@@ -1,0 +1,5019 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cradle Server API",
+    "description": "Local-first HTTP API for Cradle server capabilities.",
+    "version": "0.0.1"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health check",
+        "description": "Server readiness snapshot",
+        "x-cradle-cli": {
+          "command": [
+            "health"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status",
+                    "uptime",
+                    "memory",
+                    "cpu",
+                    "timestamp"
+                  ],
+                  "properties": {
+                    "status": {
+                      "const": "ok",
+                      "type": "string"
+                    },
+                    "uptime": {
+                      "type": "number"
+                    },
+                    "memory": {
+                      "type": "object",
+                      "required": [
+                        "heapUsed",
+                        "heapTotal",
+                        "rss",
+                        "external"
+                      ],
+                      "properties": {
+                        "heapUsed": {
+                          "type": "number"
+                        },
+                        "heapTotal": {
+                          "type": "number"
+                        },
+                        "rss": {
+                          "type": "number"
+                        },
+                        "external": {
+                          "type": "number"
+                        }
+                      }
+                    },
+                    "cpu": {
+                      "type": "object",
+                      "required": [
+                        "percent",
+                        "userMicros",
+                        "systemMicros",
+                        "sampleMs",
+                        "usedMicros",
+                        "windowReady"
+                      ],
+                      "properties": {
+                        "percent": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "userMicros": {
+                          "type": "number"
+                        },
+                        "systemMicros": {
+                          "type": "number"
+                        },
+                        "sampleMs": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "usedMicros": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "windowReady": {
+                          "type": "boolean"
+                        }
+                      }
+                    },
+                    "timestamp": {
+                      "type": "number"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getHealth"
+      }
+    },
+    "/workspaces": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "List workspaces",
+        "x-cradle-cli": {
+          "command": [
+            "workspace",
+            "list"
+          ]
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "name",
+                      "locator",
+                      "gitIdentity",
+                      "identifier",
+                      "availability",
+                      "pinned",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "locator": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "hostId",
+                          "path"
+                        ],
+                        "properties": {
+                          "hostId": {
+                            "minLength": 1,
+                            "pattern": ".*\\S.*",
+                            "type": "string"
+                          },
+                          "path": {
+                            "minLength": 1,
+                            "pattern": ".*\\S.*",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "project",
+                              "managed-worktree"
+                            ]
+                          },
+                          "sourceWorkspaceId": {
+                            "nullable": true,
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "gitIdentity": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "originUrl": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "repoRoot": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "headSha": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "branch": {
+                            "nullable": true,
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "identifier": {
+                        "type": "string"
+                      },
+                      "availability": {
+                        "type": "string",
+                        "enum": [
+                          "available",
+                          "missing",
+                          "remote"
+                        ]
+                      },
+                      "pinned": {
+                        "type": "number"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getWorkspaces"
+      },
+      "post": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Create workspace",
+        "x-cradle-cli": {
+          "command": [
+            "workspace",
+            "create"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "locator"
+                ],
+                "properties": {
+                  "name": {
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  },
+                  "locator": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "hostId",
+                      "path"
+                    ],
+                    "properties": {
+                      "hostId": {
+                        "minLength": 1,
+                        "pattern": ".*\\S.*",
+                        "type": "string"
+                      },
+                      "path": {
+                        "minLength": 1,
+                        "pattern": ".*\\S.*",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "project",
+                          "managed-worktree"
+                        ]
+                      },
+                      "sourceWorkspaceId": {
+                        "nullable": true,
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "gitIdentity": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "originUrl": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "repoRoot": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "headSha": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "branch": {
+                        "nullable": true,
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "locator"
+                ],
+                "properties": {
+                  "name": {
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  },
+                  "locator": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "hostId",
+                      "path"
+                    ],
+                    "properties": {
+                      "hostId": {
+                        "minLength": 1,
+                        "pattern": ".*\\S.*",
+                        "type": "string"
+                      },
+                      "path": {
+                        "minLength": 1,
+                        "pattern": ".*\\S.*",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "project",
+                          "managed-worktree"
+                        ]
+                      },
+                      "sourceWorkspaceId": {
+                        "nullable": true,
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "gitIdentity": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "originUrl": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "repoRoot": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "headSha": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "branch": {
+                        "nullable": true,
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "name",
+                  "locator"
+                ],
+                "properties": {
+                  "name": {
+                    "minLength": 1,
+                    "pattern": ".*\\S.*",
+                    "type": "string"
+                  },
+                  "locator": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "hostId",
+                      "path"
+                    ],
+                    "properties": {
+                      "hostId": {
+                        "minLength": 1,
+                        "pattern": ".*\\S.*",
+                        "type": "string"
+                      },
+                      "path": {
+                        "minLength": 1,
+                        "pattern": ".*\\S.*",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "project",
+                          "managed-worktree"
+                        ]
+                      },
+                      "sourceWorkspaceId": {
+                        "nullable": true,
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "gitIdentity": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "properties": {
+                      "originUrl": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "repoRoot": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "headSha": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "branch": {
+                        "nullable": true,
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "name",
+                    "locator",
+                    "gitIdentity",
+                    "identifier",
+                    "availability",
+                    "pinned",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "locator": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "hostId",
+                        "path"
+                      ],
+                      "properties": {
+                        "hostId": {
+                          "minLength": 1,
+                          "pattern": ".*\\S.*",
+                          "type": "string"
+                        },
+                        "path": {
+                          "minLength": 1,
+                          "pattern": ".*\\S.*",
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "project",
+                            "managed-worktree"
+                          ]
+                        },
+                        "sourceWorkspaceId": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "gitIdentity": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "properties": {
+                        "originUrl": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "repoRoot": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "headSha": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "branch": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "identifier": {
+                      "type": "string"
+                    },
+                    "availability": {
+                      "type": "string",
+                      "enum": [
+                        "available",
+                        "missing",
+                        "remote"
+                      ]
+                    },
+                    "pinned": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    },
+                    "updatedAt": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Response for status 409",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message",
+                    "details"
+                  ],
+                  "properties": {
+                    "code": {
+                      "const": "workspace_locator_exists",
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "required": [
+                        "locator"
+                      ],
+                      "properties": {
+                        "locator": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "hostId",
+                            "path"
+                          ],
+                          "properties": {
+                            "hostId": {
+                              "minLength": 1,
+                              "pattern": ".*\\S.*",
+                              "type": "string"
+                            },
+                            "path": {
+                              "minLength": 1,
+                              "pattern": ".*\\S.*",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "project",
+                                "managed-worktree"
+                              ]
+                            },
+                            "sourceWorkspaceId": {
+                              "nullable": true,
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postWorkspaces"
+      }
+    },
+    "/sessions/": {
+      "get": {
+        "tags": [
+          "session"
+        ],
+        "summary": "List sessions",
+        "x-cradle-cli": {
+          "command": [
+            "session",
+            "list"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionGroupId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "execution",
+                      "parentSessionId",
+                      "sideContextSource",
+                      "workspaceId",
+                      "title",
+                      "origin",
+                      "providerTargetId",
+                      "agentId",
+                      "modelId",
+                      "thinkingEffort",
+                      "linkedIssueId",
+                      "sessionGroupId",
+                      "runtimeKind",
+                      "status",
+                      "pinned",
+                      "archivedAt",
+                      "lastReadAt",
+                      "createdAt",
+                      "updatedAt",
+                      "latestUserMessageAt",
+                      "latestAssistantMessageAt",
+                      "unread",
+                      "isIsolated",
+                      "worktreeId",
+                      "worktreeBranch",
+                      "worktreePath",
+                      "worktreeHealth",
+                      "pendingWorktreeId",
+                      "isolationBoundaryRequired"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "execution": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "required": [
+                              "kind"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "local",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "type": "object",
+                            "required": [
+                              "kind",
+                              "hostId",
+                              "remoteSessionId"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "remote-host",
+                                "type": "string"
+                              },
+                              "hostId": {
+                                "type": "string"
+                              },
+                              "remoteSessionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "parentSessionId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "sideContextSource": {
+                        "nullable": true,
+                        "anyOf": [
+                          {
+                            "const": "provider-native",
+                            "type": "string"
+                          },
+                          {
+                            "const": "cradle-context",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "workspaceId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "title": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "origin": {
+                        "type": "string"
+                      },
+                      "providerTargetId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "agentId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "modelId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "thinkingEffort": {
+                        "nullable": true,
+                        "anyOf": [
+                          {
+                            "const": "none",
+                            "type": "string"
+                          },
+                          {
+                            "const": "minimal",
+                            "type": "string"
+                          },
+                          {
+                            "const": "low",
+                            "type": "string"
+                          },
+                          {
+                            "const": "medium",
+                            "type": "string"
+                          },
+                          {
+                            "const": "high",
+                            "type": "string"
+                          },
+                          {
+                            "const": "xhigh",
+                            "type": "string"
+                          },
+                          {
+                            "const": "max",
+                            "type": "string"
+                          },
+                          {
+                            "const": "ultra",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "linkedIssueId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "sessionGroupId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "runtimeKind": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "streaming",
+                          "error"
+                        ]
+                      },
+                      "pinned": {
+                        "type": "number"
+                      },
+                      "archivedAt": {
+                        "nullable": true,
+                        "type": "number"
+                      },
+                      "lastReadAt": {
+                        "nullable": true,
+                        "type": "number"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      },
+                      "latestUserMessageAt": {
+                        "nullable": true,
+                        "type": "number"
+                      },
+                      "latestAssistantMessageAt": {
+                        "nullable": true,
+                        "type": "number"
+                      },
+                      "unread": {
+                        "type": "boolean"
+                      },
+                      "isIsolated": {
+                        "type": "boolean"
+                      },
+                      "worktreeId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "worktreeBranch": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "worktreePath": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "worktreeHealth": {
+                        "nullable": true,
+                        "anyOf": [
+                          {
+                            "const": "ok",
+                            "type": "string"
+                          },
+                          {
+                            "const": "missing",
+                            "type": "string"
+                          },
+                          {
+                            "const": "stale",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "pendingWorktreeId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "isolationBoundaryRequired": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getSessions"
+      },
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Create session",
+        "x-cradle-cli": {
+          "command": [
+            "session",
+            "create"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "origin": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "providerTargetId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "agentId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "acpAgentId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "acpDraftSessionId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "runtimeKind": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "runtimeSettings": {
+                    "additionalProperties": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "type": "object",
+                    "properties": {
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "default",
+                            "type": "string"
+                          },
+                          {
+                            "const": "acceptEdits",
+                            "type": "string"
+                          },
+                          {
+                            "const": "bypassPermissions",
+                            "type": "string"
+                          },
+                          {
+                            "const": "plan",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "accessMode": {
+                        "anyOf": [
+                          {
+                            "const": "approval-required",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full-access",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "interactionMode": {
+                        "anyOf": [
+                          {
+                            "const": "default",
+                            "type": "string"
+                          },
+                          {
+                            "const": "plan",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "claudeAgent": {
+                        "nullable": true,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "modelAliases": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "properties": {
+                              "haiku": {
+                                "type": "string"
+                              },
+                              "sonnet": {
+                                "type": "string"
+                              },
+                              "opus": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "thinkingEffort": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra"
+                    ]
+                  },
+                  "linkedIssueId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "sessionGroupId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "worktreeId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "origin": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "providerTargetId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "agentId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "acpAgentId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "acpDraftSessionId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "runtimeKind": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "runtimeSettings": {
+                    "additionalProperties": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "type": "object",
+                    "properties": {
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "default",
+                            "type": "string"
+                          },
+                          {
+                            "const": "acceptEdits",
+                            "type": "string"
+                          },
+                          {
+                            "const": "bypassPermissions",
+                            "type": "string"
+                          },
+                          {
+                            "const": "plan",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "accessMode": {
+                        "anyOf": [
+                          {
+                            "const": "approval-required",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full-access",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "interactionMode": {
+                        "anyOf": [
+                          {
+                            "const": "default",
+                            "type": "string"
+                          },
+                          {
+                            "const": "plan",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "claudeAgent": {
+                        "nullable": true,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "modelAliases": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "properties": {
+                              "haiku": {
+                                "type": "string"
+                              },
+                              "sonnet": {
+                                "type": "string"
+                              },
+                              "opus": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "thinkingEffort": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra"
+                    ]
+                  },
+                  "linkedIssueId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "sessionGroupId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "worktreeId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "origin": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "providerTargetId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "agentId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "acpAgentId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "acpDraftSessionId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "runtimeKind": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "runtimeSettings": {
+                    "additionalProperties": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "type": "object",
+                    "properties": {
+                      "permissionMode": {
+                        "anyOf": [
+                          {
+                            "const": "default",
+                            "type": "string"
+                          },
+                          {
+                            "const": "acceptEdits",
+                            "type": "string"
+                          },
+                          {
+                            "const": "bypassPermissions",
+                            "type": "string"
+                          },
+                          {
+                            "const": "plan",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "accessMode": {
+                        "anyOf": [
+                          {
+                            "const": "approval-required",
+                            "type": "string"
+                          },
+                          {
+                            "const": "full-access",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "interactionMode": {
+                        "anyOf": [
+                          {
+                            "const": "default",
+                            "type": "string"
+                          },
+                          {
+                            "const": "plan",
+                            "type": "string"
+                          }
+                        ],
+                        "nullable": true
+                      },
+                      "claudeAgent": {
+                        "nullable": true,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "properties": {
+                          "modelAliases": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "properties": {
+                              "haiku": {
+                                "type": "string"
+                              },
+                              "sonnet": {
+                                "type": "string"
+                              },
+                              "opus": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "thinkingEffort": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra"
+                    ]
+                  },
+                  "linkedIssueId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "sessionGroupId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "worktreeId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "execution",
+                    "parentSessionId",
+                    "sideContextSource",
+                    "workspaceId",
+                    "title",
+                    "origin",
+                    "providerTargetId",
+                    "agentId",
+                    "modelId",
+                    "thinkingEffort",
+                    "linkedIssueId",
+                    "sessionGroupId",
+                    "runtimeKind",
+                    "status",
+                    "pinned",
+                    "archivedAt",
+                    "lastReadAt",
+                    "createdAt",
+                    "updatedAt",
+                    "latestUserMessageAt",
+                    "latestAssistantMessageAt",
+                    "unread",
+                    "isIsolated",
+                    "worktreeId",
+                    "worktreeBranch",
+                    "worktreePath",
+                    "worktreeHealth",
+                    "pendingWorktreeId",
+                    "isolationBoundaryRequired"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "execution": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "const": "local",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind",
+                            "hostId",
+                            "remoteSessionId"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "const": "remote-host",
+                              "type": "string"
+                            },
+                            "hostId": {
+                              "type": "string"
+                            },
+                            "remoteSessionId": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "parentSessionId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "sideContextSource": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "provider-native",
+                          "type": "string"
+                        },
+                        {
+                          "const": "cradle-context",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "workspaceId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "title": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "origin": {
+                      "type": "string"
+                    },
+                    "providerTargetId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "agentId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "modelId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "thinkingEffort": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "none",
+                          "type": "string"
+                        },
+                        {
+                          "const": "minimal",
+                          "type": "string"
+                        },
+                        {
+                          "const": "low",
+                          "type": "string"
+                        },
+                        {
+                          "const": "medium",
+                          "type": "string"
+                        },
+                        {
+                          "const": "high",
+                          "type": "string"
+                        },
+                        {
+                          "const": "xhigh",
+                          "type": "string"
+                        },
+                        {
+                          "const": "max",
+                          "type": "string"
+                        },
+                        {
+                          "const": "ultra",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "linkedIssueId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "sessionGroupId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "runtimeKind": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "streaming",
+                        "error"
+                      ]
+                    },
+                    "pinned": {
+                      "type": "number"
+                    },
+                    "archivedAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "lastReadAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    },
+                    "updatedAt": {
+                      "type": "number"
+                    },
+                    "latestUserMessageAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "latestAssistantMessageAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    },
+                    "isIsolated": {
+                      "type": "boolean"
+                    },
+                    "worktreeId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreeBranch": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreePath": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreeHealth": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "ok",
+                          "type": "string"
+                        },
+                        {
+                          "const": "missing",
+                          "type": "string"
+                        },
+                        {
+                          "const": "stale",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "pendingWorktreeId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "isolationBoundaryRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postSessions"
+      }
+    },
+    "/sessions/{id}": {
+      "get": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Get session by ID",
+        "x-cradle-cli": {
+          "command": [
+            "session",
+            "get"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "execution",
+                    "parentSessionId",
+                    "sideContextSource",
+                    "workspaceId",
+                    "title",
+                    "origin",
+                    "providerTargetId",
+                    "agentId",
+                    "modelId",
+                    "thinkingEffort",
+                    "linkedIssueId",
+                    "sessionGroupId",
+                    "runtimeKind",
+                    "status",
+                    "pinned",
+                    "archivedAt",
+                    "lastReadAt",
+                    "createdAt",
+                    "updatedAt",
+                    "latestUserMessageAt",
+                    "latestAssistantMessageAt",
+                    "unread",
+                    "isIsolated",
+                    "worktreeId",
+                    "worktreeBranch",
+                    "worktreePath",
+                    "worktreeHealth",
+                    "pendingWorktreeId",
+                    "isolationBoundaryRequired"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "execution": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "const": "local",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind",
+                            "hostId",
+                            "remoteSessionId"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "const": "remote-host",
+                              "type": "string"
+                            },
+                            "hostId": {
+                              "type": "string"
+                            },
+                            "remoteSessionId": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "parentSessionId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "sideContextSource": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "provider-native",
+                          "type": "string"
+                        },
+                        {
+                          "const": "cradle-context",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "workspaceId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "title": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "origin": {
+                      "type": "string"
+                    },
+                    "providerTargetId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "agentId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "modelId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "thinkingEffort": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "none",
+                          "type": "string"
+                        },
+                        {
+                          "const": "minimal",
+                          "type": "string"
+                        },
+                        {
+                          "const": "low",
+                          "type": "string"
+                        },
+                        {
+                          "const": "medium",
+                          "type": "string"
+                        },
+                        {
+                          "const": "high",
+                          "type": "string"
+                        },
+                        {
+                          "const": "xhigh",
+                          "type": "string"
+                        },
+                        {
+                          "const": "max",
+                          "type": "string"
+                        },
+                        {
+                          "const": "ultra",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "linkedIssueId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "sessionGroupId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "runtimeKind": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "streaming",
+                        "error"
+                      ]
+                    },
+                    "pinned": {
+                      "type": "number"
+                    },
+                    "archivedAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "lastReadAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    },
+                    "updatedAt": {
+                      "type": "number"
+                    },
+                    "latestUserMessageAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "latestAssistantMessageAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    },
+                    "isIsolated": {
+                      "type": "boolean"
+                    },
+                    "worktreeId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreeBranch": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreePath": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreeHealth": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "ok",
+                          "type": "string"
+                        },
+                        {
+                          "const": "missing",
+                          "type": "string"
+                        },
+                        {
+                          "const": "stale",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "pendingWorktreeId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "isolationBoundaryRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getSessionsById"
+      },
+      "patch": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Update session",
+        "x-cradle-cli": {
+          "command": [
+            "session",
+            "update"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "pinned": {
+                    "type": "boolean"
+                  },
+                  "providerTargetId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "thinkingEffort": {
+                    "nullable": true,
+                    "anyOf": [
+                      {
+                        "const": "none",
+                        "type": "string"
+                      },
+                      {
+                        "const": "minimal",
+                        "type": "string"
+                      },
+                      {
+                        "const": "low",
+                        "type": "string"
+                      },
+                      {
+                        "const": "medium",
+                        "type": "string"
+                      },
+                      {
+                        "const": "high",
+                        "type": "string"
+                      },
+                      {
+                        "const": "xhigh",
+                        "type": "string"
+                      },
+                      {
+                        "const": "max",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ultra",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "sessionGroupId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "pinned": {
+                    "type": "boolean"
+                  },
+                  "providerTargetId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "thinkingEffort": {
+                    "nullable": true,
+                    "anyOf": [
+                      {
+                        "const": "none",
+                        "type": "string"
+                      },
+                      {
+                        "const": "minimal",
+                        "type": "string"
+                      },
+                      {
+                        "const": "low",
+                        "type": "string"
+                      },
+                      {
+                        "const": "medium",
+                        "type": "string"
+                      },
+                      {
+                        "const": "high",
+                        "type": "string"
+                      },
+                      {
+                        "const": "xhigh",
+                        "type": "string"
+                      },
+                      {
+                        "const": "max",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ultra",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "sessionGroupId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "pinned": {
+                    "type": "boolean"
+                  },
+                  "providerTargetId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "thinkingEffort": {
+                    "nullable": true,
+                    "anyOf": [
+                      {
+                        "const": "none",
+                        "type": "string"
+                      },
+                      {
+                        "const": "minimal",
+                        "type": "string"
+                      },
+                      {
+                        "const": "low",
+                        "type": "string"
+                      },
+                      {
+                        "const": "medium",
+                        "type": "string"
+                      },
+                      {
+                        "const": "high",
+                        "type": "string"
+                      },
+                      {
+                        "const": "xhigh",
+                        "type": "string"
+                      },
+                      {
+                        "const": "max",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ultra",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "sessionGroupId": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "execution",
+                    "parentSessionId",
+                    "sideContextSource",
+                    "workspaceId",
+                    "title",
+                    "origin",
+                    "providerTargetId",
+                    "agentId",
+                    "modelId",
+                    "thinkingEffort",
+                    "linkedIssueId",
+                    "sessionGroupId",
+                    "runtimeKind",
+                    "status",
+                    "pinned",
+                    "archivedAt",
+                    "lastReadAt",
+                    "createdAt",
+                    "updatedAt",
+                    "latestUserMessageAt",
+                    "latestAssistantMessageAt",
+                    "unread",
+                    "isIsolated",
+                    "worktreeId",
+                    "worktreeBranch",
+                    "worktreePath",
+                    "worktreeHealth",
+                    "pendingWorktreeId",
+                    "isolationBoundaryRequired"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "execution": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "const": "local",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "required": [
+                            "kind",
+                            "hostId",
+                            "remoteSessionId"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "const": "remote-host",
+                              "type": "string"
+                            },
+                            "hostId": {
+                              "type": "string"
+                            },
+                            "remoteSessionId": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "parentSessionId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "sideContextSource": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "provider-native",
+                          "type": "string"
+                        },
+                        {
+                          "const": "cradle-context",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "workspaceId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "title": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "origin": {
+                      "type": "string"
+                    },
+                    "providerTargetId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "agentId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "modelId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "thinkingEffort": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "none",
+                          "type": "string"
+                        },
+                        {
+                          "const": "minimal",
+                          "type": "string"
+                        },
+                        {
+                          "const": "low",
+                          "type": "string"
+                        },
+                        {
+                          "const": "medium",
+                          "type": "string"
+                        },
+                        {
+                          "const": "high",
+                          "type": "string"
+                        },
+                        {
+                          "const": "xhigh",
+                          "type": "string"
+                        },
+                        {
+                          "const": "max",
+                          "type": "string"
+                        },
+                        {
+                          "const": "ultra",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "linkedIssueId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "sessionGroupId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "runtimeKind": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "streaming",
+                        "error"
+                      ]
+                    },
+                    "pinned": {
+                      "type": "number"
+                    },
+                    "archivedAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "lastReadAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    },
+                    "updatedAt": {
+                      "type": "number"
+                    },
+                    "latestUserMessageAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "latestAssistantMessageAt": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    },
+                    "isIsolated": {
+                      "type": "boolean"
+                    },
+                    "worktreeId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreeBranch": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreePath": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "worktreeHealth": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "const": "ok",
+                          "type": "string"
+                        },
+                        {
+                          "const": "missing",
+                          "type": "string"
+                        },
+                        {
+                          "const": "stale",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "pendingWorktreeId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "isolationBoundaryRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "patchSessionsById"
+      },
+      "delete": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Delete session",
+        "x-cradle-cli": {
+          "command": [
+            "session",
+            "delete"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true,
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "deleteSessionsById"
+      }
+    },
+    "/issues/": {
+      "get": {
+        "tags": [
+          "issue"
+        ],
+        "summary": "List issues",
+        "x-cradle-cli": {
+          "command": [
+            "issue",
+            "list"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "milestoneId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "parentIssueId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "labels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          {
+            "name": "statusId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "workspaceId",
+                      "number",
+                      "statusId",
+                      "milestoneId",
+                      "parentIssueId",
+                      "title",
+                      "description",
+                      "priority",
+                      "labels",
+                      "assigneeKind",
+                      "assigneeId",
+                      "dueDate",
+                      "createdByKind",
+                      "createdById",
+                      "sourceChatSessionId",
+                      "delegateAgentId",
+                      "delegateProviderTargetId",
+                      "contextRefs",
+                      "order",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "workspaceId": {
+                        "type": "string"
+                      },
+                      "number": {
+                        "type": "number"
+                      },
+                      "statusId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "milestoneId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "parentIssueId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "priority": {
+                        "type": "string",
+                        "enum": [
+                          "none",
+                          "low",
+                          "medium",
+                          "high",
+                          "urgent"
+                        ]
+                      },
+                      "labels": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "assigneeKind": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "assigneeId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "dueDate": {
+                        "nullable": true,
+                        "type": "number"
+                      },
+                      "createdByKind": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "agent",
+                          "provider-target",
+                          "system"
+                        ]
+                      },
+                      "createdById": {
+                        "type": "string"
+                      },
+                      "sourceChatSessionId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "delegateAgentId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "delegateProviderTargetId": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "contextRefs": {
+                        "type": "string"
+                      },
+                      "order": {
+                        "type": "number"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getIssues"
+      },
+      "post": {
+        "tags": [
+          "issue"
+        ],
+        "summary": "Create issue",
+        "x-cradle-cli": {
+          "command": [
+            "issue",
+            "create"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "title"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "description": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "urgent"
+                    ]
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "milestoneId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "parentIssueId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "statusId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "statusName": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "description": "Issue status name or slug, for example \"In Progress\" or \"in_progress\".",
+                    "type": "string"
+                  },
+                  "dueDate": {
+                    "nullable": true,
+                    "type": "number"
+                  },
+                  "assigneeKind": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "assigneeId": {
+                    "nullable": true,
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "title"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "description": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "urgent"
+                    ]
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "milestoneId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "parentIssueId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "statusId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "statusName": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "description": "Issue status name or slug, for example \"In Progress\" or \"in_progress\".",
+                    "type": "string"
+                  },
+                  "dueDate": {
+                    "nullable": true,
+                    "type": "number"
+                  },
+                  "assigneeKind": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "assigneeId": {
+                    "nullable": true,
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "title"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "description": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "urgent"
+                    ]
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "milestoneId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "parentIssueId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "statusId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "statusName": {
+                    "nullable": true,
+                    "minLength": 1,
+                    "description": "Issue status name or slug, for example \"In Progress\" or \"in_progress\".",
+                    "type": "string"
+                  },
+                  "dueDate": {
+                    "nullable": true,
+                    "type": "number"
+                  },
+                  "assigneeKind": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "assigneeId": {
+                    "nullable": true,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "number",
+                    "statusId",
+                    "milestoneId",
+                    "parentIssueId",
+                    "title",
+                    "description",
+                    "priority",
+                    "labels",
+                    "assigneeKind",
+                    "assigneeId",
+                    "dueDate",
+                    "createdByKind",
+                    "createdById",
+                    "sourceChatSessionId",
+                    "delegateAgentId",
+                    "delegateProviderTargetId",
+                    "contextRefs",
+                    "order",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "number"
+                    },
+                    "statusId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "milestoneId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "parentIssueId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "low",
+                        "medium",
+                        "high",
+                        "urgent"
+                      ]
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "assigneeKind": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "assigneeId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "dueDate": {
+                      "nullable": true,
+                      "type": "number"
+                    },
+                    "createdByKind": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "agent",
+                        "provider-target",
+                        "system"
+                      ]
+                    },
+                    "createdById": {
+                      "type": "string"
+                    },
+                    "sourceChatSessionId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "delegateAgentId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "delegateProviderTargetId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "contextRefs": {
+                      "type": "string"
+                    },
+                    "order": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    },
+                    "updatedAt": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postIssues"
+      }
+    },
+    "/issues/statuses": {
+      "get": {
+        "tags": [
+          "issue"
+        ],
+        "summary": "List issue statuses",
+        "x-cradle-cli": {
+          "command": [
+            "issue",
+            "status",
+            "list"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "workspaceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "workspaceId",
+                      "name",
+                      "color",
+                      "category",
+                      "order",
+                      "createdAt"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "workspaceId": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "color": {
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "category": {
+                        "type": "string"
+                      },
+                      "order": {
+                        "type": "number"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getIssuesStatuses"
+      },
+      "post": {
+        "tags": [
+          "issue"
+        ],
+        "summary": "Create issue status",
+        "x-cradle-cli": {
+          "command": [
+            "issue",
+            "status",
+            "create"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "name"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "color": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "triage",
+                      "backlog",
+                      "unstarted",
+                      "started",
+                      "completed",
+                      "canceled"
+                    ]
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "name"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "color": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "triage",
+                      "backlog",
+                      "unstarted",
+                      "started",
+                      "completed",
+                      "canceled"
+                    ]
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "workspaceId",
+                  "name"
+                ],
+                "properties": {
+                  "workspaceId": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "name": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "color": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "triage",
+                      "backlog",
+                      "unstarted",
+                      "started",
+                      "completed",
+                      "canceled"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "workspaceId",
+                    "name",
+                    "color",
+                    "category",
+                    "order",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "workspaceId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "color": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "order": {
+                      "type": "number"
+                    },
+                    "createdAt": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postIssuesStatuses"
+      }
+    },
+    "/chat/sessions/{sessionId}/messages": {
+      "get": {
+        "tags": [
+          "chat-runtime"
+        ],
+        "summary": "Get chat message rows",
+        "x-cradle-cli": {
+          "command": [
+            "chat",
+            "messages"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "revision",
+                    "rows",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "revision": {
+                      "minimum": 0,
+                      "type": "number"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "messageId",
+                          "role",
+                          "status",
+                          "preview",
+                          "previewTruncated",
+                          "parentMessageId",
+                          "parentToolCallId",
+                          "taskId",
+                          "depth",
+                          "message"
+                        ],
+                        "properties": {
+                          "messageId": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "assistant"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "streaming",
+                              "complete",
+                              "aborted",
+                              "failed"
+                            ]
+                          },
+                          "errorText": {
+                            "type": "string"
+                          },
+                          "preview": {
+                            "type": "string"
+                          },
+                          "previewTruncated": {
+                            "type": "boolean"
+                          },
+                          "parentMessageId": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "parentToolCallId": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "taskId": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "depth": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "additionalProperties": true,
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "role",
+                              "parts"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "system",
+                                  "user",
+                                  "assistant"
+                                ]
+                              },
+                              "parts": {
+                                "type": "array",
+                                "items": {
+                                  "additionalProperties": {},
+                                  "type": "object",
+                                  "required": [
+                                    "type"
+                                  ],
+                                  "properties": {
+                                    "type": {
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
+                              "metadata": {}
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "nextCursor": {
+                      "nullable": true,
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getChatSessionsBySessionIdMessages"
+      }
+    },
+    "/chat/sessions/{sessionId}/response": {
+      "post": {
+        "tags": [
+          "chat-runtime"
+        ],
+        "summary": "Send message and stream response via SSE",
+        "responses": {
+          "200": {
+            "description": "Server-sent event stream encoded as AI SDK UIMessageChunk JSON frames. The stream emits chunks such as `start`, `text-start`, `text-delta`, `tool-input-available`, `tool-approval-request`, `tool-output-available`, `finish`, `abort`, and `error`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "data: {\"type\":\"start\",\"messageId\":\"msg_main\"}\n\ndata: {\"type\":\"text-start\",\"id\":\"text_1\"}\n\ndata: {\"type\":\"text-delta\",\"id\":\"text_1\",\"delta\":\"Hello\"}\n\ndata: {\"type\":\"text-end\",\"id\":\"text_1\"}\n\ndata: {\"type\":\"finish\",\"finishReason\":\"stop\"}\n\ndata: [DONE]\n\n"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "mediaType",
+                        "url"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "mediaType": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "filename": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "providerMetadata": {}
+                      }
+                    }
+                  },
+                  "contextParts": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "name",
+                            "path",
+                            "scope",
+                            "description"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-skill",
+                              "type": "string"
+                            },
+                            "name": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "path": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "scope": {
+                              "anyOf": [
+                                {
+                                  "const": "builtin",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "legacy",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "global",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "repository",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "workspace",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "agent",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "description": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "pluginName",
+                            "displayName",
+                            "description",
+                            "routeSegment",
+                            "capabilities",
+                            "mcpServers"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-plugin",
+                              "type": "string"
+                            },
+                            "provider": {
+                              "anyOf": [
+                                {
+                                  "const": "cradle",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "codex",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "pluginName": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "description": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "iconUrl": {
+                              "nullable": true,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "routeSegment": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "capabilities": {
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "type",
+                                  "layer",
+                                  "label"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "layer": {
+                                    "anyOf": [
+                                      {
+                                        "const": "server",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "web",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "desktop",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "label": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            "mcpServers": {
+                              "type": "array",
+                              "items": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "nativeMention": {
+                              "nullable": true,
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "name",
+                                "path"
+                              ],
+                              "properties": {
+                                "name": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "workspaceId",
+                            "path",
+                            "lineStart",
+                            "lineEnd",
+                            "comment"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-file-line-comment",
+                              "type": "string"
+                            },
+                            "workspaceId": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "path": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "lineStart": {
+                              "minimum": 1,
+                              "type": "number"
+                            },
+                            "lineEnd": {
+                              "minimum": 1,
+                              "type": "number"
+                            },
+                            "comment": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "role",
+                        "parts"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "system",
+                            "user",
+                            "assistant"
+                          ]
+                        },
+                        "parts": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": {},
+                            "type": "object",
+                            "required": [
+                              "type"
+                            ],
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "metadata": {}
+                      }
+                    }
+                  },
+                  "providerTargetId": {
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "thinkingEffort": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra"
+                    ]
+                  },
+                  "runtimeSettings": {
+                    "additionalProperties": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "reviewTarget": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "type"
+                        ],
+                        "properties": {
+                          "type": {
+                            "const": "uncommittedChanges",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "type",
+                          "branch"
+                        ],
+                        "properties": {
+                          "type": {
+                            "const": "baseBranch",
+                            "type": "string"
+                          },
+                          "branch": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "mediaType",
+                        "url"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "mediaType": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "filename": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "providerMetadata": {}
+                      }
+                    }
+                  },
+                  "contextParts": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "name",
+                            "path",
+                            "scope",
+                            "description"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-skill",
+                              "type": "string"
+                            },
+                            "name": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "path": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "scope": {
+                              "anyOf": [
+                                {
+                                  "const": "builtin",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "legacy",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "global",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "repository",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "workspace",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "agent",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "description": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "pluginName",
+                            "displayName",
+                            "description",
+                            "routeSegment",
+                            "capabilities",
+                            "mcpServers"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-plugin",
+                              "type": "string"
+                            },
+                            "provider": {
+                              "anyOf": [
+                                {
+                                  "const": "cradle",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "codex",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "pluginName": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "description": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "iconUrl": {
+                              "nullable": true,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "routeSegment": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "capabilities": {
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "type",
+                                  "layer",
+                                  "label"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "layer": {
+                                    "anyOf": [
+                                      {
+                                        "const": "server",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "web",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "desktop",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "label": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            "mcpServers": {
+                              "type": "array",
+                              "items": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "nativeMention": {
+                              "nullable": true,
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "name",
+                                "path"
+                              ],
+                              "properties": {
+                                "name": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "workspaceId",
+                            "path",
+                            "lineStart",
+                            "lineEnd",
+                            "comment"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-file-line-comment",
+                              "type": "string"
+                            },
+                            "workspaceId": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "path": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "lineStart": {
+                              "minimum": 1,
+                              "type": "number"
+                            },
+                            "lineEnd": {
+                              "minimum": 1,
+                              "type": "number"
+                            },
+                            "comment": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "role",
+                        "parts"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "system",
+                            "user",
+                            "assistant"
+                          ]
+                        },
+                        "parts": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": {},
+                            "type": "object",
+                            "required": [
+                              "type"
+                            ],
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "metadata": {}
+                      }
+                    }
+                  },
+                  "providerTargetId": {
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "thinkingEffort": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra"
+                    ]
+                  },
+                  "runtimeSettings": {
+                    "additionalProperties": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "reviewTarget": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "type"
+                        ],
+                        "properties": {
+                          "type": {
+                            "const": "uncommittedChanges",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "type",
+                          "branch"
+                        ],
+                        "properties": {
+                          "type": {
+                            "const": "baseBranch",
+                            "type": "string"
+                          },
+                          "branch": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "type",
+                        "mediaType",
+                        "url"
+                      ],
+                      "properties": {
+                        "type": {
+                          "const": "file",
+                          "type": "string"
+                        },
+                        "mediaType": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "filename": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "providerMetadata": {}
+                      }
+                    }
+                  },
+                  "contextParts": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "name",
+                            "path",
+                            "scope",
+                            "description"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-skill",
+                              "type": "string"
+                            },
+                            "name": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "path": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "scope": {
+                              "anyOf": [
+                                {
+                                  "const": "builtin",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "legacy",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "global",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "repository",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "workspace",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "agent",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "description": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "pluginName",
+                            "displayName",
+                            "description",
+                            "routeSegment",
+                            "capabilities",
+                            "mcpServers"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-plugin",
+                              "type": "string"
+                            },
+                            "provider": {
+                              "anyOf": [
+                                {
+                                  "const": "cradle",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "codex",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "pluginName": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "description": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "iconUrl": {
+                              "nullable": true,
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "routeSegment": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "capabilities": {
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "type",
+                                  "layer",
+                                  "label"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "type": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
+                                  "layer": {
+                                    "anyOf": [
+                                      {
+                                        "const": "server",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "web",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "desktop",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "label": {
+                                    "nullable": true,
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            "mcpServers": {
+                              "type": "array",
+                              "items": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "nativeMention": {
+                              "nullable": true,
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "name",
+                                "path"
+                              ],
+                              "properties": {
+                                "name": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "path": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "type",
+                            "workspaceId",
+                            "path",
+                            "lineStart",
+                            "lineEnd",
+                            "comment"
+                          ],
+                          "properties": {
+                            "type": {
+                              "const": "data-cradle-file-line-comment",
+                              "type": "string"
+                            },
+                            "workspaceId": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "path": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "lineStart": {
+                              "minimum": 1,
+                              "type": "number"
+                            },
+                            "lineEnd": {
+                              "minimum": 1,
+                              "type": "number"
+                            },
+                            "comment": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "position": {
+                              "minimum": 0,
+                              "type": "number"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "role",
+                        "parts"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "system",
+                            "user",
+                            "assistant"
+                          ]
+                        },
+                        "parts": {
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": {},
+                            "type": "object",
+                            "required": [
+                              "type"
+                            ],
+                            "properties": {
+                              "type": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "metadata": {}
+                      }
+                    }
+                  },
+                  "providerTargetId": {
+                    "type": "string"
+                  },
+                  "modelId": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "thinkingEffort": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "minimal",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra"
+                    ]
+                  },
+                  "runtimeSettings": {
+                    "additionalProperties": {
+                      "nullable": true,
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "reviewTarget": {
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "type"
+                        ],
+                        "properties": {
+                          "type": {
+                            "const": "uncommittedChanges",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "type",
+                          "branch"
+                        ],
+                        "properties": {
+                          "type": {
+                            "const": "baseBranch",
+                            "type": "string"
+                          },
+                          "branch": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postChatSessionsBySessionIdResponse"
+      }
+    },
+    "/chat/sessions/{sessionId}/cancel": {
+      "post": {
+        "tags": [
+          "chat-runtime"
+        ],
+        "summary": "Cancel active run for session",
+        "x-cradle-cli": {
+          "command": [
+            "chat",
+            "cancel"
+          ]
+        },
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "ok"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "const": true,
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postChatSessionsBySessionIdCancel"
+      }
+    },
+    "/chat/sessions/{sessionId}/runtime-status": {
+      "get": {
+        "tags": [
+          "chat-runtime"
+        ],
+        "summary": "Get chat runtime session status",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Response for status 200",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "sessionId",
+                    "status",
+                    "runtimeKind",
+                    "providerTargetId",
+                    "providerSessionId",
+                    "modelId",
+                    "runtimeSettings",
+                    "pendingQueueItemId",
+                    "hasActiveGoal",
+                    "supportsLastTurnRollback",
+                    "activeRun",
+                    "latestRun",
+                    "queue"
+                  ],
+                  "properties": {
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "pending",
+                        "streaming",
+                        "waitingForUserInput",
+                        "waitingForToolApproval",
+                        "cancelling"
+                      ]
+                    },
+                    "runtimeKind": {
+                      "type": "string"
+                    },
+                    "providerTargetId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "providerSessionId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "modelId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "runtimeSettings": {
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      },
+                      "type": "object",
+                      "properties": {}
+                    },
+                    "pendingQueueItemId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "hasActiveGoal": {
+                      "type": "boolean"
+                    },
+                    "supportsLastTurnRollback": {
+                      "type": "boolean"
+                    },
+                    "activeRun": {
+                      "nullable": true,
+                      "type": "object",
+                      "required": [
+                        "runId",
+                        "messageId",
+                        "status",
+                        "startedAt",
+                        "finishedAt",
+                        "modelId",
+                        "providerSessionId",
+                        "queueItemId",
+                        "runtimeSettings"
+                      ],
+                      "properties": {
+                        "runId": {
+                          "type": "string"
+                        },
+                        "messageId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "streaming",
+                              "type": "string"
+                            },
+                            {
+                              "const": "complete",
+                              "type": "string"
+                            },
+                            {
+                              "const": "aborted",
+                              "type": "string"
+                            },
+                            {
+                              "const": "failed",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "startedAt": {
+                          "type": "number"
+                        },
+                        "finishedAt": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "modelId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "providerSessionId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "queueItemId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "runtimeSettings": {
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "type": "object",
+                          "properties": {}
+                        }
+                      }
+                    },
+                    "latestRun": {
+                      "nullable": true,
+                      "type": "object",
+                      "required": [
+                        "runId",
+                        "messageId",
+                        "status",
+                        "startedAt",
+                        "finishedAt",
+                        "modelId",
+                        "providerSessionId",
+                        "queueItemId",
+                        "runtimeSettings"
+                      ],
+                      "properties": {
+                        "runId": {
+                          "type": "string"
+                        },
+                        "messageId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "const": "streaming",
+                              "type": "string"
+                            },
+                            {
+                              "const": "complete",
+                              "type": "string"
+                            },
+                            {
+                              "const": "aborted",
+                              "type": "string"
+                            },
+                            {
+                              "const": "failed",
+                              "type": "string"
+                            }
+                          ]
+                        },
+                        "startedAt": {
+                          "type": "number"
+                        },
+                        "finishedAt": {
+                          "nullable": true,
+                          "type": "number"
+                        },
+                        "modelId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "providerSessionId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "queueItemId": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "runtimeSettings": {
+                          "additionalProperties": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "boolean"
+                              }
+                            ]
+                          },
+                          "type": "object",
+                          "properties": {}
+                        }
+                      }
+                    },
+                    "queue": {
+                      "type": "object",
+                      "required": [
+                        "pending",
+                        "running"
+                      ],
+                      "properties": {
+                        "pending": {
+                          "type": "number"
+                        },
+                        "running": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getChatSessionsBySessionIdRuntime-status"
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  }
+}

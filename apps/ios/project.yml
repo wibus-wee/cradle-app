@@ -1,0 +1,56 @@
+name: CradleMobile
+options:
+  bundleIdPrefix: app.cradle
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "16.0"
+packages:
+  CradleAPI:
+    path: Packages/CradleAPI
+  MarkdownView:
+    url: https://github.com/Lakr233/MarkdownView
+    from: 4.1.0
+  KeychainAccess:
+    url: https://github.com/kishikawakatsumi/KeychainAccess
+    from: 4.2.2
+targets:
+  CradleMobile:
+    type: application
+    platform: iOS
+    info:
+      path: CradleMobile/Resources/Info.plist
+      properties:
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Cradle uses your local network to connect to a Cradle Server hosted on your Mac or LAN.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    sources:
+      - path: CradleMobile
+    dependencies:
+      - package: CradleAPI
+      - package: MarkdownView
+      - package: KeychainAccess
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.cradle.mobile
+        PRODUCT_NAME: Cradle
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: 6.0
+        SWIFT_STRICT_CONCURRENCY: complete
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: false
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: true
+        CODE_SIGN_STYLE: Automatic
+    scheme:
+      testTargets: []
+      gatherCoverageData: false
