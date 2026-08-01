@@ -20,6 +20,7 @@
     那么 审批卡片应该消失
     而且 最后一条 AI 消息应包含"Approved. The command execution plan completed."
     而且 聊天流应结束于空闲状态
+    而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-AGENT-002
   场景: Agent 请求审批后用户拒绝
@@ -33,6 +34,7 @@
     当 审批卡片出现
     而且 我点击"拒绝"按钮
     那么 审批卡片应该消失
+    而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-AGENT-003
   场景: Tool Call 审批卡会展示计划确认入口
@@ -45,6 +47,7 @@
     那么 应该跳转到聊天视图
     当 审批卡片出现
     那么 审批卡片应包含"implement this plan"
+    而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-AGENT-004
   场景: Agent 通过 Simulator 完成 Read 工具环并给出最终回复
