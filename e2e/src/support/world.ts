@@ -13,6 +13,7 @@ import { startE2ESimulator } from './model-api-simulator'
 import { dismissTransientOverlays } from './overlays'
 import { ApprovalPage, ChatPage, NewChatPage } from './pages/chat'
 import { GitPage } from './pages/git'
+import { KanbanPage } from './pages/kanban'
 import { SearchPage } from './pages/search'
 import { SettingsPage } from './pages/settings'
 import { TerminalPage } from './pages/terminal'
@@ -99,6 +100,10 @@ export class CradleWorld extends World {
 
   get workspacePage(): WorkspacePage {
     return new WorkspacePage(this)
+  }
+
+  get kanbanPage(): KanbanPage {
+    return new KanbanPage(this)
   }
 
   static nextScenarioIndex(): number {
