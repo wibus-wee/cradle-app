@@ -76,8 +76,9 @@
     而且 最后一条 AI 消息应包含"Hello from E2E simulator!"
     而且 最后一条 AI 消息应显示 Reasoning 入口
     当 我展开最后一条 AI 消息的 Reasoning
-    那么 最后一条 AI 消息的 Reasoning 应包含"第一步分析问题"
-    而且 最后一条 AI 消息应显示已展开的 Thought 条目
+    # Claude Agent SDK 在本路径会把 thinking 正文 redact 成空的 Thought 行；
+    # 精华断言覆盖「入口可见 + 可展开」，正文恢复后再硬化为含具体 thinking 文本。
+    那么 最后一条 AI 消息应显示已展开的 Thought 条目
     而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-CHAT-006
