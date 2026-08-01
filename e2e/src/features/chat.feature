@@ -36,8 +36,10 @@
     而且 聊天流应处于进行中
     当 我点击停止生成按钮
     那么 停止生成按钮应消失
+    而且 聊天流应结束于空闲状态
+    而且 聊天中不应出现完整的慢速回复
     而且 聊天中不应出现错误提示
-    # Mid-stream stop leaves the gated exchange / stream unsettled — no assertExhausted.
+    # Mid-stream stop leaves the gated simulator exchange unsettled — no assertExhausted.
 
   @essence @P0 @CRADLE-CHAT-003
   场景: Provider 失败时显示错误状态

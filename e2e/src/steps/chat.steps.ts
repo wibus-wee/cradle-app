@@ -220,6 +220,14 @@ Then('停止生成按钮应消失', async function (this: CradleWorld) {
   await this.chat.expectStopGone(CHAT_STATUS_TIMEOUT)
 })
 
+Then('聊天中不应出现完整的慢速回复', async function (this: CradleWorld) {
+  // Abort must cut the gated stream before the scripted completion text lands.
+  const { SLOW_RESPONSE } = await import('../support/helpers/chat-scenario')
+  await expect(this.page.locator('[data-testid="chat-view"]').first())
+    .not
+    .toContainText(SLOW_RESPONSE, { timeout: 5_000 })
+})
+
 When('我打开会话{string}的菜单', async function (this: CradleWorld, alias: string) {
   await this.chat.openSessionMenu(recallSessionAlias(this, alias).id)
 })

@@ -17,7 +17,7 @@ const MULTI_TURN_RESPONSES = [
   '第一轮助手：已记住苹果',
   '第二轮助手：你让我记住了苹果',
 ]
-const SLOW_RESPONSE = '慢速助手回复完成'
+export const SLOW_RESPONSE = '慢速助手回复完成'
 const SLOW_GATE = 'e2e-slow-stream'
 export const CHAT_STATUS_TIMEOUT = 30_000
 const SESSION_ALIASES_KEY = 'chat.session-aliases'

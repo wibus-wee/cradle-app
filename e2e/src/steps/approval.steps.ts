@@ -45,10 +45,17 @@ Then('计划实施审批应为已拒绝', async function (this: CradleWorld) {
   await expect(planApproval.locator('[title*="Denied"]')).toBeVisible({ timeout: APPROVAL_TIMEOUT })
 })
 
+Then('计划实施审批应为已批准', async function (this: CradleWorld) {
+  const planApproval = this.page.locator('[data-testid="chat-tool-call-implement-plan:toolu_e2e_plan_approval"]')
+  await expect(planApproval).toBeVisible({ timeout: APPROVAL_TIMEOUT })
+  await expect(planApproval).toHaveAttribute('data-approval-approved', 'true', { timeout: APPROVAL_TIMEOUT })
+  await expect(planApproval.locator('[title*="Approved"]')).toBeVisible({ timeout: APPROVAL_TIMEOUT })
+})
+
 Then('聊天中不应出现审批通过后的完成回复', async function (this: CradleWorld) {
   await expect(this.page.locator('[data-testid="chat-view"]').first())
     .not
-.toContainText('Approved. The command execution plan completed.', { timeout: 5_000 })
+    .toContainText('Approved. The command execution plan completed.', { timeout: 5_000 })
 })
 
 // Legacy step kept for archived features; essence suite uses Claude Agent 审批 Simulator.

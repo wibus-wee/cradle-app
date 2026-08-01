@@ -18,8 +18,10 @@
     当 审批卡片出现
     而且 我点击"允许"按钮
     那么 审批卡片应该消失
+    而且 计划实施审批应为已批准
     而且 最后一条 AI 消息应包含"Approved. The command execution plan completed."
     而且 聊天流应结束于空闲状态
+    而且 聊天中不应出现错误提示
     而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-AGENT-002
