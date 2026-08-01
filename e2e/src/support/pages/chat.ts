@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test'
 import { expect } from '@playwright/test'
 
+import { dismissTransientOverlays } from '../overlays'
 import {
   fillPromptEditor,
   newChatSendButton,
@@ -20,6 +21,7 @@ export class NewChatPage {
   }
 
   async openFromNav(): Promise<void> {
+    await dismissTransientOverlays(this.page)
     const navItem = this.page.locator('[data-testid="nav-new-chat"]')
     await expect(navItem).toBeVisible({ timeout: 15_000 })
     await navItem.click()
@@ -72,7 +74,11 @@ export class NewChatPage {
   }
 
   async selectProvider(label: string | RegExp): Promise<void> {
-    const selector = this.page.locator('[data-testid="provider-model-selector"]').filter({ visible: true }).first()
+    const providerSelector = this.page.locator('[data-testid="provider-model-selector"]').filter({ visible: true }).first()
+    const agentSelector = this.page.locator('[data-testid="agent-selector"]').filter({ visible: true }).first()
+    const selector = await providerSelector.count() > 0 && await providerSelector.isVisible()
+      ? providerSelector
+      : agentSelector
     await expect(selector).toBeVisible({ timeout: 10_000 })
     await selector.click()
     const menu = this.page.locator('[role="menu"]').last()
@@ -114,8 +120,14 @@ export class ChatPage {
     return this.page.locator('[data-testid="message-bubble-assistant"]').last()
   }
 
+  async expectAssistantVisible(timeout = CHAT_TIMEOUT): Promise<Locator> {
+    const bubble = this.lastAssistantBubble()
+    await expect(bubble).toBeVisible({ timeout })
+    return bubble
+  }
+
   async expectAssistantContains(text: string | RegExp, timeout = CHAT_TIMEOUT): Promise<void> {
-    await expect(this.lastAssistantBubble()).toContainText(text, { timeout })
+    await expect(await this.expectAssistantVisible(timeout)).toContainText(text, { timeout })
   }
 
   async expectUserMessage(text: string | RegExp, timeout = CHAT_TIMEOUT): Promise<void> {
@@ -123,12 +135,37 @@ export class ChatPage {
       .toBeVisible({ timeout })
   }
 
-  async expectNoError(timeout = 5_000): Promise<void> {
-    await expect(this.page.locator('[data-testid="chat-error"]')).toHaveCount(0, { timeout })
+  errorBanner(): Locator {
+    return this.page.locator('[data-testid="chat-error-banner"]')
   }
 
-  async expectErrorContains(text: string | RegExp, timeout = CHAT_TIMEOUT): Promise<void> {
-    await expect(this.page.locator('[data-testid="chat-error"]')).toContainText(text, { timeout })
+  async expectNoError(): Promise<void> {
+    await expect(this.errorBanner()).toHaveCount(0)
+  }
+
+  /**
+   * Prefer exact failure string; optionally accept broader API Error patterns
+   * when `allowProjectedApiError` is true (legacy soft path — prefer hard).
+   */
+  async expectErrorContains(
+    text: string,
+    options: { timeout?: number, allowProjectedApiError?: boolean } = {},
+  ): Promise<void> {
+    const timeout = options.timeout ?? CHAT_TIMEOUT
+    const view = await this.waitVisible(timeout)
+    await expect.poll(async () => {
+      const bannerText = (await this.errorBanner().textContent().catch(() => '')) ?? ''
+      const viewText = (await view.textContent().catch(() => '')) ?? ''
+      const bodyText = (await this.page.locator('body').textContent().catch(() => '')) ?? ''
+      const combined = `${bannerText}\n${viewText}\n${bodyText}`
+      if (combined.includes(text)) {
+        return true
+      }
+      if (options.allowProjectedApiError) {
+        return /API Error:\s*\d+/i.test(combined) || /Unexpected request/i.test(combined)
+      }
+      return false
+    }, { timeout }).toBe(true)
   }
 
   stopButton(): Locator {
@@ -141,19 +178,130 @@ export class ChatPage {
     await btn.click()
   }
 
+  async expectStopGone(timeout = CHAT_TIMEOUT): Promise<void> {
+    await expect(this.stopButton()).toHaveCount(0, { timeout })
+  }
+
   composer(): Locator {
-    return this.page.locator('[data-testid="chat-textarea"]').filter({ visible: true }).first()
+    return this.page.locator('[data-testid="chat-composer-textarea"], [data-testid="chat-textarea"]')
+      .filter({ visible: true })
+      .first()
   }
 
   sendButton(): Locator {
     return this.page.locator('[data-testid="chat-send-btn"]').filter({ visible: true }).first()
   }
 
-  async fillAndSend(text: string): Promise<void> {
+  async fillComposer(text: string): Promise<void> {
     await fillPromptEditor(this.composer(), text)
+  }
+
+  async sendFromComposer(): Promise<void> {
     const button = this.sendButton()
     await expect(button).toBeEnabled({ timeout: READY_TIMEOUT })
     await button.click()
+  }
+
+  async fillAndSend(text: string): Promise<void> {
+    await this.fillComposer(text)
+    await this.sendFromComposer()
+  }
+
+  sessionItem(sessionId: string): Locator {
+    return this.page.locator(`[data-testid="session-item-${sessionId}"]`)
+  }
+
+  async waitForSessionInSidebar(sessionId: string, timeout = 10_000): Promise<void> {
+    await expect(this.sessionItem(sessionId)).toBeVisible({ timeout })
+  }
+
+  async openSessionMenu(sessionId: string): Promise<void> {
+    await dismissTransientOverlays(this.page)
+    const item = this.sessionItem(sessionId)
+    await expect(item).toBeVisible({ timeout: 10_000 })
+    await item.hover()
+    const trigger = this.page.locator(`[data-testid="session-menu-trigger-${sessionId}"]`)
+    await expect(trigger).toBeVisible({ timeout: 10_000 })
+    await trigger.click()
+  }
+
+  async clickSessionMenuAction(
+    sessionId: string,
+    action: 'toggle-pin' | 'copy-markdown' | 'archive' | 'rename',
+  ): Promise<void> {
+    const locator = this.page.locator(`[data-testid="session-menu-${action}-${sessionId}-context"]`)
+    await expect(locator).toBeVisible({ timeout: 10_000 })
+    await locator.click()
+  }
+
+  async expandExecutionDetails(assistantBubble?: Locator): Promise<Locator> {
+    const bubble = assistantBubble ?? await this.expectAssistantVisible()
+    const foldButton = bubble.getByRole('button', { name: 'Show execution details' })
+    if (await foldButton.count() > 0) {
+      await foldButton.click()
+    }
+    const worked = bubble.getByRole('button').filter({ hasText: /^Worked/ }).first()
+    if (await worked.count() > 0) {
+      const expanded = await worked.getAttribute('aria-expanded')
+      if (expanded !== 'true') {
+        await worked.click()
+      }
+    }
+    return bubble
+  }
+
+  async openReasoningEntry(): Promise<Locator> {
+    const bubble = await this.expandExecutionDetails()
+    const legacy = bubble.locator('[data-testid="chat-reasoning-toggle"]').last()
+    if (await legacy.count() > 0) {
+      await expect(legacy).toBeVisible({ timeout: 10_000 })
+      await legacy.click()
+      return bubble
+    }
+    const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
+    await expect(feed).toBeVisible({ timeout: 10_000 })
+    const feedSummary = feed.locator('button').first()
+    if (await feedSummary.count() > 0) {
+      const expanded = await feedSummary.getAttribute('aria-expanded')
+      if (expanded !== 'true') {
+        await feedSummary.click()
+      }
+    }
+    const reasoningRow = feed.getByRole('button').filter({ hasText: /Thought|Thinking|Reasoning/i }).first()
+    await expect(reasoningRow).toBeVisible({ timeout: 10_000 })
+    await reasoningRow.click()
+    return bubble
+  }
+
+  async expectThoughtEntryVisible(): Promise<void> {
+    const bubble = await this.expandExecutionDetails()
+    const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
+    await expect(feed).toBeVisible({ timeout: 10_000 })
+    await expect(feed).toContainText(/Thought|Thinking|Reasoning/i, { timeout: 10_000 })
+  }
+
+  async expectReasoningContains(text: string): Promise<void> {
+    const bubble = await this.expectAssistantVisible()
+    await this.expandExecutionDetails(bubble)
+    const legacy = bubble.locator('[data-testid="chat-reasoning-content"]').last()
+    if (await legacy.count() > 0) {
+      await expect(legacy).toBeVisible({ timeout: 10_000 })
+      await expect(legacy).toContainText(text, { timeout: 10_000 })
+      return
+    }
+    const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
+    await expect(feed).toContainText(text, { timeout: 10_000 })
+  }
+
+  async toolCallBlock(toolName: string): Promise<Locator> {
+    const bubble = await this.expectAssistantVisible()
+    let block = this.page.locator(`[data-testid^="chat-tool-call-"][data-tool-name="${toolName}"]`).first()
+    if (await block.count() === 0) {
+      await this.expandExecutionDetails(bubble)
+      block = this.page.locator(`[data-testid^="chat-tool-call-"][data-tool-name="${toolName}"]`).first()
+    }
+    await expect(block).toBeVisible({ timeout: 10_000 })
+    return block
   }
 }
 
@@ -178,5 +326,9 @@ export class ApprovalPage {
 
   async expectHidden(timeout = 20_000): Promise<void> {
     await expect(this.card()).toBeHidden({ timeout })
+  }
+
+  async expectContains(text: string | RegExp, timeout = 10_000): Promise<void> {
+    await expect(this.card()).toContainText(text, { timeout })
   }
 }

@@ -217,29 +217,6 @@ async function createRememberedSession(world: CradleWorld, alias: string, firstU
   return session
 }
 
-async function openSessionMenu(world: CradleWorld, sessionId: string): Promise<void> {
-  // What's New corner popup sits over the session list in bottom-left.
-  const popup = world.page.locator('[data-testid="whats-new-popup"]')
-  if (await popup.isVisible().catch(() => false)) {
-    await popup.getByRole('button', { name: /Later|稍后|Close|关闭/i }).first().click().catch(() => undefined)
-    await expect(popup).toBeHidden({ timeout: 5_000 }).catch(() => undefined)
-  }
-
-  const item = world.page.locator(`[data-testid="session-item-${sessionId}"]`)
-  await expect(item).toBeVisible({ timeout: 10_000 })
-  await item.hover()
-
-  const trigger = world.page.locator(`[data-testid="session-menu-trigger-${sessionId}"]`)
-  await expect(trigger).toBeVisible({ timeout: 10_000 })
-  await trigger.click()
-}
-
-async function clickSessionMenuAction(world: CradleWorld, sessionId: string, action: 'toggle-pin' | 'copy-markdown' | 'archive' | 'rename'): Promise<void> {
-  const locator = world.page.locator(`[data-testid="session-menu-${action}-${sessionId}-context"]`)
-  await expect(locator).toBeVisible({ timeout: 10_000 })
-  await locator.click()
-}
-
 async function getVisibleSessionOrder(world: CradleWorld): Promise<string[]> {
   return world.page.locator('[data-testid^="session-item-"]').filter({ visible: true }).evaluateAll((elements) => {
     return elements
@@ -268,33 +245,6 @@ async function expandExecutionDetailsIfCollapsed(assistantBubble: Locator) {
       await worked.click()
     }
   }
-}
-
-async function getLastAssistantReasoningToggle(world: CradleWorld) {
-  const assistantBubble = await getLastAssistantBubble(world)
-  await expandExecutionDetailsIfCollapsed(assistantBubble)
-
-  // Prefer legacy reasoning toggle when present
-  const toggle = assistantBubble.locator('[data-testid="chat-reasoning-toggle"]').last()
-  if (await toggle.count() > 0) {
-    await expect(toggle).toBeVisible({ timeout: 10_000 })
-    return toggle
-  }
-
-  // Current UI: reasoning lives in the activity feed as a Thought/Thinking row
-  const feed = assistantBubble.locator('[data-testid="chat-activity-feed"]').first()
-  await expect(feed).toBeVisible({ timeout: 10_000 })
-  // Expand the feed summary row if collapsed
-  const feedSummary = feed.locator('button').first()
-  if (await feedSummary.count() > 0) {
-    const expanded = await feedSummary.getAttribute('aria-expanded')
-    if (expanded !== 'true') {
-      await feedSummary.click()
-    }
-  }
-  const reasoningRow = feed.getByRole('button').filter({ hasText: /Thought|Thinking|Reasoning/i }).first()
-  await expect(reasoningRow).toBeVisible({ timeout: 10_000 })
-  return reasoningRow
 }
 
 async function getLastAssistantToolCallBlock(world: CradleWorld, toolName: string) {
@@ -566,7 +516,7 @@ Then('最后一条 AI 消息应包含{string}', async function (this: CradleWorl
 })
 
 Then('聊天中不应出现错误提示', async function (this: CradleWorld) {
-  await expect(this.page.locator('[data-testid="chat-error-banner"]')).toHaveCount(0)
+  await this.chat.expectNoError()
 })
 
 Then('跟进消息{string}应显示在聊天队列中', async function (this: CradleWorld, text: string) {
@@ -600,23 +550,23 @@ Then('停止生成按钮应消失', async function (this: CradleWorld) {
 })
 
 When('我打开会话{string}的菜单', async function (this: CradleWorld, alias: string) {
-  await openSessionMenu(this, recallSessionAlias(this, alias).id)
+  await this.chat.openSessionMenu(recallSessionAlias(this, alias).id)
 })
 
 When('我点击会话{string}的置顶菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'toggle-pin')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'toggle-pin')
 })
 
 When('我点击会话{string}的取消置顶菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'toggle-pin')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'toggle-pin')
 })
 
 When('我点击会话{string}的删除菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'archive')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'archive')
 })
 
 When('我点击会话{string}的重命名菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'rename')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'rename')
 })
 
 When('我将会话{string}重命名为{string}', async function (this: CradleWorld, alias: string, nextTitle: string) {
@@ -630,7 +580,7 @@ When('我将会话{string}重命名为{string}', async function (this: CradleWor
 })
 
 When('我点击会话{string}的复制 Markdown 菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'copy-markdown')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'copy-markdown')
 })
 
 When('我清空 Electron 剪贴板', async function (this: CradleWorld) {
@@ -644,22 +594,11 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 })
 
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
-  const chatView = await getChatView(this)
-  const errorBanner = this.page.locator('[data-testid="chat-error-banner"]')
-  // Claude Agent retries 503s for a while before projecting API Error — allow longer.
-  const errorTimeout = Math.max(CHAT_STATUS_TIMEOUT, 90_000)
-  await expect.poll(async () => {
-    const bannerText = (await errorBanner.textContent().catch(() => '')) ?? ''
-    const viewText = (await chatView.textContent().catch(() => '')) ?? ''
-    const bodyText = (await this.page.locator('body').textContent().catch(() => '')) ?? ''
-    const combined = `${bannerText}\n${viewText}\n${bodyText}`
-    return {
-      hit: combined.includes(text)
-        || /API Error:\s*\d+/i.test(combined)
-        || /Unexpected request/i.test(combined)
-        || /E2E simulator forced failure/i.test(combined),
-    }
-  }, { timeout: errorTimeout }).toMatchObject({ hit: true })
+  // Phase 2B will remove allowProjectedApiError once product surfaces forced failure.
+  await this.chat.expectErrorContains(text, {
+    timeout: Math.max(CHAT_STATUS_TIMEOUT, 90_000),
+    allowProjectedApiError: true,
+  })
 })
 
 When('我重新加载当前页面', async function (this: CradleWorld) {
@@ -690,33 +629,19 @@ Then('侧栏中的会话{string}标题应为{string}', async function (this: Cra
 })
 
 Then('最后一条 AI 消息应显示 Reasoning 入口', async function (this: CradleWorld) {
-  await getLastAssistantReasoningToggle(this)
+  await this.chat.openReasoningEntry()
 })
 
 When('我展开最后一条 AI 消息的 Reasoning', async function (this: CradleWorld) {
-  const toggle = await getLastAssistantReasoningToggle(this)
-  await toggle.click()
+  await this.chat.openReasoningEntry()
 })
 
 Then('最后一条 AI 消息的 Reasoning 应包含{string}', async function (this: CradleWorld, text: string) {
-  const assistantBubble = await getLastAssistantBubble(this)
-  await expandExecutionDetailsIfCollapsed(assistantBubble)
-  const legacy = assistantBubble.locator('[data-testid="chat-reasoning-content"]').last()
-  if (await legacy.count() > 0) {
-    await expect(legacy).toBeVisible({ timeout: 10_000 })
-    await expect(legacy).toContainText(text, { timeout: 10_000 })
-    return
-  }
-  const feed = assistantBubble.locator('[data-testid="chat-activity-feed"]').first()
-  await expect(feed).toContainText(text, { timeout: 10_000 })
+  await this.chat.expectReasoningContains(text)
 })
 
 Then('最后一条 AI 消息应显示已展开的 Thought 条目', async function (this: CradleWorld) {
-  const assistantBubble = await getLastAssistantBubble(this)
-  await expandExecutionDetailsIfCollapsed(assistantBubble)
-  const feed = assistantBubble.locator('[data-testid="chat-activity-feed"]').first()
-  await expect(feed).toBeVisible({ timeout: 10_000 })
-  await expect(feed).toContainText(/Thought|Thinking|Reasoning/i, { timeout: 10_000 })
+  await this.chat.expectThoughtEntryVisible()
 })
 
 Then('最后一条 AI 消息应显示名为{string}的 Tool Call', async function (this: CradleWorld, toolName: string) {

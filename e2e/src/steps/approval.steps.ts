@@ -33,7 +33,7 @@ Then('审批卡片应该消失', async function (this: CradleWorld) {
 })
 
 Then('审批卡片应包含{string}', async function (this: CradleWorld, text: string) {
-  await expect(this.approval.card()).toContainText(text, { timeout: 10_000 })
+  await this.approval.expectContains(text)
 })
 
 // Legacy step kept for archived features; essence suite uses Claude Agent 审批 Simulator.

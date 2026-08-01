@@ -10,7 +10,12 @@ import { chromium, expect } from '@playwright/test'
 
 import type { E2ESimulator } from './model-api-simulator'
 import { startE2ESimulator } from './model-api-simulator'
+import { dismissTransientOverlays } from './overlays'
 import { ApprovalPage, ChatPage, NewChatPage } from './pages/chat'
+import { GitPage } from './pages/git'
+import { SearchPage } from './pages/search'
+import { SettingsPage } from './pages/settings'
+import { TerminalPage } from './pages/terminal'
 import {
   configureClaudeAgentSimulatorProvider,
   configureCodexSimulatorProvider,
@@ -73,6 +78,22 @@ export class CradleWorld extends World {
 
   get approval(): ApprovalPage {
     return new ApprovalPage(this.page)
+  }
+
+  get search(): SearchPage {
+    return new SearchPage(this.page)
+  }
+
+  get settingsPage(): SettingsPage {
+    return new SettingsPage(this.page)
+  }
+
+  get gitPage(): GitPage {
+    return new GitPage(this.page)
+  }
+
+  get terminalPage(): TerminalPage {
+    return new TerminalPage(this.page)
   }
 
   static nextScenarioIndex(): number {
@@ -321,6 +342,7 @@ export class CradleWorld extends World {
     this.page = await this.context.newPage()
     await this.page.goto(this.params.webUrl)
     await this.page.waitForLoadState('domcontentloaded')
+    await dismissTransientOverlays(this.page)
   }
 
   async close(): Promise<void> {
