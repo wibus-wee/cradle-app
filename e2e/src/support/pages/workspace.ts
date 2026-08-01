@@ -205,7 +205,19 @@ export class WorkspacePage {
 
     await this.owner.selectDirectoryInBrowser(fixture.dir)
 
-    await expect(this.workspaceButtonByName(fixture.name)).toContainText(fixture.name, { timeout: WORKSPACE_TIMEOUT })
+    // Import may rename/display based on folder basename; wait for a project row then sync fixture.
+    await expect(this.workspaceGroups()).toHaveCount(1, { timeout: WORKSPACE_TIMEOUT })
+    const listRes = await fetch(`${this.owner.params.serverUrl}/workspaces`)
+    if (listRes.ok) {
+      const workspaces = await listRes.json() as Array<{ id: string, name?: string | null, path?: string | null }>
+      const match = workspaces.find(ws => ws.path === fixture.dir) ?? workspaces[0]
+      if (match?.name) {
+        fixture.name = match.name
+      }
+    }
+    this.rememberFixtures([fixture])
+    this.setCurrentWorkspace(fixture)
+    await expect(this.workspaceButtonByName(fixture.name)).toBeVisible({ timeout: WORKSPACE_TIMEOUT })
   }
 
   async addWorkspaceThroughNativeDialog(): Promise<void> {

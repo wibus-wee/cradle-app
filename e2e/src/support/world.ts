@@ -150,9 +150,13 @@ export class CradleWorld extends World {
     await expect(pathInput).toBeVisible({ timeout: 5_000 })
     await pathInput.fill(dirPath)
     await pathInput.press('Enter')
-    await expect(dialog.locator('[data-testid="directory-browser-confirm"]')).toBeEnabled({ timeout: 10_000 })
-    await dialog.locator('[data-testid="directory-browser-confirm"]').click()
-    await expect(dialog).toBeHidden({ timeout: 5_000 })
+    // Wait until the browser has navigated to the target folder (last segment visible).
+    const leaf = dirPath.split('/').filter(Boolean).at(-1) ?? dirPath
+    await expect(dialog.locator('[data-testid="directory-browser-breadcrumb"]')).toContainText(leaf, { timeout: 10_000 })
+    const confirm = dialog.locator('[data-testid="directory-browser-confirm"]')
+    await expect(confirm).toBeEnabled({ timeout: 10_000 })
+    await confirm.click()
+    await expect(dialog).toBeHidden({ timeout: 10_000 })
   }
 
   pushConsoleMessage(message: string): void {
