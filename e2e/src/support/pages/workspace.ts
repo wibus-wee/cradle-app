@@ -184,17 +184,23 @@ export class WorkspacePage {
     }
     else if (await emptyMenu.isVisible().catch(() => false)) {
       await emptyMenu.click()
-      await this.page.getByRole('menuitem', { name: /Add project|添加/i }).first().click()
+      await this.page.getByRole('menuitem', { name: /Add project|添加项目/i }).first().click()
     }
     else if (await headerBtn.isVisible().catch(() => false)) {
       await headerBtn.click()
     }
     else if (await headerMenu.isVisible().catch(() => false)) {
       await headerMenu.click()
-      await this.page.getByRole('menuitem', { name: /Add project|添加/i }).first().click()
+      await this.page.getByRole('menuitem', { name: /Add project|添加项目/i }).first().click()
     }
     else {
       throw new Error('No add-workspace control found')
+    }
+
+    // New chrome: intermediate "Add workspace" host picker → Choose folder → directory browser.
+    const chooseFolder = this.page.getByRole('button', { name: /Choose folder|选择文件夹|選擇資料夾/i })
+    if (await chooseFolder.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      await chooseFolder.click()
     }
 
     await this.owner.selectDirectoryInBrowser(fixture.dir)
