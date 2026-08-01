@@ -37,7 +37,6 @@ When('我点击"允许"按钮', async function (this: CradleWorld) {
         bodyTextExcludes: 'You are naming a Claude Agent task session',
       }),
     ]))
-    await enqueueClaudeNoiseAbsorber(this, 'approval-title-allow', 'Plan approval')
   }
   await this.approval.allow()
 })
@@ -61,7 +60,8 @@ Then('计划实施审批应为已拒绝', async function (this: CradleWorld) {
   const planApproval = this.page.locator('[data-testid="chat-tool-call-implement-plan:toolu_e2e_plan_approval"]')
   await expect(planApproval).toBeVisible({ timeout: APPROVAL_TIMEOUT })
   await expect(planApproval).toHaveAttribute('data-approval-approved', 'false', { timeout: APPROVAL_TIMEOUT })
-  await expect(planApproval).toContainText(/Denied|Rejected|拒绝/i, { timeout: APPROVAL_TIMEOUT })
+  // Status text lives on the status icon title (not always in innerText).
+  await expect(planApproval.locator('[title*="Denied"]')).toBeVisible({ timeout: APPROVAL_TIMEOUT })
 })
 
 Then('聊天中不应出现审批通过后的完成回复', async function (this: CradleWorld) {
