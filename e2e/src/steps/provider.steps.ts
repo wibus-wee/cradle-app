@@ -6,19 +6,22 @@ import type { CradleWorld } from '../support/world'
 const TIMEOUT = 15_000
 
 const KIND_TO_PRESET: Record<string, string> = {
+  'Anthropic': 'anthropic',
+  'OpenAI': 'openai',
+  'Universal': 'universal',
+  // Legacy labels from archived features
+  'Claude Agent': 'anthropic',
   'OpenAI-compatible': 'openai',
   'Codex': 'openai',
-  'Claude Agent': 'anthropic',
 }
 
 async function openProvidersSettings(world: CradleWorld): Promise<void> {
-  const activeSettings = world.page.locator('[data-testid="surface-pill-settings"][data-surface-active="true"]')
-  if (!(await activeSettings.isVisible().catch(() => false))) {
-    const settingsBtn = world.page.locator('[data-testid="settings-btn"]')
-    await expect(settingsBtn).toBeVisible({ timeout: TIMEOUT })
-    await settingsBtn.click()
-    await expect(activeSettings).toBeVisible({ timeout: TIMEOUT })
-  }
+  // Proven path in E2E: command palette → Open settings (surface-pill may vary by chrome).
+  await world.search.open()
+  await world.search.fill('>settings')
+  await world.search.runCommand('Open settings')
+  await world.settingsPage.expectSettingsMode()
+
   const navItem = world.page.locator('[data-testid="settings-nav-providers"]')
   await expect(navItem).toBeVisible({ timeout: TIMEOUT })
   await navItem.click()
@@ -57,7 +60,9 @@ When('我在 Provider 表单填写 Name 为{string}', async function (this: Crad
 
 When('我在 Provider 表单填写 Base URL 为 Anthropic Simulator 地址', async function (this: CradleWorld) {
   const simulator = await this.ensureSimulator()
-  const input = this.page.locator('[data-testid="provider-baseurl"]')
+  const input = this.page.locator(
+    '[data-testid="provider-baseurl"], [data-testid="provider-anthropic-baseurl"]',
+  ).first()
   await expect(input).toBeVisible({ timeout: TIMEOUT })
   await input.fill(simulator.anthropicBaseUrl)
 })

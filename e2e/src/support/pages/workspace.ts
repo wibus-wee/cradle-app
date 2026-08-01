@@ -156,7 +156,14 @@ export class WorkspacePage {
   }
 
   async expectAddWorkspaceButtonVisible(): Promise<void> {
-    await expect(this.addWorkspaceButton()).toBeVisible({ timeout: SIDEBAR_TIMEOUT })
+    const emptyBtn = this.addWorkspaceEmptyButton()
+    const headerBtn = this.addWorkspaceButton()
+    const emptyMenu = this.page.locator('[data-testid="add-workspace-empty-menu-btn"]')
+    await expect.poll(async () => {
+      return (await emptyBtn.isVisible().catch(() => false))
+        || (await headerBtn.isVisible().catch(() => false))
+        || (await emptyMenu.isVisible().catch(() => false))
+    }, { timeout: SIDEBAR_TIMEOUT }).toBe(true)
   }
 
   async addWorkspaceFromPicker(fixture: WorkspaceFixture): Promise<void> {
@@ -165,11 +172,30 @@ export class WorkspacePage {
     const sidebar = this.page.locator('[data-testid="app-sidebar"]')
     await expect(sidebar).toBeVisible({ timeout: SIDEBAR_TIMEOUT })
 
-    const button = this.addWorkspaceButton()
-    await button.waitFor({ state: 'attached', timeout: SIDEBAR_TIMEOUT })
-    await button.scrollIntoViewIfNeeded()
-    await expect(button).toBeVisible({ timeout: WORKSPACE_TIMEOUT })
-    await button.click({ force: true })
+    // Empty state uses add-workspace-empty-btn; non-empty uses header add-workspace-btn.
+    // Prefer whichever is currently visible (and handle multi-workspace menu trigger).
+    const emptyBtn = this.addWorkspaceEmptyButton()
+    const headerBtn = this.addWorkspaceButton()
+    const emptyMenu = this.page.locator('[data-testid="add-workspace-empty-menu-btn"]')
+    const headerMenu = this.page.locator('[data-testid="add-workspace-menu-btn"]')
+
+    if (await emptyBtn.isVisible().catch(() => false)) {
+      await emptyBtn.click()
+    }
+    else if (await emptyMenu.isVisible().catch(() => false)) {
+      await emptyMenu.click()
+      await this.page.getByRole('menuitem', { name: /Add project|添加/i }).first().click()
+    }
+    else if (await headerBtn.isVisible().catch(() => false)) {
+      await headerBtn.click()
+    }
+    else if (await headerMenu.isVisible().catch(() => false)) {
+      await headerMenu.click()
+      await this.page.getByRole('menuitem', { name: /Add project|添加/i }).first().click()
+    }
+    else {
+      throw new Error('No add-workspace control found')
+    }
 
     await this.owner.selectDirectoryInBrowser(fixture.dir)
 

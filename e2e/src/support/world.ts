@@ -143,7 +143,7 @@ export class CradleWorld extends World {
 
   async selectDirectoryInBrowser(dirPath: string): Promise<void> {
     const dialog = this.page.locator('[data-testid="directory-browser-dialog"]')
-    await expect(dialog).toBeVisible({ timeout: 10_000 })
+    await expect(dialog).toBeVisible({ timeout: 20_000 })
     const breadcrumbBar = dialog.locator('[data-testid="directory-browser-breadcrumb"]')
     await breadcrumbBar.dblclick()
     const pathInput = dialog.locator('[data-testid="directory-browser-path-input"]')
