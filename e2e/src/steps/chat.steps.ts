@@ -179,6 +179,15 @@ async function enqueueNextScriptedReply(world: CradleWorld, fallbackText?: strin
   if (!next) {
     return
   }
+  const preferred = world.maybeRecall<'standard' | 'claude-agent' | 'codex'>('chat.preferred-runtime')
+  if (preferred === 'codex' || preferred === 'standard') {
+    const { openAiTextExchange } = await import('../support/scenarios/openai')
+    world.enqueueOpenAi(openAiTextExchange({
+      label: `scripted-openai-${Date.now()}`,
+      text: next,
+    }))
+    return
+  }
   const { anthropicTextExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
   world.enqueue(anthropicScenario([
     anthropicTextExchange({ label: `scripted-${Date.now()}`, text: next }),
@@ -329,6 +338,47 @@ Given('我已配置 Claude Agent 审批 Simulator', async function (this: Cradle
 Given('我已配置 Codex Simulator', async function (this: CradleWorld) {
   console.warn('[step] configure Codex simulator (real app-server → OpenAI Responses)')
   await this.configureCodexChat({ texts: ['Hello from Codex E2E simulator!'] })
+})
+
+Given('我已配置 Claude Agent Read 工具环 Simulator', async function (this: CradleWorld) {
+  console.warn('[step] configure Claude Agent Read tool-loop simulator')
+  await this.configureClaudeAgentChat({ mode: 'text' })
+  this.simulator!.reset()
+  const {
+    anthropicToolUseExchange,
+    anthropicTextExchange,
+    anthropicScenario,
+  } = await import('../support/scenarios/anthropic')
+  const excludeTitle = 'You are naming a Claude Agent task session'
+  const toolUseId = 'toolu_e2e_read_agents'
+  this.enqueue(anthropicScenario([
+    anthropicToolUseExchange({
+      label: 'tool-read',
+      toolUseId,
+      toolName: 'Read',
+      toolInput: { file_path: 'AGENTS.md' },
+      bodyTextIncludes: '请读取 AGENTS.md',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicTextExchange({
+      label: 'tool-final',
+      text: '工具环完成：已读取 AGENTS.md',
+      bodyTextIncludes: toolUseId,
+      bodyTextExcludes: excludeTitle,
+    }),
+  ]))
+})
+
+Given('我已配置 Codex 多轮 Simulator', async function (this: CradleWorld) {
+  console.warn('[step] configure Codex multi-turn simulator')
+  // Only the first turn is enqueued now; follow-ups are JIT so Codex probe
+  // traffic cannot steal FIFO Responses creates.
+  await this.configureCodexChat({
+    texts: ['Codex 第一轮：已记住香蕉'],
+  })
+  this.remember('simulator.next-replies', [
+    'Codex 第二轮：你让我记住了香蕉',
+  ])
 })
 
 Given('我已导航到新建聊天并选中 Simulator', async function (this: CradleWorld) {
@@ -624,6 +674,10 @@ Then('最后一条 AI 消息的 Reasoning 应包含{string}', async function (th
 
 Then('最后一条 AI 消息应显示已展开的 Thought 条目', async function (this: CradleWorld) {
   await this.chat.expectThoughtEntryVisible()
+})
+
+Then('聊天活动流应包含{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectActivityContains(text, CHAT_STATUS_TIMEOUT)
 })
 
 Then('最后一条 AI 消息应显示名为{string}的 Tool Call', async function (this: CradleWorld, toolName: string) {

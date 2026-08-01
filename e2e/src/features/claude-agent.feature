@@ -45,3 +45,17 @@
     那么 应该跳转到聊天视图
     当 审批卡片出现
     那么 审批卡片应包含"implement this plan"
+
+  @essence @P1 @CRADLE-AGENT-004
+  场景: Agent 通过 Simulator 完成 Read 工具环并给出最终回复
+    假如 我已配置 Claude Agent Read 工具环 Simulator
+    而且 我已添加了一个工作区
+    而且 我已导航到新建聊天并选中 Simulator
+    当 我在新建聊天输入框中输入"请读取 AGENTS.md 并确认"
+    而且 我点击发送按钮
+    那么 应该跳转到聊天视图
+    而且 聊天活动流应包含"Read"
+    而且 最后一条 AI 消息应包含"工具环完成：已读取 AGENTS.md"
+    而且 聊天中不应出现错误提示
+    而且 聊天流应结束于空闲状态
+    而且 Simulator 脚本化交换应全部耗尽

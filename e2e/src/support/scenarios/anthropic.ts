@@ -140,9 +140,11 @@ export function anthropicToolUseExchange(input: {
   toolUseId: string
   toolName: string
   toolInput: Record<string, unknown>
+  bodyTextIncludes?: string | readonly string[]
+  bodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange {
   const messageId = `msg_${input.label.replaceAll(/[^a-z0-9]+/gi, '_')}`
-  return streamExchange(input.label, [
+  const exchange = streamExchange(input.label, [
     messageStart(messageId),
     {
       kind: 'event',
@@ -171,6 +173,18 @@ export function anthropicToolUseExchange(input: {
     { kind: 'event', event: { type: 'message_stop' } },
     { kind: 'close' },
   ])
+  return {
+    ...exchange,
+    request: {
+      ...exchange.request,
+      ...(input.bodyTextIncludes === undefined
+        ? {}
+        : { bodyTextIncludes: input.bodyTextIncludes }),
+      ...(input.bodyTextExcludes === undefined
+        ? {}
+        : { bodyTextExcludes: input.bodyTextExcludes }),
+    },
+  }
 }
 
 export function anthropicThinkingTextExchange(input: {

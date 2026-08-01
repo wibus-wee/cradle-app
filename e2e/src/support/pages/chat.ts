@@ -285,6 +285,14 @@ export class ChatPage {
     await expect(feed).toContainText(text, { timeout: 10_000 })
   }
 
+  async expectActivityContains(text: string | RegExp, timeout = CHAT_TIMEOUT): Promise<void> {
+    const bubble = await this.expectAssistantVisible(timeout)
+    await this.expandExecutionDetails(bubble)
+    const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
+    await expect(feed).toBeVisible({ timeout })
+    await expect(feed).toContainText(text, { timeout })
+  }
+
   async toolCallBlock(toolName: string): Promise<Locator> {
     const bubble = await this.expectAssistantVisible()
     let block = this.page.locator(`[data-testid^="chat-tool-call-"][data-tool-name="${toolName}"]`).first()

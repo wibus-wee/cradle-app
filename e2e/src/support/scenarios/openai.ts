@@ -219,6 +219,8 @@ export function openAiTextExchange(input: {
   reasoningText?: string
   gateAfterCreated?: string
   chunkDelayYields?: number
+  bodyTextIncludes?: string | readonly string[]
+  bodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange {
   const id = input.label.replaceAll(/[^a-z0-9]+/gi, '_').toLowerCase()
   const model = input.model ?? E2E_OPENAI_MODEL
@@ -228,6 +230,12 @@ export function openAiTextExchange(input: {
       method: 'POST',
       path: '/v1/responses',
       bodyFields: { '/stream': true },
+      ...(input.bodyTextIncludes === undefined
+        ? {}
+        : { bodyTextIncludes: input.bodyTextIncludes }),
+      ...(input.bodyTextExcludes === undefined
+        ? {}
+        : { bodyTextExcludes: input.bodyTextExcludes }),
     },
     response: {
       kind: 'stream',
