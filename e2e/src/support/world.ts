@@ -16,6 +16,7 @@ import { GitPage } from './pages/git'
 import { SearchPage } from './pages/search'
 import { SettingsPage } from './pages/settings'
 import { TerminalPage } from './pages/terminal'
+import { WorkspacePage } from './pages/workspace'
 import {
   configureClaudeAgentSimulatorProvider,
   configureCodexSimulatorProvider,
@@ -94,6 +95,10 @@ export class CradleWorld extends World {
 
   get terminalPage(): TerminalPage {
     return new TerminalPage(this.page)
+  }
+
+  get workspacePage(): WorkspacePage {
+    return new WorkspacePage(this)
   }
 
   static nextScenarioIndex(): number {
