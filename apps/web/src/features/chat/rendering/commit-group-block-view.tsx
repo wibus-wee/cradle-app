@@ -1,7 +1,7 @@
 import {
   Chat1Line as AddToChatIcon,
-  RightSmallLine as ChevronRightIcon,
   GitCommitLine as GitCommitIcon,
+  RightSmallLine as ChevronRightIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'

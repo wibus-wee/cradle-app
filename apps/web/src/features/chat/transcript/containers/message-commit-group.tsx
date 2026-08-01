@@ -46,7 +46,7 @@ export function MessageCommitGroup({
   const fileLinks = filePaths.length > 0
     ? new Map(filePaths.map(file => [
         file,
-        <MarkdownFileLink href={file} sessionId={sessionId} className="font-mono" title={file}>
+        <MarkdownFileLink key={file} href={file} sessionId={sessionId} className="font-mono" title={file}>
           {readFileDisplayName(file)}
         </MarkdownFileLink>,
       ]))

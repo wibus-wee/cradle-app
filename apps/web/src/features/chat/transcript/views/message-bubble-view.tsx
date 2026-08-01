@@ -98,7 +98,7 @@ const MESSAGE_MARKDOWN_COMPONENTS: MessageMarkdownComponents = {
     const fileLinks = filePaths.length > 0
       ? new Map(filePaths.map(file => [
           file,
-          <MarkdownFileLinkView href={file} className="font-mono" title={file}>
+          <MarkdownFileLinkView key={file} href={file} className="font-mono" title={file}>
             {readCodeCommentFileName(file)}
           </MarkdownFileLinkView>,
         ]))

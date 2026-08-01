@@ -274,10 +274,10 @@ const intentMentionSpec: NodeSpec = {
       'span',
       {
         ...intentMentionDomAttrs(node),
-        contenteditable: 'false',
+        'contenteditable': 'false',
         'aria-label': formatIntentMentionTokenLabel(name),
       },
-      ['span', { class: INTENT_MENTION_OPERATOR_CLASS, 'aria-hidden': 'true' }, '/'],
+      ['span', { 'class': INTENT_MENTION_OPERATOR_CLASS, 'aria-hidden': 'true' }, '/'],
       ['span', { class: INTENT_MENTION_OPERAND_CLASS }, name],
     ]
   },
