@@ -30,6 +30,13 @@ const SHARING_CONSENT = '### Sharing consent (author side)'
 const AGENT_HANDOFF_BEGIN = '<!-- agent-handoff:begin -->'
 const AGENT_HANDOFF_END = '<!-- agent-handoff:end -->'
 
+const REQUIRED_AGENT_HEADINGS = [
+  AGENT_HANDOFF_HEADING,
+  REVIEWING_INSTRUCTIONS,
+  AUTHORING_CONTEXT,
+  SHARING_CONSENT,
+]
+
 const PLACEHOLDER_ONLY = /^(?:<!--[\s\S]*?-->|\s|N\/?A|TODO|TBD|\(optional\))*$/i
 
 function parseArgs(argv) {
@@ -52,15 +59,17 @@ function parseArgs(argv) {
 }
 
 function sectionBody(markdown, heading) {
-  const start = markdown.indexOf(heading)
+  const lines = markdown.split('\n')
+  const start = lines.findIndex(line => line.trimEnd() === heading)
   if (start === -1) {
     return null
   }
-  const after = start + heading.length
-  const rest = markdown.slice(after)
-  const next = rest.search(/\n##\s+/)
-  const chunk = (next === -1 ? rest : rest.slice(0, next)).trim()
-  return chunk
+  const next = lines.findIndex((line, index) => index > start && /^##(?:\s|$)/.test(line))
+  return lines.slice(start + 1, next === -1 ? undefined : next).join('\n').trim()
+}
+
+function headingCount(markdown, heading) {
+  return markdown.split('\n').filter(line => line.trimEnd() === heading).length
 }
 
 function isFilledSection(chunk) {
@@ -83,9 +92,18 @@ export function checkPullRequestBody(body) {
     return { ok: false, findings, agent: false, human: false }
   }
 
-  for (const heading of REQUIRED_HEADINGS) {
-    if (!text.includes(heading)) {
+  const requiredHeadingCounts = new Map(REQUIRED_HEADINGS.map(heading => [
+    heading,
+    headingCount(text, heading),
+  ]))
+  for (const [heading, count] of requiredHeadingCounts) {
+    if (count === 0) {
       findings.push(`Missing required heading: ${heading}`)
+    }
+    if (count > 1) {
+      findings.push(
+        `Duplicate required section: ${heading} appears ${count} times; each required section must appear exactly once.`,
+      )
     }
   }
 
@@ -101,33 +119,35 @@ export function checkPullRequestBody(body) {
     findings.push('Author type: check only one of Agent or human, not both.')
   }
 
-  if (!isFilledSection(sectionBody(text, '## Problem / pressure'))) {
+  if (requiredHeadingCounts.get('## Problem / pressure') === 1
+    && !isFilledSection(sectionBody(text, '## Problem / pressure'))) {
     findings.push(
       '## Problem / pressure must state the constraint/failure this PR responds to (not only HTML comments / placeholders). Review against pressure, not aesthetics.',
     )
   }
-  if (!isFilledSection(sectionBody(text, '## Summary'))) {
+  if (requiredHeadingCounts.get('## Summary') === 1
+    && !isFilledSection(sectionBody(text, '## Summary'))) {
     findings.push('## Summary must include a non-empty description (not only HTML comments / placeholders).')
   }
-  if (!isFilledSection(sectionBody(text, '## Test plan'))) {
+  if (requiredHeadingCounts.get('## Test plan') === 1
+    && !isFilledSection(sectionBody(text, '## Test plan'))) {
     findings.push('## Test plan must include concrete verification (not only HTML comments / placeholders).')
   }
 
   if (agent) {
-    if (!text.includes(AGENT_HANDOFF_HEADING)) {
-      findings.push('Agent PRs must include ## Agent handoff.')
+    for (const heading of REQUIRED_AGENT_HEADINGS) {
+      const count = headingCount(text, heading)
+      if (count === 0) {
+        findings.push(`Agent PRs must include ${heading}.`)
+      }
+      if (count > 1) {
+        findings.push(
+          `Duplicate required Agent section: ${heading} appears ${count} times; each required Agent section must appear exactly once.`,
+        )
+      }
     }
     if (!text.includes(AGENT_HANDOFF_BEGIN) || !text.includes(AGENT_HANDOFF_END)) {
       findings.push('Agent PRs must keep <!-- agent-handoff:begin/end --> markers.')
-    }
-    if (!text.includes(REVIEWING_INSTRUCTIONS)) {
-      findings.push('Agent PRs must include ### Instructions for reviewing agents.')
-    }
-    if (!text.includes(AUTHORING_CONTEXT)) {
-      findings.push('Agent PRs must include ### Authoring context.')
-    }
-    if (!text.includes(SHARING_CONSENT)) {
-      findings.push('Agent PRs must include ### Sharing consent (author side).')
     }
   }
 

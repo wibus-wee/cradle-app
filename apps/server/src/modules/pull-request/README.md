@@ -94,3 +94,5 @@ of remaining pending indefinitely.
 - **merge-capability.ts**: Pure merge allow/block derivation for detail UI and merge route.
 - **delivery-push.ts**: First-publish vs force-with-lease push arg selection for managed branches.
 - **github-remote.ts**: Parse `owner/repo` from GitHub HTTPS/SSH remote URLs.
+- **pr-body.ts**: Compose Work handoff fields into the repository PR template, including
+  normalization that prevents a template-shaped summary from nesting duplicate sections.

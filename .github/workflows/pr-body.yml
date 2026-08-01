@@ -21,6 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test PR body checker
+        run: node .github/scripts/check-pr-body.test.mjs
+
       - name: Validate PR body
         id: validate
         continue-on-error: true

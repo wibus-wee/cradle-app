@@ -38,6 +38,39 @@ describe('buildWorkPullRequestBody', () => {
     expect(body).toContain('## Summary\n\nTemporary dual-use handoff narrative.')
   })
 
+  it('extracts semantic fields when summary contains an embedded PR template', () => {
+    const body = buildWorkPullRequestBody({
+      summary: [
+        '## Author type',
+        '',
+        '- [x] I am an Agent',
+        '- [ ] I am a human',
+        '',
+        '## Problem / pressure',
+        '',
+        'The Work handoff was already formatted as a PR body.',
+        '',
+        '## Summary',
+        '',
+        '- Add the requested native client.',
+        '',
+        '## Agent handoff',
+        '',
+        'Legacy handoff content that must not be embedded.',
+      ].join('\n'),
+      testPlan: 'Run focused PR body tests.',
+    })
+
+    expect(body.match(/^## Author type$/gm)).toHaveLength(1)
+    expect(body.match(/^## Problem \/ pressure$/gm)).toHaveLength(1)
+    expect(body.match(/^## Summary$/gm)).toHaveLength(1)
+    expect(body.match(/^## Test plan$/gm)).toHaveLength(1)
+    expect(body.match(/^## Agent handoff$/gm)).toHaveLength(1)
+    expect(body).toContain('## Problem / pressure\n\nThe Work handoff was already formatted as a PR body.')
+    expect(body).toContain('## Summary\n\n- Add the requested native client.')
+    expect(body).not.toContain('Legacy handoff content that must not be embedded.')
+  })
+
   it('records author-side sharing consent when provided', () => {
     const body = buildWorkPullRequestBody({
       summary: 'Ship handoff fields.',
