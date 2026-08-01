@@ -345,6 +345,10 @@ async function callPairingClaim(
 function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, requests: string[] }> {
   const requests: string[] = []
   const server = createServer((req, res) => {
+    if (req.url?.startsWith('/hang/')) {
+      req.resume()
+      return
+    }
     let body = ''
     req.on('data', (chunk) => {
       body += chunk.toString()
@@ -484,33 +488,56 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     expect(warmStream?.firstRequestByteAt).not.toBeNull()
     expect(warmStream?.firstResponseByteAt).not.toBeNull()
 
+    const hangingRequests = Array.from({ length: 32 }, (_, index) => {
+      const controller = new AbortController()
+      const result = fetch(`${handle.localBaseUrl}/hang/${index}`, {
+        signal: controller.signal,
+      }).catch(error => error)
+      return { controller, result }
+    })
     const concurrentBody = 'x'.repeat(64 * 1024)
     const concurrencyRows = []
-    for (const concurrency of [1, 8]) {
-      const batchStartedAt = performance.now()
-      const durations = await Promise.all(Array.from({ length: concurrency }, async (_, index) => {
-        const startedAt = performance.now()
-        const concurrentResponse = await fetch(`${handle.localBaseUrl}/benchmark/${concurrency}/${index}`, {
-          method: 'POST',
-          headers: { 'content-type': 'text/plain' },
-          body: concurrentBody,
+    try {
+      await new Promise(resolve => setTimeout(resolve, 25))
+      for (const concurrency of [1, 8, 64, 128]) {
+        const batchStartedAt = performance.now()
+        const durations = await Promise.all(Array.from({ length: concurrency }, async (_, index) => {
+          const startedAt = performance.now()
+          const concurrentResponse = await fetch(`${handle.localBaseUrl}/benchmark/${concurrency}/${index}`, {
+            method: 'POST',
+            headers: { 'content-type': 'text/plain' },
+            body: concurrentBody,
+            signal: AbortSignal.timeout(10_000),
+          })
+          expect(concurrentResponse.status).toBe(200)
+          const body = (await concurrentResponse.json()) as { ok: boolean, echo: string }
+          expect(body.ok).toBe(true)
+          expect(body.echo).toBe(concurrentBody)
+          return performance.now() - startedAt
+        }))
+        const batchElapsedMs = performance.now() - batchStartedAt
+        concurrencyRows.push({
+          concurrency,
+          requestBodyBytes: Buffer.byteLength(concurrentBody),
+          p50Ms: percentile(durations, 0.5),
+          p95Ms: percentile(durations, 0.95),
+          maxMs: Math.max(...durations),
+          aggregateUsefulMiBps:
+            (concurrency * Buffer.byteLength(concurrentBody) * 2) / (1024 * 1024) / (batchElapsedMs / 1_000),
         })
-        expect(concurrentResponse.status).toBe(200)
-        const body = (await concurrentResponse.json()) as { ok: boolean, echo: string }
-        expect(body.ok).toBe(true)
-        expect(body.echo).toBe(concurrentBody)
-        return performance.now() - startedAt
-      }))
-      const batchElapsedMs = performance.now() - batchStartedAt
-      concurrencyRows.push({
-        concurrency,
-        requestBodyBytes: Buffer.byteLength(concurrentBody),
-        p50Ms: percentile(durations, 0.5),
-        p95Ms: percentile(durations, 0.95),
-        maxMs: Math.max(...durations),
-        aggregateUsefulMiBps:
-          (concurrency * Buffer.byteLength(concurrentBody) * 2) / (1024 * 1024) / (batchElapsedMs / 1_000),
+      }
+      const postLoadProbe = await fetch(`${handle.localBaseUrl}/post-load-probe`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5_000),
       })
+      expect(postLoadProbe.status).toBe(200)
+      await postLoadProbe.json()
+    }
+    finally {
+      for (const request of hangingRequests) {
+        request.controller.abort()
+      }
+      await Promise.all(hangingRequests.map(request => request.result))
     }
     expect(handle.getPerformanceSnapshot().connectionAttempts).toHaveLength(attemptsBeforeWarmRequest)
     console.info([

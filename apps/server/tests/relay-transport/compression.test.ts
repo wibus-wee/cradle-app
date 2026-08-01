@@ -4,6 +4,7 @@ import {
   decodeRelayChunk,
   encodeRelayChunk,
   RELAY_COMPRESSION_KIND,
+  resolveRelayZstdCodec,
 } from '../../src/modules/relay-transport/compression'
 import { decodeInnerFrame, encodeInnerFrame } from '../../src/modules/relay-transport/protocol'
 
@@ -18,6 +19,12 @@ function incompressibleBytes(length: number): Uint8Array {
 }
 
 describe('relay chunk compression', () => {
+  it('reports the minimum Node version when the runtime has no zstd API', () => {
+    expect(() => resolveRelayZstdCodec({}, '22.14.0')).toThrow(
+      'Relay compression requires Node.js 22.15.0 or newer; current runtime is 22.14.0.',
+    )
+  })
+
   it('compresses repetitive endpoint data and round-trips the exact plaintext', () => {
     const plaintext = new Uint8Array(64 * 1024).fill(7)
     const encoded = encodeRelayChunk(plaintext)

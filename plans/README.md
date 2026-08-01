@@ -151,7 +151,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 007  | Secrets key versioning + rotation path                   | P2       | M      | —          | DONE                                                                                   |
 | 008  | Harden server plugin loading (provenance + confirm)      | P2       | L      | —          | DONE                                                                                   |
 | 009  | Gate worktree setup-hook execution behind confirmation   | P2       | S      | —          | DONE                                                                                   |
-| 011  | Coalesce check-then-act races on registries              | P2       | M      | —          | BLOCKED (drift check: relay/conversation transport modules changed since ac47f3b)      |
+| 011  | Coalesce check-then-act races on registries              | P2       | M      | —          | DONE for surviving site (managed local relayd single-flight); host connector already reserves before start; stale conversation scope superseded by 2026-08-01 relay hardening |
 | 012  | Terminal cleanup + error handling on run/boot paths      | P2       | M      | —          | DONE                                                                                   |
 | 015  | Add route-level error boundaries                         | P2       | M      | —          | DONE                                                                                   |
 | 016  | Version + validate persisted Zustand stores              | P2       | M      | —          | DONE                                                                                   |

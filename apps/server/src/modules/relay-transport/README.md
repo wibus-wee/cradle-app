@@ -105,6 +105,11 @@ small chunks remain raw. Small protocol frames retain low-fixed-cost
 XChaCha20-Poly1305, while bulk frames use native AES-256-GCM. Both choices are
 authenticated end to end and opaque to relayd.
 
+Native Zstandard requires Node.js 22.15.0 or newer. Server bootstrap validates
+that both compression and decompression APIs exist and reports the current and
+minimum Node versions if the runtime is unsupported; package metadata enforces
+the same minimum for development and standalone server installs.
+
 Each stream starts with a 512 KiB unacknowledged credit window. Send-side credit
 (`peerAckedBytes` / `bytesInFlight`) and receive-side progress
 (`appliedBytes` / `ackedToPeerBytes`) are tracked separately on each stream —
@@ -167,4 +172,6 @@ Focused validation:
     go test ./...
 
 The server test starts a real relayd subprocess and verifies pairing, an HTTP
-request through the tunnel, and pinned-pubkey reconnect.
+request through the tunnel, pinned-pubkey reconnect, 1/8/64/128 concurrent
+64 KiB transfers while 32 unrelated requests remain hung, and a successful
+post-load probe on the same tunnel.

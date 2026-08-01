@@ -113,6 +113,9 @@ const UpstreamErrorPayloadSchema = z.object({
   message: z.string().trim().min(1).max(2_000).optional(),
 })
 
+const AUTOMATIC_REPLAY_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+type ResolveUpstreamBaseUrl = (failedBaseUrl?: string) => Promise<string>
+
 async function readUpstreamErrorPayload(response: Response): Promise<{
   code?: string
   message?: string
@@ -180,6 +183,19 @@ export async function upstreamJsonByBaseUrl<T>(
   return await response.json() as T
 }
 
+export async function upstreamJsonWithReconnect<T>(
+  resolveBaseUrl: ResolveUpstreamBaseUrl,
+  pathWithQuery: string,
+  init?: RequestInit,
+): Promise<T> {
+  return await retryReplayableUpstreamRequest(
+    baseUrl => upstreamJsonByBaseUrl<T>(baseUrl, pathWithQuery, init),
+    resolveBaseUrl,
+    init?.method ?? 'GET',
+    init?.signal,
+  )
+}
+
 export function buildUpstreamRequestHeaders(headers: Headers, upstreamHost: string): Headers {
   const filtered = new Headers()
   headers.forEach((value, key) => {
@@ -243,4 +259,57 @@ export async function proxyUpstreamRequestByBaseUrl(
     statusText: upstreamResponse.statusText,
     headers: buildUpstreamResponseHeaders(upstreamResponse.headers),
   })
+}
+
+/**
+ * Replay one header-level failure after the remote-host owner has re-established
+ * its tunnel. Only bodyless, read-only HTTP methods are eligible: transparent
+ * proxy code cannot prove an arbitrary mutation is safe to execute twice.
+ */
+export async function proxyUpstreamRequestWithReconnect(
+  resolveBaseUrl: ResolveUpstreamBaseUrl,
+  request: Request,
+  upstreamPathWithQuery: string,
+): Promise<Response> {
+  return await retryReplayableUpstreamRequest(
+    baseUrl => proxyUpstreamRequestByBaseUrl(baseUrl, request, upstreamPathWithQuery),
+    resolveBaseUrl,
+    request.method,
+    request.signal,
+  )
+}
+
+async function retryReplayableUpstreamRequest<T>(
+  operation: (baseUrl: string) => Promise<T>,
+  resolveBaseUrl: ResolveUpstreamBaseUrl,
+  method: string,
+  signal?: AbortSignal | null,
+): Promise<T> {
+  const attempts = AUTOMATIC_REPLAY_METHODS.has(method.toUpperCase()) ? 2 : 1
+  let lastError: unknown
+  let failedBaseUrl: string | undefined
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (signal?.aborted) {
+      throw signal.reason
+    }
+    const baseUrl = await resolveBaseUrl(failedBaseUrl)
+    try {
+      return await operation(baseUrl)
+    }
+    catch (error) {
+      lastError = error
+      if (
+        attempt === attempts
+        || signal?.aborted
+        || !(error instanceof AppError)
+        || error.code !== 'remote_cradle_request_failed'
+      ) {
+        throw error
+      }
+      failedBaseUrl = baseUrl
+    }
+  }
+
+  throw lastError
 }

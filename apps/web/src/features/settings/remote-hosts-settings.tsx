@@ -10,7 +10,6 @@ import {
   Home2Line as HomeIcon,
   LinkLine as LinkIcon,
   PencilLine as PencilIcon,
-  PlusLine as PlusIcon,
   Refresh2Line as RefreshIcon,
   ServerLine as ServerIcon,
 } from '@mingcute/react'
@@ -80,7 +79,7 @@ import { cn } from '~/lib/cn'
 
 import { HostEnrollmentsSection } from './host-enrollments-section'
 import { RelayServersSection } from './relay-servers-settings-section'
-import { SettingsGroup, SettingsPage } from './settings-container'
+import { RemoteHostsSettingsView } from './remote-hosts-settings-view'
 
 type Host = GetRemoteHostsResponse[number]
 type ConnectionState = Host['connectionState']
@@ -445,66 +444,6 @@ function GuideStep({ index, title, isLast, children }: { index: number, title: s
   )
 }
 
-function SetupGuide({ onAdd }: { onAdd?: () => void }) {
-  const { t } = useTranslation('settings')
-  return (
-    <div className="space-y-4">
-      <ol className="space-y-0">
-        <GuideStep index={1} title={t('remoteHosts.guide.step1.title')}>
-          <p className="text-[12px] leading-relaxed text-muted-foreground/80">
-            {t('remoteHosts.guide.step1.detail')}
-          </p>
-        </GuideStep>
-        <GuideStep index={2} title={t('remoteHosts.guide.step2.title')}>
-          <p className="text-[12px] leading-relaxed text-muted-foreground/80">
-            {t('remoteHosts.guide.step2.detail')}
-          </p>
-          {onAdd && (
-            <Button size="sm" onClick={onAdd}>
-              <PlusIcon className="size-3.5" aria-hidden="true" />
-              {t('remoteHosts.action.addHost')}
-            </Button>
-          )}
-        </GuideStep>
-        <GuideStep index={3} isLast title={t('remoteHosts.guide.step3.title')}>
-          <p className="text-[12px] leading-relaxed text-muted-foreground/80">
-            {t('remoteHosts.guide.step3.detail')}
-          </p>
-          <p className="text-[11.5px] leading-relaxed text-muted-foreground/70">
-            {t('remoteHosts.guide.relayNote')}
-          </p>
-        </GuideStep>
-      </ol>
-    </div>
-  )
-}
-
-function RemoteHostsEmptyState({ onAdd }: { onAdd: () => void }) {
-  const { t } = useTranslation('settings')
-  return (
-    <div className="flex flex-col items-center gap-7 rounded-xl border border-dashed border-foreground/10 bg-muted/20 px-6 py-12 text-center">
-      <div className="flex size-11 items-center justify-center rounded-2xl bg-foreground/5 text-foreground/70">
-        <ServerIcon className="size-5" aria-hidden="true" />
-      </div>
-      <div className="max-w-md space-y-2">
-        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">
-          {t('remoteHosts.empty.title')}
-        </h2>
-        <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-          {t('remoteHosts.guide.intro')}
-        </p>
-      </div>
-      <div className="w-full max-w-md text-left">
-        <SetupGuide onAdd={onAdd} />
-      </div>
-      <Button size="sm" onClick={onAdd}>
-        <PlusIcon className="size-3.5" aria-hidden="true" />
-        {t('remoteHosts.action.addHost')}
-      </Button>
-    </div>
-  )
-}
-
 function DetailSection({ label, children }: { label: string, children: React.ReactNode }) {
   return (
     <div className="space-y-2">
@@ -709,7 +648,7 @@ function WorkspaceList({ host }: { host: Host }) {
     enabled: host.connectionState === 'connected',
     retry: false,
   })
-  const workspaces = workspacesQuery.data ?? []
+  const workspaces = useMemo(() => workspacesQuery.data ?? [], [workspacesQuery.data])
   const selectedWorkspace = useMemo(() => {
     return workspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? workspaces[0] ?? null
   }, [selectedWorkspaceId, workspaces])
@@ -2088,63 +2027,49 @@ export function RemoteHostsSettings() {
   const { data: hosts = [], isLoading } = useQuery(getRemoteHostsOptions())
 
   return (
-    <SettingsPage
-      title={t('remoteHosts.page.title')}
-      description={t('remoteHosts.page.description')}
-      action={(
-        <Button data-testid="add-remote-host-btn" size="sm" onClick={() => setAddOpen(true)}>
-          <PlusIcon className="size-3.5" aria-hidden="true" />
-          {t('remoteHosts.action.addHost')}
-        </Button>
+    <RemoteHostsSettingsView
+      copy={{
+        title: t('remoteHosts.page.title'),
+        description: t('remoteHosts.page.description'),
+        addHost: t('remoteHosts.action.addHost'),
+        loading: t('remoteHosts.loading'),
+        emptyTitle: t('remoteHosts.empty.title'),
+        guideIntro: t('remoteHosts.guide.intro'),
+        guideToggle: t('remoteHosts.guide.toggle'),
+        guideSteps: [
+          {
+            title: t('remoteHosts.guide.step1.title'),
+            detail: t('remoteHosts.guide.step1.detail'),
+          },
+          {
+            title: t('remoteHosts.guide.step2.title'),
+            detail: t('remoteHosts.guide.step2.detail'),
+          },
+          {
+            title: t('remoteHosts.guide.step3.title'),
+            detail: t('remoteHosts.guide.step3.detail'),
+          },
+        ],
+        relayNote: t('remoteHosts.guide.relayNote'),
+        otherComputers: t('remoteHosts.group.otherComputers'),
+        otherComputersDescription: t('remoteHosts.group.otherComputers.description'),
+      }}
+      hosts={hosts}
+      loading={isLoading}
+      guideOpen={guideOpen}
+      revealHostId={revealHostId}
+      onAddHost={() => setAddOpen(true)}
+      onGuideOpenChange={setGuideOpen}
+      renderHost={(host, reveal) => <HostRow key={host.id} host={host} reveal={reveal} />}
+      hostEnrollmentsSlot={<HostEnrollmentsSection />}
+      relayServersSlot={<RelayServersSection />}
+      pairComputerSlot={(
+        <PairComputerWizard
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          onReveal={setRevealHostId}
+        />
       )}
-      data-testid="remote-hosts-settings"
-    >
-      <HostEnrollmentsSection />
-
-      {isLoading
-        ? (
-            <div className="flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-10 text-[12px] text-muted-foreground">
-              <Spinner className="size-3.5" />
-              {t('remoteHosts.loading')}
-            </div>
-          )
-        : hosts.length === 0
-          ? <RemoteHostsEmptyState onAdd={() => setAddOpen(true)} />
-          : (
-              <>
-                <Collapsible open={guideOpen} onOpenChange={setGuideOpen}>
-                  <CollapsibleTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 text-[11.5px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <ChevronIcon className={cn('size-3.5 transition-transform', guideOpen ? 'rotate-0' : '-rotate-90')} aria-hidden="true" />
-                      {t('remoteHosts.guide.toggle')}
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-4">
-                    <div className="rounded-xl border border-border bg-card p-5">
-                      <SetupGuide onAdd={() => setAddOpen(true)} />
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-
-                <SettingsGroup
-                  label={t('remoteHosts.group.otherComputers')}
-                  description={t('remoteHosts.group.otherComputers.description')}
-                  bare
-                  className="[&>*+*]:border-t [&>*+*]:border-border/60"
-                >
-                  {hosts.map(host => (
-                    <HostRow key={host.id} host={host} reveal={revealHostId === host.id} />
-                  ))}
-                </SettingsGroup>
-              </>
-            )}
-
-      <RelayServersSection />
-
-      <PairComputerWizard open={addOpen} onOpenChange={setAddOpen} onReveal={setRevealHostId} />
-    </SettingsPage>
+    />
   )
 }
