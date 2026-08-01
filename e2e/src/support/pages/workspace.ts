@@ -1,4 +1,5 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 
 import type { Locator, Page } from '@playwright/test'
@@ -221,7 +222,8 @@ export class WorkspacePage {
   }
 
   async addWorkspaceThroughNativeDialog(): Promise<void> {
-    const dir = this.owner.createTempWorkspaceDir()
+    // Directory browser only allows home (and similar) roots — not /tmp.
+    const dir = mkdtempSync(join(homedir(), 'cradle-e2e-ws-'))
     const fixture: WorkspaceFixture = {
       dir,
       name: basename(dir),
