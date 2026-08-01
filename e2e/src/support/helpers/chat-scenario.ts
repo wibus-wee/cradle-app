@@ -73,6 +73,13 @@ export async function configureMultiTurnClaudeAgentSimulator(world: CradleWorld)
   ])
 }
 
+/** Provider + runtime only — no scripted conversation exchanges (Composer bang, etc.). */
+export async function configureClaudeAgentProviderWithoutExchanges(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure Claude Agent simulator provider without exchanges')
+  await world.configureClaudeAgentChat({ mode: 'text' })
+  requireSimulator(world).reset()
+}
+
 export async function configureSlowGatedClaudeAgentSimulator(world: CradleWorld): Promise<void> {
   console.warn('[step] configure slow gated Claude Agent simulator')
   await world.configureClaudeAgentChat({ mode: 'text', text: SLOW_RESPONSE })

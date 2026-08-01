@@ -6,6 +6,7 @@ import {
   assertSimulatorExhausted,
   CHAT_STATUS_TIMEOUT,
   clearBrowserClipboard,
+  configureClaudeAgentProviderWithoutExchanges,
   configureClaudeApprovalSimulator,
   configureCodexMultiTurnSimulator,
   configureDefaultAiReply,
@@ -44,6 +45,10 @@ Given('应用已启动', async function (this: CradleWorld) {
 
 Given('我已配置 Claude Agent 多轮 Simulator', async function (this: CradleWorld) {
   await configureMultiTurnClaudeAgentSimulator(this)
+})
+
+Given('我已配置 Claude Agent Simulator Provider（不预置回复）', async function (this: CradleWorld) {
+  await configureClaudeAgentProviderWithoutExchanges(this)
 })
 
 Given('我已配置带门控的慢速 Claude Agent Simulator', async function (this: CradleWorld) {

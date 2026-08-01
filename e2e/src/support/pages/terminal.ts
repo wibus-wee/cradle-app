@@ -53,10 +53,25 @@ export class TerminalPage {
   }
 
   async expectWorkspacePathHash(workspacePath: string): Promise<void> {
-    const expected = createHash('sha1').update(workspacePath).digest('hex')
+    // `pwd` prints a trailing newline before piping to shasum.
+    const expected = createHash('sha1').update(`${workspacePath}\n`).digest('hex')
     await expect.poll(async () => {
       const text = (await this.readTranscript()).replace(WHITESPACE_DOTS_RE, '')
       return text.includes(expected)
     }, { timeout: TIMEOUT }).toBe(true)
+  }
+
+  async close(): Promise<void> {
+    const toggle = this.page.locator('[data-testid="app-header-panel-toggle"]')
+    const panel = this.bottomPanel()
+    await expect(toggle).toBeVisible({ timeout: 10_000 })
+    if ((await panel.getAttribute('data-panel-open')) !== 'false') {
+      await toggle.click()
+    }
+    await expect(panel).toHaveAttribute('data-panel-open', 'false', { timeout: 10_000 })
+  }
+
+  async expectClosed(): Promise<void> {
+    await expect(this.bottomPanel()).toHaveAttribute('data-panel-open', 'false', { timeout: 10_000 })
   }
 }
