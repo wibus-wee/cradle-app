@@ -381,7 +381,7 @@ describe('resolveMacBridgeBinaryPath', () => {
   })
 })
 
-describe('macBridgeManager', () => {
+describe.skipIf(process.platform !== 'darwin')('macBridgeManager', () => {
   let manager: MacBridgeManager | null = null
 
   afterEach(async () => {
