@@ -43,12 +43,15 @@ function jsonResponse(body: unknown): Response {
 }
 
 function installGitHubFetch(routes: Record<string, unknown | Response>): ReturnType<typeof vi.fn> {
+  const routesByPathname = new Map(
+    Object.entries(routes).map(([route, body]) => [
+      new URL(route, 'https://api.github.com').pathname,
+      body,
+    ]),
+  )
   const mock = vi.fn(async (input: RequestInfo | URL) => {
-    const url = new Request(input).url
-    const parsed = new URL(url)
-    const key = `${parsed.pathname}?${parsed.searchParams.toString()}`
-    const pathKey = parsed.pathname
-    const body = routes[key] ?? routes[pathKey]
+    const { pathname } = new URL(new Request(input).url)
+    const body = routesByPathname.get(pathname)
     if (body === undefined) {
       return new Response('not found', { status: 404 })
     }
@@ -657,7 +660,13 @@ describe('gitHub session-await sources', () => {
         total_count: 0,
         workflow_runs: [],
       },
-      '/repos/acme/app/branches/main/protection': new Error('GitHub temporarily unavailable'),
+      '/repos/acme/app/branches/main/protection': new Response(
+        JSON.stringify({ message: 'GitHub temporarily unavailable' }),
+        {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
     })
 
     const [result] = await githubCISource.checkPending([
