@@ -295,29 +295,13 @@ Given('我已配置会失败的 Claude Agent Simulator', async function (this: C
   await this.configureClaudeAgentChat({ mode: 'text' })
   this.simulator!.reset()
   const { anthropicHttpErrorExchange, anthropicScenario } = await import('../support/scenarios/anthropic')
-  // Queue several identical failures so SDK retries still surface the same message
-  // under probes-only (empty queue → UnexpectedRequest would otherwise hide it).
-  // Three scripted 503s cover Claude Agent's typical retry budget; a later
-  // UnexpectedRequest still surfaces as API Error in the chat transcript.
-  const excludeTitle = 'You are naming a Claude Agent task session'
+  // Single 503 with x-should-retry:false — Claude Agent must surface the scripted message.
   this.enqueue(anthropicScenario([
     anthropicHttpErrorExchange({
-      label: 'fail-1',
+      label: 'fail-provider',
       message: 'E2E simulator forced failure',
       bodyTextIncludes: '请触发 provider 错误',
-      bodyTextExcludes: excludeTitle,
-    }),
-    anthropicHttpErrorExchange({
-      label: 'fail-2',
-      message: 'E2E simulator forced failure',
-      bodyTextIncludes: '请触发 provider 错误',
-      bodyTextExcludes: excludeTitle,
-    }),
-    anthropicHttpErrorExchange({
-      label: 'fail-3',
-      message: 'E2E simulator forced failure',
-      bodyTextIncludes: '请触发 provider 错误',
-      bodyTextExcludes: excludeTitle,
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
     }),
   ]))
 })
@@ -594,10 +578,8 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 })
 
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
-  // Phase 2B will remove allowProjectedApiError once product surfaces forced failure.
   await this.chat.expectErrorContains(text, {
-    timeout: Math.max(CHAT_STATUS_TIMEOUT, 90_000),
-    allowProjectedApiError: true,
+    timeout: Math.max(CHAT_STATUS_TIMEOUT, 60_000),
   })
 })
 

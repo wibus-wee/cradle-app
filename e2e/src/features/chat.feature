@@ -47,6 +47,7 @@
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
     而且 聊天错误提示应显示"E2E simulator forced failure"
+    而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-CHAT-004
   场景: 流式过程中刷新页面后仍能看到用户消息与最终回复
@@ -75,9 +76,8 @@
     而且 最后一条 AI 消息应包含"Hello from E2E simulator!"
     而且 最后一条 AI 消息应显示 Reasoning 入口
     当 我展开最后一条 AI 消息的 Reasoning
-    # Claude Agent currently projects thinking as an activity-feed Thought row;
-    # body text may be empty depending on SDK redaction — assert the entry opens.
-    那么 最后一条 AI 消息应显示已展开的 Thought 条目
+    那么 最后一条 AI 消息的 Reasoning 应包含"第一步分析问题"
+    而且 最后一条 AI 消息应显示已展开的 Thought 条目
     而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-CHAT-006
@@ -96,6 +96,7 @@
     当 我打开会话"旧会话"的菜单
     而且 我点击会话"旧会话"的删除菜单项
     那么 侧栏中不应显示会话"旧会话"
+    而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-CHAT-007
   场景: 可以将会话复制为 Markdown 到剪贴板
@@ -108,3 +109,4 @@
     那么 Electron 剪贴板中应包含以下 Markdown 片段:
       | 导出 Markdown 测试标题 |
       | 第一轮助手：已记住苹果 |
+    而且 Simulator 脚本化交换应全部耗尽

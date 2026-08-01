@@ -144,27 +144,19 @@ export class ChatPage {
   }
 
   /**
-   * Prefer exact failure string; optionally accept broader API Error patterns
-   * when `allowProjectedApiError` is true (legacy soft path — prefer hard).
+   * Prefer exact failure string in the chat error banner / transcript.
    */
   async expectErrorContains(
     text: string,
-    options: { timeout?: number, allowProjectedApiError?: boolean } = {},
+    options: { timeout?: number } = {},
   ): Promise<void> {
     const timeout = options.timeout ?? CHAT_TIMEOUT
     const view = await this.waitVisible(timeout)
     await expect.poll(async () => {
       const bannerText = (await this.errorBanner().textContent().catch(() => '')) ?? ''
       const viewText = (await view.textContent().catch(() => '')) ?? ''
-      const bodyText = (await this.page.locator('body').textContent().catch(() => '')) ?? ''
-      const combined = `${bannerText}\n${viewText}\n${bodyText}`
-      if (combined.includes(text)) {
-        return true
-      }
-      if (options.allowProjectedApiError) {
-        return /API Error:\s*\d+/i.test(combined) || /Unexpected request/i.test(combined)
-      }
-      return false
+      const combined = `${bannerText}\n${viewText}`
+      return combined.includes(text)
     }, { timeout }).toBe(true)
   }
 

@@ -270,6 +270,11 @@ export function anthropicHttpErrorExchange(input: {
     response: {
       kind: 'json',
       status: input.status ?? 503,
+      // Tell Anthropic SDKs not to retry so the scripted message reaches the UI.
+      headers: {
+        'x-should-retry': 'false',
+        'request-id': `req_${input.label}`,
+      },
       body: {
         type: 'error',
         request_id: `req_${input.label}`,
