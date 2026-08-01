@@ -21,6 +21,14 @@ pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@essence"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "not @wip"
 ```
 
+## CI gate
+
+- PR smoke (`e2e-smoke.yml`) runs `@P0` when **critical paths** change
+  (`e2e/**`, `packages/model-api-simulator/**`, `apps/web/**`, `apps/server/**`, …)
+  **or** when the `e2e` label is present (force / keep running).
+- Always checks out the **PR head**, provisions Codex via `sync:codex-runtime`.
+- Daily defaults to `@essence`.
+
 ## Quality bar（精）
 
 Every scenario must be a real multi-link user journey. Prefer depth over count.

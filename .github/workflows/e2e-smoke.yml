@@ -1,14 +1,9 @@
 name: E2E Smoke (PR)
 
-# Runs P0 E2E scenarios on pull requests when the `e2e` label is applied.
-# This is opt-in to avoid running the full E2E suite on every PR push.
-# Maintainers add the `e2e` label to PRs that touch critical user-facing paths.
-
-name: E2E Smoke (PR)
-
-# Runs P0 E2E scenarios on pull requests when the `e2e` label is applied.
-# Always checks out the PR head (never main) and provisions Codex app-server
-# so @CRADLE-CODEX-* scenarios can pass on clean runners.
+# Runs @P0 against the PR head when:
+# - critical paths change (e2e / simulator / web / server / Codex sync / this workflow), OR
+# - the `e2e` label is present (force / keep running on later pushes)
+# Always provisions Codex app-server so @CRADLE-CODEX-* can pass on clean runners.
 
 on:
   pull_request:
@@ -20,20 +15,51 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Opt-in via `e2e` label (re-runs on later pushes while the label remains).
-  gate:
-    name: Check label
+  changes:
+    name: Detect critical paths
     runs-on: ubuntu-latest
-    if: >
-      contains(github.event.pull_request.labels.*.name, 'e2e') ||
-      github.event.label.name == 'e2e'
+    outputs:
+      critical: ${{ steps.filter.outputs.critical }}
     steps:
-      - run: echo "e2e label present — smoke run will proceed against the PR head"
+      - name: Checkout Cradle source
+        uses: actions/checkout@v4
+        with:
+          repository: wibus-wee/cradle-app
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            critical:
+              - 'e2e/**'
+              - 'packages/model-api-simulator/**'
+              - 'apps/web/**'
+              - 'apps/server/**'
+              - 'apps/desktop/scripts/sync-codex-runtime.mjs'
+              - '.github/workflows/e2e-smoke.yml'
+              - '.github/actions/setup/**'
+
+  gate:
+    name: Check smoke gate
+    runs-on: ubuntu-latest
+    needs: changes
+    if: >
+      always() &&
+      needs.changes.result == 'success' && (
+        needs.changes.outputs.critical == 'true' ||
+        contains(github.event.pull_request.labels.*.name, 'e2e') ||
+        github.event.label.name == 'e2e'
+      )
+    steps:
+      - run: echo "E2E smoke gate open (critical paths and/or e2e label) — running @P0 on PR head"
 
   e2e-smoke:
     name: E2E Smoke (P0)
     runs-on: ubuntu-latest
     needs: gate
+    if: ${{ needs.gate.result == 'success' }}
     timeout-minutes: 30
 
     steps:

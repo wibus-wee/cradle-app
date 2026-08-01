@@ -243,14 +243,7 @@ export class KanbanPage {
   }
 
   async expectEmptyBoardText(text: string): Promise<void> {
-    // The empty board message may not be present in the current UI
-    const element = this.page.locator(`text=${text}`)
-    if (await element.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await expect(element).toBeVisible()
-    }
-    else {
-      console.warn(`[step] kanban empty board text "${text}" not found, skipping`)
-    }
+    await expect(this.page.getByText(text, { exact: false }).first()).toBeVisible({ timeout: 10_000 })
   }
 
   async open(): Promise<void> {
@@ -644,22 +637,13 @@ export class KanbanPage {
 
   async search(query: string): Promise<void> {
     const input = this.page.locator(KanbanPage.KANBAN_SEARCH_INPUT)
-    // Search input may not exist in current UI — skip gracefully
-    if (await input.isVisible().catch(() => false)) {
-      await input.fill(query)
-    }
-    else {
-      console.warn('[step] kanban search input not found, skipping search')
-    }
+    await expect(input).toBeVisible({ timeout: 10_000 })
+    await input.fill(query)
   }
 
   async clearSearch(): Promise<void> {
     const input = this.page.locator(KanbanPage.KANBAN_SEARCH_INPUT)
-    if (await input.isVisible().catch(() => false)) {
-      await input.fill('')
-    }
-    else {
-      console.warn('[step] kanban search input not found, skipping clear')
-    }
+    await expect(input).toBeVisible({ timeout: 10_000 })
+    await input.fill('')
   }
 }
