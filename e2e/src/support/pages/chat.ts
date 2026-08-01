@@ -290,6 +290,14 @@ export class ChatPage {
     await this.expandExecutionDetails(bubble)
     const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
     await expect(feed).toBeVisible({ timeout })
+    // Collapsed feed only shows the summary verb (e.g. "Explored 1 file").
+    const feedSummary = feed.locator('button').first()
+    if (await feedSummary.count() > 0) {
+      const expanded = await feedSummary.getAttribute('aria-expanded')
+      if (expanded !== 'true') {
+        await feedSummary.click()
+      }
+    }
     await expect(feed).toContainText(text, { timeout })
   }
 
