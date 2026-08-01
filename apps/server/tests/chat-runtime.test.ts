@@ -95,6 +95,12 @@ interface ChatMessageShellRow {
   errorText?: string
   preview: string
   previewTruncated: boolean
+  message: {
+    id: string
+    role: 'user' | 'assistant'
+    parts: Array<{ type: string, text?: string, [key: string]: unknown }>
+    metadata?: Record<string, unknown>
+  }
   parentMessageId: string | null
   parentToolCallId?: string | null
 }
@@ -4355,11 +4361,13 @@ describe('chat runtime capability', () => {
       expect(messageRows).toEqual([
         expect.objectContaining({
           messageId: userMessage.id,
-          content: 'Keep this history readable.',
+          preview: 'Keep this history readable.',
+          message: userMessage,
         }),
         expect.objectContaining({
           messageId: assistantMessage.id,
-          content: 'History remains available.',
+          preview: 'History remains available.',
+          message: assistantMessage,
         }),
       ])
 
@@ -4548,7 +4556,7 @@ describe('chat runtime capability', () => {
     }
   })
 
-  it('compacts oversized stored snapshots in hydrated message DTOs without mutating storage', async () => {
+  it('compacts oversized snapshots only on observation surfaces, preserving hydrated message DTOs and storage', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -4587,10 +4595,11 @@ describe('chat runtime capability', () => {
         sessionId: 'session-chat-repair-snapshot',
       })
 
+      const oversizedText = `oversized assistant text ${'x'.repeat(2_000)}`
       const originalSnapshot = JSON.stringify({
         id: 'message-repair-snapshot-assistant',
         role: 'assistant',
-        parts: [{ type: 'text', text: `oversized assistant text ${'x'.repeat(2_000)}` }],
+        parts: [{ type: 'text', text: oversizedText }],
       })
       insertMessageFixtures(db(), {
           id: 'message-repair-snapshot-assistant',
@@ -4601,7 +4610,7 @@ describe('chat runtime capability', () => {
           depth: 0,
           role: 'assistant',
           status: 'complete',
-          content: `oversized assistant text ${'x'.repeat(2_000)}`,
+          content: oversizedText,
           messageJson: originalSnapshot,
           errorText: null,
           createdAt: 1700000000,
@@ -4614,13 +4623,17 @@ describe('chat runtime capability', () => {
         'session-chat-repair-snapshot',
         'message-repair-snapshot-assistant',
       )).message.parts.find(part => part.type === 'text')?.text).toBe(
-        'oversized assistant text',
+        oversizedText,
       )
-      expect(messageRows[0]?.preview).toBe('oversized assistant text')
+      expect(messageRows[0]?.message.parts.find(part => part.type === 'text')?.text).toBe(
+        oversizedText,
+      )
+      expect(messageRows[0]?.preview).toBe(oversizedText.slice(0, 2_000))
+      expect(messageRows[0]?.previewTruncated).toBe(true)
 
       const storedRow = readMessagePayload(db(), 'message-repair-snapshot-assistant')
       expect(storedRow?.messageJson).toBe(originalSnapshot)
-      expect(storedRow?.content).toBe(`oversized assistant text ${'x'.repeat(2_000)}`)
+      expect(storedRow?.content).toBe(oversizedText)
     }
  finally {
       shutdownInfra()
@@ -5108,7 +5121,7 @@ describe('chat runtime capability', () => {
     }
   })
 
-  it('passes malformed runtime chunks through without synthesizing protocol anchors', async () => {
+  it('passes malformed runtime chunks into fail-closed validation without synthesizing protocol anchors', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -5154,27 +5167,21 @@ describe('chat runtime capability', () => {
       expect(runRes.status).toBe(200)
 
       const chunks = await collectSseChunks(runRes)
-      expect(chunks).toEqual([
+      expect(chunks).toEqual(expect.arrayContaining([
         expect.objectContaining({ type: 'start' }),
         expect.objectContaining({
-          type: 'text-delta',
-          id: 'text-missing-start',
-          delta: 'Recovered text',
+          type: 'error',
+          errorText: 'Received stream delta for missing part text-missing-start',
         }),
+      ]))
+      expect(chunks).not.toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'text-start', id: 'text-missing-start' }),
+        expect.objectContaining({ type: 'text-delta', id: 'text-missing-start' }),
         expect.objectContaining({ type: 'text-end', id: 'text-missing-start' }),
-        expect.objectContaining({
-          type: 'tool-output-available',
-          toolCallId: 'call_missing_tool',
-          output: { ok: true },
-        }),
-        expect.objectContaining({ type: 'finish', finishReason: 'stop' }),
-      ])
-      expect(chunks).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ type: 'text-start', id: 'text-missing-start' }),
-          expect.objectContaining({ type: 'tool-input-start', toolCallId: 'call_missing_tool' }),
-        ]),
-      )
+        expect.objectContaining({ type: 'tool-input-start', toolCallId: 'call_missing_tool' }),
+        expect.objectContaining({ type: 'tool-output-available', toolCallId: 'call_missing_tool' }),
+        expect.objectContaining({ type: 'finish' }),
+      ]))
     }
  finally {
       if (originalCodexRuntime) {

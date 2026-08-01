@@ -22,7 +22,7 @@ import {
 import {
   getMessageDetail,
   getMessageGroups,
-  getMessageShellSnapshot,
+  getMessageSnapshot,
 } from '../src/modules/chat-runtime/history-api'
 import {
   hydrateMessage,
@@ -299,7 +299,7 @@ describe('chat runtime recovery', () => {
         })
       }
 
-      const firstPage = await getMessageShellSnapshot('session-bounded-history')
+      const firstPage = await getMessageSnapshot('session-bounded-history')
 
       expect(firstPage.rows).toHaveLength(100)
       expect(firstPage.rows[0]?.messageId).toBe('message-0787')
@@ -308,7 +308,7 @@ describe('chat runtime recovery', () => {
       const allIds = [...firstPage.rows.map(row => row.messageId)]
       let cursor = firstPage.nextCursor
       while (cursor) {
-        const page = await getMessageShellSnapshot('session-bounded-history', { cursor })
+        const page = await getMessageSnapshot('session-bounded-history', { cursor })
         allIds.unshift(...page.rows.map(row => row.messageId))
         cursor = page.nextCursor
       }
@@ -350,18 +350,23 @@ describe('chat runtime recovery', () => {
     })
   })
 
-  it('reads malformed and huge durable payloads as bounded history shells', async () => {
+  it('handles malformed and huge durable payloads according to the history contract', async () => {
     await withTempDataDir(async () => {
       const sessionId = 'session-shell-malformed-payload'
       const messageId = 'message-shell-malformed-payload'
       seedSession(sessionId)
       const hugeContent = 'x'.repeat(20_000)
+      const message = {
+        id: messageId,
+        role: 'assistant' as const,
+        parts: [{ type: 'text' as const, text: hugeContent }],
+      }
       const createdAt = 1700000000
       putMessagePayload(db(), {
         id: messageId,
         sessionId,
         content: hugeContent,
-        messageJson: '{ deliberately malformed',
+        messageJson: JSON.stringify(message),
         errorText: null,
         createdAt,
         updatedAt: createdAt,
@@ -380,16 +385,25 @@ describe('chat runtime recovery', () => {
         updatedAt: createdAt,
       }).run()
 
-      await expect(getMessageShellSnapshot(sessionId)).resolves.toMatchObject({
+      await expect(getMessageSnapshot(sessionId)).resolves.toMatchObject({
         rows: [{
           messageId,
           preview: 'x'.repeat(2_000),
           previewTruncated: true,
+          message,
         }],
       })
-      await expect(getMessageShellSnapshot(sessionId)).resolves.not.toMatchObject({
-        rows: [expect.objectContaining({ message: expect.anything() })],
+
+      putMessagePayload(db(), {
+        id: messageId,
+        sessionId,
+        content: hugeContent,
+        messageJson: '{ deliberately malformed',
+        errorText: null,
+        createdAt,
+        updatedAt: createdAt,
       })
+      await expect(getMessageSnapshot(sessionId)).rejects.toThrow('Stored chat message snapshot is invalid')
       expect(() => getMessageDetail(sessionId, messageId)).toThrow('Stored chat message snapshot is invalid')
     })
   })

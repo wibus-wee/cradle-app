@@ -189,6 +189,16 @@ export function parseStoredMessageSnapshot(raw: string): UIMessage {
 }
 
 export function normalizeMessageSnapshot(message: UIMessage): UIMessage {
+  if (!message || typeof message.id !== 'string' || message.id.length === 0) {
+    throw new Error('UIMessage snapshot must include a non-empty id')
+  }
+  if (message.role !== 'system' && message.role !== 'user' && message.role !== 'assistant') {
+    throw new Error('UIMessage snapshot must include a valid role')
+  }
+  if (!Array.isArray(message.parts)) {
+    throw new TypeError('UIMessage snapshot must include a parts array')
+  }
+
   const compactedMessage = compactChatMessageSplitMetadata(message)
   if (
     compactedMessage.role !== 'user'
