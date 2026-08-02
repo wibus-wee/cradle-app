@@ -325,8 +325,18 @@ export class CradleWorld extends World {
     this.simulator = await startE2ESimulator()
 
     this.browser = await chromium.launch({ headless: !process.env.CRADLE_E2E_HEADED })
+    const videoDir = this.scenarioArtifacts?.scenarioDir
     this.context = await this.browser.newContext({
       permissions: ['clipboard-read', 'clipboard-write'],
+      ...(videoDir
+        ? {
+            recordVideo: {
+              dir: videoDir,
+              size: { width: 1280, height: 720 },
+            },
+          }
+        : {}),
+      viewport: { width: 1280, height: 720 },
     })
     await this.context.addInitScript(() => {
       window.localStorage.setItem('cradle:onboarding:v1', JSON.stringify({

@@ -8,9 +8,13 @@ const EDGE_DASH_RE = /^-+|-+$/g
 export interface ScenarioArtifactPaths {
   slug: string
   scenarioDir: string
+  /** Relative to e2e/artifacts — used in CI issue copy */
+  relativeDir: string
   screenshotPath: string
   tracePath: string
   consoleLogPath: string
+  /** Final failure video path (webm). Raw Playwright files may land beside it. */
+  videoPath: string
 }
 
 export function slugifyScenarioName(name: string): string {
@@ -26,12 +30,27 @@ export function buildScenarioArtifactPaths(
   caseIndex: number,
 ): ScenarioArtifactPaths {
   const slug = slugifyScenarioName(scenarioName)
-  const scenarioDir = join(artifactsRoot, 'scenarios', `${slug}-${caseIndex}`)
+  const folderName = `${slug}-${caseIndex}`
+  const scenarioDir = join(artifactsRoot, 'scenarios', folderName)
   return {
     slug,
     scenarioDir,
+    relativeDir: `scenarios/${folderName}`,
     screenshotPath: join(scenarioDir, 'failure.png'),
     tracePath: join(scenarioDir, 'trace.zip'),
     consoleLogPath: join(scenarioDir, 'console.log'),
+    videoPath: join(scenarioDir, 'failure.webm'),
   }
 }
+
+export interface FailureArtifactIndexEntry {
+  scenario: string
+  relativeDir: string
+  screenshot: string
+  video: string
+  trace: string
+  console: string
+}
+
+export const FAILURE_INDEX_FILENAME = 'failure-index.json'
+export const ARTIFACTS_GUIDE_FILENAME = 'ARTIFACTS.md'

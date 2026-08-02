@@ -414,36 +414,66 @@ jobs:
         with:
           name: e2e-smoke-artifacts-${{ github.run_id }}
           path: |
+            e2e/artifacts/ARTIFACTS.md
+            e2e/artifacts/failure-index.json
             e2e/artifacts/cucumber-summary.txt
             e2e/artifacts/cucumber-output.log
             e2e/artifacts/cucumber-junit.xml
             e2e/artifacts/e2e-summary.json
             e2e/artifacts/e2e-summary.md
             e2e/artifacts/scenarios/**/failure.png
+            e2e/artifacts/scenarios/**/failure.webm
+            e2e/artifacts/scenarios/**/trace.zip
             e2e/artifacts/scenarios/**/console.log
-          retention-days: 7
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Post PR comment on failure
         if: steps.smoke.outcome == 'failure'
         uses: actions/github-script@v7
         env:
+          RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs')
+            const { readJson, formatFailureArtifactsSection } = require('./e2e/scripts/format-failure-issue.cjs')
             const runUrl = process.env.RUN_URL
+            const runId = process.env.RUN_ID
+            const summary = readJson('e2e/artifacts/e2e-summary.json', {
+              markdown: '_(no E2E summary was generated)_',
+              resultLine: 'no parsed scenario data',
+              nonPassedScenarios: [],
+            })
+            const failureIndex = readJson('e2e/artifacts/failure-index.json', [])
 
-            const summaryPath = 'e2e/artifacts/e2e-summary.json'
-            const summary = fs.existsSync(summaryPath)
-              ? JSON.parse(fs.readFileSync(summaryPath, 'utf8'))
-              : { markdown: '_(no E2E summary was generated)_', resultLine: 'no parsed scenario data' }
+            const body = `## ❌ E2E Smoke Failed
+
+            ${summary.markdown}
+
+            **Result:** \`${summary.resultLine}\`
+
+            ### Evidence (download artifact \`e2e-smoke-artifacts-${runId}\`)
+
+            See root \`ARTIFACTS.md\` in the zip. Per failure:
+
+            ${formatFailureArtifactsSection(failureIndex)}
+
+            | Kind | Path glob |
+            |------|-----------|
+            | Video 1:1 | \`scenarios/*/failure.webm\` |
+            | Screenshot | \`scenarios/*/failure.png\` |
+            | Playwright trace | \`scenarios/*/trace.zip\` → \`npx playwright show-trace\` |
+            | Console + simulator | \`scenarios/*/console.log\` |
+
+            [View run](${runUrl}) · [Download artifacts](${runUrl}/artifacts)
+            `.split('\n').map(l => l.trimStart()).join('\n')
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## ❌ E2E Smoke Failed\n\n${summary.markdown}\n\n[View run](${runUrl}) · [Download artifacts](${runUrl}/artifacts)`,
+              body,
             })
 
       - name: Propagate failure

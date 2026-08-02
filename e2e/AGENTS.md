@@ -52,6 +52,20 @@ do not invent a parallel mock LLM.
 - Prefer `data-testid` selectors first.
 - After LLM turns settle, prefer `Simulator 脚本化交换应全部耗尽` (`assertExhausted`).
 
+## Failure evidence (local + CI)
+
+On scenario failure, `e2e/artifacts/scenarios/<slug>-<n>/` contains:
+
+| File | Purpose |
+|------|---------|
+| `failure.webm` | 1:1 Chromium recording (CI upload; not embedded in Cucumber HTML) |
+| `failure.png` | Full-page screenshot at the failing step |
+| `trace.zip` | Playwright trace — `npx playwright show-trace path/to/trace.zip` |
+| `console.log` | Renderer console + model-api-simulator request ledger |
+
+Root `e2e/artifacts/ARTIFACTS.md` and `failure-index.json` document the bundle.
+Daily/smoke CI uploads all of the above and links them from the failure Issue / PR comment.
+
 ## Simulator usage
 
 - `configureClaudeAgentChat` — Anthropic Messages + real Claude Agent
