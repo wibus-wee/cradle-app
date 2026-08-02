@@ -25,6 +25,7 @@ public final class WatchOutAppModel {
   public var editBody: String = ""
   /// When set, UI should scroll/highlight this id once.
   public var focusedItemId: String?
+  public private(set) var lastDeleted: AttentionItem?
 
   @ObservationIgnored
   @Dependency(\.watchOutStore) private var store
@@ -42,6 +43,9 @@ public final class WatchOutAppModel {
   private var externalNotifyTask: Task<Void, Never>?
 
   @ObservationIgnored
+  private var undoExpiryTask: Task<Void, Never>?
+
+  @ObservationIgnored
   private var didRequestNotificationAuth = false
 
   public init() {
@@ -54,8 +58,14 @@ public final class WatchOutAppModel {
     Array(items)
   }
 
+  public var canUndoDelete: Bool {
+    lastDeleted != nil
+  }
+
   public func bootstrap() {
     refresh()
+    WatchOutNotifier.configure()
+    WatchOutUpdater.shared.startIfConfigured()
     Task { await requestNotificationsIfNeeded() }
   }
 
@@ -240,7 +250,10 @@ public final class WatchOutAppModel {
 
   public func delete(_ item: AttentionItem) {
     do {
-      try store.delete(id: item.id)
+      let removed = try store.deleteReturning(id: item.id)
+      lastDeleted = removed
+      scheduleUndoExpiry()
+      statusMessage = "Deleted. Undo available."
       if editingItem?.id == item.id {
         cancelEditing()
       }
@@ -248,6 +261,30 @@ public final class WatchOutAppModel {
     } catch {
       errorMessage = error.localizedDescription
     }
+  }
+
+  public func undoDelete() {
+    guard let lastDeleted else { return }
+    do {
+      let restored = try store.restore(lastDeleted)
+      self.lastDeleted = nil
+      undoExpiryTask?.cancel()
+      focusedItemId = restored.id
+      statusMessage = "Restored."
+      errorMessage = nil
+      openCount = (try? store.openCount()) ?? openCount
+      if restored.status == .done {
+        showDone = true
+        restartObservation()
+      }
+    } catch {
+      errorMessage = error.localizedDescription
+    }
+  }
+
+  public func dismissUndo() {
+    lastDeleted = nil
+    undoExpiryTask?.cancel()
   }
 
   public func copyItem(_ item: AttentionItem) {
@@ -332,10 +369,12 @@ public final class WatchOutAppModel {
         guard open > lastOpenCount else { continue }
 
         await requestNotificationsIfNeeded()
-        let newestTitle =
-          (try? store.list(AttentionListQuery(status: .open, limit: 1)).first?.title)
-          ?? "New item parked"
-        await WatchOutNotifier.notifyExternalPark(title: newestTitle, openCount: open)
+        let newest = try? store.list(AttentionListQuery(status: .open, limit: 1)).first
+        await WatchOutNotifier.notifyExternalPark(
+          title: newest?.title ?? "New item parked",
+          itemId: newest?.id,
+          openCount: open
+        )
       }
     }
   }
@@ -345,6 +384,18 @@ public final class WatchOutAppModel {
     guard !didRequestNotificationAuth else { return }
     didRequestNotificationAuth = true
     await WatchOutNotifier.requestAuthorizationIfNeeded()
+  }
+
+  private func scheduleUndoExpiry() {
+    undoExpiryTask?.cancel()
+    undoExpiryTask = Task { @MainActor in
+      try? await Task.sleep(for: .seconds(10))
+      guard !Task.isCancelled else { return }
+      lastDeleted = nil
+      if statusMessage == "Deleted. Undo available." {
+        statusMessage = nil
+      }
+    }
   }
 }
 

@@ -48,7 +48,7 @@ public struct WatchOutRootScene: Scene {
         WatchOutShortcutsSettingsPane()
           .tabItem { Label("Shortcuts", systemImage: "keyboard") }
       }
-      .frame(width: 420, height: 340)
+      .frame(width: 420, height: 420)
     }
   }
 }

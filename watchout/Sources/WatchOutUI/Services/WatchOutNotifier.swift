@@ -2,11 +2,36 @@
 import UserNotifications
 #endif
 import Foundation
+import WatchOutCore
 
 /// Local notifications for externally parked items (CLI / MCP / URL).
 @MainActor
 public enum WatchOutNotifier {
   public static let categoryIdentifier = "watchout.external-park"
+  public static let openActionIdentifier = "watchout.open"
+  public static let showActionIdentifier = "watchout.show"
+
+  public static func configure() {
+    #if canImport(UserNotifications)
+    let open = UNNotificationAction(
+      identifier: openActionIdentifier,
+      title: "Open",
+      options: [.foreground]
+    )
+    let show = UNNotificationAction(
+      identifier: showActionIdentifier,
+      title: "Show WatchOut",
+      options: [.foreground]
+    )
+    let category = UNNotificationCategory(
+      identifier: categoryIdentifier,
+      actions: [open, show],
+      intentIdentifiers: [],
+      options: []
+    )
+    UNUserNotificationCenter.current().setNotificationCategories([category])
+    #endif
+  }
 
   public static func requestAuthorizationIfNeeded() async {
     #if canImport(UserNotifications)
@@ -17,7 +42,7 @@ public enum WatchOutNotifier {
     #endif
   }
 
-  public static func notifyExternalPark(title: String, openCount: Int) async {
+  public static func notifyExternalPark(title: String, itemId: String?, openCount: Int) async {
     #if canImport(UserNotifications)
     let center = UNUserNotificationCenter.current()
     let settings = await center.notificationSettings()
@@ -32,7 +57,15 @@ public enum WatchOutNotifier {
       : "\(openCount) open — latest: \(title)"
     content.sound = .default
     content.categoryIdentifier = categoryIdentifier
-    content.userInfo = ["openCount": openCount]
+    var info: [AnyHashable: Any] = ["openCount": openCount]
+    if let itemId {
+      info["itemId"] = itemId
+    }
+    content.userInfo = info
+    if let itemId, let url = WatchOutURLRouter.itemURL(id: itemId) {
+      // Helps hosts that surface notification URL metadata.
+      content.userInfo["url"] = url.absoluteString
+    }
 
     let request = UNNotificationRequest(
       identifier: "watchout.external.\(UUID().uuidString)",

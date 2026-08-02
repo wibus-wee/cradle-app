@@ -203,10 +203,31 @@ public final class WatchOutStore: Sendable {
   }
 
   public func delete(id: String) throws {
-    let deleted = try dbQueue.write { db in
+    _ = try deleteReturning(id: id)
+  }
+
+  /// Deletes and returns the removed row so callers can offer undo / restore.
+  @discardableResult
+  public func deleteReturning(id: String) throws -> AttentionItem {
+    try dbQueue.write { db in
+      guard let item = try AttentionItem.fetchOne(db, key: id) else {
+        throw WatchOutStoreError.notFound(id)
+      }
       try AttentionItem.deleteOne(db, key: id)
+      return item
     }
-    guard deleted else { throw WatchOutStoreError.notFound(id) }
+  }
+
+  /// Re-inserts a previously deleted item (same id). Fails if the id already exists.
+  @discardableResult
+  public func restore(_ item: AttentionItem) throws -> AttentionItem {
+    try dbQueue.write { db in
+      if try AttentionItem.fetchOne(db, key: item.id) != nil {
+        throw WatchOutStoreError.database("Item already exists: \(item.id)")
+      }
+      try item.insert(db)
+      return item
+    }
   }
 
   public func exportJSON() throws -> Data {

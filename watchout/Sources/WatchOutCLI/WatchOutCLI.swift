@@ -7,7 +7,7 @@ struct WatchOutCLI: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "watchout",
     abstract: "WatchOut — local Attention Object Store (parking slips).",
-    version: "0.3.0",
+    version: "0.4.0",
     subcommands: [
       Create.self,
       Get.self,
@@ -17,6 +17,7 @@ struct WatchOutCLI: AsyncParsableCommand {
       Complete.self,
       Reopen.self,
       Delete.self,
+      Restore.self,
       Count.self,
       Export.self,
       Import.self,
@@ -256,10 +257,44 @@ extension WatchOutCLI {
     @Argument(help: "Item id")
     var id: String
 
+    @Flag(name: .long, help: "Print the deleted item as JSON (for restore)")
+    var json = false
+
     func run() throws {
       let store = try WatchOutStore.makeDefault()
-      try store.delete(id: id)
-      print("deleted \(id)")
+      let item = try store.deleteReturning(id: id)
+      if json {
+        let data = try JSONEncoder.watchOut.encode(item)
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+      } else {
+        print("deleted \(id)")
+      }
+    }
+  }
+
+  struct Restore: ParsableCommand {
+    static let configuration = CommandConfiguration(
+      abstract: "Restore a deleted item from JSON (stdin or --file)"
+    )
+
+    @Option(name: .long, help: "Path to a JSON AttentionItem (default: stdin)")
+    var file: String?
+
+    @Flag(name: .long, help: "Print JSON")
+    var json = false
+
+    func run() throws {
+      let data: Data
+      if let file {
+        data = try Data(contentsOf: URL(fileURLWithPath: file))
+      } else {
+        data = FileHandle.standardInput.readDataToEndOfFile()
+      }
+      let item = try JSONDecoder.watchOut.decode(AttentionItem.self, from: data)
+      let store = try WatchOutStore.makeDefault()
+      let restored = try store.restore(item)
+      try emit(restored, json: json)
     }
   }
 

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A46FED3CF3F1408AAA427583 /* WatchOutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48A5E38503B42EA9D03E06F /* WatchOutApp.swift */; };
+		A55ET5CAT00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A55ET5CAT00000000000002 /* Assets.xcassets */; };
 		D31CAED00A764502A12DD647 /* WatchOutUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1918CFC233514A3E9857FE5C /* WatchOutUI */; };
 		443C2C29D7A74C12BB97B7E0 /* WatchOutCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9957D4A7EBF24951A0E77FCE /* WatchOutCore */; };
 /* End PBXBuildFile section */
@@ -15,6 +16,7 @@
 /* Begin PBXFileReference section */
 		B48A5E38503B42EA9D03E06F /* WatchOutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchOutApp.swift; sourceTree = "<group>"; };
 		A11NF0PL15T000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A55ET5CAT00000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F4E77257352F4FFBB23795F4 /* WatchOut.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatchOut.entitlements; sourceTree = "<group>"; };
 		D657CD84B49C420389E7D981 /* WatchOut.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatchOut.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -52,6 +54,7 @@
 			isa = PBXGroup;
 			children = (
 				B48A5E38503B42EA9D03E06F /* WatchOutApp.swift */,
+				A55ET5CAT00000000000002 /* Assets.xcassets */,
 				A11NF0PL15T000000000001 /* Info.plist */,
 				F4E77257352F4FFBB23795F4 /* WatchOut.entitlements */,
 			);
@@ -132,6 +135,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A55ET5CAT00000000000001 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -186,6 +190,7 @@
 		080DAB98E10B482CB7BE0CE5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Apps/WatchOut/WatchOut.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -202,7 +207,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.watchout.WatchOut;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -214,6 +219,7 @@
 		719CF74A75AA4E9DB2033321 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Apps/WatchOut/WatchOut.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -230,7 +236,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.watchout.WatchOut;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

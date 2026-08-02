@@ -10,7 +10,7 @@ Not part of Cradle. Cradle may become a *client* later via MCP/CLI.
 |---|---|
 | **Menu bar app** (`LSUIElement`) | Always available; open count; quick list / create / complete |
 | **Floating panel** | Draggable, optional always-on-top scratch panel |
-| **CLI** `watchout` | `create` / `get` / `list` / `search` / `update` / `complete` / `reopen` / `delete` / `count` / `export` / `import` / `url` |
+| **CLI** `watchout` | `create` / `get` / `list` / `search` / `update` / `complete` / `reopen` / `delete` / `restore` / `count` / `export` / `import` / `url` |
 | **MCP** `watchout-mcp` | Same verbs for agents |
 | **URL scheme** | `watchout://park?title=…` · `watchout://item?id=…` · `watchout://show` |
 
@@ -35,7 +35,8 @@ SQLite path: `~/Library/Application Support/WatchOut/watchout.sqlite`
 - **KeyboardShortcuts** — global hotkeys (incl. park clipboard)
 - **LaunchAtLogin-Modern** — open at login
 - **MenuBarExtraAccess** — menu bar panel presentation control
-- **UserNotifications** — alert when CLI/MCP parks while app is idle
+- **UserNotifications** — alert when CLI/MCP parks; Open action → `watchout://item`
+- **Sparkle** — optional appcast feed URL in Settings (idle until configured)
 - **swift-argument-parser** — CLI
 - **modelcontextprotocol/swift-sdk** — MCP server
 - **swift-dependencies** — store injection for UI/tests

@@ -150,4 +150,24 @@ final class WatchOutStoreTests: XCTestCase {
       XCTAssertEqual(error as? WatchOutStoreError, .notFound("missing"))
     }
   }
+
+  func testDeleteReturningAndRestore() throws {
+    let store = try WatchOutStore.makeInMemory()
+    let created = try store.create(AttentionItemCreate(title: "Undo me", body: "keep"))
+    let removed = try store.deleteReturning(id: created.id)
+    XCTAssertEqual(try store.openCount(), 0)
+    XCTAssertNil(try store.get(id: created.id))
+
+    let restored = try store.restore(removed)
+    XCTAssertEqual(restored.id, created.id)
+    XCTAssertEqual(restored.title, "Undo me")
+    XCTAssertEqual(try store.openCount(), 1)
+
+    XCTAssertThrowsError(try store.restore(removed)) { error in
+      XCTAssertEqual(
+        error as? WatchOutStoreError,
+        .database("Item already exists: \(created.id)")
+      )
+    }
+  }
 }

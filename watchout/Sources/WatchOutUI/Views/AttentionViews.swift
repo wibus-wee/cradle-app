@@ -198,6 +198,26 @@ struct AttentionListPane: View {
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.horizontal, 4)
+      } else if model.canUndoDelete {
+        HStack(spacing: 8) {
+          Text("Deleted “\(model.lastDeleted?.title ?? "")”")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+          Spacer(minLength: 0)
+          Button("Undo") { model.undoDelete() }
+            .buttonStyle(.bordered)
+            .controlSize(.mini)
+            .keyboardShortcut("z", modifiers: .command)
+          Button {
+            model.dismissUndo()
+          } label: {
+            Image(systemName: "xmark")
+          }
+          .buttonStyle(.plain)
+          .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 4)
       } else if let statusMessage = model.statusMessage {
         Text(statusMessage)
           .font(.caption)

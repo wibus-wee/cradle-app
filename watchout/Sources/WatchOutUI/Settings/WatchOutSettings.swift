@@ -12,6 +12,7 @@ public struct WatchOutGeneralSettingsPane: View {
   @Default(.showMenuBarCount) private var showMenuBarCount
   @Default(.floatingVisibleOnLaunch) private var floatingVisibleOnLaunch
   @Default(.notifyOnExternalPark) private var notifyOnExternalPark
+  @Default(.sparkleFeedURL) private var sparkleFeedURL
 
   public init() {}
 
@@ -27,6 +28,20 @@ public struct WatchOutGeneralSettingsPane: View {
       }
       Section("Notifications") {
         Toggle("Notify when CLI/MCP parks an item", isOn: $notifyOnExternalPark)
+      }
+      Section("Updates") {
+        TextField("Sparkle appcast URL", text: $sparkleFeedURL)
+          .textFieldStyle(.roundedBorder)
+          .onChange(of: sparkleFeedURL) { _, _ in
+            WatchOutUpdater.shared.applyFeedURLFromDefaults()
+          }
+        Button("Check for Updates…") {
+          WatchOutUpdater.shared.checkForUpdates()
+        }
+        .disabled(!WatchOutUpdater.shared.isConfigured)
+        Text("Leave empty until you publish a signed Sparkle feed.")
+          .font(.caption)
+          .foregroundStyle(.secondary)
       }
       Section("Data") {
         LabeledContent("Database") {

@@ -24,6 +24,7 @@ let package = Package(
     .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0"),
     .package(url: "https://github.com/pointfreeco/swift-dependencies.git", from: "1.6.0"),
     .package(url: "https://github.com/pointfreeco/swift-identified-collections.git", from: "1.1.0"),
+    .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.6.0"),
   ],
   targets: [
     .target(
@@ -47,6 +48,7 @@ let package = Package(
         .product(name: "MenuBarExtraAccess", package: "MenuBarExtraAccess"),
         .product(name: "Dependencies", package: "swift-dependencies"),
         .product(name: "IdentifiedCollections", package: "swift-identified-collections"),
+        .product(name: "Sparkle", package: "Sparkle"),
       ],
       path: "Sources/WatchOutUI"
     ),
