@@ -5,7 +5,6 @@ import { visibleChatView } from '../support/ui'
 import type { CradleWorld } from '../support/world'
 
 const TERMINAL_TIMEOUT = 30_000
-const WHITESPACE_DOTS_RE = /[·\s]+/g
 
 async function getActiveChatWorkspacePath(world: CradleWorld): Promise<string> {
   const chatView = visibleChatView(world)
@@ -70,16 +69,12 @@ When('我在底部终端中执行命令{string}', async function (this: CradleWo
 
 When('我新建一个底部终端会话', async function (this: CradleWorld) {
   console.warn('[step] create bottom terminal session')
-  const button = this.page.locator('[data-testid="bottom-terminal-new-session"]')
-  await expect(button).toBeVisible({ timeout: TERMINAL_TIMEOUT })
-  await button.click()
+  await this.terminalPage.createSession()
 })
 
 When('我切换到底部终端第 {int} 个会话', async function (this: CradleWorld, ordinal: number) {
   console.warn(`[step] switch bottom terminal session: ${ordinal}`)
-  const tab = this.page.locator('[data-testid="bottom-terminal-tab"]').nth(ordinal - 1)
-  await expect(tab).toBeVisible({ timeout: TERMINAL_TIMEOUT })
-  await tab.locator('button').first().click()
+  await this.terminalPage.activateSession(ordinal)
 })
 
 When('我关闭底部终端第 {int} 个会话', async function (this: CradleWorld, ordinal: number) {
@@ -110,8 +105,15 @@ Then('底部终端应显示当前工作区路径哈希', async function (this: C
 
 Then('底部终端应显示文本{string}', async function (this: CradleWorld, text: string) {
   console.warn(`[step] assert bottom terminal contains text: ${text}`)
-  await expect.poll(
-    async () => ((await this.terminalPage.readTranscript()) ?? '').replace(WHITESPACE_DOTS_RE, ''),
-    { timeout: TERMINAL_TIMEOUT },
-  ).toContain(text.replace(WHITESPACE_DOTS_RE, ''))
+  await this.terminalPage.expectTranscriptContains(text)
+})
+
+Then('底部终端不应显示文本{string}', async function (this: CradleWorld, text: string) {
+  console.warn(`[step] assert bottom terminal does not contain text: ${text}`)
+  await this.terminalPage.expectTranscriptNotContains(text)
+})
+
+Then('可见 shell-view 应恰好有 1 个', async function (this: CradleWorld) {
+  await expect(this.page.locator('[data-testid="shell-view"][data-shell-visible="true"]'))
+    .toHaveCount(1, { timeout: TERMINAL_TIMEOUT })
 })

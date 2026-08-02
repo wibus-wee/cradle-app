@@ -82,7 +82,10 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
       return
     }
 
-    // Re-attach stdin/focus and revive a PTY reaped after shell-lease expiry.
+    // Re-enable stdin immediately — delaying only focus to the next frame.
+    // Multi-tab switch used to leave the revealed PTY with a focused helper
+    // textarea that never delivered onData until the pane was clicked again.
+    terminal.options.disableStdin = false
     ensureShellRunningRef.current?.()
     focusFrameRef.current = requestAnimationFrame(() => {
       focusFrameRef.current = null
@@ -93,6 +96,12 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
       terminal.options.disableStdin = false
       fitAddonRef.current?.fit()
       terminal.focus()
+      // Ensure the xterm helper textarea is the document activeElement so
+      // subsequent keyboard input is owned by this PTY, not a sibling tab.
+      const helper = containerRef.current?.querySelector('textarea.xterm-helper-textarea')
+      if (helper instanceof HTMLTextAreaElement) {
+        helper.focus()
+      }
     })
   }, [visible])
 
@@ -528,6 +537,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
       data-shell-view="true"
       data-shell-visible={visible ? 'true' : 'false'}
       data-shell-ready={ready ? 'true' : 'false'}
+      data-pty-id={ptyId}
     >
       <div
         ref={containerRef}
