@@ -1,6 +1,7 @@
 import { FileLine as FilePenLineIcon, FileLine as FileTextIcon } from '@mingcute/react'
 import type { ReactNode } from 'react'
 
+import { ShikiSnippet } from '~/components/editor/shiki-snippet'
 import { Progress } from '~/components/ui/progress'
 import { Table, TableBody, TableCell, TableRow } from '~/components/ui/table'
 import { cn } from '~/lib/cn'
@@ -353,47 +354,84 @@ export function TerminalExecutionDetails({
     return null
   }
 
+  const showCommand = command !== null
+  const showOutput = sections.length > 0
+  const showMetadata = timeout !== null || backgroundTaskId !== null
+
   return (
     <div className={cn('grid gap-3', className)}>
-      {(command || timeout !== null || backgroundTaskId) && (
-        <DetailSection title="Command">
-          <div className="grid gap-1.5">
-            {command && <NativeCodeBlock text={command} wrap={false} className="max-h-32" />}
-            <KeyValueTable
-              rows={[
-                ['Timeout', timeout],
-                ['Background', backgroundTaskId],
-              ]}
-            />
+      <div
+        className="overflow-hidden rounded-lg border border-border bg-card"
+        data-testid="chat-terminal-snippet"
+      >
+        {showCommand && (
+          <div className="flex items-start">
+            <span
+              className="select-none pl-2.5 pt-2.5 pr-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground/60"
+              aria-hidden
+            >
+              $
+            </span>
+            <div className="chat-terminal-command min-w-0 flex-1">
+              <ShikiSnippet
+                code={command}
+                language="bash"
+                wrap
+                className="text-[11px] leading-relaxed"
+                fallbackClassName="whitespace-pre-wrap break-words pl-0 text-foreground"
+              />
+            </div>
           </div>
-        </DetailSection>
-      )}
-      {sections.length > 0 && (
-        <DetailSection title="Output">
-          <div className="grid gap-2">
-            {sections.map(section => (
-              <section key={section.label} className="grid gap-1">
+        )}
+        {showOutput && (
+          <div className={cn(showCommand && 'border-t border-border/60')}>
+            {sections.map((section, index) => (
+              <div
+                key={section.label}
+                className={cn(index > 0 && 'border-t border-border/60')}
+              >
                 {sections.length > 1 && (
                   <div
                     className={cn(
-                      'px-0.5 font-mono text-[10px] font-medium',
-                      section.destructive ? 'text-destructive/70' : 'text-muted-foreground/60',
+                      'px-2.5 pt-1.5 font-mono text-[10px] font-medium',
+                      section.destructive ? 'text-destructive/70' : 'text-muted-foreground/50',
                     )}
                   >
                     {section.label}
                   </div>
                 )}
-                <NativeCodeBlock
-                  text={section.text}
-                  destructive={section.destructive}
-                  wrap={false}
-                  className="max-h-44"
-                />
-              </section>
+                <pre
+                  className={cn(
+                    'm-0 max-h-44 overflow-auto whitespace-pre px-2.5 py-2 font-mono text-[11px] leading-relaxed',
+                    section.destructive ? 'text-destructive/80' : 'text-muted-foreground',
+                  )}
+                >
+                  {section.text}
+                </pre>
+              </div>
             ))}
           </div>
-        </DetailSection>
-      )}
+        )}
+        {showMetadata && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-border/60 px-2.5 py-1.5 font-mono text-[10px] text-muted-foreground/70">
+            {timeout !== null && (
+              <span>
+                timeout
+                {' '}
+                {timeout}
+                s
+              </span>
+            )}
+            {backgroundTaskId && (
+              <span>
+                background
+                {' '}
+                {backgroundTaskId}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

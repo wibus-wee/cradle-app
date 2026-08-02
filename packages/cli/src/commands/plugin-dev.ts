@@ -5,7 +5,7 @@ import { box, intro, log, outro, spinner } from '@clack/prompts'
 import { parseCradlePluginPackageJsonText } from '@cradle/plugin-sdk/manifest'
 import type { Command } from 'commander'
 import pc from 'picocolors'
-import { build, type InlineConfig, type Plugin, type Rollup } from 'vite'
+import type { InlineConfig, Plugin, Rollup } from 'vite'
 import { z } from 'zod'
 
 import { getCommandContext } from '../runtime/context'
@@ -146,11 +146,12 @@ function createBuildConfig(packageDir: string, layerBuild: LayerBuild): InlineCo
 }
 
 async function startLayerWatcher(
+  viteBuild: typeof import('vite').build,
   packageDir: string,
   layerBuild: LayerBuild,
   onRebuild: (build: LayerBuild, durationMs: number) => Promise<void>,
 ): Promise<LayerWatcher> {
-  const result = await build(createBuildConfig(packageDir, layerBuild))
+  const result = await viteBuild(createBuildConfig(packageDir, layerBuild))
   if (!('on' in result)) {
     throw new Error(`Vite did not create a watcher for the ${layerBuild.layer} layer.`)
   }
@@ -213,6 +214,7 @@ async function runPluginDev(command: Command, options: PluginDevOptions): Promis
   if (builds.length === 0) {
     throw new Error('Plugin package must declare at least one explicit cradle.dev entry.')
   }
+  const { build: viteBuild } = await import('vite')
 
   const context = getCommandContext(command)
   let session: z.infer<typeof PluginDevSessionSchema> | null = null
@@ -249,7 +251,7 @@ async function runPluginDev(command: Command, options: PluginDevOptions): Promis
     try {
       startup.start(`Building ${builds.map(item => formatLayerLabel(item.layer)).join(', ')}`)
       for (const layerBuild of builds) {
-        watchers.push(await startLayerWatcher(packageDir, layerBuild, onRebuild))
+        watchers.push(await startLayerWatcher(viteBuild, packageDir, layerBuild, onRebuild))
       }
       await Promise.all(watchers.map(watcher => watcher.initialBuild))
       startup.message(`Connecting to Cradle at ${context.serverUrl}`)

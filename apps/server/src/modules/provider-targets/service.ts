@@ -62,6 +62,8 @@ export interface UpsertManualProviderTargetInput {
   connectionConfigJson: string
   credentialRef?: string | null
   iconSlug?: string | null
+  /** Explicit integration identity only — never inferred from URL. */
+  providerId?: string | null
 }
 
 export interface ListProviderTargetsInput {
@@ -390,6 +392,9 @@ export function upsertManualProviderTarget(
   const nextEnabled = input.enabled ?? existing?.enabled ?? true
   const connectionConfigJson = normalizeManualConnectionConfig(input)
   const enabledModelsJson = providerKindChanged ? '[]' : (existing?.enabledModelsJson ?? '[]')
+  const nextProviderId = input.providerId !== undefined
+    ? (input.providerId?.trim() || null)
+    : (existing?.providerId ?? null)
   const d = db()
   d.transaction((tx) => {
     tx.insert(providerTargets)
@@ -402,6 +407,7 @@ export function upsertManualProviderTarget(
         connectionConfigJson,
         credentialRef: input.credentialRef ?? null,
         iconSlug: input.iconSlug ?? null,
+        providerId: nextProviderId,
         enabledModelsJson,
         customModelsJson: existing?.customModelsJson ?? '[]',
         createdAt: now,
@@ -416,6 +422,7 @@ export function upsertManualProviderTarget(
           connectionConfigJson,
           credentialRef: input.credentialRef ?? null,
           ...(input.iconSlug !== undefined ? { iconSlug: input.iconSlug } : {}),
+          ...(input.providerId !== undefined ? { providerId: nextProviderId } : {}),
           ...(providerKindChanged ? { enabledModelsJson } : {}),
           updatedAt: now,
         },

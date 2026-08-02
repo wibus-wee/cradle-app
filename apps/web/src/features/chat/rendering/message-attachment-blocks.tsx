@@ -8,17 +8,21 @@ import { AppshotAttachmentCard } from '../composer/appshot-attachment'
 import { readCradleAppshotMetadata } from '../composer/appshot-attachment-model'
 import type {
   ChatFileLineCommentContextMessagePart,
+  ChatIntentContextMessagePart,
   ChatPluginContextMessagePart,
   ChatSkillContextMessagePart,
 } from '../context/chat-context-parts'
 import {
   readFileLineCommentContextLabel,
   readFileLineCommentContextPart,
+  readIntentContextLabel,
+  readIntentContextPart,
   readPluginContextLabel,
   readPluginContextPart,
   readSkillContextLabel,
   readSkillContextPart,
 } from '../context/chat-context-parts'
+import { IntentMentionToken } from '../mentions/intent-mention-token'
 import { PluginMentionIcon } from '../mentions/plugin-mention-icon'
 import { SkillMentionToken } from '../mentions/skill-mention-token'
 import type { FileMessagePart } from './chat-render-plan'
@@ -121,6 +125,14 @@ export function PluginContextBlock({ part }: { part: ChatPluginContextMessagePar
 {readPluginContextLabel(plugin)}
     </span>
   )
+}
+
+export function IntentContextBlock({ part }: { part: ChatIntentContextMessagePart }) {
+  const intent = readIntentContextPart(part)
+  if (!intent) {
+    return null
+  }
+  return <IntentMentionToken name={intent.name || readIntentContextLabel(intent)} className="mx-1" />
 }
 
 export function FileLineCommentContextBlock({

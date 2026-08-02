@@ -2,13 +2,11 @@ import {
   CheckLine as CheckIcon,
   CloseLine as CloseIcon,
   ExternalLinkLine as ExternalLinkIcon,
-  GitCommitLine as GitCommitHorizontalIcon,
   Message1Line as MessageSquareIcon,
   Refresh1Line as RefreshCwIcon,
   RobotLine as BotIcon,
   SelectorHorizontalLine as SlidersHorizontalIcon,
   SendLine as SendIcon,
-  TreeLine as ListTreeIcon,
 } from '@mingcute/react'
 import { useState, useTransition } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -40,10 +38,6 @@ interface ReviewTopBarProps {
   onRefresh: () => void
   refreshPending: boolean
   isFetching: boolean
-  onOpenGuide?: () => void
-  hasGuide?: boolean
-  onOpenCommit?: () => void
-  hasCommitPlan?: boolean
   threadsRailCollapsed: boolean
   agentRailActive: boolean
   onShowThreadsRail: () => void
@@ -75,10 +69,6 @@ export function ReviewTopBar({
   onRefresh,
   refreshPending,
   isFetching,
-  onOpenGuide,
-  hasGuide = false,
-  onOpenCommit,
-  hasCommitPlan,
   threadsRailCollapsed,
   agentRailActive,
   onShowThreadsRail,
@@ -126,23 +116,6 @@ export function ReviewTopBar({
         onToggleStructural={() => onPreference({ structuralHighlighting: !review.preferences.structuralHighlighting })}
         onToggleGenerated={() => onPreference({ collapseGeneratedFiles: !review.preferences.collapseGeneratedFiles })}
       />
-
-     {onOpenGuide && (
-       <Button variant="ghost" size="sm" onClick={onOpenGuide} className="h-7 gap-1.5 px-2 text-[12px]">
-         <ListTreeIcon className="size-3.5" />
-         Guide
-         {hasGuide && <span className="size-1.5 rounded-full bg-emerald-500" aria-label="Guide generated" />}
-       </Button>
-     )}
-
-      {/* Commit plan — only for reviews whose changes can be staged into commits. */}
-      {onOpenCommit && (
-        <Button variant="ghost" size="sm" onClick={onOpenCommit} className="h-7 gap-1.5 px-2 text-[12px]">
-          <GitCommitHorizontalIcon className="size-3.5" />
-          Commit
-          {hasCommitPlan && <span className="size-1.5 rounded-full bg-sky-500" aria-label="Commit plan exists" />}
-        </Button>
-      )}
 
       {/* Threads toggle — visible, badge carries the count. */}
       <Button

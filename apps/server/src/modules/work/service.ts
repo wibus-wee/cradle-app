@@ -11,6 +11,7 @@ import { hasPendingRuntimeToolApproval } from '../chat-runtime/pending-tool-appr
 import { listPendingRuntimeUserInputSummaries } from '../chat-runtime/pending-user-input'
 import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
 import * as ChatRuntime from '../chat-runtime/runtime'
+import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
@@ -434,7 +435,7 @@ export async function prepare(input: {
   const title = requireHandoffValue(input.title, 'title')
   const summary = requireHandoffValue(input.summary, 'summary')
   const testPlan = requireHandoffValue(input.testPlan, 'testPlan')
-  const body = `## Summary\n${summary}\n\n## Test plan\n${testPlan}`
+  const body = buildWorkPullRequestBody({ summary, testPlan })
 
   const existing = await PullRequest.getPullRequest(primaryThread.id)
   const hasOpenPR = existing !== null && existing.state === 'open' && !existing.merged
@@ -611,7 +612,7 @@ export async function submit(input: {
   const title = requireHandoffValue(input.title ?? work.handoffTitle, 'title')
   const summary = requireHandoffValue(input.summary ?? work.handoffSummary, 'summary')
   const testPlan = requireHandoffValue(input.testPlan ?? work.handoffTestPlan, 'testPlan')
-  const body = `## Summary\n${summary}\n\n## Test plan\n${testPlan}`
+  const body = buildWorkPullRequestBody({ summary, testPlan })
   const existing = await PullRequest.getPullRequest(primaryThread.id)
   if (existing && (existing.state !== 'open' || existing.merged)) {
     throw new AppError({

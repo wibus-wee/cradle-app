@@ -589,6 +589,7 @@ function useWorkspaceDetailOwner(workspaceId: string) {
         modelId: opts.modelId,
         thinkingEffort: opts.thinkingEffort,
         runtimeSettings: readRunRuntimeSettingsPatch(opts.runtimeSettings),
+        reviewTarget: opts.reviewTarget,
       },
       onAccepted: () => {
         void Promise.all([

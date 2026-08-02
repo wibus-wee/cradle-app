@@ -781,7 +781,7 @@ export async function fetchBranchProtection(
           // Unprotected branch — treat as empty required checks, not a hard miss.
           return { data: null, etag: null, status: 404 }
         }
-        return { data: null, etag: null, status: mapped.status }
+        throw mapped
       }
     },
   })

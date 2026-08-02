@@ -13,6 +13,7 @@ function profile(input: Pick<AgentProfile, 'id' | 'name' | 'enabled'>): AgentPro
     credentialRef: null,
     customModels: '[]',
     iconSlug: null,
+    providerId: null,
     createdAt: 0,
     updatedAt: 0,
   }

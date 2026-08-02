@@ -12,7 +12,25 @@ import {
   setCachedModelsForTarget,
 } from './model-cache'
 import { projectProviderModelListCapabilities } from './model-capabilities'
+import { collectProviderPresets } from './provider-presets'
 import * as Providers from './service'
+
+export const providerPresets = new Elysia({
+  detail: { tags: ['providers'] },
+})
+  .get(
+    '/provider-presets',
+    async () => await collectProviderPresets(),
+    {
+      detail: {
+        'summary': 'List provider presets',
+        'x-cradle-cli': {
+          command: ['provider', 'presets'],
+        },
+      },
+      response: { 200: t.Array(ProvidersModel.providerPreset) },
+    },
+  )
 
 export const providers = new Elysia({
   prefix: '/providers',

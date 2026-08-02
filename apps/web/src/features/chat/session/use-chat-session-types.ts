@@ -1,3 +1,4 @@
+import type { RuntimeReviewTarget } from '@cradle/chat-runtime-contracts'
 import type { UIMessage } from 'ai'
 
 import type { GetChatSessionsBySessionIdMessagesResponse } from '~/api-gen/types.gen'
@@ -18,6 +19,7 @@ export interface SendMessageOptions {
   thinkingEffort?: ChatThinkingEffort | null | undefined
   runtimeSettings?: ChatRuntimeSettingsPatch
   continuationMode?: ChatContinuationMode
+  reviewTarget?: RuntimeReviewTarget
 }
 
 export type SendMessageResult = void | {

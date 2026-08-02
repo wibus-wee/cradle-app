@@ -1,3 +1,4 @@
+import { FolderLine as FolderIcon } from '@mingcute/react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 import { fn } from 'storybook/test'
@@ -7,6 +8,7 @@ import {
 } from './fixtures/workspace-sidebar'
 import { WorkspaceGroupDisclosureView } from './workspace-group-disclosure-view'
 import { WorkspaceProjectsSectionView } from './workspace-projects-section-view'
+import { WorkspaceRecentSessionListView } from './workspace-recent-session-list-view'
 import type {
   WorkspaceSidebarListFilters,
   WorkspaceSidebarProjectSortDirection,
@@ -26,6 +28,15 @@ function toggleInList<T extends string>(list: readonly T[], value: T): T[] {
     : [...list, value]
 }
 
+const recentSessionFixtures = [
+  { title: 'Refactor workspace sidebar', workspace: workspaceFixtures.local },
+  { title: 'Review remote host settings', workspace: workspaceFixtures.remote },
+  { title: 'Run the release verification suite', workspace: workspaceFixtures.local },
+  { title: 'Fix missing workspace status', workspace: workspaceFixtures.missing },
+  { title: 'Prepare the next desktop release', workspace: workspaceFixtures.remote },
+  { title: 'Audit session activity labels', workspace: workspaceFixtures.local },
+]
+
 function WorkspaceProjectsSectionCatalog() {
   const [listFilters, setListFilters]
     = useState<WorkspaceSidebarListFilters>(DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS)
@@ -36,9 +47,18 @@ function WorkspaceProjectsSectionCatalog() {
   const [projectPinnedFirst, setProjectPinnedFirst] = useState(true)
   const [sessionPreviewLimit, setSessionPreviewLimit]
     = useState(DEFAULT_SESSION_PREVIEW_LIMIT)
+  const [recentSessionsExpanded, setRecentSessionsExpanded] = useState(false)
   const [localExpanded, setLocalExpanded] = useState(true)
   const filteredEmpty = listFilters.statusFilters.includes('streaming')
     && listFilters.projectScope === 'pinned'
+  const recentSessionSort = projectSortKey === 'recentSession'
+  const recentSessionsToRender = recentSessionsExpanded
+    ? recentSessionFixtures
+    : recentSessionFixtures.slice(0, sessionPreviewLimit)
+  const hiddenRecentSessionCount = Math.max(
+    recentSessionFixtures.length - sessionPreviewLimit,
+    0,
+  )
 
   return (
     <WorkspaceProjectsSectionView
@@ -73,7 +93,12 @@ function WorkspaceProjectsSectionCatalog() {
       onShowArchivedChange={showArchived =>
         setListFilters(current => ({ ...current, showArchived }))}
       onClearListFilters={() => setListFilters(DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS)}
-      onProjectSortKeyChange={setProjectSortKey}
+      onProjectSortKeyChange={(sortKey) => {
+        setProjectSortKey(sortKey)
+        if (sortKey === 'recentSession') {
+          setProjectSortDirection('desc')
+        }
+      }}
       onProjectSortDirectionChange={setProjectSortDirection}
       onProjectPinnedFirstChange={setProjectPinnedFirst}
       onSessionPreviewLimitChange={setSessionPreviewLimit}
@@ -82,44 +107,69 @@ function WorkspaceProjectsSectionCatalog() {
       onOpenMultiWorkspaceDialog={() => {}}
       onMarkAllAsRead={() => {}}
     >
-      <WorkspaceGroupDisclosureView
-        workspace={workspaceFixtures.local}
-        workspacePinned
-        workspaceActions={[]}
-        runningSessionCount={0}
-        expanded={localExpanded}
-        overlays={null}
-        onToggleExpanded={() => setLocalExpanded(current => !current)}
-        onOpenWorkspace={() => {}}
-      >
-        <div className="ml-4.25 border-l border-sidebar-border/50 px-4 py-2 text-[11px] text-muted-foreground">
-          Refactor workspace sidebar
-        </div>
-      </WorkspaceGroupDisclosureView>
-      <WorkspaceGroupDisclosureView
-        workspace={workspaceFixtures.remote}
-        workspacePinned={false}
-        workspaceActions={[]}
-        runningSessionCount={2}
-        expanded={false}
-        overlays={null}
-        onToggleExpanded={() => {}}
-        onOpenWorkspace={() => {}}
-      >
-        {null}
-      </WorkspaceGroupDisclosureView>
-      <WorkspaceGroupDisclosureView
-        workspace={workspaceFixtures.missing}
-        workspacePinned={false}
-        workspaceActions={[]}
-        runningSessionCount={0}
-        expanded={false}
-        overlays={null}
-        onToggleExpanded={() => {}}
-        onOpenWorkspace={() => {}}
-      >
-        {null}
-      </WorkspaceGroupDisclosureView>
+      {recentSessionSort
+        ? (
+            <WorkspaceRecentSessionListView
+              sessionCount={recentSessionFixtures.length}
+              expanded={recentSessionsExpanded}
+              hiddenSessionCount={hiddenRecentSessionCount}
+              onToggleExpanded={() => setRecentSessionsExpanded(current => !current)}
+            >
+              {recentSessionsToRender.map(({ title, workspace }) => (
+                <div key={title} className="flex min-w-0 flex-col">
+                  <div className="rounded-lg px-2.5 py-1.5 text-xs text-sidebar-foreground/80 hover:bg-accent/50">
+                    {title}
+                  </div>
+                  <div className="flex min-w-0 items-center gap-1.5 px-2.5 py-0.5 pl-8 text-[11px] text-muted-foreground">
+                    <FolderIcon className="size-3 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 truncate">{workspace.name}</span>
+                  </div>
+                </div>
+              ))}
+            </WorkspaceRecentSessionListView>
+          )
+        : (
+            <>
+              <WorkspaceGroupDisclosureView
+                workspace={workspaceFixtures.local}
+                workspacePinned
+                workspaceActions={[]}
+                runningSessionCount={0}
+                expanded={localExpanded}
+                overlays={null}
+                onToggleExpanded={() => setLocalExpanded(current => !current)}
+                onOpenWorkspace={() => {}}
+              >
+                <div className="ml-4.25 border-l border-sidebar-border/50 px-4 py-2 text-[11px] text-muted-foreground">
+                  Refactor workspace sidebar
+                </div>
+              </WorkspaceGroupDisclosureView>
+              <WorkspaceGroupDisclosureView
+                workspace={workspaceFixtures.remote}
+                workspacePinned={false}
+                workspaceActions={[]}
+                runningSessionCount={2}
+                expanded={false}
+                overlays={null}
+                onToggleExpanded={() => {}}
+                onOpenWorkspace={() => {}}
+              >
+                {null}
+              </WorkspaceGroupDisclosureView>
+              <WorkspaceGroupDisclosureView
+                workspace={workspaceFixtures.missing}
+                workspacePinned={false}
+                workspaceActions={[]}
+                runningSessionCount={0}
+                expanded={false}
+                overlays={null}
+                onToggleExpanded={() => {}}
+                onOpenWorkspace={() => {}}
+              >
+                {null}
+              </WorkspaceGroupDisclosureView>
+            </>
+          )}
     </WorkspaceProjectsSectionView>
   )
 }

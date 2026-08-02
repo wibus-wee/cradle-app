@@ -199,7 +199,7 @@ export const diffReviewAgentFixes = sqliteTable('diff_review_agent_fixes', {
   instruction: text('instruction').notNull(),
   profileId: text('profile_id'),
   expectedOutput: text('expected_output', {
-    enum: ['commit', 'working-tree-change', 'patch-artifact'],
+    enum: ['working-tree-change', 'patch-artifact'],
   }).notNull(),
   status: text('status', {
     enum: ['pending', 'running', 'completed', 'failed', 'cancelled'],
@@ -316,11 +316,6 @@ export const diffReviewEvents = sqliteTable('diff_review_events', {
       'agent_fix_failed',
       'agent_fix_cancelled',
       'agent_fix_deleted',
-      'guide_cancelled',
-      'commit_plan_created',
-      'commit_plan_updated',
-      'commit_plan_applied',
-      'commit_plan_apply_failed',
       'source_readiness_changed',
       'merge_completed',
       'merge_failed',
@@ -335,62 +330,6 @@ export const diffReviewEvents = sqliteTable('diff_review_events', {
 }, table => ({
   byReview: index('diff_review_events_review_id_idx').on(table.reviewId),
   byCreatedAt: index('diff_review_events_created_at_idx').on(table.createdAt),
-}))
-
-export const diffReviewGuides = sqliteTable('diff_review_guides', {
-  id: textPk(),
-  reviewId: text('review_id')
-    .notNull()
-    .references(() => diffReviews.id, { onDelete: 'cascade' }),
-  revisionId: text('revision_id')
-    .notNull()
-    .references(() => diffReviewRevisions.id, { onDelete: 'cascade' }),
-  providerTargetId: text('provider_target_id'),
-  runtimeKind: text('runtime_kind').notNull(),
-  modelId: text('model_id'),
-  sessionId: text('session_id'),
-  runId: text('run_id'),
-  inputHash: text('input_hash').notNull(),
-  status: text('status', {
-    enum: ['pending', 'running', 'ready', 'failed', 'cancelled'],
-  }).notNull(),
-  title: text('title'),
-  stepsJson: text('steps_json').notNull().default('[]'),
-  errorMessage: text('error_message'),
-  createdAt: int('created_at').notNull(),
-  updatedAt: int('updated_at').notNull(),
-}, table => ({
-  byReview: index('diff_review_guides_review_id_idx').on(table.reviewId),
-  byRevision: index('diff_review_guides_revision_id_idx').on(table.revisionId),
-  reviewRevisionUnique: uniqueIndex('diff_review_guides_review_revision_unique').on(table.reviewId, table.revisionId),
-}))
-
-export const diffReviewCommitPlans = sqliteTable('diff_review_commit_plans', {
-  id: textPk(),
-  reviewId: text('review_id')
-    .notNull()
-    .references(() => diffReviews.id, { onDelete: 'cascade' }),
-  revisionId: text('revision_id')
-    .notNull()
-    .references(() => diffReviewRevisions.id, { onDelete: 'cascade' }),
-  agentFixId: text('agent_fix_id')
-    .references(() => diffReviewAgentFixes.id, { onDelete: 'set null' }),
-  actorId: text('actor_id').notNull(),
-  strategy: text('strategy', {
-    enum: ['manual'],
-  }).notNull(),
-  status: text('status', {
-    enum: ['draft', 'accepted', 'applied', 'abandoned'],
-  }).notNull().default('draft'),
-  groupsJson: text('groups_json').notNull(),
-  rationale: text('rationale').notNull(),
-  createdAt: int('created_at').notNull(),
-  updatedAt: int('updated_at').notNull(),
-}, table => ({
-  byReview: index('diff_review_commit_plans_review_id_idx').on(table.reviewId),
-  byRevision: index('diff_review_commit_plans_revision_id_idx').on(table.revisionId),
-  byAgentFix: uniqueIndex('diff_review_commit_plans_agent_fix_id_unique').on(table.agentFixId),
-  byCreatedAt: index('diff_review_commit_plans_created_at_idx').on(table.createdAt),
 }))
 
 export type DiffReviewSource = typeof diffReviewSources.$inferSelect
@@ -421,7 +360,3 @@ export type DiffReviewPreference = typeof diffReviewPreferences.$inferSelect
 export type NewDiffReviewPreference = typeof diffReviewPreferences.$inferInsert
 export type DiffReviewEvent = typeof diffReviewEvents.$inferSelect
 export type NewDiffReviewEvent = typeof diffReviewEvents.$inferInsert
-export type DiffReviewGuide = typeof diffReviewGuides.$inferSelect
-export type NewDiffReviewGuide = typeof diffReviewGuides.$inferInsert
-export type DiffReviewCommitPlan = typeof diffReviewCommitPlans.$inferSelect
-export type NewDiffReviewCommitPlan = typeof diffReviewCommitPlans.$inferInsert

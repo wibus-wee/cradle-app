@@ -424,6 +424,12 @@ class FakeCodexAppServerClient {
       }
       return { turn: { id: 'codex-turn-1', status: 'inProgress' } }
     }
+    if (method === 'review/start') {
+      return {
+        turn: { id: 'codex-review-turn-1', status: 'inProgress' },
+        reviewThreadId: 'codex-thread-1',
+      }
+    }
     if (method === 'thread/name/set') {
       this.threadReadName = (params as { name?: string }).name ?? this.threadReadName
       return {}
@@ -2127,6 +2133,59 @@ describe('codexProvider app-server integration', () => {
     client.pushNotification(null)
 
     await drainPromise
+  })
+
+  it('starts native reviews through review/start and streams the returned review turn', async () => {
+    const client = new FakeCodexAppServerClient({})
+    const provider = createProvider(client)
+    const stream = provider.streamTurn({
+      runId: 'run-codex-review',
+      runtimeSession: createRuntimeSession(),
+      profile: createProfile(),
+      message: createUserMessage('Review changes against main'),
+      reviewTarget: { type: 'baseBranch', branch: 'main' },
+      workspaceId: 'workspace-1',
+    })
+    const chunksPromise = (async () => {
+      const chunks: UIMessageChunk[] = []
+      for await (const chunk of stream) {
+        chunks.push(chunk)
+      }
+      return chunks
+    })()
+
+    await vi.waitFor(() => {
+      expect(client.requests).toContainEqual({
+        method: 'review/start',
+        params: {
+          threadId: 'codex-thread-1',
+          target: { type: 'baseBranch', branch: 'main' },
+          delivery: 'inline',
+        },
+      })
+    })
+    expect(client.requests.map(request => request.method)).toEqual(['thread/start', 'review/start'])
+    expect(client.requests).not.toContainEqual({ method: 'turn/start', params: expect.anything() })
+
+    client.pushNotification({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-review-turn-1',
+        itemId: 'review-message-1',
+        delta: 'No actionable findings.',
+      },
+    })
+    client.pushNotification({
+      method: 'turn/completed',
+      params: {
+        threadId: 'codex-thread-1',
+        turn: { id: 'codex-review-turn-1', status: 'completed' },
+      },
+    })
+
+    const chunks = await chunksPromise
+    expect(chunks).toContainEqual(expect.objectContaining({ type: 'text-delta', delta: 'No actionable findings.' }))
   })
 
   it('starts compact slash commands through Codex thread compaction', async () => {

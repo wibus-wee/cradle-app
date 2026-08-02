@@ -1,3 +1,4 @@
+import type { RuntimeReviewTarget } from '@cradle/chat-runtime-contracts'
 import {
   CloseLine as XIcon,
   PencilLine as PencilIcon,
@@ -8,7 +9,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
-import { getWorkspacesByWorkspaceIdGitMergeBase } from '~/api-gen/sdk.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
@@ -614,31 +614,14 @@ export function ChatView({
     [appshotRuntime, composerRuntime.supportsAttachments, sessionId],
   )
 
-  const submitCodexReviewPrompt = useCallback(
-    (prompt: string) => {
-      void composerSend(prompt, [], [])
+  const startCodexNativeReview = useCallback(
+    async (target: RuntimeReviewTarget) => {
+      const text = target.type === 'uncommittedChanges'
+        ? 'Review uncommitted changes'
+        : `Review changes against ${target.branch}`
+      await composerSend(text, [], [], { reviewTarget: target })
     },
     [composerSend],
-  )
-
-  const resolveCodexReviewMergeBase = useCallback(
-    async (baseBranch: string, repositoryPath?: string | null) => {
-      if (!workspaceId) {
-        return null
-      }
-      const result = await getWorkspacesByWorkspaceIdGitMergeBase({
-        path: { workspaceId },
-        query: {
-          baseBranch,
-          ...(repositoryPath ? { repo: repositoryPath } : {}),
-        },
-      })
-      if (result.error || !result.data) {
-        throw new Error(`Failed to resolve merge base (${result.response?.status ?? 'unknown'}).`)
-      }
-      return result.data.mergeBaseSha
-    },
-    [workspaceId],
   )
 
   const reviewSlot = useMemo<ComposerReviewSlotActions>(
@@ -646,10 +629,9 @@ export function ChatView({
       open: reviewModeOpen,
       workspaceId,
       onDismiss: () => setReviewModeOpen(false),
-      onSubmitPrompt: submitCodexReviewPrompt,
-      resolveMergeBase: resolveCodexReviewMergeBase,
+      onStartReview: startCodexNativeReview,
     }),
-    [resolveCodexReviewMergeBase, reviewModeOpen, submitCodexReviewPrompt, workspaceId],
+    [reviewModeOpen, startCodexNativeReview, workspaceId],
   )
 
   const usageSlot = useMemo<ComposerUsageSlotActions>(

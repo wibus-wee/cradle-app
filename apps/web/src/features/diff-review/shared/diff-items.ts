@@ -7,7 +7,6 @@ import type {
 import type {
   CradleDiffReview,
   ReviewFile,
-  ReviewGuideAnchor,
   ReviewSourceKind,
   ReviewThread,
 } from './types'
@@ -113,35 +112,6 @@ export function anchorSideToSelectionSide(side: 'base' | 'head'): SelectionSide 
   return side === 'base' ? 'deletions' : 'additions'
 }
 
-/** Anchors on a guide step that point into a given file path. */
-export function guideAnchorsForPath(anchors: ReviewGuideAnchor[], path: string): ReviewGuideAnchor[] {
-  return anchors.filter(anchor => anchor.path === path)
-}
-
-/**
- * Convert a guide range anchor into the CodeView's controlled line selection so the chapter's
- * focus range is highlighted in-place. Returns null for an empty/zero-width anchor.
- */
-export function anchorToLineSelection(itemId: string, anchor: ReviewGuideAnchor): CodeViewLineSelection {
-  const side = anchorSideToSelectionSide(anchor.side)
-  return {
-    id: itemId,
-    range: {
-      start: anchor.startLine,
-      end: Math.max(anchor.startLine, anchor.endLine),
-      side,
-      endSide: side,
-    },
-  }
-}
-
-/** Human label for an anchor's line range, e.g. `L12` or `L12–18`. */
-export function formatAnchorRange(anchor: ReviewGuideAnchor): string {
-  return anchor.startLine === anchor.endLine
-    ? `L${anchor.startLine}`
-    : `L${anchor.startLine}–${anchor.endLine}`
-}
-
 export function getSelectedReviewRange(
   selection: CodeViewLineSelection | null,
   files: ReviewFile[],
@@ -208,7 +178,6 @@ export function reviewParticipatedByLocalUser(review: CradleDiffReview): boolean
     thread.createdBy === LOCAL_REVIEW_USER_ID
     || thread.comments.some(comment => comment.authorId === LOCAL_REVIEW_USER_ID))
   || review.submissions.some(submission => submission.actorId === LOCAL_REVIEW_USER_ID)
-  || review.commitPlans.some(plan => plan.actorId === LOCAL_REVIEW_USER_ID)
 }
 
 /** Linear-style "For me" (involved/responsible) vs "Created" (authored). */

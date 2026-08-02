@@ -36,6 +36,7 @@ interface StartOptimisticChatResponseInput {
     modelId?: string | null
     thinkingEffort?: ChatResponseRequestBody['thinkingEffort']
     runtimeSettings?: ChatRuntimeSettingsPatch
+    reviewTarget?: ChatResponseRequestBody['reviewTarget']
   }
   supportsGoalCommand?: boolean
   queryClient?: QueryClient

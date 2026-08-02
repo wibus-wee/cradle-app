@@ -87,11 +87,7 @@ import { executeRun as executeRunWithDeps } from './run/turn-executor'
 import type { ActiveRun } from './run-registry'
 import { runRegistry } from './run-registry'
 import { liveRuntimeSessionRegistry } from './runtime-live-session-registry'
-import type {
-  ChatThinkingEffort,
-  RuntimeGoalContinuationOptions,
-  RuntimeSettingsPatch,
-} from './runtime-provider-types'
+import type { ChatThinkingEffort, RuntimeGoalContinuationOptions, RuntimeReviewTarget, RuntimeSettingsPatch } from './runtime-provider-types'
 import {
   assertProviderBoundRunContext,
   assertRunnableSession,
@@ -517,6 +513,7 @@ export async function streamResponse(input: {
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort
   runtimeSettings?: RuntimeSettingsPatch
+  reviewTarget?: RuntimeReviewTarget
 }): Promise<{
   runId: string
   assistantMessageId: string

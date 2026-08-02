@@ -2,6 +2,16 @@ packages:
   - packages/*
   - apps/*
   - plugins/*
+enableGlobalVirtualStore: true
+# Broken upstream packages omit these deps; GVS + Vite/esbuild resolve from the
+# store realpath, so undeclared imports fail unless they are linked as siblings.
+packageExtensions:
+  echarts-for-react:
+    dependencies:
+      tslib: ^2.3.0
+  tiptap-markdown:
+    peerDependencies:
+      '@tiptap/pm': '*'
 allowBuilds:
   '@google/genai': true
   '@swc/core': true
@@ -43,6 +53,6 @@ minimumReleaseAgeExclude:
   - '@arcships/light-ocr-win32-x64@0.3.0'
   - '@arcships/light-ocr@0.3.0'
 overrides:
-  '@anthropic-ai/claude-agent-sdk>@anthropic-ai/sdk': 0.81.0
+  '@cradle/cli': link:packages/cli
 patchedDependencies:
   '@elysiajs/node@1.4.5': patches/@elysiajs__node@1.4.5.patch

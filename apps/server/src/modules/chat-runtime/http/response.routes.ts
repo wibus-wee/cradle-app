@@ -56,6 +56,7 @@ export const chatRuntimeResponseRoutes = new Elysia({
           modelId: readOptionalModelId(body.modelId),
           thinkingEffort: readChatThinkingEffort(body.thinkingEffort),
           runtimeSettings: body.runtimeSettings,
+          reviewTarget: body.reviewTarget,
         })
         accepted = true
         request.signal.removeEventListener('abort', logAbortBeforeHeaders)

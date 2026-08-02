@@ -145,6 +145,8 @@ export interface RuntimeOwnedProviderTarget {
   credentialRef: string | null
   enabledModelsJson: string
   customModelsJson: string
+  /** Runtime-owned targets are unbound unless a runtime explicitly sets identity. */
+  providerId: string | null
   sourceKey: string
   externalRecordId: string | null
   sourceFingerprint: string
@@ -1222,6 +1224,11 @@ export interface RuntimeHarnessContext {
   fragments: RuntimeHarnessFragment[]
 }
 
+/** A provider-native code-review target supported by the Chat Runtime. */
+export type RuntimeReviewTarget
+  = | { type: 'uncommittedChanges' }
+    | { type: 'baseBranch', branch: string }
+
 export interface StreamTurnInput {
   runId: string
   runtimeSession: RuntimeSession
@@ -1230,6 +1237,11 @@ export interface StreamTurnInput {
   transcript?: CradleTurnTranscript
   originalMessages?: UIMessage[]
   responseMessageId?: string
+  /**
+   * Start the provider's native review operation instead of a regular text turn.
+   * The surrounding Chat Runtime run still owns transcript persistence and streaming.
+   */
+  reviewTarget?: RuntimeReviewTarget
   /** When set, the turn was drained from a Cradle queue item (may already be native-enqueued). */
   queueItemId?: string | null
   modelId?: string | null

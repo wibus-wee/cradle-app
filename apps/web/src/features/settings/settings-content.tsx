@@ -9,6 +9,7 @@ import { AboutSettings } from './about-settings'
 import { AppearanceSettings } from './appearance-settings'
 import { AwaitSettings } from './await-settings'
 import { ChatSettings } from './chat-settings'
+import { DataBackupSettings } from './data-backup-settings'
 import { DesktopUpdateSettings } from './desktop-update-settings'
 import { ExternalIssueSourceSettings } from './external-issue-source-settings'
 import { ExternalWorkImportSettings } from './external-work-import-settings'
@@ -39,6 +40,7 @@ const SECTION_MAP: Record<string, React.ComponentType> = {
   serverEndpoint: ServerEndpointSettings,
   network: ServerEndpointSettings,
   desktop: DesktopUpdateSettings,
+  backup: DataBackupSettings,
   downloads: ManagedResourcesPage,
   features: FeatureSettings,
   externalIssues: ExternalIssueSourceSettings,

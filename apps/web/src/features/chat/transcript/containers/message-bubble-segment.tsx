@@ -7,6 +7,7 @@ import {
 import type { MessageToolApprovalHandler } from '../lib/message-bubble-types'
 import { MessageFileLineCommentContextPartById } from './message-file-line-comment-context-part-by-id'
 import { MessageFilePartById } from './message-file-part-by-id'
+import { MessageIntentContextPartById } from './message-intent-context-part-by-id'
 import { MessagePluginContextPartById } from './message-plugin-context-part-by-id'
 import { MessageRuntimeWarningPartById } from './message-runtime-warning-part-by-id'
 import { MessageSkillContextPartById } from './message-skill-context-part-by-id'
@@ -45,6 +46,8 @@ export function MessageBubbleSegment({
       return <MessageSkillContextPartById sessionId={sessionId} messageId={segment.messageId} partIndex={segment.partIndex} />
     case 'plugin-context':
       return <MessagePluginContextPartById sessionId={sessionId} messageId={segment.messageId} partIndex={segment.partIndex} />
+    case 'intent-context':
+      return <MessageIntentContextPartById sessionId={sessionId} messageId={segment.messageId} partIndex={segment.partIndex} />
     case 'file-line-comment-context':
       return <MessageFileLineCommentContextPartById sessionId={sessionId} messageId={segment.messageId} partIndex={segment.partIndex} />
     case 'runtime-warning':

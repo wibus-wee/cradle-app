@@ -74,7 +74,7 @@ import { opencodeServer } from './modules/opencode-server'
 import { createPluginsModule } from './modules/plugins'
 import { preferences } from './modules/preferences'
 import { profiles } from './modules/profiles'
-import { providers } from './modules/provider-catalog'
+import { providerPresets, providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
 import { pullRequest, pullRequestFeed } from './modules/pull-request'
@@ -238,6 +238,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(modelRegistry)
   app.use(mcpServers)
   app.use(providers)
+  app.use(providerPresets)
   app.use(agentIdentity)
   app.use(automation)
   app.use(assets)

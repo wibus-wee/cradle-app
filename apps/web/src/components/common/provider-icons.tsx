@@ -126,6 +126,56 @@ export function ProviderIcon({
   return renderPresetIcon(presetId, className) ?? <CustomIcon className={className} />
 }
 
+// ── Icon tile: brand icon on a uniform rounded surface ──
+
+const TILE_SIZE_CLASSES = {
+  sm: 'size-7 rounded-lg',
+  md: 'size-9 rounded-[10px]',
+  lg: 'size-11 rounded-xl',
+} as const
+
+const TILE_ICON_SIZE_CLASSES = {
+  sm: 'size-4',
+  md: 'size-5',
+  lg: 'size-6',
+} as const
+
+/**
+ * Renders a provider brand icon centered on a uniform rounded tile so monochrome
+ * SVGs, colorful CDN marks, and image icons share one visual weight across the
+ * picker, list rows, and detail headers.
+ */
+export function ProviderIconTile({
+  iconSlug,
+  iconUrl,
+  presetId,
+  size = 'md',
+  className,
+}: {
+  iconSlug?: string | null
+  iconUrl?: string | null
+  presetId: string | null
+  size?: keyof typeof TILE_SIZE_CLASSES
+  className?: string
+}) {
+  return (
+    <span
+      className={cn(
+        'flex shrink-0 items-center justify-center bg-muted/50 ring-1 ring-foreground/[0.08] ring-inset',
+        TILE_SIZE_CLASSES[size],
+        className,
+      )}
+    >
+      <ProviderIcon
+        iconSlug={iconSlug}
+        iconUrl={iconUrl}
+        presetId={presetId}
+        className={TILE_ICON_SIZE_CLASSES[size]}
+      />
+    </span>
+  )
+}
+
 export function RuntimeIcon({
   icon,
   className,
@@ -157,23 +207,34 @@ export function RuntimeIcon({
 function LobeIconImage({ slug, className }: { slug: string, className?: string }) {
   const theme = useResolvedThemeMode()
   const iconKey = `${slug}:${theme}`
-  const [loadedIcon, setLoadedIcon] = useState<{ key: string, url: string } | null>(null)
-  const url = loadedIcon?.key === iconKey ? loadedIcon.url : null
+  const [loadedIcon, setLoadedIcon] = useState<{ key: string, url: string | null } | null>(null)
+  const resolved = loadedIcon?.key === iconKey
+  const url = resolved ? loadedIcon.url : null
 
   useEffect(() => {
     let cancelled = false
-    getLobeIconUrl(slug, theme).then((u) => {
-      if (!cancelled && u) {
-        setLoadedIcon({ key: iconKey, url: u })
-      }
-    })
+    getLobeIconUrl(slug, theme)
+      .then((u) => {
+        if (!cancelled) {
+          setLoadedIcon({ key: iconKey, url: u })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoadedIcon({ key: iconKey, url: null })
+        }
+      })
     return () => {
       cancelled = true
     }
   }, [iconKey, slug, theme])
 
-  if (!url) {
+  if (!resolved) {
     return <div className={cn('animate-pulse rounded bg-muted', className)} />
+  }
+
+  if (!url) {
+    return <CustomIcon className={className} />
   }
 
   const backgroundColor = LOBE_ICON_BRAND_BACKGROUND_SLUGS.has(slug)

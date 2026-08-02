@@ -13,6 +13,7 @@ import type { ActiveRun, PendingRunState } from '../run-registry'
 import { runRegistry } from '../run-registry'
 import type {
   ChatThinkingEffort,
+  RuntimeReviewTarget,
   RuntimeSettings,
   RuntimeSettingsPatch,
 } from '../runtime-provider-types'
@@ -49,6 +50,7 @@ export interface CreateRunInput {
   thinkingEffort?: ChatThinkingEffort
   runtimeSettings?: RuntimeSettingsPatch
   runtimeSettingsOverride?: RuntimeSettings
+  reviewTarget?: RuntimeReviewTarget
   continuationMode?: ChatSessionQueueMode
   queueItemId?: string
   internalContinuation?: 'runtimeGoal'
@@ -246,6 +248,15 @@ export async function createRun(
     })
     const runtimeSession = runtimeResolution.runtimeSession
 
+    if (input.reviewTarget && runtimeKind !== 'codex') {
+      throw new AppError({
+        code: 'chat_runtime_native_review_not_supported',
+        status: 501,
+        message: 'The selected runtime does not support native code review.',
+        details: { runtimeKind },
+      })
+    }
+
     if (pendingState.cancelled) {
       if (input.queueItemId) {
         await cancelQueuedSessionItem(input.sessionId, input.queueItemId)
@@ -378,6 +389,7 @@ export async function createRun(
         requestedModelId !== undefined
           ? requestedModelId
           : (runtimeResolution.requestedModelId ?? undefined),
+      reviewTarget: input.reviewTarget,
       thinkingEffort: requestedThinkingEffort,
       runtimeSettings,
       systemPrompt: turnContext.systemPrompt,

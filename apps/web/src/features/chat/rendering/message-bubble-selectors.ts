@@ -9,11 +9,13 @@ import type { BangCommandMetadata, BangResultMetadata } from '../commands/bang-c
 import { readBangCommandMetadata, readBangResultMetadata } from '../commands/bang-command-metadata'
 import type {
   ChatFileLineCommentContextMessagePart,
+  ChatIntentContextMessagePart,
   ChatPluginContextMessagePart,
   ChatSkillContextMessagePart,
 } from '../context/chat-context-parts'
 import {
   isChatFileLineCommentContextPart,
+  isChatIntentContextPart,
   isChatPluginContextPart,
   isChatSkillContextPart,
 } from '../context/chat-context-parts'
@@ -296,12 +298,14 @@ function areRenderSegmentEqual(left: ChatRenderSegment, right: ChatRenderSegment
     case 'file-attachment':
     case 'skill-context':
     case 'plugin-context':
+    case 'intent-context':
     case 'file-line-comment-context':
     case 'runtime-warning':
       return (
         (right.kind === 'file-attachment'
           || right.kind === 'skill-context'
           || right.kind === 'plugin-context'
+          || right.kind === 'intent-context'
           || right.kind === 'file-line-comment-context'
           || right.kind === 'runtime-warning')
         && left.kind === right.kind
@@ -503,6 +507,16 @@ export function readPluginContextPartFromState(
 ): ChatPluginContextMessagePart | null {
   const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
   return isChatPluginContextPart(part) ? part : null
+}
+
+export function readIntentContextPartFromState(
+  state: ChatStoreSnapshot,
+  sessionId: string,
+  messageId: string,
+  partIndex: number,
+): ChatIntentContextMessagePart | null {
+  const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
+  return isChatIntentContextPart(part) ? part : null
 }
 
 export function readFileLineCommentContextPartFromState(

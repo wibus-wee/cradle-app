@@ -20,12 +20,13 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import {
   patchProfilesByIdIcon,
+  postProfilesByIdBindProvider,
   postProvidersModels,
   postSecrets,
   postSecretsByIdReveal,
   putProfilesById,
 } from '~/api-gen/sdk.gen'
-import { ProviderIcon } from '~/components/common/provider-icons'
+import { ProviderIcon, ProviderIconTile } from '~/components/common/provider-icons'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +38,6 @@ import {
   AlertDialogMedia,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { IconPicker } from '~/components/ui/icon-picker'
 import { Input } from '~/components/ui/input'
@@ -48,7 +48,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { Separator } from '~/components/ui/separator'
 import { Spinner } from '~/components/ui/spinner'
 import { Switch } from '~/components/ui/switch'
 import { toastManager } from '~/components/ui/toast'
@@ -65,12 +64,10 @@ import { AGENT_MODELS_QUERY_KEY } from '~/features/agent-runtime/use-agent-model
 import { apiErrorMessage } from '~/lib/api-error'
 import { cn } from '~/lib/cn'
 
-import { SettingsDivider, SettingsRow } from '../settings/settings-row'
 import { ChatgptCredentialSummary } from './chatgpt-credential-summary'
 import {
   CLAUDE_AUTH_MODE_API_KEY,
   CLAUDE_AUTH_MODE_CLAUDE_AI,
-  CLAUDE_AUTH_MODE_OPTIONS,
   claudeCredentialPlaceholder,
   normalizeClaudeAuthMode,
 } from './claude-auth-modes'
@@ -80,7 +77,6 @@ import {
   CODEX_AUTH_MODE_API_KEY,
   CODEX_AUTH_MODE_BEDROCK_API_KEY,
   CODEX_AUTH_MODE_CHATGPT,
-  CODEX_AUTH_MODE_OPTIONS,
   codexAuthModeFromCredentialKind,
   codexCredentialPlaceholder,
   codexSecretKindForAuthMode,
@@ -88,11 +84,17 @@ import {
 } from './codex-auth-modes'
 import { CustomModelsEditor } from './custom-models-editor'
 import { ModelsPanel } from './models-panel'
+import { ProviderConnectionTestControls } from './provider-connection-test'
 import {
   ALL_DISABLED_SENTINEL,
   presetForProviderKind,
   PROVIDER_KIND_LABELS,
 } from './provider-settings-utils'
+import {
+  AuthModeSegmented,
+  InfoCallout,
+  SetupField,
+} from './provider-setup-form'
 import type { EditableCustomModel } from './provider-target-model-settings'
 import {
   CustomModelsJsonSchema,
@@ -101,6 +103,8 @@ import {
   updateProviderTargetCustomModels,
   updateProviderTargetModelVisibility,
 } from './provider-target-model-settings'
+import type { ProviderPreset, ProviderPresetAuthMethod } from './provider-templates'
+import { unboundAuthMethods } from './provider-templates'
 import type { ChatgptCredentialLoginStart } from './use-chatgpt-credential-login'
 import {
   openChatgptCredentialLoginUrl,
@@ -110,12 +114,14 @@ import {
 } from './use-chatgpt-credential-login'
 import type { CredentialMetadata } from './use-credential-metadata'
 import { isChatgptCredentialMetadata, useCredentialMetadata } from './use-credential-metadata'
+import { useMergedProviderPresets } from './use-provider-presets'
 
 type SaveState = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
 type ProfileTextField = 'name' | 'apiKey' | 'baseUrl' | 'openaiBaseUrl' | 'anthropicBaseUrl' | 'api' | 'authMode' | 'bedrockRegion'
 
 interface BuildProfileConfigOptions {
-  codexAuthMode?: string | null
+  /** Only apply Codex authMode when providerId is openai. */
+  openaiAuthMode?: string | null
 }
 
 interface CustomModelsState {
@@ -182,6 +188,12 @@ const INITIAL_CHATGPT_LOGIN_STATE: ChatgptLoginState = {
 }
 
 const EMPTY_ENABLED_MODELS: string[] = []
+
+const PROVIDER_KIND_SEGMENT_OPTIONS = [
+  { value: 'openai-compatible', label: PROVIDER_KIND_LABELS['openai-compatible'] },
+  { value: 'anthropic', label: PROVIDER_KIND_LABELS.anthropic },
+  { value: 'universal', label: PROVIDER_KIND_LABELS.universal },
+] as const
 
 const ModelDescriptorSchema = z.object({
   id: z.string(),
@@ -263,6 +275,12 @@ function getProfileFormValues(
   profile: AgentProfile,
 ): ProfileDetailFormValues {
   const config = ProfileConfigJsonSchema.parse(profile.configJson)
+  const providerId = profile.providerId
+  const authMode = providerId === 'anthropic'
+    ? normalizeClaudeAuthMode(config.authMode)
+    : providerId === 'openai'
+      ? normalizeCodexAuthMode(config.authMode)
+      : CODEX_AUTH_MODE_API_KEY
   return {
     name: profile.name,
     apiKey: '',
@@ -272,9 +290,7 @@ function getProfileFormValues(
     anthropicBaseUrl: config.anthropicBaseUrl || config.baseUrl,
     model: config.model,
     api: config.api,
-    authMode: profile.providerKind === 'anthropic'
-      ? normalizeClaudeAuthMode(config.authMode)
-      : normalizeCodexAuthMode(config.authMode),
+    authMode,
     bedrockRegion: config.bedrock?.region ?? '',
     claudeAgentAliases: readClaudeAgentModelAliases(config),
     enabledModels: getInitialEnabledModels(config.enabledModels),
@@ -283,6 +299,20 @@ function getProfileFormValues(
 
 function supportsClaudeAgentModelAliases(providerKind: ApiProviderKind): boolean {
   return providerKind === 'anthropic' || providerKind === 'universal'
+}
+
+function resolveAuthMethods(
+  providerId: string | null | undefined,
+  presets: ProviderPreset[],
+): ProviderPresetAuthMethod[] {
+  if (!providerId) {
+    return unboundAuthMethods()
+  }
+  const preset = presets.find(entry => entry.providerId === providerId || entry.id === providerId)
+  if (preset?.authMethods.length) {
+    return preset.authMethods
+  }
+  return unboundAuthMethods()
 }
 
 function applyClaudeAgentAliasesToProfileConfig(
@@ -312,6 +342,7 @@ function buildProviderRequestBody(profile: AgentProfile) {
 function buildProfileConfig(
   values: ProfileDetailFormValues,
   currentConfig: Record<string, unknown>,
+  providerId: string | null,
   options: BuildProfileConfigOptions = {},
 ): Record<string, unknown> {
   const {
@@ -335,20 +366,21 @@ function buildProfileConfig(
       model: values.model || undefined,
     }, values)
   }
-  if (values.providerKind === 'openai-compatible' && options.codexAuthMode) {
-    const codexAuthMode = normalizeCodexAuthMode(options.codexAuthMode)
+  // Codex auth suite is identity-gated (openai), not WireShape-gated.
+  if (providerId === 'openai' && options.openaiAuthMode) {
+    const openaiAuthMode = normalizeCodexAuthMode(options.openaiAuthMode)
     return applyClaudeAgentAliasesToProfileConfig({
       ...rest,
-      authMode: codexAuthMode,
-      baseUrl: codexAuthMode === CODEX_AUTH_MODE_API_KEY ? values.baseUrl : '',
+      authMode: openaiAuthMode,
+      baseUrl: openaiAuthMode === CODEX_AUTH_MODE_API_KEY ? values.baseUrl : '',
       model: values.model || undefined,
       api: values.api || undefined,
-      ...(codexAuthMode === CODEX_AUTH_MODE_BEDROCK_API_KEY
+      ...(openaiAuthMode === CODEX_AUTH_MODE_BEDROCK_API_KEY
         ? { bedrock: { region: values.bedrockRegion.trim() } }
         : {}),
     }, values)
   }
-  if (values.providerKind === 'anthropic') {
+  if (providerId === 'anthropic') {
     const claudeAuthMode = normalizeClaudeAuthMode(values.authMode)
     return applyClaudeAgentAliasesToProfileConfig({
       ...rest,
@@ -399,15 +431,29 @@ function clearTimer(timerRef: MutableRefObject<ReturnType<typeof setTimeout> | n
   timerRef.current = null
 }
 
+function hostnameOf(url: string | null | undefined): string | null {
+  if (!url) {
+    return null
+  }
+  try {
+    return new URL(url).hostname
+  }
+  catch {
+    return null
+  }
+}
+
 export function ProfileDetailPanel({
   profile,
   onRemove,
   onToggle,
+  onDuplicate,
   onSaved,
 }: {
   profile: AgentProfile
   onRemove: () => void
   onToggle: (enabled: boolean) => void
+  onDuplicate: () => void
   onSaved: () => void
 }) {
   const queryClient = useQueryClient()
@@ -449,9 +495,18 @@ export function ProfileDetailPanel({
   const { startLogin, cancelLogin } = useChatgptCredentialLoginActions()
   const chatgptLoginStatus = useChatgptCredentialLoginStatus(chatgptLogin.loginId)
   const credentialMetadata = useCredentialMetadata(profile.credentialRef)
-  const showCodexAccountDiagnostics = providerKind === 'openai-compatible'
+  const { presets } = useMergedProviderPresets()
+  const providerId = profile.providerId
+  const isOpenAiProvider = providerId === 'openai'
+  const isClaudeProvider = providerId === 'anthropic'
+  const authMethods = resolveAuthMethods(providerId, presets)
+  const showCodexAccountDiagnostics = isOpenAiProvider
     && normalizeCodexAuthMode(authMode) === CODEX_AUTH_MODE_CHATGPT
   const preset = presetForProviderKind(providerKind)
+  const showDualEndpoints = providerKind === 'universal'
+    || (presets.find(p => p.providerId === providerId)?.endpointProfiles.length ?? 0) >= 2
+  const [bindProviderId, setBindProviderId] = useState('')
+  const [bindBusy, setBindBusy] = useState(false)
 
   useEffect(() => {
     latestProfileRef.current = profile
@@ -638,7 +693,7 @@ export function ProfileDetailPanel({
   }, [form, profile.id])
 
   useEffect(() => {
-    if (profile.providerKind !== 'openai-compatible') {
+    if (profile.providerId !== 'openai') {
       return
     }
     const config = ProfileConfigJsonSchema.parse(profile.configJson)
@@ -653,7 +708,7 @@ export function ProfileDetailPanel({
     const nextValues = { ...currentValues, authMode: credentialAuthMode }
     form.setValue('authMode', credentialAuthMode, { shouldDirty: false })
     savedSignatureRef.current = createProfileSignature(nextValues)
-  }, [credentialMetadata.data?.kind, form, profile.configJson, profile.providerKind])
+  }, [credentialMetadata.data?.kind, form, profile.configJson, profile.providerId])
 
   useEffect(() => {
     if (!supportsModels) {
@@ -723,13 +778,13 @@ export function ProfileDetailPanel({
       let credentialRef = profile.credentialRef ?? null
       const credentialValue = currentValues.apiKey.trim()
       if (credentialValue && supportsModels) {
-        const codexAuthMode = currentValues.providerKind === 'openai-compatible'
+        const openaiAuthMode = profile.providerId === 'openai'
           ? normalizeCodexAuthMode(currentValues.authMode)
           : CODEX_AUTH_MODE_API_KEY
         const { data: meta } = await postSecrets({
           body: {
-            kind: currentValues.providerKind === 'openai-compatible'
-              ? codexSecretKindForAuthMode(codexAuthMode, currentValues.providerKind)
+            kind: profile.providerId === 'openai'
+              ? codexSecretKindForAuthMode(openaiAuthMode, currentValues.providerKind)
               : currentValues.providerKind,
             label: currentValues.name,
             secret: credentialValue,
@@ -737,7 +792,7 @@ export function ProfileDetailPanel({
         })
         credentialRef = SecretCreateResponseSchema.parse(meta).id
       }
-      const codexAuthMode = currentValues.providerKind === 'openai-compatible'
+      const openaiAuthMode = profile.providerId === 'openai'
         ? normalizeCodexAuthMode(currentValues.authMode)
         : null
 
@@ -748,11 +803,15 @@ export function ProfileDetailPanel({
           providerKind: currentValues.providerKind,
           enabled: profile.enabled,
           config: supportsModels
-            ? buildProfileConfig(currentValues, ProfileConfigJsonSchema.parse(profile.configJson), {
-              codexAuthMode,
-              })
+            ? buildProfileConfig(
+                currentValues,
+                ProfileConfigJsonSchema.parse(profile.configJson),
+                profile.providerId,
+                { openaiAuthMode },
+              )
             : ProfileConfigJsonSchema.parse(profile.configJson),
           credentialRef,
+          providerId: profile.providerId,
         },
       })
 
@@ -839,14 +898,14 @@ export function ProfileDetailPanel({
     }
 
   const headerName = name.trim() || profile.name
-  const kindLabel = PROVIDER_KIND_LABELS[providerKind]
+  const headerEndpoint = providerKind === 'universal' ? openaiBaseUrl : baseUrl
 
   return (
-    <div data-testid="provider-detail-panel" className="flex flex-col gap-2">
+    <div data-testid="provider-detail-panel" className="flex max-w-2xl flex-col gap-10">
       <ProfileDetailHeader
         profile={profile}
         displayName={headerName}
-        kindLabel={kindLabel}
+        subtitle={hostnameOf(headerEndpoint) ?? PROVIDER_KIND_LABELS[providerKind]}
         icon={(
           <IconPicker
             value={profile.iconSlug ?? null}
@@ -857,19 +916,20 @@ export function ProfileDetailPanel({
           >
             <button
               type="button"
-              className="mt-1 shrink-0 cursor-pointer rounded-md p-0.5 transition-colors hover:bg-fill"
+              className="shrink-0 cursor-pointer rounded-xl transition-shadow duration-150 hover:ring-2 hover:ring-foreground/10"
             >
-              <ProviderIcon iconSlug={profile.iconSlug} presetId={preset.id} className="size-6" />
+              <ProviderIconTile iconSlug={profile.iconSlug} presetId={preset.id} size="lg" />
             </button>
           </IconPicker>
         )}
         saveState={saveState}
         onToggle={onToggle}
+        onDuplicate={onDuplicate}
         onOpenRemove={() => dispatch({ type: 'remove/set', open: true })}
       />
 
       {/* Configuration */}
-      <div className="flex flex-col">
+      <div className="flex flex-col gap-10">
         <ProfileGeneralSettings
           profile={profile}
           credentialMetadata={credentialMetadata.data ?? null}
@@ -878,11 +938,47 @@ export function ProfileDetailPanel({
           onProviderKindChange={setProviderKind}
           supportsModels={supportsModels}
           readOnly={false}
+          authMethods={authMethods}
+          showDualEndpoints={showDualEndpoints}
+          isOpenAiProvider={isOpenAiProvider}
+          isClaudeProvider={isClaudeProvider}
           chatgptLoginPending={!!chatgptLogin.loginId}
           chatgptLoginBusy={startLogin.isPending}
           activeChatgptLogin={chatgptLogin.activeLogin}
           onChatgptLogin={handleChatgptLogin}
           onCancelChatgptLogin={handleCancelChatgptLogin}
+          bindPresets={presets.filter(p => p.tier === 'first-class')}
+          bindProviderId={bindProviderId}
+          onBindProviderIdChange={setBindProviderId}
+          bindBusy={bindBusy}
+          onBindProvider={async () => {
+            if (!bindProviderId.trim()) {
+              return
+            }
+            setBindBusy(true)
+            try {
+              await postProfilesByIdBindProvider({
+                path: { id: profile.id },
+                body: {
+                  providerId: bindProviderId.trim(),
+                  applyEndpointDefaults: true,
+                },
+                throwOnError: true,
+              })
+              onSaved()
+              void queryClient.invalidateQueries({ queryKey: getProviderTargetsQueryKey() })
+            }
+            catch (error) {
+              toastManager.add({
+                type: 'error',
+                title: 'Could not bind provider',
+                description: apiErrorMessage(error),
+              })
+            }
+            finally {
+              setBindBusy(false)
+            }
+          }}
         />
 
         {showCodexAccountDiagnostics && (
@@ -890,16 +986,13 @@ export function ProfileDetailPanel({
         )}
 
         {supportsModels && supportsClaudeAgentModelAliases(providerKind) && (
-          <>
-            <SettingsDivider />
-            <ClaudeModelMatrixEditor
-              aliases={claudeAgentAliases}
-              models={availableModels}
-              mainModelId={model || null}
-              loading={modelsLoading}
-              onChange={handleClaudeAgentAliasesChange}
-            />
-          </>
+          <ClaudeModelMatrixEditor
+            aliases={claudeAgentAliases}
+            models={availableModels}
+            mainModelId={model || null}
+            loading={modelsLoading}
+            onChange={handleClaudeAgentAliasesChange}
+          />
         )}
 
         {supportsModels && (
@@ -938,42 +1031,41 @@ export function ProfileDetailPanel({
 }
 
 function ProfileDetailHeader({
-  profile,
   displayName,
-  kindLabel,
+  subtitle,
   icon,
   saveState,
+  profile,
   onToggle,
+  onDuplicate,
   onOpenRemove,
 }: {
   profile: AgentProfile
   displayName: string
-  kindLabel: string
+  subtitle: string
   icon: ReactNode
   saveState: SaveState
   onToggle: (enabled: boolean) => void
+  onDuplicate: () => void
   onOpenRemove: () => void
 }) {
   return (
-    <header className="flex items-start gap-3">
+    <header className="flex items-center gap-4">
       {icon}
 
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <h4 className="font-heading truncate text-[15px] font-medium text-foreground">
-            {displayName}
-          </h4>
-          <Badge variant="secondary" className="font-normal text-muted-foreground">
-            {kindLabel}
-          </Badge>
-        </div>
-        <p className="mt-1 truncate text-[11.5px] text-muted-foreground/80">{profile.id}</p>
+        <h4 className="font-heading truncate text-[17px] font-medium tracking-[-0.01em] text-foreground">
+          {displayName}
+        </h4>
+        <p className="mt-0.5 truncate font-mono text-[11.5px] text-muted-foreground/70">
+          {subtitle}
+        </p>
       </div>
 
-      <div className="flex items-center gap-3 pt-0.5">
+      <div className="flex shrink-0 items-center gap-2.5">
         <SaveIndicator state={saveState} />
 
-        <div className="flex items-center gap-2 rounded-full bg-muted/40 px-2.5 py-1 ring-1 ring-foreground/4">
+        <div className="flex items-center gap-2 rounded-full bg-muted/50 px-2.5 py-1">
           <Switch size="sm" checked={profile.enabled} onCheckedChange={onToggle} />
           <span className="text-[11px] font-medium text-muted-foreground">
             {profile.enabled ? 'Active' : 'Off'}
@@ -983,13 +1075,31 @@ function ProfileDetailHeader({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              data-testid={`agent-profile-remove-${profile.id}`}
+              type="button"
               variant="ghost"
               size="icon-sm"
-              onClick={onOpenRemove}
-              className="text-muted-foreground/60 hover:bg-destructive/6 hover:text-destructive"
+              data-testid={`agent-profile-duplicate-${profile.id}`}
+              onClick={onDuplicate}
+              aria-label="Duplicate provider"
             >
-              <Trash2Icon className="size-3.5" />
+              <CopyIcon />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Duplicate provider</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              data-testid={`agent-profile-remove-${profile.id}`}
+              onClick={onOpenRemove}
+              aria-label="Remove provider"
+              className="hover:text-destructive"
+            >
+              <Trash2Icon />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="top">Remove provider</TooltipContent>
@@ -1007,11 +1117,20 @@ function ProfileGeneralSettings({
   onProviderKindChange,
   supportsModels,
   readOnly,
+  authMethods,
+  showDualEndpoints,
+  isOpenAiProvider,
+  isClaudeProvider,
   chatgptLoginPending,
   chatgptLoginBusy,
   activeChatgptLogin,
   onChatgptLogin,
   onCancelChatgptLogin,
+  bindPresets,
+  bindProviderId,
+  onBindProviderIdChange,
+  bindBusy,
+  onBindProvider,
 }: {
   profile: AgentProfile
   credentialMetadata: CredentialMetadata | null
@@ -1020,150 +1139,204 @@ function ProfileGeneralSettings({
   onProviderKindChange: (providerKind: ApiProviderKind) => void
   supportsModels: boolean
   readOnly: boolean
+  authMethods: ProviderPresetAuthMethod[]
+  showDualEndpoints: boolean
+  isOpenAiProvider: boolean
+  isClaudeProvider: boolean
   chatgptLoginPending: boolean
   chatgptLoginBusy: boolean
   activeChatgptLogin: ChatgptCredentialLoginStart | null
   onChatgptLogin: () => void
   onCancelChatgptLogin: () => void
+  bindPresets: ProviderPreset[]
+  bindProviderId: string
+  onBindProviderIdChange: (providerId: string) => void
+  bindBusy: boolean
+  onBindProvider: () => void
 }) {
-  const isUniversal = values.providerKind === 'universal'
-  const isCodexProvider = values.providerKind === 'openai-compatible'
-  const isClaudeProvider = values.providerKind === 'anthropic'
   const isChatgptCredential = isChatgptCredentialMetadata(credentialMetadata)
-  const codexAuthMode = isCodexProvider
+  const openaiAuthMode = isOpenAiProvider
     ? normalizeCodexAuthMode(values.authMode)
     : CODEX_AUTH_MODE_API_KEY
   const claudeAuthMode = isClaudeProvider
     ? normalizeClaudeAuthMode(values.authMode)
     : CLAUDE_AUTH_MODE_API_KEY
   const endpointDisabled = readOnly
-    || (isCodexProvider && codexAuthMode !== CODEX_AUTH_MODE_API_KEY)
-    || (isClaudeProvider
-      && claudeAuthMode !== CLAUDE_AUTH_MODE_API_KEY)
-  const providerKindDisabled = readOnly || codexAuthMode === CODEX_AUTH_MODE_CHATGPT || isChatgptCredential
+    || (isOpenAiProvider && openaiAuthMode !== CODEX_AUTH_MODE_API_KEY)
+    || (isClaudeProvider && claudeAuthMode !== CLAUDE_AUTH_MODE_API_KEY)
+  const providerKindDisabled = readOnly || openaiAuthMode === CODEX_AUTH_MODE_CHATGPT || isChatgptCredential
+  const unbound = !profile.providerId
 
   return (
-    <>
-      <SettingsRow label="Display name" description="The name shown in the provider list">
-        <Input
-          data-testid="provider-edit-name"
-          value={values.name}
-          onChange={e => onTextFieldChange('name', e.target.value)}
-          disabled={readOnly}
-          className="h-9 w-56 text-[13px]"
-        />
-      </SettingsRow>
+    <div className="flex flex-col gap-9">
+      {/* ── General ── */}
+      <section className="flex flex-col gap-4">
+        <h5 className="px-0.5 text-[13px] font-medium text-foreground">General</h5>
 
-      {supportsModels && (
-        <>
-          <SettingsDivider />
-          <SettingsRow label="Provider type" description="Runtime protocol family for this provider">
-            <Select
-              value={values.providerKind}
-              onValueChange={value => onProviderKindChange(value as ApiProviderKind)}
-              disabled={providerKindDisabled}
+        <div className="flex flex-col gap-5 rounded-xl border border-border bg-card p-4">
+          <SetupField label="Display name" hint="The name shown in the provider list.">
+            <Input
+              data-testid="provider-edit-name"
+              value={values.name}
+              onChange={e => onTextFieldChange('name', e.target.value)}
+              disabled={readOnly}
+              className="h-9 w-full text-[13px]"
+            />
+          </SetupField>
+
+          {unbound && (
+            <SetupField
+              label="Bind provider"
+              hint="This profile has no integration identity yet. Binding is an explicit choice — Cradle will not infer it from the endpoint."
             >
-              <SelectTrigger className="h-9 w-56 text-[12.5px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="openai-compatible">{PROVIDER_KIND_LABELS['openai-compatible']}</SelectItem>
-                <SelectItem value="anthropic">{PROVIDER_KIND_LABELS.anthropic}</SelectItem>
-                <SelectItem value="universal">{PROVIDER_KIND_LABELS.universal}</SelectItem>
-              </SelectContent>
-            </Select>
-          </SettingsRow>
-
-          <SettingsDivider />
-          {isUniversal
-            ? (
-                <SettingsRow label="Endpoints" description="Separate base URLs for each API family" vertical>
-                  <div className="flex w-full max-w-[28rem] flex-col gap-1.5">
-                    <label htmlFor="provider-edit-openai-baseurl" className="text-[11px] font-medium text-muted-foreground">
-                      OpenAI
-                    </label>
-                    <Input
-                      id="provider-edit-openai-baseurl"
-                      data-testid="provider-edit-openai-baseurl"
-                      value={values.openaiBaseUrl}
-                      onChange={e => onTextFieldChange('openaiBaseUrl', e.target.value)}
-                      disabled={readOnly}
-                      className="h-9 text-[12.5px] font-mono"
-                      placeholder="https://api.example.com/v1"
-                    />
-                    <label htmlFor="provider-edit-anthropic-baseurl" className="mt-1 text-[11px] font-medium text-muted-foreground">
-                      Anthropic
-                    </label>
-                    <Input
-                      id="provider-edit-anthropic-baseurl"
-                      data-testid="provider-edit-anthropic-baseurl"
-                      value={values.anthropicBaseUrl}
-                      onChange={e => onTextFieldChange('anthropicBaseUrl', e.target.value)}
-                      disabled={readOnly}
-                      className="h-9 text-[12.5px] font-mono"
-                      placeholder="https://api.example.com"
-                    />
-                  </div>
-                </SettingsRow>
-              )
-            : (
-                <SettingsRow label="Endpoint" description="Base URL for the API">
-                  <Input
-                    data-testid="provider-edit-baseurl"
-                    value={values.baseUrl}
-                    onChange={e => onTextFieldChange('baseUrl', e.target.value)}
-                    disabled={endpointDisabled}
-                    className="h-9 w-56 text-[12.5px] font-mono"
-                    placeholder="https://api.example.com/v1"
-                  />
-                </SettingsRow>
-              )}
-
-          {!isUniversal && (
-            <>
-              <SettingsDivider />
-              <SettingsRow label="API protocol" description="Communication protocol for this endpoint">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <Select
-                  value={values.api || 'auto'}
-                  onValueChange={v => onTextFieldChange('api', v === 'auto' ? '' : v)}
-                  disabled={endpointDisabled}
+                  value={bindProviderId || undefined}
+                  onValueChange={onBindProviderIdChange}
+                  disabled={readOnly || bindBusy}
                 >
-                  <SelectTrigger className="h-9 w-56 text-[12.5px]">
-                    <SelectValue />
+                  <SelectTrigger data-testid="provider-bind-select" className="h-9 w-full text-[12.5px]">
+                    <SelectValue placeholder="Choose a provider…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="auto">Auto-detect</SelectItem>
-                    <SelectItem value="openai-completions">OpenAI Completions</SelectItem>
-                    <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
-                    <SelectItem value="anthropic-messages">Anthropic Messages</SelectItem>
-                    <SelectItem value="google-generative-ai">Google Generative AI</SelectItem>
-                    <SelectItem value="bedrock-converse-stream">AWS Bedrock</SelectItem>
-                    <SelectItem value="mistral-conversations">Mistral</SelectItem>
+                    {bindPresets.map(preset => (
+                      <SelectItem key={preset.providerId} value={preset.providerId}>
+                        {preset.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </SettingsRow>
-            </>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={readOnly || bindBusy || !bindProviderId}
+                  onClick={onBindProvider}
+                  data-testid="provider-bind-submit"
+                >
+                  {bindBusy ? <Spinner className="size-3" /> : null}
+                  Bind
+                </Button>
+              </div>
+            </SetupField>
           )}
 
-          <SettingsDivider />
-          <ProfileCredentialSettings
-            profile={profile}
-            credentialMetadata={credentialMetadata}
-            values={values}
-            onTextFieldChange={onTextFieldChange}
-            readOnly={readOnly}
-            providerKind={values.providerKind}
-            lockChatgptAuth={isChatgptCredential}
-            chatgptLoginPending={chatgptLoginPending}
-            chatgptLoginBusy={chatgptLoginBusy}
-            activeChatgptLogin={activeChatgptLogin}
-            onChatgptLogin={onChatgptLogin}
-            onCancelChatgptLogin={onCancelChatgptLogin}
-          />
+          {supportsModels && (
+            <>
+              <SetupField label="Provider type" hint="Runtime protocol family for this provider.">
+                <AuthModeSegmented
+                  testIdPrefix="provider-edit-kind"
+                  options={PROVIDER_KIND_SEGMENT_OPTIONS}
+                  value={values.providerKind}
+                  onChange={value => onProviderKindChange(value as ApiProviderKind)}
+                  disabled={providerKindDisabled}
+                />
+              </SetupField>
 
-        </>
+              {showDualEndpoints
+                ? (
+                    <SetupField label="Endpoints" hint="Separate base URLs for each API family.">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-muted-foreground">OpenAI</span>
+                          <Input
+                            data-testid="provider-edit-openai-baseurl"
+                            value={values.openaiBaseUrl}
+                            onChange={e => onTextFieldChange('openaiBaseUrl', e.target.value)}
+                            disabled={readOnly}
+                            className="h-9 w-full text-[12.5px] font-mono"
+                            placeholder="https://api.example.com/v1"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[11px] font-medium text-muted-foreground">Anthropic</span>
+                          <Input
+                            data-testid="provider-edit-anthropic-baseurl"
+                            value={values.anthropicBaseUrl}
+                            onChange={e => onTextFieldChange('anthropicBaseUrl', e.target.value)}
+                            disabled={readOnly}
+                            className="h-9 w-full text-[12.5px] font-mono"
+                            placeholder="https://api.example.com/anthropic"
+                          />
+                        </div>
+                      </div>
+                    </SetupField>
+                  )
+                : (
+                    <SetupField label="Endpoint" hint="Base URL for the API.">
+                      <Input
+                        data-testid="provider-edit-baseurl"
+                        value={values.baseUrl}
+                        onChange={e => onTextFieldChange('baseUrl', e.target.value)}
+                        disabled={endpointDisabled}
+                        className="h-9 w-full text-[12.5px] font-mono"
+                        placeholder="https://api.example.com/v1"
+                      />
+                    </SetupField>
+                  )}
+
+              {!showDualEndpoints && (
+                <SetupField label="API protocol" hint="Communication protocol for this endpoint.">
+                  <Select
+                    value={values.api || 'auto'}
+                    onValueChange={v => onTextFieldChange('api', v === 'auto' ? '' : v)}
+                    disabled={endpointDisabled}
+                  >
+                    <SelectTrigger className="h-9 w-full text-[12.5px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto-detect</SelectItem>
+                      <SelectItem value="openai-completions">OpenAI Completions</SelectItem>
+                      <SelectItem value="openai-responses">OpenAI Responses</SelectItem>
+                      <SelectItem value="anthropic-messages">Anthropic Messages</SelectItem>
+                      <SelectItem value="google-generative-ai">Google Generative AI</SelectItem>
+                      <SelectItem value="bedrock-converse-stream">AWS Bedrock</SelectItem>
+                      <SelectItem value="mistral-conversations">Mistral</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </SetupField>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* ── Authentication + Connection ── */}
+      {supportsModels && (
+        <section className="flex flex-col gap-4">
+          <h5 className="px-0.5 text-[13px] font-medium text-foreground">Authentication</h5>
+
+          <div className="flex flex-col gap-5 rounded-xl border border-border bg-card p-4">
+            <ProfileCredentialSettings
+              profile={profile}
+              credentialMetadata={credentialMetadata}
+              values={values}
+              onTextFieldChange={onTextFieldChange}
+              readOnly={readOnly}
+              authMethods={authMethods}
+              isOpenAiProvider={isOpenAiProvider}
+              isClaudeProvider={isClaudeProvider}
+              lockChatgptAuth={isChatgptCredential}
+              chatgptLoginPending={chatgptLoginPending}
+              chatgptLoginBusy={chatgptLoginBusy}
+              activeChatgptLogin={activeChatgptLogin}
+              onChatgptLogin={onChatgptLogin}
+              onCancelChatgptLogin={onCancelChatgptLogin}
+            />
+
+            <div className="flex items-center justify-between gap-4 border-t border-border/60 pt-4">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[12.5px] font-medium text-foreground">Connection</span>
+                <p className="text-[11.5px] text-muted-foreground">
+                  Probe the endpoint with the saved credentials.
+                </p>
+              </div>
+              <ProviderConnectionTestControls providerTargetId={profile.id} disabled={readOnly} />
+            </div>
+          </div>
+        </section>
       )}
-    </>
+    </div>
   )
 }
 
@@ -1173,7 +1346,9 @@ function ProfileCredentialSettings({
   values,
   onTextFieldChange,
   readOnly,
-  providerKind,
+  authMethods,
+  isOpenAiProvider,
+  isClaudeProvider,
   lockChatgptAuth,
   chatgptLoginPending,
   chatgptLoginBusy,
@@ -1186,7 +1361,9 @@ function ProfileCredentialSettings({
   values: Pick<ProfileDetailFormValues, ProfileTextField>
   onTextFieldChange: (field: ProfileTextField, value: string) => void
   readOnly: boolean
-  providerKind: ApiProviderKind
+  authMethods: ProviderPresetAuthMethod[]
+  isOpenAiProvider: boolean
+  isClaudeProvider: boolean
   lockChatgptAuth: boolean
   chatgptLoginPending: boolean
   chatgptLoginBusy: boolean
@@ -1195,27 +1372,28 @@ function ProfileCredentialSettings({
   onCancelChatgptLogin: () => void
 }) {
   const { t } = useTranslation('agentManagement')
-  const isCodexProvider = providerKind === 'openai-compatible'
-  const isClaudeProvider = providerKind === 'anthropic'
   const isChatgptCredential = isChatgptCredentialMetadata(credentialMetadata)
-  const codexAuthMode = isCodexProvider
+  const openaiAuthMode = isOpenAiProvider
     ? normalizeCodexAuthMode(values.authMode)
     : CODEX_AUTH_MODE_API_KEY
   const claudeAuthMode = isClaudeProvider
     ? normalizeClaudeAuthMode(values.authMode)
     : CLAUDE_AUTH_MODE_API_KEY
   const claudeAiLogin = isClaudeProvider && claudeAuthMode === CLAUDE_AUTH_MODE_CLAUDE_AI
-  const showChatgptControls = isCodexProvider && codexAuthMode === CODEX_AUTH_MODE_CHATGPT
+  const showChatgptControls = isOpenAiProvider && openaiAuthMode === CODEX_AUTH_MODE_CHATGPT
   const [revealedSecret, setRevealedSecret] = useState<string | null>(null)
   const [revealingSecret, setRevealingSecret] = useState(false)
   const [replacingSecret, setReplacingSecret] = useState(false)
-  const description = isCodexProvider
-    ? 'How this provider signs in to Codex.'
-    : isClaudeProvider
-      ? 'How this provider authenticates to Claude.'
-      : profile.credentialRef
+  const hasAuthMethodChoice = authMethods.length > 1
+  const description = !hasAuthMethodChoice
+    ? (profile.credentialRef
         ? 'Stored securely. Reveal it briefly or replace it with a new value.'
-        : 'Stored locally and encrypted.'
+        : 'Stored locally and encrypted.')
+    : isOpenAiProvider
+      ? 'How this provider signs in to Codex.'
+      : isClaudeProvider
+        ? 'How this provider authenticates to Claude.'
+        : 'How you authenticate with this provider.'
 
   useEffect(() => {
     if (!revealedSecret) {
@@ -1249,161 +1427,146 @@ function ProfileCredentialSettings({
     }
   }
 
+  const authModeOptions = authMethods.map(method => ({ value: method.id, label: method.label }))
+  const activeAuthMode = values.authMode || authMethods[0]?.id || CODEX_AUTH_MODE_API_KEY
+
   return (
-    <SettingsRow
-      label="Authentication"
-      description={description}
-      vertical
-    >
-      <div className="flex w-full max-w-[28rem] flex-col gap-2">
-        {isCodexProvider && (
-          <Select
-            value={codexAuthMode}
-            onValueChange={(nextAuthMode) => {
-              onTextFieldChange('authMode', nextAuthMode)
-              if (nextAuthMode === CODEX_AUTH_MODE_CHATGPT) {
-                onTextFieldChange('apiKey', '')
-                onTextFieldChange('baseUrl', '')
-              }
-            }}
-            disabled={readOnly || lockChatgptAuth}
-          >
-            <SelectTrigger className="h-9 w-56 text-[12.5px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CODEX_AUTH_MODE_OPTIONS.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+    <div className="flex flex-col gap-4">
+      {hasAuthMethodChoice && (
+        <AuthModeSegmented
+          testIdPrefix="provider-edit-auth-mode"
+          options={authModeOptions}
+          value={activeAuthMode}
+          disabled={readOnly || (isOpenAiProvider && lockChatgptAuth)}
+          onChange={(nextAuthMode) => {
+            onTextFieldChange('authMode', nextAuthMode)
+            if (nextAuthMode === CODEX_AUTH_MODE_CHATGPT || nextAuthMode === CLAUDE_AUTH_MODE_CLAUDE_AI) {
+              onTextFieldChange('apiKey', '')
+              onTextFieldChange('baseUrl', '')
+            }
+          }}
+        />
+      )}
+      <p className="-mt-1 text-[11.5px] text-muted-foreground">{description}</p>
 
-        {isClaudeProvider && (
-          <Select
-            value={claudeAuthMode}
-            onValueChange={(nextAuthMode) => {
-              onTextFieldChange('authMode', nextAuthMode)
-              if (nextAuthMode === CLAUDE_AUTH_MODE_CLAUDE_AI) {
-                onTextFieldChange('apiKey', '')
-                onTextFieldChange('baseUrl', '')
-              }
-            }}
-            disabled={readOnly}
-          >
-            <SelectTrigger className="h-9 w-56 text-[12.5px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {CLAUDE_AUTH_MODE_OPTIONS.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+      {/* Mode-specific fields swap with a quick crossfade, never a jump. */}
+      <AnimatePresence mode="wait" initial={false}>
+        <m.div
+          key={activeAuthMode}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.14, ease: 'easeOut' }}
+          className="flex flex-col gap-3"
+        >
+          {claudeAiLogin && (
+            <InfoCallout>
+              {t('detail.claudeAgent.subscriptionLoginNotice')}
+            </InfoCallout>
+          )}
 
-        {claudeAiLogin && (
-          <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-[11.5px] leading-relaxed text-muted-foreground ring-1 ring-foreground/4">
-            {t('detail.claudeAgent.subscriptionLoginNotice')}
-          </div>
-        )}
+          {showChatgptControls && credentialMetadata && isChatgptCredential && (
+            <ChatgptCredentialSummary credential={credentialMetadata} />
+          )}
 
-        {showChatgptControls && credentialMetadata && isChatgptCredential && (
-          <ChatgptCredentialSummary credential={credentialMetadata} />
-        )}
-        {!showChatgptControls && !claudeAiLogin && revealedSecret && (
-          <div className="flex flex-col gap-1.5">
-            <Input value={revealedSecret} readOnly type="text" className="h-9 font-mono text-[12.5px]" />
-            <div className="flex items-center gap-2">
-              <Button type="button" size="xs" variant="outline" onClick={() => setRevealedSecret(null)}>
-                Hide API key
-              </Button>
-              <span className="text-[11px] text-muted-foreground">Hidden automatically after 15 seconds.</span>
+          {!showChatgptControls && !claudeAiLogin && revealedSecret && (
+            <div className="flex flex-col gap-1.5">
+              <Input value={revealedSecret} readOnly type="text" className="h-9 w-full font-mono text-[12.5px]" />
+              <div className="flex items-center gap-2">
+                <Button type="button" size="xs" variant="outline" onClick={() => setRevealedSecret(null)}>
+                  Hide API key
+                </Button>
+                <span className="text-[11px] text-muted-foreground">
+                  Hidden automatically after 15 seconds.
+                </span>
+              </div>
             </div>
-          </div>
-        )}
-        {!showChatgptControls && !claudeAiLogin && !revealedSecret && profile.credentialRef && !replacingSecret && (
-          <div className="flex items-center gap-2">
-            <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-muted-foreground">{credentialMetadata?.maskedSecret ?? 'Stored API key'}</span>
-            <Button type="button" size="xs" variant="outline" onClick={() => void revealSecret()} disabled={readOnly || revealingSecret}>
-              {revealingSecret ? <Spinner className="size-3" /> : null}
-              Reveal
-            </Button>
-            <Button type="button" size="xs" variant="outline" onClick={() => setReplacingSecret(true)} disabled={readOnly}>
-              Replace
-            </Button>
-          </div>
-        )}
-        {!showChatgptControls && !claudeAiLogin && !revealedSecret && (!profile.credentialRef || replacingSecret) && (
-          <div className="flex flex-col gap-1.5">
-          <Input
-            data-testid="provider-edit-apikey"
-            type="password"
-            value={values.apiKey}
-            onChange={e => onTextFieldChange('apiKey', e.target.value)}
-            disabled={readOnly}
-            placeholder={isCodexProvider
-              ? codexCredentialPlaceholder(codexAuthMode, !!profile.credentialRef)
-              : isClaudeProvider
-                ? claudeCredentialPlaceholder(!!profile.credentialRef, claudeAuthMode)
-                : codexCredentialPlaceholder(CODEX_AUTH_MODE_API_KEY, !!profile.credentialRef)}
-            className="h-9 text-[12.5px] font-mono"
-          />
-            {profile.credentialRef && (
-              <Button type="button" size="xs" variant="ghost" className="self-start" onClick={() => setReplacingSecret(false)}>
-                Keep current API key
+          )}
+
+          {!showChatgptControls && !claudeAiLogin && !revealedSecret && profile.credentialRef && !replacingSecret && (
+            <div className="flex items-center gap-2">
+              <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-muted-foreground">
+                {credentialMetadata?.maskedSecret ?? 'Stored API key'}
+              </span>
+              <Button type="button" size="xs" variant="outline" onClick={() => void revealSecret()} disabled={readOnly || revealingSecret}>
+                {revealingSecret ? <Spinner className="size-3" /> : null}
+                Reveal
               </Button>
-            )}
-          </div>
-        )}
-        {isCodexProvider && codexAuthMode === CODEX_AUTH_MODE_BEDROCK_API_KEY && (
-          <Input
-            data-testid="provider-edit-bedrock-region"
-            value={values.bedrockRegion}
-            onChange={e => onTextFieldChange('bedrockRegion', e.target.value)}
-            disabled={readOnly}
-            placeholder="us-east-1"
-            className="h-9 text-[12.5px] font-mono"
-          />
-        )}
-        {showChatgptControls && (
-          <div className="flex flex-wrap items-center gap-2">
-            {chatgptLoginPending
-              ? (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={onCancelChatgptLogin}
-                    disabled={readOnly}
-                  >
-                    <XIcon className="size-3" />
-                    Cancel ChatGPT login
-                  </Button>
-                )
-              : (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    onClick={onChatgptLogin}
-                    disabled={readOnly || chatgptLoginBusy}
-                  >
-                    {chatgptLoginBusy ? <Spinner className="size-3" /> : <LogInIcon className="size-3" />}
-                    {isChatgptCredential ? 'Re-login with ChatGPT' : 'Sign in with ChatGPT'}
-                  </Button>
-                )}
-          </div>
-        )}
-        {showChatgptControls && activeChatgptLogin && (
-          <ChatgptDeviceCodeNotice login={activeChatgptLogin} />
-        )}
-      </div>
-    </SettingsRow>
+              <Button type="button" size="xs" variant="outline" onClick={() => setReplacingSecret(true)} disabled={readOnly}>
+                Replace
+              </Button>
+            </div>
+          )}
+
+          {!showChatgptControls && !claudeAiLogin && !revealedSecret && (!profile.credentialRef || replacingSecret) && (
+            <div className="flex flex-col gap-1.5">
+              <Input
+                data-testid="provider-edit-apikey"
+                type="password"
+                value={values.apiKey}
+                onChange={e => onTextFieldChange('apiKey', e.target.value)}
+                disabled={readOnly}
+                placeholder={isOpenAiProvider
+                  ? codexCredentialPlaceholder(openaiAuthMode, !!profile.credentialRef)
+                  : isClaudeProvider
+                    ? claudeCredentialPlaceholder(!!profile.credentialRef, claudeAuthMode)
+                    : 'sk-...'}
+                className="h-9 w-full text-[12.5px] font-mono"
+              />
+              {profile.credentialRef && (
+                <Button type="button" size="xs" variant="ghost" className="self-start" onClick={() => setReplacingSecret(false)}>
+                  Keep current API key
+                </Button>
+              )}
+            </div>
+          )}
+
+          {isOpenAiProvider && openaiAuthMode === CODEX_AUTH_MODE_BEDROCK_API_KEY && (
+            <Input
+              data-testid="provider-edit-bedrock-region"
+              value={values.bedrockRegion}
+              onChange={e => onTextFieldChange('bedrockRegion', e.target.value)}
+              disabled={readOnly}
+              placeholder="us-east-1"
+              className="h-9 w-full text-[12.5px] font-mono"
+            />
+          )}
+
+          {showChatgptControls && (
+            <div className="flex flex-wrap items-center gap-2">
+              {chatgptLoginPending
+                ? (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={onCancelChatgptLogin}
+                      disabled={readOnly}
+                    >
+                      <XIcon className="size-3" />
+                      Cancel ChatGPT login
+                    </Button>
+                  )
+                : (
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={onChatgptLogin}
+                      disabled={readOnly || chatgptLoginBusy}
+                    >
+                      {chatgptLoginBusy ? <Spinner className="size-3" /> : <LogInIcon className="size-3" />}
+                      {isChatgptCredential ? 'Re-login with ChatGPT' : 'Sign in with ChatGPT'}
+                    </Button>
+                  )}
+            </div>
+          )}
+          {showChatgptControls && activeChatgptLogin && (
+            <ChatgptDeviceCodeNotice login={activeChatgptLogin} />
+          )}
+        </m.div>
+      </AnimatePresence>
+    </div>
   )
 }
 
@@ -1415,7 +1578,9 @@ function ChatgptDeviceCodeNotice({ login }: { login: ChatgptCredentialLoginStart
   return (
     <div className="rounded-md border border-foreground/8 bg-muted/35 px-2.5 py-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium text-muted-foreground">Device code</span>
+        <span className="text-[11px] font-medium text-muted-foreground">
+          Device code
+        </span>
         <Button type="button" size="xs" variant="ghost" className="h-6 px-1.5" onClick={copyCode}>
           <CopyIcon className="size-3" />
           Copy
@@ -1424,7 +1589,7 @@ function ChatgptDeviceCodeNotice({ login }: { login: ChatgptCredentialLoginStart
       <div className="mt-1 font-mono text-[18px] font-semibold tracking-normal text-foreground">
         {login.userCode}
       </div>
-      <div className="mt-1 text-[11px] leading-snug text-muted-foreground">
+      <div className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">
         Enter this code on the OpenAI Codex authorization page.
       </div>
     </div>
@@ -1449,20 +1614,17 @@ function ProfileModelsSection({
   cachedAt?: number | null
 }) {
   return (
-    <>
-      <Separator className="bg-foreground/6" />
-      <section className="mt-4 flex flex-col gap-4">
-        <ModelsPanel
-          loading={loading}
-          models={models}
-          enabledModels={enabledModels}
-          onChange={onChange}
-          onModelRegistryMapped={onModelRegistryMapped}
-          onRefresh={onRefresh}
-          cachedAt={cachedAt}
-        />
-      </section>
-    </>
+    <section className="flex flex-col gap-4">
+      <ModelsPanel
+        loading={loading}
+        models={models}
+        enabledModels={enabledModels}
+        onChange={onChange}
+        onModelRegistryMapped={onModelRegistryMapped}
+        onRefresh={onRefresh}
+        cachedAt={cachedAt}
+      />
+    </section>
   )
 }
 
@@ -1514,12 +1676,9 @@ function ProfileCustomModelsSection({
     }
 
   return (
-    <>
-      <Separator className="bg-foreground/6" />
-      <section className="mt-4 flex flex-col gap-4">
-        <CustomModelsEditor models={models} onChange={saveCustomModels} />
-      </section>
-    </>
+    <section className="flex flex-col gap-4">
+      <CustomModelsEditor models={models} onChange={saveCustomModels} />
+    </section>
   )
 }
 

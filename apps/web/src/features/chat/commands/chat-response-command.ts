@@ -1,3 +1,4 @@
+import type { RuntimeReviewTarget } from '@cradle/chat-runtime-contracts'
 import type { FileUIPart, UIMessage } from 'ai'
 import { z } from 'zod'
 
@@ -34,6 +35,7 @@ export interface ChatResponseRequestBody {
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort
   runtimeSettings?: ChatRuntimeSettingsPatch
+  reviewTarget?: RuntimeReviewTarget
 }
 
 export type ChatQueueMode = 'queue'
@@ -272,6 +274,7 @@ export function buildChatResponseRequestBody(
     modelId: body.modelId ?? undefined,
     thinkingEffort: body.thinkingEffort ?? undefined,
     runtimeSettings: compactRuntimeSettingsPatch(body.runtimeSettings),
+    reviewTarget: body.reviewTarget,
   }
 }
 

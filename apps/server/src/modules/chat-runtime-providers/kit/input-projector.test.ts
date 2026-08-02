@@ -54,6 +54,16 @@ describe('provider input projector', () => {
             comment: 'Extract this branch.',
           },
         },
+        {
+          type: 'data-cradle-intent',
+          data: {
+            type: 'data-cradle-intent',
+            intentId: 'commit',
+            name: 'commit',
+            label: 'Commit',
+            prompt: 'Propose a clean commit sequence.',
+          },
+        },
       ],
     })
 
@@ -76,6 +86,10 @@ describe('provider input projector', () => {
       expect.objectContaining({
         type: 'text',
         text: '<file_line_comment path="src/app.ts" lines="L12">\nExtract this branch.\n</file_line_comment>',
+      }),
+      expect.objectContaining({
+        type: 'text',
+        text: 'Propose a clean commit sequence.',
       }),
     ])
   })

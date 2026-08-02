@@ -250,22 +250,7 @@ export const reviewFixture: CradleDiffReview = {
     createdAt: Math.floor(Date.now() / 1000) - 172_800,
     updatedAt: Math.floor(Date.now() / 1000) - 172_800,
   },
-  guide: {
-    revisionId: REVISION_ID,
-    status: 'ready',
-    providerTargetId: null,
-    runtimeKind: null,
-    modelId: null,
-    sessionId: null,
-    runId: null,
-    errorMessage: null,
-    createdAt: Math.floor(Date.now() / 1000) - 3_000,
-    updatedAt: Math.floor(Date.now() / 1000) - 3_000,
-    title: 'How this change is constructed',
-    steps: [],
-  },
   agentFixes: [],
-  commitPlans: [],
 }
 
 /** A clean local working tree — the empty state the list links to first. */

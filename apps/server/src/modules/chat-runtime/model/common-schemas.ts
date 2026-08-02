@@ -293,6 +293,17 @@ export const contextPartSchema = t.Union([
     },
     { additionalProperties: false },
   ),
+  t.Object(
+    {
+      type: t.Literal('data-cradle-intent'),
+      intentId: t.Union([t.Literal('review'), t.Literal('commit'), t.Literal('push')]),
+      name: t.String({ minLength: 1 }),
+      label: t.String({ minLength: 1 }),
+      prompt: t.String({ minLength: 1 }),
+      position: t.Optional(t.Number({ minimum: 0 })),
+    },
+    { additionalProperties: false },
+  ),
 ])
 
 export const queueModeSchema = t.String({ enum: ['queue', 'steer'] })

@@ -57,10 +57,10 @@ describe('messageBubbleById history shells', () => {
     useChatStore.getState().clearSession('session-a')
   })
 
-  it('does not paint text-only history shells', () => {
+  it('paints text-only history shells without tool activity', () => {
     useChatStore.getState().setMessages('session-a', [shellMessage('visible')])
     renderMessage('visible')
-    expect(screen.queryByText('Preview visible')).toBeNull()
+    expect(screen.getByText('Preview visible')).toBeTruthy()
     expect(screen.queryByTestId('chat-tool-call-tool-visible')).toBeNull()
   })
 

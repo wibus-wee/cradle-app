@@ -213,7 +213,13 @@ import { register as registerProfileDelete } from './profile/delete'
 import { register as registerProfileGet } from './profile/get'
 import { register as registerProfileList } from './profile/list'
 import { register as registerProfileSet } from './profile/set'
+import { register as registerProviderDelete } from './provider/delete'
+import { register as registerProviderList } from './provider/list'
 import { register as registerProviderModels } from './provider/models'
+import { register as registerProviderPresets } from './provider/presets'
+import { register as registerProviderScanLocal } from './provider/scan-local'
+import { register as registerProviderSet } from './provider/set'
+import { register as registerProviderTest } from './provider/test'
 import { register as registerPullRequestAssignableUsers } from './pull-request/assignable-users'
 import { register as registerPullRequestAssignees } from './pull-request/assignees'
 import { register as registerPullRequestAuthored } from './pull-request/authored'
@@ -329,13 +335,9 @@ import { register as registerWorkspaceDiffsAgentFixStart } from './workspace/dif
 import { register as registerWorkspaceDiffsBranchCompare } from './workspace/diffs/branch-compare'
 import { register as registerWorkspaceDiffsClose } from './workspace/diffs/close'
 import { register as registerWorkspaceDiffsCommit } from './workspace/diffs/commit'
-import { register as registerWorkspaceDiffsCommitPlanApply } from './workspace/diffs/commit-plan/apply'
-import { register as registerWorkspaceDiffsCommitPlanUpdate } from './workspace/diffs/commit-plan/update'
 import { register as registerWorkspaceDiffsFileViewed } from './workspace/diffs/file/viewed'
 import { register as registerWorkspaceDiffsGet } from './workspace/diffs/get'
 import { register as registerWorkspaceDiffsGithubPullRequest } from './workspace/diffs/github-pull-request'
-import { register as registerWorkspaceDiffsGuideCancel } from './workspace/diffs/guide/cancel'
-import { register as registerWorkspaceDiffsGuideGenerate } from './workspace/diffs/guide/generate'
 import { register as registerWorkspaceDiffsList } from './workspace/diffs/list'
 import { register as registerWorkspaceDiffsLocalWorkingTree } from './workspace/diffs/local-working-tree'
 import { register as registerWorkspaceDiffsMerge } from './workspace/diffs/merge'
@@ -588,7 +590,13 @@ export function registerGeneratedCommands(program: Command): void {
   registerProfileGet(program)
   registerProfileList(program)
   registerProfileSet(program)
+  registerProviderDelete(program)
+  registerProviderList(program)
   registerProviderModels(program)
+  registerProviderPresets(program)
+  registerProviderScanLocal(program)
+  registerProviderSet(program)
+  registerProviderTest(program)
   registerPullRequestAssignableUsers(program)
   registerPullRequestAssignees(program)
   registerPullRequestAuthored(program)
@@ -704,13 +712,9 @@ export function registerGeneratedCommands(program: Command): void {
   registerWorkspaceDiffsBranchCompare(program)
   registerWorkspaceDiffsClose(program)
   registerWorkspaceDiffsCommit(program)
-  registerWorkspaceDiffsCommitPlanApply(program)
-  registerWorkspaceDiffsCommitPlanUpdate(program)
   registerWorkspaceDiffsFileViewed(program)
   registerWorkspaceDiffsGet(program)
   registerWorkspaceDiffsGithubPullRequest(program)
-  registerWorkspaceDiffsGuideCancel(program)
-  registerWorkspaceDiffsGuideGenerate(program)
   registerWorkspaceDiffsList(program)
   registerWorkspaceDiffsLocalWorkingTree(program)
   registerWorkspaceDiffsMerge(program)

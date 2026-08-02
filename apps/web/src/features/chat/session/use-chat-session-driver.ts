@@ -210,7 +210,7 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     let cancelled = false
     const generation = hydrateGenerationRef.current
     void (async () => {
-      const cachedRows = await readStableMessageRows(chatSessionId).catch((error: unknown) => {
+      const cachedRows = await Promise.resolve(readStableMessageRows(chatSessionId)).catch((error: unknown) => {
         console.warn('[useChatSession] failed to read stable message cache', error)
         return null
       })

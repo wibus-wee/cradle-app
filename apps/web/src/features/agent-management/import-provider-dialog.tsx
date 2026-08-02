@@ -1,16 +1,26 @@
 import {
   AlertLine as CircleAlertIcon,
   DownloadLine as DownloadIcon,
+  FileLine as FileIcon,
   GlobeLine as GlobeIcon,
   Key2Line as KeyIcon,
+  SearchLine as ScanIcon,
   SparklesLine as SparklesIcon,
   UnlockLine as DecodeIcon,
 } from '@mingcute/react'
-import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { z } from 'zod'
 
-import { patchProfilesByIdCustomModels, postSecrets } from '~/api-gen/sdk.gen'
+import {
+  getExternalProviderSourcesQueryKey,
+  getExternalProviderSourcesRecordsQueryKey,
+  getProfilesQueryKey,
+  getProviderTargetsByProviderTargetIdTestQueryKey,
+  getProviderTargetsQueryKey,
+  postExternalProviderSourcesLocalScanMutation,
+} from '~/api-gen/@tanstack/react-query.gen'
+import { patchProfilesByIdCustomModels, postProviderTargetsByProviderTargetIdTest, postSecrets } from '~/api-gen/sdk.gen'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import {
@@ -31,6 +41,8 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Spinner } from '~/components/ui/spinner'
+import { toastManager } from '~/components/ui/toast'
+import { ProfileConfigJsonSchema } from '~/features/agent-runtime/profile-config-schema'
 import type { ApiProviderKind } from '~/features/agent-runtime/types'
 import { AGENT_MODELS_QUERY_KEY } from '~/features/agent-runtime/use-agent-models'
 import { useAgentProfiles } from '~/features/agent-runtime/use-agent-profiles'
@@ -38,9 +50,10 @@ import { cn } from '~/lib/cn'
 
 import type { ParsedProvider, ParseResult } from './import-provider-parser'
 import { isBase64Like, parseProviderConfig, tryDecodeBase64 } from './import-provider-parser'
-import { matchProviderEndpoint } from './provider-endpoint-registry'
 import { warmManualProviderModelCache } from './provider-model-cache'
 import { buildProfileId } from './provider-settings-utils'
+import { presetModelsToCustomModels, suggestCatalogPresetsByEndpoint } from './provider-templates'
+import { useMergedProviderPresets } from './use-provider-presets'
 
 const SecretCreateResponseSchema = z.object({ id: z.string().min(1) })
 
@@ -107,6 +120,10 @@ function stringArraysEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index])
 }
 
+function normalizeEndpointKey(url: string): string {
+  return url.trim().toLowerCase().replace(/\/+$/, '')
+}
+
 export function ImportProviderDialog({
   open,
   onOpenChange,
@@ -116,6 +133,7 @@ export function ImportProviderDialog({
 }) {
   const queryClient = useQueryClient()
   const { createProfile, profiles } = useAgentProfiles()
+  const { presets: catalogPresets } = useMergedProviderPresets()
   const [text, setText] = useState('')
   const [importing, setImporting] = useState(false)
   const [enabledSet, setEnabledSet] = useState<Set<number>>(() => new Set())
@@ -133,6 +151,25 @@ export function ImportProviderDialog({
     if (!text.trim()) { return null }
     return parseProviderConfig(text)
   }, [text])
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Endpoints of already-configured providers, used to flag import conflicts.
+  const existingEndpointKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const profile of profiles) {
+      try {
+        const cfg = ProfileConfigJsonSchema.parse(profile.configJson)
+        for (const url of [cfg.baseUrl, cfg.openaiBaseUrl, cfg.anthropicBaseUrl]) {
+          if (typeof url === 'string' && url) {
+            keys.add(normalizeEndpointKey(url))
+          }
+        }
+      }
+      catch { /* ignore unparsable configs */ }
+    }
+    return keys
+  }, [profiles])
 
   // Deduplicate provider names: append " (2)", " (3)" etc for same-name entries
   const computeResolvedNames = useCallback((parsed: ParsedProvider[]) => {
@@ -185,6 +222,52 @@ export function ImportProviderDialog({
     setManualUrl('')
     setEnabledSet(new Set(nextParseResult.providers.map((_, i) => i)))
   }
+
+  // On open, silently prefill from the clipboard when it holds a recognizable
+  // provider snippet. Clipboard access may be denied; that is fine.
+  const prefillFromClipboard = useEffectEvent(async () => {
+    const clip = await navigator.clipboard?.readText?.().catch(() => '')
+    if (!clip?.trim()) { return }
+    const parsed = parseProviderConfig(clip)
+    if (parsed.providers.length > 0 || parsed.token) {
+      handleTextChange(clip)
+    }
+  })
+  useEffect(() => {
+    if (open) {
+      void prefillFromClipboard()
+    }
+  }, [open])
+
+  const handleFileRead = async (file: File | undefined) => {
+    if (!file) { return }
+    handleTextChange(await file.text())
+  }
+
+  const localScan = useMutation({
+    ...postExternalProviderSourcesLocalScanMutation(),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: getExternalProviderSourcesQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getExternalProviderSourcesRecordsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getProviderTargetsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getProfilesQueryKey() }),
+      ])
+      toastManager.add({
+        type: 'success',
+        title: 'Local scan complete',
+        description: 'Providers from local agent tools were added to the list.',
+      })
+      onOpenChange(false)
+    },
+    onError: (error) => {
+      toastManager.add({
+        type: 'error',
+        title: 'Local scan failed',
+        description: error instanceof Error ? error.message : undefined,
+      })
+    },
+  })
 
   const resetImportDraft = () => {
     prevParsedConfigKeyRef.current = null
@@ -300,12 +383,15 @@ export function ImportProviderDialog({
           },
         })
 
-        // Auto-populate custom models from endpoint template
-        const template = matchProviderEndpoint(kind === 'universal' ? openaiBaseUrl : baseUrl)
-        if (template && template.models.length > 0) {
+        // Suggest catalog models by endpoint hostname only — never write providerId on import.
+        const suggestedPreset = suggestCatalogPresetsByEndpoint(
+          catalogPresets,
+          kind === 'universal' ? openaiBaseUrl : baseUrl,
+        )[0]
+        if (suggestedPreset?.models?.length) {
           void patchProfilesByIdCustomModels({
             path: { id: profileId },
-            body: { models: template.models },
+            body: { models: presetModelsToCustomModels(suggestedPreset.models) },
             throwOnError: true,
           }).catch(error => console.error('[ImportProvider] custom models auto-config failed', error))
         }
@@ -319,6 +405,21 @@ export function ImportProviderDialog({
         })
           .then(() => queryClient.invalidateQueries({ queryKey: AGENT_MODELS_QUERY_KEY }))
           .catch(error => console.error('[ImportProvider] model cache warm failed', error))
+
+        // Fire-and-forget connection test so the list shows a live verdict.
+        void postProviderTargetsByProviderTargetIdTest({
+          path: { providerTargetId: profileId },
+          body: {},
+        })
+          .then(({ data }) => {
+            if (data) {
+              queryClient.setQueryData(
+                getProviderTargetsByProviderTargetIdTestQueryKey({ path: { providerTargetId: profileId } }),
+                data,
+              )
+            }
+          })
+          .catch(() => undefined)
       }
       onOpenChange(false)
       resetImportDraft()
@@ -363,6 +464,18 @@ export function ImportProviderDialog({
             aria-label="Provider configuration snippet"
             value={text}
             onChange={e => handleTextChange(e.target.value)}
+            onDragOver={(event) => {
+              if (event.dataTransfer.types.includes('Files')) {
+                event.preventDefault()
+              }
+            }}
+            onDrop={(event) => {
+              const file = event.dataTransfer.files?.[0]
+              if (file) {
+                event.preventDefault()
+                void handleFileRead(file)
+              }
+            }}
             placeholder={`token: sk-xxxxxxxx\nhttps://api.example.com/v1\nhttps://api.example.com/anthropic`}
             className={cn(
               'w-full rounded-lg border bg-muted/40 px-3 py-2.5 font-mono text-[12px] leading-relaxed',
@@ -371,6 +484,39 @@ export function ImportProviderDialog({
               'min-h-[80px] resize-y',
             )}
           />
+
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".env,.json,.txt,text/plain,application/json"
+              className="hidden"
+              onChange={(event) => {
+                void handleFileRead(event.target.files?.[0])
+                event.target.value = ''
+              }}
+            />
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <FileIcon className="size-3" />
+              Load file
+            </Button>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              disabled={localScan.isPending}
+              onClick={() => localScan.mutate({})}
+              data-testid="import-scan-local"
+            >
+              {localScan.isPending ? <Spinner className="size-3" /> : <ScanIcon className="size-3" />}
+              Scan local tools
+            </Button>
+          </div>
 
           {parseResult && (
             <>
@@ -410,6 +556,22 @@ export function ImportProviderDialog({
                         baseUrl={baseUrls[i] ?? p.baseUrl}
                         openaiBaseUrl={openaiBaseUrls[i] ?? universalEndpointDefaults(p.baseUrl).openaiBaseUrl}
                         anthropicBaseUrl={anthropicBaseUrls[i] ?? universalEndpointDefaults(p.baseUrl).anthropicBaseUrl}
+                        conflict={existingEndpointKeys.has(normalizeEndpointKey(
+                          (kinds[i] ?? p.providerKind) === 'universal'
+                            ? (openaiBaseUrls[i] ?? universalEndpointDefaults(p.baseUrl).openaiBaseUrl)
+                            : (baseUrls[i] ?? p.baseUrl),
+                        ))}
+                        autoModelsHint={(() => {
+                          const suggested = suggestCatalogPresetsByEndpoint(
+                            catalogPresets,
+                            (kinds[i] ?? p.providerKind) === 'universal'
+                              ? (openaiBaseUrls[i] ?? universalEndpointDefaults(p.baseUrl).openaiBaseUrl)
+                              : (baseUrls[i] ?? p.baseUrl),
+                          )[0]
+                          return suggested?.models?.length
+                            ? { name: suggested.name, count: suggested.models.length }
+                            : null
+                        })()}
                         enabled={enabledSet.has(i)}
                         canDecode={canDecodeApiKey(i)}
                         canRevert={(decodeHistory.get(i)?.length ?? 0) > 0}
@@ -519,6 +681,8 @@ function ProviderCard({
   baseUrl,
   openaiBaseUrl,
   anthropicBaseUrl,
+  conflict,
+  autoModelsHint,
   enabled,
   canDecode,
   canRevert,
@@ -538,6 +702,8 @@ function ProviderCard({
   baseUrl: string
   openaiBaseUrl: string
   anthropicBaseUrl: string
+  conflict: boolean
+  autoModelsHint: { name: string, count: number } | null
   enabled: boolean
   canDecode: boolean
   canRevert: boolean
@@ -589,6 +755,14 @@ function ProviderCard({
             onChange={e => onNameChange(e.target.value)}
             className="h-6 flex-1 border-0 bg-transparent px-0 text-[13px] font-medium text-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
           />
+          {conflict && (
+            <span
+              className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-600 dark:text-amber-400"
+              title="A provider with this endpoint already exists"
+            >
+              Exists
+            </span>
+          )}
         </div>
         <div className="flex flex-col gap-0.5">
           {kind === 'universal'
@@ -640,25 +814,17 @@ function ProviderCard({
             <Input type="text" value={apiKey} onChange={event => onApiKeyChange(event.target.value)} placeholder="Enter API key" className={FLAT_IMPORT_FIELD_CLASS} />
           </label>
           {kind !== 'universal' && shouldShowV1Reminder(baseUrl) && <BaseUrlV1Reminder />}
-          {(() => {
-            const template = matchProviderEndpoint(kind === 'universal' ? openaiBaseUrl : baseUrl)
-            return template
-              ? (
-                  <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/8 px-2 py-1 text-[11px] leading-snug text-emerald-700 dark:text-emerald-300">
-                    <SparklesIcon className="size-3 shrink-0" />
-                    <span>
-{template.name}
-{' '}
-—
-{' '}
-{template.models.length}
-{' '}
-models will be auto-configured
-                    </span>
-                  </div>
-                )
-              : null
-          })()}
+          {autoModelsHint && (
+            <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/8 px-2 py-1 text-[11px] leading-snug text-emerald-700 dark:text-emerald-300">
+              <SparklesIcon className="size-3 shrink-0" />
+              <span>
+                {autoModelsHint.name}
+                {' — '}
+                {autoModelsHint.count}
+                {' models will be auto-configured'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

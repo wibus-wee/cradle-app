@@ -5,8 +5,11 @@ import {
 import type { MouseEvent, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { cn } from '~/lib/cn'
+
 export interface WorkspaceSessionListViewProps {
   workspaceId: string
+  variant?: 'workspace' | 'flat'
   sessionCount: number
   expanded: boolean
   hiddenSessionCount: number
@@ -16,6 +19,7 @@ export interface WorkspaceSessionListViewProps {
 
 export function WorkspaceSessionListView({
   workspaceId,
+  variant = 'workspace',
   sessionCount,
   expanded,
   hiddenSessionCount,
@@ -32,7 +36,14 @@ export function WorkspaceSessionListView({
 
   return (
     <div className="min-w-0 overflow-hidden">
-      <div className="ml-4.25 flex min-w-0 flex-col gap-0.5 border-l border-sidebar-border/50 py-0.5 pl-2">
+      <div
+        className={cn(
+          'flex min-w-0 flex-col gap-0.5',
+          variant === 'workspace'
+            ? 'ml-4.25 border-l border-sidebar-border/50 py-0.5 pl-2'
+            : 'py-0.5',
+        )}
+      >
         {sessionCount === 0
           ? (
               <p className="px-2.5 py-1.5 text-xs text-muted-foreground">

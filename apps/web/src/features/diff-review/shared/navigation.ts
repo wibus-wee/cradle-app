@@ -7,7 +7,6 @@ export interface DiffsViewSearch {
   repo?: string
   path?: string
   review?: string
-  view?: 'commit' | 'guide'
   line?: number
   side?: 'base' | 'head'
 }
@@ -40,7 +39,6 @@ function navigateWithinCurrentDiffSurface(input: {
   repositoryPath?: string | null
   path?: string | null
   review?: string
-  view?: 'commit' | 'guide'
   line?: number | null
   side?: 'base' | 'head' | null
   replace?: boolean
@@ -55,7 +53,6 @@ function navigateWithinCurrentDiffSurface(input: {
         repo,
         path: input.path ?? undefined,
         review: input.review,
-        view: input.view,
         line: input.line ?? undefined,
         side: input.side ?? undefined,
       },
@@ -71,7 +68,6 @@ function navigateWithinCurrentDiffSurface(input: {
       repo,
       path: input.path ?? undefined,
       review: input.review,
-      view: input.view,
       line: input.line ?? undefined,
       side: input.side ?? undefined,
     },
@@ -98,9 +94,8 @@ export function navigateToReview(
 }
 
 /**
- * Jump from a guide chapter (or anywhere with a file + line) into the review detail at that
- * anchor. Drops `view: 'guide'` so the review detail renders instead of the guide, and threads
- * `line`/`side` so DiffStage can scroll to the exact line on mount.
+ * Jump from a finding (or anywhere with a file + line) into the review detail at that
+ * anchor. Threads `line`/`side` so DiffStage can scroll to the exact line on mount.
  */
 export function navigateToReviewAtAnchor(
   workspaceId: string,
@@ -119,24 +114,6 @@ export function navigateToReviewAtAnchor(
     review: reviewId,
     line: options.line,
     side: options.side,
-  })
-}
-
-export function navigateToCommitView(workspaceId: string, reviewId: string, repositoryPath?: string | null): void {
-  navigateWithinCurrentDiffSurface({
-    workspaceId,
-    repositoryPath,
-    review: reviewId,
-    view: 'commit',
-  })
-}
-
-export function navigateToGuideView(workspaceId: string, reviewId: string, repositoryPath?: string | null): void {
-  navigateWithinCurrentDiffSurface({
-    workspaceId,
-    repositoryPath,
-    review: reviewId,
-    view: 'guide',
   })
 }
 

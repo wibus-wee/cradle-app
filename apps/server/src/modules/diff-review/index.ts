@@ -284,51 +284,6 @@ export const diffReview = new Elysia({
     body: DiffReviewModel.updatePreferencesBody,
     response: { 200: DiffReviewModel.preferences },
   })
-  .post('/:workspaceId/diff-reviews/:reviewId/guide/generate', async ({ params, body }) => {
-    const input = body as {
-      providerTargetId: string
-      runtimeKind?: string
-      modelId?: string | null
-      force?: boolean
-      outputLocale?: DiffReview.ReviewOutputLocale | null
-    }
-    return await DiffReview.generateGuide({
-      workspaceId: params.workspaceId,
-      reviewId: params.reviewId,
-      providerTargetId: input.providerTargetId,
-      runtimeKind: input.runtimeKind,
-      modelId: input.modelId,
-      force: input.force,
-      outputLocale: input.outputLocale,
-    })
-  }, {
-    detail: {
-      'summary': 'Generate a diff change walkthrough',
-      'x-cradle-cli': {
-        command: ['workspace', 'diffs', 'guide', 'generate'],
-        defaultWorkspaceId: true,
-      },
-    },
-    params: DiffReviewModel.reviewParams,
-    body: DiffReviewModel.generateGuideBody,
-    response: { 200: DiffReviewModel.review },
-  })
-  .post('/:workspaceId/diff-reviews/:reviewId/guide/cancel', async ({ params }) => {
-    return await DiffReview.cancelGuide({
-      workspaceId: params.workspaceId,
-      reviewId: params.reviewId,
-    })
-  }, {
-    detail: {
-      'summary': 'Cancel diff change walkthrough generation',
-      'x-cradle-cli': {
-        command: ['workspace', 'diffs', 'guide', 'cancel'],
-        defaultWorkspaceId: true,
-      },
-    },
-    params: DiffReviewModel.reviewParams,
-    response: { 200: DiffReviewModel.review },
-  })
   .post('/:workspaceId/diff-reviews/:reviewId/agent-fixes', ({ params, body }) => {
     const input = body as {
       threadId?: string | null
@@ -342,7 +297,7 @@ export const diffReview = new Elysia({
       } | null
       instruction: string
       agentId?: string | null
-      expectedOutput: 'commit' | 'working-tree-change' | 'patch-artifact'
+      expectedOutput: 'working-tree-change' | 'patch-artifact'
     }
     return DiffReview.createAgentFix({
       workspaceId: params.workspaceId,
@@ -475,59 +430,5 @@ export const diffReview = new Elysia({
       },
     },
     params: DiffReviewModel.agentFixParams,
-    response: { 200: DiffReviewModel.review },
-  })
-  .put('/:workspaceId/diff-reviews/:reviewId/commit-plans/:commitPlanId', ({ params, body }) => {
-    const input = body as {
-      groups?: Array<{
-        id: string
-        title: string
-        message: string
-        rationale: string
-        fileIds: string[]
-        paths?: string[]
-        dependsOn: string[]
-      }>
-      rationale?: string
-      status?: 'draft' | 'accepted' | 'abandoned'
-    }
-    return DiffReview.updateCommitPlan({
-      workspaceId: params.workspaceId,
-      reviewId: params.reviewId,
-      commitPlanId: params.commitPlanId,
-      groups: input.groups,
-      rationale: input.rationale,
-      status: input.status,
-    })
-  }, {
-    detail: {
-      'summary': 'Update diff review commit plan',
-      'x-cradle-cli': {
-        command: ['workspace', 'diffs', 'commit-plan', 'update'],
-        defaultWorkspaceId: true,
-      },
-    },
-    params: DiffReviewModel.commitPlanParams,
-    body: DiffReviewModel.updateCommitPlanBody,
-    response: { 200: DiffReviewModel.review },
-  })
-  .post('/:workspaceId/diff-reviews/:reviewId/commit-plans/:commitPlanId/apply', ({ params, body }) => {
-    const input = body as { idempotencyKey?: string }
-    return DiffReview.applyCommitPlan({
-      workspaceId: params.workspaceId,
-      reviewId: params.reviewId,
-      commitPlanId: params.commitPlanId,
-      idempotencyKey: input.idempotencyKey,
-    })
-  }, {
-    detail: {
-      'summary': 'Apply diff review commit plan',
-      'x-cradle-cli': {
-        command: ['workspace', 'diffs', 'commit-plan', 'apply'],
-        defaultWorkspaceId: true,
-      },
-    },
-    params: DiffReviewModel.commitPlanParams,
-    body: DiffReviewModel.applyCommitPlanBody,
     response: { 200: DiffReviewModel.review },
   })

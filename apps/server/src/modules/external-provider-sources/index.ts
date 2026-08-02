@@ -21,6 +21,13 @@ export const externalProviderSources = new Elysia({
     },
     response: { 200: t.Array(ExternalProviderSourcesModel.refreshResult) },
   })
+  .post('/external-provider-sources/local-scan', () => ExternalProviderSources.scanLocalAgentConfigs(), {
+    detail: {
+      'summary': 'Scan local agent configs',
+      'x-cradle-cli': { command: ['provider', 'scan-local'] },
+    },
+    response: { 200: ExternalProviderSourcesModel.refreshResult },
+  })
   .post('/external-provider-sources/:sourceKey/refresh', ({ params }) => {
     return ExternalProviderSources.refreshExternalProviderSource(params.sourceKey)
   }, {

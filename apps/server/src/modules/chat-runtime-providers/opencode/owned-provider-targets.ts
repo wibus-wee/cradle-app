@@ -70,6 +70,7 @@ function projectOpencodeRuntimeOwnedProviderTarget(input: {
     credentialRef: null,
     enabledModelsJson: '[]',
     customModelsJson: '[]',
+    providerId: null,
     sourceKey: OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_SOURCE_KEY,
     externalRecordId: input.externalRecordId ?? nativeProviderId,
     sourceFingerprint: input.providerTargetId,

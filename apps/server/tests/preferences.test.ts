@@ -49,6 +49,7 @@ describe('preferences capability', () => {
           codexCliCompatibleIdentity: false,
           nativeProviderSkillProjection: false,
           turnCheckpoints: false,
+          threadHandoffs: false,
         },
         worktreeCleanup: {
           maxWorktrees: 25,
@@ -81,6 +82,7 @@ describe('preferences capability', () => {
           codexCliCompatibleIdentity: false,
           nativeProviderSkillProjection: false,
           turnCheckpoints: false,
+          threadHandoffs: false,
         },
         worktreeCleanup: {
           maxWorktrees: 25,
@@ -99,6 +101,7 @@ describe('preferences capability', () => {
           codexCliCompatibleIdentity: false,
           nativeProviderSkillProjection: false,
           turnCheckpoints: false,
+          threadHandoffs: false,
         },
         worktreeCleanup: {
           maxWorktrees: 25,

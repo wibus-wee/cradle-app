@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ChatRuntimeCapabilities, ChatRuntimeUiSlot } from '../capabilities/chat-capabilities'
 import {
+  CRADLE_INTENT_SLASH_COMMANDS,
   createRuntimeUiSlotCommand,
   projectRuntimeComposerSlashCommands,
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
@@ -91,5 +92,45 @@ describe('runtime UI slot slash commands', () => {
       capabilities: capabilities([sessionOnlySlot]),
       mode: 'session',
     })).toHaveLength(1)
+  })
+
+  it('exposes cradle review/commit/push intents as insertIntent chip actions', () => {
+    const commands = projectRuntimeComposerSlashCommands({
+      capabilities: capabilities([]),
+      cradleCommands: CRADLE_INTENT_SLASH_COMMANDS,
+    })
+
+    expect(commands.map(command => command.name)).toEqual(['review', 'commit', 'push'])
+    for (const command of commands) {
+      expect(command.source).toBe('cradle')
+      expect(command.action).toEqual({
+        kind: 'insertIntent',
+        intentId: command.name,
+      })
+    }
+  })
+
+  it('places cradle commands above runtime slots', () => {
+    const commands = projectRuntimeComposerSlashCommands({
+      capabilities: capabilities([slot({
+        id: 'plugin-runtime:goal',
+        name: 'goal',
+        commandText: '/goal ',
+      })]),
+      cradleCommands: CRADLE_INTENT_SLASH_COMMANDS,
+    })
+
+    expect(commands.map(command => command.source)).toEqual([
+      'cradle',
+      'cradle',
+      'cradle',
+      'runtime',
+    ])
+    expect(commands.map(command => command.name)).toEqual([
+      'review',
+      'commit',
+      'push',
+      'goal',
+    ])
   })
 })

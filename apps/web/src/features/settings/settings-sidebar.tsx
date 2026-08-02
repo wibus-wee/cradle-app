@@ -1,4 +1,5 @@
 import {
+  ArchiveLine as ArchiveIcon,
   ArrowToDownLine as ArrowDownToLineIcon,
   Box3Line as BoxesIcon,
   ChipLine as ChipIcon,
@@ -206,6 +207,15 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
         searchKeys: ['remoteHosts.form.sshTarget' as SettingsKey, 'remoteHosts.form.displayName' as SettingsKey],
       },
       { id: 'downloads', labelKey: 'nav.downloads', icon: DownloadIcon },
+      {
+        id: 'backup',
+        labelKey: 'nav.backup',
+        icon: ArchiveIcon,
+        searchKeys: [
+          'backup.export.label',
+          'backup.restore.label',
+        ],
+      },
       ...(import.meta.env.DEV
         ? [{ id: 'chronicle', labelKey: 'nav.chronicle', icon: ActivityIcon } satisfies SettingsNavItem]
         : []),

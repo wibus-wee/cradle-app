@@ -24,6 +24,13 @@ import { DesktopBrowserManager } from './browser-manager'
 import { ChatEventTailBroker } from './chat-event-tail-broker'
 import { ChatStreamBroker } from './chat-stream-broker'
 import {
+  completeDesktopDataBackupAfterHealthyStart,
+  getDesktopDataBackupStatus,
+  initializeDesktopDataBackup,
+  rollbackDesktopDataBackupAfterHealthFailure,
+  runPendingDesktopDataBackup,
+} from './data-backup'
+import {
   completeDesktopDataMigrationAfterHealthyStart,
   getDesktopDataDirectoryState,
   initializeDesktopDataDirectory,
@@ -744,12 +751,12 @@ export async function startDesktopApp(): Promise<void> {
     getChatStreamBroker: () => chatStreamBroker,
     getChatEventTailBroker: () => chatEventTailBroker,
     getQuitGuard: () => quitGuard,
-    requestDataDirectoryRestart: () => {
+    requestDataRestart: (reason) => {
       setTimeout(() => {
         quitGuard.allowNextQuit()
         app.relaunch()
         requestDesktopExit({
-          reason: 'data directory migration',
+          reason,
           exitCode: 0,
           stopServerRuntime: true,
         })
@@ -775,6 +782,7 @@ export async function startDesktopApp(): Promise<void> {
     .whenReady()
     .then(async () => {
       await initializeDesktopDataDirectory()
+      await initializeDesktopDataBackup()
       desktopDownloadCenter = new DesktopDownloadCenterService({
         userDataPath: app.getPath('userData'),
       })
@@ -806,18 +814,15 @@ export async function startDesktopApp(): Promise<void> {
           if (process.platform === 'darwin') {
             await macBridgeManager?.start()
           }
-          await activateDesktopPlugins()
-          processPendingPluginInstallUrls()
-          handlePluginInstallUrls(collectPluginInstallUrls(process.argv))
-          handleOpenWorkspaceUrls(collectOpenWorkspaceUrls(process.argv))
 
           const pendingDataMigration = getDesktopDataDirectoryState().pendingMigration
+          const pendingDataBackup = getDesktopDataBackupStatus()
           if (
-            pendingDataMigration
-            && !['completed', 'failed'].includes(pendingDataMigration.phase)
+            (pendingDataMigration && !['completed', 'failed'].includes(pendingDataMigration.phase))
+            || !['idle', 'completed', 'failed'].includes(pendingDataBackup.phase)
           ) {
             // A previous process may have survived a desktop crash. Stop its
-            // located server before copying the filesystem tree.
+            // located server before copying or replacing the filesystem tree.
             await stopServer()
           }
           const migration = await runPendingDesktopDataMigration((phase) => {
@@ -826,6 +831,15 @@ export async function startDesktopApp(): Promise<void> {
           if (migration.failed) {
             console.error('[desktop] data migration failed:', migration.message)
           }
+          const backup = await runPendingDesktopDataBackup(app.getVersion())
+          if (backup.failed) {
+            console.error('[desktop] data backup operation failed:', backup.message)
+          }
+
+          await activateDesktopPlugins()
+          processPendingPluginInstallUrls()
+          handlePluginInstallUrls(collectPluginInstallUrls(process.argv))
+          handleOpenWorkspaceUrls(collectOpenWorkspaceUrls(process.argv))
 
           let serverUrl: string
           desktopServerBootstrapSnapshot = createDesktopServerBootstrapSnapshot()
@@ -836,21 +850,27 @@ export async function startDesktopApp(): Promise<void> {
           try {
             serverUrl = await startServer(publishServerBootstrapSnapshot)
           }
- catch (error) {
-            await rollbackDesktopDataMigrationAfterHealthFailure(
-              error instanceof Error ? error.message : String(error),
-            )
+          catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            await rollbackDesktopDataMigrationAfterHealthFailure(message)
+            await rollbackDesktopDataBackupAfterHealthFailure(message)
             if (migration.migrated) {
               console.error('[desktop] new data root failed health check; restored previous root')
               desktopServerBootstrapSnapshot = createDesktopServerBootstrapSnapshot()
               serverUrl = await startServer(publishServerBootstrapSnapshot)
             }
- else {
+            else if (backup.restored) {
+              console.error('[desktop] restored data failed health check; restored previous data')
+              desktopServerBootstrapSnapshot = createDesktopServerBootstrapSnapshot()
+              serverUrl = await startServer(publishServerBootstrapSnapshot)
+            }
+            else {
               throw error
             }
           }
           initializeDesktopServicesForServer(serverUrl)
           await completeDesktopDataMigrationAfterHealthyStart()
+          await completeDesktopDataBackupAfterHealthyStart()
           publishDesktopServerStatus({
             state: 'ready',
             serverUrl,

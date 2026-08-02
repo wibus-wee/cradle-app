@@ -88,6 +88,7 @@ import {
   isCodexAppServerToolApprovalRequest,
   isCodexAppServerUserInputRequest,
 } from './app-server/server-request-methods'
+import type { ReviewStartResponse } from './app-server-protocol/v2/ReviewStartResponse'
 import type { Thread } from './app-server-protocol/v2/Thread'
 import type { ThreadBackgroundTerminal } from './app-server-protocol/v2/ThreadBackgroundTerminal'
 import type { ThreadBackgroundTerminalsListResponse } from './app-server-protocol/v2/ThreadBackgroundTerminalsListResponse'
@@ -1311,6 +1312,18 @@ export class CodexProvider implements ChatRuntime {
     if (context.compactCommandRequested) {
       await client.request('thread/compact/start', { threadId })
       return { turnId, shouldStream: true }
+    }
+
+    if (input.reviewTarget) {
+      const reviewResponse = await client.request('review/start', {
+        threadId,
+        target: input.reviewTarget,
+        delivery: 'inline',
+      }) as ReviewStartResponse
+      return {
+        turnId: reviewResponse.turn.id,
+        shouldStream: true,
+      }
     }
 
     const collaborationModeModel = context.effectiveModel ?? context.config.model
