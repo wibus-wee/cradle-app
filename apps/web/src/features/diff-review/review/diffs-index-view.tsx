@@ -121,7 +121,7 @@ function ReviewRow({ review, onOpen }: { review: CradleDiffReview, onOpen: () =>
         type="button"
         onClick={onOpen}
         className={cn(
-          'group/row flex h-9 w-full items-center gap-3 px-4 text-left',
+          'group/row flex min-h-12 w-full items-center gap-3 px-4 py-2.5 text-left',
           'border-b border-[var(--rv-line)] transition-colors duration-100',
           'hover:bg-[var(--rv-bg-hover)]',
         )}
@@ -131,18 +131,18 @@ function ReviewRow({ review, onOpen }: { review: CradleDiffReview, onOpen: () =>
         {identity.reference && (
           <span
             data-rv-num
-            className="w-11 shrink-0 font-[var(--rv-font-mono)] text-[11.5px] text-[var(--rv-fg-subtle)]"
+            className="w-12 shrink-0 font-[var(--rv-font-mono)] text-[12px] text-[var(--rv-fg-subtle)]"
           >
             {identity.reference}
           </span>
         )}
 
-        <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--rv-fg)]">
+        <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-snug text-[var(--rv-fg)]">
           {identity.title}
         </span>
 
         {/* Metadata is right-aligned and fixed-width so a long list reads as columns. */}
-        <span className="flex shrink-0 items-center gap-3 text-[11.5px] text-[var(--rv-fg-subtle)]">
+        <span className="flex shrink-0 items-center gap-3.5 text-[12px] text-[var(--rv-fg-subtle)]">
           {openThreads > 0 && (
             <span data-rv-num className="text-[var(--rv-warn)]">
               {openThreads}
@@ -152,8 +152,8 @@ function ReviewRow({ review, onOpen }: { review: CradleDiffReview, onOpen: () =>
 
           {detail && (
             <span className="hidden max-w-[180px] items-center gap-1 lg:flex">
-              <BranchIcon className="size-3 shrink-0" aria-hidden />
-              <span className="truncate font-[var(--rv-font-mono)] text-[11px]">{detail.headRef}</span>
+              <BranchIcon className="size-3.5 shrink-0" aria-hidden />
+              <span className="truncate font-[var(--rv-font-mono)] text-[11.5px]">{detail.headRef}</span>
             </span>
           )}
 
