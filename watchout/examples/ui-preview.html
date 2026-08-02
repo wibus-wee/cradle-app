@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WatchOut UI Preview</title>
+<style>
+  :root {
+    --accent: #eb8c2e;
+    --accent-soft: rgba(235, 140, 46, 0.14);
+    --ink: #1c1f24;
+    --ink-secondary: rgba(28, 31, 36, 0.55);
+    --hairline: rgba(0, 0, 0, 0.08);
+    --row: rgba(0, 0, 0, 0.035);
+    --row-hover: rgba(0, 0, 0, 0.06);
+    --bg: #e8e4dc;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    background:
+      radial-gradient(900px 500px at 20% 0%, rgba(235,140,46,0.18), transparent 60%),
+      radial-gradient(700px 400px at 90% 20%, rgba(80,100,140,0.12), transparent 55%),
+      linear-gradient(180deg, #f3efe6 0%, #ddd6c8 100%);
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 48px 40px 64px;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 {
+    font-size: 13px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.45);
+    font-weight: 700;
+    margin: 0 0 28px;
+  }
+  .stage {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .caption {
+    font-size: 12px;
+    color: rgba(0,0,0,0.45);
+    margin: 0 0 10px;
+    font-weight: 600;
+  }
+
+  /* Shared panel chrome */
+  .panel {
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(28px) saturate(1.4);
+    -webkit-backdrop-filter: blur(28px) saturate(1.4);
+    border: 1px solid var(--hairline);
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.65) inset,
+      0 18px 40px rgba(0,0,0,0.12),
+      0 2px 8px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .menubar {
+    width: 360px;
+    border-radius: 14px;
+  }
+  .floating {
+    width: 440px;
+    border-radius: 18px;
+    background:
+      linear-gradient(145deg, rgba(235,140,46,0.10), transparent 42%),
+      rgba(255,255,255,0.78);
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px 12px;
+  }
+  .floating .header { padding: 8px 18px 12px; }
+  .mark {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f0a045, #e07a1a);
+    display: grid; place-items: center;
+    color: white;
+    box-shadow: 0 4px 12px rgba(235,140,46,0.35);
+    flex-shrink: 0;
+  }
+  .menubar .mark { width: 24px; height: 24px; border-radius: 7px; }
+  .mark svg { width: 14px; height: 14px; }
+  .menubar .mark svg { width: 11px; height: 11px; }
+  .titles { flex: 1; min-width: 0; }
+  .titles strong {
+    display: block;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .menubar .titles strong { font-size: 18px; }
+  .titles span {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--ink-secondary);
+  }
+  .badge {
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    font-weight: 650;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    border: 1px solid var(--hairline);
+  }
+  .filter {
+    width: 28px; height: 28px;
+    border-radius: 999px;
+    display: grid; place-items: center;
+    color: var(--accent);
+    background: transparent;
+  }
+
+  .composer {
+    margin: 0 18px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.035);
+    border: 1px solid rgba(235,140,46,0.45);
+  }
+  .composer .plus { color: var(--accent); font-weight: 700; width: 18px; }
+  .composer input {
+    flex: 1;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font: 500 14px/1.3 inherit;
+    color: var(--ink);
+  }
+  .composer input::placeholder { color: rgba(0,0,0,0.35); }
+  .add {
+    border: 0;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 650;
+    background: var(--accent);
+    color: white;
+  }
+
+  .divider { height: 1px; background: rgba(0,0,0,0.08); }
+
+  .list {
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 280px;
+  }
+  .menubar .list { min-height: 240px; }
+
+  .row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 11px 12px;
+    border-radius: 12px;
+    background: var(--row);
+    border: 1px solid var(--hairline);
+  }
+  .row:hover { background: var(--row-hover); }
+  .check {
+    width: 22px; height: 22px;
+    margin-top: 3px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(235,140,46,0.55);
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .check.done {
+    border-color: var(--accent);
+  }
+  .row-body { flex: 1; min-width: 0; }
+  .row-body h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 1.35;
+  }
+  .row-body h3.done {
+    color: var(--ink-secondary);
+    text-decoration: line-through;
+  }
+  .row-body p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--ink-secondary);
+    line-height: 1.35;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 6px;
+  }
+  .chip {
+    font-size: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 500;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: rgba(0,0,0,0.05);
+    color: var(--ink-secondary);
+  }
+  .time {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: rgba(0,0,0,0.35);
+  }
+  .open-link {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .trash {
+    width: 28px; height: 28px;
+    border-radius: 999px;
+    display: grid; place-items: center;
+    color: rgba(0,0,0,0.35);
+    opacity: 0;
+  }
+  .row:hover .trash { opacity: 1; background: rgba(255,0,0,0.08); }
+
+  .footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--hairline);
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    border: 1px solid rgba(235,140,46,0.25);
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .icon-btn {
+    width: 28px; height: 28px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.05);
+    display: grid; place-items: center;
+    color: rgba(0,0,0,0.45);
+    font-size: 12px;
+  }
+  .spacer { flex: 1; }
+
+  .chrome {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--ink-secondary);
+  }
+  .pin {
+    margin-left: auto;
+    width: 26px; height: 26px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.05);
+    display: grid; place-items: center;
+    color: var(--accent);
+  }
+
+  .menubar-host {
+    position: relative;
+  }
+  .fake-menubar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-right: 6px;
+  }
+  .tray {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: rgba(40,40,40,0.82);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .note {
+    margin-top: 36px;
+    max-width: 860px;
+    font-size: 13px;
+    color: rgba(0,0,0,0.5);
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+  <h1>WatchOut — UI preview (HTML stand-in for SwiftUI)</h1>
+  <div class="stage">
+    <div>
+      <p class="caption">Menu Bar panel</p>
+      <div class="menubar-host">
+        <div class="fake-menubar">
+          <div class="tray">👁 3</div>
+        </div>
+        <div class="panel menubar">
+          <div class="header">
+            <div class="mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+            </div>
+            <div class="titles">
+              <strong>WatchOut</strong>
+              <span>Parking slips</span>
+            </div>
+            <div class="badge">3</div>
+            <div class="filter">☰</div>
+          </div>
+          <div class="composer">
+            <div class="plus">+</div>
+            <input value="" placeholder="Park something for later…" readonly />
+            <button class="add">Add</button>
+          </div>
+          <div class="divider"></div>
+          <div class="list">
+            <div class="row">
+              <div class="check"></div>
+              <div class="row-body">
+                <h3>Review PR #113 outcome</h3>
+                <p>Agent finished; you opened once and bounced.</p>
+                <div class="meta">
+                  <span class="chip">cradle</span>
+                  <span class="chip">human</span>
+                  <span class="time">2 hours ago</span>
+                  <a class="open-link" href="#">Open ↗</a>
+                </div>
+              </div>
+              <div class="trash">🗑</div>
+            </div>
+            <div class="row">
+              <div class="check"></div>
+              <div class="row-body">
+                <h3>Check CI on watchout branch</h3>
+                <div class="meta">
+                  <span class="chip">cli</span>
+                  <span class="chip">human</span>
+                  <span class="time">yesterday</span>
+                </div>
+              </div>
+              <div class="trash">🗑</div>
+            </div>
+            <div class="row">
+              <div class="check done">✓</div>
+              <div class="row-body">
+                <h3 class="done">Reply to design notes</h3>
+                <div class="meta">
+                  <span class="chip">manual</span>
+                  <span class="chip">human</span>
+                  <span class="time">3 days ago</span>
+                </div>
+              </div>
+              <div class="trash">🗑</div>
+            </div>
+          </div>
+          <div class="footer">
+            <div class="pill">🗔 Open Floating</div>
+            <div class="spacer"></div>
+            <div class="icon-btn">⚙</div>
+            <div class="icon-btn">⏻</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="caption">Floating panel</p>
+      <div class="panel floating">
+        <div class="chrome">
+          FLOATING
+          <div class="pin">📌</div>
+        </div>
+        <div class="header">
+          <div class="mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+          </div>
+          <div class="titles">
+            <strong>WatchOut</strong>
+            <span>Things to handle later</span>
+          </div>
+          <div class="badge">3</div>
+          <div class="filter">☰</div>
+        </div>
+        <div class="composer">
+          <div class="plus">+</div>
+          <input value="Ship icon + screenshot pass" readonly />
+          <button class="add">Add</button>
+        </div>
+        <div class="divider"></div>
+        <div class="list">
+          <div class="row">
+            <div class="check"></div>
+            <div class="row-body">
+              <h3>Review PR #113 outcome</h3>
+              <p>Agent finished; you opened once and bounced.</p>
+              <div class="meta">
+                <span class="chip">cradle</span>
+                <span class="chip">human</span>
+                <span class="time">2 hours ago</span>
+                <a class="open-link" href="#">Open ↗</a>
+              </div>
+            </div>
+            <div class="trash">🗑</div>
+          </div>
+          <div class="row">
+            <div class="check"></div>
+            <div class="row-body">
+              <h3>Check CI on watchout branch</h3>
+              <div class="meta">
+                <span class="chip">cli</span>
+                <span class="chip">human</span>
+                <span class="time">yesterday</span>
+              </div>
+            </div>
+            <div class="trash">🗑</div>
+          </div>
+          <div class="row">
+            <div class="check"></div>
+            <div class="row-body">
+              <h3>Ask design: more sticky-note or more HUD?</h3>
+              <div class="meta">
+                <span class="chip">manual</span>
+                <span class="chip">human</span>
+                <span class="time">just now</span>
+              </div>
+            </div>
+            <div class="trash">🗑</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note">
+    This is a high-fidelity HTML stand-in of the SwiftUI layout (Linux can’t run the macOS app).
+    Colors/structure match <code>WatchOutTheme</code> + the polished panels — not a live AppKit render.
+  </p>
+</body>
+</html>
