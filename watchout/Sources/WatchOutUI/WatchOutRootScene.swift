@@ -31,7 +31,7 @@ public struct WatchOutRootScene: Scene {
 
     Window("WatchOut", id: WatchOutWindowID.floating) {
       FloatingPanel(model: model)
-        .frame(minWidth: 360, idealWidth: 420, minHeight: 420, idealHeight: 560)
+        .frame(minWidth: 380, idealWidth: 440, minHeight: 520, idealHeight: 640)
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentSize)
@@ -54,11 +54,14 @@ struct MenuBarLabel: View {
   let showCount: Bool
 
   var body: some View {
-    if showCount, openCount > 0 {
-      Label("WatchOut (\(openCount))", systemImage: "eye.trianglebadge.exclamationmark")
-    } else {
-      Label("WatchOut", systemImage: "eye")
+    HStack(spacing: 4) {
+      Image(systemName: openCount > 0 ? "eye.trianglebadge.exclamationmark.fill" : "eye.fill")
+      if showCount, openCount > 0 {
+        Text("\(openCount)")
+          .font(.caption2.weight(.bold).monospacedDigit())
+      }
     }
+    .help(openCount > 0 ? "WatchOut — \(openCount) open" : "WatchOut")
   }
 }
 
@@ -72,25 +75,68 @@ struct MenuBarPanel: View {
   var body: some View {
     VStack(spacing: 0) {
       AttentionListPane(model: model, compact: true)
-        .frame(width: 340, height: 420)
-      Divider()
-      HStack {
-        Button("Floating Panel") { presentFloating() }
-        Spacer()
-        SettingsLink {
-          Text("Settings…")
-        }
-        Button("Quit") {
-          #if canImport(AppKit)
-          NSApp.terminate(nil)
-          #endif
-        }
-        .keyboardShortcut("q", modifiers: [.command])
-      }
-      .padding(10)
-      .controlSize(.small)
+        .frame(width: 360, height: 460)
+
+      footer
     }
+    .background(.ultraThinMaterial)
     .onAppear(perform: bootstrapIfNeeded)
+  }
+
+  private var footer: some View {
+    HStack(spacing: 8) {
+      Button {
+        presentFloating()
+      } label: {
+        Label("Open Floating", systemImage: "macwindow.on.rectangle")
+          .font(.caption.weight(.semibold))
+          .padding(.horizontal, 10)
+          .padding(.vertical, 7)
+          .background(
+            Capsule(style: .continuous)
+              .fill(WatchOutTheme.accentSoft)
+          )
+          .overlay(
+            Capsule(style: .continuous)
+              .strokeBorder(WatchOutTheme.accent.opacity(0.25), lineWidth: 1)
+          )
+          .foregroundStyle(WatchOutTheme.ink)
+      }
+      .buttonStyle(WatchOutPressableButtonStyle())
+
+      Spacer()
+
+      SettingsLink {
+        Image(systemName: "gearshape")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(.secondary)
+          .frame(width: 28, height: 28)
+          .background(Circle().fill(Color.primary.opacity(0.05)))
+      }
+      .help("Settings")
+
+      Button {
+        #if canImport(AppKit)
+        NSApp.terminate(nil)
+        #endif
+      } label: {
+        Image(systemName: "power")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(.secondary)
+          .frame(width: 28, height: 28)
+          .background(Circle().fill(Color.primary.opacity(0.05)))
+      }
+      .buttonStyle(WatchOutPressableButtonStyle())
+      .keyboardShortcut("q", modifiers: [.command])
+      .help("Quit WatchOut")
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 10)
+    .overlay(alignment: .top) {
+      Rectangle()
+        .fill(WatchOutTheme.hairline)
+        .frame(height: 1)
+    }
   }
 
   private func bootstrapIfNeeded() {
@@ -116,15 +162,64 @@ struct FloatingPanel: View {
   @Default(.floatingAlwaysOnTop) private var floatingAlwaysOnTop
 
   var body: some View {
-    AttentionListPane(model: model, compact: false)
-      .background(.regularMaterial)
-      .onAppear {
-        model.refresh()
-        applyFloatingLevel()
+    VStack(spacing: 0) {
+      floatingChrome
+      AttentionListPane(model: model, compact: false)
+    }
+    .background {
+      ZStack {
+        Rectangle().fill(.ultraThickMaterial)
+        LinearGradient(
+          colors: [
+            WatchOutTheme.accent.opacity(0.10),
+            .clear,
+            Color.black.opacity(0.03),
+          ],
+          startPoint: .topLeading,
+          endPoint: .bottomTrailing
+        )
       }
-      .onChange(of: floatingAlwaysOnTop) { _, _ in
-        applyFloatingLevel()
+    }
+    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
+    )
+    .padding(1)
+    .onAppear {
+      model.refresh()
+      applyFloatingLevel()
+    }
+    .onChange(of: floatingAlwaysOnTop) { _, _ in
+      applyFloatingLevel()
+    }
+  }
+
+  private var floatingChrome: some View {
+    HStack(spacing: 10) {
+      Text("FLOATING")
+        .font(.caption2.weight(.bold))
+        .tracking(1.2)
+        .foregroundStyle(WatchOutTheme.inkSecondary)
+      Spacer()
+      Button {
+        floatingAlwaysOnTop.toggle()
+      } label: {
+        Image(systemName: floatingAlwaysOnTop ? "pin.fill" : "pin")
+          .font(.system(size: 11, weight: .semibold))
+          .foregroundStyle(floatingAlwaysOnTop ? WatchOutTheme.accent : .secondary)
+          .frame(width: 26, height: 26)
+          .background(Circle().fill(Color.primary.opacity(0.05)))
       }
+      .buttonStyle(WatchOutPressableButtonStyle())
+      .help(floatingAlwaysOnTop ? "Unpin from top" : "Keep on top")
+    }
+    .padding(.horizontal, 16)
+    .padding(.top, 12)
+    .padding(.bottom, 4)
+    #if canImport(AppKit)
+    .background(WindowDragHandle())
+    #endif
   }
 
   private func applyFloatingLevel() {
@@ -134,11 +229,28 @@ struct FloatingPanel: View {
         window.level = floatingAlwaysOnTop ? .floating : .normal
         window.collectionBehavior.insert(.fullScreenAuxiliary)
         window.isMovableByWindowBackground = true
+        window.titlebarAppearsTransparent = true
+        window.backgroundColor = .clear
       }
     }
     #endif
   }
 }
+
+#if canImport(AppKit)
+private struct WindowDragHandle: NSViewRepresentable {
+  func makeNSView(context: Context) -> NSView {
+    let view = DragRegionView()
+    return view
+  }
+
+  func updateNSView(_ nsView: NSView, context: Context) {}
+
+  final class DragRegionView: NSView {
+    override var mouseDownCanMoveWindow: Bool { true }
+  }
+}
+#endif
 
 @MainActor
 public final class WatchOutHotKeys {
