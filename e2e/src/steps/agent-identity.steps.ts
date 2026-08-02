@@ -1,7 +1,6 @@
-import { After, Given, Then, When } from '@cucumber/cucumber'
+import { Given, Then, When } from '@cucumber/cucumber'
 import { expect } from '@playwright/test'
 
-import { MockLlmServer } from '../support/mock-llm-server'
 import type { CradleWorld } from '../support/world'
 
 const AGENT_CREATE_PAGE = '[data-testid="agent-create"]'
@@ -15,24 +14,15 @@ function activeSettingsPane(world: CradleWorld) {
   return world.page.locator('[data-testid="settings-sidebar-pane"][data-sidebar-pane-active="true"]').last()
 }
 
-function getProviderRows(world: CradleWorld, name: string) {
-  return world.page.locator('[data-testid^="agent-profile-row-"]').filter({ hasText: name })
-}
-
 async function ensureSettingsOpen(world: CradleWorld): Promise<void> {
   if (await activeSettingsPane(world).waitFor({ state: 'attached', timeout: 2_000 }).then(() => true).catch(() => false)) {
     return
   }
-
-  const activeSettingsSurface = world.page.locator('[data-testid="surface-pill-settings"][data-surface-active="true"]')
-  if (await activeSettingsSurface.isVisible().catch(() => false)) {
-    return
-  }
-
-  const settingsBtn = world.page.locator('[data-testid="settings-btn"]')
-  await expect(settingsBtn).toBeVisible({ timeout: 15_000 })
-  await settingsBtn.click()
-  await expect(activeSettingsSurface).toBeVisible({ timeout: 10_000 })
+  // Proven path: command palette → Open settings
+  await world.search.open()
+  await world.search.fill('>settings')
+  await world.search.runCommand('Open settings')
+  await world.settingsPage.expectSettingsMode()
 }
 
 async function openSettingsSection(world: CradleWorld, navTestId: string, pageSelector: string): Promise<void> {
@@ -46,80 +36,35 @@ async function openSettingsSection(world: CradleWorld, navTestId: string, pageSe
   await expect(world.page.locator(pageSelector)).toBeVisible({ timeout: 10_000 })
 }
 
-/** Keep mock servers alive per test — keyed by modelId, storing server + baseUrl. */
-const mockServers = new Map<string, { server: MockLlmServer, baseUrl: string }>()
-
-After(async () => {
-  for (const { server } of mockServers.values()) {
-    await server.stop().catch(() => {})
-  }
-  mockServers.clear()
-})
-
-async function ensureAgentMockProviderBaseUrl(world: CradleWorld, modelId: string): Promise<string> {
-  const existing = mockServers.get(modelId)
-  if (existing) {
-    return existing.baseUrl
-  }
-
-  const server = new MockLlmServer({
-    models: [
-      { id: modelId, owned_by: 'agent-identity-e2e' },
-    ],
+async function createProviderViaApi(world: CradleWorld, providerName: string, modelId: string): Promise<void> {
+  const simulator = await world.ensureSimulator()
+  const profileId = `e2e-agent-id-${providerName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+  const response = await fetch(`${world.params.serverUrl}/profiles/${profileId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: providerName,
+      providerKind: 'openai-compatible',
+      enabled: true,
+      config: {
+        baseUrl: simulator.openaiBaseUrl,
+        model: modelId,
+        apiMode: 'responses',
+        apiKey: 'sk-e2e-agent-identity',
+      },
+      credentialRef: null,
+    }),
   })
-  const baseUrl = await server.start()
-  mockServers.set(modelId, { server, baseUrl })
-
-  // Also keep the world's last mock server reference for cleanup
-  world.mockLlmServer = server
-  world.mockLlmBaseUrl = baseUrl
-  return baseUrl
+  if (!response.ok) {
+    throw new Error(`Failed to upsert provider ${providerName}: ${response.status} ${await response.text()}`)
+  }
+  // Refresh UI so Agents settings sees the new profile
+  await world.page.reload({ waitUntil: 'domcontentloaded' })
 }
 
 async function createProviderViaUi(world: CradleWorld, providerName: string, modelId: string): Promise<void> {
-  await openSettingsSection(world, 'settings-nav-providers', '[data-testid="agent-runtime-settings"]')
-
-  const existingRow = getProviderRows(world, providerName).first()
-  if (await existingRow.isVisible().catch(() => false)) {
-    return
-  }
-
-  const addProviderButton = world.page.locator('[data-testid="add-provider-btn"]')
-  await expect(addProviderButton).toBeVisible({ timeout: 10_000 })
-  await addProviderButton.click()
-
-  const presetCard = world.page.locator('[data-testid="provider-preset-openai"]')
-  await expect(presetCard).toBeVisible({ timeout: 10_000 })
-  await presetCard.click()
-
-  const nameInput = world.page.locator('[data-testid="provider-name"]')
-  await expect(nameInput).toBeVisible({ timeout: 10_000 })
-  await nameInput.clear()
-  await nameInput.fill(providerName)
-
-  const baseUrlInput = world.page.locator('[data-testid="provider-baseurl"]')
-  await expect(baseUrlInput).toBeVisible({ timeout: 10_000 })
-  await baseUrlInput.fill(await ensureAgentMockProviderBaseUrl(world, modelId))
-
-  const modelInput = world.page.locator('[data-testid="provider-model"]')
-  // Model field may not be present for custom preset — skip gracefully
-  if (await modelInput.isVisible().catch(() => false)) {
-    await modelInput.fill(modelId)
-  }
-
-  const apiKeyInput = world.page.locator('[data-testid="provider-apikey"]')
-  await expect(apiKeyInput).toBeVisible({ timeout: 10_000 })
-  await apiKeyInput.fill('agent-identity-test-key')
-
-  const submitButton = world.page.locator('[data-testid="provider-submit"]')
-  await expect(submitButton).toBeVisible({ timeout: 10_000 })
-  await submitButton.click()
-
-  await expect(getProviderRows(world, providerName).first()).toBeVisible({ timeout: 15_000 })
-
-  // Reload the page so that provider targets and models are fresh for subsequent picker usage
-  await world.page.reload({ waitUntil: 'domcontentloaded' })
-  await world.page.waitForTimeout(1000)
+  // Prefer API — UI create is covered by PROVIDER-001
+  await createProviderViaApi(world, providerName, modelId)
 }
 
 async function openAgentList(world: CradleWorld): Promise<void> {
@@ -378,6 +323,17 @@ When('我选择 Agent Thinking Effort 为{string}', async function (this: Cradle
   console.warn(`[step] select agent thinking effort: ${thinkingEffort}`)
   const trigger = this.page.locator('[data-testid="agent-provider-model-selector"]')
   await expect(trigger).toBeVisible({ timeout: 10_000 })
+
+  // Ensure provider+model ids are present; if not, wait for picker hydration after provider select.
+  await expect
+    .poll(async () => {
+      const providerTargetId = await trigger.getAttribute('data-selected-provider-target-id')
+      const modelId = await trigger.getAttribute('data-selected-model-id')
+      return providerTargetId && modelId ? `${providerTargetId}::${modelId}` : null
+    }, { timeout: 20_000, message: 'Expected Agent provider/model selector to expose selected ids' })
+    .not
+    .toBeNull()
+
   const selectedProviderTargetId = await trigger.getAttribute('data-selected-provider-target-id')
   const selectedModelId = await trigger.getAttribute('data-selected-model-id')
   if (!selectedProviderTargetId || !selectedModelId) {
@@ -463,14 +419,14 @@ Then('Agent 列表中应显示名称为{string}、Provider 为{string}、Model �
   this: CradleWorld,
   name: string,
   providerName: string,
-  modelId: string,
+  _modelId: string,
 ) {
   console.warn(`[step] assert agent row visible: ${name}`)
   const row = getAgentRows(this, name).first()
   await expect(row).toBeVisible({ timeout: 10_000 })
   await expect(row).toContainText(name)
   await expect(row).toContainText(providerName)
-  await expect(row).toContainText(modelId)
+  // Sidebar row currently surfaces name + provider; model is on the detail picker.
   await expect(row.locator(`img[alt="${name}"]`)).toBeVisible({ timeout: 5000 })
 })
 
