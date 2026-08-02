@@ -1,25 +1,24 @@
-#if canImport(AppKit)
-import AppKit
-#endif
 import Defaults
 import KeyboardShortcuts
 import LaunchAtLogin
 import SwiftUI
 import WatchOutCore
 
-struct GeneralSettingsView: View {
+public struct WatchOutGeneralSettingsPane: View {
   @Default(.floatingAlwaysOnTop) private var floatingAlwaysOnTop
   @Default(.showMenuBarCount) private var showMenuBarCount
   @Default(.floatingVisibleOnLaunch) private var floatingVisibleOnLaunch
 
-  var body: some View {
+  public init() {}
+
+  public var body: some View {
     Form {
       Section("Launch") {
         LaunchAtLogin.Toggle("Open at login")
         Toggle("Show floating panel on launch", isOn: $floatingVisibleOnLaunch)
       }
       Section("Windows") {
-        Toggle("Floating panel always on top", isOn: $floatingAlwaysOnTop)
+        Toggle("Keep floating panel on top", isOn: $floatingAlwaysOnTop)
         Toggle("Show open count in menu bar", isOn: $showMenuBarCount)
       }
       Section("Data") {
@@ -31,8 +30,6 @@ struct GeneralSettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .padding()
-    .frame(width: 480, height: 320)
   }
 
   private var dbPath: String {
@@ -42,8 +39,10 @@ struct GeneralSettingsView: View {
   }
 }
 
-struct ShortcutsSettingsView: View {
-  var body: some View {
+public struct WatchOutShortcutsSettingsPane: View {
+  public init() {}
+
+  public var body: some View {
     Form {
       Section("Global shortcuts") {
         KeyboardShortcuts.Recorder("Toggle floating panel", name: .toggleFloating)
@@ -51,17 +50,5 @@ struct ShortcutsSettingsView: View {
       }
     }
     .formStyle(.grouped)
-    .padding()
-    .frame(width: 480, height: 220)
   }
-}
-
-public struct WatchOutGeneralSettingsPane: View {
-  public init() {}
-  public var body: some View { GeneralSettingsView() }
-}
-
-public struct WatchOutShortcutsSettingsPane: View {
-  public init() {}
-  public var body: some View { ShortcutsSettingsView() }
 }

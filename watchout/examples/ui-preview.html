@@ -3,359 +3,165 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>WatchOut — bottom composer, no footer</title>
+<title>WatchOut — native tight</title>
 <style>
-  :root {
-    --phosphor: #38db9e;
-    --phosphor-dim: rgba(56, 219, 158, 0.16);
-    --ink: #12171f;
-    --mist: #e6ebf0;
-    --slate: #737f8e;
-    --hairline: rgba(0,0,0,0.10);
-    --ticket: rgba(255,255,255,0.92);
-  }
-  * { box-sizing: border-box; }
   body {
     margin: 0;
     min-height: 100vh;
-    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    color: var(--ink);
-    background: linear-gradient(180deg, #edf1f5 0%, #d9e0e8 100%);
-    padding: 44px 36px 56px;
+    font: 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    background: #c9cdd3;
+    color: #1d1d1f;
+    padding: 40px;
     -webkit-font-smoothing: antialiased;
   }
-  h1 {
-    margin: 0 0 6px;
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    font-weight: 800;
-    color: var(--slate);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  .sub { margin: 0 0 28px; font-size: 14px; color: rgba(18,23,31,0.7); }
-  .callout {
-    display: inline-block;
-    margin: 0 0 22px;
-    padding: 8px 10px;
-    border: 1px solid rgba(56,219,158,0.45);
-    background: var(--phosphor-dim);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--ink);
-  }
-  .stage { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
-  .label {
-    margin: 0 0 10px;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.16em;
-    color: var(--slate);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
+  h1 { margin: 0 0 8px; font-size: 12px; color: #6e6e73; font-weight: 600; }
+  .sub { margin: 0 0 24px; color: #6e6e73; font-size: 13px; }
+  .stage { display: flex; gap: 28px; flex-wrap: wrap; }
+  .label { margin: 0 0 8px; font-size: 11px; color: #6e6e73; font-weight: 600; }
   .panel {
-    border: 1px solid rgba(18,23,31,0.12);
+    width: 320px;
+    height: 420px;
+    background: #f5f5f7;
     border-radius: 10px;
-    overflow: hidden;
-    background: color-mix(in srgb, var(--mist) 85%, white);
-    box-shadow: 0 16px 40px rgba(18,23,31,0.10);
-    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
-  .panel::before {
-    content: "";
-    position: absolute; inset: 0;
-    background-image:
-      linear-gradient(rgba(0,0,0,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,0,0,0.035) 1px, transparent 1px);
-    background-size: 16px 16px;
-    opacity: 0.4;
-    pointer-events: none;
-  }
-  .menubar { width: 380px; height: 520px; }
-  .floating { width: 460px; height: 600px; border-radius: 12px; }
-  .floating .wash {
-    position: absolute; inset: 0;
-    background: linear-gradient(145deg, rgba(56,219,158,0.10), transparent 45%, rgba(0,0,0,0.03));
-    pointer-events: none;
-  }
-  .inner { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; }
-
-  .chrome {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px 4px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 9px; font-weight: 800; letter-spacing: 0.16em; color: var(--slate);
-  }
-  .chrome .line { flex: 1; height: 1px; background: var(--hairline); }
-  .pin {
-    padding: 5px 8px;
-    background: var(--phosphor);
-    color: var(--ink);
-    border: 1px solid var(--hairline);
-    border-radius: 2px;
-  }
-
-  .header { padding: 14px 16px 12px; }
-  .stamp {
+  .floating { width: 360px; height: 520px; }
+  .header {
     display: flex; align-items: center; gap: 8px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-weight: 800; letter-spacing: 0.28em; font-size: 13px;
+    padding: 8px 10px 6px;
   }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--phosphor);
-    box-shadow: 0 0 0 5px var(--phosphor-dim);
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #38db9e; }
+  .title { font-weight: 600; font-size: 13px; }
+  .floating .title { font-size: 15px; }
+  .count { color: #6e6e73; font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 600; }
+  .spacer { flex: 1; }
+  .done { font-size: 11px; color: #6e6e73; display: flex; align-items: center; gap: 4px; }
+  .done input { margin: 0; }
+  hr { border: 0; border-top: 1px solid rgba(0,0,0,0.08); margin: 0; }
+  .list { flex: 1; overflow: auto; padding: 4px 0; }
+  .row {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
   }
-  .toprow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .tape {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 8px; border: 1px solid var(--hairline); border-radius: 3px;
-    background: var(--phosphor-dim);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  .check { color: #6e6e73; margin-top: 1px; }
+  .check.on { color: #38db9e; }
+  .body { flex: 1; min-width: 0; }
+  .name { font-weight: 500; }
+  .name.done { color: #6e6e73; text-decoration: line-through; }
+  .meta { margin-top: 2px; font-size: 11px; color: #6e6e73; }
+  .meta a { color: #1aa876; text-decoration: none; }
+  .trash { color: #6e6e73; opacity: 0.45; font-size: 11px; }
+  .composer {
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 10px;
+    border-top: 1px solid rgba(0,0,0,0.08);
+    background: #f5f5f7;
   }
-  .tape .k { font-size: 9px; font-weight: 800; letter-spacing: 0.12em; color: var(--slate); }
-  .tape .n { font-size: 13px; font-weight: 800; }
-  .tagline { display: flex; align-items: baseline; gap: 12px; justify-content: space-between; }
-  .tagline p {
-    margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em;
-    max-width: 260px; line-height: 1.2;
+  .composer input {
+    flex: 1; border: 0; outline: 0; background: transparent; font: inherit;
   }
-  .menubar .tagline p { font-size: 12px; font-weight: 500; max-width: 200px; }
-  .mode {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
-    padding: 5px 8px; border: 1px solid var(--hairline); border-radius: 2px; color: var(--slate);
-    white-space: nowrap;
+  .composer button {
+    border: 0; border-radius: 6px; padding: 4px 10px;
+    background: #38db9e; color: #111; font-size: 12px; font-weight: 600;
   }
-
-  .scan {
-    margin: 0 16px; height: 2px; background: var(--hairline); position: relative;
-  }
-  .scan::after {
-    content: ""; position: absolute; left: 0; top: -0.5px; width: 48px; height: 2px; background: var(--phosphor);
-  }
-
-  .list {
-    padding: 12px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1;
-    overflow: hidden;
-  }
-  .ticket {
-    display: flex; background: var(--ticket); border: 1px solid var(--hairline);
-    border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); position: relative; overflow: hidden;
-  }
-  .ticket::before {
-    content: ""; position: absolute; left: 2px; top: 6px; bottom: 6px; width: 3px;
-    border-radius: 1px; background: var(--phosphor);
-  }
-  .ticket.done::before { background: rgba(115,127,142,0.25); }
-  .rail {
-    width: 36px; padding: 14px 0 10px; text-align: center;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px; font-weight: 800; color: var(--slate);
-    display: flex; flex-direction: column; align-items: center; gap: 6px;
-  }
-  .rail .mini { width: 6px; height: 6px; border-radius: 50%; background: var(--phosphor); box-shadow: 0 0 0 4px var(--phosphor-dim); }
-  .rail .mini.off { background: rgba(115,127,142,0.35); box-shadow: none; }
-  .sep { width: 1px; background: var(--hairline); margin: 8px 0; }
-  .body { flex: 1; padding: 12px 10px 12px 12px; }
-  .row1 { display: flex; align-items: flex-start; gap: 10px; }
-  .markbtn {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
-    padding: 4px 7px; border: 1px solid rgba(18,23,31,0.7); border-radius: 2px;
-    background: var(--phosphor-dim);
-  }
-  .title { flex: 1; font-size: 14px; font-weight: 650; line-height: 1.35; }
-  .title.done { color: var(--slate); text-decoration: line-through; }
-  .x { opacity: 0.2; font-size: 11px; font-weight: 800; color: var(--slate); padding: 4px; }
-  .desc { margin: 8px 0 0; font-size: 12.5px; color: var(--slate); }
-  .meta {
-    margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 9px; font-weight: 800; color: var(--slate);
-  }
-  .meta .link { color: var(--ink); }
-
-  .composer-dock {
-    border-top: 1px solid var(--hairline);
-    padding: 12px 16px 16px;
-    background: rgba(230,235,240,0.7);
-  }
-  .composer-dock .k {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 9px; font-weight: 800; letter-spacing: 0.14em; color: var(--slate); margin-bottom: 8px;
-  }
-  .composer-dock .box {
-    display: flex; border: 1.5px solid rgba(18,23,31,0.55); border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.85);
-  }
-  .composer-dock input {
-    flex: 1; border: 0; outline: 0; background: transparent;
-    padding: 12px; font-size: 14px; font-weight: 500; color: var(--ink);
-  }
-  .composer-dock button {
-    border: 0; background: var(--phosphor); color: var(--ink);
-    padding: 0 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
-  }
-
-  .tray {
-    display: inline-flex; align-items: center; gap: 6px;
-    margin-bottom: 8px; margin-left: auto;
-    padding: 5px 9px; border-radius: 7px; background: rgba(18,23,31,0.88); color: white;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 800;
-  }
-  .tray .d { width: 6px; height: 6px; border-radius: 50%; background: var(--phosphor); box-shadow: 0 0 0 4px rgba(56,219,158,0.25); }
-  .host { display: flex; flex-direction: column; align-items: flex-end; }
-  .note { margin-top: 28px; font-size: 12px; color: var(--slate); max-width: 880px; line-height: 1.5; }
+  .note { margin-top: 20px; font-size: 12px; color: #6e6e73; }
 </style>
 </head>
 <body>
   <h1>WatchOut</h1>
-  <p class="sub">Phosphor mint (not orange) · composer docked at bottom · no footer chrome</p>
-  <div class="callout">Swift accent = phosphor #38DB9E · Settings via ⌘, · Floating via hotkey · Quit via ⌘Q</div>
+  <p class="sub">Native SwiftUI-shaped: List + bottom field. No accent bars, no ticket chrome, tight padding.</p>
   <div class="stage">
     <div>
-      <p class="label">MENU BAR</p>
-      <div class="host">
-        <div class="tray"><span class="d"></span>3</div>
-        <div class="panel menubar">
-          <div class="inner">
-            <div class="header">
-              <div class="toprow">
-                <div class="stamp"><span class="dot"></span>WATCHOUT</div>
-                <div class="tape"><span class="k">OPEN</span><span class="n">3</span></div>
-              </div>
-              <div class="tagline">
-                <p>Later, without losing the thread.</p>
-                <div class="mode">OPEN ONLY</div>
-              </div>
+      <p class="label">Menu Bar</p>
+      <div class="panel">
+        <div class="header">
+          <span class="dot"></span>
+          <span class="title">WatchOut</span>
+          <span class="count">3</span>
+          <span class="spacer"></span>
+          <label class="done"><input type="checkbox" /> Done</label>
+        </div>
+        <hr />
+        <div class="list">
+          <div class="row">
+            <span class="check">○</span>
+            <div class="body">
+              <div class="name">Review PR #113 outcome</div>
+              <div class="meta">cradle · 2 hours ago · <a href="#">Open</a></div>
             </div>
-            <div class="scan"></div>
-            <div class="list">
-              <div class="ticket">
-                <div class="rail">01<span class="mini"></span></div>
-                <div class="sep"></div>
-                <div class="body">
-                  <div class="row1">
-                    <div class="markbtn">MARK</div>
-                    <div class="title">Review PR #113 outcome</div>
-                    <div class="x">✕</div>
-                  </div>
-                  <p class="desc">Agent finished; you opened once and bounced.</p>
-                  <div class="meta"><span>CRADLE</span><span>·</span><span>HUMAN</span><span>·</span><span>2 HOURS AGO</span><span class="link">LINK →</span></div>
-                </div>
-              </div>
-              <div class="ticket">
-                <div class="rail">02<span class="mini"></span></div>
-                <div class="sep"></div>
-                <div class="body">
-                  <div class="row1">
-                    <div class="markbtn">MARK</div>
-                    <div class="title">Check CI on watchout branch</div>
-                    <div class="x">✕</div>
-                  </div>
-                  <div class="meta"><span>CLI</span><span>·</span><span>HUMAN</span><span>·</span><span>YESTERDAY</span></div>
-                </div>
-              </div>
-              <div class="ticket done">
-                <div class="rail">03<span class="mini off"></span></div>
-                <div class="sep"></div>
-                <div class="body">
-                  <div class="row1">
-                    <div class="markbtn" style="background:transparent;border-color:rgba(18,23,31,0.25);color:var(--slate)">UNDO</div>
-                    <div class="title done">Reply to design notes</div>
-                    <div class="x">✕</div>
-                  </div>
-                  <div class="meta"><span>MANUAL</span><span>·</span><span>HUMAN</span><span>·</span><span>3 DAYS AGO</span></div>
-                </div>
-              </div>
-            </div>
-            <div class="composer-dock">
-              <div class="k">NEW SLIP</div>
-              <div class="box">
-                <input placeholder="What should not be forgotten?" />
-                <button>PARK</button>
-              </div>
-            </div>
+            <span class="trash">⌫</span>
           </div>
+          <div class="row">
+            <span class="check">○</span>
+            <div class="body">
+              <div class="name">Check CI on watchout branch</div>
+              <div class="meta">cli · yesterday</div>
+            </div>
+            <span class="trash">⌫</span>
+          </div>
+          <div class="row">
+            <span class="check on">●</span>
+            <div class="body">
+              <div class="name done">Reply to design notes</div>
+              <div class="meta">manual · 3 days ago</div>
+            </div>
+            <span class="trash">⌫</span>
+          </div>
+        </div>
+        <div class="composer">
+          <input placeholder="Park for later…" />
+          <button>Park</button>
         </div>
       </div>
     </div>
-
     <div>
-      <p class="label">FLOATING</p>
+      <p class="label">Floating</p>
       <div class="panel floating">
-        <div class="wash"></div>
-        <div class="inner">
-          <div class="chrome">FLOAT MODE<span class="line"></span><span class="pin">PINNED</span></div>
-          <div class="header">
-            <div class="toprow">
-              <div class="stamp"><span class="dot"></span>WATCHOUT</div>
-              <div class="tape"><span class="k">OPEN</span><span class="n">3</span></div>
+        <div class="header">
+          <span class="dot"></span>
+          <span class="title">WatchOut</span>
+          <span class="count">3</span>
+          <span class="spacer"></span>
+          <label class="done"><input type="checkbox" /> Done</label>
+        </div>
+        <hr />
+        <div class="list">
+          <div class="row">
+            <span class="check">○</span>
+            <div class="body">
+              <div class="name">Review PR #113 outcome</div>
+              <div class="meta">cradle · 2 hours ago · <a href="#">Open</a></div>
             </div>
-            <div class="tagline">
-              <p>A desk for unfinished attention.</p>
-              <div class="mode">OPEN ONLY</div>
-            </div>
+            <span class="trash">⌫</span>
           </div>
-          <div class="scan"></div>
-          <div class="list">
-            <div class="ticket">
-              <div class="rail">01<span class="mini"></span></div>
-              <div class="sep"></div>
-              <div class="body">
-                <div class="row1">
-                  <div class="markbtn">MARK</div>
-                  <div class="title">Review PR #113 outcome</div>
-                  <div class="x">✕</div>
-                </div>
-                <p class="desc">Agent finished; you opened once and bounced.</p>
-                <div class="meta"><span>CRADLE</span><span>·</span><span>HUMAN</span><span>·</span><span>2 HOURS AGO</span><span class="link">LINK →</span></div>
-              </div>
+          <div class="row">
+            <span class="check">○</span>
+            <div class="body">
+              <div class="name">Check CI on watchout branch</div>
+              <div class="meta">cli · yesterday</div>
             </div>
-            <div class="ticket">
-              <div class="rail">02<span class="mini"></span></div>
-              <div class="sep"></div>
-              <div class="body">
-                <div class="row1">
-                  <div class="markbtn">MARK</div>
-                  <div class="title">Check CI on watchout branch</div>
-                  <div class="x">✕</div>
-                </div>
-                <div class="meta"><span>CLI</span><span>·</span><span>HUMAN</span><span>·</span><span>YESTERDAY</span></div>
-              </div>
-            </div>
-            <div class="ticket">
-              <div class="rail">03<span class="mini"></span></div>
-              <div class="sep"></div>
-              <div class="body">
-                <div class="row1">
-                  <div class="markbtn">MARK</div>
-                  <div class="title">Ask design: more sticky-note or more HUD?</div>
-                  <div class="x">✕</div>
-                </div>
-                <div class="meta"><span>MANUAL</span><span>·</span><span>HUMAN</span><span>·</span><span>JUST NOW</span></div>
-              </div>
-            </div>
+            <span class="trash">⌫</span>
           </div>
-          <div class="composer-dock">
-            <div class="k">NEW SLIP</div>
-            <div class="box">
-              <input value="Ship icon + screenshot pass" />
-              <button>PARK</button>
+          <div class="row">
+            <span class="check">○</span>
+            <div class="body">
+              <div class="name">Ship icon + screenshot pass</div>
+              <div class="meta">manual · just now</div>
             </div>
+            <span class="trash">⌫</span>
           </div>
+        </div>
+        <div class="composer">
+          <input placeholder="Park for later…" />
+          <button>Park</button>
         </div>
       </div>
     </div>
   </div>
-  <p class="note">No FLOAT/CFG/QUIT footer. Capture surface is the bottom dock. Accent is mint phosphor in Swift + preview.</p>
+  <p class="note">SwiftUI: MenuBarExtra + List + TextField. Accent only on active signal / Park button.</p>
 </body>
 </html>
