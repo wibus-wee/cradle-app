@@ -94,6 +94,7 @@ export function ChatView({
   placeholder,
   runtimeKind: _runtimeKind,
   workspaceId,
+  workspacePath = null,
   remoteHostId = null,
   messageTextTransform,
   prepareSend,
@@ -801,6 +802,7 @@ export function ChatView({
 : null}
             <ChatComposerSection
               sessionId={sessionId}
+              workspacePath={workspacePath}
               runtimeKind={runtimeSettings.runtimeKind ?? _runtimeKind}
               awaitSummary={awaitSummary}
               queueItems={queueItems}

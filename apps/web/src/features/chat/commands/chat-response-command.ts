@@ -330,6 +330,36 @@ export async function executeBangCommand(args: {
   return readSdkData(result, 'Failed to execute bang command') as BangCommandResult
 }
 
+export async function persistBangTranscript(args: {
+  sessionId: string
+  transcript: string
+  command?: string
+  durationMs?: number
+  exitCode?: number | null
+  signal?: AbortSignal
+}): Promise<BangCommandResult> {
+  const response = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/bang-transcript`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      transcript: args.transcript,
+      command: args.command,
+      durationMs: args.durationMs,
+      exitCode: args.exitCode,
+    }),
+    signal: args.signal,
+  })
+  if (!response.ok) {
+    const message = await response.text().catch(() => '')
+    throw new Error(message || `Failed to persist bang transcript (${response.status})`)
+  }
+  const payload = await response.json() as { data?: BangCommandResult } | BangCommandResult
+  if (payload && typeof payload === 'object' && 'data' in payload && payload.data) {
+    return payload.data
+  }
+  return payload as BangCommandResult
+}
+
 export async function createSideChat(args: {
   sessionId: string
   providerTargetId?: string
