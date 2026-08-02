@@ -91,7 +91,7 @@ jobs:
         env:
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TAGS_FILTER: ${{ github.event.inputs.tags || '(full suite)' }}
+          TAGS_FILTER: ${{ github.event.inputs.tags || '@P0 or @P1' }}
         run: |
           node <<'NODE'
           const fs = require('fs')
@@ -409,7 +409,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ARTIFACTS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BRANCH: ${{ github.ref_name }}
-          TAGS_FILTER: ${{ github.event.inputs.tags || '(full suite)' }}
+          TAGS_FILTER: ${{ github.event.inputs.tags || '@P0 or @P1' }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
