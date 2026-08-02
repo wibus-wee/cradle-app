@@ -588,6 +588,13 @@ export function ComposerView({
         return
       }
 
+      if (command.action.kind === 'insertIntent') {
+        dispatch({ type: 'slash/selected', inputValue: currentState.inputValue, command: null })
+        promptEditorRef.current?.insertIntentMention(command.action.intentId, range)
+        requestAnimationFrame(() => promptEditorRef.current?.focus())
+        return
+      }
+
       const insertText = command.action.text
       const next = replaceSlashTrigger(
         currentState.inputValue,
@@ -595,7 +602,12 @@ export function ComposerView({
         range.from - 1,
         insertText,
       )
-      dispatch({ type: 'slash/selected', inputValue: next.value, command })
+      const keepsSlashCommand = insertText.trimStart().startsWith(`/${command.name}`)
+      dispatch({
+        type: 'slash/selected',
+        inputValue: next.value,
+        command: keepsSlashCommand ? command : null,
+      })
       promptEditorRef.current?.replaceRangeWithText(range, insertText)
     },
     [
@@ -1165,7 +1177,7 @@ export function ComposerView({
               <div className="grid min-w-0 overflow-hidden">
                 <div
                   className={cn(
-                    'col-start-1 row-start-1 flex min-w-0 items-center gap-1 transition-[opacity,transform,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
+                    'col-start-1 row-start-1 flex min-w-0 items-center gap-2 transition-[opacity,transform,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
                     isBangMode && 'pointer-events-none translate-y-2 opacity-0 blur-[3px]',
                   )}
                 >

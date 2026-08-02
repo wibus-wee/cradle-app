@@ -27,9 +27,9 @@ export type SurfaceRoute
     | { to: '/pull-requests', params?: undefined, search?: { workId?: string } }
     | { to: '/chat/new', params?: undefined, search?: { issueId?: string } }
     | { to: '/chat/$sessionId', params: { sessionId: string }, search?: undefined }
-    | { to: '/diff', params?: undefined, search?: { workspace?: string, repo?: string, path?: string, review?: string, view?: 'commit' | 'guide' } }
+    | { to: '/diff', params?: undefined, search?: { workspace?: string, repo?: string, path?: string, review?: string } }
     | { to: '/workspaces/$workspaceId', params: { workspaceId: string }, search?: undefined }
-    | { to: '/workspaces/$workspaceId/diffs', params: { workspaceId: string }, search?: { repo?: string, path?: string, review?: string, view?: 'commit' | 'guide' } }
+    | { to: '/workspaces/$workspaceId/diffs', params: { workspaceId: string }, search?: { repo?: string, path?: string, review?: string } }
     | { to: '/kanban/$boardId', params: { boardId: string }, search?: { issue?: string, milestoneId?: string } }
     | { to: '/plugins/$routeSegment/$localId', params: { routeSegment: string, localId: string }, search?: undefined }
     | { to: '/plugins', params?: undefined, search?: undefined }
@@ -206,7 +206,6 @@ function surfaceRouteFromParts(
           repo: readString(search?.repo),
           path: readString(search?.path),
           review: readString(search?.review),
-          view: search?.view === 'commit' || search?.view === 'guide' ? search.view : undefined,
         },
       }
     case '/chat/$sessionId': {
@@ -231,7 +230,6 @@ function surfaceRouteFromParts(
               repo: readString(search?.repo),
               path: readString(search?.path),
               review: readString(search?.review),
-              view: search?.view === 'commit' || search?.view === 'guide' ? search.view : undefined,
             },
           }
         : null
@@ -335,7 +333,6 @@ export function surfaceDraftFromRoute(input: {
 
   const workspaceId = readString(params.workspaceId)
   if (input.pathname === '/diff') {
-    const view = search.view === 'commit' || search.view === 'guide' ? search.view : undefined
     return {
       id: diffSurfaceId(),
       kind: 'diff',
@@ -347,7 +344,6 @@ export function surfaceDraftFromRoute(input: {
           repo: readString(search.repo),
           path: readString(search.path),
           review: readString(search.review),
-          view,
         },
       },
       closable: true,
@@ -355,7 +351,6 @@ export function surfaceDraftFromRoute(input: {
   }
 
   if (input.pathname.startsWith('/workspaces/') && input.pathname.endsWith('/diffs') && workspaceId) {
-    const view = search.view === 'commit' || search.view === 'guide' ? search.view : undefined
     return {
       id: workspaceDiffsSurfaceId(workspaceId),
       kind: 'workspace-diffs',
@@ -367,7 +362,6 @@ export function surfaceDraftFromRoute(input: {
           repo: readString(search.repo),
           path: readString(search.path),
           review: readString(search.review),
-          view,
         },
       },
       closable: true,

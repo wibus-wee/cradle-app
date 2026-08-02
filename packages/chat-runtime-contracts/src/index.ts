@@ -145,6 +145,8 @@ export interface RuntimeOwnedProviderTarget {
   credentialRef: string | null
   enabledModelsJson: string
   customModelsJson: string
+  /** Runtime-owned targets are unbound unless a runtime explicitly sets identity. */
+  providerId: string | null
   sourceKey: string
   externalRecordId: string | null
   sourceFingerprint: string

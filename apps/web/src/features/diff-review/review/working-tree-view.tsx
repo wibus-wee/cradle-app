@@ -8,7 +8,6 @@ import {
   GitCommitLine as CommitIcon,
   Refresh2Line as RefreshIcon,
   SparklesLine as AgentIcon,
-  TerminalLine as PlanIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 
@@ -72,8 +71,6 @@ export interface WorkingTreeViewProps {
   refreshPending?: boolean
   /** Hand the staged (or selected) change to an agent instead of committing it. */
   onAskAgent?: () => void
-  /** Open the AI commit-grouping plan for these changes. */
-  onOpenCommitPlan?: () => void
   railWidth?: number
   diffSlot: ReactNode
 }
@@ -84,9 +81,9 @@ export interface WorkingTreeViewProps {
  * A staging-and-commit panel, not a review: the left rail lets you choose what
  * goes into the next commit, the composer at its foot writes the message, and
  * the button commits. The diff on the right is what you are deciding about. The
- * only escape hatches from "commit it yourself" are handing the change to an
- * agent or opening the grouped-commit plan — no approve, no reviewers, no review
- * state, because none of those mean anything for code you have not committed.
+ * only escape hatch from "commit it yourself" is handing the change to an
+ * agent — no approve, no reviewers, no review state, because none of those mean
+ * anything for code you have not committed.
  */
 export function WorkingTreeView({
   model,
@@ -106,7 +103,6 @@ export function WorkingTreeView({
   onRefresh,
   refreshPending = false,
   onAskAgent,
-  onOpenCommitPlan,
   railWidth = 300,
   diffSlot,
 }: WorkingTreeViewProps) {
@@ -170,11 +166,6 @@ export function WorkingTreeView({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {onOpenCommitPlan && (
-            <IconAction label="Group into commits" onClick={onOpenCommitPlan}>
-              <PlanIcon className="size-4" aria-hidden />
-            </IconAction>
-          )}
           <DiffStyleToggle value={diffStyle} onChange={onDiffStyleChange} />
           <IconAction label="Refresh" onClick={onRefresh} disabled={refreshPending}>
             <RefreshIcon className={cn('size-4', refreshPending && 'animate-spin')} aria-hidden />

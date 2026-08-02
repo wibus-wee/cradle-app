@@ -55,7 +55,7 @@ function PastedTextLifecycleHarness({
 }
 
 describe('pasted-text lifecycle', () => {
-  it('moves a large paste from composer card through send into expandable history', async () => {
+  it('moves a large paste from composer card through send into history popover', async () => {
     const onSubmit = vi.fn()
     const writeText = vi.fn().mockResolvedValue(undefined)
     Object.defineProperty(navigator, 'clipboard', {
@@ -88,8 +88,8 @@ describe('pasted-text lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy message' }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(largePaste))
 
-    fireEvent.click(within(historyCard).getByRole('button', { name: 'Expand pasted text' }))
-    expect(within(historyCard).getByLabelText('Preview pasted text').textContent).toBe(largePaste)
+    fireEvent.click(within(historyCard).getByRole('button', { name: 'Preview pasted text' }))
+    expect(screen.getByLabelText('Preview pasted text').textContent).toBe(largePaste)
   })
 
   it('restores a composer card into the editor without sending', async () => {

@@ -97,6 +97,14 @@ const codexWhamEndpointResult = t.Object({
   body: t.Any(),
 }, { additionalProperties: false })
 
+const providerConnectionStatus = t.Union([
+  t.Literal('ok'),
+  t.Literal('auth_failed'),
+  t.Literal('network_error'),
+  t.Literal('endpoint_error'),
+  t.Literal('model_unavailable'),
+])
+
 export const ProviderTargetsModel = {
   providerTarget: t.Object({
     id: t.String(),
@@ -315,5 +323,24 @@ export const ProviderTargetsModel = {
       t.Literal('alreadyRedeemed'),
     ]),
     consumedAt: t.Number(),
+  }, { additionalProperties: false }),
+
+  connectionTestBody: t.Object({
+    deep: t.Optional(t.Boolean()),
+    model: t.Optional(t.String({ minLength: 1 })),
+  }, { additionalProperties: false }),
+
+  connectionTestResult: t.Object({
+    status: providerConnectionStatus,
+    latencyMs: t.Number(),
+    checkedAt: t.String(),
+    modelsCount: t.Optional(t.Number()),
+    detail: t.Optional(t.String()),
+    deep: t.Optional(t.Boolean()),
+    model: t.Optional(t.String()),
+  }, { additionalProperties: false }),
+
+  noCachedConnectionTestResult: t.Object({
+    error: t.Literal('no_cached_result'),
   }, { additionalProperties: false }),
 }

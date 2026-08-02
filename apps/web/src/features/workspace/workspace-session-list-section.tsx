@@ -10,6 +10,7 @@ import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import type { WorkSummary } from '~/features/work/use-work'
 
+import type { Workspace } from './types'
 import type { WorkspaceSession } from './use-session'
 import type {
   WorkspaceSessionItemMenuRequest,
@@ -30,6 +31,8 @@ export type WorkspaceRuntimeIconByKind = ReadonlyMap<
 
 export interface WorkspaceSessionListSectionProps {
   workspaceId: string
+  variant?: 'workspace' | 'flat'
+  workspace?: Workspace
   sortedSessions: WorkspaceSession[]
   workByPrimarySessionId: ReadonlyMap<string, WorkSummary>
   renamingSessionId: string | null
@@ -53,6 +56,8 @@ export interface WorkspaceSessionListSectionProps {
 
 export function WorkspaceSessionListSection({
   workspaceId,
+  variant = 'workspace',
+  workspace,
   sortedSessions,
   workByPrimarySessionId,
   renamingSessionId,
@@ -158,6 +163,7 @@ export function WorkspaceSessionListSection({
   return (
     <WorkspaceSessionListView
       workspaceId={workspaceId}
+      variant={variant}
       sessionCount={sortedSessions.length}
       expanded={sessionListExpanded}
       hiddenSessionCount={hiddenSessionCount}
@@ -172,6 +178,7 @@ export function WorkspaceSessionListSection({
           <WorkspaceSessionItem
             key={session.id}
             session={session}
+            workspace={workspace}
             work={workByPrimarySessionId.get(session.id) ?? null}
             isStreaming={isStreaming}
             attentionKind={

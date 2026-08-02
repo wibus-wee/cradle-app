@@ -28,6 +28,7 @@ import { useSessionBinding } from '../session/use-session-binding'
 import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import {
   CRADLE_APPSHOT_SLASH_COMMAND,
+  CRADLE_INTENT_SLASH_COMMANDS,
   CRADLE_SIDE_CHAT_SLASH_COMMAND,
   projectRuntimeComposerSlashCommands,
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
@@ -227,7 +228,7 @@ export function useChatComposerRuntime({
       return withSlashCommandAvailability(CRADLE_APPSHOT_SLASH_COMMAND, undefined)
     })()
 
-    return [CRADLE_SIDE_CHAT_SLASH_COMMAND, appshotCommand]
+    return [CRADLE_SIDE_CHAT_SLASH_COMMAND, ...CRADLE_INTENT_SLASH_COMMANDS, appshotCommand]
   }, [supportsAttachments])
   const mapRuntimeUiSlotCommand = useCallback(
     (command: ChatComposerSlashCommand) => {

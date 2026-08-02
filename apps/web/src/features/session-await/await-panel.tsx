@@ -827,7 +827,7 @@ function JavaScriptAwaitCard({ awaitRow, sessionId }: { awaitRow: AwaitRow, sess
       observation={observation}
       lastCheckedAt={lastCheckedAt}
       consecutiveErrors={consecutiveErrors}
-      matchedText={preview?.ok && preview.matched === true ? preview.resumeText : null}
+      matchedText={preview?.ok && preview.matched === true ? preview.resumeText ?? null : null}
       previewErrorText={previewErrorText}
       isRunning={evaluateMutation.isPending}
       onRunNow={isPending ? () => evaluateMutation.mutate({ path: { id: awaitRow.id } }) : undefined}

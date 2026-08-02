@@ -68,6 +68,16 @@ function areContextPartsEqual(left: ChatContextPart[], right: ChatContextPart[])
       )
     }
 
+    if (leftPart.type === 'data-cradle-intent') {
+      return (
+        rightPart.type === 'data-cradle-intent'
+        && leftPart.intentId === rightPart.intentId
+        && leftPart.name === rightPart.name
+        && leftPart.label === rightPart.label
+        && leftPart.prompt === rightPart.prompt
+      )
+    }
+
     if (leftPart.type === 'data-cradle-file-line-comment') {
       return (
         rightPart.type === 'data-cradle-file-line-comment'

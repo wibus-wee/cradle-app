@@ -647,14 +647,14 @@ describe('issue-agent capability', () => {
         revision: number
         rows: Array<{
           role: string
-          content: string
+          preview: string
           status: string
         }>
       }
       expect(messages.at(-1)).toEqual(
         expect.objectContaining({
           role: 'assistant',
-          content: 'Hello from delegated run 1',
+          preview: 'Hello from delegated run 1',
           status: 'complete',
         }),
       )
@@ -711,11 +711,11 @@ describe('issue-agent capability', () => {
         revision: number
         rows: Array<{
           role: string
-          content: string
+          preview: string
         }>
       }
       expect(rerunMessages.at(-1)).toEqual(
-        expect.objectContaining({ role: 'assistant', content: 'Hello from delegated run 2' }),
+        expect.objectContaining({ role: 'assistant', preview: 'Hello from delegated run 2' }),
       )
 
       const undelegateRes = await app.handle(
@@ -1267,7 +1267,7 @@ describe('issue-agent capability', () => {
         revision: number
         rows: Array<{
           role: string
-          content: string
+          preview: string
           status: string
         }>
       }
@@ -1275,12 +1275,12 @@ describe('issue-agent capability', () => {
         expect.arrayContaining([
           expect.objectContaining({
             role: 'user',
-            content: 'Continue with follow-up work',
+            preview: 'Continue with follow-up work',
             status: 'complete',
           }),
           expect.objectContaining({
             role: 'assistant',
-            content: 'Queued continuation done',
+            preview: 'Queued continuation done',
             status: 'complete',
           }),
         ]),

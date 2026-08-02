@@ -3,12 +3,14 @@ import { useEffect } from 'react'
 import { Skeleton } from '~/components/ui/skeleton'
 import type { KanbanIssue } from '~/features/kanban/types'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
+import { useWorkspaces } from '~/features/workspace/use-workspace'
 import { authorizeDangerousAction } from '~/lib/electron'
 
 import { useDeleteIssue, useIssue, useMilestones, useStatuses, useUpdateIssue } from '../use-kanban'
 import { ActivityTimeline } from './activity-timeline'
 import { IssueDescription } from './issue-description'
 import { IssueHeader } from './issue-header'
+import { IssueKeyBadge } from './issue-key-badge'
 import { IssueTitle } from './issue-title'
 import { MilestoneBanner } from './milestone-banner'
 import { calculateMilestoneProgress } from './milestone-progress'
@@ -40,6 +42,7 @@ export function IssueDetail({
   const { data: loadedIssue, isLoading, isError, error } = useIssue(issueId, shouldLoadIssue)
   const { data: statuses = [] } = useStatuses(workspaceId)
   const { data: milestones = [] } = useMilestones(workspaceId)
+  const { workspaces } = useWorkspaces()
   const updateIssue = useUpdateIssue()
   const deleteIssue = useDeleteIssue()
   const issue = issueOverride ?? loadedIssue
@@ -173,6 +176,8 @@ export function IssueDetail({
       <IssueHeader
         issue={issue}
         status={statuses.find(s => s.id === issue.statusId)}
+        statuses={statuses}
+        workspaces={workspaces}
         parentIssue={parentIssue}
         completedSubIssueCount={completedSubIssueCount}
         totalSubIssueCount={subIssues.length}
@@ -190,6 +195,7 @@ export function IssueDetail({
         {/* Main content */}
         <div className="flex-1 overflow-y-auto px-10 py-6">
           <div>
+            <IssueKeyBadge issue={issue} workspaces={workspaces} />
             <IssueTitle issue={issue} onUpdate={handleUpdate} readOnly={readOnly} />
 
             {currentMilestone && (
@@ -207,6 +213,7 @@ export function IssueDetail({
                 issueId={issueId}
                 workspaceId={workspaceId}
                 statuses={statuses}
+                workspaces={workspaces}
                 onOpenIssue={onOpenIssue}
                 readOnly={readOnly}
               />

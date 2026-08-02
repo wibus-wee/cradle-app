@@ -43,6 +43,7 @@ const PROJECT_SORT_OPTIONS: readonly WorkspaceSidebarProjectSortKey[] = [
   'name',
   'updatedAt',
   'createdAt',
+  'recentSession',
 ]
 const PROJECT_SORT_DIRECTION_OPTIONS:
 readonly WorkspaceSidebarProjectSortDirection[] = ['asc', 'desc']
@@ -169,7 +170,11 @@ export function WorkspaceProjectsSectionView({
     <div className="flex min-w-0 flex-col">
       <div className="flex items-center px-2.5 py-1.5">
         <span className="flex-1 select-none text-[11px] font-medium text-muted-foreground">
-          {t('sidebar.projects.title')}
+          {t(
+            projectSortKey === 'recentSession'
+              ? 'sidebar.projects.recentTitle'
+              : 'sidebar.projects.title',
+          )}
         </span>
         <div className="flex items-center gap-0.5">
           {hasUnreadWorkspaceSessions

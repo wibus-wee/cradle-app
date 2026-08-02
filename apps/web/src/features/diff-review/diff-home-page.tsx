@@ -45,7 +45,6 @@ export interface DiffHomePageProps {
   repo?: string
   path?: string
   review?: string
-  view?: 'commit' | 'guide'
   line?: number
   side?: 'base' | 'head'
   github?: string
@@ -57,7 +56,6 @@ export function DiffHomePage({
   repo,
   path,
   review,
-  view,
   line,
   side,
   github,
@@ -224,7 +222,6 @@ export function DiffHomePage({
                 repo={repo}
                 path={path}
                 review={review}
-                view={view}
                 line={line}
                 side={side}
                 github={github}

@@ -8,10 +8,7 @@ import {
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFixIdRerun,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgentFixIdStart,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdClose,
-  postWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanIdApply,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdFilesByFileIdViewed,
-  postWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideCancel,
-  postWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerate,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdMerge,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdRefresh,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdSubmit,
@@ -19,7 +16,6 @@ import {
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdComments,
   postWorkspacesByWorkspaceIdDiffReviewsByReviewIdThreadsByThreadIdResolve,
   postWorkspacesByWorkspaceIdDiffReviewsLocalWorkingTree,
-  putWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanId,
   putWorkspacesByWorkspaceIdDiffReviewsPreferences,
 } from '~/api-gen/sdk.gen'
 import { toastManager } from '~/components/ui/toast'
@@ -33,9 +29,6 @@ import { reviewListQueryKey, reviewQueryKey } from './diff-items'
 import type {
   CradleDiffReview,
   DiffStyle,
-  EditableCommitPlanStatus,
-  GenerateGuideInput,
-  ReviewCommitPlanGroup,
   ReviewDecision,
   ReviewThreadAnchorInput,
 } from './types'
@@ -118,9 +111,8 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
     ...queryRefreshPolicies.active,
     refetchInterval: (query) => {
       const review = query.state.data as CradleDiffReview | undefined
-      const guideActive = review?.guide.status === 'pending' || review?.guide.status === 'running'
       const agentFixActive = review?.agentFixes.some(fix => fix.status === 'running') ?? false
-      return guideActive || agentFixActive
+      return agentFixActive
         ? 1_500
         : queryRefreshPolicies.active.refetchInterval
     },
@@ -305,70 +297,13 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
     onError: reportMutationError('Update display preferences'),
   })
 
-  const commitPlanUpdateMutation = useMutation({
-    mutationFn: async (input: {
-      planId: string
-      groups: ReviewCommitPlanGroup[]
-      rationale: string
-      status: EditableCommitPlanStatus
-    }) => {
-      const review = reviewQuery.data
-      if (!review) {
-        throw new Error('Review not loaded')
-      }
-      const { data } = await putWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanId({
-        path: { workspaceId, reviewId: review.id, commitPlanId: input.planId },
-        body: {
-          groups: input.groups.map(group => ({
-            id: group.id,
-            title: group.title,
-            message: group.message,
-            rationale: group.rationale,
-            fileIds: group.fileIds,
-            paths: group.paths,
-            dependsOn: group.dependsOn,
-          })),
-          rationale: input.rationale,
-          status: input.status,
-        },
-        throwOnError: true,
-      })
-      return data
-    },
-    onSuccess: (data) => {
-      applyReview(data)
-      invalidateList()
-    },
-    onError: reportMutationError('Update commit plan'),
-  })
-
-  const commitPlanApplyMutation = useMutation({
-    mutationFn: async (planId: string) => {
-      const review = reviewQuery.data
-      if (!review) {
-        throw new Error('Review not loaded')
-      }
-      const { data } = await postWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanIdApply({
-        path: { workspaceId, reviewId: review.id, commitPlanId: planId },
-        body: {},
-        throwOnError: true,
-      })
-      return data
-    },
-    onSuccess: (data) => {
-      applyReview(data)
-      invalidateList()
-    },
-    onError: reportMutationError('Apply commit plan'),
-  })
-
   const createAgentFixMutation = useMutation({
     mutationFn: async (input: {
       threadId?: string | null
       anchor?: ReviewThreadAnchorInput | null
       instruction: string
       agentId?: string | null
-      expectedOutput: 'commit' | 'working-tree-change' | 'patch-artifact'
+      expectedOutput: 'working-tree-change' | 'patch-artifact'
     }) => {
       const review = reviewQuery.data
       if (!review) {
@@ -499,55 +434,6 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
     onError: reportMutationError('Delete agent fix'),
   })
 
-  /**
-   * On-demand change walkthrough generation. This spends tokens, so it is strictly user-initiated —
-   * never auto-triggered. `force` re-generates over an existing guide.
-   */
-  const generateGuideMutation = useMutation({
-    mutationFn: async (input: GenerateGuideInput) => {
-      const review = reviewQuery.data
-      if (!review) {
-        throw new Error('Review not loaded')
-      }
-      const { data } = await postWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerate({
-        path: { workspaceId, reviewId: review.id },
-        body: {
-          providerTargetId: input.providerTargetId,
-          runtimeKind: input.runtimeKind,
-          modelId: input.modelId ?? null,
-          force: input.force,
-          outputLocale: input.outputLocale ?? currentOutputLocale(),
-        },
-        throwOnError: true,
-      })
-      return data
-    },
-    onSuccess: (data) => {
-      applyReview(data)
-      invalidateList()
-    },
-    onError: reportMutationError('Generate guide'),
-  })
-
-  const cancelGuideMutation = useMutation({
-    mutationFn: async () => {
-      const review = reviewQuery.data
-      if (!review) {
-        throw new Error('Review not loaded')
-      }
-      const { data } = await postWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideCancel({
-        path: { workspaceId, reviewId: review.id },
-        throwOnError: true,
-      })
-      return data
-    },
-    onSuccess: (data) => {
-      applyReview(data)
-      invalidateList()
-    },
-    onError: reportMutationError('Cancel guide'),
-  })
-
   return {
     review: reviewQuery.data ?? null,
     isLoading: reviewQuery.isLoading,
@@ -562,14 +448,10 @@ export function useReview({ workspaceId, repositoryPath, reviewId }: UseReviewAr
     closeReviewMutation,
     mergeMutation,
     preferenceMutation,
-    commitPlanUpdateMutation,
-    commitPlanApplyMutation,
     createAgentFixMutation,
     startAgentFixMutation,
     cancelAgentFixMutation,
     rerunAgentFixMutation,
     deleteAgentFixMutation,
-    generateGuideMutation,
-    cancelGuideMutation,
   }
 }

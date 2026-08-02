@@ -30,6 +30,10 @@ import {
 } from '../provider-contracts/claude-agent-config'
 import type { ProviderKind } from '../provider-contracts/types'
 import { upsertSecretInDb } from '../secrets/service'
+import {
+  createLocalAgentConfigExternalProviderSource,
+  LOCAL_AGENT_CONFIG_SOURCE_OWNER,
+} from './local-agent-config-source'
 
 export interface ExternalProviderSourceView {
   id: string
@@ -795,6 +799,16 @@ export async function refreshDirectExternalProviderSource(
     input.source,
     input.sharedConfig ?? new Map(),
   )
+}
+
+// One-shot persisted scan of local agent configs for the Providers screen. Unlike the
+// agent-identity import, this only syncs external source/record rows and runtime targets;
+// it never creates agent records.
+export async function scanLocalAgentConfigs(): Promise<ExternalProviderRefreshResult> {
+  return refreshDirectExternalProviderSource({
+    owner: LOCAL_AGENT_CONFIG_SOURCE_OWNER,
+    source: createLocalAgentConfigExternalProviderSource(),
+  })
 }
 
 export async function refreshExternalProviderSource(

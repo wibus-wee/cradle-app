@@ -44,6 +44,7 @@
     "@agentclientprotocol/sdk": "^1.2.1",
     "@ai-sdk/openai": "^3.0.53",
     "@base-ui/react": "^1.4.0",
+    "@cradle/cli": "link:packages/cli",
     "@cradle/ipc": "workspace:*",
     "@dnd-kit/dom": "^0.5.0",
     "@dnd-kit/helpers": "^0.5.0",

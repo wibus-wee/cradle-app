@@ -5,7 +5,8 @@ import { persistStorage } from '~/store/persist-storage'
 
 type WorkspaceSidebarFlagMap = Record<string, true>
 
-export type WorkspaceSidebarProjectSortKey = 'name' | 'updatedAt' | 'createdAt'
+export type WorkspaceSidebarProjectSortKey
+  = 'name' | 'updatedAt' | 'createdAt' | 'recentSession'
 export type WorkspaceSidebarProjectSortDirection = 'asc' | 'desc'
 
 export type WorkspaceSidebarProjectScope = 'all' | 'pinned'
@@ -117,7 +118,12 @@ const PROJECT_SCOPES = new Set<WorkspaceSidebarProjectScope>(['all', 'pinned'])
 const STATUS_FILTERS = new Set<WorkspaceSidebarStatusFilter>(WORKSPACE_SIDEBAR_STATUS_FILTERS)
 const WORK_PR_FILTERS = new Set<WorkspaceSidebarWorkPrFilter>(WORKSPACE_SIDEBAR_WORK_PR_FILTERS)
 const SOURCE_FILTERS = new Set<WorkspaceSidebarSourceFilter>(WORKSPACE_SIDEBAR_SOURCE_FILTERS)
-const PROJECT_SORT_KEYS = new Set<WorkspaceSidebarProjectSortKey>(['name', 'updatedAt', 'createdAt'])
+const PROJECT_SORT_KEYS = new Set<WorkspaceSidebarProjectSortKey>([
+  'name',
+  'updatedAt',
+  'createdAt',
+  'recentSession',
+])
 const PROJECT_SORT_DIRECTIONS = new Set<WorkspaceSidebarProjectSortDirection>(['asc', 'desc'])
 const LEGACY_PROJECT_FILTERS = new Set<WorkspaceSidebarProjectFilter>([
   'all',

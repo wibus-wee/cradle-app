@@ -25,7 +25,7 @@ const TOAST_ICONS = {
 const TOAST_ICON_COLORS: Record<keyof typeof TOAST_ICONS, string> = {
   error: "text-destructive",
   info: "text-info",
-  loading: "animate-spin text-foreground opacity-80",
+  loading: "animate-spin text-muted-foreground",
   success: "text-success",
   warning: "text-warning",
 };
@@ -141,7 +141,7 @@ function Toasts({ position }: { position: ToastPosition }): React.ReactElement {
               key={toast.id}
               className={cn(
                 // Base: floating surface
-                "absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full select-none rounded-xl border border-border/50 bg-popover/95 backdrop-blur-sm text-popover-foreground shadow-lg [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s] data-expanded:bg-popover",
+                "absolute z-[calc(9999-var(--toast-index))] h-(--toast-calc-height) w-full select-none rounded-xl bg-popover/95 backdrop-blur-sm text-popover-foreground shadow-[var(--shadow-lg)] [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s] data-expanded:bg-popover",
                 // Stacking + positioning
                 TOAST_ROOT_POSITION_CLASSES,
                 replayClassName,
@@ -183,7 +183,7 @@ function Toasts({ position }: { position: ToastPosition }): React.ReactElement {
                     </Toast.Action>
                   )}
                   <Toast.Close
-                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-[--color-text-dim] transition-colors hover:text-secondary-foreground"
+                    className="flex size-6 shrink-0 items-center justify-center rounded-md text-text-dim transition-colors hover:text-foreground"
                     aria-label="Dismiss"
                   >
                     <XIcon className="size-3.5" />

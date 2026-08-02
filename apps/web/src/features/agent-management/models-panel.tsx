@@ -7,7 +7,6 @@ import type { TFunction } from 'i18next'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Input } from '~/components/ui/input'
@@ -80,30 +79,17 @@ function applyRegistryResult(
   }
 }
 
-type RegistryStatus = 'exact' | 'fuzzy' | 'manual' | 'alias' | 'unmatched'
-
-function registryStatusLabel(model: ModelDescriptor): RegistryStatus {
+function isRegistryUnmatched(model: ModelDescriptor): boolean {
   switch (model.capabilities.registryMatch) {
     case 'exact':
-      return 'exact'
     case 'fuzzy':
-      return 'fuzzy'
     case 'manual':
-      return 'manual'
     case 'alias':
-      return 'alias'
+      return false
     default:
-      return 'unmatched'
+      return true
   }
 }
-
-const REGISTRY_STATUS_KEYS = {
-  exact: 'models.registry.status.exact',
-  fuzzy: 'models.registry.status.fuzzy',
-  manual: 'models.registry.status.manual',
-  alias: 'models.registry.status.alias',
-  unmatched: 'models.registry.status.unmatched',
-} as const
 
 export function ModelsPanel({
   loading,
@@ -280,7 +266,23 @@ export function ModelsPanel({
             <ul className="divide-y divide-foreground/4">
               {visible.map((m) => {
                 const checked = isChecked(m.id)
-                const registryStatus = registryStatusLabel(m)
+                const unmatched = isRegistryUnmatched(m)
+                const metaParts: string[] = []
+                if (m.capabilities.contextWindow != null && m.capabilities.contextWindow > 0) {
+                  metaParts.push(`${Math.round(m.capabilities.contextWindow / 1000)}k ctx`)
+                }
+                if (m.capabilities.reasoning) {
+                  metaParts.push(t('models.manual.capability.reasoning'))
+                }
+                if (m.capabilities.toolCall) {
+                  metaParts.push(t('models.manual.capability.tools'))
+                }
+                if (m.capabilities.inputModalities?.includes('image')) {
+                  metaParts.push(t('models.manual.capability.imageInput'))
+                }
+                if (m.capabilities.registryModelId && m.capabilities.registryModelId !== m.id) {
+                  metaParts.push(`models.dev: ${m.capabilities.registryModelId}`)
+                }
                 return (
                   <li key={occurrenceKey(m.id, modelKeyCounts)}>
                     <div
@@ -302,39 +304,18 @@ export function ModelsPanel({
                             {m.id}
                           </div>
                         )}
-                        {m.capabilities.registryModelId
-                          && m.capabilities.registryModelId !== m.id && (
-                            <div className="truncate text-[10.5px] text-muted-foreground/70">
-                              models.dev:
-{' '}
-                              <span className="font-mono">{m.capabilities.registryModelId}</span>
-                            </div>
-                          )}
-                      </div>
-                      <Badge
-                        variant="secondary"
-                        className={cn(
-                          'text-[10px] font-normal tabular-nums',
-                          registryStatus === 'exact'
-                          && 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-                          registryStatus === 'fuzzy'
-                          && 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-                          registryStatus === 'manual'
-                          && 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-                          registryStatus === 'unmatched' && 'text-muted-foreground',
+                        {(metaParts.length > 0 || unmatched) && (
+                          <div className="truncate text-[10.5px] text-muted-foreground/70">
+                            {metaParts.join(' · ')}
+                            {unmatched && (
+                              <span className="text-amber-600 dark:text-amber-400">
+                                {metaParts.length > 0 ? ' · ' : ''}
+                                {t('models.registry.status.unmatched')}
+                              </span>
+                            )}
+                          </div>
                         )}
-                      >
-                        {t(REGISTRY_STATUS_KEYS[registryStatus])}
-                      </Badge>
-                      {m.capabilities.contextWindow != null && m.capabilities.contextWindow > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="font-mono text-[10px] font-normal tabular-nums text-muted-foreground"
-                        >
-                          {Math.round(m.capabilities.contextWindow / 1000)}
-k
-                        </Badge>
-                      )}
+                      </div>
                       <Button
                         type="button"
                         size="icon-xs"

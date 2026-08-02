@@ -3,7 +3,7 @@
 This module owns host-side persistence of plugin-provided provider source snapshots and external provider targets.
 
 - `index.ts`: HTTP routes for listing sources, refreshing sources, listing source records, and reading external provider target metadata.
-- `local-agent-config-source.ts`: Onboarding utility that reads allowlisted local Claude/Codex config files and scans Gemini, Pi, and Kimi CLI commands into an `ExternalProviderSourceSnapshot`; it is intentionally not registered on startup yet.
+- `local-agent-config-source.ts`: Onboarding utility that reads allowlisted local Claude/Codex config files and scans Gemini, Pi, and Kimi CLI commands into an `ExternalProviderSourceSnapshot`; it is intentionally not registered on startup yet. It is exercised as a one-shot persisted scan via `POST /external-provider-sources/local-scan` (providers-only; no agent records) and via the agent-identity local-config import flow, both under the shared owner namespace `LOCAL_AGENT_CONFIG_SOURCE_OWNER`.
 - `model.ts`: Elysia response schemas for the fixed external provider source API.
 - `service.ts`: Snapshot validation, source persistence, registered-plus-persisted source listing, direct onboarding source refresh, `provider_targets(kind = 'external')` projection, secret upsert, missing-record handling, runtime preference preservation, disabled-target agent shutdown, and view serialization.
 

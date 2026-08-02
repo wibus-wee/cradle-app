@@ -33,6 +33,7 @@ import { SettingsRow } from '../settings/settings-row'
 import { ClaudeModelMatrixEditor } from './claude-model-matrix-editor'
 import { CustomModelsEditor } from './custom-models-editor'
 import { ModelsPanel } from './models-panel'
+import { ProviderConnectionTestControls } from './provider-connection-test'
 import type {
   ExternalProviderRecordView,
   ExternalProviderRuntimeTargetView,
@@ -537,6 +538,15 @@ export function ExternalProviderRecordDetailPanel({
             <Separator className="bg-foreground/6" />
             <SettingsRow label="Default model" description="Model selected in the source app">
               <span className="font-mono text-[12px] text-foreground">{metadata.model}</span>
+            </SettingsRow>
+          </>
+        )}
+
+        {record.providerTargetId && (
+          <>
+            <Separator className="bg-foreground/6" />
+            <SettingsRow label="Connection test" description="Probe the endpoint and credentials on demand">
+              <ProviderConnectionTestControls providerTargetId={record.providerTargetId} />
             </SettingsRow>
           </>
         )}

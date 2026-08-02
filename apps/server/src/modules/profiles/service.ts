@@ -2,6 +2,7 @@ import type { ProviderTarget } from '@cradle/db'
 import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
+import { getProviderContribution } from '../provider-catalog/provider-registry'
 import type { ModelCapabilities, ProviderKind } from '../provider-contracts/types'
 import * as ProviderTargets from '../provider-targets/service'
 
@@ -15,6 +16,7 @@ export interface UpsertProfileInput {
   configJson: string
   credentialRef: string | null
   iconSlug?: string | null
+  providerId?: string | null
 }
 
 export interface AgentProfile {
@@ -26,6 +28,7 @@ export interface AgentProfile {
   credentialRef: string | null
   customModels: string
   iconSlug: string | null
+  providerId: string | null
   createdAt: number
   updatedAt: number
 }
@@ -40,6 +43,7 @@ function toProfile(target: ProviderTarget): AgentProfile {
     credentialRef: target.credentialRef,
     customModels: target.customModelsJson,
     iconSlug: target.iconSlug,
+    providerId: target.providerId ?? null,
     createdAt: target.createdAt,
     updatedAt: target.updatedAt,
   }
@@ -113,7 +117,82 @@ export function upsertProfile(input: UpsertProfileInput): AgentProfile {
     connectionConfigJson: input.configJson,
     credentialRef: input.credentialRef,
     iconSlug: input.iconSlug,
+    providerId: input.providerId,
   }))
+}
+
+/**
+ * Explicitly bind a manual profile to a Provider contribution id.
+ * Never infers identity from baseUrl. Optional applyEndpointDefaults rewrites
+ * connection URLs from the contribution defaults when the client opts in.
+ */
+export function bindProfileProvider(
+  profileId: string,
+  input: { providerId: string, applyEndpointDefaults?: boolean },
+): AgentProfile {
+  assertManualProfileOperation(profileId)
+  const existing = getProfile(profileId)
+  if (!existing) {
+    throw new AppError({
+      code: 'profile_not_found',
+      status: 404,
+      message: 'Profile not found',
+      details: { profileId },
+    })
+  }
+  const providerId = input.providerId.trim()
+  if (!providerId) {
+    throw new AppError({
+      code: 'invalid_profile_input',
+      status: 400,
+      message: 'providerId is required',
+    })
+  }
+
+  const contribution = getProviderContribution(providerId)
+  if (!contribution) {
+    throw new AppError({
+      code: 'invalid_profile_input',
+      status: 400,
+      message: `Unknown providerId: ${providerId}`,
+      details: { providerId },
+    })
+  }
+
+  let configJson = existing.configJson
+  let providerKind = existing.providerKind
+  if (input.applyEndpointDefaults) {
+    providerKind = contribution.defaultWireKind
+    const config = JSON.parse(existing.configJson) as Record<string, unknown>
+    if (contribution.defaultWireKind === 'universal') {
+      const openai = contribution.endpointProfiles.find(p => p.id === 'openai')?.defaultBaseUrl ?? ''
+      const anthropic = contribution.endpointProfiles.find(p => p.id === 'anthropic')?.defaultBaseUrl ?? ''
+      configJson = JSON.stringify({
+        ...config,
+        openaiBaseUrl: openai,
+        anthropicBaseUrl: anthropic,
+        baseUrl: openai || anthropic || null,
+      })
+    }
+    else {
+      const baseUrl = contribution.endpointProfiles[0]?.defaultBaseUrl ?? ''
+      configJson = JSON.stringify({
+        ...config,
+        baseUrl: baseUrl || null,
+      })
+    }
+  }
+
+  return upsertProfile({
+    id: profileId,
+    name: existing.name,
+    providerKind,
+    enabled: existing.enabled,
+    configJson,
+    credentialRef: existing.credentialRef,
+    iconSlug: existing.iconSlug,
+    providerId,
+  })
 }
 
 export function updateIcon(profileId: string, iconSlug: string | null): AgentProfile {

@@ -1,5 +1,5 @@
 import type { MarkdownComponents } from '@cradle/streamdown'
-import { remarkCodeComment, Streamdown } from '@cradle/streamdown'
+import { remarkCodeComment, remarkCommitGroup, Streamdown } from '@cradle/streamdown'
 import type { ComponentType } from 'react'
 import { useMemo } from 'react'
 
@@ -22,14 +22,19 @@ import type { CodeCommentMarkdownProps } from './message-code-comment'
 import {
   MessageCodeComment,
 } from './message-code-comment'
+import type { CommitGroupMarkdownProps } from './message-commit-group'
+import {
+  MessageCommitGroup,
+} from './message-commit-group'
 
 export interface MessageTextPartByIdProps { sessionId: string, messageId: string, partIndex: number, isUser: boolean, isActiveStreamingSegment: boolean, textTransform?: MessageTextTransform }
 
 type MessageMarkdownComponents = MarkdownComponents & {
   'code-comment': ComponentType<CodeCommentMarkdownProps>
+  'commit-group': ComponentType<CommitGroupMarkdownProps>
 }
 
-const CODE_COMMENT_REMARK_PLUGINS = [remarkCodeComment]
+const MESSAGE_DIRECTIVE_REMARK_PLUGINS = [remarkCodeComment, remarkCommitGroup]
 
 export function MessageTextPartById({ sessionId, messageId, partIndex, isUser, isActiveStreamingSegment, textTransform }: MessageTextPartByIdProps) {
   const displayPart = useMessagePartAt(partIndex)
@@ -54,6 +59,7 @@ export function MessageTextPartById({ sessionId, messageId, partIndex, isUser, i
   const markdownComponents = useMemo<MessageMarkdownComponents>(() => ({
     'a': props => <MarkdownFileLink {...readMarkdownAnchorProps(props)} sessionId={sessionId} />,
     'code-comment': props => <MessageCodeComment {...props} sessionId={sessionId} />,
+    'commit-group': props => <MessageCommitGroup {...props} sessionId={sessionId} />,
   }), [sessionId])
 
   if (isUser) {
@@ -82,7 +88,7 @@ export function MessageTextPartById({ sessionId, messageId, partIndex, isUser, i
         showCursor={STREAMDOWN_RENDER_OPTIONS.showCursor}
         animated={text.length <= MESSAGE_STREAMING_ANIMATION_MAX_CHARS}
         components={markdownComponents}
-        remarkPlugins={CODE_COMMENT_REMARK_PLUGINS}
+        remarkPlugins={MESSAGE_DIRECTIVE_REMARK_PLUGINS}
       />
       {overflow && (
         <BlobOverflowNotice

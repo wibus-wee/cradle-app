@@ -24,6 +24,8 @@ export const providerTargets = sqliteTable('provider_targets', {
   credentialRef: text('credential_ref'),
   enabledModelsJson: text('enabled_models_json').notNull().default('[]'),
   customModelsJson: text('custom_models_json').notNull().default('[]'),
+  /** Integration identity; null = unbound (API Key auth UI only). Never inferred from URL. */
+  providerId: text('provider_id'),
   sourceKey: text('source_key'),
   externalRecordId: text('external_record_id'),
   sourceFingerprint: text('source_fingerprint'),

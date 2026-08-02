@@ -1,3 +1,4 @@
+import { AnimatePresence, m } from 'motion/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -42,6 +43,13 @@ import {
   useStatuses,
 } from './use-kanban'
 import { useKanbanKeyboard } from './use-kanban-keyboard'
+
+const ISSUE_DETAIL_SPRING = {
+  type: 'spring',
+  stiffness: 500,
+  damping: 42,
+  mass: 0.8,
+} as const
 
 interface KanbanViewProps {
   board: KanbanBoard
@@ -561,18 +569,29 @@ export function KanbanView({
         />
       </div>
 
-      {selectedIssueId && (
-        <IssueDetail
-          issueId={selectedIssueId}
-          workspaceId={workspaceId}
-          issues={nativeIssues}
-          issueOverride={openedExternalIssue}
-          readOnly={Boolean(openedExternalIssue)}
-          onOpenIssue={openIssue}
-          onOpenMilestone={handleOpenMilestone}
-          onBack={() => onSelectIssue?.(null)}
-        />
-      )}
+      <AnimatePresence>
+        {selectedIssueId && (
+          <m.div
+            key="issue-detail"
+            className="flex flex-1 flex-col overflow-hidden"
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 8 }}
+            transition={ISSUE_DETAIL_SPRING}
+          >
+            <IssueDetail
+              issueId={selectedIssueId}
+              workspaceId={workspaceId}
+              issues={nativeIssues}
+              issueOverride={openedExternalIssue}
+              readOnly={Boolean(openedExternalIssue)}
+              onOpenIssue={openIssue}
+              onOpenMilestone={handleOpenMilestone}
+              onBack={() => onSelectIssue?.(null)}
+            />
+          </m.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

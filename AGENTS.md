@@ -180,6 +180,7 @@ function Button({ variant = 'primary', size = 'md', className, ...props }: Butto
 
 - **Always use Drizzle**: For database interactions, use Drizzle ORM to ensure type safety and consistency. Avoid raw SQL queries or other database libraries. Use drizzle-kit for schema management and migrations.
 - **During code review**: Check for missing or outdated documentation
+- **Do not run full tests**: Avoid running the entire test suite unless necessary. Focus on relevant tests for the changes made.
 
 ## Pull Request
 

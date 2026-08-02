@@ -372,6 +372,20 @@
       "when": 1785393864632,
       "tag": "0052_majestic_marvex",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "6",
+      "when": 1785500000000,
+      "tag": "0053_drop_diff_review_guides_and_commit_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "6",
+      "when": 1785600000000,
+      "tag": "0054_provider_targets_provider_id",
+      "breakpoints": true
     }
   ]
 }

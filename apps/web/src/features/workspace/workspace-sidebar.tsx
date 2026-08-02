@@ -97,6 +97,7 @@ import {
   WorkspaceMultiFolderDialog,
 } from './workspace-multi-folder-dialog'
 import { WorkspaceProjectsSectionView } from './workspace-projects-section-view'
+import { WorkspaceRecentSessionListView } from './workspace-recent-session-list-view'
 import {
   WorkspaceRecognitionDialogView,
 } from './workspace-recognition-dialog-view'
@@ -140,6 +141,11 @@ const EMPTY_WORK_BY_PRIMARY_SESSION_ID = new Map<string, WorkSummary>()
 
 type SessionAttentionKind = WorkspaceSessionAttentionKind
 const EMPTY_ATTENTION_BY_SESSION_ID = new Map<string, SessionAttentionKind>()
+
+interface RecentWorkspaceSession {
+  session: WorkspaceSession
+  workspace: Workspace
+}
 
 function formatToastError(error: unknown): string {
   if (error instanceof Error) {
@@ -200,6 +206,7 @@ const WorkspaceGroup = memo(
   ({
     workspace,
     sessions,
+    flatSession = false,
     listFilters,
     workByPrimarySessionId,
     runtimeIconByKind,
@@ -208,6 +215,7 @@ const WorkspaceGroup = memo(
   }: {
     workspace: Workspace
     sessions: WorkspaceSession[]
+    flatSession?: boolean
     listFilters: WorkspaceSidebarListFilters
     workByPrimarySessionId: ReadonlyMap<string, WorkSummary>
     runtimeIconByKind: RuntimeIconByKind
@@ -853,87 +861,118 @@ const WorkspaceGroup = memo(
       ],
     )
 
+    const overlays = (
+      <>
+        <WorkspaceTextInputDialogView
+          open={renameOpen}
+          title={t('workspace.dialog.renameTitle')}
+          initialValue={workspace.name}
+          label={t('workspace.dialog.nameLabel')}
+          confirmLabel={t('workspace.dialog.rename')}
+          onOpenChange={setRenameOpen}
+          onCommit={handleRenameWorkspace}
+        />
+        <MigrateWorkspaceDialog
+          open={migrateOpen}
+          onOpenChange={setMigrateOpen}
+          sourceWorkspaceId={workspace.id}
+        />
+        <WorkspaceTextInputDialogView
+          open={createRequest !== null}
+          title={
+            createRequest?.kind === 'folder'
+              ? t('workspace.dialog.newFolderTitle')
+              : t('workspace.dialog.newFileTitle')
+          }
+          initialValue={
+            createRequest?.kind === 'folder'
+              ? DEFAULT_WORKSPACE_FOLDER_NAME
+              : DEFAULT_WORKSPACE_FILE_NAME
+          }
+          label={t('workspace.dialog.nameLabel')}
+          confirmLabel={t('workspace.dialog.create')}
+          onOpenChange={handleOpenCreateDialogChange}
+          onCommit={handleCreateWorkspaceChild}
+        />
+        <WorkspaceTextInputDialogView
+          open={createGroupOpen}
+          title={t('sessionGroup.dialog.createTitle')}
+          initialValue=""
+          label={t('sessionGroup.dialog.titleLabel')}
+          confirmLabel={t('sessionGroup.dialog.create')}
+          onOpenChange={(open) => {
+            setCreateGroupOpen(open)
+            if (!open) {
+              setCreateGroupSeedSession(null)
+            }
+          }}
+          onCommit={handleCreateSessionGroup}
+        />
+        <WorkspaceTextInputDialogView
+          open={renameGroupTarget !== null}
+          title={t('sessionGroup.dialog.renameTitle')}
+          initialValue={renameGroupTarget?.title ?? ''}
+          label={t('sessionGroup.dialog.titleLabel')}
+          confirmLabel={t('sessionGroup.dialog.rename')}
+          onOpenChange={(open) => {
+            if (!open) {
+              setRenameGroupTarget(null)
+            }
+          }}
+          onCommit={handleRenameSessionGroup}
+        />
+        <WorkspaceSessionActionsMenu
+          state={sessionMenuState}
+          session={activeMenuSession}
+          work={activeMenuWork}
+          workspaceId={workspace.id}
+          sessionGroups={sessionGroups}
+          onOpenChange={handleSessionMenuOpenChange}
+          onPrepareSessionOpen={handlePrepareSessionOpen}
+          onStartRename={handleStartSessionRename}
+          onAddSessionToGroup={handleAddSessionToGroup}
+          onRemoveSessionFromGroup={handleRemoveSessionFromGroup}
+          onCreateSessionGroupFromSession={handleCreateSessionGroupFromSession}
+        />
+      </>
+    )
+
+    if (flatSession) {
+      return (
+        <div
+          className="flex min-w-0 flex-col"
+          data-testid={`recent-session-workspace-group-${workspace.id}`}
+        >
+          {overlays}
+          <WorkspaceSessionListSection
+            workspaceId={workspace.id}
+            variant="flat"
+            workspace={workspace}
+            sortedSessions={sidebarSessions}
+            workByPrimarySessionId={resolvedWorkByPrimarySessionId}
+            renamingSessionId={renamingSessionId}
+            retainedSessionIds={retainedSessionIds}
+            locallyStreamingSessionIds={locallyStreamingSessionIds}
+            sessionAttentionBySessionId={sessionAttentionBySessionId}
+            locallyErroredSessionIds={locallyErroredSessionIds}
+            runtimeIconByKind={runtimeIconByKind}
+            onPrepareSessionOpen={handlePrepareSessionOpen}
+            onPrefetchSession={prefetchSession}
+            onRenameCommit={handleRenameSession}
+            onRenameCancel={handleRenameCancel}
+            onOpenSessionMenu={handleOpenSessionMenu}
+          />
+        </div>
+      )
+    }
+
     return (
       <WorkspaceGroupDisclosure
         workspace={workspace}
         workspacePinned={workspacePinned}
         workspaceActions={workspaceActions}
         runningSessionCount={runningSessionCount}
-        overlays={(
-          <>
-            <WorkspaceTextInputDialogView
-              open={renameOpen}
-              title={t('workspace.dialog.renameTitle')}
-              initialValue={workspace.name}
-              label={t('workspace.dialog.nameLabel')}
-              confirmLabel={t('workspace.dialog.rename')}
-              onOpenChange={setRenameOpen}
-              onCommit={handleRenameWorkspace}
-            />
-            <MigrateWorkspaceDialog
-              open={migrateOpen}
-              onOpenChange={setMigrateOpen}
-              sourceWorkspaceId={workspace.id}
-            />
-            <WorkspaceTextInputDialogView
-              open={createRequest !== null}
-              title={
-                createRequest?.kind === 'folder'
-                  ? t('workspace.dialog.newFolderTitle')
-                  : t('workspace.dialog.newFileTitle')
-              }
-              initialValue={
-                createRequest?.kind === 'folder'
-                  ? DEFAULT_WORKSPACE_FOLDER_NAME
-                  : DEFAULT_WORKSPACE_FILE_NAME
-              }
-              label={t('workspace.dialog.nameLabel')}
-              confirmLabel={t('workspace.dialog.create')}
-              onOpenChange={handleOpenCreateDialogChange}
-              onCommit={handleCreateWorkspaceChild}
-            />
-            <WorkspaceTextInputDialogView
-              open={createGroupOpen}
-              title={t('sessionGroup.dialog.createTitle')}
-              initialValue=""
-              label={t('sessionGroup.dialog.titleLabel')}
-              confirmLabel={t('sessionGroup.dialog.create')}
-              onOpenChange={(open) => {
-                setCreateGroupOpen(open)
-                if (!open) {
-                  setCreateGroupSeedSession(null)
-                }
-              }}
-              onCommit={handleCreateSessionGroup}
-            />
-            <WorkspaceTextInputDialogView
-              open={renameGroupTarget !== null}
-              title={t('sessionGroup.dialog.renameTitle')}
-              initialValue={renameGroupTarget?.title ?? ''}
-              label={t('sessionGroup.dialog.titleLabel')}
-              confirmLabel={t('sessionGroup.dialog.rename')}
-              onOpenChange={(open) => {
-                if (!open) {
-                  setRenameGroupTarget(null)
-                }
-              }}
-              onCommit={handleRenameSessionGroup}
-            />
-            <WorkspaceSessionActionsMenu
-              state={sessionMenuState}
-              session={activeMenuSession}
-              work={activeMenuWork}
-              workspaceId={workspace.id}
-              sessionGroups={sessionGroups}
-              onOpenChange={handleSessionMenuOpenChange}
-              onPrepareSessionOpen={handlePrepareSessionOpen}
-              onStartRename={handleStartSessionRename}
-              onAddSessionToGroup={handleAddSessionToGroup}
-              onRemoveSessionFromGroup={handleRemoveSessionFromGroup}
-              onCreateSessionGroupFromSession={handleCreateSessionGroupFromSession}
-            />
-          </>
-        )}
+        overlays={overlays}
       >
         <div className="flex min-w-0 flex-col">
           {groupedSessions.map(({ group, sessions: groupSessions }) => (
@@ -1000,6 +1039,8 @@ function compareProjectBySortKey(
       return left.updatedAt - right.updatedAt
     case 'name':
       return left.name.localeCompare(right.name)
+    case 'recentSession':
+      return 0
   }
 }
 
@@ -1064,6 +1105,7 @@ const WorkspaceSidebarBody = memo(
     const setProjectPinnedFirst = useWorkspaceSidebarUiStore(state => state.setProjectPinnedFirst)
     const setSessionPreviewLimit = useWorkspaceSidebarUiStore(state => state.setSessionPreviewLimit)
     const collapseAllWorkspaces = useWorkspaceSidebarUiStore(state => state.collapseAllWorkspaces)
+    const [recentSessionsExpanded, setRecentSessionsExpanded] = useState(false)
 
     const listFilters = useMemo<WorkspaceSidebarListFilters>(() => ({
       projectScope,
@@ -1158,7 +1200,131 @@ const WorkspaceSidebarBody = memo(
       workByPrimarySessionId,
       workspaces,
     ])
-    const filteredEmpty = workspaces.length > 0 && visibleWorkspaces.length === 0
+    const visibleRecentSessions = useMemo(() => {
+      const candidates: RecentWorkspaceSession[] = []
+
+      for (const workspace of workspaces) {
+        if (listFilters.projectScope === 'pinned' && !workspace.pinned) {
+          continue
+        }
+
+        for (const session of sessionsByWorkspaceId.get(workspace.id) ?? []) {
+          if (
+            session.origin === 'work'
+            && !workByPrimarySessionId.has(session.id)
+          ) {
+            continue
+          }
+
+          if (
+            sessionMatchesListFilters(
+              session,
+              workByPrimarySessionId.get(session.id) ?? null,
+              listFilters,
+              locallyStreamingSessionIds,
+              locallyErroredSessionIds,
+              resolvedAttentionBySessionId,
+            )
+          ) {
+            candidates.push({ session, workspace })
+          }
+        }
+      }
+
+      return candidates.toSorted((left, right) => {
+        if (projectPinnedFirst) {
+          const workspacePinDiff
+            = (right.workspace.pinned ? 1 : 0)
+              - (left.workspace.pinned ? 1 : 0)
+          if (workspacePinDiff !== 0) {
+            return workspacePinDiff
+          }
+        }
+
+        const sessionPinDiff = right.session.pinned - left.session.pinned
+        if (sessionPinDiff !== 0) {
+          return sessionPinDiff
+        }
+
+        const rightRunning = isWorkspaceSessionRunning(
+          right.session,
+          locallyStreamingSessionIds,
+        )
+          ? 1
+          : 0
+        const leftRunning = isWorkspaceSessionRunning(
+          left.session,
+          locallyStreamingSessionIds,
+        )
+          ? 1
+          : 0
+        const runningDiff = rightRunning - leftRunning
+        if (runningDiff !== 0) {
+          return runningDiff
+        }
+
+        const activityDiff
+          = right.session.listActivityAt - left.session.listActivityAt
+        const directedActivityDiff = projectSortDirection === 'desc'
+          ? activityDiff
+          : -activityDiff
+        if (directedActivityDiff !== 0) {
+          return directedActivityDiff
+        }
+
+        const titleDiff = (
+          left.session.title ?? ''
+        ).localeCompare(right.session.title ?? '')
+        return titleDiff !== 0
+          ? titleDiff
+          : left.session.id.localeCompare(right.session.id)
+      })
+    }, [
+      listFilters,
+      locallyErroredSessionIds,
+      locallyStreamingSessionIds,
+      projectPinnedFirst,
+      projectSortDirection,
+      resolvedAttentionBySessionId,
+      sessionsByWorkspaceId,
+      workByPrimarySessionId,
+      workspaces,
+    ])
+    const recentSessionPreviewCount = useMemo(() => {
+      let highestRequiredIndex = -1
+      for (const [index, { session }] of visibleRecentSessions.entries()) {
+        if (
+          session.pinned
+          || isWorkspaceSessionRunning(session, locallyStreamingSessionIds)
+        ) {
+          highestRequiredIndex = index
+        }
+      }
+      return Math.max(sessionPreviewLimit, highestRequiredIndex + 1)
+    }, [
+      locallyStreamingSessionIds,
+      sessionPreviewLimit,
+      visibleRecentSessions,
+    ])
+    const recentSessionsToRender = recentSessionsExpanded
+      ? visibleRecentSessions
+      : visibleRecentSessions.slice(0, recentSessionPreviewCount)
+    const hiddenRecentSessionCount = Math.max(
+      visibleRecentSessions.length - recentSessionPreviewCount,
+      0,
+    )
+    const isRecentSessionSort = projectSortKey === 'recentSession'
+    const filteredEmpty = workspaces.length > 0
+      && (isRecentSessionSort
+        ? visibleRecentSessions.length === 0
+        : visibleWorkspaces.length === 0)
+
+    const handleProjectSortKeyChange = useCallback((sortKey: WorkspaceSidebarProjectSortKey) => {
+      setProjectSortKey(sortKey)
+      if (sortKey === 'recentSession') {
+        setProjectSortDirection('desc')
+      }
+    }, [setProjectSortDirection, setProjectSortKey])
 
     useEffect(() => {
       if (!workspacesReady) {
@@ -1193,7 +1359,7 @@ const WorkspaceSidebarBody = memo(
           onToggleSourceFilter={toggleSourceFilter}
           onShowArchivedChange={setShowArchived}
           onClearListFilters={clearListFilters}
-          onProjectSortKeyChange={setProjectSortKey}
+          onProjectSortKeyChange={handleProjectSortKeyChange}
           onProjectSortDirectionChange={setProjectSortDirection}
           onProjectPinnedFirstChange={setProjectPinnedFirst}
           onSessionPreviewLimitChange={setSessionPreviewLimit}
@@ -1202,18 +1368,41 @@ const WorkspaceSidebarBody = memo(
           onOpenMultiWorkspaceDialog={onOpenMultiWorkspaceDialog}
           onMarkAllAsRead={onMarkAllAsRead}
         >
-          {visibleWorkspaces.map(workspace => (
-            <WorkspaceGroup
-              key={workspace.id}
-              workspace={workspace}
-              sessions={sessionsByWorkspaceId.get(workspace.id) ?? EMPTY_WORKSPACE_SESSIONS}
-              listFilters={listFilters}
-              workByPrimarySessionId={workByPrimarySessionId}
-              runtimeIconByKind={runtimeIconByKind}
-              onDelete={onDelete}
-              onTogglePin={onTogglePin}
-            />
-          ))}
+          {isRecentSessionSort
+            ? (
+                <WorkspaceRecentSessionListView
+                  sessionCount={visibleRecentSessions.length}
+                  expanded={recentSessionsExpanded}
+                  hiddenSessionCount={hiddenRecentSessionCount}
+                  onToggleExpanded={() => setRecentSessionsExpanded(current => !current)}
+                >
+                  {recentSessionsToRender.map(({ session, workspace }) => (
+                    <WorkspaceGroup
+                      key={`${workspace.id}:${session.id}`}
+                      workspace={workspace}
+                      sessions={[session]}
+                      flatSession
+                      listFilters={listFilters}
+                      workByPrimarySessionId={workByPrimarySessionId}
+                      runtimeIconByKind={runtimeIconByKind}
+                      onDelete={onDelete}
+                      onTogglePin={onTogglePin}
+                    />
+                  ))}
+                </WorkspaceRecentSessionListView>
+              )
+            : visibleWorkspaces.map(workspace => (
+                <WorkspaceGroup
+                  key={workspace.id}
+                  workspace={workspace}
+                  sessions={sessionsByWorkspaceId.get(workspace.id) ?? EMPTY_WORKSPACE_SESSIONS}
+                  listFilters={listFilters}
+                  workByPrimarySessionId={workByPrimarySessionId}
+                  runtimeIconByKind={runtimeIconByKind}
+                  onDelete={onDelete}
+                  onTogglePin={onTogglePin}
+                />
+              ))}
         </WorkspaceProjectsSectionView>
       </PreviewCardProvider>
     )

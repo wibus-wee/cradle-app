@@ -193,43 +193,12 @@ const event = t.Object({
   createdAt: t.Number(),
 })
 
-const guideRuntimeKind = t.String({ minLength: 1 })
 const outputLocale = t.Union([
   t.Literal('en-US'),
   t.Literal('zh-CN'),
   t.Literal('ja-JP'),
   t.Literal('es-ES'),
 ])
-const guideStatus = t.Union([
-  t.Literal('pending'),
-  t.Literal('running'),
-  t.Literal('ready'),
-  t.Literal('failed'),
-  t.Literal('cancelled'),
-])
-
-const guide = t.Object({
-  revisionId: t.Nullable(t.String()),
-  status: t.Nullable(guideStatus),
-  providerTargetId: t.Nullable(t.String()),
-  runtimeKind: t.Nullable(guideRuntimeKind),
-  modelId: t.Nullable(t.String()),
-  sessionId: t.Nullable(t.String()),
-  runId: t.Nullable(t.String()),
-  errorMessage: t.Nullable(t.String()),
-  createdAt: t.Nullable(t.Number()),
-  updatedAt: t.Nullable(t.Number()),
-  title: t.Nullable(t.String()),
-  steps: t.Array(t.Object({
-    id: t.String(),
-    title: t.String(),
-    rationale: t.String(),
-    fileIds: t.Array(t.String()),
-    threadIds: t.Array(t.String()),
-    anchors: t.Array(rangeAnchor),
-    order: t.Number(),
-  })),
-})
 
 const agentFix = t.Object({
   id: t.String(),
@@ -239,7 +208,7 @@ const agentFix = t.Object({
   anchor: t.Nullable(rangeAnchor),
   instruction: t.String(),
   profileId: t.Nullable(t.String()),
-  expectedOutput: t.Union([t.Literal('commit'), t.Literal('working-tree-change'), t.Literal('patch-artifact')]),
+  expectedOutput: t.Union([t.Literal('working-tree-change'), t.Literal('patch-artifact')]),
   status: t.Union([t.Literal('pending'), t.Literal('running'), t.Literal('completed'), t.Literal('failed'), t.Literal('cancelled')]),
   sessionId: t.Nullable(t.String()),
   runId: t.Nullable(t.String()),
@@ -262,42 +231,6 @@ const agentFixArtifact = t.Object({
   contentHash: t.String(),
   createdAt: t.Number(),
 })
-
-const commitPlan = t.Object({
-  id: t.String(),
-  reviewId: t.String(),
-  revisionId: t.String(),
-  actorId: t.String(),
-  strategy: t.Literal('manual'),
-  status: t.Union([t.Literal('draft'), t.Literal('accepted'), t.Literal('applied'), t.Literal('abandoned')]),
-  groups: t.Array(t.Object({
-    id: t.String(),
-    title: t.String(),
-    message: t.String(),
-    rationale: t.String(),
-    fileIds: t.Array(t.String()),
-    paths: t.Array(t.String()),
-    dependsOn: t.Array(t.String()),
-  })),
-  conflicts: t.Array(t.Object({
-    fileId: t.String(),
-    path: t.String(),
-    groupIds: t.Array(t.String()),
-  })),
-  rationale: t.String(),
-  createdAt: t.Number(),
-  updatedAt: t.Number(),
-})
-
-const commitPlanGroupInput = t.Object({
-  id: t.String({ minLength: 1 }),
-  title: t.String({ minLength: 1 }),
-  message: t.String({ minLength: 1 }),
-  rationale: t.String(),
-  fileIds: t.Array(t.String({ minLength: 1 })),
-  paths: t.Optional(t.Array(t.String())),
-  dependsOn: t.Array(t.String()),
-}, { additionalProperties: false })
 
 const readiness = t.Object({
   sourceKind,
@@ -342,12 +275,6 @@ export const DiffReviewModel = {
     workspaceId: t.String({ minLength: 1 }),
     reviewId: t.String({ minLength: 1 }),
     agentFixId: t.String({ minLength: 1 }),
-  }, { additionalProperties: false }),
-
-  commitPlanParams: t.Object({
-    workspaceId: t.String({ minLength: 1 }),
-    reviewId: t.String({ minLength: 1 }),
-    commitPlanId: t.String({ minLength: 1 }),
   }, { additionalProperties: false }),
 
   localWorkingTreeBody: t.Object({
@@ -420,7 +347,7 @@ export const DiffReviewModel = {
     anchor: t.Optional(t.Nullable(rangeAnchorInput)),
     instruction: t.String({ minLength: 1 }),
     agentId: t.Optional(t.Nullable(t.String({ minLength: 1 }))),
-    expectedOutput: t.Union([t.Literal('commit'), t.Literal('working-tree-change'), t.Literal('patch-artifact')]),
+    expectedOutput: t.Union([t.Literal('working-tree-change'), t.Literal('patch-artifact')]),
   }, { additionalProperties: false }),
 
   startAgentFixBody: t.Object({
@@ -433,24 +360,6 @@ export const DiffReviewModel = {
 
   cancelAgentFixBody: t.Object({}, { additionalProperties: false }),
 
-  updateCommitPlanBody: t.Object({
-    groups: t.Optional(t.Array(commitPlanGroupInput)),
-    rationale: t.Optional(t.String()),
-    status: t.Optional(t.Union([t.Literal('draft'), t.Literal('accepted'), t.Literal('abandoned')])),
-  }, { additionalProperties: false }),
-
-  applyCommitPlanBody: t.Object({
-    idempotencyKey: t.Optional(t.String({ minLength: 1 })),
-  }, { additionalProperties: false }),
-
-  generateGuideBody: t.Object({
-    providerTargetId: t.String({ minLength: 1 }),
-    runtimeKind: t.Optional(guideRuntimeKind),
-    modelId: t.Optional(t.Nullable(t.String({ minLength: 1 }))),
-    force: t.Optional(t.Boolean()),
-    outputLocale: t.Optional(t.Nullable(outputLocale)),
-  }, { additionalProperties: false }),
-
   revision,
 
   file,
@@ -459,10 +368,8 @@ export const DiffReviewModel = {
   submission,
   preferences,
   event,
-  guide,
   agentFix,
   agentFixArtifact,
-  commitPlan,
   readiness,
 
   review: t.Object({
@@ -484,8 +391,6 @@ export const DiffReviewModel = {
     submissions: t.Array(submission),
     events: t.Array(event),
     preferences,
-    guide,
     agentFixes: t.Array(agentFix),
-    commitPlans: t.Array(commitPlan),
   }),
 }

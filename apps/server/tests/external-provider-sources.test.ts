@@ -789,12 +789,7 @@ describe('external provider sources capability', () => {
       const templateSettings = ProviderTargetModelSettingsResponseSchema.parse(
         await templateSettingsRes.json(),
       )
-      expect(JSON.parse(templateSettings.customModelsJson)).toEqual([
-        { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-        { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
-        { id: 'deepseek-chat', label: 'DeepSeek Chat (Legacy)' },
-        { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner (Legacy)' },
-      ])
+      expect(JSON.parse(templateSettings.customModelsJson)).toEqual([])
 
       const defaultModelTargetRes = await app.handle(
         new Request(
@@ -936,10 +931,7 @@ describe('external provider sources capability', () => {
         enabledModels: [],
       })
       expect(JSON.parse(settings.customModelsJson)).toEqual([
-        { id: 'deepseek-v4-flash', label: 'DeepSeek V4 Flash' },
-        { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro' },
-        { id: 'deepseek-chat', label: 'DeepSeek Chat (Legacy)' },
-        { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner (Legacy)' },
+        { id: 'deepseek-v4-pro', label: 'deepseek-v4-pro' },
       ])
 
       registration.dispose()

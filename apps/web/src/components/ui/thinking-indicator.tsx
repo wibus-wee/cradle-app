@@ -60,7 +60,7 @@ const ThinkingIndicator = forwardRef<HTMLDivElement, ThinkingIndicatorProps>(
             transition={{
               d: {
                 duration: 6,
-                ease: "easeInOut",
+                ease: [0.22, 1, 0.36, 1],
                 repeat: Infinity,
                 times: [0, 0.25, 0.5, 0.75, 1.0],
               },

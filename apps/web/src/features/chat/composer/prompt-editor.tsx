@@ -15,9 +15,18 @@ import { cn } from '~/lib/cn'
 import type {
   ChatContextPart,
   ChatFileLineCommentContextPart,
+  ChatIntentContextPart,
   ChatPluginContextPart,
   ChatSkillContextPart,
 } from '../context/chat-context-parts'
+import {
+  fillIntentMentionTokenContent,
+  formatIntentMentionTokenLabel,
+  INTENT_MENTION_OPERAND_CLASS,
+  INTENT_MENTION_OPERATOR_CLASS,
+  INTENT_MENTION_TOKEN_CLASS,
+  normalizeIntentMentionName,
+} from '../mentions/intent-mention-token'
 import type { MentionItem, PluginMentionItem } from '../mentions/mention-panel'
 import type { SkillMentionItem } from '../mentions/skill-mention-panel'
 import {
@@ -26,6 +35,8 @@ import {
 } from '../mentions/skill-mention-token'
 import type { ChatComposerSlashCommand } from '../slash-commands/chat-slash-commands'
 import { getActiveSlashCommand } from '../slash-commands/slash-command-input'
+import type { ComposerIntentId } from './composer-intent-actions'
+import { readComposerIntentAction } from './composer-intent-actions'
 
 const PLACEHOLDER_PLUGIN_KEY = new PluginKey<{ placeholder: string }>('chatPromptPlaceholder')
 const TOKEN_LEAF_TEXT = '\uFFFC'
@@ -61,6 +72,7 @@ export interface PromptEditorController {
   getContextParts: () => ChatContextPart[]
   getText: () => string
   insertFileMention: (item: MentionItem, range: PromptEditorTriggerRange) => void
+  insertIntentMention: (intentId: ComposerIntentId, range: PromptEditorTriggerRange) => void
   insertPluginMention: (item: PluginMentionItem, range: PromptEditorTriggerRange) => void
   insertSkillMention: (item: SkillMentionItem, range: PromptEditorTriggerRange) => void
   insertText: (text: string) => void
@@ -244,6 +256,49 @@ const pluginMentionSpec: NodeSpec = {
   ],
 }
 
+const intentMentionSpec: NodeSpec = {
+  attrs: {
+    intentId: { default: 'commit' },
+    name: { default: '' },
+    label: { default: '' },
+    prompt: { default: '' },
+  },
+  atom: true,
+  inline: true,
+  group: 'inline',
+  draggable: false,
+  selectable: false,
+  toDOM(node) {
+    const name = normalizeIntentMentionName(String(node.attrs.name || node.attrs.label))
+    return [
+      'span',
+      {
+        ...intentMentionDomAttrs(node),
+        'contenteditable': 'false',
+        'aria-label': formatIntentMentionTokenLabel(name),
+      },
+      ['span', { 'class': INTENT_MENTION_OPERATOR_CLASS, 'aria-hidden': 'true' }, '/'],
+      ['span', { class: INTENT_MENTION_OPERAND_CLASS }, name],
+    ]
+  },
+  parseDOM: [
+    {
+      tag: 'span[data-intent-mention-id][data-intent-mention-name]',
+      getAttrs(element) {
+        if (!(element instanceof HTMLElement)) {
+          return false
+        }
+        return {
+          intentId: element.getAttribute('data-intent-mention-id') ?? 'commit',
+          name: element.getAttribute('data-intent-mention-name') ?? '',
+          label: element.getAttribute('data-intent-mention-label') ?? '',
+          prompt: element.getAttribute('data-intent-mention-prompt') ?? '',
+        }
+      },
+    },
+  ],
+}
+
 const fileLineCommentSpec: NodeSpec = {
   attrs: {
     workspaceId: { default: '' },
@@ -310,6 +365,7 @@ export const promptEditorSchema = new Schema({
     fileMention: fileMentionSpec,
     skillMention: skillMentionSpec,
     pluginMention: pluginMentionSpec,
+    intentMention: intentMentionSpec,
     fileLineComment: fileLineCommentSpec,
   },
   marks: {},
@@ -423,6 +479,20 @@ export const PromptEditor = forwardRef(
             capabilities: item.capabilities,
             mcpServers: item.mcpServers,
             nativeMention: item.nativeMention ?? null,
+          })
+          replaceRangeWithInlineNode(view, range, node)
+        },
+        insertIntentMention(intentId, range) {
+          const view = viewRef.current
+          if (!view) {
+            return
+          }
+          const intent = readComposerIntentAction(intentId)
+          const node = promptEditorSchema.nodes.intentMention.create({
+            intentId: intent.id,
+            name: intent.name,
+            label: intent.label,
+            prompt: intent.prompt,
           })
           replaceRangeWithInlineNode(view, range, node)
         },
@@ -685,6 +755,7 @@ function createEditorProps({
       fileMention: createMentionNodeView,
       skillMention: createMentionNodeView,
       pluginMention: createMentionNodeView,
+      intentMention: createMentionNodeView,
     },
   }
 }
@@ -868,6 +939,15 @@ function createContextPartMentionNode(part: ChatContextPart): ProseMirrorNode {
     return promptEditorSchema.nodes.fileLineComment.create(part)
   }
 
+  if (part.type === 'data-cradle-intent') {
+    return promptEditorSchema.nodes.intentMention.create({
+      intentId: part.intentId,
+      name: part.name,
+      label: part.label,
+      prompt: part.prompt,
+    })
+  }
+
   return promptEditorSchema.nodes.skillMention.create({
     name: part.name,
     displayName: part.name,
@@ -945,7 +1025,9 @@ function createMentionNodeView(node: ProseMirrorNode): NodeView {
       ? skillMentionDomAttrs(node)
       : node.type.name === 'pluginMention'
         ? pluginMentionDomAttrs(node)
-        : fileMentionDomAttrs(node)
+        : node.type.name === 'intentMention'
+          ? intentMentionDomAttrs(node)
+          : fileMentionDomAttrs(node)
   for (const [name, value] of Object.entries(attrs)) {
     dom.setAttribute(name, value)
   }
@@ -964,6 +1046,11 @@ function createMentionNodeView(node: ProseMirrorNode): NodeView {
     dom.appendChild(
       document.createTextNode(`@${String(node.attrs.displayName || node.attrs.pluginName)}`),
     )
+  }
+ else if (node.type.name === 'intentMention') {
+    const name = String(node.attrs.name || node.attrs.label)
+    dom.setAttribute('aria-label', formatIntentMentionTokenLabel(name))
+    fillIntentMentionTokenContent(dom, name)
   }
  else {
     dom.textContent
@@ -1002,6 +1089,16 @@ function skillMentionDomAttrs(node: ProseMirrorNode): Record<string, string> {
     'data-skill-mention-description':
       typeof node.attrs.description === 'string' ? node.attrs.description : '',
     'data-skill-mention-scope': String(node.attrs.scope),
+  }
+}
+
+function intentMentionDomAttrs(node: ProseMirrorNode): Record<string, string> {
+  return {
+    'class': INTENT_MENTION_TOKEN_CLASS,
+    'data-intent-mention-id': String(node.attrs.intentId),
+    'data-intent-mention-name': String(node.attrs.name),
+    'data-intent-mention-label': String(node.attrs.label || node.attrs.name),
+    'data-intent-mention-prompt': String(node.attrs.prompt),
   }
 }
 
@@ -1070,6 +1167,9 @@ export function serializePromptDoc(doc: ProseMirrorNode): string {
  else if (node.type.name === 'fileLineComment') {
         text += ''
       }
+ else if (node.type.name === 'intentMention') {
+        text += ''
+      }
  else if (node.type.name === 'hardBreak') {
         text += '\n'
       }
@@ -1128,6 +1228,23 @@ export function readContextParts(doc: ProseMirrorNode): ChatContextPart[] {
           lineStart: Number(node.attrs.lineStart),
           lineEnd: Number(node.attrs.lineEnd),
           comment: String(node.attrs.comment),
+          position: textOffset,
+        }
+        parts.push(part)
+        return
+      }
+      if (node.type.name === 'intentMention') {
+        const part: ChatIntentContextPart = {
+          type: 'data-cradle-intent',
+          intentId:
+            node.attrs.intentId === 'review'
+            || node.attrs.intentId === 'commit'
+            || node.attrs.intentId === 'push'
+              ? node.attrs.intentId
+              : 'commit',
+          name: String(node.attrs.name),
+          label: String(node.attrs.label || node.attrs.name),
+          prompt: String(node.attrs.prompt),
           position: textOffset,
         }
         parts.push(part)

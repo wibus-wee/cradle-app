@@ -59,7 +59,6 @@ const spec = {
       "target": "body.expectedOutput",
       "type": "string",
       "values": [
-        "commit",
         "working-tree-change",
         "patch-artifact"
       ]
