@@ -165,6 +165,8 @@ export function readToolRowLabel(part: RenderableToolPart): FeedLabel {
       return { verb: 'Planned', object: target, stats: null }
     case 'plan-implementation':
       return { verb: 'Proposed', object: 'this plan', stats: null }
+    case 'artifact':
+      return { verb: 'Wrote artifact', object: target, stats: null }
     case 'question':
       return { verb: 'Asked', object: target, stats: null }
     case 'mcp':

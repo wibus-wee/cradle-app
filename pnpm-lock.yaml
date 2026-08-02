@@ -780,6 +780,9 @@ importers:
       '@base-ui/react':
         specifier: ^1.4.0
         version: 1.4.0(@date-fns/tz@1.4.1)(@types/react@19.2.14)(date-fns@4.1.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@cradle/artifact':
+        specifier: workspace:*
+        version: link:../../packages/artifact
       '@cradle/chat-runtime-contracts':
         specifier: workspace:*
         version: link:../../packages/chat-runtime-contracts
@@ -1059,6 +1062,9 @@ importers:
       shiki:
         specifier: ^3.4.2
         version: 3.23.0
+      sucrase:
+        specifier: ^3.35.1
+        version: 3.35.1
       tailwind-merge:
         specifier: ^3.3.0
         version: 3.5.0
@@ -1173,6 +1179,24 @@ importers:
       vitest:
         specifier: ^4.1.4
         version: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@22.20.0)(jsdom@29.0.2(@noble/hashes@2.2.0))(msw@2.13.3(@types/node@22.20.0)(typescript@5.9.3))(vite@8.0.11(@types/node@22.20.0)(esbuild@0.28.0)(jiti@2.7.0)(tsx@4.23.0)(yaml@2.9.0))
+
+  packages/artifact:
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.17)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.7(react@19.2.7)
+      typescript:
+        specifier: ^6.0.0
+        version: 6.0.3
 
   packages/chat-runtime-contracts:
     dependencies:
@@ -14890,7 +14914,7 @@ snapshots:
       fzf: 0.5.2
       package-manager-detector: 1.6.0
       tinyexec: 1.2.4
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
 
   '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.220':
     optional: true
@@ -20387,7 +20411,7 @@ snapshots:
       babel-dead-code-elimination: 1.0.12
       diff: 8.0.4
       pathe: 2.0.3
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
     transitivePeerDependencies:
       - supports-color
 
@@ -21003,6 +21027,10 @@ snapshots:
     dependencies:
       '@types/react': 19.2.15
 
+  '@types/react-dom@19.2.3(@types/react@19.2.17)':
+    dependencies:
+      '@types/react': 19.2.17
+
   '@types/react@19.2.14':
     dependencies:
       csstype: 3.2.3
@@ -21145,7 +21173,7 @@ snapshots:
       debug: 4.4.3
       minimatch: 10.2.5
       semver: 7.8.5
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -21224,7 +21252,7 @@ snapshots:
       p-limit: 7.3.0
       pathe: 2.0.3
       publint: 0.3.21
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       unconfig: 7.5.0
       unstorage: 1.17.5
       vue-virtual-scroller: 3.0.4(vue@3.5.34(typescript@5.8.3))
@@ -23561,7 +23589,7 @@ snapshots:
       jsonc-eslint-parser: 3.1.0
       pathe: 2.0.3
       pnpm-workspace-yaml: 1.6.0
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       yaml: 2.9.0
       yaml-eslint-parser: 2.0.0
 
@@ -26115,7 +26143,7 @@ snapshots:
       proc-log: 6.1.0
       semver: 7.8.5
       tar: 7.5.13
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       undici: 6.25.0
       which: 6.0.1
 
@@ -26128,7 +26156,7 @@ snapshots:
       proc-log: 7.0.0
       semver: 7.8.5
       tar: 7.5.13
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       undici: 8.7.0
       which: 7.0.0
 
@@ -27205,7 +27233,6 @@ snapshots:
     dependencies:
       react: 19.2.7
       scheduler: 0.27.0
-    optional: true
 
   react-grab@0.1.33(react@19.2.5):
     dependencies:
@@ -27339,8 +27366,7 @@ snapshots:
 
   react@19.2.6: {}
 
-  react@19.2.7:
-    optional: true
+  react@19.2.7: {}
 
   read-binary-file-arch@1.0.6:
     dependencies:
@@ -28226,7 +28252,7 @@ snapshots:
       lines-and-columns: 1.2.4
       mz: 2.7.0
       pirates: 4.0.7
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       ts-interface-checker: 0.1.13
 
   sumchecker@3.0.1:

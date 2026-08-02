@@ -209,6 +209,7 @@ export const cradleToolKinds = [
   'plan',
   'plan-implementation',
   'question',
+  'artifact',
   'mcp',
   'worktree',
   'generic',

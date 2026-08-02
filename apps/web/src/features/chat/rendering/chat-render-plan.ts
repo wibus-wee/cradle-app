@@ -312,7 +312,7 @@ export function groupMessageParts(input: GroupMessagePartsInput): ChatRenderItem
   return collectActivityFeeds(items, input.describeToolKind)
 }
 
-const FINAL_REPLY_TOOL_KINDS = new Set<ToolUiKind>(['plan', 'plan-implementation'])
+const FINAL_REPLY_TOOL_KINDS = new Set<ToolUiKind>(['plan', 'plan-implementation', 'artifact'])
 
 type FeedEntry = ActivityFeedEntryRef | ActivityFeedEntryItem
 

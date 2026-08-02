@@ -1,0 +1,33 @@
+import type { ReactNode } from 'react'
+
+import { cn } from '../cn'
+
+export interface ArtifactProps {
+  /** Optional document title shown above the body when Header is not used. */
+  title?: string
+  children?: ReactNode
+  className?: string
+}
+
+/**
+ * Root layout for an Agent Artifact. Matches the Context Usage Report density:
+ * centered article, soft borders, compact type scale.
+ */
+export function Artifact({ title, children, className }: ArtifactProps) {
+  return (
+    <div className={cn('absolute inset-0 bg-card', className)} data-cradle-artifact-root="">
+      <div className="h-full overflow-auto">
+        <article className="mx-auto max-w-4xl px-4 py-4 lg:px-5">
+          {title
+            ? (
+              <h1 className="mb-3 text-balance text-[17px] font-semibold leading-6 text-foreground">
+                {title}
+              </h1>
+            )
+            : null}
+          {children}
+        </article>
+      </div>
+    </div>
+  )
+}

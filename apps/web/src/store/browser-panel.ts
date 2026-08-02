@@ -304,6 +304,19 @@ export interface BrowserPlanDocumentTab {
   favicon: null
 }
 
+export interface BrowserArtifactTab {
+  kind: 'artifact'
+  id: string
+  sessionId: string
+  artifactId: string
+  toolCallId: string | null
+  title: string
+  source: string
+  revision: number
+  loading: false
+  favicon: null
+}
+
 export interface BrowserPlanRefineTab {
   kind: 'plan-refine'
   id: string
@@ -327,6 +340,7 @@ export type BrowserPanelTab
     | BrowserPanelLauncherTab
     | BrowserTuiTab
     | BrowserPlanDocumentTab
+    | BrowserArtifactTab
     | BrowserPlanRefineTab
 
 export const BROWSER_PANEL_TAB_KINDS = [
@@ -341,6 +355,7 @@ export const BROWSER_PANEL_TAB_KINDS = [
   'launcher',
   'tui',
   'plan-document',
+  'artifact',
   'plan-refine',
 ] as const satisfies readonly BrowserPanelTab['kind'][]
 
@@ -355,6 +370,7 @@ const MULTI_INSTANCE_BROWSER_PANEL_TAB_KINDS: ReadonlySet<BrowserPanelTabKind> =
   'side-conversation',
   'tui',
   'plan-document',
+  'artifact',
   'plan-refine',
 ])
 
@@ -550,6 +566,19 @@ const planDocumentTabSchema = z.object({
   favicon: z.null(),
 }) satisfies z.ZodType<BrowserPlanDocumentTab>
 
+const artifactTabSchema = z.object({
+  kind: z.literal('artifact'),
+  id: z.string(),
+  sessionId: z.string(),
+  artifactId: z.string(),
+  toolCallId: z.string().nullable(),
+  title: z.string(),
+  source: z.string(),
+  revision: z.number(),
+  loading: z.literal(false),
+  favicon: z.null(),
+}) satisfies z.ZodType<BrowserArtifactTab>
+
 const planRefineTabSchema = z.object({
   kind: z.literal('plan-refine'),
   id: z.string(),
@@ -570,6 +599,7 @@ const restorableBrowserPanelTabSchema = z.discriminatedUnion('kind', [
   sideConversationTabSchema,
   contextUsageReportTabSchema,
   planDocumentTabSchema,
+  artifactTabSchema,
   planRefineTabSchema,
 ]) satisfies z.ZodType<RestorableBrowserPanelTab>
 
@@ -924,6 +954,15 @@ interface BrowserPanelState {
     text: string
     ownerId?: string | null
   }) => string
+  openArtifactTab: (input: {
+    sessionId: string
+    artifactId: string
+    toolCallId?: string | null
+    title: string
+    source: string
+    revision: number
+    ownerId?: string | null
+  }) => string
   openPlanRefineTab: (input: {
     sessionId?: string | null
     requestId: string
@@ -1222,6 +1261,10 @@ function matchesMultiInstanceBrowserPanelTab(
         && existing.sideConversationId === incoming.sideConversationId
     case 'plan-document':
       return existing.kind === 'plan-document' && existing.toolCallId === incoming.toolCallId
+    case 'artifact':
+      return existing.kind === 'artifact'
+        && existing.sessionId === incoming.sessionId
+        && existing.artifactId === incoming.artifactId
     case 'plan-refine':
       return existing.kind === 'plan-refine' && existing.requestId === incoming.requestId
     case 'workspace-diff':
@@ -1775,6 +1818,50 @@ function createBrowserPanelStore() {
           text,
           loading: false,
           favicon: null,
+        }
+        return commitOpenTab(set, ownerId, tab)
+      },
+
+      openArtifactTab: ({
+        sessionId,
+        artifactId,
+        toolCallId,
+        title,
+        source,
+        revision,
+        ownerId: ownerIdInput,
+      }) => {
+        const ownerId = normalizeBrowserPanelOwnerId(ownerIdInput ?? get().activeOwnerId)
+        const tab: BrowserArtifactTab = {
+          kind: 'artifact',
+          id: `artifact:${sessionId}:${artifactId}`,
+          sessionId,
+          artifactId,
+          toolCallId: toolCallId ?? null,
+          title,
+          source,
+          revision,
+          loading: false,
+          favicon: null,
+        }
+        // Always replace content when reopening so updates (new revision) land in the panel.
+        const existing = get().owners[ownerId]?.tabs.find(
+          candidate => candidate.kind === 'artifact'
+            && candidate.sessionId === sessionId
+            && candidate.artifactId === artifactId,
+        )
+        if (existing) {
+          set((state) => {
+            const ownerState = getOwnerState(state, ownerId)
+            return applyOwnerState(state, ownerId, {
+              ...ownerState,
+              open: true,
+              activeTabId: existing.id,
+              tabs: ownerState.tabs.map(candidate =>
+                candidate.id === existing.id ? { ...tab, id: existing.id } : candidate),
+            })
+          })
+          return existing.id
         }
         return commitOpenTab(set, ownerId, tab)
       },

@@ -83,6 +83,9 @@ function renderPanelTabIcon(tab: BrowserPanelTab) {
   if (tab.kind === 'plan-document') {
     return <PlanIcon className={iconClassName} aria-hidden="true" />
   }
+  if (tab.kind === 'artifact') {
+    return <ContextUsageIcon className={iconClassName} aria-hidden="true" />
+  }
   if (tab.kind === 'plan-refine') {
     return <RefineIcon className={iconClassName} aria-hidden="true" />
   }
