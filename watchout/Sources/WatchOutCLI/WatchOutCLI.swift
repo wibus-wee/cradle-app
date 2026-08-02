@@ -7,7 +7,7 @@ struct WatchOutCLI: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "watchout",
     abstract: "WatchOut — local Attention Object Store (parking slips).",
-    version: "0.2.0",
+    version: "0.3.0",
     subcommands: [
       Create.self,
       Get.self,
@@ -20,6 +20,7 @@ struct WatchOutCLI: AsyncParsableCommand {
       Count.self,
       Export.self,
       Import.self,
+      DeepLink.self,
       Path.self,
     ]
   )
@@ -315,6 +316,107 @@ extension WatchOutCLI {
 
     func run() throws {
       print(try WatchOutStore.databaseURL().path)
+    }
+  }
+
+  struct DeepLink: ParsableCommand {
+    static let configuration = CommandConfiguration(
+      commandName: "url",
+      abstract: "Build or apply watchout:// deep links",
+      subcommands: [Park.self, Item.self, Show.self, Apply.self]
+    )
+  }
+}
+
+extension WatchOutCLI.DeepLink {
+  struct Park: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Print a watchout://park URL")
+
+    @Argument(help: "Title")
+    var title: String
+
+    @Option(name: .long, help: "Optional body")
+    var body: String?
+
+    @Option(name: .long, help: "Optional href")
+    var href: String?
+
+    @Option(name: .long, help: "Source tag")
+    var source: String = "url"
+
+    @Option(name: .long, help: "Audience: human | agent | any")
+    var audience: String = AttentionItem.Audience.human.rawValue
+
+    func run() throws {
+      guard let audience = AttentionItem.Audience(rawValue: audience) else {
+        throw ValidationError("audience must be human|agent|any")
+      }
+      guard let url = WatchOutURLRouter.parkURL(
+        title: title,
+        body: body,
+        href: href,
+        source: source,
+        audience: audience
+      ) else {
+        throw ExitCode.failure
+      }
+      print(url.absoluteString)
+    }
+  }
+
+  struct Item: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Print a watchout://item URL")
+
+    @Argument(help: "Item id")
+    var id: String
+
+    func run() throws {
+      guard let url = WatchOutURLRouter.itemURL(id: id) else {
+        throw ExitCode.failure
+      }
+      print(url.absoluteString)
+    }
+  }
+
+  struct Show: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Print watchout://show")
+
+    func run() {
+      print(WatchOutURLRouter.showURL().absoluteString)
+    }
+  }
+
+  struct Apply: ParsableCommand {
+    static let configuration = CommandConfiguration(
+      abstract: "Parse a watchout:// URL and apply park actions against the local store"
+    )
+
+    @Argument(help: "watchout:// URL")
+    var url: String
+
+    @Flag(name: .long, help: "Print JSON")
+    var json = false
+
+    func run() throws {
+      guard let parsed = URL(string: url),
+            let link = WatchOutURLRouter.parse(parsed)
+      else {
+        throw ValidationError("invalid watchout:// URL")
+      }
+
+      let store = try WatchOutStore.makeDefault()
+      switch link {
+      case .park(let input):
+        let item = try store.create(input)
+        try emit(item, json: json)
+      case .item(let id):
+        guard let item = try store.get(id: id) else {
+          throw ValidationError("item not found: \(id)")
+        }
+        try emit(item, json: json)
+      case .show:
+        print(WatchOutURLRouter.showURL().absoluteString)
+      }
     }
   }
 }

@@ -47,7 +47,7 @@ public struct AttentionItem: Codable, Hashable, Identifiable, Sendable {
   }
 }
 
-public struct AttentionItemCreate: Sendable {
+public struct AttentionItemCreate: Sendable, Equatable {
   public var title: String
   public var body: String?
   public var href: String?

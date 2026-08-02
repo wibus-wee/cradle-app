@@ -3,6 +3,7 @@ import WatchOutCore
 
 struct AttentionItemRow: View {
   let item: AttentionItem
+  var focused: Bool = false
   let onComplete: () -> Void
   let onReopen: () -> Void
   let onDelete: () -> Void
@@ -55,7 +56,10 @@ struct AttentionItemRow: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
-    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .background(
+      .quaternary.opacity(focused ? 0.55 : 0.35),
+      in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+    )
     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .contextMenu {
       Button("Edit…", action: onEdit)
@@ -222,6 +226,7 @@ struct AttentionListPane: View {
               ForEach(model.items) { item in
                 AttentionItemRow(
                   item: item,
+                  focused: model.focusedItemId == item.id,
                   onComplete: { model.complete(item) },
                   onReopen: { model.reopen(item) },
                   onDelete: { model.delete(item) },
@@ -229,6 +234,16 @@ struct AttentionListPane: View {
                   onEdit: { model.beginEditing(item) },
                   onCopy: { model.copyItem(item) }
                 )
+                .onAppear {
+                  if model.focusedItemId == item.id {
+                    // Clear focus after first paint so it does not stick forever.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                      if model.focusedItemId == item.id {
+                        model.clearFocusedItem()
+                      }
+                    }
+                  }
+                }
               }
             }
             .padding(.horizontal, 2)

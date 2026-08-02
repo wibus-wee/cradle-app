@@ -6,6 +6,7 @@ extension Defaults.Keys {
   static let floatingAlwaysOnTop = Key<Bool>("floatingAlwaysOnTop", default: true)
   static let showMenuBarCount = Key<Bool>("showMenuBarCount", default: true)
   static let floatingVisibleOnLaunch = Key<Bool>("floatingVisibleOnLaunch", default: false)
+  static let notifyOnExternalPark = Key<Bool>("notifyOnExternalPark", default: true)
   static let defaultAudience = Key<String>("defaultAudience", default: "human")
 }
 

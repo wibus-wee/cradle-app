@@ -8,7 +8,7 @@ enum WatchOutMCPMain {
     let store = try WatchOutStore.makeDefault()
     let server = Server(
       name: "watchout",
-      version: "0.2.0",
+      version: "0.3.0",
       capabilities: .init(
         tools: .init(listChanged: false)
       )

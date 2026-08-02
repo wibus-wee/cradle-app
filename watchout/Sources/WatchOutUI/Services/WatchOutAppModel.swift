@@ -2,6 +2,7 @@
 import AppKit
 #endif
 import AsyncAlgorithms
+import Defaults
 import Dependencies
 import Foundation
 import IdentifiedCollections
@@ -22,6 +23,8 @@ public final class WatchOutAppModel {
   public var editingItem: AttentionItem?
   public var editTitle: String = ""
   public var editBody: String = ""
+  /// When set, UI should scroll/highlight this id once.
+  public var focusedItemId: String?
 
   @ObservationIgnored
   @Dependency(\.watchOutStore) private var store
@@ -35,13 +38,25 @@ public final class WatchOutAppModel {
   @ObservationIgnored
   private var searchContinuation: AsyncStream<String>.Continuation?
 
+  @ObservationIgnored
+  private var externalNotifyTask: Task<Void, Never>?
+
+  @ObservationIgnored
+  private var didRequestNotificationAuth = false
+
   public init() {
     startSearchDebounce()
     startObservation()
+    startExternalParkNotifications()
   }
 
   public var displayedItems: [AttentionItem] {
     Array(items)
+  }
+
+  public func bootstrap() {
+    refresh()
+    Task { await requestNotificationsIfNeeded() }
   }
 
   public func refresh() {
@@ -59,11 +74,64 @@ public final class WatchOutAppModel {
     searchContinuation?.yield(value)
   }
 
+  public func handleOpenURL(_ url: URL) {
+    guard let link = WatchOutURLRouter.parse(url) else {
+      statusMessage = "Unrecognized WatchOut URL."
+      return
+    }
+    applyDeepLink(link)
+  }
+
+  public func applyDeepLink(_ link: WatchOutDeepLink) {
+    switch link {
+    case .park(let input):
+      do {
+        let item = try store.create(input)
+        statusMessage = "Parked from URL."
+        errorMessage = nil
+        focusedItemId = item.id
+        isFloatingPresented = true
+        openCount = (try? store.openCount()) ?? openCount
+        #if canImport(AppKit)
+        NSApp.activate(ignoringOtherApps: true)
+        #endif
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+
+    case .item(let id):
+      do {
+        guard let item = try store.get(id: id) else {
+          errorMessage = WatchOutStoreError.notFound(id).errorDescription
+          return
+        }
+        if item.status == .done {
+          showDone = true
+          restartObservation()
+        }
+        focusedItemId = id
+        isFloatingPresented = true
+        statusMessage = nil
+        #if canImport(AppKit)
+        NSApp.activate(ignoringOtherApps: true)
+        #endif
+      } catch {
+        errorMessage = error.localizedDescription
+      }
+
+    case .show:
+      isFloatingPresented = true
+      #if canImport(AppKit)
+      NSApp.activate(ignoringOtherApps: true)
+      #endif
+    }
+  }
+
   public func createFromDraft(source: String = "app") {
     let title = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !title.isEmpty else { return }
     do {
-      _ = try store.create(
+      let item = try store.create(
         AttentionItemCreate(
           title: title,
           source: source,
@@ -73,6 +141,7 @@ public final class WatchOutAppModel {
       draftTitle = ""
       errorMessage = nil
       statusMessage = nil
+      focusedItemId = item.id
       openCount = (try? store.openCount()) ?? openCount
     } catch {
       errorMessage = error.localizedDescription
@@ -96,7 +165,7 @@ public final class WatchOutAppModel {
       .trimmingCharacters(in: .whitespacesAndNewlines)
 
     do {
-      _ = try store.create(
+      let item = try store.create(
         AttentionItemCreate(
           title: firstLine.isEmpty ? "Clipboard" : String(firstLine.prefix(120)),
           body: rest.isEmpty ? (firstLine.count > 120 ? text : nil) : rest,
@@ -106,6 +175,7 @@ public final class WatchOutAppModel {
       )
       statusMessage = "Parked clipboard."
       errorMessage = nil
+      focusedItemId = item.id
       openCount = (try? store.openCount()) ?? openCount
     } catch {
       errorMessage = error.localizedDescription
@@ -207,6 +277,10 @@ public final class WatchOutAppModel {
     #endif
   }
 
+  public func clearFocusedItem() {
+    focusedItemId = nil
+  }
+
   private func currentQuery() -> AttentionListQuery {
     AttentionListQuery(
       status: showDone ? nil : .open,
@@ -241,6 +315,36 @@ public final class WatchOutAppModel {
 
   private func restartObservation() {
     startObservation()
+  }
+
+  private func startExternalParkNotifications() {
+    externalNotifyTask?.cancel()
+    externalNotifyTask = Task { @MainActor in
+      var lastOpenCount = (try? store.openCount()) ?? 0
+      for await _ in store.observeExternalDataVersion() {
+        guard !Task.isCancelled else { return }
+        guard Defaults[.notifyOnExternalPark] else {
+          lastOpenCount = (try? store.openCount()) ?? lastOpenCount
+          continue
+        }
+        let open = (try? store.openCount()) ?? lastOpenCount
+        defer { lastOpenCount = open }
+        guard open > lastOpenCount else { continue }
+
+        await requestNotificationsIfNeeded()
+        let newestTitle =
+          (try? store.list(AttentionListQuery(status: .open, limit: 1)).first?.title)
+          ?? "New item parked"
+        await WatchOutNotifier.notifyExternalPark(title: newestTitle, openCount: open)
+      }
+    }
+  }
+
+  private func requestNotificationsIfNeeded() async {
+    guard Defaults[.notifyOnExternalPark] else { return }
+    guard !didRequestNotificationAuth else { return }
+    didRequestNotificationAuth = true
+    await WatchOutNotifier.requestAuthorizationIfNeeded()
   }
 }
 

@@ -14,6 +14,7 @@
 
 /* Begin PBXFileReference section */
 		B48A5E38503B42EA9D03E06F /* WatchOutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchOutApp.swift; sourceTree = "<group>"; };
+		A11NF0PL15T000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		F4E77257352F4FFBB23795F4 /* WatchOut.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatchOut.entitlements; sourceTree = "<group>"; };
 		D657CD84B49C420389E7D981 /* WatchOut.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatchOut.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -51,6 +52,7 @@
 			isa = PBXGroup;
 			children = (
 				B48A5E38503B42EA9D03E06F /* WatchOutApp.swift */,
+				A11NF0PL15T000000000001 /* Info.plist */,
 				F4E77257352F4FFBB23795F4 /* WatchOut.entitlements */,
 			);
 			path = WatchOut;
@@ -190,6 +192,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Apps/WatchOut/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = WatchOut;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -199,7 +202,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.watchout.WatchOut;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -217,6 +220,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Apps/WatchOut/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = WatchOut;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -226,7 +230,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.watchout.WatchOut;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

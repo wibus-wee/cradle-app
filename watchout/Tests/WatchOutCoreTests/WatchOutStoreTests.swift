@@ -94,14 +94,14 @@ final class WatchOutStoreTests: XCTestCase {
     })
   }
 
-  func testSearchEscapesLikeWildcards() throws {
+  func testFTSPrefixSearch() throws {
     let store = try WatchOutStore.makeInMemory()
-    _ = try store.create(AttentionItemCreate(title: "100% done"))
-    _ = try store.create(AttentionItemCreate(title: "100x done"))
+    _ = try store.create(AttentionItemCreate(title: "notification redesign"))
+    _ = try store.create(AttentionItemCreate(title: "notify agents"))
+    _ = try store.create(AttentionItemCreate(title: "unrelated"))
 
-    let hits = try store.list(.init(status: nil, search: "100%"))
-    XCTAssertEqual(hits.count, 1)
-    XCTAssertEqual(hits[0].title, "100% done")
+    let hits = try store.list(.init(status: nil, search: "notif"))
+    XCTAssertEqual(hits.count, 2)
   }
 
   func testExportImportRoundTrip() throws {

@@ -11,6 +11,7 @@ public struct WatchOutGeneralSettingsPane: View {
   @Default(.floatingAlwaysOnTop) private var floatingAlwaysOnTop
   @Default(.showMenuBarCount) private var showMenuBarCount
   @Default(.floatingVisibleOnLaunch) private var floatingVisibleOnLaunch
+  @Default(.notifyOnExternalPark) private var notifyOnExternalPark
 
   public init() {}
 
@@ -23,6 +24,9 @@ public struct WatchOutGeneralSettingsPane: View {
       Section("Windows") {
         Toggle("Keep floating panel on top", isOn: $floatingAlwaysOnTop)
         Toggle("Show open count in menu bar", isOn: $showMenuBarCount)
+      }
+      Section("Notifications") {
+        Toggle("Notify when CLI/MCP parks an item", isOn: $notifyOnExternalPark)
       }
       Section("Data") {
         LabeledContent("Database") {

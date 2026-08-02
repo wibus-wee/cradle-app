@@ -32,10 +32,14 @@ public struct WatchOutRootScene: Scene {
     Window("WatchOut", id: WatchOutWindowID.floating) {
       FloatingPanel(model: model)
         .frame(minWidth: 300, idealWidth: 340, minHeight: 400, idealHeight: 480)
+        .onOpenURL { url in
+          model.handleOpenURL(url)
+        }
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentSize)
     .defaultPosition(.topTrailing)
+    .handlesExternalEvents(matching: Set(["park", "create", "item", "open", "show", "float"]))
 
     Settings {
       TabView {
@@ -44,7 +48,7 @@ public struct WatchOutRootScene: Scene {
         WatchOutShortcutsSettingsPane()
           .tabItem { Label("Shortcuts", systemImage: "keyboard") }
       }
-      .frame(width: 420, height: 320)
+      .frame(width: 420, height: 340)
     }
   }
 }
@@ -81,12 +85,17 @@ struct MenuBarPanel: View {
       .frame(width: 300, height: 400)
       .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
       .onAppear(perform: bootstrapIfNeeded)
+      .onChange(of: model.isFloatingPresented) { _, visible in
+        if visible {
+          presentFloating()
+        }
+      }
   }
 
   private func bootstrapIfNeeded() {
     guard !didBootstrap else { return }
     didBootstrap = true
-    model.refresh()
+    model.bootstrap()
     let keys = WatchOutHotKeys(
       openFloating: { presentFloating() },
       parkClipboard: { model.parkClipboard() }

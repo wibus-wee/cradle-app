@@ -95,6 +95,17 @@ public final class WatchOutStore: Sendable {
         columns: ["status", "createdAt"]
       )
     }
+    migrator.registerMigration("v2_attention_items_fts5") { db in
+      // External-content FTS5 + sync triggers + backfill of existing rows.
+      try db.create(virtualTable: "attention_items_fts", using: FTS5()) { table in
+        table.synchronize(withTable: AttentionItem.databaseTableName)
+        table.tokenizer = .unicode61()
+        table.column("title")
+        table.column("body")
+        table.column("source")
+        table.column("href")
+      }
+    }
     try migrator.migrate(dbQueue)
   }
 
@@ -326,25 +337,16 @@ public final class WatchOutStore: Sendable {
   }
 
   private static func fetch(_ db: Database, query: AttentionListQuery) throws -> [AttentionItem] {
+    if let search = query.search?.trimmingCharacters(in: .whitespacesAndNewlines), !search.isEmpty {
+      return try fetchFTS(db, query: query, search: search)
+    }
+
     var request = AttentionItem.all()
     if let status = query.status {
       request = request.filter(AttentionItem.Columns.status == status.rawValue)
     }
     if let audience = query.audience {
       request = request.filter(AttentionItem.Columns.audience == audience.rawValue)
-    }
-    if let search = query.search?.trimmingCharacters(in: .whitespacesAndNewlines), !search.isEmpty {
-      let pattern = "%\(escapeLike(search))%"
-      // ESCAPE so literal % / _ in the query do not act as wildcards.
-      request = request.filter(
-        sql: """
-          (title LIKE ? ESCAPE '\\'
-           OR IFNULL(body, '') LIKE ? ESCAPE '\\'
-           OR source LIKE ? ESCAPE '\\'
-           OR IFNULL(href, '') LIKE ? ESCAPE '\\')
-          """,
-        arguments: [pattern, pattern, pattern, pattern]
-      )
     }
     request = request.order(AttentionItem.Columns.createdAt.desc)
     if let limit = query.limit {
@@ -353,11 +355,42 @@ public final class WatchOutStore: Sendable {
     return try request.fetchAll(db)
   }
 
-  private static func escapeLike(_ raw: String) -> String {
-    raw
-      .replacingOccurrences(of: "\\", with: "\\\\")
-      .replacingOccurrences(of: "%", with: "\\%")
-      .replacingOccurrences(of: "_", with: "\\_")
+  private static func fetchFTS(
+    _ db: Database,
+    query: AttentionListQuery,
+    search: String
+  ) throws -> [AttentionItem] {
+    // Prefer GRDB's safe pattern builder over concatenating user MATCH strings.
+    guard let pattern = FTS5Pattern(matchingAllPrefixesIn: search) else {
+      return []
+    }
+
+    var sql = """
+      SELECT attention_items.*
+      FROM attention_items
+      JOIN attention_items_fts
+        ON attention_items_fts.rowid = attention_items.rowid
+      WHERE attention_items_fts MATCH ?
+      """
+    var arguments = StatementArguments()
+    arguments += pattern
+
+    if let status = query.status {
+      sql += " AND attention_items.status = ?"
+      arguments += status.rawValue
+    }
+    if let audience = query.audience {
+      sql += " AND attention_items.audience = ?"
+      arguments += audience.rawValue
+    }
+
+    sql += " ORDER BY rank, attention_items.createdAt DESC"
+    if let limit = query.limit {
+      sql += " LIMIT ?"
+      arguments += limit
+    }
+
+    return try AttentionItem.fetchAll(db, sql: sql, arguments: arguments)
   }
 }
 
