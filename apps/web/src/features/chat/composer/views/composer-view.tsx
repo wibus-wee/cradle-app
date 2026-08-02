@@ -1101,7 +1101,7 @@ export function ComposerView({
         ref={setActionTargetElement}
         className={cn(
           'rounded-xl bg-background shadow-md border border-border focus-within:ring-0 focus-within:border-ring/40 transition-[border-color,box-shadow,background-color] duration-200',
-          bangPtyActive && 'border-zinc-800 bg-zinc-950 focus-within:border-zinc-700',
+          bangPtyActive && 'overflow-hidden rounded-3xl border-zinc-800 bg-zinc-950 focus-within:border-zinc-700',
           cardClassName,
           isPlanMode && [
             'border-amber-400/70 shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_18px_40px_-30px_rgba(245,158,11,0.72)]',

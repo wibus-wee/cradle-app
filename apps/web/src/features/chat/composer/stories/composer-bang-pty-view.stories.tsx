@@ -42,7 +42,7 @@ type Story = StoryObj<typeof meta>
 export const IdlePrompt: Story = {
   render: args => (
     <main className="flex min-h-[32rem] items-center justify-center bg-background px-4 py-10 text-foreground">
-      <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-zinc-800 shadow-md">
+      <div className="w-full max-w-2xl">
         <ComposerBangPtyView
           {...args}
           terminal={(
@@ -61,7 +61,7 @@ export const IdlePrompt: Story = {
 export const WithOutput: Story = {
   render: args => (
     <main className="flex min-h-[32rem] items-center justify-center bg-background px-4 py-10 text-foreground">
-      <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-zinc-800 shadow-md">
+      <div className="w-full max-w-2xl">
         <ComposerBangPtyView
           {...args}
           terminal={(
@@ -87,7 +87,7 @@ export const BusyWritingBack: Story = {
   },
   render: args => (
     <main className="flex min-h-[32rem] items-center justify-center bg-background px-4 py-10 text-foreground">
-      <div className="w-full max-w-2xl overflow-hidden rounded-xl border border-zinc-800 shadow-md">
+      <div className="w-full max-w-2xl">
         <ComposerBangPtyView
           {...args}
           terminal={(

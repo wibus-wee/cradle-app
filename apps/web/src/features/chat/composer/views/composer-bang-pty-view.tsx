@@ -1,4 +1,4 @@
-import { CloseLine as CloseIcon, SendLine as SendIcon } from '@mingcute/react'
+import { CloseLine as CloseIcon, SendPlaneLine as SendIcon } from '@mingcute/react'
 import type { ReactNode } from 'react'
 
 import { Button } from '~/components/ui/button'
@@ -24,42 +24,39 @@ export function ComposerBangPtyView({
   return (
     <div
       className={cn(
-        'flex min-h-0 flex-col overflow-hidden rounded-[inherit] bg-zinc-950 text-zinc-50',
+        'relative flex min-h-0 flex-col overflow-hidden rounded-3xl bg-zinc-950 text-zinc-50',
         className,
       )}
       data-testid="composer-bang-pty"
     >
-      <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-1.5">
-        <div className="min-w-0 font-mono text-[11px] text-zinc-400">
-          Temporary shell · Esc to discard · Send to write back
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={busy}
-            onClick={onDiscard}
-            className="h-7 gap-1 px-2 text-zinc-300 hover:bg-white/10 hover:text-zinc-50"
-            data-testid="composer-bang-pty-discard"
-          >
-            <CloseIcon className="size-3.5" aria-hidden="true" />
-            Discard
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={busy}
-            onClick={onSubmit}
-            className="h-7 gap-1 px-2.5"
-            data-testid="composer-bang-pty-submit"
-          >
-            <SendIcon className="size-3.5" aria-hidden="true" />
-            Write back
-          </Button>
-        </div>
+      <div className="pointer-events-none absolute top-2 right-2 z-10 flex items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          disabled={busy}
+          onClick={onDiscard}
+          aria-label="Discard shell session"
+          title="Discard"
+          className="pointer-events-auto size-6 rounded-full bg-zinc-950/70 text-zinc-300 hover:bg-white/10 hover:text-zinc-50"
+          data-testid="composer-bang-pty-discard"
+        >
+          <CloseIcon className="size-3.5" aria-hidden="true" />
+        </Button>
+        <Button
+          type="button"
+          size="icon-xs"
+          disabled={busy}
+          onClick={onSubmit}
+          aria-label="Write shell transcript back to chat"
+          title="Write back"
+          className="pointer-events-auto size-6 rounded-full"
+          data-testid="composer-bang-pty-submit"
+        >
+          <SendIcon className="size-3.5" aria-hidden="true" />
+        </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-hidden">{terminal}</div>
+      <div className="min-h-0 flex-1 overflow-hidden rounded-[inherit]">{terminal}</div>
     </div>
   )
 }
