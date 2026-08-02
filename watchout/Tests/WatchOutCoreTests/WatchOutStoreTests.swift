@@ -170,4 +170,48 @@ final class WatchOutStoreTests: XCTestCase {
       )
     }
   }
+
+  func testBatchCompleteAndMatching() throws {
+    let store = try WatchOutStore.makeInMemory()
+    let a = try store.create(AttentionItemCreate(title: "A", source: "cli"))
+    let b = try store.create(AttentionItemCreate(title: "B zebra", source: "cli"))
+    let c = try store.create(AttentionItemCreate(title: "C zebra", source: "mcp"))
+    XCTAssertEqual(try store.openCount(), 3)
+
+    let batch = try store.complete(ids: [a.id, b.id, "missing"])
+    XCTAssertEqual(batch.count, 2)
+    XCTAssertEqual(try store.openCount(), 1)
+
+    let matched = try store.completeMatching(
+      AttentionListQuery(status: .open, search: "zebra")
+    )
+    XCTAssertEqual(matched.count, 1)
+    XCTAssertEqual(matched.items[0].id, c.id)
+    XCTAssertEqual(try store.openCount(), 0)
+  }
+
+  func testExportJSONFilters() throws {
+    let store = try WatchOutStore.makeInMemory()
+    let open = try store.create(AttentionItemCreate(title: "Keep open", source: "cli"))
+    let done = try store.create(AttentionItemCreate(title: "Will finish", source: "mcp"))
+    _ = try store.complete(id: done.id)
+
+    let openOnly = try JSONDecoder.watchOut.decode(
+      [AttentionItem].self,
+      from: try store.exportJSON(.init(status: .open))
+    )
+    XCTAssertEqual(openOnly.map(\.id), [open.id])
+
+    let mcpOnly = try JSONDecoder.watchOut.decode(
+      [AttentionItem].self,
+      from: try store.exportJSON(.init(status: nil, source: "mcp"))
+    )
+    XCTAssertEqual(mcpOnly.map(\.id), [done.id])
+
+    let searched = try JSONDecoder.watchOut.decode(
+      [AttentionItem].self,
+      from: try store.exportJSON(.init(status: nil, search: "finish"))
+    )
+    XCTAssertEqual(searched.map(\.id), [done.id])
+  }
 }

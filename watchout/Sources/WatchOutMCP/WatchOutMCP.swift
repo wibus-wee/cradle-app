@@ -8,7 +8,7 @@ enum WatchOutMCPMain {
     let store = try WatchOutStore.makeDefault()
     let server = Server(
       name: "watchout",
-      version: "0.4.0",
+      version: "0.5.0",
       capabilities: .init(
         tools: .init(listChanged: false)
       )
@@ -80,7 +80,11 @@ enum WatchOutMCPTools {
           ]),
           "search": .object([
             "type": .string("string"),
-            "description": .string("Substring match on title/body/source/href"),
+            "description": .string("FTS match on title/body/source/href"),
+          ]),
+          "source": .object([
+            "type": .string("string"),
+            "description": .string("Exact source tag"),
           ]),
           "limit": .object(["type": .string("number")]),
         ]),
@@ -119,13 +123,45 @@ enum WatchOutMCPTools {
     ),
     Tool(
       name: "watchout_complete",
-      description: "Explicitly mark an item done. Prefer human completion for human audience items.",
+      description: "Mark item(s) done. Pass id, ids[], or matching=true with list filters. Explicit only — never auto-complete.",
       inputSchema: .object([
         "type": .string("object"),
         "properties": .object([
           "id": .object(["type": .string("string")]),
+          "ids": .object([
+            "type": .string("array"),
+            "items": .object(["type": .string("string")]),
+          ]),
+          "matching": .object([
+            "type": .string("boolean"),
+            "description": .string("When true, complete all items matching status/audience/source/search"),
+          ]),
+          "status": .object([
+            "type": .string("string"),
+            "description": .string("open | done | all (for matching; default open)"),
+          ]),
+          "audience": .object(["type": .string("string")]),
+          "source": .object(["type": .string("string")]),
+          "search": .object(["type": .string("string")]),
+          "limit": .object(["type": .string("number")]),
         ]),
-        "required": .array([.string("id")]),
+      ])
+    ),
+    Tool(
+      name: "watchout_export",
+      description: "Export matching items as a JSON array. Filters: status/audience/source/search/limit.",
+      inputSchema: .object([
+        "type": .string("object"),
+        "properties": .object([
+          "status": .object([
+            "type": .string("string"),
+            "description": .string("open | done | all (default all)"),
+          ]),
+          "audience": .object(["type": .string("string")]),
+          "source": .object(["type": .string("string")]),
+          "search": .object(["type": .string("string")]),
+          "limit": .object(["type": .string("number")]),
+        ]),
       ])
     ),
     Tool(
@@ -196,10 +232,17 @@ enum WatchOutMCPTools {
         }
       }()
       let audience = arguments?["audience"]?.stringValue.flatMap(AttentionItem.Audience.init(rawValue:))
+      let source = arguments?["source"]?.stringValue
       let search = arguments?["search"]?.stringValue
       let limit = intArgument(arguments?["limit"])
       let items = try store.list(
-        AttentionListQuery(status: status, audience: audience, search: search, limit: limit)
+        AttentionListQuery(
+          status: status,
+          audience: audience,
+          source: source,
+          search: search,
+          limit: limit
+        )
       )
       return try string(from: items, encoder: encoder)
 
@@ -235,10 +278,53 @@ enum WatchOutMCPTools {
       return try string(from: item, encoder: encoder)
 
     case "watchout_complete":
-      guard let id = arguments?["id"]?.stringValue else {
-        throw WatchOutStoreError.database("id required")
+      if arguments?["matching"]?.boolValue == true {
+        let statusRaw = arguments?["status"]?.stringValue ?? "open"
+        let status: AttentionItem.Status? = {
+          switch statusRaw {
+          case "all": return nil
+          case "done": return .done
+          default: return .open
+          }
+        }()
+        let batch = try store.completeMatching(
+          AttentionListQuery(
+            status: status,
+            audience: arguments?["audience"]?.stringValue.flatMap(AttentionItem.Audience.init(rawValue:)),
+            source: arguments?["source"]?.stringValue,
+            search: arguments?["search"]?.stringValue,
+            limit: intArgument(arguments?["limit"])
+          )
+        )
+        return try string(from: batch, encoder: encoder)
       }
-      return try string(from: store.complete(id: id), encoder: encoder)
+      if let ids = stringArrayArgument(arguments?["ids"]), !ids.isEmpty {
+        return try string(from: store.complete(ids: ids), encoder: encoder)
+      }
+      if let id = arguments?["id"]?.stringValue {
+        return try string(from: store.complete(id: id), encoder: encoder)
+      }
+      throw WatchOutStoreError.database("id, ids, or matching required")
+
+    case "watchout_export":
+      let statusRaw = arguments?["status"]?.stringValue ?? "all"
+      let status: AttentionItem.Status? = {
+        switch statusRaw {
+        case "open": return .open
+        case "done": return .done
+        default: return nil
+        }
+      }()
+      let data = try store.exportJSON(
+        AttentionListQuery(
+          status: status,
+          audience: arguments?["audience"]?.stringValue.flatMap(AttentionItem.Audience.init(rawValue:)),
+          source: arguments?["source"]?.stringValue,
+          search: arguments?["search"]?.stringValue,
+          limit: intArgument(arguments?["limit"])
+        )
+      )
+      return String(decoding: data, as: UTF8.self)
 
     case "watchout_reopen":
       guard let id = arguments?["id"]?.stringValue else {
@@ -270,6 +356,20 @@ enum WatchOutMCPTools {
     if let int = value.intValue { return int }
     if let double = value.doubleValue { return Int(double) }
     if let string = value.stringValue, let int = Int(string) { return int }
+    return nil
+  }
+
+  private static func stringArrayArgument(_ value: Value?) -> [String]? {
+    guard let value else { return nil }
+    if let array = value.arrayValue {
+      return array.compactMap(\.stringValue)
+    }
+    if let string = value.stringValue {
+      return string
+        .split(separator: ",")
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    }
     return nil
   }
 

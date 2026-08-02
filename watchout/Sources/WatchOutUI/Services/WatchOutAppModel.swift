@@ -1,5 +1,6 @@
 #if canImport(AppKit)
 import AppKit
+import UniformTypeIdentifiers
 #endif
 import AsyncAlgorithms
 import Defaults
@@ -26,6 +27,8 @@ public final class WatchOutAppModel {
   /// When set, UI should scroll/highlight this id once.
   public var focusedItemId: String?
   public private(set) var lastDeleted: AttentionItem?
+  public var isSelecting = false
+  public var selectedIds: Set<String> = []
 
   @ObservationIgnored
   @Dependency(\.watchOutStore) private var store
@@ -233,10 +236,87 @@ public final class WatchOutAppModel {
   public func complete(_ item: AttentionItem) {
     do {
       _ = try store.complete(id: item.id)
+      selectedIds.remove(item.id)
       openCount = (try? store.openCount()) ?? openCount
     } catch {
       errorMessage = error.localizedDescription
     }
+  }
+
+  public func completeSelected() {
+    let ids = Array(selectedIds)
+    guard !ids.isEmpty else { return }
+    do {
+      let batch = try store.complete(ids: ids)
+      selectedIds.removeAll()
+      isSelecting = false
+      statusMessage = "Completed \(batch.count)."
+      openCount = (try? store.openCount()) ?? openCount
+    } catch {
+      errorMessage = error.localizedDescription
+    }
+  }
+
+  /// Completes every currently displayed open item (respects Done toggle + search).
+  public func completeVisibleOpen() {
+    let ids = items.filter { $0.status == .open }.map(\.id)
+    guard !ids.isEmpty else {
+      statusMessage = "Nothing open to complete."
+      return
+    }
+    do {
+      let batch = try store.complete(ids: ids)
+      selectedIds.removeAll()
+      isSelecting = false
+      statusMessage = "Completed \(batch.count)."
+      openCount = (try? store.openCount()) ?? openCount
+    } catch {
+      errorMessage = error.localizedDescription
+    }
+  }
+
+  public func toggleSelecting() {
+    isSelecting.toggle()
+    if !isSelecting {
+      selectedIds.removeAll()
+    }
+  }
+
+  public func toggleSelection(for item: AttentionItem) {
+    if selectedIds.contains(item.id) {
+      selectedIds.remove(item.id)
+    } else {
+      selectedIds.insert(item.id)
+    }
+  }
+
+  public func selectAllVisible() {
+    selectedIds = Set(items.map(\.id))
+  }
+
+  public func clearSelection() {
+    selectedIds.removeAll()
+  }
+
+  public func exportVisibleToFile() {
+    #if canImport(AppKit)
+    let panel = NSSavePanel()
+    panel.allowedContentTypes = [.json]
+    panel.nameFieldStringValue = "watchout-export.json"
+    panel.canCreateDirectories = true
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    do {
+      let data = try store.exportJSON(currentQuery())
+      try data.write(to: url, options: .atomic)
+      let count = try JSONDecoder.watchOut.decode([AttentionItem].self, from: data).count
+      statusMessage = "Exported \(count)."
+      errorMessage = nil
+    } catch {
+      errorMessage = error.localizedDescription
+    }
+    #else
+    statusMessage = "Export requires macOS."
+    #endif
   }
 
   public func reopen(_ item: AttentionItem) {

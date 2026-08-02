@@ -94,19 +94,32 @@ public struct AttentionItemUpdate: Sendable {
 public struct AttentionListQuery: Sendable, Hashable {
   public var status: AttentionItem.Status?
   public var audience: AttentionItem.Audience?
+  public var source: String?
   public var search: String?
   public var limit: Int?
 
   public init(
     status: AttentionItem.Status? = .open,
     audience: AttentionItem.Audience? = nil,
+    source: String? = nil,
     search: String? = nil,
     limit: Int? = nil
   ) {
     self.status = status
     self.audience = audience
+    self.source = source
     self.search = search
     self.limit = limit
+  }
+}
+
+public struct AttentionBatchResult: Codable, Sendable, Hashable {
+  public var items: [AttentionItem]
+  public var count: Int
+
+  public init(items: [AttentionItem]) {
+    self.items = items
+    self.count = items.count
   }
 }
 

@@ -193,6 +193,35 @@ public final class WatchOutStore: Sendable {
     }
   }
 
+  /// Mark many items done in one write transaction. Missing ids are skipped.
+  @discardableResult
+  public func complete(ids: [String]) throws -> AttentionBatchResult {
+    let uniqueIds = Array(ids.uniqued())
+    let updated = try dbQueue.write { db -> [AttentionItem] in
+      var result: [AttentionItem] = []
+      result.reserveCapacity(uniqueIds.count)
+      let now = Date.now
+      for id in uniqueIds {
+        guard var item = try AttentionItem.fetchOne(db, key: id) else { continue }
+        if item.status != .done {
+          item.status = .done
+          item.completedAt = now
+          try item.update(db)
+        }
+        result.append(item)
+      }
+      return result
+    }
+    return AttentionBatchResult(items: updated)
+  }
+
+  /// Complete every item matching the query (typically `status: .open` + optional search/source).
+  @discardableResult
+  public func completeMatching(_ query: AttentionListQuery) throws -> AttentionBatchResult {
+    let targets = try list(query)
+    return try complete(ids: targets.map(\.id))
+  }
+
   @discardableResult
   public func reopen(id: String) throws -> AttentionItem {
     try mutate(id: id) { item in
@@ -230,10 +259,14 @@ public final class WatchOutStore: Sendable {
     }
   }
 
+  public func exportJSON(_ query: AttentionListQuery = .init(status: nil, limit: nil)) throws -> Data {
+    let items = try list(query)
+    return try JSONEncoder.watchOut.encode(items)
+  }
+
+  /// Convenience: export everything (no status filter).
   public func exportJSON() throws -> Data {
-    let items = try list(.init(status: nil, limit: nil))
-    let encoder = JSONEncoder.watchOut
-    return try encoder.encode(items)
+    try exportJSON(.init(status: nil, limit: nil))
   }
 
   @discardableResult
@@ -369,6 +402,9 @@ public final class WatchOutStore: Sendable {
     if let audience = query.audience {
       request = request.filter(AttentionItem.Columns.audience == audience.rawValue)
     }
+    if let source = query.source?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
+      request = request.filter(AttentionItem.Columns.source == source)
+    }
     request = request.order(AttentionItem.Columns.createdAt.desc)
     if let limit = query.limit {
       request = request.limit(limit)
@@ -403,6 +439,10 @@ public final class WatchOutStore: Sendable {
     if let audience = query.audience {
       sql += " AND attention_items.audience = ?"
       arguments += audience.rawValue
+    }
+    if let source = query.source?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
+      sql += " AND attention_items.source = ?"
+      arguments += source
     }
 
     sql += " ORDER BY rank, attention_items.createdAt DESC"

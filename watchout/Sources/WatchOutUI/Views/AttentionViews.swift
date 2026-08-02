@@ -4,6 +4,9 @@ import WatchOutCore
 struct AttentionItemRow: View {
   let item: AttentionItem
   var focused: Bool = false
+  var selecting: Bool = false
+  var selected: Bool = false
+  let onToggleSelect: () -> Void
   let onComplete: () -> Void
   let onReopen: () -> Void
   let onDelete: () -> Void
@@ -13,14 +16,25 @@ struct AttentionItemRow: View {
 
   var body: some View {
     HStack(spacing: 10) {
-      Button(action: item.status == .open ? onComplete : onReopen) {
-        Image(systemName: item.status == .open ? "circle" : "checkmark.circle.fill")
-          .font(.body)
-          .foregroundStyle(.secondary)
-          .frame(width: 20, height: 20)
+      if selecting {
+        Button(action: onToggleSelect) {
+          Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.plain)
+        .help(selected ? "Deselect" : "Select")
+      } else {
+        Button(action: item.status == .open ? onComplete : onReopen) {
+          Image(systemName: item.status == .open ? "circle" : "checkmark.circle.fill")
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .frame(width: 20, height: 20)
+        }
+        .buttonStyle(.plain)
+        .help(item.status == .open ? "Mark done" : "Reopen")
       }
-      .buttonStyle(.plain)
-      .help(item.status == .open ? "Mark done" : "Reopen")
 
       VStack(alignment: .leading, spacing: 2) {
         Text(item.title)
@@ -44,38 +58,49 @@ struct AttentionItemRow: View {
 
       Spacer(minLength: 0)
 
-      Button(role: .destructive, action: onDelete) {
-        Image(systemName: "xmark")
-          .font(.caption.weight(.semibold))
-          .foregroundStyle(.tertiary)
-          .frame(width: 22, height: 22)
-          .contentShape(Rectangle())
+      if !selecting {
+        Button(role: .destructive, action: onDelete) {
+          Image(systemName: "xmark")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.tertiary)
+            .frame(width: 22, height: 22)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Delete")
       }
-      .buttonStyle(.plain)
-      .help("Delete")
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
     .background(
-      .quaternary.opacity(focused ? 0.55 : 0.35),
+      .quaternary.opacity(focused || selected ? 0.55 : 0.35),
       in: RoundedRectangle(cornerRadius: 18, style: .continuous)
     )
     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     .contextMenu {
-      Button("Edit…", action: onEdit)
-      Button("Copy", action: onCopy)
-      if item.href != nil {
-        Button("Open Link", action: onOpenHref)
-      }
-      Divider()
-      if item.status == .open {
-        Button("Mark Done", action: onComplete)
+      if selecting {
+        Button(selected ? "Deselect" : "Select", action: onToggleSelect)
       } else {
-        Button("Reopen", action: onReopen)
+        Button("Edit…", action: onEdit)
+        Button("Copy", action: onCopy)
+        if item.href != nil {
+          Button("Open Link", action: onOpenHref)
+        }
+        Divider()
+        if item.status == .open {
+          Button("Mark Done", action: onComplete)
+        } else {
+          Button("Reopen", action: onReopen)
+        }
+        Button("Delete", role: .destructive, action: onDelete)
       }
-      Button("Delete", role: .destructive, action: onDelete)
     }
-    .onTapGesture(count: 2, perform: onEdit)
+    .onTapGesture(count: 2) {
+      if !selecting { onEdit() }
+    }
+    .onTapGesture {
+      if selecting { onToggleSelect() }
+    }
   }
 }
 
@@ -247,6 +272,9 @@ struct AttentionListPane: View {
                 AttentionItemRow(
                   item: item,
                   focused: model.focusedItemId == item.id,
+                  selecting: model.isSelecting,
+                  selected: model.selectedIds.contains(item.id),
+                  onToggleSelect: { model.toggleSelection(for: item) },
                   onComplete: { model.complete(item) },
                   onReopen: { model.reopen(item) },
                   onDelete: { model.delete(item) },
@@ -256,7 +284,6 @@ struct AttentionListPane: View {
                 )
                 .onAppear {
                   if model.focusedItemId == item.id {
-                    // Clear focus after first paint so it does not stick forever.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                       if model.focusedItemId == item.id {
                         model.clearFocusedItem()
@@ -272,11 +299,15 @@ struct AttentionListPane: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-      AttentionComposer(
-        title: $model.draftTitle,
-        onSubmit: { model.createFromDraft() },
-        onParkClipboard: { model.parkClipboard() }
-      )
+      if model.isSelecting {
+        selectionBar
+      } else {
+        AttentionComposer(
+          title: $model.draftTitle,
+          onSubmit: { model.createFromDraft() },
+          onParkClipboard: { model.parkClipboard() }
+        )
+      }
     }
     .padding(10)
     .onAppear { model.refresh() }
@@ -286,6 +317,28 @@ struct AttentionListPane: View {
     )) {
       AttentionEditSheet(model: model)
     }
+  }
+
+  private var selectionBar: some View {
+    HStack(spacing: 8) {
+      Text("\(model.selectedIds.count) selected")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+      Spacer(minLength: 0)
+      Button("All") { model.selectAllVisible() }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+      Button("Complete") { model.completeSelected() }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .disabled(model.selectedIds.isEmpty)
+      Button("Cancel") { model.toggleSelecting() }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(.quaternary.opacity(0.45), in: Capsule(style: .continuous))
   }
 
   private var header: some View {
@@ -303,6 +356,25 @@ struct AttentionListPane: View {
       }
 
       Spacer(minLength: 8)
+
+      Menu {
+        Button(model.isSelecting ? "Cancel Selection" : "Select…") {
+          model.toggleSelecting()
+        }
+        Button("Complete Visible Open") {
+          model.completeVisibleOpen()
+        }
+        .disabled(model.items.allSatisfy { $0.status != .open })
+        Divider()
+        Button("Export Visible…") {
+          model.exportVisibleToFile()
+        }
+        .disabled(model.items.isEmpty)
+      } label: {
+        Image(systemName: "ellipsis.circle")
+      }
+      .menuStyle(.borderlessButton)
+      .fixedSize()
 
       Toggle("Done", isOn: Binding(
         get: { model.showDone },

@@ -10,7 +10,7 @@ Not part of Cradle. Cradle may become a *client* later via MCP/CLI.
 |---|---|
 | **Menu bar app** (`LSUIElement`) | Always available; open count; quick list / create / complete |
 | **Floating panel** | Draggable, optional always-on-top scratch panel |
-| **CLI** `watchout` | `create` / `get` / `list` / `search` / `update` / `complete` / `reopen` / `delete` / `restore` / `count` / `export` / `import` / `url` |
+| **CLI** `watchout` | `create` / `get` / `list` / `search` / `update` / `complete` (batch/`--matching`) / `reopen` / `delete` / `restore` / `count` / `export` (filters) / `import` / `url` |
 | **MCP** `watchout-mcp` | Same verbs for agents |
 | **URL scheme** | `watchout://park?title=…` · `watchout://item?id=…` · `watchout://show` |
 

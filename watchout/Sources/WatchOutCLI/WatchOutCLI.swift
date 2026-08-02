@@ -7,7 +7,7 @@ struct WatchOutCLI: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "watchout",
     abstract: "WatchOut — local Attention Object Store (parking slips).",
-    version: "0.4.0",
+    version: "0.5.0",
     subcommands: [
       Create.self,
       Get.self,
@@ -94,6 +94,9 @@ extension WatchOutCLI {
     @Option(name: .long, help: "Filter audience: human | agent | any")
     var audience: String?
 
+    @Option(name: .long, help: "Exact source tag")
+    var source: String?
+
     @Option(name: .long, help: "Substring search across title/body/source/href")
     var search: String?
 
@@ -126,6 +129,7 @@ extension WatchOutCLI {
         AttentionListQuery(
           status: statusFilter,
           audience: audienceFilter,
+          source: source,
           search: search,
           limit: limit
         )
@@ -220,18 +224,80 @@ extension WatchOutCLI {
   }
 
   struct Complete: ParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Mark an item done (explicit)")
+    static let configuration = CommandConfiguration(
+      abstract: "Mark item(s) done. Pass ids, or use --matching with filters."
+    )
 
-    @Argument(help: "Item id")
-    var id: String
+    @Argument(help: "Item id(s)")
+    var ids: [String] = []
+
+    @Flag(name: .long, help: "Complete every item matching the filters below")
+    var matching = false
+
+    @Option(name: .long, help: "Filter status when using --matching: open | done | all (default open)")
+    var status: String = "open"
+
+    @Option(name: .long, help: "Filter audience when using --matching")
+    var audience: String?
+
+    @Option(name: .long, help: "Exact source tag when using --matching")
+    var source: String?
+
+    @Option(name: .long, help: "Search query when using --matching")
+    var search: String?
+
+    @Option(name: .long, help: "Max rows when using --matching")
+    var limit: Int?
 
     @Flag(name: .long, help: "Print JSON")
     var json = false
 
     func run() throws {
       let store = try WatchOutStore.makeDefault()
-      let item = try store.complete(id: id)
-      try emit(item, json: json)
+      let batch: AttentionBatchResult
+      if matching {
+        if !["all", "open", "done"].contains(status) {
+          throw ValidationError("status must be open|done|all")
+        }
+        let statusFilter: AttentionItem.Status? = {
+          switch status {
+          case "all": return nil
+          case "done": return .done
+          default: return .open
+          }
+        }()
+        let audienceFilter = try audience.map { raw -> AttentionItem.Audience in
+          guard let value = AttentionItem.Audience(rawValue: raw) else {
+            throw ValidationError("audience must be human|agent|any")
+          }
+          return value
+        }
+        batch = try store.completeMatching(
+          AttentionListQuery(
+            status: statusFilter,
+            audience: audienceFilter,
+            source: source,
+            search: search,
+            limit: limit
+          )
+        )
+      } else {
+        guard !ids.isEmpty else {
+          throw ValidationError("provide id(s) or --matching")
+        }
+        batch = try store.complete(ids: ids)
+      }
+
+      if json {
+        let data = try JSONEncoder.watchOut.encode(batch)
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+      } else {
+        print("completed \(batch.count)")
+        for item in batch.items {
+          print("\(item.id)\t\(item.title)")
+        }
+      }
     }
   }
 
@@ -308,17 +374,60 @@ extension WatchOutCLI {
   }
 
   struct Export: ParsableCommand {
-    static let configuration = CommandConfiguration(abstract: "Export all items as JSON")
+    static let configuration = CommandConfiguration(
+      abstract: "Export items as JSON (optional status/audience/source/search filters)"
+    )
+
+    @Option(name: .long, help: "Filter status: open | done | all (default all)")
+    var status: String = "all"
+
+    @Option(name: .long, help: "Filter audience: human | agent | any")
+    var audience: String?
+
+    @Option(name: .long, help: "Exact source tag")
+    var source: String?
+
+    @Option(name: .long, help: "FTS search query")
+    var search: String?
+
+    @Option(name: .long, help: "Max rows")
+    var limit: Int?
 
     @Option(name: .shortAndLong, help: "Write to file instead of stdout")
     var output: String?
 
     func run() throws {
+      if !["all", "open", "done"].contains(status) {
+        throw ValidationError("status must be open|done|all")
+      }
+      let statusFilter: AttentionItem.Status? = {
+        switch status {
+        case "open": return .open
+        case "done": return .done
+        default: return nil
+        }
+      }()
+      let audienceFilter = try audience.map { raw -> AttentionItem.Audience in
+        guard let value = AttentionItem.Audience(rawValue: raw) else {
+          throw ValidationError("audience must be human|agent|any")
+        }
+        return value
+      }
+
       let store = try WatchOutStore.makeDefault()
-      let data = try store.exportJSON()
+      let data = try store.exportJSON(
+        AttentionListQuery(
+          status: statusFilter,
+          audience: audienceFilter,
+          source: source,
+          search: search,
+          limit: limit
+        )
+      )
       if let output {
         try data.write(to: URL(fileURLWithPath: output), options: .atomic)
-        print("exported \(output)")
+        let count = try JSONDecoder.watchOut.decode([AttentionItem].self, from: data).count
+        print("exported \(count) → \(output)")
       } else {
         FileHandle.standardOutput.write(data)
         FileHandle.standardOutput.write(Data("\n".utf8))
