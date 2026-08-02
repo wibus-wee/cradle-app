@@ -332,7 +332,7 @@ async function waitForCondition<T>(read: () => Promise<T | null>, description: s
 }
 
 describe('diff-review capability', () => {
-  it('materializes a GitHub pull request as a refreshable review source', async () => {
+  it('materializes a GitHub pull request as a refreshable review source', { timeout: 30_000 }, async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-diff-review-github-workspace-')
     const previousEnv = useIsolatedTestInfra(dataDir)

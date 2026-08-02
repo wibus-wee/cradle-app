@@ -153,8 +153,9 @@ function completedResponse(
 }
 
 function streamSteps(response: JsonObject, text: string): readonly StreamStep[] {
-  const message = isJsonArray(response.output) ? response.output[0] : undefined
-  const messageId = isJsonObject(message) && typeof message.id === 'string'
+  const outputItem = isJsonArray(response.output) ? response.output[0] : undefined
+  const message = outputItem !== undefined && isJsonObject(outputItem) ? outputItem : undefined
+  const messageId = message && typeof message.id === 'string'
     ? message.id
     : 'msg_simulator_auto'
   const events: JsonValue[] = [

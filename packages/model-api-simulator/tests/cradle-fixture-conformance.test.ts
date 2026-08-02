@@ -22,14 +22,15 @@ function loadFixture(name: string): {
   }
 }
 
-function asObserved(fixture: ReturnType<typeof loadFixture>, provider: 'anthropic' | 'openai'): ObservedRequest {
+function asObserved(fixture: ReturnType<typeof loadFixture>): ObservedRequest {
   return {
-    provider,
     method: fixture.method,
     path: fixture.path,
     query: {},
     headers: {},
-    body: fixture.body as ObservedRequest['body'],
+    ...(fixture.body !== undefined && fixture.body !== null
+      ? { body: fixture.body as NonNullable<ObservedRequest['body']> }
+      : {}),
     index: 0,
   }
 }
@@ -86,8 +87,8 @@ describe('cradle Agent / Codex request fixtures', () => {
       },
     }
     controller.enqueue({ provider: 'anthropic', exchanges: [exchange] })
-    expect(controller.nextMatches('anthropic', asObserved(fixture, 'anthropic'))).toBe(true)
-    const matched = controller.take('anthropic', asObserved(fixture, 'anthropic'))
+    expect(controller.nextMatches('anthropic', asObserved(fixture))).toBe(true)
+    const matched = controller.take('anthropic', asObserved(fixture))
     expect(matched.label).toBe('claude-agent-fixture')
     controller.assertExhausted()
   })
@@ -118,8 +119,8 @@ describe('cradle Agent / Codex request fixtures', () => {
       },
     }
     controller.enqueue({ provider: 'openai', exchanges: [exchange] })
-    expect(controller.nextMatches('openai', asObserved(fixture, 'openai'))).toBe(true)
-    const matched = controller.take('openai', asObserved(fixture, 'openai'))
+    expect(controller.nextMatches('openai', asObserved(fixture))).toBe(true)
+    const matched = controller.take('openai', asObserved(fixture))
     expect(matched.label).toBe('codex-fixture')
     controller.assertExhausted()
   })

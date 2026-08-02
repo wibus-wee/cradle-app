@@ -3,12 +3,12 @@ export type JsonArray = readonly JsonValue[]
 export type JsonObject = { readonly [key: string]: JsonValue }
 export type JsonValue = JsonPrimitive | JsonArray | JsonObject
 
-export function isJsonArray(value: JsonValue): value is JsonArray {
+export function isJsonArray(value: JsonValue | undefined): value is JsonArray {
   return Array.isArray(value)
 }
 
-export function isJsonObject(value: JsonValue): value is JsonObject {
-  return value !== null && typeof value === 'object' && !isJsonArray(value)
+export function isJsonObject(value: JsonValue | undefined): value is JsonObject {
+  return value !== null && value !== undefined && typeof value === 'object' && !isJsonArray(value)
 }
 
 export interface RequestMatch {
