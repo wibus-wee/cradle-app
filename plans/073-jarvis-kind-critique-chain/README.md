@@ -19,4 +19,8 @@ Multi-round adversarial strategy chain (2026-08-02). **Macro only** — no imple
 | G | `20260802-constitution-draft-SynthesizerG.md` | Draft synthesis |
 | H | `20260802-draft-review-CriticH.md` | Final adversarial review |
 | I | `20260802-reality-audit-AuditorI.md` | Reality audit vs Cradle today |
-| J | `20260802-FINAL-cradle-platform-constitution.md` | **FINAL** |
+| J | `20260802-FINAL-cradle-platform-constitution.md` | Constitution FINAL |
+| K | `20260802-can-win-AffirmativeK.md` | Competitive affirmative |
+| L | `20260802-cannot-dominate-NegativeL.md` | Competitive kill shot |
+| M | `20260802-combat-cards-AnalystM.md` | Head-to-head combat cards |
+| N | `20260802-FINAL-competitive-verdict.md` | **Competitive verdict FINAL** |
