@@ -122,11 +122,7 @@ tool 输出内联），以及一个静默 bug：超过 128 000 字符的 tool pa
 最初的 072/073/074 三份拆分草稿与其未写的 075 回填。
 
 2026-08-02 补充 Plan 073：Cradle Platform Constitution — Jarvis as Agent Kind。
-多轮 adversarial critique-chain 产出的**宪法/方向**文档（非实现计划）。核心定论：
-Jarvis 是窄义 Platform Kind（管家身份），不是聊天升级、不是 HiJarvis 品牌、不是第二调度器；
-默认 propose-before-act；诚实委托语义 + 工作账本 + Session 执行载体双中心；IRON LAW 升格为
-对所有 native 与 Kind 概念本身的宪法。人类决策：accept / amend / reject。链式辩论底稿见
-`plans/073-jarvis-kind-critique-chain/`。不重开 Plan 061/062 的既定生命周期边界。
+**宪法/方向**文档（非实现计划）。核心定论：Jarvis 是窄义 Platform Kind（管家身份），不是聊天升级、不是 HiJarvis 品牌、不是第二调度器；默认 propose-before-act；诚实委托语义 + 工作账本 + Session 执行载体双中心；IRON LAW 升格为对所有 native 与 Kind 概念本身的宪法。竞争姿态是拒克隆 / niche 天花板，不是征服。人类决策：accept / amend / reject。不重开 Plan 061/062 的既定生命周期边界。
 
 Each executor: read the plan fully before starting, run its drift check, honor its
 STOP conditions, and update your row below when done. Plans are self-contained —

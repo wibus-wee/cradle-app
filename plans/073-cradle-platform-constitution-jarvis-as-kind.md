@@ -1,7 +1,7 @@
 # Plan 073: Cradle Platform Constitution — Jarvis as Agent Kind
 
 > **Type:** Constitution / direction (not an implementation plan).  
-> **Executor instructions:** Do **not** implement from this document. Human decision first. Critique-chain artifacts live in `plans/073-jarvis-kind-critique-chain/`. Related: Plan 061 (cognition stack), Plan 062 (Claude projection / IRON LAW).
+> **Executor instructions:** Do **not** implement from this document. Human decision first. Related: Plan 061 (cognition stack), Plan 062 (Claude projection / IRON LAW).
 
 ## Plan status
 
@@ -479,23 +479,23 @@ Cradle does not conquer competitor categories. Cradle occupies the empty interse
 
 If the story is told as…
 
-| Story | Absorbed by |
+| Story | Absorbed by category |
 |---|---|
-| “Operator for your AI team” | Operator-workplace products |
-| “Agents on your board” | teammate work-graph products |
-| “One harness to rule them” | meta-harness products |
-| “Orchestrate coding agents in worktrees” | builder-orchestrator products |
+| “Operator for your AI team” | Operator-workplace |
+| “Agents on your board” | Teammate work-graph |
+| “One harness to rule them” | Meta-harness |
+| “Orchestrate coding agents in worktrees” | Builder-orchestrator |
 
 …the constitution has failed. The sentence must keep: **non-ownership of native scheduling + durable receipts + narrow elevated Kind (not flat teammate, not monopoly).**
 
-### Principles to copy (not products)
+### Principles to copy (from adjacent categories — not named products)
 
-- **thin agent-multiplexer products:** lifecycle honesty over wrapped fiction.  
-- **builder-orchestrator products:** platform owns truthfulness; agents own strategy (Cradle: truth + receipts; Kind/human own strategy).  
-- **teammate work-graph products:** durable work objects beat chat archaeology — without flat teammate ontology.  
-- **meta-harness products:** governance as product surface — without owning the harness.  
-- **Operator-workplace products:** continuous operator identity is desirable — reject playground schedule ownership.  
-- **single-agent multi-surface runtimes:** runtime excellence belongs to natives/workers, not to Cradle pretending to be the one mind.
+- **Thin multiplexer:** lifecycle honesty over wrapped fiction.  
+- **Builder-orchestrator:** platform owns truthfulness; agents own strategy (Cradle: truth + receipts; Kind/human own strategy).  
+- **Teammate work-graph:** durable work objects beat chat archaeology — without flat teammate ontology.  
+- **Meta-harness:** governance as product surface — without owning the harness.  
+- **Operator-workplace:** continuous operator identity is desirable — reject playground schedule ownership.  
+- **Single-agent multi-surface runtime:** runtime excellence belongs to natives/workers, not to Cradle pretending to be the one mind.
 
 ---
 
