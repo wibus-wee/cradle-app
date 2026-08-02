@@ -69,11 +69,14 @@ async function flush(): Promise<void> {
   await Promise.resolve()
 }
 
-async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    if (predicate()) { return }
+async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return
+    }
     await flush()
-    await new Promise<void>(resolve => setImmediate(resolve))
+    await new Promise<void>(resolve => setTimeout(resolve, 10))
   }
   throw new Error('Condition did not become true.')
 }
