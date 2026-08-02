@@ -172,6 +172,8 @@ Focused validation:
     go test ./...
 
 The server test starts a real relayd subprocess and verifies pairing, an HTTP
-request through the tunnel, pinned-pubkey reconnect, 1/8/64/128 concurrent
-64 KiB transfers while 32 unrelated requests remain hung, and a successful
-post-load probe on the same tunnel.
+request through the tunnel, pinned-pubkey reconnect, concurrent transfers while
+32 unrelated requests remain hung (1/8/64/128 × 64 KiB, plus 256 KiB × 32 and
+512 KiB × 1/32 so mid-stream write acknowledgements are required), and a
+successful post-load probe on the same tunnel. The e2e host bridge releases
+stream credit after local TCP writes complete, matching production transports.
