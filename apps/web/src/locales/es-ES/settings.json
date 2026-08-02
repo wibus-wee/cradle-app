@@ -277,7 +277,7 @@
   "features.loading": "Loading feature flags...",
   "features.localAuthForDangerousActions.description": "Ask the desktop app for system verification before deleting agents, issues, or workspaces.",
   "features.localAuthForDangerousActions.label": "System verification for destructive actions",
-  "features.multiWorkspace.description": "Enable the CRA-026 symlink workspace POC. New multi-folder workspaces are created under ~/Documents/Cradle/workspaces and registered as normal workspaces.",
+  "features.multiWorkspace.description": "Activa el POC de workspace symlink CRA-026. Combina proyectos locales ya registrados en un workspace de Cradle bajo ~/Documents/Cradle/workspaces. Work no está soportado en workspaces multifolder.",
   "features.multiWorkspace.label": "Multi-folder workspace POC",
   "features.nativeProviderSkillProjection.description": "Proyecta skills de plugins habilitados y skills incluidas en las carpetas nativas de Codex y Claude para inicios de provider sin agent.",
   "features.nativeProviderSkillProjection.label": "Raíces nativas de skills del provider",

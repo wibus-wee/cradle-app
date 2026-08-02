@@ -9,6 +9,7 @@ import {
   PlusLine as PlusIcon,
 } from '@mingcute/react'
 import type { ComponentProps, ReactNode } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
@@ -29,6 +30,8 @@ import {
 } from '~/components/ui/menu'
 import { cn } from '~/lib/cn'
 
+import type { Workspace } from './types'
+import { WorkspaceMultiFolderMenuView } from './workspace-multi-folder-menu-view'
 import type { WorkspaceSidebarListFilters, WorkspaceSidebarProjectScope, WorkspaceSidebarProjectSortDirection, WorkspaceSidebarProjectSortKey, WorkspaceSidebarSourceFilter, WorkspaceSidebarStatusFilter, WorkspaceSidebarWorkPrFilter } from './workspace-sidebar-ui-store'
 import {
   DEFAULT_SESSION_PREVIEW_LIMIT,
@@ -94,6 +97,8 @@ export interface WorkspaceProjectsSectionViewProps {
   sessionPreviewLimit: number
   adding: boolean
   multiWorkspaceEnabled: boolean
+  multiFolderCandidates: readonly Workspace[]
+  multiFolderCreating: boolean
   hasUnreadWorkspaceSessions: boolean
   markingAllSessionsRead: boolean
   children: ReactNode
@@ -111,7 +116,10 @@ export interface WorkspaceProjectsSectionViewProps {
   onSessionPreviewLimitChange: (limit: number) => void
   onCollapseAll: () => void
   onAddFromPicker: () => void
-  onOpenMultiWorkspaceDialog: () => void
+  onCreateMultiFolder: (input: {
+    name: string
+    folders: Array<{ name: string, path: string }>
+  }) => Promise<void>
   onMarkAllAsRead: () => void
 }
 
@@ -125,6 +133,8 @@ export function WorkspaceProjectsSectionView({
   sessionPreviewLimit,
   adding,
   multiWorkspaceEnabled,
+  multiFolderCandidates,
+  multiFolderCreating,
   hasUnreadWorkspaceSessions,
   markingAllSessionsRead,
   children,
@@ -140,7 +150,7 @@ export function WorkspaceProjectsSectionView({
   onSessionPreviewLimitChange,
   onCollapseAll,
   onAddFromPicker,
-  onOpenMultiWorkspaceDialog,
+  onCreateMultiFolder,
   onMarkAllAsRead,
 }: WorkspaceProjectsSectionViewProps) {
   const { t } = useTranslation('workspace')
@@ -165,6 +175,17 @@ export function WorkspaceProjectsSectionView({
     listFilters.sourceFilters.map(filter => t(`sidebar.filter.source.${filter}`)),
     t('sidebar.filter.any'),
   )
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [emptyAddMenuOpen, setEmptyAddMenuOpen] = useState(false)
+
+  const commitMultiFolder = async (input: {
+    name: string
+    folders: Array<{ name: string, path: string }>
+  }) => {
+    await onCreateMultiFolder(input)
+    setAddMenuOpen(false)
+    setEmptyAddMenuOpen(false)
+  }
 
   return (
     <div className="flex min-w-0 flex-col">
@@ -419,7 +440,7 @@ export function WorkspaceProjectsSectionView({
           </Menu>
           {multiWorkspaceEnabled
             ? (
-                <Menu>
+                <Menu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
                   <MenuTrigger
                     render={(
                       <Button
@@ -444,10 +465,22 @@ export function WorkspaceProjectsSectionView({
                       <FolderPlusIcon className="size-3" />
                       {t('sidebar.action.addProject')}
                     </MenuItem>
-                    <MenuItem onClick={onOpenMultiWorkspaceDialog}>
-                      <FolderIcon className="size-3" />
-                      {t('sidebar.action.addMultiWorkspace')}
-                    </MenuItem>
+                    <MenuSub>
+                      <MenuSubTrigger>
+                        <FolderIcon className="size-3" />
+                        {t('sidebar.action.addMultiWorkspace')}
+                      </MenuSubTrigger>
+                      <MenuSubPopup
+                        {...SUB_POPUP_PROPS}
+                        className="w-auto p-0"
+                      >
+                        <WorkspaceMultiFolderMenuView
+                          candidates={multiFolderCandidates}
+                          creating={multiFolderCreating}
+                          onCommit={commitMultiFolder}
+                        />
+                      </MenuSubPopup>
+                    </MenuSub>
                   </MenuPopup>
                 </Menu>
               )
@@ -490,7 +523,7 @@ export function WorkspaceProjectsSectionView({
                 </div>
                 {multiWorkspaceEnabled
                   ? (
-                      <Menu>
+                      <Menu open={emptyAddMenuOpen} onOpenChange={setEmptyAddMenuOpen}>
                         <MenuTrigger
                           render={(
                             <Button
@@ -518,10 +551,22 @@ export function WorkspaceProjectsSectionView({
                             <FolderPlusIcon className="size-3" />
                             {t('sidebar.action.addProject')}
                           </MenuItem>
-                          <MenuItem onClick={onOpenMultiWorkspaceDialog}>
-                            <FolderIcon className="size-3" />
-                            {t('sidebar.action.addMultiWorkspace')}
-                          </MenuItem>
+                          <MenuSub>
+                            <MenuSubTrigger>
+                              <FolderIcon className="size-3" />
+                              {t('sidebar.action.addMultiWorkspace')}
+                            </MenuSubTrigger>
+                            <MenuSubPopup
+                              {...SUB_POPUP_PROPS}
+                              className="w-auto p-0"
+                            >
+                              <WorkspaceMultiFolderMenuView
+                                candidates={multiFolderCandidates}
+                                creating={multiFolderCreating}
+                                onCommit={commitMultiFolder}
+                              />
+                            </MenuSubPopup>
+                          </MenuSub>
                         </MenuPopup>
                       </Menu>
                     )

@@ -53,7 +53,7 @@ import type { WorkSummary } from '~/features/work/use-work'
 import { useWorks, useWorkspaceWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import type { Workspace } from '~/features/workspace/types'
-import { getLocalWorkspacePath, getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { getLocalWorkspacePath, getWorkspaceLocationLabel, isLocalWorkspace } from '~/features/workspace/types'
 import { cn } from '~/lib/cn'
 import { authorizeDangerousAction, isElectron, nativeIpc } from '~/lib/electron'
 import { useIsActiveSurfaceId } from '~/navigation/active-surface'
@@ -93,9 +93,6 @@ import {
 import { WorkspaceAddDialog } from './workspace-add-dialog'
 import { WorkspaceGroupDisclosure } from './workspace-group-disclosure'
 import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
-import {
-  WorkspaceMultiFolderDialog,
-} from './workspace-multi-folder-dialog'
 import { WorkspaceProjectsSectionView } from './workspace-projects-section-view'
 import { WorkspaceRecentSessionListView } from './workspace-recent-session-list-view'
 import {
@@ -1054,8 +1051,12 @@ interface WorkspaceSidebarBodyProps {
   runtimeIconByKind: RuntimeIconByKind
   adding: boolean
   multiWorkspaceEnabled: boolean
+  multiFolderCreating: boolean
   onAddFromPicker: () => void
-  onOpenMultiWorkspaceDialog: () => void
+  onCreateMultiFolder: (input: {
+    name: string
+    folders: Array<{ name: string, path: string }>
+  }) => Promise<void>
   hasUnreadWorkspaceSessions: boolean
   markingAllSessionsRead: boolean
   onMarkAllAsRead: () => void
@@ -1072,8 +1073,9 @@ const WorkspaceSidebarBody = memo(
     runtimeIconByKind,
     adding,
     multiWorkspaceEnabled,
+    multiFolderCreating,
     onAddFromPicker,
-    onOpenMultiWorkspaceDialog,
+    onCreateMultiFolder,
     hasUnreadWorkspaceSessions,
     markingAllSessionsRead,
     onMarkAllAsRead,
@@ -1351,6 +1353,11 @@ const WorkspaceSidebarBody = memo(
           sessionPreviewLimit={sessionPreviewLimit}
           adding={adding}
           multiWorkspaceEnabled={multiWorkspaceEnabled}
+          multiFolderCandidates={workspaces.filter(workspace =>
+            isLocalWorkspace(workspace)
+            && workspace.availability === 'available'
+            && !workspace.multiFolder)}
+          multiFolderCreating={multiFolderCreating}
           hasUnreadWorkspaceSessions={hasUnreadWorkspaceSessions}
           markingAllSessionsRead={markingAllSessionsRead}
           onProjectScopeChange={setProjectScope}
@@ -1365,7 +1372,7 @@ const WorkspaceSidebarBody = memo(
           onSessionPreviewLimitChange={setSessionPreviewLimit}
           onCollapseAll={() => collapseAllWorkspaces(workspaceIds)}
           onAddFromPicker={onAddFromPicker}
-          onOpenMultiWorkspaceDialog={onOpenMultiWorkspaceDialog}
+          onCreateMultiFolder={onCreateMultiFolder}
           onMarkAllAsRead={onMarkAllAsRead}
         >
           {isRecentSessionSort
@@ -1465,7 +1472,6 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
   const { remove } = useDeleteWorkspace()
   const { togglePin } = useToggleWorkspacePin()
   const [addWorkspaceDialogOpen, setAddWorkspaceDialogOpen] = useState(false)
-  const [multiFolderDialogOpen, setMultiFolderDialogOpen] = useState(false)
   const multiWorkspaceEnabled = useFeatureFlag('multiWorkspacePoc')
   const localAuthForDangerousActions = useFeatureFlag('localAuthForDangerousActions')
   const { mutateAsync: createMultiFolderWorkspace, isPending: creatingMultiFolderWorkspace }
@@ -1573,14 +1579,14 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
           throwOnError: true,
         })
         toastManager.add({ type: 'success', title: t('workspace.toast.multiFolderCreated') })
-        setMultiFolderDialogOpen(false)
       }
- catch (error) {
+      catch (error) {
         toastManager.add({
           type: 'error',
           title: t('workspace.toast.multiFolderCreateFailed'),
           description: formatToastError(error),
         })
+        throw error
       }
     },
     [createMultiFolderWorkspace, t],
@@ -1683,8 +1689,9 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
             runtimeIconByKind={runtimeIconByKind}
             adding={adding}
             multiWorkspaceEnabled={multiWorkspaceEnabled}
+            multiFolderCreating={creatingMultiFolderWorkspace}
             onAddFromPicker={() => setAddWorkspaceDialogOpen(true)}
-            onOpenMultiWorkspaceDialog={() => setMultiFolderDialogOpen(true)}
+            onCreateMultiFolder={handleCreateMultiFolderWorkspace}
             hasUnreadWorkspaceSessions={unreadWorkspaceSessions.length > 0}
             markingAllSessionsRead={markingAllSessionsRead}
             onMarkAllAsRead={handleMarkAllAsRead}
@@ -1693,12 +1700,6 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
           />
         </div>
       </ScrollArea>
-      <WorkspaceMultiFolderDialog
-        open={multiFolderDialogOpen && multiWorkspaceEnabled}
-        creating={creatingMultiFolderWorkspace}
-        onOpenChange={setMultiFolderDialogOpen}
-        onCommit={handleCreateMultiFolderWorkspace}
-      />
       <WorkspaceAddDialog
         open={addWorkspaceDialogOpen}
         creating={adding}

@@ -13,7 +13,7 @@ import { DraftChatComposerWithState } from '~/features/chat/composer/containers/
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { useComposerState } from '~/features/composer-toolbar'
 import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
-import { isLocalWorkspace } from '~/features/workspace/types'
+import { isWorkEligibleWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { apiErrorMessage } from '~/lib/api-error'
@@ -48,7 +48,7 @@ export function NewWorkPage() {
   const { workspaces, loading } = useWorkspaces()
   const { addFromPicker, adding } = useAddWorkspace()
   const localWorkspaces = useMemo(
-    () => workspaces.filter(isLocalWorkspace),
+    () => workspaces.filter(isWorkEligibleWorkspace),
     [workspaces],
   )
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(() => {

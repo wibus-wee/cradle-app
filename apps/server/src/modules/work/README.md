@@ -12,7 +12,8 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
   whole collection. Point lookups (`get`) still surface
   `work_primary_thread_missing` for a specific broken Work.
 - Work creation requires a local Git workspace and an immediately active
-  managed Worktree.
+  managed Worktree. Multi-folder (symlink composition) workspaces are rejected;
+  Work needs a single primary repository root.
 - Default creation bases the managed Worktree on a clean local `HEAD`
   (`baseStrategy: source-head`). When the source checkout is dirty, clients may
   explicitly opt into `baseStrategy: remote-default` to start from the remote

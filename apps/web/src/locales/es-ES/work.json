@@ -46,7 +46,7 @@
   "new.title": "Nuevo Work",
   "new.tryAgain": "Intentar de nuevo",
   "new.workspace": "Espacio de trabajo",
-  "new.workspaceRequired": "Elige un espacio de trabajo Git local para iniciar el Work.",
+  "new.workspaceRequired": "Elige un espacio Git local de una sola carpeta para iniciar Work. Los espacios multifolder no están soportados.",
   "sidebar.archive": "Archivar Work",
   "sidebar.draft": "Draft PR #{{number}}",
   "sidebar.merged": "PR fusionado #{{number}}",

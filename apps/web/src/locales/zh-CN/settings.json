@@ -280,7 +280,7 @@
   "features.loading": "正在加载功能开关...",
   "features.localAuthForDangerousActions.description": "在删除 agent、issue 或工作区之前，向桌面应用请求系统验证。",
   "features.localAuthForDangerousActions.label": "破坏性操作的系统验证",
-  "features.multiWorkspace.description": "启用 CRA-026 symlink 工作区 POC。新建的多文件夹工作区位于 ~/Documents/Cradle/workspaces，按普通工作区注册。",
+  "features.multiWorkspace.description": "启用 CRA-026 symlink 工作区 POC。将已注册的本地项目组合成位于 ~/Documents/Cradle/workspaces 的 Cradle 工作区。多文件夹工作区不支持 Work。",
   "features.multiWorkspace.label": "多文件夹工作区 POC",
   "features.nativeProviderSkillProjection.description": "开启后，Agent 可以发现并使用 Cradle 提供的全部能力，包括已启用插件和内置技能。",
   "features.nativeProviderSkillProjection.label": "让 Agent 使用 Cradle 的全部能力",
