@@ -28,6 +28,9 @@ AI SDK wire validation is intentionally limited to the SSE boundary through `uiM
 - **composer/bang-pty.ts**: Helpers for Composer bang PTY door detection, namespaced pty ids, and discard-confirm transcript heuristics.
 - **composer/views/composer-bang-pty-view.tsx**: Props-only dark PTY chrome with discard / write-back actions.
 - **composer/containers/composer-bang-pty-container.tsx**: Mounts Cradle `ShellView`, owns discard confirm, and persists scrubbed transcripts through `/bang-transcript`.
+- **composer/stories/composer-bang-pty-view.stories.tsx**: Server-free gallery for idle, with-output, and busy write-back bang PTY chrome.
+- **composer/stories/composer-view.stories.tsx**: Includes a `BangPty` state that mounts the bang PTY surface inside ComposerView.
+- **fixtures/screenshots/composer-bang-pty.png**: Preview capture of the bang PTY chrome with discard / write-back actions.
 - **bang-command-metadata.ts**: Trusted metadata reader for Cradle-owned `metadata.cradle.bangResult` snapshots persisted by Chat Runtime.
 - **chat-slash-commands.ts**: Web-owned slash command descriptor and merge helpers; converts runtime-native commands and command-like runtime UI slots into composer actions, annotates matching runtime slot command rows with provider-owned state labels, filters picker/metadata slots out of the slash panel, executes provider-declared slot `commandAction` metadata for submit/UI actions, hides `requiresSession` slots from pre-session draft composers, registers Cradle UI commands such as `/appshot` and `/side`, and keeps Cradle UI commands separate from provider capabilities
 - **transcript/views/message-bubble-view.tsx**: Direct props-only message bubble renderer for fully materialized `UIMessage` fixtures, exports, and host-provided callbacks. It has no store, session, route, Electron, or runtime dependency.
