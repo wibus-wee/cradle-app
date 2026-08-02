@@ -17,6 +17,7 @@ pnpm --filter @cradle/plugin-sdk build
 # Optional: provision native Codex app-server for Codex essence scenarios
 pnpm --filter @cradle/desktop sync:codex-runtime
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0"
+pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0 or @P1"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@essence"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "not @wip"
 ```
@@ -27,7 +28,13 @@ pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "not @wip"
   (`e2e/**`, `packages/model-api-simulator/**`, `apps/web/**`, `apps/server/**`, …)
   **or** when the `e2e` label is present (force / keep running).
 - Always checks out the **PR head**, provisions Codex via `sync:codex-runtime`.
-- Daily defaults to `@essence`.
+- Daily (`e2e-daily.yml`) defaults to **`@P0 or @P1`** (full active priority suite).
+  Failures open a GitHub Issue labeled `daily-e2e-failure` assigned to `wibus-wee`.
+- Tag model:
+  - `@P0` — smoke / must-never-break core path
+  - `@P1` — important journeys (daily with P0)
+  - `@essence` — quality marker (every live scenario should be essence); not the CI selector
+  - `@wip` — park unfinished scenarios outside CI
 
 ## Quality bar（精）
 
@@ -42,7 +49,8 @@ Archive retired features under `e2e/_archive/` (outside cucumber `paths`).
 ## Authoring Rules
 
 - Write `.feature` files in Chinese.
-- Tags: `@cradle`, `@essence`, `@P0`/`@P1`, plus stable IDs like `@CRADLE-CHAT-001`.
+- Tags: `@cradle`, `@P0`/`@P1`, `@essence` (quality marker), plus stable IDs like `@CRADLE-CHAT-001`.
+  Every live scenario should carry a priority (`@P0` or `@P1`) **and** `@essence`.
 - Put reusable setup in `e2e/src/support/` (simulator, providers, scenarios, pages).
 - Keep step definitions thin; use page objects under `e2e/src/support/pages/`.
 - Prefer `data-testid` selectors first.
