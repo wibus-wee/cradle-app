@@ -10,7 +10,7 @@ Not part of Cradle. Cradle may become a *client* later via MCP/CLI.
 |---|---|
 | **Menu bar app** (`LSUIElement`) | Always available; open count; quick list / create / complete |
 | **Floating panel** | Draggable, optional always-on-top scratch panel |
-| **CLI** `watchout` | `create` / `list` / `complete` / `reopen` / `delete` / `count` |
+| **CLI** `watchout` | `create` / `get` / `list` / `search` / `update` / `complete` / `reopen` / `delete` / `count` / `export` / `import` |
 | **MCP** `watchout-mcp` | Same verbs for Cursor / other agents |
 
 ## Model (intentionally thin)
@@ -26,9 +26,12 @@ SQLite path: `~/Library/Application Support/WatchOut/watchout.sqlite`
 ## Swift stack
 
 - **SwiftUI** + `MenuBarExtra` + `Window` + `Settings`
-- **GRDB** — local persistence
+- **GRDB** — local persistence + `ValueObservation` (live UI)
+- **IdentifiedCollections** — identity-stable item arrays
+- **swift-algorithms** — import dedupe (`uniqued`)
+- **swift-async-algorithms** — debounced search
 - **Defaults** — preferences
-- **KeyboardShortcuts** — global hotkeys
+- **KeyboardShortcuts** — global hotkeys (incl. park clipboard)
 - **LaunchAtLogin-Modern** — open at login
 - **MenuBarExtraAccess** — menu bar panel presentation control
 - **swift-argument-parser** — CLI

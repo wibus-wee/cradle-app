@@ -44,6 +44,17 @@
     border: 1px solid rgba(0,0,0,0.12);
     border-radius: 999px; padding: 3px 8px;
   }
+  .search {
+    display: flex; gap: 6px; align-items: center;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.05);
+    color: #aeaeb2;
+    font-size: 12px;
+  }
+  .search input {
+    flex: 1; border: 0; outline: 0; background: transparent; font: inherit; color: #1d1d1f;
+  }
   .list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
   .row {
     display: flex; gap: 10px; align-items: flex-start;
@@ -91,6 +102,10 @@
           <span class="spacer"></span>
           <span class="done">Done</span>
         </div>
+        <div class="search">
+          <span>⌕</span>
+          <input placeholder="Search" />
+        </div>
         <div class="list">
           <div class="row">
             <span class="check">○</span>
@@ -119,6 +134,7 @@
         </div>
         <div class="composer">
           <input placeholder="Park for later…" />
+          <button type="button" title="Park clipboard">⎘</button>
           <button>Park</button>
         </div>
       </div>
@@ -131,6 +147,10 @@
           <span class="count">3</span>
           <span class="spacer"></span>
           <span class="done">Done</span>
+        </div>
+        <div class="search">
+          <span>⌕</span>
+          <input placeholder="Search" />
         </div>
         <div class="list">
           <div class="row">
@@ -160,11 +180,12 @@
         </div>
         <div class="composer">
           <input placeholder="Park for later…" />
+          <button type="button" title="Park clipboard">⎘</button>
           <button>Park</button>
         </div>
       </div>
     </div>
   </div>
-  <p class="note">System gray only. Capsule item rows + capsule input. Checkbox is the only mark control.</p>
+  <p class="note">System gray only. Search + capsule rows + clipboard park. Checkbox is the only mark control.</p>
 </body>
 </html>

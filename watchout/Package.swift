@@ -19,15 +19,20 @@ let package = Package(
     .package(url: "https://github.com/sindresorhus/LaunchAtLogin-Modern.git", from: "1.1.0"),
     .package(url: "https://github.com/orchetect/MenuBarExtraAccess.git", from: "1.2.0"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+    .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
+    .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "1.0.0"),
     .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.11.0"),
     .package(url: "https://github.com/pointfreeco/swift-dependencies.git", from: "1.6.0"),
+    .package(url: "https://github.com/pointfreeco/swift-identified-collections.git", from: "1.1.0"),
   ],
   targets: [
     .target(
       name: "WatchOutCore",
       dependencies: [
         .product(name: "GRDB", package: "GRDB.swift"),
+        .product(name: "Algorithms", package: "swift-algorithms"),
         .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "IdentifiedCollections", package: "swift-identified-collections"),
       ],
       path: "Sources/WatchOutCore"
     ),
@@ -35,11 +40,13 @@ let package = Package(
       name: "WatchOutUI",
       dependencies: [
         "WatchOutCore",
+        .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
         .product(name: "Defaults", package: "Defaults"),
         .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts"),
         .product(name: "LaunchAtLogin", package: "LaunchAtLogin-Modern"),
         .product(name: "MenuBarExtraAccess", package: "MenuBarExtraAccess"),
         .product(name: "Dependencies", package: "swift-dependencies"),
+        .product(name: "IdentifiedCollections", package: "swift-identified-collections"),
       ],
       path: "Sources/WatchOutUI"
     ),
@@ -61,7 +68,10 @@ let package = Package(
     ),
     .testTarget(
       name: "WatchOutCoreTests",
-      dependencies: ["WatchOutCore"],
+      dependencies: [
+        "WatchOutCore",
+        .product(name: "IdentifiedCollections", package: "swift-identified-collections"),
+      ],
       path: "Tests/WatchOutCoreTests"
     ),
   ]

@@ -1,5 +1,7 @@
+import Algorithms
 import Foundation
 import GRDB
+import IdentifiedCollections
 
 extension AttentionItem: FetchableRecord, PersistableRecord {
   public static let databaseTableName = "attention_items"
@@ -43,7 +45,6 @@ public final class WatchOutStore: Sendable {
     try Self.migrate(dbQueue)
   }
 
-  /// Default on-disk location: `~/Library/Application Support/WatchOut/watchout.sqlite`
   public static func makeDefault() throws -> WatchOutStore {
     let root = try applicationSupportDirectory()
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -68,6 +69,10 @@ public final class WatchOutStore: Sendable {
       create: true
     )
     return base.appendingPathComponent("WatchOut", isDirectory: true)
+  }
+
+  public static func databaseURL() throws -> URL {
+    try applicationSupportDirectory().appendingPathComponent("watchout.sqlite")
   }
 
   private static func migrate(_ dbQueue: DatabaseQueue) throws {
@@ -123,18 +128,17 @@ public final class WatchOutStore: Sendable {
 
   public func list(_ query: AttentionListQuery = .init()) throws -> [AttentionItem] {
     try dbQueue.read { db in
-      var request = AttentionItem.all()
-      if let status = query.status {
-        request = request.filter(AttentionItem.Columns.status == status.rawValue)
-      }
-      if let audience = query.audience {
-        request = request.filter(AttentionItem.Columns.audience == audience.rawValue)
-      }
-      request = request.order(AttentionItem.Columns.createdAt.desc)
-      if let limit = query.limit {
-        request = request.limit(limit)
-      }
-      return try request.fetchAll(db)
+      try Self.fetch(db, query: query)
+    }
+  }
+
+  public func snapshot(_ query: AttentionListQuery = .init()) throws -> AttentionSnapshot {
+    try dbQueue.read { db in
+      let items = try Self.fetch(db, query: query)
+      let openCount = try AttentionItem
+        .filter(AttentionItem.Columns.status == AttentionItem.Status.open.rawValue)
+        .fetchCount(db)
+      return AttentionSnapshot(items: items, openCount: openCount)
     }
   }
 
@@ -143,6 +147,29 @@ public final class WatchOutStore: Sendable {
       try AttentionItem
         .filter(AttentionItem.Columns.status == AttentionItem.Status.open.rawValue)
         .fetchCount(db)
+    }
+  }
+
+  @discardableResult
+  public func update(id: String, _ patch: AttentionItemUpdate) throws -> AttentionItem {
+    try mutate(id: id) { item in
+      if let title = patch.title {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw WatchOutStoreError.invalidTitle }
+        item.title = trimmed
+      }
+      if let body = patch.body {
+        item.body = body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+      }
+      if let href = patch.href {
+        item.href = href?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+      }
+      if let source = patch.source {
+        item.source = source.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? item.source
+      }
+      if let audience = patch.audience {
+        item.audience = audience
+      }
     }
   }
 
@@ -171,15 +198,166 @@ public final class WatchOutStore: Sendable {
     guard deleted else { throw WatchOutStoreError.notFound(id) }
   }
 
-  private func mutate(id: String, _ body: (inout AttentionItem) -> Void) throws -> AttentionItem {
+  public func exportJSON() throws -> Data {
+    let items = try list(.init(status: nil, limit: nil))
+    let encoder = JSONEncoder.watchOut
+    return try encoder.encode(items)
+  }
+
+  @discardableResult
+  public func importJSON(_ data: Data, replace: Bool = false) throws -> Int {
+    let decoder = JSONDecoder.watchOut
+    let decoded = try decoder.decode([AttentionItem].self, from: data)
+    // Keep the first occurrence per id when a dump contains duplicates.
+    let items = Array(decoded.uniqued(on: \.id))
+    return try dbQueue.write { db in
+      if replace {
+        try AttentionItem.deleteAll(db)
+      }
+      for item in items {
+        try item.save(db)
+      }
+      return items.count
+    }
+  }
+
+  /// Same-process observation via GRDB `ValueObservation`.
+  public func observeSnapshot(
+    _ query: AttentionListQuery = .init()
+  ) -> AsyncThrowingStream<AttentionSnapshot, Error> {
+    let observation = ValueObservation.tracking { db in
+      let items = try Self.fetch(db, query: query)
+      let openCount = try AttentionItem
+        .filter(AttentionItem.Columns.status == AttentionItem.Status.open.rawValue)
+        .fetchCount(db)
+      return AttentionSnapshot(items: items, openCount: openCount)
+    }
+
+    return AsyncThrowingStream { continuation in
+      let task = Task {
+        do {
+          for try await value in observation.values(in: dbQueue) {
+            continuation.yield(value)
+          }
+          continuation.finish()
+        } catch {
+          continuation.finish(throwing: error)
+        }
+      }
+      continuation.onTermination = { _ in task.cancel() }
+    }
+  }
+
+  /// Detect writes from other processes (CLI / MCP) via `PRAGMA data_version`.
+  public func observeExternalDataVersion(
+    pollInterval nanoseconds: UInt64 = 800_000_000
+  ) -> AsyncStream<Int> {
+    AsyncStream { continuation in
+      let task = Task {
+        var last = try? self.dataVersion()
+        while !Task.isCancelled {
+          try? await Task.sleep(nanoseconds: nanoseconds)
+          let current = try? self.dataVersion()
+          if let current, current != last {
+            last = current
+            continuation.yield(current)
+          }
+        }
+        continuation.finish()
+      }
+      continuation.onTermination = { _ in task.cancel() }
+    }
+  }
+
+  /// Live snapshots for the app: GRDB observation + cross-process `data_version` polling.
+  public func observe(
+    _ query: AttentionListQuery = .init(),
+    externalPollNanoseconds: UInt64 = 800_000_000
+  ) -> AsyncStream<AttentionSnapshot> {
+    AsyncStream { continuation in
+      let task = Task {
+        if let initial = try? self.snapshot(query) {
+          continuation.yield(initial)
+        }
+
+        await withTaskGroup(of: Void.self) { group in
+          group.addTask {
+            do {
+              for try await value in self.observeSnapshot(query) {
+                guard !Task.isCancelled else { return }
+                continuation.yield(value)
+              }
+            } catch {
+              // Observation ended; external poll may still refresh.
+            }
+          }
+          group.addTask {
+            for await _ in self.observeExternalDataVersion(pollInterval: externalPollNanoseconds) {
+              guard !Task.isCancelled else { return }
+              if let snap = try? self.snapshot(query) {
+                continuation.yield(snap)
+              }
+            }
+          }
+          await group.next()
+          group.cancelAll()
+        }
+        continuation.finish()
+      }
+      continuation.onTermination = { _ in task.cancel() }
+    }
+  }
+
+  public func dataVersion() throws -> Int {
+    try dbQueue.read { db in
+      try Int.fetchOne(db, sql: "PRAGMA data_version") ?? 0
+    }
+  }
+
+  private func mutate(id: String, _ body: (inout AttentionItem) throws -> Void) throws -> AttentionItem {
     try dbQueue.write { db in
       guard var item = try AttentionItem.fetchOne(db, key: id) else {
         throw WatchOutStoreError.notFound(id)
       }
-      body(&item)
+      try body(&item)
       try item.update(db)
       return item
     }
+  }
+
+  private static func fetch(_ db: Database, query: AttentionListQuery) throws -> [AttentionItem] {
+    var request = AttentionItem.all()
+    if let status = query.status {
+      request = request.filter(AttentionItem.Columns.status == status.rawValue)
+    }
+    if let audience = query.audience {
+      request = request.filter(AttentionItem.Columns.audience == audience.rawValue)
+    }
+    if let search = query.search?.trimmingCharacters(in: .whitespacesAndNewlines), !search.isEmpty {
+      let pattern = "%\(escapeLike(search))%"
+      // ESCAPE so literal % / _ in the query do not act as wildcards.
+      request = request.filter(
+        sql: """
+          (title LIKE ? ESCAPE '\\'
+           OR IFNULL(body, '') LIKE ? ESCAPE '\\'
+           OR source LIKE ? ESCAPE '\\'
+           OR IFNULL(href, '') LIKE ? ESCAPE '\\')
+          """,
+        arguments: [pattern, pattern, pattern, pattern]
+      )
+    }
+    request = request.order(AttentionItem.Columns.createdAt.desc)
+    if let limit = query.limit {
+      request = request.limit(limit)
+    }
+    return try request.fetchAll(db)
+  }
+
+  private static func escapeLike(_ raw: String) -> String {
+    raw
+      .replacingOccurrences(of: "\\", with: "\\\\")
+      .replacingOccurrences(of: "%", with: "\\%")
+      .replacingOccurrences(of: "_", with: "\\_")
   }
 }
 
@@ -187,4 +365,21 @@ private extension String {
   var nilIfEmpty: String? {
     isEmpty ? nil : self
   }
+}
+
+public extension JSONEncoder {
+  static let watchOut: JSONEncoder = {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    encoder.dateEncodingStrategy = .iso8601
+    return encoder
+  }()
+}
+
+public extension JSONDecoder {
+  static let watchOut: JSONDecoder = {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return decoder
+  }()
 }

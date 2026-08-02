@@ -7,14 +7,19 @@ struct WatchOutCLI: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "watchout",
     abstract: "WatchOut — local Attention Object Store (parking slips).",
-    version: "0.1.0",
+    version: "0.2.0",
     subcommands: [
       Create.self,
+      Get.self,
       List.self,
+      Search.self,
+      Update.self,
       Complete.self,
       Reopen.self,
       Delete.self,
       Count.self,
+      Export.self,
+      Import.self,
       Path.self,
     ]
   )
@@ -60,6 +65,24 @@ extension WatchOutCLI {
     }
   }
 
+  struct Get: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Get one item by id")
+
+    @Argument(help: "Item id")
+    var id: String
+
+    @Flag(name: .long, help: "Print JSON")
+    var json = false
+
+    func run() throws {
+      let store = try WatchOutStore.makeDefault()
+      guard let item = try store.get(id: id) else {
+        throw ValidationError("item not found: \(id)")
+      }
+      try emit(item, json: json)
+    }
+  }
+
   struct List: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "List attention items")
 
@@ -69,6 +92,9 @@ extension WatchOutCLI {
     @Option(name: .long, help: "Filter audience: human | agent | any")
     var audience: String?
 
+    @Option(name: .long, help: "Substring search across title/body/source/href")
+    var search: String?
+
     @Option(name: .long, help: "Max rows")
     var limit: Int?
 
@@ -77,6 +103,9 @@ extension WatchOutCLI {
 
     func run() throws {
       let store = try WatchOutStore.makeDefault()
+      if !["all", "open", "done"].contains(status) {
+        throw ValidationError("status must be open|done|all")
+      }
       let statusFilter: AttentionItem.Status? = {
         switch status {
         case "all": return nil
@@ -85,9 +114,6 @@ extension WatchOutCLI {
         default: return nil
         }
       }()
-      if !["all", "open", "done"].contains(status) {
-        throw ValidationError("status must be open|done|all")
-      }
       let audienceFilter = try audience.map { raw -> AttentionItem.Audience in
         guard let value = AttentionItem.Audience(rawValue: raw) else {
           throw ValidationError("audience must be human|agent|any")
@@ -95,21 +121,99 @@ extension WatchOutCLI {
         return value
       }
       let items = try store.list(
-        AttentionListQuery(status: statusFilter, audience: audienceFilter, limit: limit)
+        AttentionListQuery(
+          status: statusFilter,
+          audience: audienceFilter,
+          search: search,
+          limit: limit
+        )
       )
-      if json {
-        let data = try JSONEncoder.watchOut.encode(items)
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
-      } else if items.isEmpty {
-        print("(no items)")
-      } else {
-        for item in items {
-          let mark = item.status == .open ? "[ ]" : "[x]"
-          let href = item.href.map { "  \($0)" } ?? ""
-          print("\(mark) \(item.id.prefix(8))  \(item.title)\(href)")
+      try emitList(items, json: json)
+    }
+  }
+
+  struct Search: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Search open + done items")
+
+    @Argument(help: "Query substring")
+    var query: String
+
+    @Option(name: .long, help: "Max rows")
+    var limit: Int = 50
+
+    @Flag(name: .long, help: "Print JSON")
+    var json = false
+
+    func run() throws {
+      let store = try WatchOutStore.makeDefault()
+      let items = try store.list(
+        AttentionListQuery(status: nil, search: query, limit: limit)
+      )
+      try emitList(items, json: json)
+    }
+  }
+
+  struct Update: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Update title/body/href/source/audience")
+
+    @Argument(help: "Item id")
+    var id: String
+
+    @Option(name: .long, help: "New title")
+    var title: String?
+
+    @Option(name: .long, help: "New body (pass empty string to clear)")
+    var body: String?
+
+    @Flag(name: .long, help: "Clear body")
+    var clearBody = false
+
+    @Option(name: .long, help: "New href (pass empty string to clear)")
+    var href: String?
+
+    @Flag(name: .long, help: "Clear href")
+    var clearHref = false
+
+    @Option(name: .long, help: "New source tag")
+    var source: String?
+
+    @Option(name: .long, help: "Audience: human | agent | any")
+    var audience: String?
+
+    @Flag(name: .long, help: "Print JSON")
+    var json = false
+
+    func run() throws {
+      let store = try WatchOutStore.makeDefault()
+      let audienceValue = try audience.map { raw -> AttentionItem.Audience in
+        guard let value = AttentionItem.Audience(rawValue: raw) else {
+          throw ValidationError("audience must be human|agent|any")
         }
+        return value
       }
+
+      let bodyPatch: String?? = {
+        if clearBody { return .some(nil) }
+        if let body { return .some(body) }
+        return nil
+      }()
+      let hrefPatch: String?? = {
+        if clearHref { return .some(nil) }
+        if let href { return .some(href.isEmpty ? nil : href) }
+        return nil
+      }()
+
+      let item = try store.update(
+        id: id,
+        AttentionItemUpdate(
+          title: title,
+          body: bodyPatch,
+          href: hrefPatch,
+          source: source,
+          audience: audienceValue
+        )
+      )
+      try emit(item, json: json)
     }
   }
 
@@ -167,13 +271,50 @@ extension WatchOutCLI {
     }
   }
 
+  struct Export: ParsableCommand {
+    static let configuration = CommandConfiguration(abstract: "Export all items as JSON")
+
+    @Option(name: .shortAndLong, help: "Write to file instead of stdout")
+    var output: String?
+
+    func run() throws {
+      let store = try WatchOutStore.makeDefault()
+      let data = try store.exportJSON()
+      if let output {
+        try data.write(to: URL(fileURLWithPath: output), options: .atomic)
+        print("exported \(output)")
+      } else {
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+      }
+    }
+  }
+
+  struct Import: ParsableCommand {
+    static let configuration = CommandConfiguration(
+      commandName: "import",
+      abstract: "Import items from a JSON file"
+    )
+
+    @Argument(help: "Path to JSON array of AttentionItem")
+    var path: String
+
+    @Flag(name: .long, help: "Replace all existing items")
+    var replace = false
+
+    func run() throws {
+      let store = try WatchOutStore.makeDefault()
+      let data = try Data(contentsOf: URL(fileURLWithPath: path))
+      let count = try store.importJSON(data, replace: replace)
+      print("imported \(count)")
+    }
+  }
+
   struct Path: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Print the SQLite database path")
 
     func run() throws {
-      let url = try WatchOutStore.applicationSupportDirectory()
-        .appendingPathComponent("watchout.sqlite")
-      print(url.path)
+      print(try WatchOutStore.databaseURL().path)
     }
   }
 }
@@ -188,11 +329,18 @@ private func emit(_ item: AttentionItem, json: Bool) throws {
   }
 }
 
-private extension JSONEncoder {
-  static let watchOut: JSONEncoder = {
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-    encoder.dateEncodingStrategy = .iso8601
-    return encoder
-  }()
+private func emitList(_ items: [AttentionItem], json: Bool) throws {
+  if json {
+    let data = try JSONEncoder.watchOut.encode(items)
+    FileHandle.standardOutput.write(data)
+    FileHandle.standardOutput.write(Data("\n".utf8))
+  } else if items.isEmpty {
+    print("(no items)")
+  } else {
+    for item in items {
+      let mark = item.status == .open ? "[ ]" : "[x]"
+      let href = item.href.map { "  \($0)" } ?? ""
+      print("\(mark) \(item.id.prefix(8))  \(item.title)\(href)")
+    }
+  }
 }

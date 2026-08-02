@@ -1,3 +1,6 @@
+#if canImport(AppKit)
+import AppKit
+#endif
 import Defaults
 import KeyboardShortcuts
 import LaunchAtLogin
@@ -27,15 +30,23 @@ public struct WatchOutGeneralSettingsPane: View {
             .font(.caption.monospaced())
             .textSelection(.enabled)
         }
+        Button("Reveal in Finder") {
+          revealDatabase()
+        }
       }
     }
     .formStyle(.grouped)
   }
 
   private var dbPath: String {
-    let url = (try? WatchOutStore.applicationSupportDirectory())?
-      .appendingPathComponent("watchout.sqlite")
-    return url?.path ?? "(unavailable)"
+    (try? WatchOutStore.databaseURL())?.path ?? "(unavailable)"
+  }
+
+  private func revealDatabase() {
+    #if canImport(AppKit)
+    guard let url = try? WatchOutStore.databaseURL() else { return }
+    NSWorkspace.shared.activateFileViewerSelecting([url])
+    #endif
   }
 }
 
@@ -47,6 +58,7 @@ public struct WatchOutShortcutsSettingsPane: View {
       Section("Global shortcuts") {
         KeyboardShortcuts.Recorder("Toggle floating panel", name: .toggleFloating)
         KeyboardShortcuts.Recorder("Focus quick capture", name: .quickCapture)
+        KeyboardShortcuts.Recorder("Park clipboard", name: .parkClipboard)
       }
     }
     .formStyle(.grouped)

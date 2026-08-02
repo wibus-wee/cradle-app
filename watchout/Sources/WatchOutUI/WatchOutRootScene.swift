@@ -44,7 +44,7 @@ public struct WatchOutRootScene: Scene {
         WatchOutShortcutsSettingsPane()
           .tabItem { Label("Shortcuts", systemImage: "keyboard") }
       }
-      .frame(width: 420, height: 280)
+      .frame(width: 420, height: 320)
     }
   }
 }
@@ -87,7 +87,10 @@ struct MenuBarPanel: View {
     guard !didBootstrap else { return }
     didBootstrap = true
     model.refresh()
-    let keys = WatchOutHotKeys { presentFloating() }
+    let keys = WatchOutHotKeys(
+      openFloating: { presentFloating() },
+      parkClipboard: { model.parkClipboard() }
+    )
     keys.install()
     hotKeys = keys
     if floatingVisibleOnLaunch {
@@ -144,9 +147,11 @@ struct FloatingPanel: View {
 @MainActor
 public final class WatchOutHotKeys {
   private let openFloating: () -> Void
+  private let parkClipboard: () -> Void
 
-  public init(openFloating: @escaping () -> Void) {
+  public init(openFloating: @escaping () -> Void, parkClipboard: @escaping () -> Void = {}) {
     self.openFloating = openFloating
+    self.parkClipboard = parkClipboard
   }
 
   public func install() {
@@ -155,6 +160,9 @@ public final class WatchOutHotKeys {
     }
     KeyboardShortcuts.onKeyUp(for: .quickCapture) { [openFloating] in
       Task { @MainActor in openFloating() }
+    }
+    KeyboardShortcuts.onKeyUp(for: .parkClipboard) { [parkClipboard] in
+      Task { @MainActor in parkClipboard() }
     }
   }
 }

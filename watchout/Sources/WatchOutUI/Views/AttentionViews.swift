@@ -7,6 +7,8 @@ struct AttentionItemRow: View {
   let onReopen: () -> Void
   let onDelete: () -> Void
   let onOpenHref: () -> Void
+  let onEdit: () -> Void
+  let onCopy: () -> Void
 
   var body: some View {
     HStack(spacing: 10) {
@@ -54,12 +56,29 @@ struct AttentionItemRow: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
     .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .contextMenu {
+      Button("Edit…", action: onEdit)
+      Button("Copy", action: onCopy)
+      if item.href != nil {
+        Button("Open Link", action: onOpenHref)
+      }
+      Divider()
+      if item.status == .open {
+        Button("Mark Done", action: onComplete)
+      } else {
+        Button("Reopen", action: onReopen)
+      }
+      Button("Delete", role: .destructive, action: onDelete)
+    }
+    .onTapGesture(count: 2, perform: onEdit)
   }
 }
 
 struct AttentionComposer: View {
   @Binding var title: String
   let onSubmit: () -> Void
+  var onParkClipboard: (() -> Void)? = nil
 
   private var canSubmit: Bool {
     !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -70,6 +89,14 @@ struct AttentionComposer: View {
       TextField("Park for later…", text: $title)
         .textFieldStyle(.plain)
         .onSubmit(onSubmit)
+
+      if let onParkClipboard {
+        Button(action: onParkClipboard) {
+          Image(systemName: "clipboard")
+        }
+        .buttonStyle(.borderless)
+        .help("Park clipboard")
+      }
 
       Button("Park", action: onSubmit)
         .buttonStyle(.bordered)
@@ -83,6 +110,70 @@ struct AttentionComposer: View {
   }
 }
 
+struct AttentionSearchField: View {
+  @Binding var text: String
+  let onChange: (String) -> Void
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Image(systemName: "magnifyingglass")
+        .foregroundStyle(.tertiary)
+      TextField("Search", text: $text)
+        .textFieldStyle(.plain)
+        .onChange(of: text) { _, newValue in
+          onChange(newValue)
+        }
+      if !text.isEmpty {
+        Button {
+          text = ""
+          onChange("")
+        } label: {
+          Image(systemName: "xmark.circle.fill")
+            .foregroundStyle(.tertiary)
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .font(.callout)
+    .padding(.horizontal, 10)
+    .padding(.vertical, 7)
+    .background(.quaternary.opacity(0.35), in: Capsule(style: .continuous))
+  }
+}
+
+struct AttentionEditSheet: View {
+  @Bindable var model: WatchOutAppModel
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Text("Edit")
+        .font(.headline)
+
+      TextField("Title", text: $model.editTitle)
+        .textFieldStyle(.roundedBorder)
+
+      TextEditor(text: $model.editBody)
+        .font(.body)
+        .frame(minHeight: 120)
+        .overlay(
+          RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .strokeBorder(.quaternary, lineWidth: 1)
+        )
+
+      HStack {
+        Spacer()
+        Button("Cancel") { model.cancelEditing() }
+          .keyboardShortcut(.cancelAction)
+        Button("Save") { model.saveEditing() }
+          .keyboardShortcut(.defaultAction)
+          .disabled(model.editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+      }
+    }
+    .padding(16)
+    .frame(width: 360)
+  }
+}
+
 struct AttentionListPane: View {
   @Bindable var model: WatchOutAppModel
   var compact: Bool = false
@@ -92,8 +183,19 @@ struct AttentionListPane: View {
       header
         .padding(.horizontal, 4)
 
+      AttentionSearchField(text: $model.searchText) { value in
+        model.setSearchText(value)
+      }
+      .padding(.horizontal, 2)
+
       if let errorMessage = model.errorMessage {
         Text(errorMessage)
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, 4)
+      } else if let statusMessage = model.statusMessage {
+        Text(statusMessage)
           .font(.caption)
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
@@ -103,9 +205,16 @@ struct AttentionListPane: View {
       Group {
         if model.items.isEmpty {
           ContentUnavailableView {
-            Label("Nothing parked", systemImage: "tray")
+            Label(
+              model.searchText.isEmpty ? "Nothing parked" : "No matches",
+              systemImage: model.searchText.isEmpty ? "tray" : "magnifyingglass"
+            )
           } description: {
-            Text("Park something before you context-switch.")
+            Text(
+              model.searchText.isEmpty
+                ? "Park something before you context-switch."
+                : "Try a different search."
+            )
           }
         } else {
           ScrollView {
@@ -116,7 +225,9 @@ struct AttentionListPane: View {
                   onComplete: { model.complete(item) },
                   onReopen: { model.reopen(item) },
                   onDelete: { model.delete(item) },
-                  onOpenHref: { model.openHref(item) }
+                  onOpenHref: { model.openHref(item) },
+                  onEdit: { model.beginEditing(item) },
+                  onCopy: { model.copyItem(item) }
                 )
               }
             }
@@ -126,12 +237,20 @@ struct AttentionListPane: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-      AttentionComposer(title: $model.draftTitle) {
-        model.createFromDraft()
-      }
+      AttentionComposer(
+        title: $model.draftTitle,
+        onSubmit: { model.createFromDraft() },
+        onParkClipboard: { model.parkClipboard() }
+      )
     }
     .padding(10)
     .onAppear { model.refresh() }
+    .sheet(isPresented: Binding(
+      get: { model.editingItem != nil },
+      set: { if !$0 { model.cancelEditing() } }
+    )) {
+      AttentionEditSheet(model: model)
+    }
   }
 
   private var header: some View {
@@ -150,10 +269,12 @@ struct AttentionListPane: View {
 
       Spacer(minLength: 8)
 
-      Toggle("Done", isOn: $model.showDone)
-        .toggleStyle(.button)
-        .controlSize(.small)
-        .onChange(of: model.showDone) { _, _ in model.refresh() }
+      Toggle("Done", isOn: Binding(
+        get: { model.showDone },
+        set: { model.setShowDone($0) }
+      ))
+      .toggleStyle(.button)
+      .controlSize(.small)
     }
   }
 }

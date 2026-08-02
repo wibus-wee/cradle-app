@@ -10,7 +10,8 @@ extension Defaults.Keys {
 }
 
 extension KeyboardShortcuts.Name {
-  static let toggleFloating = Self("toggleFloating")
-  static let quickCapture = Self("quickCapture")
+  static let toggleFloating = Self("toggleFloating", default: .init(.w, modifiers: [.option, .command]))
+  static let quickCapture = Self("quickCapture", default: .init(.n, modifiers: [.option, .command]))
+  static let parkClipboard = Self("parkClipboard", default: .init(.v, modifiers: [.option, .command, .shift]))
   static let toggleMenuBarPanel = Self("toggleMenuBarPanel")
 }
