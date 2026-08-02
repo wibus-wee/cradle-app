@@ -1,4 +1,5 @@
 import {
+  ArtboardLine as ArtifactIcon,
   Chat1Line as SideConversationIcon,
   CloseLine as CloseIcon,
   Dashboard2Line as ContextUsageIcon,
@@ -84,7 +85,7 @@ function renderPanelTabIcon(tab: BrowserPanelTab) {
     return <PlanIcon className={iconClassName} aria-hidden="true" />
   }
   if (tab.kind === 'artifact') {
-    return <ContextUsageIcon className={iconClassName} aria-hidden="true" />
+    return <ArtifactIcon className={iconClassName} aria-hidden="true" />
   }
   if (tab.kind === 'plan-refine') {
     return <RefineIcon className={iconClassName} aria-hidden="true" />

@@ -29,6 +29,7 @@ function ActivityFeedScene({
         animated={false}
         onOpenWorkspaceDiff={path => onActivity(`diff: ${path}`)}
         onOpenPlanDocument={input => onActivity(`plan: ${input.toolCallId}`)}
+        onOpenArtifact={input => onActivity(`artifact: ${input.artifactId}`)}
       />
     </section>
   )

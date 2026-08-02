@@ -87,7 +87,7 @@ export function ToolCallBlock({
       artifactId: input.artifactId,
       toolCallId: input.toolCallId,
       title: input.title,
-      source: input.source,
+      source: input.source ?? '',
       revision: input.revision,
     })
   }, [openArtifactTab])

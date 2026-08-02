@@ -2717,6 +2717,7 @@ export function BrowserPanel({
             title={activePanelTab.title}
             source={activePanelTab.source}
             revision={activePanelTab.revision}
+            refreshFromServer
           />
         )}
 

@@ -48,7 +48,7 @@ export function ActivityFeed({
       artifactId: input.artifactId,
       toolCallId: input.toolCallId,
       title: input.title,
-      source: input.source,
+      source: input.source ?? '',
       revision: input.revision,
     })
   }, [openArtifactTab])

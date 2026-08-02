@@ -1,5 +1,5 @@
 import {
-  Dashboard2Line as ArtifactIcon,
+  ArtboardLine as ArtifactIcon,
   FullscreenLine as Maximize2Icon,
 } from '@mingcute/react'
 import type { KeyboardEvent, MouseEvent } from 'react'
@@ -11,7 +11,8 @@ export interface ArtifactOpenInput {
   artifactId: string
   toolCallId: string
   title: string
-  source: string
+  /** Optional snapshot; panel fetches latest from the server when opened. */
+  source?: string
   revision: number
 }
 
@@ -20,7 +21,7 @@ export interface ArtifactPreviewViewProps {
   artifactId: string
   toolCallId: string
   title: string
-  source: string
+  source?: string
   revision: number
   onOpen?: (input: ArtifactOpenInput) => void
 }
@@ -31,7 +32,7 @@ export function ArtifactPreviewView({
   artifactId,
   toolCallId,
   title,
-  source,
+  source = '',
   revision,
   onOpen,
 }: ArtifactPreviewViewProps) {
@@ -59,7 +60,8 @@ export function ArtifactPreviewView({
     }
   }
 
-  const lineCount = source.split(/\r?\n/).length
+  const hasSource = source.trim().length > 0
+  const lineCount = hasSource ? source.split(/\r?\n/).length : 0
 
   return (
     <div
@@ -97,18 +99,39 @@ export function ArtifactPreviewView({
       <div className="space-y-1 px-3 py-2.5">
         <div className="text-[11px] tabular-nums text-text-tertiary">
           {artifactId}
-          <span className="mx-1.5 text-border">·</span>
-          {lineCount}
-          {' '}
-          lines JSX
+          {hasSource
+            ? (
+              <>
+                <span className="mx-1.5 text-border">·</span>
+                {lineCount}
+                {' '}
+                lines JSX
+              </>
+            )
+            : (
+              <>
+                <span className="mx-1.5 text-border">·</span>
+                open panel for latest JSX
+              </>
+            )}
         </div>
-        <pre className="max-h-28 overflow-hidden whitespace-pre-wrap break-all font-mono text-[10px] leading-4 text-text-secondary" style={{
-            maskImage:
-              'linear-gradient(to bottom, black 0%, black calc(100% - 20px), transparent)',
-          }}
-        >
-          {source.slice(0, 600)}
-        </pre>
+        {hasSource
+          ? (
+            <pre
+              className="max-h-28 overflow-hidden whitespace-pre-wrap break-all font-mono text-[10px] leading-4 text-text-secondary"
+              style={{
+                maskImage:
+                  'linear-gradient(to bottom, black 0%, black calc(100% - 20px), transparent)',
+              }}
+            >
+              {source.slice(0, 600)}
+            </pre>
+          )
+          : (
+            <div className="text-[11px] leading-4 text-text-secondary">
+              Interactive view ready in the side panel.
+            </div>
+          )}
       </div>
     </div>
   )

@@ -2,8 +2,11 @@ import type { ReactNode } from 'react'
 import { createContext, useContext } from 'react'
 
 export interface ArtifactActionContextValue {
-  /** Run a follow-up prompt in the owning chat session (host-provided). */
-  runPrompt: (prompt: string) => void
+  /**
+   * Run a follow-up prompt in the owning chat session (host-provided).
+   * Returns false when the host could not accept the prompt (e.g. session not ready).
+   */
+  runPrompt: (prompt: string) => boolean
 }
 
 const ArtifactActionContext = createContext<ArtifactActionContextValue | null>(null)

@@ -12,7 +12,46 @@ type ToolFixtureProps = Omit<
   | 'onOpenWorkflowSurface'
   | 'onWorkflowSurfaceChange'
   | 'onOpenPlanDocument'
+  | 'onOpenArtifact'
 >
+
+/** Valid cradle/artifact JSX used by artifact tool fixtures and Storybook. */
+export const sampleArtifactSource = `
+import { Artifact, Header, MetricGrid, Section, Table, ActionButton } from 'cradle/artifact'
+
+export default function ReviewBoard() {
+  return (
+    <Artifact>
+      <Header
+        eyebrow="PR Review"
+        title="Priority changes"
+        summary="Grouped by risk. Click through to dig into each cluster."
+      />
+      <MetricGrid
+        items={[
+          { label: 'Files', value: '24', meta: 'changed' },
+          { label: 'High risk', value: '3', meta: 'review first' },
+        ]}
+      />
+      <Section title="Clusters" flush>
+        <Table
+          columns={[
+            { key: 'area', header: 'Area' },
+            { key: 'risk', header: 'Risk', align: 'right' },
+          ]}
+          rows={[
+            { area: 'auth', risk: 'high' },
+            { area: 'ui', risk: 'low' },
+          ]}
+        />
+        <ActionButton prompt="Explain the high-risk auth changes in detail.">
+          Dig into auth
+        </ActionButton>
+      </Section>
+    </Artifact>
+  )
+}
+`.trim()
 
 interface ToolFixtureInput {
   kind: CradleToolKind
@@ -205,6 +244,24 @@ export const chatToolKindFixtures: ChatToolFixture[] = [
     apiName: 'Skill',
     args: { name: 'agent-browser', input: 'Capture the tool gallery.' },
     result: { output: 'Screenshot saved.' },
+  }),
+  createToolFixture({
+    kind: 'artifact',
+    apiName: 'mcp__cradle__write_artifact',
+    args: {
+      title: 'Priority changes',
+      source: sampleArtifactSource,
+      artifactId: 'priority-changes',
+    },
+    result: {
+      // Metadata-only — matches production write_artifact tool results.
+      artifactId: 'priority-changes',
+      sessionId: 'storybook-session',
+      title: 'Priority changes',
+      revision: 1,
+      created: true,
+      updatedAt: Date.UTC(2026, 7, 2, 12, 0, 0),
+    },
   }),
 ]
 

@@ -959,7 +959,8 @@ interface BrowserPanelState {
     artifactId: string
     toolCallId?: string | null
     title: string
-    source: string
+    /** Optional snapshot; ArtifactViewer refreshes from GET /chat-artifacts. */
+    source?: string
     revision: number
     ownerId?: string | null
   }) => string
@@ -1839,7 +1840,7 @@ function createBrowserPanelStore() {
           artifactId,
           toolCallId: toolCallId ?? null,
           title,
-          source,
+          source: source ?? '',
           revision,
           loading: false,
           favicon: null,

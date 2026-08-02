@@ -78,29 +78,23 @@ export async function executeWriteArtifactTool(input: WriteArtifactToolInput) {
       responseSchema: WriteArtifactResponseSchema,
     })
 
+    // Metadata-only tool result: full JSX lives on disk / GET /chat-artifacts.
+    // Echoing source here blows past chat truncation and is redundant with the panel fetch.
     const created = record.revision === 1
+    const meta = {
+      artifactId: record.id,
+      sessionId: record.sessionId,
+      title: record.title,
+      revision: record.revision,
+      created,
+      updatedAt: record.updatedAt,
+    }
     return {
       content: [{
         type: 'text' as const,
-        text: JSON.stringify({
-          artifactId: record.id,
-          sessionId: record.sessionId,
-          title: record.title,
-          revision: record.revision,
-          source: record.source,
-          created,
-          updatedAt: record.updatedAt,
-        }),
+        text: JSON.stringify(meta),
       }],
-      structuredContent: {
-        artifactId: record.id,
-        sessionId: record.sessionId,
-        title: record.title,
-        revision: record.revision,
-        source: record.source,
-        created,
-        updatedAt: record.updatedAt,
-      },
+      structuredContent: meta,
     }
   }
   catch (error) {

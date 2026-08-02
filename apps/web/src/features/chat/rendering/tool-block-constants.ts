@@ -1,5 +1,6 @@
 import {
   AlertLine as CircleAlertIcon,
+  ArtboardLine as ArtifactIcon,
   CheckCircleLine as CheckCircle2Icon,
   ClockLine as ClockIcon,
   CodeLine as Code2Icon,
@@ -40,7 +41,7 @@ export const TOOL_ICON_MAP: Record<ToolUiKind, IconComponent> = {
   'plan': PanelTopIcon,
   'plan-implementation': ListChecksIcon,
   'question': HelpCircleIcon,
-  'artifact': PanelTopIcon,
+  'artifact': ArtifactIcon,
   'mcp': ServerIcon,
   'worktree': GitBranchIcon,
   'generic': Code2Icon,
