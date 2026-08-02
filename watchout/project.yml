@@ -1,0 +1,40 @@
+name: WatchOut
+options:
+  bundleIdPrefix: app.watchout
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  BASE_SDK: macosx
+  SWIFT_VERSION: "6.0"
+  MACOSX_DEPLOYMENT_TARGET: "14.0"
+packages:
+  WatchOut:
+    path: .
+targets:
+  WatchOut:
+    type: application
+    platform: macOS
+    sources:
+      - path: Apps/WatchOut
+    dependencies:
+      - package: WatchOut
+        product: WatchOutUI
+      - package: WatchOut
+        product: WatchOutCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.watchout.WatchOut
+        PRODUCT_NAME: WatchOut
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: WatchOut
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_NSHumanReadableCopyright: Copyright © WatchOut
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_ENTITLEMENTS: Apps/WatchOut/WatchOut.entitlements
+        SWIFT_STRICT_CONCURRENCY: complete
+    scheme:
+      testTargets: []
