@@ -19890,6 +19890,13 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             disabledCount: number;
             errorCount: number;
             roots: Array<string>;
+            items?: Array<{
+                name: string;
+                enabled: boolean;
+                displayName: string | null;
+                iconUrl: string | null;
+                brandColor: string | null;
+            }>;
             updatedAt: number;
         } | {
             kind: 'plugin';
