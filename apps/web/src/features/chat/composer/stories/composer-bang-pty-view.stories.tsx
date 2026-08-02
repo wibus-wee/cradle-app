@@ -4,6 +4,24 @@ import { fn } from 'storybook/test'
 import { COMPOSER_BANG_PTY_HEIGHT_PX } from '../bang-pty'
 import { ComposerBangPtyView } from '../views/composer-bang-pty-view'
 
+type BangPtyStoryState = 'idle' | 'output' | 'busy'
+
+const TERMINAL_LINES: Record<BangPtyStoryState, string[]> = {
+  idle: ['user@cradle:~/workspace$ '],
+  output: [
+    'user@cradle:~/workspace$ ls',
+    'AGENTS.md  README.md  apps  packages',
+    'user@cradle:~/workspace$ git status -sb',
+    '## cursor/composer-bang-pty-f544',
+    'user@cradle:~/workspace$ ',
+  ],
+  busy: [
+    'user@cradle:~/workspace$ pnpm --filter @cradle/web typecheck',
+    '…',
+    'user@cradle:~/workspace$ ',
+  ],
+}
+
 function FixtureTerminal({ lines }: { lines: string[] }) {
   return (
     <div
@@ -21,86 +39,37 @@ function FixtureTerminal({ lines }: { lines: string[] }) {
   )
 }
 
+function ComposerBangPtyScene({ state }: { state: BangPtyStoryState }) {
+  return (
+    <main className="flex min-h-[32rem] items-center justify-center bg-background px-4 py-10 text-foreground">
+      <div className="w-full max-w-2xl">
+        <ComposerBangPtyView
+          busy={state === 'busy'}
+          onDiscard={fn()}
+          onSubmit={fn()}
+          terminal={<FixtureTerminal lines={TERMINAL_LINES[state]} />}
+        />
+      </div>
+    </main>
+  )
+}
+
 const meta = {
   title: 'Chat/Composer/ComposerBangPtyView',
-  component: ComposerBangPtyView,
+  component: ComposerBangPtyScene,
   parameters: {
     layout: 'fullscreen',
     controls: { disable: true },
   },
   args: {
-    busy: false,
-    onSubmit: fn(),
-    onDiscard: fn(),
+    state: 'idle' as BangPtyStoryState,
   },
-} satisfies Meta<typeof ComposerBangPtyView>
+} satisfies Meta<typeof ComposerBangPtyScene>
 
 export default meta
 
 type Story = StoryObj<typeof meta>
 
-export const IdlePrompt: Story = {
-  render: args => (
-    <main className="flex min-h-[32rem] items-center justify-center bg-background px-4 py-10 text-foreground">
-      <div className="w-full max-w-2xl">
-        <ComposerBangPtyView
-          {...args}
-          terminal={(
-            <FixtureTerminal
-              lines={[
-                'user@cradle:~/workspace$ ',
-              ]}
-            />
-          )}
-        />
-      </div>
-    </main>
-  ),
-}
-
-export const WithOutput: Story = {
-  render: args => (
-    <main className="flex min-h-[32rem] items-center justify-center bg-background px-4 py-10 text-foreground">
-      <div className="w-full max-w-2xl">
-        <ComposerBangPtyView
-          {...args}
-          terminal={(
-            <FixtureTerminal
-              lines={[
-                'user@cradle:~/workspace$ ls',
-                'AGENTS.md  README.md  apps  packages',
-                'user@cradle:~/workspace$ git status -sb',
-                '## cursor/composer-bang-pty-f544',
-                'user@cradle:~/workspace$ ',
-              ]}
-            />
-          )}
-        />
-      </div>
-    </main>
-  ),
-}
-
-export const BusyWritingBack: Story = {
-  args: {
-    busy: true,
-  },
-  render: args => (
-    <main className="flex min-h-[32rem] items-center justify-center bg-background px-4 py-10 text-foreground">
-      <div className="w-full max-w-2xl">
-        <ComposerBangPtyView
-          {...args}
-          terminal={(
-            <FixtureTerminal
-              lines={[
-                'user@cradle:~/workspace$ pnpm --filter @cradle/web typecheck',
-                '…',
-                'user@cradle:~/workspace$ ',
-              ]}
-            />
-          )}
-        />
-      </div>
-    </main>
-  ),
-}
+export const IdlePrompt: Story = { args: { state: 'idle' } }
+export const WithOutput: Story = { args: { state: 'output' } }
+export const BusyWritingBack: Story = { args: { state: 'busy' } }
