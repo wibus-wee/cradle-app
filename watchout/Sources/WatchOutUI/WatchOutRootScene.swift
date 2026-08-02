@@ -31,7 +31,7 @@ public struct WatchOutRootScene: Scene {
 
     Window("WatchOut", id: WatchOutWindowID.floating) {
       FloatingPanel(model: model)
-        .frame(minWidth: 380, idealWidth: 440, minHeight: 520, idealHeight: 640)
+        .frame(minWidth: 400, idealWidth: 460, minHeight: 560, idealHeight: 680)
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentSize)
@@ -54,11 +54,12 @@ struct MenuBarLabel: View {
   let showCount: Bool
 
   var body: some View {
-    HStack(spacing: 4) {
-      Image(systemName: openCount > 0 ? "eye.trianglebadge.exclamationmark.fill" : "eye.fill")
+    HStack(spacing: 5) {
+      WatchOutSignalDot(active: openCount > 0, size: 6)
       if showCount, openCount > 0 {
         Text("\(openCount)")
-          .font(.caption2.weight(.bold).monospacedDigit())
+          .font(.system(size: 11, weight: .bold, design: .monospaced))
+          .monospacedDigit()
       }
     }
     .help(openCount > 0 ? "WatchOut — \(openCount) open" : "WatchOut")
@@ -75,67 +76,79 @@ struct MenuBarPanel: View {
   var body: some View {
     VStack(spacing: 0) {
       AttentionListPane(model: model, compact: true)
-        .frame(width: 360, height: 460)
+        .frame(width: 380, height: 480)
 
       footer
     }
-    .background(.ultraThinMaterial)
+    .background {
+      ZStack {
+        WatchOutTheme.mist
+        Rectangle().fill(.ultraThinMaterial.opacity(0.65))
+        // subtle grid
+        WatchOutGridBackdrop()
+          .opacity(0.35)
+      }
+    }
+    .clipShape(RoundedRectangle(cornerRadius: WatchOutTheme.panelRadius, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: WatchOutTheme.panelRadius, style: .continuous)
+        .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
+    )
     .onAppear(perform: bootstrapIfNeeded)
   }
 
   private var footer: some View {
-    HStack(spacing: 8) {
-      Button {
-        presentFloating()
-      } label: {
-        Label("Open Floating", systemImage: "macwindow.on.rectangle")
-          .font(.caption.weight(.semibold))
-          .padding(.horizontal, 10)
-          .padding(.vertical, 7)
-          .background(
-            Capsule(style: .continuous)
-              .fill(WatchOutTheme.accentSoft)
-          )
-          .overlay(
-            Capsule(style: .continuous)
-              .strokeBorder(WatchOutTheme.accent.opacity(0.25), lineWidth: 1)
-          )
-          .foregroundStyle(WatchOutTheme.ink)
+    HStack(spacing: 10) {
+      Button(action: presentFloating) {
+        HStack(spacing: 7) {
+          WatchOutSignalDot(size: 5)
+          Text("FLOAT")
+            .font(.system(size: 10, weight: .heavy, design: .monospaced))
+            .tracking(1)
+        }
+        .foregroundStyle(WatchOutTheme.ink)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(WatchOutTheme.phosphor)
       }
-      .buttonStyle(WatchOutPressableButtonStyle())
+      .buttonStyle(WatchOutPressStyle())
 
       Spacer()
 
       SettingsLink {
-        Image(systemName: "gearshape")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(.secondary)
-          .frame(width: 28, height: 28)
-          .background(Circle().fill(Color.primary.opacity(0.05)))
+        Text("CFG")
+          .font(.system(size: 10, weight: .heavy, design: .monospaced))
+          .foregroundStyle(WatchOutTheme.slate)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 7)
+          .background(
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+              .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
+          )
       }
-      .help("Settings")
 
       Button {
         #if canImport(AppKit)
         NSApp.terminate(nil)
         #endif
       } label: {
-        Image(systemName: "power")
-          .font(.system(size: 11, weight: .semibold))
-          .foregroundStyle(.secondary)
-          .frame(width: 28, height: 28)
-          .background(Circle().fill(Color.primary.opacity(0.05)))
+        Text("QUIT")
+          .font(.system(size: 10, weight: .heavy, design: .monospaced))
+          .foregroundStyle(WatchOutTheme.slate)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 7)
+          .background(
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+              .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
+          )
       }
-      .buttonStyle(WatchOutPressableButtonStyle())
+      .buttonStyle(WatchOutPressStyle())
       .keyboardShortcut("q", modifiers: [.command])
-      .help("Quit WatchOut")
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 10)
     .overlay(alignment: .top) {
-      Rectangle()
-        .fill(WatchOutTheme.hairline)
-        .frame(height: 1)
+      Rectangle().fill(WatchOutTheme.hairline).frame(height: 1)
     }
   }
 
@@ -168,22 +181,23 @@ struct FloatingPanel: View {
     }
     .background {
       ZStack {
-        Rectangle().fill(.ultraThickMaterial)
+        WatchOutTheme.mist
         LinearGradient(
           colors: [
-            WatchOutTheme.accent.opacity(0.10),
+            WatchOutTheme.phosphor.opacity(0.10),
             .clear,
             Color.black.opacity(0.03),
           ],
           startPoint: .topLeading,
           endPoint: .bottomTrailing
         )
+        WatchOutGridBackdrop().opacity(0.4)
       }
     }
-    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay(
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .strokeBorder(WatchOutTheme.ink.opacity(0.12), lineWidth: 1)
     )
     .padding(1)
     .onAppear {
@@ -196,27 +210,37 @@ struct FloatingPanel: View {
   }
 
   private var floatingChrome: some View {
-    HStack(spacing: 10) {
-      Text("FLOATING")
-        .font(.caption2.weight(.bold))
-        .tracking(1.2)
-        .foregroundStyle(WatchOutTheme.inkSecondary)
-      Spacer()
+    HStack {
+      Text("FLOAT MODE")
+        .font(.system(size: 9, weight: .heavy, design: .monospaced))
+        .tracking(1.6)
+        .foregroundStyle(WatchOutTheme.slate)
+      Rectangle()
+        .fill(WatchOutTheme.hairline)
+        .frame(height: 1)
       Button {
         floatingAlwaysOnTop.toggle()
       } label: {
-        Image(systemName: floatingAlwaysOnTop ? "pin.fill" : "pin")
-          .font(.system(size: 11, weight: .semibold))
-          .foregroundStyle(floatingAlwaysOnTop ? WatchOutTheme.accent : .secondary)
-          .frame(width: 26, height: 26)
-          .background(Circle().fill(Color.primary.opacity(0.05)))
+        Text(floatingAlwaysOnTop ? "PINNED" : "PIN")
+          .font(.system(size: 9, weight: .heavy, design: .monospaced))
+          .tracking(1)
+          .foregroundStyle(floatingAlwaysOnTop ? WatchOutTheme.ink : WatchOutTheme.slate)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 5)
+          .background(
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+              .fill(floatingAlwaysOnTop ? WatchOutTheme.phosphor : Color.clear)
+              .overlay(
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                  .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
+              )
+          )
       }
-      .buttonStyle(WatchOutPressableButtonStyle())
-      .help(floatingAlwaysOnTop ? "Unpin from top" : "Keep on top")
+      .buttonStyle(WatchOutPressStyle())
     }
     .padding(.horizontal, 16)
     .padding(.top, 12)
-    .padding(.bottom, 4)
+    .padding(.bottom, 2)
     #if canImport(AppKit)
     .background(WindowDragHandle())
     #endif
@@ -237,13 +261,28 @@ struct FloatingPanel: View {
   }
 }
 
+struct WatchOutGridBackdrop: View {
+  var body: some View {
+    Canvas { context, size in
+      let step: CGFloat = 16
+      var path = Path()
+      stride(from: 0, through: size.width, by: step).forEach { x in
+        path.move(to: CGPoint(x: x, y: 0))
+        path.addLine(to: CGPoint(x: x, y: size.height))
+      }
+      stride(from: 0, through: size.height, by: step).forEach { y in
+        path.move(to: CGPoint(x: 0, y: y))
+        path.addLine(to: CGPoint(x: size.width, y: y))
+      }
+      context.stroke(path, with: .color(.black.opacity(0.035)), lineWidth: 1)
+    }
+    .allowsHitTesting(false)
+  }
+}
+
 #if canImport(AppKit)
 private struct WindowDragHandle: NSViewRepresentable {
-  func makeNSView(context: Context) -> NSView {
-    let view = DragRegionView()
-    return view
-  }
-
+  func makeNSView(context: Context) -> NSView { DragRegionView() }
   func updateNSView(_ nsView: NSView, context: Context) {}
 
   final class DragRegionView: NSView {

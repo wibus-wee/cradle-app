@@ -7,114 +7,125 @@ struct AttentionItemRow: View {
   let onReopen: () -> Void
   let onDelete: () -> Void
   let onOpenHref: () -> Void
+  let index: Int
 
   @State private var hovering = false
 
   var body: some View {
-    HStack(alignment: .top, spacing: 12) {
-      Button(action: item.status == .open ? onComplete : onReopen) {
-        ZStack {
-          Circle()
-            .strokeBorder(
-              item.status == .open ? WatchOutTheme.accent.opacity(0.55) : WatchOutTheme.accent,
-              lineWidth: 1.5
-            )
-            .frame(width: 22, height: 22)
-          if item.status == .done {
-            Image(systemName: "checkmark")
-              .font(.system(size: 10, weight: .bold))
-              .foregroundStyle(WatchOutTheme.accent)
-              .transition(
-                .asymmetric(
-                  insertion: .scale(scale: 0.25).combined(with: .opacity),
-                  removal: .opacity
-                )
+    HStack(alignment: .top, spacing: 0) {
+      // Ticket stub / index rail
+      VStack(spacing: 6) {
+        Text(String(format: "%02d", index + 1))
+          .font(.system(size: 10, weight: .bold, design: .monospaced))
+          .foregroundStyle(WatchOutTheme.slate)
+        WatchOutSignalDot(active: item.status == .open, size: 6)
+        Spacer(minLength: 0)
+      }
+      .frame(width: 36)
+      .padding(.top, 2)
+
+      Rectangle()
+        .fill(WatchOutTheme.hairline)
+        .frame(width: 1)
+        .padding(.vertical, 2)
+
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+          Button(action: item.status == .open ? onComplete : onReopen) {
+            Text(item.status == .open ? "MARK" : "UNDO")
+              .font(.system(size: 9, weight: .heavy, design: .monospaced))
+              .tracking(0.8)
+              .foregroundStyle(item.status == .open ? WatchOutTheme.ink : WatchOutTheme.slate)
+              .padding(.horizontal, 7)
+              .padding(.vertical, 4)
+              .background(
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                  .strokeBorder(WatchOutTheme.ink.opacity(item.status == .open ? 0.7 : 0.25), lineWidth: 1)
+                  .background(
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                      .fill(item.status == .open ? WatchOutTheme.phosphorDim : Color.clear)
+                  )
               )
           }
-        }
-        .frame(width: 28, height: 28)
-        .contentShape(Rectangle())
-      }
-      .buttonStyle(WatchOutPressableButtonStyle())
-      .help(item.status == .open ? "Mark done" : "Reopen")
-      .accessibilityLabel(item.status == .open ? "Complete \(item.title)" : "Reopen \(item.title)")
+          .buttonStyle(WatchOutPressStyle())
+          .help(item.status == .open ? "Mark done" : "Reopen")
 
-      VStack(alignment: .leading, spacing: 5) {
-        Text(item.title)
-          .font(.system(.body, design: .default).weight(.semibold))
-          .foregroundStyle(item.status == .done ? WatchOutTheme.inkSecondary : .primary)
-          .strikethrough(item.status == .done, color: WatchOutTheme.inkSecondary)
-          .multilineTextAlignment(.leading)
-          .frame(maxWidth: .infinity, alignment: .leading)
+          Text(item.title)
+            .font(.system(size: 14, weight: .semibold, design: .default))
+            .foregroundStyle(item.status == .done ? WatchOutTheme.slate : WatchOutTheme.ink)
+            .strikethrough(item.status == .done, color: WatchOutTheme.slate)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+          Button(action: onDelete) {
+            Image(systemName: "xmark")
+              .font(.system(size: 9, weight: .bold))
+              .foregroundStyle(WatchOutTheme.slate)
+              .frame(width: 22, height: 22)
+              .background(
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                  .fill(hovering ? WatchOutTheme.danger.opacity(0.12) : Color.clear)
+              )
+          }
+          .buttonStyle(WatchOutPressStyle())
+          .opacity(hovering ? 1 : 0.15)
+          .help("Delete")
+        }
 
         if let body = item.body, !body.isEmpty {
           Text(body)
-            .font(.callout)
-            .foregroundStyle(WatchOutTheme.inkSecondary)
+            .font(.system(size: 12.5, weight: .regular, design: .default))
+            .foregroundStyle(WatchOutTheme.slate)
             .lineLimit(2)
         }
 
-        HStack(spacing: 8) {
-          MetaChip(text: item.source)
-          MetaChip(text: item.audience.rawValue)
+        HStack(spacing: 10) {
+          Text(item.source.uppercased())
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
+            .foregroundStyle(WatchOutTheme.slate)
+          Text("·")
+            .foregroundStyle(WatchOutTheme.hairline)
+          Text(item.audience.rawValue.uppercased())
+            .font(.system(size: 9, weight: .bold, design: .monospaced))
+            .foregroundStyle(WatchOutTheme.slate)
+          Text("·")
+            .foregroundStyle(WatchOutTheme.hairline)
           Text(item.createdAt.formatted(.relative(presentation: .named)))
-            .font(.caption.monospacedDigit())
-            .foregroundStyle(.tertiary)
+            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .monospacedDigit()
+            .foregroundStyle(WatchOutTheme.slate.opacity(0.9))
           if item.href != nil {
-            Button(action: onOpenHref) {
-              Label("Open", systemImage: "arrow.up.right")
-                .labelStyle(.titleAndIcon)
-                .font(.caption.weight(.medium))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(WatchOutTheme.accent)
+            Button("LINK →", action: onOpenHref)
+              .buttonStyle(WatchOutPressStyle())
+              .font(.system(size: 9, weight: .heavy, design: .monospaced))
+              .foregroundStyle(WatchOutTheme.ink)
           }
         }
       }
-
-      Button(role: .destructive, action: onDelete) {
-        Image(systemName: "trash")
-          .font(.system(size: 12, weight: .semibold))
-          .foregroundStyle(.secondary)
-          .frame(width: 28, height: 28)
-          .background(
-            Circle().fill(hovering ? Color.red.opacity(0.12) : .clear)
-          )
-      }
-      .buttonStyle(WatchOutPressableButtonStyle())
-      .opacity(hovering ? 1 : 0)
-      .help("Delete")
-      .accessibilityLabel("Delete \(item.title)")
+      .padding(.leading, 12)
+      .padding(.vertical, 12)
+      .padding(.trailing, 10)
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 11)
+    .padding(.leading, 8)
     .background(
-      RoundedRectangle(cornerRadius: WatchOutTheme.rowCorner, style: .continuous)
-        .fill(hovering ? WatchOutTheme.rowFillHover : WatchOutTheme.rowFill)
+      RoundedRectangle(cornerRadius: WatchOutTheme.ticketRadius, style: .continuous)
+        .fill(WatchOutTheme.ticketFill)
+        .shadow(color: .black.opacity(hovering ? 0.08 : 0.03), radius: hovering ? 8 : 2, y: 1)
     )
+    .overlay(alignment: .leading) {
+      Rectangle()
+        .fill(item.status == .open ? WatchOutTheme.phosphor : WatchOutTheme.slate.opacity(0.25))
+        .frame(width: 3)
+        .clipShape(RoundedRectangle(cornerRadius: 1, style: .continuous))
+        .padding(.vertical, 6)
+        .padding(.leading, 2)
+    }
     .overlay(
-      RoundedRectangle(cornerRadius: WatchOutTheme.rowCorner, style: .continuous)
+      RoundedRectangle(cornerRadius: WatchOutTheme.ticketRadius, style: .continuous)
         .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
     )
     .onHover { hovering = $0 }
-    .animation(.easeOut(duration: 0.15), value: hovering)
-    .animation(.easeOut(duration: 0.18), value: item.status)
-  }
-}
-
-private struct MetaChip: View {
-  let text: String
-
-  var body: some View {
-    Text(text)
-      .font(.caption2.weight(.medium).monospaced())
-      .foregroundStyle(WatchOutTheme.inkSecondary)
-      .padding(.horizontal, 6)
-      .padding(.vertical, 2)
-      .background(
-        RoundedRectangle(cornerRadius: 5, style: .continuous)
-          .fill(Color.primary.opacity(0.05))
-      )
+    .animation(.easeOut(duration: 0.14), value: hovering)
   }
 }
 
@@ -128,75 +139,74 @@ struct AttentionComposer: View {
   }
 
   var body: some View {
-    HStack(spacing: 10) {
-      Image(systemName: "plus")
-        .font(.system(size: 13, weight: .bold))
-        .foregroundStyle(focused ? WatchOutTheme.accent : .tertiary)
-        .frame(width: 18)
+    VStack(alignment: .leading, spacing: 8) {
+      Text("NEW SLIP")
+        .font(.system(size: 9, weight: .heavy, design: .monospaced))
+        .tracking(1.4)
+        .foregroundStyle(WatchOutTheme.slate)
 
-      TextField("Park something for later…", text: $title)
-        .textFieldStyle(.plain)
-        .font(.body.weight(.medium))
-        .focused($focused)
-        .onSubmit(onSubmit)
+      HStack(spacing: 0) {
+        TextField("What should not be forgotten?", text: $title)
+          .textFieldStyle(.plain)
+          .font(.system(size: 14, weight: .medium))
+          .focused($focused)
+          .onSubmit(onSubmit)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 12)
 
-      Button(action: onSubmit) {
-        Text("Add")
-          .font(.caption.weight(.semibold))
-          .padding(.horizontal, 10)
-          .padding(.vertical, 6)
-          .background(
-            Capsule(style: .continuous)
-              .fill(canSubmit ? WatchOutTheme.accent : Color.primary.opacity(0.08))
-          )
-          .foregroundStyle(canSubmit ? Color.white : Color.secondary)
+        Button(action: onSubmit) {
+          Text("PARK")
+            .font(.system(size: 11, weight: .heavy, design: .monospaced))
+            .tracking(1)
+            .foregroundStyle(canSubmit ? WatchOutTheme.ink : WatchOutTheme.slate)
+            .padding(.horizontal, 14)
+            .frame(maxHeight: .infinity)
+            .background(canSubmit ? WatchOutTheme.phosphor : Color.black.opacity(0.04))
+        }
+        .buttonStyle(WatchOutPressStyle())
+        .disabled(!canSubmit)
+        .keyboardShortcut(.return, modifiers: [.command])
       }
-      .buttonStyle(WatchOutPressableButtonStyle())
-      .disabled(!canSubmit)
-      .keyboardShortcut(.return, modifiers: [.command])
+      .background(
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+          .strokeBorder(
+            focused ? WatchOutTheme.ink.opacity(0.55) : WatchOutTheme.hairline,
+            lineWidth: focused ? 1.5 : 1
+          )
+      )
+      .animation(.easeOut(duration: 0.12), value: focused)
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 11)
-    .background(
-      RoundedRectangle(cornerRadius: WatchOutTheme.controlCorner, style: .continuous)
-        .fill(Color.primary.opacity(focused ? 0.05 : 0.035))
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: WatchOutTheme.controlCorner, style: .continuous)
-        .strokeBorder(
-          focused ? WatchOutTheme.accent.opacity(0.45) : WatchOutTheme.hairline,
-          lineWidth: 1
-        )
-    )
-    .animation(.easeOut(duration: 0.15), value: focused)
   }
 }
 
 struct AttentionEmptyState: View {
-  var compact: Bool
-
   var body: some View {
-    VStack(spacing: 14) {
-      ZStack {
-        Circle()
-          .fill(WatchOutTheme.accentSoft)
-          .frame(width: compact ? 56 : 72, height: compact ? 56 : 72)
-        Image(systemName: "eye.slash")
-          .font(.system(size: compact ? 22 : 28, weight: .semibold))
-          .foregroundStyle(WatchOutTheme.accent)
+    VStack(alignment: .leading, spacing: 14) {
+      HStack(spacing: 8) {
+        WatchOutSignalDot(active: false, size: 7)
+        Text("NO OPEN SIGNALS")
+          .font(.system(size: 11, weight: .heavy, design: .monospaced))
+          .tracking(1.5)
+          .foregroundStyle(WatchOutTheme.slate)
       }
-      VStack(spacing: 6) {
-        Text("Nothing to watch")
-          .font(compact ? .headline : .title3.weight(.semibold))
-        Text("When something finishes and you can’t review yet,\npark it here. Opening a chat won’t clear it.")
-          .font(.callout)
-          .foregroundStyle(WatchOutTheme.inkSecondary)
-          .multilineTextAlignment(.center)
-          .fixedSize(horizontal: false, vertical: true)
-      }
+      Text("Park a follow-up before you context-switch.\nOpening a chat won’t clear it.")
+        .font(.system(size: 13.5, weight: .medium))
+        .foregroundStyle(WatchOutTheme.ink.opacity(0.72))
+        .fixedSize(horizontal: false, vertical: true)
+      Text("CMD+N FROM FLOATING · OR JUST TYPE ABOVE")
+        .font(.system(size: 9, weight: .bold, design: .monospaced))
+        .tracking(0.8)
+        .foregroundStyle(WatchOutTheme.slate.opacity(0.8))
     }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .padding(.horizontal, 20)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(18)
+    .background(
+      RoundedRectangle(cornerRadius: WatchOutTheme.ticketRadius, style: .continuous)
+        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+        .foregroundStyle(WatchOutTheme.hairline)
+    )
+    .padding(.horizontal, 16)
+    .padding(.vertical, 18)
   }
 }
 
@@ -207,29 +217,37 @@ struct AttentionListPane: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       header
-        .padding(.horizontal, compact ? 14 : 18)
-        .padding(.top, compact ? 14 : 18)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 16)
+        .padding(.top, compact ? 14 : 10)
+        .padding(.bottom, 14)
 
       AttentionComposer(title: $model.draftTitle) {
         model.createFromDraft()
       }
-      .padding(.horizontal, compact ? 14 : 18)
-      .padding(.bottom, 12)
+      .padding(.horizontal, 16)
+      .padding(.bottom, 14)
 
       if let errorMessage = model.errorMessage {
         Text(errorMessage)
-          .font(.caption)
-          .foregroundStyle(.red)
-          .padding(.horizontal, compact ? 14 : 18)
+          .font(.system(size: 11, weight: .medium, design: .monospaced))
+          .foregroundStyle(WatchOutTheme.danger)
+          .padding(.horizontal, 16)
           .padding(.bottom, 8)
       }
 
-      Divider().opacity(0.5)
+      // Scanline divider
+      ZStack(alignment: .leading) {
+        Rectangle().fill(WatchOutTheme.hairline).frame(height: 1)
+        Rectangle()
+          .fill(WatchOutTheme.phosphor)
+          .frame(width: 48, height: 2)
+      }
+      .padding(.horizontal, 16)
 
       Group {
         if model.items.isEmpty {
-          AttentionEmptyState(compact: compact)
+          AttentionEmptyState()
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         } else {
           ScrollView {
             LazyVStack(spacing: 8) {
@@ -239,19 +257,12 @@ struct AttentionListPane: View {
                   onComplete: { model.complete(item) },
                   onReopen: { model.reopen(item) },
                   onDelete: { model.delete(item) },
-                  onOpenHref: { model.openHref(item) }
-                )
-                .transition(.asymmetric(
-                  insertion: .opacity.combined(with: .move(edge: .top)),
-                  removal: .opacity.combined(with: .scale(scale: 0.98))
-                ))
-                .animation(
-                  .easeOut(duration: 0.2).delay(Double(min(index, 6)) * 0.03),
-                  value: model.items.map(\.id)
+                  onOpenHref: { model.openHref(item) },
+                  index: index
                 )
               }
             }
-            .padding(.horizontal, compact ? 14 : 18)
+            .padding(.horizontal, 16)
             .padding(.vertical, 12)
           }
         }
@@ -262,30 +273,41 @@ struct AttentionListPane: View {
   }
 
   private var header: some View {
-    HStack(alignment: .center, spacing: 12) {
-      WatchOutMark(size: compact ? 24 : 30)
-      VStack(alignment: .leading, spacing: 2) {
-        Text("WatchOut")
-          .font(compact ? .title3.weight(.bold) : .largeTitle.weight(.bold))
-          .tracking(-0.4)
-        Text(compact ? "Parking slips" : "Things to handle later")
-          .font(.caption)
-          .foregroundStyle(WatchOutTheme.inkSecondary)
+    VStack(alignment: .leading, spacing: compact ? 8 : 12) {
+      HStack(alignment: .center) {
+        WatchOutStamp(compact: compact)
+        Spacer()
+        WatchOutCountTape(count: model.openCount)
       }
-      Spacer(minLength: 8)
-      WatchOutBadge(count: model.openCount)
-      Button {
-        model.showDone.toggle()
-        model.refresh()
-      } label: {
-        Image(systemName: model.showDone ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-          .font(.system(size: 16, weight: .semibold))
-          .foregroundStyle(model.showDone ? WatchOutTheme.accent : .secondary)
-          .frame(width: 28, height: 28)
-          .contentShape(Rectangle())
+
+      HStack(alignment: .firstTextBaseline) {
+        Text(compact ? "Later, without losing the thread." : "A desk for unfinished attention.")
+          .font(.system(size: compact ? 12 : 20, weight: compact ? .medium : .semibold))
+          .foregroundStyle(WatchOutTheme.ink.opacity(0.88))
+          .lineLimit(2)
+        Spacer(minLength: 12)
+        Button {
+          model.showDone.toggle()
+          model.refresh()
+        } label: {
+          Text(model.showDone ? "OPEN+DONE" : "OPEN ONLY")
+            .font(.system(size: 9, weight: .heavy, design: .monospaced))
+            .tracking(0.6)
+            .foregroundStyle(model.showDone ? WatchOutTheme.ink : WatchOutTheme.slate)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+              RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
+                .background(
+                  RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(model.showDone ? WatchOutTheme.phosphorDim : Color.clear)
+                )
+            )
+        }
+        .buttonStyle(WatchOutPressStyle())
+        .help(model.showDone ? "Hide completed" : "Show completed")
       }
-      .buttonStyle(WatchOutPressableButtonStyle())
-      .help(model.showDone ? "Hide completed" : "Show completed")
     }
   }
 }

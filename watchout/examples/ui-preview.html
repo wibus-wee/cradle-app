@@ -3,470 +3,370 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>WatchOut UI Preview</title>
+<title>WatchOut — radar desk preview</title>
 <style>
   :root {
-    --accent: #eb8c2e;
-    --accent-soft: rgba(235, 140, 46, 0.14);
-    --ink: #1c1f24;
-    --ink-secondary: rgba(28, 31, 36, 0.55);
-    --hairline: rgba(0, 0, 0, 0.08);
-    --row: rgba(0, 0, 0, 0.035);
-    --row-hover: rgba(0, 0, 0, 0.06);
-    --bg: #e8e4dc;
+    --phosphor: #38db9e;
+    --phosphor-dim: rgba(56, 219, 158, 0.16);
+    --ink: #12171f;
+    --mist: #e6ebf0;
+    --slate: #737f8e;
+    --hairline: rgba(0,0,0,0.10);
+    --ticket: rgba(255,255,255,0.92);
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-    background:
-      radial-gradient(900px 500px at 20% 0%, rgba(235,140,46,0.18), transparent 60%),
-      radial-gradient(700px 400px at 90% 20%, rgba(80,100,140,0.12), transparent 55%),
-      linear-gradient(180deg, #f3efe6 0%, #ddd6c8 100%);
-    color: var(--ink);
     min-height: 100vh;
-    padding: 48px 40px 64px;
+    font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: var(--ink);
+    background:
+      linear-gradient(180deg, #edf1f5 0%, #d9e0e8 100%);
+    padding: 44px 36px 56px;
     -webkit-font-smoothing: antialiased;
   }
   h1 {
-    font-size: 13px;
-    letter-spacing: 0.14em;
+    margin: 0 0 6px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: rgba(0,0,0,0.45);
-    font-weight: 700;
-    margin: 0 0 28px;
-  }
-  .stage {
-    display: flex;
-    gap: 40px;
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-  .caption {
-    font-size: 12px;
-    color: rgba(0,0,0,0.45);
-    margin: 0 0 10px;
-    font-weight: 600;
-  }
-
-  /* Shared panel chrome */
-  .panel {
-    background: rgba(255,255,255,0.72);
-    backdrop-filter: blur(28px) saturate(1.4);
-    -webkit-backdrop-filter: blur(28px) saturate(1.4);
-    border: 1px solid var(--hairline);
-    box-shadow:
-      0 1px 0 rgba(255,255,255,0.65) inset,
-      0 18px 40px rgba(0,0,0,0.12),
-      0 2px 8px rgba(0,0,0,0.06);
-    overflow: hidden;
-  }
-  .menubar {
-    width: 360px;
-    border-radius: 14px;
-  }
-  .floating {
-    width: 440px;
-    border-radius: 18px;
-    background:
-      linear-gradient(145deg, rgba(235,140,46,0.10), transparent 42%),
-      rgba(255,255,255,0.78);
-  }
-
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 18px 12px;
-  }
-  .floating .header { padding: 8px 18px 12px; }
-  .mark {
-    width: 30px; height: 30px;
-    border-radius: 8px;
-    background: linear-gradient(180deg, #f0a045, #e07a1a);
-    display: grid; place-items: center;
-    color: white;
-    box-shadow: 0 4px 12px rgba(235,140,46,0.35);
-    flex-shrink: 0;
-  }
-  .menubar .mark { width: 24px; height: 24px; border-radius: 7px; }
-  .mark svg { width: 14px; height: 14px; }
-  .menubar .mark svg { width: 11px; height: 11px; }
-  .titles { flex: 1; min-width: 0; }
-  .titles strong {
-    display: block;
-    font-size: 28px;
-    letter-spacing: -0.02em;
-    font-weight: 700;
-    line-height: 1.1;
-  }
-  .menubar .titles strong { font-size: 18px; }
-  .titles span {
-    display: block;
-    margin-top: 2px;
-    font-size: 12px;
-    color: var(--ink-secondary);
-  }
-  .badge {
-    font-variant-numeric: tabular-nums;
-    font-size: 12px;
-    font-weight: 650;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: var(--accent-soft);
-    border: 1px solid var(--hairline);
-  }
-  .filter {
-    width: 28px; height: 28px;
-    border-radius: 999px;
-    display: grid; place-items: center;
-    color: var(--accent);
-    background: transparent;
-  }
-
-  .composer {
-    margin: 0 18px 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 11px 12px;
-    border-radius: 10px;
-    background: rgba(0,0,0,0.035);
-    border: 1px solid rgba(235,140,46,0.45);
-  }
-  .composer .plus { color: var(--accent); font-weight: 700; width: 18px; }
-  .composer input {
-    flex: 1;
-    border: 0;
-    outline: none;
-    background: transparent;
-    font: 500 14px/1.3 inherit;
-    color: var(--ink);
-  }
-  .composer input::placeholder { color: rgba(0,0,0,0.35); }
-  .add {
-    border: 0;
-    border-radius: 999px;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 650;
-    background: var(--accent);
-    color: white;
-  }
-
-  .divider { height: 1px; background: rgba(0,0,0,0.08); }
-
-  .list {
-    padding: 12px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    min-height: 280px;
-  }
-  .menubar .list { min-height: 240px; }
-
-  .row {
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-    padding: 11px 12px;
-    border-radius: 12px;
-    background: var(--row);
-    border: 1px solid var(--hairline);
-  }
-  .row:hover { background: var(--row-hover); }
-  .check {
-    width: 22px; height: 22px;
-    margin-top: 3px;
-    border-radius: 999px;
-    border: 1.5px solid rgba(235,140,46,0.55);
-    display: grid; place-items: center;
-    flex-shrink: 0;
-    color: var(--accent);
-    font-size: 10px;
-    font-weight: 700;
-  }
-  .check.done {
-    border-color: var(--accent);
-  }
-  .row-body { flex: 1; min-width: 0; }
-  .row-body h3 {
-    margin: 0;
-    font-size: 14px;
-    font-weight: 650;
-    line-height: 1.35;
-  }
-  .row-body h3.done {
-    color: var(--ink-secondary);
-    text-decoration: line-through;
-  }
-  .row-body p {
-    margin: 4px 0 0;
-    font-size: 13px;
-    color: var(--ink-secondary);
-    line-height: 1.35;
-  }
-  .meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-    margin-top: 6px;
-  }
-  .chip {
-    font-size: 10px;
+    font-weight: 800;
+    color: var(--slate);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-weight: 500;
-    padding: 2px 6px;
-    border-radius: 5px;
-    background: rgba(0,0,0,0.05);
-    color: var(--ink-secondary);
   }
-  .time {
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    color: rgba(0,0,0,0.35);
+  .sub {
+    margin: 0 0 28px;
+    font-size: 14px;
+    color: rgba(18,23,31,0.7);
   }
-  .open-link {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--accent);
-    text-decoration: none;
-  }
-  .trash {
-    width: 28px; height: 28px;
-    border-radius: 999px;
-    display: grid; place-items: center;
-    color: rgba(0,0,0,0.35);
-    opacity: 0;
-  }
-  .row:hover .trash { opacity: 1; background: rgba(255,0,0,0.08); }
-
-  .footer {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-top: 1px solid var(--hairline);
-  }
-  .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 10px;
-    border-radius: 999px;
-    background: var(--accent-soft);
-    border: 1px solid rgba(235,140,46,0.25);
-    font-size: 12px;
-    font-weight: 650;
-  }
-  .icon-btn {
-    width: 28px; height: 28px;
-    border-radius: 999px;
-    background: rgba(0,0,0,0.05);
-    display: grid; place-items: center;
-    color: rgba(0,0,0,0.45);
-    font-size: 12px;
-  }
-  .spacer { flex: 1; }
-
-  .chrome {
-    display: flex;
-    align-items: center;
-    padding: 12px 16px 4px;
+  .stage { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
+  .label {
+    margin: 0 0 10px;
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    color: var(--ink-secondary);
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    color: var(--slate);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  .pin {
-    margin-left: auto;
-    width: 26px; height: 26px;
-    border-radius: 999px;
-    background: rgba(0,0,0,0.05);
-    display: grid; place-items: center;
-    color: var(--accent);
+  .gridbg {
+    background-image:
+      linear-gradient(rgba(0,0,0,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.035) 1px, transparent 1px);
+    background-size: 16px 16px;
   }
-
-  .menubar-host {
+  .panel {
+    border: 1px solid rgba(18,23,31,0.12);
+    border-radius: 10px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--mist) 85%, white);
+    box-shadow: 0 16px 40px rgba(18,23,31,0.10);
     position: relative;
   }
-  .fake-menubar {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    padding-right: 6px;
+  .panel::before {
+    content: "";
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,0,0,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,0,0,0.035) 1px, transparent 1px);
+    background-size: 16px 16px;
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  .menubar { width: 380px; }
+  .floating { width: 460px; border-radius: 12px; }
+  .floating .wash {
+    position: absolute; inset: 0;
+    background: linear-gradient(145deg, rgba(56,219,158,0.10), transparent 45%, rgba(0,0,0,0.03));
+    pointer-events: none;
+  }
+  .inner { position: relative; z-index: 1; }
+
+  .chrome {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 9px; font-weight: 800; letter-spacing: 0.16em; color: var(--slate);
+  }
+  .chrome .line { flex: 1; height: 1px; background: var(--hairline); }
+  .pin {
+    padding: 5px 8px;
+    background: var(--phosphor);
+    color: var(--ink);
+    border: 1px solid var(--hairline);
+    border-radius: 2px;
+  }
+
+  .header { padding: 14px 16px 14px; }
+  .stamp {
+    display: flex; align-items: center; gap: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-weight: 800; letter-spacing: 0.28em; font-size: 13px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--phosphor);
+    box-shadow: 0 0 0 5px var(--phosphor-dim);
+  }
+  .dot.off { background: rgba(115,127,142,0.35); box-shadow: none; }
+  .toprow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .tape {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 8px; border: 1px solid var(--hairline); border-radius: 3px;
+    background: var(--phosphor-dim);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .tape .k { font-size: 9px; font-weight: 800; letter-spacing: 0.12em; color: var(--slate); }
+  .tape .n { font-size: 13px; font-weight: 800; }
+  .tagline {
+    display: flex; align-items: baseline; gap: 12px; justify-content: space-between;
+  }
+  .tagline p {
+    margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em;
+    max-width: 260px; line-height: 1.2;
+  }
+  .menubar .tagline p { font-size: 12px; font-weight: 500; max-width: 200px; color: rgba(18,23,31,0.88); }
+  .mode {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+    padding: 5px 8px; border: 1px solid var(--hairline); border-radius: 2px; color: var(--slate);
+    white-space: nowrap;
+  }
+
+  .composer { padding: 0 16px 14px; }
+  .composer .k {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 9px; font-weight: 800; letter-spacing: 0.14em; color: var(--slate); margin-bottom: 8px;
+  }
+  .composer .box {
+    display: flex; border: 1.5px solid rgba(18,23,31,0.55); border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.7);
+  }
+  .composer input {
+    flex: 1; border: 0; outline: 0; background: transparent;
+    padding: 12px; font-size: 14px; font-weight: 500; color: var(--ink);
+  }
+  .composer button {
+    border: 0; background: var(--phosphor); color: var(--ink);
+    padding: 0 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
+  }
+
+  .scan {
+    margin: 0 16px; height: 2px; background: var(--hairline); position: relative;
+  }
+  .scan::after {
+    content: ""; position: absolute; left: 0; top: -0.5px; width: 48px; height: 2px; background: var(--phosphor);
+  }
+
+  .list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; min-height: 250px; }
+  .ticket {
+    display: flex; background: var(--ticket); border: 1px solid var(--hairline);
+    border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); position: relative; overflow: hidden;
+  }
+  .ticket::before {
+    content: ""; position: absolute; left: 2px; top: 6px; bottom: 6px; width: 3px;
+    border-radius: 1px; background: var(--phosphor);
+  }
+  .ticket.done::before { background: rgba(115,127,142,0.25); }
+  .rail {
+    width: 36px; padding: 14px 0 10px; text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px; font-weight: 800; color: var(--slate);
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .rail .mini { width: 6px; height: 6px; border-radius: 50%; background: var(--phosphor); box-shadow: 0 0 0 4px var(--phosphor-dim); }
+  .rail .mini.off { background: rgba(115,127,142,0.35); box-shadow: none; }
+  .sep { width: 1px; background: var(--hairline); margin: 8px 0; }
+  .body { flex: 1; padding: 12px 10px 12px 12px; }
+  .row1 { display: flex; align-items: flex-start; gap: 10px; }
+  .markbtn {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
+    padding: 4px 7px; border: 1px solid rgba(18,23,31,0.7); border-radius: 2px;
+    background: var(--phosphor-dim);
+  }
+  .title { flex: 1; font-size: 14px; font-weight: 650; line-height: 1.35; }
+  .title.done { color: var(--slate); text-decoration: line-through; }
+  .x { opacity: 0.2; font-size: 11px; font-weight: 800; color: var(--slate); padding: 4px; }
+  .desc { margin: 8px 0 0; font-size: 12.5px; color: var(--slate); }
+  .meta {
+    margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 9px; font-weight: 800; color: var(--slate);
+  }
+  .meta .link { color: var(--ink); }
+
+  .footer {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-top: 1px solid var(--hairline);
+  }
+  .floatbtn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--phosphor); color: var(--ink);
+    padding: 7px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.1em;
+  }
+  .floatbtn .d { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); }
+  .ghost {
+    margin-left: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: var(--slate);
+    padding: 7px 8px; border: 1px solid var(--hairline); border-radius: 2px;
   }
   .tray {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    border-radius: 8px;
-    background: rgba(40,40,40,0.82);
-    color: white;
-    font-size: 11px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-bottom: 8px; margin-left: auto;
+    padding: 5px 9px; border-radius: 7px; background: rgba(18,23,31,0.88); color: white;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 800;
   }
-  .note {
-    margin-top: 36px;
-    max-width: 860px;
-    font-size: 13px;
-    color: rgba(0,0,0,0.5);
-    line-height: 1.5;
-  }
+  .tray .d { width: 6px; height: 6px; border-radius: 50%; background: var(--phosphor); box-shadow: 0 0 0 4px rgba(56,219,158,0.25); }
+  .host { display: flex; flex-direction: column; align-items: flex-end; }
+  .note { margin-top: 28px; font-size: 12px; color: var(--slate); max-width: 880px; line-height: 1.5; }
 </style>
 </head>
 <body>
-  <h1>WatchOut — UI preview (HTML stand-in for SwiftUI)</h1>
+  <h1>WatchOut redesign</h1>
+  <p class="sub">Cool stone desk · phosphor signal · ticket slips — not generic orange cards.</p>
   <div class="stage">
     <div>
-      <p class="caption">Menu Bar panel</p>
-      <div class="menubar-host">
-        <div class="fake-menubar">
-          <div class="tray">👁 3</div>
-        </div>
+      <p class="label">MENU BAR</p>
+      <div class="host">
+        <div class="tray"><span class="d"></span>3</div>
         <div class="panel menubar">
-          <div class="header">
-            <div class="mark" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+          <div class="inner">
+            <div class="header">
+              <div class="toprow">
+                <div class="stamp"><span class="dot"></span>WATCHOUT</div>
+                <div class="tape"><span class="k">OPEN</span><span class="n">3</span></div>
+              </div>
+              <div class="tagline">
+                <p>Later, without losing the thread.</p>
+                <div class="mode">OPEN ONLY</div>
+              </div>
             </div>
-            <div class="titles">
-              <strong>WatchOut</strong>
-              <span>Parking slips</span>
+            <div class="composer">
+              <div class="k">NEW SLIP</div>
+              <div class="box">
+                <input placeholder="What should not be forgotten?" />
+                <button>PARK</button>
+              </div>
             </div>
-            <div class="badge">3</div>
-            <div class="filter">☰</div>
-          </div>
-          <div class="composer">
-            <div class="plus">+</div>
-            <input value="" placeholder="Park something for later…" readonly />
-            <button class="add">Add</button>
-          </div>
-          <div class="divider"></div>
-          <div class="list">
-            <div class="row">
-              <div class="check"></div>
-              <div class="row-body">
-                <h3>Review PR #113 outcome</h3>
-                <p>Agent finished; you opened once and bounced.</p>
-                <div class="meta">
-                  <span class="chip">cradle</span>
-                  <span class="chip">human</span>
-                  <span class="time">2 hours ago</span>
-                  <a class="open-link" href="#">Open ↗</a>
+            <div class="scan"></div>
+            <div class="list">
+              <div class="ticket">
+                <div class="rail">01<span class="mini"></span></div>
+                <div class="sep"></div>
+                <div class="body">
+                  <div class="row1">
+                    <div class="markbtn">MARK</div>
+                    <div class="title">Review PR #113 outcome</div>
+                    <div class="x">✕</div>
+                  </div>
+                  <p class="desc">Agent finished; you opened once and bounced.</p>
+                  <div class="meta"><span>CRADLE</span><span>·</span><span>HUMAN</span><span>·</span><span>2 HOURS AGO</span><span class="link">LINK →</span></div>
                 </div>
               </div>
-              <div class="trash">🗑</div>
-            </div>
-            <div class="row">
-              <div class="check"></div>
-              <div class="row-body">
-                <h3>Check CI on watchout branch</h3>
-                <div class="meta">
-                  <span class="chip">cli</span>
-                  <span class="chip">human</span>
-                  <span class="time">yesterday</span>
+              <div class="ticket">
+                <div class="rail">02<span class="mini"></span></div>
+                <div class="sep"></div>
+                <div class="body">
+                  <div class="row1">
+                    <div class="markbtn">MARK</div>
+                    <div class="title">Check CI on watchout branch</div>
+                    <div class="x">✕</div>
+                  </div>
+                  <div class="meta"><span>CLI</span><span>·</span><span>HUMAN</span><span>·</span><span>YESTERDAY</span></div>
                 </div>
               </div>
-              <div class="trash">🗑</div>
-            </div>
-            <div class="row">
-              <div class="check done">✓</div>
-              <div class="row-body">
-                <h3 class="done">Reply to design notes</h3>
-                <div class="meta">
-                  <span class="chip">manual</span>
-                  <span class="chip">human</span>
-                  <span class="time">3 days ago</span>
+              <div class="ticket done">
+                <div class="rail">03<span class="mini off"></span></div>
+                <div class="sep"></div>
+                <div class="body">
+                  <div class="row1">
+                    <div class="markbtn" style="background:transparent;border-color:rgba(18,23,31,0.25);color:var(--slate)">UNDO</div>
+                    <div class="title done">Reply to design notes</div>
+                    <div class="x">✕</div>
+                  </div>
+                  <div class="meta"><span>MANUAL</span><span>·</span><span>HUMAN</span><span>·</span><span>3 DAYS AGO</span></div>
                 </div>
               </div>
-              <div class="trash">🗑</div>
             </div>
-          </div>
-          <div class="footer">
-            <div class="pill">🗔 Open Floating</div>
-            <div class="spacer"></div>
-            <div class="icon-btn">⚙</div>
-            <div class="icon-btn">⏻</div>
+            <div class="footer">
+              <div class="floatbtn"><span class="d"></span>FLOAT</div>
+              <div class="ghost">CFG</div>
+              <div class="ghost" style="margin-left:0">QUIT</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <div>
-      <p class="caption">Floating panel</p>
+      <p class="label">FLOATING</p>
       <div class="panel floating">
-        <div class="chrome">
-          FLOATING
-          <div class="pin">📌</div>
-        </div>
-        <div class="header">
-          <div class="mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8z"/></svg>
+        <div class="wash"></div>
+        <div class="inner">
+          <div class="chrome">FLOAT MODE<span class="line"></span><span class="pin">PINNED</span></div>
+          <div class="header">
+            <div class="toprow">
+              <div class="stamp"><span class="dot"></span>WATCHOUT</div>
+              <div class="tape"><span class="k">OPEN</span><span class="n">3</span></div>
+            </div>
+            <div class="tagline">
+              <p>A desk for unfinished attention.</p>
+              <div class="mode">OPEN ONLY</div>
+            </div>
           </div>
-          <div class="titles">
-            <strong>WatchOut</strong>
-            <span>Things to handle later</span>
+          <div class="composer">
+            <div class="k">NEW SLIP</div>
+            <div class="box">
+              <input value="Ship icon + screenshot pass" />
+              <button>PARK</button>
+            </div>
           </div>
-          <div class="badge">3</div>
-          <div class="filter">☰</div>
-        </div>
-        <div class="composer">
-          <div class="plus">+</div>
-          <input value="Ship icon + screenshot pass" readonly />
-          <button class="add">Add</button>
-        </div>
-        <div class="divider"></div>
-        <div class="list">
-          <div class="row">
-            <div class="check"></div>
-            <div class="row-body">
-              <h3>Review PR #113 outcome</h3>
-              <p>Agent finished; you opened once and bounced.</p>
-              <div class="meta">
-                <span class="chip">cradle</span>
-                <span class="chip">human</span>
-                <span class="time">2 hours ago</span>
-                <a class="open-link" href="#">Open ↗</a>
+          <div class="scan"></div>
+          <div class="list">
+            <div class="ticket">
+              <div class="rail">01<span class="mini"></span></div>
+              <div class="sep"></div>
+              <div class="body">
+                <div class="row1">
+                  <div class="markbtn">MARK</div>
+                  <div class="title">Review PR #113 outcome</div>
+                  <div class="x">✕</div>
+                </div>
+                <p class="desc">Agent finished; you opened once and bounced.</p>
+                <div class="meta"><span>CRADLE</span><span>·</span><span>HUMAN</span><span>·</span><span>2 HOURS AGO</span><span class="link">LINK →</span></div>
               </div>
             </div>
-            <div class="trash">🗑</div>
-          </div>
-          <div class="row">
-            <div class="check"></div>
-            <div class="row-body">
-              <h3>Check CI on watchout branch</h3>
-              <div class="meta">
-                <span class="chip">cli</span>
-                <span class="chip">human</span>
-                <span class="time">yesterday</span>
+            <div class="ticket">
+              <div class="rail">02<span class="mini"></span></div>
+              <div class="sep"></div>
+              <div class="body">
+                <div class="row1">
+                  <div class="markbtn">MARK</div>
+                  <div class="title">Check CI on watchout branch</div>
+                  <div class="x">✕</div>
+                </div>
+                <div class="meta"><span>CLI</span><span>·</span><span>HUMAN</span><span>·</span><span>YESTERDAY</span></div>
               </div>
             </div>
-            <div class="trash">🗑</div>
-          </div>
-          <div class="row">
-            <div class="check"></div>
-            <div class="row-body">
-              <h3>Ask design: more sticky-note or more HUD?</h3>
-              <div class="meta">
-                <span class="chip">manual</span>
-                <span class="chip">human</span>
-                <span class="time">just now</span>
+            <div class="ticket">
+              <div class="rail">03<span class="mini"></span></div>
+              <div class="sep"></div>
+              <div class="body">
+                <div class="row1">
+                  <div class="markbtn">MARK</div>
+                  <div class="title">Ask design: more sticky-note or more HUD?</div>
+                  <div class="x">✕</div>
+                </div>
+                <div class="meta"><span>MANUAL</span><span>·</span><span>HUMAN</span><span>·</span><span>JUST NOW</span></div>
               </div>
             </div>
-            <div class="trash">🗑</div>
           </div>
         </div>
       </div>
     </div>
   </div>
-  <p class="note">
-    This is a high-fidelity HTML stand-in of the SwiftUI layout (Linux can’t run the macOS app).
-    Colors/structure match <code>WatchOutTheme</code> + the polished panels — not a live AppKit render.
-  </p>
+  <p class="note">HTML stand-in of the redesigned SwiftUI theme (stone + phosphor tickets). Not AppKit pixels.</p>
 </body>
 </html>
