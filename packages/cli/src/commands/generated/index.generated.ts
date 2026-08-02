@@ -251,6 +251,14 @@ import { register as registerRemoteHostDelete } from './remote-host/delete'
 import { register as registerRemoteHostList } from './remote-host/list'
 import { register as registerRemoteHostRelayClaim } from './remote-host/relay/claim'
 import { register as registerRemoteHostUpdate } from './remote-host/update'
+import { register as registerSandboxExec } from './sandbox/exec'
+import { register as registerSandboxGet } from './sandbox/get'
+import { register as registerSandboxLease } from './sandbox/lease'
+import { register as registerSandboxLeases } from './sandbox/leases'
+import { register as registerSandboxPool } from './sandbox/pool'
+import { register as registerSandboxProfiles } from './sandbox/profiles'
+import { register as registerSandboxReconcile } from './sandbox/reconcile'
+import { register as registerSandboxRelease } from './sandbox/release'
 import { register as registerSearchChronicle } from './search/chronicle'
 import { register as registerSearchThreads } from './search/threads'
 import { register as registerSecretDelete } from './secret/delete'
@@ -319,6 +327,8 @@ import { register as registerWorkGet } from './work/get'
 import { register as registerWorkList } from './work/list'
 import { register as registerWorkPrepare } from './work/prepare'
 import { register as registerWorkRenameBranch } from './work/rename-branch'
+import { register as registerWorkSandboxLease } from './work/sandbox-lease'
+import { register as registerWorkSandboxes } from './work/sandboxes'
 import { register as registerWorkSubmit } from './work/submit'
 import { register as registerWorkflowRuleDelete } from './workflow-rule/delete'
 import { register as registerWorkflowRuleGet } from './workflow-rule/get'
@@ -628,6 +638,14 @@ export function registerGeneratedCommands(program: Command): void {
   registerRemoteHostList(program)
   registerRemoteHostRelayClaim(program)
   registerRemoteHostUpdate(program)
+  registerSandboxExec(program)
+  registerSandboxGet(program)
+  registerSandboxLease(program)
+  registerSandboxLeases(program)
+  registerSandboxPool(program)
+  registerSandboxProfiles(program)
+  registerSandboxReconcile(program)
+  registerSandboxRelease(program)
   registerSearchChronicle(program)
   registerSearchThreads(program)
   registerSecretDelete(program)
@@ -696,6 +714,8 @@ export function registerGeneratedCommands(program: Command): void {
   registerWorkList(program)
   registerWorkPrepare(program)
   registerWorkRenameBranch(program)
+  registerWorkSandboxLease(program)
+  registerWorkSandboxes(program)
   registerWorkSubmit(program)
   registerWorkflowRuleDelete(program)
   registerWorkflowRuleGet(program)

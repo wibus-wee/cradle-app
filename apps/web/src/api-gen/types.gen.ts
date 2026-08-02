@@ -8631,6 +8631,24 @@ export type PostWorksResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        sandboxes: Array<{
+            id: string;
+            instanceId: string;
+            profileId: string;
+            engineContainerId: string;
+            workId: string | null;
+            sessionId: string | null;
+            workspaceId: string;
+            purpose: string;
+            mountsResolved: Array<{
+                hostPath: string;
+                containerPath: string;
+                readOnly: boolean;
+            }>;
+            createdAt: number;
+            expiresAt: number | null;
+            releasedAt: number | null;
+        }>;
     };
 };
 
@@ -8743,6 +8761,24 @@ export type GetWorksByIdResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        sandboxes: Array<{
+            id: string;
+            instanceId: string;
+            profileId: string;
+            engineContainerId: string;
+            workId: string | null;
+            sessionId: string | null;
+            workspaceId: string;
+            purpose: string;
+            mountsResolved: Array<{
+                hostPath: string;
+                containerPath: string;
+                readOnly: boolean;
+            }>;
+            createdAt: number;
+            expiresAt: number | null;
+            releasedAt: number | null;
+        }>;
     };
 };
 
@@ -8857,6 +8893,24 @@ export type PostWorksByIdArchiveResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        sandboxes: Array<{
+            id: string;
+            instanceId: string;
+            profileId: string;
+            engineContainerId: string;
+            workId: string | null;
+            sessionId: string | null;
+            workspaceId: string;
+            purpose: string;
+            mountsResolved: Array<{
+                hostPath: string;
+                containerPath: string;
+                readOnly: boolean;
+            }>;
+            createdAt: number;
+            expiresAt: number | null;
+            releasedAt: number | null;
+        }>;
     };
 };
 
@@ -8973,6 +9027,24 @@ export type PostWorksByIdPrepareResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        sandboxes: Array<{
+            id: string;
+            instanceId: string;
+            profileId: string;
+            engineContainerId: string;
+            workId: string | null;
+            sessionId: string | null;
+            workspaceId: string;
+            purpose: string;
+            mountsResolved: Array<{
+                hostPath: string;
+                containerPath: string;
+                readOnly: boolean;
+            }>;
+            createdAt: number;
+            expiresAt: number | null;
+            releasedAt: number | null;
+        }>;
     };
 };
 
@@ -9090,6 +9162,24 @@ export type PostWorksByIdSubmitResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        sandboxes: Array<{
+            id: string;
+            instanceId: string;
+            profileId: string;
+            engineContainerId: string;
+            workId: string | null;
+            sessionId: string | null;
+            workspaceId: string;
+            purpose: string;
+            mountsResolved: Array<{
+                hostPath: string;
+                containerPath: string;
+                readOnly: boolean;
+            }>;
+            createdAt: number;
+            expiresAt: number | null;
+            releasedAt: number | null;
+        }>;
     };
 };
 
@@ -9204,10 +9294,104 @@ export type PostWorksByIdBranchResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        sandboxes: Array<{
+            id: string;
+            instanceId: string;
+            profileId: string;
+            engineContainerId: string;
+            workId: string | null;
+            sessionId: string | null;
+            workspaceId: string;
+            purpose: string;
+            mountsResolved: Array<{
+                hostPath: string;
+                containerPath: string;
+                readOnly: boolean;
+            }>;
+            createdAt: number;
+            expiresAt: number | null;
+            releasedAt: number | null;
+        }>;
     };
 };
 
 export type PostWorksByIdBranchResponse = PostWorksByIdBranchResponses[keyof PostWorksByIdBranchResponses];
+
+export type GetWorksByIdSandboxesData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/works/{id}/sandboxes';
+};
+
+export type GetWorksByIdSandboxesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        instanceId: string;
+        profileId: string;
+        engineContainerId: string;
+        workId: string | null;
+        sessionId: string | null;
+        workspaceId: string;
+        purpose: string;
+        mountsResolved: Array<{
+            hostPath: string;
+            containerPath: string;
+            readOnly: boolean;
+        }>;
+        createdAt: number;
+        expiresAt: number | null;
+        releasedAt: number | null;
+    }>;
+};
+
+export type GetWorksByIdSandboxesResponse = GetWorksByIdSandboxesResponses[keyof GetWorksByIdSandboxesResponses];
+
+export type PostWorksByIdSandboxesLeaseData = {
+    body: {
+        profileId: string;
+        purpose?: string;
+        mountWritable?: boolean;
+        networkMode?: 'none' | 'bridge';
+        ttlSec?: number;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/works/{id}/sandboxes/lease';
+};
+
+export type PostWorksByIdSandboxesLeaseResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        instanceId: string;
+        profileId: string;
+        engineContainerId: string;
+        workId: string | null;
+        sessionId: string | null;
+        workspaceId: string;
+        purpose: string;
+        mountsResolved: Array<{
+            hostPath: string;
+            containerPath: string;
+            readOnly: boolean;
+        }>;
+        createdAt: number;
+        expiresAt: number | null;
+        releasedAt: number | null;
+    };
+};
+
+export type PostWorksByIdSandboxesLeaseResponse = PostWorksByIdSandboxesLeaseResponses[keyof PostWorksByIdSandboxesLeaseResponses];
 
 export type GetSessionsByIdWorkData = {
     body?: never;
@@ -9267,6 +9451,279 @@ export type GetSessionsByIdWorkResponses = {
 };
 
 export type GetSessionsByIdWorkResponse = GetSessionsByIdWorkResponses[keyof GetSessionsByIdWorkResponses];
+
+export type GetSandboxesProfilesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/sandboxes/profiles';
+};
+
+export type GetSandboxesProfilesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        name: string;
+        image: string;
+        workdir: string;
+        env: {
+            [key: string]: unknown;
+        };
+        cpuLimit?: number;
+        memoryMb?: number;
+        networkMode: 'none' | 'bridge';
+        idleTtlSec: number;
+        labels: {
+            [key: string]: unknown;
+        };
+    }>;
+};
+
+export type GetSandboxesProfilesResponse = GetSandboxesProfilesResponses[keyof GetSandboxesProfilesResponses];
+
+export type GetSandboxesPoolData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/sandboxes/pool';
+};
+
+export type GetSandboxesPoolResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        runtimeKind: 'mock' | 'docker-cli';
+        engineAvailable: boolean;
+        config: {
+            minWarm: number;
+            maxTotal: number;
+            maxPerWork: number;
+            defaultExecTimeoutMs: number;
+            maxExecTimeoutMs: number;
+        };
+        profiles: Array<{
+            id: string;
+            name: string;
+            image: string;
+            warm: number;
+            leased: number;
+        }>;
+        totals: {
+            warm: number;
+            leased: number;
+            stopping: number;
+            dead: number;
+            activeLeases: number;
+        };
+    };
+};
+
+export type GetSandboxesPoolResponse = GetSandboxesPoolResponses[keyof GetSandboxesPoolResponses];
+
+export type GetSandboxesLeasesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        workId?: string;
+        sessionId?: string;
+        workspaceId?: string;
+        includeReleased?: boolean;
+    };
+    url: '/sandboxes/leases';
+};
+
+export type GetSandboxesLeasesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        instanceId: string;
+        profileId: string;
+        engineContainerId: string;
+        workId: string | null;
+        sessionId: string | null;
+        workspaceId: string;
+        purpose: string;
+        mountsResolved: Array<{
+            hostPath: string;
+            containerPath: string;
+            readOnly: boolean;
+        }>;
+        createdAt: number;
+        expiresAt: number | null;
+        releasedAt: number | null;
+    }>;
+};
+
+export type GetSandboxesLeasesResponse = GetSandboxesLeasesResponses[keyof GetSandboxesLeasesResponses];
+
+export type PostSandboxesLeasesData = {
+    body: {
+        profileId: string;
+        workspaceId: string;
+        workId?: string;
+        sessionId?: string;
+        purpose?: string;
+        mountPath?: string;
+        mountWritable?: boolean;
+        networkMode?: 'none' | 'bridge';
+        ttlSec?: number;
+    };
+    path?: never;
+    query?: never;
+    url: '/sandboxes/leases';
+};
+
+export type PostSandboxesLeasesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        instanceId: string;
+        profileId: string;
+        engineContainerId: string;
+        workId: string | null;
+        sessionId: string | null;
+        workspaceId: string;
+        purpose: string;
+        mountsResolved: Array<{
+            hostPath: string;
+            containerPath: string;
+            readOnly: boolean;
+        }>;
+        createdAt: number;
+        expiresAt: number | null;
+        releasedAt: number | null;
+    };
+};
+
+export type PostSandboxesLeasesResponse = PostSandboxesLeasesResponses[keyof PostSandboxesLeasesResponses];
+
+export type GetSandboxesLeasesByLeaseIdData = {
+    body?: never;
+    path: {
+        leaseId: string;
+    };
+    query?: never;
+    url: '/sandboxes/leases/{leaseId}';
+};
+
+export type GetSandboxesLeasesByLeaseIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        instanceId: string;
+        profileId: string;
+        engineContainerId: string;
+        workId: string | null;
+        sessionId: string | null;
+        workspaceId: string;
+        purpose: string;
+        mountsResolved: Array<{
+            hostPath: string;
+            containerPath: string;
+            readOnly: boolean;
+        }>;
+        createdAt: number;
+        expiresAt: number | null;
+        releasedAt: number | null;
+    };
+};
+
+export type GetSandboxesLeasesByLeaseIdResponse = GetSandboxesLeasesByLeaseIdResponses[keyof GetSandboxesLeasesByLeaseIdResponses];
+
+export type PostSandboxesLeasesByLeaseIdExecData = {
+    body: {
+        command: Array<string>;
+        workdir?: string;
+        env?: {
+            [key: string]: unknown;
+        };
+        timeoutMs?: number;
+    };
+    path: {
+        leaseId: string;
+    };
+    query?: never;
+    url: '/sandboxes/leases/{leaseId}/exec';
+};
+
+export type PostSandboxesLeasesByLeaseIdExecResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        leaseId: string;
+        exitCode: number;
+        stdout: string;
+        stderr: string;
+        timedOut: boolean;
+    };
+};
+
+export type PostSandboxesLeasesByLeaseIdExecResponse = PostSandboxesLeasesByLeaseIdExecResponses[keyof PostSandboxesLeasesByLeaseIdExecResponses];
+
+export type PostSandboxesLeasesByLeaseIdReleaseData = {
+    body?: never;
+    path: {
+        leaseId: string;
+    };
+    query?: never;
+    url: '/sandboxes/leases/{leaseId}/release';
+};
+
+export type PostSandboxesLeasesByLeaseIdReleaseResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        instanceId: string;
+        profileId: string;
+        engineContainerId: string;
+        workId: string | null;
+        sessionId: string | null;
+        workspaceId: string;
+        purpose: string;
+        mountsResolved: Array<{
+            hostPath: string;
+            containerPath: string;
+            readOnly: boolean;
+        }>;
+        createdAt: number;
+        expiresAt: number | null;
+        releasedAt: number | null;
+    };
+};
+
+export type PostSandboxesLeasesByLeaseIdReleaseResponse = PostSandboxesLeasesByLeaseIdReleaseResponses[keyof PostSandboxesLeasesByLeaseIdReleaseResponses];
+
+export type PostSandboxesReconcileData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/sandboxes/reconcile';
+};
+
+export type PostSandboxesReconcileResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        expiredReleased: number;
+        orphansRemoved: number;
+        warmEnsured: number;
+    };
+};
+
+export type PostSandboxesReconcileResponse = PostSandboxesReconcileResponses[keyof PostSandboxesReconcileResponses];
 
 export type GetSessionsByIdPullRequestData = {
     body?: never;

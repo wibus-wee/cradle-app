@@ -1752,8 +1752,62 @@ export const zPostWorksByIdBranchPath = z.object({
     id: z.string().min(1)
 });
 
+export const zGetWorksByIdSandboxesPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostWorksByIdSandboxesLeaseBody = z.object({
+    profileId: z.string().min(1),
+    purpose: z.string().optional(),
+    mountWritable: z.boolean().optional(),
+    networkMode: z.enum(['none', 'bridge']).optional(),
+    ttlSec: z.number().optional()
+});
+
+export const zPostWorksByIdSandboxesLeasePath = z.object({
+    id: z.string().min(1)
+});
+
 export const zGetSessionsByIdWorkPath = z.object({
     id: z.string().min(1)
+});
+
+export const zGetSandboxesLeasesQuery = z.object({
+    workId: z.string().min(1).optional(),
+    sessionId: z.string().min(1).optional(),
+    workspaceId: z.string().min(1).optional(),
+    includeReleased: z.boolean().optional()
+});
+
+export const zPostSandboxesLeasesBody = z.object({
+    profileId: z.string().min(1),
+    workspaceId: z.string().min(1),
+    workId: z.string().min(1).optional(),
+    sessionId: z.string().min(1).optional(),
+    purpose: z.string().optional(),
+    mountPath: z.string().min(1).optional(),
+    mountWritable: z.boolean().optional(),
+    networkMode: z.enum(['none', 'bridge']).optional(),
+    ttlSec: z.number().optional()
+});
+
+export const zGetSandboxesLeasesByLeaseIdPath = z.object({
+    leaseId: z.string().min(1)
+});
+
+export const zPostSandboxesLeasesByLeaseIdExecBody = z.object({
+    command: z.array(z.string().min(1)).min(1),
+    workdir: z.string().min(1).optional(),
+    env: z.record(z.string(), z.unknown()).optional(),
+    timeoutMs: z.number().optional()
+});
+
+export const zPostSandboxesLeasesByLeaseIdExecPath = z.object({
+    leaseId: z.string().min(1)
+});
+
+export const zPostSandboxesLeasesByLeaseIdReleasePath = z.object({
+    leaseId: z.string().min(1)
 });
 
 export const zGetSessionsByIdPullRequestPath = z.object({
