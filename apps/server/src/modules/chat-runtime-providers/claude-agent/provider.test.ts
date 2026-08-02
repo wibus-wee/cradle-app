@@ -1405,14 +1405,23 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
   it('refreshes live presentation from commands_changed without another SDK query', async () => {
     const activeQuery = createControllableQuery()
-    sdkMocks.query.mockReturnValue(activeQuery)
+    // Only the long-lived session Query may share this controllable iterator.
+    // Title-generation / short-lived discovery calls must get their own Query —
+    // otherwise concurrent next() waiters overwrite resolveNext and hang the pump.
+    sdkMocks.query.mockImplementation((call: { prompt?: unknown }) => {
+      const prompt = call?.prompt
+      if (prompt !== null && typeof prompt === 'object') {
+        return activeQuery
+      }
+      return createAsyncQuery([])
+    })
 
     const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
     const runtimeSession = createRuntimeSession()
     const profile = createProfile()
 
     // Drive the turn to completion with an in-band commands_changed event.
-    // Avoid awaiting a half-open stream.next() — that races the pump teardown.
+    // Assert presentation while the live Query is still open.
     const turn = (async () => {
       const chunks: UIMessageChunk[] = []
       for await (const chunk of provider.streamTurn({
@@ -1427,7 +1436,9 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       return chunks
     })()
 
-    await vi.waitFor(() => expect(sdkMocks.query).toHaveBeenCalledOnce())
+    await vi.waitFor(() => {
+      expect(countLongLivedSessionQueryCalls()).toBe(1)
+    })
 
     activeQuery.push({
       type: 'system',
