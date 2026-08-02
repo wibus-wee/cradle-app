@@ -397,7 +397,8 @@ Cradle **will not** become or pursue:
 17. **Kind zoo before Platform Kind’s felt loop is real.** Coding Kind boundary is future kind-status work — not a present parallel and not a blocker for Platform Kind.  
 18. **Structural-moat marketing** on unbuilt legs — silence + constitutional build beats loud clone behavior.  
 19. **Honesty perfection forever delaying any useful propose loop.**  
-20. **Jarvis internal Function maps / MCP laundry lists / guts phasing as a substitute for these laws.**
+20. **Jarvis internal Function maps / MCP laundry lists / guts phasing as a substitute for these laws.**  
+21. **Conquest / “rule the field” rhetoric** while Kind labor-relief is unbuilt — refuse. Niche monastery beat ≠ empire.
 
 ---
 
@@ -438,13 +439,41 @@ Ranked by whether a human can experience “Jarvis is a Kind” as true. Honest 
 
 *A local home where foreign agent minds stay sovereign, durable work keeps the receipts, and a platform Kind — not a chat upgrade — stewards the plane under human-owned grants.*
 
+### Competitive Verdict Addendum (beat vs rule)
+
+**Settled after competitive critique (2026-08-02; chain K/L/M → N):** Full verdict: `plans/073-jarvis-kind-critique-chain/20260802-FINAL-competitive-verdict.md`.
+
+Plan 073 is a **refusal constitution**, not a conquest doctrine. It stops Cradle from becoming a worse clone. It does not make LobeHub, Multica, Orca, Omnigent, Herdr, or DimCode strategically irrelevant.
+
+| Ambition | Status |
+|---|---|
+| **Rule / dominate the field** | **Forbidden as ambition.** Ruling requires winning their category sentences; this constitution forbids playing those games. |
+| **Beat them on their home axes** | **Not the job.** Ignore marketplace, IM, squad HR, worktree theater, meta-harness continuum, terminal thinness, KV-cache runtime races. |
+| **Niche beat on Cradle’s axis** | **Ceiling.** Preferred home for sovereignty-seeking solo/small builders who already run heterogeneous natives and need leave/return stewardship under grant — *if* Kind becomes felt labor-relief (Law 13). Unbuilt Kind = no beat yet. |
+| **Absorption defense** | **Actual competitive job.** Success = users cannot truthfully rename Cradle as Operator / board teammates / meta-harness / worktree orchestrator. |
+
+**Combat doctrine (one sentence):**  
+Cradle does not conquer competitor categories. Cradle occupies the empty intersection they cannot claim without betraying themselves — and dies the day its sentence collapses into one of theirs.
+
+**Per-competitor stance:**
+
+| Competitor | Stance |
+|---|---|
+| LobeHub | Contest ontology ridge (operator identity without schedule ownership); ignore workplace/marketplace axes |
+| Multica | Contest elevated Kind vs flat teammate; ignore board-HR feature races |
+| Omnigent | Contest anti-scheduler buyers only; ignore meta-harness axes |
+| Orca | Ignore as category rival; coexist; borrow substrate only as non-center |
+| Herdr | Ignore as category rival; ally-of-principle on lifecycle honesty |
+| DimCode | Ignore as category rival; runtime excellence belongs to natives |
+
 ### Honest limits
 
 - This is a **coherent disciplined bet**, not a structural moat. Competitors can absorb partial clauses without “betraying blood oaths.”  
 - The bet is a **fragile intersection**: drop projection non-ownership, or durable receipts, or narrow Kind, and a competitor’s shorter sentence wins.  
-- Empty market space ≠ proven demand. Steward rejection can kill a “correct” constitution.  
+- Empty market space ≠ reserved throne. Steward rejection and competitor good-enough partials can kill a correct constitution. Niche win is the ceiling; field conquest is fantasy. Keeping both Plan 073’s ceilings and “打败/统治他们” rhetoric is lying about the game.  
 - Local/sovereignty is table stakes among adjacent products — not the differentiator. The differentiator is Kind-on-honest-tower — currently unbuilt.  
-- Competitors will out-demo autonomy. Cradle must not race silent act; Cradle also must not wait forever to show *useful propose*.
+- Competitors will out-demo autonomy. Cradle must not race silent act; Cradle also must not wait forever to show *useful propose*.  
+- Scoreboard: revealed preference in the intersection segment. Not category share, not demo virality.
 
 ### Clone absorption tests
 
@@ -475,7 +504,7 @@ If the story is told as…
 Treat as kill criteria **owned by product-owning humans**, who may declare a falsifier triggered on evidence they accept. The constitution does not self-execute. Detailed thresholds and pre-authorized pivots remain open (gap #13).
 
 1. **Human still carries the plane.** Leave/return promise fails: after hours away, proposed / granted-done / blocked / needs-me still requires chat archaeology; or Kind never proposes with platform scope; or human remains sole discoverer/router/unblocker while Kind narrates. → Kind bet failed even if Iron Law holds.  
-2. **Steward rejection.** Target users prefer peer teammates / squad leaders and treat a platform steward as worthless overhead. → Pivot to work-graph + teammates; drop species identity claim.  
+2. **Steward rejection.** Target users prefer peer teammates / squad leaders and treat a platform steward as worthless overhead — **or** good-enough partial stewards elsewhere fill the leave/return desire without Cradle’s Kind. → Pivot to work-graph + teammates; drop species identity claim.  
 3. **Honesty impossibility.** Heterogeneous projection cannot yield a situation picture trustworthy enough for delegation without Cradle owning native scheduling. → Iron Law and Kind stewardship are incompatible; redesign ambition downward or face existential fork.  
 4. **Work graph sterility for stewardship.** Work remains only a coding-delivery container; no durable steward obligation ledger emerges; Session remains the only noun anyone respects for “what did I leave running?” → Dual-center collapses.  
 5. **Receipts never trusted.** Delegate/receipt exists in name; humans and workers ignore them; outcomes diverge silently. → Stewardship is theater.  
