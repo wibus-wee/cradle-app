@@ -443,7 +443,7 @@ Ranked by whether a human can experience “Jarvis is a Kind” as true. Honest 
 
 **Settled after competitive critique (2026-08-02; chain K/L/M → N):** Full verdict: `plans/073-jarvis-kind-critique-chain/20260802-FINAL-competitive-verdict.md`.
 
-Plan 073 is a **refusal constitution**, not a conquest doctrine. It stops Cradle from becoming a worse clone. It does not make LobeHub, Multica, Orca, Omnigent, Herdr, or DimCode strategically irrelevant.
+Plan 073 is a **refusal constitution**, not a conquest doctrine. It stops Cradle from becoming a worse clone. It does not make adjacent Operator-workplace, teammate work-graph, builder-orchestrator, meta-harness, thin-multiplexer, and single-agent-runtime products strategically irrelevant.
 
 | Ambition | Status |
 |---|---|
@@ -455,16 +455,16 @@ Plan 073 is a **refusal constitution**, not a conquest doctrine. It stops Cradle
 **Combat doctrine (one sentence):**  
 Cradle does not conquer competitor categories. Cradle occupies the empty intersection they cannot claim without betraying themselves — and dies the day its sentence collapses into one of theirs.
 
-**Per-competitor stance:**
+**Per-category stance:**
 
-| Competitor | Stance |
+| Adjacent category | Stance |
 |---|---|
-| LobeHub | Contest ontology ridge (operator identity without schedule ownership); ignore workplace/marketplace axes |
-| Multica | Contest elevated Kind vs flat teammate; ignore board-HR feature races |
-| Omnigent | Contest anti-scheduler buyers only; ignore meta-harness axes |
-| Orca | Ignore as category rival; coexist; borrow substrate only as non-center |
-| Herdr | Ignore as category rival; ally-of-principle on lifecycle honesty |
-| DimCode | Ignore as category rival; runtime excellence belongs to natives |
+| Operator-workplace | Contest ontology ridge (operator identity without schedule ownership); ignore workplace/marketplace axes |
+| Teammate work-graph | Contest elevated Kind vs flat teammate; ignore board-HR feature races |
+| Meta-harness | Contest anti-scheduler buyers only; ignore meta-harness axes |
+| Builder-orchestrator | Ignore as category rival; coexist; borrow substrate only as non-center |
+| Thin agent-multiplexer | Ignore as category rival; ally-of-principle on lifecycle honesty |
+| Single-agent multi-surface runtime | Ignore as category rival; runtime excellence belongs to natives |
 
 ### Honest limits
 
@@ -481,21 +481,21 @@ If the story is told as…
 
 | Story | Absorbed by |
 |---|---|
-| “Operator for your AI team” | LobeHub |
-| “Agents on your board” | Multica |
-| “One harness to rule them” | Omnigent |
-| “Orchestrate coding agents in worktrees” | Orca |
+| “Operator for your AI team” | Operator-workplace products |
+| “Agents on your board” | teammate work-graph products |
+| “One harness to rule them” | meta-harness products |
+| “Orchestrate coding agents in worktrees” | builder-orchestrator products |
 
 …the constitution has failed. The sentence must keep: **non-ownership of native scheduling + durable receipts + narrow elevated Kind (not flat teammate, not monopoly).**
 
 ### Principles to copy (not products)
 
-- **Herdr:** lifecycle honesty over wrapped fiction.  
-- **Orca:** platform owns truthfulness; agents own strategy (Cradle: truth + receipts; Kind/human own strategy).  
-- **Multica:** durable work objects beat chat archaeology — without flat teammate ontology.  
-- **Omnigent:** governance as product surface — without owning the harness.  
-- **LobeHub:** continuous operator identity is desirable — reject playground schedule ownership.  
-- **DimCode:** runtime excellence belongs to natives/workers, not to Cradle pretending to be the one mind.
+- **thin agent-multiplexer products:** lifecycle honesty over wrapped fiction.  
+- **builder-orchestrator products:** platform owns truthfulness; agents own strategy (Cradle: truth + receipts; Kind/human own strategy).  
+- **teammate work-graph products:** durable work objects beat chat archaeology — without flat teammate ontology.  
+- **meta-harness products:** governance as product surface — without owning the harness.  
+- **Operator-workplace products:** continuous operator identity is desirable — reject playground schedule ownership.  
+- **single-agent multi-surface runtimes:** runtime excellence belongs to natives/workers, not to Cradle pretending to be the one mind.
 
 ---
 

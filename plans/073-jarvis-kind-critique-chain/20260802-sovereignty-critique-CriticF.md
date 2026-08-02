@@ -12,7 +12,7 @@ This document is self-contained. Prior agents are treated as claims under pressu
 
 ## Verdict (for the next round)
 
-The Strategist–Architect–Competitor chain has produced a **constitution that protects Cradle from becoming Ultron or Omnigent**. That is necessary. It is not yet sufficient for a human who ships software alone.
+The Strategist–Architect–Competitor chain has produced a **constitution that protects Cradle from becoming Ultron or meta-harness products**. That is necessary. It is not yet sufficient for a human who ships software alone.
 
 For that human, the chain currently risks a second failure mode: **a beautifully constrained steward that never takes weight off their shoulders**. Propose-default, Iron Law, receipts, dual-center Work/Session — all correct as fences. Without a user-visible shift in *who carries platform cognition*, “Jarvis is a kind” remains a boardroom sentence while the developer still opens every session, re-explains every situation, and clicks every handoff.
 
@@ -100,7 +100,7 @@ Sovereignty fails in both directions. The chain is stronger on “too strong” 
 
 | Failure mode | User-visible symptom | How gravity / misread docs enable it |
 |---|---|---|
-| **Silent co-owner** | Files change, PRs open, issues close while laptop was closed — no prior grant the human remembers. | Racing LobeHub/Multica offline-autonomy demos. |
+| **Silent co-owner** | Files change, PRs open, issues close while laptop was closed — no prior grant the human remembers. | Racing Operator-workplace products/teammate work-graph products offline-autonomy demos. |
 | **Scheduler theft** | Claude/Codex feel “weird”; synthetic continuations; queue ownership by heuristic. | Explicitly banned (Iron Law / L1–L2) — still the known failure; Kind continuity will be the excuse name. |
 | **Permission bottleneck** | Coding workers wait on Kind/Cradle for micro-steps; everything feels slower than native tools alone. | Misimplementing Kind as central coordinator (C gravity #1). |
 | **Namespace invasion** | Kind rewrites preferences, automations, other features’ lifecycles “for coherence.” | L8 bans it; organism myth will pressure it. |
@@ -113,7 +113,7 @@ Sovereignty fails in both directions. The chain is stronger on “too strong” 
 
 Architect C’s T4 is right: useful Kind lives in discomfort between weak and strong. Product reality addendum for a solo builder:
 
-- **Too weak** fails weekly (they leave for Multica/LobeHub demos or just stay in Claude Code).  
+- **Too weak** fails weekly (they leave for teammate work-graph products/Operator-workplace products demos or just stay in Claude Code).  
 - **Too strong** fails once (they uninstall Cradle).  
 
 Constitution must bias **default** to propose, and bias **capability** so that grants can make Kind *materially* labor-reducing inside owned namespaces. A constitution that only specifies the default and not the legitimacy of strong grants will be read as permanent weakness.
@@ -197,7 +197,7 @@ B/C/D delay charismatic autonomy demos for good reason. Attack: if “before spe
 Agree with dual-center substance. Solo-builder nuance: they will live in Session for years. Constitution fails if it shames that. Success = Work quietly becomes where they look when they ask “what did I leave running?” — not a forced enterprise religion.
 
 **Reject** pure Session-as-meaning (species becomes chat orchestration).  
-**Reject** pure Issue-board-as-HR (Multica clone; Jarvis becomes assignee).
+**Reject** pure Issue-board-as-HR (teammate work-graph products clone; Jarvis becomes assignee).
 
 ### Choice D — Orchestration ceiling?
 

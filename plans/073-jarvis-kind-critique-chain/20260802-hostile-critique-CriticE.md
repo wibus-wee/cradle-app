@@ -106,7 +106,7 @@ C’s “propose-or-observe” plus uncertainty→propose is a lawyer hatch: alm
 
 9. **Situation picture honesty has no test.** “Incomplete is fine; lying is not” (C) is right — and unenforceable without a definition of lie vs lag vs partial projection. Competitors will call lag incompetence; Cradle will call lie “eventual consistency.” Blind spot is measurement of tower truth.
 
-10. **Provider-native crews as Kind bypass.** All three leave the boundary “open.” None rank “Kind is routinely bypassed by provider crews” as an existential competitive failure. If strategy lives inside provider threads, Cradle’s elevated Kind is a spectator with a constitution — Herdr with paperwork.
+10. **Provider-native crews as Kind bypass.** All three leave the boundary “open.” None rank “Kind is routinely bypassed by provider crews” as an existential competitive failure. If strategy lives inside provider threads, Cradle’s elevated Kind is a spectator with a constitution — thin agent-multiplexer products with paperwork.
 
 ---
 
@@ -191,17 +191,17 @@ D’s structural moat: competitors cannot copy without “betraying their catego
 
 **Why that collapses:**
 
-1. **Category sentences are marketing, not blood oaths.** LobeHub can ship a “bring your own runtime / project-only” mode without abandoning Operator. Multica can elevate a “workspace steward” without deleting assignees. Omnigent can market honesty while still owning harness where users allow it. Betrayal of a README is cheap; D prices it as impossible.
+1. **Category sentences are marketing, not blood oaths.** Operator-workplace products can ship a “bring your own runtime / project-only” mode without abandoning Operator. teammate work-graph products can elevate a “workspace steward” without deleting assignees. meta-harness products can market honesty while still owning harness where users allow it. Betrayal of a README is cheap; D prices it as impossible.
 
 2. **Four-conjunct wedge is a weakest-link moat.** D admits: drop non-ownership **or** Work receipts **or** elevated Kind and a competitor’s sentence wins. That is the opposite of durable advantage — it is a **fragile intersection**. Structural moats survive partial failure; this one dies if any leg slips. Cradle today already lacks species and situation picture (D’s own verdict). Claiming a moat on missing legs is futurism.
 
-3. **Empty market space ≠ winnable space.** B’s steward-demand uncertainty kills D’s “only durable wedge” certainty. If users want teammates, Multica’s “worse ontology” is the better business. D never stress-tests the wedge against “correct and unwanted.”
+3. **Empty market space ≠ winnable space.** B’s steward-demand uncertainty kills D’s “only durable wedge” certainty. If users want teammates, teammate work-graph products’s “worse ontology” is the better business. D never stress-tests the wedge against “correct and unwanted.”
 
-4. **Local/sovereignty is not Cradle-exclusive.** Orca, Herdr, DimCode are local-first in different ways. “Desktop-first local control plane” is table stakes among this set, not the differentiator. The differentiator is Kind-on-honest-tower — which is the unbuilt part.
+4. **Local/sovereignty is not Cradle-exclusive.** builder-orchestrator products, thin agent-multiplexer products, single-agent multi-surface runtimes are local-first in different ways. “Desktop-first local control plane” is table stakes among this set, not the differentiator. The differentiator is Kind-on-honest-tower — which is the unbuilt part.
 
 5. **Slow-honest vs fast-demo.** D says competitors out-demo autonomy and Cradle should not race — then asserts Cradle wins if it “gets there first” on honesty. You cannot refuse the race and win “first.” Timing falsifier (B #6) is the realistic endgame; D underplays it while selling moat.
 
-6. **“Only local home where native agents keep their own minds…”** Uniqueness claim. No evidence others cannot project foreign minds. Herdr’s honesty bet is thinner; Orca’s humility is adjacent. Cradle’s thickness is a choice, not a lock.
+6. **“Only local home where native agents keep their own minds…”** Uniqueness claim. No evidence others cannot project foreign minds. thin agent-multiplexer products’s honesty bet is thinner; builder-orchestrator products’s humility is adjacent. Cradle’s thickness is a choice, not a lock.
 
 **Wedge that survives scrutiny (demoted):**  
 Not “structural moat.” At best: *a coherent bet* — honest heterogeneous projection + Work receipts + narrow platform Kind — that is easy to dilute and hard to demo. Treat as **discipline**, not moat. Moat language dies.
@@ -248,10 +248,10 @@ Not “structural moat.” At best: *a coherent bet* — honest heterogeneous pr
 | Cradle must not own native turn/session scheduling; no synthetic continuation | Iron Law; C’s best formalization (L1/L2/L12); non-negotiable. |
 | Honest control tower ≠ magic orchestrator | C’s distinction is the sharpest intellectual contribution in the chain. |
 | Default initiative: propose before act; brand ≠ grant | Survives competitive and sovereignty pressure; keep C’s ambiguity hatch under watch. |
-| No default legion / no meta-harness ownership | Alignment with Iron Law and anti-Omnigent; hold. |
+| No default legion / no meta-harness ownership | Alignment with Iron Law and anti-meta-harness products; hold. |
 | HiJarvis ambient ≠ platform species | Seed-true; all three agree. |
 | Build truthfulness before expanding species power **as a principle** | Survives; completion criteria still missing. |
-| Anti-clone discipline (don’t become LobeHub Operator / Multica HR / Omnigent harness) | Useful as refusal list; not as moat. |
+| Anti-clone discipline (don’t become Operator-workplace products Operator / teammate work-graph products HR / meta-harness products harness) | Useful as refusal list; not as moat. |
 | B’s falsifiers as kill criteria | Keep; add process ownership later. |
 | C’s tension register (T1–T8) | Keep visible; do not “resolve” by slogan. |
 
@@ -287,7 +287,7 @@ If the final artifact announces that B/C/D already agreed, it is lying. That lie
 
 ## Closing brutality
 
-The chain has produced a **shared aesthetic**: honest tower, propose-first, Kind-not-chat, Work-not-only-Session, no Omnigent. Aesthetics are not a constitution.
+The chain has produced a **shared aesthetic**: honest tower, propose-first, Kind-not-chat, Work-not-only-Session, no meta-harness products. Aesthetics are not a constitution.
 
 The unresolved core is still the user’s core:
 

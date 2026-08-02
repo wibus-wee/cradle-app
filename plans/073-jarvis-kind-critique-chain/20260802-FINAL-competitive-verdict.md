@@ -19,7 +19,7 @@
 
 | Term | Meaning | Verdict for Cradle under Plan 073 |
 |---|---|---|
-| **Beat** | Named buyer prefers Cradle over a named competitor for a named job; stays; would lose something material if forced onto that competitor’s ontology | **Conditional niche beat only** — possible against Omnigent (anti-scheduler buyer), Herdr (when job is plane stewardship not pane truth), and LobeHub/Multica *only* when buyers reject Operator/flat-teammate ontologies. Not a field-wide beat. Unbuilt Kind = no beat yet. |
+| **Beat** | Named buyer prefers Cradle over a named competitor for a named job; stays; would lose something material if forced onto that competitor’s ontology | **Conditional niche beat only** — possible against meta-harness products (anti-scheduler buyer), thin agent-multiplexer products (when job is plane stewardship not pane truth), and Operator-workplace products/teammate work-graph products *only* when buyers reject Operator/flat-teammate ontologies. Not a field-wide beat. Unbuilt Kind = no beat yet. |
 | **Rule** | Own the category sentence so peers/buyers treat Cradle’s frame as default; make others strategically irrelevant or subordinate | **Impossible.** Constitution forbids playing their arenas. Empty intersection ≠ throne. Moat mythology already demoted; “rule them” is ego. |
 
 K defended beat-without-rule. L killed rule and demoted beat to monastery survival. M said the actual job is absorption defense, not conquest. **Reconciled truth: L’s ceiling on rule stands; K’s niche beat stands only as conditional possibility; M’s combat doctrine is the operating stance.**
@@ -30,12 +30,12 @@ K defended beat-without-rule. L killed rule and demoted beat to monastery surviv
 
 | Competitor | Stance | Why |
 |---|---|---|
-| **LobeHub** | **Contest** (ontology ridge only) / **Ignore** (workplace axes) | Contest: continuous operator *identity* under IRON LAW + grants, not playground scheduling. Ignore: skills marketplace, IM gateway, Agent Groups, hire/schedule demos. Absorb risk if story becomes “Operator for your AI team.” They can fake Cradle’s virtue as a mode; Cradle cannot fake their vice. |
-| **Multica** | **Contest** (elevated Kind vs flat teammate) / **Ignore** (board HR checklist) | Contest: Work-as-steward ledger + Kind not as assignee. Ignore: squads, autopilot chrome, “10 hires” meme. Kill if steward demand dies or Kind becomes another row. Team money sits here; Cradle’s solo desktop thesis (T17) does not conquer Multica’s market. |
-| **Orca** | **Ignore** (as category rival) | Same honesty humility, different job. They own builder substrate (worktrees, mobile, terminals). Cradle beats Orca only when pain is plane cognition after absence — most Orca users may never feel Kind demand. Ignoring ≠ beating. |
-| **Omnigent** | **Contest** (anti-scheduler buyer only) / **Ignore** (meta-harness axes) | Sharpest structural opposition: their sentence requires owning orchestration; Cradle’s forbids it. Contest only where non-ownership is the buying reason. Ignore: sandbox catalog, multi-device continuum, Polly cosplay. Anti-oath creates a monastery, not a conquest. |
-| **Herdr** | **Ignore** (adjacent non-compete) | Honesty ally at different thickness. Cradle “wins” only when users outgrow pane truth and need plane stewardship. Do not race Rust binary / TUI. Calling coexistence a victory is ego. |
-| **DimCode** | **Ignore** (different architecture) | “One agent everywhere” vs “every agent, one home.” Runtime excellence stays with natives. Never fight KV-cache / one-mind title. Demand threat (buyers want a mind, not a tower), not clone threat. |
+| **Operator-workplace products** | **Contest** (ontology ridge only) / **Ignore** (workplace axes) | Contest: continuous operator *identity* under IRON LAW + grants, not playground scheduling. Ignore: skills marketplace, IM gateway, Agent Groups, hire/schedule demos. Absorb risk if story becomes “Operator for your AI team.” They can fake Cradle’s virtue as a mode; Cradle cannot fake their vice. |
+| **teammate work-graph products** | **Contest** (elevated Kind vs flat teammate) / **Ignore** (board HR checklist) | Contest: Work-as-steward ledger + Kind not as assignee. Ignore: squads, autopilot chrome, “10 hires” meme. Kill if steward demand dies or Kind becomes another row. Team money sits here; Cradle’s solo desktop thesis (T17) does not conquer teammate work-graph products’s market. |
+| **builder-orchestrator products** | **Ignore** (as category rival) | Same honesty humility, different job. They own builder substrate (worktrees, mobile, terminals). Cradle beats builder-orchestrator products only when pain is plane cognition after absence — most builder-orchestrator products users may never feel Kind demand. Ignoring ≠ beating. |
+| **meta-harness products** | **Contest** (anti-scheduler buyer only) / **Ignore** (meta-harness axes) | Sharpest structural opposition: their sentence requires owning orchestration; Cradle’s forbids it. Contest only where non-ownership is the buying reason. Ignore: sandbox catalog, multi-device continuum, Polly cosplay. Anti-oath creates a monastery, not a conquest. |
+| **thin agent-multiplexer products** | **Ignore** (adjacent non-compete) | Honesty ally at different thickness. Cradle “wins” only when users outgrow pane truth and need plane stewardship. Do not race Rust binary / TUI. Calling coexistence a victory is ego. |
+| **single-agent multi-surface runtimes** | **Ignore** (different architecture) | “One agent everywhere” vs “every agent, one home.” Runtime excellence stays with natives. Never fight KV-cache / one-mind title. Demand threat (buyers want a mind, not a tower), not clone threat. |
 
 **Cannot rule:** every row. There is no competitor Cradle should try to rule. Ruling their axis requires becoming their sentence — constitutional suicide.
 
@@ -47,10 +47,10 @@ K defended beat-without-rule. L killed rule and demoted beat to monastery surviv
 
 What it successfully does:
 
-1. Stops Cradle from becoming a worse clone of LobeHub / Multica / Omnigent / Orca.  
+1. Stops Cradle from becoming a worse clone of Operator-workplace products / teammate work-graph products / meta-harness products / builder-orchestrator products.  
 2. Names the only non-clone path worth attempting: projection non-ownership × durable receipts × narrow elevated Kind × local sovereignty.  
 3. Gives kill criteria (falsifiers) so “correct but dead” can be declared.  
-4. Absorbs principles (Herdr honesty, Orca humility, Multica durable work, Omnigent governance-as-surface, LobeHub operator *desire*, DimCode runtime excellence for natives) without copying product shapes.
+4. Absorbs principles (thin agent-multiplexer products honesty, builder-orchestrator products humility, teammate work-graph products durable work, meta-harness products governance-as-surface, Operator-workplace products operator *desire*, single-agent multi-surface runtimes runtime excellence for natives) without copying product shapes.
 
 What it does **not** do:
 
@@ -92,10 +92,10 @@ These fire **even if Plan 073 is obeyed faithfully** (L’s head-to-head loss mo
 | **Steward rejection** | Market buys teammates / Operator / harness / worktrees; elevated Kind feels like middle management. Correct constitution, dead market. |
 | **Good-enough partials fill the slot** | Competitors absorb 1–2 conjuncts (BYO runtime mode, board status, Polly, mobile notifications, approval gates). Fragile four-conjunct intersection dies to “shipping elsewhere.” |
 | **Demo tax compounds** | Honesty + propose-default lose every launch cycle to silent-act theater. Race refused = race lost for category mindshare. |
-| **Desire mismatch on “leave/return”** | LobeHub/Multica/Orca already sell “worked while away” in legible metaphors. Cradle’s picture+propose loses the English word to their act theater. |
+| **Desire mismatch on “leave/return”** | Operator-workplace products/teammate work-graph products/builder-orchestrator products already sell “worked while away” in legible metaphors. Cradle’s picture+propose loses the English word to their act theater. |
 | **Kind becomes spectator** | Strategy lives inside provider-native crews (gap #12 / T12); Kind is paperwork. |
 | **Honesty impossibility** | Heterogeneous projection cannot support trusted delegation without owning scheduling → Iron Law ↔ Kind existential fork. |
-| **Thickness / shape rejection** | Terminal purists take Herdr; one-mind buyers take DimCode; team buyers take Multica/LobeHub — regardless of Kind correctness. |
+| **Thickness / shape rejection** | Terminal purists take thin agent-multiplexer products; one-mind buyers take single-agent multi-surface runtimes; team buyers take teammate work-graph products/Operator-workplace products — regardless of Kind correctness. |
 | **Category trust incident** | “Platform Kind beyond the app” poisoned by someone else’s Ultron; Cradle pays for the claim; peers who never claimed species keep shipping. |
 | **Absorption by Cradle’s own mouth** | Story collapses into Operator / board teammates / meta-harness / worktree orchestrator — clone tests fail from the inside. |
 
@@ -109,7 +109,7 @@ These fire **even if Plan 073 is obeyed faithfully** (L’s head-to-head loss mo
 
 | Dead ambition | Surviving ambition |
 |---|---|
-| Beat or rule LobeHub / Multica / Orca / Omnigent / Herdr / DimCode | Be the best home for a thin slice of sovereignty-seeking solo builders who want an honest tower + narrow Kind under grant |
+| Beat or rule Operator-workplace products / teammate work-graph products / builder-orchestrator products / meta-harness products / thin agent-multiplexer products / single-agent multi-surface runtimes | Be the best home for a thin slice of sovereignty-seeking solo builders who want an honest tower + narrow Kind under grant |
 | Own the agent-product category | Refuse absorption; occupy an intersection peers cannot fully claim without self-betrayal |
 | Structural moat / cannot be copied | Disciplined bet; fragile; falsifiable; die allowed |
 | First to the empty slot = destiny | Empty ≠ reserved; empty often means correct and unwanted; timing falsifier real |
@@ -129,7 +129,7 @@ Scoreboard that matters: revealed preference among users who already run heterog
 
 1. **Add after “The bet (discipline, not moat)”** a subsection **“Beat vs rule (settled)”**:
    - Cradle may pursue **niche beat** for sovereignty-seeking solo/small builders on the Kind-on-honest-tower axis.  
-   - Cradle **will not** pursue ruling LobeHub / Multica / Orca / Omnigent / Herdr / DimCode category sentences. Ruling requires playing their games; the constitution forbids those games.  
+   - Cradle **will not** pursue ruling Operator-workplace products / teammate work-graph products / builder-orchestrator products / meta-harness products / thin agent-multiplexer products / single-agent multi-surface runtimes category sentences. Ruling requires playing their games; the constitution forbids those games.  
    - Success metric: retention/revealed preference in the intersection segment — not category ownership.
 
 2. **Replace soft hope tone** in “Honest limits” bullet “Empty market space ≠ proven demand” with explicit:  
@@ -138,7 +138,7 @@ Scoreboard that matters: revealed preference among users who already run heterog
 3. **Add combat doctrine one-liner** (from M, reconciled):  
    *Cradle does not conquer competitor categories. Cradle occupies the empty intersection they cannot claim without betraying themselves — and dies the day its sentence collapses into one of theirs.*
 
-4. **Add stance table** (ignore / contest / cannot rule) matching the verdict table above — so builders stop inventing conquest PRs against Orca worktrees, Herdr thinness, DimCode cache, LobeHub marketplace, Omnigent sandboxes, Multica squad chrome.
+4. **Add stance table** (ignore / contest / cannot rule) matching the verdict table above — so builders stop inventing conquest PRs against builder-orchestrator products worktrees, thin agent-multiplexer products thinness, single-agent multi-surface runtimes cache, Operator-workplace products marketplace, meta-harness products sandboxes, teammate work-graph products squad chrome.
 
 5. **Anti-goals:** add or harden — **“Conquest language / ‘rule the field’ rhetoric while Kind labor-relief is unbuilt.”** Already adjacent to anti-goal 18 (structural-moat marketing); make empire language an explicit anti-goal.
 
@@ -152,7 +152,7 @@ Full proposed mergeable prose: see **Proposed addendum text for Plan 073** below
 
 | Decision question | Answer |
 |---|---|
-| 足以打败那些项目吗？ | **不够打全体。** 最多在「主权向 / 异构原生 / 离席归返」薄切片上有条件打败个别对手（尤其反调度买方 vs Omnigent；以及拒绝 Operator/扁平队友本体论的买家）。Kind 未落地前，连这个条件胜利也不存在。 |
+| 足以打败那些项目吗？ | **不够打全体。** 最多在「主权向 / 异构原生 / 离席归返」薄切片上有条件打败个别对手（尤其反调度买方 vs meta-harness products；以及拒绝 Operator/扁平队友本体论的买家）。Kind 未落地前，连这个条件胜利也不存在。 |
 | 可以统治他们吗？ | **不可以。** 统治 = 类别占有。073 的纪律是自我流放出他们的赛场。想统治就要撕毁 IRON LAW / propose-default / narrow Kind — 那是另一部宪法，不是这部的补丁。 |
 | Accept Plan 073 as competitive strategy? | **Accept as refusal constitution + niche-win ceiling.** Reject any reading that treats 073 as conquest doctrine. Amend competitive stance per above (or merge the addendum). |
 | If you still need “打败/统治” as ego fuel? | Reject Plan 073’s ceilings and accept Ultron / schedule-ownership / clone risks — **do not keep both.** |
@@ -170,7 +170,7 @@ Plan 073 is enough to keep Cradle from becoming a worse clone. It is not enough 
 
 **Settled after competitive critique (K/L/M → N):**
 
-Plan 073 is a **refusal constitution**, not a conquest doctrine. It stops Cradle from becoming a worse clone. It does not make LobeHub, Multica, Orca, Omnigent, Herdr, or DimCode strategically irrelevant.
+Plan 073 is a **refusal constitution**, not a conquest doctrine. It stops Cradle from becoming a worse clone. It does not make adjacent Operator-workplace, teammate work-graph, builder-orchestrator, meta-harness, thin-multiplexer, and single-agent-runtime products strategically irrelevant.
 
 | Ambition | Status |
 |---|---|
@@ -186,12 +186,12 @@ Cradle does not conquer competitor categories. Cradle occupies the empty interse
 
 | Competitor | Stance |
 |---|---|
-| LobeHub | Contest ontology ridge (operator identity without schedule ownership); ignore workplace/marketplace axes |
-| Multica | Contest elevated Kind vs flat teammate; ignore board-HR feature races |
-| Omnigent | Contest anti-scheduler buyers only; ignore meta-harness axes |
-| Orca | Ignore as category rival; coexist; borrow substrate only as non-center |
-| Herdr | Ignore as category rival; ally-of-principle on lifecycle honesty |
-| DimCode | Ignore as category rival; runtime excellence belongs to natives |
+| Operator-workplace products | Contest ontology ridge (operator identity without schedule ownership); ignore workplace/marketplace axes |
+| teammate work-graph products | Contest elevated Kind vs flat teammate; ignore board-HR feature races |
+| meta-harness products | Contest anti-scheduler buyers only; ignore meta-harness axes |
+| builder-orchestrator products | Ignore as category rival; coexist; borrow substrate only as non-center |
+| thin agent-multiplexer products | Ignore as category rival; ally-of-principle on lifecycle honesty |
+| single-agent multi-surface runtimes | Ignore as category rival; runtime excellence belongs to natives |
 
 **Honest limits (hardened):**
 

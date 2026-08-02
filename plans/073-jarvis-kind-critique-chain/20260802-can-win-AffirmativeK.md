@@ -2,8 +2,8 @@
 
 **Role:** Agent K — Competitive Affirmative  
 **Date:** 2026-08-02  
-**Question:** Can Plan 073’s Cradle (local constitutional tower + narrow Platform Kind) beat — or even “rule” — LobeHub, Multica, Orca, Omnigent, Herdr, DimCode?  
-**Inputs:** Plan 073 (competitive stance, gaps, falsifiers); Competitor D wedge; competitor READMEs (LobeHub, Multica, Orca, Omnigent, Herdr); DimCode via D’s positioning.  
+**Question:** Can Plan 073’s Cradle (local constitutional tower + narrow Platform Kind) beat — or even “rule” — Operator-workplace products, teammate work-graph products, builder-orchestrator products, meta-harness products, thin agent-multiplexer products, single-agent multi-surface runtimes?  
+**Inputs:** Plan 073 (competitive stance, gaps, falsifiers); Competitor D wedge; competitor READMEs (Operator-workplace products, teammate work-graph products, builder-orchestrator products, meta-harness products, thin agent-multiplexer products); single-agent multi-surface runtimes via D’s positioning.  
 **Hard bans honored:** no marketing fluff, no implementation plans, no Jarvis internals.
 
 ---
@@ -24,7 +24,7 @@ If Kind never takes weight (Law 13 / leave-return promise), the answer collapses
 
 | Term | Meaning here | What it is *not* |
 |---|---|---|
-| **Beat** | For a named buyer and job-to-be-done, Cradle is the *preferred* product: they choose Cradle over a named competitor, stay, and would lose something material if forced onto that competitor’s ontology. Measured in retention and revealed preference, not star counts. | Out-demoing autonomy. Matching feature laundry lists. Winning Product Hunt weeks. Being “more constitutional” while users still live in LobeHub/Multica. |
+| **Beat** | For a named buyer and job-to-be-done, Cradle is the *preferred* product: they choose Cradle over a named competitor, stay, and would lose something material if forced onto that competitor’s ontology. Measured in retention and revealed preference, not star counts. | Out-demoing autonomy. Matching feature laundry lists. Winning Product Hunt weeks. Being “more constitutional” while users still live in Operator-workplace products/teammate work-graph products. |
 | **Rule** | Own the category sentence so peers and buyers treat Cradle’s framing as the default frame: “local constitutional tower + platform Kind” becomes how the market talks about heterogeneous agent homes. Competitors either copy and self-betray, or concede the segment. | Temporary narrative lead. One viral demo. Being right in a constitution while the market still shops “AI teammates” and “meta-harness.” |
 
 **Implication:** Affirmative case can defend **beat** without defending **rule**. Claiming rule from Plan 073’s discipline alone is dishonest. Claiming beat in *every* listed competitor’s home game is also dishonest.
@@ -39,28 +39,28 @@ Structure ≠ destiny. Structure is *permission to win without self-contradictio
 
 | Competitor | Their home sentence | Why Cradle can beat them *for the steward + honesty buyer* |
 |---|---|---|
-| **Omnigent** | Meta-harness that *owns* orchestration across agents | Cradle’s IRON LAW is the antithesis. Buyers burned by puppeteered/synthetic continuity, or who refuse a second scheduler, have a coherent reason to prefer projection-only. Omnigent winning that buyer requires abandoning “we orchestrate.” |
-| **DimCode** | One cache-native runtime identity; multi-agent as *internal* subagents | Opposite architecture from “foreign minds stay sovereign.” Users who already commit to Claude/Codex/Kimi/OpenCode as *peers*, not Dim subroutines, are not Dim’s core. Cradle does not need to beat Dim’s runtime excellence; it needs to be the home those natives live in. |
-| **Herdr** | Thin terminal multiplexer; lifecycle honesty; stay under agents | Honesty is shared principle; thickness and Kind are not. Herdr wins pane truth. Cradle can win users who outgrow “real panes, no steward” and want Work receipts + leave/return cognition — without Herdr needing to become a control plane (they won’t). Different thickness = different job. Cradle “beats” Herdr only when the job is *plane stewardship*, not *terminal truth*. |
+| **meta-harness products** | Meta-harness that *owns* orchestration across agents | Cradle’s IRON LAW is the antithesis. Buyers burned by puppeteered/synthetic continuity, or who refuse a second scheduler, have a coherent reason to prefer projection-only. meta-harness products winning that buyer requires abandoning “we orchestrate.” |
+| **single-agent multi-surface runtimes** | One cache-native runtime identity; multi-agent as *internal* subagents | Opposite architecture from “foreign minds stay sovereign.” Users who already commit to Claude/Codex/Kimi/OpenCode as *peers*, not Dim subroutines, are not Dim’s core. Cradle does not need to beat Dim’s runtime excellence; it needs to be the home those natives live in. |
+| **thin agent-multiplexer products** | Thin terminal multiplexer; lifecycle honesty; stay under agents | Honesty is shared principle; thickness and Kind are not. thin agent-multiplexer products wins pane truth. Cradle can win users who outgrow “real panes, no steward” and want Work receipts + leave/return cognition — without thin agent-multiplexer products needing to become a control plane (they won’t). Different thickness = different job. Cradle “beats” thin agent-multiplexer products only when the job is *plane stewardship*, not *terminal truth*. |
 
 ### 2.2 Contestable wins (possible, not easy)
 
 | Competitor | Why a win is possible | Why it is fragile |
 |---|---|---|
-| **LobeHub** | Operator desire is real; Cradle accepts continuous operator *identity* while rejecting playground schedule ownership + agents-as-unit-of-work. Sovereignty-first users who distrust Operator magic have a slot. | LobeHub owns narrative speed, social productivity metaphor, marketplace gravity. If Cradle’s story is told as “Operator for your AI team,” LobeHub absorbs it. Beat requires the full sentence (non-ownership + receipts + Kind), lived — not slogan. |
-| **Multica** | Work-graph seriousness is shared principle; Cradle can take durable obligations *without* flat teammate ontology. Elevated Kind contradicts “everyone is an assignee.” Buyers who want a steward over the board, not HR for AIs, are structurally available. | Multica already centered issues + managed lifecycle + “next 10 hires.” If Cradle only adds a board, Multica wins. If Jarvis becomes another assignee row, Multica’s ontology wins. Beat requires Kind elevation *and* steward ledger beyond coding-delivery Work. |
-| **Orca** | Shared humility on worker strategy / substrate truth. Cradle can keep that for coding workers while Kind holds cross-plane stewardship — a species difference Orca’s “little magic” grain resists. | Orca owns 100x-builder execution theater (worktrees, mobile steer, terminals). Chasing that grain abandons Cradle’s. Cradle beats Orca only when the buyer’s pain is *plane cognition after absence*, not *parallel execution substrate*. Most Orca users may never feel Kind demand (T10). |
+| **Operator-workplace products** | Operator desire is real; Cradle accepts continuous operator *identity* while rejecting playground schedule ownership + agents-as-unit-of-work. Sovereignty-first users who distrust Operator magic have a slot. | Operator-workplace products owns narrative speed, social productivity metaphor, marketplace gravity. If Cradle’s story is told as “Operator for your AI team,” Operator-workplace products absorbs it. Beat requires the full sentence (non-ownership + receipts + Kind), lived — not slogan. |
+| **teammate work-graph products** | Work-graph seriousness is shared principle; Cradle can take durable obligations *without* flat teammate ontology. Elevated Kind contradicts “everyone is an assignee.” Buyers who want a steward over the board, not HR for AIs, are structurally available. | teammate work-graph products already centered issues + managed lifecycle + “next 10 hires.” If Cradle only adds a board, teammate work-graph products wins. If Jarvis becomes another assignee row, teammate work-graph products’s ontology wins. Beat requires Kind elevation *and* steward ledger beyond coding-delivery Work. |
+| **builder-orchestrator products** | Shared humility on worker strategy / substrate truth. Cradle can keep that for coding workers while Kind holds cross-plane stewardship — a species difference builder-orchestrator products’s “little magic” grain resists. | builder-orchestrator products owns 100x-builder execution theater (worktrees, mobile steer, terminals). Chasing that grain abandons Cradle’s. Cradle beats builder-orchestrator products only when the buyer’s pain is *plane cognition after absence*, not *parallel execution substrate*. Most builder-orchestrator products users may never feel Kind demand (T10). |
 
 ### 2.3 Where “beat everyone” is false
 
 Cradle does **not** structurally beat these competitors *in their home games*:
 
-- LobeHub at agent workplace / IM / marketplace  
-- Multica at teammate HR / squads / autopilots-as-culture  
-- Orca at worktree fan-out / mobile companion / terminal craft  
-- Omnigent at multi-device session continuum / cloud sandbox catalog (even if governance-as-product is copyable as principle)  
-- Herdr at thinness / Rust binary romance / pane purity  
-- DimCode at KV-cache / single-runtime excellence  
+- Operator-workplace products at agent workplace / IM / marketplace  
+- teammate work-graph products at teammate HR / squads / autopilots-as-culture  
+- builder-orchestrator products at worktree fan-out / mobile companion / terminal craft  
+- meta-harness products at multi-device session continuum / cloud sandbox catalog (even if governance-as-product is copyable as principle)  
+- thin agent-multiplexer products at thinness / Rust binary romance / pane purity  
+- single-agent multi-surface runtimes at KV-cache / single-runtime excellence  
 
 Affirmative case that pretends otherwise is marketing. The win path is **segment + axis**, not universal supremacy.
 
@@ -96,12 +96,12 @@ Cradle’s multi-year bet does not require defeating the field. It requires **wi
 
 | Do not need to beat… | Because… |
 |---|---|
-| **LobeHub’s social Operator mass market** | Different ontology. Cradle needs the sovereignty-first minority that rejects playground scheduling — not LobeHub’s headline DAU. |
-| **Multica’s “next 10 hires” team OS** | Flat teammate culture is a different product. Cradle needs users who want an elevated steward + receipts, not AI HR at scale. Multi-human / team sovereignty is explicitly open / different shape (T17). |
-| **Orca’s builder-substrate demo war** | Worktree theater is nice-to-have substrate, fatal as category center. Let Orca own parallel execution craft. |
-| **Omnigent’s harness continuum / sandbox breadth** | Competing as meta-harness is self-contradiction. Beat Omnigent only where non-ownership is the buying reason. |
-| **Herdr’s terminal purists** | Thickness already chosen. Coexistence is fine; conversion happens when users need plane cognition, not when Cradle ships a better pane. |
-| **DimCode’s runtime heroes** | Runtime excellence belongs to natives. Cradle wins as home, not as the one mind. |
+| **Operator-workplace products’s social Operator mass market** | Different ontology. Cradle needs the sovereignty-first minority that rejects playground scheduling — not Operator-workplace products’s headline DAU. |
+| **teammate work-graph products’s “next 10 hires” team OS** | Flat teammate culture is a different product. Cradle needs users who want an elevated steward + receipts, not AI HR at scale. Multi-human / team sovereignty is explicitly open / different shape (T17). |
+| **builder-orchestrator products’s builder-substrate demo war** | Worktree theater is nice-to-have substrate, fatal as category center. Let builder-orchestrator products own parallel execution craft. |
+| **meta-harness products’s harness continuum / sandbox breadth** | Competing as meta-harness is self-contradiction. Beat meta-harness products only where non-ownership is the buying reason. |
+| **thin agent-multiplexer products’s terminal purists** | Thickness already chosen. Coexistence is fine; conversion happens when users need plane cognition, not when Cradle ships a better pane. |
+| **single-agent multi-surface runtimes’s runtime heroes** | Runtime excellence belongs to natives. Cradle wins as home, not as the one mind. |
 
 **Strategic corollary:** Market share across “all agent products” is the wrong scoreboard. Revealed preference among users who already run 2+ native agents under a local control plane — and who feel leave/return pain — is the right one.
 
@@ -113,7 +113,7 @@ These are real but **not decisive**. They buy time and selection; they do not mi
 
 1. **Honesty tax is front-loaded; clone tax is back-loaded.** Competitors can out-demo autonomy now. Users who hit synthetic continuity, silent act, or unverifiable “done” later become available to Cradle — *if* Cradle is ready when they bounce. Asymmetry favors Cradle only with timing discipline (propose useful before perfection; never act-on-lies).
 
-2. **Self-betrayal cost for peers.** To fully occupy Cradle’s sentence, LobeHub must soften Operator magic; Multica must elevate a non-teammate species; Omnigent must stop owning the harness; Orca must accept a platform organism; DimCode must host foreign schedulers as equals; Herdr must thicken. Partial absorption is still possible (Plan 073 is honest). Full sentence copy is expensive. That is adoption friction *for them*, not automatic win *for Cradle*.
+2. **Self-betrayal cost for peers.** To fully occupy Cradle’s sentence, Operator-workplace products must soften Operator magic; teammate work-graph products must elevate a non-teammate species; meta-harness products must stop owning the harness; builder-orchestrator products must accept a platform organism; single-agent multi-surface runtimes must host foreign schedulers as equals; thin agent-multiplexer products must thicken. Partial absorption is still possible (Plan 073 is honest). Full sentence copy is expensive. That is adoption friction *for them*, not automatic win *for Cradle*.
 
 3. **Present inventory is not zero.** Work durability (coding delivery), Issue Agent, Automation, Session Await, Thread Handoff, multi-provider projection, HiJarvis observe — competitors starting from chat shells or thin multiplexers must build similar gravity. Cradle’s gap is Kind + steward picture + Kind receipts/grants — not “first durability machinery.” That shortens the path *if* proto-stewards are reconciled rather than ignored (gap #11).
 
@@ -132,13 +132,13 @@ None of these asymmetries survive Kind remaining a mascot, IRON LAW breaking for
 **Ceiling — what “winning” can honestly mean:**
 
 - **Category:** Durable leader of a *real niche* — “local constitutional control plane for heterogeneous native agents, with a narrow platform Kind under human grant.” Not the default AI-team OS. Not the default meta-harness. Not the default builder orchestrator.
-- **Beat:** Preferred home for sovereignty-seeking power users (solo / small) who already trust native CLIs and need leave/return stewardship. Credible displacement of Omnigent for the anti-scheduler buyer; of LobeHub/Multica *only* when those buyers reject playground/flat-teammate ontologies; coexistence with Orca/Herdr/DimCode as different jobs.
-- **Rule:** At most, **rule the niche’s vocabulary** — peers cite “projection not ownership,” “Kind not teammate,” “receipts not vibes” as the serious local-tower frame. Not rule the broader agent-product market. Not force LobeHub/Multica to abandon their sentences. Plan 073’s own falsifier #8 admits a peer can close the slot first.
+- **Beat:** Preferred home for sovereignty-seeking power users (solo / small) who already trust native CLIs and need leave/return stewardship. Credible displacement of meta-harness products for the anti-scheduler buyer; of Operator-workplace products/teammate work-graph products *only* when those buyers reject playground/flat-teammate ontologies; coexistence with builder-orchestrator products/thin agent-multiplexer products/single-agent multi-surface runtimes as different jobs.
+- **Rule:** At most, **rule the niche’s vocabulary** — peers cite “projection not ownership,” “Kind not teammate,” “receipts not vibes” as the serious local-tower frame. Not rule the broader agent-product market. Not force Operator-workplace products/teammate work-graph products to abandon their sentences. Plan 073’s own falsifier #8 admits a peer can close the slot first.
 
 **What is *not* credible:**
 
-- Cradle as default “Chief Agent Operator” at LobeHub scale while keeping IRON LAW.  
-- Cradle as Multica-scale teammate OS *and* elevated Kind without collapsing to flat HR or monopoly operator (both banned).  
+- Cradle as default “Chief Agent Operator” at Operator-workplace products scale while keeping IRON LAW.  
+- Cradle as teammate work-graph products-scale teammate OS *and* elevated Kind without collapsing to flat HR or monopoly operator (both banned).  
 - Structural moat that “cannot be copied.” Demoted for cause.  
 - Ruling by constitution quality alone while Kind labor-relief stays unbuilt.
 

@@ -7,7 +7,7 @@
 ## User intent (authoritative)
 
 1. Design how Cradle should host a Jarvis-like super-intelligence that manages the whole app platform and beyond — including session-level orchestration across heterogeneous model workers.
-2. Learn from lobehub, herdr, orca, omnigent, multica, dimcode, and related agent products (repos cloned under `/workspace/research/`).
+2. Learn from adjacent agent-product categories (Operator-workplace, thin multiplexer, builder-orchestrator, meta-harness, teammate work-graph, single-agent multi-surface runtime) — research clones kept local, not named in public artifacts.
 3. Jarvis is **not one agent**. Jarvis is a **kind of agent** (species / AgentKind), analogous to MCU J.A.R.V.I.S. as Stark's system organism — many capabilities, one continuous system identity.
 4. Do **not** discuss implementation.
 5. Do **not** depict Jarvis internals (no Function maps, no MCP tool lists, no phased engineering plans for Jarvis guts).
@@ -36,12 +36,12 @@
 
 | Family | Bet |
 |--------|-----|
-| LobeHub | Agents as teammates; Operator workspace; platform skill |
-| Multica | Work graph (issues); polymorphic actors; squads; builtin platform skills |
-| Omnigent | Meta-harness; child sessions as first-class; skill-encoded multi-vendor workflows |
-| Orca | Strong orchestration primitives, little magic; agent owns strategy; platform owns truthfulness |
-| Herdr | Thin runtime under agents; lifecycle honesty |
-| DimCode | Cache-friendly single-agent runtime; multi-agent as runtime feature |
+| Operator-workplace products | Agents as teammates; Operator workspace; platform skill |
+| teammate work-graph products | Work graph (issues); polymorphic actors; squads; builtin platform skills |
+| meta-harness products | Meta-harness; child sessions as first-class; skill-encoded multi-vendor workflows |
+| builder-orchestrator products | Strong orchestration primitives, little magic; agent owns strategy; platform owns truthfulness |
+| thin agent-multiplexer products | Thin runtime under agents; lifecycle honesty |
+| single-agent multi-surface runtimes | Cache-friendly single-agent runtime; multi-agent as runtime feature |
 
 Cradle's open strategic slot: local control tower × heterogeneous projection × work control plane × **platform-owned species** (mostly missing).
 

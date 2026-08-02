@@ -17,7 +17,7 @@ Unpack carefully:
 
 - **Local control plane, not chat shell.** Cradle’s multi-year product is not “a nicer agent window.” It is the place where work is named, delegated, awaited, observed, and bounded across many native runtimes the user already trusts (Claude Agent, Codex, Kimi, OpenCode, peers). Projection stays honest; Cradle does not steal native turn/session scheduling.
 - **Heterogeneous labor market, one home.** Coding workers remain specialists. They do not become “the platform.” The platform’s job is situation truth, work graph continuity, and enforceable authority boundaries.
-- **Platform species is the missing product identity.** Without a first-class *kind* that continuously manages the control plane (Jarvis-as-species), Cradle collapses into either (a) a session multiplexer competitors already ship, or (b) a work board with agents as teammates (Multica/LobeHub territory) without a steward that owns the *platform* problem.
+- **Platform species is the missing product identity.** Without a first-class *kind* that continuously manages the control plane (Jarvis-as-species), Cradle collapses into either (a) a session multiplexer competitors already ship, or (b) a work board with agents as teammates (teammate work-graph products/Operator-workplace products territory) without a steward that owns the *platform* problem.
 - **Sovereignty is the brand constraint.** Privacy-first desktop control and human final authority are not marketing garnish; they are why a platform species is tolerable. A cloud “AI operator” that quietly owns scheduling and write-power is a different product — and a worse trust model for Cradle’s thesis.
 
 One-line constitution:
@@ -94,7 +94,7 @@ Tradeoff stated plainly: a steward that cannot act feels weak; a steward that ac
 
 **Answer: Yes. Jarvis is a first-class AgentKind parallel to Coding Kind — not a chat upgrade, not HiJarvis 2.0, not a catalog badge.**
 
-Rationale: Catalog placement and ambient surfaces already exist and have not produced a platform organism. Without kind-level identity, authority, memory, and initiative, every “Jarvis” feature decays into another session with a nicer name. Competitors win on teammates (Multica), operator workspaces (LobeHub), or meta-harness (Omnigent) while Cradle’s open slot — *local control tower × heterogeneous projection × work plane × platform-owned species* — stays empty.
+Rationale: Catalog placement and ambient surfaces already exist and have not produced a platform organism. Without kind-level identity, authority, memory, and initiative, every “Jarvis” feature decays into another session with a nicer name. Competitors win on teammates (teammate work-graph products), operator workspaces (Operator-workplace products), or meta-harness (meta-harness products) while Cradle’s open slot — *local control tower × heterogeneous projection × work plane × platform-owned species* — stays empty.
 
 Tradeoff: Declaring species first-class raises the product bar. Cradle must then refuse half-measures that look like Jarvis in marketing and behave like chat in reality.
 
@@ -118,9 +118,9 @@ Tradeoff: Dual-center is harder to explain than a single slogan. Single-center s
 
 **Answer: Platform supplies honest delegation semantics and situation truth; strategy stays with the Kind and/or the human. Reject default “legion mode.”**
 
-Rationale: Orca’s bet (agent owns strategy; platform owns truthfulness) and Cradle’s Iron Law converge: Cradle must not become the shadow scheduler. Omnigent-style meta-harness ambition without that ceiling recreates the empty-user-run → synthetic-system-run pathology at product scale. “Legion mode” (platform actively multi-strategizes a swarm) is a later, optional product surface — only after receipts, situation picture, and initiative policy exist. It is not the constitution.
+Rationale: builder-orchestrator products’s bet (agent owns strategy; platform owns truthfulness) and Cradle’s Iron Law converge: Cradle must not become the shadow scheduler. meta-harness products-style meta-harness ambition without that ceiling recreates the empty-user-run → synthetic-system-run pathology at product scale. “Legion mode” (platform actively multi-strategizes a swarm) is a later, optional product surface — only after receipts, situation picture, and initiative policy exist. It is not the constitution.
 
-Tradeoff: Some users will want a louder orchestrator that “just runs the fleet.” Cradle should look weaker than LobeHub’s operator myth in demos and stronger in auditability. That is the bet.
+Tradeoff: Some users will want a louder orchestrator that “just runs the fleet.” Cradle should look weaker than Operator-workplace products’s operator myth in demos and stronger in auditability. That is the bet.
 
 ### Choice E — Initiative red line?
 
@@ -143,9 +143,9 @@ Tradeoff: Power users will demand wider grants quickly. That is fine — grants 
 
 1. **A Jarvis-branded chat agent** — one immortal thread with a personality. That is the failure mode the user forbade.
 2. **A second native scheduler** — any design where Cradle closes/clears user runs and invents system continuity to finish “the same work.” Iron Law is constitutional, not a bug ticket.
-3. **Cloud operator SaaS that owns the user’s agents** — LobeHub’s “hire/schedule your team while you’re offline” is a coherent bet; it is not Cradle’s sovereignty bet.
-4. **Teammates-only board with no steward** — Multica’s agents-as-hires is valuable and adjacent; without a platform species, Cradle becomes a slower Multica with more runtimes and no constitutional center.
-5. **Meta-harness cosplay** — Omnigent’s “orchestrate all harnesses” without honest receipts and without respecting native scheduling ownership.
+3. **Cloud operator SaaS that owns the user’s agents** — Operator-workplace products’s “hire/schedule your team while you’re offline” is a coherent bet; it is not Cradle’s sovereignty bet.
+4. **Teammates-only board with no steward** — teammate work-graph products’s agents-as-hires is valuable and adjacent; without a platform species, Cradle becomes a slower teammate work-graph products with more runtimes and no constitutional center.
+5. **Meta-harness cosplay** — meta-harness products’s “orchestrate all harnesses” without honest receipts and without respecting native scheduling ownership.
 6. **HiJarvis inflation** — promoting ambient personal surface into “the species” by branding alone.
 7. **Unaccountable CEO fantasy** — a platform organism that acts broadly, remembers vaguely, and cannot show delegates/receipts. That is not J.A.R.V.I.S.; that is a liability.
 8. **Species proliferation before two kinds work** — inventing a zoo of kinds before Coding Kind and Platform Kind have clear authority boundaries.
@@ -186,7 +186,7 @@ Gaps explicitly *not* ranked here (important later, not constitutional blockers)
 
 Treat these as kill criteria, not vibes:
 
-1. **Steward rejection.** In real use, target users consistently prefer peer teammates / squad leaders (Multica-like) and treat a platform steward as worthless overhead. → Species bet is wrong; pivot to work-graph + teammates only.
+1. **Steward rejection.** In real use, target users consistently prefer peer teammates / squad leaders (teammate work-graph products-like) and treat a platform steward as worthless overhead. → Species bet is wrong; pivot to work-graph + teammates only.
 2. **Honesty impossibility.** Heterogeneous projection cannot yield a situation picture trustworthy enough for delegation decisions without Cradle owning native scheduling. → Iron Law and species stewardship are incompatible; thesis fails; must redesign ambition downward or abandon Iron Law (existential fork).
 3. **Work graph sterility.** Work/Issue never becomes an operable object of care; Session remains the only noun users and agents respect. → Dual-center collapses; platform species has nothing durable to steward.
 4. **Receipts never trusted.** Delegate/receipt semantics exist in name but humans and workers ignore them; outcomes diverge silently. → Stewardship is theater; constitution is fiction.
@@ -200,12 +200,12 @@ Treat these as kill criteria, not vibes:
 
 | Family | Bet | Cradle must not copy blindly |
 |---|---|---|
-| LobeHub | Agents as hired team; operator stays in charge offline | Cloud operator myth; schedule-as-product |
-| Multica | Work graph + polymorphic teammates + squads | Teammates without platform steward |
-| Omnigent | Meta-harness over many agents | Orchestration without Cradle’s honesty ceiling |
-| Orca | Strong primitives; agent strategy; platform truthfulness | Closest philosophical ally on truthfulness — still not a species host |
-| Herdr | Thin lifecycle-honest multiplexer | Terminal multiplexer ≠ control plane constitution |
-| DimCode | Cache-friendly single-agent runtime | Runtime excellence ≠ platform species |
+| Operator-workplace products | Agents as hired team; operator stays in charge offline | Cloud operator myth; schedule-as-product |
+| teammate work-graph products | Work graph + polymorphic teammates + squads | Teammates without platform steward |
+| meta-harness products | Meta-harness over many agents | Orchestration without Cradle’s honesty ceiling |
+| builder-orchestrator products | Strong primitives; agent strategy; platform truthfulness | Closest philosophical ally on truthfulness — still not a species host |
+| thin agent-multiplexer products | Thin lifecycle-honest multiplexer | Terminal multiplexer ≠ control plane constitution |
+| single-agent multi-surface runtimes | Cache-friendly single-agent runtime | Runtime excellence ≠ platform species |
 
 **Cradle’s open slot:** local control tower × heterogeneous projection × work control plane × **platform-owned species**. The first three are partially present. The fourth is the multi-year identity move. Building the fourth on a dishonest plane is how you lose the slot while looking ambitious.
 

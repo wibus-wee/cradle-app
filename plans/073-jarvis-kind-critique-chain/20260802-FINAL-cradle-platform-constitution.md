@@ -435,21 +435,21 @@ If the story is told as…
 
 | Story | Absorbed by |
 |---|---|
-| “Operator for your AI team” | LobeHub |
-| “Agents on your board” | Multica |
-| “One harness to rule them” | Omnigent |
-| “Orchestrate coding agents in worktrees” | Orca |
+| “Operator for your AI team” | Operator-workplace products |
+| “Agents on your board” | teammate work-graph products |
+| “One harness to rule them” | meta-harness products |
+| “Orchestrate coding agents in worktrees” | builder-orchestrator products |
 
 …the constitution has failed. The sentence must keep: **non-ownership of native scheduling + durable receipts + narrow elevated Kind (not flat teammate, not monopoly).**
 
 ### Principles to copy (not products)
 
-- **Herdr:** lifecycle honesty over wrapped fiction.  
-- **Orca:** platform owns truthfulness; agents own strategy (Cradle: truth + receipts; Kind/human own strategy).  
-- **Multica:** durable work objects beat chat archaeology — without flat teammate ontology.  
-- **Omnigent:** governance as product surface — without owning the harness.  
-- **LobeHub:** continuous operator identity is desirable — reject playground schedule ownership.  
-- **DimCode:** runtime excellence belongs to natives/workers, not to Cradle pretending to be the one mind.
+- **thin agent-multiplexer products:** lifecycle honesty over wrapped fiction.  
+- **builder-orchestrator products:** platform owns truthfulness; agents own strategy (Cradle: truth + receipts; Kind/human own strategy).  
+- **teammate work-graph products:** durable work objects beat chat archaeology — without flat teammate ontology.  
+- **meta-harness products:** governance as product surface — without owning the harness.  
+- **Operator-workplace products:** continuous operator identity is desirable — reject playground schedule ownership.  
+- **single-agent multi-surface runtimes:** runtime excellence belongs to natives/workers, not to Cradle pretending to be the one mind.
 
 ---
 

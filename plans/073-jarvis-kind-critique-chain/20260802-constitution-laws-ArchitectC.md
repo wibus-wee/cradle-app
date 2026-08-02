@@ -78,7 +78,7 @@ If making Kind work appears to require Cradle to own native lifecycle again, the
 | **Relationship to workers** | Projects their events; binds mandates to receipts | Becomes their scheduler and conscience |
 | **Failure mode it avoids** | Lying completeness; silent reassignment; stolen turns | Bottleneck + knowledge sink + cascade SPOF |
 | **Success signal** | Human/Kind can answer: who has what mandate, what was observed, what is unverified | System "just handles it" — until it can't and no one can see why |
-| **Orca-aligned non-goal echo** | No hidden scheduler, no silence-as-death, no fake verification | Those non-goals inverted into product features |
+| **builder-orchestrator products-aligned non-goal echo** | No hidden scheduler, no silence-as-death, no fake verification | Those non-goals inverted into product features |
 
 **Honest control tower means:** Cradle is the place you trust *not to invent cognition*. It shows the situation picture, holds the work graph, records delegate→receipt contracts, enforces ownership and initiative gates, and refuses to paper over native ambiguity with synthetic runs.
 
@@ -221,7 +221,7 @@ For the foreseeable multi-year horizon, Cradle **will not** pursue:
 11. A product requirement that every worker ask Cradle or Kind-control what to do next.  
 12. Designing Jarvis internal Function maps, MCP tool lists, or phased guts plans as a substitute for these laws (out of scope here and constitutionally premature).
 
-These echo Orca's orchestration non-goals as *principles*: strong primitives and truthfulness, little magic; agents own strategy; platform owns honest mechanics — not a second cognition.
+These echo builder-orchestrator products's orchestration non-goals as *principles*: strong primitives and truthfulness, little magic; agents own strategy; platform owns honest mechanics — not a second cognition.
 
 ---
 

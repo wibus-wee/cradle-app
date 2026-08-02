@@ -243,7 +243,7 @@ Species *act* power may not widen until:
 
 **Rejected:** “Work is *the* center” if that demotes Session to second-class fiction (Iron Law collision risk B warned about).  
 **Rejected:** Session/Chat as the only real noun of platform meaning (species becomes chat orchestration).  
-**Rejected:** Pure Issue-board-as-HR (Multica clone; Jarvis becomes assignee).
+**Rejected:** Pure Issue-board-as-HR (teammate work-graph products clone; Jarvis becomes assignee).
 
 **Lived gravity stays open (§6):** Users may still *dwell* in Session for years. Success is Work becoming where they look when they ask “what did I leave running?” — not a forced enterprise religion.
 
@@ -259,7 +259,7 @@ Honest control tower ≠ magic orchestrator:
 | Authority | Truth of record; policy fences; blast-radius envelopes | Semantic micro-strategy; step approval; turn ownership |
 | Success | Human/Kind can answer: who has what mandate, what was observed, what is unverified | “It just handles it” — until it can’t and no one can see why |
 
-**Rejected:** Meta-harness ownership of native turns (Omnigent suicide under IRON LAW).  
+**Rejected:** Meta-harness ownership of native turns (meta-harness products suicide under IRON LAW).  
 **Rejected:** Default legion / platform-directed multi-worker campaigns. Legion may exist later only as explicit Kind/human-chosen mode through honest delegate→receipt — never as constitutional default.  
 **Narrowed:** Kind “strategy” is mandate-level stewardship, not classical mega-orchestrator scope wearing a Kind badge (Critic E wound on C L9 accepted).
 
@@ -312,8 +312,8 @@ Cradle **will not** become or pursue:
 
 1. **A Jarvis-branded chat agent** — one immortal thread with a personality.  
 2. **A second native scheduler** — close/clear user runs and invent system continuity to finish “the same work.” IRON LAW is constitutional.  
-3. **Cloud Operator SaaS that owns the user’s agents** — LobeHub’s coherent bet; not Cradle’s sovereignty bet.  
-4. **Teammates-only board with no steward** — Multica-adjacent without constitutional center.  
+3. **Cloud Operator SaaS that owns the user’s agents** — Operator-workplace products’s coherent bet; not Cradle’s sovereignty bet.  
+4. **Teammates-only board with no steward** — teammate work-graph products-adjacent without constitutional center.  
 5. **Flat teammate absorption of Kind** — Jarvis as another assignee row.  
 6. **Meta-harness cosplay** — orchestrate all harnesses without honest receipts and without respecting native scheduling.  
 7. **HiJarvis inflation** — ambient personal surface promoted to species by branding alone.  
@@ -375,7 +375,7 @@ One spine. Ranked by whether a human can experience “Jarvis is a Kind” as tr
 - This is a **coherent disciplined bet**, not a structural moat. Category sentences are marketing; competitors can absorb partial clauses without “betraying blood oaths.”  
 - The bet is a **fragile intersection**: drop projection non-ownership, or Work receipts, or narrow Kind, and a competitor’s shorter sentence wins.  
 - Empty market space ≠ proven demand. Steward rejection (falsifier below) can kill a “correct” constitution.  
-- Local/sovereignty is table stakes among Herdr/Orca/DimCode-adjacent products — not the differentiator. The differentiator is Kind-on-honest-tower — currently unbuilt.  
+- Local/sovereignty is table stakes among thin agent-multiplexer products/builder-orchestrator products/single-agent multi-surface runtimes-adjacent products — not the differentiator. The differentiator is Kind-on-honest-tower — currently unbuilt.  
 - Competitors will out-demo autonomy. Cradle must not race silent act; Cradle also must not wait forever to show *useful propose*.
 
 ### Clone absorption tests (keep D’s filter, delete monopoly)
@@ -384,21 +384,21 @@ If the story is told as…
 
 | Story | Absorbed by |
 |---|---|
-| “Operator for your AI team” | LobeHub |
-| “Agents on your board” | Multica |
-| “One harness to rule them” | Omnigent |
-| “Orchestrate coding agents in worktrees” | Orca |
+| “Operator for your AI team” | Operator-workplace products |
+| “Agents on your board” | teammate work-graph products |
+| “One harness to rule them” | meta-harness products |
+| “Orchestrate coding agents in worktrees” | builder-orchestrator products |
 
 …the constitution has failed. The sentence must keep: **non-ownership of native scheduling + Work receipts + narrow elevated Kind (not flat teammate, not monopoly organism).**
 
 ### Principles to copy (not products)
 
-- **Herdr:** lifecycle honesty over wrapped fiction.  
-- **Orca:** platform owns truthfulness; agents own strategy (Cradle: truth + receipts; Kind/human own strategy).  
-- **Multica:** durable work objects beat chat archaeology — without flat teammate ontology.  
-- **Omnigent:** governance as product surface — without owning the harness.  
-- **LobeHub:** continuous operator identity is desirable — reject playground schedule ownership.  
-- **DimCode:** runtime excellence belongs to natives/workers, not to Cradle pretending to be the one mind.
+- **thin agent-multiplexer products:** lifecycle honesty over wrapped fiction.  
+- **builder-orchestrator products:** platform owns truthfulness; agents own strategy (Cradle: truth + receipts; Kind/human own strategy).  
+- **teammate work-graph products:** durable work objects beat chat archaeology — without flat teammate ontology.  
+- **meta-harness products:** governance as product surface — without owning the harness.  
+- **Operator-workplace products:** continuous operator identity is desirable — reject playground schedule ownership.  
+- **single-agent multi-surface runtimes:** runtime excellence belongs to natives/workers, not to Cradle pretending to be the one mind.
 
 ---
 
