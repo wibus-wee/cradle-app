@@ -74,82 +74,22 @@ struct MenuBarPanel: View {
   @State private var hotKeys: WatchOutHotKeys?
 
   var body: some View {
-    VStack(spacing: 0) {
-      AttentionListPane(model: model, compact: true)
-        .frame(width: 380, height: 480)
-
-      footer
-    }
-    .background {
-      ZStack {
-        WatchOutTheme.mist
-        Rectangle().fill(.ultraThinMaterial.opacity(0.65))
-        // subtle grid
-        WatchOutGridBackdrop()
-          .opacity(0.35)
-      }
-    }
-    .clipShape(RoundedRectangle(cornerRadius: WatchOutTheme.panelRadius, style: .continuous))
-    .overlay(
-      RoundedRectangle(cornerRadius: WatchOutTheme.panelRadius, style: .continuous)
-        .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
-    )
-    .onAppear(perform: bootstrapIfNeeded)
-  }
-
-  private var footer: some View {
-    HStack(spacing: 10) {
-      Button(action: presentFloating) {
-        HStack(spacing: 7) {
-          WatchOutSignalDot(size: 5)
-          Text("FLOAT")
-            .font(.system(size: 10, weight: .heavy, design: .monospaced))
-            .tracking(1)
+    AttentionListPane(model: model, compact: true)
+      .frame(width: 380, height: 500)
+      .background {
+        ZStack {
+          WatchOutTheme.mist
+          Rectangle().fill(.ultraThinMaterial.opacity(0.65))
+          WatchOutGridBackdrop()
+            .opacity(0.35)
         }
-        .foregroundStyle(WatchOutTheme.ink)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(WatchOutTheme.phosphor)
       }
-      .buttonStyle(WatchOutPressStyle())
-
-      Spacer()
-
-      SettingsLink {
-        Text("CFG")
-          .font(.system(size: 10, weight: .heavy, design: .monospaced))
-          .foregroundStyle(WatchOutTheme.slate)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 7)
-          .background(
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-              .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
-          )
-      }
-
-      Button {
-        #if canImport(AppKit)
-        NSApp.terminate(nil)
-        #endif
-      } label: {
-        Text("QUIT")
-          .font(.system(size: 10, weight: .heavy, design: .monospaced))
-          .foregroundStyle(WatchOutTheme.slate)
-          .padding(.horizontal, 8)
-          .padding(.vertical, 7)
-          .background(
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-              .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
-          )
-      }
-      .buttonStyle(WatchOutPressStyle())
-      .keyboardShortcut("q", modifiers: [.command])
-    }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 10)
-    .overlay(alignment: .top) {
-      Rectangle().fill(WatchOutTheme.hairline).frame(height: 1)
-    }
+      .clipShape(RoundedRectangle(cornerRadius: WatchOutTheme.panelRadius, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: WatchOutTheme.panelRadius, style: .continuous)
+          .strokeBorder(WatchOutTheme.hairline, lineWidth: 1)
+      )
+      .onAppear(perform: bootstrapIfNeeded)
   }
 
   private func bootstrapIfNeeded() {

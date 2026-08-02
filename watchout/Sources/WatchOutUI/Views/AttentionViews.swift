@@ -13,7 +13,6 @@ struct AttentionItemRow: View {
 
   var body: some View {
     HStack(alignment: .top, spacing: 0) {
-      // Ticket stub / index rail
       VStack(spacing: 6) {
         Text(String(format: "%02d", index + 1))
           .font(.system(size: 10, weight: .bold, design: .monospaced))
@@ -193,7 +192,7 @@ struct AttentionEmptyState: View {
         .font(.system(size: 13.5, weight: .medium))
         .foregroundStyle(WatchOutTheme.ink.opacity(0.72))
         .fixedSize(horizontal: false, vertical: true)
-      Text("CMD+N FROM FLOATING · OR JUST TYPE ABOVE")
+      Text("TYPE BELOW TO PARK")
         .font(.system(size: 9, weight: .bold, design: .monospaced))
         .tracking(0.8)
         .foregroundStyle(WatchOutTheme.slate.opacity(0.8))
@@ -219,23 +218,8 @@ struct AttentionListPane: View {
       header
         .padding(.horizontal, 16)
         .padding(.top, compact ? 14 : 10)
-        .padding(.bottom, 14)
+        .padding(.bottom, 12)
 
-      AttentionComposer(title: $model.draftTitle) {
-        model.createFromDraft()
-      }
-      .padding(.horizontal, 16)
-      .padding(.bottom, 14)
-
-      if let errorMessage = model.errorMessage {
-        Text(errorMessage)
-          .font(.system(size: 11, weight: .medium, design: .monospaced))
-          .foregroundStyle(WatchOutTheme.danger)
-          .padding(.horizontal, 16)
-          .padding(.bottom, 8)
-      }
-
-      // Scanline divider
       ZStack(alignment: .leading) {
         Rectangle().fill(WatchOutTheme.hairline).frame(height: 1)
         Rectangle()
@@ -268,6 +252,26 @@ struct AttentionListPane: View {
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+      // Composer lives at the bottom — the actual capture surface.
+      VStack(spacing: 0) {
+        Rectangle().fill(WatchOutTheme.hairline).frame(height: 1)
+        AttentionComposer(title: $model.draftTitle) {
+          model.createFromDraft()
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, compact ? 14 : 16)
+        .background(WatchOutTheme.mist.opacity(0.55))
+      }
+
+      if let errorMessage = model.errorMessage {
+        Text(errorMessage)
+          .font(.system(size: 11, weight: .medium, design: .monospaced))
+          .foregroundStyle(WatchOutTheme.danger)
+          .padding(.horizontal, 16)
+          .padding(.bottom, 10)
+      }
     }
     .onAppear { model.refresh() }
   }

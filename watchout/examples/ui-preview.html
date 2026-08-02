@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>WatchOut — radar desk preview</title>
+<title>WatchOut — bottom composer, no footer</title>
 <style>
   :root {
     --phosphor: #38db9e;
@@ -20,8 +20,7 @@
     min-height: 100vh;
     font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color: var(--ink);
-    background:
-      linear-gradient(180deg, #edf1f5 0%, #d9e0e8 100%);
+    background: linear-gradient(180deg, #edf1f5 0%, #d9e0e8 100%);
     padding: 44px 36px 56px;
     -webkit-font-smoothing: antialiased;
   }
@@ -34,10 +33,17 @@
     color: var(--slate);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  .sub {
-    margin: 0 0 28px;
-    font-size: 14px;
-    color: rgba(18,23,31,0.7);
+  .sub { margin: 0 0 28px; font-size: 14px; color: rgba(18,23,31,0.7); }
+  .callout {
+    display: inline-block;
+    margin: 0 0 22px;
+    padding: 8px 10px;
+    border: 1px solid rgba(56,219,158,0.45);
+    background: var(--phosphor-dim);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink);
   }
   .stage { display: flex; gap: 36px; flex-wrap: wrap; align-items: flex-start; }
   .label {
@@ -48,12 +54,6 @@
     color: var(--slate);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
-  .gridbg {
-    background-image:
-      linear-gradient(rgba(0,0,0,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,0,0,0.035) 1px, transparent 1px);
-    background-size: 16px 16px;
-  }
   .panel {
     border: 1px solid rgba(18,23,31,0.12);
     border-radius: 10px;
@@ -61,6 +61,8 @@
     background: color-mix(in srgb, var(--mist) 85%, white);
     box-shadow: 0 16px 40px rgba(18,23,31,0.10);
     position: relative;
+    display: flex;
+    flex-direction: column;
   }
   .panel::before {
     content: "";
@@ -72,14 +74,14 @@
     opacity: 0.4;
     pointer-events: none;
   }
-  .menubar { width: 380px; }
-  .floating { width: 460px; border-radius: 12px; }
+  .menubar { width: 380px; height: 520px; }
+  .floating { width: 460px; height: 600px; border-radius: 12px; }
   .floating .wash {
     position: absolute; inset: 0;
     background: linear-gradient(145deg, rgba(56,219,158,0.10), transparent 45%, rgba(0,0,0,0.03));
     pointer-events: none;
   }
-  .inner { position: relative; z-index: 1; }
+  .inner { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; }
 
   .chrome {
     display: flex; align-items: center; gap: 10px;
@@ -96,7 +98,7 @@
     border-radius: 2px;
   }
 
-  .header { padding: 14px 16px 14px; }
+  .header { padding: 14px 16px 12px; }
   .stamp {
     display: flex; align-items: center; gap: 8px;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -107,7 +109,6 @@
     background: var(--phosphor);
     box-shadow: 0 0 0 5px var(--phosphor-dim);
   }
-  .dot.off { background: rgba(115,127,142,0.35); box-shadow: none; }
   .toprow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .tape {
     display: inline-flex; align-items: center; gap: 6px;
@@ -117,37 +118,17 @@
   }
   .tape .k { font-size: 9px; font-weight: 800; letter-spacing: 0.12em; color: var(--slate); }
   .tape .n { font-size: 13px; font-weight: 800; }
-  .tagline {
-    display: flex; align-items: baseline; gap: 12px; justify-content: space-between;
-  }
+  .tagline { display: flex; align-items: baseline; gap: 12px; justify-content: space-between; }
   .tagline p {
     margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em;
     max-width: 260px; line-height: 1.2;
   }
-  .menubar .tagline p { font-size: 12px; font-weight: 500; max-width: 200px; color: rgba(18,23,31,0.88); }
+  .menubar .tagline p { font-size: 12px; font-weight: 500; max-width: 200px; }
   .mode {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 9px; font-weight: 800; letter-spacing: 0.08em;
     padding: 5px 8px; border: 1px solid var(--hairline); border-radius: 2px; color: var(--slate);
     white-space: nowrap;
-  }
-
-  .composer { padding: 0 16px 14px; }
-  .composer .k {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 9px; font-weight: 800; letter-spacing: 0.14em; color: var(--slate); margin-bottom: 8px;
-  }
-  .composer .box {
-    display: flex; border: 1.5px solid rgba(18,23,31,0.55); border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.7);
-  }
-  .composer input {
-    flex: 1; border: 0; outline: 0; background: transparent;
-    padding: 12px; font-size: 14px; font-weight: 500; color: var(--ink);
-  }
-  .composer button {
-    border: 0; background: var(--phosphor); color: var(--ink);
-    padding: 0 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
   }
 
   .scan {
@@ -157,7 +138,14 @@
     content: ""; position: absolute; left: 0; top: -0.5px; width: 48px; height: 2px; background: var(--phosphor);
   }
 
-  .list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; min-height: 250px; }
+  .list {
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    overflow: hidden;
+  }
   .ticket {
     display: flex; background: var(--ticket); border: 1px solid var(--hairline);
     border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); position: relative; overflow: hidden;
@@ -195,23 +183,28 @@
   }
   .meta .link { color: var(--ink); }
 
-  .footer {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; border-top: 1px solid var(--hairline);
+  .composer-dock {
+    border-top: 1px solid var(--hairline);
+    padding: 12px 16px 16px;
+    background: rgba(230,235,240,0.7);
   }
-  .floatbtn {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: var(--phosphor); color: var(--ink);
-    padding: 7px 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px; font-weight: 800; letter-spacing: 0.1em;
-  }
-  .floatbtn .d { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); }
-  .ghost {
-    margin-left: auto;
+  .composer-dock .k {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px; font-weight: 800; letter-spacing: 0.08em; color: var(--slate);
-    padding: 7px 8px; border: 1px solid var(--hairline); border-radius: 2px;
+    font-size: 9px; font-weight: 800; letter-spacing: 0.14em; color: var(--slate); margin-bottom: 8px;
   }
+  .composer-dock .box {
+    display: flex; border: 1.5px solid rgba(18,23,31,0.55); border-radius: 3px; overflow: hidden; background: rgba(255,255,255,0.85);
+  }
+  .composer-dock input {
+    flex: 1; border: 0; outline: 0; background: transparent;
+    padding: 12px; font-size: 14px; font-weight: 500; color: var(--ink);
+  }
+  .composer-dock button {
+    border: 0; background: var(--phosphor); color: var(--ink);
+    padding: 0 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; font-weight: 800; letter-spacing: 0.1em;
+  }
+
   .tray {
     display: inline-flex; align-items: center; gap: 6px;
     margin-bottom: 8px; margin-left: auto;
@@ -224,8 +217,9 @@
 </style>
 </head>
 <body>
-  <h1>WatchOut redesign</h1>
-  <p class="sub">Cool stone desk · phosphor signal · ticket slips — not generic orange cards.</p>
+  <h1>WatchOut</h1>
+  <p class="sub">Phosphor mint (not orange) · composer docked at bottom · no footer chrome</p>
+  <div class="callout">Swift accent = phosphor #38DB9E · Settings via ⌘, · Floating via hotkey · Quit via ⌘Q</div>
   <div class="stage">
     <div>
       <p class="label">MENU BAR</p>
@@ -241,13 +235,6 @@
               <div class="tagline">
                 <p>Later, without losing the thread.</p>
                 <div class="mode">OPEN ONLY</div>
-              </div>
-            </div>
-            <div class="composer">
-              <div class="k">NEW SLIP</div>
-              <div class="box">
-                <input placeholder="What should not be forgotten?" />
-                <button>PARK</button>
               </div>
             </div>
             <div class="scan"></div>
@@ -290,10 +277,12 @@
                 </div>
               </div>
             </div>
-            <div class="footer">
-              <div class="floatbtn"><span class="d"></span>FLOAT</div>
-              <div class="ghost">CFG</div>
-              <div class="ghost" style="margin-left:0">QUIT</div>
+            <div class="composer-dock">
+              <div class="k">NEW SLIP</div>
+              <div class="box">
+                <input placeholder="What should not be forgotten?" />
+                <button>PARK</button>
+              </div>
             </div>
           </div>
         </div>
@@ -314,13 +303,6 @@
             <div class="tagline">
               <p>A desk for unfinished attention.</p>
               <div class="mode">OPEN ONLY</div>
-            </div>
-          </div>
-          <div class="composer">
-            <div class="k">NEW SLIP</div>
-            <div class="box">
-              <input value="Ship icon + screenshot pass" />
-              <button>PARK</button>
             </div>
           </div>
           <div class="scan"></div>
@@ -363,10 +345,17 @@
               </div>
             </div>
           </div>
+          <div class="composer-dock">
+            <div class="k">NEW SLIP</div>
+            <div class="box">
+              <input value="Ship icon + screenshot pass" />
+              <button>PARK</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
-  <p class="note">HTML stand-in of the redesigned SwiftUI theme (stone + phosphor tickets). Not AppKit pixels.</p>
+  <p class="note">No FLOAT/CFG/QUIT footer. Capture surface is the bottom dock. Accent is mint phosphor in Swift + preview.</p>
 </body>
 </html>
