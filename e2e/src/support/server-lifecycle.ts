@@ -178,6 +178,8 @@ BeforeAll({ timeout: 120_000 }, async () => {
         CRADLE_DATA_DIR: dataDir,
         CRADLE_PORT: String(serverPort),
         CRADLE_HOST: '127.0.0.1',
+        // Allow loopback model-api-simulator hosts for provider probe/warm during E2E.
+        CRADLE_ALLOW_PRIVATE_PROVIDER_HOSTS: '127.0.0.1,localhost,::1',
         CRADLE_CREDENTIAL_SECRET: 'e2e-test-secret',
         // Do NOT set CRADLE_MOCK_LLM_URL — E2E must use the real Claude Agent Provider
         // talking to @cradle/model-api-simulator over Anthropic Messages.
