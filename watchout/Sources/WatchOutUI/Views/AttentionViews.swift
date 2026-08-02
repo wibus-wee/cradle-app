@@ -9,11 +9,12 @@ struct AttentionItemRow: View {
   let onOpenHref: () -> Void
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 8) {
+    HStack(spacing: 10) {
       Button(action: item.status == .open ? onComplete : onReopen) {
         Image(systemName: item.status == .open ? "circle" : "checkmark.circle.fill")
           .font(.body)
-          .foregroundStyle(item.status == .open ? WatchOutTheme.secondary : WatchOutTheme.phosphor)
+          .foregroundStyle(.secondary)
+          .frame(width: 20, height: 20)
       }
       .buttonStyle(.plain)
       .help(item.status == .open ? "Mark done" : "Reopen")
@@ -22,32 +23,37 @@ struct AttentionItemRow: View {
         Text(item.title)
           .font(.body.weight(.medium))
           .strikethrough(item.status == .done)
-          .foregroundStyle(item.status == .done ? WatchOutTheme.secondary : WatchOutTheme.ink)
+          .foregroundStyle(item.status == .done ? .secondary : .primary)
           .lineLimit(2)
 
         HStack(spacing: 6) {
           Text(item.source)
-          Text("·")
           Text(item.createdAt, format: .relative(presentation: .named))
           if item.href != nil {
             Button("Open", action: onOpenHref)
               .buttonStyle(.plain)
-              .foregroundStyle(WatchOutTheme.phosphor)
+              .foregroundStyle(.secondary)
           }
         }
         .font(.caption)
-        .foregroundStyle(WatchOutTheme.secondary)
+        .foregroundStyle(.tertiary)
       }
 
       Spacer(minLength: 0)
 
       Button(role: .destructive, action: onDelete) {
-        Image(systemName: "trash")
-          .font(.caption)
+        Image(systemName: "xmark")
+          .font(.caption.weight(.semibold))
+          .foregroundStyle(.tertiary)
+          .frame(width: 22, height: 22)
+          .contentShape(Rectangle())
       }
-      .buttonStyle(.borderless)
+      .buttonStyle(.plain)
+      .help("Delete")
     }
-    .padding(.vertical, 4)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
   }
 }
 
@@ -66,14 +72,14 @@ struct AttentionComposer: View {
         .onSubmit(onSubmit)
 
       Button("Park", action: onSubmit)
-        .buttonStyle(.borderedProminent)
-        .tint(WatchOutTheme.phosphor)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
         .disabled(!canSubmit)
         .keyboardShortcut(.return, modifiers: [.command])
-        .controlSize(.small)
     }
-    .padding(.horizontal, 10)
-    .padding(.vertical, 8)
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .background(.quaternary.opacity(0.45), in: Capsule(style: .continuous))
   }
 }
 
@@ -82,81 +88,72 @@ struct AttentionListPane: View {
   var compact: Bool = false
 
   var body: some View {
-    VStack(spacing: 0) {
+    VStack(spacing: 10) {
       header
-        .padding(.horizontal, 10)
-        .padding(.top, 8)
-        .padding(.bottom, 6)
-
-      Divider()
+        .padding(.horizontal, 4)
 
       if let errorMessage = model.errorMessage {
         Text(errorMessage)
           .font(.caption)
-          .foregroundStyle(.red)
+          .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
-          .padding(.horizontal, 10)
-          .padding(.vertical, 4)
+          .padding(.horizontal, 4)
       }
 
-      if model.items.isEmpty {
-        ContentUnavailableView {
-          Label("Nothing parked", systemImage: "tray")
-        } description: {
-          Text("Park something before you context-switch.")
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-      } else {
-        List {
-          ForEach(model.items) { item in
-            AttentionItemRow(
-              item: item,
-              onComplete: { model.complete(item) },
-              onReopen: { model.reopen(item) },
-              onDelete: { model.delete(item) },
-              onOpenHref: { model.openHref(item) }
-            )
-            .listRowInsets(EdgeInsets(top: 2, leading: 10, bottom: 2, trailing: 10))
-            .listRowSeparator(.visible)
+      Group {
+        if model.items.isEmpty {
+          ContentUnavailableView {
+            Label("Nothing parked", systemImage: "tray")
+          } description: {
+            Text("Park something before you context-switch.")
+          }
+        } else {
+          ScrollView {
+            LazyVStack(spacing: 8) {
+              ForEach(model.items) { item in
+                AttentionItemRow(
+                  item: item,
+                  onComplete: { model.complete(item) },
+                  onReopen: { model.reopen(item) },
+                  onDelete: { model.delete(item) },
+                  onOpenHref: { model.openHref(item) }
+                )
+              }
+            }
+            .padding(.horizontal, 2)
           }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
       }
-
-      Divider()
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
 
       AttentionComposer(title: $model.draftTitle) {
         model.createFromDraft()
       }
     }
+    .padding(10)
     .onAppear { model.refresh() }
   }
 
   private var header: some View {
     HStack(spacing: 8) {
-      Circle()
-        .fill(model.openCount > 0 ? WatchOutTheme.phosphor : WatchOutTheme.secondary.opacity(0.35))
-        .frame(width: 7, height: 7)
-
       Text("WatchOut")
         .font(compact ? .headline : .title3.weight(.semibold))
 
       if model.openCount > 0 {
         Text("\(model.openCount)")
           .font(.caption.monospacedDigit().weight(.semibold))
-          .foregroundStyle(WatchOutTheme.secondary)
+          .foregroundStyle(.secondary)
+          .padding(.horizontal, 8)
+          .padding(.vertical, 3)
+          .background(.quaternary.opacity(0.5), in: Capsule())
       }
 
       Spacer(minLength: 8)
 
-      Toggle(isOn: $model.showDone) {
-        Text("Done")
-          .font(.caption)
-      }
-      .toggleStyle(.checkbox)
-      .controlSize(.small)
-      .onChange(of: model.showDone) { _, _ in model.refresh() }
+      Toggle("Done", isOn: $model.showDone)
+        .toggleStyle(.button)
+        .controlSize(.small)
+        .onChange(of: model.showDone) { _, _ in model.refresh() }
     }
   }
 }

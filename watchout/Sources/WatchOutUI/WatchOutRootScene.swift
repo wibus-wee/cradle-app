@@ -31,7 +31,7 @@ public struct WatchOutRootScene: Scene {
 
     Window("WatchOut", id: WatchOutWindowID.floating) {
       FloatingPanel(model: model)
-        .frame(minWidth: 320, idealWidth: 360, minHeight: 420, idealHeight: 520)
+        .frame(minWidth: 300, idealWidth: 340, minHeight: 400, idealHeight: 480)
     }
     .windowStyle(.hiddenTitleBar)
     .windowResizability(.contentSize)
@@ -54,15 +54,17 @@ struct MenuBarLabel: View {
   let showCount: Bool
 
   var body: some View {
-    HStack(spacing: 4) {
-      Image(systemName: openCount > 0 ? "circle.fill" : "circle")
-        .font(.system(size: 7, weight: .bold))
-        .foregroundStyle(openCount > 0 ? WatchOutTheme.phosphor : .secondary)
+    Label {
       if showCount, openCount > 0 {
         Text("\(openCount)")
           .font(.caption2.monospacedDigit().weight(.semibold))
+      } else {
+        Text("WatchOut")
       }
+    } icon: {
+      Image(systemName: "eyeglasses")
     }
+    .labelStyle(.titleAndIcon)
     .help(openCount > 0 ? "WatchOut — \(openCount) open" : "WatchOut")
   }
 }
@@ -76,8 +78,8 @@ struct MenuBarPanel: View {
 
   var body: some View {
     AttentionListPane(model: model, compact: true)
-      .frame(width: 320, height: 420)
-      .background(.background)
+      .frame(width: 300, height: 400)
+      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
       .onAppear(perform: bootstrapIfNeeded)
   }
 
@@ -105,7 +107,8 @@ struct FloatingPanel: View {
 
   var body: some View {
     AttentionListPane(model: model, compact: false)
-      .background(.background)
+      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+      .padding(6)
       .onAppear {
         model.refresh()
         applyFloatingLevel()
@@ -131,6 +134,7 @@ struct FloatingPanel: View {
         window.level = floatingAlwaysOnTop ? .floating : .normal
         window.collectionBehavior.insert(.fullScreenAuxiliary)
         window.isMovableByWindowBackground = true
+        window.backgroundColor = .clear
       }
     }
     #endif

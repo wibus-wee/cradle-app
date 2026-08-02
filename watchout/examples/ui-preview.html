@@ -3,97 +3,102 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>WatchOut — native tight</title>
+<title>WatchOut — capsules, no accent color</title>
 <style>
   body {
     margin: 0;
     min-height: 100vh;
-    font: 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-    background: #c9cdd3;
+    font: 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    background: #b9bec6;
     color: #1d1d1f;
     padding: 40px;
     -webkit-font-smoothing: antialiased;
   }
-  h1 { margin: 0 0 8px; font-size: 12px; color: #6e6e73; font-weight: 600; }
-  .sub { margin: 0 0 24px; color: #6e6e73; font-size: 13px; }
+  h1 { margin: 0 0 6px; font-size: 12px; color: #5c5c62; font-weight: 600; }
+  .sub { margin: 0 0 22px; color: #5c5c62; font-size: 13px; }
   .stage { display: flex; gap: 28px; flex-wrap: wrap; }
-  .label { margin: 0 0 8px; font-size: 11px; color: #6e6e73; font-weight: 600; }
+  .label { margin: 0 0 8px; font-size: 11px; color: #5c5c62; font-weight: 600; }
   .panel {
-    width: 320px;
-    height: 420px;
-    background: #f5f5f7;
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+    width: 300px;
+    height: 400px;
+    border-radius: 22px;
+    background: rgba(245,245,247,0.92);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.16);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    padding: 10px;
+    gap: 10px;
   }
-  .floating { width: 360px; height: 520px; }
-  .header {
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 10px 6px;
-  }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: #38db9e; }
+  .floating { width: 340px; height: 480px; border-radius: 24px; }
+  .header { display: flex; align-items: center; gap: 8px; padding: 0 4px; }
   .title { font-weight: 600; font-size: 13px; }
   .floating .title { font-size: 15px; }
-  .count { color: #6e6e73; font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 600; }
-  .spacer { flex: 1; }
-  .done { font-size: 11px; color: #6e6e73; display: flex; align-items: center; gap: 4px; }
-  .done input { margin: 0; }
-  hr { border: 0; border-top: 1px solid rgba(0,0,0,0.08); margin: 0; }
-  .list { flex: 1; overflow: auto; padding: 4px 0; }
-  .row {
-    display: flex; gap: 8px; align-items: flex-start;
-    padding: 6px 10px;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+  .count {
+    font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;
+    color: #6e6e73; background: rgba(0,0,0,0.06);
+    padding: 3px 8px; border-radius: 999px;
   }
-  .check { color: #6e6e73; margin-top: 1px; }
-  .check.on { color: #38db9e; }
+  .spacer { flex: 1; }
+  .done {
+    font-size: 11px; color: #6e6e73;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 999px; padding: 3px 8px;
+  }
+  .list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+  .row {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 10px 12px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.05);
+  }
+  .check { color: #8e8e93; width: 20px; text-align: center; }
   .body { flex: 1; min-width: 0; }
   .name { font-weight: 500; }
-  .name.done { color: #6e6e73; text-decoration: line-through; }
-  .meta { margin-top: 2px; font-size: 11px; color: #6e6e73; }
-  .meta a { color: #1aa876; text-decoration: none; }
-  .trash { color: #6e6e73; opacity: 0.45; font-size: 11px; }
+  .name.done { color: #8e8e93; text-decoration: line-through; }
+  .meta { margin-top: 2px; font-size: 11px; color: #aeaeb2; }
+  .x { color: #aeaeb2; font-size: 11px; font-weight: 600; padding-top: 2px; }
   .composer {
     display: flex; gap: 8px; align-items: center;
-    padding: 8px 10px;
-    border-top: 1px solid rgba(0,0,0,0.08);
-    background: #f5f5f7;
+    padding: 10px 12px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.06);
   }
   .composer input {
     flex: 1; border: 0; outline: 0; background: transparent; font: inherit;
   }
   .composer button {
-    border: 0; border-radius: 6px; padding: 4px 10px;
-    background: #38db9e; color: #111; font-size: 12px; font-weight: 600;
+    border: 1px solid rgba(0,0,0,0.14);
+    border-radius: 999px;
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.7);
+    color: #1d1d1f;
+    font-size: 12px;
+    font-weight: 600;
   }
-  .note { margin-top: 20px; font-size: 12px; color: #6e6e73; }
+  .note { margin-top: 18px; font-size: 12px; color: #5c5c62; }
 </style>
 </head>
 <body>
   <h1>WatchOut</h1>
-  <p class="sub">Native SwiftUI-shaped: List + bottom field. No accent bars, no ticket chrome, tight padding.</p>
+  <p class="sub">No accent color · no status dots · capsule rows + capsule composer</p>
   <div class="stage">
     <div>
       <p class="label">Menu Bar</p>
       <div class="panel">
         <div class="header">
-          <span class="dot"></span>
           <span class="title">WatchOut</span>
           <span class="count">3</span>
           <span class="spacer"></span>
-          <label class="done"><input type="checkbox" /> Done</label>
+          <span class="done">Done</span>
         </div>
-        <hr />
         <div class="list">
           <div class="row">
             <span class="check">○</span>
             <div class="body">
               <div class="name">Review PR #113 outcome</div>
-              <div class="meta">cradle · 2 hours ago · <a href="#">Open</a></div>
+              <div class="meta">cradle · 2 hours ago · Open</div>
             </div>
-            <span class="trash">⌫</span>
+            <span class="x">✕</span>
           </div>
           <div class="row">
             <span class="check">○</span>
@@ -101,15 +106,15 @@
               <div class="name">Check CI on watchout branch</div>
               <div class="meta">cli · yesterday</div>
             </div>
-            <span class="trash">⌫</span>
+            <span class="x">✕</span>
           </div>
           <div class="row">
-            <span class="check on">●</span>
+            <span class="check">◉</span>
             <div class="body">
               <div class="name done">Reply to design notes</div>
               <div class="meta">manual · 3 days ago</div>
             </div>
-            <span class="trash">⌫</span>
+            <span class="x">✕</span>
           </div>
         </div>
         <div class="composer">
@@ -122,21 +127,19 @@
       <p class="label">Floating</p>
       <div class="panel floating">
         <div class="header">
-          <span class="dot"></span>
           <span class="title">WatchOut</span>
           <span class="count">3</span>
           <span class="spacer"></span>
-          <label class="done"><input type="checkbox" /> Done</label>
+          <span class="done">Done</span>
         </div>
-        <hr />
         <div class="list">
           <div class="row">
             <span class="check">○</span>
             <div class="body">
               <div class="name">Review PR #113 outcome</div>
-              <div class="meta">cradle · 2 hours ago · <a href="#">Open</a></div>
+              <div class="meta">cradle · 2 hours ago · Open</div>
             </div>
-            <span class="trash">⌫</span>
+            <span class="x">✕</span>
           </div>
           <div class="row">
             <span class="check">○</span>
@@ -144,7 +147,7 @@
               <div class="name">Check CI on watchout branch</div>
               <div class="meta">cli · yesterday</div>
             </div>
-            <span class="trash">⌫</span>
+            <span class="x">✕</span>
           </div>
           <div class="row">
             <span class="check">○</span>
@@ -152,7 +155,7 @@
               <div class="name">Ship icon + screenshot pass</div>
               <div class="meta">manual · just now</div>
             </div>
-            <span class="trash">⌫</span>
+            <span class="x">✕</span>
           </div>
         </div>
         <div class="composer">
@@ -162,6 +165,6 @@
       </div>
     </div>
   </div>
-  <p class="note">SwiftUI: MenuBarExtra + List + TextField. Accent only on active signal / Park button.</p>
+  <p class="note">System gray only. Capsule item rows + capsule input. Checkbox is the only mark control.</p>
 </body>
 </html>
