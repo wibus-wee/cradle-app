@@ -213,6 +213,10 @@ Then('聊天流应处于进行中', async function (this: CradleWorld) {
 })
 
 When('我点击停止生成按钮', async function (this: CradleWorld) {
+  // Capture stop-path console thrash (ede_diagnostic / missing run stream) across
+  // the click and subsequent settlement assertions.
+  const watch = this.chat.beginStopPathConsoleWatch()
+  this.remember('chat.stop-path-console', watch)
   await this.chat.stop()
 })
 
@@ -230,6 +234,17 @@ Then('聊天中不应出现完整的慢速回复', async function (this: CradleW
 
 Then('停止后聊天视图、侧栏会话与 Composer 状态应一致为空闲', async function (this: CradleWorld) {
   await this.chat.expectStopSettledConsistent(CHAT_STATUS_TIMEOUT)
+})
+
+Then('停止后不应再刷 Claude stop-path 诊断错误', async function (this: CradleWorld) {
+  // Give a brief window for late Query fallout; a broken cancel floods these.
+  await this.page.waitForTimeout(1_500)
+  const watch = this.maybeRecall<{ stopPathErrors: string[], dispose: () => void }>('chat.stop-path-console')
+  if (!watch) {
+    throw new Error('Expected stop-path console watch from 我点击停止生成按钮')
+  }
+  watch.dispose()
+  await this.chat.expectNoStopPathConsoleErrors(watch.stopPathErrors)
 })
 
 When('我打开会话{string}的菜单', async function (this: CradleWorld, alias: string) {

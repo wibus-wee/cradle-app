@@ -174,9 +174,20 @@ export class ChatPage {
     await expect(this.stopButton()).toHaveCount(0, { timeout })
   }
 
+  /**
+   * Stop must fully settle — not "chrome looks stopped while the Query keeps thrashing".
+   * Old Claude Agent cancel left `data-chat-status=error`, flooded
+   * `[ede_diagnostic] … stop_reason=null` / `No active run stream`, and left Send disabled.
+   */
   async expectStopSettledConsistent(timeout = CHAT_TIMEOUT): Promise<void> {
     const view = await this.waitVisible(timeout)
-    await expect(view).toHaveAttribute('data-chat-status', 'idle', { timeout })
+
+    // Explicitly reject the old stop-path failure mode (`error` limbo), not only "not streaming".
+    await expect
+      .poll(async () => view.getAttribute('data-chat-status'), { timeout })
+      .toBe('idle')
+    await expect(view).not.toHaveAttribute('data-chat-status', 'error')
+    await expect(view).not.toHaveAttribute('data-chat-status', 'streaming')
     await expect(this.stopButton()).toHaveCount(0, { timeout })
 
     const sessionId = await view.getAttribute('data-chat-session-id')
@@ -193,6 +204,45 @@ export class ChatPage {
     if (await assistant.count() > 0) {
       await expect(assistant).toHaveAttribute('data-message-streaming', 'false', { timeout })
     }
+
+    // Session must be usable again — old stop left the session in `error` limbo where
+    // further prompts could not start. Empty composer keeps Send disabled by design,
+    // so probe with a single character.
+    await this.fillComposer('x')
+    await expect(this.sendButton()).toBeEnabled({ timeout })
+    await this.fillComposer('')
+  }
+
+  /**
+   * Watch console during Stop. A clean abort must not flood stop-path diagnostics
+   * that mean the Claude Query is still emitting broken empty results.
+   */
+  beginStopPathConsoleWatch(): { stopPathErrors: string[], dispose: () => void } {
+    const stopPathErrors: string[] = []
+    const onConsole = (msg: { text: () => string }) => {
+      const text = msg.text()
+      if (
+        /\[ede_diagnostic\]/i.test(text)
+        || /No active run stream was found for this session/i.test(text)
+        || /failed to cancel server chat response/i.test(text)
+      ) {
+        stopPathErrors.push(text.slice(0, 300))
+      }
+    }
+    this.page.on('console', onConsole)
+    return {
+      stopPathErrors,
+      dispose: () => {
+        this.page.off('console', onConsole)
+      },
+    }
+  }
+
+  async expectNoStopPathConsoleErrors(errors: readonly string[]): Promise<void> {
+    expect(
+      errors,
+      `Stop must fully abort the Claude Query; got stop-path console errors:\n${errors.join('\n')}`,
+    ).toEqual([])
   }
 
   composer(): Locator {
