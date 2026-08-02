@@ -174,6 +174,27 @@ export class ChatPage {
     await expect(this.stopButton()).toHaveCount(0, { timeout })
   }
 
+  async expectStopSettledConsistent(timeout = CHAT_TIMEOUT): Promise<void> {
+    const view = await this.waitVisible(timeout)
+    await expect(view).toHaveAttribute('data-chat-status', 'idle', { timeout })
+    await expect(this.stopButton()).toHaveCount(0, { timeout })
+
+    const sessionId = await view.getAttribute('data-chat-session-id')
+    if (!sessionId) {
+      throw new Error('Expected chat view to expose data-chat-session-id after stop')
+    }
+
+    // Sidebar must not keep a running spinner for this session.
+    await expect(this.page.locator(`[data-testid="session-running-indicator-${sessionId}"]`))
+      .toHaveCount(0, { timeout })
+
+    // Assistant bubble (if any) must not still claim streaming.
+    const assistant = this.page.locator('[data-testid="message-bubble-assistant"]').last()
+    if (await assistant.count() > 0) {
+      await expect(assistant).toHaveAttribute('data-message-streaming', 'false', { timeout })
+    }
+  }
+
   composer(): Locator {
     return this.page.locator('[data-testid="chat-composer-textarea"], [data-testid="chat-textarea"]')
       .filter({ visible: true })

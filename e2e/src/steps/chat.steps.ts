@@ -228,6 +228,10 @@ Then('聊天中不应出现完整的慢速回复', async function (this: CradleW
     .toContainText(SLOW_RESPONSE, { timeout: 5_000 })
 })
 
+Then('停止后聊天视图、侧栏会话与 Composer 状态应一致为空闲', async function (this: CradleWorld) {
+  await this.chat.expectStopSettledConsistent(CHAT_STATUS_TIMEOUT)
+})
+
 When('我打开会话{string}的菜单', async function (this: CradleWorld, alias: string) {
   await this.chat.openSessionMenu(recallSessionAlias(this, alias).id)
 })

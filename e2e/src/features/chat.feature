@@ -36,7 +36,7 @@
     而且 聊天流应处于进行中
     当 我点击停止生成按钮
     那么 停止生成按钮应消失
-    而且 聊天流应结束于空闲状态
+    而且 停止后聊天视图、侧栏会话与 Composer 状态应一致为空闲
     而且 聊天中不应出现完整的慢速回复
     而且 聊天中不应出现错误提示
     # Mid-stream stop leaves the gated simulator exchange unsettled — no assertExhausted.
