@@ -614,6 +614,7 @@
   "nav.plugins": "插件",
   "nav.providers": "模型服务",
   "nav.registry": "模型 Registry",
+  "nav.mcpServers": "MCP 服务器",
   "nav.remoteHosts": "远程主机",
   "nav.serverEndpoint": "Server Endpoint",
   "nav.shortcut": "快捷键",

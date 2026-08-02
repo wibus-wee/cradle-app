@@ -1,7 +1,7 @@
 'use client'
 
 import { Menu as MenuPrimitive } from '@base-ui/react/menu'
-import { RightSmallLine as ChevronRightIcon } from '@mingcute/react'
+import { CheckLine, RightSmallLine as ChevronRightIcon } from '@mingcute/react'
 import type * as React from 'react'
 import { cn } from '~/lib/cn'
 
@@ -131,23 +131,10 @@ export function MenuCheckboxItem({
         </>
       ) : (
         <>
+          <span className="col-start-1">{children}</span>
           <MenuPrimitive.CheckboxItemIndicator className="col-start-1 -ms-0.5">
-            <svg
-              aria-hidden="true"
-              fill="none"
-              height="24"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-              width="24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
-            </svg>
+            <CheckLine />
           </MenuPrimitive.CheckboxItemIndicator>
-          <span className="col-start-2">{children}</span>
         </>
       )}
     </MenuPrimitive.CheckboxItem>
@@ -173,20 +160,7 @@ export function MenuRadioItem({
       {...props}
     >
       <MenuPrimitive.RadioItemIndicator className="col-start-1 -ms-0.5">
-        <svg
-          aria-hidden="true"
-          fill="none"
-          height="24"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          viewBox="0 0 24 24"
-          width="24"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path d="M5.252 12.7 10.2 18.63 18.748 5.37" />
-        </svg>
+        <CheckLine />
       </MenuPrimitive.RadioItemIndicator>
       <span className="col-start-2">{children}</span>
     </MenuPrimitive.RadioItem>

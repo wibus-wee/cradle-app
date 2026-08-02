@@ -576,6 +576,7 @@
   "nav.plugins": "プラグイン",
   "nav.providers": "モデルプロバイダー",
   "nav.registry": "モデル Registry",
+  "nav.mcpServers": "MCP サーバー",
   "nav.remoteHosts": "リモートホスト",
   "nav.serverEndpoint": "サーバーエンドポイント",
   "nav.shortcut": "ショートカット",

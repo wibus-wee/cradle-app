@@ -43,7 +43,7 @@ export function NumberFieldGroup({
   return (
     <NumberFieldPrimitive.Group
       className={cn(
-        "relative flex w-full justify-between rounded-lg border border-input bg-background text-base text-foreground shadow-[var(--shadow-xs)] transition-shadow focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 has-aria-invalid:border-destructive has-autofill:bg-muted focus-within:has-aria-invalid:ring-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 sm:text-sm [[data-disabled],:focus-within,[aria-invalid]]:shadow-none [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "relative flex w-full justify-between rounded-lg border border-input bg-background text-base text-foreground shadow-[var(--shadow-xs)] transition-shadow focus-within:border-ring focus-within:ring-ring/20 has-aria-invalid:border-destructive has-autofill:bg-muted focus-within:has-aria-invalid:ring-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 sm:text-sm [[data-disabled],:focus-within,[aria-invalid]]:shadow-none [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}
       data-slot="number-field-group"

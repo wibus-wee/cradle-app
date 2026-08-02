@@ -1016,7 +1016,7 @@ importers:
         version: 5.7.284
       posthog-js:
         specifier: ^1.396.5
-        version: 1.399.1(preact-render-to-string@6.6.5(preact@10.29.1))
+        version: 1.399.1(preact-render-to-string@6.6.5(preact@11.0.0-beta.0))
       pretty-bytes:
         specifier: ^7.1.0
         version: 7.1.0
@@ -26804,14 +26804,14 @@ snapshots:
     dependencies:
       xtend: 4.0.2
 
-  posthog-js@1.399.1(preact-render-to-string@6.6.5(preact@10.29.1)):
+  posthog-js@1.399.1(preact-render-to-string@6.6.5(preact@11.0.0-beta.0)):
     dependencies:
       '@posthog/core': 1.40.1
       '@posthog/types': 1.393.0
       core-js: 3.49.0
       dompurify: 3.4.11
       fflate: 0.4.8
-      preact: 10.29.7(preact-render-to-string@6.6.5(preact@10.29.1))
+      preact: 10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0))
       query-selector-shadow-dom: 1.0.1
       web-vitals: 5.3.0
     transitivePeerDependencies:
@@ -26824,20 +26824,15 @@ snapshots:
 
   powershell-utils@0.1.0: {}
 
-  preact-render-to-string@6.6.5(preact@10.29.1):
-    dependencies:
-      preact: 10.29.1
-    optional: true
-
   preact-render-to-string@6.6.5(preact@11.0.0-beta.0):
     dependencies:
       preact: 11.0.0-beta.0
 
   preact@10.29.1: {}
 
-  preact@10.29.7(preact-render-to-string@6.6.5(preact@10.29.1)):
+  preact@10.29.7(preact-render-to-string@6.6.5(preact@11.0.0-beta.0)):
     optionalDependencies:
-      preact-render-to-string: 6.6.5(preact@10.29.1)
+      preact-render-to-string: 6.6.5(preact@11.0.0-beta.0)
 
   preact@11.0.0-beta.0: {}
 

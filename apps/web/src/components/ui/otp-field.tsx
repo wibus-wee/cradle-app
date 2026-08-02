@@ -32,7 +32,7 @@ export function OTPFieldInput({
   return (
     <OTPFieldPrimitive.Input
       className={cn(
-        "relative in-[[data-slot=otp-field][data-size=lg]]:size-10 size-9 min-w-0 rounded-lg border border-input bg-background text-center in-[[data-slot=otp-field][data-size=lg]]:text-lg text-base text-foreground in-[[data-slot=otp-field][data-size=lg]]:leading-10 leading-9 shadow-[var(--shadow-xs)] outline-none transition-shadow focus-visible:z-10 focus-visible:border-ring focus-visible:shadow-none focus-visible:ring-[3px] focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:shadow-none aria-invalid:focus-visible:border-destructive aria-invalid:focus-visible:ring-destructive/20 sm:in-[[data-slot=otp-field][data-size=lg]]:size-9 sm:size-8 sm:in-[[data-slot=otp-field][data-size=lg]]:text-base sm:text-sm sm:in-[[data-slot=otp-field][data-size=lg]]:leading-9 sm:leading-8",
+        "relative in-[[data-slot=otp-field][data-size=lg]]:size-10 size-9 min-w-0 rounded-lg border border-input bg-background text-center in-[[data-slot=otp-field][data-size=lg]]:text-lg text-base text-foreground in-[[data-slot=otp-field][data-size=lg]]:leading-10 leading-9 shadow-[var(--shadow-xs)] outline-none transition-shadow focus-visible:z-10 focus-visible:border-ring focus-visible:shadow-none focus-visible:ring-ring/20 aria-invalid:border-destructive aria-invalid:shadow-none aria-invalid:focus-visible:border-destructive aria-invalid:focus-visible:ring-destructive/20 sm:in-[[data-slot=otp-field][data-size=lg]]:size-9 sm:size-8 sm:in-[[data-slot=otp-field][data-size=lg]]:text-base sm:text-sm sm:in-[[data-slot=otp-field][data-size=lg]]:leading-9 sm:leading-8",
         className,
       )}
       data-slot="otp-field-input"

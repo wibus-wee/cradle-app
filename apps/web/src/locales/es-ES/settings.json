@@ -576,6 +576,7 @@
   "nav.plugins": "Plugins",
   "nav.providers": "Proveedores de modelos",
   "nav.registry": "Registro de modelos",
+  "nav.mcpServers": "Servidores MCP",
   "nav.remoteHosts": "Hosts remotos",
   "nav.serverEndpoint": "Endpoint del servidor",
   "nav.shortcut": "Atajos",

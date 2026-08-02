@@ -3,6 +3,7 @@ import { AgentRuntimeSettings } from '~/features/agent-management/agent-runtime-
 import { RuntimesSettings } from '~/features/agent-runtimes/runtimes-settings'
 import { ChronicleSettings } from '~/features/chronicle/chronicle-settings'
 import { ManagedResourcesPage } from '~/features/managed-resources/managed-resources-page'
+import { McpServersSettings } from '~/features/mcp-servers/mcp-servers-settings'
 import { cn } from '~/lib/cn'
 
 import { AboutSettings } from './about-settings'
@@ -36,6 +37,7 @@ const SECTION_MAP: Record<string, React.ComponentType> = {
   chronicle: ChronicleSettings,
   remoteHosts: RemoteHostsSettings,
   integrations: IntegrationsSettings,
+  mcpServers: McpServersSettings,
   shortcut: ShortcutSettings,
   serverEndpoint: ServerEndpointSettings,
   network: ServerEndpointSettings,

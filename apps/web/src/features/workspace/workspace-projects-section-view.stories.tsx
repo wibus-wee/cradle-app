@@ -10,9 +10,11 @@ import { WorkspaceGroupDisclosureView } from './workspace-group-disclosure-view'
 import { WorkspaceProjectsSectionView } from './workspace-projects-section-view'
 import { WorkspaceRecentSessionListView } from './workspace-recent-session-list-view'
 import type {
+  WorkspaceSidebarEnvironmentFilter,
+  WorkspaceSidebarGrouping,
   WorkspaceSidebarListFilters,
-  WorkspaceSidebarProjectSortDirection,
-  WorkspaceSidebarProjectSortKey,
+  WorkspaceSidebarOrderingDirection,
+  WorkspaceSidebarSessionOrdering,
   WorkspaceSidebarSourceFilter,
   WorkspaceSidebarStatusFilter,
   WorkspaceSidebarWorkPrFilter,
@@ -40,18 +42,19 @@ const recentSessionFixtures = [
 function WorkspaceProjectsSectionCatalog() {
   const [listFilters, setListFilters]
     = useState<WorkspaceSidebarListFilters>(DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS)
-  const [projectSortKey, setProjectSortKey]
-    = useState<WorkspaceSidebarProjectSortKey>('name')
-  const [projectSortDirection, setProjectSortDirection]
-    = useState<WorkspaceSidebarProjectSortDirection>('asc')
-  const [projectPinnedFirst, setProjectPinnedFirst] = useState(true)
+  const [grouping, setGrouping]
+    = useState<WorkspaceSidebarGrouping>('workspace')
+  const [ordering, setOrdering]
+    = useState<WorkspaceSidebarSessionOrdering>('updated')
+  const [orderingDirection, setOrderingDirection]
+    = useState<WorkspaceSidebarOrderingDirection>('desc')
   const [sessionPreviewLimit, setSessionPreviewLimit]
     = useState(DEFAULT_SESSION_PREVIEW_LIMIT)
   const [recentSessionsExpanded, setRecentSessionsExpanded] = useState(false)
   const [localExpanded, setLocalExpanded] = useState(true)
   const filteredEmpty = listFilters.statusFilters.includes('streaming')
-    && listFilters.projectScope === 'pinned'
-  const recentSessionSort = projectSortKey === 'recentSession'
+    && listFilters.environmentFilters.includes('remote')
+  const flatGrouping = grouping !== 'workspace'
   const recentSessionsToRender = recentSessionsExpanded
     ? recentSessionFixtures
     : recentSessionFixtures.slice(0, sessionPreviewLimit)
@@ -65,9 +68,9 @@ function WorkspaceProjectsSectionCatalog() {
       hasWorkspaces
       filteredEmpty={filteredEmpty}
       listFilters={listFilters}
-      projectSortKey={projectSortKey}
-      projectSortDirection={projectSortDirection}
-      projectPinnedFirst={projectPinnedFirst}
+      grouping={grouping}
+      ordering={ordering}
+      orderingDirection={orderingDirection}
       sessionPreviewLimit={sessionPreviewLimit}
       adding={false}
       multiWorkspaceEnabled
@@ -87,8 +90,9 @@ function WorkspaceProjectsSectionCatalog() {
       multiFolderCreating={false}
       hasUnreadWorkspaceSessions
       markingAllSessionsRead={false}
-      onProjectScopeChange={projectScope =>
-        setListFilters(current => ({ ...current, projectScope }))}
+      onGroupingChange={setGrouping}
+      onSessionOrderingChange={setOrdering}
+      onOrderingDirectionChange={setOrderingDirection}
       onToggleStatusFilter={(filter: WorkspaceSidebarStatusFilter) =>
         setListFilters(current => ({
           ...current,
@@ -99,6 +103,11 @@ function WorkspaceProjectsSectionCatalog() {
           ...current,
           workPrFilters: toggleInList(current.workPrFilters, filter),
         }))}
+      onToggleEnvironmentFilter={(filter: WorkspaceSidebarEnvironmentFilter) =>
+        setListFilters(current => ({
+          ...current,
+          environmentFilters: toggleInList(current.environmentFilters, filter),
+        }))}
       onToggleSourceFilter={(filter: WorkspaceSidebarSourceFilter) =>
         setListFilters(current => ({
           ...current,
@@ -107,21 +116,13 @@ function WorkspaceProjectsSectionCatalog() {
       onShowArchivedChange={showArchived =>
         setListFilters(current => ({ ...current, showArchived }))}
       onClearListFilters={() => setListFilters(DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS)}
-      onProjectSortKeyChange={(sortKey) => {
-        setProjectSortKey(sortKey)
-        if (sortKey === 'recentSession') {
-          setProjectSortDirection('desc')
-        }
-      }}
-      onProjectSortDirectionChange={setProjectSortDirection}
-      onProjectPinnedFirstChange={setProjectPinnedFirst}
       onSessionPreviewLimitChange={setSessionPreviewLimit}
       onCollapseAll={() => {}}
       onAddFromPicker={() => {}}
       onCreateMultiFolder={async () => {}}
       onMarkAllAsRead={() => {}}
     >
-      {recentSessionSort
+      {flatGrouping
         ? (
             <WorkspaceRecentSessionListView
               sessionCount={recentSessionFixtures.length}
@@ -204,9 +205,9 @@ const meta = {
     hasWorkspaces: true,
     filteredEmpty: false,
     listFilters: DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS,
-    projectSortKey: 'name',
-    projectSortDirection: 'asc',
-    projectPinnedFirst: true,
+    grouping: 'workspace',
+    ordering: 'updated',
+    orderingDirection: 'desc',
     sessionPreviewLimit: DEFAULT_SESSION_PREVIEW_LIMIT,
     adding: false,
     multiWorkspaceEnabled: true,
@@ -215,15 +216,15 @@ const meta = {
     hasUnreadWorkspaceSessions: true,
     markingAllSessionsRead: false,
     children: null,
-    onProjectScopeChange: fn(),
+    onGroupingChange: fn(),
+    onSessionOrderingChange: fn(),
+    onOrderingDirectionChange: fn(),
     onToggleStatusFilter: fn(),
     onToggleWorkPrFilter: fn(),
+    onToggleEnvironmentFilter: fn(),
     onToggleSourceFilter: fn(),
     onShowArchivedChange: fn(),
     onClearListFilters: fn(),
-    onProjectSortKeyChange: fn(),
-    onProjectSortDirectionChange: fn(),
-    onProjectPinnedFirstChange: fn(),
     onSessionPreviewLimitChange: fn(),
     onCollapseAll: fn(),
     onAddFromPicker: fn(),
@@ -263,5 +264,60 @@ export const FilteredEmpty: Story = {
 export const MarkingAllRead: Story = {
   args: {
     markingAllSessionsRead: true,
+  },
+}
+
+function FlatSectionFixture({ label, titles }: { label: string, titles: string[] }) {
+  return (
+    <div className="flex min-w-0 flex-col">
+      <div className="px-2.5 pb-0.5 pt-2 text-[11px] font-medium text-muted-foreground">
+        {label}
+      </div>
+      {titles.map((title, index) => (
+        <div key={title} className="flex min-w-0 flex-col">
+          <div className="rounded-lg px-2.5 py-1.5 text-xs text-sidebar-foreground/80 hover:bg-accent/50">
+            {title}
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5 px-2.5 py-0.5 pl-8 text-[11px] text-muted-foreground">
+            <FolderIcon className="size-3 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 truncate">
+              {recentSessionFixtures[index % recentSessionFixtures.length].workspace.name}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export const GroupedByStatus: Story = {
+  args: {
+    grouping: 'status',
+    children: (
+      <>
+        <FlatSectionFixture label="Running" titles={['Refactor workspace sidebar']} />
+        <FlatSectionFixture label="Needs you" titles={['Review remote host settings']} />
+        <FlatSectionFixture
+          label="Idle"
+          titles={['Run the release verification suite', 'Audit session activity labels']}
+        />
+      </>
+    ),
+  },
+}
+
+export const GroupedByUpdated: Story = {
+  args: {
+    grouping: 'updated',
+    children: (
+      <>
+        <FlatSectionFixture label="Today" titles={['Refactor workspace sidebar']} />
+        <FlatSectionFixture
+          label="Yesterday"
+          titles={['Review remote host settings', 'Fix missing workspace status']}
+        />
+        <FlatSectionFixture label="Earlier" titles={['Prepare the next desktop release']} />
+      </>
+    ),
   },
 }
