@@ -8,6 +8,7 @@ import {
 } from './browser-annotation-toolbar'
 import type { BrowserAnnotationAnchor, BrowserAnnotationDesignChange, BrowserAnnotationElement, BrowserAnnotationElementStyle, BrowserAnnotationLayoutComponentType, BrowserAnnotationLayoutHint, BrowserAnnotationMarkerClickBehavior, BrowserAnnotationMarkerColorId, BrowserAnnotationOutputDetail, BrowserAnnotationReactDetectionMode, BrowserAnnotationResizeHandle, BrowserAnnotationRuntimeAnnotation, BrowserAnnotationRuntimeCommand, BrowserAnnotationRuntimeEvent, BrowserAnnotationRuntimeNotification, BrowserAnnotationRuntimeSettings, BrowserAnnotationRuntimeStage, BrowserPanelPromptAttachment } from './browser-panel-contract'
 import {
+  BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES,
   BROWSER_ANNOTATION_RUNTIME_COMMAND_CHANNEL,
   BROWSER_ANNOTATION_RUNTIME_EVENT_CHANNEL,
 } from './browser-panel-contract'
@@ -250,16 +251,21 @@ const BROWSER_ANNOTATION_POPUP_STYLE_FIELDS: ReadonlyArray<{
   property: string
 }> = [
   { key: 'display', property: 'display' },
+  { key: 'position', property: 'position' },
   { key: 'color', property: 'color' },
   { key: 'backgroundColor', property: 'background-color' },
   { key: 'fontSize', property: 'font-size' },
   { key: 'fontWeight', property: 'font-weight' },
+  { key: 'fontFamily', property: 'font-family' },
+  { key: 'lineHeight', property: 'line-height' },
   { key: 'width', property: 'width' },
   { key: 'height', property: 'height' },
   { key: 'paddingTop', property: 'padding-top' },
   { key: 'paddingRight', property: 'padding-right' },
   { key: 'paddingBottom', property: 'padding-bottom' },
   { key: 'paddingLeft', property: 'padding-left' },
+  { key: 'borderRadius', property: 'border-radius' },
+  { key: 'boxShadow', property: 'box-shadow' },
 ]
 
 function browserAnnotationFreezeState(): BrowserAnnotationFreezeState {
@@ -532,6 +538,7 @@ class BrowserAnnotationRuntime {
     root.id = 'cradle-browser-comment-root'
     root.setAttribute('data-cradle-browser-comment-root', 'true')
     this.applyRootSettings(root)
+    this.installOverlayEventIsolation(root)
 
     const style = document.createElement('style')
     style.textContent = `
@@ -542,7 +549,7 @@ class BrowserAnnotationRuntime {
         --cradle-browser-comment-red: #ff383c;
         position: fixed;
         inset: 0;
-        z-index: 2147483646;
+        z-index: 2147483647;
         pointer-events: none;
         color-scheme: light;
         font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -594,6 +601,7 @@ class BrowserAnnotationRuntime {
       #cradle-browser-comment-root [data-cradle-browser-comment-region],
       #cradle-browser-comment-root [data-cradle-browser-comment-selection-frame] {
         position: absolute;
+        z-index: 20;
         box-sizing: border-box;
         border: 2px solid var(--cradle-browser-comment-accent);
         border-radius: 4px;
@@ -620,6 +628,7 @@ class BrowserAnnotationRuntime {
       #cradle-browser-comment-root [data-cradle-browser-comment-highlight-label],
       #cradle-browser-comment-root [data-cradle-browser-comment-selection-label] {
         position: absolute;
+        z-index: 21;
         box-sizing: border-box;
         max-width: min(220px, calc(100vw - 16px));
         min-height: 22px;
@@ -672,11 +681,13 @@ class BrowserAnnotationRuntime {
       #cradle-browser-comment-root [data-cradle-browser-comment-marker-layer] {
         position: absolute;
         inset: 0;
+        z-index: 30;
         pointer-events: none;
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-placement-layer] {
         position: absolute;
         inset: 0;
+        z-index: 40;
         pointer-events: none;
       }
       #cradle-browser-comment-root[data-cradle-browser-layout-mode="true"] [data-cradle-browser-comment-placement-layer] {
@@ -783,7 +794,7 @@ class BrowserAnnotationRuntime {
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-layout-selection] {
         position: absolute;
-        z-index: 3;
+        z-index: 45;
         box-sizing: border-box;
         border: 1.5px solid var(--cradle-browser-comment-blue);
         border-radius: 6px;
@@ -846,7 +857,7 @@ class BrowserAnnotationRuntime {
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-notice] {
         position: fixed;
-        z-index: 11;
+        z-index: 90;
         max-width: min(280px, calc(100vw - 24px));
         padding: 8px 11px;
         border-radius: 12px;
@@ -877,10 +888,11 @@ class BrowserAnnotationRuntime {
         position: fixed;
         right: 20px;
         bottom: 72px;
-        z-index: 10;
+        z-index: 80;
         width: 292px;
         max-height: min(620px, calc(100vh - 96px));
         overflow: auto;
+        overscroll-behavior: contain;
         border-radius: 1rem;
         padding: 12px;
         color: #fff;
@@ -997,7 +1009,7 @@ class BrowserAnnotationRuntime {
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-drag-preview] {
         position: fixed;
-        z-index: 12;
+        z-index: 95;
         box-sizing: border-box;
         display: flex;
         align-items: center;
@@ -1152,11 +1164,11 @@ class BrowserAnnotationRuntime {
       @keyframes cradle-browser-comment-toolbar-enter {
         from {
           opacity: 0;
-          transform: scale(0.5) rotate(90deg);
+          transform: translateY(8px) scale(0.92);
         }
         to {
           opacity: 1;
-          transform: scale(1) rotate(0deg);
+          transform: translateY(0) scale(1);
         }
       }
       @keyframes cradle-browser-comment-popup-enter {
@@ -1199,6 +1211,7 @@ class BrowserAnnotationRuntime {
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-editor] {
         position: absolute;
+        z-index: 60;
         box-sizing: border-box;
         width: min(280px, calc(100vw - 24px));
         min-height: 112px;
@@ -1452,6 +1465,43 @@ class BrowserAnnotationRuntime {
     this.renderMarkers()
     this.renderPlacements()
     this.renderToolbar()
+  }
+
+  /**
+   * The overlay is injected into the page DOM, so without a boundary its
+   * interactions leak into the page: clicks bubble into page-level listeners
+   * (closing the page's own popovers) and pressing overlay buttons moves
+   * focus away from whatever the page had focused. Contain UI events at the
+   * overlay root and cancel the focus-moving mousedown default for
+   * everything except the overlay's own form fields.
+   */
+  private installOverlayEventIsolation(root: HTMLDivElement): void {
+    const containedEvents = [
+      'pointerdown',
+      'pointerup',
+      'mousedown',
+      'mouseup',
+      'click',
+      'dblclick',
+      'auxclick',
+      'contextmenu',
+      'keydown',
+      'keyup',
+      'keypress',
+    ] as const
+    for (const type of containedEvents) {
+      root.addEventListener(type, (event) => {
+        event.stopPropagation()
+      })
+    }
+    root.addEventListener('mousedown', (event) => {
+      const target = event.target
+      const keepsNativeFocus = target instanceof Element
+        && target.closest('textarea, input, select, [contenteditable="true"]')
+      if (!keepsNativeFocus) {
+        event.preventDefault()
+      }
+    })
   }
 
   private readonly onDocumentPointerDown = (event: PointerEvent): void => {
@@ -1976,10 +2026,12 @@ class BrowserAnnotationRuntime {
     actions.setAttribute('data-cradle-browser-comment-actions', 'true')
     const fileLabel = document.createElement('label')
     fileLabel.textContent = 'Attach'
+    fileLabel.tabIndex = -1
     const fileInput = document.createElement('input')
     fileInput.type = 'file'
     fileInput.accept = 'image/*'
     fileInput.multiple = true
+    fileInput.tabIndex = -1
     fileLabel.appendChild(fileInput)
     const fileCount = document.createElement('span')
     fileCount.setAttribute('data-cradle-browser-comment-file-count', 'true')
@@ -1988,14 +2040,17 @@ class BrowserAnnotationRuntime {
       : `${this.attachedImages.length} file${this.attachedImages.length === 1 ? '' : 's'}`
     const cancelButton = document.createElement('button')
     cancelButton.type = 'button'
+    cancelButton.tabIndex = -1
     cancelButton.textContent = 'Cancel'
     cancelButton.setAttribute('data-cradle-browser-comment-ghost', 'true')
     const saveButton = document.createElement('button')
     saveButton.type = 'button'
+    saveButton.tabIndex = -1
     saveButton.textContent = 'Save'
     saveButton.setAttribute('data-cradle-browser-comment-ghost', 'true')
     const sendButton = document.createElement('button')
     sendButton.type = 'button'
+    sendButton.tabIndex = -1
     sendButton.textContent = '↑'
     sendButton.title = 'Add to chat (Command L)'
     sendButton.setAttribute('data-primary', 'true')
@@ -2149,12 +2204,9 @@ class BrowserAnnotationRuntime {
     ]
     const toolbar = renderBrowserAnnotationToolbar({
       buttons,
-      count: totalCount,
-      expanded: true,
       entrance: !this.toolbarHasEntered,
       tooltipBelow: this.toolbarPosition !== null && this.toolbarPosition.y < 100,
       position: this.toolbarPosition,
-      onCollapsedClick: () => undefined,
       onPointerDown: (event, currentToolbar) => this.handleToolbarPointerDown(event, currentToolbar),
     })
     this.toolbarHasEntered = true
@@ -2546,6 +2598,7 @@ class BrowserAnnotationRuntime {
       }
       const marker = document.createElement('button')
       marker.type = 'button'
+      marker.tabIndex = -1
       marker.setAttribute('data-cradle-browser-comment-marker', 'true')
       marker.setAttribute('aria-label', `Browser annotation ${markerNumber}`)
       marker.style.left = `${point.x}px`
@@ -4238,14 +4291,25 @@ class BrowserAnnotationRuntime {
         fontFamily: style.fontFamily,
         fontSize: style.fontSize,
         fontWeight: style.fontWeight,
+        fontStyle: style.fontStyle,
         lineHeight: style.lineHeight,
+        letterSpacing: style.letterSpacing,
+        textAlign: style.textAlign,
+        textTransform: style.textTransform,
+        textDecorationLine: style.textDecorationLine,
         borderRadius: style.borderRadius,
         borderColor: style.borderColor,
         borderWidth: style.borderWidth,
+        borderStyle: style.borderStyle,
+        boxShadow: style.boxShadow,
         display: style.display,
         alignItems: style.alignItems,
         justifyContent: style.justifyContent,
         flexDirection: style.flexDirection,
+        flexWrap: style.flexWrap,
+        overflow: style.overflow,
+        position: style.position,
+        zIndex: style.zIndex,
         width: style.width,
         height: style.height,
         marginTop: style.marginTop,
@@ -4276,33 +4340,9 @@ class BrowserAnnotationRuntime {
     this.designElement = element
     element.setAttribute('data-cradle-browser-design-group', 'active')
     this.designChange = designChange
-    const rows = [
-      this.cssDeclaration('color', designChange.color),
-      this.cssDeclaration('background-color', designChange.backgroundColor),
-      this.cssDeclaration('opacity', designChange.opacity),
-      this.cssDeclaration('font-family', designChange.fontFamily),
-      this.cssDeclaration('font-size', designChange.fontSize),
-      this.cssDeclaration('font-weight', designChange.fontWeight),
-      this.cssDeclaration('border-radius', designChange.borderRadius),
-      this.cssDeclaration('border-color', designChange.borderColor),
-      this.cssDeclaration('border-width', designChange.borderWidth),
-      this.cssDeclaration('display', designChange.display),
-      this.cssDeclaration('align-items', designChange.alignItems),
-      this.cssDeclaration('justify-content', designChange.justifyContent),
-      this.cssDeclaration('flex-direction', designChange.flexDirection),
-      this.cssDeclaration('width', designChange.width),
-      this.cssDeclaration('height', designChange.height),
-      this.cssDeclaration('margin-top', designChange.marginTop),
-      this.cssDeclaration('margin-right', designChange.marginRight),
-      this.cssDeclaration('margin-bottom', designChange.marginBottom),
-      this.cssDeclaration('margin-left', designChange.marginLeft),
-      this.cssDeclaration('padding-top', designChange.paddingTop),
-      this.cssDeclaration('padding-right', designChange.paddingRight),
-      this.cssDeclaration('padding-bottom', designChange.paddingBottom),
-      this.cssDeclaration('padding-left', designChange.paddingLeft),
-      this.cssDeclaration('row-gap', designChange.rowGap),
-      this.cssDeclaration('column-gap', designChange.columnGap),
-    ].filter(row => row !== null)
+    const rows = BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES
+      .map(({ key, property }) => this.cssDeclaration(property, designChange[key]))
+      .filter(row => row !== null)
 
     let style = document.getElementById('cradle-browser-design-draft-style')
     if (!style) {
