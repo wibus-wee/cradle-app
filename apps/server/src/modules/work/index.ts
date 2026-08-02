@@ -92,6 +92,26 @@ export const work = new Elysia({
     body: WorkModel.renameBranchBody,
     response: { 200: WorkModel.detail },
   })
+  .get('/:id/sandboxes', ({ params }) => Work.listSandboxes(params.id), {
+    detail: {
+      'summary': 'List active sandboxes leased for a Work',
+      'x-cradle-cli': { command: ['work', 'sandboxes'] },
+    },
+    params: WorkModel.idParams,
+    response: { 200: t.Array(WorkModel.sandboxLease) },
+  })
+  .post('/:id/sandboxes/lease', async ({ params, body }) => await Work.leaseSandbox({
+    id: params.id,
+    ...body,
+  }), {
+    detail: {
+      'summary': 'Lease an OrbStack/Docker sandbox for a Work',
+      'x-cradle-cli': { command: ['work', 'sandbox-lease'] },
+    },
+    params: WorkModel.idParams,
+    body: WorkModel.leaseSandboxBody,
+    response: { 200: WorkModel.sandboxLease },
+  })
 
 export const sessionWork = new Elysia({
   prefix: '/sessions',

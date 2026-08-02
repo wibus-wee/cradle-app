@@ -216,6 +216,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 071  | Eliminate active-run replay retention and recover from snapshots | P0 | M | — (supersedes Plan 054 replay retention only) | DONE |
 | 072  | Move chat message bytes into a content-addressed blob store, losslessly | P0 | XL | — | TODO (Step 0 is a standalone web-only bug fix; Step 9 backfill is what shrinks existing sessions) |
 | 073  | Provider first-class identity + dual-endpoint platform (no Kimi OAuth) | P1 | XL | — | TODO |
+| 074  | OrbStack high-concurrency sidecar sandbox POC | P1 | L | 036 | DONE (`modules/sandbox`; mock tests + Work lease composition) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 

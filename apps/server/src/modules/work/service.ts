@@ -13,6 +13,7 @@ import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
+import * as Sandbox from '../sandbox/service'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
 import type { SessionAwaitSource } from '../session-await/types'
@@ -34,6 +35,7 @@ export interface WorkDetail {
   readiness: PullRequest.PullRequestReadiness
   pullRequest: PullRequest.SessionPullRequestView | null
   activity: WorkActivity
+  sandboxes: Sandbox.SandboxLeaseSummary[]
   initialRun?: CreateRunResult
 }
 
@@ -119,6 +121,10 @@ async function archiveWorkForPrimarySession(sessionId: string): Promise<void> {
   if (worktreeId) {
     await Worktree.cleanupWorktree({ worktreeId, mode: 'abandon' })
   }
+
+  // Session archiving also triggers sandbox session hooks; release by work id
+  // covers leases bound to the Work even if sessionId was omitted.
+  await Sandbox.releaseLeasesForWork(membership.workId)
 
   const timestamp = now()
   db().update(works).set({
@@ -240,6 +246,7 @@ export async function get(id: string): Promise<WorkDetail | null> {
     readiness,
     pullRequest,
     activity: readActivity({ ...primaryThread, ...execution }),
+    sandboxes: Sandbox.listLeases({ workId: work.id }),
   }
 }
 
@@ -664,4 +671,48 @@ export async function submit(input: {
     updatedAt: timestamp,
   }).where(eq(works.id, work.id)).run()
   return (await get(work.id))!
+}
+
+/** Lease an OrbStack/Docker sandbox mounted on the Work primary execution root. */
+export async function leaseSandbox(input: {
+  id: string
+  profileId: string
+  purpose?: string
+  mountWritable?: boolean
+  networkMode?: 'none' | 'bridge'
+  ttlSec?: number
+}): Promise<Sandbox.SandboxLeaseSummary> {
+  const work = requireWork(input.id)
+  const primaryThread = requirePrimaryThread(work.id)
+  if (!primaryThread.workspaceId) {
+    throw new AppError({
+      code: 'work_workspace_required',
+      status: 409,
+      message: 'Work primary session is missing a workspace',
+    })
+  }
+  const execution = Worktree.resolveSessionExecutionRoot(primaryThread)
+  if (!execution.rootPath || !execution.isIsolated) {
+    throw new AppError({
+      code: 'work_isolation_unavailable',
+      status: 409,
+      message: 'Work requires a healthy isolated checkout before leasing a sandbox',
+    })
+  }
+  return Sandbox.leaseSandbox({
+    profileId: input.profileId,
+    workspaceId: primaryThread.workspaceId,
+    workId: work.id,
+    sessionId: primaryThread.id,
+    purpose: input.purpose,
+    mountPath: execution.rootPath,
+    mountWritable: input.mountWritable,
+    networkMode: input.networkMode,
+    ttlSec: input.ttlSec,
+  })
+}
+
+export function listSandboxes(workId: string): Sandbox.SandboxLeaseSummary[] {
+  requireWork(workId)
+  return Sandbox.listLeases({ workId })
 }

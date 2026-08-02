@@ -46,6 +46,27 @@ const summary = t.Object({
   pullRequest: t.Nullable(pullRequestViewSchema),
 })
 
+const sandboxMount = t.Object({
+  hostPath: t.String(),
+  containerPath: t.String(),
+  readOnly: t.Boolean(),
+})
+
+const sandboxLease = t.Object({
+  id: t.String(),
+  instanceId: t.String(),
+  profileId: t.String(),
+  engineContainerId: t.String(),
+  workId: nullableString,
+  sessionId: nullableString,
+  workspaceId: t.String(),
+  purpose: t.String(),
+  mountsResolved: t.Array(sandboxMount),
+  createdAt: t.Number(),
+  expiresAt: nullableTimestamp,
+  releasedAt: nullableTimestamp,
+})
+
 const detail = t.Object({
   work,
   primaryThread: SessionModel.session,
@@ -53,6 +74,7 @@ const detail = t.Object({
   readiness,
   pullRequest: t.Nullable(pullRequestViewSchema),
   activity,
+  sandboxes: t.Array(sandboxLease),
 })
 
 const thinkingEffort = t.Union([
@@ -126,6 +148,15 @@ export const WorkModel = {
 
   renameBranchBody: t.Object({
     branch: t.String({ minLength: 1 }),
+  }),
+
+  sandboxLease,
+  leaseSandboxBody: t.Object({
+    profileId: t.String({ minLength: 1 }),
+    purpose: t.Optional(t.String()),
+    mountWritable: t.Optional(t.Boolean()),
+    networkMode: t.Optional(t.Union([t.Literal('none'), t.Literal('bridge')])),
+    ttlSec: t.Optional(t.Number()),
   }),
 
   sessionResolution: t.Object({

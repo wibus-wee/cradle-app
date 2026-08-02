@@ -56,6 +56,8 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
 - Pull Request owns Git comparison, push, GitHub API calls, and PR persistence.
 - Chat Runtime owns runs and pending interaction state.
 - Session Await owns external waiting facts.
+- Sandbox owns OrbStack/Docker sidecar leases; Work may lease/list sandboxes for
+  a primary execution root and releases them when the Work is archived.
 
 Work reads and composes those services but does not duplicate their semantics.
 

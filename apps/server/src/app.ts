@@ -84,6 +84,7 @@ import { relayTransport } from './modules/relay-transport'
 import { assertRelayCompressionRuntimeSupport } from './modules/relay-transport/compression'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
 import { registerRemoteHostWebSocketRoutes, remoteHosts } from './modules/remote-hosts'
+import { registerSandboxMaintenance, sandbox } from './modules/sandbox'
 import { search } from './modules/search'
 import { secrets } from './modules/secrets'
 import { session } from './modules/session'
@@ -252,6 +253,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(turnCheckpoint)
   app.use(work)
   app.use(sessionWork)
+  app.use(sandbox)
   app.use(pullRequest)
   app.use(pullRequestFeed)
   app.use(sessionGroup)
@@ -390,6 +392,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     registerRunSnapshotMaintenance()
     TurnCheckpoint.registerTurnCheckpointMaintenance()
     registerBlobStoreMaintenance()
+    registerSandboxMaintenance()
     registerMessageBlobBackfillMaintenance()
     registerMessageSteerSplitBackfillMaintenance()
     Maintenance.registerTask({
