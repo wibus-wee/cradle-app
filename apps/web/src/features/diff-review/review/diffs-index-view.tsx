@@ -19,9 +19,9 @@ import { formatRelativeTime, reviewIdentity, reviewStatusBadge } from './review-
  * A repository as the Diffs surface understands it: a code identity that owns
  * its reviews, whether or not it is checked out locally.
  *
- * This mirrors the server's repository record. Reviews group under it instead of
- * under a workspace, which is what stops a pull request for someone else's
- * repository from appearing inside an unrelated project.
+ * Until the server's repository record is wired end-to-end, containers derive
+ * this from workspace git checkouts plus review/GitHub identities, and carry
+ * `workspaceId` / `repositoryPath` so navigation stays reachable.
  */
 export interface RepositoryScope {
   id: string
@@ -31,6 +31,10 @@ export interface RepositoryScope {
   /** Absolute checkout path, when this repository is checked out locally. */
   localRoot: string | null
   reviewCount: number
+  /** Workspace that can materialize reviews for this repository today. */
+  workspaceId: string
+  /** Relative path within the workspace; null for remote-only GitHub identities. */
+  repositoryPath: string | null
 }
 
 type IndexTab = 'all' | 'open' | 'mine' | 'closed'

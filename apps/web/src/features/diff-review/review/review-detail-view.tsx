@@ -8,6 +8,7 @@ import {
   DownLine as ExpandIcon,
   GithubLine as GithubIcon,
   Refresh2Line as RefreshIcon,
+  RobotLine as AgentIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 
@@ -71,10 +72,24 @@ export interface ReviewDetailViewProps {
   submitPending?: boolean
   threadsOpen: boolean
   onToggleThreads: () => void
+  /** Optional agent-rail toggle; when omitted the control is hidden. */
+  agentOpen?: boolean
+  onToggleAgent?: () => void
+  agentFixCount?: number
+  /**
+   * Extra header controls (display prefs, GitHub merge, close, …) rendered
+   * before the primary submit control. Keeps the View free of product mutations.
+   */
+  extraActions?: ReactNode
+  /**
+   * Replaces the default Approve button when the container needs the full
+   * review popover (approve / request changes / comment).
+   */
+  submitControl?: ReactNode
   railWidth?: number
   /** The diff itself, supplied by the container so this View stays runtime-free. */
   diffSlot: ReactNode
-  /** Open-thread list rendered as an overlay sheet, not a permanent column. */
+  /** Open-thread / agent list rendered as an overlay sheet, not a permanent column. */
   threadsSlot?: ReactNode
 }
 
@@ -105,6 +120,11 @@ export function ReviewDetailView({
   submitPending = false,
   threadsOpen,
   onToggleThreads,
+  agentOpen = false,
+  onToggleAgent,
+  agentFixCount = 0,
+  extraActions,
+  submitControl,
   railWidth = 248,
   diffSlot,
   threadsSlot,
@@ -175,14 +195,16 @@ export function ReviewDetailView({
             <RefreshIcon className={cn('size-4', refreshPending && 'animate-spin')} aria-hidden />
           </IconAction>
 
+          {extraActions}
+
           <button
             type="button"
             onClick={onToggleThreads}
-            aria-pressed={threadsOpen}
+            aria-pressed={threadsOpen && !agentOpen}
             className={cn(
               'inline-flex h-7 items-center gap-1.5 rounded-[var(--rv-radius)] px-2',
               'text-[11.5px] font-medium transition-colors duration-100',
-              threadsOpen
+              threadsOpen && !agentOpen
                 ? 'bg-[var(--rv-bg-active)] text-[var(--rv-fg)]'
                 : 'text-[var(--rv-fg-muted)] hover:bg-[var(--rv-bg-hover)] hover:text-[var(--rv-fg)]',
             )}
@@ -191,21 +213,41 @@ export function ReviewDetailView({
             <span data-rv-num>{openThreads}</span>
           </button>
 
+          {onToggleAgent && (
+            <button
+              type="button"
+              onClick={onToggleAgent}
+              aria-pressed={agentOpen}
+              className={cn(
+                'inline-flex h-7 items-center gap-1.5 rounded-[var(--rv-radius)] px-2',
+                'text-[11.5px] font-medium transition-colors duration-100',
+                agentOpen
+                  ? 'bg-[var(--rv-bg-active)] text-[var(--rv-fg)]'
+                  : 'text-[var(--rv-fg-muted)] hover:bg-[var(--rv-bg-hover)] hover:text-[var(--rv-fg)]',
+              )}
+            >
+              <AgentIcon className="size-3.5" aria-hidden />
+              <span data-rv-num>{agentFixCount}</span>
+            </button>
+          )}
+
           <span aria-hidden className="mx-1 h-4 w-px bg-[var(--rv-line)]" />
 
-          <button
-            type="button"
-            onClick={() => onSubmit('approve')}
-            disabled={submitPending}
-            className={cn(
-              'inline-flex h-7 items-center rounded-[var(--rv-radius)] px-2.5',
-              'bg-[var(--rv-accent)] text-[11.5px] font-medium text-[var(--rv-accent-fg)]',
-              'transition-opacity duration-100 hover:opacity-90',
-              'disabled:pointer-events-none disabled:opacity-50',
-            )}
-          >
-            Approve
-          </button>
+          {submitControl ?? (
+            <button
+              type="button"
+              onClick={() => onSubmit('approve')}
+              disabled={submitPending}
+              className={cn(
+                'inline-flex h-7 items-center rounded-[var(--rv-radius)] px-2.5',
+                'bg-[var(--rv-accent)] text-[11.5px] font-medium text-[var(--rv-accent-fg)]',
+                'transition-opacity duration-100 hover:opacity-90',
+                'disabled:pointer-events-none disabled:opacity-50',
+              )}
+            >
+              Approve
+            </button>
+          )}
         </div>
       </header>
 
@@ -238,7 +280,7 @@ export function ReviewDetailView({
               'motion-safe:animate-in motion-safe:slide-in-from-right-2 motion-safe:duration-150',
             )}
             role="complementary"
-            aria-label="Review threads"
+            aria-label={agentOpen ? 'Agent fixes' : 'Review threads'}
           >
             {threadsSlot}
           </div>
