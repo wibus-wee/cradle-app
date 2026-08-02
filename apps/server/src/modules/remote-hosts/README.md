@@ -10,7 +10,8 @@ Rows live in `remote_hosts`. The remote host module owns connection lifecycle, h
 - `model.ts`: TypeBox request and response schemas for remote host config, relay claim input, and remote Cradle Server health.
 - `service.ts`: Drizzle-backed host registry, SSH/direct URL/relay connection lifecycle, relay pairing claim, relay controller recovery, health checks, and upstream-backed workspace/file helpers used by the workspace module.
 - `reconnect-policy.ts`: Bounded exponential retry delay with jitter for relay controller recovery.
-- `upstream.ts`: Transparent HTTP/SSE upstream fetch and proxy helpers that forward to the connected tunnel `localBaseUrl`.
+- `upstream.ts`: Transparent HTTP/SSE upstream fetch and proxy helpers that forward to the connected tunnel `localBaseUrl`, including one bounded reconnect replay for bodyless read methods.
+- `upstream-websocket.ts`: Transparent WebSocket bridge with local-ticket isolation, text/binary forwarding, close propagation, and bounded congestion handling.
 - `cradle-server-tunnel.ts`: OpenSSH local TCP port-forwarding helper for reaching a target Cradle Server through an SSH profile.
 
 ## Connection Config
@@ -97,6 +98,22 @@ policy. Examples:
 - `GET /remote-hosts/:hostId/upstream/health`
 - `GET /remote-hosts/:hostId/upstream/workspaces`
 - `GET /remote-hosts/:hostId/upstream/workspaces/:id/files`
+
+If GET, HEAD, or OPTIONS loses its transport before response headers arrive,
+the gateway gives the failed base URL to the remote-host lifecycle owner. That
+owner single-flights replacement of the failed connection generation before the
+gateway replays the request once. Mutations and streaming request bodies are never
+replayed automatically because the proxy cannot prove that a partially applied
+remote operation is safe to execute twice. A failure after response bytes have
+already reached the caller terminates that response stream; it cannot be
+transparently replayed without duplicating bytes.
+
+The same path accepts WebSocket Upgrade. The local single-use `ticket` query
+parameter is consumed against the local path and removed before the upstream
+connection is opened. Text and binary messages remain distinct, close code and
+reason propagate in both directions, and a congested side is paused or closed
+with a bounded pending-message budget. WebSocket conversations are not replayed
+after a disconnect.
 
 The workspace module still exposes local `/workspaces/:id/files...` routes for
 registered remote locators; those call the upstream-backed helpers in

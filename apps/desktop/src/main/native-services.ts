@@ -23,6 +23,12 @@ import type {
   DesktopChatSubscribeSessionRequest,
 } from './chat-stream-broker'
 import {
+  ensureCradleBackupExtension,
+  getDesktopDataBackupStatus,
+  scheduleDesktopDataBackupExport,
+  scheduleDesktopDataBackupRestore,
+} from './data-backup'
+import {
   getDesktopDataDirectoryState,
   getDesktopDataMigrationStatus,
   scheduleDesktopDataDirectoryMigration,
@@ -289,18 +295,85 @@ class NativeService extends IpcService {
     targetPath: string
     restartRequired: true
   }> {
-    const requestRestart = nativeServicesContext?.requestDataDirectoryRestart
+    const requestRestart = nativeServicesContext?.requestDataRestart
     if (!requestRestart) {
       throw new Error('Desktop restart service is not initialized')
     }
     const migration = await scheduleDesktopDataDirectoryMigration(targetPath)
-    requestRestart()
+    requestRestart('data directory migration')
     return { scheduled: true, targetPath: migration.targetRoot, restartRequired: true }
   }
 
   @IpcMethod()
   async getCradleDataMigrationStatus(): Promise<ReturnType<typeof getDesktopDataMigrationStatus>> {
     return getDesktopDataMigrationStatus()
+  }
+
+  @IpcMethod()
+  async chooseCradleDataBackupDestination(): Promise<{ canceled: boolean, filePath?: string }> {
+    const timestamp = new Date().toISOString().slice(0, 10)
+    const result = await dialog.showSaveDialog({
+      title: 'Export Cradle data backup',
+      defaultPath: join(app.getPath('documents'), `Cradle Backup ${timestamp}.cradle-backup`),
+      filters: [{ name: 'Cradle data backup', extensions: ['cradle-backup'] }],
+    })
+    if (result.canceled || !result.filePath) {
+      return { canceled: true }
+    }
+    return { canceled: false, filePath: ensureCradleBackupExtension(result.filePath) }
+  }
+
+  @IpcMethod()
+  async scheduleCradleDataBackupExport(archivePath: string): Promise<{
+    scheduled: true
+    archivePath: string
+    restartRequired: true
+  }> {
+    const requestRestart = nativeServicesContext?.requestDataRestart
+    if (!requestRestart) {
+      throw new Error('Desktop restart service is not initialized')
+    }
+    await scheduleDesktopDataBackupExport(archivePath)
+    requestRestart('data backup export')
+    return {
+      scheduled: true,
+      archivePath: ensureCradleBackupExtension(archivePath),
+      restartRequired: true,
+    }
+  }
+
+  @IpcMethod()
+  async chooseCradleDataBackupToRestore(): Promise<{ canceled: boolean, filePath?: string }> {
+    const result = await dialog.showOpenDialog({
+      title: 'Restore Cradle data backup',
+      defaultPath: app.getPath('documents'),
+      properties: ['openFile'],
+      filters: [{ name: 'Cradle data backup', extensions: ['cradle-backup'] }],
+    })
+    if (result.canceled || !result.filePaths[0]) {
+      return { canceled: true }
+    }
+    return { canceled: false, filePath: result.filePaths[0] }
+  }
+
+  @IpcMethod()
+  async scheduleCradleDataBackupRestore(archivePath: string): Promise<{
+    scheduled: true
+    archivePath: string
+    restartRequired: true
+  }> {
+    const requestRestart = nativeServicesContext?.requestDataRestart
+    if (!requestRestart) {
+      throw new Error('Desktop restart service is not initialized')
+    }
+    await scheduleDesktopDataBackupRestore(archivePath)
+    requestRestart('data backup restore')
+    return { scheduled: true, archivePath, restartRequired: true }
+  }
+
+  @IpcMethod()
+  async getCradleDataBackupStatus(): Promise<ReturnType<typeof getDesktopDataBackupStatus>> {
+    return getDesktopDataBackupStatus()
   }
 
   @IpcMethod()
@@ -440,7 +513,7 @@ interface NativeServicesContext {
   getChatStreamBroker: () => ChatStreamBroker | null
   getChatEventTailBroker: () => ChatEventTailBroker | null
   getQuitGuard: () => QuitGuard
-  requestDataDirectoryRestart: () => void
+  requestDataRestart: (reason: string) => void
 }
 
 let nativeServicesContext: NativeServicesContext | null = null

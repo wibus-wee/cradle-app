@@ -1,6 +1,5 @@
 import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 
@@ -11,6 +10,8 @@ import {
   captureExternalSessionBundle,
   openExternalSessionBundleFile,
 } from '../bundle-store'
+import type { CodexImportRootSet } from '../cradle-runtime-roots'
+import { defaultCodexImportRootSets } from '../cradle-runtime-roots'
 import {
   compactText,
   createCandidateId,
@@ -18,6 +19,7 @@ import {
   createImportedMessageId,
   createSourceFilesRevision,
   importedMessage,
+  mergeExternalSessionDescriptors,
   safeJsonValue,
   titleFromText,
   unixSeconds,
@@ -127,25 +129,43 @@ interface CodexRolloutMetadata {
 }
 
 export interface CodexSessionSourceOptions {
+  rootSets?: CodexImportRootSet[]
   roots?: CodexRolloutRoots
   sessionIndex?: string
   history?: string
   concurrency?: number
 }
 
+function resolveCodexRootSets(options: CodexSessionSourceOptions): CodexImportRootSet[] {
+  if (options.rootSets) {
+    return options.rootSets
+  }
+  if (options.roots) {
+    const sessionIndex = options.sessionIndex ?? join(dirname(options.roots.current), 'session_index.jsonl')
+    const history = options.history ?? join(dirname(options.roots.current), 'history.jsonl')
+    return [{ roots: options.roots, sessionIndex, history }]
+  }
+  return defaultCodexImportRootSets()
+}
+
 export function createCodexSessionSource(
   options: CodexSessionSourceOptions = {},
 ): ExternalSessionSourceAdapter {
-  const roots = options.roots ?? {
-    current: join(homedir(), '.codex', 'sessions'),
-    archived: join(homedir(), '.codex', 'archived_sessions'),
-  }
-  const sessionIndex = options.sessionIndex ?? join(dirname(roots.current), 'session_index.jsonl')
-  const history = options.history ?? join(dirname(roots.current), 'history.jsonl')
+  const rootSets = resolveCodexRootSets(options)
   return {
     sourceApp: 'codex',
     async discover(input) {
-      return await discoverCodexSessions(roots, sessionIndex, history, input, options.concurrency ?? 24)
+      const discoveries = await Promise.all(rootSets.map(rootSet =>
+        discoverCodexSessions(
+          rootSet.roots,
+          rootSet.sessionIndex,
+          rootSet.history,
+          input,
+          options.concurrency ?? 24,
+        )))
+      return mergeExternalSessionDescriptors(discoveries.flat())
+        .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+        .slice(0, input.limit ?? 2_000)
     },
     async capture(input) {
       return await captureExternalSessionBundle(input.descriptor)
@@ -222,7 +242,6 @@ async function discoverCodexSessions(
       }
     })
     .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
-    .slice(0, input.limit ?? 2_000)
 }
 
 async function readCodexRolloutMetadata(

@@ -1,5 +1,6 @@
 import type * as React from 'react'
 import { memo } from 'react'
+import type { Components } from 'react-markdown'
 import ReactMarkdown from 'react-markdown'
 import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
@@ -24,7 +25,7 @@ interface BlockProps {
   /** Whether this is the last actively streaming block (cursor shown via CSS) */
   isActiveEnd?: boolean
   /** Custom ReactMarkdown components */
-  components?: Record<string, React.ComponentType<unknown>>
+  components?: Components
   /** Extra rehype plugins */
   extraRehypePlugins?: unknown[]
   /** Extra remark plugins */
@@ -80,7 +81,7 @@ const Block = memo<BlockProps>(({
       <ReactMarkdown
         remarkPlugins={remarkPluginsList}
         rehypePlugins={rehypePlugins}
-        components={mergedComponents as Record<string, React.ComponentType<never>>}
+        components={mergedComponents}
       >
         {content}
       </ReactMarkdown>

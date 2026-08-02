@@ -2,11 +2,13 @@ import type { UIMessage } from 'ai'
 
 import type {
   ChatFileLineCommentContextMessagePart,
+  ChatIntentContextMessagePart,
   ChatPluginContextMessagePart,
   ChatSkillContextMessagePart,
 } from '../context/chat-context-parts'
 import {
   isChatFileLineCommentContextPart,
+  isChatIntentContextPart,
   isChatPluginContextPart,
   isChatSkillContextPart,
 } from '../context/chat-context-parts'
@@ -59,6 +61,7 @@ export type ChatRenderSegment
     | { kind: 'activity-feed', entries: ActivityFeedEntryRef[], key: string }
     | (MessagePartRefBase & { kind: 'skill-context' })
     | (MessagePartRefBase & { kind: 'plugin-context' })
+    | (MessagePartRefBase & { kind: 'intent-context' })
     | (MessagePartRefBase & { kind: 'file-line-comment-context' })
     | (MessagePartRefBase & { kind: 'file-attachment' })
     | (MessagePartRefBase & { kind: 'runtime-warning' })
@@ -69,6 +72,7 @@ export type ChatRenderItem
     | { kind: 'activity-feed', entries: ActivityFeedEntryItem[], key: string }
     | { kind: 'skill-context', part: ChatSkillContextMessagePart, key: string }
     | { kind: 'plugin-context', part: ChatPluginContextMessagePart, key: string }
+    | { kind: 'intent-context', part: ChatIntentContextMessagePart, key: string }
     | { kind: 'file-line-comment-context', part: ChatFileLineCommentContextMessagePart, key: string }
     | { kind: 'file-attachment', part: FileMessagePart, key: string }
     | { kind: 'runtime-warning', part: RuntimeWarningMessagePart, key: string }
@@ -187,9 +191,17 @@ export function groupMessagePartRefs(input: GroupMessagePartsInput): ChatRenderS
         partIndex: i,
       })
     }
- else if (isChatPluginContextPart(part)) {
+    else if (isChatPluginContextPart(part)) {
       items.push({
         kind: 'plugin-context',
+        key,
+        messageId: input.messageId,
+        partIndex: i,
+      })
+    }
+ else if (isChatIntentContextPart(part)) {
+      items.push({
+        kind: 'intent-context',
         key,
         messageId: input.messageId,
         partIndex: i,
@@ -261,8 +273,11 @@ export function groupMessageParts(input: GroupMessagePartsInput): ChatRenderItem
  else if (isChatSkillContextPart(part)) {
       items.push({ kind: 'skill-context', part: part as ChatSkillContextMessagePart, key })
     }
- else if (isChatPluginContextPart(part)) {
+    else if (isChatPluginContextPart(part)) {
       items.push({ kind: 'plugin-context', part: part as ChatPluginContextMessagePart, key })
+    }
+ else if (isChatIntentContextPart(part)) {
+      items.push({ kind: 'intent-context', part: part as ChatIntentContextMessagePart, key })
     }
  else if (isChatFileLineCommentContextPart(part)) {
       items.push({

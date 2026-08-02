@@ -8,8 +8,6 @@ import {
   DownLine as ExpandIcon,
   GithubLine as GithubIcon,
   Refresh2Line as RefreshIcon,
-  SparklesLine as GuideIcon,
-  TerminalLine as CommitIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 
@@ -71,8 +69,6 @@ export interface ReviewDetailViewProps {
   refreshPending?: boolean
   onSubmit: (decision: ReviewDecision) => void
   submitPending?: boolean
-  onOpenGuide?: () => void
-  onOpenCommitPlan?: () => void
   threadsOpen: boolean
   onToggleThreads: () => void
   railWidth?: number
@@ -107,8 +103,6 @@ export function ReviewDetailView({
   refreshPending = false,
   onSubmit,
   submitPending = false,
-  onOpenGuide,
-  onOpenCommitPlan,
   threadsOpen,
   onToggleThreads,
   railWidth = 248,
@@ -175,17 +169,6 @@ export function ReviewDetailView({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {onOpenGuide && (
-            <IconAction label="Change walkthrough" onClick={onOpenGuide}>
-              <GuideIcon className="size-4" aria-hidden />
-            </IconAction>
-          )}
-          {onOpenCommitPlan && (
-            <IconAction label="Commit plan" onClick={onOpenCommitPlan}>
-              <CommitIcon className="size-4" aria-hidden />
-            </IconAction>
-          )}
-
           <DiffStyleToggle value={diffStyle} onChange={onDiffStyleChange} />
 
           <IconAction label="Refresh" onClick={onRefresh} disabled={refreshPending}>

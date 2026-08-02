@@ -2,7 +2,7 @@
  * Codex review composer slot UI.
  *
  * Review mode is a chat-owned picker opened by the `/review` UI action. It
- * builds native Codex review prompts without sending raw slash text.
+ * starts the native Codex review operation without sending a prompt turn.
  */
 import {
   ArrowLeftLine as ArrowLeftIcon,
@@ -21,10 +21,6 @@ import { Spinner } from '~/components/ui/spinner'
 import { useGitBranches, useGitRepositories, useGitStatus } from '~/features/git/shared/use-git'
 import { cn } from '~/lib/cn'
 
-import {
-  buildCodexReviewPrompt,
-  createCodexReviewBranchLines,
-} from '../../capabilities/codex-review-mode'
 import { ComposerSlotIconAction, ComposerSlotShell } from './composer-slot-shell'
 import type { ComposerReviewSlotActions } from './types'
 
@@ -67,15 +63,11 @@ export function ReviewSlotState({
     review.onDismiss()
   }
 
-  function submitUncommittedReview() {
+  async function submitUncommittedReview() {
     setErrorText(null)
     setSubmittingUncommitted(true)
     try {
-      review.onSubmitPrompt(buildCodexReviewPrompt({
-        mode: 'uncommitted',
-        sourceBranch: currentBranch ?? 'HEAD',
-        repositoryPath,
-      }))
+      await review.onStartReview({ type: 'uncommittedChanges' })
       review.onDismiss()
     }
     finally {
@@ -87,17 +79,7 @@ export function ReviewSlotState({
     setErrorText(null)
     setSubmittingBranchName(baseBranch)
     try {
-      const mergeBaseSha = await review.resolveMergeBase(baseBranch, repositoryPath)
-      if (!mergeBaseSha) {
-        throw new Error(`Failed to resolve a merge base between HEAD and ${baseBranch}.`)
-      }
-      review.onSubmitPrompt(buildCodexReviewPrompt({
-        mode: 'base-branch',
-        sourceBranch: currentBranch ?? 'HEAD',
-        repositoryPath,
-        baseBranch,
-        mergeBaseSha,
-      }))
+      await review.onStartReview({ type: 'baseBranch', branch: baseBranch })
       review.onDismiss()
     }
     catch (error) {
@@ -163,7 +145,7 @@ export function ReviewSlotState({
                 description="Staged, unstaged, and untracked files"
                 disabled={!hasWorkspace || gitUnavailable || submittingUncommitted}
                 loading={submittingUncommitted}
-                onClick={submitUncommittedReview}
+                onClick={() => void submitUncommittedReview()}
               />
               <ReviewOptionButton
                 title="Review against base branch"
@@ -228,6 +210,35 @@ export function ReviewSlotState({
           )}
     </ComposerSlotShell>
   )
+}
+
+function createCodexReviewBranchLines({
+  branches,
+  currentBranch,
+}: {
+  branches: GetWorkspacesByWorkspaceIdGitBranchesResponse | null | undefined
+  currentBranch: string | null | undefined
+}): Array<{ key: string, label: string }> {
+  const excluded = new Set(currentBranch ? [currentBranch] : [])
+  const preferred = ['main', 'master', 'develop', 'origin/main', 'origin/master', 'origin/develop']
+  const ordered = [
+    ...preferred,
+    ...(branches?.local ?? []).map(branch => branch.name),
+    ...(branches?.remote ?? []).map(branch => branch.name),
+  ]
+  const available = new Set([
+    ...(branches?.local ?? []).map(branch => branch.name),
+    ...(branches?.remote ?? []).map(branch => branch.name),
+  ])
+  const seen = new Set<string>()
+
+  return ordered.flatMap((branch) => {
+    if (!branch || excluded.has(branch) || seen.has(branch) || !available.has(branch)) {
+      return []
+    }
+    seen.add(branch)
+    return [{ key: branch, label: branch }]
+  })
 }
 
 function ReviewSlotNotice({

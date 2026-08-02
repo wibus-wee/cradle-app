@@ -34,7 +34,10 @@ import type {
   RemoteWorkspaceFileInfo,
   RemoteWorkspaceView,
 } from './upstream'
-import { proxyUpstreamRequestByBaseUrl, upstreamJsonByBaseUrl } from './upstream'
+import {
+  proxyUpstreamRequestWithReconnect,
+  upstreamJsonWithReconnect,
+} from './upstream'
 
 const logger = createChildLogger({ module: 'remote-hosts' })
 
@@ -276,6 +279,7 @@ const capabilitiesSchema = z.object({
 
 const connections = new Map<string, RemoteHostConnectionRecord>()
 const connectPromises = new Map<string, Promise<RemoteCradleServerConnectionView>>()
+const recoveryPromises = new Map<string, Promise<{ baseUrl: string }>>()
 const connectionGenerations = new Map<string, number>()
 const reconnectTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const reconnectAttempts = new Map<string, number>()
@@ -391,10 +395,12 @@ export async function shutdownRemoteHostConnections(): Promise<void> {
   const hostIds = new Set([
     ...connections.keys(),
     ...connectPromises.keys(),
+    ...recoveryPromises.keys(),
     ...reconnectTimers.keys(),
   ])
   await Promise.all(Array.from(hostIds, hostId => disconnectRemoteHostCradleServer(hostId)))
   await Promise.allSettled([...connectPromises.values()])
+  await Promise.allSettled([...recoveryPromises.values()])
 }
 
 /** Restore paired relay controller tunnels after a Cradle Server restart. */
@@ -493,17 +499,18 @@ export async function testRemoteHostCradleServer(hostId: string): Promise<Remote
 }
 
 export async function listRemoteCradleWorkspaces(hostId: string): Promise<RemoteWorkspaceView[]> {
-  const { baseUrl } = await ensureRemoteHostConnected(hostId)
-  return await upstreamJsonByBaseUrl<RemoteWorkspaceView[]>(baseUrl, '/workspaces')
+  return await upstreamJsonWithReconnect<RemoteWorkspaceView[]>(
+    failedBaseUrl => resolveRemoteHostUpstreamBaseUrl(hostId, failedBaseUrl),
+    '/workspaces',
+  )
 }
 
 export async function listRemoteCradleWorkspaceFiles(
   hostId: string,
   remoteWorkspaceId: string,
 ): Promise<RemoteWorkspaceFileEntry[]> {
-  const { baseUrl } = await ensureRemoteHostConnected(hostId)
-  return await upstreamJsonByBaseUrl<RemoteWorkspaceFileEntry[]>(
-    baseUrl,
+  return await upstreamJsonWithReconnect<RemoteWorkspaceFileEntry[]>(
+    failedBaseUrl => resolveRemoteHostUpstreamBaseUrl(hostId, failedBaseUrl),
     `/workspaces/${encodeURIComponent(remoteWorkspaceId)}/files`,
   )
 }
@@ -513,11 +520,13 @@ export async function listRemoteCradleWorkspaceFileChildren(
   remoteWorkspaceId: string,
   relativePath: string,
 ): Promise<RemoteWorkspaceFileEntry[]> {
-  const { baseUrl } = await ensureRemoteHostConnected(hostId)
   const path = `/workspaces/${encodeURIComponent(remoteWorkspaceId)}/files/children`
   const url = new URL(path, 'http://127.0.0.1')
   url.searchParams.set('path', relativePath)
-  return await upstreamJsonByBaseUrl<RemoteWorkspaceFileEntry[]>(baseUrl, `${url.pathname}${url.search}`)
+  return await upstreamJsonWithReconnect<RemoteWorkspaceFileEntry[]>(
+    failedBaseUrl => resolveRemoteHostUpstreamBaseUrl(hostId, failedBaseUrl),
+    `${url.pathname}${url.search}`,
+  )
 }
 
 export async function readRemoteCradleWorkspaceFileContent(
@@ -525,11 +534,13 @@ export async function readRemoteCradleWorkspaceFileContent(
   remoteWorkspaceId: string,
   relativePath: string,
 ): Promise<RemoteWorkspaceFileContent> {
-  const { baseUrl } = await ensureRemoteHostConnected(hostId)
   const path = `/workspaces/${encodeURIComponent(remoteWorkspaceId)}/files/content`
   const url = new URL(path, 'http://127.0.0.1')
   url.searchParams.set('path', relativePath)
-  return await upstreamJsonByBaseUrl<RemoteWorkspaceFileContent>(baseUrl, `${url.pathname}${url.search}`)
+  return await upstreamJsonWithReconnect<RemoteWorkspaceFileContent>(
+    failedBaseUrl => resolveRemoteHostUpstreamBaseUrl(hostId, failedBaseUrl),
+    `${url.pathname}${url.search}`,
+  )
 }
 
 export async function readRemoteCradleWorkspaceFileInfo(
@@ -537,11 +548,13 @@ export async function readRemoteCradleWorkspaceFileInfo(
   remoteWorkspaceId: string,
   relativePath: string,
 ): Promise<RemoteWorkspaceFileInfo | null> {
-  const { baseUrl } = await ensureRemoteHostConnected(hostId)
   const path = `/workspaces/${encodeURIComponent(remoteWorkspaceId)}/files/info`
   const url = new URL(path, 'http://127.0.0.1')
   url.searchParams.set('path', relativePath)
-  return await upstreamJsonByBaseUrl<RemoteWorkspaceFileInfo | null>(baseUrl, `${url.pathname}${url.search}`)
+  return await upstreamJsonWithReconnect<RemoteWorkspaceFileInfo | null>(
+    failedBaseUrl => resolveRemoteHostUpstreamBaseUrl(hostId, failedBaseUrl),
+    `${url.pathname}${url.search}`,
+  )
 }
 
 export async function proxyRemoteHostUpstreamRequest(
@@ -549,8 +562,11 @@ export async function proxyRemoteHostUpstreamRequest(
   request: Request,
   upstreamPathWithQuery: string,
 ): Promise<Response> {
-  const { baseUrl } = await ensureRemoteHostConnected(hostId)
-  return await proxyUpstreamRequestByBaseUrl(baseUrl, request, upstreamPathWithQuery)
+  return await proxyUpstreamRequestWithReconnect(
+    failedBaseUrl => resolveRemoteHostUpstreamBaseUrl(hostId, failedBaseUrl),
+    request,
+    upstreamPathWithQuery,
+  )
 }
 
 export async function resolveRemoteWorkspaceByPath(hostId: string, remotePath: string): Promise<RemoteWorkspaceView | null> {
@@ -561,6 +577,67 @@ export async function resolveRemoteWorkspaceByPath(hostId: string, remotePath: s
 export async function ensureRemoteHostConnected(hostId: string): Promise<{ baseUrl: string }> {
   const record = await connectedRecord(hostId)
   return { baseUrl: record.baseUrl }
+}
+
+async function resolveRemoteHostUpstreamBaseUrl(
+  hostId: string,
+  failedBaseUrl?: string,
+): Promise<string> {
+  if (!failedBaseUrl) {
+    return (await ensureRemoteHostConnected(hostId)).baseUrl
+  }
+  return (await recoverRemoteHostConnection(hostId, failedBaseUrl)).baseUrl
+}
+
+async function recoverRemoteHostConnection(
+  hostId: string,
+  failedBaseUrl: string,
+): Promise<{ baseUrl: string }> {
+  const existing = recoveryPromises.get(hostId)
+  if (existing) {
+    return await existing
+  }
+  const recovery = recoverRemoteHostConnectionInner(hostId, failedBaseUrl).finally(() => {
+    if (recoveryPromises.get(hostId) === recovery) {
+      recoveryPromises.delete(hostId)
+    }
+  })
+  recoveryPromises.set(hostId, recovery)
+  return await recovery
+}
+
+async function recoverRemoteHostConnectionInner(
+  hostId: string,
+  failedBaseUrl: string,
+): Promise<{ baseUrl: string }> {
+  const generation = connectionGenerations.get(hostId) ?? 0
+  const current = connections.get(hostId)
+  if (current && !current.tunnelExited && current.baseUrl !== failedBaseUrl) {
+    return { baseUrl: current.baseUrl }
+  }
+  if (current) {
+    current.tunnelExited = true
+    connections.delete(hostId)
+    await current.tunnel?.close()
+  }
+  if ((connectionGenerations.get(hostId) ?? 0) !== generation) {
+    throw remoteHostConnectionCancelledError(hostId)
+  }
+  const recovered = await ensureRemoteHostConnected(hostId)
+  if ((connectionGenerations.get(hostId) ?? 0) !== generation) {
+    await closeRemoteHostConnection(hostId)
+    throw remoteHostConnectionCancelledError(hostId)
+  }
+  return recovered
+}
+
+function remoteHostConnectionCancelledError(hostId: string): AppError {
+  return new AppError({
+    code: 'remote_host_connection_cancelled',
+    status: 409,
+    message: 'Remote host connection was cancelled.',
+    details: { hostId },
+  })
 }
 
 async function connectedRecord(hostId: string): Promise<RemoteHostConnectionRecord> {
@@ -640,12 +717,7 @@ async function connectRemoteHostCradleServerInner(hostId: string, generation: nu
     })
     if ((connectionGenerations.get(hostId) ?? 0) !== generation) {
       await tunnel?.close()
-      throw new AppError({
-        code: 'remote_host_connection_cancelled',
-        status: 409,
-        message: 'Remote host connection was cancelled.',
-        details: { hostId },
-      })
+      throw remoteHostConnectionCancelledError(hostId)
     }
     requireRemoteHost(hostId)
     connections.set(hostId, record)

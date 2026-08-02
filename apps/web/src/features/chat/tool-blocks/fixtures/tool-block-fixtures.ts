@@ -341,3 +341,8 @@ export const activityFeedMixedFixtures: ActivityFeedViewEntry[] = [
   toToolEntry(chatToolKindFixtures[8], 'feed-todo-1'),
   toToolEntry(chatToolKindFixtures[12], 'feed-mcp-1'),
 ]
+
+/** A single activity renders its own row directly, with no summary header. */
+export const activityFeedSingleToolFixtures: ActivityFeedViewEntry[] = [
+  toToolEntry(chatToolKindFixtures[0], 'feed-single-terminal'),
+]

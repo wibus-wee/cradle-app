@@ -37,6 +37,29 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       response: { 200: ChatRuntimeModel.bangCommandResponse },
     },
   )
+  .post(
+    '/sessions/:sessionId/observations',
+    async ({ params, body }) => {
+      return await (
+        await loadChatRuntime()
+      ).appendSessionObservation({
+        sessionId: params.sessionId,
+        text: body.text,
+        entity: body.entity,
+        entityType: body.entityType,
+        durationMs: body.durationMs,
+        endReason: body.endReason,
+      })
+    },
+    {
+      detail: {
+        summary: 'Append a UI activity observation message without starting a run',
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      body: ChatRuntimeModel.observationBody,
+      response: { 200: ChatRuntimeModel.observationResponse },
+    },
+  )
   // POST /chat/sessions/:sessionId/side-chat -> fork a live-only provider side conversation from the current chat session
   .post(
     '/sessions/:sessionId/side-chat',

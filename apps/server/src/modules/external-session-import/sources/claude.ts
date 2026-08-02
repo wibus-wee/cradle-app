@@ -1,7 +1,6 @@
 import type { Stats } from 'node:fs'
 import { createReadStream } from 'node:fs'
 import { readdir, stat } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { basename, dirname, join, sep } from 'node:path'
 import { createInterface } from 'node:readline'
 
@@ -12,6 +11,7 @@ import {
   captureExternalSessionBundle,
   openExternalSessionBundleFile,
 } from '../bundle-store'
+import { defaultClaudeImportRoots } from '../cradle-runtime-roots'
 import {
   compactText,
   createCandidateId,
@@ -20,6 +20,7 @@ import {
   createSourceFilesRevision,
   emptyGitIdentity,
   importedMessage,
+  mergeExternalSessionDescriptors,
   titleFromText,
   unixSeconds,
 } from '../source-utils'
@@ -72,18 +73,33 @@ type MutableToolPart = UIMessage['parts'][number] & {
 }
 
 export interface ClaudeSessionSourceOptions {
+  roots?: string[]
   root?: string
   concurrency?: number
+}
+
+function resolveClaudeRoots(options: ClaudeSessionSourceOptions): string[] {
+  if (options.roots) {
+    return options.roots
+  }
+  if (options.root) {
+    return [options.root]
+  }
+  return defaultClaudeImportRoots()
 }
 
 export function createClaudeSessionSource(
   options: ClaudeSessionSourceOptions = {},
 ): ExternalSessionSourceAdapter {
-  const root = options.root ?? join(homedir(), '.claude', 'projects')
+  const roots = resolveClaudeRoots(options)
   return {
     sourceApp: 'claude',
     async discover(input) {
-      return await discoverClaudeSessions(root, input, options.concurrency ?? 16)
+      const discoveries = await Promise.all(roots.map(root =>
+        discoverClaudeSessions(root, input, options.concurrency ?? 16)))
+      return mergeExternalSessionDescriptors(discoveries.flat())
+        .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
+        .slice(0, input.limit ?? 2_000)
     },
     async capture(input) {
       return await captureExternalSessionBundle(input.descriptor)
@@ -104,8 +120,7 @@ async function discoverClaudeSessions(
   const descriptors = (await mapConcurrent(paths, concurrency, async path =>
     await readClaudeDescriptor(path, input.sourceHostId)))
     .filter((descriptor): descriptor is ExternalSessionDescriptor => descriptor !== null)
-    .sort((left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0))
-  return descriptors.slice(0, input.limit ?? 2_000)
+  return descriptors
 }
 
 async function readClaudeDescriptor(

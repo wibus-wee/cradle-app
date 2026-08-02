@@ -1,9 +1,15 @@
-import { Elysia, t } from 'elysia'
+import type { Elysia } from 'elysia'
+import { Elysia as ElysiaApp, t } from 'elysia'
 
+import { createUnauthorizedError, verifyWebSocketRequestToken } from '../../http/auth'
 import { RemoteHostsModel } from './model'
 import * as RemoteHosts from './service'
+import type { UpstreamBridgeSocket } from './upstream-websocket'
+import {
+  RemoteUpstreamWebSocketBridge,
+} from './upstream-websocket'
 
-export const remoteHosts = new Elysia({
+export const remoteHosts = new ElysiaApp({
   prefix: '/remote-hosts',
   detail: { tags: ['remote-hosts'] },
 })
@@ -126,3 +132,55 @@ export const remoteHosts = new Elysia({
       '*': t.Optional(t.String()),
     }, { additionalProperties: false }),
   })
+
+/** Register Upgrade handling directly on the Node-adapted root app. */
+export function registerRemoteHostWebSocketRoutes(app: Elysia): Elysia {
+  const upstreamWebSocketBridges = new Map<string, RemoteUpstreamWebSocketBridge>()
+  app.ws('/remote-hosts/:hostId/upstream/*', {
+    detail: {
+      summary: 'Transparent WebSocket upstream to the connected remote Cradle Server',
+    },
+    body: t.Any(),
+    parse: (_ws, message) => message,
+    beforeHandle({ request }) {
+      const audience = new URL(request.url).pathname
+      if (!verifyWebSocketRequestToken(request, { audience })) {
+        throw createUnauthorizedError()
+      }
+    },
+    open(ws) {
+      const requestUrl = new URL(ws.data.request.url)
+      const upstreamPath = `/${ws.data.params['*'] ?? ''}`
+      const pathWithQuery = `${upstreamPath}${requestUrl.search}`
+      const bridge = new RemoteUpstreamWebSocketBridge(
+        ws as UpstreamBridgeSocket,
+        async () => (await RemoteHosts.ensureRemoteHostConnected(ws.data.params.hostId)).baseUrl,
+        pathWithQuery,
+      )
+      upstreamWebSocketBridges.set(ws.id, bridge)
+      void bridge.open()
+    },
+    message(ws, message) {
+      upstreamWebSocketBridges.get(ws.id)?.send(message)
+    },
+    drain(ws) {
+      upstreamWebSocketBridges.get(ws.id)?.drain()
+    },
+    close(ws, code, reason) {
+      const bridge = upstreamWebSocketBridges.get(ws.id)
+      upstreamWebSocketBridges.delete(ws.id)
+      bridge?.close(code, reason)
+    },
+    params: t.Object({
+      'hostId': t.String({ minLength: 1 }),
+      '*': t.Optional(t.String()),
+    }, { additionalProperties: false }),
+  })
+  app.onStop(() => {
+    for (const bridge of upstreamWebSocketBridges.values()) {
+      bridge.close(1001, 'Server stopping')
+    }
+    upstreamWebSocketBridges.clear()
+  })
+  return app
+}

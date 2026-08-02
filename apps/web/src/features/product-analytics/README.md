@@ -42,6 +42,9 @@ All events include `event_schema_version`; schema version 2 uses:
 - `onboarding_completed`: onboarding success milestone.
 - `task_started`: a typed product-value task began.
 - `task_finished`: the same typed task ended with outcome, duration bucket, and allowlisted failure category.
+- `activity_segment_started` / `activity_segment_ended`: privacy-safe UI activity
+  projections (`entity_type`, `duration_bucket`, `end_reason` only — never raw
+  entity strings, paths, or resource IDs). Skipped in tearoff windows.
 
 Chat task events may also include server-issued opaque `session_id` and `run_id`
 properties. These correlate a product task with the matching AI generation without

@@ -21,7 +21,10 @@ Generic renderer context item contracts, registry lifecycle, and provider compos
 - **explicit-context.test.ts**: Unit coverage for explicit context attachment publication, selected-text capture, and attachment removal.
 - **format-context.ts**: Formats the collected snapshot into the `<cradle_context>` block injected into Jarvis prompts
 - **format-context.test.ts**: Unit coverage for legacy snapshot formatting and typed context envelope formatting
-- **jarvis-history-picker.tsx**: Footer-adjacent Jarvis History picker — reads Session-owned workspace-unbound rows, restores the selected historical session into Jarvis footer tabs, activates it, and leaves persisted session lifecycle owned by Session.
+- **jarvis-history-picker.tsx**: Footer-adjacent Jarvis History picker — reads Session-owned workspace-unbound rows, restores the selected historical session into Jarvis footer tabs, activates it, and leaves persisted session lifecycle owned by Session. Excludes `origin === 'jarvis-ambient'` ambient observation sessions.
+- **jarvis-ambient-session.ts**: Creates/resumes the per-window `origin: 'jarvis-ambient'` observation session (localStorage id; never added to jarvis-ui-store tabs).
+- **activity-jarvis-bridge.ts**: Subscribes to the UI activity bus and POSTs metadata-only observation user messages (min duration gate).
+- **build-jarvis-prompt.ts**: Prepends recent ambient observations before the live `<cradle_context>` block on Jarvis send.
 - **jarvis-popover.tsx**: Jarvis popover shell — creates / resumes hidden Jarvis Chat Runtime sessions, injects System Agent-owned context through ChatView's send preparation hook, renders active sessions with the shared Chat runtime UI/driver/composer, keeps only the no-session first-send composer in this feature boundary, and owns positioning, resize bounds, context toggles, explicit selection attachments, and popover chrome.
 - **jarvis-popover-loader.ts**: Jarvis popover 的共享 lazy loader 与 intent preload 入口，供 footer hover、focus、click 和 shortcut 复用
 - **jarvis-ui-store.ts**: Feature-owned Jarvis UI state for expand/collapse behavior, persisted include-context preference, persisted and de-duplicated Jarvis footer tab sessions, active Jarvis session selection, close-tab semantics that do not delete persisted sessions, and cross-window synchronization of the persisted Jarvis tab slice

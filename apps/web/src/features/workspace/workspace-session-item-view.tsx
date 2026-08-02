@@ -1,5 +1,6 @@
 import {
   AlertLine as CircleAlertIcon,
+  FolderLine as FolderIcon,
   GitPullRequestLine as WorkIcon,
   LoadingLine,
   More2Line as MoreHorizontalIcon,
@@ -18,6 +19,7 @@ import {
   statusKind,
 } from '~/features/pull-requests/status-meta'
 import type { WorkSummary } from '~/features/work/use-work'
+import type { Workspace } from '~/features/workspace/types'
 import { cn } from '~/lib/cn'
 
 import { SessionRenameInput } from './session-rename-input'
@@ -33,6 +35,7 @@ export type WorkspaceSessionMenuAnchor
 
 export interface WorkspaceSessionItemViewProps {
   session: WorkspaceSession
+  workspace?: Workspace
   work: WorkSummary | null
   active: boolean
   dimmed: boolean
@@ -70,6 +73,7 @@ function createPointMenuAnchor(
 
 export function WorkspaceSessionItemView({
   session,
+  workspace,
   work,
   active,
   dimmed,
@@ -183,7 +187,8 @@ export function WorkspaceSessionItemView({
       onPointerEnter={isRenaming ? undefined : preview}
       onPointerLeave={isRenaming ? undefined : onPreviewLeave}
       className={cn(
-        'group relative isolate flex min-w-0 w-full items-center rounded-lg text-left text-xs hover:bg-accent/50 [content-visibility:auto] [contain-intrinsic-block-size:30px]',
+        'group relative isolate flex min-w-0 w-full rounded-lg text-left text-xs hover:bg-accent/50 [content-visibility:auto] [contain-intrinsic-block-size:30px]',
+        workspace ? 'flex-col items-stretch' : 'items-center',
         draggable && 'cursor-grab active:cursor-grabbing',
       )}
       data-testid={`session-item-${session.id}`}
@@ -211,21 +216,27 @@ export function WorkspaceSessionItemView({
           )
         : (
             <>
-              <button
-                type="button"
-                onClick={onOpen}
-                onDoubleClick={canOpenInNewWindow
-                  ? openNewWindow
-                  : undefined}
-                onFocus={onPrefetch}
-                onPointerDown={onPrepareOpen}
-                data-testid={`session-open-${session.id}`}
+              <div
                 className={cn(
-                  'relative z-10 flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-2.5 py-1.5 text-sidebar-foreground/80',
-                  dimmed
-                  && 'opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100',
+                  'flex min-w-0 items-center',
+                  workspace ? 'w-full' : 'flex-1',
                 )}
               >
+                <button
+                  type="button"
+                  onClick={onOpen}
+                  onDoubleClick={canOpenInNewWindow
+                    ? openNewWindow
+                    : undefined}
+                  onFocus={onPrefetch}
+                  onPointerDown={onPrepareOpen}
+                  data-testid={`session-open-${session.id}`}
+                  className={cn(
+                    'relative z-10 flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-2.5 py-1.5 text-sidebar-foreground/80',
+                    dimmed
+                    && 'opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100',
+                  )}
+                >
                 {work
                   ? (
                       <span
@@ -360,19 +371,31 @@ export function WorkspaceSessionItemView({
                         {relativeTime}
                       </span>
                     )}
-              </button>
-              <div className="group/menu relative z-10 mr-0.5 size-6 shrink-0">
-                <button
-                  type="button"
-                  className="absolute inset-0 grid place-items-center rounded-md text-muted-foreground/50 opacity-0 hover:bg-accent/80 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100"
-                  onClick={openButtonMenu}
-                  aria-haspopup="menu"
-                  aria-label={t('session.aria.menu')}
-                  data-testid={`session-menu-trigger-${session.id}`}
-                >
-                  <MoreHorizontalIcon className="size-3" aria-hidden="true" />
                 </button>
+                <div className="group/menu relative z-10 mr-0.5 size-6 shrink-0">
+                  <button
+                    type="button"
+                    className="absolute inset-0 grid place-items-center rounded-md text-muted-foreground/50 opacity-0 hover:bg-accent/80 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100"
+                    onClick={openButtonMenu}
+                    aria-haspopup="menu"
+                    aria-label={t('session.aria.menu')}
+                    data-testid={`session-menu-trigger-${session.id}`}
+                  >
+                    <MoreHorizontalIcon className="size-3" aria-hidden="true" />
+                  </button>
+                </div>
               </div>
+              {workspace
+                ? (
+                    <div
+                      className="flex min-w-0 items-center gap-1.5 px-2.5 pb-1.5 pl-8 text-[11px] text-muted-foreground"
+                      data-testid={`session-workspace-${session.id}`}
+                    >
+                      <FolderIcon className="size-3 shrink-0" aria-hidden="true" />
+                      <span className="min-w-0 truncate">{workspace.name}</span>
+                    </div>
+                  )
+                : null}
             </>
           )}
     </div>

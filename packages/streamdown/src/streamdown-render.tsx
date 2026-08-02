@@ -1,4 +1,5 @@
 import { memo, useEffect, useId, useMemo, useRef } from 'react'
+import type { Components } from 'react-markdown'
 
 import { Block } from './blocks/block'
 import { StreamErrorBoundary } from './components/error-boundary'
@@ -44,7 +45,7 @@ interface StreamdownRenderProps {
   /** Show blinking cursor at stream edge (default: true) */
   showCursor?: boolean
   /** Custom ReactMarkdown components map */
-  components?: Record<string, React.ComponentType<unknown>>
+  components?: Components
   /** Additional rehype plugins (applied after core plugins) */
   rehypePlugins?: unknown[]
   /** Additional remark plugins (applied after core plugins) */

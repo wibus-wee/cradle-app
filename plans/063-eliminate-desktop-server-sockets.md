@@ -10,12 +10,13 @@
 > **Drift check (run first)**:
 >
 > ```bash
-> git diff --stat 598007aa..HEAD -- \
+> git diff --stat 00ba970e..HEAD -- \
 >   apps/desktop/src/main \
 >   apps/desktop/src/preload \
 >   apps/desktop/src/shared/server-runtime.ts \
 >   apps/desktop/package.json \
 >   apps/server/src/index.ts \
+>   apps/server/src/bootstrap-lifecycle.ts \
 >   apps/server/src/app.ts \
 >   apps/server/src/modules/pty \
 >   apps/server/src/modules/sync-gateway \
@@ -26,34 +27,46 @@
 >   apps/web/src/features/tui/pty-channel.ts \
 >   apps/web/src/features/workspace/file-tree.tsx \
 >   apps/web/src/lib \
+>   apps/web/src/main.tsx \
+>   apps/web/src/tearoff-main.tsx \
 >   apps/web/src/env.d.ts \
 >   packages \
 >   package.json \
 >   pnpm-lock.yaml
 > ```
 >
-> Changes are expected because Plan 061 is in progress. Compare every changed transport
-> symbol with the current-state facts and invariants below. Transport-only drift may be
-> reconciled; any change to Chat admission, completion, cursor, queue, or provider
+> The original audit was at `598007aa`; the facts below were revalidated at `00ba970e`.
+> Plan 061 remains in progress and Plan 071 has changed Chat recovery from retained active
+> run replay to snapshot-first recovery. Compare every changed transport symbol with the
+> current-state facts and invariants below. Transport-only drift may be reconciled; any
+> change to Chat admission, completion, cursor, queue, provider, or snapshot-recovery
 > ownership is a STOP condition for this plan.
 
 ## Status
 
 - **Priority**: P0
-- **Effort**: XL, estimated 25-40 engineering days across reviewable milestones
+- **Effort**: XL; 13 gated milestones spanning Desktop, Server, Web, and a shared contract
 - **Risk**: HIGH
 - **Depends on**: Plan 038 (DONE), Plan 040 (DONE), Plan 054 (DONE)
-- **Coordinates with**: Plan 061 (IN PROGRESS); this plan changes transport only
+- **Coordinates with**: Plan 061 (IN PROGRESS) and Plan 071 (DONE); this plan changes
+  transport only and must preserve snapshot-first recovery
 - **Category**: migration / tech-debt
 - **Planned at**: commit `598007aa`, 2026-07-23
+- **Revalidated at**: commit `00ba970e`, 2026-07-31
 
 ## Decision and confidence
 
-The selected architecture is feasible, but it is not honest to claim 100% implementation
-confidence before Electron's packaged runtime has demonstrated streaming, cancellation,
-dynamic `import()`, binary bodies, and default-session isolation over the custom scheme.
-Those behaviors are version- and packaging-sensitive. Milestone 0 exists to turn the
-remaining platform uncertainty into measured evidence before the expensive migration.
+**Decision: GO, conditionally on the packaged M0 gate.** No current architecture or API
+capability is a known wall. Development Electron 42.4.1 proved custom-protocol first-byte
+streaming and cancellation, multipart `FormData`, image loading, dynamic module import,
+binary bodies, renderer streamed upload, and default-session isolation without `bypassCSP`
+or `codeCache`. A two-hop `fork()` probe also preserved a 1 MiB `Buffer` with advanced
+serialization, an Elysia Node-adapter probe streamed a `Request` through `app.handle()`,
+and `session.defaultSession.fetch` retained an HttpOnly browser-session cookie.
+
+That is deliberately not the production acceptance claim: packaged Electron and a 64 MiB
+resource bound remain version- and packaging-sensitive. Milestone 0 is the sole hard
+feasibility gate before the expensive migration. If it fails, stop; do not add a fallback.
 
 The architectural decision is:
 
@@ -91,7 +104,7 @@ IPC is impossible. That state is explicitly `attached-http`, keeps the authentic
 adapter, and does not claim the zero-socket invariant. It must never be silently labeled
 or treated as `owned-ipc`.
 
-## Why this matters
+## Purpose and Big Picture
 
 Electron's default Chromium session applies the HTTP/1.1 per-origin connection pool to
 the main window and all Tearoff windows. Long-lived SSE requests consume those slots, so
@@ -106,33 +119,44 @@ may reach the local Server over HTTP, HTTPS, SSE, or WebSocket. Logical request 
 grow with Tearoffs, but every request is multiplexed over the existing child-process IPC
 topology with explicit flow control.
 
-## Current state
+## Context and Orientation
+
+The target retains the Server's HTTP listener for the CLI and explicit attached clients;
+it removes only Desktop renderer/main sockets to a Server that this Desktop instance owns.
+The existing Elysia HTTP application remains the one request contract. The new transport is
+therefore a bounded, versioned way to carry `Request -> app.handle -> Response` and PTY
+frames across the already-managed process tree, not a second route API.
+
+The following facts are the revalidated starting point for implementation.
 
 ### Window and connection topology
 
 - `apps/desktop/src/main/window-manager.ts:100-124` creates Tearoffs without a
   `webPreferences.partition`. They share the default Electron session and therefore the
   same Chromium per-origin connection pool.
-- `apps/desktop/src/main/main-app.ts:195-216` and
-  `apps/desktop/src/main/window-manager.ts:108-121` pass the long-lived local Server token
-  into renderer command-line arguments.
-- `apps/desktop/src/preload/index.ts:39-86` parses and exposes `serverUrl` and
-  `serverAuthToken`; `apps/web/src/env.d.ts:35-51` makes both part of the renderer contract.
-- `apps/desktop/src/shared/server-runtime.ts:4-9` reports a ready Server as only
-  `{ state: 'ready', serverUrl }`, so callers cannot distinguish an owned child from a
-  reused locator-backed process.
+- `main-app.ts` and `window-manager.ts` still pass the long-lived local Server token into
+  renderer command-line arguments; preload and `apps/web/src/env.d.ts` still expose it.
+- `DesktopServerStatus` has gained a bootstrap snapshot (`starting`, `migrating`,
+  `bootstrapping`, `ready`, `failed`), but its ready state still has only `serverUrl` and
+  cannot distinguish an owned child from a locator-backed process or publish a renderer
+  transport base.
+- `main-app.ts` creates the main window before starting the Server. Scheme registration must
+  therefore happen synchronously in `index.ts`, and default-session handler installation
+  must occur before the renderer can receive a ready endpoint.
 
 ### Requests are concentrated enough to adapt once
 
 - `apps/web/src/lib/client.config.ts:8-21` injects `cradleFetch` into the generated client.
 - `apps/web/src/lib/server-credential.ts:13-35` resolves the configured base URL, adds the
   renderer-visible bearer token, and calls global `fetch`.
-- The generated client currently exposes 545 exported operations in
-  `apps/web/src/api-gen/sdk.gen.ts`. Creating 545 IPC methods would duplicate the HTTP
+- The generated client currently exposes 581 exported operations in
+  `apps/web/src/api-gen/sdk.gen.ts`. Creating 581 IPC methods would duplicate the HTTP
   contract and make every API evolution a cross-process migration.
-- At the planned commit, 32 production Web files reference `getServerUrl()`,
+- At revalidation, 33 production Web files reference `getServerUrl()`,
   `getConfiguredServerUrl()`, or `SERVER_BASE`; binary, `FormData`, module, image, PDF,
-  and download consumers exist in addition to JSON APIs.
+  and download consumers exist in addition to JSON APIs. Raw traffic now also includes
+  asset uploads and plugin descriptor fetches, so the migration cannot assume every Server
+  call goes through the generated client.
 - Seven production files instantiate native `EventSource`:
   `features/chat/session/session-sync-engine.ts`,
   `features/chat/transport/chat-event-tail-transport.ts`,
@@ -169,15 +193,18 @@ rg -l 'FormData\(|\.blob\(\)|\.arrayBuffer\(\)' \
 
 The brokers remain useful ownership boundaries and do not need a semantic rewrite. Inject
 the new `DesktopServerTransport.fetch` implementation into them. Plan 061 owns Chat run
-admission/completion; Plan 054 owns run cursor semantics. This plan must not absorb either.
+admission/completion. Plan 071 now owns snapshot-first recovery and supersedes only
+Plan 054's retained active-run replay; this plan must not restore exact replay or absorb
+either plan's semantics.
 
 ### A bidirectional Server IPC path is feasible but incomplete
 
 - `apps/desktop/src/main/managed-process.ts:51-83` forks a managed runner with an IPC fd.
 - `apps/desktop/src/main/managed-process-runner.ts:46-55` forks the actual Server with a
   second IPC fd.
-- `managed-process-runner.ts:111` currently forwards Server messages upward as
-  `{ type: 'target-message', message }`; it does not forward owner messages downward.
+- `managed-process-protocol.ts` now centralizes the existing upward
+  `{ type: 'target-message', message }` wrapper, but the runner still does not forward
+  owner messages downward.
 - `apps/desktop/src/main/server-process.ts:304-322` already receives Server startup
   messages through that relay.
 - Both `fork()` calls currently use default JSON serialization. The transport must set
@@ -189,7 +216,8 @@ admission/completion; Plan 054 owns run cursor semantics. This plan must not abs
 - `apps/server/src/app.ts:144-177` constructs one Elysia app, then installs CORS, request
   identity, and authentication before feature routes.
 - `apps/server/src/app.ts:258-483` exports `createServerApp()` and returns that same app.
-- `apps/server/src/index.ts:112-149` creates the app and calls `app.listen()`.
+- `apps/server/src/index.ts` creates the app and calls `app.listen()`, while the new
+  `bootstrap-lifecycle.ts` reports the full startup snapshot over child IPC.
 - Existing Server tests call `app.handle(new Request(...))`, proving the application can
   execute a standard Fetch request in process.
 
@@ -204,9 +232,9 @@ single public API contract.
 - A newly spawned Server is waited on through `waitForServer()`.
 - `apps/desktop/src/main/server-process.ts:899-922` polls `/health` with `fetch`, which
   itself violates the final owned-mode zero-TCP invariant.
-- `apps/server/src/database/migration-runner.ts:98-103` already publishes startup phases
-  over child IPC. Extend this lifecycle with a versioned transport-ready handshake rather
-  than polling HTTP for an owned child.
+- `bootstrap-lifecycle.ts` now publishes the startup phases over child IPC. Add a separate,
+  versioned transport-ready handshake rather than a competing readiness state machine or an
+  HTTP poll for an owned child.
 
 ### Electron 42 exposes the required primitive
 
@@ -235,6 +263,29 @@ installed after readiness but before any app window can issue Server requests. P
 handlers are session-scoped, so install it on `session.defaultSession` only. BrowserPanel
 web contents use explicit partitions and must not gain access to this handler.
 
+### Revalidation probes and remaining uncertainty
+
+- A disposable development Electron probe passed all supported-mechanics checks: first
+  response chunk followed by cancellation, `FormData`, `<img>`, dynamic `import()`, binary
+  bytes, renderer-streamed request upload, and denial from an independent partition. It
+  used only `standard`, `secure`, `supportFetchAPI`, `corsEnabled`, and `stream`.
+- A disposable Elysia probe preserved a streamed `[1, 2, 3]` request body through
+  `app.handle()` with two pulls. The existing app-level middleware remains on that path.
+- A disposable managed-process probe preserved a 1 MiB `Buffer` across main -> runner ->
+  child -> runner -> main after setting `serialization: 'advanced'` on both forks.
+- A disposable Electron session probe received an HttpOnly `cradle-session` cookie from a
+  local response and sent it on the next `session.defaultSession.fetch`. The M11
+  Main-owned attached-auth design therefore has a supported development path.
+- `PtySocketHub` is already the useful seam: its Elysia socket dependency is limited to an
+  endpoint shape (`id`, `send`, `close`), while timeline, lease, and resume semantics live
+  outside it. This lowers PTY migration risk without reducing its conformance requirement.
+- No production owned-mode consumer remains for `/sync` once existing Desktop Chat bridges
+  take priority and PTY selects the process channel. Keep a ratchet for that claim.
+
+The remaining unknowns are deliberately narrow: the packaged artifact must reproduce the
+custom-scheme behaviors, including a 64 MiB resource bound and real plugin module/CSP
+behavior. They are M0 acceptance evidence, not an unproven architecture assumption.
+
 ## Alternatives considered and rejected
 
 | Alternative | Why it is not the final architecture |
@@ -242,7 +293,7 @@ web contents use explicit partitions and must not gain access to this handler.
 | Raise Chromium's six-connection limit | No supported Electron product contract makes this unlimited; flags are brittle and retain socket-per-stream scaling. |
 | Give every Tearoff a separate session partition | Multiplies cookies/cache/auth state and only moves the cap per partition; it does not remove resource growth. |
 | Share only Chat EventSource instances | Helps identical subscriptions but cannot combine different sessions, workspace files, workflows, downloads, plugin events, PTY, or ordinary fetches. |
-| Add one IPC method per HTTP route | Duplicates 545 generated operations plus manual endpoints and creates permanent contract drift. |
+| Add one IPC method per HTTP route | Duplicates 581 generated operations plus manual endpoints and creates permanent contract drift. |
 | Send whole request/response bodies in one IPC message | Breaks large upload/download paths, cancellation, memory bounds, and streaming latency. |
 | Base64 binary bodies | Adds size and CPU overhead and defeats bounded streaming. |
 | Use native `EventSource` on the custom scheme | Header, reconnect, and custom-scheme behavior is not a safe cross-platform contract. A fetch-backed SSE adapter is explicit and testable. |
@@ -364,22 +415,29 @@ export type DesktopServerConnection =
   listener. The zero-socket invariant concerns Desktop renderer/main traffic to the owned
   Server, not Server-owned remote calls or explicitly external CLI clients.
 
-`DesktopServerStatus` must expose the connection kind and the renderer endpoint. Web
-readiness must use the ready status directly in Electron; it must not probe `/health`.
+`DesktopServerStatus` must retain its existing bootstrap snapshot and expose the complete
+connection projection in its ready state, including `connection.kind` and
+`rendererBaseUrl`. Web readiness must use the ready status directly in Electron; it must
+not probe `/health`. The normal shutdown path currently stops a located process, but
+`attached-http` remains necessary for locator reuse, stale processes, and parallel Desktop
+instances; it is a connection fact, not a shutdown-policy claim.
 
 ## Process protocol semantics
 
 ### Handshake and readiness
 
 1. Main creates generation `g`, attaches the bidirectional relay, and sends `hello` with
-   supported version(s).
+   supported version(s). The Server installs the process-message listener early enough to
+   retain this message while the Elysia app is being built.
 2. Runner validates only the outer managed-process envelope and forwards the inner
    transport message unchanged.
 3. Server creates the Elysia app, installs the process host against that exact app, and
    completes normal startup/listen readiness.
-4. Server returns `ready` with selected protocol version and generation.
-5. Main marks `owned-ipc` ready only when generation/version match. Startup phase messages
-   remain separate and continue to update the loading UI.
+4. Server returns a versioned `transport-ready` envelope with selected protocol version and
+   generation. It is distinct from the existing `cradle-server-bootstrap` snapshots.
+5. Main marks `owned-ipc` ready only when generation/version match **and** the existing
+   bootstrap reporter has completed `listener-establishment`. Startup phase messages remain
+   the loading-UI authority; no second phase enum or competing state machine is created.
 
 The owned-mode readiness path performs no HTTP health fetch. A focused IPC health request
 through `app.handle` may run after the handshake as a parity assertion, but it travels over
@@ -388,7 +446,8 @@ the process transport.
 ### Request and response mapping
 
 - Accept only `cradle-server://local/...`; reject credentials, ports, other hosts, and
-  malformed URLs.
+  malformed URLs. Do not use `URL.origin` as the authority check: standard custom URLs have
+  an opaque origin in the generic URL model. Compare protocol, hostname, and port directly.
 - Convert the custom URL to the canonical internal HTTP URL before `app.handle` so Elysia
   route and URL semantics remain unchanged.
 - Preserve method, query, ordered headers, and body bytes. Never forward a renderer-supplied
@@ -397,7 +456,8 @@ the process transport.
 - For a streamed Node `Request` body, set the runtime-required duplex option in the Server
   adapter. Do not buffer `FormData` or upload bodies to discover content length.
 - Preserve response `status`, `statusText`, headers, and body. A body-less HEAD/204/304
-  response remains body-less.
+  response remains body-less. Preserve repeated `set-cookie` values with the platform's
+  multi-value headers API rather than flattening `Headers` into an object.
 - Redirect behavior must match fetch. Do not let a redirect escape to an arbitrary scheme
   without the existing web security policy.
 
@@ -419,7 +479,9 @@ Electron protocol Response.body pull()
 
 There is at most one unfulfilled pull per logical body direction unless the protocol later
 adds explicit integer credit. Transport only `Buffer`/`Uint8Array`; do not convert large
-bodies to JSON arrays or base64. Empty chunks do not create unbounded spin.
+bodies to JSON arrays or base64. Slice producer chunks to a documented bounded frame size
+(initially no larger than 256 KiB) before relaying them. Empty chunks do not create
+unbounded spin.
 
 ### Cancellation and failure
 
@@ -442,6 +504,7 @@ adapter around the existing PTY hub/service while preserving:
 
 - existing start/attach/stop route ownership;
 - input, resize, ping/pong, snapshot, output, exit, and error frames;
+- the current `status` frame as well as all existing PTY event variants;
 - `fromSeq` resume and timeline replay semantics;
 - shell lease attach/detach counts and cleanup;
 - one close notification and generation fencing.
@@ -457,7 +520,10 @@ use fetch-backed SSE; add a test/ratchet proving `/sync` is never opened against
 
 ## Security invariants
 
-1. The renderer never receives the Desktop-owned Server's long-lived bearer token.
+1. The renderer never receives the Desktop-owned Server's long-lived bearer token. In
+   attached HTTP mode, Main must establish the existing browser-session cookie in the
+   default Electron session (or explicitly set the returned cookie there) rather than
+   retaining a renderer-visible bearer argument.
 2. The custom protocol handler accepts only the exact `local` authority and app default
    session. BrowserPanel partitions are not registered.
 3. Every IPC HTTP request still runs through Elysia auth, validation, CORS, request-id,
@@ -470,6 +536,12 @@ use fetch-backed SSE; add a test/ratchet proving `/sync` is never opened against
    not be logged.
 7. Remote-host proxy behavior inside the Server remains Server-owned and continues to obey
    Plan 038 credential-audience rules.
+
+The `cradle-server://local` handler must return a deterministic unavailable response before
+an owned connection is ready; it must never fall through to loopback HTTP. Endpoint settings
+remain HTTP(S)-only. A separate internal runtime-base setter may accept the custom scheme,
+and endpoint identity checks must compare protocol/host/port rather than opaque custom
+origins.
 
 ## Commands you will need
 
@@ -487,7 +559,8 @@ use fetch-backed SSE; add a test/ratchet proving `/sync` is never opened against
 | Web suite | `pnpm --filter @cradle/web test` | all pass |
 | Root suite | `pnpm test` | all pass or only recorded pre-existing failures |
 | Lint | `pnpm lint` | exit 0 or only recorded pre-existing failures |
-| Packaged runtime | `pnpm build:desktop` | exit 0 |
+| Desktop bundle | `pnpm build:desktop` | exit 0 |
+| Packaged runtime | `pnpm --filter @cradle/desktop pack` | unpacked artifact and its M0 smoke pass |
 | Diff hygiene | `git diff --check` | no output |
 
 If a listed focused test file does not exist yet, create it in the milestone that first
@@ -520,7 +593,7 @@ new failure as baseline.
 **Explicitly out of scope**:
 
 - Changing Chat admission, completion, queueing, durable facts, provider lifecycle, or
-  cursor semantics owned by Plans 061 and 054.
+  snapshot-first recovery/cursor semantics owned by Plans 061, 071, and 054.
 - Replacing Elysia routes with feature RPC methods.
 - Changing database schema or adding a transport table.
 - Removing the HTTP listener or CLI locator. External CLI and explicit attached clients
@@ -534,10 +607,8 @@ new failure as baseline.
 
 ## Git workflow and delivery slices
 
-- Suggested branch: `advisor/063-eliminate-desktop-server-sockets`.
-- Preserve unrelated operator changes. At planning time these files are dirty and outside
-  transport scope: `apps/server/src/modules/chat-runtime-providers/claude-agent/provider.ts`,
-  its test, and `apps/server/src/modules/chat-runtime/lifecycle/cancel.ts`.
+- Use the managed Work branch and preserve unrelated changes in the worktree. Re-run the
+  drift command before each slice instead of relying on the original planned-at diff.
 - Use conventional commit messages consistent with the repository.
 - Deliver in independently reviewable slices after Milestone 0:
   1. contracts + managed-process relay;
@@ -546,7 +617,16 @@ new failure as baseline.
   4. SSE + Desktop main consumer migration;
   5. PTY duplex + credential removal;
   6. ratchet + packaged stress verification + docs.
-- Do not push or open a PR unless the operator instructs it.
+- Commit each coherent slice after its focused verification and use the managed Work PR
+  delivery flow for the resulting commit.
+
+## Plan of Work
+
+Establish the platform facts before introducing production seams. Then introduce one shared
+versioned contract, make the existing supervisor relay it, host it at the Server's existing
+Fetch boundary, and make Desktop lifecycle own the `owned-ipc`/`attached-http` choice. Only
+after that choice is explicit should Web endpoints, SSE, PTY, and renderer credentials move.
+The final ratchet makes the zero-socket invariant durable instead of a one-time audit.
 
 ## Milestones
 
@@ -555,8 +635,9 @@ new failure as baseline.
 Build a minimal test fixture using the proposed privileged scheme and
 `session.defaultSession.protocol.handle`. It may live under
 `apps/desktop/src/main/desktop-server-transport/fixtures/` and must use a fake transport,
-not production Server logic. Prove all of the following in both `electron-vite` development
-and a packaged `pnpm build:desktop` artifact:
+not production Server logic. The disposable development probe already proved the mechanics;
+replace it with this committed fixture. Prove all of the following in both `electron-vite`
+development and the unpacked artifact produced by `pnpm --filter @cradle/desktop pack`:
 
 - fetch GET/POST and non-2xx `Response` status/headers;
 - streamed response first-byte delivery without whole-body buffering;
@@ -565,7 +646,8 @@ and a packaged `pnpm build:desktop` artifact:
 - at least a 64 MiB binary download with bounded process memory;
 - `FormData` upload preserves multipart bytes/content type;
 - `<img src="cradle-server://local/...">` loads;
-- dynamic `import('cradle-server://local/.../web.mjs')` evaluates a module;
+- dynamic `import('cradle-server://local/.../web.mjs')` evaluates a module, including the
+  repository's real plugin bundle/CSP shape where the fixture cannot prove it;
 - a PDF/binary response remains readable by its real consumer or a representative fixture;
 - the handler is available in the default app session and unavailable in a BrowserPanel
   partition.
@@ -574,8 +656,10 @@ Capture automated assertions, not screenshots. Measure main/renderer RSS before 
 the 64 MiB transfer; steady-state growth must remain bounded by a documented small number
 of chunks rather than body size.
 
-**Verify**: focused fixture tests pass and `pnpm build:desktop` exits 0. Store the exact
-command and measured result in this plan's Progress section when executing.
+**Verify**: the focused fixture tests pass, `pnpm build:desktop` exits 0, and the unpacked
+artifact smoke runs from the `pack` output. Store the exact launch command, artifact path,
+RSS result, and platform result in this plan's Progress section when executing. A bundle
+build alone is not packaged-runtime evidence.
 
 **Gate**: if any required custom-protocol behavior cannot be made reliable in the packaged
 artifact using supported Electron APIs, STOP. Do not start the production migration and do
@@ -585,9 +669,13 @@ not replace it with hidden buffering.
 
 Before changing transport, add reusable request/response fixtures against the existing
 `app.handle(Request)` path and HTTP listener. Cover JSON, typed errors, redirects, empty
-bodies, repeated headers, SSE, binary range/full responses, multipart upload, abort before
-headers, abort mid-body, and slow-consumer backpressure. Add current connection-mode tests
-for new child versus reused locator.
+bodies, repeated headers (including repeated `set-cookie`), SSE, binary range/full
+responses, multipart upload, abort before headers, abort mid-body, and slow-consumer
+backpressure. Add current connection-mode tests for new child versus reused locator.
+
+Characterize the existing snapshot-first Chat recovery boundary as a transport fixture:
+the IPC migration may carry the same frames but must neither retain active-run history nor
+reintroduce exact replay behavior superseded by Plan 071.
 
 Add a test-only socket ownership recorder for the future Electron smoke. It must identify
 connections by process and destination, not merely count browser DevTools entries.
@@ -601,7 +689,9 @@ Create `@cradle/desktop-server-contracts` with Zod schemas and inferred types fo
 request/response streaming, cancellation, errors, generation, and logical duplex channels.
 Add pure tests for every envelope, unknown versions/types, invalid ids, negative credit,
 oversized metadata, and binary payload acceptance. Set conservative metadata limits;
-payload size is bounded by the pull protocol/chunk producer, not by base64 parsing.
+payload size is bounded by the pull protocol/chunk producer, not by base64 parsing. Model
+the bootstrap snapshot wrapper and the separate `transport-ready` envelope explicitly so
+neither can be mistaken for a request frame.
 
 Its `package.json` must define working `typecheck` and `test` scripts so the package can be
 verified independently with the commands in this plan; do not rely on an implicit root-only
@@ -618,8 +708,8 @@ returns no imports into app/framework code.
 Extend `ManagedChildProcess` with one typed target-message send method rather than exposing
 arbitrary raw `child.send` usage to all callers. Configure `serialization: 'advanced'` on
 both nested forks. In the runner, accept only the managed outer envelope, validate it, and
-forward the inner message to a fork target. Spawn targets have no IPC child and must reject
-target sends deterministically.
+forward the inner message in both directions. Preserve bootstrap target messages unchanged.
+Spawn targets have no IPC child and must reject target sends deterministically.
 
 Preserve existing `started`, `stopping`, `error`, `exit`, process-group kill, and stdout/
 stderr behavior. Handle disconnected channels and failed `send` callbacks without throwing
@@ -632,9 +722,11 @@ listeners after restart.
 ### M4 - Host `Request -> app.handle -> Response` in the Server child
 
 Install the Server process host against the exact app returned by `createServerApp()`. Keep
-normal listener startup for CLI/attached clients, but publish transport readiness over IPC.
-Reconstruct request bodies as pull-driven `ReadableStream`s and connect cancellation to an
-`AbortController`. Stream the app response only when main sends response credit.
+normal listener startup for CLI/attached clients, but publish a separate `transport-ready`
+envelope over IPC only after the host is installed and listener establishment has completed.
+Do not change `ServerBootstrapReporter` phase ownership. Reconstruct request bodies as
+pull-driven `ReadableStream`s and connect cancellation to an `AbortController`. Stream the
+app response only when main sends response credit.
 
 Do not bypass `createAuthPlugin`. Main's internal request must use the existing owned Server
 credential, so parity tests exercise auth success and rejection exactly as HTTP does.
@@ -653,9 +745,12 @@ Server pull messages, reconstruct the Response head/body, and honor abort in bot
 directions. Keep per-request state private to the transport module.
 
 Refactor `startServer()` to return `DesktopServerConnection`. A spawned child becomes
-`owned-ipc` only after the ready handshake. A reused locator is `attached-http`. Replace the
+`owned-ipc` only after both the matching transport-ready handshake and the existing
+`listener-establishment` bootstrap completion. A reused locator is `attached-http`; its
+bounded HTTP health check remains allowed because it has no child IPC route. Replace the
 owned child HTTP health loop with the IPC readiness gate. On restart, invalidate the old
-generation and publish starting/ready status again.
+generation and publish starting/ready status again with the connection projection and
+`rendererBaseUrl`.
 
 Inject this fetch adapter into both chat brokers first. Do not alter their renderer-facing
 frame semantics or Plan 061 lifecycle behavior.
@@ -673,9 +768,11 @@ add `codeCache` only if M0 proves it is required for plugin modules. Never enabl
 `bypassCSP`, service workers, or extension access without a separate security review.
 
 After Electron readiness and before app windows issue Server requests, install one handler
-on `session.defaultSession`. Validate the exact scheme/host, strip credential headers,
-delegate to the current transport generation, and return a standard Response. Do not
-install a handler on `session.fromPartition(...)` BrowserPanel sessions.
+on `session.defaultSession`. Validate protocol, hostname, and an empty port directly (not
+`URL.origin`), strip credential headers, delegate to the current transport generation, and
+return a standard Response. Return a deterministic unavailable response before owned
+transport readiness; never fall through to HTTP. Do not install a handler on
+`session.fromPartition(...)` BrowserPanel sessions.
 
 Publish `DesktopServerStatus` with the connection discriminant. In owned mode, Web runtime
 base URL is `cradle-server://local`; in attached mode it remains the explicit HTTP URL.
@@ -696,6 +793,12 @@ Replace ambient Server-bound `fetch` calls with injected `DesktopServerTransport
 - `notification-center-manager.ts` and both chat brokers;
 - Server readiness/restart diagnostics in `server-process.ts`.
 
+The revalidated owner inventory is eight modules: `main-app`, `server-process`,
+`plugin-source-sync`, `observability-reporter`, `tray-manager`, `chat-stream-broker`,
+`chat-event-tail-broker`, and `notification-center-manager`. Keep the injected `fetchFn`
+seams already present in the two Chat brokers and notification manager; replace their global
+default only at composition.
+
 Audit every match from `rg -l 'fetch\(' apps/desktop/src/main`. Explicitly exclude
 `browser-manager.ts` local browser-target probing, which is not Desktop -> Cradle Server
 traffic. Document every other exclusion next to the boundary ratchet.
@@ -707,11 +810,13 @@ fetches and rejects new unclassified matches.
 ### M8 - Move generated, raw, binary, and subresource Web traffic to the custom base
 
 Teach the Web endpoint runtime to distinguish internal `cradle-server://local` from stored
-HTTP(S) endpoints. `cradleFetch` must preserve Request objects and bodies when rebasing.
-The generated client continues to use its existing fetch hook; do not edit generated files
-manually and do not add generated-operation IPC methods.
+HTTP(S) endpoints. Keep the persisted/user-entered endpoint normalizer HTTP(S)-only and add
+a separate internal runtime-base setter for the custom scheme. `cradleFetch` must preserve
+Request objects and bodies when rebasing, and must not forward renderer auth/cookie headers
+in owned mode. The generated client continues to use its existing fetch hook; do not edit
+generated files manually and do not add generated-operation IPC methods.
 
-Audit all 32 planned-at URL consumers and the raw-fetch allowlist. Exercise actual paths for:
+Audit all 33 revalidated URL consumers and the raw-fetch allowlist. Exercise actual paths for:
 
 - generated JSON reads/mutations and typed errors;
 - `FormData` uploads;
@@ -719,6 +824,7 @@ Audit all 32 planned-at URL consumers and the raw-fetch allowlist. Exercise actu
 - session ZIP and other binary downloads;
 - workspace PDF preview;
 - plugin `web.mjs` dynamic import and revision query;
+- raw asset `FormData` upload and plugin descriptor fetch;
 - range/cache/content-disposition behavior where currently used.
 
 External URLs such as changelog content and data URLs must continue using ordinary fetch.
@@ -733,9 +839,8 @@ production handler.
 
 Create one fetch-backed SSE transport that accepts `Request`, `AbortSignal`, reconnect
 policy, event name/id/retry fields, and last-event/cursor construction supplied by the
-feature owner. Use a standards-compliant parser already present in the dependency graph if
-available; do not hand-roll frame parsing unless existing Cradle code is first extracted
-and fully characterized.
+feature owner. Add `eventsource-parser` as a direct Web dependency at the currently locked
+3.x version; do not rely on a transitive copy and do not hand-roll frame parsing.
 
 Migrate the seven direct EventSource sites. Preserve each feature's existing event name,
 snapshot-before-events, reconnect, cursor, parse-error, and disposal behavior. Chat
@@ -750,13 +855,14 @@ returns only an explicitly documented non-owned adapter, never an owned-mode cal
 
 ### M10 - Carry PTY duplex traffic over the same process transport
 
-Define a transport-neutral PTY channel interface at the PTY module boundary. Adapt the
-existing WebSocket handlers and the new process channel to that interface. Add a narrow
-preload bridge with schema-validated open/send/close methods and output events. Select it
-only for `owned-ipc`; keep WebSocket for browser/attached mode.
+Generalize the endpoint type already used by `PtySocketHub` into a transport-neutral PTY
+channel interface (`id`, `send`, `close`) rather than moving the hub or duplicating its
+timeline logic. Adapt existing WebSocket handlers and the new process channel to that
+interface. Add a narrow preload bridge with schema-validated open/send/close methods and
+output events. Select it only for `owned-ipc`; keep WebSocket for browser/attached mode.
 
 Do not move PTY runtime/timeline state into Desktop main. Preserve `fromSeq`, reconnect,
-lease, input, resize, ping/pong, output, snapshot, exit, and error semantics. A Server
+lease, input, resize, ping/pong, output, snapshot, status, exit, and error semantics. A Server
 restart closes the old generation once; the renderer reconnects through existing policy
 and resumes from its last acknowledged sequence.
 
@@ -771,15 +877,16 @@ output, server restart, normal exit, and renderer destruction.
 
 ### M11 - Remove the Desktop-owned credential from renderer arguments
 
-Remove `--server-auth-token` from main and Tearoff `additionalArguments` for owned mode,
-then remove `serverAuthToken` from preload and Web environment types for that mode. Main is
-the credential owner and injects it only into the internal Request sent to `app.handle`.
-Owned mode does not call `/auth/browser-session` or mint EventSource/WebSocket tickets.
+Remove `--server-auth-token` from main and Tearoff `additionalArguments` entirely, then
+remove `serverAuthToken` from preload and Web environment types. Main is the credential
+owner and injects it only into the internal Request sent to `app.handle`. Owned mode does
+not call `/auth/browser-session` or mint EventSource/WebSocket tickets.
 
-Preserve attached/browser authentication explicitly. If the current static argument cannot
-be removed without breaking attached mode, introduce a mode-scoped credential bootstrap
-owned by main; do not weaken attached auth and do not expose the owned credential merely to
-share code paths.
+Preserve attached/browser authentication explicitly by having Main establish the existing
+browser-session cookie in `session.defaultSession` with its bearer credential before the
+renderer starts authenticated attached-HTTP traffic. Verify that Electron session fetch
+persists the server `Set-Cookie`; if it does not, parse and set that exact cookie through
+the Electron cookie API. Do not retain a renderer bearer-token fallback.
 
 **Verify**:
 
@@ -803,6 +910,10 @@ Desktop/Web production code. It must fail on a new owned-mode:
 - credential argument/exposure;
 - per-route process message that bypasses the generic Request/Response or PTY adapter.
 
+The checker must allow the explicit browser/attached adapters and non-Server destinations
+only by named, reviewed rule; it must also reject `getServerWebSocketUrl()` selection for
+`owned-ipc` and any owned-mode call to the EventSource ticket endpoint.
+
 Create one targeted Electron integration smoke, not a generic UI E2E. In a packaged-like
 runtime:
 
@@ -820,7 +931,7 @@ bytes/chunks, and cancellation totals, but no sensitive contents.
 **Verify**: all commands in "Commands you will need" pass, the packaged smoke passes on
 the release platforms available in CI, and `git diff --check` is empty.
 
-## Test plan
+## Validation and Acceptance
 
 ### Contract and relay
 
@@ -828,6 +939,7 @@ the release platforms available in CI, and `git diff --check` is empty.
 - Unknown type/version, malformed ids, invalid generation, metadata limit, and binary type.
 - Two-hop runner echo with advanced serialization.
 - Send/disconnect/exit races and exactly-once cleanup.
+- Bootstrap snapshots and transport-ready envelopes cannot be confused with data frames.
 
 ### Fetch parity
 
@@ -839,6 +951,7 @@ the release platforms available in CI, and `git diff --check` is empty.
 - Slow producer, slow consumer, and many concurrent logical streams proving one stream
   cannot head-of-line block all others at the application protocol layer.
 - Auth middleware is executed; an uncredentialed internal request is rejected.
+- Repeated `set-cookie` values survive both the IPC codec and attached-session bootstrap.
 
 ### Connection lifecycle
 
@@ -848,6 +961,8 @@ the release platforms available in CI, and `git diff --check` is empty.
 - Restart changes generation and rejects old pending mutations without replay.
 - Old chunks cannot settle a new-generation request.
 - Shutdown drains/cancels active maps and removes listeners.
+- The existing bootstrap phase UI remains monotonic while transport readiness gates only the
+  final owned connection.
 
 ### Electron protocol
 
@@ -857,12 +972,15 @@ the release platforms available in CI, and `git diff --check` is empty.
   and packaged builds.
 - Renderer cannot observe the owned Server token through argv, preload, headers, errors,
   logs, or diagnostics.
+- Custom-scheme endpoint identity never relies on `URL.origin`; non-`local` host and any
+  nonempty port are rejected.
 
 ### Streams and PTY
 
 - SSE parser conformance, split chunks, cursor reconnect, cancellation, and disposal.
 - Existing Chat broker fanout/dedup behavior with the new injected upstream fetch.
-- Plan 054 cursor/resume regression suites unchanged.
+- Plan 054 cursor/resume regression suites remain valid, and Plan 071 snapshot-first
+  recovery is unchanged (no active-run replay is reintroduced).
 - PTY WebSocket/process adapter conformance, `fromSeq`, leases, burst output, resize/input,
   ping/pong, exit, reconnect, restart, and destroyed renderer.
 - `/sync` WebSocket constructor not reached in owned mode.
@@ -876,6 +994,15 @@ the release platforms available in CI, and `git diff --check` is empty.
 - Active request/channel counts return to baseline after windows close.
 - Memory does not scale with total upload/download body size; record a numeric threshold
   established by M0 and apply it in CI with platform allowance.
+
+## Idempotence and Recovery
+
+All milestones are additive until their focused parity tests pass. Restarting an owned
+Server invalidates exactly one generation; it cancels active maps and lets existing
+feature-owned recovery decide whether a read can resume. A failed M0 fixture or packaged
+smoke leaves production routing untouched. Never delete the HTTP listener, locator, or
+attached adapter as part of this migration; they are needed for recovery and explicit
+non-owned operation.
 
 ## Required runtime invariant
 
@@ -948,8 +1075,11 @@ Stop and report; do not improvise if any condition occurs:
 - An owned-mode consumer still requires `/sync` after the migration; inventory and design
   its channel contract before extending this plan.
 - The work requires a database schema change.
-- The executor would need to modify Plan 061 Chat admission/completion/queue ownership or
-  Plan 054 cursor semantics rather than only transport adapters.
+- The executor would need to modify Plan 061 Chat admission/completion/queue ownership,
+  Plan 054 cursor semantics, or Plan 071 snapshot-first recovery rather than only transport
+  adapters.
+- Electron default-session cookie bootstrap cannot preserve attached HTTP authentication
+  without returning the bearer credential to the renderer.
 - BrowserPanel partitions must receive the custom protocol handler to make an app feature
   work; that is a security-boundary change requiring separate review.
 - A verification gate fails twice after a reasonable correction, or the planned-at
@@ -971,10 +1101,61 @@ Stop and report; do not improvise if any condition occurs:
 - The HTTP listener remains useful for CLI and attached clients. Removing it is a separate
   product decision and is not necessary to eliminate the Tearoff connection limit.
 
+## Artifacts and Notes
+
+- The development-only Electron protocol probe was intentionally deleted after recording
+  its result; M0 must replace it with committed, reproducible source fixtures.
+- The current package command is `pnpm --filter @cradle/desktop pack`, which runs the
+  Desktop build and `electron-builder --dir`. `pnpm build:desktop` is useful bundle/type
+  evidence but is not a packaged-runtime test.
+- Re-run the drift command at the top of this document before starting each delivery slice;
+  `00ba970e` is the revalidation baseline, while `598007aa` remains the historical plan
+  origin.
+
 ## Progress
 
 - [x] (2026-07-23) Read-only feasibility and blast-radius audit completed at `598007aa`.
 - [x] (2026-07-23) Architecture selected: custom Fetch protocol + multiplexed child IPC +
   transport-neutral PTY, with explicit `owned-ipc`/`attached-http` distinction.
+- [x] (2026-07-31) Revalidated at `00ba970e`: current bootstrap lifecycle, auth exposure,
+  locator reuse, managed-runner relay, PTY hub seam, Chat snapshot recovery, Web endpoint
+  consumers, and raw binary/upload traffic reconciled into this plan.
+- [x] (2026-07-31) Development-only protocol, Elysia streaming, and two-hop advanced IPC
+  probes passed; the default Electron session also persisted the HttpOnly browser-session
+  cookie. Their disposable source was removed. This is evidence for the design, not
+  completion of M0.
 - [ ] M0 packaged Electron feasibility gate.
 - [ ] M1-M12 implementation and verification.
+
+## Surprises & Discoveries
+
+- The bootstrap lifecycle is now already observable over child IPC. Transport readiness must
+  compose with `listener-establishment`, not replace or extend its published phase enum.
+- `URL.origin` is not a safe equality primitive for the standard custom scheme; all internal
+  endpoint checks need explicit protocol/hostname/port comparison.
+- The newly added `PtyStatusEvent` is a transport-parity requirement. It is easy to miss if
+  PTY is treated as only a byte stream.
+- Existing Chat bridges and the PTY process channel leave no known owned-mode `/sync`
+  consumer. That conclusion is an inventory fact to ratchet, not permission to remove the
+  browser/attached `/sync` transport.
+
+## Decision Log
+
+| Date       | Decision                                                                       | Rationale                                                                                       |
+| ---------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 2026-07-23 | Reuse `app.handle(Request)` instead of route RPC.                              | Preserves Elysia middleware and avoids generated-client contract drift.                         |
+| 2026-07-31 | Continue with custom default-session protocol + multiplexed process relay.     | Development probes removed the API-capability concern; only packaged/resource evidence remains. |
+| 2026-07-31 | Keep `attached-http` explicit and retain the HTTP listener.                    | Locator/CLI/parallel-process cases cannot gain the owned child IPC channel.                     |
+| 2026-07-31 | Remove renderer bearer arguments entirely; bootstrap attached cookies in Main. | A static window argv cannot safely express connection-specific credential ownership.            |
+
+## Outcomes & Retrospective
+
+This is a feasibility revalidation, not an implementation completion. The architecture is
+clear to build and has no known structural wall. The only unresolved production risk is the
+packaged M0 fixture, especially the 64 MiB memory bound and real plugin module behavior.
+If M0 passes, execute M1-M12 in order; if it fails, stop with the artifact and measurement
+rather than broadening permissions or restoring Desktop-owned sockets.
+
+> Revision note (2026-07-31): rebased the plan from `598007aa` to the current-state facts at
+> `00ba970e`, incorporated the bootstrap/credential/PTY/Chat-snapshot drift, corrected the
+> packaged command, and recorded the development feasibility evidence and remaining gate.

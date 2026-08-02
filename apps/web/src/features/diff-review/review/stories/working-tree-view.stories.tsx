@@ -47,7 +47,6 @@ function WorkingTreeScene({ model: initialModel }: { model: WorkingTreeModel }) 
           onBack={() => {}}
           onRefresh={() => {}}
           onAskAgent={() => {}}
-          onOpenCommitPlan={() => {}}
           diffSlot={(
             <CodeView
               items={diffData.items}

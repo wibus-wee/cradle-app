@@ -15,11 +15,6 @@ export const PROVIDER_KIND_LABELS: Record<ProviderKind, string> = {
   'cli-tool': 'CLI Tool',
 }
 
-export interface DraftProvider {
-  id: string
-  presetId: string | null
-}
-
 export interface ExternalProviderSourceView {
   id: string
   pluginName: string

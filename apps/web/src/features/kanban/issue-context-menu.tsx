@@ -23,7 +23,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogMedia,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
 import {
@@ -353,9 +352,6 @@ export function IssueContextMenu({ issue, statuses, milestones, onOpen, children
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogMedia>
-              <Trash2Icon className="size-5 !text-destructive" />
-            </AlertDialogMedia>
             <AlertDialogTitle>
               {t('context.deleteIssue')}
             </AlertDialogTitle>

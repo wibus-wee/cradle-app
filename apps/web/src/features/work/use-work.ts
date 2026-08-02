@@ -35,15 +35,33 @@ export function useWorkDetail(workId: string | null | undefined) {
   })
 }
 
-export function useWorkspaceWorks(workspaceId: string | null | undefined) {
+export function useWorks(options?: {
+  workspaceId?: string | null
+  archived?: boolean
+  enabled?: boolean
+}) {
+  const workspaceId = options?.workspaceId
+  const archived = options?.archived
   return useQuery({
-    ...getWorksOptions({ query: workspaceId ? { workspaceId } : undefined }),
-    enabled: !!workspaceId,
+    ...getWorksOptions({
+      query: {
+        ...(workspaceId ? { workspaceId } : {}),
+        ...(archived === undefined ? {} : { archived }),
+      },
+    }),
+    enabled: options?.enabled ?? true,
     staleTime: 5_000,
     refetchInterval: query => hasOpenWorkPullRequest(query.state.data)
       ? WORK_PULL_REQUEST_REFRESH_INTERVAL_MS
       : false,
     refetchIntervalInBackground: true,
+  })
+}
+
+export function useWorkspaceWorks(workspaceId: string | null | undefined) {
+  return useWorks({
+    workspaceId,
+    enabled: !!workspaceId,
   })
 }
 

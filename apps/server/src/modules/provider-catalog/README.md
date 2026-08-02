@@ -22,8 +22,12 @@ This module owns **Inventory** (layer 1):
 
 ## Files
 
-- `index.ts`: `/providers` HTTP routes and generated CLI metadata for provider model list/cache/search/lookup.
+- `index.ts`: `/providers` HTTP routes and generated CLI metadata for provider model list/cache/search/lookup, plus the root-level `GET /provider-presets` preset catalog route.
 - `model.ts`: Route-local TypeBox schemas for provider catalog requests and responses.
+- `provider-preset-overlay.ts`: Curated overlay (base URLs, hostnames, default models) used for models.dev merge + endpoint suggest hints.
+- `provider-registry.ts`: Provider setup contributions (`providerId` identity, authMethods, endpointProfiles). Gallery auth/endpoints project from here.
+- `provider-presets.ts`: `collectProviderPresets()` = models.dev + overlay seeds, then contribution projection (`providerId`, `tier`, `authMethods`, `endpointProfiles`).
+- `provider-endpoint-registry.ts`: Hostname → endpoint template matching derived from the overlay; owns `matchProviderEndpoint` / suggest-style helpers. Must never write `providerId`.
 - `service.ts`: Provider target override resolution, `collectProviderModelInventory` (raw upstream), `listModels` (full pipeline), custom model/default model fallback, and audit writes.
 - `catalog.ts`: Provider-specific metadata implementations for OpenAI-compatible, Anthropic, and Universal model APIs.
 - `model-cache.ts`: Inventory-only cache persistence; async read with re-enrichment.

@@ -101,23 +101,6 @@ export interface GitCommitDiffView {
   patch: string
 }
 
-export interface GitCommitFileGroupInput {
-  message: string
-  paths: string[]
-}
-
-export interface GitCommitFileGroupResult {
-  sha: string
-  message: string
-  paths: string[]
-}
-
-export interface GitCommitFileGroupsResult {
-  repositoryPath: string
-  repositoryName: string
-  commits: GitCommitFileGroupResult[]
-}
-
 interface GitRepositoryLocator {
   path: string
   name: string
@@ -132,7 +115,6 @@ const FIELD_SEP = '\x1F'
 const ROOT_REPOSITORY_PATH = '.'
 const CRADLE_INTERNAL_REFS = 'refs/cradle/*'
 const EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
-const CRADLE_CO_AUTHOR_TRAILER = 'Co-authored-by: Cradle Agent <cradleagent@wibus.ren>'
 const RE_REMOTE_PREFIX = /^remotes\//
 const RE_REMOTE_BRANCH = /^[^/]+\/(.+)$/
 const MAX_REPOSITORY_SCAN_ENTRIES = 20_000
@@ -597,94 +579,6 @@ export async function getCommitDiff(
   }
 }
 
-export async function commitFileGroups(
-  workspaceId: string,
-  groups: GitCommitFileGroupInput[],
-  repositoryPath?: string,
-): Promise<GitCommitFileGroupsResult> {
-  const { repository } = await resolveRepository(workspaceId, repositoryPath)
-  if (groups.length === 0) {
-    throw new AppError({
-      code: 'git_commit_groups_empty',
-      status: 400,
-      message: 'Git commit groups must include at least one group',
-      details: { workspaceId, repositoryPath: repository.path },
-    })
-  }
-
-  const commits: GitCommitFileGroupResult[] = []
-  let stagedPathsForCurrentGroup: string[] = []
-  try {
-    const preexistingStagedPaths = parseGitPathList(
-      await runGitCommand(repository.absolutePath, ['diff', '--cached', '--name-only', '--']),
-    )
-    if (preexistingStagedPaths.length > 0) {
-      throw new AppError({
-        code: 'git_index_not_clean',
-        status: 409,
-        message: 'Git index must be clean before applying commit groups',
-        details: { workspaceId, repositoryPath: repository.path, stagedPaths: preexistingStagedPaths },
-      })
-    }
-
-    for (const group of groups) {
-      if (!group.message.trim()) {
-        throw new AppError({
-          code: 'git_commit_message_required',
-          status: 400,
-          message: 'Git commit message is required',
-          details: { workspaceId, repositoryPath: repository.path },
-        })
-      }
-
-      const paths = normalizeRepositoryFilePaths(group.paths)
-      if (paths.length === 0) {
-        throw new AppError({
-          code: 'git_commit_group_paths_empty',
-          status: 400,
-          message: 'Git commit group must include at least one path',
-          details: { workspaceId, repositoryPath: repository.path, message: group.message },
-        })
-      }
-
-      stagedPathsForCurrentGroup = paths
-      await runGitCommand(repository.absolutePath, ['add', '--', ...paths])
-      const stagedPaths = parseGitPathList(
-        await runGitCommand(repository.absolutePath, ['diff', '--cached', '--name-only', '--', ...paths]),
-      )
-      if (stagedPaths.length === 0) {
-        throw new AppError({
-          code: 'git_commit_group_empty',
-          status: 409,
-          message: 'Git commit group has no staged changes',
-          details: { workspaceId, repositoryPath: repository.path, paths },
-        })
-      }
-
-      await runGitCommand(repository.absolutePath, ['commit', '-m', group.message, '--trailer', CRADLE_CO_AUTHOR_TRAILER])
-      const sha = (await runGitCommand(repository.absolutePath, ['rev-parse', 'HEAD'])).trim()
-      commits.push({
-        sha,
-        message: group.message,
-        paths: stagedPaths,
-      })
-      stagedPathsForCurrentGroup = []
-    }
-
-    return {
-      repositoryPath: repository.path,
-      repositoryName: repository.name,
-      commits,
-    }
-  }
-  catch (error) {
-    if (stagedPathsForCurrentGroup.length > 0) {
-      await runGitCommand(repository.absolutePath, ['reset', '--', ...stagedPathsForCurrentGroup]).catch(() => '')
-    }
-    throw mapGitError(workspaceId, error, repository.path)
-  }
-}
-
 async function resolveRepository(
   workspaceId: string,
   repositoryPath?: string | null,
@@ -864,33 +758,6 @@ function normalizeDiffPaths(paths?: string[]): string[] | undefined {
   return normalizedPaths.length > 0 ? Array.from(new Set(normalizedPaths)) : undefined
 }
 
-function normalizeRepositoryFilePaths(paths: string[]): string[] {
-  const normalizedPaths: string[] = []
-  for (const path of paths) {
-    const trimmedPath = path.trim()
-    if (!trimmedPath) {
-      continue
-    }
-    const normalizedPath = pathPosix.normalize(trimmedPath.replaceAll('\\', '/'))
-    if (
-      isAbsolute(trimmedPath)
-      || pathPosix.isAbsolute(normalizedPath)
-      || normalizedPath === ROOT_REPOSITORY_PATH
-      || normalizedPath === '..'
-      || normalizedPath.startsWith('../')
-    ) {
-      throw new AppError({
-        code: 'git_path_invalid',
-        status: 400,
-        message: 'Git file path must be relative to the repository',
-        details: { path },
-      })
-    }
-    normalizedPaths.push(normalizedPath)
-  }
-  return Array.from(new Set(normalizedPaths))
-}
-
 function collectUntrackedDiffPaths(status: StatusResult, selectedPaths?: string[]): Set<string> {
   const untrackedPaths = new Set(status.not_added)
   if (!selectedPaths) {
@@ -898,10 +765,6 @@ function collectUntrackedDiffPaths(status: StatusResult, selectedPaths?: string[
   }
 
   return new Set(selectedPaths.filter(path => untrackedPaths.has(path)))
-}
-
-function parseGitPathList(output: string): string[] {
-  return output.split('\n').map(path => path.trim()).filter(Boolean)
 }
 
 function joinDiffs(diffs: string[]): string {

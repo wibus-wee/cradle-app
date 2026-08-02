@@ -1,9 +1,10 @@
+import type { RuntimeReviewTarget } from '@cradle/chat-runtime-contracts'
 import { Settings2Line as SettingsIcon, ShieldLine as ShieldIcon } from '@mingcute/react'
 import type { FileUIPart } from 'ai'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getSkills, getWorkspacesByWorkspaceIdGitMergeBase } from '~/api-gen/sdk.gen'
+import { getSkills } from '~/api-gen/sdk.gen'
 import { toastManager } from '~/components/ui/toast'
 import type { ApiProviderKind } from '~/features/agent-runtime/types'
 import {
@@ -40,6 +41,7 @@ import type { ChatComposerSlashCommand } from '../../slash-commands/chat-slash-c
 import {
   CRADLE_APPSHOT_SLASH_ACTION_ID,
   CRADLE_APPSHOT_SLASH_COMMAND,
+  CRADLE_INTENT_SLASH_COMMANDS,
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
   withSlashCommandAvailability,
 } from '../../slash-commands/chat-slash-commands'
@@ -281,7 +283,7 @@ function DraftChatComposerContent({
       return withSlashCommandAvailability(CRADLE_APPSHOT_SLASH_COMMAND, undefined)
     })()
 
-    return [appshotCommand]
+    return [...CRADLE_INTENT_SLASH_COMMANDS, appshotCommand]
   })()
   const slashCommands = useRuntimeComposerSlashCommands(
     selection.runtimeKind,
@@ -297,7 +299,7 @@ function DraftChatComposerContent({
           : !effectiveProfile || sending)
 
   const toolbar = (
-    <div className="flex min-w-0 items-center gap-1">
+    <div className="flex min-w-0 items-center gap-2">
       <ComposerToolbar
         context="new-chat"
         state={composerState}
@@ -326,6 +328,7 @@ function DraftChatComposerContent({
     text: string,
     files: FileUIPart[],
     contextParts: ChatContextPart[],
+    reviewTarget?: RuntimeReviewTarget,
   ) => {
     const trimmedText = text.trim()
     const hasDraft = trimmedText.length > 0 || files.length > 0 || contextParts.length > 0
@@ -368,6 +371,7 @@ function DraftChatComposerContent({
             thinkingEffort: selection.thinkingEffort ?? undefined,
           }),
       runtimeSettings: submitRuntimeSettings,
+      ...(reviewTarget ? { reviewTarget } : {}),
     }
 
     return Promise.resolve()
@@ -465,36 +469,18 @@ function DraftChatComposerContent({
     }
   }
 
-  const submitCodexReviewPrompt = (prompt: string) => {
-    void handleSend(prompt, [], [])
-  }
-
-  const resolveCodexReviewMergeBase = async (
-    baseBranch: string,
-    repositoryPath?: string | null,
-  ) => {
-    if (!workspaceId) {
-      return null
-    }
-    const result = await getWorkspacesByWorkspaceIdGitMergeBase({
-      path: { workspaceId },
-      query: {
-        baseBranch,
-        ...(repositoryPath ? { repo: repositoryPath } : {}),
-      },
-    })
-    if (result.error || !result.data) {
-      throw new Error(`Failed to resolve merge base (${result.response?.status ?? 'unknown'}).`)
-    }
-    return result.data.mergeBaseSha
+  const startCodexNativeReview = async (target: RuntimeReviewTarget) => {
+    const text = target.type === 'uncommittedChanges'
+      ? 'Review uncommitted changes'
+      : `Review changes against ${target.branch}`
+    await handleSendWithTarget(onSend, text, [], [], target)
   }
 
   const reviewSlot = {
     open: reviewModeOpen,
     workspaceId,
     onDismiss: () => setReviewModeOpen(false),
-    onSubmitPrompt: submitCodexReviewPrompt,
-    resolveMergeBase: resolveCodexReviewMergeBase,
+    onStartReview: startCodexNativeReview,
   }
 
   return (

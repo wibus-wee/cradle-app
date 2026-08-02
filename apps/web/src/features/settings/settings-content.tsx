@@ -3,12 +3,14 @@ import { AgentRuntimeSettings } from '~/features/agent-management/agent-runtime-
 import { RuntimesSettings } from '~/features/agent-runtimes/runtimes-settings'
 import { ChronicleSettings } from '~/features/chronicle/chronicle-settings'
 import { ManagedResourcesPage } from '~/features/managed-resources/managed-resources-page'
+import { McpServersSettings } from '~/features/mcp-servers/mcp-servers-settings'
 import { cn } from '~/lib/cn'
 
 import { AboutSettings } from './about-settings'
 import { AppearanceSettings } from './appearance-settings'
 import { AwaitSettings } from './await-settings'
 import { ChatSettings } from './chat-settings'
+import { DataBackupSettings } from './data-backup-settings'
 import { DesktopUpdateSettings } from './desktop-update-settings'
 import { ExternalIssueSourceSettings } from './external-issue-source-settings'
 import { ExternalWorkImportSettings } from './external-work-import-settings'
@@ -35,10 +37,12 @@ const SECTION_MAP: Record<string, React.ComponentType> = {
   chronicle: ChronicleSettings,
   remoteHosts: RemoteHostsSettings,
   integrations: IntegrationsSettings,
+  mcpServers: McpServersSettings,
   shortcut: ShortcutSettings,
   serverEndpoint: ServerEndpointSettings,
   network: ServerEndpointSettings,
   desktop: DesktopUpdateSettings,
+  backup: DataBackupSettings,
   downloads: ManagedResourcesPage,
   features: FeatureSettings,
   externalIssues: ExternalIssueSourceSettings,

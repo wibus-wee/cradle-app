@@ -2,7 +2,7 @@ import {
   Delete2Line as TrashIcon,
   InformationLine as InfoIcon,
   More2Line as MoreIcon,
-  Settings2Line as SettingsIcon,
+  Settings2Line as SettingsIcon
 } from '@mingcute/react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
@@ -15,9 +15,8 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogMedia,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialogTrigger
 } from './alert-dialog'
 import { Button } from './button'
 import {
@@ -26,7 +25,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from './dialog'
 import {
   DropdownMenu,
@@ -36,12 +35,21 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
-  DropdownMenuTrigger,
+  DropdownMenuTrigger
 } from './dropdown-menu'
 import { Input } from './input'
 import { Popover, PopoverContent, PopoverTrigger } from './popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select'
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from './sheet'
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger
+} from './sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip'
 
 function UiOverlaysGallery() {
@@ -53,7 +61,10 @@ function UiOverlaysGallery() {
       <div className="mx-auto max-w-5xl space-y-10">
         <section>
           <h1 className="text-xl font-semibold">Overlays and option sets</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Interactive surfaces using the same focus, portal, and host-suppression paths as the application.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Interactive surfaces using the same focus, portal, and host-suppression paths as the
+            application.
+          </p>
         </section>
 
         <section className="grid gap-6 md:grid-cols-2">
@@ -75,7 +86,10 @@ function UiOverlaysGallery() {
                   </DropdownMenuItem>
                   <DropdownMenuCheckboxItem defaultChecked>Pin to sidebar</DropdownMenuCheckboxItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" onSelect={() => setActivity('Archive selected')}>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => setActivity('Archive selected')}
+                  >
                     Archive
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -98,7 +112,9 @@ function UiOverlaysGallery() {
                 </PopoverTrigger>
                 <PopoverContent className="w-72">
                   <div className="text-sm font-medium">Codex runtime</div>
-                  <div className="mt-1 text-xs leading-5 text-muted-foreground">Connected locally with a 128k context window.</div>
+                  <div className="mt-1 text-xs leading-5 text-muted-foreground">
+                    Connected locally with a 128k context window.
+                  </div>
                 </PopoverContent>
               </Popover>
 
@@ -121,14 +137,20 @@ function UiOverlaysGallery() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Rename session</DialogTitle>
-                    <DialogDescription>Choose a concise title that will remain easy to scan in the sidebar.</DialogDescription>
+                    <DialogDescription>
+                      Choose a concise title that will remain easy to scan in the sidebar.
+                    </DialogDescription>
                   </DialogHeader>
-                  <Input defaultValue="Component architecture refactor" aria-label="Session title" />
+                  <Input
+                    defaultValue="Component architecture refactor"
+                    aria-label="Session title"
+                  />
                   <DialogFooter showCloseButton>
-                    <Button onClick={() => {
-                      setActivity('Session renamed')
-                      setDialogOpen(false)
-                    }}
+                    <Button
+                      onClick={() => {
+                        setActivity('Session renamed')
+                        setDialogOpen(false)
+                      }}
                     >
                       Save
                     </Button>
@@ -138,35 +160,59 @@ function UiOverlaysGallery() {
 
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive"><TrashIcon aria-hidden="true" />Delete</Button>
+                  <Button variant="destructive">
+                    <TrashIcon aria-hidden="true" />
+                    Delete
+                  </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogMedia><TrashIcon aria-hidden="true" /></AlertDialogMedia>
                     <AlertDialogTitle>Delete this session?</AlertDialogTitle>
-                    <AlertDialogDescription>This removes the session from local history and cannot be undone.</AlertDialogDescription>
+                    <AlertDialogDescription>
+                      This removes the session from local history and cannot be undone.
+                    </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction variant="destructive" onClick={() => setActivity('Session deleted')}>Delete</AlertDialogAction>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() => setActivity('Session deleted')}
+                    >
+                      Delete
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
 
               <Sheet>
-                <SheetTrigger asChild><Button variant="outline">Open details</Button></SheetTrigger>
+                <SheetTrigger asChild>
+                  <Button variant="outline">Open details</Button>
+                </SheetTrigger>
                 <SheetContent>
                   <SheetHeader>
                     <SheetTitle>Runtime details</SheetTitle>
-                    <SheetDescription>Inspect the active model and host capabilities.</SheetDescription>
+                    <SheetDescription>
+                      Inspect the active model and host capabilities.
+                    </SheetDescription>
                   </SheetHeader>
                   <div className="space-y-3 px-4 text-sm">
-                    <div className="flex items-center justify-between border-b border-border py-2"><span>Runtime</span><span className="text-muted-foreground">Codex</span></div>
-                    <div className="flex items-center justify-between border-b border-border py-2"><span>Model</span><span className="text-muted-foreground">GPT-5</span></div>
-                    <div className="flex items-center justify-between border-b border-border py-2"><span>Status</span><span className="text-emerald-600">Connected</span></div>
+                    <div className="flex items-center justify-between border-b border-border py-2">
+                      <span>Runtime</span>
+                      <span className="text-muted-foreground">Codex</span>
+                    </div>
+                    <div className="flex items-center justify-between border-b border-border py-2">
+                      <span>Model</span>
+                      <span className="text-muted-foreground">GPT-5</span>
+                    </div>
+                    <div className="flex items-center justify-between border-b border-border py-2">
+                      <span>Status</span>
+                      <span className="text-emerald-600">Connected</span>
+                    </div>
                   </div>
                   <SheetFooter>
-                    <SheetClose asChild><Button>Done</Button></SheetClose>
+                    <SheetClose asChild>
+                      <Button>Done</Button>
+                    </SheetClose>
                   </SheetFooter>
                 </SheetContent>
               </Sheet>
@@ -178,7 +224,9 @@ function UiOverlaysGallery() {
           <InfoIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <div>
             <div className="text-sm font-medium">Interaction status</div>
-            <div className="mt-1 text-xs text-muted-foreground" role="status">{activity}</div>
+            <div className="mt-1 text-xs text-muted-foreground" role="status">
+              {activity}
+            </div>
           </div>
         </section>
       </div>
@@ -191,8 +239,8 @@ const meta = {
   component: UiOverlaysGallery,
   parameters: {
     layout: 'fullscreen',
-    controls: { disable: true },
-  },
+    controls: { disable: true }
+  }
 } satisfies Meta<typeof UiOverlaysGallery>
 
 export default meta

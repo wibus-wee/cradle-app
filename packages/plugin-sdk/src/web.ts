@@ -4,6 +4,50 @@ import type { Disposable, Logger } from './index'
 
 export type { Disposable, Logger } from './index'
 
+export type UiActivityEntityType
+  = | 'chat'
+    | 'file'
+    | 'settings'
+    | 'pr'
+    | 'diff'
+    | 'kanban'
+    | 'plugin'
+    | 'work'
+    | 'app'
+
+export type UiActivityEndReason = 'entity-changed' | 'idle' | 'hidden'
+
+export type UiActivityEvent
+  = | {
+    kind: 'ui.segment.started'
+    occurredAt: number
+    entity: string
+    entityType: UiActivityEntityType
+    previousEntity: string | null
+    previousEntityType: UiActivityEntityType | null
+  }
+  | {
+    kind: 'ui.segment.ended'
+    occurredAt: number
+    entity: string
+    entityType: UiActivityEntityType
+    durationMs: number
+    endReason: UiActivityEndReason
+  }
+
+export interface UiActivitySegment {
+  entity: string
+  entityType: UiActivityEntityType
+  startedAt: number
+}
+
+export type UiActivityHandler = (activity: UiActivityEvent) => void | Promise<void>
+
+export interface UiActivitySubscription {
+  subscribe: (handler: UiActivityHandler) => Disposable
+  getCurrentSegment: () => UiActivitySegment | null
+}
+
 /** Web plugin context — provided by host during activation */
 export interface WebPluginContext {
   /** Plugin-owned server route client */
@@ -17,6 +61,12 @@ export interface WebPluginContext {
 
   /** Command registrations */
   commands: WebPluginCommandRegistry
+
+  /**
+   * Renderer UI activity segments (entity + duration).
+   * Requires declared `activity-subscription` capability and `ui.activity.read`.
+   */
+  activities: UiActivitySubscription
 
   /** Disposables that the host releases when this plugin layer deactivates */
   subscriptions: Disposable[]

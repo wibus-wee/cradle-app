@@ -213,7 +213,7 @@ export function ComposerToolbar({ context, state, claudeModelAliases }: Composer
   )) ?? providerSelector
 
   return (
-    <div className="flex min-w-0 items-center gap-1">
+    <div className="flex min-w-0 items-center gap-2">
       {runtimeControl}
       {targetControl}
       {thinkingControl}

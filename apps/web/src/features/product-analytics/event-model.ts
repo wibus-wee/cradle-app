@@ -1,4 +1,7 @@
+import type { UiActivityEntityType } from '~/features/activity/types'
 import type { SurfaceKind } from '~/navigation/surface-identity'
+
+export type { UiActivityEntityType }
 
 export type ProductFeatureDomain
   = | 'chat'
@@ -78,6 +81,15 @@ export interface ProductAnalyticsEventMap {
     outcome: ProductAnalyticsOutcome
     duration_bucket: ProductAnalyticsDurationBucket
     failure_category: ProductAnalyticsFailureCategory | null
+  }
+  activity_segment_started: {
+    entity_type: UiActivityEntityType
+    previous_entity_type: UiActivityEntityType | null
+  }
+  activity_segment_ended: {
+    entity_type: UiActivityEntityType
+    duration_bucket: ProductAnalyticsDurationBucket
+    end_reason: 'entity-changed' | 'idle' | 'hidden'
   }
 }
 

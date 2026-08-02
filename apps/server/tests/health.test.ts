@@ -17,7 +17,6 @@ describe('health module', () => {
     const dataDir = makeTempDataDir()
     const previousDataDir = process.env.CRADLE_DATA_DIR
     process.env.CRADLE_DATA_DIR = dataDir
-    resetHealthSamplesForTests()
     let app: Awaited<ReturnType<typeof createServerApp>> | undefined
 
     try {

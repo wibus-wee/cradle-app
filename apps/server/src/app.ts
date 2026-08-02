@@ -74,15 +74,16 @@ import { opencodeServer } from './modules/opencode-server'
 import { createPluginsModule } from './modules/plugins'
 import { preferences } from './modules/preferences'
 import { profiles } from './modules/profiles'
-import { providers } from './modules/provider-catalog'
+import { providerPresets, providers } from './modules/provider-catalog'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
 import { pullRequest, pullRequestFeed } from './modules/pull-request'
 import { recall } from './modules/recall'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
+import { assertRelayCompressionRuntimeSupport } from './modules/relay-transport/compression'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
-import { remoteHosts } from './modules/remote-hosts'
+import { registerRemoteHostWebSocketRoutes, remoteHosts } from './modules/remote-hosts'
 import { search } from './modules/search'
 import { secrets } from './modules/secrets'
 import { session } from './modules/session'
@@ -238,6 +239,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(modelRegistry)
   app.use(mcpServers)
   app.use(providers)
+  app.use(providerPresets)
   app.use(agentIdentity)
   app.use(automation)
   app.use(assets)
@@ -283,6 +285,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(agentInteractionRuntime)
   app.use(desktop)
   app.use(downloadCenter.routes)
+  registerRemoteHostWebSocketRoutes(app)
   registerPtyRoutes(app)
   registerSyncGatewayRoutes(app)
   app.use(observability)
@@ -297,6 +300,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
 }
 
 export async function createServerApp(options: CreateServerAppOptions = {}) {
+  assertRelayCompressionRuntimeSupport()
   const { startBackgroundTasks = process.env.NODE_ENV !== 'test', bootstrapReporter } = options
   const downloadCenterService = new DownloadCenterService()
   initializeDatabase(bootstrapReporter)

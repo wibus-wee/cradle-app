@@ -69,5 +69,10 @@ export interface ChatViewProps {
     files?: Parameters<ChatComposerRuntime['send']>[1]
     contextParts?: Parameters<ChatComposerRuntime['send']>[2]
     options?: Parameters<ChatComposerRuntime['send']>[3]
-  }
+  } | Promise<{
+    text: Parameters<ChatComposerRuntime['send']>[0]
+    files?: Parameters<ChatComposerRuntime['send']>[1]
+    contextParts?: Parameters<ChatComposerRuntime['send']>[2]
+    options?: Parameters<ChatComposerRuntime['send']>[3]
+  }>
 }

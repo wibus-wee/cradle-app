@@ -21,29 +21,29 @@ interface StatusOption {
 }
 
 const defaultStatuses: StatusOption[] = [
-  { id: 1, label: 'Draft', value: 'draft', color: '#354055', bg: '#F3F4F7', fill: 0 },
-  { id: 2, label: 'In-progress', value: 'in-progress', color: '#F07C29', bg: '#FFEED7', fill: 0.5 },
-  { id: 3, label: 'In-review', value: 'in-review', color: '#195FEF', bg: '#EFF4FF', fill: 0.75 },
-  { id: 4, label: 'Completed', value: 'completed', color: '#099557', bg: '#EBFDF3', fill: 1 },
+  { id: 1, label: 'Draft', value: 'draft', color: 'var(--color-text-secondary)', bg: 'var(--color-fill)', fill: 0 },
+  { id: 2, label: 'In-progress', value: 'in-progress', color: 'var(--color-warning)', bg: 'color-mix(in srgb, var(--color-warning) 12%, transparent)', fill: 0.5 },
+  { id: 3, label: 'In-review', value: 'in-review', color: 'var(--color-info)', bg: 'color-mix(in srgb, var(--color-info) 12%, transparent)', fill: 0.75 },
+  { id: 4, label: 'Completed', value: 'completed', color: 'var(--color-success)', bg: 'color-mix(in srgb, var(--color-success) 12%, transparent)', fill: 1 },
 ]
 
 /** Kanban-style status categories with their canonical colors. */
 const kanbanCategoryColors: Record<string, string> = {
-  triage: '#a855f7',
-  backlog: '#6b7280',
-  unstarted: '#9ca3af',
-  started: '#f59e0b',
-  completed: '#22c55e',
-  canceled: '#6b7280',
+  triage: 'var(--color-info)',
+  backlog: 'var(--color-text-secondary)',
+  unstarted: 'var(--color-text-dim)',
+  started: 'var(--color-warning)',
+  completed: 'var(--color-success)',
+  canceled: 'var(--color-text-secondary)',
 }
 
 const kanbanCategoryBgs: Record<string, string> = {
-  triage: '#f5f0ff',
-  backlog: '#f3f4f6',
-  unstarted: '#f3f4f6',
-  started: '#fffbeb',
-  completed: '#f0fdf4',
-  canceled: '#f3f4f6',
+  triage: 'color-mix(in srgb, var(--color-info) 12%, transparent)',
+  backlog: 'var(--color-fill)',
+  unstarted: 'var(--color-fill)',
+  started: 'color-mix(in srgb, var(--color-warning) 12%, transparent)',
+  completed: 'color-mix(in srgb, var(--color-success) 12%, transparent)',
+  canceled: 'var(--color-fill)',
 }
 
 const CIRCUMFERENCE = 2 * Math.PI * 2
@@ -184,7 +184,7 @@ function StatusIcon({ value, color, size = 12, animated = true, className }: {
         strokeDasharray={CIRCUMFERENCE}
         transform="rotate(-90 8 8)"
         animate={{ strokeDashoffset: CIRCUMFERENCE * (1 - fill) }}
-        transition={{ duration: 0.4, ease: 'easeInOut' }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       />
 
       {/* Filled circle — completed only */}
@@ -201,7 +201,7 @@ function StatusIcon({ value, color, size = 12, animated = true, className }: {
       {/* Checkmark path — draws on with delay */}
       <m.path
         d="M 5 8.2 L 7.2 10.5 L 11 5.5"
-        stroke="white"
+        stroke="var(--color-white)"
         strokeWidth={1.8}
         strokeLinecap="round"
         strokeLinejoin="round"

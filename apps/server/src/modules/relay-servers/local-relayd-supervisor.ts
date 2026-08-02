@@ -35,6 +35,7 @@ const defaultInboundRelayConfig = {
 }
 
 let runningLocalRelayd: RunningLocalRelayd | null = null
+let startingLocalRelayd: Promise<void> | null = null
 
 export function shouldStartManagedLocalRelayd(): boolean {
   const configured = process.env.CRADLE_RELAYD_AUTOSTART?.trim().toLowerCase()
@@ -52,6 +53,20 @@ export async function startManagedLocalRelayd(): Promise<void> {
     return
   }
 
+  if (startingLocalRelayd) {
+    return await startingLocalRelayd
+  }
+
+  const start = startManagedLocalRelaydInner().finally(() => {
+    if (startingLocalRelayd === start) {
+      startingLocalRelayd = null
+    }
+  })
+  startingLocalRelayd = start
+  return await start
+}
+
+async function startManagedLocalRelaydInner(): Promise<void> {
   const launch = await resolveLocalRelaydLaunch()
   if (!launch) {
     logger.warn('managed local relayd is enabled but no relayd executable or development source tree was found')
@@ -104,12 +119,20 @@ export async function startManagedLocalRelayd(): Promise<void> {
     logger.info('managed local relayd started', { relayUrl, pid: readManagedProcessPid(child) })
   }
   catch (error) {
-    await stopManagedLocalRelayd()
+    await stopRunningManagedLocalRelayd()
     logger.warn('managed local relayd did not become ready', { err: error })
   }
 }
 
 export async function stopManagedLocalRelayd(): Promise<void> {
+  const starting = startingLocalRelayd
+  if (starting) {
+    await starting
+  }
+  await stopRunningManagedLocalRelayd()
+}
+
+async function stopRunningManagedLocalRelayd(): Promise<void> {
   const running = runningLocalRelayd
   if (!running) {
     return

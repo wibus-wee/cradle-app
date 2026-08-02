@@ -34,7 +34,7 @@ interface AgentRailProps {
     threadId?: string | null
     instruction: string
     agentId?: string | null
-    expectedOutput: 'commit' | 'working-tree-change' | 'patch-artifact'
+    expectedOutput: 'working-tree-change' | 'patch-artifact'
   }) => Promise<CradleDiffReview>
   onStart: (input: {
     agentFixId: string

@@ -1,4 +1,5 @@
 import * as React from 'react'
+import type { Components } from 'react-markdown'
 import type { PluggableList } from 'unified'
 
 import type { SmoothPreset } from './hooks/use-smooth-content'
@@ -22,7 +23,7 @@ export interface StreamdownProps {
   /** Show blinking cursor at stream edge (default: true) */
   showCursor?: boolean
   /** Custom ReactMarkdown components map */
-  components?: Record<string, React.ComponentType<unknown>>
+  components?: Components
   /** Additional rehype plugins (applied after core plugins) */
   rehypePlugins?: PluggableList
   /** Additional remark plugins (applied after core plugins) */

@@ -30,6 +30,33 @@ describe('groupMessageParts', () => {
 
     expect(items.map(item => item.kind)).toEqual(['text', 'runtime-warning', 'text'])
   })
+
+  it('renders cradle intent context parts as chips, not plain text', () => {
+    const parts = [
+      {
+        type: 'data-cradle-intent',
+        data: {
+          type: 'data-cradle-intent',
+          intentId: 'commit',
+          name: 'commit',
+          label: 'Commit',
+          prompt: 'Propose a clean commit sequence.',
+        },
+      },
+      { type: 'text', text: ' skip hooks', state: 'done' },
+    ] as UIMessage['parts']
+
+    const items = groupMessageParts({
+      parts,
+      messageId: 'message-1',
+      describeToolKind: () => null,
+    })
+
+    expect(items).toEqual([
+      expect.objectContaining({ kind: 'intent-context' }),
+      expect.objectContaining({ kind: 'text', text: ' skip hooks' }),
+    ])
+  })
 })
 
 describe('splitExecutionPhase', () => {

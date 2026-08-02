@@ -1,4 +1,7 @@
-import { Streamdown } from '@cradle/streamdown'
+import type { MarkdownComponents } from '@cradle/streamdown'
+import { remarkCodeComment, remarkCommitGroup, Streamdown } from '@cradle/streamdown'
+import type { ComponentType } from 'react'
+import { useMemo } from 'react'
 
 import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
@@ -15,8 +18,23 @@ import {
 import { MESSAGE_STREAMING_ANIMATION_MAX_CHARS } from '../../rendering/message-rendering-constants'
 import { UserMessageText } from '../../rendering/user-message-text'
 import { useMessagePartAt } from '../lib/message-display-parts-context'
+import type { CodeCommentMarkdownProps } from './message-code-comment'
+import {
+  MessageCodeComment,
+} from './message-code-comment'
+import type { CommitGroupMarkdownProps } from './message-commit-group'
+import {
+  MessageCommitGroup,
+} from './message-commit-group'
 
 export interface MessageTextPartByIdProps { sessionId: string, messageId: string, partIndex: number, isUser: boolean, isActiveStreamingSegment: boolean, textTransform?: MessageTextTransform }
+
+type MessageMarkdownComponents = MarkdownComponents & {
+  'code-comment': ComponentType<CodeCommentMarkdownProps>
+  'commit-group': ComponentType<CommitGroupMarkdownProps>
+}
+
+const MESSAGE_DIRECTIVE_REMARK_PLUGINS = [remarkCodeComment, remarkCommitGroup]
 
 export function MessageTextPartById({ sessionId, messageId, partIndex, isUser, isActiveStreamingSegment, textTransform }: MessageTextPartByIdProps) {
   const displayPart = useMessagePartAt(partIndex)
@@ -38,6 +56,11 @@ export function MessageTextPartById({ sessionId, messageId, partIndex, isUser, i
   const overflow = displayPart !== undefined
     ? readPartOverflowNotice(displayPart)
     : storeOverflow
+  const markdownComponents = useMemo<MessageMarkdownComponents>(() => ({
+    'a': props => <MarkdownFileLink {...readMarkdownAnchorProps(props)} sessionId={sessionId} />,
+    'code-comment': props => <MessageCodeComment {...props} sessionId={sessionId} />,
+    'commit-group': props => <MessageCommitGroup {...props} sessionId={sessionId} />,
+  }), [sessionId])
 
   if (isUser) {
     return (
@@ -64,7 +87,8 @@ export function MessageTextPartById({ sessionId, messageId, partIndex, isUser, i
         animateMode={STREAMDOWN_RENDER_OPTIONS.animateMode}
         showCursor={STREAMDOWN_RENDER_OPTIONS.showCursor}
         animated={text.length <= MESSAGE_STREAMING_ANIMATION_MAX_CHARS}
-        components={{ a: props => <MarkdownFileLink {...readMarkdownAnchorProps(props)} sessionId={sessionId} /> }}
+        components={markdownComponents}
+        remarkPlugins={MESSAGE_DIRECTIVE_REMARK_PLUGINS}
       />
       {overflow && (
         <BlobOverflowNotice

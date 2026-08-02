@@ -9,7 +9,10 @@ import { z } from 'zod'
 import { AppError } from '../../errors/app-error'
 import { AgentRuntimeConfigJsonSchema } from '../../helpers/agent-runtime-config'
 import { db } from '../../infra'
-import { createLocalAgentConfigExternalProviderSource } from '../external-provider-sources/local-agent-config-source'
+import {
+  createLocalAgentConfigExternalProviderSource,
+  LOCAL_AGENT_CONFIG_SOURCE_OWNER,
+} from '../external-provider-sources/local-agent-config-source'
 import {
   getExternalRuntimeTarget,
   listExternalProviderRecords,
@@ -297,8 +300,6 @@ export function create(input: CreateAgentInput): Agent {
     throw mapAgentIdentityError(error, parsed?.providerTargetId)
   }
 }
-
-const LOCAL_AGENT_CONFIG_SOURCE_OWNER = 'cradle-onboarding'
 
 function localAgentApp(app: string): LocalConfigImportCandidate['app'] | null {
   if (app === 'claude') {

@@ -350,18 +350,23 @@ describe('chat runtime recovery', () => {
     })
   })
 
-  it('rejects malformed durable payloads from inline history snapshots', async () => {
+  it('handles malformed and huge durable payloads according to the history contract', async () => {
     await withTempDataDir(async () => {
       const sessionId = 'session-shell-malformed-payload'
       const messageId = 'message-shell-malformed-payload'
       seedSession(sessionId)
       const hugeContent = 'x'.repeat(20_000)
+      const message = {
+        id: messageId,
+        role: 'assistant' as const,
+        parts: [{ type: 'text' as const, text: hugeContent }],
+      }
       const createdAt = 1700000000
       putMessagePayload(db(), {
         id: messageId,
         sessionId,
         content: hugeContent,
-        messageJson: '{ deliberately malformed',
+        messageJson: JSON.stringify(message),
         errorText: null,
         createdAt,
         updatedAt: createdAt,
@@ -380,14 +385,25 @@ describe('chat runtime recovery', () => {
         updatedAt: createdAt,
       }).run()
 
-      await expect(getMessageSnapshot(sessionId)).rejects.toMatchObject({
-        code: 'chat_message_snapshot_invalid',
-        status: 500,
-        details: {
+      await expect(getMessageSnapshot(sessionId)).resolves.toMatchObject({
+        rows: [{
           messageId,
-          role: 'assistant',
-        },
+          preview: 'x'.repeat(2_000),
+          previewTruncated: true,
+          message,
+        }],
       })
+
+      putMessagePayload(db(), {
+        id: messageId,
+        sessionId,
+        content: hugeContent,
+        messageJson: '{ deliberately malformed',
+        errorText: null,
+        createdAt,
+        updatedAt: createdAt,
+      })
+      await expect(getMessageSnapshot(sessionId)).rejects.toThrow('Stored chat message snapshot is invalid')
       expect(() => getMessageDetail(sessionId, messageId)).toThrow('Stored chat message snapshot is invalid')
     })
   })

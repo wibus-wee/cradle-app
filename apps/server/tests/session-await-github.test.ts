@@ -42,24 +42,16 @@ function jsonResponse(body: unknown): Response {
   })
 }
 
-function canonicalRouteKey(url: string): string {
-  const parsed = new URL(url, 'https://api.github.com')
-  const params = [...parsed.searchParams.entries()]
-    .filter(([key, value]) => key !== 'page' || value !== '1')
-    .sort(([leftKey, leftValue], [rightKey, rightValue]) =>
-      leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue))
-  const query = new URLSearchParams(params).toString()
-  return query ? `${parsed.pathname}?${query}` : parsed.pathname
-}
-
 function installGitHubFetch(routes: Record<string, unknown | Response>): ReturnType<typeof vi.fn> {
-  const canonicalRoutes = new Map(
-    Object.entries(routes).map(([route, response]) => [canonicalRouteKey(route), response]),
+  const routesByPathname = new Map(
+    Object.entries(routes).map(([route, body]) => [
+      new URL(route, 'https://api.github.com').pathname,
+      body,
+    ]),
   )
   const mock = vi.fn(async (input: RequestInfo | URL) => {
-    const url = new Request(input).url
-    const parsed = new URL(url)
-    const body = canonicalRoutes.get(canonicalRouteKey(url)) ?? canonicalRoutes.get(parsed.pathname)
+    const { pathname } = new URL(new Request(input).url)
+    const body = routesByPathname.get(pathname)
     if (body === undefined) {
       return new Response('not found', { status: 404 })
     }
@@ -668,10 +660,13 @@ describe('gitHub session-await sources', () => {
         total_count: 0,
         workflow_runs: [],
       },
-      '/repos/acme/app/branches/main/protection': new Response(JSON.stringify({ message: 'Bad credentials' }), {
-        status: 401,
-        headers: { 'content-type': 'application/json' },
-      }),
+      '/repos/acme/app/branches/main/protection': new Response(
+        JSON.stringify({ message: 'GitHub temporarily unavailable' }),
+        {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        },
+      ),
     })
 
     const [result] = await githubCISource.checkPending([

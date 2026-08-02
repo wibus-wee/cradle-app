@@ -1405,29 +1405,41 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
   it('refreshes live presentation from commands_changed without another SDK query', async () => {
     const activeQuery = createControllableQuery()
-    sdkMocks.query.mockReturnValue(activeQuery)
+    // Only the long-lived session Query may share this controllable iterator.
+    // Title-generation / short-lived discovery calls must get their own Query —
+    // otherwise concurrent next() waiters overwrite resolveNext and hang the pump.
+    sdkMocks.query.mockImplementation((call: { prompt?: unknown }) => {
+      const prompt = call?.prompt
+      if (prompt !== null && typeof prompt === 'object') {
+        return activeQuery
+      }
+      return createAsyncQuery([])
+    })
 
     const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
     const runtimeSession = createRuntimeSession()
-    const stream = provider.streamTurn({
-      runId: 'run-claude-agent-commands-changed',
-      runtimeSession,
-      profile: createProfile(),
-      message: createUserMessage('Discover commands'),
-      workspaceId: 'workspace-1',
-    })
-    const pendingNext = stream.next()
-    void pendingNext.catch(() => undefined)
-    const activeQueries = (provider as unknown as {
-      activeQueries: Map<string, {
-        query: unknown
-        slashCommands: Array<{ name: string }> | null
-      }>
-    }).activeQueries
+    const profile = createProfile()
+
+    // Drive the turn to completion with an in-band commands_changed event.
+    // Assert presentation while the live Query is still open.
+    const turn = (async () => {
+      const chunks: UIMessageChunk[] = []
+      for await (const chunk of provider.streamTurn({
+        runId: 'run-claude-agent-commands-changed',
+        runtimeSession,
+        profile,
+        message: createUserMessage('Discover commands'),
+        workspaceId: 'workspace-1',
+      })) {
+        chunks.push(chunk)
+      }
+      return chunks
+    })()
 
     await vi.waitFor(() => {
-      expect(activeQueries.get(runtimeSession.chatSessionId)?.query).toBe(activeQuery)
+      expect(countLongLivedSessionQueryCalls()).toBe(1)
     })
+
     activeQuery.push({
       type: 'system',
       subtype: 'commands_changed',
@@ -1437,13 +1449,17 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
 
     await vi.waitFor(() => {
-      const entry = activeQueries.get(runtimeSession.chatSessionId)
-      expect(entry?.slashCommands).toEqual([{ name: 'review', description: 'Review the change', argumentHint: '<file>' }])
+      const entry = (provider as unknown as {
+        activeQueries: Map<string, { slashCommands: Array<{ name: string }> | null }>
+      }).activeQueries.get(runtimeSession.chatSessionId)
+      expect(entry?.slashCommands).toEqual([
+        { name: 'review', description: 'Review the change', argumentHint: '<file>' },
+      ])
     })
 
     await expect(provider.getPresentation({
       runtimeSession,
-      profile: createProfile(),
+      profile,
       workspaceId: 'workspace-1',
       workspacePath: '/tmp/cradle-workspace',
     })).resolves.toMatchObject({
@@ -1451,6 +1467,21 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     })
     expect(activeQuery.supportedCommands).not.toHaveBeenCalled()
 
+    activeQuery.push({
+      type: 'assistant',
+      session_id: 'claude-session-commands-changed',
+      message: { content: [{ type: 'text', text: 'Commands ready' }] },
+    })
+    activeQuery.push({
+      type: 'result',
+      session_id: 'claude-session-commands-changed',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })
+    activeQuery.close()
+
+    await expect(turn).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'text-delta' }),
+    ]))
     await provider.disposeSession(runtimeSession.chatSessionId)
   })
 

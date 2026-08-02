@@ -7,6 +7,7 @@ import { join } from 'node:path'
 
 import { providerTargets } from '@cradle/db'
 import { afterEach, describe, expect, it } from 'vitest'
+import WebSocket, { WebSocketServer } from 'ws'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
@@ -19,6 +20,7 @@ interface FakeRemoteCradleServer {
   close: () => Promise<void>
   seenHosts: string[]
   healthRequestCount: () => number
+  seenWebSocketUrls: string[]
 }
 
 function makeTempDir(prefix: string): string {
@@ -40,6 +42,7 @@ async function createAppWithDataDir(dataDir: string): Promise<ElysiaApp> {
 
 async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
   const seenHosts: string[] = []
+  const seenWebSocketUrls: string[] = []
   let healthRequestCount = 0
   const workspace = {
     id: 'remote-workspace-1',
@@ -114,6 +117,11 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
     response.writeHead(404, { 'content-type': 'text/plain' })
     response.end('not found')
   })
+  const webSocketServer = new WebSocketServer({ server })
+  webSocketServer.on('connection', (socket, request) => {
+    seenWebSocketUrls.push(request.url ?? '')
+    socket.on('message', (data, isBinary) => socket.send(data, { binary: isBinary }))
+  })
 
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject)
@@ -126,9 +134,37 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
   return {
     baseUrl: `http://127.0.0.1:${address.port}`,
     seenHosts,
+    seenWebSocketUrls,
     healthRequestCount: () => healthRequestCount,
-    close: () => closeServer(server),
+    close: async () => {
+      for (const client of webSocketServer.clients) {
+        client.terminate()
+      }
+      webSocketServer.close()
+      await closeServer(server)
+    },
   }
+}
+
+async function getAvailablePort(): Promise<number> {
+  const server = createServer()
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => resolve())
+  })
+  const port = (server.address() as AddressInfo).port
+  await closeServer(server)
+  return port
+}
+
+async function receiveWebSocketMessage(socket: WebSocket): Promise<string> {
+  return await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Timed out waiting for WebSocket message.')), 3_000)
+    socket.once('message', (data) => {
+      clearTimeout(timeout)
+      resolve(data.toString())
+    })
+  })
 }
 
 function writeJson(response: import('node:http').ServerResponse, payload: unknown): void {
@@ -292,6 +328,41 @@ describe('remote Cradle Server hosts', () => {
       expect(fakeRemote.seenHosts.some(host => host.includes('127.0.0.1') && !host.startsWith('localhost'))).toBe(true)
     }
     finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
+  it('upgrades the transparent upstream route and isolates the local ticket', async () => {
+    const dataDir = makeTempDir('cradle-remote-websocket-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    let app: ElysiaApp | undefined
+    let socket: WebSocket | undefined
+
+    try {
+      fakeRemote = await startFakeRemoteCradleServer()
+      app = await createAppWithDataDir(dataDir)
+      await createDirectUrlHost(app, 'remote-host-websocket', fakeRemote.baseUrl)
+
+      const port = await getAvailablePort()
+      app.listen({ hostname: '127.0.0.1', port })
+      socket = new WebSocket(
+        `ws://127.0.0.1:${port}/remote-hosts/remote-host-websocket/upstream/echo?ticket=local-only&marker=kept`,
+      )
+      await new Promise<void>((resolve, reject) => {
+        socket?.once('open', resolve)
+        socket?.once('error', reject)
+      })
+
+      socket.send('through-the-gateway')
+      await expect(receiveWebSocketMessage(socket)).resolves.toBe('through-the-gateway')
+      expect(fakeRemote.seenWebSocketUrls).toEqual(['/echo?marker=kept'])
+    }
+    finally {
+      socket?.close(1000, 'test complete')
+      if (app?.server) {
+        await app.stop()
+      }
       rmSync(dataDir, { recursive: true, force: true })
       restoreEnv('CRADLE_DATA_DIR', previousDataDir)
     }

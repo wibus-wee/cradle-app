@@ -45,10 +45,21 @@ export interface ChatFileLineCommentContextPart {
   position?: number
 }
 
+export interface ChatIntentContextPart {
+  type: 'data-cradle-intent'
+  intentId: 'review' | 'commit' | 'push'
+  name: string
+  label: string
+  /** Prompt expanded for the model; never shown as plain bubble text. */
+  prompt: string
+  position?: number
+}
+
 export type ChatContextPart
   = | ChatSkillContextPart
     | ChatPluginContextPart
     | ChatFileLineCommentContextPart
+    | ChatIntentContextPart
 export type ChatSkillContextMessagePart = {
   type: 'data-cradle-skill'
   data: ChatSkillContextPart
@@ -61,10 +72,15 @@ export type ChatFileLineCommentContextMessagePart = {
   type: 'data-cradle-file-line-comment'
   data: ChatFileLineCommentContextPart
 }
+export type ChatIntentContextMessagePart = {
+  type: 'data-cradle-intent'
+  data: ChatIntentContextPart
+}
 export type ChatContextMessagePart
   = | ChatSkillContextMessagePart
     | ChatPluginContextMessagePart
     | ChatFileLineCommentContextMessagePart
+    | ChatIntentContextMessagePart
 
 function readSkillContextPayload(part: unknown): ChatSkillContextPart | null {
   if (!part || typeof part !== 'object') {
@@ -160,6 +176,31 @@ function readFileLineCommentPayload(part: unknown): ChatFileLineCommentContextPa
   return data as ChatFileLineCommentContextPart
 }
 
+function readIntentPayload(part: unknown): ChatIntentContextPart | null {
+  if (!part || typeof part !== 'object') {
+    return null
+  }
+  const record = part as { type?: unknown, data?: unknown }
+  if (record.type !== 'data-cradle-intent') {
+    return null
+  }
+  const data
+    = record.data && typeof record.data === 'object'
+      ? (record.data as Partial<ChatIntentContextPart>)
+      : null
+  if (
+    !data
+    || data.type !== 'data-cradle-intent'
+    || (data.intentId !== 'review' && data.intentId !== 'commit' && data.intentId !== 'push')
+    || typeof data.name !== 'string'
+    || typeof data.label !== 'string'
+    || typeof data.prompt !== 'string'
+  ) {
+    return null
+  }
+  return data as ChatIntentContextPart
+}
+
 function readPluginNativeMention(value: unknown): ChatPluginNativeMention | null {
   if (!value || typeof value !== 'object') {
     return null
@@ -188,6 +229,10 @@ export function isChatFileLineCommentContextPart(
   return readFileLineCommentPayload(part) !== null
 }
 
+export function isChatIntentContextPart(part: unknown): part is ChatIntentContextMessagePart {
+  return readIntentPayload(part) !== null
+}
+
 export function readSkillContextPart(part: unknown): ChatSkillContextPart | null {
   return readSkillContextPayload(part)
 }
@@ -202,12 +247,19 @@ export function readFileLineCommentContextPart(
   return readFileLineCommentPayload(part)
 }
 
+export function readIntentContextPart(part: unknown): ChatIntentContextPart | null {
+  return readIntentPayload(part)
+}
+
 function toMessageContextPart(part: ChatContextPart): ChatContextMessagePart {
   if (part.type === 'data-cradle-skill') {
     return { type: 'data-cradle-skill', data: part }
   }
   if (part.type === 'data-cradle-plugin') {
     return { type: 'data-cradle-plugin', data: part }
+  }
+  if (part.type === 'data-cradle-intent') {
+    return { type: 'data-cradle-intent', data: part }
   }
   return { type: 'data-cradle-file-line-comment', data: part }
 }
@@ -263,4 +315,8 @@ export function readFileLineCommentContextLabel(part: ChatFileLineCommentContext
   const lines
     = part.lineStart === part.lineEnd ? `L${part.lineStart}` : `L${part.lineStart}-L${part.lineEnd}`
   return `${part.path}:${lines}`
+}
+
+export function readIntentContextLabel(part: ChatIntentContextPart): string {
+  return part.label || part.name
 }

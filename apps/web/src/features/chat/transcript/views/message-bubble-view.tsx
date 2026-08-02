@@ -1,6 +1,7 @@
-import { Streamdown } from '@cradle/streamdown'
+import type { MarkdownComponents } from '@cradle/streamdown'
+import { remarkCodeComment, remarkCommitGroup, Streamdown } from '@cradle/streamdown'
 import type { UIMessage } from 'ai'
-import type { ReactNode } from 'react'
+import type { ComponentPropsWithoutRef, ComponentType, ReactNode } from 'react'
 import { useEffect, useState } from 'react'
 
 import { cn } from '~/lib/cn'
@@ -12,6 +13,15 @@ import { RuntimeWarningBlock } from '../../rendering/blocks/runtime-warning-bloc
 import type { ChatRenderItem } from '../../rendering/chat-render-plan'
 import { groupMessageParts, splitExecutionPhase } from '../../rendering/chat-render-plan'
 import { toolNameFromPart } from '../../rendering/chat-tool-entities'
+import type { CodeCommentData } from '../../rendering/code-comment-block-view'
+import {
+  CodeCommentBlockView,
+} from '../../rendering/code-comment-block-view'
+import type { CommitGroupData } from '../../rendering/commit-group-block-view'
+import {
+  CommitGroupBlockView,
+  parseCommitGroupFiles,
+} from '../../rendering/commit-group-block-view'
 import {
   GoalMessageLabel,
   SteerMessageLabel,
@@ -31,6 +41,7 @@ import { UserMessageText } from '../../rendering/user-message-text'
 import { ActivityFeedView } from '../../tool-blocks/views/activity-feed-view'
 import { ToolCallBlockView } from '../../tool-blocks/views/tool-call-block-view'
 import { FileAttachmentView } from './file-attachment-view'
+import { IntentContextView } from './intent-context-view'
 import { MarkdownFileLinkView } from './markdown-file-link-view'
 import { MessageBubbleActionsView } from './message-bubble-actions-view'
 import { PluginContextView } from './plugin-context-view'
@@ -46,6 +57,55 @@ const DEFAULT_STREAMDOWN_OPTIONS = {
   animateMode: 'char',
   showCursor: false,
 } as const
+
+const MESSAGE_DIRECTIVE_REMARK_PLUGINS = [remarkCodeComment, remarkCommitGroup]
+
+type CodeCommentMarkdownProps = ComponentPropsWithoutRef<'div'> & CodeCommentData
+type CommitGroupMarkdownProps = ComponentPropsWithoutRef<'div'> & CommitGroupData
+
+type MessageMarkdownComponents = MarkdownComponents & {
+  'code-comment': ComponentType<CodeCommentMarkdownProps>
+  'commit-group': ComponentType<CommitGroupMarkdownProps>
+}
+
+function readCodeCommentLineRange(start?: string, end?: string): string | null {
+  if (!start) {
+    return null
+  }
+  return end && end !== start ? `${start}–${end}` : start
+}
+
+function readCodeCommentFileName(file: string): string {
+  return file.split('/').filter(Boolean).at(-1) ?? file
+}
+
+const MESSAGE_MARKDOWN_COMPONENTS: MessageMarkdownComponents = {
+  'a': props => <MarkdownFileLinkView {...readMarkdownAnchorProps(props)} />,
+  'code-comment': ({ title, body, file, start, end, priority }) => {
+    const lineRange = readCodeCommentLineRange(start, end)
+    const fileLink = file
+      ? (
+          <MarkdownFileLinkView href={start ? `${file}:${start}` : file} className="font-mono" title={file}>
+            {readCodeCommentFileName(file)}
+            {lineRange ? `:${lineRange}` : ''}
+          </MarkdownFileLinkView>
+        )
+      : undefined
+    return <CodeCommentBlockView title={title} body={body} file={file} start={start} end={end} priority={priority} fileLink={fileLink} />
+  },
+  'commit-group': ({ message, files, body }) => {
+    const filePaths = parseCommitGroupFiles(files)
+    const fileLinks = filePaths.length > 0
+      ? new Map(filePaths.map(file => [
+          file,
+          <MarkdownFileLinkView key={file} href={file} className="font-mono" title={file}>
+            {readCodeCommentFileName(file)}
+          </MarkdownFileLinkView>,
+        ]))
+      : undefined
+    return <CommitGroupBlockView message={message} files={files} body={body} fileLinks={fileLinks} />
+  },
+}
 
 export interface MessageBubbleViewProps {
   message: UIMessage
@@ -120,7 +180,8 @@ export function MessageBubbleView({
                 animateMode={DEFAULT_STREAMDOWN_OPTIONS.animateMode}
                 showCursor={DEFAULT_STREAMDOWN_OPTIONS.showCursor}
                 animated={item.text.length <= MESSAGE_STREAMING_ANIMATION_MAX_CHARS}
-                components={{ a: props => <MarkdownFileLinkView {...readMarkdownAnchorProps(props)} /> }}
+                components={MESSAGE_MARKDOWN_COMPONENTS}
+                remarkPlugins={MESSAGE_DIRECTIVE_REMARK_PLUGINS}
               />
             )
       case 'activity-feed':
@@ -161,6 +222,7 @@ export function MessageBubbleView({
         )
       case 'skill-context': return <SkillContextView key={item.key} part={item.part} />
       case 'plugin-context': return <PluginContextView key={item.key} part={item.part} />
+      case 'intent-context': return <IntentContextView key={item.key} part={item.part} />
       case 'runtime-warning': return <RuntimeWarningBlock key={item.key} warning={item.part.data} />
       default: return null
     }

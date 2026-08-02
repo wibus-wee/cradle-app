@@ -32,6 +32,7 @@ import { readSessionThinkingEffort } from '~/features/chat/session/session-think
 import { cn } from '~/lib/cn'
 import { useActiveSurface } from '~/navigation/active-surface'
 
+import { buildJarvisPromptText } from './build-jarvis-prompt'
 import { stripCradleContextForDisplay } from './display-context'
 import type { ExplicitContextAttachment } from './explicit-context'
 import {
@@ -40,9 +41,7 @@ import {
   removeExplicitContextAttachment,
   useExplicitContextAttachments,
 } from './explicit-context'
-import { formatContextEnvelopeForAgent } from './format-context'
 import { useJarvisUiStore } from './jarvis-ui-store'
-import { collectContextEnvelope } from './use-context-snapshot'
 import { useJarvisPreferences } from './use-jarvis-preferences'
 
 const FALLBACK_EXPANDED_BOUNDS = { top: 44, left: 268, width: 800, height: 600 }
@@ -91,18 +90,6 @@ function clipContextLabel(label: string): string {
   }
 
   return `${trimmed.slice(0, MAX_CONTEXT_LABEL_CHARS).trimEnd()}...`
-}
-
-function buildJarvisPromptText(text: string, includeContext: boolean): string {
-  const envelope = collectContextEnvelope()
-  const contextItems = includeContext
-    ? envelope.items
-    : envelope.items.filter(item => item.id.startsWith('explicit:'))
-  const contextBlock = contextItems.length > 0
-    ? formatContextEnvelopeForAgent({ ...envelope, items: contextItems })
-    : ''
-
-  return contextBlock ? `${contextBlock}\n\n${text}` : text
 }
 
 function readSessionRuntimeKind(value: unknown): RuntimeKind | undefined {
@@ -466,8 +453,8 @@ export function JarvisPopover({
   }, [includeContext, setIncludeContext])
 
   const prepareJarvisSend = React.useCallback<NonNullable<ChatViewProps['prepareSend']>>(
-    ({ text, files, contextParts, options }) => {
-      const preparedText = buildJarvisPromptText(text, includeContext)
+    async ({ text, files, contextParts, options }) => {
+      const preparedText = await buildJarvisPromptText(text, includeContext)
       clearExplicitContextAttachments()
       setSendError(null)
       return {
@@ -492,7 +479,7 @@ export function JarvisPopover({
 
     setCreating(true)
     setSendError(null)
-    const preparedText = buildJarvisPromptText(trimmedText, includeContext)
+    const preparedText = await buildJarvisPromptText(trimmedText, includeContext)
 
     try {
       const res = await postSessions({

@@ -295,6 +295,7 @@ function useNewChatPageOwner(
           modelId: options.modelId,
           thinkingEffort: options.thinkingEffort,
           runtimeSettings: readRunRuntimeSettingsPatch(options.runtimeSettings),
+          reviewTarget: options.reviewTarget,
         },
         onAccepted: () => {
           void Promise.all([

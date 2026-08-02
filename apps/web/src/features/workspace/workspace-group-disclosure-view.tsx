@@ -2,6 +2,7 @@ import {
   AlertLine as CircleAlertIcon,
   FolderLine as FolderClosedIcon,
   FolderOpenLine as FolderOpenIcon,
+  LoadingLine,
   More2Line as MoreHorizontalIcon,
   PinLine as PinIcon,
 } from '@mingcute/react'
@@ -43,6 +44,7 @@ export interface WorkspaceGroupDisclosureViewProps {
   workspacePinned: boolean
   workspaceActions: WorkspaceMenuAction[]
   expanded: boolean
+  runningSessionCount: number
   overlays: ReactNode
   children: ReactNode
   onToggleExpanded: () => void
@@ -100,6 +102,7 @@ export function WorkspaceGroupDisclosureView({
   workspacePinned,
   workspaceActions,
   expanded,
+  runningSessionCount,
   overlays,
   children,
   onToggleExpanded,
@@ -158,6 +161,23 @@ export function WorkspaceGroupDisclosureView({
             )
           : null}
       </button>
+
+      {!expanded && runningSessionCount > 0
+        ? (
+            <span
+              className="flex shrink-0 items-center gap-1 rounded-full bg-fill/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums"
+              aria-label={t('workspace.aria.runningSessions', { count: runningSessionCount })}
+              role="status"
+              data-testid={`workspace-running-badge-${workspace.id}`}
+            >
+              <LoadingLine
+                className="size-2.5 animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+              {runningSessionCount}
+            </span>
+          )
+        : null}
 
       <Menu>
         <MenuTrigger

@@ -46,6 +46,8 @@ interface SplitWorkspaceStoreState {
    * Returns the pane id, or `null` when the route is already on screen.
    */
   registerPane: (surfaceId: string, route: SurfaceRoute) => string | null
+  /** Replace a secondary pane's route without changing its instance identity. */
+  updatePaneRoute: (surfaceId: string, paneId: string, route: SurfaceRoute) => void
   forgetPane: (surfaceId: string, paneId: string) => void
   focusPane: (surfaceId: string, paneId: string) => void
   setLayout: (surfaceId: string, layout: SerializedDockview | null) => void
@@ -55,6 +57,18 @@ interface SplitWorkspaceStoreState {
 const STORAGE_KEY = 'cradle:split-workspaces:v1'
 /** Chat-only predecessor of this store; its layouts are not portable. */
 const LEGACY_STORAGE_KEY = 'cradle:chat-split-workspaces:v1'
+
+let localPaneId = 0
+
+function createPaneId(route: SurfaceRoute): string {
+  const resourceId = surfaceIdForRoute(route)
+  const uuid = globalThis.crypto?.randomUUID?.()
+  if (uuid) {
+    return `pane:${resourceId}:${uuid}`
+  }
+  localPaneId += 1
+  return `pane:${resourceId}:${Date.now().toString(36)}-${localPaneId.toString(36)}`
+}
 
 function createWorkspace(route: SurfaceRoute): SplitWorkspace {
   const paneId = surfaceIdForRoute(route)
@@ -108,13 +122,13 @@ export const useSplitWorkspaceStore = create<SplitWorkspaceStoreState>()(
         }),
 
       registerPane: (surfaceId, route) => {
-        const paneId = surfaceIdForRoute(route)
         let registered: string | null = null
         set((state) => {
           const existing = state.workspaces[surfaceId]
-          if (!existing || existing.panes[paneId]) {
+          if (!existing || Object.values(existing.panes).some(pane => sameRoute(pane.route, route))) {
             return state
           }
+          const paneId = createPaneId(route)
           registered = paneId
           return {
             workspaces: {
@@ -129,6 +143,27 @@ export const useSplitWorkspaceStore = create<SplitWorkspaceStoreState>()(
         })
         return registered
       },
+
+      updatePaneRoute: (surfaceId, paneId, route) =>
+        set((state) => {
+          const workspace = state.workspaces[surfaceId]
+          const pane = workspace?.panes[paneId]
+          if (!workspace || !pane || paneId === workspace.primaryPaneId || sameRoute(pane.route, route)) {
+            return state
+          }
+          return {
+            workspaces: {
+              ...state.workspaces,
+              [surfaceId]: {
+                ...workspace,
+                panes: {
+                  ...workspace.panes,
+                  [paneId]: { ...pane, route },
+                },
+              },
+            },
+          }
+        }),
 
       forgetPane: (surfaceId, paneId) =>
         set((state) => {
@@ -209,6 +244,11 @@ useSurfaceStore.subscribe((state) => {
 
 export function readSplitWorkspace(surfaceId: string): SplitWorkspace | undefined {
   return useSplitWorkspaceStore.getState().workspaces[surfaceId]
+}
+
+export function readSplitPaneByRoute(surfaceId: string, route: SurfaceRoute): SplitPane | null {
+  const workspace = readSplitWorkspace(surfaceId)
+  return Object.values(workspace?.panes ?? {}).find(pane => sameRoute(pane.route, route)) ?? null
 }
 
 export function isSplitWorkspace(workspace: SplitWorkspace | undefined): boolean {

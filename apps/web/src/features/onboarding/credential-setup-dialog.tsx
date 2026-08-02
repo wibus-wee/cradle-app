@@ -15,8 +15,7 @@ import {
   DialogFooter,
   DialogTitle,
 } from '~/components/ui/dialog'
-import { DraftSetupPanel } from '~/features/agent-management/draft-setup-panel'
-import type { DraftProvider } from '~/features/agent-management/provider-settings-utils'
+import { ProviderSetupFlow } from '~/features/agent-management/provider-setup-flow'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
 import { GithubAppConnectionView } from '~/features/settings/github-app-connection-view'
 import { useGithubAppConnectionController } from '~/features/settings/use-github-app-connection-controller'
@@ -79,7 +78,7 @@ export function CredentialSetupDialog() {
   const [sessionActive, setSessionActive] = useState(false)
   const [step, setStep] = useState<DialogStep | null>(null)
   const [sessionQueue, setSessionQueue] = useState<FirstRunSetupStepKey[]>([])
-  const [draft, setDraft] = useState<DraftProvider>({ id: 'first-run-draft', presetId: null })
+  const [providerPresetId, setProviderPresetId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!onboardingCompleted || !inventoryReady || pendingSteps.length === 0 || sessionActive) {
@@ -99,7 +98,7 @@ export function CredentialSetupDialog() {
     setSessionActive(false)
     setStep(null)
     setSessionQueue([])
-    setDraft({ id: 'first-run-draft', presetId: null })
+    setProviderPresetId(null)
   }
 
   function dismissRemaining() {
@@ -168,12 +167,17 @@ export function CredentialSetupDialog() {
 
           {step === 'provider'
             ? (
-                <DraftSetupPanel
-                  draft={draft}
-                  onSelectPreset={presetId => setDraft(prev => ({ ...prev, presetId: presetId || null }))}
-                  onComplete={() => advanceFrom('provider')}
-                  onCancel={() => advanceFrom('provider')}
-                />
+                // Full-bleed: the flow owns its own horizontal padding and
+                // pinned footer, matching the settings AddProviderDialog.
+                <div className="-mx-5 -mb-4">
+                  <ProviderSetupFlow
+                    presetId={providerPresetId}
+                    onSelectPreset={presetId => setProviderPresetId(presetId || null)}
+                    onComplete={() => advanceFrom('provider')}
+                    onCancel={() => advanceFrom('provider')}
+                    showGalleryHeader={false}
+                  />
+                </div>
               )
             : null}
 

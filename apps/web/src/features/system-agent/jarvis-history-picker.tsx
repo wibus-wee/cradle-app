@@ -52,6 +52,7 @@ function isJarvisHistorySession(session: GetSessionsResponse[number]): boolean {
     && session.parentSessionId === null
     && session.sideContextSource === null
     && session.archivedAt === null
+    && session.origin !== 'jarvis-ambient'
 }
 
 export function JarvisHistoryPicker({

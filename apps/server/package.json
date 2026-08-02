@@ -122,6 +122,7 @@
     "@types/node": "^22.19.1",
     "nodemon": "^3.1.9",
     "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "unplugin-swc": "^1.5.9",
     "vite": "^8.0.0",
     "vite-node": "^6.0.0",

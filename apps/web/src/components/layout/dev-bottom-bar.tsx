@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import { Switch } from '~/components/ui/switch'
 import { BackgroundActivityPopover } from '~/features/devtool/background-activity/background-activity-popover'
 import { ResourcesPopover } from '~/features/devtool/resources/resources-popover'
+import { UiActivityPopover } from '~/features/devtool/ui-activity/ui-activity-popover'
 import { isElectron, nativeIpc } from '~/lib/electron'
 import { getReactDiagnosticsApi } from '~/lib/react-diagnostics'
 
@@ -102,6 +103,7 @@ export function DevBottomBar() {
           {t('dev.action.openUserData')}
         </button>
         <BackgroundActivityPopover />
+        <UiActivityPopover />
         <ResourcesPopover />
       </div>
     </footer>

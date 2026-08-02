@@ -12,6 +12,7 @@ export interface WorkspaceGroupDisclosureProps {
   workspace: Workspace
   workspacePinned: boolean
   workspaceActions: WorkspaceMenuAction[]
+  runningSessionCount: number
   overlays: ReactNode
   children: ReactNode
 }
@@ -20,6 +21,7 @@ export function WorkspaceGroupDisclosure({
   workspace,
   workspacePinned,
   workspaceActions,
+  runningSessionCount,
   overlays,
   children,
 }: WorkspaceGroupDisclosureProps) {
@@ -42,6 +44,7 @@ export function WorkspaceGroupDisclosure({
       workspacePinned={workspacePinned}
       workspaceActions={workspaceActions}
       expanded={expanded}
+      runningSessionCount={runningSessionCount}
       overlays={overlays}
       onToggleExpanded={toggleExpanded}
       onOpenWorkspace={openWorkspace}

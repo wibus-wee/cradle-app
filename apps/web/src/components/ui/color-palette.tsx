@@ -473,7 +473,7 @@ export function ColorPalette({
             whileTap={{ scale: 0.92 }}
             transition={{ type: 'spring', duration: 0.25, bounce: 0.4 }}
             className={cn(
-              'relative size-5 shrink-0 overflow-hidden rounded-full shadow-[0_0_0_1px_rgba(0,0,0,0.10),0_1px_3px_rgba(0,0,0,0.16)] outline-none ring-primary/55 transition-shadow focus-visible:ring-2 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.12),0_1px_3px_rgba(0,0,0,0.28)]',
+              'relative size-5 shrink-0 overflow-hidden rounded-full shadow-[var(--shadow-xs)] outline-none ring-ring/20 transition-shadow focus-visible:ring-ring/20',
               className,
             )}
           >
@@ -490,7 +490,7 @@ export function ColorPalette({
               ariaLabel={`${label} saturation and brightness`}
               ariaValueNow={Math.round(hsva.s * 100)}
               ariaValueText={`Saturation ${Math.round(hsva.s * 100)}%, brightness ${Math.round(hsva.v * 100)}%`}
-              className="h-32 w-full cursor-crosshair overflow-hidden rounded-xl ring-1 ring-foreground/10 focus-visible:ring-2 focus-visible:ring-primary/60"
+              className="h-32 w-full cursor-crosshair overflow-hidden rounded-xl ring-1 ring-border focus-visible:ring-ring/20"
               style={{
                 backgroundColor: `hsl(${hsva.h}, 100%, 50%)`,
                 backgroundImage: 'linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent)',
@@ -512,7 +512,7 @@ export function ColorPalette({
 
           {/* Preview + hue + alpha sliders */}
           <div className="flex items-center gap-2.5">
-            <span className="relative size-9 shrink-0 overflow-hidden rounded-full ring-1 ring-foreground/15">
+            <span className="relative size-9 shrink-0 overflow-hidden rounded-full ring-1 ring-border">
               <span className="absolute inset-0" style={CHECKERBOARD_STYLE} aria-hidden="true" />
               <span className="absolute inset-0" style={{ backgroundColor: displayColor }} aria-hidden="true" />
             </span>
@@ -522,7 +522,7 @@ export function ColorPalette({
                 ariaValueNow={Math.round(hsva.h)}
                 ariaValueMax={360}
                 ariaValueText={`Hue ${Math.round(hsva.h)} degrees`}
-                className="h-3.5 w-full cursor-pointer rounded-full ring-1 ring-foreground/10 focus-visible:ring-2 focus-visible:ring-primary/60"
+                className="h-3.5 w-full cursor-pointer rounded-full ring-1 ring-border focus-visible:ring-ring/20"
                 style={{ backgroundImage: HUE_GRADIENT }}
                 onKeyDown={hueKeyStep}
                 onPick={x => commit({ ...hsva, h: x * 360 })}
@@ -534,7 +534,7 @@ export function ColorPalette({
                   ariaLabel={`${label} opacity`}
                   ariaValueNow={Math.round(hsva.a * 100)}
                   ariaValueText={`Opacity ${Math.round(hsva.a * 100)}%`}
-                  className="relative h-3.5 w-full cursor-pointer overflow-hidden rounded-full ring-1 ring-foreground/10 focus-visible:ring-2 focus-visible:ring-primary/60"
+                  className="relative h-3.5 w-full cursor-pointer overflow-hidden rounded-full ring-1 ring-border focus-visible:ring-ring/20"
                   style={CHECKERBOARD_STYLE}
                   onKeyDown={alphaKeyStep}
                   onPick={x => commit({ ...hsva, a: x })}
@@ -552,7 +552,7 @@ export function ColorPalette({
 
           {/* Hex + alpha inputs + eyedropper */}
           <div className="flex items-center gap-2">
-            <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-lg bg-foreground/5 px-2 ring-1 ring-foreground/10 focus-within:ring-primary/55 dark:bg-white/6">
+            <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-lg bg-muted px-2 ring-1 ring-border focus-within:ring-ring/20">
               <span className="text-[11px] font-medium text-muted-foreground">#</span>
               <Input
                 id={hexInputId}
@@ -565,7 +565,7 @@ export function ColorPalette({
               />
             </div>
             {!disableAlpha && (
-              <div className="flex h-8 w-14 items-center gap-0.5 rounded-lg bg-foreground/5 px-2 ring-1 ring-foreground/10 focus-within:ring-primary/55 dark:bg-white/6">
+              <div className="flex h-8 w-14 items-center gap-0.5 rounded-lg bg-muted px-2 ring-1 ring-border focus-within:ring-ring/20">
                 <Input
                   type="number"
                   min={0}
@@ -585,7 +585,7 @@ export function ColorPalette({
                 size="icon"
                 aria-label="Pick color from screen"
                 title="Pick color from screen"
-                className="size-8 shrink-0 rounded-lg bg-foreground/5 text-muted-foreground ring-1 ring-foreground/10 hover:bg-foreground/10 hover:text-foreground active:scale-95 dark:bg-white/6"
+                className="size-8 shrink-0 rounded-lg bg-muted text-muted-foreground ring-1 ring-border hover:bg-accent hover:text-foreground active:scale-95"
                 onClick={handleEyeDropper}
               >
                 <PipetteIcon className="size-3.5" />
@@ -607,7 +607,7 @@ export function ColorPalette({
                   whileHover={{ scale: 1.18, zIndex: 1 }}
                   whileTap={{ scale: 0.88 }}
                   transition={{ type: 'spring', duration: 0.22, bounce: 0.4 }}
-                  className="relative flex aspect-square items-center justify-center rounded-md ring-1 ring-foreground/10 ring-inset"
+                  className="relative flex aspect-square items-center justify-center rounded-md ring-1 ring-border ring-inset"
                   style={{ backgroundColor: preset }}
                   onClick={() => presetRgba && commit({ ...rgbToHsv(presetRgba), a: 1 })}
                 >

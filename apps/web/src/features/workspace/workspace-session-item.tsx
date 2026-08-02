@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import { writeSurfaceRouteDrag } from '~/features/split-view/dnd/split-drag-payload'
 import type { WorkSummary } from '~/features/work/use-work'
+import type { Workspace } from '~/features/workspace/types'
 import { isElectron } from '~/lib/electron'
 import { useIsActiveSurfaceId } from '~/navigation/active-surface'
 import {
@@ -46,6 +47,7 @@ export interface WorkspaceSessionItemMenuRequest {
 
 export interface WorkspaceSessionItemProps {
   session: WorkspaceSession
+  workspace?: Workspace
   work: WorkSummary | null
   isStreaming: boolean
   attentionKind: WorkspaceSessionAttentionKind | null
@@ -86,6 +88,7 @@ function formatRelativeTime(
 export const WorkspaceSessionItem = memo(
   ({
     session,
+    workspace,
     work,
     isStreaming,
     attentionKind,
@@ -255,6 +258,7 @@ export const WorkspaceSessionItem = memo(
     return (
       <WorkspaceSessionItemView
         session={session}
+        workspace={workspace}
         work={work}
         active={active}
         dimmed={dimmed}

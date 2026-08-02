@@ -99,11 +99,18 @@ export interface ModelRegistrySearchResult {
   capabilities: ModelCapabilities
 }
 
-interface ModelsDevProvider {
+export interface ModelsDevProvider {
+  name?: string
+  /** OpenAI-compatible base URL advertised by the provider, when any. */
+  api?: string
+  npm?: string
+  /** Required environment variable names, e.g. ['DEEPSEEK_API_KEY']. */
+  env?: string[]
+  doc?: string
   models: Record<string, ModelsDevModel>
 }
 
-type ModelsDevData = Record<string, ModelsDevProvider>
+export type ModelsDevData = Record<string, ModelsDevProvider>
 
 const MODELS_DEV_URL = 'https://models.dev/api.json'
 const CACHE_KEY = 'models_dev_api_json'
@@ -153,6 +160,11 @@ export const ModelsDevModelSchema: z.ZodType<ModelsDevModel> = z.object({
 }).passthrough()
 
 const ModelsDevDataSchema = z.record(z.string(), z.object({
+  name: z.string().optional(),
+  api: z.string().optional(),
+  npm: z.string().optional(),
+  env: z.array(z.string()).optional(),
+  doc: z.string().optional(),
   models: z.record(z.string(), ModelsDevModelSchema),
 }).passthrough())
 
@@ -254,7 +266,7 @@ function scheduleBackgroundRefresh(): void {
  * - soft ≤ age < hard → return cache, refresh in background
  * - age ≥ hard (or miss) → await network; fall back to stale on failure
  */
-async function fetchModelsDevData(options?: { forceRefresh?: boolean }): Promise<ModelsDevData | null> {
+export async function fetchModelsDevData(options?: { forceRefresh?: boolean }): Promise<ModelsDevData | null> {
   if (options?.forceRefresh) {
     return (await refreshFromNetwork()) ?? getLocalCache()?.data ?? null
   }

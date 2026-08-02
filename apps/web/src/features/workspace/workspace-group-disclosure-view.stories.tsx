@@ -77,6 +77,7 @@ function WorkspaceGroupDisclosureCatalog() {
               workspaceFixtures.local.id,
               setActivity,
             )}
+            runningSessionCount={0}
             expanded={localExpanded}
             overlays={null}
             onToggleExpanded={() => setLocalExpanded(current => !current)}
@@ -117,6 +118,7 @@ function WorkspaceGroupDisclosureCatalog() {
               workspaceFixtures.missing.id,
               setActivity,
             )}
+            runningSessionCount={0}
             expanded={missingExpanded}
             overlays={null}
             onToggleExpanded={() => setMissingExpanded(current => !current)}
@@ -134,6 +136,7 @@ function WorkspaceGroupDisclosureCatalog() {
               workspaceFixtures.remote.id,
               setActivity,
             )}
+            runningSessionCount={2}
             expanded={remoteExpanded}
             overlays={null}
             onToggleExpanded={() => setRemoteExpanded(current => !current)}

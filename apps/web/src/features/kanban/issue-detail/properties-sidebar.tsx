@@ -115,17 +115,14 @@ export const PropertiesSidebar = ({
   })()
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="bg-card rounded-lg px-3 py-2 text-sm shadow-xs font-medium text-muted-foreground border border-border">
+    <div className="flex flex-col divide-y divide-border/60" data-testid="issue-properties-sidebar">
+      <div className="flex flex-col gap-0.5 pb-3">
         {/* Workspace */}
         <PropertyRow label={t('property.workspace')}>
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={readOnly}
-              className={cn(
-                'flex max-w-44 items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px] text-foreground transition-colors',
-                readOnly ? 'cursor-default' : 'hover:bg-fill',
-              )}
+              className={cn(propertyTriggerClass(readOnly), 'max-w-44')}
               data-testid="issue-workspace-trigger"
             >
               <span className="truncate">{currentWorkspace?.name ?? issue.workspaceId}</span>
@@ -154,10 +151,7 @@ export const PropertiesSidebar = ({
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={readOnly}
-              className={cn(
-                'flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px] text-foreground transition-colors',
-                readOnly ? 'cursor-default' : 'hover:bg-fill',
-              )}
+              className={propertyTriggerClass(readOnly)}
               data-testid="issue-status-trigger"
             >
               {currentStatus && (
@@ -186,10 +180,7 @@ export const PropertiesSidebar = ({
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={readOnly}
-              className={cn(
-                'flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px] text-foreground transition-colors',
-                readOnly ? 'cursor-default' : 'hover:bg-fill',
-              )}
+              className={propertyTriggerClass(readOnly)}
               data-testid="issue-priority-trigger"
             >
               <PriorityIcon priority={issue.priority as IssuePriority} size={14} />
@@ -243,11 +234,13 @@ export const PropertiesSidebar = ({
             <DropdownMenuTrigger
               disabled={readOnly}
               className={cn(
-                'flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px] text-foreground transition-colors',
-                readOnly ? 'cursor-default' : 'hover:bg-fill',
+                propertyTriggerClass(readOnly),
+                'max-w-40',
+                !currentMilestone && 'border border-dashed border-border text-muted-foreground hover:text-foreground',
               )}
+              data-testid="issue-milestone-trigger"
             >
-              <span>{currentMilestone?.title ?? t('priority.none')}</span>
+              <span className="truncate">{currentMilestone?.title ?? t('priority.none')}</span>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-44">
               <DropdownMenuRadioGroup
@@ -280,9 +273,7 @@ export const PropertiesSidebar = ({
 
       <AgentSessionPanel issue={issue} readOnly={readOnly} />
 
-      <div className="my-3" />
-
-      <div className="bg-card rounded-lg px-3 py-2 shadow-xs text-sm font-medium text-muted-foreground border border-border">
+      <div className="pt-3">
         <RelationManager
           issueId={issue.id}
           workspaceId={issue.workspaceId}
@@ -291,6 +282,14 @@ export const PropertiesSidebar = ({
         />
       </div>
     </div>
+  )
+}
+
+/** Shared visual language for every property value trigger — same height, radius, and hover feel. */
+function propertyTriggerClass(readOnly: boolean): string {
+  return cn(
+    'flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[13px] text-foreground transition-colors',
+    readOnly ? 'cursor-default' : 'hover:bg-fill',
   )
 }
 
@@ -356,29 +355,26 @@ function AgentSessionPanel({
       && !rerunSession.isPending
 
   return (
-    <div
-      className="mt-2 rounded-lg border border-border bg-card px-3 py-2 text-sm shadow-xs"
-      data-testid="issue-agent-session"
-    >
+    <div className="flex flex-col gap-2.5 py-3" data-testid="issue-agent-session">
       {currentSession && (
         <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <div className="text-[12px] font-medium text-muted-foreground">Agent session</div>
-            <div
-              className="mt-0.5 text-[13px] font-semibold text-foreground"
+          <div className="flex min-w-0 items-center gap-1.5">
+            <SessionStatusDot status={currentSession.status} />
+            <span className="text-[12px] font-medium text-muted-foreground">Delegation</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span
+              className="truncate text-[12px] text-foreground"
               data-testid="issue-agent-session-phase"
             >
               {agentSessionStatusText[currentSession.status]}
-            </div>
+            </span>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-0.5">
             <button
               type="button"
               className={cn(
-                'flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors',
-                canOpenChat
-                  ? 'hover:bg-fill hover:text-foreground'
-                  : 'cursor-not-allowed opacity-50',
+                'flex size-6 items-center justify-center rounded text-muted-foreground transition-colors',
+                canOpenChat ? 'hover:bg-fill hover:text-foreground' : 'cursor-not-allowed opacity-40',
               )}
               disabled={!canOpenChat}
               aria-label="Open chat"
@@ -396,10 +392,8 @@ function AgentSessionPanel({
               <button
                 type="button"
                 className={cn(
-                  'flex size-7 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors',
-                  canRerun
-                    ? 'hover:bg-fill hover:text-foreground'
-                    : 'cursor-not-allowed opacity-50',
+                  'flex size-6 items-center justify-center rounded text-muted-foreground transition-colors',
+                  canRerun ? 'hover:bg-fill hover:text-foreground' : 'cursor-not-allowed opacity-40',
                 )}
                 disabled={!canRerun}
                 aria-label="Rerun"
@@ -418,14 +412,14 @@ function AgentSessionPanel({
         </div>
       )}
       {linkedSessionGroups.length > 0 && (
-        <div className={cn('space-y-1.5', currentSession && 'mt-3 border-t border-border pt-2.5')}>
+        <div className={cn('space-y-1.5', currentSession && 'border-t border-border/60 pt-2.5')}>
           <div className="text-[12px] font-medium text-muted-foreground">
             {linkedSessionGroups.length === 1 ? 'Session group' : 'Session groups'}
           </div>
           {linkedSessionGroups.map(group => (
             <div key={group.id} className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-semibold text-foreground">
+                <div className="truncate text-[13px] font-medium text-foreground">
                   {group.title}
                 </div>
                 <div className="mt-0.5 text-[12px] text-muted-foreground">
@@ -443,16 +437,16 @@ function AgentSessionPanel({
       {ordinaryLinkedSessions.length > 0 && (
         <div className={cn(
           'space-y-1.5',
-          (currentSession || linkedSessionGroups.length > 0) && 'mt-3 border-t border-border pt-2.5',
+          (currentSession || linkedSessionGroups.length > 0) && 'border-t border-border/60 pt-2.5',
         )}
         >
           <div className="text-[12px] font-medium text-muted-foreground">
             {ordinaryLinkedSessions.length === 1 ? 'Linked chat' : 'Linked chats'}
           </div>
           {ordinaryLinkedSessions.map(session => (
-            <div key={session.id} className="flex items-center justify-between gap-2">
+            <div key={session.id} className="group flex items-center justify-between gap-2 rounded-md">
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-semibold text-foreground">
+                <div className="truncate text-[13px] font-medium text-foreground">
                   {session.title ?? 'Untitled chat'}
                 </div>
                 <div className="mt-0.5 text-[12px] text-muted-foreground">
@@ -461,7 +455,7 @@ function AgentSessionPanel({
               </div>
               <button
                 type="button"
-                className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-fill hover:text-foreground"
+                className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-fill hover:text-foreground"
                 aria-label="Open linked chat"
                 title="Open linked chat"
                 data-testid="issue-linked-session-open-chat"
@@ -477,11 +471,31 @@ function AgentSessionPanel({
   )
 }
 
+const sessionStatusDotColor = {
+  created: 'bg-amber-400',
+  active: 'bg-blue-500',
+  completed: 'bg-emerald-500',
+  stopped: 'bg-muted-foreground/40',
+  failed: 'bg-destructive',
+} satisfies Record<AgentSession['status'], string>
+
+/** Small live indicator — pulses only while the delegated session is actually running. */
+function SessionStatusDot({ status }: { status: AgentSession['status'] }) {
+  return (
+    <span className="relative flex size-1.5 shrink-0">
+      {status === 'active' && (
+        <span className={cn('absolute inline-flex size-full animate-ping rounded-full opacity-60', sessionStatusDotColor[status])} />
+      )}
+      <span className={cn('relative inline-flex size-1.5 rounded-full', sessionStatusDotColor[status])} />
+    </span>
+  )
+}
+
 PropertiesSidebar.displayName = 'PropertiesSidebar'
 
 function PropertyRow({ label, children }: { label: string, children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-1.5">
+    <div className="grid grid-cols-[76px_minmax(0,1fr)] items-center gap-2">
       <span className="shrink-0 text-[12px] text-muted-foreground">{label}</span>
       <div className="flex min-w-0 items-center">{children}</div>
     </div>
@@ -528,10 +542,12 @@ function DueDateEditor({
           type="button"
           disabled={readOnly}
           className={cn(
-            'flex max-w-40 items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px]',
+            'flex h-7 max-w-40 items-center gap-1.5 rounded-md px-1.5 text-[13px]',
             'transition-colors',
             readOnly ? 'cursor-default' : 'hover:bg-fill',
-            selectedDate ? 'text-foreground' : 'text-muted-foreground',
+            selectedDate
+              ? 'text-foreground'
+              : 'border border-dashed border-border text-muted-foreground hover:text-foreground',
           )}
         >
           <CalendarIcon className="size-3.5 !text-muted-foreground" aria-hidden="true" />
@@ -602,7 +618,7 @@ function AssigneePicker({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          'flex max-w-40 items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px]',
+          'flex h-7 max-w-40 items-center gap-1.5 rounded-md px-1.5 text-[13px]',
           'transition-[background-color,color]',
           readOnly ? 'cursor-default' : 'hover:bg-fill',
           selectedValue
@@ -694,7 +710,7 @@ function AgentDelegatePicker({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          'flex max-w-40 items-center gap-1.5 rounded px-1.5 py-0.5 text-[13px]',
+          'flex h-7 max-w-40 items-center gap-1.5 rounded-md px-1.5 text-[13px]',
           'transition-[background-color,color]',
           readOnly ? 'cursor-default' : 'hover:bg-fill',
           selectedValue

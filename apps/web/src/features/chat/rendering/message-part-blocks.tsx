@@ -9,6 +9,7 @@ import { MarkdownFileLink } from './markdown-file-link'
 import {
   FileAttachmentBlock,
   FileLineCommentContextBlock,
+  IntentContextBlock,
   PluginContextBlock,
   SkillContextBlock,
 } from './message-attachment-blocks'
@@ -16,6 +17,7 @@ import type { MessageTextTransform } from './message-bubble-selectors'
 import {
   readFileLineCommentContextPartFromState,
   readFilePartFromState,
+  readIntentContextPartFromState,
   readMarkdownAnchorProps,
   readPluginContextPartFromState,
   readRuntimeWarningPartFromState,
@@ -144,6 +146,24 @@ export const MessagePluginContextPartById = ({
   return <PluginContextBlock part={part} />
 }
 MessagePluginContextPartById.displayName = 'MessagePluginContextPartById'
+
+export const MessageIntentContextPartById = ({
+  sessionId,
+  messageId,
+  partIndex,
+}: {
+  sessionId: string
+  messageId: string
+  partIndex: number
+}) => {
+  const part = useChatRenderStore(state =>
+    readIntentContextPartFromState(state, sessionId, messageId, partIndex))
+  if (!part) {
+    return null
+  }
+  return <IntentContextBlock part={part} />
+}
+MessageIntentContextPartById.displayName = 'MessageIntentContextPartById'
 
 export const MessageFileLineCommentContextPartById = ({
   sessionId,

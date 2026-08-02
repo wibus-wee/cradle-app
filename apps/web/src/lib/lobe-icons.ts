@@ -28,18 +28,54 @@ export function getLobeIconBrandColor(slug: string): string | null {
 // Vite glob import for PNG icons (as URL, for <img> usage)
 const darkIcons = import.meta.glob<string>(
   '/node_modules/@lobehub/icons-static-png/dark/*.png',
-  { query: '?url', import: 'default' },
+  { eager: true, query: '?url', import: 'default' },
 )
 
 const lightIcons = import.meta.glob<string>(
   '/node_modules/@lobehub/icons-static-png/light/*.png',
-  { query: '?url', import: 'default' },
+  { eager: true, query: '?url', import: 'default' },
 )
 
 const ICON_PATH_RE = /\/(?:dark|light)\/(.+)\.png$/
 const VARIANT_SUFFIX_RE = /-(color|text|brand|brand-color)$/
 
 type Theme = 'dark' | 'light'
+
+function normalizeIconLookup(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+const assetSlugByNormalized = new Map<string, string>()
+for (const path of Object.keys(darkIcons)) {
+  const match = ICON_PATH_RE.exec(path)
+  if (match) {
+    const baseSlug = match[1].replace(VARIANT_SUFFIX_RE, '')
+    assetSlugByNormalized.set(normalizeIconLookup(baseSlug), baseSlug)
+  }
+}
+
+function resolveIconAssetSlug(value: string): string {
+  const normalized = normalizeIconLookup(value)
+  const directMatch = assetSlugByNormalized.get(normalized)
+  if (directMatch) {
+    return directMatch
+  }
+
+  const tocMatch = lobeIconsToc.find((entry) => {
+    const fields = [entry.docsUrl, entry.title, entry.fullTitle, entry.id]
+      .map(normalizeIconLookup)
+      .filter(Boolean)
+    return fields.includes(normalized)
+      || (normalized.length >= 5 && fields.some(field => field.includes(normalized) || normalized.includes(field)))
+  })
+  if (!tocMatch) {
+    return value
+  }
+
+  return assetSlugByNormalized.get(normalizeIconLookup(tocMatch.docsUrl))
+    ?? assetSlugByNormalized.get(normalizeIconLookup(tocMatch.title))
+    ?? value
+}
 
 /**
  * Get the URL for an icon PNG (colored variant preferred).
@@ -50,15 +86,16 @@ export async function getLobeIconUrl(
   theme: Theme = 'dark',
 ): Promise<string | null> {
   const icons = theme === 'dark' ? darkIcons : lightIcons
+  const assetSlug = resolveIconAssetSlug(slug)
   // Try color variant first
-  const colorKey = `/node_modules/@lobehub/icons-static-png/${theme}/${slug}-color.png`
+  const colorKey = `/node_modules/@lobehub/icons-static-png/${theme}/${assetSlug}-color.png`
   if (icons[colorKey]) {
-    return await icons[colorKey]()
+    return icons[colorKey]
   }
   // Fallback to base
-  const baseKey = `/node_modules/@lobehub/icons-static-png/${theme}/${slug}.png`
+  const baseKey = `/node_modules/@lobehub/icons-static-png/${theme}/${assetSlug}.png`
   if (icons[baseKey]) {
-    return await icons[baseKey]()
+    return icons[baseKey]
   }
   return null
 }

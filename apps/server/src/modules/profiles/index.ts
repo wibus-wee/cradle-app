@@ -42,6 +42,7 @@ export const profiles = new Elysia({
       configJson: JSON.stringify(body.config),
       credentialRef: body.credentialRef ?? null,
       iconSlug: body.iconSlug !== undefined ? (body.iconSlug ?? null) : undefined,
+      providerId: body.providerId !== undefined ? (body.providerId ?? null) : undefined,
     })
   }, {
     detail: {
@@ -52,6 +53,20 @@ export const profiles = new Elysia({
     },
     params: ProfilesModel.idParams,
     body: ProfilesModel.upsertBody,
+    response: { 200: ProfilesModel.agentProfile },
+  })
+  .post('/:id/bind-provider', ({ params, body }) => {
+    return Profiles.bindProfileProvider(params.id, {
+      providerId: body.providerId,
+      applyEndpointDefaults: body.applyEndpointDefaults,
+    })
+  }, {
+    detail: {
+      summary: 'Bind profile to an explicit Provider contribution',
+      description: 'Sets providerId from an explicit client choice. Does not infer identity from endpoint URL. Optional applyEndpointDefaults rewrites URLs from contribution defaults.',
+    },
+    params: ProfilesModel.idParams,
+    body: ProfilesModel.bindProviderBody,
     response: { 200: ProfilesModel.agentProfile },
   })
   .delete('/:id', ({ params }) => {

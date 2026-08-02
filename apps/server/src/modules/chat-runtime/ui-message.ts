@@ -189,6 +189,16 @@ export function parseStoredMessageSnapshot(raw: string): UIMessage {
 }
 
 export function normalizeMessageSnapshot(message: UIMessage): UIMessage {
+  if (!message || typeof message.id !== 'string' || message.id.length === 0) {
+    throw new Error('UIMessage snapshot must include a non-empty id')
+  }
+  if (message.role !== 'system' && message.role !== 'user' && message.role !== 'assistant') {
+    throw new Error('UIMessage snapshot must include a valid role')
+  }
+  if (!Array.isArray(message.parts)) {
+    throw new TypeError('UIMessage snapshot must include a parts array')
+  }
+
   const compactedMessage = compactChatMessageSplitMetadata(message)
   if (
     compactedMessage.role !== 'user'
@@ -440,6 +450,35 @@ export function annotateBangResultMessage(
       cradle: {
         ...cradleMetadata,
         bangResult: result,
+      },
+    },
+  } as UIMessage
+}
+
+export interface UiActivityObservationMetadata {
+  kind: 'ui-activity'
+  entity?: string
+  entityType?: string
+  durationMs?: number
+  endReason?: string
+}
+
+export function annotateObservationMessage(
+  message: UIMessage,
+  observation: Omit<UiActivityObservationMetadata, 'kind'>,
+): UIMessage {
+  const metadata = readObjectRecord((message as { metadata?: unknown }).metadata)
+  const cradleMetadata = readObjectRecord(metadata.cradle)
+  return {
+    ...message,
+    metadata: {
+      ...metadata,
+      cradle: {
+        ...cradleMetadata,
+        observation: {
+          kind: 'ui-activity',
+          ...observation,
+        } satisfies UiActivityObservationMetadata,
       },
     },
   } as UIMessage

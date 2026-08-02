@@ -19,6 +19,10 @@ import type {
   ComposerSlashCommandActionResult,
   ComposerSlashCommandActionTools,
 } from '../composer/composer-action-context'
+import {
+  consumeComposerInsert,
+  useComposerInsertStore,
+} from '../composer/composer-insert'
 import type {
   ComposerPlanSlotActions,
   ComposerQuickQuestionSlotActions,
@@ -158,11 +162,19 @@ export function ChatComposerSection({
     ComposerReplaceDraft | undefined
   >(undefined)
   const [composerReplaceDraftKey, setComposerReplaceDraftKey] = useState(0)
+  const [composerAppendText, setComposerAppendText] = useState<string | undefined>(undefined)
+  const [composerAppendTextKey, setComposerAppendTextKey] = useState<number | undefined>(undefined)
+  const [composerAppendTextCreatedAt, setComposerAppendTextCreatedAt] = useState<number | undefined>(undefined)
   const [dismissPlanSignal, setDismissPlanSignal] = useState(0)
   const [composerHasDraft, setComposerHasDraft] = useState(false)
   const [activePlanRefineTabId, setActivePlanRefineTabId] = useState<string | null>(null)
   const editingQueueItemIdRef = useRef<string | null>(null)
   const [editingQueueItemId, setEditingQueueItemId] = useState<string | null>(null)
+  const pendingComposerInsert = useComposerInsertStore(
+    state => sessionId ? state.requests[sessionId]?.[0] ?? null : null,
+  )
+  const shouldAppendComment = composerAppendTextCreatedAt !== undefined
+    && (droppedPath === null || composerAppendTextCreatedAt >= droppedPath.ts)
   const planState
     = composerRuntime.slotStates.find(
       (state): state is ChatRuntimePlanUiSlotState => state.kind === 'plan',
@@ -253,6 +265,16 @@ export function ChatComposerSection({
     },
     [runtimeSettings],
   )
+
+  useEffect(() => {
+    if (!sessionId || !pendingComposerInsert) {
+      return
+    }
+    setComposerAppendText(pendingComposerInsert.text)
+    setComposerAppendTextKey(pendingComposerInsert.id)
+    setComposerAppendTextCreatedAt(pendingComposerInsert.createdAt)
+    consumeComposerInsert(sessionId, pendingComposerInsert.id)
+  }, [pendingComposerInsert, sessionId])
 
   useEffect(() => {
     if (!rollbackDraftSignal) {
@@ -451,8 +473,8 @@ export function ChatComposerSection({
             contextBar,
           }}
           externalSignals={{
-            appendText: droppedPath ? `${droppedPath.text}` : undefined,
-            appendTextKey: droppedPath?.ts,
+            appendText: shouldAppendComment ? composerAppendText : (droppedPath ? `${droppedPath.text}` : undefined),
+            appendTextKey: shouldAppendComment ? composerAppendTextKey : droppedPath?.ts,
             appendContextParts: contextIngress?.parts,
             appendContextPartsKey: contextIngress?.key,
             clearDraftKey: clearDraftSignal,

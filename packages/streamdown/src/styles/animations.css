@@ -305,13 +305,12 @@
   tab-size: 2;
 }
 
-/* Shiki dual-theme support */
+/* Shiki dual-theme support: shiki v3 colors light tokens inline and carries the
+   dark override in a `--shiki-dark` var on the same span, so the light theme
+   needs no override here. (Don't reintroduce `color: var(--shiki-light)`: that
+   var is never emitted, so it flattens every token to the inherited text color.) */
 .sd-code-body .shiki {
   background: transparent !important;
-}
-
-.sd-code-body .shiki span {
-  color: var(--shiki-light) !important;
 }
 
 @media (prefers-color-scheme: dark) {

@@ -8,6 +8,9 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
 
 - A Session belongs to at most one Work.
 - A Work has exactly one primary Session in the local v1 flow.
+- Work list skips rows whose primary Session is missing instead of failing the
+  whole collection. Point lookups (`get`) still surface
+  `work_primary_thread_missing` for a specific broken Work.
 - Work creation requires a local Git workspace and an immediately active
   managed Worktree.
 - Default creation bases the managed Worktree on a clean local `HEAD`

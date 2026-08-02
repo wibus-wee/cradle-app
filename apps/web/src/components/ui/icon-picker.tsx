@@ -96,8 +96,8 @@ export function IconPicker({ value, onChange, children, disabled, renderIcon }: 
         className="w-80 p-0"
       >
         {/* Search */}
-        <div className="flex items-center gap-2 border-b border-border/50 px-3 py-2">
-          <SearchIcon className="size-3.5 shrink-0 !text-muted-foreground/60" />
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <SearchIcon className="size-3.5 shrink-0 !text-text-tertiary" />
           <input
             ref={inputRef}
             type="text"
@@ -105,14 +105,14 @@ export function IconPicker({ value, onChange, children, disabled, renderIcon }: 
             aria-label="Search icons"
             onChange={e => setQuery(e.target.value)}
             placeholder="Search icons..."
-            className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50"
+            className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-text-dim"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
               aria-label="Clear icon search"
-              className="text-muted-foreground/60 hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground"
             >
               <XIcon className="size-3" />
             </button>
@@ -124,7 +124,7 @@ export function IconPicker({ value, onChange, children, disabled, renderIcon }: 
           <button
             type="button"
             onClick={handleRemove}
-            className="flex w-full items-center gap-2 border-b border-border/50 px-3 py-1.5 text-xs text-muted-foreground hover:bg-fill hover:text-foreground"
+            className="flex w-full items-center gap-2 border-b border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-fill hover:text-foreground"
           >
             <XIcon className="size-3" />
             Remove custom icon
@@ -141,19 +141,19 @@ export function IconPicker({ value, onChange, children, disabled, renderIcon }: 
               onClick={() => handleSelect(entry)}
               className={cn(
                 'flex flex-col items-center gap-1 rounded-md px-1 py-1.5 transition-colors hover:bg-fill',
-                value === entry.slug && 'bg-fill ring-1 ring-foreground/10',
+                value === entry.slug && 'bg-fill ring-1 ring-border',
               )}
             >
               {renderIcon
                 ? renderIcon(entry, 'size-6')
                 : <IconImage slug={entry.slug} className="size-6" />}
-              <span className="w-full truncate text-center text-[9px] leading-tight text-muted-foreground/70">
+              <span className="w-full truncate text-center text-[9px] leading-tight text-text-tertiary">
                 {entry.title}
               </span>
             </button>
           ))}
           {filtered.length === 0 && (
-            <div className="col-span-6 py-6 text-center text-xs text-muted-foreground/60">
+            <div className="col-span-6 py-6 text-center text-xs text-text-tertiary">
               No icons found
             </div>
           )}

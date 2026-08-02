@@ -670,6 +670,49 @@ function MyPanel({ isActive }: { isActive: boolean }) {
 
 Web panel and command registrations are tracked in `ctx.subscriptions` and are disposed by the host when the web plugin layer deactivates. Use namespace APIs such as `ctx.panels.register` and `ctx.commands.register`. Keep a returned `Disposable` only when the plugin needs to remove a panel or command before full deactivation.
 
+### `ctx.activities` — UI activity segments
+
+Subscribe to renderer-owned UI presence segments (what entity the user is on and how long they stayed). This is **not** the same as server plugin `activity.read` / committed chat-run activity (Plan 002): web UI activity observes user presence in the renderer; server activity observes agent run lifecycle after commit.
+
+Declare both the capability and permission:
+
+```json
+{
+  "capabilities": [
+    {
+      "id": "ui-activity",
+      "type": "activity-subscription",
+      "layer": "web",
+      "label": "Observe UI activity",
+      "permissions": ["ui.activity.read"]
+    }
+  ],
+  "permissions": [
+    {
+      "id": "ui.activity.read",
+      "label": "Read UI activity",
+      "description": "Observe user activity segment metadata (entity and duration only).",
+      "required": true
+    }
+  ]
+}
+```
+
+```ts
+export function activate(ctx: WebPluginContext): void {
+  const disposable = ctx.activities.subscribe((event) => {
+    if (event.kind === 'ui.segment.ended') {
+      // plugin-owned heartbeat may use event.entity + ctx.activities.getCurrentSegment()
+    }
+  })
+  ctx.subscriptions.push(disposable)
+}
+```
+
+`subscribe` fails at the host boundary when the capability is undeclared or `ui.activity.read` is not granted. Disposing the registration stops new delivery; in-flight async handlers are not cancelled.
+
+Reference consumer (not shipped): a future WakaTime-style plugin would heartbeat from `ui.segment.ended` and `getCurrentSegment()`.
+
 ### `ctx.panels.register(panel)` — UI Panel Registration
 
 Register a React component as a panel in the Cradle UI:

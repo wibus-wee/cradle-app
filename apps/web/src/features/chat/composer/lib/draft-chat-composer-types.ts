@@ -1,3 +1,4 @@
+import type { RuntimeReviewTarget } from '@cradle/chat-runtime-contracts'
 import type { FileUIPart } from 'ai'
 import type { ReactNode } from 'react'
 
@@ -24,6 +25,7 @@ export interface DraftChatComposerSubmitOptions {
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort
   runtimeSettings: DraftChatRuntimeSettings
+  reviewTarget?: RuntimeReviewTarget
 }
 
 export type DraftChatComposerSendHandler = (

@@ -1,13 +1,4 @@
 {
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    },
-    {
-      "path": "./tsconfig.cli.json"
-    }
-  ],
-  "files": [],
-  "compilerOptions": {},
-  "extends": "expo/tsconfig.base"
+  "references": [{ "path": "./tsconfig.node.json" }, { "path": "./tsconfig.cli.json" }],
+  "files": []
 }

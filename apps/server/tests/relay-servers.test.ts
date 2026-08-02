@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -28,6 +28,10 @@ function writeFakeRelaydExecutable(dir: string, name = 'fake-relayd.cjs'): strin
   const executablePath = join(dir, name)
   writeFileSync(executablePath, `#!/usr/bin/env node
 const http = require('node:http')
+const fs = require('node:fs')
+if (process.env.CRADLE_TEST_RELAYD_START_LOG) {
+  fs.appendFileSync(process.env.CRADLE_TEST_RELAYD_START_LOG, 'start\\n')
+}
 const listen = process.env.CRADLE_RELAYD_LISTEN || '127.0.0.1:0'
 const index = listen.lastIndexOf(':')
 const host = listen.slice(0, index)
@@ -278,6 +282,42 @@ describe('relay servers', () => {
       restoreEnv('CRADLE_RELAYD_PATH', previousRelaydPath)
       restoreEnv('CRADLE_RELAYD_LISTEN', previousRelaydListen)
       restoreEnv('CRADLE_RELAYD_PUBLIC_URL', previousRelaydPublicUrl)
+    }
+  })
+
+  it('coalesces concurrent managed local relayd starts into one child process', async () => {
+    const dataDir = makeTempDir('cradle-managed-local-relayd-single-flight-')
+    const binDir = makeTempDir('cradle-managed-local-relayd-single-flight-bin-')
+    const startLog = join(binDir, 'starts.log')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    const previousAutostart = process.env.CRADLE_RELAYD_AUTOSTART
+    const previousRelaydPath = process.env.CRADLE_RELAYD_PATH
+    const previousRelaydListen = process.env.CRADLE_RELAYD_LISTEN
+    const previousStartLog = process.env.CRADLE_TEST_RELAYD_START_LOG
+
+    try {
+      process.env.CRADLE_RELAYD_AUTOSTART = '1'
+      process.env.CRADLE_RELAYD_PATH = writeFakeRelaydExecutable(binDir)
+      process.env.CRADLE_TEST_RELAYD_START_LOG = startLog
+      delete process.env.CRADLE_RELAYD_LISTEN
+      await createAppWithDataDir(dataDir)
+
+      await Promise.all([
+        startManagedLocalRelayd(),
+        startManagedLocalRelayd(),
+      ])
+
+      expect(readFileSync(startLog, 'utf8').trim().split('\n')).toEqual(['start'])
+    }
+    finally {
+      await stopManagedLocalRelayd()
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(binDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+      restoreEnv('CRADLE_RELAYD_AUTOSTART', previousAutostart)
+      restoreEnv('CRADLE_RELAYD_PATH', previousRelaydPath)
+      restoreEnv('CRADLE_RELAYD_LISTEN', previousRelaydListen)
+      restoreEnv('CRADLE_TEST_RELAYD_START_LOG', previousStartLog)
     }
   })
 

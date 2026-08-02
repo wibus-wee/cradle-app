@@ -353,7 +353,7 @@ const AccordionGroup = forwardRef<HTMLDivElement, AccordionGroupProps>(
               {[...openItemRects.entries()].map(([idx, rect]) => (
                 <motion.div
                   key={`expanded-${idx}`}
-                  className={`absolute ${shape.bg} bg-accent/20 dark:bg-accent/12 pointer-events-none`}
+                  className={`absolute ${shape.bg} bg-muted pointer-events-none`}
                   initial={false}
                   animate={{
                     top: rect.top,
@@ -407,7 +407,7 @@ const AccordionGroup = forwardRef<HTMLDivElement, AccordionGroupProps>(
             <AnimatePresence>
               {focusRect && (
                 <motion.div
-                  className={`absolute ${shape.focusRing} pointer-events-none z-20 border border-[#6B97FF]`}
+                  className={`absolute ${shape.focusRing} pointer-events-none z-20 border border-ring`}
                   initial={false}
                   animate={{
                     left: focusRect.left - 2,
@@ -635,7 +635,7 @@ const AccordionItem = forwardRef<HTMLDivElement, AccordionItemProps>(
             <AnimatePresence>
               {isOpen && (
                 <motion.div
-                  className={`absolute inset-0 ${shape.bg} bg-accent/20 dark:bg-accent/12 pointer-events-none`}
+                  className={`absolute inset-0 ${shape.bg} bg-muted pointer-events-none`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0, transition: spring.fast.exit }}
@@ -680,7 +680,7 @@ const AccordionTrigger = forwardRef<HTMLButtonElement, AccordionTriggerProps>(
             className={cn(
               `relative z-10 flex items-center gap-2.5 ${shape.item} px-3 py-2 w-full cursor-pointer outline-none select-none`,
               !groupCtx?.grouped &&
-                "focus-visible:ring-1 focus-visible:ring-[#6B97FF] focus-visible:ring-offset-0",
+                "focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0",
               className
             )}
             {...(props as React.ComponentProps<typeof AccordionPrimitive.Trigger>)}

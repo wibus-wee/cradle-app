@@ -13,6 +13,7 @@ conditions, and update the status row when done.
 |---|---|---|---|---|---|
 | 001 | Build a deterministic Anthropic Messages and OpenAI Responses API simulator | P1 | L | — | IN PROGRESS |
 | 002 | Expose committed chat-run activity to server plugins | P1 | M | — | DONE |
+| 003 | UI activity pipeline with Jarvis, analytics, and web plugin sinks | P1 | L | — | DONE |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with a one-line
 reason) | `REJECTED` (with a one-line rationale).
@@ -23,7 +24,12 @@ reason) | `REJECTED` (with a one-line rationale).
   migrate Claude Agent or Codex provider tests; those consumers should be
   planned only after the simulator's official-SDK conformance suite passes.
 - Plan 002 is independent of Plan 001. It reuses Chat Runtime's committed fact
-  publication and does not modify any provider implementation.
+  publication and does not modify any provider implementation. Plan 002 observes
+  **agent chat run** lifecycle on the server.
+- Plan 003 is independent of Plans 001 and 002. It owns renderer **user UI
+  activity** segments and ships three built-in sinks (Jarvis ambient session,
+  product analytics, web plugin SDK). A future WakaTime plugin is a documented
+  reference consumer only; it is not implemented in Plan 003.
 
 ## Findings considered and rejected
 
@@ -67,3 +73,12 @@ reason) | `REJECTED` (with a one-line rationale).
 - **Build the WakaTime plugin in Plan 002**: rejected. This plan establishes
   SDK support only; API key UX and WakaTime network behavior are a separate
   consumer.
+- **Use server chat-run activity for WakaTime heartbeats**: rejected. User UI
+  presence belongs in the renderer activity pipeline (Plan 003), not committed
+  `RunStarted` facts (Plan 002).
+- **Split Plan 003 into separate plans for analytics and web plugin SDK**:
+  rejected. All three sinks consume the same segment bus and ship as one
+  product capability.
+- **Trigger Jarvis model runs on activity segment end**: rejected. Ambient
+  injection persists observation user messages only; the user or an explicit
+  Jarvis send still owns run scheduling.

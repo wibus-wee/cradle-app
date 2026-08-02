@@ -26,7 +26,6 @@ interface CodecResult {
 const KEY = new Uint8Array(32).fill(7)
 const BASELINE_CIPHER = new RelayCipher(KEY, false)
 const OPTIMIZED_CIPHER = new RelayCipher(KEY)
-const ASSERT_THROUGHPUT = process.env.CRADLE_RELAY_BENCHMARK === '1'
 
 function payloadFor(profile: PayloadProfile, length: number): Uint8Array {
   if (profile === 'compressible') {
@@ -189,14 +188,11 @@ describe('relay endpoint codec throughput benchmark', () => {
 
     for (const row of rows) {
       expect(row.optimizedWireBytes).toBeLessThanOrEqual(row.baselineWireBytes)
-      if (!ASSERT_THROUGHPUT) {
-        continue
-      }
-      if (row.payloadBytes >= 64 * 1024) {
-        expect(row.optimizedMiBps).toBeGreaterThan(row.baselineMiBps)
-      }
-      else {
-        expect(row.optimizedMiBps).toBeGreaterThan(row.baselineMiBps * 0.85)
+      // 512 B frames are dominated by AEAD fixed cost; CI VM noise can swing the
+      // median past a tight floor. Keep a throughput regression guard on bulk
+      // payloads only (within 20% of baseline, not a strict win every run).
+      if (row.payloadBytes >= RELAY_MIN_COMPRESSION_INPUT_BYTES) {
+        expect(row.optimizedMiBps).toBeGreaterThan(row.baselineMiBps * 0.8)
       }
     }
   }, 15_000)

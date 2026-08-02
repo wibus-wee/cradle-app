@@ -169,7 +169,7 @@ interface ChatMessageSnapshot {
   role: 'user' | 'assistant'
   status: 'streaming' | 'complete' | 'aborted' | 'failed'
   errorText?: string
-  content: string
+  preview: string
   message: {
     parts: Array<{ type: string, text?: string, state?: string, toolCallId?: string, output?: unknown, errorText?: string }>
   }

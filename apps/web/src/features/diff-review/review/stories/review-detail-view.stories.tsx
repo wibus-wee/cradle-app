@@ -52,8 +52,6 @@ function ReviewDetailScene({ review: initialReview }: { review: CradleDiffReview
           onBack={() => {}}
           onRefresh={() => {}}
           onSubmit={() => {}}
-          onOpenGuide={() => {}}
-          onOpenCommitPlan={() => {}}
           threadsOpen={threadsOpen}
           onToggleThreads={() => setThreadsOpen(value => !value)}
           diffSlot={(

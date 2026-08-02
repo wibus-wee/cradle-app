@@ -10,6 +10,19 @@ import type {
   ExternalSessionSourceFile,
 } from './types'
 
+export function mergeExternalSessionDescriptors(
+  descriptors: ExternalSessionDescriptor[],
+): ExternalSessionDescriptor[] {
+  const byCandidateId = new Map<string, ExternalSessionDescriptor>()
+  for (const descriptor of descriptors) {
+    const existing = byCandidateId.get(descriptor.candidateId)
+    if (!existing || (descriptor.updatedAt ?? 0) >= (existing.updatedAt ?? 0)) {
+      byCandidateId.set(descriptor.candidateId, descriptor)
+    }
+  }
+  return [...byCandidateId.values()]
+}
+
 export function createCandidateId(input: {
   sourceHostId: string
   sourceApp: ExternalSessionSourceApp

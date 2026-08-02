@@ -306,6 +306,16 @@ export interface CradleDataPaths {
   }
 }
 
+export interface CradleDataBackupStatus {
+  kind: 'export' | 'restore' | null
+  phase: 'idle' | 'scheduled' | 'running' | 'verify' | 'health-check' | 'completed' | 'failed'
+  archivePath: string | null
+  createdAt: string | null
+  completedAt: string | null
+  backupRoot: string | null
+  errorMessage: string | null
+}
+
 interface NativeServiceMethods {
   showOpenDialog: (options: {
     title?: string
@@ -340,6 +350,19 @@ interface NativeServiceMethods {
     backupRoot: string | null
     errorMessage: string | null
   }>
+  chooseCradleDataBackupDestination: () => Promise<{ canceled: boolean, filePath?: string }>
+  scheduleCradleDataBackupExport: (archivePath: string) => Promise<{
+    scheduled: true
+    archivePath: string
+    restartRequired: true
+  }>
+  chooseCradleDataBackupToRestore: () => Promise<{ canceled: boolean, filePath?: string }>
+  scheduleCradleDataBackupRestore: (archivePath: string) => Promise<{
+    scheduled: true
+    archivePath: string
+    restartRequired: true
+  }>
+  getCradleDataBackupStatus: () => Promise<CradleDataBackupStatus>
   getDesktopCliStatus: () => Promise<DesktopCliStatus>
   installDesktopCliCommand: () => Promise<DesktopCliStatus>
   removeDesktopCliCommand: () => Promise<DesktopCliStatus>

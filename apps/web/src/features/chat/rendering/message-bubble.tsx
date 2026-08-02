@@ -36,6 +36,7 @@ import { ImageLightbox } from './image-lightbox'
 import { MarkdownFileLink } from './markdown-file-link'
 import {
   FileAttachmentBlock,
+  IntentContextBlock,
   PluginContextBlock,
   SkillContextBlock,
 } from './message-attachment-blocks'
@@ -66,6 +67,7 @@ import {
 import {
   MessageFileLineCommentContextPartById,
   MessageFilePartById,
+  MessageIntentContextPartById,
   MessagePluginContextPartById,
   MessageRuntimeWarningPartById,
   MessageSkillContextPartById,
@@ -416,6 +418,14 @@ const MessageSegmentView = ({
     case 'plugin-context':
       return (
         <MessagePluginContextPartById
+          sessionId={sessionId}
+          messageId={segment.messageId}
+          partIndex={segment.partIndex}
+        />
+      )
+    case 'intent-context':
+      return (
+        <MessageIntentContextPartById
           sessionId={sessionId}
           messageId={segment.messageId}
           partIndex={segment.partIndex}
@@ -859,6 +869,8 @@ function MessageBubbleView({
         return <SkillContextBlock key={item.key} part={item.part} />
       case 'plugin-context':
         return <PluginContextBlock key={item.key} part={item.part} />
+      case 'intent-context':
+        return <IntentContextBlock key={item.key} part={item.part} />
       case 'runtime-warning':
         return <RuntimeWarningBlock key={item.key} warning={item.part.data} />
 

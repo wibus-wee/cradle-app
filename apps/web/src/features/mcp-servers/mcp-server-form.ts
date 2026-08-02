@@ -3,6 +3,16 @@ import type { PostMcpServersData } from '~/api-gen/types.gen'
 export type McpServerTransport = 'stdio' | 'streamable-http'
 export type McpServerSaveBody = PostMcpServersData['body']
 
+/** Initial form values for a server not yet created, e.g. prefilled from a registry candidate. */
+export interface McpServerDraft {
+  transport: McpServerTransport
+  name: string
+  command?: string
+  args?: string[]
+  url?: string
+  secretKeys?: string[]
+}
+
 export function parseSecretValues(value: string): Record<string, string> {
   const entries = value
     .split('\n')
