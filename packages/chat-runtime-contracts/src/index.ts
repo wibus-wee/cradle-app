@@ -641,6 +641,14 @@ export interface RuntimeFilesystemUiSlotState {
   updatedAt: number
 }
 
+export interface RuntimeSkillsUiSlotItem {
+  name: string
+  enabled: boolean
+  displayName: string | null
+  iconUrl: string | null
+  brandColor: string | null
+}
+
 export interface RuntimeSkillsUiSlotState {
   kind: 'skills'
   slotId: string
@@ -649,6 +657,8 @@ export interface RuntimeSkillsUiSlotState {
   disabledCount: number
   errorCount: number
   roots: string[]
+  /** Optional per-skill display enrichment (remote/local icons, brand color). */
+  items?: RuntimeSkillsUiSlotItem[]
   updatedAt: number
 }
 
