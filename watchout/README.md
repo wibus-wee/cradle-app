@@ -37,25 +37,26 @@ SQLite path: `~/Library/Application Support/WatchOut/watchout.sqlite`
 
 ## Build (macOS only)
 
-This environment cannot compile the AppKit/SwiftUI app. On a Mac:
+This Linux CI agent cannot compile AppKit/SwiftUI. On a Mac with **Xcode 16+**:
 
 ```bash
 cd watchout
-swift build          # Core + CLI + MCP
-swift test           # Core tests
-chmod +x Scripts/generate-xcodeproj.sh
-./Scripts/generate-xcodeproj.sh
 open WatchOut.xcodeproj
 ```
 
-Run the **WatchOut** scheme. For CLI/MCP products from SPM:
+Select the **WatchOut** scheme → Run. The app is a menu-bar utility (`LSUIElement`).
+
+SPM still owns Core / CLI / MCP (same folder’s `Package.swift`); the Xcode app target links local products `WatchOutUI` + `WatchOutCore`.
 
 ```bash
+swift test           # Core tests
+swift build          # CLI + MCP
 swift run watchout create "Review the session outcome"
 swift run watchout list
 swift run watchout-mcp
 ```
 
+`project.yml` + `Scripts/generate-xcodeproj.sh` remain as a regenerate path if the checked-in `WatchOut.xcodeproj` ever needs rebuilding via XcodeGen.
 ### MCP host config (example)
 
 ```json

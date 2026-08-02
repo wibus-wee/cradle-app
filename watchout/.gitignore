@@ -3,7 +3,6 @@
 .build/
 .swiftpm/
 DerivedData/
-*.xcodeproj/
-*.xcworkspace/
 xcuserdata/
+*.xcuserstate
 *.app
