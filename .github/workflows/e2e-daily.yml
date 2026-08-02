@@ -418,7 +418,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const path = require('path')
             const { readJson, buildDailyFailureIssueBody } = require('./e2e/scripts/format-failure-issue.cjs')
 
             const runUrl = process.env.RUN_URL
