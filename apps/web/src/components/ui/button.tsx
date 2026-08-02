@@ -1,4 +1,6 @@
+import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import { Slot } from "radix-ui"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "~/lib/cn"
@@ -44,10 +46,13 @@ function Button({
   className,
   variant = "default",
   size = "default",
+  asChild = false,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: React.ComponentProps<typeof ButtonPrimitive> &
+  VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
+  const Comp = asChild ? Slot.Root : ButtonPrimitive
   return (
-    <ButtonPrimitive
+    <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
