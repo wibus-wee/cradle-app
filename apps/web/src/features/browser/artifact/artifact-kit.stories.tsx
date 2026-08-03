@@ -1,5 +1,3 @@
-import type { Meta, StoryObj } from '@storybook/react-vite'
-
 import {
   ActionButton,
   Artifact,
@@ -13,6 +11,7 @@ import {
   SegmentedBar,
   Table,
 } from '@cradle/artifact'
+import type { Meta, StoryObj } from '@storybook/react-vite'
 
 function ArtifactKitGallery() {
   return (
