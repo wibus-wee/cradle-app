@@ -19,7 +19,6 @@ import { Table } from './components/table'
 
 export type { ArtifactActionContextValue } from './action-context'
 export { ArtifactActionProvider, useArtifactAction } from './action-context'
-export { ARTIFACT_THEME_STYLE } from './theme'
 export type { ActionButtonProps } from './components/action-button'
 export { ActionButton } from './components/action-button'
 export type { ArtifactProps } from './components/artifact'
@@ -42,6 +41,7 @@ export type { DividerProps, HStackProps, StackProps, TextProps } from './compone
 export { Divider, HStack, Stack, Text } from './components/stack'
 export type { TableColumn, TableProps } from './components/table'
 export { Table } from './components/table'
+export { ARTIFACT_THEME_STYLE } from './theme'
 
 /** Runtime module map used by the Artifact host compiler. */
 export function createArtifactModuleExports() {
