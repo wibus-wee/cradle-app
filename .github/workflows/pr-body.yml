@@ -16,8 +16,9 @@ jobs:
   check:
     name: Check PR body format
     runs-on: ubuntu-latest
-    # Bots / Dependabot use their own body shapes; humans and agents must follow the template.
-    if: ${{ !endsWith(github.actor, '[bot]') && github.actor != 'dependabot' }}
+    # The repo owner's own PRs skip the format check; bots / Dependabot use their own body shapes;
+    # humans and agents must follow the template.
+    if: ${{ github.actor != 'wibus-wee' && !endsWith(github.actor, '[bot]') && github.actor != 'dependabot' }}
     steps:
       - uses: actions/checkout@v4
 
