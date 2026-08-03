@@ -216,6 +216,7 @@ const config = {
     'dist/main/**/*',
     'dist/preload/**/*',
     'dist/renderer/**/*',
+    'resources/tray/**/*',
     '!node_modules',
     // Sparkle bridge must ship as a real node_modules package so the packaged
     // loader can require native/build/Release/sparkle_bridge.node from asar.unpacked.

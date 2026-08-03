@@ -11,11 +11,40 @@ function createMemoryStorage(): Storage {
   }
 }
 
+// Node pool for transport-boundary tests: expose window as globalThis so
+// modules that read window.localStorage / window.cradle work without jsdom.
+if (typeof globalThis.window === 'undefined') {
+  Object.defineProperty(globalThis, 'window', {
+    value: globalThis,
+    configurable: true,
+    writable: true,
+  })
+}
+
 if (typeof globalThis.localStorage === 'undefined') {
   globalThis.localStorage = createMemoryStorage()
 }
 if (typeof globalThis.sessionStorage === 'undefined') {
   globalThis.sessionStorage = createMemoryStorage()
+}
+
+if (typeof globalThis.Event === 'undefined') {
+  globalThis.Event = class Event {
+    type: string
+    constructor(type: string) {
+      this.type = type
+    }
+  } as typeof Event
+}
+
+if (typeof globalThis.MessageEvent === 'undefined') {
+  globalThis.MessageEvent = class MessageEvent extends Event {
+    data: unknown
+    constructor(type: string, init?: MessageEventInit) {
+      super(type)
+      this.data = init?.data ?? null
+    }
+  } as unknown as typeof MessageEvent
 }
 
 if (typeof globalThis.ResizeObserver === 'undefined') {

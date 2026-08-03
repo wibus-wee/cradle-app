@@ -36,12 +36,17 @@ function slugifyServerName(candidate: RegistryCandidate): string {
   return slug || 'mcp-server'
 }
 
-function draftFromCandidate(candidate: RegistryCandidate): McpServerDraft | null {
-  if (!candidate.installHint) { return null }
+function draftFromCandidate(candidate: RegistryCandidate): McpServerDraft {
   const name = slugifyServerName(candidate)
   const secretKeys = [...candidate.env]
     .sort((a, b) => Number(b.required) - Number(a.required))
     .map(entry => entry.name)
+
+  // No install hint — open the create dialog with name/secrets prefilled so
+  // Manual setup is not a dead end.
+  if (!candidate.installHint) {
+    return { transport: 'stdio', name, secretKeys }
+  }
   if (candidate.installHint.transport === 'stdio') {
     return {
       transport: 'stdio',
@@ -150,10 +155,8 @@ export function McpServersSettings() {
     setDialogOpen(true)
   }
   const installCandidate = (candidate: RegistryCandidate) => {
-    const candidateDraft = draftFromCandidate(candidate)
-    if (!candidateDraft) { return }
     setEditing(null)
-    setDraft(candidateDraft)
+    setDraft(draftFromCandidate(candidate))
     setDialogOpen(true)
   }
 

@@ -173,6 +173,7 @@ const electronMocks = vi.hoisted(() => {
 
   const ipcHandlers = new Map<string, Listener>()
   const nativeImageValue = {
+    isEmpty: vi.fn(() => false),
     resize: vi.fn(() => nativeImageValue),
     setTemplateImage: vi.fn(),
   }
@@ -182,6 +183,7 @@ const electronMocks = vi.hoisted(() => {
       dock: {
         setMenu: vi.fn(),
       },
+      getAppPath: vi.fn(() => '/tmp/cradle-app-path'),
       quit: vi.fn(),
     },
     BrowserWindow: FakeBrowserWindow,
@@ -340,11 +342,11 @@ describe('trayManager', () => {
     expect(electronMocks.Tray.instances[0]?.image).toBeTruthy()
     expect(electronMocks.Tray.instances[0]?.pressedImage).toBeTruthy()
     expect(electronMocks.BrowserWindow.instances).toHaveLength(0)
-    expect(electronMocks.nativeImage.createFromBuffer).toHaveBeenCalledWith(expect.any(Buffer), {
-      width: 18,
-      height: 18,
-    })
-    expect(electronMocks.nativeImage.createFromPath).not.toHaveBeenCalled()
+    expect(electronMocks.nativeImage.createFromPath).toHaveBeenCalledWith(
+      expect.stringMatching(/trayTemplate\.png$/),
+    )
+    expect(electronMocks.nativeImage.createFromPath.mock.results[0]?.value.setTemplateImage)
+      .toHaveBeenCalledWith(true)
     expect(electronMocks.nativeImage.createEmpty).not.toHaveBeenCalled()
     expect(globalThis.fetch).toHaveBeenCalledWith(new URL('/desktop/summary', 'http://127.0.0.1:21423'), { headers: {} })
     expect(globalThis.fetch).toHaveBeenCalledWith(new URL('/desktop/recent-sessions', 'http://127.0.0.1:21423'), { headers: {} })

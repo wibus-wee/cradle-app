@@ -10,7 +10,8 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "generate": "drizzle-kit generate"
+    "generate": "drizzle-kit generate",
+    "studio": "drizzle-kit studio"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2"

@@ -116,6 +116,7 @@ export default defineConfig({
     createAssetPrecachePlugin(),
   ],
   resolve: {
+    dedupe: ['react', 'react-dom'],
     alias: {
       '~': resolve(__dirname, 'src'),
     },
