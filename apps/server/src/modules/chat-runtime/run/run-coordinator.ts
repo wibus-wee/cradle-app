@@ -248,7 +248,7 @@ export async function createRun(
     })
     const runtimeSession = runtimeResolution.runtimeSession
 
-    if (input.reviewTarget && runtimeKind !== 'codex') {
+    if (input.reviewTarget && runtime.capabilities.supportsNativeReview !== true) {
       throw new AppError({
         code: 'chat_runtime_native_review_not_supported',
         status: 501,

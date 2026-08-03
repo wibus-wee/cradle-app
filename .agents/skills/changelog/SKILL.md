@@ -20,11 +20,11 @@ Collect user-facing changes from the Cradle repo since the last release tag, the
 
 ## Rules
 
-- Changelog files live in `/Users/wibus/dev/cradle-app/apps/landing/changelog/`.
+- Changelog files live in `apps/landing/changelog/` in this repository.
 - **Two files per version** — one per language:
   - `<version>.zh.md` — Chinese (primary)
   - `<version>.en.md` — English
-- Collect changes from this `cradle-app` repository's `origin/main` branch.
+- Collect changes from this repository's `origin/main` branch.
 - Focus on user-facing changes. Skip internal refactors, CI tweaks, and trivial fixes.
 - The body is free-form Markdown (GFM). Images, links, code blocks all work.
 - If no changelog file exists for a version, the release still works — just no "What's New" is shown.
@@ -83,7 +83,7 @@ The English version uses `title: Daily Build` (or descriptive title) and English
 If the user provided a version argument, use it directly. Otherwise, resolve the next dev version:
 
 ```bash
-cd /Users/wibus/dev/cradle-app
+cd "$(git rev-parse --show-toplevel)"
 git fetch origin main --tags
 DATE=$(date +%Y%m%d)
 LAST=$(
@@ -99,7 +99,7 @@ VERSION="dev-${DATE}.${INCREMENT}"
 ### 2. Find the last release tag
 
 ```bash
-cd /Users/wibus/dev/cradle-app
+cd "$(git rev-parse --show-toplevel)"
 
 git fetch origin main --tags
 
@@ -114,7 +114,7 @@ LATEST_TAG=$(
 ### 3. Collect changes from the release range
 
 ```bash
-cd /Users/wibus/dev/cradle-app
+cd "$(git rev-parse --show-toplevel)"
 
 LATEST_TAG=$(git tag -l 'dev-*' 'v*' --sort=-version:refname | grep -E '^(dev-[0-9]{8}\.[0-9]+|v[0-9])' | head -1)
 

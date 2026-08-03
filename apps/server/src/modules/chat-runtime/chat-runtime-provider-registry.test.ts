@@ -139,4 +139,37 @@ describe('runtime capability validation', () => {
       'Runtime test-rollback-runtime declares rollbackLastTurn support but does not implement the hook.',
     )
   })
+
+  it('rejects a non-boolean supportsNativeReview declaration', () => {
+    const runtime = {
+      runtimeKind: 'test-native-review-runtime',
+      metadata: {
+        label: 'Test Native Review Runtime',
+        providerKinds: ['openai-compatible'],
+      },
+      capabilities: {
+        steer: 'queue-fallback',
+        supportsShellExecution: false,
+        supportsLastTurnRollback: false,
+        supportsRuntimeSettings: false,
+        supportsUiSlotStates: false,
+        supportsDynamicCapabilities: false,
+        supportsTitleGeneration: false,
+        supportsNativeReview: 'yes' as unknown as boolean,
+        sessionModelSwitch: 'in-session',
+      },
+      startChatSession: async () => {
+        throw new Error('not used')
+      },
+      resumeChatSession: async () => {
+        throw new Error('not used')
+      },
+      async* streamTurn() {},
+      cancelTurn: async () => undefined,
+    } as ChatRuntime
+
+    expect(() => registerRuntime(runtime)).toThrow(
+      'Runtime test-native-review-runtime capability supportsNativeReview must be boolean.',
+    )
+  })
 })

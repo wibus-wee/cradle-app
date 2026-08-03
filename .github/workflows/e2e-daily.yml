@@ -11,8 +11,8 @@ on:
         description: 'Cucumber tags filter (e.g. "@P0 or @P1"). Leave empty for full suite.'
         required: false
         default: ''
-      source_ref:
-        description: Git ref from wibus-wee/cradle-app to test
+      ref:
+        description: Git ref in this repository to test (branch, tag, or SHA)
         required: false
         default: main
 
@@ -28,12 +28,10 @@ jobs:
 
     steps:
       # ── Checkout & Setup ──────────────────────────────────────────────────
-      - name: Checkout Cradle source
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/cradle-app
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: ${{ github.event.inputs.source_ref || 'main' }}
+          ref: ${{ github.event.inputs.ref || 'main' }}
 
       - uses: ./.github/actions/setup
         with:

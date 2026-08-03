@@ -341,9 +341,120 @@ export interface ChatRuntimeContributionMetadata {
   sortOrder?: number
 }
 
+// ── Plugin Chat Runtime contract ─────────────────────────────────────────────
+//
+// Minimal structural mirror of the host `ChatRuntime` contract from
+// `@cradle/chat-runtime-contracts`. The SDK is published and must not depend
+// on that private package, so the shapes below intentionally cover only the
+// members every plugin runtime must provide. The host asserts at compile time
+// that its full `ChatRuntime` type stays assignable to `PluginChatRuntime`.
+
+/** Loose mirror of the host provider target profile handed to plugin runtimes. */
+export interface PluginChatRuntimeProviderTargetProfile {
+  id: string
+  name: string
+  enabled: boolean
+  configJson: string
+  customModels: string
+  iconSlug: string | null
+  providerTargetKind: 'manual' | 'external'
+  providerTargetId: string
+}
+
+export interface PluginChatRuntimeSession {
+  id: string
+  chatSessionId: string
+  providerTargetId: string | null
+  runtimeKind: string
+  providerSessionId: string | null
+  providerStateSnapshot: string | null
+}
+
+/** Loose mirror of the AI SDK `UIMessage` shape streamed through Cradle. */
+export interface PluginChatUiMessage {
+  id: string
+  role: 'system' | 'user' | 'assistant'
+  parts: Array<{ type: string }>
+}
+
+export type PluginChatRuntimeSteerCapability = 'native' | 'queue-fallback' | 'unsupported'
+
+export interface PluginChatRuntimeCapabilities {
+  readonly steer: PluginChatRuntimeSteerCapability
+  readonly supportsShellExecution: boolean
+  readonly supportsLastTurnRollback: boolean
+  readonly supportsRuntimeSettings: boolean
+  readonly supportsUiSlotStates: boolean
+  readonly supportsDynamicCapabilities: boolean
+  readonly supportsTitleGeneration: boolean
+  readonly sessionModelSwitch: 'in-session' | 'restart-session' | 'unsupported'
+}
+
+export interface PluginChatRuntimeMetadata {
+  label: string
+  description?: string
+  providerKinds: string[]
+  iconKey?: string
+  surfaces?: ChatRuntimeSurface[]
+  sortOrder?: number
+}
+
+export interface PluginStartChatSessionInput {
+  chatSessionId: string
+  profile: PluginChatRuntimeProviderTargetProfile | null
+  workspacePath: string
+  agentId?: string | null
+  modelId?: string | null
+  previousProviderStateSnapshot?: string | null
+}
+
+export interface PluginResumeChatSessionInput {
+  runtimeSession: PluginChatRuntimeSession
+  profile: PluginChatRuntimeProviderTargetProfile | null
+  workspacePath: string
+  agentId?: string | null
+  modelId?: string | null
+}
+
+export interface PluginStreamTurnInput {
+  runId: string
+  runtimeSession: PluginChatRuntimeSession
+  profile: PluginChatRuntimeProviderTargetProfile | null
+  message: PluginChatUiMessage
+  queueItemId?: string | null
+  modelId?: string | null
+  workspaceId?: string | null
+  workspacePath?: string
+  agentId?: string | null
+  systemPrompt?: string
+}
+
+export interface PluginCancelTurnInput {
+  runtimeSession: PluginChatRuntimeSession
+  profile: PluginChatRuntimeProviderTargetProfile | null
+}
+
+/**
+ * Contract for a plugin-contributed Chat Runtime.
+ *
+ * Members are declared with method syntax on purpose: the host `ChatRuntime`
+ * uses richer input types, and method parameter bivariance keeps it assignable
+ * to this contract while plugin authors still get typed inputs instead of
+ * `unknown`. Streamed chunks follow the AI SDK `UIMessageChunk` protocol.
+ */
+export interface PluginChatRuntime {
+  readonly runtimeKind: string
+  readonly metadata: PluginChatRuntimeMetadata
+  readonly capabilities: PluginChatRuntimeCapabilities
+  startChatSession: (input: PluginStartChatSessionInput) => Promise<PluginChatRuntimeSession>
+  resumeChatSession: (input: PluginResumeChatSessionInput) => Promise<PluginChatRuntimeSession>
+  streamTurn: (input: PluginStreamTurnInput) => AsyncIterable<unknown>
+  cancelTurn: (input: PluginCancelTurnInput) => Promise<void>
+}
+
 export interface ServerPluginRuntimeRegistry {
   /** Register a Chat Runtime provider. The runtime must declare runtimeKind, metadata, static capabilities, and the four core ChatRuntime methods. */
-  register: (runtime: unknown, metadata: ChatRuntimeContributionMetadata) => Disposable
+  register: (runtime: PluginChatRuntime, metadata: ChatRuntimeContributionMetadata) => Disposable
 }
 
 export interface ConversationBridgeAdapterRegistry {

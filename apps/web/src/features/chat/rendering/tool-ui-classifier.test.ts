@@ -30,6 +30,25 @@ describe('describeToolCall', () => {
     expect(descriptor.target).toBe('git status')
   })
 
+  it('surfaces Codex plugin command provenance in terminal tool titles and summaries', () => {
+    const descriptor = describeToolCall(toolPart({
+      type: 'cradle.builtin-tool-call.input.v1',
+      identifier: 'codex',
+      apiName: 'command_execution',
+      kind: 'terminal',
+      args: {
+        command: 'node ./hooks/run.js',
+        pluginId: 'plugin-github',
+        scriptPath: 'hooks/run.js',
+      },
+    }, 'tool-command_execution'))
+
+    expect(descriptor.kind).toBe('terminal')
+    expect(descriptor.title).toBe('Run plugin-github')
+    expect(descriptor.summary).toBe('plugin-github · hooks/run.js')
+    expect(descriptor.target).toBe('node ./hooks/run.js')
+  })
+
   it('classifies canonical Claude Code Agent as subagent from the envelope kind', () => {
     const descriptor = describeToolCall(toolPart({
       type: 'cradle.builtin-tool-call.input.v1',

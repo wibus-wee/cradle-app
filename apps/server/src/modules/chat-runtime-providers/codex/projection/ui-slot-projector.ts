@@ -4,7 +4,7 @@
  * Position: Codex provider package owner for runtime UI slot projection.
  */
 
-import type { RuntimeAlertUiSlotState, RuntimeApprovalsUiSlotState, RuntimeBackgroundTerminal, RuntimeCompactUiSlotState, RuntimeConfigUiSlotState, RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimeDiffUiSlotState, RuntimeFilesystemUiSlotState, RuntimeMcpUiSlotState, RuntimeModelUiSlotState, RuntimePlanUiSlotState, RuntimePluginUiSlotState, RuntimeReasoningUiSlotState, RuntimeSearchUiSlotState, RuntimeSkillsUiSlotState, RuntimeStatusUiSlotState, RuntimeTerminalUiSlotState, RuntimeToolActivityStatus, RuntimeToolActivityUiSlotState, RuntimeUiSlot, RuntimeUiSlotState, RuntimeUsageUiSlotState } from '../../../chat-runtime/runtime-provider-types'
+import type { RuntimeAlertUiSlotState, RuntimeApprovalsUiSlotState, RuntimeBackgroundTerminal, RuntimeCompactUiSlotState, RuntimeConfigUiSlotState, RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimeDiffUiSlotState, RuntimeFilesystemUiSlotState, RuntimeMcpUiSlotState, RuntimeModelUiSlotState, RuntimePlanUiSlotState, RuntimePluginUiSlotState, RuntimeReasoningUiSlotState, RuntimeSearchUiSlotState, RuntimeSkillsUiSlotItem, RuntimeSkillsUiSlotState, RuntimeStatusUiSlotState, RuntimeTerminalUiSlotState, RuntimeToolActivityStatus, RuntimeToolActivityUiSlotState, RuntimeUiSlot, RuntimeUiSlotState, RuntimeUsageUiSlotState } from '../../../chat-runtime/runtime-provider-types'
 import {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
@@ -458,6 +458,20 @@ export function projectCodexUiSlots(manifest: CodexAppServerCapabilityManifest):
       surfaces: surfaces ?? ['runtimePanel'],
     }),
   )
+}
+
+/**
+ * Applies host-local config requirements that gate presentation slots.
+ * `feedback.enabled === false` removes `/feedback`; null/undefined leaves the slot.
+ */
+export function applyCodexConfigRequirementSlotGates(
+  slots: RuntimeUiSlot[],
+  requirements: CodexConfigRequirementsReadResponse['requirements'] | null | undefined,
+): RuntimeUiSlot[] {
+  if (requirements?.feedback?.enabled === false) {
+    return slots.filter(slot => slot.id !== 'codex:feedback')
+  }
+  return slots
 }
 
 function supportsSlot(
@@ -975,6 +989,33 @@ function projectCodexSkillsState(
     return null
   }
   const skills = entries.flatMap(entry => entry.skills ?? [])
+  const items = skills.flatMap((skill): RuntimeSkillsUiSlotItem[] => {
+    if (typeof skill.name !== 'string' || !skill.name.trim()) {
+      return []
+    }
+    const skillInterface = skill.interface
+    const remoteIcon = typeof skillInterface?.iconSmallUrl === 'string' && skillInterface.iconSmallUrl.trim()
+      ? skillInterface.iconSmallUrl
+      : typeof skillInterface?.iconLargeUrl === 'string' && skillInterface.iconLargeUrl.trim()
+        ? skillInterface.iconLargeUrl
+        : null
+    const localIcon = typeof skillInterface?.iconSmall === 'string' && skillInterface.iconSmall.trim()
+      ? skillInterface.iconSmall
+      : typeof skillInterface?.iconLarge === 'string' && skillInterface.iconLarge.trim()
+        ? skillInterface.iconLarge
+        : null
+    return [{
+      name: skill.name,
+      enabled: skill.enabled !== false,
+      displayName: typeof skillInterface?.displayName === 'string' && skillInterface.displayName.trim()
+        ? skillInterface.displayName
+        : null,
+      iconUrl: remoteIcon ?? localIcon,
+      brandColor: typeof skillInterface?.brandColor === 'string' && skillInterface.brandColor.trim()
+        ? skillInterface.brandColor
+        : null,
+    }]
+  })
   return {
     kind: 'skills',
     slotId: 'codex:skills',
@@ -983,6 +1024,7 @@ function projectCodexSkillsState(
     disabledCount: skills.filter(skill => skill.enabled === false).length,
     errorCount: entries.reduce((count, entry) => count + (entry.errors?.length ?? 0), 0),
     roots: entries.flatMap(entry => (typeof entry.cwd === 'string' ? [entry.cwd] : [])),
+    items,
     updatedAt: Date.now(),
   }
 }

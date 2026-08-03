@@ -2522,6 +2522,17 @@
                           ],
                           "type": "object"
                         },
+                        "interruptReason": {
+                          "enum": [
+                            "user_cancelled",
+                            "aborted",
+                            "max_steps",
+                            "error",
+                            "filtered",
+                            "blocked"
+                          ],
+                          "type": "string"
+                        },
                         "reason": {
                           "enum": [
                             "completed",
@@ -6544,7 +6555,7 @@
   "info": {
     "description": "WebSocket protocol for Kimi Code daemon control frames, acknowledgements, system frames, and session event streaming.",
     "title": "Kimi Code WebSocket API",
-    "version": "0.29.2"
+    "version": "0.31.1"
   },
   "operations": {
     "receiveClientMessages": {

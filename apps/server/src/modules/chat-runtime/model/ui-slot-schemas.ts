@@ -412,6 +412,14 @@ export const runtimeFilesystemUiSlotStateSchema = t.Object({
   updatedAt: t.Number(),
 })
 
+export const runtimeSkillsUiSlotItemSchema = t.Object({
+  name: t.String(),
+  enabled: t.Boolean(),
+  displayName: t.Union([t.String(), t.Null()]),
+  iconUrl: t.Union([t.String(), t.Null()]),
+  brandColor: t.Union([t.String(), t.Null()]),
+}, { additionalProperties: false })
+
 export const runtimeSkillsUiSlotStateSchema = t.Object({
   kind: t.Literal('skills'),
   slotId: t.String(),
@@ -420,6 +428,7 @@ export const runtimeSkillsUiSlotStateSchema = t.Object({
   disabledCount: t.Number(),
   errorCount: t.Number(),
   roots: t.Array(t.String()),
+  items: t.Optional(t.Array(runtimeSkillsUiSlotItemSchema)),
   updatedAt: t.Number(),
 })
 

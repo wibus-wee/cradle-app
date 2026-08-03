@@ -19,6 +19,7 @@
     "build": "pnpm --filter @cradle/server build:desktop-runtime && pnpm --filter @cradle/server build:desktop-plugins && pnpm --filter @cradle/cli build && pnpm build:mac-bridge && pnpm rebuild:sparkle && electron-vite build",
     "build:relayd-resource": "pnpm --filter @cradle/relayd build:desktop-resource",
     "build:mac-bridge": "node scripts/build-mac-bridge.mjs",
+    "generate:tray-icon": "node scripts/generate-tray-icon.mjs",
     "rebuild:sparkle": "node scripts/rebuild-sparkle.mjs",
     "record:appshot-parity": "node scripts/record-appshot-parity.mjs",
     "set-version": "node scripts/set-version.mjs",

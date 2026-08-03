@@ -204,6 +204,7 @@ export type GetApiV1ConfigResponses = {
             raw?: {
                 [key: string]: unknown;
             };
+            secondary_model?: unknown;
             services?: unknown;
             telemetry?: boolean;
             thinking?: unknown;
@@ -239,6 +240,7 @@ export type PostApiV1ConfigData = {
         providers?: {
             [key: string]: unknown;
         };
+        secondary_model?: unknown;
         services?: unknown;
         telemetry?: boolean;
         thinking?: unknown;
@@ -284,6 +286,7 @@ export type PostApiV1ConfigResponses = {
             raw?: {
                 [key: string]: unknown;
             };
+            secondary_model?: unknown;
             services?: unknown;
             telemetry?: boolean;
             thinking?: unknown;
@@ -505,6 +508,56 @@ export type FsHomeResponses = {
 };
 
 export type FsHomeResponse = FsHomeResponses[keyof FsHomeResponses];
+
+export type FsMkdirData = {
+    body: {
+        path: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/fs:mkdir';
+};
+
+export type FsMkdirResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            path: string;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40409;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40411;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40919;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type FsMkdirResponse = FsMkdirResponses[keyof FsMkdirResponses];
 
 export type PostApiV1GuiStoreClearData = {
     body?: never;
@@ -1001,16 +1054,24 @@ export type GetApiV1OauthUsageResponses = {
             } | null;
             kind: 'ok';
             limits: Array<{
-                label: string;
                 limit: number;
-                reset_hint?: string;
+                name?: string;
+                reset_at?: string;
                 used: number;
+                window?: {
+                    duration: number;
+                    unit: 'minute' | 'hour' | 'day' | 'week';
+                };
             }>;
             summary: {
-                label: string;
                 limit: number;
-                reset_hint?: string;
+                name?: string;
+                reset_at?: string;
                 used: number;
+                window?: {
+                    duration: number;
+                    unit: 'minute' | 'hour' | 'day' | 'week';
+                };
             } | null;
         } | {
             kind: 'error';
@@ -1024,6 +1085,57 @@ export type GetApiV1OauthUsageResponses = {
 };
 
 export type GetApiV1OauthUsageResponse = GetApiV1OauthUsageResponses[keyof GetApiV1OauthUsageResponses];
+
+export type GetApiV1OauthUserinfoData = {
+    body?: never;
+    path?: never;
+    query?: {
+        provider?: string;
+    };
+    url: '/api/v1/oauth/userinfo';
+};
+
+export type GetApiV1OauthUserinfoResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            kind: 'ok';
+            userInfo: {
+                avatar?: string;
+                bio?: string;
+                createdTime?: string;
+                domain: number;
+                domainName: string;
+                email?: string;
+                globalId?: string;
+                lastLoginTime?: string;
+                nickname: string;
+                phone?: {
+                    countryCode: string;
+                    number: string;
+                };
+                region: string;
+                status: string;
+                userId: string;
+                userLevel: number;
+                userLevelName: string;
+                username?: string;
+            };
+        } | {
+            kind: 'error';
+            message: string;
+            status?: number;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1OauthUserinfoResponse = GetApiV1OauthUserinfoResponses[keyof GetApiV1OauthUserinfoResponses];
 
 export type GetApiV1ProvidersData = {
     body?: never;
@@ -1425,6 +1537,74 @@ export type RefreshProviderResponses = {
 };
 
 export type RefreshProviderResponse = RefreshProviderResponses[keyof RefreshProviderResponses];
+
+export type PostApiV1SearchData = {
+    body: {
+        container?: {
+            agent_id?: string;
+            session_id?: string;
+        };
+        end_time?: number;
+        mode?: 'terms' | 'literal';
+        op?: 'AND' | 'OR';
+        page_size?: number;
+        page_token?: string;
+        query: string;
+        role?: 'user' | 'assistant' | 'title';
+        sort?: 'score' | 'time_desc' | 'time_asc';
+        start_time?: number;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/search';
+};
+
+export type PostApiV1SearchResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            has_more: boolean;
+            incomplete?: 'candidate_cap';
+            index_state: {
+                documents: number;
+                indexed_sessions: number;
+                state: 'building' | 'ready' | 'readonly';
+                total_sessions: number;
+            };
+            items: Array<{
+                agent_id: string;
+                role: 'user' | 'assistant' | 'title';
+                score: number;
+                session_id: string;
+                session_title: string;
+                snippet: string;
+                step_id?: string;
+                time: number;
+                turn?: number;
+                workspace_id: string;
+            }>;
+            page_token?: string;
+            source: 'live' | 'index';
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: Array<{
+            message: string;
+            path: string;
+        }> | null;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type PostApiV1SearchResponse = PostApiV1SearchResponses[keyof PostApiV1SearchResponses];
 
 export type GetApiV1SessionsData = {
     body?: never;
@@ -5595,6 +5775,65 @@ export type GetApiV1ToolsResponses = {
 
 export type GetApiV1ToolsResponse = GetApiV1ToolsResponses[keyof GetApiV1ToolsResponses];
 
+export type WorkspaceFsSearchData = {
+    body: {
+        exclude_globs?: Array<string>;
+        follow_gitignore?: boolean;
+        include_globs?: Array<string>;
+        limit?: number;
+        query: string;
+        workspace: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/workspace/fs:search';
+};
+
+export type WorkspaceFsSearchResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            items: Array<{
+                kind: 'file' | 'directory' | 'symlink';
+                match_positions: Array<number>;
+                name: string;
+                path: string;
+                score: number;
+            }>;
+            truncated: boolean;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: Array<{
+            message: string;
+            path: string;
+        }> | null;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40410;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 41303;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type WorkspaceFsSearchResponse = WorkspaceFsSearchResponses[keyof WorkspaceFsSearchResponses];
+
 export type GetApiV1WorkspacesData = {
     body?: never;
     path?: never;
@@ -5800,6 +6039,102 @@ export type ListWorkspaceSkillsResponses = {
 };
 
 export type ListWorkspaceSkillsResponse = ListWorkspaceSkillsResponses[keyof ListWorkspaceSkillsResponses];
+
+export type GetApiV1WorkspacesByWorkspaceIdTrustData = {
+    body?: never;
+    path: {
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/trust';
+};
+
+export type GetApiV1WorkspacesByWorkspaceIdTrustResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            trusted: boolean;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40410;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1WorkspacesByWorkspaceIdTrustResponse = GetApiV1WorkspacesByWorkspaceIdTrustResponses[keyof GetApiV1WorkspacesByWorkspaceIdTrustResponses];
+
+export type PostApiV1WorkspacesByWorkspaceIdTrustData = {
+    body?: never;
+    path: {
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/trust';
+};
+
+export type PostApiV1WorkspacesByWorkspaceIdTrustResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            trusted: boolean;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40410;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type PostApiV1WorkspacesByWorkspaceIdTrustResponse = PostApiV1WorkspacesByWorkspaceIdTrustResponses[keyof PostApiV1WorkspacesByWorkspaceIdTrustResponses];
+
+export type PostApiV1WorkspacesByWorkspaceIdUntrustData = {
+    body?: never;
+    path: {
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/untrust';
+};
+
+export type PostApiV1WorkspacesByWorkspaceIdUntrustResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            trusted: boolean;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40410;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type PostApiV1WorkspacesByWorkspaceIdUntrustResponse = PostApiV1WorkspacesByWorkspaceIdUntrustResponses[keyof PostApiV1WorkspacesByWorkspaceIdUntrustResponses];
 
 export type GetAsyncapiJsonData = {
     body?: never;

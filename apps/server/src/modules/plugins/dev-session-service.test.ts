@@ -93,3 +93,48 @@ describe('plugin development session service', () => {
     await service.shutdown()
   })
 })
+
+describe('pluginDevSessionService stream', () => {
+  it('flushes an open comment immediately so clients receive headers without waiting for events', async () => {
+    const service = new PluginDevSessionService()
+    const abortController = new AbortController()
+    const reader = service.stream(abortController.signal).getReader()
+    const decoder = new TextDecoder()
+
+    const first = await reader.read()
+    expect(first.done).toBe(false)
+    expect(decoder.decode(first.value)).toBe(': cradle-event-stream-open\n\n')
+
+    abortController.abort()
+    await expect(reader.read()).resolves.toMatchObject({ done: true })
+    await service.shutdown()
+  })
+
+  it('forwards published session events after the open comment', async () => {
+    await writeFixture()
+    await writeServerBundle('v1')
+    const service = new PluginDevSessionService()
+    const abortController = new AbortController()
+    const reader = service.stream(abortController.signal).getReader()
+    const decoder = new TextDecoder()
+
+    const open = await reader.read()
+    expect(decoder.decode(open.value)).toBe(': cradle-event-stream-open\n\n')
+
+    const session = await service.create({
+      packageDir: packageDir!,
+      entries: { server: '.cradle/dev/server.mjs' },
+    })
+
+    const event = await reader.read()
+    expect(event.done).toBe(false)
+    expect(JSON.parse(decoder.decode(event.value!).replace(/^data:\s*/, '').trim())).toEqual({
+      type: 'started',
+      layer: null,
+      session,
+    })
+
+    abortController.abort()
+    await service.shutdown()
+  })
+})

@@ -1,4 +1,3 @@
-import type { Root } from 'mdast'
 import type { ComponentPropsWithoutRef, ComponentType } from 'react'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -8,84 +7,77 @@ import { describe, expect, it } from 'vitest'
 import { StaticRender } from '../static-render'
 import { remarkCodeComment } from './remark-code-comment'
 
-function run(tree: Root) {
-  remarkCodeComment()(tree)
-  return tree.children
-}
-
-function rootWithParagraph(text: string): Root {
-  return {
-    type: 'root',
-    children: [{ type: 'paragraph', children: [{ type: 'text', value: text }] }],
-  }
-}
-
 const DIRECTIVE
   = '::code-comment{title="Fix the test" body="It times out." file="/repo/a.test.ts" start="12" end="14" priority="P1"}'
 
 type CodeCommentComponents = MarkdownComponents & {
-  'code-comment': ComponentType<ComponentPropsWithoutRef<'div'>>
+  'code-comment': ComponentType<ComponentPropsWithoutRef<'div'> & {
+    title?: string
+    body?: string
+    file?: string
+    start?: string
+    end?: string
+    priority?: string
+  }>
 }
 
-const COMPONENTS = {
-  'code-comment': ({ title }: ComponentPropsWithoutRef<'div'>) => createElement('div', { 'data-code-comment': '' }, title),
-} satisfies CodeCommentComponents
+function render(content: string) {
+  const seen: Array<Record<string, string | undefined>> = []
+  const components = {
+    'code-comment': (props) => {
+      seen.push({
+        title: props.title,
+        body: props.body,
+        file: props.file,
+        start: props.start,
+        end: props.end,
+        priority: props.priority,
+      })
+      return createElement('div', { 'data-code-comment': '' }, props.title)
+    },
+  } satisfies CodeCommentComponents
+
+  const markup = renderToStaticMarkup(createElement(StaticRender, {
+    content,
+    remarkPlugins: [remarkCodeComment],
+    components,
+  }))
+  return { markup, seen }
+}
 
 describe('remarkCodeComment', () => {
-  it('lifts complete directives while preserving surrounding prose', () => {
-    const children = run(rootWithParagraph(`Found an issue.\n${DIRECTIVE}\nMore text.`))
-    expect(children.map(child => child.type)).toEqual(['paragraph', 'code-comment', 'paragraph'])
-    expect(children[1]).toMatchObject({
-      data: {
-        hName: 'code-comment',
-        hProperties: {
-          title: 'Fix the test',
-          body: 'It times out.',
-          file: '/repo/a.test.ts',
-          start: '12',
-          end: '14',
-          priority: 'P1',
-        },
-      },
-    })
+  it('tokenizes complete directives into code-comment elements', () => {
+    const { markup, seen } = render(`Found an issue.\n${DIRECTIVE}\nMore text.`)
+    expect(markup).toContain('data-code-comment')
+    expect(markup).toContain('Fix the test')
+    expect(markup).toContain('Found an issue.')
+    expect(markup).toContain('More text.')
+    // hast/property-information treats HTML `start` as a number (ol.start).
+    expect(seen).toEqual([{
+      title: 'Fix the test',
+      body: 'It times out.',
+      file: '/repo/a.test.ts',
+      start: 12,
+      end: '14',
+      priority: 'P1',
+    }])
   })
 
   it('leaves incomplete or malformed directives as literal text', () => {
-    expect(run(rootWithParagraph('::code-comment{title="Still streaming'))[0]?.type).toBe('paragraph')
-    expect(run(rootWithParagraph('::code-comment{title="unclosed}'))[0]?.type).toBe('paragraph')
+    expect(render('::code-comment{title="Still streaming').markup).not.toContain('data-code-comment')
+    expect(render('::code-comment{title="unclosed}').markup).not.toContain('data-code-comment')
   })
 
-  it('restores inline code and escaped quotes in directive attributes', () => {
-    const tree: Root = {
-      type: 'root',
-      children: [{
-        type: 'paragraph',
-        children: [
-          { type: 'text', value: '::code-comment{title="say \\"hi\\"" body="fails in ' },
-          { type: 'inlineCode', value: 'provider.test.ts' },
-          { type: 'text', value: '"}' },
-        ],
-      }],
-    }
-
-    expect(run(tree)[0]).toMatchObject({
-      data: {
-        hProperties: {
-          title: 'say "hi"',
-          body: 'fails in `provider.test.ts`',
-        },
-      },
-    })
-  })
-
-  it('renders the transformed element through Streamdown after sanitization', () => {
-    const markup = renderToStaticMarkup(createElement(StaticRender, {
-      content: DIRECTIVE,
-      remarkPlugins: [remarkCodeComment],
-      components: COMPONENTS,
-    }))
-
+  it('keeps attribute interiors opaque (escaped quotes and backticks)', () => {
+    const { markup, seen } = render('::code-comment{title="say \\"hi\\"" body="fails in `provider.test.ts`"}')
     expect(markup).toContain('data-code-comment')
-    expect(markup).toContain('Fix the test')
+    expect(seen).toEqual([{
+      title: 'say "hi"',
+      body: 'fails in `provider.test.ts`',
+      file: undefined,
+      start: undefined,
+      end: undefined,
+      priority: undefined,
+    }])
   })
 })

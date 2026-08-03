@@ -83,6 +83,7 @@
     "embla-carousel-react": "^8.6.0",
     "es-module-shims": "^2.8.1",
     "es-toolkit": "^1.47.0",
+    "eventsource-parser": "3.1.0",
     "fast-deep-equal": "^3.1.3",
     "fast-glob": "^3.3.3",
     "format-duration": "^3.0.2",

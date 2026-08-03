@@ -3,8 +3,8 @@ name: Verify Windows Desktop Package
 on:
   workflow_dispatch:
     inputs:
-      source_ref:
-        description: Git ref from wibus-wee/cradle-app to checkout
+      ref:
+        description: Git ref in this repository to checkout (branch, tag, or SHA)
         required: true
         default: main
 
@@ -22,12 +22,10 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Checkout Cradle source
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/cradle-app
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: ${{ inputs.source_ref || 'main' }}
+          ref: ${{ inputs.ref || 'main' }}
 
       - name: Setup desktop build environment
         uses: ./.github/actions/desktop-build-setup

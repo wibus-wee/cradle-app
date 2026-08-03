@@ -7,9 +7,9 @@ import { DiffsIndexView } from '../diffs-index-view'
 import { reviewFixture, workingTreeReviewFixture } from '../fixtures/review-fixtures'
 
 const repositories: RepositoryScope[] = [
-  { id: 'repo_cradle', hostKind: 'github', label: 'wibus-wee/cradle-app', localRoot: '/Users/wibus/dev/cradle-app', reviewCount: 6 },
-  { id: 'repo_streamdown', hostKind: 'github', label: 'wibus-wee/streamdown', localRoot: null, reviewCount: 2 },
-  { id: 'repo_scratch', hostKind: 'local', label: 'scratch', localRoot: '/Users/wibus/dev/scratch', reviewCount: 1 },
+  { id: 'repo_cradle', hostKind: 'github', label: 'wibus-wee/cradle-app', localRoot: '/Users/wibus/dev/cradle-app', reviewCount: 6, workspaceId: 'ws_cradle_app', repositoryPath: '.' },
+  { id: 'repo_streamdown', hostKind: 'github', label: 'wibus-wee/streamdown', localRoot: null, reviewCount: 2, workspaceId: 'ws_cradle_app', repositoryPath: null },
+  { id: 'repo_scratch', hostKind: 'local', label: 'scratch', localRoot: '/Users/wibus/dev/scratch', reviewCount: 1, workspaceId: 'ws_scratch', repositoryPath: '.' },
 ]
 
 /** A handful of reviews spanning states so the tab counts and columns are exercised. */

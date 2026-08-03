@@ -46,7 +46,7 @@
   "new.title": "新建 Work",
   "new.tryAgain": "重试",
   "new.workspace": "工作区",
-  "new.workspaceRequired": "请选择一个本地 Git 工作区来开始 Work。",
+  "new.workspaceRequired": "请选择一个本地单文件夹 Git 工作区以开始 Work。多文件夹工作区不支持 Work。",
   "sidebar.archive": "归档 Work",
   "sidebar.draft": "Draft PR #{{number}}",
   "sidebar.merged": "已合并 PR #{{number}}",

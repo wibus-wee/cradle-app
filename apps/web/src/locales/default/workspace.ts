@@ -275,18 +275,26 @@ export default {
   'workspace.dialog.multiFolderBrowseFolder': 'Browse folder',
   'workspace.dialog.multiFolderBrowseTitle': 'Choose folder',
   'workspace.dialog.multiFolderDescription':
-    'Create one Cradle workspace that links several local project folders.',
+    'Combine already-registered Cradle projects into one symlink workspace under ~/Documents/Cradle/workspaces.',
   'workspace.dialog.multiFolderEntriesDescription':
-    'Each folder gets a short name and an absolute local path.',
-  'workspace.dialog.multiFolderEntriesLabel': 'Folders',
+    'Choose registered local workspaces. Cradle links them as sibling folders.',
+  'workspace.dialog.multiFolderEntriesLabel': 'Registered projects',
   'workspace.dialog.multiFolderFolderNameLabel': 'Folder name',
   'workspace.dialog.multiFolderFolderNamePlaceholder': 'frontend',
   'workspace.dialog.multiFolderFolderPathLabel': 'Absolute path',
   'workspace.dialog.multiFolderFolderPathPlaceholder': '/Users/me/dev/frontend',
   'workspace.dialog.multiFolderNameDescription': 'Used for the Cradle-owned workspace folder.',
-  'workspace.dialog.multiFolderNamePlaceholder': 'my-monorepo',
+  'workspace.dialog.multiFolderNamePlaceholder': 'my-stack',
   'workspace.dialog.multiFolderRemoveFolder': 'Remove folder',
   'workspace.dialog.multiFolderTitle': 'Multi-folder workspace',
+  'workspace.menu.multiFolderCreate': 'Create',
+  'workspace.menu.multiFolderHint':
+    'Pick at least two registered projects, then name the combined workspace.',
+  'workspace.menu.multiFolderMembersLabel': 'Registered projects',
+  'workspace.menu.multiFolderNameLabel': 'Name',
+  'workspace.menu.multiFolderNamePlaceholder': 'my-stack',
+  'workspace.menu.multiFolderNeedProjects':
+    'Add at least two local projects first, then combine them here.',
   'workspace.dialog.nameLabel': 'Name',
   'workspace.dialog.recognitionTitle': 'Cradle Workspace detected',
   'workspace.dialog.recognitionDescription':
@@ -335,7 +343,7 @@ export default {
   'workspace.toast.multiFolderCreated': 'Multi-folder workspace created',
   'workspace.toast.multiFolderDuplicateName': 'Folder names must be unique.',
   'workspace.toast.multiFolderInvalidEntry':
-    'Add a workspace name and an absolute path for every folder.',
+    'Add a name and select at least two registered projects.',
   'workspace.toast.openDefaultFailed': 'Workspace could not be opened',
   'workspace.toast.openInFinderFailed': 'Workspace could not be opened in Finder',
   'workspace.toast.renameFailed': 'Workspace could not be renamed',

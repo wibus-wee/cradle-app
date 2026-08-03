@@ -6,9 +6,9 @@ import { cn } from '~/lib/cn'
  * The small shared vocabulary of the Diffs surface: a status dot, a hairline
  * pill, an added/removed stat pair, and a quiet icon button.
  *
- * These are deliberately local to Diffs rather than pulled from `components/ui`
- * — the review surface runs on its own token set (`review-surface.css`) and at a
- * denser scale than the rest of the app.
+ * Local to Diffs rather than `components/ui` so the reading surface can stay
+ * denser than the rest of the app. Colors come from the app token system via
+ * the thin `--rv-*` aliases in `review-surface.css`.
  */
 
 export type ReviewStatusTone = 'open' | 'merged' | 'closed' | 'draft' | 'warn' | 'danger' | 'neutral'
