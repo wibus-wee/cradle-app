@@ -41,7 +41,7 @@ jobs:
       - name: Check Model API Simulator Protocol Coverage
         run: pnpm --filter @cradle/model-api-simulator coverage:check
 
-  # ─── Mobile ───────────────────────────────────────────────────────────────
+  # ─── Mobile (Expo / React Native merge gate) ───────────────────────────────
   mobile:
     name: Mobile
     runs-on: ubuntu-latest
