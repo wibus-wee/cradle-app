@@ -13,21 +13,11 @@ import {
   TransferVerticalLine as ArrowUpDownIcon,
 } from '@mingcute/react'
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { shallow } from 'zustand/shallow'
 
-import {
-  patchSessionsById,
-  postSessionsByIdRead,
-} from '~/api-gen'
+import { patchSessionsById, postSessionsByIdRead } from '~/api-gen'
 import {
   getSessionsByIdQueryKey,
   patchWorkspacesByWorkspaceIdLocationMutation,
@@ -44,6 +34,7 @@ import { prefetchChatSession } from '~/features/chat/session/chat-session-prefet
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
 import { KanbanSidebar } from '~/features/kanban/kanban-sidebar'
 import { PluginsSidebar } from '~/features/plugins/plugins-sidebar'
+import { useRemoteHostsQuery } from '~/features/remote-hosts/use-remote-host-connection'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
 import { GithubRequiredDialog } from '~/features/settings/github-required-dialog'
 import { openGithubRequiredDialog } from '~/features/settings/github-required-dialog-store'
@@ -53,7 +44,7 @@ import type { WorkSummary } from '~/features/work/use-work'
 import { useWorks, useWorkspaceWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import type { Workspace } from '~/features/workspace/types'
-import { getLocalWorkspacePath, getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { getLocalWorkspacePath, getWorkspaceLocationLabel, isLocalWorkspace } from '~/features/workspace/types'
 import { cn } from '~/lib/cn'
 import { authorizeDangerousAction, isElectron, nativeIpc } from '~/lib/electron'
 import { useIsActiveSurfaceId } from '~/navigation/active-surface'
@@ -93,45 +84,33 @@ import {
 import { WorkspaceAddDialog } from './workspace-add-dialog'
 import { WorkspaceGroupDisclosure } from './workspace-group-disclosure'
 import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
-import {
-  WorkspaceMultiFolderDialog,
-} from './workspace-multi-folder-dialog'
 import { WorkspaceProjectsSectionView } from './workspace-projects-section-view'
 import { WorkspaceRecentSessionListView } from './workspace-recent-session-list-view'
-import {
-  WorkspaceRecognitionDialogView,
-} from './workspace-recognition-dialog-view'
+import { WorkspaceRecognitionDialogView } from './workspace-recognition-dialog-view'
 import { WorkspaceSessionActionsMenu } from './workspace-session-actions-menu'
-import type {
-  WorkspaceSessionActionsMenuState,
-} from './workspace-session-actions-menu-state'
-import {
-  CLOSED_WORKSPACE_SESSION_ACTIONS_MENU_STATE,
-} from './workspace-session-actions-menu-state'
-import {
-  partitionWorkspaceSessions,
-} from './workspace-session-group-partition'
+import type { WorkspaceSessionActionsMenuState } from './workspace-session-actions-menu-state'
+import { CLOSED_WORKSPACE_SESSION_ACTIONS_MENU_STATE } from './workspace-session-actions-menu-state'
+import { partitionWorkspaceSessions } from './workspace-session-group-partition'
 import { WorkspaceSessionGroupSection } from './workspace-session-groups'
 import type { WorkspaceSessionItemMenuRequest } from './workspace-session-item'
-import type {
-  WorkspaceSessionAttentionKind,
-} from './workspace-session-item-view'
+import type { WorkspaceSessionAttentionKind } from './workspace-session-item-view'
 import type { WorkspaceRuntimeIconByKind } from './workspace-session-list-section'
 import { WorkspaceSessionListSection } from './workspace-session-list-section'
 import { isWorkspaceSessionRunning } from './workspace-session-status'
+import type { SidebarSessionEntry } from './workspace-sidebar-grouping'
+import {
+  compareSidebarSessions,
+  computeSectionPreviewCount,
+  groupSidebarSessions,
+} from './workspace-sidebar-grouping'
 import {
   projectMatchesListFilters,
   sessionMatchesListFilters,
 } from './workspace-sidebar-list-filters'
 import { WorkspaceSidebarNavigationView } from './workspace-sidebar-navigation-view'
-import type {
-  WorkspaceSidebarListFilters,
-  WorkspaceSidebarProjectSortKey,
-} from './workspace-sidebar-ui-store'
+import type { WorkspaceSidebarListFilters } from './workspace-sidebar-ui-store'
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
-import {
-  WorkspaceTextInputDialogView,
-} from './workspace-text-input-dialog-view'
+import { WorkspaceTextInputDialogView } from './workspace-text-input-dialog-view'
 
 const DEFAULT_WORKSPACE_FILE_NAME = 'untitled'
 const DEFAULT_WORKSPACE_FOLDER_NAME = 'untitled-folder'
@@ -142,16 +121,16 @@ const EMPTY_WORK_BY_PRIMARY_SESSION_ID = new Map<string, WorkSummary>()
 type SessionAttentionKind = WorkspaceSessionAttentionKind
 const EMPTY_ATTENTION_BY_SESSION_ID = new Map<string, SessionAttentionKind>()
 
-interface RecentWorkspaceSession {
-  session: WorkspaceSession
-  workspace: Workspace
-}
-
 function formatToastError(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
-  if (error && typeof error === 'object' && 'message' in error && typeof (error as { message: unknown }).message === 'string') {
+  if (
+    error
+    && typeof error === 'object'
+    && 'message' in error
+    && typeof (error as { message: unknown }).message === 'string'
+  ) {
     return (error as { message: string }).message
   }
   if (typeof error === 'string') {
@@ -165,9 +144,10 @@ function useSessionAttentionBySessionId(
   locallyStreamingSessionIds: Set<string>,
 ): Map<string, SessionAttentionKind> {
   const activeSessionIds = useMemo(
-    () => sessions
-      .filter(session => isWorkspaceSessionRunning(session, locallyStreamingSessionIds))
-      .map(session => session.id),
+    () =>
+      sessions
+        .filter(session => isWorkspaceSessionRunning(session, locallyStreamingSessionIds))
+        .map(session => session.id),
     [locallyStreamingSessionIds, sessions],
   )
   const statusQueries = useQueries({
@@ -235,11 +215,12 @@ const WorkspaceGroup = memo(
     const [createRequest, setCreateRequest] = useState<{
       kind: 'file' | 'folder'
     } | null>(null)
-    const [sessionMenuState, setSessionMenuState]
-      = useState<WorkspaceSessionActionsMenuState>(
-        CLOSED_WORKSPACE_SESSION_ACTIONS_MENU_STATE,
-      )
+    const [sessionMenuState, setSessionMenuState] = useState<WorkspaceSessionActionsMenuState>(
+      CLOSED_WORKSPACE_SESSION_ACTIONS_MENU_STATE,
+    )
     const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null)
+    const sessionOrdering = useWorkspaceSidebarUiStore(state => state.sessionOrdering)
+    const orderingDirection = useWorkspaceSidebarUiStore(state => state.orderingDirection)
     const workspacePinned = Boolean(workspace.pinned)
     const workspaceSessionIds = useMemo(() => sessions.map(session => session.id), [sessions])
     const sessionsById = useMemo(() => {
@@ -269,8 +250,8 @@ const WorkspaceGroup = memo(
     )
     const runningSessionCount = useMemo(
       () =>
-        sessions.filter(session =>
-          isWorkspaceSessionRunning(session, locallyStreamingSessionIds)).length,
+        sessions.filter(session => isWorkspaceSessionRunning(session, locallyStreamingSessionIds))
+          .length,
       [locallyStreamingSessionIds, sessions],
     )
     const locallyErroredSessionIds = useChatStore(
@@ -331,31 +312,24 @@ const WorkspaceGroup = memo(
         ])
       },
     })
-    const { mutateAsync: createWorkspaceFile } = useMutation(postWorkspacesByWorkspaceIdFilesFileMutation())
+    const { mutateAsync: createWorkspaceFile } = useMutation(
+      postWorkspacesByWorkspaceIdFilesFileMutation(),
+    )
     const { mutateAsync: createWorkspaceFolder } = useMutation(
       postWorkspacesByWorkspaceIdFilesFolderMutation(),
     )
     const sortedSessions = useMemo(() => {
-      return filteredSessions.toSorted((a, b) => {
-        const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)
-        if (pinDiff !== 0) {
-          return pinDiff
-        }
-        const runningDiff
-          = (isWorkspaceSessionRunning(b, locallyStreamingSessionIds) ? 1 : 0)
-            - (isWorkspaceSessionRunning(a, locallyStreamingSessionIds) ? 1 : 0)
-        if (runningDiff !== 0) {
-          return runningDiff
-        }
-        return 0
-      })
-    }, [filteredSessions, locallyStreamingSessionIds])
+      return filteredSessions.toSorted((a, b) =>
+        compareSidebarSessions(a, b, sessionOrdering, orderingDirection))
+    }, [filteredSessions, orderingDirection, sessionOrdering])
     const activeMenuWork = sessionMenuState.workId
       ? (workspaceWorks.find(work => work.id === sessionMenuState.workId) ?? null)
       : null
     const sidebarSessions = useMemo(
-      () => sortedSessions.filter(session =>
-        session.origin !== 'work' || resolvedWorkByPrimarySessionId.has(session.id)),
+      () =>
+        sortedSessions.filter(
+          session => session.origin !== 'work' || resolvedWorkByPrimarySessionId.has(session.id),
+        ),
       [resolvedWorkByPrimarySessionId, sortedSessions],
     )
     const { data: sessionGroups = [] } = useSessionGroups(workspace.id)
@@ -365,120 +339,129 @@ const WorkspaceGroup = memo(
     const addSessionGroupMembers = useAddSessionGroupMembers(workspace.id)
     const removeSessionGroupMember = useRemoveSessionGroupMember(workspace.id)
     const [createGroupOpen, setCreateGroupOpen] = useState(false)
-    const [createGroupSeedSession, setCreateGroupSeedSession] = useState<WorkspaceSession | null>(null)
+    const [createGroupSeedSession, setCreateGroupSeedSession] = useState<WorkspaceSession | null>(
+      null,
+    )
     const [renameGroupTarget, setRenameGroupTarget] = useState<WorkspaceSessionGroup | null>(null)
     const { grouped: groupedSessions, ungrouped: ungroupedSessions } = useMemo(
       () => partitionWorkspaceSessions(sidebarSessions, sessionGroups),
       [sessionGroups, sidebarSessions],
     )
-    const sortSessionsForList = useCallback((items: WorkspaceSession[]) => {
-      return items.toSorted((a, b) => {
-        const pinDiff = (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)
-        if (pinDiff !== 0) {
-          return pinDiff
+    const sortSessionsForList = useCallback(
+      (items: WorkspaceSession[]) => {
+        return items.toSorted((a, b) =>
+          compareSidebarSessions(a, b, sessionOrdering, orderingDirection))
+      },
+      [orderingDirection, sessionOrdering],
+    )
+    const handleCreateSessionGroup = useCallback(
+      async (titleRaw: string) => {
+        const title = titleRaw.trim()
+        if (!title) {
+          return
         }
-        const runningDiff
-          = (isWorkspaceSessionRunning(b, locallyStreamingSessionIds) ? 1 : 0)
-            - (isWorkspaceSessionRunning(a, locallyStreamingSessionIds) ? 1 : 0)
-        if (runningDiff !== 0) {
-          return runningDiff
+        try {
+          await createSessionGroup.mutateAsync({
+            body: {
+              workspaceId: workspace.id,
+              title,
+              ...(createGroupSeedSession ? { sessionIds: [createGroupSeedSession.id] } : {}),
+            },
+          })
+          setCreateGroupOpen(false)
+          setCreateGroupSeedSession(null)
         }
-        return 0
-      })
-    }, [locallyStreamingSessionIds])
-    const handleCreateSessionGroup = useCallback(async (titleRaw: string) => {
-      const title = titleRaw.trim()
-      if (!title) {
-        return
-      }
-      try {
-        await createSessionGroup.mutateAsync({
-          body: {
-            workspaceId: workspace.id,
-            title,
-            ...(createGroupSeedSession ? { sessionIds: [createGroupSeedSession.id] } : {}),
-          },
-        })
-        setCreateGroupOpen(false)
-        setCreateGroupSeedSession(null)
-      }
  catch (error) {
-        toastManager.add({
-          type: 'error',
-          title: t('sessionGroup.toast.createFailed'),
-          description: formatToastError(error),
-        })
-      }
-    }, [createGroupSeedSession, createSessionGroup, t, workspace.id])
-    const handleRenameSessionGroup = useCallback(async (titleRaw: string) => {
-      if (!renameGroupTarget) {
-        return
-      }
-      const title = titleRaw.trim()
-      if (!title || title === renameGroupTarget.title) {
-        setRenameGroupTarget(null)
-        return
-      }
-      try {
-        await updateSessionGroup.mutateAsync({
-          path: { id: renameGroupTarget.id },
-          body: { title },
-        })
-        setRenameGroupTarget(null)
-      }
+          toastManager.add({
+            type: 'error',
+            title: t('sessionGroup.toast.createFailed'),
+            description: formatToastError(error),
+          })
+        }
+      },
+      [createGroupSeedSession, createSessionGroup, t, workspace.id],
+    )
+    const handleRenameSessionGroup = useCallback(
+      async (titleRaw: string) => {
+        if (!renameGroupTarget) {
+          return
+        }
+        const title = titleRaw.trim()
+        if (!title || title === renameGroupTarget.title) {
+          setRenameGroupTarget(null)
+          return
+        }
+        try {
+          await updateSessionGroup.mutateAsync({
+            path: { id: renameGroupTarget.id },
+            body: { title },
+          })
+          setRenameGroupTarget(null)
+        }
  catch (error) {
-        toastManager.add({
-          type: 'error',
-          title: t('sessionGroup.toast.renameFailed'),
-          description: formatToastError(error),
-        })
-      }
-    }, [renameGroupTarget, t, updateSessionGroup])
-    const handleDeleteSessionGroup = useCallback(async (group: WorkspaceSessionGroup) => {
-      try {
-        await deleteSessionGroup.mutateAsync({ path: { id: group.id } })
-      }
+          toastManager.add({
+            type: 'error',
+            title: t('sessionGroup.toast.renameFailed'),
+            description: formatToastError(error),
+          })
+        }
+      },
+      [renameGroupTarget, t, updateSessionGroup],
+    )
+    const handleDeleteSessionGroup = useCallback(
+      async (group: WorkspaceSessionGroup) => {
+        try {
+          await deleteSessionGroup.mutateAsync({ path: { id: group.id } })
+        }
  catch (error) {
-        toastManager.add({
-          type: 'error',
-          title: t('sessionGroup.toast.deleteFailed'),
-          description: formatToastError(error),
-        })
-      }
-    }, [deleteSessionGroup, t])
-    const handleAddSessionToGroup = useCallback(async (sessionId: string, groupId: string) => {
-      try {
-        await addSessionGroupMembers.mutateAsync({
-          path: { id: groupId },
-          body: { sessionIds: [sessionId] },
-        })
-      }
+          toastManager.add({
+            type: 'error',
+            title: t('sessionGroup.toast.deleteFailed'),
+            description: formatToastError(error),
+          })
+        }
+      },
+      [deleteSessionGroup, t],
+    )
+    const handleAddSessionToGroup = useCallback(
+      async (sessionId: string, groupId: string) => {
+        try {
+          await addSessionGroupMembers.mutateAsync({
+            path: { id: groupId },
+            body: { sessionIds: [sessionId] },
+          })
+        }
  catch (error) {
-        toastManager.add({
-          type: 'error',
-          title: t('sessionGroup.toast.addMemberFailed'),
-          description: formatToastError(error),
-        })
-      }
-    }, [addSessionGroupMembers, t])
-    const handleRemoveSessionFromGroup = useCallback(async (session: WorkspaceSession) => {
-      if (!session.sessionGroupId) {
-        return
-      }
-      try {
-        await removeSessionGroupMember.mutateAsync({
-          groupId: session.sessionGroupId,
-          sessionId: session.id,
-        })
-      }
+          toastManager.add({
+            type: 'error',
+            title: t('sessionGroup.toast.addMemberFailed'),
+            description: formatToastError(error),
+          })
+        }
+      },
+      [addSessionGroupMembers, t],
+    )
+    const handleRemoveSessionFromGroup = useCallback(
+      async (session: WorkspaceSession) => {
+        if (!session.sessionGroupId) {
+          return
+        }
+        try {
+          await removeSessionGroupMember.mutateAsync({
+            groupId: session.sessionGroupId,
+            sessionId: session.id,
+          })
+        }
  catch (error) {
-        toastManager.add({
-          type: 'error',
-          title: t('sessionGroup.toast.removeMemberFailed'),
-          description: formatToastError(error),
-        })
-      }
-    }, [removeSessionGroupMember, t])
+          toastManager.add({
+            type: 'error',
+            title: t('sessionGroup.toast.removeMemberFailed'),
+            description: formatToastError(error),
+          })
+        }
+      },
+      [removeSessionGroupMember, t],
+    )
     const handleCreateSessionGroupFromSession = useCallback((session: WorkspaceSession) => {
       setCreateGroupSeedSession(session)
       setCreateGroupOpen(true)
@@ -584,10 +567,7 @@ const WorkspaceGroup = memo(
 
       for (const sessionId of acknowledgedSessionIdsRef.current!) {
         const session = sessionsById.get(sessionId)
-        if (
-          session
-          && isWorkspaceSessionRunning(session, locallyStreamingSessionIds)
-        ) {
+        if (session && isWorkspaceSessionRunning(session, locallyStreamingSessionIds)) {
           next.add(sessionId)
         }
       }
@@ -614,7 +594,7 @@ const WorkspaceGroup = memo(
           body: { path },
         })
       }
-      catch (error) {
+ catch (error) {
         toastManager.add({
           type: 'error',
           title: t('workspace.toast.relinkFailed'),
@@ -745,16 +725,18 @@ const WorkspaceGroup = memo(
           invoke: handleOpenWorkspace,
         },
         ...(workspace.availability === 'missing'
-          ? [{
-              key: 'relink',
-              label: t('workspace.action.relink'),
-              icon: <RefreshCwIcon />,
-              testId: `workspace-relink-${workspace.id}`,
-              invoke: handleRelinkWorkspace,
-            }] satisfies WorkspaceMenuAction[]
+          ? ([
+              {
+                key: 'relink',
+                label: t('workspace.action.relink'),
+                icon: <RefreshCwIcon />,
+                testId: `workspace-relink-${workspace.id}`,
+                invoke: handleRelinkWorkspace,
+              },
+            ] satisfies WorkspaceMenuAction[])
           : []),
         ...(workspaceLocalPath
-          ? [
+          ? ([
               {
                 key: 'open-default',
                 label: t('workspace.action.openDefault'),
@@ -784,7 +766,7 @@ const WorkspaceGroup = memo(
                 testId: `workspace-new-folder-${workspace.id}`,
                 invoke: () => setCreateRequest({ kind: 'folder' }),
               },
-            ] satisfies WorkspaceMenuAction[]
+            ] satisfies WorkspaceMenuAction[])
           : []),
         {
           key: 'rename',
@@ -1027,23 +1009,6 @@ const WorkspaceGroup = memo(
 )
 WorkspaceGroup.displayName = 'WorkspaceGroup'
 
-function compareProjectBySortKey(
-  left: Workspace,
-  right: Workspace,
-  sortKey: WorkspaceSidebarProjectSortKey,
-): number {
-  switch (sortKey) {
-    case 'createdAt':
-      return left.createdAt - right.createdAt
-    case 'updatedAt':
-      return left.updatedAt - right.updatedAt
-    case 'name':
-      return left.name.localeCompare(right.name)
-    case 'recentSession':
-      return 0
-  }
-}
-
 // ── Main sidebar content ──────────────────────────────────────────────────────
 
 interface WorkspaceSidebarBodyProps {
@@ -1054,8 +1019,12 @@ interface WorkspaceSidebarBodyProps {
   runtimeIconByKind: RuntimeIconByKind
   adding: boolean
   multiWorkspaceEnabled: boolean
+  multiFolderCreating: boolean
   onAddFromPicker: () => void
-  onOpenMultiWorkspaceDialog: () => void
+  onCreateMultiFolder: (input: {
+    name: string
+    folders: Array<{ name: string, path: string }>
+  }) => Promise<void>
   hasUnreadWorkspaceSessions: boolean
   markingAllSessionsRead: boolean
   onMarkAllAsRead: () => void
@@ -1072,48 +1041,56 @@ const WorkspaceSidebarBody = memo(
     runtimeIconByKind,
     adding,
     multiWorkspaceEnabled,
+    multiFolderCreating,
     onAddFromPicker,
-    onOpenMultiWorkspaceDialog,
+    onCreateMultiFolder,
     hasUnreadWorkspaceSessions,
     markingAllSessionsRead,
     onMarkAllAsRead,
     onDelete,
     onTogglePin,
   }: WorkspaceSidebarBodyProps) => {
+    const { t } = useTranslation('workspace')
     const pruneWorkspaceSidebarState = useWorkspaceSidebarUiStore(
       state => state.pruneWorkspaceSidebarState,
     )
-    const projectScope = useWorkspaceSidebarUiStore(state => state.projectScope)
     const statusFilters = useWorkspaceSidebarUiStore(state => state.statusFilters)
     const workPrFilters = useWorkspaceSidebarUiStore(state => state.workPrFilters)
+    const environmentFilters = useWorkspaceSidebarUiStore(state => state.environmentFilters)
     const sourceFilters = useWorkspaceSidebarUiStore(state => state.sourceFilters)
     const showArchived = useWorkspaceSidebarUiStore(state => state.showArchived)
-    const projectSortKey = useWorkspaceSidebarUiStore(state => state.projectSortKey)
-    const projectSortDirection = useWorkspaceSidebarUiStore(state => state.projectSortDirection)
-    const projectPinnedFirst = useWorkspaceSidebarUiStore(state => state.projectPinnedFirst)
+    const grouping = useWorkspaceSidebarUiStore(state => state.grouping)
+    const sessionOrdering = useWorkspaceSidebarUiStore(state => state.sessionOrdering)
+    const orderingDirection = useWorkspaceSidebarUiStore(state => state.orderingDirection)
     const sessionPreviewLimit = useWorkspaceSidebarUiStore(state => state.sessionPreviewLimit)
-    const setProjectScope = useWorkspaceSidebarUiStore(state => state.setProjectScope)
+    const setGrouping = useWorkspaceSidebarUiStore(state => state.setGrouping)
+    const setSessionOrdering = useWorkspaceSidebarUiStore(state => state.setSessionOrdering)
+    const setOrderingDirection = useWorkspaceSidebarUiStore(state => state.setOrderingDirection)
     const toggleStatusFilter = useWorkspaceSidebarUiStore(state => state.toggleStatusFilter)
     const toggleWorkPrFilter = useWorkspaceSidebarUiStore(state => state.toggleWorkPrFilter)
+    const toggleEnvironmentFilter = useWorkspaceSidebarUiStore(
+      state => state.toggleEnvironmentFilter,
+    )
     const toggleSourceFilter = useWorkspaceSidebarUiStore(state => state.toggleSourceFilter)
     const setShowArchived = useWorkspaceSidebarUiStore(state => state.setShowArchived)
     const clearListFilters = useWorkspaceSidebarUiStore(state => state.clearListFilters)
-    const setProjectSortKey = useWorkspaceSidebarUiStore(state => state.setProjectSortKey)
-    const setProjectSortDirection = useWorkspaceSidebarUiStore(
-      state => state.setProjectSortDirection,
+    const setSessionPreviewLimit = useWorkspaceSidebarUiStore(
+      state => state.setSessionPreviewLimit,
     )
-    const setProjectPinnedFirst = useWorkspaceSidebarUiStore(state => state.setProjectPinnedFirst)
-    const setSessionPreviewLimit = useWorkspaceSidebarUiStore(state => state.setSessionPreviewLimit)
     const collapseAllWorkspaces = useWorkspaceSidebarUiStore(state => state.collapseAllWorkspaces)
-    const [recentSessionsExpanded, setRecentSessionsExpanded] = useState(false)
+    const [expandedFlatSectionKeys, setExpandedFlatSectionKeys]
+      = useState<ReadonlySet<string>>(EMPTY_SESSION_ID_SET)
 
-    const listFilters = useMemo<WorkspaceSidebarListFilters>(() => ({
-      projectScope,
-      statusFilters,
-      workPrFilters,
-      sourceFilters,
-      showArchived,
-    }), [projectScope, showArchived, sourceFilters, statusFilters, workPrFilters])
+    const listFilters = useMemo<WorkspaceSidebarListFilters>(
+      () => ({
+        statusFilters,
+        workPrFilters,
+        environmentFilters,
+        sourceFilters,
+        showArchived,
+      }),
+      [environmentFilters, showArchived, sourceFilters, statusFilters, workPrFilters],
+    )
 
     const workspaceIds = useMemo(() => workspaces.map(workspace => workspace.id), [workspaces])
     const allSessions = useMemo(() => {
@@ -1123,10 +1100,7 @@ const WorkspaceSidebarBody = memo(
       }
       return sessions
     }, [sessionsByWorkspaceId])
-    const sessionIds = useMemo(
-      () => allSessions.map(session => session.id),
-      [allSessions],
-    )
+    const sessionIds = useMemo(() => allSessions.map(session => session.id), [allSessions])
     const locallyStreamingSessionIds = useChatStore(
       useCallback(
         state =>
@@ -1144,19 +1118,20 @@ const WorkspaceSidebarBody = memo(
             return EMPTY_SESSION_ID_SET
           }
           return new Set(
-            sessionIds.filter(sessionId =>
-              Boolean(chatSelectors.latestError(sessionId)(state))),
+            sessionIds.filter(sessionId => Boolean(chatSelectors.latestError(sessionId)(state))),
           )
         },
         [sessionIds],
       ),
       shallow,
     )
+    const attentionRequired
+      = listFilters.statusFilters.includes('needsYou') || grouping === 'status'
     const attentionBySessionId = useSessionAttentionBySessionId(
-      listFilters.statusFilters.includes('needsYou') ? allSessions : EMPTY_WORKSPACE_SESSIONS,
+      attentionRequired ? allSessions : EMPTY_WORKSPACE_SESSIONS,
       locallyStreamingSessionIds,
     )
-    const resolvedAttentionBySessionId = listFilters.statusFilters.includes('needsYou')
+    const resolvedAttentionBySessionId = attentionRequired
       ? attentionBySessionId
       : EMPTY_ATTENTION_BY_SESSION_ID
 
@@ -1164,7 +1139,6 @@ const WorkspaceSidebarBody = memo(
       return workspaces
         .filter(workspace =>
           projectMatchesListFilters(
-            Boolean(workspace.pinned),
             sessionsByWorkspaceId.get(workspace.id) ?? [],
             workByPrimarySessionId,
             listFilters,
@@ -1173,46 +1147,27 @@ const WorkspaceSidebarBody = memo(
             resolvedAttentionBySessionId,
           ))
         .toSorted((left, right) => {
-          if (projectPinnedFirst) {
-            const pinDiff = (right.pinned ? 1 : 0) - (left.pinned ? 1 : 0)
-            if (pinDiff !== 0) {
-              return pinDiff
-            }
+          const pinDiff = (right.pinned ? 1 : 0) - (left.pinned ? 1 : 0)
+          if (pinDiff !== 0) {
+            return pinDiff
           }
-
-          const keyDiff = compareProjectBySortKey(left, right, projectSortKey)
-          const directedKeyDiff = projectSortDirection === 'desc' ? -keyDiff : keyDiff
-          if (directedKeyDiff !== 0) {
-            return directedKeyDiff
-          }
-
           return left.name.localeCompare(right.name)
         })
     }, [
       listFilters,
       locallyErroredSessionIds,
       locallyStreamingSessionIds,
-      projectPinnedFirst,
-      projectSortDirection,
-      projectSortKey,
       resolvedAttentionBySessionId,
       sessionsByWorkspaceId,
       workByPrimarySessionId,
       workspaces,
     ])
-    const visibleRecentSessions = useMemo(() => {
-      const candidates: RecentWorkspaceSession[] = []
+    const filteredFlatEntries = useMemo(() => {
+      const candidates: SidebarSessionEntry[] = []
 
       for (const workspace of workspaces) {
-        if (listFilters.projectScope === 'pinned' && !workspace.pinned) {
-          continue
-        }
-
         for (const session of sessionsByWorkspaceId.get(workspace.id) ?? []) {
-          if (
-            session.origin === 'work'
-            && !workByPrimarySessionId.has(session.id)
-          ) {
+          if (session.origin === 'work' && !workByPrimarySessionId.has(session.id)) {
             continue
           }
 
@@ -1231,100 +1186,60 @@ const WorkspaceSidebarBody = memo(
         }
       }
 
-      return candidates.toSorted((left, right) => {
-        if (projectPinnedFirst) {
-          const workspacePinDiff
-            = (right.workspace.pinned ? 1 : 0)
-              - (left.workspace.pinned ? 1 : 0)
-          if (workspacePinDiff !== 0) {
-            return workspacePinDiff
-          }
-        }
-
-        const sessionPinDiff = right.session.pinned - left.session.pinned
-        if (sessionPinDiff !== 0) {
-          return sessionPinDiff
-        }
-
-        const rightRunning = isWorkspaceSessionRunning(
-          right.session,
-          locallyStreamingSessionIds,
-        )
-          ? 1
-          : 0
-        const leftRunning = isWorkspaceSessionRunning(
-          left.session,
-          locallyStreamingSessionIds,
-        )
-          ? 1
-          : 0
-        const runningDiff = rightRunning - leftRunning
-        if (runningDiff !== 0) {
-          return runningDiff
-        }
-
-        const activityDiff
-          = right.session.listActivityAt - left.session.listActivityAt
-        const directedActivityDiff = projectSortDirection === 'desc'
-          ? activityDiff
-          : -activityDiff
-        if (directedActivityDiff !== 0) {
-          return directedActivityDiff
-        }
-
-        const titleDiff = (
-          left.session.title ?? ''
-        ).localeCompare(right.session.title ?? '')
-        return titleDiff !== 0
-          ? titleDiff
-          : left.session.id.localeCompare(right.session.id)
-      })
+      return candidates
     }, [
       listFilters,
       locallyErroredSessionIds,
       locallyStreamingSessionIds,
-      projectPinnedFirst,
-      projectSortDirection,
       resolvedAttentionBySessionId,
       sessionsByWorkspaceId,
       workByPrimarySessionId,
       workspaces,
     ])
-    const recentSessionPreviewCount = useMemo(() => {
-      let highestRequiredIndex = -1
-      for (const [index, { session }] of visibleRecentSessions.entries()) {
-        if (
-          session.pinned
-          || isWorkspaceSessionRunning(session, locallyStreamingSessionIds)
-        ) {
-          highestRequiredIndex = index
-        }
+    const { data: remoteHosts = [] } = useRemoteHostsQuery(grouping === 'environment')
+    const flatSections = useMemo(() => {
+      if (grouping === 'workspace') {
+        return []
       }
-      return Math.max(sessionPreviewLimit, highestRequiredIndex + 1)
+      return groupSidebarSessions({
+        entries: filteredFlatEntries,
+        grouping,
+        ordering: sessionOrdering,
+        orderingDirection,
+        workByPrimarySessionId,
+        locallyStreamingSessionIds,
+        locallyErroredSessionIds,
+        attentionBySessionId: resolvedAttentionBySessionId,
+        remoteHosts,
+      })
     }, [
+      filteredFlatEntries,
+      grouping,
+      locallyErroredSessionIds,
       locallyStreamingSessionIds,
-      sessionPreviewLimit,
-      visibleRecentSessions,
+      orderingDirection,
+      remoteHosts,
+      resolvedAttentionBySessionId,
+      sessionOrdering,
+      workByPrimarySessionId,
     ])
-    const recentSessionsToRender = recentSessionsExpanded
-      ? visibleRecentSessions
-      : visibleRecentSessions.slice(0, recentSessionPreviewCount)
-    const hiddenRecentSessionCount = Math.max(
-      visibleRecentSessions.length - recentSessionPreviewCount,
-      0,
-    )
-    const isRecentSessionSort = projectSortKey === 'recentSession'
-    const filteredEmpty = workspaces.length > 0
-      && (isRecentSessionSort
-        ? visibleRecentSessions.length === 0
-        : visibleWorkspaces.length === 0)
+    const flatGroupingActive = grouping !== 'workspace'
+    const filteredEmpty
+      = workspaces.length > 0
+        && (flatGroupingActive ? filteredFlatEntries.length === 0 : visibleWorkspaces.length === 0)
 
-    const handleProjectSortKeyChange = useCallback((sortKey: WorkspaceSidebarProjectSortKey) => {
-      setProjectSortKey(sortKey)
-      if (sortKey === 'recentSession') {
-        setProjectSortDirection('desc')
-      }
-    }, [setProjectSortDirection, setProjectSortKey])
+    const toggleFlatSectionExpanded = useCallback((sectionKey: string) => {
+      setExpandedFlatSectionKeys((current) => {
+        const next = new Set(current)
+        if (next.has(sectionKey)) {
+          next.delete(sectionKey)
+        }
+ else {
+          next.add(sectionKey)
+        }
+        return next
+      })
+    }, [])
 
     useEffect(() => {
       if (!workspacesReady) {
@@ -1345,52 +1260,77 @@ const WorkspaceSidebarBody = memo(
           hasWorkspaces={workspaces.length > 0}
           filteredEmpty={filteredEmpty}
           listFilters={listFilters}
-          projectSortKey={projectSortKey}
-          projectSortDirection={projectSortDirection}
-          projectPinnedFirst={projectPinnedFirst}
+          grouping={grouping}
+          ordering={sessionOrdering}
+          orderingDirection={orderingDirection}
           sessionPreviewLimit={sessionPreviewLimit}
           adding={adding}
           multiWorkspaceEnabled={multiWorkspaceEnabled}
+          multiFolderCandidates={workspaces.filter(workspace =>
+            isLocalWorkspace(workspace)
+            && workspace.availability === 'available'
+            && !workspace.multiFolder)}
+          multiFolderCreating={multiFolderCreating}
           hasUnreadWorkspaceSessions={hasUnreadWorkspaceSessions}
           markingAllSessionsRead={markingAllSessionsRead}
-          onProjectScopeChange={setProjectScope}
+          onGroupingChange={setGrouping}
+          onSessionOrderingChange={setSessionOrdering}
+          onOrderingDirectionChange={setOrderingDirection}
           onToggleStatusFilter={toggleStatusFilter}
           onToggleWorkPrFilter={toggleWorkPrFilter}
+          onToggleEnvironmentFilter={toggleEnvironmentFilter}
           onToggleSourceFilter={toggleSourceFilter}
           onShowArchivedChange={setShowArchived}
           onClearListFilters={clearListFilters}
-          onProjectSortKeyChange={handleProjectSortKeyChange}
-          onProjectSortDirectionChange={setProjectSortDirection}
-          onProjectPinnedFirstChange={setProjectPinnedFirst}
           onSessionPreviewLimitChange={setSessionPreviewLimit}
           onCollapseAll={() => collapseAllWorkspaces(workspaceIds)}
           onAddFromPicker={onAddFromPicker}
-          onOpenMultiWorkspaceDialog={onOpenMultiWorkspaceDialog}
+          onCreateMultiFolder={onCreateMultiFolder}
           onMarkAllAsRead={onMarkAllAsRead}
         >
-          {isRecentSessionSort
-            ? (
-                <WorkspaceRecentSessionListView
-                  sessionCount={visibleRecentSessions.length}
-                  expanded={recentSessionsExpanded}
-                  hiddenSessionCount={hiddenRecentSessionCount}
-                  onToggleExpanded={() => setRecentSessionsExpanded(current => !current)}
-                >
-                  {recentSessionsToRender.map(({ session, workspace }) => (
-                    <WorkspaceGroup
-                      key={`${workspace.id}:${session.id}`}
-                      workspace={workspace}
-                      sessions={[session]}
-                      flatSession
-                      listFilters={listFilters}
-                      workByPrimarySessionId={workByPrimarySessionId}
-                      runtimeIconByKind={runtimeIconByKind}
-                      onDelete={onDelete}
-                      onTogglePin={onTogglePin}
-                    />
-                  ))}
-                </WorkspaceRecentSessionListView>
-              )
+          {flatGroupingActive
+            ? flatSections.map((section) => {
+                const expanded = expandedFlatSectionKeys.has(section.key)
+                const previewCount = computeSectionPreviewCount(
+                  section.entries,
+                  sessionPreviewLimit,
+                  locallyStreamingSessionIds,
+                )
+                const entriesToRender = expanded
+                  ? section.entries
+                  : section.entries.slice(0, previewCount)
+                const hiddenEntryCount = Math.max(section.entries.length - previewCount, 0)
+                return (
+                  <div key={section.key} className="flex min-w-0 flex-col">
+                    <div
+                      className="px-1 pb-0.5 pt-1.5 text-[11px] font-medium text-muted-foreground"
+                      data-testid="workspace-flat-section-label"
+                    >
+                      {section.labelKey ? t(section.labelKey) : section.label}
+                    </div>
+                    <WorkspaceRecentSessionListView
+                      sessionCount={section.entries.length}
+                      expanded={expanded}
+                      hiddenSessionCount={hiddenEntryCount}
+                      onToggleExpanded={() => toggleFlatSectionExpanded(section.key)}
+                    >
+                      {entriesToRender.map(({ session, workspace }) => (
+                        <WorkspaceGroup
+                          key={`${workspace.id}:${session.id}`}
+                          workspace={workspace}
+                          sessions={[session]}
+                          flatSession
+                          listFilters={listFilters}
+                          workByPrimarySessionId={workByPrimarySessionId}
+                          runtimeIconByKind={runtimeIconByKind}
+                          onDelete={onDelete}
+                          onTogglePin={onTogglePin}
+                        />
+                      ))}
+                    </WorkspaceRecentSessionListView>
+                  </div>
+                )
+              })
             : visibleWorkspaces.map(workspace => (
                 <WorkspaceGroup
                   key={workspace.id}
@@ -1448,9 +1388,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
         byPrimarySessionId.set(work.primarySessionId, work)
       }
     }
-    return byPrimarySessionId.size > 0
-      ? byPrimarySessionId
-      : EMPTY_WORK_BY_PRIMARY_SESSION_ID
+    return byPrimarySessionId.size > 0 ? byPrimarySessionId : EMPTY_WORK_BY_PRIMARY_SESSION_ID
   }, [activeWorks, archivedWorks, showArchived])
   const { runtimes } = useRuntimeCatalog()
   const {
@@ -1465,7 +1403,6 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
   const { remove } = useDeleteWorkspace()
   const { togglePin } = useToggleWorkspacePin()
   const [addWorkspaceDialogOpen, setAddWorkspaceDialogOpen] = useState(false)
-  const [multiFolderDialogOpen, setMultiFolderDialogOpen] = useState(false)
   const multiWorkspaceEnabled = useFeatureFlag('multiWorkspacePoc')
   const localAuthForDangerousActions = useFeatureFlag('localAuthForDangerousActions')
   const { mutateAsync: createMultiFolderWorkspace, isPending: creatingMultiFolderWorkspace }
@@ -1573,14 +1510,14 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
           throwOnError: true,
         })
         toastManager.add({ type: 'success', title: t('workspace.toast.multiFolderCreated') })
-        setMultiFolderDialogOpen(false)
       }
- catch (error) {
+      catch (error) {
         toastManager.add({
           type: 'error',
           title: t('workspace.toast.multiFolderCreateFailed'),
           description: formatToastError(error),
         })
+        throw error
       }
     },
     [createMultiFolderWorkspace, t],
@@ -1591,7 +1528,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
       await openAsCradleWorkspace()
       toastManager.add({ type: 'success', title: t('workspace.toast.multiFolderCreated') })
     }
-    catch (error) {
+ catch (error) {
       toastManager.add({
         type: 'error',
         title: t('workspace.toast.recognitionOpenFailed'),
@@ -1604,7 +1541,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
     try {
       await addAsSingleFolder()
     }
-    catch (error) {
+ catch (error) {
       toastManager.add({
         type: 'error',
         title: t('workspace.toast.recognitionSingleFailed'),
@@ -1613,23 +1550,26 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
     }
   }, [addAsSingleFolder, t])
 
-  const handleCreateRemoteWorkspace = useCallback(async (input: CreateWorkspaceInput) => {
-    try {
-      await createFromLocator(input)
-      setAddWorkspaceDialogOpen(false)
-      toastManager.add({
-        type: 'success',
-        title: t('workspace.toast.remoteWorkspaceCreated'),
-      })
-    }
-    catch (error) {
-      toastManager.add({
-        type: 'error',
-        title: t('workspace.toast.remoteWorkspaceCreateFailed'),
-        description: formatToastError(error),
-      })
-    }
-  }, [createFromLocator, t])
+  const handleCreateRemoteWorkspace = useCallback(
+    async (input: CreateWorkspaceInput) => {
+      try {
+        await createFromLocator(input)
+        setAddWorkspaceDialogOpen(false)
+        toastManager.add({
+          type: 'success',
+          title: t('workspace.toast.remoteWorkspaceCreated'),
+        })
+      }
+ catch (error) {
+        toastManager.add({
+          type: 'error',
+          title: t('workspace.toast.remoteWorkspaceCreateFailed'),
+          description: formatToastError(error),
+        })
+      }
+    },
+    [createFromLocator, t],
+  )
 
   const openSearch = useCallback(() => useGlobalSearchStore.getState().openSearch(), [])
 
@@ -1683,8 +1623,9 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
             runtimeIconByKind={runtimeIconByKind}
             adding={adding}
             multiWorkspaceEnabled={multiWorkspaceEnabled}
+            multiFolderCreating={creatingMultiFolderWorkspace}
             onAddFromPicker={() => setAddWorkspaceDialogOpen(true)}
-            onOpenMultiWorkspaceDialog={() => setMultiFolderDialogOpen(true)}
+            onCreateMultiFolder={handleCreateMultiFolderWorkspace}
             hasUnreadWorkspaceSessions={unreadWorkspaceSessions.length > 0}
             markingAllSessionsRead={markingAllSessionsRead}
             onMarkAllAsRead={handleMarkAllAsRead}
@@ -1693,12 +1634,6 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
           />
         </div>
       </ScrollArea>
-      <WorkspaceMultiFolderDialog
-        open={multiFolderDialogOpen && multiWorkspaceEnabled}
-        creating={creatingMultiFolderWorkspace}
-        onOpenChange={setMultiFolderDialogOpen}
-        onCommit={handleCreateMultiFolderWorkspace}
-      />
       <WorkspaceAddDialog
         open={addWorkspaceDialogOpen}
         creating={adding}

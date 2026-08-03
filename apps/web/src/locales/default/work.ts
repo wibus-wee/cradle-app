@@ -5,7 +5,7 @@ export default {
   'new.description': 'Let\'s give the agent something to finish',
   'new.start': 'Start Work',
   'new.workspace': 'Workspace',
-  'new.workspaceRequired': 'Choose a local Git workspace to start Work.',
+  'new.workspaceRequired': 'Choose a local single-folder Git workspace to start Work. Multi-folder workspaces are not supported.',
   'new.noLocalWorkspace': 'No local workspace is available.',
   'new.addProject': 'Add project',
   'new.addingProject': 'Adding...',

@@ -14,6 +14,10 @@ on:
       source_ref:
         description: Git ref from wibus-wee/cradle-app to test
         required: false
+        default: ''
+      ref:
+        description: Git ref in this repository to test (branch, tag, or SHA)
+        required: false
         default: main
 
 permissions:
@@ -33,7 +37,7 @@ jobs:
         with:
           repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: ${{ github.event.inputs.source_ref || 'main' }}
+          ref: ${{ github.event.inputs.source_ref || github.event.inputs.ref || 'main' }}
 
       - uses: ./.github/actions/setup
         with:

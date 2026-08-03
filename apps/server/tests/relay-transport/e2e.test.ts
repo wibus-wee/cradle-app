@@ -219,6 +219,30 @@ interface HostBridge {
   stop: () => Promise<void>
 }
 
+/**
+ * Mirror production host/controller transports: release send credit only after
+ * the kernel accepts the local TCP write. Skipping this leaves the peer stuck
+ * at the 512 KiB initial stream window (bodies ≥512 KiB hang even at concurrency 1).
+ */
+function writeHostBridgeStreamData(
+  session: RelaySession,
+  socket: Socket | undefined,
+  streamId: string,
+  data: Uint8Array,
+): void {
+  if (!socket) {
+    return
+  }
+  const chunk = Buffer.from(data)
+  socket.write(chunk, (error) => {
+    if (error) {
+      socket.destroy()
+      return
+    }
+    session.reportStreamDataConsumed(streamId, chunk.byteLength)
+  })
+}
+
 async function startHostBridge(opts: {
   relayUrl: string
   roomId: string
@@ -258,10 +282,7 @@ async function startHostBridge(opts: {
         })
       },
       onStreamData: (streamId, data) => {
-        const socket = streams.get(streamId)
-        if (socket) {
-          socket.write(Buffer.from(data))
-        }
+        writeHostBridgeStreamData(session, streams.get(streamId), streamId, data)
       },
       onStreamClose: (streamId) => {
         const socket = streams.get(streamId)
@@ -345,6 +366,10 @@ async function callPairingClaim(
 function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, requests: string[] }> {
   const requests: string[] = []
   const server = createServer((req, res) => {
+    if (req.url?.startsWith('/hang/')) {
+      req.resume()
+      return
+    }
     let body = ''
     req.on('data', (chunk) => {
       body += chunk.toString()
@@ -484,33 +509,68 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     expect(warmStream?.firstRequestByteAt).not.toBeNull()
     expect(warmStream?.firstResponseByteAt).not.toBeNull()
 
-    const concurrentBody = 'x'.repeat(64 * 1024)
+    const hangingRequests = Array.from({ length: 32 }, (_, index) => {
+      const controller = new AbortController()
+      const result = fetch(`${handle.localBaseUrl}/hang/${index}`, {
+        signal: controller.signal,
+      }).catch(error => error)
+      return { controller, result }
+    })
+    // 64 KiB stays under the initial stream credit without mid-stream acks; 256/512 KiB
+    // require host write acknowledgements or the sender wedges at RELAY_STREAM_MIN_CREDIT_BYTES.
+    const concurrencyCases = [
+      { bodyBytes: 64 * 1024, concurrencies: [1, 8, 64, 128] },
+      { bodyBytes: 256 * 1024, concurrencies: [32] },
+      { bodyBytes: 512 * 1024, concurrencies: [1, 32] },
+    ] as const
     const concurrencyRows = []
-    for (const concurrency of [1, 8]) {
-      const batchStartedAt = performance.now()
-      const durations = await Promise.all(Array.from({ length: concurrency }, async (_, index) => {
-        const startedAt = performance.now()
-        const concurrentResponse = await fetch(`${handle.localBaseUrl}/benchmark/${concurrency}/${index}`, {
-          method: 'POST',
-          headers: { 'content-type': 'text/plain' },
-          body: concurrentBody,
-        })
-        expect(concurrentResponse.status).toBe(200)
-        const body = (await concurrentResponse.json()) as { ok: boolean, echo: string }
-        expect(body.ok).toBe(true)
-        expect(body.echo).toBe(concurrentBody)
-        return performance.now() - startedAt
-      }))
-      const batchElapsedMs = performance.now() - batchStartedAt
-      concurrencyRows.push({
-        concurrency,
-        requestBodyBytes: Buffer.byteLength(concurrentBody),
-        p50Ms: percentile(durations, 0.5),
-        p95Ms: percentile(durations, 0.95),
-        maxMs: Math.max(...durations),
-        aggregateUsefulMiBps:
-          (concurrency * Buffer.byteLength(concurrentBody) * 2) / (1024 * 1024) / (batchElapsedMs / 1_000),
+    try {
+      await new Promise(resolve => setTimeout(resolve, 25))
+      for (const { bodyBytes, concurrencies } of concurrencyCases) {
+        const concurrentBody = 'x'.repeat(bodyBytes)
+        for (const concurrency of concurrencies) {
+          const batchStartedAt = performance.now()
+          const durations = await Promise.all(Array.from({ length: concurrency }, async (_, index) => {
+            const startedAt = performance.now()
+            const concurrentResponse = await fetch(
+              `${handle.localBaseUrl}/benchmark/${bodyBytes}/${concurrency}/${index}`,
+              {
+                method: 'POST',
+                headers: { 'content-type': 'text/plain' },
+                body: concurrentBody,
+                signal: AbortSignal.timeout(20_000),
+              },
+            )
+            expect(concurrentResponse.status).toBe(200)
+            const body = (await concurrentResponse.json()) as { ok: boolean, echo: string }
+            expect(body.ok).toBe(true)
+            expect(body.echo).toBe(concurrentBody)
+            return performance.now() - startedAt
+          }))
+          const batchElapsedMs = performance.now() - batchStartedAt
+          concurrencyRows.push({
+            concurrency,
+            requestBodyBytes: bodyBytes,
+            p50Ms: percentile(durations, 0.5),
+            p95Ms: percentile(durations, 0.95),
+            maxMs: Math.max(...durations),
+            aggregateUsefulMiBps:
+              (concurrency * bodyBytes * 2) / (1024 * 1024) / (batchElapsedMs / 1_000),
+          })
+        }
+      }
+      const postLoadProbe = await fetch(`${handle.localBaseUrl}/post-load-probe`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(5_000),
       })
+      expect(postLoadProbe.status).toBe(200)
+      await postLoadProbe.json()
+    }
+    finally {
+      for (const request of hangingRequests) {
+        request.controller.abort()
+      }
+      await Promise.all(hangingRequests.map(request => request.result))
     }
     expect(handle.getPerformanceSnapshot().connectionAttempts).toHaveLength(attemptsBeforeWarmRequest)
     console.info([
@@ -528,7 +588,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
       conditions: {
         relayd: 'local subprocess',
         transport: 'binary-v2',
-        logicalUsefulBytesPerRequest: Buffer.byteLength(concurrentBody) * 2,
+        hostBridgeAcksAppliedWrites: true,
         connectionAttemptsBeforeMatrix: attemptsBeforeWarmRequest,
         connectionAttemptsAfterMatrix: handle.getPerformanceSnapshot().connectionAttempts.length,
       },
@@ -612,7 +672,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
 
     await handle2.close()
     await hostBridgeReconnect.stop()
-  }, 60_000)
+  }, 120_000)
 })
 
 function latestRelayStream(snapshot: RelayControllerPerformanceSnapshot): RelayStreamCheckpoint | undefined {
@@ -674,7 +734,7 @@ async function startHostBridgePinned(opts: {
         })
       },
       onStreamData: (streamId, data) => {
-        streams.get(streamId)?.write(Buffer.from(data))
+        writeHostBridgeStreamData(session, streams.get(streamId), streamId, data)
       },
       onStreamClose: (streamId) => {
         const socket = streams.get(streamId)

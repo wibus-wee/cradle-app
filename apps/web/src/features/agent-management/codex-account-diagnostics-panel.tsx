@@ -30,7 +30,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogMedia,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
 import { Badge } from '~/components/ui/badge'
@@ -246,9 +245,6 @@ export function CodexAccountDiagnosticsPanel({ providerTargetId }: { providerTar
       <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogMedia>
-              <TimerResetIcon />
-            </AlertDialogMedia>
             <AlertDialogTitle>Use reset credit?</AlertDialogTitle>
             <AlertDialogDescription>
               {resetCreditCount !== null

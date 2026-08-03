@@ -474,6 +474,7 @@ export type GetWorkspacesResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -544,6 +545,7 @@ export type PostWorkspacesResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -602,6 +604,7 @@ export type PostWorkspacesFromDirectoryResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -697,6 +700,7 @@ export type PostWorkspacesMultiFolderResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -755,6 +759,7 @@ export type PostWorkspacesMultiFolderFromConfigResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -794,6 +799,7 @@ export type GetWorkspacesResolveResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -1152,6 +1158,7 @@ export type GetWorkspacesByWorkspaceIdResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -1193,6 +1200,7 @@ export type PatchWorkspacesByWorkspaceIdResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -1233,6 +1241,7 @@ export type PatchWorkspacesByWorkspaceIdLocationResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -4616,6 +4625,48 @@ export type PutModelRegistryMappingsByModelIdResponses = {
 };
 
 export type PutModelRegistryMappingsByModelIdResponse = PutModelRegistryMappingsByModelIdResponses[keyof PutModelRegistryMappingsByModelIdResponses];
+
+export type GetMcpServersRegistryServersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        search?: string;
+        cursor?: string;
+    };
+    url: '/mcp-servers/registry/servers';
+};
+
+export type GetMcpServersRegistryServersResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        servers: Array<{
+            name: string;
+            title: string | null;
+            description: string | null;
+            version: string | null;
+            publishedAt: string | null;
+            packageRegistry: 'npm' | 'pypi' | 'oci' | null;
+            env: Array<{
+                name: string;
+                description: string | null;
+                required: boolean;
+            }>;
+            installHint: {
+                transport: 'stdio';
+                command: string;
+                args: Array<string>;
+            } | {
+                transport: 'streamable-http';
+                url: string;
+            } | null;
+        }>;
+        nextCursor: string | null;
+    };
+};
+
+export type GetMcpServersRegistryServersResponse = GetMcpServersRegistryServersResponses[keyof GetMcpServersRegistryServersResponses];
 
 export type GetMcpServersData = {
     body?: never;
@@ -19848,6 +19899,13 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             disabledCount: number;
             errorCount: number;
             roots: Array<string>;
+            items?: Array<{
+                name: string;
+                enabled: boolean;
+                displayName: string | null;
+                iconUrl: string | null;
+                brandColor: string | null;
+            }>;
             updatedAt: number;
         } | {
             kind: 'plugin';

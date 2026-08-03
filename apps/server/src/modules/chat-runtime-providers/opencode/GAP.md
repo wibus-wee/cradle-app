@@ -237,6 +237,10 @@
 - `/api/fs/*` 只适合 read/search/reference；写入仍应走 agent tool execution 或 Cradle workspace APIs，避免绕开文件变更审计和 diff UI。
 - `/api/agent` 是“支持哪些 agent”的 catalog，不是当前 session 已创建的 subagent/crew 状态。
 
+## Cross-runtime note (after Codex/Kimi #106)
+
+Composer mention / workspace search still lacks a shared **runtime reference source** kit. Kimi 0.31 added `/api/v1/search` and `/api/v1/workspace/fs:search`, and OpenCode already exposes `/api/reference` + `/api/fs/*` read/search. Do not project either provider’s search into composer until that shared kit exists; otherwise each runtime invents an incompatible mention surface.
+
 ## 参考实现
 
 ### Claude Agent Provider

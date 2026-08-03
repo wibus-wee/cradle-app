@@ -3,6 +3,8 @@ import type {
   ChatSessionTailEventType,
 } from '@cradle/chat-runtime-contracts'
 
+import { openServerEventSource } from '~/lib/server-transport'
+
 export interface GlobalSessionSyncEngineCallbacks {
   onSessionChanged: (event: ChatGlobalSessionTailEvent) => void
   onSnapshotRequired?: () => void
@@ -121,7 +123,7 @@ export function buildGlobalSessionEventTailUrl(input: {
 }
 
 function createBrowserEventSource(url: string): GlobalSessionEventSource {
-  return new EventSource(url)
+  return openServerEventSource(url)
 }
 
 function readGlobalSessionTailEvent(value: string): ChatGlobalSessionTailEvent | null {

@@ -35,7 +35,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogMedia,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
@@ -1699,9 +1698,6 @@ function RemoveProfileDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogMedia>
-            <Trash2Icon />
-          </AlertDialogMedia>
           <AlertDialogTitle>Remove provider?</AlertDialogTitle>
           <AlertDialogDescription>
             <strong className="text-foreground">{profileName}</strong>

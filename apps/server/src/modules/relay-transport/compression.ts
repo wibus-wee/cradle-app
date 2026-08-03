@@ -1,8 +1,4 @@
-import {
-  constants as zlibConstants,
-  zstdCompressSync,
-  zstdDecompressSync,
-} from 'node:zlib'
+import * as zlib from 'node:zlib'
 
 import { AppError } from '../../errors/app-error'
 import { RELAY_MAX_STREAM_CHUNK_BYTES } from './protocol'
@@ -25,9 +21,55 @@ export const RELAY_MIN_COMPRESSION_INPUT_BYTES = 1024
 const MIN_COMPRESSION_SAVINGS_BYTES = 64
 const ZSTD_OPTIONS = {
   params: {
-    [zlibConstants.ZSTD_c_compressionLevel]: 1,
+    [zlib.constants.ZSTD_c_compressionLevel]: 1,
   },
 } as const
+
+interface RelayZstdCodec {
+  compress: typeof zlib.zstdCompressSync
+  decompress: typeof zlib.zstdDecompressSync
+}
+
+type RelayZlibRuntime = Partial<Pick<
+  typeof zlib,
+  'zstdCompressSync' | 'zstdDecompressSync'
+>>
+
+let runtimeCodec: RelayZstdCodec | null = null
+
+export function resolveRelayZstdCodec(
+  runtime: RelayZlibRuntime,
+  nodeVersion = process.versions.node,
+): RelayZstdCodec {
+  if (
+    typeof runtime.zstdCompressSync !== 'function'
+    || typeof runtime.zstdDecompressSync !== 'function'
+  ) {
+    throw new AppError({
+      code: 'relay_zstd_runtime_unsupported',
+      status: 500,
+      message: `Relay compression requires Node.js 22.15.0 or newer; current runtime is ${nodeVersion}.`,
+      details: {
+        currentNodeVersion: nodeVersion,
+        minimumNodeVersion: '22.15.0',
+      },
+    })
+  }
+  return {
+    compress: runtime.zstdCompressSync,
+    decompress: runtime.zstdDecompressSync,
+  }
+}
+
+/** Fail during server bootstrap with an actionable runtime compatibility error. */
+export function assertRelayCompressionRuntimeSupport(): void {
+  relayZstdCodec()
+}
+
+function relayZstdCodec(): RelayZstdCodec {
+  runtimeCodec ??= resolveRelayZstdCodec(zlib)
+  return runtimeCodec
+}
 
 function bufferView(bytes: Uint8Array): Buffer {
   return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -50,7 +92,7 @@ export function encodeRelayChunk(
     }
   }
 
-  const compressed = zstdCompressSync(bufferView(data), ZSTD_OPTIONS)
+  const compressed = relayZstdCodec().compress(bufferView(data), ZSTD_OPTIONS)
   if (compressed.byteLength + MIN_COMPRESSION_SAVINGS_BYTES >= data.byteLength) {
     return {
       data,
@@ -79,7 +121,7 @@ export function decodeRelayChunk(chunk: EncodedRelayChunk): Uint8Array {
     throw compressionError('Compressed Relay chunk declares an invalid output length.')
   }
   try {
-    const decompressed = zstdDecompressSync(bufferView(chunk.data), {
+    const decompressed = relayZstdCodec().decompress(bufferView(chunk.data), {
       maxOutputLength: chunk.uncompressedBytes,
     })
     if (decompressed.byteLength !== chunk.uncompressedBytes) {

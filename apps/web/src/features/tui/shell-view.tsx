@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { postTerminalSessionsShellStart } from '~/api-gen/sdk.gen'
+import { cn } from '~/lib/cn'
 
 import { getAppTerminalTheme, watchTerminalTheme } from './app-theme'
 import { attachMacKeyboardHandler } from './keyboard-handler'
@@ -15,7 +16,7 @@ import { mergeTerminalMetadata, readTerminalMetadata } from './terminal-metadata
 import { useTerminalPreferencesStore } from './terminal-preferences'
 
 const EXIT_BANNER = '\r\n\x1B[2m[Process exited]\x1B[0m\r\n'
-const MAX_TRANSCRIPT_CHARS = 8_000
+const DEFAULT_MAX_TRANSCRIPT_CHARS = 8_000
 const MAX_OSC_LOOKBEHIND_CHARS = 1_000
 
 const RE_OSC = /\u001B\][^\u0007]*(\u0007|\u001B\\)/g
@@ -39,13 +40,28 @@ interface ShellViewProps {
   cwd: string
   /** Whether this terminal is the selected panel tab. Hidden terminals stay mounted. */
   visible?: boolean
+  /** Optional className for the outer shell surface. */
+  className?: string
+  /** Bounded plain-text transcript window; defaults to the bottom-panel size. */
+  maxTranscriptChars?: number
   /** Called when the shell process exits, so the parent can reset the key. */
   onExited?: () => void
   /** Called when OSC title/path metadata is observed in the terminal stream. */
   onMetadata?: (metadata: TerminalMetadata) => void
+  /** Called whenever the scrubbed plain-text transcript changes. */
+  onTranscriptChange?: (transcript: string) => void
 }
 
-export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: ShellViewProps) {
+export function ShellView({
+  ptyId,
+  cwd,
+  visible = true,
+  className,
+  maxTranscriptChars = DEFAULT_MAX_TRANSCRIPT_CHARS,
+  onExited,
+  onMetadata,
+  onTranscriptChange,
+}: ShellViewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLPreElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
@@ -53,6 +69,8 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
   const metadataRef = useRef<TerminalMetadata>({ title: null, cwd: null })
   const onExitedRef = useRef(onExited)
   const onMetadataRef = useRef(onMetadata)
+  const onTranscriptChangeRef = useRef(onTranscriptChange)
+  const maxTranscriptCharsRef = useRef(maxTranscriptChars)
   const visibleRef = useRef(visible)
   const focusFrameRef = useRef<number | null>(null)
   const ensureShellRunningRef = useRef<(() => void) | null>(null)
@@ -61,7 +79,9 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
   useEffect(() => {
     onExitedRef.current = onExited
     onMetadataRef.current = onMetadata
-  }, [onExited, onMetadata])
+    onTranscriptChangeRef.current = onTranscriptChange
+    maxTranscriptCharsRef.current = maxTranscriptChars
+  }, [maxTranscriptChars, onExited, onMetadata, onTranscriptChange])
 
   useLayoutEffect(() => {
     visibleRef.current = visible
@@ -163,6 +183,10 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
     let transcriptFrame: number | null = null
     let fontFrame: number | null = null
 
+    function publishTranscript(next: string) {
+      onTranscriptChangeRef.current?.(next)
+    }
+
     function setTranscript(next: string) {
       pendingTranscript = ''
       if (transcriptFrame !== null) {
@@ -173,7 +197,9 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
       if (!transcript) {
         return
       }
-      transcript.textContent = next.slice(-MAX_TRANSCRIPT_CHARS)
+      const bounded = next.slice(-maxTranscriptCharsRef.current)
+      transcript.textContent = bounded
+      publishTranscript(bounded)
     }
 
     function appendTranscript(next: string) {
@@ -189,8 +215,10 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
       transcriptFrame = requestAnimationFrame(() => {
         transcriptFrame = null
         const current = transcript.textContent ?? ''
-        transcript.textContent = `${current}${pendingTranscript}`.slice(-MAX_TRANSCRIPT_CHARS)
+        const bounded = `${current}${pendingTranscript}`.slice(-maxTranscriptCharsRef.current)
+        transcript.textContent = bounded
         pendingTranscript = ''
+        publishTranscript(bounded)
       })
     }
 
@@ -532,7 +560,7 @@ export function ShellView({ ptyId, cwd, visible = true, onExited, onMetadata }: 
 
   return (
     <div
-      className="h-full w-full overflow-hidden bg-background"
+      className={cn('h-full w-full overflow-hidden bg-background', className)}
       data-testid="shell-view"
       data-shell-view="true"
       data-shell-visible={visible ? 'true' : 'false'}

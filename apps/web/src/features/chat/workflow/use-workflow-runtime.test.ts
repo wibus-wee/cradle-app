@@ -1,11 +1,20 @@
+// @vitest-environment jsdom
+
 import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { useWorkflowRuntime } from './use-workflow-runtime'
 
+const { openServerEventSource } = vi.hoisted(() => ({
+  openServerEventSource: vi.fn(),
+}))
+
 vi.mock('~/lib/electron', () => ({
-  getAuthenticatedEventSourceUrl: async (url: string) => url,
   getServerUrl: () => 'http://localhost:21423',
+}))
+
+vi.mock('~/lib/server-transport', () => ({
+  openServerEventSource,
 }))
 
 const eventSources: MockEventSource[] = []
@@ -25,12 +34,12 @@ class MockEventSource {
 
 afterEach(() => {
   eventSources.length = 0
-  vi.unstubAllGlobals()
+  openServerEventSource.mockReset()
 })
 
 describe('useWorkflowRuntime', () => {
   it('shares one EventSource and closes it after the final subscriber leaves', async () => {
-    vi.stubGlobal('EventSource', MockEventSource)
+    openServerEventSource.mockImplementation((url: string) => new MockEventSource(url))
     const first = renderHook(() => useWorkflowRuntime('session-1', 'tool-1'))
     const second = renderHook(() => useWorkflowRuntime('session-1', 'tool-1'))
 

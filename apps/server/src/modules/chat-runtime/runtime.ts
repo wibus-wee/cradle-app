@@ -20,9 +20,13 @@ import type { ChatContextPart } from './context-parts'
 import type { ChatRuntimeRecoveryResult } from './es/recovery'
 import { recoverChatRuntimeProjections, recoverChatRuntimeSession } from './es/recovery'
 import { resolveSessionSystemPrompt } from './harness/turn-context'
-import type { ExecuteBangCommandInput } from './interaction/bang-command-execution'
+import type {
+  ExecuteBangCommandInput,
+  PersistBangTranscriptInput,
+} from './interaction/bang-command-execution'
 import {
   executeBangCommand as executeBangCommandFromInteraction,
+  persistBangTranscript as persistBangTranscriptFromInteraction,
 } from './interaction/bang-command-execution'
 import {
   recordRuntimeInteractionEventToSessionEvents,
@@ -460,6 +464,10 @@ export async function createSideChat(input: CreateSideChatInput): Promise<SideCh
 
 export async function executeBangCommand(input: ExecuteBangCommandInput) {
   return executeBangCommandFromInteraction(input)
+}
+
+export async function persistBangTranscript(input: PersistBangTranscriptInput) {
+  return persistBangTranscriptFromInteraction(input)
 }
 
 export async function appendSessionObservation(input: {

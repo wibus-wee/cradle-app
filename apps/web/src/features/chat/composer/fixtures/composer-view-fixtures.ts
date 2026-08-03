@@ -1,6 +1,13 @@
 import type { FileUIPart } from 'ai'
 
-export type ComposerStoryState = 'empty' | 'draft' | 'attachments' | 'streaming' | 'sending' | 'disabled'
+export type ComposerStoryState
+  = | 'empty'
+    | 'draft'
+    | 'attachments'
+    | 'streaming'
+    | 'sending'
+    | 'disabled'
+    | 'bangPty'
 
 export const composerAttachmentFixtures: FileUIPart[] = [
   {

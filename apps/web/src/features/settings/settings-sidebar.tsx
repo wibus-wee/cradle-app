@@ -21,6 +21,7 @@ import {
   RobotLine as BotIcon,
   SandglassLine as HourglassIcon,
   ServerLine as ServerIcon,
+  TerminalBoxLine as TerminalIcon,
   WifiLine as WifiIcon,
 } from '@mingcute/react'
 import { useMemo } from 'react'
@@ -170,6 +171,12 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
           'integrations.channelBindings.title',
           'integrations.secrets.title',
         ],
+      },
+      {
+        id: 'mcpServers',
+        labelKey: 'nav.mcpServers',
+        icon: TerminalIcon,
+        searchKeys: ['mcpServers.page.title'],
       },
     ],
   },

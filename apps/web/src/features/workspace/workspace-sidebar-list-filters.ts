@@ -3,6 +3,7 @@ import type { WorkSummary } from '~/features/work/use-work'
 import type { WorkspaceSession } from './use-session'
 import { isWorkspaceSessionRunning } from './workspace-session-status'
 import type {
+  WorkspaceSidebarEnvironmentFilter,
   WorkspaceSidebarListFilters,
   WorkspaceSidebarSourceFilter,
   WorkspaceSidebarStatusFilter,
@@ -111,6 +112,22 @@ function matchesSourceFilters(
   return filters.includes(source)
 }
 
+export function classifyWorkspaceSidebarEnvironment(
+  session: WorkspaceSession,
+): WorkspaceSidebarEnvironmentFilter {
+  return session.execution.kind === 'remote-host' ? 'remote' : 'local'
+}
+
+function matchesEnvironmentFilters(
+  session: WorkspaceSession,
+  filters: readonly WorkspaceSidebarEnvironmentFilter[],
+): boolean {
+  if (filters.length === 0) {
+    return true
+  }
+  return filters.includes(classifyWorkspaceSidebarEnvironment(session))
+}
+
 export function sessionMatchesListFilters(
   session: WorkspaceSession,
   work: WorkSummary | null | undefined,
@@ -132,11 +149,11 @@ export function sessionMatchesListFilters(
     attentionBySessionId,
   )
   && matchesWorkPrFilters(session, work, filters.workPrFilters)
+  && matchesEnvironmentFilters(session, filters.environmentFilters)
   && matchesSourceFilters(session, filters.sourceFilters)
 }
 
 export function projectMatchesListFilters(
-  workspacePinned: boolean,
   sessions: readonly WorkspaceSession[],
   workByPrimarySessionId: ReadonlyMap<string, WorkSummary>,
   filters: WorkspaceSidebarListFilters,
@@ -144,11 +161,7 @@ export function projectMatchesListFilters(
   locallyErroredSessionIds: ReadonlySet<string>,
   attentionBySessionId: ReadonlyMap<string, WorkspaceSidebarSessionAttention>,
 ): boolean {
-  if (filters.projectScope === 'pinned' && !workspacePinned) {
-    return false
-  }
-
-  // Scope / archived only change the candidate set. Row facets decide whether a
+  // Archived only changes the candidate set. Row facets decide whether a
   // project stays visible after session trimming.
   if (!rowFiltersAreActive(filters)) {
     return true

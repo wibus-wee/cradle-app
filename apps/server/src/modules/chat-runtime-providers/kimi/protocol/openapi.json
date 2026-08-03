@@ -5,7 +5,7 @@
   "info": {
     "description": "REST API for the Kimi Code local server. All JSON responses are wrapped in a uniform envelope `{ code, msg, data, request_id }`.",
     "title": "Kimi Code Server API",
-    "version": "0.29.2"
+    "version": "0.31.1"
   },
   "openapi": "3.0.3",
   "paths": {
@@ -608,6 +608,7 @@
                           "additionalProperties": {},
                           "type": "object"
                         },
+                        "secondary_model": {},
                         "services": {},
                         "telemetry": {
                           "type": "boolean"
@@ -708,6 +709,7 @@
                     },
                     "type": "object"
                   },
+                  "secondary_model": {},
                   "services": {},
                   "telemetry": {
                     "type": "boolean"
@@ -812,6 +814,7 @@
                               "additionalProperties": {},
                               "type": "object"
                             },
+                            "secondary_model": {},
                             "services": {},
                             "telemetry": {
                               "type": "boolean"
@@ -1431,6 +1434,212 @@
                     "request_id"
                   ],
                   "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/v1/fs:mkdir": {
+      "post": {
+        "description": "Create a directory on the host filesystem by absolute path (folder-picker \"new folder\" backend). Non-recursive: the parent directory must already exist.",
+        "operationId": "fsMkdir",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "path": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "path": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "path"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40409
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40411
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40919
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
                 }
               }
             },
@@ -3016,25 +3225,48 @@
                               "items": {
                                 "additionalProperties": false,
                                 "properties": {
-                                  "label": {
-                                    "type": "string"
-                                  },
                                   "limit": {
                                     "maximum": 9007199254740991,
                                     "minimum": -9007199254740991,
                                     "type": "integer"
                                   },
-                                  "reset_hint": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "reset_at": {
                                     "type": "string"
                                   },
                                   "used": {
                                     "maximum": 9007199254740991,
                                     "minimum": -9007199254740991,
                                     "type": "integer"
+                                  },
+                                  "window": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "duration": {
+                                        "maximum": 9007199254740991,
+                                        "minimum": -9007199254740991,
+                                        "type": "integer"
+                                      },
+                                      "unit": {
+                                        "enum": [
+                                          "minute",
+                                          "hour",
+                                          "day",
+                                          "week"
+                                        ],
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "duration",
+                                      "unit"
+                                    ],
+                                    "type": "object"
                                   }
                                 },
                                 "required": [
-                                  "label",
                                   "used",
                                   "limit"
                                 ],
@@ -3046,25 +3278,48 @@
                               "additionalProperties": false,
                               "nullable": true,
                               "properties": {
-                                "label": {
-                                  "type": "string"
-                                },
                                 "limit": {
                                   "maximum": 9007199254740991,
                                   "minimum": -9007199254740991,
                                   "type": "integer"
                                 },
-                                "reset_hint": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "reset_at": {
                                   "type": "string"
                                 },
                                 "used": {
                                   "maximum": 9007199254740991,
                                   "minimum": -9007199254740991,
                                   "type": "integer"
+                                },
+                                "window": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "duration": {
+                                      "maximum": 9007199254740991,
+                                      "minimum": -9007199254740991,
+                                      "type": "integer"
+                                    },
+                                    "unit": {
+                                      "enum": [
+                                        "minute",
+                                        "hour",
+                                        "day",
+                                        "week"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "duration",
+                                    "unit"
+                                  ],
+                                  "type": "object"
                                 }
                               },
                               "required": [
-                                "label",
                                 "used",
                                 "limit"
                               ],
@@ -3076,6 +3331,184 @@
                             "summary",
                             "limits",
                             "extra_usage"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "error"
+                              ],
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "status": {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "message"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    },
+                    "details": {},
+                    "msg": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "request_id"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/oauth/userinfo": {
+      "get": {
+        "description": "Get the managed account profile",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "provider",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "enum": [
+                        0
+                      ],
+                      "type": "number"
+                    },
+                    "data": {
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "ok"
+                              ],
+                              "type": "string"
+                            },
+                            "userInfo": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "avatar": {
+                                  "type": "string"
+                                },
+                                "bio": {
+                                  "type": "string"
+                                },
+                                "createdTime": {
+                                  "type": "string"
+                                },
+                                "domain": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": -9007199254740991,
+                                  "type": "integer"
+                                },
+                                "domainName": {
+                                  "type": "string"
+                                },
+                                "email": {
+                                  "type": "string"
+                                },
+                                "globalId": {
+                                  "type": "string"
+                                },
+                                "lastLoginTime": {
+                                  "type": "string"
+                                },
+                                "nickname": {
+                                  "type": "string"
+                                },
+                                "phone": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "countryCode": {
+                                      "type": "string"
+                                    },
+                                    "number": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "countryCode",
+                                    "number"
+                                  ],
+                                  "type": "object"
+                                },
+                                "region": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                },
+                                "userId": {
+                                  "type": "string"
+                                },
+                                "userLevel": {
+                                  "maximum": 9007199254740991,
+                                  "minimum": -9007199254740991,
+                                  "type": "integer"
+                                },
+                                "userLevelName": {
+                                  "type": "string"
+                                },
+                                "username": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "userId",
+                                "nickname",
+                                "status",
+                                "region",
+                                "userLevel",
+                                "userLevelName",
+                                "domain",
+                                "domainName"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "userInfo"
                           ],
                           "type": "object"
                         },
@@ -4816,6 +5249,300 @@
         ]
       }
     },
+    "/api/v1/search": {
+      "post": {
+        "description": "Global full-text search over user messages, assistant replies and session titles across all sessions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "container": {
+                    "properties": {
+                      "agent_id": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "session_id": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "end_time": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "mode": {
+                    "enum": [
+                      "terms",
+                      "literal"
+                    ],
+                    "type": "string"
+                  },
+                  "op": {
+                    "enum": [
+                      "AND",
+                      "OR"
+                    ],
+                    "type": "string"
+                  },
+                  "page_size": {
+                    "maximum": 50,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "page_token": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "query": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "role": {
+                    "enum": [
+                      "user",
+                      "assistant",
+                      "title"
+                    ],
+                    "type": "string"
+                  },
+                  "sort": {
+                    "enum": [
+                      "score",
+                      "time_desc",
+                      "time_asc"
+                    ],
+                    "type": "string"
+                  },
+                  "start_time": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "query"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "has_more": {
+                              "type": "boolean"
+                            },
+                            "incomplete": {
+                              "enum": [
+                                "candidate_cap"
+                              ],
+                              "type": "string"
+                            },
+                            "index_state": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "documents": {
+                                  "type": "number"
+                                },
+                                "indexed_sessions": {
+                                  "type": "number"
+                                },
+                                "state": {
+                                  "enum": [
+                                    "building",
+                                    "ready",
+                                    "readonly"
+                                  ],
+                                  "type": "string"
+                                },
+                                "total_sessions": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "state",
+                                "indexed_sessions",
+                                "total_sessions",
+                                "documents"
+                              ],
+                              "type": "object"
+                            },
+                            "items": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "agent_id": {
+                                    "type": "string"
+                                  },
+                                  "role": {
+                                    "enum": [
+                                      "user",
+                                      "assistant",
+                                      "title"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "score": {
+                                    "type": "number"
+                                  },
+                                  "session_id": {
+                                    "type": "string"
+                                  },
+                                  "session_title": {
+                                    "type": "string"
+                                  },
+                                  "snippet": {
+                                    "type": "string"
+                                  },
+                                  "step_id": {
+                                    "type": "string"
+                                  },
+                                  "time": {
+                                    "type": "number"
+                                  },
+                                  "turn": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": 0,
+                                    "type": "integer"
+                                  },
+                                  "workspace_id": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "session_id",
+                                  "workspace_id",
+                                  "session_title",
+                                  "agent_id",
+                                  "role",
+                                  "snippet",
+                                  "time",
+                                  "score"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "page_token": {
+                              "type": "string"
+                            },
+                            "source": {
+                              "enum": [
+                                "live",
+                                "index"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "items",
+                            "has_more",
+                            "index_state",
+                            "source"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "message": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "nullable": true,
+                          "type": "array"
+                        },
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "search"
+        ]
+      }
+    },
     "/api/v1/sessions": {
       "get": {
         "description": "List sessions",
@@ -6538,7 +7265,6 @@
                         "type": "integer"
                       },
                       "query": {
-                        "minLength": 1,
                         "type": "string"
                       }
                     },
@@ -23793,6 +24519,269 @@
         ]
       }
     },
+    "/api/v1/workspace/fs:search": {
+      "post": {
+        "description": "Search files in a workspace without a session. `workspace` accepts a registered workspace id or an absolute root (registered on the spot).",
+        "operationId": "workspaceFsSearch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "exclude_globs": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "follow_gitignore": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "include_globs": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "default": 50,
+                    "maximum": 200,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "workspace": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query",
+                  "workspace"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "items": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "file",
+                                      "directory",
+                                      "symlink"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "match_positions": {
+                                    "items": {
+                                      "maximum": 9007199254740991,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "path": {
+                                    "type": "string"
+                                  },
+                                  "score": {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "path",
+                                  "name",
+                                  "kind",
+                                  "score",
+                                  "match_positions"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "truncated": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "items",
+                            "truncated"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "message": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "nullable": true,
+                          "type": "array"
+                        },
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40410
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            41303
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "fs"
+        ]
+      }
+    },
     "/api/v1/workspaces": {
       "get": {
         "description": "List registered workspaces",
@@ -24552,6 +25541,307 @@
         ]
       }
     },
+    "/api/v1/workspaces/{workspace_id}/trust": {
+      "get": {
+        "description": "Read the workspace trust state",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "pattern": "^wd_[a-z0-9._-]+_[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "trusted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "trusted"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40410
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "workspaces"
+        ]
+      },
+      "post": {
+        "description": "Mark the workspace trusted (project-level MCP config loads)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "pattern": "^wd_[a-z0-9._-]+_[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "trusted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "trusted"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40410
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
+    "/api/v1/workspaces/{workspace_id}/untrust": {
+      "post": {
+        "description": "Revoke workspace trust (project-level MCP config unloads)",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "pattern": "^wd_[a-z0-9._-]+_[0-9a-f]{12}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "trusted": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "trusted"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40410
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "workspaces"
+        ]
+      }
+    },
     "/asyncapi.json": {
       "get": {
         "responses": {
@@ -24599,6 +25889,10 @@
     {
       "description": "Message history",
       "name": "messages"
+    },
+    {
+      "description": "Global message search",
+      "name": "search"
     },
     {
       "description": "Turn-granular session transcript",

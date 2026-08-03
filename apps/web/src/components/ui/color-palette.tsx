@@ -473,7 +473,7 @@ export function ColorPalette({
             whileTap={{ scale: 0.92 }}
             transition={{ type: 'spring', duration: 0.25, bounce: 0.4 }}
             className={cn(
-              'relative size-5 shrink-0 overflow-hidden rounded-full shadow-[var(--shadow-xs)] outline-none ring-ring/50 transition-shadow focus-visible:ring-2',
+              'relative size-5 shrink-0 overflow-hidden rounded-full shadow-[var(--shadow-xs)] outline-none ring-ring/20 transition-shadow focus-visible:ring-ring/20',
               className,
             )}
           >
@@ -490,7 +490,7 @@ export function ColorPalette({
               ariaLabel={`${label} saturation and brightness`}
               ariaValueNow={Math.round(hsva.s * 100)}
               ariaValueText={`Saturation ${Math.round(hsva.s * 100)}%, brightness ${Math.round(hsva.v * 100)}%`}
-              className="h-32 w-full cursor-crosshair overflow-hidden rounded-xl ring-1 ring-border focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="h-32 w-full cursor-crosshair overflow-hidden rounded-xl ring-1 ring-border focus-visible:ring-ring/20"
               style={{
                 backgroundColor: `hsl(${hsva.h}, 100%, 50%)`,
                 backgroundImage: 'linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent)',
@@ -522,7 +522,7 @@ export function ColorPalette({
                 ariaValueNow={Math.round(hsva.h)}
                 ariaValueMax={360}
                 ariaValueText={`Hue ${Math.round(hsva.h)} degrees`}
-                className="h-3.5 w-full cursor-pointer rounded-full ring-1 ring-border focus-visible:ring-2 focus-visible:ring-ring/50"
+                className="h-3.5 w-full cursor-pointer rounded-full ring-1 ring-border focus-visible:ring-ring/20"
                 style={{ backgroundImage: HUE_GRADIENT }}
                 onKeyDown={hueKeyStep}
                 onPick={x => commit({ ...hsva, h: x * 360 })}
@@ -534,7 +534,7 @@ export function ColorPalette({
                   ariaLabel={`${label} opacity`}
                   ariaValueNow={Math.round(hsva.a * 100)}
                   ariaValueText={`Opacity ${Math.round(hsva.a * 100)}%`}
-                  className="relative h-3.5 w-full cursor-pointer overflow-hidden rounded-full ring-1 ring-border focus-visible:ring-2 focus-visible:ring-ring/50"
+                  className="relative h-3.5 w-full cursor-pointer overflow-hidden rounded-full ring-1 ring-border focus-visible:ring-ring/20"
                   style={CHECKERBOARD_STYLE}
                   onKeyDown={alphaKeyStep}
                   onPick={x => commit({ ...hsva, a: x })}
@@ -552,7 +552,7 @@ export function ColorPalette({
 
           {/* Hex + alpha inputs + eyedropper */}
           <div className="flex items-center gap-2">
-            <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-lg bg-muted px-2 ring-1 ring-border focus-within:ring-ring/50">
+            <div className="flex h-8 min-w-0 flex-1 items-center gap-1 rounded-lg bg-muted px-2 ring-1 ring-border focus-within:ring-ring/20">
               <span className="text-[11px] font-medium text-muted-foreground">#</span>
               <Input
                 id={hexInputId}
@@ -565,7 +565,7 @@ export function ColorPalette({
               />
             </div>
             {!disableAlpha && (
-              <div className="flex h-8 w-14 items-center gap-0.5 rounded-lg bg-muted px-2 ring-1 ring-border focus-within:ring-ring/50">
+              <div className="flex h-8 w-14 items-center gap-0.5 rounded-lg bg-muted px-2 ring-1 ring-border focus-within:ring-ring/20">
                 <Input
                   type="number"
                   min={0}

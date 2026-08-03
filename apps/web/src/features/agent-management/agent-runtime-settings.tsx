@@ -32,7 +32,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogMedia,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
@@ -613,9 +612,11 @@ export function AgentRuntimeSettings() {
     </div>
   )
 
+  // Batch actions only make sense for multi-select. A single selection is edited
+  // in the detail pane; showing the floating bar there is redundant noise.
   const floatingToolbar = (
     <AnimatePresence initial={false}>
-      {currentSelectedIds.size > 0 && (
+      {currentSelectedIds.size > 1 && (
         <m.div
           key="agent-runtime-selection-bar"
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -905,9 +906,6 @@ export function AgentRuntimeSettings() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogMedia>
-              <Trash2Icon className="size-5 !text-destructive" />
-            </AlertDialogMedia>
             <AlertDialogTitle>
               {t('runtime.deleteDialog.title')}
             </AlertDialogTitle>

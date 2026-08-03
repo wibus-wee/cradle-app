@@ -30,6 +30,30 @@ describe('classifyCodexToolKind', () => {
   })
 })
 
+describe('buildCodexToolInput for commandExecution provenance', () => {
+  it('projects pluginId and scriptPath when a command resolves to a plugin script', () => {
+    const input = buildCodexToolInput({
+      type: 'commandExecution',
+      id: 'cmd-plugin-1',
+      command: 'node ./hooks/run.js',
+      cwd: '/tmp/workspace',
+      processId: null,
+      source: 'agent',
+      status: 'inProgress',
+      commandActions: [],
+      pluginId: 'plugin-github',
+      scriptPath: 'hooks/run.js',
+    })
+
+    expect(input.apiName).toBe('command_execution')
+    expect(input.args).toEqual(expect.objectContaining({
+      command: 'node ./hooks/run.js',
+      pluginId: 'plugin-github',
+      scriptPath: 'hooks/run.js',
+    }))
+  })
+})
+
 describe('buildCodexToolInput/output for collabAgentToolCall', () => {
   it('projects wait/sendInput/resumeAgent envelopes with kind subagent', () => {
     for (const tool of ['wait', 'sendInput', 'resumeAgent', 'spawnAgent', 'closeAgent'] as const) {

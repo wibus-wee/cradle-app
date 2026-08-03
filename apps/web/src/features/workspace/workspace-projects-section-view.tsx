@@ -3,12 +3,16 @@ import {
   FilterLine as FilterIcon,
   FolderLine as FolderIcon,
   FolderOpenLine as FolderOpenIcon,
+  ListCheckLine as StatusIcon,
   LoadingLine,
   MailOpenLine as MarkReadIcon,
   NewFolderLine as FolderPlusIcon,
   PlusLine as PlusIcon,
+  ServerLine as EnvironmentIcon,
+  TimeLine as UpdatedIcon,
 } from '@mingcute/react'
 import type { ComponentProps, ReactNode } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
@@ -29,28 +33,41 @@ import {
 } from '~/components/ui/menu'
 import { cn } from '~/lib/cn'
 
-import type { WorkspaceSidebarListFilters, WorkspaceSidebarProjectScope, WorkspaceSidebarProjectSortDirection, WorkspaceSidebarProjectSortKey, WorkspaceSidebarSourceFilter, WorkspaceSidebarStatusFilter, WorkspaceSidebarWorkPrFilter } from './workspace-sidebar-ui-store'
+import type { Workspace } from './types'
+import { WorkspaceMultiFolderMenuView } from './workspace-multi-folder-menu-view'
+import type {
+  WorkspaceSidebarEnvironmentFilter,
+  WorkspaceSidebarGrouping,
+  WorkspaceSidebarListFilters,
+  WorkspaceSidebarOrderingDirection,
+  WorkspaceSidebarSessionOrdering,
+  WorkspaceSidebarSourceFilter,
+  WorkspaceSidebarStatusFilter,
+  WorkspaceSidebarWorkPrFilter,
+} from './workspace-sidebar-ui-store'
 import {
   DEFAULT_SESSION_PREVIEW_LIMIT,
+  DEFAULT_WORKSPACE_SIDEBAR_GROUPING,
+  DEFAULT_WORKSPACE_SIDEBAR_ORDERING_DIRECTION,
+  DEFAULT_WORKSPACE_SIDEBAR_SESSION_ORDERING,
   listFiltersAreActive,
   SESSION_PREVIEW_LIMIT_OPTIONS,
+  WORKSPACE_SIDEBAR_ENVIRONMENT_FILTERS,
+  WORKSPACE_SIDEBAR_GROUPINGS,
+  WORKSPACE_SIDEBAR_SESSION_ORDERINGS,
   WORKSPACE_SIDEBAR_SOURCE_FILTERS,
   WORKSPACE_SIDEBAR_STATUS_FILTERS,
   WORKSPACE_SIDEBAR_WORK_PR_FILTERS,
 } from './workspace-sidebar-ui-store'
 
-const PROJECT_SORT_OPTIONS: readonly WorkspaceSidebarProjectSortKey[] = [
-  'name',
-  'updatedAt',
-  'createdAt',
-  'recentSession',
-]
-const PROJECT_SORT_DIRECTION_OPTIONS:
-readonly WorkspaceSidebarProjectSortDirection[] = ['asc', 'desc']
-const PROJECT_SCOPE_OPTIONS: readonly WorkspaceSidebarProjectScope[] = [
-  'all',
-  'pinned',
-]
+const ORDERING_DIRECTION_OPTIONS: readonly WorkspaceSidebarOrderingDirection[] = ['desc', 'asc']
+
+const GROUPING_ICONS: Record<WorkspaceSidebarGrouping, typeof FolderIcon> = {
+  workspace: FolderIcon,
+  updated: UpdatedIcon,
+  status: StatusIcon,
+  environment: EnvironmentIcon,
+}
 
 function joinFacetLabels(labels: readonly string[], emptyLabel: string): string {
   if (labels.length === 0) {
@@ -88,30 +105,33 @@ export interface WorkspaceProjectsSectionViewProps {
   hasWorkspaces: boolean
   filteredEmpty: boolean
   listFilters: WorkspaceSidebarListFilters
-  projectSortKey: WorkspaceSidebarProjectSortKey
-  projectSortDirection: WorkspaceSidebarProjectSortDirection
-  projectPinnedFirst: boolean
+  grouping: WorkspaceSidebarGrouping
+  ordering: WorkspaceSidebarSessionOrdering
+  orderingDirection: WorkspaceSidebarOrderingDirection
   sessionPreviewLimit: number
   adding: boolean
   multiWorkspaceEnabled: boolean
+  multiFolderCandidates: readonly Workspace[]
+  multiFolderCreating: boolean
   hasUnreadWorkspaceSessions: boolean
   markingAllSessionsRead: boolean
   children: ReactNode
-  onProjectScopeChange: (scope: WorkspaceSidebarProjectScope) => void
+  onGroupingChange: (grouping: WorkspaceSidebarGrouping) => void
+  onSessionOrderingChange: (ordering: WorkspaceSidebarSessionOrdering) => void
+  onOrderingDirectionChange: (direction: WorkspaceSidebarOrderingDirection) => void
   onToggleStatusFilter: (filter: WorkspaceSidebarStatusFilter) => void
   onToggleWorkPrFilter: (filter: WorkspaceSidebarWorkPrFilter) => void
+  onToggleEnvironmentFilter: (filter: WorkspaceSidebarEnvironmentFilter) => void
   onToggleSourceFilter: (filter: WorkspaceSidebarSourceFilter) => void
   onShowArchivedChange: (showArchived: boolean) => void
   onClearListFilters: () => void
-  onProjectSortKeyChange: (sortKey: WorkspaceSidebarProjectSortKey) => void
-  onProjectSortDirectionChange: (
-    direction: WorkspaceSidebarProjectSortDirection,
-  ) => void
-  onProjectPinnedFirstChange: (pinnedFirst: boolean) => void
   onSessionPreviewLimitChange: (limit: number) => void
   onCollapseAll: () => void
   onAddFromPicker: () => void
-  onOpenMultiWorkspaceDialog: () => void
+  onCreateMultiFolder: (input: {
+    name: string
+    folders: Array<{ name: string, path: string }>
+  }) => Promise<void>
   onMarkAllAsRead: () => void
 }
 
@@ -119,40 +139,42 @@ export function WorkspaceProjectsSectionView({
   hasWorkspaces,
   filteredEmpty,
   listFilters,
-  projectSortKey,
-  projectSortDirection,
-  projectPinnedFirst,
+  grouping,
+  ordering,
+  orderingDirection,
   sessionPreviewLimit,
   adding,
   multiWorkspaceEnabled,
+  multiFolderCandidates,
+  multiFolderCreating,
   hasUnreadWorkspaceSessions,
   markingAllSessionsRead,
   children,
-  onProjectScopeChange,
+  onGroupingChange,
+  onSessionOrderingChange,
+  onOrderingDirectionChange,
   onToggleStatusFilter,
   onToggleWorkPrFilter,
+  onToggleEnvironmentFilter,
   onToggleSourceFilter,
   onShowArchivedChange,
   onClearListFilters,
-  onProjectSortKeyChange,
-  onProjectSortDirectionChange,
-  onProjectPinnedFirstChange,
   onSessionPreviewLimitChange,
   onCollapseAll,
   onAddFromPicker,
-  onOpenMultiWorkspaceDialog,
+  onCreateMultiFolder,
   onMarkAllAsRead,
 }: WorkspaceProjectsSectionViewProps) {
   const { t } = useTranslation('workspace')
   const filtersActive = listFiltersAreActive(listFilters)
-  const customView = projectSortKey !== 'name'
-    || projectSortDirection !== 'asc'
-    || !projectPinnedFirst
+  const customView = grouping !== DEFAULT_WORKSPACE_SIDEBAR_GROUPING
+    || ordering !== DEFAULT_WORKSPACE_SIDEBAR_SESSION_ORDERING
+    || orderingDirection !== DEFAULT_WORKSPACE_SIDEBAR_ORDERING_DIRECTION
     || sessionPreviewLimit !== DEFAULT_SESSION_PREVIEW_LIMIT
   const controlActive = filtersActive || customView
 
-  const orderingLabel = t(`sidebar.sort.option.${projectSortKey}`)
-  const scopeLabel = t(`sidebar.filter.scope.${listFilters.projectScope}`)
+  const groupingLabel = t(`sidebar.grouping.${grouping}`)
+  const orderingLabel = t(`sidebar.ordering.${ordering}`)
   const statusLabel = joinFacetLabels(
     listFilters.statusFilters.map(filter => t(`sidebar.filter.status.${filter}`)),
     t('sidebar.filter.any'),
@@ -161,19 +183,34 @@ export function WorkspaceProjectsSectionView({
     listFilters.workPrFilters.map(filter => t(`sidebar.filter.workPr.${filter}`)),
     t('sidebar.filter.any'),
   )
+  const environmentLabel = joinFacetLabels(
+    listFilters.environmentFilters.map(filter => t(`sidebar.filter.environment.${filter}`)),
+    t('sidebar.filter.any'),
+  )
   const sourceLabel = joinFacetLabels(
     listFilters.sourceFilters.map(filter => t(`sidebar.filter.source.${filter}`)),
     t('sidebar.filter.any'),
   )
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [emptyAddMenuOpen, setEmptyAddMenuOpen] = useState(false)
+
+  const commitMultiFolder = async (input: {
+    name: string
+    folders: Array<{ name: string, path: string }>
+  }) => {
+    await onCreateMultiFolder(input)
+    setAddMenuOpen(false)
+    setEmptyAddMenuOpen(false)
+  }
 
   return (
     <div className="flex min-w-0 flex-col">
       <div className="flex items-center px-2.5 py-1.5">
         <span className="flex-1 select-none text-[11px] font-medium text-muted-foreground">
           {t(
-            projectSortKey === 'recentSession'
-              ? 'sidebar.projects.recentTitle'
-              : 'sidebar.projects.title',
+            grouping === 'workspace'
+              ? 'sidebar.projects.title'
+              : `sidebar.grouping.${grouping}`,
           )}
         </span>
         <div className="flex items-center gap-0.5">
@@ -221,21 +258,29 @@ export function WorkspaceProjectsSectionView({
             >
               <MenuSub>
                 <MenuFacetSubTrigger
-                  data-testid="workspace-scope-submenu"
-                  label={t('sidebar.filter.scope')}
-                  value={scopeLabel}
+                  data-testid="workspace-grouping-submenu"
+                  label={t('sidebar.grouping')}
+                  value={groupingLabel}
                 />
-                <MenuSubPopup {...SUB_POPUP_PROPS} className="w-40">
+                <MenuSubPopup {...SUB_POPUP_PROPS} className="w-44">
                   <MenuRadioGroup
-                    value={listFilters.projectScope}
+                    value={grouping}
                     onValueChange={value =>
-                      onProjectScopeChange(value as WorkspaceSidebarProjectScope)}
+                      onGroupingChange(value as WorkspaceSidebarGrouping)}
                   >
-                    {PROJECT_SCOPE_OPTIONS.map(scope => (
-                      <MenuRadioItem key={scope} value={scope}>
-                        {t(`sidebar.filter.scope.${scope}`)}
-                      </MenuRadioItem>
-                    ))}
+                    {WORKSPACE_SIDEBAR_GROUPINGS.map((option) => {
+                      const GroupingIcon = GROUPING_ICONS[option]
+                      return (
+                        <MenuRadioItem key={option} value={option}>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <GroupingIcon className="size-3.5 shrink-0" aria-hidden="true" />
+                            <span className="min-w-0 truncate">
+                              {t(`sidebar.grouping.${option}`)}
+                            </span>
+                          </span>
+                        </MenuRadioItem>
+                      )
+                    })}
                   </MenuRadioGroup>
                 </MenuSubPopup>
               </MenuSub>
@@ -243,22 +288,22 @@ export function WorkspaceProjectsSectionView({
               <MenuSub>
                 <MenuFacetSubTrigger
                   data-testid="workspace-ordering-submenu"
-                  label={t('sidebar.sort.by')}
+                  label={t('sidebar.ordering')}
                   value={orderingLabel}
                 />
                 <MenuSubPopup {...SUB_POPUP_PROPS} className="w-44">
                   <MenuGroup>
-                    <MenuGroupLabel>{t('sidebar.sort.by')}</MenuGroupLabel>
+                    <MenuGroupLabel>{t('sidebar.ordering')}</MenuGroupLabel>
                     <MenuRadioGroup
-                      value={projectSortKey}
+                      value={ordering}
                       onValueChange={value =>
-                        onProjectSortKeyChange(
-                          value as WorkspaceSidebarProjectSortKey,
+                        onSessionOrderingChange(
+                          value as WorkspaceSidebarSessionOrdering,
                         )}
                     >
-                      {PROJECT_SORT_OPTIONS.map(sortKey => (
-                        <MenuRadioItem key={sortKey} value={sortKey}>
-                          {t(`sidebar.sort.option.${sortKey}`)}
+                      {WORKSPACE_SIDEBAR_SESSION_ORDERINGS.map(option => (
+                        <MenuRadioItem key={option} value={option}>
+                          {t(`sidebar.ordering.${option}`)}
                         </MenuRadioItem>
                       ))}
                     </MenuRadioGroup>
@@ -266,32 +311,24 @@ export function WorkspaceProjectsSectionView({
                   <MenuSeparator />
                   <MenuGroup>
                     <MenuGroupLabel>
-                      {t('sidebar.sort.direction')}
+                      {t('sidebar.ordering.direction')}
                     </MenuGroupLabel>
                     <MenuRadioGroup
-                      value={projectSortDirection}
+                      value={orderingDirection}
                       onValueChange={value =>
-                        onProjectSortDirectionChange(
-                          value as WorkspaceSidebarProjectSortDirection,
+                        onOrderingDirectionChange(
+                          value as WorkspaceSidebarOrderingDirection,
                         )}
                     >
-                      {PROJECT_SORT_DIRECTION_OPTIONS.map(direction => (
+                      {ORDERING_DIRECTION_OPTIONS.map(direction => (
                         <MenuRadioItem key={direction} value={direction}>
-                          {t(`sidebar.sort.direction.${direction}`)}
+                          {t(`sidebar.ordering.direction.${direction}`)}
                         </MenuRadioItem>
                       ))}
                     </MenuRadioGroup>
                   </MenuGroup>
                 </MenuSubPopup>
               </MenuSub>
-
-              <MenuCheckboxItem
-                variant="switch"
-                checked={projectPinnedFirst}
-                onCheckedChange={onProjectPinnedFirstChange}
-              >
-                {t('sidebar.sort.pinnedFirst')}
-              </MenuCheckboxItem>
 
               <MenuSub>
                 <MenuFacetSubTrigger
@@ -351,6 +388,25 @@ export function WorkspaceProjectsSectionView({
                         onCheckedChange={() => onToggleWorkPrFilter(filter)}
                       >
                         {t(`sidebar.filter.workPr.${filter}`)}
+                      </MenuCheckboxItem>
+                    ))}
+                  </MenuSubPopup>
+                </MenuSub>
+
+                <MenuSub>
+                  <MenuFacetSubTrigger
+                    data-testid="workspace-environment-submenu"
+                    label={t('sidebar.filter.environment')}
+                    value={environmentLabel}
+                  />
+                  <MenuSubPopup {...SUB_POPUP_PROPS} className="w-44">
+                    {WORKSPACE_SIDEBAR_ENVIRONMENT_FILTERS.map(filter => (
+                      <MenuCheckboxItem
+                        key={filter}
+                        checked={listFilters.environmentFilters.includes(filter)}
+                        onCheckedChange={() => onToggleEnvironmentFilter(filter)}
+                      >
+                        {t(`sidebar.filter.environment.${filter}`)}
                       </MenuCheckboxItem>
                     ))}
                   </MenuSubPopup>
@@ -419,7 +475,7 @@ export function WorkspaceProjectsSectionView({
           </Menu>
           {multiWorkspaceEnabled
             ? (
-                <Menu>
+                <Menu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
                   <MenuTrigger
                     render={(
                       <Button
@@ -444,10 +500,22 @@ export function WorkspaceProjectsSectionView({
                       <FolderPlusIcon className="size-3" />
                       {t('sidebar.action.addProject')}
                     </MenuItem>
-                    <MenuItem onClick={onOpenMultiWorkspaceDialog}>
-                      <FolderIcon className="size-3" />
-                      {t('sidebar.action.addMultiWorkspace')}
-                    </MenuItem>
+                    <MenuSub>
+                      <MenuSubTrigger>
+                        <FolderIcon className="size-3" />
+                        {t('sidebar.action.addMultiWorkspace')}
+                      </MenuSubTrigger>
+                      <MenuSubPopup
+                        {...SUB_POPUP_PROPS}
+                        className="w-auto p-0"
+                      >
+                        <WorkspaceMultiFolderMenuView
+                          candidates={multiFolderCandidates}
+                          creating={multiFolderCreating}
+                          onCommit={commitMultiFolder}
+                        />
+                      </MenuSubPopup>
+                    </MenuSub>
                   </MenuPopup>
                 </Menu>
               )
@@ -490,7 +558,7 @@ export function WorkspaceProjectsSectionView({
                 </div>
                 {multiWorkspaceEnabled
                   ? (
-                      <Menu>
+                      <Menu open={emptyAddMenuOpen} onOpenChange={setEmptyAddMenuOpen}>
                         <MenuTrigger
                           render={(
                             <Button
@@ -518,10 +586,22 @@ export function WorkspaceProjectsSectionView({
                             <FolderPlusIcon className="size-3" />
                             {t('sidebar.action.addProject')}
                           </MenuItem>
-                          <MenuItem onClick={onOpenMultiWorkspaceDialog}>
-                            <FolderIcon className="size-3" />
-                            {t('sidebar.action.addMultiWorkspace')}
-                          </MenuItem>
+                          <MenuSub>
+                            <MenuSubTrigger>
+                              <FolderIcon className="size-3" />
+                              {t('sidebar.action.addMultiWorkspace')}
+                            </MenuSubTrigger>
+                            <MenuSubPopup
+                              {...SUB_POPUP_PROPS}
+                              className="w-auto p-0"
+                            >
+                              <WorkspaceMultiFolderMenuView
+                                candidates={multiFolderCandidates}
+                                creating={multiFolderCreating}
+                                onCommit={commitMultiFolder}
+                              />
+                            </MenuSubPopup>
+                          </MenuSub>
                         </MenuPopup>
                       </Menu>
                     )

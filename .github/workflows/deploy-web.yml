@@ -6,8 +6,8 @@ on:
       - main
   workflow_dispatch:
     inputs:
-      source_ref:
-        description: Git ref from wibus-wee/cradle-app to checkout
+      ref:
+        description: Git ref in this repository to deploy (branch, tag, or SHA)
         required: true
         default: main
 
@@ -28,12 +28,10 @@ jobs:
       name: github-pages
       url: https://app.cradle.wibus.ren
     steps:
-      - name: Checkout Cradle source
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/cradle-app
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: ${{ inputs.source_ref || 'main' }}
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Setup pnpm & Node.js
         uses: ./.github/actions/setup

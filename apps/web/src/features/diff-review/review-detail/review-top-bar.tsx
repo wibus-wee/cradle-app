@@ -209,7 +209,7 @@ export function ReviewTopBar({
   )
 }
 
-function DisplayPopover({
+export function DisplayPopover({
   hideWhitespaceOnly,
   structuralHighlighting,
   collapseGeneratedFiles,
@@ -251,7 +251,7 @@ function DisplayPopover({
   )
 }
 
-function ReviewPopover({
+export function ReviewPopover({
   pending,
   state,
   requireBodyForFeedback,

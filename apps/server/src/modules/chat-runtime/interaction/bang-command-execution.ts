@@ -17,6 +17,53 @@ export interface ExecuteBangCommandInput {
   signal?: AbortSignal
 }
 
+export interface PersistBangTranscriptInput {
+  sessionId: string
+  transcript: string
+  command?: string
+  durationMs?: number
+  exitCode?: number | null
+}
+
+const BANG_TRANSCRIPT_MAX_CHARS = 100 * 1024
+
+/** Persist an interactive Composer bang PTY transcript without executing a shell command. */
+export async function persistBangTranscript(
+  input: PersistBangTranscriptInput,
+): Promise<BangCommandExecutionResult> {
+  assertStoredSession(input.sessionId)
+  const transcript = input.transcript.replace(/\0/g, '')
+  const truncated = transcript.length > BANG_TRANSCRIPT_MAX_CHARS
+  const stdout = truncated ? transcript.slice(0, BANG_TRANSCRIPT_MAX_CHARS) : transcript
+  const command = (input.command?.trim() || 'interactive shell')
+  const durationMs = typeof input.durationMs === 'number' && input.durationMs >= 0
+    ? Math.round(input.durationMs)
+    : 0
+  const exitCode = input.exitCode === undefined ? 0 : input.exitCode
+
+  const persisted = await persistBangCommandMessages({
+    sessionId: input.sessionId,
+    command,
+    stdout,
+    stderr: '',
+    exitCode,
+    durationMs,
+    timedOut: false,
+    truncated,
+  })
+
+  return {
+    command,
+    stdout,
+    stderr: '',
+    exitCode,
+    durationMs,
+    timedOut: false,
+    truncated,
+    ...persisted,
+  }
+}
+
 export async function executeBangCommand(
   input: ExecuteBangCommandInput,
 ): Promise<BangCommandExecutionResult> {

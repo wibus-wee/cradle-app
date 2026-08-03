@@ -35,12 +35,15 @@ import type {
   ChatRuntimeCrewCollaborationMode,
   ChatRuntimeCrewUiSlotState,
   ChatRuntimeMcpServerStatus,
+  ChatRuntimeSkillsUiSlotItem,
+  ChatRuntimeSkillsUiSlotState,
   ChatRuntimeToolActivityStatus,
   ChatRuntimeUiSlot,
   ChatRuntimeUiSlotIconKey,
   ChatRuntimeUiSlotState,
   ChatRuntimeUiSlotSurface,
 } from '../capabilities/chat-capabilities'
+import { PluginMentionIcon } from '../mentions/plugin-mention-icon'
 
 interface RuntimeUiSlotPanelProps {
   slots: ChatRuntimeUiSlot[]
@@ -309,10 +312,11 @@ function SlotStateCard({ card }: { card: SlotCardModel }) {
           {card.lines.length > 0 && (
             <div className="mt-1.5 space-y-1">
               {card.lines.map(line => (
-                <KeyValueLine key={`${card.id}:${line.label}`} line={line} />
+                <KeyValueLine key={`${card.id}:${line.label}:${line.value}`} line={line} />
               ))}
             </div>
           )}
+          {card.state?.kind === 'skills' && <SkillsSlotDetails state={card.state} />}
           {card.state?.kind === 'crew' && <CrewSlotDetails state={card.state} />}
         </div>
       </div>
@@ -331,6 +335,45 @@ function KeyValueLine({ line }: { line: SlotCardLine }) {
         )}
       >
         {line.value}
+      </span>
+    </div>
+  )
+}
+
+function SkillsSlotDetails({ state }: { state: ChatRuntimeSkillsUiSlotState }) {
+  const items = (state.items ?? []).slice(0, 6)
+  if (items.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      {items.map(item => (
+        <SkillSlotItemRow key={item.name} item={item} />
+      ))}
+    </div>
+  )
+}
+
+function SkillSlotItemRow({ item }: { item: ChatRuntimeSkillsUiSlotItem }) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-[10px]">
+      <span
+        className="grid size-4 shrink-0 place-items-center overflow-hidden rounded-[3px]"
+        style={item.brandColor ? { backgroundColor: `${item.brandColor}22` } : undefined}
+      >
+        <PluginMentionIcon iconUrl={item.iconUrl} className="size-3.5" />
+      </span>
+      <span className="min-w-0 flex-1 truncate font-medium text-foreground">
+        {item.displayName ?? item.name}
+      </span>
+      <span
+        className={cn(
+          'shrink-0 tabular-nums',
+          item.enabled ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400',
+        )}
+      >
+        {item.enabled ? 'on' : 'off'}
       </span>
     </div>
   )
@@ -619,7 +662,9 @@ function readStateView(
         summary: `${state.enabledCount} enabled`,
         meta: `${state.disabledCount} disabled / ${state.errorCount} errors`,
         progress: null,
-        lines: state.roots.slice(0, 4).map(root => ({ label: 'Root', value: root })),
+        lines: (state.items?.length ?? 0) > 0
+          ? state.roots.slice(0, 2).map(root => ({ label: 'Root', value: root }))
+          : state.roots.slice(0, 4).map(root => ({ label: 'Root', value: root })),
       }
     case 'plugin':
       return {

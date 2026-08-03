@@ -25,6 +25,7 @@ import { MessageBubbleFrameView } from '../views/message-bubble-frame-view'
 import { MessageBubbleActionsById } from './message-bubble-actions-by-id'
 import { MessageBubbleSegment } from './message-bubble-segment'
 import { MessageBubbleThinkingPlaceholderById } from './message-bubble-thinking-placeholder-by-id'
+import { RunDebugCaptionById } from './run-debug-caption-by-id'
 
 const IMAGE_ATTACHMENT_GRID_ITEM_CLASS = 'min-w-0 max-w-[300px] flex-1 basis-[calc(50%-0.25rem)]'
 
@@ -145,6 +146,7 @@ export function MessageBubbleSegmentsContainer({
         isStreaming={isStreaming}
         content={content}
         thinkingPlaceholder={<MessageBubbleThinkingPlaceholderById sessionId={sessionId} messageId={frame.id} isAssistant={isAssistant} isStreaming={isStreaming} segments={segments} textTransform={textTransform} suppressPlaceholder={frame.hasHiddenRuntimeUserInputTail} />}
+        debugCaption={isAssistant ? <RunDebugCaptionById messageId={frame.id} /> : undefined}
         actions={!isStreaming ? <MessageBubbleActionsById sessionId={sessionId} messageId={frame.id} isUser={isUser} editAction={isUser ? editAction : undefined} textTransform={textTransform} /> : undefined}
       />
       {lightboxImages.length > 0 && <ImageLightbox images={lightboxImages} initialIndex={lightboxIndex} open={lightboxOpen} onOpenChange={setLightboxOpen} />}
