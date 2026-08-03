@@ -2,7 +2,9 @@
 
 Independent **macOS 14+** Attention Object Store — parking slips for things you (or an agent) should handle later.
 
-Not part of Cradle. Cradle may become a *client* later via MCP/CLI.
+The UI follows the current macOS design direction: Liquid Glass is used for the floating control layer while the attention queue remains a quiet, legible content surface. On macOS 26 and newer the native Liquid Glass APIs are used; macOS 14–25 receive the same hierarchy with a material fallback. See [DESIGN.md](DESIGN.md) for the rationale and Apple references.
+
+WatchOut now lives in this repository as an independent Swift package under `watchout/`. It keeps its own local store and executable surfaces; Cradle may become a *client* later via MCP/CLI.
 
 ## Surfaces
 

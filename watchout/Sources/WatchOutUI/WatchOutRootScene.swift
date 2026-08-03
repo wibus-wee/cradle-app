@@ -31,7 +31,7 @@ public struct WatchOutRootScene: Scene {
 
     Window("WatchOut", id: WatchOutWindowID.floating) {
       FloatingPanel(model: model)
-        .frame(minWidth: 300, idealWidth: 340, minHeight: 400, idealHeight: 480)
+        .frame(minWidth: 440, idealWidth: 600, minHeight: 500, idealHeight: 620)
         .onOpenURL { url in
           model.handleOpenURL(url)
         }
@@ -81,9 +81,11 @@ struct MenuBarPanel: View {
   @State private var hotKeys: WatchOutHotKeys?
 
   var body: some View {
-    AttentionListPane(model: model, compact: true)
-      .frame(width: 300, height: 400)
-      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    WatchOutGlassRounded(cornerRadius: 24) {
+      AttentionListPane(model: model, compact: true)
+        .frame(width: 320, height: 440)
+    }
+    .padding(8)
       .onAppear(perform: bootstrapIfNeeded)
       .onChange(of: model.isFloatingPresented) { _, visible in
         if visible {
@@ -118,9 +120,10 @@ struct FloatingPanel: View {
   @Default(.floatingAlwaysOnTop) private var floatingAlwaysOnTop
 
   var body: some View {
-    AttentionListPane(model: model, compact: false)
-      .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-      .padding(6)
+    WatchOutGlassRounded(cornerRadius: 30) {
+      AttentionListPane(model: model, compact: false)
+    }
+      .padding(10)
       .onAppear {
         model.refresh()
         applyFloatingLevel()

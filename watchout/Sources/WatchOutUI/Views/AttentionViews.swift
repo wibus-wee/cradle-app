@@ -13,15 +13,17 @@ struct AttentionItemRow: View {
   let onOpenHref: () -> Void
   let onEdit: () -> Void
   let onCopy: () -> Void
+  @State private var isHovered = false
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(alignment: .top, spacing: 10) {
       if selecting {
         Button(action: onToggleSelect) {
           Image(systemName: selected ? "checkmark.circle.fill" : "circle")
             .font(.body)
-            .foregroundStyle(.secondary)
-            .frame(width: 20, height: 20)
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(selected ? .tint : .secondary)
+            .frame(width: 22, height: 22)
         }
         .buttonStyle(.plain)
         .help(selected ? "Deselect" : "Select")
@@ -29,25 +31,35 @@ struct AttentionItemRow: View {
         Button(action: item.status == .open ? onComplete : onReopen) {
           Image(systemName: item.status == .open ? "circle" : "checkmark.circle.fill")
             .font(.body)
-            .foregroundStyle(.secondary)
-            .frame(width: 20, height: 20)
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(item.status == .open ? .secondary : .tint)
+            .frame(width: 22, height: 22)
         }
         .buttonStyle(.plain)
         .help(item.status == .open ? "Mark done" : "Reopen")
       }
 
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: 4) {
         Text(item.title)
-          .font(.body.weight(.medium))
+          .font(.body.weight(.semibold))
           .strikethrough(item.status == .done)
           .foregroundStyle(item.status == .done ? .secondary : .primary)
           .lineLimit(2)
 
+        if let body = item.body, !body.isEmpty, item.status == .open {
+          Text(body)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+        }
+
         HStack(spacing: 6) {
-          Text(item.source)
+          Label(item.source.capitalized, systemImage: sourceSymbol)
           Text(item.createdAt, format: .relative(presentation: .named))
           if item.href != nil {
-            Button("Open", action: onOpenHref)
+            Button(action: onOpenHref) {
+              Label("Open", systemImage: "arrow.up.right")
+            }
               .buttonStyle(.plain)
               .foregroundStyle(.secondary)
           }
@@ -58,9 +70,9 @@ struct AttentionItemRow: View {
 
       Spacer(minLength: 0)
 
-      if !selecting {
+      if !selecting, isHovered {
         Button(role: .destructive, action: onDelete) {
-          Image(systemName: "xmark")
+          Image(systemName: "trash")
             .font(.caption.weight(.semibold))
             .foregroundStyle(.tertiary)
             .frame(width: 22, height: 22)
@@ -71,12 +83,20 @@ struct AttentionItemRow: View {
       }
     }
     .padding(.horizontal, 12)
-    .padding(.vertical, 10)
+    .padding(.vertical, item.body == nil ? 11 : 12)
     .background(
-      .quaternary.opacity(focused || selected ? 0.55 : 0.35),
+      Color.primary.opacity(focused || selected ? 0.085 : isHovered ? 0.055 : 0.028),
       in: RoundedRectangle(cornerRadius: 18, style: .continuous)
     )
+    .overlay {
+      RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .strokeBorder(
+          Color.accentColor.opacity(focused || selected ? 0.42 : 0),
+          lineWidth: 1
+        )
+    }
     .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    .onHover { isHovered = $0 }
     .contextMenu {
       if selecting {
         Button(selected ? "Deselect" : "Select", action: onToggleSelect)
@@ -102,6 +122,15 @@ struct AttentionItemRow: View {
       if selecting { onToggleSelect() }
     }
   }
+
+  private var sourceSymbol: String {
+    switch item.source.lowercased() {
+    case "clipboard": return "doc.on.clipboard"
+    case "agent", "mcp": return "sparkles"
+    case "cradle": return "square.stack.3d.up"
+    default: return "tray"
+    }
+  }
 }
 
 struct AttentionComposer: View {
@@ -114,28 +143,33 @@ struct AttentionComposer: View {
   }
 
   var body: some View {
-    HStack(spacing: 8) {
-      TextField("Park for later…", text: $title)
-        .textFieldStyle(.plain)
-        .onSubmit(onSubmit)
+    WatchOutGlassCapsule {
+      HStack(spacing: 8) {
+        TextField("Park for later…", text: $title)
+          .textFieldStyle(.plain)
+          .onSubmit(onSubmit)
 
-      if let onParkClipboard {
-        Button(action: onParkClipboard) {
-          Image(systemName: "clipboard")
+        if let onParkClipboard {
+          Button(action: onParkClipboard) {
+            Image(systemName: "doc.on.clipboard")
+          }
+          .buttonStyle(.borderless)
+          .help("Park clipboard")
         }
-        .buttonStyle(.borderless)
-        .help("Park clipboard")
-      }
 
-      Button("Park", action: onSubmit)
-        .buttonStyle(.bordered)
+        Button {
+          onSubmit()
+        } label: {
+          Label("Park", systemImage: "arrow.down.to.line.compact")
+        }
+        .watchOutProminentButton()
         .controlSize(.small)
         .disabled(!canSubmit)
         .keyboardShortcut(.return, modifiers: [.command])
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 9)
     }
-    .padding(.horizontal, 12)
-    .padding(.vertical, 10)
-    .background(.quaternary.opacity(0.45), in: Capsule(style: .continuous))
   }
 }
 
@@ -165,8 +199,12 @@ struct AttentionSearchField: View {
     }
     .font(.callout)
     .padding(.horizontal, 10)
-    .padding(.vertical, 7)
-    .background(.quaternary.opacity(0.35), in: Capsule(style: .continuous))
+    .padding(.vertical, 8)
+    .background(Color.primary.opacity(0.045), in: Capsule(style: .continuous))
+    .overlay {
+      Capsule(style: .continuous)
+        .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+    }
   }
 }
 
@@ -209,13 +247,19 @@ struct AttentionListPane: View {
 
   var body: some View {
     VStack(spacing: 10) {
-      header
-        .padding(.horizontal, 4)
+      watchOutGlassGroup {
+        header
+          .padding(.horizontal, 4)
 
-      AttentionSearchField(text: $model.searchText) { value in
-        model.setSearchText(value)
+        AttentionSearchField(text: $model.searchText) { value in
+          model.setSearchText(value)
+        }
+        .padding(.horizontal, 2)
       }
-      .padding(.horizontal, 2)
+
+      if !compact {
+        AttentionSummaryStrip(model: model)
+      }
 
       if let errorMessage = model.errorMessage {
         Text(errorMessage)
@@ -223,6 +267,7 @@ struct AttentionListPane: View {
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.horizontal, 4)
+          .padding(.vertical, 2)
       } else if model.canUndoDelete {
         HStack(spacing: 8) {
           Text("Deleted “\(model.lastDeleted?.title ?? "")”")
@@ -243,12 +288,14 @@ struct AttentionListPane: View {
           .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 4)
+        .padding(.vertical, 2)
       } else if let statusMessage = model.statusMessage {
         Text(statusMessage)
           .font(.caption)
           .foregroundStyle(.secondary)
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.horizontal, 4)
+          .padding(.vertical, 2)
       }
 
       Group {
@@ -309,7 +356,7 @@ struct AttentionListPane: View {
         )
       }
     }
-    .padding(10)
+    .padding(compact ? 10 : 14)
     .onAppear { model.refresh() }
     .sheet(isPresented: Binding(
       get: { model.editingItem != nil },
@@ -337,8 +384,8 @@ struct AttentionListPane: View {
         .controlSize(.small)
     }
     .padding(.horizontal, 12)
-    .padding(.vertical, 10)
-    .background(.quaternary.opacity(0.45), in: Capsule(style: .continuous))
+    .padding(.vertical, 9)
+    .background(Color.primary.opacity(0.05), in: Capsule(style: .continuous))
   }
 
   private var header: some View {
@@ -352,36 +399,75 @@ struct AttentionListPane: View {
           .foregroundStyle(.secondary)
           .padding(.horizontal, 8)
           .padding(.vertical, 3)
-          .background(.quaternary.opacity(0.5), in: Capsule())
+          .background(Color.primary.opacity(0.08), in: Capsule())
       }
 
       Spacer(minLength: 8)
 
+      Picker("Items", selection: Binding(
+        get: { model.showDone },
+        set: { model.setShowDone($0) }
+      )) {
+        Text("Open").tag(false)
+        Text("Done").tag(true)
+      }
+      .labelsHidden()
+      .pickerStyle(.segmented)
+      .controlSize(.small)
+      .frame(width: compact ? 112 : 132)
+
       Menu {
-        Button(model.isSelecting ? "Cancel Selection" : "Select…") {
+        Button(model.isSelecting ? "Cancel Selection" : "Select…", systemImage: "checklist") {
           model.toggleSelecting()
         }
-        Button("Complete Visible Open") {
+        Button("Complete Visible Open", systemImage: "checkmark.circle") {
           model.completeVisibleOpen()
         }
         .disabled(model.items.allSatisfy { $0.status != .open })
         Divider()
-        Button("Export Visible…") {
+        Button("Export Visible…", systemImage: "square.and.arrow.up") {
           model.exportVisibleToFile()
         }
         .disabled(model.items.isEmpty)
       } label: {
-        Image(systemName: "ellipsis.circle")
+        Image(systemName: "ellipsis")
       }
       .menuStyle(.borderlessButton)
       .fixedSize()
 
-      Toggle("Done", isOn: Binding(
-        get: { model.showDone },
-        set: { model.setShowDone($0) }
-      ))
-      .toggleStyle(.button)
-      .controlSize(.small)
     }
+  }
+}
+
+private struct AttentionSummaryStrip: View {
+  @Bindable var model: WatchOutAppModel
+
+  private var agentItems: Int {
+    model.items.filter { source in
+      let value = source.source.lowercased()
+      return value == "agent" || value == "mcp"
+    }.count
+  }
+
+  var body: some View {
+    HStack(spacing: 8) {
+      summary(value: "\(model.openCount)", label: "open now")
+      summary(value: "\(model.items.count)", label: "in view")
+      summary(value: "\(agentItems)", label: "from agents")
+    }
+  }
+
+  private func summary(value: String, label: String) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text(value)
+        .font(.title3.weight(.semibold).monospacedDigit())
+      Text(label)
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.horizontal, 10)
+    .padding(.vertical, 8)
+    .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
   }
 }
