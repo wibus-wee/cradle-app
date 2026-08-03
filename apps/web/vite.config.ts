@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { pluginImportMap } from '@cradle/plugin-sdk/vite-plugin-import-map'
 import tailwindcss from '@tailwindcss/vite'
@@ -15,6 +16,7 @@ const ASSET_MODULE_RE = /\.(?:avif|gif|ico|jpe?g|png|svg|webp)(?:\?|$)/
 const PRECACHE_ASSET_RE = /\.(?:css|js|woff2)$/
 const enableViteDevtools = process.env.CRADLE_VITE_DEVTOOLS === '1'
 const isE2E = process.env.CRADLE_E2E === '1'
+const lobeIconsPackageRoot = dirname(fileURLToPath(import.meta.resolve('@lobehub/icons-static-png/package.json')))
 
 function getVendorChunk(id: string): string | undefined {
   if (id.includes('?url') || ASSET_MODULE_RE.test(id)) {
@@ -121,6 +123,12 @@ export default defineConfig({
   server: {
     port: 5174,
     hmr: isE2E ? false : undefined,
+    fs: {
+      allow: [
+        resolve(__dirname, '../..'),
+        lobeIconsPackageRoot,
+      ],
+    },
   },
   build: {
     manifest: true,

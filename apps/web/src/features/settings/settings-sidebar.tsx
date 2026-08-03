@@ -1,4 +1,5 @@
 import {
+  ArchiveLine as ArchiveIcon,
   ArrowToDownLine as ArrowDownToLineIcon,
   Box3Line as BoxesIcon,
   ChipLine as ChipIcon,
@@ -20,6 +21,7 @@ import {
   RobotLine as BotIcon,
   SandglassLine as HourglassIcon,
   ServerLine as ServerIcon,
+  TerminalBoxLine as TerminalIcon,
   WifiLine as WifiIcon,
 } from '@mingcute/react'
 import { useMemo } from 'react'
@@ -170,6 +172,12 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
           'integrations.secrets.title',
         ],
       },
+      {
+        id: 'mcpServers',
+        labelKey: 'nav.mcpServers',
+        icon: TerminalIcon,
+        searchKeys: ['mcpServers.page.title'],
+      },
     ],
   },
   {
@@ -206,6 +214,15 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
         searchKeys: ['remoteHosts.form.sshTarget' as SettingsKey, 'remoteHosts.form.displayName' as SettingsKey],
       },
       { id: 'downloads', labelKey: 'nav.downloads', icon: DownloadIcon },
+      {
+        id: 'backup',
+        labelKey: 'nav.backup',
+        icon: ArchiveIcon,
+        searchKeys: [
+          'backup.export.label',
+          'backup.restore.label',
+        ],
+      },
       ...(import.meta.env.DEV
         ? [{ id: 'chronicle', labelKey: 'nav.chronicle', icon: ActivityIcon } satisfies SettingsNavItem]
         : []),

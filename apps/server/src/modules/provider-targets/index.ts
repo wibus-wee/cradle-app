@@ -11,6 +11,10 @@ import {
   readCodexChatgptCredentialLoginStatus,
   startCodexChatgptCredentialLogin,
 } from '../chat-runtime-providers/codex/app-server/account-service'
+import {
+  readCachedConnectionTest,
+  testProviderConnection,
+} from './connection-test'
 import { ProviderTargetsModel } from './model'
 import * as ProviderTargets from './service'
 
@@ -26,7 +30,8 @@ export const providerTargets = new Elysia({
     }),
     {
       detail: {
-        summary: 'List provider targets',
+        'summary': 'List provider targets',
+        'x-cradle-cli': { command: ['provider', 'list'] },
       },
       query: ProviderTargetsModel.listQuery,
       response: { 200: t.Array(ProviderTargetsModel.providerTarget) },
@@ -47,7 +52,8 @@ export const providerTargets = new Elysia({
     },
     {
       detail: {
-        summary: 'Create or update a manual provider target',
+        'summary': 'Create or update a manual provider target',
+        'x-cradle-cli': { command: ['provider', 'set'] },
       },
       params: ProviderTargetsModel.idParams,
       body: ProviderTargetsModel.upsertManualBody,
@@ -62,7 +68,8 @@ export const providerTargets = new Elysia({
     },
     {
       detail: {
-        summary: 'Delete provider target',
+        'summary': 'Delete provider target',
+        'x-cradle-cli': { command: ['provider', 'delete'] },
       },
       params: ProviderTargetsModel.idParams,
       response: { 200: t.Object({ ok: t.Literal(true) }) },
@@ -202,5 +209,43 @@ export const providerTargets = new Elysia({
       params: ProviderTargetsModel.idParams,
       body: ProviderTargetsModel.customModelsBody,
       response: { 200: ProviderTargetsModel.customModelEntryList },
+    },
+  )
+  .post(
+    '/:providerTargetId/test',
+    ({ params, body }) => testProviderConnection(params.providerTargetId, {
+      deep: body.deep,
+      model: body.model,
+    }),
+    {
+      detail: {
+        'summary': 'Test provider connection',
+        'x-cradle-cli': { command: ['provider', 'test'] },
+      },
+      params: ProviderTargetsModel.idParams,
+      body: ProviderTargetsModel.connectionTestBody,
+      response: { 200: ProviderTargetsModel.connectionTestResult },
+    },
+  )
+  .get(
+    '/:providerTargetId/test',
+    async ({ params, set }) => {
+      const cached = await readCachedConnectionTest(params.providerTargetId)
+      if (!cached) {
+        set.status = 404
+        return { error: 'no_cached_result' as const }
+      }
+      return cached
+    },
+    {
+      detail: {
+        'summary': 'Read cached connection test',
+        'x-cradle-cli': { command: ['provider', 'test', 'cached'], hidden: true },
+      },
+      params: ProviderTargetsModel.idParams,
+      response: {
+        200: ProviderTargetsModel.connectionTestResult,
+        404: ProviderTargetsModel.noCachedConnectionTestResult,
+      },
     },
   )

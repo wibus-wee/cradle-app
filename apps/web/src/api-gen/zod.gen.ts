@@ -354,10 +354,20 @@ export const zPutProfilesByIdBody = z.object({
     enabled: z.boolean(),
     config: z.record(z.string(), z.unknown()),
     credentialRef: z.string().min(1).nullish(),
-    iconSlug: z.string().nullish()
+    iconSlug: z.string().nullish(),
+    providerId: z.string().min(1).nullish()
 });
 
 export const zPutProfilesByIdPath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostProfilesByIdBindProviderBody = z.object({
+    providerId: z.string().min(1),
+    applyEndpointDefaults: z.boolean().optional()
+});
+
+export const zPostProfilesByIdBindProviderPath = z.object({
     id: z.string().min(1)
 });
 
@@ -510,6 +520,19 @@ export const zPatchProviderTargetsByProviderTargetIdCustomModelsBody = z.object(
 });
 
 export const zPatchProviderTargetsByProviderTargetIdCustomModelsPath = z.object({
+    providerTargetId: z.string().min(1)
+});
+
+export const zGetProviderTargetsByProviderTargetIdTestPath = z.object({
+    providerTargetId: z.string().min(1)
+});
+
+export const zPostProviderTargetsByProviderTargetIdTestBody = z.object({
+    deep: z.boolean().optional(),
+    model: z.string().min(1).optional()
+});
+
+export const zPostProviderTargetsByProviderTargetIdTestPath = z.object({
     providerTargetId: z.string().min(1)
 });
 
@@ -892,6 +915,11 @@ export const zPutModelRegistryMappingsByModelIdBody = z.object({
 
 export const zPutModelRegistryMappingsByModelIdPath = z.object({
     modelId: z.string().min(1)
+});
+
+export const zGetMcpServersRegistryServersQuery = z.object({
+    search: z.string().optional(),
+    cursor: z.string().optional()
 });
 
 export const zPostMcpServersBody = z.union([
@@ -2877,29 +2905,6 @@ export const zPutWorkspacesByWorkspaceIdDiffReviewsPreferencesPath = z.object({
     workspaceId: z.string().min(1)
 });
 
-export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGenerateBody = z.object({
-    providerTargetId: z.string().min(1),
-    runtimeKind: z.string().min(1).optional(),
-    modelId: z.string().min(1).nullish(),
-    force: z.boolean().optional(),
-    outputLocale: z.enum([
-        'en-US',
-        'zh-CN',
-        'ja-JP',
-        'es-ES'
-    ]).nullish()
-});
-
-export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideGeneratePath = z.object({
-    workspaceId: z.string().min(1),
-    reviewId: z.string().min(1)
-});
-
-export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdGuideCancelPath = z.object({
-    workspaceId: z.string().min(1),
-    reviewId: z.string().min(1)
-});
-
 export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesBody = z.object({
     threadId: z.string().min(1).nullish(),
     anchor: z.object({
@@ -2912,11 +2917,7 @@ export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesBody = z
     }).nullish(),
     instruction: z.string().min(1),
     agentId: z.string().min(1).nullish(),
-    expectedOutput: z.enum([
-        'commit',
-        'working-tree-change',
-        'patch-artifact'
-    ])
+    expectedOutput: z.enum(['working-tree-change', 'patch-artifact'])
 });
 
 export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesPath = z.object({
@@ -2980,40 +2981,6 @@ export const zDeleteWorkspacesByWorkspaceIdDiffReviewsByReviewIdAgentFixesByAgen
     workspaceId: z.string().min(1),
     reviewId: z.string().min(1),
     agentFixId: z.string().min(1)
-});
-
-export const zPutWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanIdBody = z.object({
-    groups: z.array(z.object({
-        id: z.string().min(1),
-        title: z.string().min(1),
-        message: z.string().min(1),
-        rationale: z.string(),
-        fileIds: z.array(z.string().min(1)),
-        paths: z.array(z.string()).optional(),
-        dependsOn: z.array(z.string())
-    })).optional(),
-    rationale: z.string().optional(),
-    status: z.enum([
-        'draft',
-        'accepted',
-        'abandoned'
-    ]).optional()
-});
-
-export const zPutWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanIdPath = z.object({
-    workspaceId: z.string().min(1),
-    reviewId: z.string().min(1),
-    commitPlanId: z.string().min(1)
-});
-
-export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanIdApplyBody = z.object({
-    idempotencyKey: z.string().min(1).optional()
-});
-
-export const zPostWorkspacesByWorkspaceIdDiffReviewsByReviewIdCommitPlansByCommitPlanIdApplyPath = z.object({
-    workspaceId: z.string().min(1),
-    reviewId: z.string().min(1),
-    commitPlanId: z.string().min(1)
 });
 
 export const zGetAcpRegistryByAgentIdDistributionTypesPath = z.object({
@@ -3174,6 +3141,18 @@ export const zPutChatComposerDraftsBySurfaceIdBody = z.object({
                 lineStart: z.number().gte(1),
                 lineEnd: z.number().gte(1),
                 comment: z.string().min(1),
+                position: z.number().gte(0).optional()
+            }),
+            z.object({
+                type: z.enum(['data-cradle-intent']),
+                intentId: z.enum([
+                    'review',
+                    'commit',
+                    'push'
+                ]),
+                name: z.string().min(1),
+                label: z.string().min(1),
+                prompt: z.string().min(1),
                 position: z.number().gte(0).optional()
             })
         ])),
@@ -3377,6 +3356,18 @@ export const zPostChatSessionsBySessionIdQueueBody = z.object({
             lineEnd: z.number().gte(1),
             comment: z.string().min(1),
             position: z.number().gte(0).optional()
+        }),
+        z.object({
+            type: z.enum(['data-cradle-intent']),
+            intentId: z.enum([
+                'review',
+                'commit',
+                'push'
+            ]),
+            name: z.string().min(1),
+            label: z.string().min(1),
+            prompt: z.string().min(1),
+            position: z.number().gte(0).optional()
         })
     ])).optional(),
     providerTargetId: z.string().optional(),
@@ -3460,6 +3451,18 @@ export const zPostChatSessionsBySessionIdSteerBody = z.object({
             lineEnd: z.number().gte(1),
             comment: z.string().min(1),
             position: z.number().gte(0).optional()
+        }),
+        z.object({
+            type: z.enum(['data-cradle-intent']),
+            intentId: z.enum([
+                'review',
+                'commit',
+                'push'
+            ]),
+            name: z.string().min(1),
+            label: z.string().min(1),
+            prompt: z.string().min(1),
+            position: z.number().gte(0).optional()
         })
     ])).optional(),
     providerTargetId: z.string().optional()
@@ -3539,6 +3542,18 @@ export const zPatchChatSessionsBySessionIdQueueByQueueItemIdBody = z.object({
             lineStart: z.number().gte(1),
             lineEnd: z.number().gte(1),
             comment: z.string().min(1),
+            position: z.number().gte(0).optional()
+        }),
+        z.object({
+            type: z.enum(['data-cradle-intent']),
+            intentId: z.enum([
+                'review',
+                'commit',
+                'push'
+            ]),
+            name: z.string().min(1),
+            label: z.string().min(1),
+            prompt: z.string().min(1),
             position: z.number().gte(0).optional()
         })
     ])).optional(),
@@ -3658,6 +3673,18 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
             lineEnd: z.number().gte(1),
             comment: z.string().min(1),
             position: z.number().gte(0).optional()
+        }),
+        z.object({
+            type: z.enum(['data-cradle-intent']),
+            intentId: z.enum([
+                'review',
+                'commit',
+                'push'
+            ]),
+            name: z.string().min(1),
+            label: z.string().min(1),
+            prompt: z.string().min(1),
+            position: z.number().gte(0).optional()
         })
     ])).optional(),
     messages: z.array(z.object({
@@ -3688,7 +3715,16 @@ export const zPostChatSessionsBySessionIdResponseBody = z.object({
         z.string(),
         z.number(),
         z.boolean()
-    ]).nullable()).optional()
+    ]).nullable()).optional(),
+    reviewTarget: z.union([
+        z.object({
+            type: z.enum(['uncommittedChanges'])
+        }),
+        z.object({
+            type: z.enum(['baseBranch']),
+            branch: z.string().min(1)
+        })
+    ]).optional()
 });
 
 export const zPostChatSessionsBySessionIdResponsePath = z.object({
@@ -3753,6 +3789,18 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
             lineEnd: z.number().gte(1),
             comment: z.string().min(1),
             position: z.number().gte(0).optional()
+        }),
+        z.object({
+            type: z.enum(['data-cradle-intent']),
+            intentId: z.enum([
+                'review',
+                'commit',
+                'push'
+            ]),
+            name: z.string().min(1),
+            label: z.string().min(1),
+            prompt: z.string().min(1),
+            position: z.number().gte(0).optional()
         })
     ])).optional(),
     messages: z.array(z.object({
@@ -3783,7 +3831,16 @@ export const zPostChatSideConversationsBySideConversationIdResponseBody = z.obje
         z.string(),
         z.number(),
         z.boolean()
-    ]).nullable()).optional()
+    ]).nullable()).optional(),
+    reviewTarget: z.union([
+        z.object({
+            type: z.enum(['uncommittedChanges'])
+        }),
+        z.object({
+            type: z.enum(['baseBranch']),
+            branch: z.string().min(1)
+        })
+    ]).optional()
 });
 
 export const zPostChatSideConversationsBySideConversationIdResponsePath = z.object({

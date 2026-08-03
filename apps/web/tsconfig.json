@@ -9,7 +9,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "~/*": ["src/*"]
+      "~/*": ["src/*"],
+      "react": ["./node_modules/@types/react/index.d.ts"]
     },
     "types": ["vite/client", "node"],
     "allowImportingTsExtensions": true,

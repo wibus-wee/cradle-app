@@ -19,6 +19,8 @@
 
 > The project is still in the early stages of development. If you have any ideas or suggestions, please feel free to open an issue or open a pull request. Your contributions are welcome! Thank you for your support and interest in this project ❤️.
 
+Development requires Node.js 22.15.0 or newer and pnpm 11.2.2. The minimum Node version is required by the relay transport's built-in Zstandard compression support.
+
 <p align="center">
 <img src='./.github/readme/screenshot.png' alt='Screenshot' width='800px' />
 </p>

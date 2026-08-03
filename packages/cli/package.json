@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "private": true,
   "bin": {
-    "cradle": "./dist/index.js"
+    "cradle": "./dist/index.cjs"
   },
   "scripts": {
-    "build": "vite build && chmod +x dist/index.js",
+    "build": "tsup && chmod +x dist/index.cjs",
     "gen:cli": "tsx scripts/generate-cli.ts",
     "typecheck": "tsc --noEmit",
     "cradle": "tsx src/index.ts"
@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.1",
+    "tsup": "^8.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

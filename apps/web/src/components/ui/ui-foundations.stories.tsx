@@ -1,9 +1,9 @@
 import {
   AddLine as PlusIcon,
   CheckCircleLine as CheckIcon,
-  InformationLine as InfoIcon,
   Settings2Line as SettingsIcon,
 } from '@mingcute/react'
+import { AlertTriangle as WarningIcon, CheckCircle2 as StatusCheckIcon, Info as InfoIcon, XCircle as ErrorIcon } from 'lucide-react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
 import { Alert, AlertAction, AlertDescription, AlertTitle } from './alert'
@@ -115,8 +115,8 @@ function UiFoundationsGallery() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Toggle aria-label="Toggle pinned">Pinned</Toggle>
-            <ToggleGroup type="multiple" defaultValue={['code']} aria-label="View modes">
+            <Toggle variant="outline" aria-label="Toggle pinned">Pinned</Toggle>
+            <ToggleGroup variant="outline" type="multiple" defaultValue={['code']} aria-label="View modes">
               <ToggleGroupItem value="code">Code</ToggleGroupItem>
               <ToggleGroupItem value="preview">Preview</ToggleGroupItem>
               <ToggleGroupItem value="diff">Diff</ToggleGroupItem>
@@ -132,14 +132,24 @@ function UiFoundationsGallery() {
             <p className="mt-1 text-sm text-muted-foreground">Inline notices, errors, tabs, and identity treatments.</p>
           </div>
           <div className="grid gap-3 lg:grid-cols-2">
-            <Alert>
-              <InfoIcon aria-hidden="true" />
+            <Alert variant="success">
+              <StatusCheckIcon aria-hidden="true" />
               <AlertTitle>Runtime connected</AlertTitle>
               <AlertDescription>The provider catalog was refreshed successfully.</AlertDescription>
               <AlertAction><Button variant="ghost" size="xs">Details</Button></AlertAction>
             </Alert>
-            <Alert variant="destructive">
+            <Alert variant="info">
               <InfoIcon aria-hidden="true" />
+              <AlertTitle>Sync in progress</AlertTitle>
+              <AlertDescription>Session history is being indexed in the background.</AlertDescription>
+            </Alert>
+            <Alert variant="warning">
+              <WarningIcon aria-hidden="true" />
+              <AlertTitle>Approaching token limit</AlertTitle>
+              <AlertDescription>This session is using over 80% of its context window.</AlertDescription>
+            </Alert>
+            <Alert variant="destructive">
+              <ErrorIcon aria-hidden="true" />
               <AlertTitle>Action requires attention</AlertTitle>
               <AlertDescription>The remote host is not accepting new sessions.</AlertDescription>
             </Alert>

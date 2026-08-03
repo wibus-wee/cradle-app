@@ -1,7 +1,13 @@
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import type { BrowserWindow } from 'electron'
 import { app, ipcMain, Menu, nativeImage, Tray } from 'electron'
 
 import { getDesktopServerAuthHeaders } from './server-process'
+
+const localModuleDir = dirname(fileURLToPath(import.meta.url))
 
 export type TrayActionId
   = | 'open-app'
@@ -80,6 +86,26 @@ interface TrayData {
 const TRAY_ICON_SIZE = 18
 const MENU_ICON_SIZE = 10
 const MAX_SESSION_LABEL_LENGTH = 52
+const TRAY_TEMPLATE_FILE = 'trayTemplate.png'
+
+/**
+ * Resolve Cradle menubar Template PNGs generated into `resources/tray/`.
+ * Electron auto-picks `wendy.h@example.net` when present beside the 1x file.
+ */
+function resolveTrayTemplatePath(): string {
+  const packagedAppPath = typeof app.getAppPath === 'function'
+    ? app.getAppPath()
+    : ''
+  const candidates = [
+    // Packaged asar: electron-builder copies `resources/tray` into the app root.
+    packagedAppPath ? join(packagedAppPath, 'resources/tray', TRAY_TEMPLATE_FILE) : '',
+    // electron-vite dist/out: `dist/main` → `../../resources/tray`
+    join(localModuleDir, '../../resources/tray', TRAY_TEMPLATE_FILE),
+    // Extra fallback when the main bundle sits one level deeper.
+    join(localModuleDir, '../../../resources/tray', TRAY_TEMPLATE_FILE),
+  ].filter(Boolean)
+  return candidates.find(candidate => existsSync(candidate)) ?? candidates[0]!
+}
 
 function createCircleImage(size: number, red: number, green: number, blue: number, alpha = 255): Electron.NativeImage {
   const buffer = Buffer.alloc(size * size * 4, 0)
@@ -103,11 +129,21 @@ function createCircleImage(size: number, red: number, green: number, blue: numbe
   return nativeImage.createFromBuffer(buffer, { width: size, height: size })
 }
 
-function createTrayImage(alpha = 255): Electron.NativeImage {
-  const image = createCircleImage(TRAY_ICON_SIZE, 0, 0, 0, alpha)
-  if (process.platform === 'darwin') {
-    image.setTemplateImage(true)
+function createFallbackTrayImage(): Electron.NativeImage {
+  const image = createCircleImage(TRAY_ICON_SIZE, 0, 0, 0, 255)
+  image.setTemplateImage(true)
+  return image
+}
+
+function createTrayImage(): Electron.NativeImage {
+  const templatePath = resolveTrayTemplatePath()
+  const image = nativeImage.createFromPath(templatePath)
+  if (image.isEmpty()) {
+    console.warn(`[tray] Missing tray template at ${templatePath}; falling back to circle`)
+    return createFallbackTrayImage()
   }
+  // Template silhouette: macOS tints it for the menu bar; other platforms keep black+alpha.
+  image.setTemplateImage(true)
   return image
 }
 
@@ -169,7 +205,8 @@ export class TrayManager {
     const trayImage = createTrayImage()
     this.tray = new Tray(trayImage)
     this.tray.setImage(trayImage)
-    this.tray.setPressedImage(createTrayImage(180))
+    // Same Template glyph for pressed; macOS already dims template images.
+    this.tray.setPressedImage(trayImage)
     this.tray.setToolTip('Cradle')
     this.tray.setIgnoreDoubleClickEvents(true)
     this.updateNativeMenus(null)

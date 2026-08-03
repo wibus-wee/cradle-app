@@ -89,6 +89,10 @@ export function useChatActions(input: UseChatActionsInput) {
       ),
     )
 
+    if (opts?.reviewTarget && isBusy) {
+      throw new Error('Wait for the current turn to finish before starting code review.')
+    }
+
     if (sideChatMessage !== null) {
       const controller = new AbortController()
       const driverMessageId = `side-chat-${Date.now()}`
@@ -255,6 +259,7 @@ export function useChatActions(input: UseChatActionsInput) {
             modelId: opts?.modelId ?? undefined,
             thinkingEffort: opts?.thinkingEffort === null ? undefined : opts?.thinkingEffort,
             runtimeSettings: opts?.runtimeSettings,
+            reviewTarget: opts?.reviewTarget,
           },
           signal: controller.signal,
         })

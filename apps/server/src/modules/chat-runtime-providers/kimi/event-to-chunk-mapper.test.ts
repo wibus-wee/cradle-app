@@ -21,7 +21,52 @@ describe('kimi event to chunk mapper', () => {
       'tool-input-available',
     ])
     expect(result.map(chunk => chunk.type)).toEqual(['tool-output-available'])
-    expect(finish.map(chunk => chunk.type)).toEqual(['finish'])
+    expect(finish.map(chunk => chunk.type)).toEqual(['data-runtime-event', 'finish'])
+    expect(finish[0]).toMatchObject({
+      type: 'data-runtime-event',
+      data: { kind: 'kimi.turn.ended', reason: 'completed', interruptReason: null },
+    })
+  })
+
+  it('preserves interruptReason and maps limit/filter interrupts to finish error', () => {
+    const mapper = new KimiEventToChunkMapper()
+    const finish = mapper.map(event({
+      type: 'turn.ended',
+      turnId: 9,
+      reason: 'cancelled',
+      interruptReason: 'max_steps',
+    }))
+
+    expect(finish).toMatchObject([
+      {
+        type: 'data-runtime-event',
+        data: {
+          kind: 'kimi.turn.ended',
+          turnId: 9,
+          reason: 'cancelled',
+          interruptReason: 'max_steps',
+        },
+      },
+      { type: 'finish', finishReason: 'error' },
+    ])
+  })
+
+  it('keeps user_cancelled interrupts as a clean stop finish', () => {
+    const mapper = new KimiEventToChunkMapper()
+    const finish = mapper.map(event({
+      type: 'turn.ended',
+      turnId: 3,
+      reason: 'cancelled',
+      interruptReason: 'user_cancelled',
+    }))
+
+    expect(finish).toMatchObject([
+      {
+        type: 'data-runtime-event',
+        data: { kind: 'kimi.turn.ended', interruptReason: 'user_cancelled' },
+      },
+      { type: 'finish', finishReason: 'stop' },
+    ])
   })
 
   it('splits text and thinking blocks around tools in the same Kimi turn', () => {
@@ -59,6 +104,7 @@ describe('kimi event to chunk mapper', () => {
     expect(finish).toMatchObject([
       { type: 'text-end', id: 'kimi-text-7-1' },
       { type: 'reasoning-end', id: 'kimi-thinking-7-1' },
+      { type: 'data-runtime-event', data: { kind: 'kimi.turn.ended', reason: 'completed' } },
       { type: 'finish', finishReason: 'stop' },
     ])
   })
@@ -106,6 +152,17 @@ describe('kimi event to chunk mapper', () => {
     ])
     expect(mapper.finishFromRecovery('failed')).toEqual([
       { type: 'text-end', id: 'kimi-text-7-1' },
+      {
+        type: 'data-runtime-event',
+        data: {
+          kind: 'kimi.turn.ended',
+          turnId: null,
+          reason: 'failed',
+          interruptReason: null,
+          durationMs: null,
+          error: null,
+        },
+      },
       { type: 'finish', finishReason: 'error' },
     ])
   })

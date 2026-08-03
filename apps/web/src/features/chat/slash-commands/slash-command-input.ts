@@ -2,7 +2,7 @@ import type { FuzzyRankField } from '~/lib/fuzzy-rank'
 import { rankFuzzyItems } from '~/lib/fuzzy-rank'
 
 import type { ChatComposerSlashCommand } from './chat-slash-commands'
-import { getSlashCommandSourceLabel } from './chat-slash-commands'
+import { getSlashCommandSourceLabel, resolveSlashCommandPanelSection } from './chat-slash-commands'
 
 export const RE_SIMPLE_SLASH_COMMAND = /^[ \t]*\/[^/\s]*$/
 export const CHAT_SLASH_COMMAND_LISTBOX_ID = 'chat-slash-command-listbox'
@@ -20,7 +20,13 @@ export function isSlashCommandAvailable(command: ChatComposerSlashCommand): bool
 }
 
 export function getSlashCommandPrefix(command: ChatComposerSlashCommand): string {
-  return command.action.kind === 'insertText' ? command.action.text : `/${command.name} `
+  if (command.action.kind === 'insertText') {
+    return command.action.text
+  }
+  if (command.action.kind === 'insertIntent') {
+    return `/${command.name} `
+  }
+  return `/${command.name} `
 }
 
 export function isSlashCommandAwaitingRequiredArgument(inputValue: string, command: ChatComposerSlashCommand): boolean {
@@ -89,15 +95,72 @@ function getSlashCommandRankFields(command: ChatComposerSlashCommand): FuzzyRank
   ]
 }
 
+export type SlashCommandPanelSectionId = 'commands' | 'runtime'
+
+export interface SlashCommandPanelSection {
+  id: SlashCommandPanelSectionId
+  label: string
+  items: ChatComposerSlashCommand[]
+}
+
+export function getSlashCommandPanelSectionId(
+  command: ChatComposerSlashCommand,
+): SlashCommandPanelSectionId {
+  return resolveSlashCommandPanelSection(command)
+}
+
+export function getSlashCommandPanelSectionLabel(sectionId: SlashCommandPanelSectionId): string {
+  return sectionId === 'commands' ? 'Commands' : 'Runtime'
+}
+
+/** Keep product Commands above Runtime controls while preserving relative order within each section. */
+export function partitionSlashCommandPanelItems(
+  items: ChatComposerSlashCommand[],
+): ChatComposerSlashCommand[] {
+  const commandItems: ChatComposerSlashCommand[] = []
+  const runtimeItems: ChatComposerSlashCommand[] = []
+  for (const item of items) {
+    if (resolveSlashCommandPanelSection(item) === 'commands') {
+      commandItems.push(item)
+    }
+ else {
+      runtimeItems.push(item)
+    }
+  }
+  return [...commandItems, ...runtimeItems]
+}
+
+export function groupSlashCommandPanelItems(
+  items: ChatComposerSlashCommand[],
+): SlashCommandPanelSection[] {
+  const sections: SlashCommandPanelSection[] = []
+  for (const item of items) {
+    const sectionId = getSlashCommandPanelSectionId(item)
+    const last = sections.at(-1)
+    if (last?.id === sectionId) {
+      last.items.push(item)
+      continue
+    }
+    sections.push({
+      id: sectionId,
+      label: getSlashCommandPanelSectionLabel(sectionId),
+      items: [item],
+    })
+  }
+  return sections
+}
+
 export function getSlashCommandPanelItems(commands: ChatComposerSlashCommand[], query: string): ChatComposerSlashCommand[] {
   if (!query) {
-    return commands.slice(0, MAX_SLASH_COMMAND_RESULTS)
+    return partitionSlashCommandPanelItems(commands).slice(0, MAX_SLASH_COMMAND_RESULTS)
   }
-  return rankFuzzyItems(commands, query, {
-    fields: getSlashCommandRankFields,
-    searchText: formatSlashCommandSearchText,
-    limit: MAX_SLASH_COMMAND_RESULTS,
-  }).map(result => result.item)
+  return partitionSlashCommandPanelItems(
+    rankFuzzyItems(commands, query, {
+      fields: getSlashCommandRankFields,
+      searchText: formatSlashCommandSearchText,
+      limit: MAX_SLASH_COMMAND_RESULTS,
+    }).map(result => result.item),
+  )
 }
 
 export function readSlashTriggerState(inputValue: string, cursor: number, commands: ChatComposerSlashCommand[], selectedCommand: ChatComposerSlashCommand | null): SlashTriggerState | null {

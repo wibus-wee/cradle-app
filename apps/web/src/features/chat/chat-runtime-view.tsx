@@ -30,6 +30,7 @@ export function ChatRuntimeView({
   sessionThinkingEffort,
   runtimeKind,
   workspaceId,
+  workspacePath = null,
   agentId,
   remoteHostId = null,
   composerContextBar,
@@ -47,6 +48,7 @@ export function ChatRuntimeView({
   sessionThinkingEffort: SendMessageOptions['thinkingEffort'] | null
   runtimeKind: RuntimeKind | undefined
   workspaceId: string | null
+  workspacePath?: string | null
   agentId: string | null
   remoteHostId?: string | null
   composerContextBar?: ReactNode
@@ -234,6 +236,7 @@ export function ChatRuntimeView({
         sessionId={sessionId}
         runtimeKind={runtimeKind}
         workspaceId={workspaceId}
+        workspacePath={workspacePath}
         remoteHostId={remoteHostId}
         searchFiles={searchFiles}
         searchPlugins={searchPlugins}

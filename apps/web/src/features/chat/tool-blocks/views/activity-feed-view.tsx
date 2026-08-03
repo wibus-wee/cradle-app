@@ -162,7 +162,7 @@ function FeedRow({
     <>
       <span className={verbTone}>{label.verb}</span>
       {label.object && (
-        <span className={cn('ml-1 min-w-0', objectTone)}>{label.object}</span>
+        <span className={cn('ml-1 min-w-0 line-clamp-1', objectTone)}>{label.object}</span>
       )}
       {label.stats && <DiffStats stats={label.stats} />}
       {expandable && <FeedChevron expanded={expanded} animated={animated} />}
@@ -349,28 +349,45 @@ export function ActivityFeedView({
     )
   }
 
+  const renderEntry = (entry: ActivityFeedViewEntry) => (
+    entry.entryKind === 'tool-call' ? renderToolEntry(entry) : renderReasoningEntry(entry)
+  )
+
+  const renderExpandedList = () => (
+    <m.div
+      className="flex flex-col gap-0.5"
+      initial={animated ? { opacity: 0, y: -2 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={CHEVRON_SPRING}
+    >
+      {entries.map(renderEntry)}
+    </m.div>
+  )
+
+  // A single activity is already its own row — a collapsed "Ran 1 command"
+  // summary wrapped around one entry would just duplicate it, so skip it.
+  const showSummaryHeader = entries.length !== 1
+
   return (
     <div className="flex flex-col gap-0.5 py-1" data-testid="chat-activity-feed">
-      <FeedRow
-        label={summary}
-        interactive
-        expandable
-        expanded={listExpanded}
-        pulsing={running}
-        animated={animated}
-        onClick={() => setListExpanded(value => !value)}
-      />
-      {listExpanded && (
-        <m.div
-          className="flex flex-col gap-0.5"
-          initial={animated ? { opacity: 0, y: -2 } : false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={CHEVRON_SPRING}
-        >
-          {entries.map(entry =>
-            entry.entryKind === 'tool-call' ? renderToolEntry(entry) : renderReasoningEntry(entry))}
-        </m.div>
-      )}
+      {showSummaryHeader
+        ? (
+            <>
+              <FeedRow
+                label={summary}
+                interactive
+                expandable
+                expanded={listExpanded}
+                pulsing={running}
+                animated={animated}
+                onClick={() => setListExpanded(value => !value)}
+              />
+              {listExpanded && renderExpandedList()}
+            </>
+          )
+        : (
+            renderEntry(entries[0])
+          )}
     </div>
   )
 }

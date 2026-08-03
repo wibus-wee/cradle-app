@@ -37,6 +37,29 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       response: { 200: ChatRuntimeModel.bangCommandResponse },
     },
   )
+  // POST /chat/sessions/:sessionId/bang-transcript -> persist an interactive Composer bang PTY transcript as chat context
+  .post(
+    '/sessions/:sessionId/bang-transcript',
+    async ({ params, body }) => {
+      return await (
+        await loadChatRuntime()
+      ).persistBangTranscript({
+        sessionId: params.sessionId,
+        transcript: body.transcript,
+        command: body.command,
+        durationMs: body.durationMs,
+        exitCode: body.exitCode,
+      })
+    },
+    {
+      detail: {
+        summary: 'Persist an interactive Composer bang PTY transcript as chat context',
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      body: ChatRuntimeModel.bangTranscriptBody,
+      response: { 200: ChatRuntimeModel.bangCommandResponse },
+    },
+  )
   .post(
     '/sessions/:sessionId/observations',
     async ({ params, body }) => {

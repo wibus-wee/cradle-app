@@ -233,10 +233,24 @@ export const ChatRuntimeModel = {
     modelId: t.Optional(nullableModelIdSchema),
     thinkingEffort: t.Optional(thinkingEffortSchema),
     runtimeSettings: t.Optional(runtimeSettingsPatchSchema),
+    reviewTarget: t.Optional(t.Union([
+      t.Object({ type: t.Literal('uncommittedChanges') }, { additionalProperties: false }),
+      t.Object({
+        type: t.Literal('baseBranch'),
+        branch: t.String({ minLength: 1 }),
+      }, { additionalProperties: false }),
+    ])),
   }),
 
   bangCommandBody: t.Object({
     command: t.String({ minLength: 1 }),
+  }),
+
+  bangTranscriptBody: t.Object({
+    transcript: t.String(),
+    command: t.Optional(t.String({ minLength: 1 })),
+    durationMs: t.Optional(t.Number({ minimum: 0 })),
+    exitCode: t.Optional(t.Union([t.Number(), t.Null()])),
   }),
 
   observationBody: t.Object({

@@ -7,6 +7,7 @@ import {
   activityFeedMixedFixtures,
   activityFeedReasoningFixtures,
   activityFeedRunningFixtures,
+  activityFeedSingleToolFixtures,
 } from '../fixtures/tool-block-fixtures'
 import type { ActivityFeedViewEntry } from '../views/activity-feed-view'
 import { ActivityFeedView } from '../views/activity-feed-view'
@@ -46,6 +47,7 @@ function ActivityFeedGalleryScene() {
           <ActivityFeedScene title="With error" entries={activityFeedErrorFixtures} onActivity={handleActivity} />
           <ActivityFeedScene title="Reasoning" entries={activityFeedReasoningFixtures} onActivity={handleActivity} />
           <ActivityFeedScene title="Mixed kinds" entries={activityFeedMixedFixtures} onActivity={handleActivity} />
+          <ActivityFeedScene title="Single activity" entries={activityFeedSingleToolFixtures} onActivity={handleActivity} />
         </div>
         <div
           className="mt-8 w-fit rounded-md border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground shadow-sm"
@@ -103,6 +105,16 @@ export const FeedWithError: Story = {
     <main className="min-h-screen bg-background px-6 py-8 text-foreground">
       <div className="mx-auto max-w-2xl">
         <ActivityFeedView entries={activityFeedErrorFixtures} animated={false} />
+      </div>
+    </main>
+  ),
+}
+
+export const SingleActivity: Story = {
+  render: () => (
+    <main className="min-h-screen bg-background px-6 py-8 text-foreground">
+      <div className="mx-auto max-w-2xl">
+        <ActivityFeedView entries={activityFeedSingleToolFixtures} animated={false} />
       </div>
     </main>
   ),

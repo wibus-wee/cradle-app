@@ -25,7 +25,7 @@ them to the Work surface.
 - **use-workspace.ts**: Hooks for listing, adding (via native directory picker), pin toggling, and deleting workspaces; exposes list readiness for interaction-level performance gates that depend on workspace names.
 - **use-session.ts**: Hooks for listing active or archived sessions globally or under a single workspace, with memoized row normalization, session layout metadata hydration for app chrome, latest-user-message activity timestamps for list display, and targeted session-list cache updates; ordinary row patches preserve the API's latest-user-message order and existing timestamps, while explicit optimistic promotion is reserved for new user messages or newly created chat sessions.
 - **use-cli-agents.ts**: Transitional hook for listing CLI-TUI Agent Profiles from the unified Agent Runtime
-- **workspace-sidebar-ui-store.ts**: Workspace-owned persisted UI state for sidebar project group collapse and per-project full session-list expansion, using the shared safe localStorage wrapper and bounded workspace-id flag maps.
+- **workspace-sidebar-ui-store.ts**: Workspace-owned persisted UI state (v4) for sidebar grouping, session ordering, list filters, preview limit, project group collapse, and per-project full session-list expansion, using the shared safe localStorage wrapper and bounded workspace-id flag maps.
 - **workspace-group-disclosure.tsx**: Thin adapter that owns persisted collapse state and workspace-detail navigation for a project group.
 - **workspace-group-disclosure-view.tsx**: Pure props project-group rendering seam for local, missing, and remote workspaces. It owns the disclosure header, button menu, context menu, pinned/missing state, and child composition without reading routes or stores.
 - **workspace-group-disclosure-view.stories.tsx**: Fixture-driven Storybook catalog for expanded, missing, and remote project groups, including composed Session rows and interactive menu/disclosure callbacks.
@@ -46,7 +46,10 @@ them to the Work surface.
 - **workspace-recognition-dialog-view.tsx**: Pure props rendering seam for valid, invalid, experimental, already-imported, and busy Cradle Workspace recognition states.
 - **workspace-recognition-dialog-view.stories.tsx**: Owner-typed Storybook variants for the workspace recognition decision surface.
 - **fixtures/workspace-recognition.ts**: Owner-typed recognition results covering the supported inspection outcomes.
-- **workspace-multi-folder-dialog.tsx**: Thin DirectoryPicker adapter for multi-folder workspace creation.
+- **workspace-multi-folder-menu-view.tsx**: Submenu checkbox flow for combining already-registered local workspaces into a multi-folder symlink workspace.
+- **workspace-multi-folder-menu-view.stories.tsx**: Storybook states for the multi-folder submenu create surface.
+- **multi-folder-entry-name.ts**: Safe symlink entry names derived from registered workspace identity.
+- **workspace-multi-folder-dialog.tsx**: Thin DirectoryPicker adapter for multi-folder workspace creation (legacy dialog path; create UX now uses the submenu).
 - **workspace-multi-folder-dialog-view.tsx**: Pure props, owner-contract-typed multi-folder form with local row editing, validation, responsive layout, and browse/submit callbacks.
 - **workspace-multi-folder-dialog-view.stories.tsx**: Interactive default and creating Storybook states for multi-folder workspace creation.
 - **fixtures/workspace-sidebar.ts**: Owner-typed Workspace, Session, and Work fixtures shared by workspace rendering previews.

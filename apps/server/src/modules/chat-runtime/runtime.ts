@@ -20,9 +20,13 @@ import type { ChatContextPart } from './context-parts'
 import type { ChatRuntimeRecoveryResult } from './es/recovery'
 import { recoverChatRuntimeProjections, recoverChatRuntimeSession } from './es/recovery'
 import { resolveSessionSystemPrompt } from './harness/turn-context'
-import type { ExecuteBangCommandInput } from './interaction/bang-command-execution'
+import type {
+  ExecuteBangCommandInput,
+  PersistBangTranscriptInput,
+} from './interaction/bang-command-execution'
 import {
   executeBangCommand as executeBangCommandFromInteraction,
+  persistBangTranscript as persistBangTranscriptFromInteraction,
 } from './interaction/bang-command-execution'
 import {
   recordRuntimeInteractionEventToSessionEvents,
@@ -87,11 +91,7 @@ import { executeRun as executeRunWithDeps } from './run/turn-executor'
 import type { ActiveRun } from './run-registry'
 import { runRegistry } from './run-registry'
 import { liveRuntimeSessionRegistry } from './runtime-live-session-registry'
-import type {
-  ChatThinkingEffort,
-  RuntimeGoalContinuationOptions,
-  RuntimeSettingsPatch,
-} from './runtime-provider-types'
+import type { ChatThinkingEffort, RuntimeGoalContinuationOptions, RuntimeReviewTarget, RuntimeSettingsPatch } from './runtime-provider-types'
 import {
   assertProviderBoundRunContext,
   assertRunnableSession,
@@ -466,6 +466,10 @@ export async function executeBangCommand(input: ExecuteBangCommandInput) {
   return executeBangCommandFromInteraction(input)
 }
 
+export async function persistBangTranscript(input: PersistBangTranscriptInput) {
+  return persistBangTranscriptFromInteraction(input)
+}
+
 export async function appendSessionObservation(input: {
   sessionId: string
   text: string
@@ -517,6 +521,7 @@ export async function streamResponse(input: {
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort
   runtimeSettings?: RuntimeSettingsPatch
+  reviewTarget?: RuntimeReviewTarget
 }): Promise<{
   runId: string
   assistantMessageId: string

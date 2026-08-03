@@ -45,7 +45,7 @@ describe('split workspace store', () => {
     store.ensureWorkspace(SURFACE_ID, CHAT_ROUTE)
 
     const other: SurfaceRoute = { to: '/chat/$sessionId', params: { sessionId: 'other' } }
-    expect(store.registerPane(SURFACE_ID, other)).toBe('chat:other')
+    expect(store.registerPane(SURFACE_ID, other)).toMatch(/^pane:chat:other:/)
     expect(isSplitWorkspace(readSplitWorkspace(SURFACE_ID))).toBe(true)
 
     // Same route again is a no-op — a route is unique per surface.
@@ -63,9 +63,12 @@ describe('split workspace store', () => {
   it('drops the persisted grid once a workspace falls back to one pane', () => {
     const store = useSplitWorkspaceStore.getState()
     store.ensureWorkspace(SURFACE_ID, CHAT_ROUTE)
-    store.registerPane(SURFACE_ID, { to: '/chat/$sessionId', params: { sessionId: 'other' } })
+    const paneId = store.registerPane(SURFACE_ID, { to: '/chat/$sessionId', params: { sessionId: 'other' } })
+    if (!paneId) {
+      throw new Error('Expected a secondary pane to be registered')
+    }
     store.setLayout(SURFACE_ID, { grid: {} } as never)
-    store.forgetPane(SURFACE_ID, 'chat:other')
+    store.forgetPane(SURFACE_ID, paneId)
     expect(readSplitWorkspace(SURFACE_ID)!.layout).toBeNull()
   })
 

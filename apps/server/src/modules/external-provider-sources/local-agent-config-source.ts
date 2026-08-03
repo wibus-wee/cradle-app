@@ -155,6 +155,10 @@ interface ReadJsonResult<T> {
 const DEFAULT_SOURCE_ID = 'local-agent-config'
 const DEFAULT_SOURCE_LABEL = 'Local Agent Config'
 
+// Owner namespace shared by every one-shot local scan (agent onboarding import and the
+// providers local-scan route) so both write to the same persisted source/record rows.
+export const LOCAL_AGENT_CONFIG_SOURCE_OWNER = 'cradle-onboarding'
+
 function hashText(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }

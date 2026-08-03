@@ -13,6 +13,7 @@ import type {
   RuntimeGoalContinuationOptions,
   RuntimeHarnessContext,
   RuntimeProviderTargetProfile,
+  RuntimeReviewTarget,
   RuntimeSettings,
   TokenUsage,
 } from '../runtime-provider-types'
@@ -57,6 +58,7 @@ export interface ExecuteRunInput {
   message: UIMessage
   profile: RuntimeProviderTargetProfile | null
   modelId?: string | null
+  reviewTarget?: RuntimeReviewTarget
   thinkingEffort?: ChatThinkingEffort
   runtimeSettings?: RuntimeSettings
   systemPrompt?: string
@@ -265,6 +267,7 @@ async function pumpRuntimeStream(
       runtimeSession: activeRun.runtimeSession,
       profile: input.profile,
       message: input.message,
+      reviewTarget: input.reviewTarget,
       responseMessageId: activeRun.messageId,
       queueItemId: activeRun.queueItemId ?? null,
       modelId: input.modelId,

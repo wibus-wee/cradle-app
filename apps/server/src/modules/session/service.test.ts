@@ -1,13 +1,17 @@
-import { backendSessionBindings, sessions } from '@cradle/db'
+import { backendRuns, backendSessionBindings, messages, sessions, workspaces } from '@cradle/db'
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { insertMessageFixtures } from '../../../tests/helpers/message-fixture'
 import { db } from '../../infra'
 import { toOpenCodeRuntimeNativeProviderTargetId } from '../chat-runtime-providers/opencode/native-provider-target-id'
-import { get } from './service'
+import { aggregateSessionStatus, get, list } from './service'
 
 afterEach(() => {
+  db().delete(backendRuns).run()
   db().delete(backendSessionBindings).run()
+  db().delete(messages).run()
   db().delete(sessions).run()
+  db().delete(workspaces).run()
 })
 
 describe('session service provider target projection', () => {
@@ -35,5 +39,136 @@ describe('session service provider target projection', () => {
     expect(session?.providerTargetId).toBeNull()
     expect(session?.providerTargetId).not.toBe(toOpenCodeRuntimeNativeProviderTargetId('openai'))
     expect(session?.modelId).toBe('openai/gpt-5')
+  })
+})
+
+describe('session list activity and status projection', () => {
+  it('orders by latest user message within the listed workspace and ignores other workspaces', () => {
+    db().insert(workspaces).values([
+      {
+        id: 'ws-listed',
+        name: 'Listed',
+        locatorJson: JSON.stringify({ hostId: 'local', path: '/tmp/listed' }),
+      },
+      {
+        id: 'ws-other',
+        name: 'Other',
+        locatorJson: JSON.stringify({ hostId: 'local', path: '/tmp/other' }),
+      },
+    ]).run()
+
+    db().insert(sessions).values([
+      {
+        id: 'sess-older-activity',
+        workspaceId: 'ws-listed',
+        title: 'Older activity',
+        createdAt: 100,
+        updatedAt: 100,
+      },
+      {
+        id: 'sess-newer-activity',
+        workspaceId: 'ws-listed',
+        title: 'Newer activity',
+        createdAt: 50,
+        updatedAt: 50,
+      },
+      {
+        id: 'sess-other-workspace',
+        workspaceId: 'ws-other',
+        title: 'Other workspace',
+        createdAt: 200,
+        updatedAt: 200,
+      },
+    ]).run()
+
+    insertMessageFixtures(db(), [
+      {
+        id: 'msg-user-older',
+        sessionId: 'sess-older-activity',
+        role: 'user',
+        content: 'older',
+        messageJson: '[]',
+        createdAt: 300,
+      },
+      {
+        id: 'msg-user-newer',
+        sessionId: 'sess-newer-activity',
+        role: 'user',
+        content: 'newer',
+        messageJson: '[]',
+        createdAt: 400,
+      },
+      {
+        id: 'msg-user-other',
+        sessionId: 'sess-other-workspace',
+        role: 'user',
+        content: 'other',
+        messageJson: '[]',
+        createdAt: 900,
+      },
+      {
+        id: 'msg-assistant-newer',
+        sessionId: 'sess-newer-activity',
+        role: 'assistant',
+        status: 'complete',
+        content: 'reply',
+        messageJson: '[]',
+        createdAt: 410,
+      },
+    ])
+
+    const rows = list({ workspaceId: 'ws-listed' })
+    expect(rows.map(row => row.id)).toEqual(['sess-newer-activity', 'sess-older-activity'])
+    expect(rows[0]?.latestUserMessageAt).toBe(400)
+    expect(rows[0]?.latestAssistantMessageAt).toBe(410)
+    expect(rows[1]?.latestUserMessageAt).toBe(300)
+    expect(rows.every(row => row.id !== 'sess-other-workspace')).toBe(true)
+  })
+
+  it('projects status from the latest backend run per session only', () => {
+    db().insert(sessions).values({
+      id: 'sess-status',
+      title: 'Status session',
+      createdAt: 1,
+      updatedAt: 1,
+    }).run()
+
+    db().insert(backendRuns).values([
+      {
+        id: 'run-old-failed',
+        bindingId: null,
+        chatSessionId: 'sess-status',
+        messageId: null,
+        origin: 'user',
+        status: 'failed',
+        startedAt: 10,
+        finishedAt: 11,
+      },
+      {
+        id: 'run-newer-complete',
+        bindingId: null,
+        chatSessionId: 'sess-status',
+        messageId: null,
+        origin: 'user',
+        status: 'complete',
+        startedAt: 20,
+        finishedAt: 21,
+      },
+      {
+        id: 'run-same-time-streaming',
+        bindingId: null,
+        chatSessionId: 'sess-status',
+        messageId: null,
+        origin: 'user',
+        status: 'streaming',
+        startedAt: 20,
+        finishedAt: null,
+      },
+    ]).run()
+
+    const row = list().find(session => session.id === 'sess-status')
+    expect(row?.status).toBe('streaming')
+    expect(aggregateSessionStatus(['sess-status'])).toBe('streaming')
+    expect(get('sess-status')?.status).toBe('streaming')
   })
 })

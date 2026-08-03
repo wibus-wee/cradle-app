@@ -304,7 +304,7 @@ cradle chronicle privacy redact --text "Sensitive text to preview"
 
 ## Recall Evidence Retrieval
 
-Use the session-bound `recall_query` MCP tool to retrieve citable evidence from prior Cradle execution when the user asks about an earlier decision, conversation, failure, run, or file change. Use `recall_attune` only after the user explicitly asks to save, update, or forget a durable, evidence-backed memory; its proposal still requires user approval.
+Use the session-bound `recall_query` MCP tool when this workspace's past chat or execution context may matter—even if the user never says "before". Prefer a quick recall check over guessing a prior decision, agreement, or attempt. Use `recall_attune` only after the user explicitly asks to save, update, or forget a durable, evidence-backed memory; its proposal still requires user approval.
 
 Read [the Recall reference](references/recall.md) before writing Recall CodeAct or explaining its scope and approval behavior. Do not inject Recall automatically as pre-turn context.
 
@@ -351,7 +351,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `plugin` | 11 | Generated Cradle CLI module. | `cradle man plugin` |
 | `preferences` | 11 | Read and update server preferences. | `cradle man preferences` |
 | `profile` | 5 | Manage agent profiles. | `cradle man profile` |
-| `provider` | 1 | Inspect provider model availability. | `cradle man provider` |
+| `provider` | 7 | Inspect provider model availability. | `cradle man provider` |
 | `pull-request` | 14 | Generated Cradle CLI module. | `cradle man pull-request` |
 | `relay-server` | 4 | Generated Cradle CLI module. | `cradle man relay-server` |
 | `relay-transport` | 5 | Generated Cradle CLI module. | `cradle man relay-transport` |
@@ -364,6 +364,6 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `usage` | 14 | Inspect usage and cost data. | `cradle man usage` |
 | `work` | 7 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
 | `workflow-rule` | 4 | Manage workflow rules. | `cradle man workflow-rule` |
-| `workspace` | 55 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
+| `workspace` | 51 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
 
 <!-- CRADLE_CLI_MODULES_END -->

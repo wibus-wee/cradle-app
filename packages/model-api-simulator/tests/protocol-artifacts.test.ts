@@ -162,11 +162,12 @@ describe('protocol profile and operation registry', () => {
     expect(anthropicManifest.packageIntegrity).toBe(
       lock.packages?.['@anthropic-ai/sdk@0.115.0']?.resolution?.integrity,
     )
-    expect(lock.overrides?.['@anthropic-ai/claude-agent-sdk>@anthropic-ai/sdk']).toBe('0.81.0')
+    // Claude Agent SDK consumes the workspace Anthropic SDK directly (no nested override).
+    expect(lock.overrides?.['@anthropic-ai/claude-agent-sdk>@anthropic-ai/sdk']).toBeUndefined()
     expect(
       lock.importers?.['apps/server']
         ?.dependencies?.['@anthropic-ai/claude-agent-sdk']
         ?.version,
-    ).toContain('@anthropic-ai/sdk@0.81.0')
+    ).toContain('@anthropic-ai/sdk@0.115.0')
   })
 })

@@ -1,12 +1,10 @@
 import {
   CheckLine as CheckIcon,
   CloseLine as XIcon,
-  CodeLine as CodeIcon,
   GitCommitLine as GitCommitHorizontalIcon,
   GitPullRequestLine as GitPullRequestIcon,
   Magic2Line as WandSparklesIcon,
   Message1Line as MessageSquareCheckIcon,
-  PlayLine as PlayIcon,
   PlusLine as PlusIcon,
   RightSmallLine as ChevronRightIcon,
   WarningLine as MessageSquareWarningIcon,
@@ -26,16 +24,13 @@ import {
   postSessionAwaitsMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type { GetSessionAwaitsResponse } from '~/api-gen/types.gen'
-import { DARK_THEME, getHighlighter, LIGHT_THEME } from '~/components/editor/shiki-highlighter'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { cn } from '~/lib/cn'
-import { formatTimeAgo } from '~/lib/format-time'
 import { queryRefreshPolicies } from '~/lib/query-refresh-policy'
 
 import type { GitFileStatus, GitRemote } from '../git/shared/types'
@@ -47,6 +42,8 @@ import {
   parseGitHubRepositoryInput,
   selectGitHubRepository,
 } from './await-github'
+import type { JavaScriptAwaitStatus } from './javascript-await-card-view'
+import { JavaScriptAwaitCardView } from './javascript-await-card-view'
 import type {
   GitHubReviewMode,
   LiveAwaitStatus,
@@ -796,88 +793,10 @@ function readAwaitProgram(awaitRow: AwaitRow): string | null {
   return null
 }
 
-function formatObservationValue(value: unknown): string {
-  if (typeof value === 'string') {
-    return value
-  }
-  try {
-    return JSON.stringify(value) ?? String(value)
-  }
-  catch {
-    return String(value)
-  }
-}
-
-/** Renders a cell-reported progress observation; `{ note, ...rest }` objects lead with the note. */
-function ObservationView({ observation }: { observation: unknown }) {
-  if (observation !== null && typeof observation === 'object' && !Array.isArray(observation)) {
-    const entries = Object.entries(observation as Record<string, unknown>)
-    const note = entries.find(([key, value]) => key === 'note' && typeof value === 'string')?.[1] as string | undefined
-    const rest = entries.filter(([key]) => key !== 'note')
-    return (
-      <div className="space-y-0.5">
-        {note && <span className="block text-[11px] text-foreground/80">{note}</span>}
-        {rest.map(([key, value]) => (
-          <span key={key} className="block break-words font-mono text-[10px] text-muted-foreground">
-            {key}
-            :
-            {' '}
-            {formatObservationValue(value)}
-          </span>
-        ))}
-      </div>
-    )
-  }
-  return (
-    <span className="block break-words font-mono text-[10px] text-muted-foreground">
-      {formatObservationValue(observation)}
-    </span>
-  )
-}
-
-/** Renders the await cell source with shiki highlighting; falls back to plain text while the highlighter loads. */
-function HighlightedProgram({ program }: { program: string }) {
-  const [html, setHtml] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    getHighlighter()
-      .then(highlighter => highlighter.codeToHtml(program, {
-        lang: 'javascript',
-        themes: { dark: DARK_THEME, light: LIGHT_THEME },
-      }))
-      .then((highlighted) => {
-        if (!cancelled) {
-          setHtml(highlighted)
-        }
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [program])
-
-  if (html === null) {
-    return (
-      <pre className="whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-5 text-muted-foreground">
-        {program}
-      </pre>
-    )
-  }
-  return (
-    <div
-      className="tool-call-code-highlight p-3 text-[11px] leading-5 [&_.shiki]:!p-0"
-      data-wrap="true"
-      // Shiki generates escaped token markup from the stored program source.
-      // eslint-disable-next-line react-dom/no-dangerously-set-innerhtml
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  )
-}
-
 function JavaScriptAwaitCard({ awaitRow, sessionId }: { awaitRow: AwaitRow, sessionId: string | null }) {
   const isPending = awaitRow.status === 'pending'
   const evaluateMutation = useMutation(postSessionAwaitsByIdEvaluateNowMutation())
+  const cancelMutation = useCancelAwait(sessionId)
 
   const program = readAwaitProgram(awaitRow)
   const lastErrorText = (awaitRow.lastErrorText as string | null) ?? null
@@ -899,103 +818,21 @@ function JavaScriptAwaitCard({ awaitRow, sessionId }: { awaitRow: AwaitRow, sess
       : null
 
   return (
-    <div className={cn(
-      'relative rounded-md border p-3',
-      hasError ? 'border-red-500/35 bg-red-500/[0.04]' : 'border-border',
-    )}
-    >
-      {isPending && (
-        <div className="absolute right-1.5 top-1.5">
-          <CancelAwaitButton awaitId={awaitRow.id} sessionId={sessionId} />
-        </div>
-      )}
-      <div className="space-y-1.5 text-xs">
-        <div className={cn(
-          'flex items-center gap-2',
-          hasError ? 'text-red-500' : 'text-muted-foreground',
-        )}
-        >
-          <CodeIcon className="size-3.5 shrink-0" aria-hidden />
-          <span>JavaScript</span>
-        </div>
-        <span
-          className={cn(
-            'block min-w-0 whitespace-normal break-words leading-5',
-            hasError ? 'text-red-500' : 'text-muted-foreground',
-          )}
-        >
-          {statusText}
-        </span>
-
-        {observation != null && (
-          <div className="max-h-32 overflow-y-auto rounded bg-muted/50 px-2 py-1.5 leading-4">
-            <ObservationView observation={observation} />
-          </div>
-        )}
-
-        {preview?.ok && preview.matched === true && (
-          <div className="rounded bg-green-500/10 px-2 py-1.5 leading-4 text-green-600 dark:text-green-400">
-            Condition met:
-            {' '}
-            {preview.resumeText}
-          </div>
-        )}
-        {previewErrorText && (
-          <div className="rounded bg-red-500/10 px-2 py-1.5 leading-4 text-red-500">
-            {previewErrorText}
-          </div>
-        )}
-
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/70">
-          <span>{lastCheckedAt ? `Checked ${formatTimeAgo(lastCheckedAt)}` : 'Not checked yet'}</span>
-          {consecutiveErrors > 0 && (
-            <span className="text-amber-500">
-              ·
-              {consecutiveErrors}
-              {' '}
-              consecutive eval
-              {consecutiveErrors === 1 ? ' error' : ' errors'}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 pt-0.5">
-          {program && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className="h-6 gap-1 px-2 text-[10px]"
-                >
-                  <CodeIcon className="size-3" aria-hidden />
-                  Program
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-fit max-w-md p-0">
-                <div className="max-h-[50vh] max-w-full overflow-auto">
-                  <HighlightedProgram program={program} />
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-          {isPending && (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-6 gap-1 px-2 text-[10px]"
-              disabled={evaluateMutation.isPending}
-              onClick={() => evaluateMutation.mutate({ path: { id: awaitRow.id } })}
-            >
-              {evaluateMutation.isPending ? <Spinner className="size-3" /> : <PlayIcon className="size-3" aria-hidden />}
-              Run now
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
+    <JavaScriptAwaitCardView
+      status={awaitRow.status as JavaScriptAwaitStatus}
+      title={(awaitRow.reason as string | null) ?? 'JavaScript await'}
+      statusText={statusText}
+      hasError={hasError}
+      program={program}
+      observation={observation}
+      lastCheckedAt={lastCheckedAt}
+      consecutiveErrors={consecutiveErrors}
+      matchedText={preview?.ok && preview.matched === true ? preview.resumeText ?? null : null}
+      previewErrorText={previewErrorText}
+      isRunning={evaluateMutation.isPending}
+      onRunNow={isPending ? () => evaluateMutation.mutate({ path: { id: awaitRow.id } }) : undefined}
+      onCancel={isPending ? () => cancelMutation.mutate({ path: { id: awaitRow.id } }) : undefined}
+    />
   )
 }
 

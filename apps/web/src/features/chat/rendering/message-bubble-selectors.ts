@@ -9,11 +9,13 @@ import type { BangCommandMetadata, BangResultMetadata } from '../commands/bang-c
 import { readBangCommandMetadata, readBangResultMetadata } from '../commands/bang-command-metadata'
 import type {
   ChatFileLineCommentContextMessagePart,
+  ChatIntentContextMessagePart,
   ChatPluginContextMessagePart,
   ChatSkillContextMessagePart,
 } from '../context/chat-context-parts'
 import {
   isChatFileLineCommentContextPart,
+  isChatIntentContextPart,
   isChatPluginContextPart,
   isChatSkillContextPart,
 } from '../context/chat-context-parts'
@@ -21,7 +23,7 @@ import type { ComposerPastedText } from '../pasted-text/pasted-text'
 import { projectPastedTextPrompt } from '../pasted-text/pasted-text'
 import type { RuntimeWarningMessagePart } from '../runtime-warning'
 import { isRuntimeWarningMessagePart } from '../runtime-warning'
-import type { ActivityFeedEntryRef, ChatRenderItem, ChatRenderSegment, FileMessagePart } from './chat-render-plan'
+import type { ChatRenderItem, ChatRenderSegment, FileMessagePart } from './chat-render-plan'
 import {
   groupMessagePartRefs,
   isRuntimeUserInputToolPart,
@@ -32,7 +34,6 @@ import { describeToolCallCached } from './tool-ui-classifier'
 
 const CODEX_GOAL_COMMAND_PREFIX = '/goal '
 const ACTIVE_TOOL_STATES = new Set(['input-streaming', 'input-available', 'approval-requested'])
-const EMPTY_RENDER_SEGMENTS: ChatRenderSegment[] = []
 
 export type ChatStoreSnapshot = ReturnType<typeof useChatStore.getState>
 export type MessageTextTransform = (text: string) => string
@@ -171,16 +172,6 @@ export function readMessageFromState(
   return message ? projectMessageText(message, textTransform) : undefined
 }
 
-export function readMessageFrameFromState(
-  state: ChatStoreSnapshot,
-  sessionId: string,
-  messageId: string,
-  textTransform?: MessageTextTransform,
-): MessageFrame | null {
-  const message = readMessageFromState(state, sessionId, messageId, textTransform)
-  return message ? readMessageFrame(message) : null
-}
-
 export function readMessageFrame(message: UIMessage): MessageFrame {
   const continuationMetadata = readChatContinuationMetadata(message)
   return {
@@ -204,22 +195,6 @@ function readRunDurationMs(message: UIMessage): number | null {
     : null
 }
 
-export function areMessageFramesEqual(
-  left: MessageFrame | null,
-  right: MessageFrame | null,
-): boolean {
-  return (
-    left?.id === right?.id
-    && left?.role === right?.role
-    && left?.isSteerMessage === right?.isSteerMessage
-    && left?.isGoalMessage === right?.isGoalMessage
-    && left?.bangCommand?.command === right?.bangCommand?.command
-    && areBangResultsEqual(left?.bangResult ?? null, right?.bangResult ?? null)
-    && left?.runDurationMs === right?.runDurationMs
-    && left?.hasHiddenRuntimeUserInputTail === right?.hasHiddenRuntimeUserInputTail
-  )
-}
-
 function hasHiddenRuntimeUserInputTail(message: UIMessage): boolean {
   const tail = message.parts.at(-1)
   if (!tail) {
@@ -230,122 +205,12 @@ function hasHiddenRuntimeUserInputTail(message: UIMessage): boolean {
   return toolPart ? isRuntimeUserInputToolPart(toolPart) : false
 }
 
-function areBangResultsEqual(
-  left: BangResultMetadata | null,
-  right: BangResultMetadata | null,
-): boolean {
-  return (
-    left?.command === right?.command
-    && left?.stdout === right?.stdout
-    && left?.stderr === right?.stderr
-    && left?.exitCode === right?.exitCode
-    && left?.durationMs === right?.durationMs
-    && left?.timedOut === right?.timedOut
-    && left?.truncated === right?.truncated
-  )
-}
-
-export function readRenderSegmentsFromState(
-  state: ChatStoreSnapshot,
-  sessionId: string,
-  messageId: string,
-  textTransform?: MessageTextTransform,
-): ChatRenderSegment[] {
-  const message = readMessageFromState(state, sessionId, messageId, textTransform)
-  return message ? readRenderSegments(message) : EMPTY_RENDER_SEGMENTS
-}
-
 export function readRenderSegments(message: UIMessage): ChatRenderSegment[] {
   return groupMessagePartRefs({
     parts: message.parts,
     messageId: message.id,
     describeToolKind: part => describeToolCallCached(part).kind,
   })
-}
-
-export function areRenderSegmentsEqual(
-  left: ChatRenderSegment[],
-  right: ChatRenderSegment[],
-): boolean {
-  if (left === right) {
-    return true
-  }
-  if (left.length !== right.length) {
-    return false
-  }
-  for (let i = 0; i < left.length; i++) {
-    if (!areRenderSegmentEqual(left[i], right[i])) {
-      return false
-    }
-  }
-  return true
-}
-
-function areRenderSegmentEqual(left: ChatRenderSegment, right: ChatRenderSegment): boolean {
-  if (left.kind !== right.kind || left.key !== right.key) {
-    return false
-  }
-  switch (left.kind) {
-    case 'text':
-      return (
-        right.kind === 'text'
-        && left.messageId === right.messageId
-        && left.partIndex === right.partIndex
-        && left.hasText === right.hasText
-      )
-    case 'file-attachment':
-    case 'skill-context':
-    case 'plugin-context':
-    case 'file-line-comment-context':
-    case 'runtime-warning':
-      return (
-        (right.kind === 'file-attachment'
-          || right.kind === 'skill-context'
-          || right.kind === 'plugin-context'
-          || right.kind === 'file-line-comment-context'
-          || right.kind === 'runtime-warning')
-        && left.kind === right.kind
-        && left.messageId === right.messageId
-        && left.partIndex === right.partIndex
-      )
-    case 'tool-call':
-      return (
-        right.kind === 'tool-call'
-        && left.messageId === right.messageId
-        && left.partIndex === right.partIndex
-        && left.toolCallId === right.toolCallId
-      )
-    case 'activity-feed':
-      return (
-        right.kind === 'activity-feed'
-        && areActivityFeedEntryRefsEqual(left.entries, right.entries)
-      )
-    default:
-      return false
-  }
-}
-
-function areActivityFeedEntryRefsEqual(
-  left: ActivityFeedEntryRef[],
-  right: ActivityFeedEntryRef[],
-): boolean {
-  if (left.length !== right.length) {
-    return false
-  }
-  for (let i = 0; i < left.length; i++) {
-    const l = left[i]
-    const r = right[i]
-    if (
-      l.entryKind !== r.entryKind
-      || l.key !== r.key
-      || l.messageId !== r.messageId
-      || l.partIndex !== r.partIndex
-      || (l.entryKind === 'tool-call' && r.entryKind === 'tool-call' && l.toolCallId !== r.toolCallId)
-    ) {
-      return false
-    }
-  }
-  return true
 }
 
 export function readTextPartFromState(
@@ -409,16 +274,6 @@ export function readReasoningPartFromState(
   }
 }
 
-export function areReasoningPartsEqual(
-  left: { text: string, state?: 'streaming' | 'done', overflow?: PartOverflowNotice | null },
-  right: { text: string, state?: 'streaming' | 'done', overflow?: PartOverflowNotice | null },
-): boolean {
-  return left.text === right.text
-    && left.state === right.state
-    && left.overflow?.blobId === right.overflow?.blobId
-    && left.overflow?.originalChars === right.overflow?.originalChars
-}
-
 export function readFilePartFromState(
   state: ChatStoreSnapshot,
   sessionId: string,
@@ -434,17 +289,6 @@ export interface MessageImageAttachment {
   part: FileMessagePart
 }
 
-export function readMessageImageAttachmentsFromState(
-  state: ChatStoreSnapshot,
-  sessionId: string,
-  segments: ChatRenderSegment[],
-): MessageImageAttachment[] {
-  return readMessageImageAttachmentsFromParts(
-    segments,
-    (messageId, partIndex) => readFilePartFromState(state, sessionId, messageId, partIndex),
-  )
-}
-
 export function readMessageImageAttachmentsFromMessage(
   message: UIMessage | undefined,
   segments: ChatRenderSegment[],
@@ -452,37 +296,15 @@ export function readMessageImageAttachmentsFromMessage(
   if (!message) {
     return []
   }
-  return readMessageImageAttachmentsFromParts(
-    segments,
-    (_messageId, partIndex) => {
-      const part = message.parts[partIndex]
-      return part?.type === 'file' ? part : null
-    },
-  )
-}
-
-function readMessageImageAttachmentsFromParts(
-  segments: ChatRenderSegment[],
-  readFilePart: (messageId: string, partIndex: number) => FileMessagePart | null,
-): MessageImageAttachment[] {
   return segments.flatMap((segment) => {
     if (segment.kind !== 'file-attachment') {
       return []
     }
-    const part = readFilePart(segment.messageId, segment.partIndex)
-    return part?.mediaType.startsWith('image/') ? [{ segmentKey: segment.key, part }] : []
+    const part = message.parts[segment.partIndex]
+    return part?.type === 'file' && part.mediaType.startsWith('image/')
+      ? [{ segmentKey: segment.key, part }]
+      : []
   })
-}
-
-export function areMessageImageAttachmentsEqual(
-  left: MessageImageAttachment[],
-  right: MessageImageAttachment[],
-): boolean {
-  return left.length === right.length
-    && left.every((attachment, index) => {
-      const candidate = right[index]
-      return attachment.segmentKey === candidate?.segmentKey && attachment.part === candidate.part
-    })
 }
 
 export function readSkillContextPartFromState(
@@ -503,6 +325,16 @@ export function readPluginContextPartFromState(
 ): ChatPluginContextMessagePart | null {
   const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
   return isChatPluginContextPart(part) ? part : null
+}
+
+export function readIntentContextPartFromState(
+  state: ChatStoreSnapshot,
+  sessionId: string,
+  messageId: string,
+  partIndex: number,
+): ChatIntentContextMessagePart | null {
+  const part = readMessageFromState(state, sessionId, messageId)?.parts[partIndex]
+  return isChatIntentContextPart(part) ? part : null
 }
 
 export function readFileLineCommentContextPartFromState(

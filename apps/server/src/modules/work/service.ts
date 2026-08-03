@@ -11,10 +11,12 @@ import { hasPendingRuntimeToolApproval } from '../chat-runtime/pending-tool-appr
 import { listPendingRuntimeUserInputSummaries } from '../chat-runtime/pending-user-input'
 import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
 import * as ChatRuntime from '../chat-runtime/runtime'
+import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
 import type { SessionAwaitSource } from '../session-await/types'
+import * as Workspace from '../workspace/service'
 import * as Worktree from '../worktree/service'
 
 const logger = createChildLogger({ module: 'work' })
@@ -267,6 +269,23 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
   }
 
   const baseStrategy: WorkBaseStrategy = input.baseStrategy ?? 'source-head'
+  const sourceWorkspace = Workspace.get(input.workspaceId)
+  if (!sourceWorkspace) {
+    throw new AppError({
+      code: 'workspace_not_found',
+      status: 404,
+      message: 'Workspace not found',
+      details: { workspaceId: input.workspaceId },
+    })
+  }
+  if (Workspace.isMultiFolderWorkspace(sourceWorkspace)) {
+    throw new AppError({
+      code: 'work_multi_folder_unsupported',
+      status: 400,
+      message: 'Work requires a single-folder local Git workspace. Multi-folder workspaces are for Agent context only.',
+      details: { workspaceId: input.workspaceId },
+    })
+  }
   // Remote-default isolation never copies uncommitted local files into the
   // managed worktree, so a dirty source checkout is safe. Source-head still
   // requires a clean tree so Work does not silently drop or mix WIP.
@@ -434,7 +453,7 @@ export async function prepare(input: {
   const title = requireHandoffValue(input.title, 'title')
   const summary = requireHandoffValue(input.summary, 'summary')
   const testPlan = requireHandoffValue(input.testPlan, 'testPlan')
-  const body = `## Summary\n${summary}\n\n## Test plan\n${testPlan}`
+  const body = buildWorkPullRequestBody({ summary, testPlan })
 
   const existing = await PullRequest.getPullRequest(primaryThread.id)
   const hasOpenPR = existing !== null && existing.state === 'open' && !existing.merged
@@ -611,7 +630,7 @@ export async function submit(input: {
   const title = requireHandoffValue(input.title ?? work.handoffTitle, 'title')
   const summary = requireHandoffValue(input.summary ?? work.handoffSummary, 'summary')
   const testPlan = requireHandoffValue(input.testPlan ?? work.handoffTestPlan, 'testPlan')
-  const body = `## Summary\n${summary}\n\n## Test plan\n${testPlan}`
+  const body = buildWorkPullRequestBody({ summary, testPlan })
   const existing = await PullRequest.getPullRequest(primaryThread.id)
   if (existing && (existing.state !== 'open' || existing.merged)) {
     throw new AppError({

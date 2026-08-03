@@ -51,6 +51,7 @@ export { PRESETS } from './presets/types'
 export { findOpenFenceLanguage, shouldBypassSmoother } from './core/fence-state'
 export { createCoreRehypePlugins, markdownHtmlSchema } from './plugins/markdown-html'
 export { remarkCodeComment } from './plugins/remark-code-comment'
+export { remarkCommitGroup } from './plugins/remark-commit-group'
 export { patchIncomplete } from './plugins/remark-incomplete'
 
 // Types

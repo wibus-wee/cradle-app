@@ -46,7 +46,7 @@
   "new.title": "New Work",
   "new.tryAgain": "Try Again",
   "new.workspace": "Workspace",
-  "new.workspaceRequired": "Choose a local Git workspace to start Work.",
+  "new.workspaceRequired": "Choose a local single-folder Git workspace to start Work. Multi-folder workspaces are not supported.",
   "sidebar.archive": "Archive Work",
   "sidebar.draft": "Draft PR #{{number}}",
   "sidebar.merged": "Merged PR #{{number}}",

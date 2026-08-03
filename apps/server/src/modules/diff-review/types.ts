@@ -1,5 +1,4 @@
 import type { GitFileStatusKind } from '../git/service'
-import type { RuntimeKind } from '../provider-contracts/types'
 
 export interface DiffRevisionView {
   id: string
@@ -115,11 +114,6 @@ export interface ReviewEventView {
     | 'agent_fix_failed'
     | 'agent_fix_cancelled'
     | 'agent_fix_deleted'
-    | 'guide_cancelled'
-    | 'commit_plan_created'
-    | 'commit_plan_updated'
-    | 'commit_plan_applied'
-    | 'commit_plan_apply_failed'
     | 'source_readiness_changed'
     | 'merge_completed'
     | 'merge_failed'
@@ -137,7 +131,7 @@ export interface ReviewAgentFixView {
   anchor: ReviewRangeAnchorView | null
   instruction: string
   profileId: string | null
-  expectedOutput: 'commit' | 'working-tree-change' | 'patch-artifact'
+  expectedOutput: 'working-tree-change' | 'patch-artifact'
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
   sessionId: string | null
   runId: string | null
@@ -161,82 +155,7 @@ export interface ReviewAgentFixArtifactView {
   createdAt: number
 }
 
-export interface ReviewCommitPlanGroupView {
-  id: string
-  title: string
-  message: string
-  rationale: string
-  fileIds: string[]
-  paths: string[]
-  dependsOn: string[]
-}
-
-export interface ReviewCommitPlanConflictView {
-  fileId: string
-  path: string
-  groupIds: string[]
-}
-
-export interface ReviewCommitPlanView {
-  id: string
-  reviewId: string
-  revisionId: string
-  actorId: string
-  strategy: 'manual'
-  status: 'draft' | 'accepted' | 'applied' | 'abandoned'
-  groups: ReviewCommitPlanGroupView[]
-  conflicts: ReviewCommitPlanConflictView[]
-  rationale: string
-  createdAt: number
-  updatedAt: number
-}
-
-export interface ReviewCommitPlanGroupInput {
-  id: string
-  title: string
-  message: string
-  rationale: string
-  fileIds: string[]
-  paths?: string[]
-  dependsOn: string[]
-}
-
-export interface ReviewGuideStepView {
-  id: string
-  title: string
-  rationale: string
-  fileIds: string[]
-  threadIds: string[]
-  anchors: ReviewRangeAnchorView[]
-  order: number
-}
-
-export type ReviewGuideStatus = 'pending' | 'running' | 'ready' | 'failed' | 'cancelled'
-
-export interface ReviewGuideView {
-  revisionId: string | null
-  status: ReviewGuideStatus | null
-  providerTargetId: string | null
-  runtimeKind: RuntimeKind | null
-  modelId: string | null
-  sessionId: string | null
-  runId: string | null
-  errorMessage: string | null
-  createdAt: number | null
-  updatedAt: number | null
-  title: string | null
-  steps: ReviewGuideStepView[]
-}
-
 export type ReviewOutputLocale = 'en-US' | 'zh-CN' | 'ja-JP' | 'es-ES'
-
-export interface ReviewGuideGenerateInput {
-  providerTargetId: string
-  runtimeKind?: RuntimeKind
-  modelId?: string | null
-  force?: boolean
-  outputLocale?: ReviewOutputLocale | null
-}
 
 export interface ReviewSourceReadinessView {
   sourceKind: 'local-working-tree' | 'local-branch-compare' | 'local-commit' | 'agent-change-set' | 'github-pull-request' | 'external-import'
@@ -273,9 +192,7 @@ export interface DiffReviewView {
   submissions: ReviewSubmissionView[]
   events: ReviewEventView[]
   preferences: DiffReviewPreferenceView
-  guide: ReviewGuideView
   agentFixes: ReviewAgentFixView[]
-  commitPlans: ReviewCommitPlanView[]
 }
 
 export type ReviewSourceKind = DiffReviewView['sourceKind']

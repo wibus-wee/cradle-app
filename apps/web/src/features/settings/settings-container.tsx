@@ -81,6 +81,12 @@ interface SettingsMasterDetailProps extends React.ComponentPropsWithoutRef<'div'
    * master-detail card (e.g. an account row card or a batch-selection bar).
    */
   toolbar?: React.ReactNode
+  /**
+   * Optional floating content anchored to the bottom of the master-detail card
+   * (e.g. a multi-select batch action bar). Rendered inside the card surface so
+   * it overlays the list/detail split rather than the page shell.
+   */
+  floatingToolbar?: React.ReactNode
   /** Left list pane content (search + list + footer). */
   list: React.ReactNode
   /** Right detail pane content. */
@@ -107,6 +113,7 @@ export function SettingsMasterDetail({
   description,
   action,
   toolbar,
+  floatingToolbar,
   list,
   detail,
   listWidth = 300,
@@ -115,10 +122,14 @@ export function SettingsMasterDetail({
   ...rest
 }: SettingsMasterDetailProps) {
   return (
-    <div className={cn('flex h-full min-h-0 w-full min-w-0 flex-col gap-5', className)} {...rest}>
+    <div className={cn('relative flex h-full min-h-0 w-full min-w-0 flex-col gap-5', className)} {...rest}>
       <SettingsHeader title={title} description={description} action={action} />
       {toolbar}
-      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-card">
+      {/*
+        Floating batch bars anchor to this card surface (not the page shell) so
+        they sit over the list/detail split and stay inside the overflow clip.
+      */}
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-xl border border-border bg-card">
         <aside
           className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-border/60"
           style={{ flex: `0 0 ${listWidth}px`, maxWidth: '42%' }}
@@ -128,6 +139,7 @@ export function SettingsMasterDetail({
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           {detail}
         </section>
+        {floatingToolbar}
       </div>
       {children}
     </div>

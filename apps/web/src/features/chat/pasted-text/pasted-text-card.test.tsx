@@ -35,16 +35,17 @@ describe('pasted-text cards', () => {
     expect(onRemove).toHaveBeenCalledOnce()
   })
 
-  it('expands and collapses sent-message content read-only', async () => {
+  it('previews sent-message content in a popover without expanding layout', async () => {
     renderWithI18n(<HistoryPastedTextCard pastedText={pastedText} />)
 
-    const expand = await screen.findByRole('button', { name: 'Expand pasted text' })
-    expect(screen.queryByLabelText('Preview pasted text')).toBeNull()
+    const preview = await screen.findByRole('button', { name: 'Preview pasted text' })
+    expect(screen.queryByLabelText('Preview pasted text')).toBe(preview)
 
-    fireEvent.click(expand)
+    fireEvent.click(preview)
     expect(screen.getByLabelText('Preview pasted text').textContent).toBe(pastedText.text)
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse pasted text' }))
-    expect(screen.queryByLabelText('Preview pasted text')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Collapse pasted text' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Preview pasted text' })).not.toBeNull()
   })
 })

@@ -23,4 +23,5 @@ Extensions: StarterKit, HeadingWithId, Markdown, SlashCommand, SmartMention, Shi
 - **heading-with-id.ts**: Heading extension with auto-slugified anchor IDs
 - **shiki-code-block.tsx**: Code block extension with Shiki syntax highlighting
 - **shiki-highlighter.ts**: Lazy Shiki highlighter loader，延后加载 themes、languages 和 tokenizer，避免 Markdown editor 入口同步拉取完整 Shiki runtime
+- **shiki-snippet.tsx**: Read-only highlighted snippet for non-editor surfaces (session-await JS condition cards, etc.); reuses `shiki-highlighter` + `.tool-call-code-highlight` dual-theme CSS. Candidates for adoption: `workspace-file-preview` text highlight path, tool/payload monospace dumps that should gain syntax color.
 - **code-block-view.tsx**: React NodeView for code blocks with language selector

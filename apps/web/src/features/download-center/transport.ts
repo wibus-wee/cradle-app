@@ -2,7 +2,9 @@ import {
   getDownloadCenterTasks,
   postDownloadCenterTasksByIdCancel,
 } from '~/api-gen/sdk.gen'
-import { getAuthenticatedEventSourceUrl, getServerUrl, isElectron } from '~/lib/electron'
+import { getServerUrl, isElectron } from '~/lib/electron'
+import type { ServerEventSource } from '~/lib/server-transport'
+import { openServerEventSource } from '~/lib/server-transport'
 
 import type { DownloadTask } from './types'
 
@@ -25,28 +27,26 @@ export const serverDownloadCenterTransport: DownloadCenterTransport = {
     return data as DownloadTask | null
   },
   subscribe(onTask, onReconnect) {
-    let source: EventSource | null = null
     let disposed = false
     let acceptingEvents = false
-    void getAuthenticatedEventSourceUrl(new URL('/download-center/events', getServerUrl()).toString()).then((url) => {
-      if (disposed) { return }
-      source = new EventSource(url)
-      source.onmessage = (event) => {
-        if (!acceptingEvents) { return }
-        const task = JSON.parse(event.data) as DownloadTask
-        onTask(task)
-      }
-      source.onopen = () => {
-        acceptingEvents = false
-        // A stream can replay an old event after reconnecting. Establish a fresh
-        // generated-GET snapshot before accepting any subsequent event frames.
-        void onReconnect().finally(() => { acceptingEvents = !disposed })
-      }
-      source.onerror = () => { acceptingEvents = false }
-    }).catch(() => {})
+    const source: ServerEventSource = openServerEventSource(
+      new URL('/download-center/events', getServerUrl()).toString(),
+    )
+    source.onmessage = (event) => {
+      if (!acceptingEvents) { return }
+      const task = JSON.parse(event.data) as DownloadTask
+      onTask(task)
+    }
+    source.onopen = () => {
+      acceptingEvents = false
+      // A stream can replay an old event after reconnecting. Establish a fresh
+      // generated-GET snapshot before accepting any subsequent event frames.
+      void onReconnect().finally(() => { acceptingEvents = !disposed })
+    }
+    source.onerror = () => { acceptingEvents = false }
     return () => {
       disposed = true
-      source?.close()
+      source.close()
     }
   },
 }

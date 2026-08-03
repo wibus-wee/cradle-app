@@ -38,6 +38,8 @@ const workspaceRecord = t.Object({
     t.Literal('missing'),
     t.Literal('remote'),
   ]),
+  /** True when this workspace is a Cradle-owned multi-folder symlink root. */
+  multiFolder: t.Boolean(),
   pinned: t.Number(),
   createdAt: t.Number(),
   updatedAt: t.Number(),
@@ -89,7 +91,7 @@ export const WorkspaceModel = {
     folders: t.Array(t.Object({
       name: nonBlankString,
       path: nonBlankString,
-    }, { additionalProperties: false }), { minItems: 1 }),
+    }, { additionalProperties: false }), { minItems: 2 }),
   }, { additionalProperties: false }),
 
   multiFolderWorkspaceImportBody: t.Object({

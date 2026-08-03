@@ -173,6 +173,7 @@ interface ToolObjectPayload {
   runId: string | null
   transcriptDir: string | null
   scriptPath: string | null
+  pluginId: string | null
   sessionUrl: string | null
   warning: string | null
   error: string | null
@@ -661,6 +662,7 @@ function readToolObjectPayload(value: unknown): ToolObjectPayload {
     runId: readNullableString(record.runId),
     transcriptDir: readNullableString(record.transcriptDir),
     scriptPath: readNullableString(record.scriptPath),
+    pluginId: readNullableString(record.pluginId),
     sessionUrl: readNullableString(record.sessionUrl),
     warning: readNullableString(record.warning),
     error: readNullableString(record.error),
@@ -748,6 +750,8 @@ export interface ToolPayload {
   workflowTranscriptDir: string | null
   workflowScriptPath: string | null
   workflowSessionUrl: string | null
+  pluginId: string | null
+  pluginScriptPath: string | null
   warning: string | null
   error: string | null
   plan: string | null
@@ -827,8 +831,10 @@ function toolPayloadFromObject(value: ToolObjectPayload): ToolPayload {
     workflowPhases: value.workflowPhases,
     workflowRunId: value.runId,
     workflowTranscriptDir: value.transcriptDir,
-    workflowScriptPath: value.scriptPath,
+    workflowScriptPath: value.pluginId ? null : value.scriptPath,
     workflowSessionUrl: value.sessionUrl,
+    pluginId: value.pluginId,
+    pluginScriptPath: value.pluginId ? value.scriptPath : null,
     warning: value.warning,
     error: value.error,
     plan: value.plan,
@@ -1302,7 +1308,7 @@ function readToolTitle(
     case 'notebook-diff':
       return 'Edit notebook'
     case 'terminal':
-      return 'Run command'
+      return input.pluginId ? `Run ${input.pluginId}` : 'Run command'
     case 'search':
       return displayName.includes('Glob') ? 'Find files' : 'Search code'
     case 'web':
@@ -1379,7 +1385,7 @@ function readToolSummary(kind: ToolUiKind, input: ToolPayload, output: ToolPaylo
     case 'notebook-diff':
       return output.editMode ?? output.cellType
     case 'terminal':
-      return readTerminalSummary(output)
+      return readTerminalSummary(input, output)
     case 'search':
       return readSearchSummary(output)
     case 'web':
@@ -1490,7 +1496,12 @@ function readWebSummary(output: ToolPayload): string | null {
   return null
 }
 
-function readTerminalSummary(output: ToolPayload): string | null {
+function readTerminalSummary(input: ToolPayload, output: ToolPayload): string | null {
+  if (input.pluginId) {
+    return input.pluginScriptPath
+      ? `${input.pluginId} · ${input.pluginScriptPath}`
+      : `plugin ${input.pluginId}`
+  }
   if (output.stderr !== null) {
     return 'stderr available'
   }

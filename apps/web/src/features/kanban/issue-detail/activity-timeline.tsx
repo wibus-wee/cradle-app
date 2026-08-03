@@ -2,6 +2,7 @@ import {
   AddCircleLine as CirclePlusIcon,
   DeleteLine as Trash2Icon,
   GitBranchLine as GitBranchIcon,
+  More2Line as MoreHorizontalIcon,
   PicLine as PicIcon,
   SparklesLine as SparklesIcon,
   UserFollowLine as UserRoundCheckIcon,
@@ -61,6 +62,10 @@ function appendMarkdownBlock(current: string, block: string): string {
   return `${current}\n\n${block}`
 }
 
+/** Field-change entries older than the most recent tail collapse behind a "show earlier" toggle. */
+const FIELD_CHANGE_VISIBLE_TAIL = 2
+const FIELD_CHANGE_COLLAPSE_THRESHOLD = 4
+
 export const ActivityTimeline = ({
   issueId,
   workspaceId = null,
@@ -73,7 +78,19 @@ export const ActivityTimeline = ({
   const assetUpload = useUploadAsset({ workspaceId })
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [commentText, setCommentText] = useState('')
+  const [showEarlierUpdates, setShowEarlierUpdates] = useState(false)
   const timelineItems = activity.toSorted((left, right) => left.createdAt - right.createdAt)
+
+  const fieldChangeIndices = timelineItems.reduce<number[]>((acc, item, index) => {
+    if (item.kind === 'field-change') {
+      acc.push(index)
+    }
+    return acc
+  }, [])
+  const collapsedIndices = fieldChangeIndices.length > FIELD_CHANGE_COLLAPSE_THRESHOLD
+    ? new Set(fieldChangeIndices.slice(0, -FIELD_CHANGE_VISIBLE_TAIL))
+    : new Set<number>()
+  const firstCollapsedIndex = collapsedIndices.size > 0 ? Math.min(...collapsedIndices) : -1
 
   const handleSubmit = () => {
     if (readOnly) {
@@ -127,18 +144,43 @@ export const ActivityTimeline = ({
         {t('issue.activity.title')}
       </h3>
 
-      <div className="mt-3 flex flex-col gap-3">
-        {timelineItems.map(item => (
-          <ActivityItem
-            key={item.id}
-            item={item}
-            onDeleteComment={
-              !readOnly && item.kind === 'comment' && item.actor.kind === 'user'
-                ? handleDeleteComment
-                : undefined
+      <div className="relative mt-3 flex flex-col gap-3">
+        {timelineItems.length > 1 && (
+          <div className="absolute inset-y-1 left-[10.5px] w-px bg-border" aria-hidden="true" />
+        )}
+        {timelineItems.map((item, index) => {
+          const isCollapsed = collapsedIndices.has(index) && !showEarlierUpdates
+          if (isCollapsed) {
+            if (index !== firstCollapsedIndex) {
+              return null
             }
-          />
-        ))}
+            return (
+              <button
+                key="show-earlier-updates"
+                type="button"
+                onClick={() => setShowEarlierUpdates(true)}
+                className="relative flex items-center gap-2.5 text-[12px] text-text-dim transition-colors hover:text-foreground"
+                data-testid="activity-show-earlier"
+              >
+                <span className="relative z-10 flex size-5.5 shrink-0 items-center justify-center bg-background">
+                  <MoreHorizontalIcon className="size-3.5 !text-text-tertiary" aria-hidden="true" />
+                </span>
+                {t('issue.activity.showEarlier', { count: collapsedIndices.size })}
+              </button>
+            )
+          }
+          return (
+            <ActivityItem
+              key={item.id}
+              item={item}
+              onDeleteComment={
+                !readOnly && item.kind === 'comment' && item.actor.kind === 'user'
+                  ? handleDeleteComment
+                  : undefined
+              }
+            />
+          )
+        })}
       </div>
 
       <div className="mt-4 rounded-lg border border-border bg-card shadow-xs">
@@ -354,7 +396,7 @@ const CommentItem = ({
   const isAiAuthored = item.actor.kind === 'agent' || item.actor.kind === 'provider-target'
 
   return (
-    <div className="group flex gap-2.5" data-testid={`comment-${item.id}`}>
+    <div className="group relative flex gap-2.5" data-testid={`comment-${item.id}`}>
       {isAiAuthored
 ? (
         item.actor.avatarUrl
@@ -362,11 +404,11 @@ const CommentItem = ({
           <img
             src={item.actor.avatarUrl}
             alt={item.actor.displayName}
-            className="size-5.5 shrink-0 rounded-full mt-0.5 object-cover"
+            className="relative z-10 size-5.5 shrink-0 rounded-full mt-0.5 object-cover"
           />
         )
 : (
-          <div className="flex size-5.5 shrink-0 items-center justify-center mt-0.5">
+          <div className="relative z-10 flex size-5.5 shrink-0 items-center justify-center mt-0.5 bg-background">
             <SparklesIcon className="size-3.5 !text-text-tertiary" aria-hidden="true" />
           </div>
         )
@@ -375,7 +417,7 @@ const CommentItem = ({
         <AssigneeAvatar
           name={formatActorName(item.actor, t)}
           size={22}
-          className="mt-0.5 shrink-0"
+          className="relative z-10 mt-0.5 shrink-0"
         />
       )}
       <div className={cn('flex-1 min-w-0 rounded-lg border border-border px-3 py-2.5 bg-card')}>
@@ -427,8 +469,8 @@ function TimelineLine({
   testId: string
 }) {
   return (
-    <div className="group flex gap-2.5" data-testid={testId}>
-      <div className="flex size-5.5 shrink-0 items-center justify-center mt-0.5">{icon}</div>
+    <div className="group relative flex gap-2.5" data-testid={testId}>
+      <div className="relative z-10 mt-0.5 flex size-5.5 shrink-0 items-center justify-center bg-background">{icon}</div>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] leading-5">
         {children}
       </div>

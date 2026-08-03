@@ -1,182 +1,64 @@
 /**
- * Design tokens for the Cradle Diffs surface.
+ * Diffs surface chrome — layout rhythm + Pierre bridge only.
  *
- * Deliberately self-contained: the review surface does not inherit the app's
- * shared component palette, so the diff reads as a dense, quiet reading
- * environment rather than a form. Scope every token to `[data-review-surface]`
- * so nothing here leaks into the rest of the app.
- *
- * Neutrals carry a faint blue-violet bias toward the accent so greys read as
- * chosen rather than inherited. Diff tints are expressed as alpha over the
- * surface so they sit *under* syntax highlighting instead of fighting it.
+ * Color, type, radius, and shadow come from the app token system in
+ * `apps/web/src/styles.css` (`--background`, `--foreground`, `--primary`, …).
+ * Legacy `--rv-*` names remain as thin aliases so the dense review Views keep
+ * reading through `var(--rv-…)` without owning a second palette.
  */
 
 [data-review-surface] {
   /* Ground */
-  --rv-bg: #ffffff;
-  --rv-bg-subtle: #fbfbfc;
-  --rv-bg-inset: #f5f5f7;
-  --rv-bg-raised: #ffffff;
-  --rv-bg-hover: rgb(16 16 24 / 4%);
-  --rv-bg-active: rgb(16 16 24 / 7%);
+  --rv-bg: var(--background);
+  --rv-bg-subtle: color-mix(in srgb, var(--muted) 55%, var(--background));
+  --rv-bg-inset: var(--muted);
+  --rv-bg-raised: var(--card);
+  --rv-bg-hover: var(--muted);
+  --rv-bg-active: var(--accent);
 
-  /* Hairlines. `line` is the default 1px rule; `edge` separates major regions. */
-  --rv-line: rgb(16 16 24 / 8%);
-  --rv-edge: rgb(16 16 24 / 12%);
+  /* Hairlines */
+  --rv-line: var(--border);
+  --rv-edge: color-mix(in srgb, var(--border) 100%, var(--foreground) 8%);
 
   /* Type */
-  --rv-fg: #101014;
-  --rv-fg-muted: #62636b;
-  --rv-fg-subtle: #8b8c95;
+  --rv-fg: var(--foreground);
+  --rv-fg-muted: var(--muted-foreground);
+  --rv-fg-subtle: var(--text-tertiary);
 
-  /* One accent, spent sparingly: selection, focus, active nav. */
-  --rv-accent: #5b5bd6;
-  --rv-accent-fg: #ffffff;
-  --rv-accent-wash: rgb(91 91 214 / 10%);
+  /* Accent — app primary, spent sparingly for selection / focus / CTA */
+  --rv-accent: var(--primary);
+  --rv-accent-fg: var(--primary-foreground);
+  --rv-accent-wash: color-mix(in srgb, var(--primary) 12%, transparent);
 
-  /* Semantic state — separate from the accent hue. */
-  --rv-add: #16794c;
-  --rv-add-wash: rgb(22 163 100 / 10%);
-  --rv-add-gutter: rgb(22 163 100 / 18%);
-  --rv-del: #b42318;
-  --rv-del-wash: rgb(217 45 32 / 9%);
-  --rv-del-gutter: rgb(217 45 32 / 16%);
-  --rv-warn: #a15c07;
-  --rv-danger: #d92d20;
-  --rv-open: #3d8f5b;
-  --rv-merged: #7d5bd6;
-  --rv-closed: #8b8c95;
-  --rv-draft: #8b8c95;
+  /* Diff + status semantics */
+  --rv-add: var(--success-foreground);
+  --rv-add-wash: color-mix(in srgb, var(--success) 14%, transparent);
+  --rv-add-gutter: color-mix(in srgb, var(--success) 22%, transparent);
+  --rv-del: var(--destructive-foreground);
+  --rv-del-wash: color-mix(in srgb, var(--destructive) 14%, transparent);
+  --rv-del-gutter: color-mix(in srgb, var(--destructive) 22%, transparent);
+  --rv-warn: var(--warning-foreground);
+  --rv-danger: var(--destructive);
+  --rv-open: var(--success-foreground);
+  --rv-merged: var(--info-foreground);
+  --rv-closed: var(--text-tertiary);
+  --rv-draft: var(--text-tertiary);
 
-  /* Geometry — Vercel-ish crisp radii, no pill-everything. */
-  --rv-radius: 6px;
-  --rv-radius-lg: 10px;
-  --rv-shadow-raised: 0 1px 2px rgb(16 16 24 / 5%), 0 0 0 1px var(--rv-line);
-  --rv-shadow-pop: 0 8px 24px -6px rgb(16 16 24 / 14%), 0 0 0 1px var(--rv-edge);
+  /* Geometry — follow app radius / shadow scales */
+  --rv-radius: var(--radius-md);
+  --rv-radius-lg: var(--radius-lg);
+  --rv-shadow-raised: var(--shadow-xs);
+  --rv-shadow-pop: var(--shadow-md);
 
-  /* Rhythm */
+  /* Rhythm unique to the review reading surface */
   --rv-topbar-h: 44px;
   --rv-rail-w: 248px;
   --rv-meta-w: 264px;
   --rv-code-line-h: 18px;
 
-  --rv-font-ui: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --rv-font-mono: ui-monospace, 'SF Mono', 'Geist Mono', 'JetBrains Mono', Menlo, monospace;
-}
+  --rv-font-ui: var(--font-sans);
+  --rv-font-mono: var(--font-mono);
 
-@media (prefers-color-scheme: dark) {
-  [data-review-surface] {
-    --rv-bg: #08090a;
-    --rv-bg-subtle: #0c0d0f;
-    --rv-bg-inset: #111214;
-    --rv-bg-raised: #101113;
-    --rv-bg-hover: rgb(255 255 255 / 5%);
-    --rv-bg-active: rgb(255 255 255 / 8%);
-
-    --rv-line: rgb(255 255 255 / 9%);
-    --rv-edge: rgb(255 255 255 / 14%);
-
-    --rv-fg: #f5f6f8;
-    --rv-fg-muted: #8b9099;
-    --rv-fg-subtle: #5f636b;
-
-    --rv-accent: #7c7cff;
-    --rv-accent-fg: #0b0b12;
-    --rv-accent-wash: rgb(124 124 255 / 16%);
-
-    --rv-add: #4ac57f;
-    --rv-add-wash: rgb(46 194 116 / 13%);
-    --rv-add-gutter: rgb(46 194 116 / 22%);
-    --rv-del: #ff7b70;
-    --rv-del-wash: rgb(248 81 73 / 13%);
-    --rv-del-gutter: rgb(248 81 73 / 22%);
-    --rv-warn: #e0a12a;
-    --rv-danger: #ff6b60;
-    --rv-open: #4ac57f;
-    --rv-merged: #a48bff;
-    --rv-closed: #6d7178;
-    --rv-draft: #6d7178;
-
-    --rv-shadow-raised: 0 1px 2px rgb(0 0 0 / 40%), 0 0 0 1px var(--rv-line);
-    --rv-shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 64%), 0 0 0 1px var(--rv-edge);
-  }
-}
-
-/* The app's own theme toggle must win over the OS preference, both directions. */
-:root[data-theme='dark'] [data-review-surface],
-.dark [data-review-surface] {
-  --rv-bg: #08090a;
-  --rv-bg-subtle: #0c0d0f;
-  --rv-bg-inset: #111214;
-  --rv-bg-raised: #101113;
-  --rv-bg-hover: rgb(255 255 255 / 5%);
-  --rv-bg-active: rgb(255 255 255 / 8%);
-
-  --rv-line: rgb(255 255 255 / 9%);
-  --rv-edge: rgb(255 255 255 / 14%);
-
-  --rv-fg: #f5f6f8;
-  --rv-fg-muted: #8b9099;
-  --rv-fg-subtle: #5f636b;
-
-  --rv-accent: #7c7cff;
-  --rv-accent-fg: #0b0b12;
-  --rv-accent-wash: rgb(124 124 255 / 16%);
-
-  --rv-add: #4ac57f;
-  --rv-add-wash: rgb(46 194 116 / 13%);
-  --rv-add-gutter: rgb(46 194 116 / 22%);
-  --rv-del: #ff7b70;
-  --rv-del-wash: rgb(248 81 73 / 13%);
-  --rv-del-gutter: rgb(248 81 73 / 22%);
-  --rv-warn: #e0a12a;
-  --rv-danger: #ff6b60;
-  --rv-open: #4ac57f;
-  --rv-merged: #a48bff;
-  --rv-closed: #6d7178;
-  --rv-draft: #6d7178;
-
-  --rv-shadow-raised: 0 1px 2px rgb(0 0 0 / 40%), 0 0 0 1px var(--rv-line);
-  --rv-shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 64%), 0 0 0 1px var(--rv-edge);
-}
-
-:root[data-theme='light'] [data-review-surface] {
-  --rv-bg: #ffffff;
-  --rv-bg-subtle: #fbfbfc;
-  --rv-bg-inset: #f5f5f7;
-  --rv-bg-raised: #ffffff;
-  --rv-bg-hover: rgb(16 16 24 / 4%);
-  --rv-bg-active: rgb(16 16 24 / 7%);
-
-  --rv-line: rgb(16 16 24 / 8%);
-  --rv-edge: rgb(16 16 24 / 12%);
-
-  --rv-fg: #101014;
-  --rv-fg-muted: #62636b;
-  --rv-fg-subtle: #8b8c95;
-
-  --rv-accent: #5b5bd6;
-  --rv-accent-fg: #ffffff;
-  --rv-accent-wash: rgb(91 91 214 / 10%);
-
-  --rv-add: #16794c;
-  --rv-add-wash: rgb(22 163 100 / 10%);
-  --rv-add-gutter: rgb(22 163 100 / 18%);
-  --rv-del: #b42318;
-  --rv-del-wash: rgb(217 45 32 / 9%);
-  --rv-del-gutter: rgb(217 45 32 / 16%);
-  --rv-warn: #a15c07;
-  --rv-danger: #d92d20;
-  --rv-open: #3d8f5b;
-  --rv-merged: #7d5bd6;
-  --rv-closed: #8b8c95;
-  --rv-draft: #8b8c95;
-
-  --rv-shadow-raised: 0 1px 2px rgb(16 16 24 / 5%), 0 0 0 1px var(--rv-line);
-  --rv-shadow-pop: 0 8px 24px -6px rgb(16 16 24 / 14%), 0 0 0 1px var(--rv-edge);
-}
-
-[data-review-surface] {
   background: var(--rv-bg);
   color: var(--rv-fg);
   font-family: var(--rv-font-ui);
@@ -189,12 +71,12 @@
 }
 
 [data-review-surface] :focus-visible {
-  outline: 2px solid var(--rv-accent);
+  outline: 2px solid var(--ring);
   outline-offset: 1px;
   border-radius: 3px;
 }
 
-/* Pierre's CodeView paints its own chrome; align it to the surface tokens. */
+/* Pierre's CodeView paints its own chrome; align it to app diff washes. */
 [data-review-surface] [data-rv-code] {
   --pierre-diff-addition-bg: var(--rv-add-wash);
   --pierre-diff-deletion-bg: var(--rv-del-wash);

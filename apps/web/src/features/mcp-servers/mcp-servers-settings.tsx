@@ -1,12 +1,3 @@
-import {
-  AddLine as AddIcon,
-  DeleteLine as DeleteIcon,
-  EditLine as EditIcon,
-  Link3Line as HttpIcon,
-  Refresh2Line as RefreshIcon,
-  ServerLine as ServerIcon,
-  TerminalBoxLine as TerminalIcon,
-} from '@mingcute/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -20,27 +11,57 @@ import {
 } from '~/api-gen/sdk.gen'
 import type { GetMcpServersResponse } from '~/api-gen/types.gen'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '~/components/ui/alert-dialog'
-import { Badge } from '~/components/ui/badge'
-import { Button } from '~/components/ui/button'
-import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from '~/components/ui/empty'
-import { Spinner } from '~/components/ui/spinner'
-import { Switch } from '~/components/ui/switch'
 import { toastManager } from '~/components/ui/toast'
-import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
-import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
-import { cn } from '~/lib/cn'
 
 import { McpServerDialog } from './mcp-server-dialog'
-import type { McpServerSaveBody } from './mcp-server-form'
+import type { McpServerDraft, McpServerSaveBody } from './mcp-server-form'
+import type { McpServersSettingsMode } from './mcp-servers-settings-view'
+import { McpServersSettingsView } from './mcp-servers-settings-view'
+import type { RegistryCandidate } from './registry-browser'
+import { RegistryBrowser } from './registry-browser-container'
 
 type McpServer = GetMcpServersResponse[number]
 const QUERY_KEY = ['mcp-servers'] as const
 const EMPTY_SERVERS: McpServer[] = []
 
-const statusDotClasses: Record<McpServer['status'], string> = {
-  ready: 'bg-emerald-500',
-  disabled: 'bg-muted-foreground/40',
-  error: 'bg-destructive',
+const NAME_MAX_LENGTH = 64
+
+function slugifyServerName(candidate: RegistryCandidate): string {
+  const source = (candidate.title ?? candidate.name).toLowerCase()
+  const slug = source
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[-._]+/, '')
+    .replace(/-+/g, '-')
+    .slice(0, NAME_MAX_LENGTH)
+  return slug || 'mcp-server'
+}
+
+function draftFromCandidate(candidate: RegistryCandidate): McpServerDraft {
+  const name = slugifyServerName(candidate)
+  const secretKeys = [...candidate.env]
+    .sort((a, b) => Number(b.required) - Number(a.required))
+    .map(entry => entry.name)
+
+  // No install hint — open the create dialog with name/secrets prefilled so
+  // Manual setup is not a dead end.
+  if (!candidate.installHint) {
+    return { transport: 'stdio', name, secretKeys }
+  }
+  if (candidate.installHint.transport === 'stdio') {
+    return {
+      transport: 'stdio',
+      name,
+      command: candidate.installHint.command,
+      args: candidate.installHint.args,
+      secretKeys,
+    }
+  }
+  return {
+    transport: 'streamable-http',
+    name,
+    url: candidate.installHint.url,
+    secretKeys,
+  }
 }
 
 export function McpServersSettings() {
@@ -48,7 +69,9 @@ export function McpServersSettings() {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<McpServer | null>(null)
+  const [draft, setDraft] = useState<McpServerDraft | null>(null)
   const [deleting, setDeleting] = useState<McpServer | null>(null)
+  const [mode, setMode] = useState<McpServersSettingsMode>('installed')
 
   const serversQuery = useQuery({
     queryKey: QUERY_KEY,
@@ -71,6 +94,7 @@ export function McpServersSettings() {
     onSuccess: () => {
       setDialogOpen(false)
       setEditing(null)
+      setDraft(null)
       void queryClient.invalidateQueries({ queryKey: QUERY_KEY })
       toastManager.add({ type: 'success', title: t('mcpServers.toast.saved') })
     },
@@ -122,125 +146,50 @@ export function McpServersSettings() {
 
   const openCreate = () => {
     setEditing(null)
+    setDraft(null)
     setDialogOpen(true)
   }
   const openEdit = (server: McpServer) => {
     setEditing(server)
+    setDraft(null)
+    setDialogOpen(true)
+  }
+  const installCandidate = (candidate: RegistryCandidate) => {
+    setEditing(null)
+    setDraft(draftFromCandidate(candidate))
     setDialogOpen(true)
   }
 
   return (
-    <SettingsPage
-      title={t('mcpServers.page.title')}
-      description={t('mcpServers.page.description')}
-      maxWidth="3xl"
-      action={(
-        <Button size="sm" onClick={openCreate}>
-          <AddIcon />
-          {t('mcpServers.action.add')}
-        </Button>
-      )}
-    >
-      <SettingsGroup bare>
-        {serversQuery.isLoading
-          ? (
-              <div className="flex min-h-40 items-center justify-center">
-                <Spinner />
-              </div>
-            )
-          : serversQuery.isError
-            ? (
-                <Empty className="min-h-48 border-none">
-                  <EmptyMedia variant="icon"><ServerIcon /></EmptyMedia>
-                  <EmptyTitle>{t('mcpServers.error.title')}</EmptyTitle>
-                  <EmptyDescription>{t('mcpServers.error.description')}</EmptyDescription>
-                  <Button size="sm" variant="outline" onClick={() => void serversQuery.refetch()}>
-                    <RefreshIcon />
-                    {t('mcpServers.action.retry')}
-                  </Button>
-                </Empty>
-              )
-            : servers.length === 0
-              ? (
-                  <Empty className="min-h-48 border-none">
-                    <EmptyMedia variant="icon"><ServerIcon /></EmptyMedia>
-                    <EmptyTitle>{t('mcpServers.empty.title')}</EmptyTitle>
-                    <EmptyDescription>{t('mcpServers.empty.description')}</EmptyDescription>
-                    <Button size="sm" variant="outline" onClick={openCreate}>
-                      <AddIcon />
-                      {t('mcpServers.action.add')}
-                    </Button>
-                  </Empty>
-                )
-              : (
-                  <div className="divide-y divide-border/60">
-                    {servers.map(server => (
-                      <div key={server.id} className="flex min-w-0 items-center gap-3 px-4 py-3.5">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground">
-                          {server.transport === 'stdio' ? <TerminalIcon className="size-4" /> : <HttpIcon className="size-4" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span className="truncate text-sm font-medium text-foreground">{server.name}</span>
-                            <Badge variant="outline">
-                              {server.transport === 'stdio' ? t('mcpServers.transport.stdio') : t('mcpServers.transport.http')}
-                            </Badge>
-                            <span className={cn('size-1.5 shrink-0 rounded-full', statusDotClasses[server.status])} />
-                          </div>
-                          <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                            {server.transport === 'stdio'
-                              ? [server.command, ...(server.args ?? [])].join(' ')
-                              : server.url}
-                          </p>
-                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                            {server.secretKeys.map(key => (
-                              <Badge key={key} variant="secondary" className="font-mono text-[10px]">{key}</Badge>
-                            ))}
-                            {server.status === 'error' && server.error && (
-                              <span className="truncate text-xs text-destructive">{server.error}</span>
-                            )}
-                            {server.transport === 'streamable-http' && (
-                              <span className="text-[11px] text-muted-foreground">{t('mcpServers.runtime.httpNote')}</span>
-                            )}
-                          </div>
-                        </div>
-                        <Switch
-                          checked={server.enabled}
-                          onCheckedChange={enabled => enabledMutation.mutate({ server, enabled })}
-                          disabled={enabledMutation.isPending}
-                          aria-label={t('mcpServers.action.toggle', { name: server.name })}
-                        />
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button size="icon-sm" variant="ghost" onClick={() => openEdit(server)} aria-label={t('mcpServers.action.edit')}>
-                              <EditIcon />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{t('mcpServers.action.edit')}</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button size="icon-sm" variant="ghost" onClick={() => setDeleting(server)} aria-label={t('mcpServers.action.delete')}>
-                              <DeleteIcon />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{t('mcpServers.action.delete')}</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    ))}
-                  </div>
-                )}
-      </SettingsGroup>
+    <>
+      <McpServersSettingsView
+        mode={mode}
+        servers={servers}
+        isLoading={serversQuery.isLoading}
+        isError={serversQuery.isError}
+        toggling={enabledMutation.isPending}
+        discover={mode === 'discover' ? <RegistryBrowser onInstall={installCandidate} /> : null}
+        onModeChange={setMode}
+        onRetry={() => void serversQuery.refetch()}
+        onAdd={openCreate}
+        onToggle={(server, enabled) => enabledMutation.mutate({ server, enabled })}
+        onEdit={openEdit}
+        onDelete={setDeleting}
+      />
 
       {dialogOpen && (
         <McpServerDialog
-          key={editing?.id ?? 'new'}
+          key={editing?.id ?? (draft ? `draft-${draft.name}` : 'new')}
           open={dialogOpen}
           server={editing}
+          draft={draft ?? undefined}
           saving={saveMutation.isPending}
           onOpenChange={(open) => {
             setDialogOpen(open)
-            if (!open) { setEditing(null) }
+            if (!open) {
+              setEditing(null)
+              setDraft(null)
+            }
           }}
           onSave={async (body) => {
             await saveMutation.mutateAsync({ server: editing, body })
@@ -268,6 +217,6 @@ export function McpServersSettings() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </SettingsPage>
+    </>
   )
 }

@@ -5,27 +5,31 @@ import { persistStorage } from '~/store/persist-storage'
 
 type WorkspaceSidebarFlagMap = Record<string, true>
 
-export type WorkspaceSidebarProjectSortKey = 'name' | 'updatedAt' | 'createdAt'
-export type WorkspaceSidebarProjectSortDirection = 'asc' | 'desc'
+export type WorkspaceSidebarGrouping = 'workspace' | 'updated' | 'status' | 'environment'
+export type WorkspaceSidebarSessionOrdering = 'updated' | 'created'
+export type WorkspaceSidebarOrderingDirection = 'asc' | 'desc'
 
-export type WorkspaceSidebarProjectScope = 'all' | 'pinned'
 export type WorkspaceSidebarStatusFilter = 'unread' | 'streaming' | 'error' | 'needsYou'
 export type WorkspaceSidebarWorkPrFilter = 'work' | 'draft' | 'ready' | 'merged'
+export type WorkspaceSidebarEnvironmentFilter = 'local' | 'remote'
 export type WorkspaceSidebarSourceFilter = 'chat' | 'work' | 'automation' | 'review'
-
-/** @deprecated Prefer the facet model. Kept for migrate-from-v2 only. */
-export type WorkspaceSidebarProjectFilter
-  = | 'all'
-    | 'pinned'
-    | 'unpinned'
-    | 'unread'
-    | 'running'
-    | 'recent'
 
 export const SESSION_PREVIEW_LIMIT_OPTIONS = [3, 5, 8, 10, 15, 20] as const
 export const DEFAULT_SESSION_PREVIEW_LIMIT = 5
 export const MIN_SESSION_PREVIEW_LIMIT = SESSION_PREVIEW_LIMIT_OPTIONS[0]
 export const MAX_SESSION_PREVIEW_LIMIT = SESSION_PREVIEW_LIMIT_OPTIONS.at(-1) ?? DEFAULT_SESSION_PREVIEW_LIMIT
+
+export const WORKSPACE_SIDEBAR_GROUPINGS = [
+  'workspace',
+  'updated',
+  'status',
+  'environment',
+] as const satisfies readonly WorkspaceSidebarGrouping[]
+
+export const WORKSPACE_SIDEBAR_SESSION_ORDERINGS = [
+  'updated',
+  'created',
+] as const satisfies readonly WorkspaceSidebarSessionOrdering[]
 
 export const WORKSPACE_SIDEBAR_STATUS_FILTERS = [
   'unread',
@@ -41,6 +45,11 @@ export const WORKSPACE_SIDEBAR_WORK_PR_FILTERS = [
   'merged',
 ] as const satisfies readonly WorkspaceSidebarWorkPrFilter[]
 
+export const WORKSPACE_SIDEBAR_ENVIRONMENT_FILTERS = [
+  'local',
+  'remote',
+] as const satisfies readonly WorkspaceSidebarEnvironmentFilter[]
+
 export const WORKSPACE_SIDEBAR_SOURCE_FILTERS = [
   'chat',
   'work',
@@ -49,43 +58,47 @@ export const WORKSPACE_SIDEBAR_SOURCE_FILTERS = [
 ] as const satisfies readonly WorkspaceSidebarSourceFilter[]
 
 export interface WorkspaceSidebarListFilters {
-  projectScope: WorkspaceSidebarProjectScope
   statusFilters: WorkspaceSidebarStatusFilter[]
   workPrFilters: WorkspaceSidebarWorkPrFilter[]
+  environmentFilters: WorkspaceSidebarEnvironmentFilter[]
   sourceFilters: WorkspaceSidebarSourceFilter[]
   showArchived: boolean
 }
 
 export const DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS: WorkspaceSidebarListFilters = {
-  projectScope: 'all',
   statusFilters: [],
   workPrFilters: [],
+  environmentFilters: [],
   sourceFilters: [],
   showArchived: false,
 }
+
+export const DEFAULT_WORKSPACE_SIDEBAR_GROUPING: WorkspaceSidebarGrouping = 'workspace'
+export const DEFAULT_WORKSPACE_SIDEBAR_SESSION_ORDERING: WorkspaceSidebarSessionOrdering = 'updated'
+export const DEFAULT_WORKSPACE_SIDEBAR_ORDERING_DIRECTION: WorkspaceSidebarOrderingDirection = 'desc'
 
 interface WorkspaceSidebarUiState {
   collapsedWorkspaceIds: WorkspaceSidebarFlagMap
   expandedSessionListWorkspaceIds: WorkspaceSidebarFlagMap
   expandedSessionGroupIds: WorkspaceSidebarFlagMap
   sessionPreviewLimit: number
-  projectScope: WorkspaceSidebarProjectScope
+  grouping: WorkspaceSidebarGrouping
+  sessionOrdering: WorkspaceSidebarSessionOrdering
+  orderingDirection: WorkspaceSidebarOrderingDirection
   statusFilters: WorkspaceSidebarStatusFilter[]
   workPrFilters: WorkspaceSidebarWorkPrFilter[]
+  environmentFilters: WorkspaceSidebarEnvironmentFilter[]
   sourceFilters: WorkspaceSidebarSourceFilter[]
   showArchived: boolean
-  projectSortKey: WorkspaceSidebarProjectSortKey
-  projectSortDirection: WorkspaceSidebarProjectSortDirection
-  projectPinnedFirst: boolean
-  setProjectScope: (scope: WorkspaceSidebarProjectScope) => void
+  setGrouping: (grouping: WorkspaceSidebarGrouping) => void
+  setSessionOrdering: (ordering: WorkspaceSidebarSessionOrdering) => void
+  setOrderingDirection: (direction: WorkspaceSidebarOrderingDirection) => void
   toggleStatusFilter: (filter: WorkspaceSidebarStatusFilter) => void
   toggleWorkPrFilter: (filter: WorkspaceSidebarWorkPrFilter) => void
+  toggleEnvironmentFilter: (filter: WorkspaceSidebarEnvironmentFilter) => void
   toggleSourceFilter: (filter: WorkspaceSidebarSourceFilter) => void
   setShowArchived: (showArchived: boolean) => void
   clearListFilters: () => void
-  setProjectSortKey: (sortKey: WorkspaceSidebarProjectSortKey) => void
-  setProjectSortDirection: (sortDirection: WorkspaceSidebarProjectSortDirection) => void
-  setProjectPinnedFirst: (pinnedFirst: boolean) => void
   setSessionPreviewLimit: (limit: number) => void
   setWorkspaceExpanded: (workspaceId: string, expanded: boolean) => void
   toggleWorkspaceExpanded: (workspaceId: string) => void
@@ -102,31 +115,27 @@ interface PersistedWorkspaceSidebarUiState {
   expandedSessionListWorkspaceIds?: WorkspaceSidebarFlagMap
   expandedSessionGroupIds?: WorkspaceSidebarFlagMap
   sessionPreviewLimit?: unknown
-  projectFilter?: unknown
-  projectScope?: unknown
+  grouping?: unknown
+  sessionOrdering?: unknown
+  orderingDirection?: unknown
   statusFilters?: unknown
   workPrFilters?: unknown
+  environmentFilters?: unknown
   sourceFilters?: unknown
   showArchived?: unknown
+  // Legacy (v2/v3) fields, only read during migration.
+  projectFilter?: unknown
   projectSortKey?: unknown
   projectSortDirection?: unknown
-  projectPinnedFirst?: unknown
 }
 
-const PROJECT_SCOPES = new Set<WorkspaceSidebarProjectScope>(['all', 'pinned'])
+const GROUPINGS = new Set<WorkspaceSidebarGrouping>(WORKSPACE_SIDEBAR_GROUPINGS)
+const SESSION_ORDERINGS = new Set<WorkspaceSidebarSessionOrdering>(WORKSPACE_SIDEBAR_SESSION_ORDERINGS)
+const ORDERING_DIRECTIONS = new Set<WorkspaceSidebarOrderingDirection>(['asc', 'desc'])
 const STATUS_FILTERS = new Set<WorkspaceSidebarStatusFilter>(WORKSPACE_SIDEBAR_STATUS_FILTERS)
 const WORK_PR_FILTERS = new Set<WorkspaceSidebarWorkPrFilter>(WORKSPACE_SIDEBAR_WORK_PR_FILTERS)
+const ENVIRONMENT_FILTERS = new Set<WorkspaceSidebarEnvironmentFilter>(WORKSPACE_SIDEBAR_ENVIRONMENT_FILTERS)
 const SOURCE_FILTERS = new Set<WorkspaceSidebarSourceFilter>(WORKSPACE_SIDEBAR_SOURCE_FILTERS)
-const PROJECT_SORT_KEYS = new Set<WorkspaceSidebarProjectSortKey>(['name', 'updatedAt', 'createdAt'])
-const PROJECT_SORT_DIRECTIONS = new Set<WorkspaceSidebarProjectSortDirection>(['asc', 'desc'])
-const LEGACY_PROJECT_FILTERS = new Set<WorkspaceSidebarProjectFilter>([
-  'all',
-  'pinned',
-  'unpinned',
-  'unread',
-  'running',
-  'recent',
-])
 
 function setFlag(map: WorkspaceSidebarFlagMap, key: string, enabled: boolean): WorkspaceSidebarFlagMap {
   if (enabled) {
@@ -173,12 +182,6 @@ function normalizeFlags(value: unknown): WorkspaceSidebarFlagMap {
   return flags
 }
 
-function normalizeProjectScope(value: unknown): WorkspaceSidebarProjectScope {
-  return typeof value === 'string' && PROJECT_SCOPES.has(value as WorkspaceSidebarProjectScope)
-    ? value as WorkspaceSidebarProjectScope
-    : 'all'
-}
-
 function normalizeFilterList<T extends string>(
   value: unknown,
   allowed: ReadonlySet<T>,
@@ -195,16 +198,22 @@ function normalizeFilterList<T extends string>(
   return next
 }
 
-function normalizeProjectSortKey(value: unknown): WorkspaceSidebarProjectSortKey {
-  return typeof value === 'string' && PROJECT_SORT_KEYS.has(value as WorkspaceSidebarProjectSortKey)
-    ? value as WorkspaceSidebarProjectSortKey
-    : 'name'
+function normalizeGrouping(value: unknown): WorkspaceSidebarGrouping {
+  return typeof value === 'string' && GROUPINGS.has(value as WorkspaceSidebarGrouping)
+    ? value as WorkspaceSidebarGrouping
+    : DEFAULT_WORKSPACE_SIDEBAR_GROUPING
 }
 
-function normalizeProjectSortDirection(value: unknown): WorkspaceSidebarProjectSortDirection {
-  return typeof value === 'string' && PROJECT_SORT_DIRECTIONS.has(value as WorkspaceSidebarProjectSortDirection)
-    ? value as WorkspaceSidebarProjectSortDirection
-    : 'asc'
+function normalizeSessionOrdering(value: unknown): WorkspaceSidebarSessionOrdering {
+  return typeof value === 'string' && SESSION_ORDERINGS.has(value as WorkspaceSidebarSessionOrdering)
+    ? value as WorkspaceSidebarSessionOrdering
+    : DEFAULT_WORKSPACE_SIDEBAR_SESSION_ORDERING
+}
+
+function normalizeOrderingDirection(value: unknown): WorkspaceSidebarOrderingDirection {
+  return typeof value === 'string' && ORDERING_DIRECTIONS.has(value as WorkspaceSidebarOrderingDirection)
+    ? value as WorkspaceSidebarOrderingDirection
+    : DEFAULT_WORKSPACE_SIDEBAR_ORDERING_DIRECTION
 }
 
 function normalizeSessionPreviewLimit(value: unknown): number {
@@ -215,22 +224,18 @@ function normalizeSessionPreviewLimit(value: unknown): number {
   return clamped
 }
 
-function migrateLegacyProjectFilter(value: unknown): Partial<WorkspaceSidebarListFilters> {
-  if (typeof value !== 'string' || !LEGACY_PROJECT_FILTERS.has(value as WorkspaceSidebarProjectFilter)) {
-    return {}
-  }
-
-  switch (value as WorkspaceSidebarProjectFilter) {
-    case 'pinned':
-      return { projectScope: 'pinned' }
+/**
+ * Legacy v2 `projectFilter` facets that still map onto v4 status filters.
+ * Scope-like values (`pinned` / `unpinned`) have no v4 equivalent and are dropped.
+ */
+function migrateLegacyProjectFilterStatusFilters(value: unknown): WorkspaceSidebarStatusFilter[] {
+  switch (value) {
     case 'unread':
-      return { statusFilters: ['unread'] }
+      return ['unread']
     case 'running':
-      return { statusFilters: ['streaming'] }
-    case 'unpinned':
-    case 'all':
-    case 'recent':
-      return {}
+      return ['streaming']
+    default:
+      return []
   }
 }
 
@@ -248,9 +253,9 @@ function sameStringList(left: readonly string[], right: readonly string[]): bool
 }
 
 export function listFiltersAreActive(filters: WorkspaceSidebarListFilters): boolean {
-  return filters.projectScope !== 'all'
-    || filters.statusFilters.length > 0
+  return filters.statusFilters.length > 0
     || filters.workPrFilters.length > 0
+    || filters.environmentFilters.length > 0
     || filters.sourceFilters.length > 0
     || filters.showArchived
 }
@@ -258,6 +263,7 @@ export function listFiltersAreActive(filters: WorkspaceSidebarListFilters): bool
 export function rowFiltersAreActive(filters: WorkspaceSidebarListFilters): boolean {
   return filters.statusFilters.length > 0
     || filters.workPrFilters.length > 0
+    || filters.environmentFilters.length > 0
     || filters.sourceFilters.length > 0
 }
 
@@ -268,12 +274,16 @@ export const useWorkspaceSidebarUiStore = create<WorkspaceSidebarUiState>()(
       expandedSessionListWorkspaceIds: {},
       expandedSessionGroupIds: {},
       sessionPreviewLimit: DEFAULT_SESSION_PREVIEW_LIMIT,
+      grouping: DEFAULT_WORKSPACE_SIDEBAR_GROUPING,
+      sessionOrdering: DEFAULT_WORKSPACE_SIDEBAR_SESSION_ORDERING,
+      orderingDirection: DEFAULT_WORKSPACE_SIDEBAR_ORDERING_DIRECTION,
       ...DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS,
-      projectSortKey: 'name',
-      projectSortDirection: 'asc',
-      projectPinnedFirst: true,
-      setProjectScope: projectScope => set(state =>
-        state.projectScope === projectScope ? state : { projectScope }),
+      setGrouping: grouping => set(state =>
+        state.grouping === grouping ? state : { grouping }),
+      setSessionOrdering: sessionOrdering => set(state =>
+        state.sessionOrdering === sessionOrdering ? state : { sessionOrdering }),
+      setOrderingDirection: orderingDirection => set(state =>
+        state.orderingDirection === orderingDirection ? state : { orderingDirection }),
       toggleStatusFilter: filter => set((state) => {
         const statusFilters = toggleInList(state.statusFilters, filter)
         return sameStringList(state.statusFilters, statusFilters) ? state : { statusFilters }
@@ -281,6 +291,12 @@ export const useWorkspaceSidebarUiStore = create<WorkspaceSidebarUiState>()(
       toggleWorkPrFilter: filter => set((state) => {
         const workPrFilters = toggleInList(state.workPrFilters, filter)
         return sameStringList(state.workPrFilters, workPrFilters) ? state : { workPrFilters }
+      }),
+      toggleEnvironmentFilter: filter => set((state) => {
+        const environmentFilters = toggleInList(state.environmentFilters, filter)
+        return sameStringList(state.environmentFilters, environmentFilters)
+          ? state
+          : { environmentFilters }
       }),
       toggleSourceFilter: filter => set((state) => {
         const sourceFilters = toggleInList(state.sourceFilters, filter)
@@ -293,12 +309,6 @@ export const useWorkspaceSidebarUiStore = create<WorkspaceSidebarUiState>()(
           ? { ...DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS }
           : state
       )),
-      setProjectSortKey: projectSortKey => set(state =>
-        state.projectSortKey === projectSortKey ? state : { projectSortKey }),
-      setProjectSortDirection: projectSortDirection => set(state =>
-        state.projectSortDirection === projectSortDirection ? state : { projectSortDirection }),
-      setProjectPinnedFirst: projectPinnedFirst => set(state =>
-        state.projectPinnedFirst === projectPinnedFirst ? state : { projectPinnedFirst }),
       setSessionPreviewLimit: limit => set((state) => {
         const normalized = normalizeSessionPreviewLimit(limit)
         return state.sessionPreviewLimit === normalized ? state : { sessionPreviewLimit: normalized }
@@ -365,61 +375,64 @@ export const useWorkspaceSidebarUiStore = create<WorkspaceSidebarUiState>()(
     {
       name: 'cradle:workspace-sidebar-ui:v1',
       storage: persistStorage,
-      version: 3,
+      version: 4,
       partialize: state => ({
         collapsedWorkspaceIds: state.collapsedWorkspaceIds,
         expandedSessionListWorkspaceIds: state.expandedSessionListWorkspaceIds,
         expandedSessionGroupIds: state.expandedSessionGroupIds,
         sessionPreviewLimit: state.sessionPreviewLimit,
-        projectScope: state.projectScope,
+        grouping: state.grouping,
+        sessionOrdering: state.sessionOrdering,
+        orderingDirection: state.orderingDirection,
         statusFilters: state.statusFilters,
         workPrFilters: state.workPrFilters,
+        environmentFilters: state.environmentFilters,
         sourceFilters: state.sourceFilters,
         showArchived: state.showArchived,
-        projectSortKey: state.projectSortKey,
-        projectSortDirection: state.projectSortDirection,
-        projectPinnedFirst: state.projectPinnedFirst,
       }),
       migrate: (persistedState, version) => {
         const persisted = (persistedState ?? {}) as PersistedWorkspaceSidebarUiState
-        if (version >= 3) {
+        if (version >= 4) {
           return persisted
         }
 
-        const legacy = migrateLegacyProjectFilter(persisted.projectFilter)
+        // v3 → v4: the flat recent-session sort became the `updated` grouping,
+        // project sorting collapsed to the session ordering, and scope /
+        // pinned-first were dropped without replacement.
+        const legacyStatusFilters = migrateLegacyProjectFilterStatusFilters(persisted.projectFilter)
         return {
-          ...persisted,
-          projectScope: persisted.projectScope ?? legacy.projectScope ?? 'all',
-          statusFilters: persisted.statusFilters ?? legacy.statusFilters ?? [],
+          collapsedWorkspaceIds: persisted.collapsedWorkspaceIds,
+          expandedSessionListWorkspaceIds: persisted.expandedSessionListWorkspaceIds,
+          expandedSessionGroupIds: persisted.expandedSessionGroupIds,
+          sessionPreviewLimit: persisted.sessionPreviewLimit,
+          grouping: persisted.projectSortKey === 'recentSession' ? 'updated' : 'workspace',
+          sessionOrdering: persisted.projectSortKey === 'createdAt' ? 'created' : 'updated',
+          orderingDirection: persisted.projectSortDirection === 'asc' ? 'asc' : 'desc',
+          statusFilters: persisted.statusFilters ?? legacyStatusFilters,
           workPrFilters: persisted.workPrFilters ?? [],
+          environmentFilters: [],
           sourceFilters: persisted.sourceFilters ?? [],
           showArchived: persisted.showArchived ?? false,
         }
       },
       merge: (persistedState, currentState) => {
         const persisted = persistedState as PersistedWorkspaceSidebarUiState
-        const legacy = migrateLegacyProjectFilter(persisted?.projectFilter)
         return {
           ...currentState,
           collapsedWorkspaceIds: normalizeFlags(persisted?.collapsedWorkspaceIds),
           expandedSessionListWorkspaceIds: normalizeFlags(persisted?.expandedSessionListWorkspaceIds),
           expandedSessionGroupIds: normalizeFlags(persisted?.expandedSessionGroupIds),
           sessionPreviewLimit: normalizeSessionPreviewLimit(persisted?.sessionPreviewLimit),
-          projectScope: normalizeProjectScope(persisted?.projectScope ?? legacy.projectScope),
-          statusFilters: normalizeFilterList(
-            persisted?.statusFilters ?? legacy.statusFilters,
-            STATUS_FILTERS,
-          ),
+          grouping: normalizeGrouping(persisted?.grouping),
+          sessionOrdering: normalizeSessionOrdering(persisted?.sessionOrdering),
+          orderingDirection: normalizeOrderingDirection(persisted?.orderingDirection),
+          statusFilters: normalizeFilterList(persisted?.statusFilters, STATUS_FILTERS),
           workPrFilters: normalizeFilterList(persisted?.workPrFilters, WORK_PR_FILTERS),
+          environmentFilters: normalizeFilterList(persisted?.environmentFilters, ENVIRONMENT_FILTERS),
           sourceFilters: normalizeFilterList(persisted?.sourceFilters, SOURCE_FILTERS),
           showArchived: typeof persisted?.showArchived === 'boolean'
             ? persisted.showArchived
             : false,
-          projectSortKey: normalizeProjectSortKey(persisted?.projectSortKey),
-          projectSortDirection: normalizeProjectSortDirection(persisted?.projectSortDirection),
-          projectPinnedFirst: typeof persisted?.projectPinnedFirst === 'boolean'
-            ? persisted.projectPinnedFirst
-            : true,
         }
       },
     },

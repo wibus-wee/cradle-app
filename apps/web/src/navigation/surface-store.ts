@@ -34,7 +34,6 @@ const diffSearchSchema = z.object({
   repo: optionalStringSchema,
   path: optionalStringSchema,
   review: optionalStringSchema,
-  view: z.enum(['commit', 'guide']).optional(),
 }).optional()
 
 const surfaceRouteSchema = z.discriminatedUnion('to', [

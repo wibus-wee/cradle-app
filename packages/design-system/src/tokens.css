@@ -50,14 +50,15 @@
   --color-surface: var(--color-neutral-1);
   --color-surface-inset: var(--color-neutral-2);
   --color-fill: rgba(255, 255, 255, 0.04);
-  --color-border-content: rgba(255, 255, 255, 0.06);
-  --color-border-chrome: rgba(255, 255, 255, 0.05);
+  --color-border-content: rgba(255, 255, 255, 0.05);
+  --color-border-chrome: rgba(255, 255, 255, 0.04);
 
-  /* Shadow stack — heavier opacity to compensate for dark surfaces */
+  /* Shadow stack — original opacity, plus a faint top inset highlight so
+     borderless elevated surfaces lift off dark backgrounds without a stroke */
   --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.20), 0 0 0 1px oklch(0 0 0 / 0.18);
-  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.30), 0 0 0 1px oklch(0 0 0 / 0.22);
-  --shadow-md: 0 4px 16px -2px oklch(0 0 0 / 0.35), 0 2px 4px -1px oklch(0 0 0 / 0.20);
-  --shadow-lg: 0 8px 40px -8px oklch(0 0 0 / 0.40), 0 2px 8px -2px oklch(0 0 0 / 0.25);
+  --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.30), 0 0 0 1px oklch(0 0 0 / 0.22), inset 0 1px 0 oklch(1 0 0 / 0.05);
+  --shadow-md: 0 4px 16px -2px oklch(0 0 0 / 0.35), 0 2px 4px -1px oklch(0 0 0 / 0.20), inset 0 1px 0 oklch(1 0 0 / 0.06);
+  --shadow-lg: 0 8px 40px -8px oklch(0 0 0 / 0.40), 0 2px 8px -2px oklch(0 0 0 / 0.25), inset 0 1px 0 oklch(1 0 0 / 0.07);
 }
 
 /* ─── Canonical light-mode declarations ──────────────────────────────── */
@@ -119,15 +120,17 @@
   --color-sidebar: var(--color-neutral-2);        /* sidebar / header / footer bg */
   --color-sidebar-foreground: var(--color-neutral-7);
   --color-sidebar-fill: rgba(0, 0, 0, 0.04);      /* sidebar row hover */
-  --color-sidebar-border: rgba(0, 0, 0, 0.06);    /* chrome-region borders */
+  --color-sidebar-border: rgba(0, 0, 0, 0.05);    /* chrome-region borders */
   --color-sidebar-ring: var(--color-neutral-4);
-  --color-border-content: rgba(0, 0, 0, 0.08);    /* content-region borders */
-  --color-border-chrome: rgba(0, 0, 0, 0.06);     /* chrome-region borders */
+  --color-border-content: rgba(0, 0, 0, 0.06);    /* content-region borders — last resort */
+  --color-border-chrome: rgba(0, 0, 0, 0.05);     /* chrome-region borders */
 }
 
-/* 8 · Shadow stack — surface texture, not elevation.
-   Every layer is a 1px oklch ring plus a low-opacity soft cast. No `md`
-   floating cards. Use inset-shadow for pressed / focused states. */
+/* 8 · Shadow stack — layered elevation, not decoration.
+   Borders are a last resort: elevated surfaces (popovers, menus, modals)
+   separate from the page through fill + shadow alone. Every layer pairs a
+   soft ambient cast with a faint near cast; dark mode adds a top inset
+   highlight instead of a visible stroke. */
 :root {
   --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.04), 0 0 0 1px oklch(0 0 0 / 0.05);
   --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.08), 0 0 0 1px oklch(0 0 0 / 0.06);

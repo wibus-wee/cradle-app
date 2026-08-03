@@ -29,14 +29,18 @@ import type {
   ChatRuntimeUserInputUiSlotState,
   ChatSlashCommand,
 } from '../capabilities/chat-capabilities'
+import type { ComposerIntentId } from '../composer/composer-intent-actions'
+import { COMPOSER_INTENT_ACTIONS } from '../composer/composer-intent-actions'
 
 export type ChatSlashCommandSource = 'runtime' | 'cradle'
+export type ChatSlashCommandPanelSection = 'commands' | 'runtime'
 export type ChatSlashCommandPresentation = 'command' | 'slot'
 export type ChatSlashCommandIconKey
   = | 'appshot'
     | 'alert'
     | 'approvals'
     | 'code-review'
+    | 'commit'
     | 'compact'
     | 'config'
     | 'crew'
@@ -51,6 +55,7 @@ export type ChatSlashCommandIconKey
     | 'plugin'
     | 'plan'
     | 'progress'
+    | 'push'
     | 'quick-question'
     | 'user-input'
     | 'reasoning'
@@ -64,6 +69,7 @@ export type ChatSlashCommandIconKey
 
 export type ChatSlashCommandAction
   = | { kind: 'insertText', text: string }
+    | { kind: 'insertIntent', intentId: ComposerIntentId }
     | { kind: 'submitText', text: string, requiresEmptyComposer?: boolean }
     | { kind: 'uiAction', actionId: string }
 
@@ -83,6 +89,8 @@ export interface ChatComposerSlashCommand {
   label?: string
   aliases?: string[]
   source: ChatSlashCommandSource
+  /** Product panel group. Defaults from source + command-like icon keys. */
+  panelSection?: ChatSlashCommandPanelSection
   action: ChatSlashCommandAction
   presentation?: ChatSlashCommandPresentation
   iconKey?: ChatSlashCommandIconKey
@@ -95,12 +103,47 @@ export interface ChatComposerSlashCommand {
   }
 }
 
+/**
+ * Slash entries that behave as product Commands even when a runtime owns them
+ * (e.g. `/btw` quick-question, runtime `/side`).
+ */
+const PRODUCT_COMMAND_ICON_KEYS: ReadonlySet<ChatSlashCommandIconKey> = new Set([
+  'appshot',
+  'code-review',
+  'commit',
+  'feedback',
+  'push',
+  'quick-question',
+  'side-chat',
+])
+
+export function resolveSlashCommandPanelSection(
+  command: ChatComposerSlashCommand,
+): ChatSlashCommandPanelSection {
+  if (command.panelSection) {
+    return command.panelSection
+  }
+  if (command.source === 'cradle') {
+    return 'commands'
+  }
+  if (command.iconKey && PRODUCT_COMMAND_ICON_KEYS.has(command.iconKey)) {
+    return 'commands'
+  }
+  return 'runtime'
+}
+
 export const CRADLE_APPSHOT_SLASH_ACTION_ID = 'capture-appshot'
 export {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
 }
 const TOKEN_COUNT_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
+
+const INTENT_ICON_KEYS: Record<string, ChatSlashCommandIconKey> = {
+  review: 'code-review',
+  commit: 'commit',
+  push: 'push',
+}
 
 export const CRADLE_APPSHOT_SLASH_COMMAND: ChatComposerSlashCommand = {
   id: 'cradle:appshot',
@@ -122,6 +165,18 @@ export const CRADLE_SIDE_CHAT_SLASH_COMMAND: ChatComposerSlashCommand = {
   action: { kind: 'insertText', text: '/side ' },
   iconKey: 'side-chat',
 }
+
+/** Working-tree Review / Commit / Push prompt intents as Cradle slash commands. */
+export const CRADLE_INTENT_SLASH_COMMANDS: ChatComposerSlashCommand[] = COMPOSER_INTENT_ACTIONS.map(intent => ({
+  id: `cradle:intent:${intent.id}`,
+  name: intent.name,
+  label: intent.label,
+  description: intent.description,
+  argumentHint: '',
+  source: 'cradle' as const,
+  action: { kind: 'insertIntent' as const, intentId: intent.id },
+  iconKey: INTENT_ICON_KEYS[intent.id] ?? 'diff',
+}))
 
 export interface MergeChatSlashCommandsInput {
   runtimeCommands: ChatSlashCommand[]
@@ -232,8 +287,8 @@ export function mergeChatSlashCommands({
     command => command.availability?.enabled === false,
   )
   return [
-    ...runtimeUiSlotCommands,
     ...enabledCradleCommands,
+    ...runtimeUiSlotCommands,
     ...runtimeCommands.map(createRuntimeSlashCommand),
     ...disabledCradleCommands,
   ]

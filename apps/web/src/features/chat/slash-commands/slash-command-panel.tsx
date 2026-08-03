@@ -7,6 +7,7 @@ import {
   Cursor2Line as MousePointer2Icon,
   Dashboard2Line as GaugeIcon,
   DotCircleLine as CircleDotIcon,
+  GitCommitLine as GitCommitIcon,
   GitCompareLine as DiffIcon,
   GroupLine as UsersIcon,
   HammerLine as HammerIcon,
@@ -24,10 +25,11 @@ import {
   TargetLine as TargetIcon,
   TerminalBoxLine as SquareTerminalIcon,
   TreeLine as FolderTreeIcon,
+  Upload2Line as UploadIcon,
   WarningLine as AlertTriangleIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
@@ -35,7 +37,11 @@ import { clampPercentValue } from '~/lib/number-format'
 
 import type { ChatComposerSlashCommand, ChatSlashCommandStateVisual } from './chat-slash-commands'
 import { getSlashCommandSourceLabel, hasDuplicateSlashCommandName } from './chat-slash-commands'
-import { getSlashCommandPanelItems, isSlashCommandAvailable } from './slash-command-input'
+import {
+  getSlashCommandPanelItems,
+  groupSlashCommandPanelItems,
+  isSlashCommandAvailable,
+} from './slash-command-input'
 
 interface SlashCommandPanelProps {
   commands: ChatComposerSlashCommand[]
@@ -142,6 +148,8 @@ function renderCommandIcon(command: ChatComposerSlashCommand): ReactNode {
       return <ShieldCheckIcon className={className} aria-hidden="true" />
     case 'code-review':
       return <ScanEyeIcon className={className} aria-hidden="true" />
+    case 'commit':
+      return <GitCommitIcon className={className} aria-hidden="true" />
     case 'compact':
       return <GaugeIcon className={className} aria-hidden="true" />
     case 'config':
@@ -168,6 +176,8 @@ function renderCommandIcon(command: ChatComposerSlashCommand): ReactNode {
       return <CircleDotIcon className={className} aria-hidden="true" />
     case 'progress':
       return <ListChecksIcon className={className} aria-hidden="true" />
+    case 'push':
+      return <UploadIcon className={className} aria-hidden="true" />
     case 'quick-question':
       return <MessageCircleQuestionIcon className={className} aria-hidden="true" />
     case 'user-input':
@@ -269,12 +279,29 @@ export function SlashCommandPanel({
   const [selection, setSelection] = useState({ activeIndex: 0, query })
   const listRef = useRef<HTMLMenuElement>(null)
 
-  const results = useMemo(
-    () =>
-      getSlashCommandPanelItems(commands, query)
-        .slice(0, MAX_RESULTS)
-        .map(item => ({ item })),
+  const sections = useMemo(
+    () => groupSlashCommandPanelItems(
+      getSlashCommandPanelItems(commands, query).slice(0, MAX_RESULTS),
+    ),
     [commands, query],
+  )
+  const sectionRows = useMemo(() => {
+    return sections.map((section, sectionIndex) => {
+      const offset = sections
+        .slice(0, sectionIndex)
+        .reduce((total, previousSection) => total + previousSection.items.length, 0)
+      return {
+        ...section,
+        rows: section.items.map((item, itemIndex) => ({
+          item,
+          index: offset + itemIndex,
+        })),
+      }
+    })
+  }, [sections])
+  const results = useMemo(
+    () => sectionRows.flatMap(section => section.rows),
+    [sectionRows],
   )
 
   const effectiveActiveIndex
@@ -282,16 +309,21 @@ export function SlashCommandPanel({
       ? 0
       : Math.min(selection.query === query ? selection.activeIndex : 0, results.length - 1)
 
+  const activeCommand = results[effectiveActiveIndex]?.item
+  const activeOptionId = activeCommand
+    ? formatSlashCommandOptionId(activeCommand, effectiveActiveIndex)
+    : undefined
+
   useEffect(() => {
     const list = listRef.current
-    if (!list) {
+    if (!list || !activeOptionId) {
       return
     }
-    const active = list.children[effectiveActiveIndex] as HTMLElement | undefined
+    const active = list.querySelector<HTMLElement>(`#${CSS.escape(activeOptionId)}`)
     if (typeof active?.scrollIntoView === 'function') {
       active.scrollIntoView({ block: 'nearest' })
     }
-  }, [effectiveActiveIndex])
+  }, [activeOptionId])
 
   const handleDocumentKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (!visible) {
@@ -341,11 +373,6 @@ export function SlashCommandPanel({
     [onSelect],
   )
 
-  const activeCommand = results[effectiveActiveIndex]?.item
-  const activeOptionId = activeCommand
-    ? formatSlashCommandOptionId(activeCommand, effectiveActiveIndex)
-    : undefined
-
   useEffect(() => {
     onActiveOptionIdChange?.(visible ? activeOptionId : undefined)
   }, [activeOptionId, onActiveOptionIdChange, visible])
@@ -357,73 +384,86 @@ export function SlashCommandPanel({
   return (
     <div className="absolute bottom-full left-0 right-0 z-10 mb-1.5 max-h-72 overflow-hidden rounded-xl border border-border bg-popover shadow-xl backdrop-blur-md">
       <menu ref={listRef} className="m-0 max-h-72 list-none overflow-y-auto p-1" id={listboxId}>
-        {results.map(({ item }, idx) => {
-          const subtitle = formatCommandRowSubtitle(commands, item)
-          const badge = getCommandBadge(commands, item)
-          const isAvailable = isSlashCommandAvailable(item)
-          return (
-            <li key={formatCommandKey(item, idx)}>
-              <Button
-                type="button"
-                id={formatSlashCommandOptionId(item, idx)}
-                aria-label={`${readCommandTitle(item)} ${getSlashCommandSourceLabel(item)}`}
-                data-active={formatSlashCommandOptionId(item, idx) === activeOptionId}
-                disabled={!isAvailable}
-                variant="ghost"
-                className={cn(
-                  'h-auto w-full items-start justify-start gap-2.5 rounded-lg px-2.5 py-1 text-left whitespace-normal transition-none',
-                  isAvailable
-                    ? idx === effectiveActiveIndex
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-foreground/80 hover:bg-accent/40'
-                    : 'cursor-not-allowed text-muted-foreground/45 opacity-75',
-                )}
-                onMouseEnter={() => setSelection({ activeIndex: idx, query })}
-                onFocus={() => setSelection({ activeIndex: idx, query })}
-                onClick={() => handleOptionClick(item)}
-              >
-                <SlashCommandIcon command={item} />
-                <span className="flex min-w-0 flex-1 flex-row items-center gap-1.5">
-                  <span className="flex shrink-0 items-baseline gap-1.5">
-                    <span className="shrink-0 whitespace-nowrap text-xs font-medium">
-                      {readCommandTitle(item)}
-                    </span>
-                    {item.argumentHint && (
-                      <span className="truncate text-[11px] text-muted-foreground">
-                        {item.argumentHint}
-                      </span>
-                    )}
-                    {badge && (
-                      <span
-                        className={cn(
-                          'rounded border px-1 py-px text-[9px] font-medium leading-none',
-                          getCommandBadgeClassName(item),
-                        )}
-                      >
-                        {badge}
-                      </span>
-                    )}
-                    {item.stateLabel && item.stateVisual?.kind !== 'compactUsage' && (
-                      <span
-                        className={cn(
-                          'max-w-28 truncate rounded border px-1 py-px text-[9px] font-medium leading-none tabular-nums',
-                          getCommandStateClassName(item),
-                        )}
-                      >
-                        {item.stateLabel}
-                      </span>
-                    )}
-                  </span>
-                  {subtitle && (
-                    <span className="mt-0.5 block min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                      {subtitle}
-                    </span>
-                  )}
-                </span>
-              </Button>
+        {sectionRows.map(section => (
+          <Fragment key={section.id}>
+            <li
+              role="presentation"
+              className={cn(
+                'px-2.5 pb-1 pt-1.5 text-[10px] font-medium tracking-wide text-muted-foreground/70',
+                section.rows[0]?.index > 0 && 'mt-0.5 border-t border-border/60 pt-2',
+              )}
+            >
+              {section.label}
             </li>
-          )
-        })}
+            {section.rows.map(({ item, index: idx }) => {
+              const subtitle = formatCommandRowSubtitle(commands, item)
+              const badge = getCommandBadge(commands, item)
+              const isAvailable = isSlashCommandAvailable(item)
+              return (
+                <li key={formatCommandKey(item, idx)}>
+                  <Button
+                    type="button"
+                    id={formatSlashCommandOptionId(item, idx)}
+                    aria-label={`${readCommandTitle(item)} ${getSlashCommandSourceLabel(item)}`}
+                    data-active={formatSlashCommandOptionId(item, idx) === activeOptionId}
+                    disabled={!isAvailable}
+                    variant="ghost"
+                    className={cn(
+                      'h-auto w-full items-start justify-start gap-2.5 rounded-lg px-2.5 py-1 text-left whitespace-normal transition-none',
+                      isAvailable
+                        ? idx === effectiveActiveIndex
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-foreground/80 hover:bg-accent/40'
+                        : 'cursor-not-allowed text-muted-foreground/45 opacity-75',
+                    )}
+                    onMouseEnter={() => setSelection({ activeIndex: idx, query })}
+                    onFocus={() => setSelection({ activeIndex: idx, query })}
+                    onClick={() => handleOptionClick(item)}
+                  >
+                    <SlashCommandIcon command={item} />
+                    <span className="flex min-w-0 flex-1 flex-row items-center gap-1.5">
+                      <span className="flex shrink-0 items-baseline gap-1.5">
+                        <span className="shrink-0 whitespace-nowrap text-xs font-medium">
+                          {readCommandTitle(item)}
+                        </span>
+                        {item.argumentHint && (
+                          <span className="truncate text-[11px] text-muted-foreground">
+                            {item.argumentHint}
+                          </span>
+                        )}
+                        {badge && (
+                          <span
+                            className={cn(
+                              'rounded border px-1 py-px text-[9px] font-medium leading-none',
+                              getCommandBadgeClassName(item),
+                            )}
+                          >
+                            {badge}
+                          </span>
+                        )}
+                        {item.stateLabel && item.stateVisual?.kind !== 'compactUsage' && (
+                          <span
+                            className={cn(
+                              'max-w-28 truncate rounded border px-1 py-px text-[9px] font-medium leading-none tabular-nums',
+                              getCommandStateClassName(item),
+                            )}
+                          >
+                            {item.stateLabel}
+                          </span>
+                        )}
+                      </span>
+                      {subtitle && (
+                        <span className="mt-0.5 block min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
+                          {subtitle}
+                        </span>
+                      )}
+                    </span>
+                  </Button>
+                </li>
+              )
+            })}
+          </Fragment>
+        ))}
       </menu>
     </div>
   )

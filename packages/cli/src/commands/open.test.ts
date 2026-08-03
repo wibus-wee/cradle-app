@@ -85,6 +85,17 @@ describe('open path helpers', () => {
       'open',
       '.',
     ])
+
+    const packagedArgv = [
+      process.execPath,
+      '/Applications/Cradle.app/Contents/Resources/cli/index.cjs',
+      '.',
+    ]
+    expect(applyOpenPathSugar(packagedArgv, KNOWN)).toEqual([
+      ...packagedArgv.slice(0, 2),
+      'open',
+      '.',
+    ])
   })
 
   it('builds a cradle:// open deep link with encoded workspace id', () => {

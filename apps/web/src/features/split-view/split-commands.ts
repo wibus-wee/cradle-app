@@ -1,7 +1,6 @@
 import type { DockviewGroupPanel } from 'dockview-react'
 
 import type { SurfaceRoute } from '~/navigation/surface-identity'
-import { surfaceIdForRoute } from '~/navigation/surface-identity'
 
 import { clearSplitDropHover } from './dnd/split-drop-hover'
 import type { SplitDropPoint } from './dnd/split-drop-target'
@@ -9,7 +8,12 @@ import { resolveSplitDropTarget } from './dnd/split-drop-target'
 import type { SplitDirection } from './model/split-direction'
 import { getSplitDockviewApi } from './runtime/split-dockview-registry'
 import { addSplitPanel } from './runtime/split-panels'
-import { isSplitWorkspace, readSplitWorkspace, useSplitWorkspaceStore } from './store/split-workspace-store'
+import {
+  isSplitWorkspace,
+  readSplitPaneByRoute,
+  readSplitWorkspace,
+  useSplitWorkspaceStore,
+} from './store/split-workspace-store'
 
 /**
  * Imperative entry points into the split view, for callers outside the split
@@ -36,7 +40,10 @@ export function openRouteInSplit(
   const paneId = store.registerPane(surfaceId, input.route)
   if (!paneId) {
     // Already open — surface it instead of stacking a duplicate.
-    api.getPanel(surfaceIdForRoute(input.route))?.api.setActive()
+    const existingPane = readSplitPaneByRoute(surfaceId, input.route)
+    if (existingPane) {
+      api.getPanel(existingPane.id)?.api.setActive()
+    }
     return false
   }
 
@@ -71,6 +78,35 @@ export function focusSplitPane(surfaceId: string, paneId: string): void {
   useSplitWorkspaceStore.getState().focusPane(surfaceId, paneId)
 }
 
+/** Replace the route rendered by one secondary pane while preserving its layout slot. */
+export function replaceSplitPaneRoute(
+  surfaceId: string,
+  paneId: string,
+  route: SurfaceRoute,
+): boolean {
+  const workspace = readSplitWorkspace(surfaceId)
+  if (!workspace || paneId === workspace.primaryPaneId || !workspace.panes[paneId]) {
+    return false
+  }
+  useSplitWorkspaceStore.getState().updatePaneRoute(surfaceId, paneId, route)
+  return true
+}
+
+/** Close a specific secondary pane through Dockview so layout and store stay in sync. */
+export function closeSplitPaneById(surfaceId: string, paneId: string): boolean {
+  const workspace = readSplitWorkspace(surfaceId)
+  if (!workspace || paneId === workspace.primaryPaneId || !workspace.panes[paneId]) {
+    return false
+  }
+  const api = getSplitDockviewApi(surfaceId)
+  const panel = api?.getPanel(paneId)
+  if (!api || !panel) {
+    return false
+  }
+  api.removePanel(panel)
+  return true
+}
+
 /**
  * VS Code-style Cmd+W: close the focused pane before the whole tab. Returns
  * `false` when the surface is down to its primary pane, the caller's signal to
@@ -81,11 +117,5 @@ export function closeFocusedSplitPane(surfaceId: string): boolean {
   if (!workspace || !isSplitWorkspace(workspace) || workspace.focusedPaneId === workspace.primaryPaneId) {
     return false
   }
-  const api = getSplitDockviewApi(surfaceId)
-  const panel = api?.getPanel(workspace.focusedPaneId)
-  if (!api || !panel) {
-    return false
-  }
-  api.removePanel(panel)
-  return true
+  return closeSplitPaneById(surfaceId, workspace.focusedPaneId)
 }

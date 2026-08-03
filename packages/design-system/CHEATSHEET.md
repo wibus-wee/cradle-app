@@ -141,18 +141,31 @@ The system has one root radius (`--radius: 0.625rem` = 10 px). Every step is der
 | `--radius-3xl` | × 2.4 | 24 px | Hero surfaces |
 | `--radius-full` | — | 9999 px | Pills, avatars, badges |
 
-## Shadow stack (surface texture, not elevation)
+## Shadow stack (layered elevation, borders as last resort)
 
 | Token | Value | Use |
 |---|---|---|
-| `--shadow-xs` | 1 px cast + 1 px oklch ring @ 5 % | Inputs, small controls |
-| `--shadow-sm` | 3 px cast + 1 px oklch ring @ 6 % | Cards, floating chrome card |
-| `--shadow-md` | 16 px soft cast + 4 px near cast | Modals, popovers |
-| `--shadow-lg` | 40 px far cast + 8 px near cast | Sheets, overlays, jarvis popover |
+| `--shadow-xs` | 2 px cast + 1 px oklch ring @ 5 % | Inputs, small controls, popovers, menus — **borderless** |
+| `--shadow-sm` | 3 px cast + 1 px oklch ring @ 6 % | Cards, floating chrome card, dialogs |
+| `--shadow-md` | 16 px soft cast + 4 px near cast | Reserved — rare hero overlays only |
+| `--shadow-lg` | 40 px far cast + 8 px near cast | Sheets, overlays, toasts — **borderless** |
 | `--shadow-inset` | `inset 0 1px 0 rgba(255,255,255,0.05)` | Top highlight (bevel effect) |
 | `--shadow-inset-ring` | `inset 0 0 0 1px rgba(0,0,0,0.06)` | Etched interior ring |
 
-Wrong: `shadow-lg` on a card. Right: `shadow-sm` for surface presence, `shadow-inset` for interior wells.
+Shadow depth does not change between themes. Dark mode only appends a faint top inset highlight (`inset 0 1px 0 white/5–7 %`) so borderless surfaces still read as lifted.
+
+Wrong: `border` on a popover or menu. Right: fill + `--shadow-md`; borders only when layout gap and shadow cannot separate two surfaces.
+
+---
+
+## Border contract (weakened)
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-border-content` | black / 6 % (light) · white / 5 % (dark) | Content-region borders — last resort |
+| `--color-border-chrome` | black / 5 % (light) · white / 4 % (dark) | Chrome-region borders |
+
+In `apps/web` these surface as `--border` (6 % / 5 %) and `--input` (7 % / 7 %).
 
 ---
 

@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { buildUpstreamRequestHeaders, buildUpstreamResponseHeaders, upstreamJsonByBaseUrl } from './upstream'
+import {
+  buildUpstreamRequestHeaders,
+  buildUpstreamResponseHeaders,
+  proxyUpstreamRequestWithReconnect,
+  upstreamJsonByBaseUrl,
+} from './upstream'
 
 describe('remote-host upstream helpers', () => {
   afterEach(() => {
@@ -73,5 +78,51 @@ describe('remote-host upstream helpers', () => {
         upstreamMessage: 'Session requires a provider target or an agent',
       },
     })
+  })
+
+  it('replays a failed GET once after resolving a reconnected tunnel', async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError('socket hang up'))
+      .mockResolvedValueOnce(new Response('recovered', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const resolveBaseUrl = vi.fn()
+      .mockResolvedValueOnce('http://127.0.0.1:4101')
+      .mockResolvedValueOnce('http://127.0.0.1:4102')
+
+    const response = await proxyUpstreamRequestWithReconnect(
+      resolveBaseUrl,
+      new Request('http://localhost/remote-hosts/host/upstream/health'),
+      '/health',
+    )
+
+    expect(await response.text()).toBe('recovered')
+    expect(resolveBaseUrl).toHaveBeenCalledTimes(2)
+    expect(resolveBaseUrl.mock.calls).toEqual([
+      [undefined],
+      ['http://127.0.0.1:4101'],
+    ])
+    expect(fetchMock.mock.calls.map(call => String(call[0]))).toEqual([
+      'http://127.0.0.1:4101/health',
+      'http://127.0.0.1:4102/health',
+    ])
+  })
+
+  it('does not replay a mutation after a transport hangup', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError('socket hang up'))
+    vi.stubGlobal('fetch', fetchMock)
+    const resolveBaseUrl = vi.fn().mockResolvedValue('http://127.0.0.1:4101')
+
+    await expect(proxyUpstreamRequestWithReconnect(
+      resolveBaseUrl,
+      new Request('http://localhost/remote-hosts/host/upstream/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ title: 'one execution only' }),
+        headers: { 'content-type': 'application/json' },
+      }),
+      '/sessions',
+    )).rejects.toMatchObject({ code: 'remote_cradle_request_failed' })
+
+    expect(resolveBaseUrl).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

@@ -5,6 +5,8 @@ import type { StorybookConfig } from '@storybook/react-vite'
 import { mergeConfig } from 'vite'
 
 const storybookDirectory = dirname(fileURLToPath(import.meta.url))
+const reactPath = resolve(storybookDirectory, '../node_modules/react')
+const reactDomPath = resolve(storybookDirectory, '../node_modules/react-dom')
 
 const config: StorybookConfig = {
   stories: ['../src/**/*.stories.@(ts|tsx)'],
@@ -17,8 +19,11 @@ const config: StorybookConfig = {
   async viteFinal(viteConfig) {
     return mergeConfig(viteConfig, {
       resolve: {
+        dedupe: ['react', 'react-dom'],
         alias: {
           '~': resolve(storybookDirectory, '../src'),
+          'react': reactPath,
+          'react-dom': reactDomPath,
         },
       },
     })

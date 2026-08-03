@@ -145,6 +145,8 @@ export interface RuntimeOwnedProviderTarget {
   credentialRef: string | null
   enabledModelsJson: string
   customModelsJson: string
+  /** Runtime-owned targets are unbound unless a runtime explicitly sets identity. */
+  providerId: string | null
   sourceKey: string
   externalRecordId: string | null
   sourceFingerprint: string
@@ -639,6 +641,14 @@ export interface RuntimeFilesystemUiSlotState {
   updatedAt: number
 }
 
+export interface RuntimeSkillsUiSlotItem {
+  name: string
+  enabled: boolean
+  displayName: string | null
+  iconUrl: string | null
+  brandColor: string | null
+}
+
 export interface RuntimeSkillsUiSlotState {
   kind: 'skills'
   slotId: string
@@ -647,6 +657,8 @@ export interface RuntimeSkillsUiSlotState {
   disabledCount: number
   errorCount: number
   roots: string[]
+  /** Optional per-skill display enrichment (remote/local icons, brand color). */
+  items?: RuntimeSkillsUiSlotItem[]
   updatedAt: number
 }
 
@@ -790,6 +802,12 @@ export interface ChatRuntimeCapabilities {
   readonly supportsUiSlotStates: boolean
   readonly supportsDynamicCapabilities: boolean
   readonly supportsTitleGeneration: boolean
+  /**
+   * Opt-in: the runtime accepts a `StreamTurnInput.reviewTarget` and maps it to its native code
+   * review flow (e.g. Codex app-server `review/start`). Absent means unsupported, and the server
+   * rejects `reviewTarget` turns for the runtime.
+   */
+  readonly supportsNativeReview?: boolean
   readonly sessionModelSwitch: 'in-session' | 'restart-session' | 'unsupported'
 }
 
@@ -1222,6 +1240,11 @@ export interface RuntimeHarnessContext {
   fragments: RuntimeHarnessFragment[]
 }
 
+/** A provider-native code-review target supported by the Chat Runtime. */
+export type RuntimeReviewTarget
+  = | { type: 'uncommittedChanges' }
+    | { type: 'baseBranch', branch: string }
+
 export interface StreamTurnInput {
   runId: string
   runtimeSession: RuntimeSession
@@ -1230,6 +1253,11 @@ export interface StreamTurnInput {
   transcript?: CradleTurnTranscript
   originalMessages?: UIMessage[]
   responseMessageId?: string
+  /**
+   * Start the provider's native review operation instead of a regular text turn.
+   * The surrounding Chat Runtime run still owns transcript persistence and streaming.
+   */
+  reviewTarget?: RuntimeReviewTarget
   /** When set, the turn was drained from a Cradle queue item (may already be native-enqueued). */
   queueItemId?: string | null
   modelId?: string | null

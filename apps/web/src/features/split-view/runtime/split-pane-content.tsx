@@ -84,7 +84,11 @@ export function SplitPaneContent({ api, params }: IDockviewPanelProps<SplitPaneP
           ? host.primaryContent
           : pane && (
             <Suspense fallback={null}>
-              <SplitPaneRouter route={pane.route} />
+              <SplitPaneRouter
+                surfaceId={host.surfaceId}
+                paneId={pane.id}
+                route={pane.route}
+              />
             </Suspense>
           )}
       </div>

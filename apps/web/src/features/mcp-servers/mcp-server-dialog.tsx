@@ -12,7 +12,7 @@ import { Switch } from '~/components/ui/switch'
 import { Textarea } from '~/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 
-import type { McpServerSaveBody, McpServerTransport } from './mcp-server-form'
+import type { McpServerDraft, McpServerSaveBody, McpServerTransport } from './mcp-server-form'
 import { parseArguments, parseSecretValues } from './mcp-server-form'
 
 type McpServer = GetMcpServersResponse[number]
@@ -20,21 +20,22 @@ type McpServer = GetMcpServersResponse[number]
 interface McpServerDialogProps {
   open: boolean
   server: McpServer | null
+  draft?: McpServerDraft
   saving: boolean
   onOpenChange: (open: boolean) => void
   onSave: (body: McpServerSaveBody) => Promise<void>
 }
 
-export function McpServerDialog({ open, server, saving, onOpenChange, onSave }: McpServerDialogProps) {
+export function McpServerDialog({ open, server, draft, saving, onOpenChange, onSave }: McpServerDialogProps) {
   const { t } = useTranslation('settings')
-  const [transport, setTransport] = useState<McpServerTransport>(server?.transport ?? 'stdio')
-  const [name, setName] = useState(server?.name ?? '')
-  const [command, setCommand] = useState(server?.command ?? '')
-  const [args, setArgs] = useState(server?.args?.join('\n') ?? '')
-  const [url, setUrl] = useState(server?.url ?? '')
+  const [transport, setTransport] = useState<McpServerTransport>(server?.transport ?? draft?.transport ?? 'stdio')
+  const [name, setName] = useState(server?.name ?? draft?.name ?? '')
+  const [command, setCommand] = useState(server?.command ?? draft?.command ?? '')
+  const [args, setArgs] = useState(server?.args?.join('\n') ?? draft?.args?.join('\n') ?? '')
+  const [url, setUrl] = useState(server?.url ?? draft?.url ?? '')
   const [enabled, setEnabled] = useState(server?.enabled ?? true)
   const [replaceSecrets, setReplaceSecrets] = useState(!server)
-  const [secretText, setSecretText] = useState('')
+  const [secretText, setSecretText] = useState(draft?.secretKeys?.map(key => `${key}=`).join('\n') ?? '')
   const [error, setError] = useState<string | null>(null)
 
   const submit = async () => {

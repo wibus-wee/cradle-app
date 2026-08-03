@@ -1,13 +1,15 @@
 import { useCallback, useSyncExternalStore } from 'react'
 
-import { getAuthenticatedEventSourceUrl, getServerUrl } from '~/lib/electron'
+import { getServerUrl } from '~/lib/electron'
+import type { ServerEventSource } from '~/lib/server-transport'
+import { openServerEventSource } from '~/lib/server-transport'
 import type { BrowserWorkflowRuntimeSnapshot } from '~/store/browser-panel'
 import { browserWorkflowRuntimeSnapshotSchema } from '~/store/browser-panel'
 
 interface WorkflowRuntimeEntry {
   snapshot: BrowserWorkflowRuntimeSnapshot | null
   listeners: Set<() => void>
-  source: EventSource | null
+  source: ServerEventSource | null
   generation: number
 }
 
@@ -38,18 +40,16 @@ function connect(key: string, sessionId: string, toolCallId: string): void {
     `/chat/sessions/${encodeURIComponent(sessionId)}/workflows/${encodeURIComponent(toolCallId)}/stream`,
     getServerUrl(),
   ).toString()
-  void getAuthenticatedEventSourceUrl(endpoint).then((url) => {
-    if (entry.generation !== generation || entry.listeners.size === 0) { return }
-    const source = new EventSource(url)
-    entry.source = source
-    source.onmessage = (event) => {
-      const parsedJson = parseJson(event.data)
-      const parsedSnapshot = browserWorkflowRuntimeSnapshotSchema.safeParse(parsedJson)
-      if (!parsedSnapshot.success) { return }
-      entry.snapshot = parsedSnapshot.data
-      for (const listener of entry.listeners) { listener() }
-    }
-  }).catch(() => undefined)
+  if (entry.generation !== generation || entry.listeners.size === 0) { return }
+  const source = openServerEventSource(endpoint)
+  entry.source = source
+  source.onmessage = (event) => {
+    const parsedJson = parseJson(event.data)
+    const parsedSnapshot = browserWorkflowRuntimeSnapshotSchema.safeParse(parsedJson)
+    if (!parsedSnapshot.success) { return }
+    entry.snapshot = parsedSnapshot.data
+    for (const listener of entry.listeners) { listener() }
+  }
 }
 
 function disconnect(key: string, entry: WorkflowRuntimeEntry): void {

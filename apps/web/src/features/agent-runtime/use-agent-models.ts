@@ -62,6 +62,7 @@ const AgentProfileSchema = z.object({
   credentialRef: z.string().nullable(),
   customModels: z.string(),
   iconSlug: z.string().nullable(),
+  providerId: z.string().nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
 })

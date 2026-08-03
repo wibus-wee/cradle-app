@@ -7,11 +7,9 @@ import { BetaNotice } from '~/components/common/beta-notice'
 import { DiffWorkerProvider } from '~/components/common/diff/diff-runtime'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { Spinner } from '~/components/ui/spinner'
-import { CommitPlanPage } from '~/features/diff-review/commit-plan-page'
 import { parseGitHubPullRequestReference } from '~/features/diff-review/github-pull-request-reference'
-import { GuideView } from '~/features/diff-review/review-detail/guide-view'
+import { DiffsIndexContainer } from '~/features/diff-review/review/diffs-index-container'
 import { ReviewDetailPage } from '~/features/diff-review/review-detail/review-detail-page'
-import { ReviewsListPage } from '~/features/diff-review/reviews-list-page'
 import { navigateToReview, WORKING_TREE_REVIEW_ID } from '~/features/diff-review/shared/navigation'
 
 export interface WorkspaceDiffsViewProps {
@@ -19,7 +17,6 @@ export interface WorkspaceDiffsViewProps {
   repo?: string
   path?: string
   review?: string
-  view?: 'commit' | 'guide'
   line?: number
   side?: 'base' | 'head'
   github?: string
@@ -32,17 +29,15 @@ export interface WorkspaceDiffsViewProps {
  * identically whether mounted by the `/workspaces/$workspaceId/diffs` route or
  * by the split-view / tear-off surface renderer.
  *
- * One shared highlighter worker pool for every CodeView under /diffs (review
- * detail, guide, commit plan). Without this, each CodeView tokenizes on the
- * main thread and the singleton pool is never initialized — see
- * shared/diff-items.ts for the option constants.
+ * One shared highlighter worker pool for every CodeView under /diffs.
+ * Without this, each CodeView tokenizes on the main thread and the singleton
+ * pool is never initialized — see shared/diff-items.ts for the option constants.
  */
 export function WorkspaceDiffsView({
   workspaceId,
   repo,
   path,
   review,
-  view,
   line,
   side,
   github,
@@ -56,17 +51,20 @@ export function WorkspaceDiffsView({
     hasPanel: false,
   }), [workspaceId]))
 
+  const isBrowsing = !review && !path && !github
+
   return (
     <DiffWorkerProvider>
       <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-background">
-        <BetaNotice title={t('beta.title')} description={t('beta.description')} />
+        {!isBrowsing && (
+          <BetaNotice title={t('beta.title')} description={t('beta.description')} />
+        )}
         <div className="min-h-0 flex-1 overflow-hidden">
           <WorkspaceDiffsContent
             workspaceId={workspaceId}
             repo={repo}
             path={path}
             review={review}
-            view={view}
             line={line}
             side={side}
             github={github}
@@ -82,26 +80,10 @@ function WorkspaceDiffsContent({
   repo,
   path,
   review,
-  view,
   line,
   side,
   github,
 }: WorkspaceDiffsViewProps) {
-  if (review && view === 'commit') {
-    return <CommitPlanPage workspaceId={workspaceId} repositoryPath={repo} reviewId={review} />
-  }
-
-  if (review && view === 'guide') {
-    return (
-      <GuideView
-        workspaceId={workspaceId}
-        repositoryPath={repo}
-        reviewId={review}
-        onBack={() => navigateToReview(workspaceId, review, { repositoryPath: repo })}
-      />
-    )
-  }
-
   if (review) {
     return (
       <ReviewDetailPage
@@ -134,7 +116,13 @@ function WorkspaceDiffsContent({
     )
   }
 
-  return <ReviewsListPage workspaceId={workspaceId} repositoryPath={repo} />
+  return (
+    <DiffsIndexContainer
+      workspaceId={workspaceId}
+      preferredWorkspaceId={workspaceId}
+      selectedRepositoryKey={repo}
+    />
+  )
 }
 
 function GitHubPullRequestDeepLink({ workspaceId, reference }: { workspaceId: string, reference: string }) {

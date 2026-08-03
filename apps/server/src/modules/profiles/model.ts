@@ -15,6 +15,7 @@ export const ProfilesModel = {
     credentialRef: nullableString,
     customModels: t.String(),
     iconSlug: nullableString,
+    providerId: nullableString,
     createdAt: t.Number(),
     updatedAt: t.Number(),
   }),
@@ -30,6 +31,12 @@ export const ProfilesModel = {
     config: t.Record(t.String(), t.Any()),
     credentialRef: t.Optional(nullableProfileRef),
     iconSlug: t.Optional(nullableString),
+    providerId: t.Optional(nullableProfileRef),
+  }),
+
+  bindProviderBody: t.Object({
+    providerId: t.String({ minLength: 1 }),
+    applyEndpointDefaults: t.Optional(t.Boolean()),
   }),
 
   customModelsBody: t.Object({

@@ -3,6 +3,7 @@ import type { UIMessage } from 'ai'
 import type { ChatPluginContextPart, ChatSkillContextPart } from '../../chat-runtime/context-parts'
 import {
   readChatFileLineCommentContextPart,
+  readChatIntentContextPart,
   readChatPluginContextPart,
   readChatSkillContextPart,
 } from '../../chat-runtime/context-parts'
@@ -59,6 +60,10 @@ export function projectProviderInputParts(message: RuntimeMessageInput): Provide
           '</file_line_comment>',
         ].join('\n'),
       }
+    }
+    const intentPart = readChatIntentContextPart(part)
+    if (intentPart) {
+      return { type: 'text', text: intentPart.prompt }
     }
     return { type: 'unsupported', partType: part.type, part }
   })

@@ -16,6 +16,11 @@ export function setRuntimeServerUrl(value: string): void {
   runtimeServerUrl = normalizeServerEndpointUrl(value)
 }
 
+/** Test-only: clear the in-memory runtime override without touching localStorage. */
+export function resetRuntimeServerUrlForTests(): void {
+  runtimeServerUrl = null
+}
+
 export function normalizeServerEndpointUrl(value: string): string {
   const trimmed = value.trim()
   if (!trimmed) {

@@ -12,10 +12,19 @@ import { createContext, use } from 'react'
  * Deliberately dependency-free: the root route imports it, and so does the
  * pane runtime that the root route transitively pulls in.
  */
-const SplitPaneRootContext = createContext(false)
+export interface SplitPaneRoot {
+  surfaceId: string
+  paneId: string
+}
+
+const SplitPaneRootContext = createContext<SplitPaneRoot | null>(null)
 
 export const SplitPaneRootProvider = SplitPaneRootContext.Provider
 
-export function useIsSplitPaneRoot(): boolean {
+export function useSplitPaneRoot(): SplitPaneRoot | null {
   return use(SplitPaneRootContext)
+}
+
+export function useIsSplitPaneRoot(): boolean {
+  return useSplitPaneRoot() !== null
 }

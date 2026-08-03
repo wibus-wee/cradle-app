@@ -63,18 +63,20 @@ The single strongest identity signature in Cradle is the **inset floating card i
 - The content card sits inside chrome with a `--layout-gutter` margin and `--radius-xl` corners.
 - `--shadow-sm` (a 1-px oklch ring plus a soft cast) defines the card's edge — never `shadow-lg` or `shadow-xl`.
 
-### 2 · Surface texture, not elevation
+### 2 · Layered elevation, borders as last resort
 
-Cradle **does not float things**. Material Design's floating card is banned.
+Cradle separates surfaces through **fill steps and layered shadows** — not visible strokes. A border is the last tool you reach for, when fill and shadow cannot convey separation on their own.
 
-Depth in Cradle comes from **inset shadows** — the surface receives a 1-px inner ring, or an inset highlight, or a pressed-in feel. Cards embed *into* the chrome; they do not levitate *above* it.
+Overlays (popovers, menus, selects, comboboxes) **do float**, but barely: they carry `--shadow-xs` with *no* `border` class. Dialogs use `--shadow-sm`; only sheets, drawers and toasts reach `--shadow-lg`. In dark mode the shadow stack adds a faint top inset highlight (`inset 0 1px 0 white/5-7%`) instead of a keyline, so the surface lifts off the page cleanly.
 
-**Why**: elevation shadows read as "temporary UI floating over a document." That framing is wrong for a desktop tool. Everything in Cradle is *always here*, not popping up momentarily. Surface texture communicates permanence.
+Page-embedded cards stay quiet: `--shadow-sm` at most, edge defined by the token, never a hand-rolled ring.
+
+**Why**: every visible 1px stroke is noise at desktop density. Fill + shadow produce hierarchy the eye reads *spatially*; borders produce hierarchy the eye reads *bureaucratically*.
 
 **Rules**:
-- Use `--shadow-xs`, `--shadow-sm`, `--shadow-md` — never a hand-rolled `shadow-*` with 20px+ blur.
+- Use `--shadow-xs`, `--shadow-sm`, `--shadow-md`, `--shadow-lg` — never a hand-rolled `shadow-*` with arbitrary blur.
+- Elevated surfaces (popover, menu, dialog, sheet, toast, tooltip content) ship **borderless**. Separation comes from the shadow token.
 - For pressed / focused states, use `--shadow-inset-ring` (an inset 1-px ring), not a bigger outer shadow.
-- Highlight tops with `--shadow-inset` (a hairline inner white line) — the "beveled glass" edge on preview cards, buttons, wells.
 
 ### 3 · Spring physics, not CSS transitions
 
@@ -140,7 +142,7 @@ Prefer **layout gap** over visible borders. Separators are used only when spatia
 **Rules**:
 - If a `gap-2` between siblings already reads as "these are separate things," drop the border.
 - Reserve `<Separator />` for cases where two adjacent regions *must* be visually severed (menu group breaks, form fieldset dividers).
-- Border colors are `--color-border-content` (rgba 8%) for content regions and `--color-border-chrome` (rgba 6%) for chrome — never a named neutral step.
+- Border colors are `--color-border-content` (rgba 6%) for content regions and `--color-border-chrome` (rgba 5%) for chrome — never a named neutral step.
 
 ### 7 · One radius, one scale, one grid
 

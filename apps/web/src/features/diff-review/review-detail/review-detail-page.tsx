@@ -1,27 +1,32 @@
-import { GitCompareLine as FileDiffIcon } from '@mingcute/react'
+import {
+  CloseLine as CloseIcon,
+  ExternalLinkLine as ExternalLinkIcon,
+  GitCompareLine as FileDiffIcon,
+} from '@mingcute/react'
 import type { CodeViewItem } from '@pierre/diffs'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import type { DiffData } from '~/components/common/diff/diff-data'
 import { buildDiffData, emptyDiffData } from '~/components/common/diff/diff-data'
-import { ResizeHandle } from '~/components/layout/resize-handle'
+import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
 
+import { ReviewDetailView } from '../review/review-detail-view'
 import type { CodeViewLineSelection, ThreadAnnotation } from '../shared/diff-items'
 import {
   formatSelectedReviewRange,
   getSelectedReviewRange,
 } from '../shared/diff-items'
-import { reviewSupportsCommitPlan, reviewSupportsGuide } from '../shared/guide-insights'
-import { navigateToCommitView, navigateToGuideView, navigateToReviewsList } from '../shared/navigation'
+import { navigateToReviewsList } from '../shared/navigation'
 import type { DiffStyle, ReviewFile, ReviewThread } from '../shared/types'
 import { useReview } from '../shared/use-review'
 import { AgentRail } from './agent-rail'
 import type { DiffStageHandle } from './diff-stage'
 import { DiffStage } from './diff-stage'
-import { FileListAside } from './file-tree-aside'
+import { GitHubReviewContext } from './github-review-context'
 import { OpenThreadsRail } from './open-threads-rail'
-import { ReviewTopBar } from './review-top-bar'
+import { DisplayPopover, ReviewPopover } from './review-top-bar'
 
 interface ReviewDetailPageProps {
   workspaceId: string
@@ -40,6 +45,7 @@ export function ReviewDetailPage({
   initialLine,
   initialSide,
 }: ReviewDetailPageProps) {
+  const { t } = useTranslation('diff-review')
   const {
     review,
     isLoading,
@@ -73,11 +79,8 @@ export function ReviewDetailPage({
     initialPath && initialLine ? { line: initialLine, side: initialSide ?? 'head' } : null,
   )
 
-  // Panel widths — Linear-style: panels are resizable, the diff stays the protagonist.
-  // Right rail auto-hides when there are no open threads so the diff gets the room.
-  const [fileTreeWidth, setFileTreeWidth] = useState(256)
-  const [threadsRailWidth, setThreadsRailWidth] = useState(320)
-  const [threadsRailCollapsed, setThreadsRailCollapsed] = useState(false)
+  const [overviewCollapsed, setOverviewCollapsed] = useState(false)
+  const [overlayOpen, setOverlayOpen] = useState(false)
   const [railMode, setRailMode] = useState<'threads' | 'agent'>('threads')
 
   const files = useMemo(() => review?.files ?? [], [review?.files])
@@ -211,6 +214,11 @@ export function ReviewDetailPage({
           event.preventDefault()
           setComposerAnchor(null)
           setSelectedLineSelection(null)
+          return
+        }
+        if (overlayOpen) {
+          event.preventDefault()
+          setOverlayOpen(false)
         }
         return
       }
@@ -238,7 +246,15 @@ export function ReviewDetailPage({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [composerAnchor, diffStyle, preferenceMutation, selectedFileId, selectedLineSelection, visibleFiles])
+  }, [
+    composerAnchor,
+    diffStyle,
+    overlayOpen,
+    preferenceMutation,
+    selectedFileId,
+    selectedLineSelection,
+    visibleFiles,
+  ])
 
   useEffect(() => {
     if (visibleItems.length === 0 || !pendingScrollRef.current) {
@@ -268,7 +284,7 @@ export function ReviewDetailPage({
     }, {
       onSuccess: () => {
         setRailMode('agent')
-        setThreadsRailCollapsed(false)
+        setOverlayOpen(true)
       },
     })
   }
@@ -294,76 +310,119 @@ export function ReviewDetailPage({
     ? files.filter(file => (!collapseGeneratedFiles || !file.isGenerated) && diffData.whitespaceOnlyPaths.has(file.path)).length
     : 0
   const hiddenGeneratedFileCount = collapseGeneratedFiles ? files.filter(file => file.isGenerated).length : 0
+  const hiddenFileCount = hiddenWhitespaceFileCount + hiddenGeneratedFileCount
 
-  const openThreadCount = review.threads.filter(thread => thread.state !== 'resolved').length
-  const showRightRail = !threadsRailCollapsed
+  const canCloseReview = review.status === 'open'
+    && review.sourceKind !== 'local-working-tree'
+    && review.sourceKind !== 'github-pull-request'
+
+  const showOverlay = overlayOpen
+  const agentOpen = showOverlay && railMode === 'agent'
 
   return (
-    <div className="flex h-full w-full min-h-0 flex-col overflow-hidden" data-testid="review-detail-page">
-      <ReviewTopBar
+    <div className="h-full w-full min-h-0" data-testid="review-detail-page">
+      <ReviewDetailView
         review={review}
+        files={visibleFiles}
+        hiddenFileCount={hiddenFileCount}
+        selectedFileId={selectedFileId}
+        onSelectFile={selectFile}
+        onToggleViewed={file => viewedMutation.mutate({ fileId: file.id, viewed: !file.isViewed })}
         diffStyle={diffStyle}
         onDiffStyleChange={(style) => {
           setDiffStyle(style)
           preferenceMutation.mutate({ diffStyle: style })
         }}
-        onPreference={input => preferenceMutation.mutate(input)}
-        preferencePending={preferenceMutation.isPending}
-        onSubmit={(decision, bodyMarkdown) => submitMutation.mutate({ decision, bodyMarkdown })}
-        submitPending={submitMutation.isPending}
-        onMerge={method => mergeMutation.mutate(method)}
-        mergePending={mergeMutation.isPending}
-        onCloseReview={() => closeReviewMutation.mutate(undefined, {
-          onSuccess: () => navigateToReviewsList(workspaceId, repositoryPath),
-        })}
-        closeReviewPending={closeReviewMutation.isPending}
+        overviewCollapsed={overviewCollapsed}
+        onToggleOverview={() => setOverviewCollapsed(value => !value)}
+        onBack={() => navigateToReviewsList(workspaceId, repositoryPath)}
         onRefresh={() => refreshMutation.mutate()}
-        refreshPending={refreshMutation.isPending}
-        isFetching={isFetching}
-        onOpenGuide={reviewSupportsGuide(review)
-          ? () => navigateToGuideView(workspaceId, review.id, repositoryPath)
-          : undefined}
-        hasGuide={review.guide.steps.length > 0}
-        onOpenCommit={reviewSupportsCommitPlan(review)
-          ? () => navigateToCommitView(workspaceId, review.id, repositoryPath)
-          : undefined}
-        hasCommitPlan={review.commitPlans.length > 0}
-        threadsRailCollapsed={threadsRailCollapsed}
-        agentRailActive={!threadsRailCollapsed && railMode === 'agent'}
-        onShowThreadsRail={() => {
+        refreshPending={refreshMutation.isPending || isFetching}
+        onSubmit={decision => submitMutation.mutate({ decision, bodyMarkdown: '' })}
+        submitPending={submitMutation.isPending}
+        threadsOpen={showOverlay}
+        onToggleThreads={() => {
+          if (showOverlay && railMode === 'threads') {
+            setOverlayOpen(false)
+            return
+          }
           setRailMode('threads')
-          setThreadsRailCollapsed(value => railMode === 'threads' ? !value : false)
+          setOverlayOpen(true)
         }}
-        onShowAgentRail={() => {
+        agentOpen={agentOpen}
+        onToggleAgent={() => {
+          if (showOverlay && railMode === 'agent') {
+            setOverlayOpen(false)
+            return
+          }
           setRailMode('agent')
-          setThreadsRailCollapsed(value => railMode === 'agent' ? !value : false)
+          setOverlayOpen(true)
         }}
-        openThreadCount={openThreadCount}
         agentFixCount={review.agentFixes.length}
-      />
-
-      <div className="flex min-h-0 flex-1">
-        <FileListAside
-          visibleFiles={visibleFiles}
-          selectedFileId={selectedFileId}
-          onSelectFile={selectFile}
-          onToggleViewed={file => viewedMutation.mutate({ fileId: file.id, viewed: !file.isViewed })}
-          viewedPending={viewedMutation.isPending}
-          hiddenWhitespaceFileCount={hiddenWhitespaceFileCount}
-          hiddenGeneratedFileCount={hiddenGeneratedFileCount}
-          width={fileTreeWidth}
-        />
-
-        <ResizeHandle
-          direction="horizontal"
-          value={fileTreeWidth}
-          onChange={setFileTreeWidth}
-          min={200}
-          max={420}
-          className="w-1.25 h-full"
-        />
-
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+        extraActions={(
+          <>
+            <DisplayPopover
+              hideWhitespaceOnly={review.preferences.hideWhitespaceOnly}
+              structuralHighlighting={review.preferences.structuralHighlighting}
+              collapseGeneratedFiles={review.preferences.collapseGeneratedFiles}
+              pending={preferenceMutation.isPending}
+              onToggleWhitespace={() => preferenceMutation.mutate({
+                hideWhitespaceOnly: !review.preferences.hideWhitespaceOnly,
+              })}
+              onToggleStructural={() => preferenceMutation.mutate({
+                structuralHighlighting: !review.preferences.structuralHighlighting,
+              })}
+              onToggleGenerated={() => preferenceMutation.mutate({
+                collapseGeneratedFiles: !review.preferences.collapseGeneratedFiles,
+              })}
+            />
+            {review.githubPullRequest && (
+              <GitHubReviewContext
+                pullRequest={review.githubPullRequest}
+                onMerge={method => mergeMutation.mutate(method)}
+                mergePending={mergeMutation.isPending}
+              />
+            )}
+            {review.githubPullRequest && (
+              <Button variant="ghost" size="icon" className="size-7" asChild>
+                <a
+                  href={`https://github.com/${review.githubPullRequest.owner}/${review.githubPullRequest.repo}/pull/${review.githubPullRequest.number}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={t('review.github.open')}
+                  title={t('review.github.open')}
+                >
+                  <ExternalLinkIcon className="size-3.5" />
+                </a>
+              </Button>
+            )}
+            {canCloseReview
+              ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1.5 px-2 text-[12px] text-muted-foreground hover:text-foreground"
+                    onClick={() => closeReviewMutation.mutate(undefined, {
+                      onSuccess: () => navigateToReviewsList(workspaceId, repositoryPath),
+                    })}
+                    disabled={closeReviewMutation.isPending}
+                  >
+                    <CloseIcon className="size-3.5" />
+                    Close
+                  </Button>
+                )
+              : null}
+          </>
+        )}
+        submitControl={(
+          <ReviewPopover
+            pending={submitMutation.isPending}
+            state={review.reviewState}
+            requireBodyForFeedback={review.sourceKind === 'github-pull-request'}
+            onSubmit={(decision, bodyMarkdown) => submitMutation.mutate({ decision, bodyMarkdown })}
+          />
+        )}
+        diffSlot={(
           <DiffStage
             review={review}
             diffData={diffData}
@@ -379,7 +438,12 @@ export function ReviewDetailPage({
             onCreateThread={(input) => {
               createThreadMutation.mutate({
                 fileId: input.fileId,
-                anchor: { fileId: input.anchor.fileId, side: input.anchor.side, startLine: input.anchor.startLine, endLine: input.anchor.endLine },
+                anchor: {
+                  fileId: input.anchor.fileId,
+                  side: input.anchor.side,
+                  startLine: input.anchor.startLine,
+                  endLine: input.anchor.endLine,
+                },
                 bodyMarkdown: input.bodyMarkdown,
               })
               setComposerAnchor(null)
@@ -394,54 +458,42 @@ export function ReviewDetailPage({
             files={files}
             handleRef={handle => stageHandleRef.current = handle}
           />
-        </main>
-
-        {showRightRail && (
-          <>
-            <ResizeHandle
-              direction="horizontal"
-              value={threadsRailWidth}
-              onChange={setThreadsRailWidth}
-              min={240}
-              max={480}
-              inverted
-              className="w-1.25 h-full"
-            />
-            {railMode === 'agent'
-              ? (
-                  <AgentRail
-                    review={review}
-                    selectedAnchor={selectedAgentAnchor}
-                    selectedLabel={selectedAgentLabel}
-                    createPending={createAgentFixMutation.isPending}
-                    startPending={startAgentFixMutation.isPending}
-                    cancelPending={cancelAgentFixMutation.isPending}
-                    rerunPending={rerunAgentFixMutation.isPending}
-                    deletePending={deleteAgentFixMutation.isPending}
-                    onCreate={input => createAgentFixMutation.mutateAsync(input)}
-                    onStart={input => startAgentFixMutation.mutateAsync(input)}
-                    onCancel={agentFixId => cancelAgentFixMutation.mutate(agentFixId)}
-                    onRerun={input => rerunAgentFixMutation.mutateAsync(input)}
-                    onDelete={agentFixId => deleteAgentFixMutation.mutate(agentFixId)}
-                    onCollapse={() => setThreadsRailCollapsed(true)}
-                    width={threadsRailWidth}
-                  />
-                )
-              : (
-                  <OpenThreadsRail
-                    review={review}
-                    files={files}
-                    onJumpToThread={jumpToThread}
-                    onResolve={threadId => resolveThreadMutation.mutate(threadId)}
-                    resolvePending={resolveThreadMutation.isPending}
-                    onAskAgent={askAgentForThread}
-                    onCollapse={() => setThreadsRailCollapsed(true)}
-                    width={threadsRailWidth}
-                  />
-                )}
-          </>
         )}
-      </div>
+        threadsSlot={showOverlay
+          ? (
+              railMode === 'agent'
+                ? (
+                    <AgentRail
+                      review={review}
+                      selectedAnchor={selectedAgentAnchor}
+                      selectedLabel={selectedAgentLabel}
+                      createPending={createAgentFixMutation.isPending}
+                      startPending={startAgentFixMutation.isPending}
+                      cancelPending={cancelAgentFixMutation.isPending}
+                      rerunPending={rerunAgentFixMutation.isPending}
+                      deletePending={deleteAgentFixMutation.isPending}
+                      onCreate={input => createAgentFixMutation.mutateAsync(input)}
+                      onStart={input => startAgentFixMutation.mutateAsync(input)}
+                      onCancel={agentFixId => cancelAgentFixMutation.mutate(agentFixId)}
+                      onRerun={input => rerunAgentFixMutation.mutateAsync(input)}
+                      onDelete={agentFixId => deleteAgentFixMutation.mutate(agentFixId)}
+                      onCollapse={() => setOverlayOpen(false)}
+                    />
+                  )
+                : (
+                    <OpenThreadsRail
+                      review={review}
+                      files={files}
+                      onJumpToThread={jumpToThread}
+                      onResolve={threadId => resolveThreadMutation.mutate(threadId)}
+                      resolvePending={resolveThreadMutation.isPending}
+                      onAskAgent={askAgentForThread}
+                      onCollapse={() => setOverlayOpen(false)}
+                    />
+                  )
+            )
+          : undefined}
+      />
     </div>
   )
 }

@@ -61,7 +61,7 @@ function registerRecallQueryTool(server: McpServer): void {
     {
       title: 'Recall Query',
       description:
-        'Search prior Cradle execution evidence and memories, returning citable JSON from the current workspace. Use when the user asks what happened before, how a decision or bug was handled, what a prior chat concluded, or to find related failures, runs, messages, or file history. Typical requests include "how did we handle this before", "did we discuss this earlier", "why did this fail", "find the earlier decision", and "what changed in this file". Read-only: helper filters may narrow the runtime-bound workspace scope but cannot broaden it.',
+        'Search this workspace\'s prior chat/execution evidence; returns citable JSON. Use when past context may matter—even if the user never says "before". Prefer a quick check over guessing past decisions. Read-only; not a code-search substitute.',
       inputSchema: {
         code: z
           .string()

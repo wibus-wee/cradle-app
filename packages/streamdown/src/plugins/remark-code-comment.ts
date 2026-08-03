@@ -1,220 +1,34 @@
-import type {
-  Paragraph,
-  PhrasingContent,
-  Root,
-} from 'mdast'
-import type { Plugin } from 'unified'
-import { SKIP, visit } from 'unist-util-visit'
-
-const DIRECTIVE_PREFIX = '::code-comment{'
-
-interface DirectiveSegment {
-  type: 'directive'
-  attributes: Record<string, string>
-}
-
-interface TextSegment {
-  type: 'text'
-  value: string
-}
-
-interface CodeCommentNode {
-  type: 'code-comment'
-  data: {
-    hName: 'code-comment'
-    hProperties: Record<string, string>
-  }
-  children: []
-}
+import { createRemarkAttributeDirective } from './remark-attribute-directive'
 
 declare module 'mdast' {
   interface BlockContentMap {
-    'code-comment': CodeCommentNode
-  }
-}
-
-type Segment = DirectiveSegment | TextSegment
-
-function parseDirectiveAttributes(
-  source: string,
-  startIndex: number,
-): { attributes: Record<string, string>, endIndex: number } | null {
-  const attributes: Record<string, string> = {}
-  let index = startIndex
-
-  while (index < source.length) {
-    while (index < source.length && /\s/.test(source[index]!)) {
-      index += 1
-    }
-    if (source[index] === '}') {
-      return { attributes, endIndex: index + 1 }
-    }
-
-    const keyMatch = /^[A-Z][\w-]*/i.exec(source.slice(index))
-    if (!keyMatch) {
-      return null
-    }
-    const key = keyMatch[0]
-    index += key.length
-
-    while (index < source.length && /\s/.test(source[index]!)) {
-      index += 1
-    }
-    if (source[index] !== '=') {
-      return null
-    }
-    index += 1
-    while (index < source.length && /\s/.test(source[index]!)) {
-      index += 1
-    }
-
-    let value = ''
-    if (source[index] === '"') {
-      index += 1
-      let closed = false
-      while (index < source.length) {
-        const char = source[index]!
-        if (char === '\\' && source[index + 1] === '"') {
-          value += '"'
-          index += 2
-          continue
-        }
-        if (char === '"') {
-          closed = true
-          index += 1
-          break
-        }
-        value += char
-        index += 1
+    'code-comment': {
+      type: 'code-comment'
+      data: {
+        hName: 'code-comment'
+        hProperties: Record<string, string>
       }
-      if (!closed) {
-        return null
+      children: []
+    }
+  }
+
+  interface PhrasingContentMap {
+    'code-comment': {
+      type: 'code-comment'
+      data: {
+        hName: 'code-comment'
+        hProperties: Record<string, string>
       }
+      children: []
     }
-    else {
-      const bareMatch = /^[^\s}]+/.exec(source.slice(index))
-      if (!bareMatch) {
-        return null
-      }
-      value = bareMatch[0]
-      index += value.length
-    }
-
-    attributes[key] = value
-  }
-
-  return null
-}
-
-function splitDirectives(text: string): Segment[] | null {
-  const segments: Segment[] = []
-  let cursor = 0
-  let found = false
-
-  for (;;) {
-    const start = text.indexOf(DIRECTIVE_PREFIX, cursor)
-    if (start === -1) {
-      break
-    }
-    const parsed = parseDirectiveAttributes(text, start + DIRECTIVE_PREFIX.length)
-    if (!parsed) {
-      cursor = start + DIRECTIVE_PREFIX.length
-      continue
-    }
-    if (start > cursor) {
-      segments.push({ type: 'text', value: text.slice(cursor, start) })
-    }
-    segments.push({ type: 'directive', attributes: parsed.attributes })
-    cursor = parsed.endIndex
-    found = true
-  }
-
-  if (!found) {
-    return null
-  }
-  if (cursor < text.length) {
-    segments.push({ type: 'text', value: text.slice(cursor) })
-  }
-  return segments
-}
-
-function readRawInlineText(children: readonly PhrasingContent[]): string | null {
-  let raw = ''
-  for (const child of children) {
-    switch (child.type) {
-      case 'text':
-        raw += child.value
-        break
-      case 'inlineCode':
-        raw += `\`${child.value}\``
-        break
-      case 'emphasis':
-      case 'strong':
-      case 'delete': {
-        const marker = child.type === 'emphasis' ? '*' : child.type === 'strong' ? '**' : '~~'
-        const inner = readRawInlineText(child.children)
-        if (inner === null) {
-          return null
-        }
-        raw += marker + inner + marker
-        break
-      }
-      default:
-        return null
-    }
-  }
-  return raw
-}
-
-function createTextParagraph(value: string): Paragraph {
-  return {
-    type: 'paragraph',
-    children: [{ type: 'text', value }],
-  }
-}
-
-function createCodeComment(attributes: Record<string, string>): CodeCommentNode {
-  return {
-    type: 'code-comment',
-    data: {
-      hName: 'code-comment',
-      hProperties: attributes,
-    },
-    children: [],
   }
 }
 
 /**
- * Turns complete Codex review directives into a custom markdown element.
- * Incomplete directives deliberately remain plain text so streaming stays lossless.
+ * First-class `::code-comment{...}` markdown dialect.
+ * Complete directives are tokenized atomically by micromark (GFM-safe);
+ * incomplete forms remain plain text for lossless streaming.
  */
-export const remarkCodeComment: Plugin<[], Root> = () => (tree) => {
-  visit(tree, 'paragraph', (node, index, parent) => {
-    if (!parent || typeof index !== 'number') {
-      return
-    }
-    const fullText = readRawInlineText(node.children)
-    if (!fullText || !fullText.includes(DIRECTIVE_PREFIX)) {
-      return
-    }
-    const segments = splitDirectives(fullText)
-    if (!segments) {
-      return
-    }
-
-    const replacement: Array<Paragraph | CodeCommentNode> = []
-    for (const segment of segments) {
-      if (segment.type === 'text') {
-        const value = segment.value.trim()
-        if (value) {
-          replacement.push(createTextParagraph(value))
-        }
-      }
-      else {
-        replacement.push(createCodeComment(segment.attributes))
-      }
-    }
-    parent.children.splice(index, 1, ...replacement)
-    return [SKIP, index + replacement.length]
-  })
-}
+export const remarkCodeComment = createRemarkAttributeDirective({
+  name: 'code-comment',
+})
