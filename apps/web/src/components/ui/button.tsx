@@ -55,6 +55,7 @@ function Button({
   const classNames = cn(buttonVariants({ variant, size, className }))
   if (asChild) {
     // Slot merges props onto the child; Base UI render-prop `style` is not valid here.
+    // Keep this adapter local so the Base UI button remains the default path.
     const { style, ...slotProps } = props
     return (
       <Slot.Root
