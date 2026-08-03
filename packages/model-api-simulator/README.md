@@ -274,9 +274,23 @@ Treat snapshot refreshes as protocol changes. Review the manifests, core
 allowlist, generated witness corpus, and grammar coverage together. A newly
 published provider event is not automatically part of the core profile.
 
+## Cradle E2E fixtures
+
+Checked-in anonymized request shapes from real Claude Agent / Codex traffic live
+under [`fixtures/cradle/`](./fixtures/cradle/). They lock the request forms that
+Cradle E2E enqueues against (`bodyTextIncludes`, `stream: true`, etc.).
+
+- Refresh by dumping the E2E simulator request ledger, stripping secrets /
+  workspace paths / long system prompts, and updating the JSON fixtures.
+- Cover them with `tests/cradle-fixture-conformance.test.ts`.
+- **If a needed wire behaviour is missing, extend this simulator — never invent
+  a parallel mock LLM or set `CRADLE_MOCK_LLM_URL`.**
+
 ## Limitations
 
-- No model intelligence or prompt matching.
-- No fallback for an unmatched request.
-- No recording, proxying, fixture redaction, or replay of upstream traffic.
+- No model intelligence or prompt matching beyond explicit `RequestMatch`.
+- Unmatched conversation creates fail under `autoRespond: 'probes-only'` when
+  the queue is empty (E2E default).
+- No recording, proxying, or automatic redaction/replay of upstream traffic —
+  Cradle fixtures are hand-curated anonymized snapshots only.
 - Logical SSE events are ordered, but transports may coalesce adjacent writes.

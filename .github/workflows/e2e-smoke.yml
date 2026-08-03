@@ -1,12 +1,14 @@
 name: E2E Smoke (PR)
 
-# Runs P0 E2E scenarios on pull requests when the `e2e` label is applied.
-# This is opt-in to avoid running the full E2E suite on every PR push.
-# Maintainers add the `e2e` label to PRs that touch critical user-facing paths.
+# Runs @P0 against the PR head when:
+# The checkout below intentionally follows the PR head SHA after main is merged.
+# - critical paths change (e2e / simulator / web / server / Codex sync / this workflow), OR
+# - the `e2e` label is present (force / keep running on later pushes)
+# Always provisions Codex app-server so @CRADLE-CODEX-* can pass on clean runners.
 
 on:
   pull_request:
-    types: [labeled]
+    types: [labeled, synchronize, opened, reopened]
 
 permissions:
   contents: read
@@ -14,23 +16,61 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Only run when the triggering label is exactly 'e2e'
-  gate:
-    name: Check label
+  changes:
+    name: Detect critical paths
     runs-on: ubuntu-latest
-    if: github.event.label.name == 'e2e'
+    outputs:
+      critical: ${{ steps.filter.outputs.critical }}
     steps:
-      - run: echo "e2e label added — smoke run will proceed"
+      - name: Checkout Cradle source
+        uses: actions/checkout@v4
+        with:
+          repository: wibus-wee/cradle-app
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            critical:
+              - 'e2e/**'
+              - 'packages/model-api-simulator/**'
+              - 'apps/web/**'
+              - 'apps/server/**'
+              - 'apps/desktop/scripts/sync-codex-runtime.mjs'
+              - '.github/workflows/e2e-smoke.yml'
+              - '.github/actions/setup/**'
+
+  gate:
+    name: Check smoke gate
+    runs-on: ubuntu-latest
+    needs: changes
+    if: >
+      always() &&
+      needs.changes.result == 'success' && (
+        needs.changes.outputs.critical == 'true' ||
+        contains(github.event.pull_request.labels.*.name, 'e2e') ||
+        github.event.label.name == 'e2e'
+      )
+    steps:
+      - run: echo "E2E smoke gate open (critical paths and/or e2e label) — running @P0 on PR head"
 
   e2e-smoke:
     name: E2E Smoke (P0)
     runs-on: ubuntu-latest
     needs: gate
+    if: ${{ needs.gate.result == 'success' }}
     timeout-minutes: 30
 
     steps:
-      - name: Checkout
+      - name: Checkout Cradle source
         uses: actions/checkout@v4
+        with:
+          repository: wibus-wee/cradle-app
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          # Test the PR head, not main — otherwise labeled PRs never exercise their own commits.
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: ./.github/actions/setup
         with:
@@ -39,6 +79,9 @@ jobs:
       - name: Install Playwright browsers
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium-headless-shell
+
+      - name: Provision Codex app-server for E2E
+        run: pnpm --filter @cradle/desktop sync:codex-runtime
 
       - name: Prepare Cucumber CI config
         run: |
@@ -372,36 +415,66 @@ jobs:
         with:
           name: e2e-smoke-artifacts-${{ github.run_id }}
           path: |
+            e2e/artifacts/ARTIFACTS.md
+            e2e/artifacts/failure-index.json
             e2e/artifacts/cucumber-summary.txt
             e2e/artifacts/cucumber-output.log
             e2e/artifacts/cucumber-junit.xml
             e2e/artifacts/e2e-summary.json
             e2e/artifacts/e2e-summary.md
             e2e/artifacts/scenarios/**/failure.png
+            e2e/artifacts/scenarios/**/failure.webm
+            e2e/artifacts/scenarios/**/trace.zip
             e2e/artifacts/scenarios/**/console.log
-          retention-days: 7
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Post PR comment on failure
         if: steps.smoke.outcome == 'failure'
         uses: actions/github-script@v7
         env:
+          RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs')
+            const { readJson, formatFailureArtifactsSection } = require('./e2e/scripts/format-failure-issue.cjs')
             const runUrl = process.env.RUN_URL
+            const runId = process.env.RUN_ID
+            const summary = readJson('e2e/artifacts/e2e-summary.json', {
+              markdown: '_(no E2E summary was generated)_',
+              resultLine: 'no parsed scenario data',
+              nonPassedScenarios: [],
+            })
+            const failureIndex = readJson('e2e/artifacts/failure-index.json', [])
 
-            const summaryPath = 'e2e/artifacts/e2e-summary.json'
-            const summary = fs.existsSync(summaryPath)
-              ? JSON.parse(fs.readFileSync(summaryPath, 'utf8'))
-              : { markdown: '_(no E2E summary was generated)_', resultLine: 'no parsed scenario data' }
+            const body = `## ❌ E2E Smoke Failed
+
+            ${summary.markdown}
+
+            **Result:** \`${summary.resultLine}\`
+
+            ### Evidence (download artifact \`e2e-smoke-artifacts-${runId}\`)
+
+            See root \`ARTIFACTS.md\` in the zip. Per failure:
+
+            ${formatFailureArtifactsSection(failureIndex)}
+
+            | Kind | Path glob |
+            |------|-----------|
+            | Video 1:1 | \`scenarios/*/failure.webm\` |
+            | Screenshot | \`scenarios/*/failure.png\` |
+            | Playwright trace | \`scenarios/*/trace.zip\` → \`npx playwright show-trace\` |
+            | Console + simulator | \`scenarios/*/console.log\` |
+
+            [View run](${runUrl}) · [Download artifacts](${runUrl}/artifacts)
+            `.split('\n').map(l => l.trimStart()).join('\n')
 
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: `## ❌ E2E Smoke Failed\n\n${summary.markdown}\n\n[View run](${runUrl}) · [Download artifacts](${runUrl}/artifacts)`,
+              body,
             })
 
       - name: Propagate failure

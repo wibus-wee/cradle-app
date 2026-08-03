@@ -1,191 +1,119 @@
 # language: zh-CN
 @cradle
-功能: 聊天功能
-  作为用户，我希望能够发送消息给 Agent、处理中断与失败，并在刷新后继续看到真实状态
+功能: 精华聊天旅程
+  作为用户，我希望通过真实 Claude Agent SDK 与 Anthropic Messages 协议完成多轮聊天、中断、错误恢复与会话管理
+  （产品已从新会话目录移除 Standard runtime，精华聊天主路径对齐 Claude Agent）
 
   背景:
     假如 应用已启动
 
-  @P0 @smoke @CRADLE-CHAT-002
-  场景: 新建聊天页面可见
-    假如 我已配置 Mock LLM Provider
-    当 我点击"新建聊天"导航项
-    那么 我应该看到新建聊天页面
-    而且 聊天输入框应可见
-
-  @P0 @smoke @CRADLE-CHAT-003
-  场景: 发送消息并接收已完成的 AI 回复
-    假如 我已配置 Mock LLM Provider
+  @essence @P0 @CRADLE-CHAT-001
+  场景: 添加工作区后完成多轮 Claude Agent 聊天
+    假如 我已配置 Claude Agent 多轮 Simulator
     而且 我已添加了一个工作区
-    而且 我已导航到新建聊天页面
-    当 我在新建聊天输入框中输入"你好，请自我介绍"
+    当 我点击"新建聊天"导航项
+    而且 我选择 Claude Agent 运行时与 Simulator Provider
+    而且 我在新建聊天输入框中输入"第一轮：请记住苹果"
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
-    而且 我应该看到用户消息"你好，请自我介绍"
-    而且 最后一条 AI 消息应包含"Hello from mock LLM!"
+    而且 我应该看到用户消息"第一轮：请记住苹果"
+    而且 最后一条 AI 消息应包含"第一轮助手：已记住苹果"
     而且 聊天中不应出现错误提示
-
-  @P1 @CRADLE-CHAT-004
-  场景: 在聊天视图中继续发送消息
-    假如 我已配置 Mock LLM Provider
-    而且 我已添加了一个工作区
-    而且 我已在新建聊天页面发送了初始消息
-    当 我在聊天输入框中输入"继续说明"
+    当 我在聊天输入框中输入"第二轮：请总结"
     而且 我点击聊天发送按钮
-    那么 我应该看到用户消息"继续说明"
-    而且 最后一条 AI 消息应包含"Hello from mock LLM!"
+    那么 最后一条 AI 消息应包含"第二轮助手：你让我记住了苹果"
+    而且 聊天流应结束于空闲状态
+    而且 Simulator 脚本化交换应全部耗尽
 
-  @P1 @CRADLE-CHAT-005
-  场景: 发送消息后侧栏显示会话
-    假如 我已配置 Mock LLM Provider
+  @essence @P0 @CRADLE-CHAT-002
+  场景: 流式回复进行中可以停止生成
+    假如 我已配置带门控的慢速 Claude Agent Simulator
     而且 我已添加了一个工作区
-    而且 我已在新建聊天页面发送了初始消息
-    那么 侧栏应显示至少一个会话项
-
-  @P1 @CRADLE-CHAT-006
-  场景: 可以在流式回复进行中停止当前聊天
-    假如 我已配置会慢速流式返回的 Mock LLM Provider
-    而且 我已添加了一个工作区
-    而且 我已导航到新建聊天页面
-    当 我在新建聊天输入框中输入"请生成一段比较长的说明用于停止测试"
+    而且 我已导航到新建聊天并选中 Simulator
+    当 我在新建聊天输入框中输入"请生成一段较长说明"
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
     而且 聊天流应处于进行中
     当 我点击停止生成按钮
     那么 停止生成按钮应消失
-    而且 我应该看到至少一条 AI 消息
+    # Must be a real abort: idle (not error limbo), three-surface consistent, Send usable again.
+    # Old Claude Agent cancel left Query thrashing ([ede_diagnostic]/No active run stream) — assert that is gone.
+    而且 停止后聊天视图、侧栏会话与 Composer 状态应一致为空闲
+    而且 停止后不应再刷 Claude stop-path 诊断错误
+    而且 聊天中不应出现完整的慢速回复
     而且 聊天中不应出现错误提示
+    # Mid-stream stop leaves the gated simulator exchange unsettled — no assertExhausted.
 
-  @P1 @CRADLE-CHAT-007
-  场景: Provider 失败时会显示错误状态
-    假如 我已配置会失败的 Mock LLM Provider
+  @essence @P0 @CRADLE-CHAT-003
+  场景: Provider 失败时显示错误状态
+    假如 我已配置会失败的 Claude Agent Simulator
     而且 我已添加了一个工作区
-    而且 我已导航到新建聊天页面
-    当 我在新建聊天输入框中输入"请触发一个 provider 错误"
+    而且 我已导航到新建聊天并选中 Simulator
+    当 我在新建聊天输入框中输入"请触发 provider 错误"
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
-    而且 聊天错误提示应显示"Mock LLM forced failure"
+    而且 聊天错误提示应显示"E2E simulator forced failure"
+    而且 Simulator 脚本化交换应全部耗尽
 
-  @P1 @CRADLE-CHAT-008
-  场景: 页面重载后可以恢复当前聊天并继续看到回复
-    假如 我已配置会慢速流式返回的 Mock LLM Provider
+  @essence @P1 @CRADLE-CHAT-004
+  场景: 流式过程中刷新页面后仍能看到用户消息与最终回复
+    假如 我已配置带门控的慢速 Claude Agent Simulator
     而且 我已添加了一个工作区
-    而且 我已导航到新建聊天页面
-    当 我在新建聊天输入框中输入"请输出一段足够长的说明，以便我在中途刷新页面"
+    而且 我已导航到新建聊天并选中 Simulator
+    当 我在新建聊天输入框中输入"刷新恢复测试消息"
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
     而且 聊天流应处于进行中
-    当 我重新加载当前页面
-    那么 我应该看到用户消息"请输出一段足够长的说明，以便我在中途刷新页面"
-    而且 最后一条 AI 消息应包含"Hello from mock LLM!"
+    当 我释放慢速流门控
+    而且 我重新加载当前页面
+    那么 我应该看到用户消息"刷新恢复测试消息"
+    而且 最后一条 AI 消息应包含"慢速助手回复完成"
     而且 聊天中不应出现错误提示
+    而且 Simulator 脚本化交换应全部耗尽
 
-  @P1 @CRADLE-CHAT-011
-  场景: 多轮对话会在界面中体现前序上下文
-    假如 我已配置按轮次返回不同回复的 Mock LLM Provider
+  @essence @P1 @CRADLE-CHAT-005
+  场景: 可以展开查看 Thinking 内容
+    假如 我已配置会返回 Thinking 的 Claude Agent Simulator
     而且 我已添加了一个工作区
-    而且 我已导航到新建聊天页面
-    当 我在新建聊天输入框中输入"第一轮问题：请记住苹果"
+    而且 我已导航到新建聊天并选中 Simulator
+    当 我在新建聊天输入框中输入"请先思考再回答"
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
-    而且 最后一条 AI 消息应包含"第一轮助手回复：我记住了苹果。"
-    当 我在聊天输入框中输入"第二轮问题：请记住香蕉"
-    而且 我点击聊天发送按钮
-    那么 最后一条 AI 消息应包含"第二轮助手回复：我记住了香蕉。"
-    当 我在聊天输入框中输入"第三轮问题：请总结前两轮你记住了什么"
-    而且 我点击聊天发送按钮
-    那么 最后一条 AI 消息应包含"第三轮助手回复：你先让我记住苹果，又让我记住香蕉。"
+    而且 最后一条 AI 消息应包含"Hello from E2E simulator!"
+    而且 最后一条 AI 消息应显示 Reasoning 入口
+    当 我展开最后一条 AI 消息的 Reasoning
+    # Claude Agent SDK 在本路径会把 thinking 正文 redact 成空的 Thought 行；
+    # 精华断言覆盖「入口可见 + 可展开」，正文恢复后再硬化为含具体 thinking 文本。
+    那么 最后一条 AI 消息应显示已展开的 Thought 条目
+    而且 Simulator 脚本化交换应全部耗尽
 
-  @P1 @CRADLE-CHAT-012
-  场景: 可以重命名已有会话
-    假如 我已配置 Mock LLM Provider
+  @essence @P1 @CRADLE-CHAT-006
+  场景: 会话生命周期：重命名、置顶、删除
+    假如 我已配置 Claude Agent 多轮 Simulator
     而且 我已添加了一个工作区
-    当 我新建一个聊天会话并记住为"待重命名会话"，首条消息为"待重命名会话：请生成一条稍后会被改名的记录"
-    而且 我打开会话"待重命名会话"的菜单
-    而且 我点击会话"待重命名会话"的重命名菜单项
-    而且 我将会话"待重命名会话"重命名为"重命名后的会话"
-    那么 侧栏中的会话"待重命名会话"标题应为"重命名后的会话"
-
-  @P1 @CRADLE-CHAT-013
-  场景: 可以置顶并取消置顶会话
-    假如 我已配置 Mock LLM Provider
-    而且 我已添加了一个工作区
-    当 我新建一个聊天会话并记住为"旧会话"，首条消息为"旧会话：稍后把我置顶"
-    而且 我新建一个聊天会话并记住为"新会话"，首条消息为"新会话：保持默认顺序"
-    那么 侧栏会话顺序应为"旧会话"在"新会话"之前
+    当 我新建一个聊天会话并记住为"旧会话"，首条消息为"旧会话消息"
+    而且 我新建一个聊天会话并记住为"新会话"，首条消息为"新会话消息"
     当 我打开会话"新会话"的菜单
     而且 我点击会话"新会话"的置顶菜单项
     那么 会话"新会话"应显示为已置顶
     当 我打开会话"新会话"的菜单
-    而且 我点击会话"新会话"的取消置顶菜单项
-    那么 会话"新会话"不应显示为已置顶
-    而且 侧栏会话顺序应为"旧会话"在"新会话"之前
+    而且 我点击会话"新会话"的重命名菜单项
+    而且 我将会话"新会话"重命名为"已改名会话"
+    那么 侧栏中的会话"新会话"标题应为"已改名会话"
+    当 我打开会话"旧会话"的菜单
+    而且 我点击会话"旧会话"的删除菜单项
+    那么 侧栏中不应显示会话"旧会话"
+    而且 Simulator 脚本化交换应全部耗尽
 
-  @P1 @CRADLE-CHAT-014
-  场景: 可以删除会话
-    假如 我已配置 Mock LLM Provider
-    而且 我已添加了一个工作区
-    当 我新建一个聊天会话并记住为"待删除会话"，首条消息为"待删除会话：请生成一条会被删除的记录"
-    那么 侧栏应显示会话"待删除会话"
-    当 我打开会话"待删除会话"的菜单
-    而且 我点击会话"待删除会话"的删除菜单项
-    那么 侧栏中不应显示会话"待删除会话"
-
-  @P1 @CRADLE-CHAT-015
+  @essence @P1 @CRADLE-CHAT-007
   场景: 可以将会话复制为 Markdown 到剪贴板
-    假如 我已配置用于 Markdown 导出的 Mock LLM Provider
+    假如 我已配置 Claude Agent 多轮 Simulator
     而且 我已添加了一个工作区
     当 我新建一个聊天会话并记住为"Markdown 会话"，首条消息为"导出 Markdown 测试标题"
     而且 我清空 Electron 剪贴板
     而且 我打开会话"Markdown 会话"的菜单
     而且 我点击会话"Markdown 会话"的复制 Markdown 菜单项
     那么 Electron 剪贴板中应包含以下 Markdown 片段:
-      | # 导出 Markdown 测试标题         |
-      | ## User                         |
-      | 导出 Markdown 测试标题           |
-      | ## Assistant                    |
-      | Markdown 导出助手回复：请复制我。 |
-
-  @P1 @CRADLE-CHAT-016
-  场景: 可以展开查看最后一条 AI 消息的 Reasoning 内容
-    假如 我已配置会返回 Reasoning 的 Mock LLM Provider
-    而且 我已添加了一个工作区
-    而且 我已导航到新建聊天页面
-    当 我在新建聊天输入框中输入"请先思考再回答"
-    而且 我点击发送按钮
-    那么 应该跳转到聊天视图
-    而且 最后一条 AI 消息应包含"Hello from mock LLM!"
-    而且 最后一条 AI 消息应显示 Reasoning 入口
-    当 我展开最后一条 AI 消息的 Reasoning
-    那么 最后一条 AI 消息的 Reasoning 应包含"第一步分析问题"
-
-  @P1 @CRADLE-CHAT-017
-  场景: Tool Call 结果块会显示输入与输出占位
-    假如 我已配置会返回 Tool Call 的 Mock LLM Provider
-    而且 我已添加了一个工作区
-    而且 我已导航到新建聊天页面
-    当 我在新建聊天输入框中输入"请调用 read_file 工具"
-    而且 我点击发送按钮
-    那么 应该跳转到聊天视图
-    而且 最后一条 AI 消息应显示名为"read_file"的 Tool Call
-    当 我展开最后一条 AI 消息中名为"read_file"的 Tool Call
-    那么 最后一条 AI 消息中名为"read_file"的 Tool Call 输入应包含"demo.txt"
-
-  @P1 @CRADLE-CHAT-018
-  场景: 新建聊天快速操作会填充项目任务提示词
-    假如 我已配置 Mock LLM Provider
-    而且 我已添加了一个工作区
-    而且 我已导航到新建聊天页面
-    当 我点击新建聊天快速操作"Find risky changes"
-    那么 新建聊天输入框应包含"Inspect the recent changes in this project"
-
-  @P1 @CRADLE-CHAT-019
-  场景: 新建聊天可选择目标工作区并把会话归入该工作区
-    假如 我已配置 Mock LLM Provider
-    而且 我已添加了两个可区分的工作区
-    而且 我已导航到新建聊天页面
-    当 我在新建聊天中选择第 2 个工作区
-    而且 我在新建聊天输入框中输入"第二个工作区绑定测试"
-    而且 我点击发送按钮
-    那么 应该跳转到聊天视图
-    而且 当前聊天会话应显示在选中的工作区下
+      | 导出 Markdown 测试标题 |
+      | 第一轮助手：已记住苹果 |
+    而且 Simulator 脚本化交换应全部耗尽

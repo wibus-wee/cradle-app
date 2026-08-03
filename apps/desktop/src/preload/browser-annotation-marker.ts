@@ -105,7 +105,7 @@ export const BROWSER_ANNOTATION_MARKER_CSS = `
     position: absolute;
     top: calc(100% + 10px);
     left: 50%;
-    z-index: 100002;
+    z-index: 100;
     min-width: 120px;
     max-width: 200px;
     padding: 8px 0.75rem;

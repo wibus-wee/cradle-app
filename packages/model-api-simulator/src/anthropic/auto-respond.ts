@@ -8,8 +8,8 @@ const FALLBACK_MODEL = 'claude-sonnet-4-5'
 
 /**
  * Synthesises a protocol-valid Anthropic response for requests that no enqueued
- * exchange claims. This turns the scenario replayer into a standalone stub API
- * that real clients (Claude Code, the SDK) can talk to indefinitely.
+ * exchange claims. Shapes must satisfy Anthropic beta Message / SSE schemas
+ * (Claude Agent SDK validates against draft-07).
  */
 export function autoAnthropicResponse(
   controller: ScenarioController,
@@ -34,16 +34,7 @@ export function autoAnthropicResponse(
 
   if (body.stream !== true) {
     return Response.json(
-      {
-        id: messageId,
-        type: 'message',
-        role: 'assistant',
-        model,
-        content: [{ type: 'text', text }],
-        stop_reason: 'end_turn',
-        stop_sequence: null,
-        usage: usage(inputTokens, outputTokens),
-      },
+      completedMessage(messageId, model, text, inputTokens, outputTokens),
       { headers: { 'request-id': 'req_simulator_auto' } },
     )
   }
@@ -59,6 +50,29 @@ export function autoAnthropicResponse(
       },
     },
   )
+}
+
+function completedMessage(
+  messageId: string,
+  model: string,
+  text: string,
+  inputTokens: number,
+  outputTokens: number,
+): JsonObject {
+  return {
+    id: messageId,
+    type: 'message',
+    role: 'assistant',
+    model,
+    content: [{ type: 'text', text, citations: null }],
+    container: null,
+    context_management: null,
+    diagnostics: null,
+    stop_details: null,
+    stop_reason: 'end_turn',
+    stop_sequence: null,
+    usage: fullUsage(inputTokens, outputTokens),
+  }
 }
 
 function streamSteps(
@@ -77,12 +91,20 @@ function streamSteps(
         role: 'assistant',
         model,
         content: [],
+        container: null,
+        context_management: null,
+        diagnostics: null,
         stop_reason: null,
         stop_sequence: null,
-        usage: usage(inputTokens, 1),
+        stop_details: null,
+        usage: fullUsage(inputTokens, 1),
       },
     },
-    { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    {
+      type: 'content_block_start',
+      index: 0,
+      content_block: { type: 'text', text: '', citations: null },
+    },
     ...chunk(text).map(part => ({
       type: 'content_block_delta',
       index: 0,
@@ -91,12 +113,30 @@ function streamSteps(
     { type: 'content_block_stop', index: 0 },
     {
       type: 'message_delta',
-      delta: { stop_reason: 'end_turn', stop_sequence: null },
-      usage: { output_tokens: outputTokens },
+      context_management: null,
+      delta: {
+        container: null,
+        stop_details: null,
+        stop_reason: 'end_turn',
+        stop_sequence: null,
+      },
+      usage: {
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+        fallback_credit: null,
+        input_tokens: inputTokens,
+        iterations: null,
+        output_tokens: outputTokens,
+        output_tokens_details: null,
+        server_tool_use: null,
+      },
     },
     { type: 'message_stop' },
   ]
-  return events.map(event => ({ kind: 'event' as const, event }))
+  return [
+    ...events.map(event => ({ kind: 'event' as const, event })),
+    { kind: 'close' as const },
+  ]
 }
 
 function modelsResponse(path: string, _body: JsonObject): Response {
@@ -154,12 +194,20 @@ function estimateInputTokens(body: JsonObject): number {
   return Math.max(1, Math.ceil(JSON.stringify(body).length / 4))
 }
 
-function usage(inputTokens: number, outputTokens: number): JsonObject {
+function fullUsage(inputTokens: number, outputTokens: number): JsonObject {
   return {
+    cache_creation: null,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
     cache_creation_input_tokens: 0,
     cache_read_input_tokens: 0,
+    fallback_credit: null,
+    inference_geo: null,
+    iterations: null,
+    output_tokens_details: null,
+    server_tool_use: null,
+    service_tier: null,
+    speed: null,
   }
 }
 

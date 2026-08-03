@@ -1,0 +1,27 @@
+{
+  "_comment": "Anonymized Codex app-server OpenAI Responses POST /v1/responses shape used by Cradle E2E. Secrets stripped.",
+  "method": "POST",
+  "path": "/v1/responses",
+  "headers": {
+    "accept": "application/json",
+    "authorization": "Bearer sk-e2e-simulator",
+    "content-type": "application/json"
+  },
+  "body": {
+    "model": "e2e-model",
+    "input": [
+      {
+        "type": "message",
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Codex 精华第一轮"
+          }
+        ]
+      }
+    ],
+    "stream": true,
+    "store": false
+  }
+}

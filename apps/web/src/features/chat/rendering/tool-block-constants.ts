@@ -63,10 +63,26 @@ export const STATUS_LABELS: Record<ToolState, string> = {
   'input-streaming': 'Preparing',
   'input-available': 'Running',
   'approval-requested': 'Awaiting approval',
-  'approval-responded': 'Approved',
+  // Generic fallback when approved flag is unavailable; prefer statusLabelForToolState().
+  'approval-responded': 'Responded',
   'output-available': 'Done',
   'output-error': 'Failed',
   'output-denied': 'Denied',
+}
+
+export function statusLabelForToolState(
+  state: ToolState,
+  approval?: { approved?: boolean } | null,
+): string {
+  if (state === 'approval-responded') {
+    if (approval?.approved === false) {
+      return 'Denied'
+    }
+    if (approval?.approved === true) {
+      return 'Approved'
+    }
+  }
+  return STATUS_LABELS[state]
 }
 
 // ---------------------------------------------------------------------------

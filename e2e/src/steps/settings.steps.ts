@@ -38,6 +38,13 @@ function themeId(label: string): string {
   return id
 }
 
+When('我打开设置页', async function (this: CradleWorld) {
+  await this.search.open()
+  await this.search.fill('>settings')
+  await this.search.runCommand('Open settings')
+  await this.settingsPage.expectSettingsMode()
+})
+
 When('我点击{string}设置导航项', async function (this: CradleWorld, label: string) {
   const navItem = this.page.locator(`[data-testid="settings-nav-${settingNavId(label)}"]`)
   await expect(navItem).toBeVisible({ timeout: SETTINGS_TIMEOUT })
@@ -60,7 +67,7 @@ When('我关闭设置并返回首页', async function (this: CradleWorld) {
 When('我复制 Support 反馈模板', async function (this: CradleWorld) {
   const settings = this.page.locator('[data-testid="support-settings"]')
   await expect(settings).toBeVisible({ timeout: SETTINGS_TIMEOUT })
-  await settings.getByRole('button', { name: 'Copy' }).click()
+  await settings.getByRole('button', { name: 'Copy' }).first().click()
 })
 
 When('我选择外观主题{string}', async function (this: CradleWorld, label: string) {
@@ -76,9 +83,11 @@ Then('我应该看到 Support 设置页面', async function (this: CradleWorld) 
 })
 
 Then('我应该看到 Appearance 设置页面', async function (this: CradleWorld) {
-  const settings = this.page.locator('[data-testid="appearance-settings"]')
-  await expect(settings).toBeVisible({ timeout: SETTINGS_TIMEOUT })
-  await expect(settings).toHaveAttribute('data-settings-appearance-ready', 'true', { timeout: SETTINGS_TIMEOUT })
+  await this.settingsPage.expectAppearancePage()
+})
+
+Then('侧边栏应处于设置模式', async function (this: CradleWorld) {
+  await this.settingsPage.expectSettingsMode()
 })
 
 Then('我应该看到 Desktop Updates 设置页面', async function (this: CradleWorld) {
@@ -184,7 +193,7 @@ Then('Jarvis 模型选择器应显示模型{string}', async function (this: Crad
   // Model loads lazily after provider selection — poll until it appears
   await expect.poll(async () => {
     const text = await selector.textContent().catch(() => '')
-    return text.includes(model) ? true : text
+    return (text ?? '').includes(model) ? true : text
   }, { timeout: 30_000, message: `Expected Jarvis selector to contain "${model}"` }).toBe(true)
 })
 

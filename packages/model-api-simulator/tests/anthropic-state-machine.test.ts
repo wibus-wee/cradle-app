@@ -37,7 +37,7 @@ function validStream(): StreamStep[] {
     event({
       type: 'content_block_delta',
       index: 2,
-      delta: { type: 'thinking_delta', thinking: 'reason' },
+      delta: { type: 'thinking_delta', thinking: 'reason', estimated_tokens: null },
     }),
     event({
       type: 'content_block_delta',

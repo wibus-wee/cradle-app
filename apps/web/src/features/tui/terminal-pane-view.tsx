@@ -37,11 +37,12 @@ interface TerminalPaneViewProps {
   onResizeSplit: (splitId: string, weights: number[]) => void
 }
 
-function PaneAction({ label, onClick, children, disabled = false }: {
+function PaneAction({ label, onClick, children, disabled = false, testId }: {
   label: string
   onClick: () => void
   children: ReactNode
   disabled?: boolean
+  testId?: string
 }) {
   return (
     <Button
@@ -51,6 +52,7 @@ function PaneAction({ label, onClick, children, disabled = false }: {
       title={label}
       onClick={onClick}
       disabled={disabled}
+      data-testid={testId}
       className="text-muted-foreground hover:text-foreground active:scale-[0.96] transition-[color,transform]"
     >
       {children}
@@ -107,6 +109,9 @@ function TerminalPane({
             return (
               <div
                 key={sessionId}
+                data-testid="bottom-terminal-tab"
+                data-session-id={sessionId}
+                data-active={selected ? 'true' : 'false'}
                 className={cn(
                   'group flex h-6 min-w-0 max-w-52 shrink-0 items-center rounded-md text-[11px] transition-[background-color,color,opacity] duration-150',
                   selected
@@ -131,6 +136,7 @@ function TerminalPane({
                   type="button"
                   aria-label={`Close ${session.title}`}
                   title={`Close ${session.title}`}
+                  data-testid={`bottom-terminal-close-${sessionId}`}
                   className={cn(
                     'mr-0.5 flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground transition-[background-color,color,opacity] duration-150 hover:bg-foreground/10 hover:text-foreground focus-visible:opacity-100',
                     selected ? 'opacity-60' : 'opacity-0 group-hover:opacity-60',
@@ -145,7 +151,7 @@ function TerminalPane({
               </div>
             )
           })}
-          <PaneAction label="New terminal tab" onClick={onAddTab}>
+          <PaneAction label="New terminal tab" onClick={onAddTab} testId="bottom-terminal-new-session">
             <PlusIcon className="size-3" />
           </PaneAction>
         </div>
@@ -166,19 +172,22 @@ function TerminalPane({
             return null
           }
           const selected = sessionId === paneActiveSessionId
+          // Unmount inactive tabs. Keeping multiple xterm instances mounted with
+          // disableStdin toggling left revealed tabs unable to deliver onData
+          // (multi-PTY input went nowhere until remount). Server-side PTY stays
+          // parked; remount reconnects and restores via snapshot.
+          if (!selected) {
+            return null
+          }
           return (
             <div
               key={sessionId}
-              className={cn(
-                'absolute inset-0 min-h-0 min-w-0 transition-opacity duration-150 motion-reduce:transition-none',
-                selected ? 'z-[1] opacity-100' : 'pointer-events-none z-0 opacity-0',
-              )}
-              aria-hidden={!selected}
+              className="absolute inset-0 min-h-0 min-w-0"
             >
               <ShellView
                 ptyId={session.id}
                 cwd={session.cwd}
-                visible={panelVisible && selected}
+                visible={panelVisible}
                 onMetadata={metadata => onMetadata(session.id, metadata)}
                 onExited={() => onExited(session.id)}
               />

@@ -1,10 +1,10 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 import { AfterAll, BeforeAll } from '@cucumber/cucumber'
 
@@ -115,7 +115,7 @@ async function reserveAvailablePort(): Promise<number> {
   })
 }
 
-function resolveManagedCodexAppServerPath(): string {
+function resolveManagedCodexAppServerPath(): string | null {
   const configuredPath = process.env[CODEX_APP_SERVER_PATH_ENV]?.trim()
   if (configuredPath) {
     return configuredPath
@@ -124,11 +124,27 @@ function resolveManagedCodexAppServerPath(): string {
   try {
     return createRequire(join(ROOT, 'package.json')).resolve(CODEX_APP_SERVER_PACKAGE_PATH)
   }
-  catch (error) {
-    throw new Error(`Unable to resolve ${CODEX_APP_SERVER_PACKAGE_PATH} for the managed E2E server`, {
-      cause: error,
-    })
+  catch {
+    // Fall through to the desktop-synced native binary when the npm package is absent.
   }
+
+  // Prefer the desktop `sync:codex-runtime` artifact (gitignored binaries under resources/codex).
+  const platformArch = `${process.platform}-${process.arch}`
+  const bundled = join(
+    ROOT,
+    'apps',
+    'desktop',
+    'resources',
+    'codex',
+    platformArch,
+    process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server',
+  )
+  if (existsSync(bundled)) {
+    return bundled
+  }
+
+  // Codex is optional for essence E2E paths that do not exercise the Codex runtime.
+  return null
 }
 
 /**
@@ -149,16 +165,25 @@ BeforeAll({ timeout: 120_000 }, async () => {
   let webProcess: ChildProcess | null = null
 
   try {
-    serverProcess = spawn(join(ROOT, 'apps', 'server', 'node_modules', '.bin', 'vite-node'), ['src/index.ts'], {
+    const nodeBinary = process.env.CRADLE_E2E_NODE
+      ?? (existsSync(join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node'))
+        ? join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node')
+        : process.execPath)
+    const tsxCli = join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs')
+    serverProcess = spawn(nodeBinary, [tsxCli, 'src/index.ts'], {
       cwd: join(ROOT, 'apps', 'server'),
       env: {
         ...process.env,
+        PATH: `${dirname(nodeBinary)}:${process.env.PATH ?? ''}`,
         CRADLE_DATA_DIR: dataDir,
         CRADLE_PORT: String(serverPort),
         CRADLE_HOST: '127.0.0.1',
+        // Allow loopback model-api-simulator hosts for provider probe/warm during E2E.
+        CRADLE_ALLOW_PRIVATE_PROVIDER_HOSTS: '127.0.0.1,localhost,::1',
         CRADLE_CREDENTIAL_SECRET: 'e2e-test-secret',
-        CRADLE_MOCK_LLM_URL: 'http://127.0.0.1:1', // Placeholder — actual URL set per-profile config.baseUrl
-        CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath,
+        // Do NOT set CRADLE_MOCK_LLM_URL — E2E must use the real Claude Agent Provider
+        // talking to @cradle/model-api-simulator over Anthropic Messages.
+        ...(codexAppServerPath ? { CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath } : {}),
         CRADLE_E2E: '1',
         NODE_ENV: 'test',
       },
@@ -181,6 +206,12 @@ BeforeAll({ timeout: 120_000 }, async () => {
     await waitForReady(`${serverUrl}/health`, 'Managed E2E Server')
 
     console.log(`[e2e] Managed server started at ${serverUrl} (data: ${dataDir})`)
+    if (codexAppServerPath) {
+      console.log(`[e2e] Codex app-server: ${codexAppServerPath}`)
+    }
+    else {
+      console.warn('[e2e] Codex app-server not resolved — Codex scenarios will fail until sync:codex-runtime')
+    }
 
     // Start a web dev server pointing to the managed API server
     let webUrl: string | null = null

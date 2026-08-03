@@ -1,5 +1,7 @@
 import { Elysia } from 'elysia'
 
+import type { AutoRespondMode } from '../contract'
+import { shouldAutoRespondForController } from '../core/auto-respond-policy'
 import type { SimulatorProtocolValidator } from '../core/protocol-validation'
 import { observeRequest } from '../core/request-ledger'
 import type { ScenarioController } from '../core/scenario-runtime'
@@ -13,7 +15,7 @@ import { validateAnthropicStream } from './state-machine'
 export function anthropicRoutes(
   controller: ScenarioController,
   protocol: SimulatorProtocolValidator,
-  autoRespond = false,
+  autoRespond: AutoRespondMode = false,
 ) {
   return new Elysia({ name: 'cradle.model-api-simulator.anthropic' })
     .post('/v1/messages', ({ request }) =>
@@ -26,14 +28,17 @@ export async function handleAnthropicRequest(
   controller: ScenarioController,
   protocol: SimulatorProtocolValidator,
   request: Request,
-  autoRespond = false,
+  autoRespond: AutoRespondMode = false,
 ): Promise<Response> {
   const authenticationError = authenticateAnthropic(request)
   if (authenticationError) { return authenticationError }
   try {
     const observed = await observeRequest(request)
     const operation = protocol.validateRequest('anthropic', request, observed)
-    if (autoRespond && controller.pendingExchangeCount === 0) {
+    if (
+      shouldAutoRespondForController(autoRespond, 'anthropic', observed, controller)
+      && !controller.nextMatches('anthropic', observed)
+    ) {
       controller.record(observed)
       return autoAnthropicResponse(controller, observed)
     }
@@ -41,15 +46,21 @@ export async function handleAnthropicRequest(
     const headers = new Headers(exchange.response.headers)
     headers.set('request-id', headers.get('request-id') ?? `req_simulator_${controller.requests().length}`)
     if (exchange.response.kind === 'json') {
-      protocol.validateJsonResponse(
-        operation,
-        request,
-        exchange.response.status ?? 200,
-        exchange.response.body,
-      )
+      const status = exchange.response.status ?? 200
+      // Error payloads are AnthropicErrorResponse, not Message — do not validate
+      // them against the success response schema (that remaps into a 400 and hides
+      // the scripted failure message from Claude Agent).
+      if (status < 400) {
+        protocol.validateJsonResponse(
+          operation,
+          request,
+          status,
+          exchange.response.body,
+        )
+      }
       headers.set('content-type', 'application/json')
       return Response.json(exchange.response.body, {
-        status: exchange.response.status ?? 200,
+        status,
         headers,
       })
     }

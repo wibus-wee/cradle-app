@@ -38,6 +38,7 @@ import type {
   ThreadBrowserState,
 } from '~/store/browser-panel'
 import {
+  BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES,
   DEFAULT_BROWSER_PANEL_OWNER_ID,
   selectOwnerBrowserAnnotations,
   selectOwnerBrowserHistory,
@@ -704,6 +705,15 @@ function formatBrowserAnnotationElementDetails(anchor: BrowserAnnotationAnchor):
     return []
   }
   const element = anchor.element
+  const styleRows = BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES
+    .map(({ key, property }) => {
+      const value = element.styles[key]
+      if (!value || value === 'rgba(0, 0, 0, 0)') {
+        return null
+      }
+      return `- ${property}: ${value}`
+    })
+    .filter((line): line is string => line !== null)
   return [
     `Element selector: ${element.selector}`,
     element.reactComponents ? `React components: ${element.reactComponents}` : null,
@@ -715,33 +725,8 @@ function formatBrowserAnnotationElementDetails(anchor: BrowserAnnotationAnchor):
     element.attributes?.placeholder
       ? `Element placeholder: ${element.attributes.placeholder}`
       : null,
-    'Element styles:',
-    `- color: ${element.styles.color}`,
-    `- background: ${element.styles.backgroundColor}`,
-    `- opacity: ${element.styles.opacity}`,
-    `- font: ${element.styles.fontFamily}`,
-    `- font-size: ${element.styles.fontSize}`,
-    `- font-weight: ${element.styles.fontWeight}`,
-    `- line-height: ${element.styles.lineHeight}`,
-    `- border-radius: ${element.styles.borderRadius}`,
-    element.styles.borderColor ? `- border-color: ${element.styles.borderColor}` : null,
-    element.styles.borderWidth ? `- border-width: ${element.styles.borderWidth}` : null,
-    element.styles.display ? `- display: ${element.styles.display}` : null,
-    element.styles.alignItems ? `- align-items: ${element.styles.alignItems}` : null,
-    element.styles.justifyContent ? `- justify-content: ${element.styles.justifyContent}` : null,
-    element.styles.flexDirection ? `- flex-direction: ${element.styles.flexDirection}` : null,
-    element.styles.width ? `- width: ${element.styles.width}` : null,
-    element.styles.height ? `- height: ${element.styles.height}` : null,
-    element.styles.marginTop ? `- margin-top: ${element.styles.marginTop}` : null,
-    element.styles.marginRight ? `- margin-right: ${element.styles.marginRight}` : null,
-    element.styles.marginBottom ? `- margin-bottom: ${element.styles.marginBottom}` : null,
-    element.styles.marginLeft ? `- margin-left: ${element.styles.marginLeft}` : null,
-    element.styles.paddingTop ? `- padding-top: ${element.styles.paddingTop}` : null,
-    element.styles.paddingRight ? `- padding-right: ${element.styles.paddingRight}` : null,
-    element.styles.paddingBottom ? `- padding-bottom: ${element.styles.paddingBottom}` : null,
-    element.styles.paddingLeft ? `- padding-left: ${element.styles.paddingLeft}` : null,
-    element.styles.rowGap ? `- row-gap: ${element.styles.rowGap}` : null,
-    element.styles.columnGap ? `- column-gap: ${element.styles.columnGap}` : null,
+    styleRows.length > 0 ? 'Element styles:' : null,
+    ...styleRows,
   ].filter(line => line !== null)
 }
 
@@ -753,32 +738,9 @@ function formatBrowserAnnotationDesignChange(
   }
 
   const rows = [
-    ['color', designChange.color],
-    ['background', designChange.backgroundColor],
-    ['opacity', designChange.opacity],
-    ['font', designChange.fontFamily],
-    ['font-size', designChange.fontSize],
-    ['font-weight', designChange.fontWeight],
-    ['border-radius', designChange.borderRadius],
-    ['border-color', designChange.borderColor],
-    ['border-width', designChange.borderWidth],
-    ['display', designChange.display],
-    ['align-items', designChange.alignItems],
-    ['justify-content', designChange.justifyContent],
-    ['flex-direction', designChange.flexDirection],
-    ['width', designChange.width],
-    ['height', designChange.height],
-    ['margin-top', designChange.marginTop],
-    ['margin-right', designChange.marginRight],
-    ['margin-bottom', designChange.marginBottom],
-    ['margin-left', designChange.marginLeft],
-    ['padding-top', designChange.paddingTop],
-    ['padding-right', designChange.paddingRight],
-    ['padding-bottom', designChange.paddingBottom],
-    ['padding-left', designChange.paddingLeft],
-    ['row-gap', designChange.rowGap],
-    ['column-gap', designChange.columnGap],
-    ['comment', designChange.comment],
+    ...BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES.map(({ key, property }): [string, string | undefined] =>
+      [property, designChange[key]]),
+    ['comment', designChange.comment] as [string, string | undefined],
   ]
     .filter(([, value]) => Boolean(value))
     .map(([label, value]) => `- ${label}: ${value}`)

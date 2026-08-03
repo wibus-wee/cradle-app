@@ -3,12 +3,12 @@ export type JsonArray = readonly JsonValue[]
 export type JsonObject = { readonly [key: string]: JsonValue }
 export type JsonValue = JsonPrimitive | JsonArray | JsonObject
 
-export function isJsonArray(value: JsonValue): value is JsonArray {
+export function isJsonArray(value: JsonValue | undefined): value is JsonArray {
   return Array.isArray(value)
 }
 
-export function isJsonObject(value: JsonValue): value is JsonObject {
-  return value !== null && typeof value === 'object' && !isJsonArray(value)
+export function isJsonObject(value: JsonValue | undefined): value is JsonObject {
+  return value !== null && value !== undefined && typeof value === 'object' && !isJsonArray(value)
 }
 
 export interface RequestMatch {
@@ -17,6 +17,14 @@ export interface RequestMatch {
   readonly query?: Readonly<Record<string, string | readonly string[]>>
   readonly body?: JsonValue
   readonly bodyFields?: Readonly<Record<string, JsonValue>>
+  /**
+   * Match when the JSON-stringified request body contains each of these
+   * substrings. Useful for Claude Agent / Codex turns that share the same path
+   * but differ by user prompt text buried in nested message arrays.
+   */
+  readonly bodyTextIncludes?: string | readonly string[]
+  /** Fail the match when any of these substrings appear in the body text. */
+  readonly bodyTextExcludes?: string | readonly string[]
 }
 
 export interface ObservedRequest {
@@ -85,16 +93,22 @@ export interface SimulatorController {
   reset: () => void
 }
 
+export type AutoRespondMode = boolean | 'probes-only'
+
 export interface StartSimulatorOptions {
   readonly port?: number
   /** When true, request bodies are validated against the provider schema (default: false). */
   readonly strictRequestValidation?: boolean
   /**
-   * When true, requests that no enqueued exchange claims get a synthesised
-   * protocol-valid response instead of an `UnexpectedRequestError`. This is what
-   * turns the scenario replayer into a standalone mock server (default: false).
+   * Auto-response policy for unmatched requests:
+   * - `false` (default): unmatched requests fail with UnexpectedRequestError
+   * - `true`: synthesise a protocol-valid response for any unmatched request
+   * - `'probes-only'`: synthesise for probe paths (token count, models, etc.) and
+   *   for unmatched conversation creates only while exchanges remain queued
+   *   (so SDK noise cannot steal FIFO). Unmatched conversation creates fail when
+   *   the queue is empty — this is what E2E should use to catch unexpected turns.
    */
-  readonly autoRespond?: boolean
+  readonly autoRespond?: AutoRespondMode
 }
 
 export interface ModelApiSimulator {

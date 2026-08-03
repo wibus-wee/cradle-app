@@ -622,14 +622,25 @@ export interface BrowserAnnotationElementStyle {
   fontFamily: string
   fontSize: string
   fontWeight: string
+  fontStyle?: string
   lineHeight: string
+  letterSpacing?: string
+  textAlign?: string
+  textTransform?: string
+  textDecorationLine?: string
   borderRadius: string
   borderColor?: string
   borderWidth?: string
+  borderStyle?: string
+  boxShadow?: string
   display?: string
   alignItems?: string
   justifyContent?: string
   flexDirection?: string
+  flexWrap?: string
+  overflow?: string
+  position?: string
+  zIndex?: string
   width?: string
   height?: string
   marginTop?: string
@@ -743,13 +754,25 @@ export interface BrowserAnnotationDesignChange {
   fontFamily?: string
   fontSize?: string
   fontWeight?: string
+  fontStyle?: string
+  lineHeight?: string
+  letterSpacing?: string
+  textAlign?: string
+  textTransform?: string
+  textDecorationLine?: string
   borderRadius?: string
   borderColor?: string
   borderWidth?: string
+  borderStyle?: string
+  boxShadow?: string
   display?: string
   alignItems?: string
   justifyContent?: string
   flexDirection?: string
+  flexWrap?: string
+  overflow?: string
+  position?: string
+  zIndex?: string
   width?: string
   height?: string
   marginTop?: string
@@ -763,6 +786,56 @@ export interface BrowserAnnotationDesignChange {
   rowGap?: string
   columnGap?: string
 }
+
+/** Draft-style key applied to the selected element, excluding the free-form comment. */
+export type BrowserAnnotationDesignStyleKey = Exclude<keyof BrowserAnnotationDesignChange, 'comment'>
+
+/**
+ * Canonical draft-style key → CSS property mapping.
+ * Mirrors BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES in the desktop preload contract.
+ */
+export const BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES: ReadonlyArray<{
+  key: BrowserAnnotationDesignStyleKey
+  property: string
+}> = [
+  { key: 'color', property: 'color' },
+  { key: 'backgroundColor', property: 'background-color' },
+  { key: 'opacity', property: 'opacity' },
+  { key: 'fontFamily', property: 'font-family' },
+  { key: 'fontSize', property: 'font-size' },
+  { key: 'fontWeight', property: 'font-weight' },
+  { key: 'fontStyle', property: 'font-style' },
+  { key: 'lineHeight', property: 'line-height' },
+  { key: 'letterSpacing', property: 'letter-spacing' },
+  { key: 'textAlign', property: 'text-align' },
+  { key: 'textTransform', property: 'text-transform' },
+  { key: 'textDecorationLine', property: 'text-decoration-line' },
+  { key: 'borderRadius', property: 'border-radius' },
+  { key: 'borderColor', property: 'border-color' },
+  { key: 'borderWidth', property: 'border-width' },
+  { key: 'borderStyle', property: 'border-style' },
+  { key: 'boxShadow', property: 'box-shadow' },
+  { key: 'display', property: 'display' },
+  { key: 'alignItems', property: 'align-items' },
+  { key: 'justifyContent', property: 'justify-content' },
+  { key: 'flexDirection', property: 'flex-direction' },
+  { key: 'flexWrap', property: 'flex-wrap' },
+  { key: 'overflow', property: 'overflow' },
+  { key: 'position', property: 'position' },
+  { key: 'zIndex', property: 'z-index' },
+  { key: 'width', property: 'width' },
+  { key: 'height', property: 'height' },
+  { key: 'marginTop', property: 'margin-top' },
+  { key: 'marginRight', property: 'margin-right' },
+  { key: 'marginBottom', property: 'margin-bottom' },
+  { key: 'marginLeft', property: 'margin-left' },
+  { key: 'paddingTop', property: 'padding-top' },
+  { key: 'paddingRight', property: 'padding-right' },
+  { key: 'paddingBottom', property: 'padding-bottom' },
+  { key: 'paddingLeft', property: 'padding-left' },
+  { key: 'rowGap', property: 'row-gap' },
+  { key: 'columnGap', property: 'column-gap' },
+]
 
 export interface BrowserAnnotationRecord {
   id: string
