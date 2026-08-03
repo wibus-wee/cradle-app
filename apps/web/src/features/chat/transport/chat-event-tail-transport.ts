@@ -8,6 +8,7 @@ import type {
   DesktopChatSubscribeSessionEventsRequest,
 } from '~/lib/electron'
 import { readDesktopChatEventTailBridge } from '~/lib/electron'
+import { openServerEventSource } from '~/lib/server-transport'
 import {
   createSyncGlobalSessionEventSource,
   createSyncSessionEventSource,
@@ -43,7 +44,7 @@ export function createChatSessionEventSource(url: string): SessionEventSource {
   if (isSyncSocketEnabled() && syncRequest) {
     return createSyncSessionEventSource(syncRequest)
   }
-  return new EventSource(url)
+  return openServerEventSource(url)
 }
 
 export function createGlobalSessionEventSource(url: string): GlobalSessionEventSource {
@@ -56,7 +57,7 @@ export function createGlobalSessionEventSource(url: string): GlobalSessionEventS
   if (isSyncSocketEnabled() && syncRequest) {
     return createSyncGlobalSessionEventSource(syncRequest)
   }
-  return new EventSource(url)
+  return openServerEventSource(url)
 }
 
 class DesktopChatSessionEventSource implements SessionEventSource {

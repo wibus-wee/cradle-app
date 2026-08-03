@@ -63,6 +63,7 @@ export interface WorkspaceView {
   gitIdentity: WorkspaceGitIdentity
   identifier: string
   availability: 'available' | 'missing' | 'remote'
+  multiFolder: boolean
   pinned: number
   createdAt: number
   updatedAt: number
@@ -423,7 +424,9 @@ function createWithDatabase(
 
 export function createMultiFolderWorkspace(input: MultiFolderWorkspaceConfig): WorkspaceView {
   assertMultiWorkspacePocEnabled()
-  const config = normalizeMultiFolderWorkspaceConfig(input)
+  // Create path requires already-registered local members. Config import keeps
+  // path-only validation so recognition can reopen an existing composite root.
+  const config = normalizeMultiFolderWorkspaceConfig(input, { requireRegisteredMembers: true })
   const workspaceRoot = resolveMultiWorkspacePath(config.name)
 
   // Idempotent re-import / cradle open: if the managed root is already registered,
@@ -888,10 +891,23 @@ function toWorkspaceView(row: Workspace): WorkspaceView {
     gitIdentity: readWorkspaceGitIdentity(row),
     identifier: row.identifier,
     availability: workspaceAvailability(locator),
+    multiFolder: isMultiFolderWorkspaceLocator(locator),
     pinned: row.pinned,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
+}
+
+/** Whether a workspace view is a Cradle-owned multi-folder symlink root. */
+export function isMultiFolderWorkspace(workspace: Pick<WorkspaceView, 'locator' | 'multiFolder'>): boolean {
+  return workspace.multiFolder || isMultiFolderWorkspaceLocator(workspace.locator)
+}
+
+function isMultiFolderWorkspaceLocator(locator: WorkspaceLocator): boolean {
+  if (locator.hostId !== 'local') {
+    return false
+  }
+  return existsSync(join(locator.path, MULTI_WORKSPACE_CONFIG_FILE))
 }
 
 function existingHistoricalWorkspacePlan(
@@ -1073,7 +1089,10 @@ function readMultiFolderWorkspaceConfigRaw(path: string): MultiFolderWorkspaceCo
   }
 }
 
-function normalizeMultiFolderWorkspaceConfig(input: MultiFolderWorkspaceConfig): MultiFolderWorkspaceConfig {
+function normalizeMultiFolderWorkspaceConfig(
+  input: MultiFolderWorkspaceConfig,
+  options: { requireRegisteredMembers?: boolean } = {},
+): MultiFolderWorkspaceConfig {
   const name = input.name.trim()
   if (!isSafeWorkspaceEntryName(name)) {
     throw new AppError({
@@ -1092,7 +1111,17 @@ function normalizeMultiFolderWorkspaceConfig(input: MultiFolderWorkspaceConfig):
     })
   }
 
+  if (options.requireRegisteredMembers && input.folders.length < 2) {
+    throw new AppError({
+      code: 'multi_workspace_folders_required',
+      status: 400,
+      message: 'Select at least two registered Cradle workspaces',
+      details: { count: input.folders.length },
+    })
+  }
+
   const names = new Set<string>()
+  const memberWorkspaceIds = new Set<string>()
   const folders = input.folders.map((folder) => {
     const folderName = folder.name.trim()
     const folderPath = resolve(folder.path.trim())
@@ -1121,11 +1150,62 @@ function normalizeMultiFolderWorkspaceConfig(input: MultiFolderWorkspaceConfig):
       })
     }
     assertDirectory(folderPath, folderName)
+
+    if (options.requireRegisteredMembers) {
+      const member = assertRegisteredMultiFolderMember(folderPath)
+      if (memberWorkspaceIds.has(member.id)) {
+        throw new AppError({
+          code: 'multi_workspace_member_duplicate',
+          status: 409,
+          message: 'Each registered workspace may only be linked once',
+          details: { workspaceId: member.id, path: folderPath },
+        })
+      }
+      memberWorkspaceIds.add(member.id)
+    }
+
     names.add(folderName)
     return { name: folderName, path: folderPath }
   })
 
   return { name, folders }
+}
+
+/**
+ * Members for create must already be registered local single-folder workspaces.
+ * Arbitrary filesystem paths are rejected so the POC stays inside Cradle's registry.
+ */
+function assertRegisteredMultiFolderMember(absolutePath: string): WorkspaceView {
+  const workspace = resolveByPath(absolutePath)
+  if (!workspace || workspace.locator.hostId !== 'local') {
+    throw new AppError({
+      code: 'multi_workspace_member_not_registered',
+      status: 400,
+      message: 'Multi-folder members must be local workspaces already registered in Cradle',
+      details: { path: absolutePath },
+    })
+  }
+  if (workspace.availability !== 'available') {
+    throw new AppError({
+      code: 'multi_workspace_member_unavailable',
+      status: 400,
+      message: 'Multi-folder members must be available local workspaces',
+      details: {
+        workspaceId: workspace.id,
+        path: absolutePath,
+        availability: workspace.availability,
+      },
+    })
+  }
+  if (isMultiFolderWorkspaceLocator(workspace.locator)) {
+    throw new AppError({
+      code: 'multi_workspace_member_is_multi',
+      status: 400,
+      message: 'Multi-folder workspaces cannot nest other multi-folder workspaces',
+      details: { workspaceId: workspace.id, path: absolutePath },
+    })
+  }
+  return workspace
 }
 
 function isSafeWorkspaceEntryName(name: string): boolean {

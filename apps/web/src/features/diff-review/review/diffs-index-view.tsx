@@ -1,27 +1,37 @@
 import './review-surface.css'
 
 import {
+  CheckLine as CheckIcon,
+  CloseLine as FailIcon,
   Folder2Line as LocalRepoIcon,
   GitBranchLine as BranchIcon,
   GithubLine as GithubIcon,
   GitPullRequestLine as PullRequestIcon,
+  LoadingLine as RunningIcon,
   SearchLine as SearchIcon,
+  User2Line as AuthorIcon,
 } from '@mingcute/react'
+import type { ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 
 import { cn } from '~/lib/cn'
 
 import type { CradleDiffReview } from '../shared/types'
 import { ChangeStat, StatusDot } from './review-primitives'
-import { formatRelativeTime, reviewIdentity, reviewStatusBadge } from './review-summary'
+import {
+  formatRelativeTime,
+  reviewChecks,
+  reviewIdentity,
+  reviewStatusBadge,
+} from './review-summary'
 
 /**
  * A repository as the Diffs surface understands it: a code identity that owns
  * its reviews, whether or not it is checked out locally.
  *
- * This mirrors the server's repository record. Reviews group under it instead of
- * under a workspace, which is what stops a pull request for someone else's
- * repository from appearing inside an unrelated project.
+ * Until the server's repository record is wired end-to-end, containers derive
+ * this from workspace git checkouts plus review/GitHub identities, and carry
+ * `workspaceId` / `repositoryPath` so navigation stays reachable.
  */
 export interface RepositoryScope {
   id: string
@@ -31,6 +41,10 @@ export interface RepositoryScope {
   /** Absolute checkout path, when this repository is checked out locally. */
   localRoot: string | null
   reviewCount: number
+  /** Workspace that can materialize reviews for this repository today. */
+  workspaceId: string
+  /** Relative path within the workspace; null for remote-only GitHub identities. */
+  repositoryPath: string | null
 }
 
 type IndexTab = 'all' | 'open' | 'mine' | 'closed'
@@ -58,18 +72,52 @@ function matchesTab(review: CradleDiffReview, tab: IndexTab): boolean {
       || review.files.some(file => !file.isViewed))
 }
 
+function sourceKindLabel(sourceKind: CradleDiffReview['sourceKind']): string {
+  switch (sourceKind) {
+    case 'github-pull-request':
+      return 'Pull request'
+    case 'local-working-tree':
+      return 'Working tree'
+    case 'local-branch-compare':
+      return 'Branch compare'
+    case 'local-commit':
+      return 'Commit'
+    case 'agent-change-set':
+      return 'Agent changes'
+    case 'external-import':
+      return 'Imported'
+    default:
+      return 'Review'
+  }
+}
+
+function MetaSep() {
+  return <span aria-hidden className="text-[var(--rv-fg-subtle)]/70">·</span>
+}
+
+function MetaItem({ children, className }: { children: ReactNode, className?: string }) {
+  return (
+    <span className={cn('inline-flex min-w-0 items-center gap-1', className)}>
+      {children}
+    </span>
+  )
+}
+
 function RepositoryRow({ repository, selected, onSelect }: {
   repository: RepositoryScope
   selected: boolean
   onSelect: () => void
 }) {
   const Icon = repository.hostKind === 'github' ? GithubIcon : LocalRepoIcon
+  const secondary = repository.localRoot
+    ?? (repository.hostKind === 'github' ? 'GitHub' : 'Local')
+
   return (
     <li className="relative">
       {selected && (
         <span
           aria-hidden
-          className="absolute inset-y-[5px] left-0 w-[2px] rounded-r-full bg-[var(--rv-accent)]"
+          className="absolute inset-y-[6px] left-0 w-[2px] rounded-r-full bg-[var(--rv-accent)]"
         />
       )}
       <button
@@ -77,26 +125,34 @@ function RepositoryRow({ repository, selected, onSelect }: {
         onClick={onSelect}
         title={repository.localRoot ?? repository.label}
         className={cn(
-          'flex h-[30px] w-full items-center gap-2 pl-3 pr-2.5 text-left transition-colors duration-100',
+          'flex min-h-12 w-full items-center gap-2.5 px-3 py-2 text-left transition-colors duration-100',
           selected ? 'bg-[var(--rv-bg-active)]' : 'hover:bg-[var(--rv-bg-hover)]',
         )}
       >
         <Icon
           className={cn(
-            'size-3.5 shrink-0',
+            'size-4 shrink-0',
             selected ? 'text-[var(--rv-fg)]' : 'text-[var(--rv-fg-subtle)]',
           )}
           aria-hidden
         />
-        <span
-          className={cn(
-            'min-w-0 flex-1 truncate text-[12.5px]',
-            selected ? 'font-medium text-[var(--rv-fg)]' : 'text-[var(--rv-fg-muted)]',
-          )}
-        >
-          {repository.label}
+        <span className="min-w-0 flex-1">
+          <span
+            className={cn(
+              'block truncate text-[13.5px] leading-snug',
+              selected ? 'font-medium text-[var(--rv-fg)]' : 'text-[var(--rv-fg-muted)]',
+            )}
+          >
+            {repository.label}
+          </span>
+          <span
+            className="mt-0.5 block truncate font-[var(--rv-font-mono)] text-[11px] leading-tight text-[var(--rv-fg-subtle)]"
+            title={secondary}
+          >
+            {secondary}
+          </span>
         </span>
-        <span data-rv-num className="shrink-0 text-[11px] text-[var(--rv-fg-subtle)]">
+        <span data-rv-num className="shrink-0 self-start pt-0.5 text-[12px] text-[var(--rv-fg-subtle)]">
           {repository.reviewCount}
         </span>
       </button>
@@ -107,9 +163,14 @@ function RepositoryRow({ repository, selected, onSelect }: {
 function ReviewRow({ review, onOpen }: { review: CradleDiffReview, onOpen: () => void }) {
   const identity = reviewIdentity(review)
   const status = reviewStatusBadge(review)
+  const checks = reviewChecks(review)
   const revision = review.currentRevision
   const detail = review.githubPullRequest?.detail
   const openThreads = review.threads.filter(thread => thread.state !== 'resolved').length
+  const unviewedFiles = review.files.filter(file => !file.isViewed).length
+  const author = detail?.author?.login ?? null
+  const labels = detail?.labels.slice(0, 3) ?? []
+  const extraLabelCount = detail ? Math.max(0, detail.labels.length - labels.length) : 0
 
   return (
     <li>
@@ -117,62 +178,157 @@ function ReviewRow({ review, onOpen }: { review: CradleDiffReview, onOpen: () =>
         type="button"
         onClick={onOpen}
         className={cn(
-          'group/row flex h-9 w-full items-center gap-3 px-4 text-left',
+          'group/row flex w-full items-start gap-3 px-4 py-3 text-left',
           'border-b border-[var(--rv-line)] transition-colors duration-100',
           'hover:bg-[var(--rv-bg-hover)]',
         )}
       >
-        <StatusDot tone={status.tone} filled={status.filled} />
+        <StatusDot tone={status.tone} filled={status.filled} className="mt-[7px]" />
 
-        {identity.reference && (
-          <span
-            data-rv-num
-            className="w-11 shrink-0 font-[var(--rv-font-mono)] text-[11.5px] text-[var(--rv-fg-subtle)]"
-          >
-            {identity.reference}
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-baseline gap-2.5">
+            {identity.reference && (
+              <span
+                data-rv-num
+                className="shrink-0 font-[var(--rv-font-mono)] text-[12.5px] text-[var(--rv-fg-subtle)]"
+              >
+                {identity.reference}
+              </span>
+            )}
+            <span className="min-w-0 truncate text-[14px] font-medium leading-snug text-[var(--rv-fg)]">
+              {identity.title}
+            </span>
           </span>
-        )}
 
-        <span className="min-w-0 flex-1 truncate text-[12.5px] text-[var(--rv-fg)]">
-          {identity.title}
+          {/* Second line carries the scan-worthy facts the single-line row left empty. */}
+          <span className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-[var(--rv-fg-subtle)]">
+            <MetaItem>
+              <span className="text-[var(--rv-fg-muted)]">{status.label}</span>
+            </MetaItem>
+
+            {author && (
+              <>
+                <MetaSep />
+                <MetaItem>
+                  <AuthorIcon className="size-3 shrink-0" aria-hidden />
+                  <span className="truncate">{author}</span>
+                </MetaItem>
+              </>
+            )}
+
+            {!detail && (
+              <>
+                <MetaSep />
+                <MetaItem>{sourceKindLabel(review.sourceKind)}</MetaItem>
+              </>
+            )}
+
+            {detail && (
+              <>
+                <MetaSep />
+                <MetaItem className="max-w-[220px] font-[var(--rv-font-mono)] text-[11.5px]">
+                  <BranchIcon className="size-3 shrink-0" aria-hidden />
+                  <span className="truncate" title={`${detail.headRef} → ${detail.baseRef}`}>
+                    {detail.headRef}
+                    <span className="text-[var(--rv-fg-subtle)]"> → </span>
+                    {detail.baseRef}
+                  </span>
+                </MetaItem>
+              </>
+            )}
+
+            {checks && (
+              <>
+                <MetaSep />
+                <MetaItem
+                  className={cn(
+                    checks.failed > 0 && 'text-[var(--rv-danger)]',
+                    checks.failed === 0 && checks.pending > 0 && 'text-[var(--rv-warn)]',
+                    checks.failed === 0 && checks.pending === 0 && 'text-[var(--rv-open)]',
+                  )}
+                >
+                  {checks.failed > 0
+                    ? <FailIcon className="size-3 shrink-0" aria-hidden />
+                    : checks.pending > 0
+                      ? <RunningIcon className="size-3 shrink-0 animate-spin" aria-hidden />
+                      : <CheckIcon className="size-3 shrink-0" aria-hidden />}
+                  <span data-rv-num>{checks.label}</span>
+                </MetaItem>
+              </>
+            )}
+
+            {openThreads > 0 && (
+              <>
+                <MetaSep />
+                <MetaItem className="text-[var(--rv-warn)]">
+                  <span data-rv-num>
+                    {openThreads}
+                    {openThreads === 1 ? ' unresolved' : ' unresolved'}
+                  </span>
+                </MetaItem>
+              </>
+            )}
+
+            {unviewedFiles > 0 && review.files.length > 0 && (
+              <>
+                <MetaSep />
+                <MetaItem>
+                  <span data-rv-num>
+                    {unviewedFiles}
+                    {' / '}
+                    {review.files.length}
+                    {' unviewed'}
+                  </span>
+                </MetaItem>
+              </>
+            )}
+
+            {labels.map(label => (
+              <span
+                key={label.name}
+                className={cn(
+                  'inline-flex h-[18px] items-center gap-1 rounded-[4px] px-1.5',
+                  'border border-[var(--rv-line)] text-[10.5px] text-[var(--rv-fg-muted)]',
+                )}
+              >
+                <span
+                  aria-hidden
+                  className="size-[6px] rounded-full"
+                  style={{ background: `#${label.color}` }}
+                />
+                {label.name}
+              </span>
+            ))}
+            {extraLabelCount > 0 && (
+              <span data-rv-num className="text-[11px] text-[var(--rv-fg-subtle)]">
+                +
+                {extraLabelCount}
+              </span>
+            )}
+          </span>
         </span>
 
-        {/* Metadata is right-aligned and fixed-width so a long list reads as columns. */}
-        <span className="flex shrink-0 items-center gap-3 text-[11.5px] text-[var(--rv-fg-subtle)]">
-          {openThreads > 0 && (
-            <span data-rv-num className="text-[var(--rv-warn)]">
-              {openThreads}
-              {' unresolved'}
-            </span>
-          )}
-
-          {detail && (
-            <span className="hidden max-w-[180px] items-center gap-1 lg:flex">
-              <BranchIcon className="size-3 shrink-0" aria-hidden />
-              <span className="truncate font-[var(--rv-font-mono)] text-[11px]">{detail.headRef}</span>
-            </span>
-          )}
-
+        <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5 text-[12px] text-[var(--rv-fg-subtle)]">
           {revision && (
-            <>
-              <span data-rv-num className="hidden w-14 text-right sm:inline">
+            <ChangeStat
+              additions={revision.additions}
+              deletions={revision.deletions}
+              className="justify-end text-[12px]"
+            />
+          )}
+          <span className="flex items-center gap-2">
+            {revision && (
+              <span data-rv-num>
                 {revision.fileCount}
                 {revision.fileCount === 1 ? ' file' : ' files'}
               </span>
-              <ChangeStat
-                additions={revision.additions}
-                deletions={revision.deletions}
-                className="w-24 justify-end"
-              />
-            </>
-          )}
-
-          <span
-            data-rv-num
-            className="w-20 text-right"
-            title={new Date(review.updatedAt * 1000).toLocaleString()}
-          >
-            {formatRelativeTime(review.updatedAt)}
+            )}
+            <span
+              data-rv-num
+              title={new Date(review.updatedAt * 1000).toLocaleString()}
+            >
+              {formatRelativeTime(review.updatedAt)}
+            </span>
           </span>
         </span>
       </button>
@@ -236,7 +392,7 @@ export function DiffsIndexView({
       className="flex h-full min-h-0 w-full overflow-hidden"
     >
       <aside
-        className="flex w-[var(--rv-rail-w)] shrink-0 flex-col border-r border-[var(--rv-line)] bg-[var(--rv-bg-subtle)]"
+        className="flex w-[280px] shrink-0 flex-col border-r border-[var(--rv-line)] bg-[var(--rv-bg-subtle)]"
         aria-label="Repositories"
       >
         <div className="flex h-[var(--rv-topbar-h)] shrink-0 items-center px-4">

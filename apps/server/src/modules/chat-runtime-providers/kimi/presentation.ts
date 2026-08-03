@@ -6,7 +6,7 @@ const KIMI_UI_SLOTS: RuntimeUiSlot[] = [
   { id: 'kimi:model', name: 'model', label: 'Model', description: 'Show the active Kimi model.', argumentHint: '', iconKey: 'model', commandText: '/model ', surfaces: ['runtimePanel', 'composerState'] },
   { id: 'kimi:config', name: 'config', label: 'Configuration', description: 'Show Kimi interaction configuration.', argumentHint: '', iconKey: 'config', commandText: '/config ', surfaces: ['runtimePanel'] },
   { id: 'kimi:plan', name: 'plan', label: 'Plan', description: 'Show Kimi plan mode.', argumentHint: '', iconKey: 'plan', commandText: '/plan ', surfaces: ['runtimePanel', 'composerState'] },
-  { id: 'kimi:usage', name: 'usage', label: 'Usage', description: 'Show Kimi context usage.', argumentHint: '', iconKey: 'usage', commandText: '/usage ', surfaces: ['runtimePanel'] },
+  { id: 'kimi:usage', name: 'usage', label: 'Usage', description: 'Show Kimi OAuth account usage limits.', argumentHint: '', iconKey: 'usage', commandText: '/usage ', surfaces: ['slashCommand', 'runtimePanel'] },
   { id: 'kimi:goal', name: 'goal', label: 'Goal', description: 'Show Kimi goal progress.', argumentHint: '', iconKey: 'progress', commandText: '/goal ', surfaces: ['runtimePanel', 'composerState'] },
   { id: 'kimi:approvals', name: 'approvals', label: 'Approvals', description: 'Show pending Kimi tool approvals.', argumentHint: '', iconKey: 'approvals', commandText: '/approvals ', surfaces: ['runtimePanel', 'composerState'] },
   { id: 'kimi:questions', name: 'questions', label: 'Questions', description: 'Show pending Kimi questions.', argumentHint: '', iconKey: 'user-input', commandText: '/questions ', surfaces: ['runtimePanel', 'composerState'] },

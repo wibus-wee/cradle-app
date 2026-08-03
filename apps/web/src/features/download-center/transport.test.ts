@@ -1,12 +1,14 @@
-// @vitest-environment jsdom
+// @vitest-environment node
+// Prefer: pnpm exec vitest run --config vitest.transport.config.ts <this-file>
 
 import { describe, expect, it, vi } from 'vitest'
 
 import { createDesktopDownloadCenterTransport, serverDownloadCenterTransport } from './transport'
 import type { DownloadTask } from './types'
 
-const { postDownloadCenterTasksByIdCancel } = vi.hoisted(() => ({
+const { postDownloadCenterTasksByIdCancel, openServerEventSource } = vi.hoisted(() => ({
   postDownloadCenterTasksByIdCancel: vi.fn(),
+  openServerEventSource: vi.fn(),
 }))
 
 vi.mock('~/api-gen/sdk.gen', () => ({
@@ -15,9 +17,12 @@ vi.mock('~/api-gen/sdk.gen', () => ({
 }))
 
 vi.mock('~/lib/electron', () => ({
-  getAuthenticatedEventSourceUrl: vi.fn(async (url: string) => url),
   getServerUrl: () => 'http://server.test',
   isElectron: false,
+}))
+
+vi.mock('~/lib/server-transport', () => ({
+  openServerEventSource,
 }))
 
 function task(overrides: Partial<DownloadTask> = {}): DownloadTask {
@@ -42,6 +47,14 @@ function task(overrides: Partial<DownloadTask> = {}): DownloadTask {
   }
 }
 
+class FakeServerEventSource {
+  onmessage: ((event: MessageEvent<string>) => void) | null = null
+  onopen: (() => void) | null = null
+  onerror: (() => void) | null = null
+
+  close() {}
+}
+
 describe('download center server transport', () => {
   it('uses the scoped server cancel route and never sends desktop task IDs to it', async () => {
     postDownloadCenterTasksByIdCancel.mockResolvedValue({ data: task({ status: 'cancelled' }) })
@@ -52,26 +65,13 @@ describe('download center server transport', () => {
   })
 
   it('waits for the reconnect snapshot before accepting stream events', async () => {
-    class FakeEventSource {
-      static instances: FakeEventSource[] = []
-      onmessage: ((event: MessageEvent<string>) => void) | null = null
-      onopen: (() => void) | null = null
-      onerror: (() => void) | null = null
-
-      constructor(_url: string) {
-        FakeEventSource.instances.push(this)
-      }
-
-      close() {}
-    }
-    vi.stubGlobal('EventSource', FakeEventSource)
+    const source = new FakeServerEventSource()
+    openServerEventSource.mockReturnValue(source)
     const refresh = { finish: null as (() => void) | null }
     const reconnect = vi.fn(() => new Promise<void>((resolve) => { refresh.finish = resolve }))
     const received: DownloadTask[] = []
     const unsubscribe = serverDownloadCenterTransport.subscribe(task => received.push(task), reconnect)
-    await Promise.resolve()
-    await Promise.resolve()
-    const source = FakeEventSource.instances[0]!
+    expect(openServerEventSource).toHaveBeenCalledWith('http://server.test/download-center/events')
 
     source.onopen?.()
     source.onmessage?.({ data: JSON.stringify(task()) } as MessageEvent<string>)
@@ -81,7 +81,6 @@ describe('download center server transport', () => {
     source.onmessage?.({ data: JSON.stringify(task({ taskId: 'fresh-task' })) } as MessageEvent<string>)
     expect(received.map(item => item.taskId)).toEqual(['fresh-task'])
     unsubscribe()
-    vi.unstubAllGlobals()
   })
 
   it('sends cancellation for desktop tasks only through Desktop IPC', async () => {

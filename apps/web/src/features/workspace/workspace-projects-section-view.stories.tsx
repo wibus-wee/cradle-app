@@ -74,6 +74,20 @@ function WorkspaceProjectsSectionCatalog() {
       sessionPreviewLimit={sessionPreviewLimit}
       adding={false}
       multiWorkspaceEnabled
+      multiFolderCandidates={[
+        workspaceFixtures.local,
+        {
+          ...workspaceFixtures.local,
+          id: 'workspace-docs',
+          name: 'docs',
+          identifier: 'DOC',
+          locator: {
+            ...workspaceFixtures.local.locator,
+            path: '/Users/demo/docs',
+          },
+        },
+      ]}
+      multiFolderCreating={false}
       hasUnreadWorkspaceSessions
       markingAllSessionsRead={false}
       onGroupingChange={setGrouping}
@@ -105,7 +119,7 @@ function WorkspaceProjectsSectionCatalog() {
       onSessionPreviewLimitChange={setSessionPreviewLimit}
       onCollapseAll={() => {}}
       onAddFromPicker={() => {}}
-      onOpenMultiWorkspaceDialog={() => {}}
+      onCreateMultiFolder={async () => {}}
       onMarkAllAsRead={() => {}}
     >
       {flatGrouping
@@ -197,6 +211,8 @@ const meta = {
     sessionPreviewLimit: DEFAULT_SESSION_PREVIEW_LIMIT,
     adding: false,
     multiWorkspaceEnabled: true,
+    multiFolderCandidates: [workspaceFixtures.local],
+    multiFolderCreating: false,
     hasUnreadWorkspaceSessions: true,
     markingAllSessionsRead: false,
     children: null,
@@ -212,7 +228,7 @@ const meta = {
     onSessionPreviewLimitChange: fn(),
     onCollapseAll: fn(),
     onAddFromPicker: fn(),
-    onOpenMultiWorkspaceDialog: fn(),
+    onCreateMultiFolder: fn(),
     onMarkAllAsRead: fn(),
   },
 } satisfies Meta<typeof WorkspaceProjectsSectionView>

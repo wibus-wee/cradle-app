@@ -29,7 +29,6 @@ export const Route = createFileRoute('/diff')({
 })
 
 function DiffRoute() {
-  const navigate = Route.useNavigate()
   const { workspace, repo, path, review, line, side, github } = Route.useSearch()
 
   return (
@@ -41,13 +40,6 @@ function DiffRoute() {
       line={line}
       side={side}
       github={github}
-      onWorkspaceSelect={(workspaceId) => {
-        void navigate({
-          search: {
-            workspace: workspaceId,
-          },
-        })
-      }}
     />
   )
 }

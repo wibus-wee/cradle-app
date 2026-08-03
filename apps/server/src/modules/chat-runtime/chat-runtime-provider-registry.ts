@@ -354,6 +354,13 @@ function assertRuntimeCapabilities(runtime: Partial<ChatRuntime>): void {
       throw new TypeError(`Runtime ${runtime.runtimeKind} capability ${key} must be boolean.`)
     }
   }
+  // Opt-in flag: absent means unsupported, but a declared value must still be boolean.
+  if (
+    capabilities.supportsNativeReview !== undefined
+    && typeof capabilities.supportsNativeReview !== 'boolean'
+  ) {
+    throw new TypeError(`Runtime ${runtime.runtimeKind} capability supportsNativeReview must be boolean.`)
+  }
   if (!['native', 'queue-fallback', 'unsupported'].includes(capabilities.steer)) {
     throw new Error(`Runtime ${runtime.runtimeKind} has invalid steer capability.`)
   }

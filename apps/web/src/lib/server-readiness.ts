@@ -1,11 +1,23 @@
+import { client } from './client.config'
+import { getServerUrl } from './electron'
 import { cradleFetch } from './server-credential'
-import { getConfiguredServerUrl, setRuntimeServerUrl } from './server-endpoint-preferences'
+import { getConfiguredServerUrl } from './server-endpoint-preferences'
+import type { DesktopServerConnectionProjection } from './server-transport/base-url'
+import {
+  applyDesktopServerReadyEndpoint,
+} from './server-transport/base-url'
 
 type DesktopServerStatus
   = | { state: 'starting' }
     | { state: 'migrating', phase: string }
     | { state: 'bootstrapping', bootstrap: DesktopServerBootstrapSnapshot }
-    | { state: 'ready', serverUrl: string, bootstrap: DesktopServerBootstrapSnapshot }
+    | {
+      state: 'ready'
+      serverUrl: string
+      bootstrap: DesktopServerBootstrapSnapshot
+      /** Absent on older Desktop builds — fall back to HTTP(S) serverUrl. */
+      connection?: DesktopServerConnectionProjection
+    }
     | { state: 'failed', message: string, bootstrap: DesktopServerBootstrapSnapshot | null }
 
 type DesktopServerBootstrapSnapshot = {
@@ -37,7 +49,7 @@ async function waitForHostedServer(): Promise<string> {
         return serverUrl
       }
     }
- catch {
+    catch {
       // The server is still starting or temporarily unreachable.
     }
 
@@ -76,8 +88,13 @@ export async function waitForDesktopServer(): Promise<string> {
         return
       }
 
-      setRuntimeServerUrl(status.serverUrl)
-      resolve(getConfiguredServerUrl())
+      applyDesktopServerReadyEndpoint({
+        serverUrl: status.serverUrl,
+        connection: status.connection ?? null,
+      })
+      // Keep the generated client baseUrl aligned after Desktop publishes ready.
+      client.setConfig({ baseUrl: getServerUrl() })
+      resolve(getServerUrl())
     }
 
     // Snapshot first: a renderer may attach after the server emitted ready.
@@ -92,6 +109,10 @@ export async function waitForDesktopServer(): Promise<string> {
 }
 
 function updateBootstrapStatus(status: DesktopServerStatus): void {
+  // Node/unit tests have no DOM; production renderer always has document.
+  if (typeof document === 'undefined') {
+    return
+  }
   const message = document.querySelector<HTMLElement>('[data-bootstrap-message]')
   if (!message) {
     return
@@ -102,25 +123,25 @@ function updateBootstrapStatus(status: DesktopServerStatus): void {
   ) {
     message.textContent = 'Preparing your data…'
   }
- else if (
+  else if (
     status.state === 'bootstrapping'
     && status.bootstrap.currentPhase === 'database-maintenance'
   ) {
     message.textContent = 'Making a little room…'
   }
- else if (
+  else if (
     status.state === 'bootstrapping'
     && status.bootstrap.currentPhase === 'persisted-run-recovery'
   ) {
     message.textContent = 'Restoring your work…'
   }
- else if (
+  else if (
     status.state === 'bootstrapping'
     && status.bootstrap.currentPhase === 'plugin-activation'
   ) {
     message.textContent = 'Starting extensions…'
   }
- else if (status.state === 'starting') {
+  else if (status.state === 'starting') {
     message.textContent = 'Opening Cradle…'
   }
 }

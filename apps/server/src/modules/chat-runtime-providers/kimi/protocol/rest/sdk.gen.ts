@@ -4,8 +4,8 @@ import * as z from 'zod';
 
 import { type Client, formDataBodySerializer, type Options as Options2, type TDataShape } from './client';
 import { client } from './client.gen';
-import type { ActivateSkillData, ActivateSkillResponses, CancelTaskData, CancelTaskResponses, CloseTerminalData, CloseTerminalResponses, CreateProviderData, CreateProviderResponses, DeleteApiV1FilesByFileIdData, DeleteApiV1FilesByFileIdResponses, DeleteApiV1OauthLoginData, DeleteApiV1OauthLoginResponses, DeleteApiV1WorkspacesByWorkspaceIdData, DeleteApiV1WorkspacesByWorkspaceIdResponses, DeleteProviderData, DeleteProviderResponses, DownloadFileData, DownloadFileResponses, FsActionData, FsActionResponses, FsBrowseData, FsBrowseResponses, FsContentData, FsContentResponses, FsHomeData, FsHomeResponses, GetApiV1AuthData, GetApiV1AuthResponses, GetApiV1ConfigData, GetApiV1ConfigResponses, GetApiV1ConnectionsData, GetApiV1ConnectionsResponses, GetApiV1FilesByFileIdData, GetApiV1FilesByFileIdErrors, GetApiV1FilesByFileIdResponses, GetApiV1GuiStoreGetItemData, GetApiV1GuiStoreGetItemResponses, GetApiV1GuiStoreLengthData, GetApiV1GuiStoreLengthResponses, GetApiV1HealthzData, GetApiV1HealthzResponses, GetApiV1McpServersData, GetApiV1McpServersResponses, GetApiV1MetaData, GetApiV1MetaResponses, GetApiV1ModelsData, GetApiV1ModelsResponses, GetApiV1OauthLoginData, GetApiV1OauthLoginResponses, GetApiV1OauthUsageData, GetApiV1OauthUsageResponses, GetApiV1ProvidersByProviderIdData, GetApiV1ProvidersByProviderIdResponses, GetApiV1ProvidersData, GetApiV1ProvidersResponses, GetApiV1SessionsBySessionIdApprovalsData, GetApiV1SessionsBySessionIdApprovalsResponses, GetApiV1SessionsBySessionIdChildrenData, GetApiV1SessionsBySessionIdChildrenResponses, GetApiV1SessionsBySessionIdData, GetApiV1SessionsBySessionIdGoalData, GetApiV1SessionsBySessionIdGoalResponses, GetApiV1SessionsBySessionIdMessagesByMessageIdData, GetApiV1SessionsBySessionIdMessagesByMessageIdResponses, GetApiV1SessionsBySessionIdMessagesData, GetApiV1SessionsBySessionIdMessagesResponses, GetApiV1SessionsBySessionIdProfileData, GetApiV1SessionsBySessionIdProfileResponses, GetApiV1SessionsBySessionIdQuestionsData, GetApiV1SessionsBySessionIdQuestionsResponses, GetApiV1SessionsBySessionIdResponses, GetApiV1SessionsBySessionIdSnapshotData, GetApiV1SessionsBySessionIdSnapshotResponses, GetApiV1SessionsBySessionIdStatusData, GetApiV1SessionsBySessionIdStatusResponses, GetApiV1SessionsBySessionIdTasksByTaskIdData, GetApiV1SessionsBySessionIdTasksByTaskIdResponses, GetApiV1SessionsBySessionIdTasksData, GetApiV1SessionsBySessionIdTasksResponses, GetApiV1SessionsBySessionIdTerminalsByTerminalIdData, GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses, GetApiV1SessionsBySessionIdTerminalsData, GetApiV1SessionsBySessionIdTerminalsResponses, GetApiV1SessionsBySessionIdTranscriptData, GetApiV1SessionsBySessionIdTranscriptOpsData, GetApiV1SessionsBySessionIdTranscriptOpsResponses, GetApiV1SessionsBySessionIdTranscriptPlanData, GetApiV1SessionsBySessionIdTranscriptPlanResponses, GetApiV1SessionsBySessionIdTranscriptResponses, GetApiV1SessionsBySessionIdTranscriptUserMessagesData, GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses, GetApiV1SessionsBySessionIdWarningsData, GetApiV1SessionsBySessionIdWarningsResponses, GetApiV1SessionsData, GetApiV1SessionsResponses, GetApiV1ToolsData, GetApiV1ToolsResponses, GetApiV1WorkspacesData, GetApiV1WorkspacesResponses, GetAsyncapiJsonData, GetAsyncapiJsonResponses, GetBy__Data, GetBy__Responses, GetCatalogProviderData, GetCatalogProviderResponses, GetData, GetOpenapiJsonData, GetOpenapiJsonResponses, GetResponses, ListCatalogProvidersData, ListCatalogProvidersResponses, ListPromptsData, ListPromptsResponses, ListSkillsData, ListSkillsResponses, ListWorkspaceSkillsData, ListWorkspaceSkillsResponses, PatchApiV1WorkspacesByWorkspaceIdData, PatchApiV1WorkspacesByWorkspaceIdResponses, PostApiV1ConfigData, PostApiV1ConfigResponses, PostApiV1FilesData, PostApiV1FilesResponses, PostApiV1GuiStoreClearData, PostApiV1GuiStoreClearResponses, PostApiV1GuiStoreRemoveItemData, PostApiV1GuiStoreRemoveItemResponses, PostApiV1GuiStoreSetItemData, PostApiV1GuiStoreSetItemResponses, PostApiV1OauthLoginData, PostApiV1OauthLoginResponses, PostApiV1OauthLogoutData, PostApiV1OauthLogoutResponses, PostApiV1SessionsBySessionIdApprovalsByApprovalIdData, PostApiV1SessionsBySessionIdApprovalsByApprovalIdResponses, PostApiV1SessionsBySessionIdChildrenData, PostApiV1SessionsBySessionIdChildrenResponses, PostApiV1SessionsBySessionIdExportData, PostApiV1SessionsBySessionIdExportResponses, PostApiV1SessionsBySessionIdProfileData, PostApiV1SessionsBySessionIdProfileResponses, PostApiV1SessionsBySessionIdQuestionsByTailData, PostApiV1SessionsBySessionIdQuestionsByTailResponses, PostApiV1SessionsBySessionIdTerminalsData, PostApiV1SessionsBySessionIdTerminalsResponses, PostApiV1SessionsData, PostApiV1SessionsResponses, PostApiV1ShutdownData, PostApiV1ShutdownResponses, PostApiV1WorkspacesData, PostApiV1WorkspacesResponses, PromptActionData, PromptActionResponses, ProviderCollectionActionData, ProviderCollectionActionResponses, RefreshProviderData, RefreshProviderResponses, ReplaceProviderData, ReplaceProviderResponses, RestartMcpServerData, RestartMcpServerResponses, RunSessionArchiveActionData, RunSessionArchiveActionResponses, SetDefaultModelData, SetDefaultModelResponses, SteerPromptsData, SteerPromptsResponses, SubmitPromptData, SubmitPromptResponses } from './types.gen';
-import { zActivateSkillBody, zActivateSkillPath, zCancelTaskPath, zCloseTerminalPath, zCreateProviderBody, zDeleteApiV1FilesByFileIdPath, zDeleteApiV1OauthLoginQuery, zDeleteApiV1WorkspacesByWorkspaceIdPath, zDeleteProviderPath, zDownloadFilePath, zFsActionBody, zFsActionPath, zFsBrowseQuery, zFsContentQuery, zGetApiV1FilesByFileIdPath, zGetApiV1GuiStoreGetItemQuery, zGetApiV1OauthLoginQuery, zGetApiV1OauthUsageQuery, zGetApiV1ProvidersByProviderIdPath, zGetApiV1SessionsBySessionIdApprovalsPath, zGetApiV1SessionsBySessionIdApprovalsQuery, zGetApiV1SessionsBySessionIdChildrenPath, zGetApiV1SessionsBySessionIdChildrenQuery, zGetApiV1SessionsBySessionIdGoalPath, zGetApiV1SessionsBySessionIdMessagesByMessageIdPath, zGetApiV1SessionsBySessionIdMessagesPath, zGetApiV1SessionsBySessionIdMessagesQuery, zGetApiV1SessionsBySessionIdPath, zGetApiV1SessionsBySessionIdProfilePath, zGetApiV1SessionsBySessionIdQuestionsPath, zGetApiV1SessionsBySessionIdQuestionsQuery, zGetApiV1SessionsBySessionIdSnapshotPath, zGetApiV1SessionsBySessionIdStatusPath, zGetApiV1SessionsBySessionIdTasksByTaskIdPath, zGetApiV1SessionsBySessionIdTasksByTaskIdQuery, zGetApiV1SessionsBySessionIdTasksPath, zGetApiV1SessionsBySessionIdTasksQuery, zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath, zGetApiV1SessionsBySessionIdTerminalsPath, zGetApiV1SessionsBySessionIdTranscriptOpsPath, zGetApiV1SessionsBySessionIdTranscriptOpsQuery, zGetApiV1SessionsBySessionIdTranscriptPath, zGetApiV1SessionsBySessionIdTranscriptPlanPath, zGetApiV1SessionsBySessionIdTranscriptPlanQuery, zGetApiV1SessionsBySessionIdTranscriptQuery, zGetApiV1SessionsBySessionIdTranscriptUserMessagesPath, zGetApiV1SessionsBySessionIdTranscriptUserMessagesQuery, zGetApiV1SessionsBySessionIdWarningsPath, zGetApiV1SessionsQuery, zGetApiV1ToolsQuery, zGetBy__Path, zGetCatalogProviderPath, zListPromptsPath, zListSkillsPath, zListWorkspaceSkillsPath, zPatchApiV1WorkspacesByWorkspaceIdBody, zPatchApiV1WorkspacesByWorkspaceIdPath, zPostApiV1ConfigBody, zPostApiV1FilesBody, zPostApiV1GuiStoreRemoveItemBody, zPostApiV1GuiStoreSetItemBody, zPostApiV1OauthLoginBody, zPostApiV1OauthLogoutBody, zPostApiV1SessionsBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdPath, zPostApiV1SessionsBySessionIdChildrenBody, zPostApiV1SessionsBySessionIdChildrenPath, zPostApiV1SessionsBySessionIdExportBody, zPostApiV1SessionsBySessionIdExportPath, zPostApiV1SessionsBySessionIdProfileBody, zPostApiV1SessionsBySessionIdProfilePath, zPostApiV1SessionsBySessionIdQuestionsByTailBody, zPostApiV1SessionsBySessionIdQuestionsByTailPath, zPostApiV1SessionsBySessionIdTerminalsBody, zPostApiV1SessionsBySessionIdTerminalsPath, zPostApiV1WorkspacesBody, zPromptActionPath, zProviderCollectionActionBody, zProviderCollectionActionPath, zRefreshProviderPath, zReplaceProviderBody, zReplaceProviderPath, zRestartMcpServerPath, zRunSessionArchiveActionBody, zRunSessionArchiveActionPath, zSetDefaultModelPath, zSteerPromptsBody, zSteerPromptsPath, zSubmitPromptBody, zSubmitPromptPath } from './zod.gen';
+import type { ActivateSkillData, ActivateSkillResponses, CancelTaskData, CancelTaskResponses, CloseTerminalData, CloseTerminalResponses, CreateProviderData, CreateProviderResponses, DeleteApiV1FilesByFileIdData, DeleteApiV1FilesByFileIdResponses, DeleteApiV1OauthLoginData, DeleteApiV1OauthLoginResponses, DeleteApiV1WorkspacesByWorkspaceIdData, DeleteApiV1WorkspacesByWorkspaceIdResponses, DeleteProviderData, DeleteProviderResponses, DownloadFileData, DownloadFileResponses, FsActionData, FsActionResponses, FsBrowseData, FsBrowseResponses, FsContentData, FsContentResponses, FsHomeData, FsHomeResponses, FsMkdirData, FsMkdirResponses, GetApiV1AuthData, GetApiV1AuthResponses, GetApiV1ConfigData, GetApiV1ConfigResponses, GetApiV1ConnectionsData, GetApiV1ConnectionsResponses, GetApiV1FilesByFileIdData, GetApiV1FilesByFileIdErrors, GetApiV1FilesByFileIdResponses, GetApiV1GuiStoreGetItemData, GetApiV1GuiStoreGetItemResponses, GetApiV1GuiStoreLengthData, GetApiV1GuiStoreLengthResponses, GetApiV1HealthzData, GetApiV1HealthzResponses, GetApiV1McpServersData, GetApiV1McpServersResponses, GetApiV1MetaData, GetApiV1MetaResponses, GetApiV1ModelsData, GetApiV1ModelsResponses, GetApiV1OauthLoginData, GetApiV1OauthLoginResponses, GetApiV1OauthUsageData, GetApiV1OauthUsageResponses, GetApiV1OauthUserinfoData, GetApiV1OauthUserinfoResponses, GetApiV1ProvidersByProviderIdData, GetApiV1ProvidersByProviderIdResponses, GetApiV1ProvidersData, GetApiV1ProvidersResponses, GetApiV1SessionsBySessionIdApprovalsData, GetApiV1SessionsBySessionIdApprovalsResponses, GetApiV1SessionsBySessionIdChildrenData, GetApiV1SessionsBySessionIdChildrenResponses, GetApiV1SessionsBySessionIdData, GetApiV1SessionsBySessionIdGoalData, GetApiV1SessionsBySessionIdGoalResponses, GetApiV1SessionsBySessionIdMessagesByMessageIdData, GetApiV1SessionsBySessionIdMessagesByMessageIdResponses, GetApiV1SessionsBySessionIdMessagesData, GetApiV1SessionsBySessionIdMessagesResponses, GetApiV1SessionsBySessionIdProfileData, GetApiV1SessionsBySessionIdProfileResponses, GetApiV1SessionsBySessionIdQuestionsData, GetApiV1SessionsBySessionIdQuestionsResponses, GetApiV1SessionsBySessionIdResponses, GetApiV1SessionsBySessionIdSnapshotData, GetApiV1SessionsBySessionIdSnapshotResponses, GetApiV1SessionsBySessionIdStatusData, GetApiV1SessionsBySessionIdStatusResponses, GetApiV1SessionsBySessionIdTasksByTaskIdData, GetApiV1SessionsBySessionIdTasksByTaskIdResponses, GetApiV1SessionsBySessionIdTasksData, GetApiV1SessionsBySessionIdTasksResponses, GetApiV1SessionsBySessionIdTerminalsByTerminalIdData, GetApiV1SessionsBySessionIdTerminalsByTerminalIdResponses, GetApiV1SessionsBySessionIdTerminalsData, GetApiV1SessionsBySessionIdTerminalsResponses, GetApiV1SessionsBySessionIdTranscriptData, GetApiV1SessionsBySessionIdTranscriptOpsData, GetApiV1SessionsBySessionIdTranscriptOpsResponses, GetApiV1SessionsBySessionIdTranscriptPlanData, GetApiV1SessionsBySessionIdTranscriptPlanResponses, GetApiV1SessionsBySessionIdTranscriptResponses, GetApiV1SessionsBySessionIdTranscriptUserMessagesData, GetApiV1SessionsBySessionIdTranscriptUserMessagesResponses, GetApiV1SessionsBySessionIdWarningsData, GetApiV1SessionsBySessionIdWarningsResponses, GetApiV1SessionsData, GetApiV1SessionsResponses, GetApiV1ToolsData, GetApiV1ToolsResponses, GetApiV1WorkspacesByWorkspaceIdTrustData, GetApiV1WorkspacesByWorkspaceIdTrustResponses, GetApiV1WorkspacesData, GetApiV1WorkspacesResponses, GetAsyncapiJsonData, GetAsyncapiJsonResponses, GetBy__Data, GetBy__Responses, GetCatalogProviderData, GetCatalogProviderResponses, GetData, GetOpenapiJsonData, GetOpenapiJsonResponses, GetResponses, ListCatalogProvidersData, ListCatalogProvidersResponses, ListPromptsData, ListPromptsResponses, ListSkillsData, ListSkillsResponses, ListWorkspaceSkillsData, ListWorkspaceSkillsResponses, PatchApiV1WorkspacesByWorkspaceIdData, PatchApiV1WorkspacesByWorkspaceIdResponses, PostApiV1ConfigData, PostApiV1ConfigResponses, PostApiV1FilesData, PostApiV1FilesResponses, PostApiV1GuiStoreClearData, PostApiV1GuiStoreClearResponses, PostApiV1GuiStoreRemoveItemData, PostApiV1GuiStoreRemoveItemResponses, PostApiV1GuiStoreSetItemData, PostApiV1GuiStoreSetItemResponses, PostApiV1OauthLoginData, PostApiV1OauthLoginResponses, PostApiV1OauthLogoutData, PostApiV1OauthLogoutResponses, PostApiV1SearchData, PostApiV1SearchResponses, PostApiV1SessionsBySessionIdApprovalsByApprovalIdData, PostApiV1SessionsBySessionIdApprovalsByApprovalIdResponses, PostApiV1SessionsBySessionIdChildrenData, PostApiV1SessionsBySessionIdChildrenResponses, PostApiV1SessionsBySessionIdExportData, PostApiV1SessionsBySessionIdExportResponses, PostApiV1SessionsBySessionIdProfileData, PostApiV1SessionsBySessionIdProfileResponses, PostApiV1SessionsBySessionIdQuestionsByTailData, PostApiV1SessionsBySessionIdQuestionsByTailResponses, PostApiV1SessionsBySessionIdTerminalsData, PostApiV1SessionsBySessionIdTerminalsResponses, PostApiV1SessionsData, PostApiV1SessionsResponses, PostApiV1ShutdownData, PostApiV1ShutdownResponses, PostApiV1WorkspacesByWorkspaceIdTrustData, PostApiV1WorkspacesByWorkspaceIdTrustResponses, PostApiV1WorkspacesByWorkspaceIdUntrustData, PostApiV1WorkspacesByWorkspaceIdUntrustResponses, PostApiV1WorkspacesData, PostApiV1WorkspacesResponses, PromptActionData, PromptActionResponses, ProviderCollectionActionData, ProviderCollectionActionResponses, RefreshProviderData, RefreshProviderResponses, ReplaceProviderData, ReplaceProviderResponses, RestartMcpServerData, RestartMcpServerResponses, RunSessionArchiveActionData, RunSessionArchiveActionResponses, SetDefaultModelData, SetDefaultModelResponses, SteerPromptsData, SteerPromptsResponses, SubmitPromptData, SubmitPromptResponses, WorkspaceFsSearchData, WorkspaceFsSearchResponses } from './types.gen';
+import { zActivateSkillBody, zActivateSkillPath, zCancelTaskPath, zCloseTerminalPath, zCreateProviderBody, zDeleteApiV1FilesByFileIdPath, zDeleteApiV1OauthLoginQuery, zDeleteApiV1WorkspacesByWorkspaceIdPath, zDeleteProviderPath, zDownloadFilePath, zFsActionBody, zFsActionPath, zFsBrowseQuery, zFsContentQuery, zFsMkdirBody, zGetApiV1FilesByFileIdPath, zGetApiV1GuiStoreGetItemQuery, zGetApiV1OauthLoginQuery, zGetApiV1OauthUsageQuery, zGetApiV1OauthUserinfoQuery, zGetApiV1ProvidersByProviderIdPath, zGetApiV1SessionsBySessionIdApprovalsPath, zGetApiV1SessionsBySessionIdApprovalsQuery, zGetApiV1SessionsBySessionIdChildrenPath, zGetApiV1SessionsBySessionIdChildrenQuery, zGetApiV1SessionsBySessionIdGoalPath, zGetApiV1SessionsBySessionIdMessagesByMessageIdPath, zGetApiV1SessionsBySessionIdMessagesPath, zGetApiV1SessionsBySessionIdMessagesQuery, zGetApiV1SessionsBySessionIdPath, zGetApiV1SessionsBySessionIdProfilePath, zGetApiV1SessionsBySessionIdQuestionsPath, zGetApiV1SessionsBySessionIdQuestionsQuery, zGetApiV1SessionsBySessionIdSnapshotPath, zGetApiV1SessionsBySessionIdStatusPath, zGetApiV1SessionsBySessionIdTasksByTaskIdPath, zGetApiV1SessionsBySessionIdTasksByTaskIdQuery, zGetApiV1SessionsBySessionIdTasksPath, zGetApiV1SessionsBySessionIdTasksQuery, zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath, zGetApiV1SessionsBySessionIdTerminalsPath, zGetApiV1SessionsBySessionIdTranscriptOpsPath, zGetApiV1SessionsBySessionIdTranscriptOpsQuery, zGetApiV1SessionsBySessionIdTranscriptPath, zGetApiV1SessionsBySessionIdTranscriptPlanPath, zGetApiV1SessionsBySessionIdTranscriptPlanQuery, zGetApiV1SessionsBySessionIdTranscriptQuery, zGetApiV1SessionsBySessionIdTranscriptUserMessagesPath, zGetApiV1SessionsBySessionIdTranscriptUserMessagesQuery, zGetApiV1SessionsBySessionIdWarningsPath, zGetApiV1SessionsQuery, zGetApiV1ToolsQuery, zGetApiV1WorkspacesByWorkspaceIdTrustPath, zGetBy__Path, zGetCatalogProviderPath, zListPromptsPath, zListSkillsPath, zListWorkspaceSkillsPath, zPatchApiV1WorkspacesByWorkspaceIdBody, zPatchApiV1WorkspacesByWorkspaceIdPath, zPostApiV1ConfigBody, zPostApiV1FilesBody, zPostApiV1GuiStoreRemoveItemBody, zPostApiV1GuiStoreSetItemBody, zPostApiV1OauthLoginBody, zPostApiV1OauthLogoutBody, zPostApiV1SearchBody, zPostApiV1SessionsBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdBody, zPostApiV1SessionsBySessionIdApprovalsByApprovalIdPath, zPostApiV1SessionsBySessionIdChildrenBody, zPostApiV1SessionsBySessionIdChildrenPath, zPostApiV1SessionsBySessionIdExportBody, zPostApiV1SessionsBySessionIdExportPath, zPostApiV1SessionsBySessionIdProfileBody, zPostApiV1SessionsBySessionIdProfilePath, zPostApiV1SessionsBySessionIdQuestionsByTailBody, zPostApiV1SessionsBySessionIdQuestionsByTailPath, zPostApiV1SessionsBySessionIdTerminalsBody, zPostApiV1SessionsBySessionIdTerminalsPath, zPostApiV1WorkspacesBody, zPostApiV1WorkspacesByWorkspaceIdTrustPath, zPostApiV1WorkspacesByWorkspaceIdUntrustPath, zPromptActionPath, zProviderCollectionActionBody, zProviderCollectionActionPath, zRefreshProviderPath, zReplaceProviderBody, zReplaceProviderPath, zRestartMcpServerPath, zRunSessionArchiveActionBody, zRunSessionArchiveActionPath, zSetDefaultModelPath, zSteerPromptsBody, zSteerPromptsPath, zSubmitPromptBody, zSubmitPromptPath, zWorkspaceFsSearchBody } from './zod.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -204,6 +204,23 @@ export const fsHome = <ThrowOnError extends boolean = false>(options?: Options<F
     }).parseAsync(data),
     url: '/api/v1/fs:home',
     ...options
+});
+
+/**
+ * Create a directory on the host filesystem by absolute path (folder-picker "new folder" backend). Non-recursive: the parent directory must already exist.
+ */
+export const fsMkdir = <ThrowOnError extends boolean = false>(options: Options<FsMkdirData, ThrowOnError>) => (options.client ?? client).post<FsMkdirResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zFsMkdirBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/fs:mkdir',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -431,6 +448,19 @@ export const getApiV1OauthUsage = <ThrowOnError extends boolean = false>(options
 });
 
 /**
+ * Get the managed account profile
+ */
+export const getApiV1OauthUserinfo = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1OauthUserinfoData, ThrowOnError>) => (options?.client ?? client).get<GetApiV1OauthUserinfoResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: z.never().optional(),
+        query: zGetApiV1OauthUserinfoQuery.optional()
+    }).parseAsync(data),
+    url: '/api/v1/oauth/userinfo',
+    ...options
+});
+
+/**
  * List configured providers
  */
 export const getApiV1Providers = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1ProvidersData, ThrowOnError>) => (options?.client ?? client).get<GetApiV1ProvidersResponses, unknown, ThrowOnError>({
@@ -531,6 +561,23 @@ export const refreshProvider = <ThrowOnError extends boolean = false>(options: O
     }).parseAsync(data),
     url: '/api/v1/providers/{tail}',
     ...options
+});
+
+/**
+ * Global full-text search over user messages, assistant replies and session titles across all sessions
+ */
+export const postApiV1Search = <ThrowOnError extends boolean = false>(options: Options<PostApiV1SearchData, ThrowOnError>) => (options.client ?? client).post<PostApiV1SearchResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostApiV1SearchBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/search',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**
@@ -1102,6 +1149,23 @@ export const getApiV1Tools = <ThrowOnError extends boolean = false>(options?: Op
 });
 
 /**
+ * Search files in a workspace without a session. `workspace` accepts a registered workspace id or an absolute root (registered on the spot).
+ */
+export const workspaceFsSearch = <ThrowOnError extends boolean = false>(options: Options<WorkspaceFsSearchData, ThrowOnError>) => (options.client ?? client).post<WorkspaceFsSearchResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zWorkspaceFsSearchBody,
+        path: z.never().optional(),
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/workspace/fs:search',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
  * List registered workspaces
  */
 export const getApiV1Workspaces = <ThrowOnError extends boolean = false>(options?: Options<GetApiV1WorkspacesData, ThrowOnError>) => (options?.client ?? client).get<GetApiV1WorkspacesResponses, unknown, ThrowOnError>({
@@ -1171,6 +1235,45 @@ export const listWorkspaceSkills = <ThrowOnError extends boolean = false>(option
         query: z.never().optional()
     }).parseAsync(data),
     url: '/api/v1/workspaces/{workspace_id}/skills',
+    ...options
+});
+
+/**
+ * Read the workspace trust state
+ */
+export const getApiV1WorkspacesByWorkspaceIdTrust = <ThrowOnError extends boolean = false>(options: Options<GetApiV1WorkspacesByWorkspaceIdTrustData, ThrowOnError>) => (options.client ?? client).get<GetApiV1WorkspacesByWorkspaceIdTrustResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetApiV1WorkspacesByWorkspaceIdTrustPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/workspaces/{workspace_id}/trust',
+    ...options
+});
+
+/**
+ * Mark the workspace trusted (project-level MCP config loads)
+ */
+export const postApiV1WorkspacesByWorkspaceIdTrust = <ThrowOnError extends boolean = false>(options: Options<PostApiV1WorkspacesByWorkspaceIdTrustData, ThrowOnError>) => (options.client ?? client).post<PostApiV1WorkspacesByWorkspaceIdTrustResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPostApiV1WorkspacesByWorkspaceIdTrustPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/workspaces/{workspace_id}/trust',
+    ...options
+});
+
+/**
+ * Revoke workspace trust (project-level MCP config unloads)
+ */
+export const postApiV1WorkspacesByWorkspaceIdUntrust = <ThrowOnError extends boolean = false>(options: Options<PostApiV1WorkspacesByWorkspaceIdUntrustData, ThrowOnError>) => (options.client ?? client).post<PostApiV1WorkspacesByWorkspaceIdUntrustResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zPostApiV1WorkspacesByWorkspaceIdUntrustPath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/api/v1/workspaces/{workspace_id}/untrust',
     ...options
 });
 

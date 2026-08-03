@@ -42,7 +42,7 @@
     "cli": "pnpm --filter @cradle/cli cradle",
     "gen:cli": "pnpm --filter @cradle/cli gen:cli",
     "knip": "knip",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "pnpm --filter @cradle/db studio"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.2.1",

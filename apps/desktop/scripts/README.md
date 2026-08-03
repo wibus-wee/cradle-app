@@ -6,6 +6,7 @@
 - **build-mac-bridge.mjs**: Builds the Swift Mac Bridge binary for packaging.
 - **fix-macos-framework-symlinks.mjs**: Rewrites absolute Electron framework symlinks after pack.
 - **sync-codex-runtime.mjs**: Copies Codex runtime assets into packaged resources.
+- **generate-tray-icon.mjs**: Builds macOS menubar Template PNGs (`resources/tray/trayTemplate.png` + `@2x`) from `resources/icon.png`. Re-run after brand icon changes: `pnpm --filter @cradle/desktop generate:tray-icon`.
 - **verify-macos-distribution-credentials.mjs**: Optional Developer ID credential checks.
 
 ## Sparkle update packaging notes

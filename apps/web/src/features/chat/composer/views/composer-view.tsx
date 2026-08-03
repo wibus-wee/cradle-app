@@ -52,6 +52,7 @@ import {
   replaceSlashTrigger,
 } from '../../slash-commands/slash-command-input'
 import { SlashCommandPanel } from '../../slash-commands/slash-command-panel'
+import { isComposerBangPtyDoor } from '../bang-pty'
 import type {
   ComposerActionContextOptions,
   ComposerSlashCommandActionContext,
@@ -131,6 +132,18 @@ export interface ComposerSlots {
   toolbar?: React.ReactNode
   contextBar?: React.ReactNode
   footer?: React.ReactNode
+  /**
+   * Interactive Cradle bang PTY mode. When `enabled`, typing `!` opens the surface
+   * instead of keeping a bang text prefix in the prompt editor.
+   */
+  bangPty?: {
+    enabled: boolean
+    active: boolean
+    surface: React.ReactNode
+    onEnter: () => void
+    onWriteBack: () => void
+    onDiscard: () => void
+  }
 }
 
 export interface ComposerExternalSignals {
@@ -282,6 +295,9 @@ export function ComposerView({
   const toolbar = slots?.toolbar
   const contextBar = slots?.contextBar
   const footer = slots?.footer
+  const bangPty = slots?.bangPty
+  const bangPtyActive = bangPty?.active === true
+  const bangPtyEnabled = bangPty?.enabled === true && !bangPtyActive
   const replaceText = externalSignals?.replaceText
   const replaceTextKey = externalSignals?.replaceTextKey
   const clearDraftKey = externalSignals?.clearDraftKey
@@ -413,17 +429,23 @@ export function ComposerView({
         || attachmentController.hasAttachments
         || state.contextParts.length > 0
         || pastedTexts.length > 0)
-  const hasDraft = hasVisibleInputPayload || Boolean(allowEmptySend)
+  const hasDraft = hasVisibleInputPayload || Boolean(allowEmptySend) || bangPtyActive
   const bangCommandPreview
-    = !inputCollapsed && !attachmentController.hasAttachments && state.contextParts.length === 0
+    = !bangPtyActive
+      && !inputCollapsed
+      && !attachmentController.hasAttachments
+      && state.contextParts.length === 0
       ? readBangCommandDraft(state.inputValue)
       : null
   const bangCommand
-    = !inputCollapsed && !attachmentController.hasAttachments && state.contextParts.length === 0
+    = !bangPtyActive
+      && !inputCollapsed
+      && !attachmentController.hasAttachments
+      && state.contextParts.length === 0
       ? readBangCommand(state.inputValue)
       : null
   const isBangMode = bangCommandPreview !== null
-  const sendBlocked = (isBangMode && bangCommand === null) || slashAwaitingRequiredArgument
+  const sendBlocked = (isBangMode && bangCommand === null && !bangPtyActive) || slashAwaitingRequiredArgument
   const effectiveDisabled = disabled || isSending
   const textareaRowsClassName
     = textareaRows === undefined
@@ -440,11 +462,40 @@ export function ComposerView({
       if (historyAppliedTextRef.current === snapshot.text) {
         historyAppliedTextRef.current = null
       }
- else if (historyIndexRef.current !== null) {
+      else if (historyIndexRef.current !== null) {
         historyIndexRef.current = null
         historyDraftRef.current = null
       }
       const currentState = stateRef.current
+
+      // `!` is only a door into Cradle PTY mode — never keep it as a text prefix.
+      if (
+        bangPtyEnabled
+        && bangPty
+        && !attachmentController.hasAttachments
+        && snapshot.contextParts.length === 0
+        && isComposerBangPtyDoor(snapshot.text)
+      ) {
+        promptEditorRef.current?.setText('')
+        dispatch({
+          type: 'input/changed',
+          state: {
+            ...currentState,
+            inputValue: '',
+            contextParts: [],
+            mentionActive: false,
+            mentionQuery: '',
+            slashActive: false,
+            slashQuery: '',
+            skillActive: false,
+            skillQuery: '',
+            selectedSlashCommand: null,
+          },
+        })
+        bangPty.onEnter()
+        return
+      }
+
       const selectedSlashCommand
         = snapshot.trigger?.kind === 'slash'
           ? snapshot.trigger.selectedCommand
@@ -474,7 +525,7 @@ export function ComposerView({
         },
       })
     },
-    [visibleSlashCommands],
+    [attachmentController.hasAttachments, bangPty, bangPtyEnabled, visibleSlashCommands],
   )
 
   const handleMentionSelect = useCallback((item: MentionPickerItem) => {
@@ -627,6 +678,13 @@ export function ComposerView({
       options?: { invertContinuationMode?: boolean },
       submitHandler: ComposerSendHandler = submit,
     ) => {
+      if (bangPtyActive && bangPty) {
+        if (disabled || isSending || sendDisabled) {
+          return
+        }
+        bangPty.onWriteBack()
+        return
+      }
       const currentState = stateRef.current
       const editorText = inputCollapsed
         ? ''
@@ -690,6 +748,8 @@ export function ComposerView({
     [
       allowEmptySend,
       appendComposerFileParts,
+      bangPty,
+      bangPtyActive,
       clearComposerAttachments,
       composerAttachments,
       disabled,
@@ -1040,7 +1100,8 @@ export function ComposerView({
       <div
         ref={setActionTargetElement}
         className={cn(
-          'rounded-xl bg-background shadow-md border border-border focus-within:ring-0 focus-within:border-ring/40 transition-[border-color,box-shadow] duration-150',
+          'rounded-xl bg-background shadow-md border border-border focus-within:ring-0 focus-within:border-ring/40 transition-[border-color,box-shadow,background-color] duration-200',
+          bangPtyActive && 'overflow-hidden rounded-3xl border-zinc-800 bg-zinc-950 focus-within:border-zinc-700',
           cardClassName,
           isPlanMode && [
             'border-amber-400/70 shadow-[0_0_0_1px_rgba(251,191,36,0.18),0_18px_40px_-30px_rgba(245,158,11,0.72)]',
@@ -1097,42 +1158,65 @@ export function ComposerView({
               testId={fileInputTestId}
             />
           )}
-          {/* Prompt editor */}
-          <div className={cn('relative', inputCollapsed && 'hidden')}>
-            {slashArgumentHint && (
-              <div
-                aria-hidden="true"
-                className={cn(
-                  'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 pt-3.5 pb-2 text-sm text-transparent',
-                  textareaRowsClassName ?? 'min-h-20 max-h-60',
-                )}
-                data-testid="slash-argument-hint"
-              >
-                <span>{state.inputValue}</span>
-                <span className="text-muted-foreground/45">{slashArgumentHint}</span>
-              </div>
-            )}
-            <PromptEditor
-              ref={promptEditorRef}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onDrop={handleEditorDrop}
-              onChange={handleEditorChange}
-              onFocusChange={handleEditorFocusChange}
-              placeholder={placeholder}
-              disabled={effectiveDisabled}
-              ariaLabel={textareaAriaLabel}
-              ariaControls={slashPanelHasResults ? CHAT_SLASH_COMMAND_LISTBOX_ID : undefined}
-              ariaExpanded={state.slashActive}
-              ariaActiveDescendant={slashPanelHasResults ? activeSlashOptionId : undefined}
-              testId={textareaTestId}
-              className={cn(textareaRowsClassName, textareaClassName)}
-              selectedSlashCommand={state.selectedSlashCommand}
-              slashCommands={visibleSlashCommands}
-            />
+          {/* Prompt editor ↔ bang PTY morph */}
+          <div className={cn('relative', inputCollapsed && !bangPtyActive && 'hidden')}>
+            <div
+              className={cn(
+                'transition-[opacity,transform,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
+                bangPtyActive
+                  ? 'pointer-events-none absolute inset-x-0 top-0 opacity-0 blur-[3px] translate-y-1'
+                  : 'relative opacity-100 blur-0 translate-y-0',
+              )}
+              aria-hidden={bangPtyActive || undefined}
+            >
+              {slashArgumentHint && (
+                <div
+                  aria-hidden="true"
+                  className={cn(
+                    'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-4 pt-3.5 pb-2 text-sm text-transparent',
+                    textareaRowsClassName ?? 'min-h-20 max-h-60',
+                  )}
+                  data-testid="slash-argument-hint"
+                >
+                  <span>{state.inputValue}</span>
+                  <span className="text-muted-foreground/45">{slashArgumentHint}</span>
+                </div>
+              )}
+              <PromptEditor
+                ref={promptEditorRef}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                onDrop={handleEditorDrop}
+                onChange={handleEditorChange}
+                onFocusChange={handleEditorFocusChange}
+                placeholder={placeholder}
+                disabled={effectiveDisabled || bangPtyActive}
+                ariaLabel={textareaAriaLabel}
+                ariaControls={slashPanelHasResults ? CHAT_SLASH_COMMAND_LISTBOX_ID : undefined}
+                ariaExpanded={state.slashActive}
+                ariaActiveDescendant={slashPanelHasResults ? activeSlashOptionId : undefined}
+                testId={textareaTestId}
+                className={cn(textareaRowsClassName, textareaClassName)}
+                selectedSlashCommand={state.selectedSlashCommand}
+                slashCommands={visibleSlashCommands}
+              />
+            </div>
+
+            <div
+              className={cn(
+                'overflow-hidden transition-[opacity,transform,filter,height] duration-200 ease-[cubic-bezier(0.2,0,0,1)] motion-reduce:transition-none',
+                bangPtyActive
+                  ? 'relative opacity-100 blur-0 translate-y-0'
+                  : 'pointer-events-none absolute inset-x-0 top-0 h-0 opacity-0 blur-[3px] translate-y-1',
+              )}
+              aria-hidden={!bangPtyActive || undefined}
+              data-testid="composer-bang-pty-slot"
+            >
+              {bangPty?.surface}
+            </div>
           </div>
 
-          {!inputCollapsed && pastedTexts.length > 0 && (
+          {!inputCollapsed && !bangPtyActive && pastedTexts.length > 0 && (
             <div className={cn('px-3 py-2 pb-0', isUltraDecoration && 'relative')}>
               <div className="flex gap-2">
                 <AnimatePresence mode="popLayout" initial={false}>
@@ -1155,7 +1239,7 @@ export function ComposerView({
             </div>
           )}
 
-          {!inputCollapsed && (
+          {!inputCollapsed && !bangPtyActive && (
             <ComposerAttachmentList
               attachments={attachmentController.attachments}
               onRemove={attachmentController.removeAttachment}
@@ -1169,6 +1253,7 @@ export function ComposerView({
             className={cn(
               'flex items-center justify-between gap-2 px-3 py-2',
               isUltraDecoration && 'relative',
+              bangPtyActive && 'hidden',
               actionBarClassName,
             )}
           >

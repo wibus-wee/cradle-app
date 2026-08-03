@@ -11,13 +11,24 @@ declare module 'mdast' {
       children: []
     }
   }
+
+  interface PhrasingContentMap {
+    'code-comment': {
+      type: 'code-comment'
+      data: {
+        hName: 'code-comment'
+        hProperties: Record<string, string>
+      }
+      children: []
+    }
+  }
 }
 
 /**
- * Turns complete Codex review directives into a custom markdown element.
- * Incomplete directives deliberately remain plain text so streaming stays lossless.
+ * First-class `::code-comment{...}` markdown dialect.
+ * Complete directives are tokenized atomically by micromark (GFM-safe);
+ * incomplete forms remain plain text for lossless streaming.
  */
 export const remarkCodeComment = createRemarkAttributeDirective({
-  prefix: '::code-comment{',
   name: 'code-comment',
 })

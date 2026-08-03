@@ -4,6 +4,8 @@ import type {
   ChatSessionTailMessageSnapshot,
 } from '@cradle/chat-runtime-contracts'
 
+import { openServerEventSource } from '~/lib/server-transport'
+
 import type {
   RuntimeSessionRunStatus,
   RuntimeSessionStatus,
@@ -371,7 +373,7 @@ export function buildSessionEventTailUrl(input: {
 }
 
 function createBrowserEventSource(url: string): SessionEventSource {
-  return new EventSource(url)
+  return openServerEventSource(url)
 }
 
 function readChatSessionTailEvent(value: string, sessionId: string): ChatSessionTailEvent | null {

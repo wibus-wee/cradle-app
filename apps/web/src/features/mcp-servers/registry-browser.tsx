@@ -43,16 +43,6 @@ function CandidateCard({ candidate, onInstall }: {
     : candidate.installHint.transport === 'stdio'
       ? [candidate.installHint.command, ...candidate.installHint.args].join(' ')
       : candidate.installHint.url
-  const installButton = (
-    <Button
-      size="sm"
-      variant="outline"
-      disabled={!installable}
-      onClick={() => onInstall(candidate)}
-    >
-      {t('mcpServers.registry.install')}
-    </Button>
-  )
   return (
     <div className="relative min-w-0 overflow-hidden rounded-lg border border-border bg-card p-3 transition-colors hover:border-foreground/20">
       <DitheredGlyph icon={TransportGlyph} className="-right-2 -top-2 size-16 rotate-12 opacity-[0.12]" />
@@ -98,17 +88,11 @@ function CandidateCard({ candidate, onInstall }: {
             </span>
           )}
         </div>
-        {installable
-          ? installButton
-          : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {/* span keeps the tooltip alive on a disabled button */}
-                  <span>{installButton}</span>
-                </TooltipTrigger>
-                <TooltipContent>{t('mcpServers.registry.notInstallable')}</TooltipContent>
-              </Tooltip>
-            )}
+        <Button size="sm" variant="outline" onClick={() => onInstall(candidate)}>
+          {installable
+            ? t('mcpServers.registry.install')
+            : t('mcpServers.registry.notInstallable')}
+        </Button>
       </div>
     </div>
   )
@@ -129,6 +113,11 @@ export function RegistryBrowserView({
   const { t } = useTranslation('settings')
   return (
     <div className="flex min-w-0 flex-col gap-4">
+      <div className="space-y-1">
+        <h2 className="text-[13px] font-medium text-foreground">{t('mcpServers.registry.title')}</h2>
+        <p className="text-xs text-muted-foreground">{t('mcpServers.registry.description')}</p>
+      </div>
+
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input

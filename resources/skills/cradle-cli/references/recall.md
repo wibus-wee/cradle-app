@@ -1,10 +1,10 @@
 # Recall evidence retrieval
 
-Use Recall to answer questions about prior work with evidence from the active Cradle workspace. It is a session-bound, runtime-provided MCP capability; it is not a global database search and it does not replace the `cradle` CLI for ordinary Cradle operations.
+Use Recall when this workspace's past chat or execution evidence may matter—not only when the user explicitly asks about history. It is a session-bound, runtime-provided MCP capability; it is not a global database search and it does not replace the `cradle` CLI for ordinary Cradle operations.
 
 ## Query prior evidence
 
-Call `recall_query` when the user asks what happened earlier, how a decision or bug was handled, what a previous chat concluded, why something failed, or what changed in a file. The tool accepts JavaScript CodeAct that exports a default function and returns JSON-compatible data.
+Call `recall_query` when past chat or execution context in this workspace may matter—even if the user never says "before" or "earlier". Prefer a quick check over guessing a prior decision, agreement, attempt, failure, or file-related history. The tool accepts JavaScript CodeAct that exports a default function and returns JSON-compatible data.
 
 ```js
 export default async function () {

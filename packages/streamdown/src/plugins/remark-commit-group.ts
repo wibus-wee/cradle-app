@@ -11,13 +11,24 @@ declare module 'mdast' {
       children: []
     }
   }
+
+  interface PhrasingContentMap {
+    'commit-group': {
+      type: 'commit-group'
+      data: {
+        hName: 'commit-group'
+        hProperties: Record<string, string>
+      }
+      children: []
+    }
+  }
 }
 
 /**
- * Turns complete commit-group directives into a custom markdown element.
- * Incomplete directives deliberately remain plain text so streaming stays lossless.
+ * First-class `::commit-group{...}` markdown dialect.
+ * Complete directives are tokenized atomically by micromark (GFM-safe);
+ * incomplete forms remain plain text for lossless streaming.
  */
 export const remarkCommitGroup = createRemarkAttributeDirective({
-  prefix: '::commit-group{',
   name: 'commit-group',
 })

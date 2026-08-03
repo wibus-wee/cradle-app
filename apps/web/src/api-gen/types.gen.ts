@@ -474,6 +474,7 @@ export type GetWorkspacesResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -544,6 +545,7 @@ export type PostWorkspacesResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -602,6 +604,7 @@ export type PostWorkspacesFromDirectoryResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -697,6 +700,7 @@ export type PostWorkspacesMultiFolderResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -755,6 +759,7 @@ export type PostWorkspacesMultiFolderFromConfigResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -794,6 +799,7 @@ export type GetWorkspacesResolveResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -1152,6 +1158,7 @@ export type GetWorkspacesByWorkspaceIdResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -1193,6 +1200,7 @@ export type PatchWorkspacesByWorkspaceIdResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -1233,6 +1241,7 @@ export type PatchWorkspacesByWorkspaceIdLocationResponses = {
         };
         identifier: string;
         availability: 'available' | 'missing' | 'remote';
+        multiFolder: boolean;
         pinned: number;
         createdAt: number;
         updatedAt: number;
@@ -19890,6 +19899,13 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             disabledCount: number;
             errorCount: number;
             roots: Array<string>;
+            items?: Array<{
+                name: string;
+                enabled: boolean;
+                displayName: string | null;
+                iconUrl: string | null;
+                brandColor: string | null;
+            }>;
             updatedAt: number;
         } | {
             kind: 'plugin';

@@ -25,6 +25,7 @@ export const zPostApiV1ConfigBody = z.object({
     permission: z.unknown().optional(),
     plan_mode: z.boolean().optional(),
     providers: z.record(z.string(), z.unknown()).optional(),
+    secondary_model: z.unknown().optional(),
     services: z.unknown().optional(),
     telemetry: z.boolean().optional(),
     thinking: z.unknown().optional(),
@@ -50,6 +51,10 @@ export const zFsBrowseQuery = z.object({
 });
 
 export const zFsContentQuery = z.object({
+    path: z.string().min(1)
+});
+
+export const zFsMkdirBody = z.object({
     path: z.string().min(1)
 });
 
@@ -91,6 +96,10 @@ export const zPostApiV1OauthLogoutBody = z.object({
 });
 
 export const zGetApiV1OauthUsageQuery = z.object({
+    provider: z.string().min(1).optional()
+});
+
+export const zGetApiV1OauthUserinfoQuery = z.object({
     provider: z.string().min(1).optional()
 });
 
@@ -168,6 +177,30 @@ export const zReplaceProviderPath = z.object({
 
 export const zRefreshProviderPath = z.object({
     tail: z.string().min(1)
+});
+
+export const zPostApiV1SearchBody = z.object({
+    container: z.object({
+        agent_id: z.string().min(1).optional(),
+        session_id: z.string().min(1).optional()
+    }).optional(),
+    end_time: z.int().gte(0).lte(9007199254740991).optional(),
+    mode: z.enum(['terms', 'literal']).optional(),
+    op: z.enum(['AND', 'OR']).optional(),
+    page_size: z.int().gte(1).lte(50).optional(),
+    page_token: z.string().min(1).optional(),
+    query: z.string().min(1),
+    role: z.enum([
+        'user',
+        'assistant',
+        'title'
+    ]).optional(),
+    sort: z.enum([
+        'score',
+        'time_desc',
+        'time_asc'
+    ]).optional(),
+    start_time: z.int().gte(0).lte(9007199254740991).optional()
 });
 
 export const zGetApiV1SessionsQuery = z.object({
@@ -283,7 +316,7 @@ export const zFsActionBody = z.union([
         follow_gitignore: z.boolean().optional().default(true),
         include_globs: z.array(z.string()).optional(),
         limit: z.int().gte(1).lte(200).optional().default(50),
-        query: z.string().min(1)
+        query: z.string()
     }),
     z.object({
         case_sensitive: z.boolean().optional().default(true),
@@ -737,6 +770,15 @@ export const zGetApiV1ToolsQuery = z.object({
     session_id: z.string().min(1).optional()
 });
 
+export const zWorkspaceFsSearchBody = z.object({
+    exclude_globs: z.array(z.string()).optional(),
+    follow_gitignore: z.boolean().optional().default(true),
+    include_globs: z.array(z.string()).optional(),
+    limit: z.int().gte(1).lte(200).optional().default(50),
+    query: z.string(),
+    workspace: z.string().min(1)
+});
+
 export const zPostApiV1WorkspacesBody = z.object({
     name: z.string().min(1).max(100).optional(),
     root: z.string().min(1)
@@ -755,5 +797,17 @@ export const zPatchApiV1WorkspacesByWorkspaceIdPath = z.object({
 });
 
 export const zListWorkspaceSkillsPath = z.object({
+    workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
+});
+
+export const zGetApiV1WorkspacesByWorkspaceIdTrustPath = z.object({
+    workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
+});
+
+export const zPostApiV1WorkspacesByWorkspaceIdTrustPath = z.object({
+    workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
+});
+
+export const zPostApiV1WorkspacesByWorkspaceIdUntrustPath = z.object({
     workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
 });

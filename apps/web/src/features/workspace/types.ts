@@ -12,6 +12,20 @@ export function isLocalWorkspace(workspace: Pick<Workspace, 'locator'>): boolean
   return workspace.locator.hostId === LOCAL_WORKSPACE_HOST_ID
 }
 
+export function isMultiFolderWorkspace(
+  workspace: Pick<Workspace, 'multiFolder'>,
+): boolean {
+  return workspace.multiFolder
+}
+
+export function isWorkEligibleWorkspace(
+  workspace: Pick<Workspace, 'locator' | 'availability' | 'multiFolder'>,
+): boolean {
+  return isLocalWorkspace(workspace)
+    && workspace.availability === 'available'
+    && !workspace.multiFolder
+}
+
 export function getLocalWorkspacePath(workspace: Pick<Workspace, 'locator' | 'availability'> | null | undefined): string | null {
   return workspace && isLocalWorkspace(workspace) && workspace.availability === 'available'
     ? workspace.locator.path

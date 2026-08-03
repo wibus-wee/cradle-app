@@ -46,7 +46,10 @@ them to the Work surface.
 - **workspace-recognition-dialog-view.tsx**: Pure props rendering seam for valid, invalid, experimental, already-imported, and busy Cradle Workspace recognition states.
 - **workspace-recognition-dialog-view.stories.tsx**: Owner-typed Storybook variants for the workspace recognition decision surface.
 - **fixtures/workspace-recognition.ts**: Owner-typed recognition results covering the supported inspection outcomes.
-- **workspace-multi-folder-dialog.tsx**: Thin DirectoryPicker adapter for multi-folder workspace creation.
+- **workspace-multi-folder-menu-view.tsx**: Submenu checkbox flow for combining already-registered local workspaces into a multi-folder symlink workspace.
+- **workspace-multi-folder-menu-view.stories.tsx**: Storybook states for the multi-folder submenu create surface.
+- **multi-folder-entry-name.ts**: Safe symlink entry names derived from registered workspace identity.
+- **workspace-multi-folder-dialog.tsx**: Thin DirectoryPicker adapter for multi-folder workspace creation (legacy dialog path; create UX now uses the submenu).
 - **workspace-multi-folder-dialog-view.tsx**: Pure props, owner-contract-typed multi-folder form with local row editing, validation, responsive layout, and browse/submit callbacks.
 - **workspace-multi-folder-dialog-view.stories.tsx**: Interactive default and creating Storybook states for multi-folder workspace creation.
 - **fixtures/workspace-sidebar.ts**: Owner-typed Workspace, Session, and Work fixtures shared by workspace rendering previews.

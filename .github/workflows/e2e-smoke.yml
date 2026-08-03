@@ -29,12 +29,8 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Checkout Cradle source
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          repository: wibus-wee/cradle-app
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: main
 
       - uses: ./.github/actions/setup
         with:

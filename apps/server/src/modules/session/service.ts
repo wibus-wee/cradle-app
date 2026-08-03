@@ -294,30 +294,35 @@ function listStatusesBySessionIds(sessionIds: string[]): Map<string, SessionStat
     return new Map()
   }
 
+  // Latest run per session in SQL (started_at, then rowid) — not every historical run.
   const runRows = db()
     .select({
       chatSessionId: backendRuns.chatSessionId,
       status: backendRuns.status,
-      startedAt: backendRuns.startedAt,
     })
     .from(backendRuns)
-    .where(inArray(backendRuns.chatSessionId, sessionIds))
-    .orderBy(desc(backendRuns.startedAt), desc(sql`backend_runs.rowid`))
+    .where(
+      and(
+        inArray(backendRuns.chatSessionId, sessionIds),
+        sql`backend_runs.rowid = (
+          SELECT br2.rowid
+          FROM backend_runs AS br2
+          WHERE br2.chat_session_id = ${backendRuns.chatSessionId}
+          ORDER BY br2.started_at DESC, br2.rowid DESC
+          LIMIT 1
+        )`,
+      ),
+    )
     .all()
 
-  const statusesBySessionId = new Map<string, SessionStatus>()
-
-  for (const row of runRows) {
-    if (statusesBySessionId.has(row.chatSessionId)) {
-      continue
-    }
-    statusesBySessionId.set(
+  const statusesBySessionId = new Map<string, SessionStatus>(
+    runRows.map(row => [
       row.chatSessionId,
       projectSessionStatus({
         runStatus: row.status,
       }),
-    )
-  }
+    ]),
+  )
 
   for (const sessionId of sessionIds) {
     if (statusesBySessionId.has(sessionId)) {
@@ -382,50 +387,63 @@ function listRowsByActivity(where: ReturnType<typeof and> | undefined): Array<{
   latestUserMessageAt: number | null
   latestAssistantMessageAt: number | null
 }> {
-  const latestUserMessages = db()
+  // Restrict message aggregation to the sessions being listed so GROUP BY scales
+  // with the returned set (uses messages_session_created_at_idx), not the global corpus.
+  const sessionQuery = db().select().from(sessions)
+  const sessionRows = (where ? sessionQuery.where(where) : sessionQuery).all()
+  if (sessionRows.length === 0) {
+    return []
+  }
+
+  const sessionIds = sessionRows.map(row => row.id)
+
+  const latestUserRows = db()
     .select({
       sessionId: messages.sessionId,
-      latestUserMessageAt: max(messages.createdAt).as('latest_user_message_at'),
+      latestUserMessageAt: max(messages.createdAt),
     })
     .from(messages)
-    .where(eq(messages.role, 'user'))
+    .where(and(inArray(messages.sessionId, sessionIds), eq(messages.role, 'user')))
     .groupBy(messages.sessionId)
-    .as('latest_user_messages')
+    .all()
 
-  const latestAssistantMessages = db()
+  const latestAssistantRows = db()
     .select({
       sessionId: messages.sessionId,
-      latestAssistantMessageAt: max(messages.createdAt).as('latest_assistant_message_at'),
+      latestAssistantMessageAt: max(messages.createdAt),
     })
     .from(messages)
     .where(
       and(
+        inArray(messages.sessionId, sessionIds),
         eq(messages.role, 'assistant'),
         inArray(messages.status, ['complete', 'aborted', 'failed']),
       ),
     )
     .groupBy(messages.sessionId)
-    .as('latest_assistant_messages')
+    .all()
 
-  const query = db()
-    .select({
-      session: sessions,
-      latestUserMessageAt: latestUserMessages.latestUserMessageAt,
-      latestAssistantMessageAt: latestAssistantMessages.latestAssistantMessageAt,
+  const latestUserBySessionId = new Map(
+    latestUserRows.map(row => [row.sessionId, row.latestUserMessageAt ?? null]),
+  )
+  const latestAssistantBySessionId = new Map(
+    latestAssistantRows.map(row => [row.sessionId, row.latestAssistantMessageAt ?? null]),
+  )
+
+  return sessionRows
+    .map(session => ({
+      session,
+      latestUserMessageAt: latestUserBySessionId.get(session.id) ?? null,
+      latestAssistantMessageAt: latestAssistantBySessionId.get(session.id) ?? null,
+    }))
+    .sort((a, b) => {
+      const aActivity = a.latestUserMessageAt ?? a.session.createdAt
+      const bActivity = b.latestUserMessageAt ?? b.session.createdAt
+      if (bActivity !== aActivity) {
+        return bActivity - aActivity
+      }
+      return b.session.createdAt - a.session.createdAt
     })
-    .from(sessions)
-    .leftJoin(latestUserMessages, eq(sessions.id, latestUserMessages.sessionId))
-    .leftJoin(latestAssistantMessages, eq(sessions.id, latestAssistantMessages.sessionId))
-    .orderBy(
-      desc(sql<number>`coalesce(${latestUserMessages.latestUserMessageAt}, ${sessions.createdAt})`),
-      desc(sessions.createdAt),
-    )
-
-  return (where ? query.where(where).all() : query.all()).map(row => ({
-    session: row.session,
-    latestUserMessageAt: row.latestUserMessageAt ?? null,
-    latestAssistantMessageAt: row.latestAssistantMessageAt ?? null,
-  }))
 }
 
 function readLatestUserMessageAt(sessionId: string): number | null {
@@ -1301,6 +1319,11 @@ export function deleteByAgentIdsInDb(agentIds: string[], d: SessionDeleteDb): vo
   deleteSessionIdsInDb(ids, d)
 }
 
+/**
+ * Export-only / unused hot-path candidate: no in-repo callers today.
+ * Loads every message for a session plus all matching assistant runs ordered by
+ * startedAt and keeps the latest in JS — do not wire into sidebar/list paths.
+ */
 export function getMessagesWithRunIds(
   sessionId: string,
 ): Array<HydratedMessage & { runId: string | null }> {

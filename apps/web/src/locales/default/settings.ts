@@ -354,7 +354,7 @@ export default {
   'features.continueBlockedCodexGoals.label': 'Continue blocked Codex Goals',
   'features.localAuthForDangerousActions.description': 'Ask the desktop app for system verification before deleting agents, issues, or workspaces.',
   'features.localAuthForDangerousActions.label': 'System verification for destructive actions',
-  'features.multiWorkspace.description': 'Enable the CRA-026 symlink workspace POC. New multi-folder workspaces are created under ~/Documents/Cradle/workspaces and registered as normal workspaces.',
+  'features.multiWorkspace.description': 'Enable the CRA-026 symlink workspace POC. Combine already-registered local projects into a Cradle-owned workspace under ~/Documents/Cradle/workspaces. Work is not supported on multi-folder workspaces.',
   'features.multiWorkspace.label': 'Multi-folder workspace POC',
   'features.nativeProviderSkillProjection.description': 'Allow agents to discover and use all Cradle capabilities, including enabled plugins and built-in skills.',
   'features.nativeProviderSkillProjection.label': 'Let agents use all Cradle capabilities',

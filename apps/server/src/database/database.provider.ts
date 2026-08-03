@@ -137,6 +137,8 @@ export class DbProvider {
     this.sqlite.pragma('foreign_keys = ON')
     this.sqlite.pragma('journal_mode = WAL')
     this.sqlite.pragma('busy_timeout = 5000')
+    // NORMAL is the recommended durability tradeoff with WAL (vs FULL fsync on every commit).
+    this.sqlite.pragma('synchronous = NORMAL')
     this.db = drizzle(this.sqlite, { schema: dbSchema })
   }
 

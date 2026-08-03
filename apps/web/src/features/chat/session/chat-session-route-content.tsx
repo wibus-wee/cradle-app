@@ -157,16 +157,6 @@ export function ChatSessionRouteContent({
   const workspaceId = session?.workspaceId ?? null
   const agentId = session?.agentId ?? null
   const remoteHostId = getRemoteHostId(session)
-  const activeSession = useMemo(() => ({
-    sessionId,
-    sessionProviderTargetId,
-    sessionModelId,
-    sessionThinkingEffort,
-    runtimeKind: session?.runtimeKind,
-    workspaceId,
-    agentId,
-    remoteHostId,
-  }), [agentId, remoteHostId, session?.runtimeKind, sessionId, sessionModelId, sessionProviderTargetId, sessionThinkingEffort, workspaceId])
 
   const { data: workspace } = useQuery({
     ...getWorkspacesByWorkspaceIdOptions({ path: { workspaceId: workspaceId! } }),
@@ -175,6 +165,18 @@ export function ChatSessionRouteContent({
   })
 
   const workspacePath = getLocalWorkspacePath(workspace)
+
+  const activeSession = useMemo(() => ({
+    sessionId,
+    sessionProviderTargetId,
+    sessionModelId,
+    sessionThinkingEffort,
+    runtimeKind: session?.runtimeKind,
+    workspaceId,
+    workspacePath,
+    agentId,
+    remoteHostId,
+  }), [agentId, remoteHostId, session?.runtimeKind, sessionId, sessionModelId, sessionProviderTargetId, sessionThinkingEffort, workspaceId, workspacePath])
 
   useEffect(() => {
     if (workspacePath) {

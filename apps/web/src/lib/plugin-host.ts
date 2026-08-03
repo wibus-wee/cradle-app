@@ -14,8 +14,10 @@ import { toastManager } from '~/components/ui/toast'
 import { uiActivityBus } from '~/features/activity/activity-bus'
 import { readPluginDevSessions } from '~/features/plugins/api/plugin-dev'
 
-import { getAuthenticatedEventSourceUrl, getServerUrl } from './electron'
+import { getServerUrl } from './electron'
 import { usePluginStore } from './plugin-store'
+import type { ServerEventSource } from './server-transport'
+import { openServerEventSource } from './server-transport'
 import { assertWebActivityReadAccess, registerWebActivitySubscription } from './web-activity-registry'
 
 type WebPluginDescriptor = Pick<PluginDescriptor, 'name' | 'version' | 'displayName' | 'hasWeb'>
@@ -351,7 +353,7 @@ async function reloadDevelopmentWebPlugin(session: PluginDevSession): Promise<vo
 }
 
 export async function startPluginDevSessionWatcher(): Promise<() => void> {
-  let source: EventSource | null = null
+  let source: ServerEventSource | null = null
   let disposed = false
   const appliedRevisions = new Map<string, number>()
   let reconcileQueue = Promise.resolve()
@@ -371,9 +373,9 @@ export async function startPluginDevSessionWatcher(): Promise<() => void> {
   const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
   for (const session of sessions) { reconcile(session) }
 
-  const eventsUrl = await getAuthenticatedEventSourceUrl('/plugins/dev-sessions/events')
   if (disposed) { return () => undefined }
-  source = new EventSource(eventsUrl)
+  const eventsUrl = new URL('/plugins/dev-sessions/events', getServerUrl()).toString()
+  source = openServerEventSource(eventsUrl)
   source.onmessage = (message) => {
     const event = PluginDevSessionEventSchema.parse(JSON.parse(message.data))
     if (event.type === 'stopped') {
@@ -386,7 +388,7 @@ export async function startPluginDevSessionWatcher(): Promise<() => void> {
     }
   }
   source.onerror = () => {
-    console.warn('[plugin-host] plugin development event stream disconnected; EventSource will retry')
+    console.warn('[plugin-host] plugin development event stream disconnected; fetch SSE will retry')
   }
 
   return () => {
