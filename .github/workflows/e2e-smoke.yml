@@ -1,6 +1,7 @@
 name: E2E Smoke (PR)
 
 # Runs @P0 against the PR head when:
+# The checkout below intentionally follows the PR head SHA after main is merged.
 # - critical paths change (e2e / simulator / web / server / Codex sync / this workflow), OR
 # - the `e2e` label is present (force / keep running on later pushes)
 # Always provisions Codex app-server so @CRADLE-CODEX-* can pass on clean runners.
