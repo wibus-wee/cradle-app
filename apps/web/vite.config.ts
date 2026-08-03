@@ -116,6 +116,7 @@ export default defineConfig({
     createAssetPrecachePlugin(),
   ],
   resolve: {
+    // Keep workspace packages on the app's React instance during Vitest.
     dedupe: ['react', 'react-dom'],
     alias: {
       '~': resolve(__dirname, 'src'),
