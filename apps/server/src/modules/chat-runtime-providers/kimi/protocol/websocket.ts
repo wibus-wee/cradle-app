@@ -2426,6 +2426,17 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                       ],
                       type: 'object',
                     },
+                    interruptReason: {
+                      enum: [
+                        'user_cancelled',
+                        'aborted',
+                        'max_steps',
+                        'error',
+                        'filtered',
+                        'blocked',
+                      ],
+                      type: 'string',
+                    },
                     reason: {
                       enum: [
                         'completed',

@@ -162,6 +162,7 @@ class FakeCodexAppServerClient {
           allowedSandboxModes: ['workspace-write', 'read-only'],
           allowedWebSearchModes: ['enabled', 'disabled'],
           featureRequirements: { webSearch: true, imageGeneration: true },
+          feedback: { enabled: true },
         },
       }
     }
@@ -171,7 +172,16 @@ class FakeCodexAppServerClient {
           {
             cwd: '/tmp/cradle-workspace',
             skills: [
-              { name: 'agent-design', enabled: true },
+              {
+                name: 'agent-design',
+                enabled: true,
+                interface: {
+                  displayName: 'Agent Design',
+                  iconSmallUrl: 'https://cdn.example/skills/agent-design.png',
+                  iconLargeUrl: null,
+                  brandColor: '#3366ff',
+                },
+              },
               { name: 'server-app-development', enabled: true },
               { name: 'disabled-skill', enabled: false },
             ],
@@ -3149,6 +3159,15 @@ describe('codexProvider app-server integration', () => {
         disabledCount: 1,
         errorCount: 1,
         roots: ['/tmp/cradle-workspace'],
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'agent-design',
+            enabled: true,
+            displayName: 'Agent Design',
+            iconUrl: 'https://cdn.example/skills/agent-design.png',
+            brandColor: '#3366ff',
+          }),
+        ]),
       }),
       expect.objectContaining({
         kind: 'plugin',

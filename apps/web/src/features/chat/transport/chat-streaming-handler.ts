@@ -133,7 +133,9 @@ export class ChatStreamingHandler {
         if (chunk.type === 'tool-input-delta') {
           await flushUIMessageStreamToolInputs(target)
         }
-        this.applyMessageSnapshot(structuredClone(target.message), this.currentChunkReplay)
+        // Keep the live mutable target in pending maps; clone only at flush so
+        // high token rates do not pay O(message) structuredClone per chunk.
+        this.applyMessageSnapshot(target.message, this.currentChunkReplay)
         if (isUIMessageStreamSnapshotChunk(chunk)) {
           this.flushPendingMessages()
           this.replayBatchOpen = false
@@ -215,11 +217,14 @@ export class ChatStreamingHandler {
     }
     const store = this.store.getState()
     for (const [messageId, { message, receivedAtMs, dirtyToolCallIds }] of this.pendingMessages) {
+      // Isolate from the live stream target before any store write. Subsequent
+      // chunks keep mutating `target.message`; the store must receive a snapshot.
+      const isolatedMessage = structuredClone(message)
       store.markRunFirstEvent(messageId, receivedAtMs)
-      if (hasVisibleContent(message)) {
+      if (hasVisibleContent(isolatedMessage)) {
         store.markRunFirstContent(messageId, receivedAtMs)
       }
-      const displayMessage = store.projectStreamingMessageForDisplay(this.sessionId, message)
+      const displayMessage = store.projectStreamingMessageForDisplay(this.sessionId, isolatedMessage)
       if (displayMessage.id !== messageId) {
         store.moveStreamingMessage(this.sessionId, messageId, displayMessage.id)
       }

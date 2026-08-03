@@ -412,6 +412,7 @@ describe('workspace capability', () => {
           name: 'my-monorepo',
           folders: [
             { name: 'frontend', path: frontendRoot },
+            { name: 'backend', path: backendRoot },
           ],
         }),
       }))
@@ -429,6 +430,39 @@ describe('workspace capability', () => {
       }))
       expect(prefsRes.status).toBe(200)
 
+      const unregisteredRes = await app.handle(new Request('http://localhost/workspaces/multi-folder', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'my-monorepo',
+          folders: [
+            { name: 'frontend', path: frontendRoot },
+            { name: 'backend', path: backendRoot },
+          ],
+        }),
+      }))
+      expect(unregisteredRes.status).toBe(400)
+      expect((await unregisteredRes.json()).code).toBe('multi_workspace_member_not_registered')
+
+      const frontendWorkspaceRes = await app.handle(new Request('http://localhost/workspaces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'frontend',
+          locator: { hostId: 'local', path: frontendRoot },
+        }),
+      }))
+      expect(frontendWorkspaceRes.status).toBe(200)
+      const backendWorkspaceRes = await app.handle(new Request('http://localhost/workspaces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'backend',
+          locator: { hostId: 'local', path: backendRoot },
+        }),
+      }))
+      expect(backendWorkspaceRes.status).toBe(200)
+
       const createRes = await app.handle(new Request('http://localhost/workspaces/multi-folder', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -445,6 +479,7 @@ describe('workspace capability', () => {
       const workspacePath = join(multiRoot, 'my-monorepo')
       expect(workspace).toEqual(expect.objectContaining({
         name: 'my-monorepo',
+        multiFolder: true,
         locator: { hostId: 'local', path: workspacePath },
       }))
       expect(JSON.parse(readFileSync(join(workspacePath, 'cradle-workspace.json'), 'utf8'))).toEqual({
@@ -459,7 +494,7 @@ describe('workspace capability', () => {
 
       const listRes = await app.handle(new Request('http://localhost/workspaces'))
       expect(await listRes.json()).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: workspace.id, locator: { hostId: 'local', path: workspacePath } }),
+        expect.objectContaining({ id: workspace.id, multiFolder: true, locator: { hostId: 'local', path: workspacePath } }),
       ]))
 
       const collisionRes = await app.handle(new Request('http://localhost/workspaces/multi-folder', {
@@ -492,6 +527,7 @@ describe('workspace capability', () => {
       const importedWorkspace = await importRes.json()
       expect(importedWorkspace).toEqual(expect.objectContaining({
         name: 'imported-monorepo',
+        multiFolder: true,
         locator: { hostId: 'local', path: join(multiRoot, 'imported-monorepo') },
       }))
     }

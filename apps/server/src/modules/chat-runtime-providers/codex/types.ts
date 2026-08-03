@@ -322,6 +322,12 @@ export interface CodexConfigRequirementsReadResponse {
     allowedSandboxModes?: string[] | null
     allowedWebSearchModes?: string[] | null
     featureRequirements?: Record<string, boolean> | null
+    feedback?: {
+      enabled?: boolean | null
+    } | null
+    browserUse?: {
+      disableAutoReview?: boolean | null
+    } | null
   } | null
 }
 
@@ -527,7 +533,20 @@ export interface CodexListMcpServerStatusResponse {
 export interface CodexSkillsListResponse {
   data?: Array<{
     cwd?: string
-    skills?: Array<{ name?: string, enabled?: boolean }>
+    skills?: Array<{
+      name?: string
+      enabled?: boolean
+      interface?: {
+        displayName?: string
+        shortDescription?: string
+        iconSmall?: string
+        iconLarge?: string
+        iconSmallUrl?: string | null
+        iconLargeUrl?: string | null
+        brandColor?: string
+        defaultPrompt?: string
+      }
+    }>
     errors?: unknown[]
   }>
 }

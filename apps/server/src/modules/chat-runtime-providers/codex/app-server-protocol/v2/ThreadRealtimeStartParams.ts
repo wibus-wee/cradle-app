@@ -36,6 +36,11 @@ codexResponseItemPrefix?: string | null,
  */
 codexResponseHandoffMode?: CodexResponseHandoffMode | null,
 /**
+ * Overrides BEM channel prefixes by `analysis`, `commentary`, or `final`.
+ * Omitted channels retain their default uppercase bracketed prefixes.
+ */
+codexResponseHandoffChannelPrefixes?: { [key in string]?: Array<string> } | null,
+/**
  * Overrides the configured realtime model for this session only.
  */
 model?: string | null,

@@ -17,8 +17,10 @@ import { toastManager } from '~/components/ui/toast'
 import type { GitFileStatus } from '~/features/git/shared/types'
 import { useGitRepositories } from '~/features/git/shared/use-git'
 import { useWorkspaceFiles } from '~/features/workspace/use-workspace-files'
-import { getAuthenticatedEventSourceUrl, getServerUrl, isElectron, nativeIpc, platform } from '~/lib/electron'
+import { getServerUrl, isElectron, nativeIpc, platform } from '~/lib/electron'
 import { queryRefreshPolicies } from '~/lib/query-refresh-policy'
+import type { ServerEventSource } from '~/lib/server-transport'
+import { openServerEventSource } from '~/lib/server-transport'
 import { serializeWorkspaceFileDragPayload, writeWorkspaceFileDragData } from '~/lib/workspace-drag-data'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
@@ -327,41 +329,39 @@ export function FileTree({ workspaceId, workspacePath }: FileTreeProps) {
       return
     }
 
-    let eventSource: EventSource | null = null
-    let cancelled = false
+    let eventSource: ServerEventSource | null = null
     let malformedFrameReported = false
-    void getAuthenticatedEventSourceUrl(buildWorkspaceFileEventsUrl(workspaceId)).then((url) => {
-      if (cancelled) {
-        return
-      }
-      eventSource = new EventSource(url)
+    try {
+      eventSource = openServerEventSource(buildWorkspaceFileEventsUrl(workspaceId))
       eventSource.onmessage = (event) => {
-      let message: WorkspaceFileEvent
-      try {
-        message = WorkspaceFileEventSchema.parse(JSON.parse(event.data))
-      }
- catch (error) {
-        if (!malformedFrameReported) {
-          malformedFrameReported = true
-          console.warn('[file-tree] dropped malformed workspace file event', error)
+        let message: WorkspaceFileEvent
+        try {
+          message = WorkspaceFileEventSchema.parse(JSON.parse(event.data))
         }
-        return
-      }
-      if (message.type !== 'directory-changed') {
-        return
-      }
-      const path = normalizeDirectoryPath(message.path ?? ROOT_DIRECTORY_KEY)
-      if (!loadedDirectoriesRef.current.has(path)) {
-        return
-      }
-      void loadDirectoryChildren(path, true)
+        catch (error) {
+          if (!malformedFrameReported) {
+            malformedFrameReported = true
+            console.warn('[file-tree] dropped malformed workspace file event', error)
+          }
+          return
+        }
+        if (message.type !== 'directory-changed') {
+          return
+        }
+        const path = normalizeDirectoryPath(message.path ?? ROOT_DIRECTORY_KEY)
+        if (!loadedDirectoriesRef.current.has(path)) {
+          return
+        }
+        void loadDirectoryChildren(path, true)
       }
       eventSource.onerror = () => {
-        // EventSource reconnects automatically while the short-lived ticket remains attached.
+        // Fetch-backed SSE reconnects automatically; feature owns parse/cursor policy.
       }
-    }).catch(error => console.warn('[file-tree] failed to open workspace file events', error))
+    }
+    catch (error) {
+      console.warn('[file-tree] failed to open workspace file events', error)
+    }
     return () => {
-      cancelled = true
       eventSource?.close()
     }
   }, [loadDirectoryChildren, workspaceId])

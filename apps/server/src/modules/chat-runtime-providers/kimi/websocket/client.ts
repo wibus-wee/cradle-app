@@ -77,7 +77,18 @@ export type KimiSessionEventPayload
     | { type: 'tool.call.started', turnId: number, toolCallId: string, name: string, args: unknown, description?: string }
     | { type: 'tool.result', turnId: number, toolCallId: string, output: unknown, isError?: boolean }
     | { type: 'tool.progress', turnId: number, toolCallId: string, update: { kind: 'stdout' | 'stderr' | 'progress' | 'status' | 'custom', text?: string, percent?: number } }
-    | { type: 'turn.ended', turnId: number, reason: 'completed' | 'cancelled' | 'failed' | 'blocked' }
+    | {
+      type: 'turn.ended'
+      turnId: number
+      reason: 'completed' | 'cancelled' | 'failed' | 'blocked'
+      /**
+       * Native interrupt taxonomy when the turn did not complete cleanly.
+       * Distinct from `reason` so Cradle can preserve cancel vs limit vs filter fidelity.
+       */
+      interruptReason?: 'user_cancelled' | 'aborted' | 'max_steps' | 'error' | 'filtered' | 'blocked'
+      durationMs?: number
+      error?: { code: string, message: string, retryable: boolean }
+    }
     | {
     type: 'agent.status.updated'
     model?: string

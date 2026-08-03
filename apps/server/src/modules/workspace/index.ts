@@ -90,7 +90,7 @@ export const workspace = new Elysia({
   }), {
     detail: {
       'summary': 'Create multi-folder workspace',
-      'description': 'Create a Cradle-owned symlink workspace under the multi-workspace root from explicit folder entries. Requires the multi-workspace POC feature flag.',
+      'description': 'Create a Cradle-owned symlink workspace under the multi-workspace root from already-registered local Cradle workspaces. Requires the multi-workspace POC feature flag. Work is not supported on the resulting workspace.',
       'x-cradle-cli': {
         command: ['workspace', 'multi-folder', 'create'],
       },

@@ -31,6 +31,7 @@ export const kanbanRuntimeData: KanbanCardRuntimeData = {
     gitIdentity: { originUrl: 'https://github.com/wibus-wee/cradle-app', branch: 'main' },
     identifier: 'CRA',
     availability: 'available',
+    multiFolder: false,
     pinned: 1,
     createdAt: 1,
     updatedAt: 1,

@@ -641,6 +641,14 @@ export interface RuntimeFilesystemUiSlotState {
   updatedAt: number
 }
 
+export interface RuntimeSkillsUiSlotItem {
+  name: string
+  enabled: boolean
+  displayName: string | null
+  iconUrl: string | null
+  brandColor: string | null
+}
+
 export interface RuntimeSkillsUiSlotState {
   kind: 'skills'
   slotId: string
@@ -649,6 +657,8 @@ export interface RuntimeSkillsUiSlotState {
   disabledCount: number
   errorCount: number
   roots: string[]
+  /** Optional per-skill display enrichment (remote/local icons, brand color). */
+  items?: RuntimeSkillsUiSlotItem[]
   updatedAt: number
 }
 
@@ -792,6 +802,12 @@ export interface ChatRuntimeCapabilities {
   readonly supportsUiSlotStates: boolean
   readonly supportsDynamicCapabilities: boolean
   readonly supportsTitleGeneration: boolean
+  /**
+   * Opt-in: the runtime accepts a `StreamTurnInput.reviewTarget` and maps it to its native code
+   * review flow (e.g. Codex app-server `review/start`). Absent means unsupported, and the server
+   * rejects `reviewTarget` turns for the runtime.
+   */
+  readonly supportsNativeReview?: boolean
   readonly sessionModelSwitch: 'in-session' | 'restart-session' | 'unsupported'
 }
 

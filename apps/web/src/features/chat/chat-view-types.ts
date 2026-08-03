@@ -56,6 +56,8 @@ export interface ChatViewProps {
   placeholder?: string
   runtimeKind?: RuntimeKind
   workspaceId?: string | null
+  /** Absolute local workspace path for Composer bang PTY. */
+  workspacePath?: string | null
   /** When set, composer catalogs and connection gating use the remote host. */
   remoteHostId?: string | null
   messageTextTransform?: MessageTextTransform

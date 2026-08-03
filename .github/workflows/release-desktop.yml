@@ -20,8 +20,8 @@ on:
       version:
         description: 'Version (e.g. 1.2.3 for release, or auto-generated for dev)'
         required: true
-      source_ref:
-        description: Git ref from wibus-wee/cradle-app to checkout
+      ref:
+        description: Git ref in this repository to build (branch, tag, or SHA)
         required: true
         default: main
 
@@ -47,7 +47,7 @@ jobs:
       release_tag: ${{ steps.params.outputs.release_tag }}
       dev_feed_tag: ${{ steps.params.outputs.dev_feed_tag }}
       bleeding_edge_feed_tag: ${{ steps.params.outputs.bleeding_edge_feed_tag }}
-      source_ref: ${{ steps.params.outputs.source_ref }}
+      checkout_ref: ${{ steps.params.outputs.checkout_ref }}
       update_url: ${{ steps.params.outputs.update_url }}
       sparkle_appcast_url: ${{ steps.params.outputs.sparkle_appcast_url }}
       sparkle_tag_prefix: ${{ steps.params.outputs.sparkle_tag_prefix }}
@@ -70,7 +70,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             CHANNEL="${{ inputs.channel }}"
             INPUT_VERSION="${{ inputs.version }}"
-            SOURCE_REF="${{ inputs.source_ref }}"
+            CHECKOUT_REF="${{ inputs.ref }}"
 
             if [ "$CHANNEL" = "dev" ]; then
               DISPLAY_VERSION="$INPUT_VERSION"
@@ -92,7 +92,8 @@ jobs:
             DISPLAY_VERSION="$SHORT_SHA"
             DESKTOP_VERSION="0.0.0-be.${RUN_NUMBER}"
             RELEASE_TAG="bleeding-edge-$SHORT_SHA"
-            SOURCE_REF="main"
+            # Build the pushed commit, not a floating branch tip.
+            CHECKOUT_REF="${{ github.sha }}"
           else
             TAG="${GITHUB_REF_NAME}"
             if [[ "$TAG" == dev-* ]]; then
@@ -104,7 +105,8 @@ jobs:
               DISPLAY_VERSION="${TAG#v}"
               DESKTOP_VERSION="$DISPLAY_VERSION"
             fi
-            SOURCE_REF="main"
+            # Tag push: build the tagged commit itself.
+            CHECKOUT_REF="${{ github.sha }}"
             RELEASE_TAG="$TAG"
           fi
 
@@ -159,7 +161,7 @@ jobs:
           echo "release_tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           echo "dev_feed_tag=$DEV_FEED_TAG" >> "$GITHUB_OUTPUT"
           echo "bleeding_edge_feed_tag=$BLEEDING_EDGE_FEED_TAG" >> "$GITHUB_OUTPUT"
-          echo "source_ref=$SOURCE_REF" >> "$GITHUB_OUTPUT"
+          echo "checkout_ref=$CHECKOUT_REF" >> "$GITHUB_OUTPUT"
           echo "update_url=$UPDATE_URL" >> "$GITHUB_OUTPUT"
           echo "sparkle_appcast_url=$SPARKLE_APPCAST_URL" >> "$GITHUB_OUTPUT"
           echo "sparkle_tag_prefix=$SPARKLE_TAG_PREFIX" >> "$GITHUB_OUTPUT"
@@ -176,7 +178,7 @@ jobs:
           echo "Release tag: $RELEASE_TAG"
           echo "Dev feed tag: $DEV_FEED_TAG"
           echo "Bleeding edge feed tag: $BLEEDING_EDGE_FEED_TAG"
-          echo "Source ref: $SOURCE_REF"
+          echo "Checkout ref: $CHECKOUT_REF"
           echo "Update URL: $UPDATE_URL"
           echo "Release download URL: $RELEASE_DOWNLOAD_URL"
           echo "Analytics build channel: $ANALYTICS_BUILD_CHANNEL"
@@ -190,12 +192,10 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Checkout Cradle source
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/cradle-app
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: ${{ needs.resolve.outputs.source_ref }}
+          ref: ${{ needs.resolve.outputs.checkout_ref }}
 
       - name: Verify macOS packaging fix is present
         shell: bash
@@ -203,12 +203,11 @@ jobs:
           set -euo pipefail
           echo "Checked out source commit: $(git rev-parse HEAD)"
           if [ ! -f apps/desktop/scripts/fix-macos-framework-symlinks.mjs ]; then
-            echo "source_ref '${{ needs.resolve.outputs.source_ref }}' from wibus-wee/cradle-app does not include apps/desktop/scripts/fix-macos-framework-symlinks.mjs" >&2
-            echo "Sync the macOS framework symlink packaging fix into wibus-wee/cradle-app, or release from a source_ref that contains it." >&2
+            echo "Checked-out ref '${{ needs.resolve.outputs.checkout_ref }}' is missing apps/desktop/scripts/fix-macos-framework-symlinks.mjs" >&2
             exit 1
           fi
           if ! /usr/bin/grep -q 'fixMacOSFrameworkSymlinks' apps/desktop/electron-builder.mjs; then
-            echo "source_ref '${{ needs.resolve.outputs.source_ref }}' from wibus-wee/cradle-app does not run the macOS framework symlink fix from electron-builder.afterPack" >&2
+            echo "Checked-out ref '${{ needs.resolve.outputs.checkout_ref }}' does not run the macOS framework symlink fix from electron-builder.afterPack" >&2
             exit 1
           fi
 
@@ -277,7 +276,7 @@ jobs:
           CRADLE_DESKTOP_SPARKLE_DISPLAY_VERSION: ${{ needs.resolve.outputs.display_version }}
           SPARKLE_ED_PUBLIC_KEY: ${{ secrets.SPARKLE_ED_PUBLIC_KEY }}
           CRADLE_ELECTRON_REBUILD_ARCH: arm64
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: --max-old-space-size=4096
         shell: bash
         run: |
@@ -442,12 +441,10 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Checkout Cradle source
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/cradle-app
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: ${{ needs.resolve.outputs.source_ref }}
+          ref: ${{ needs.resolve.outputs.checkout_ref }}
 
       - name: Setup pnpm & Node.js
         uses: ./.github/actions/setup
@@ -503,7 +500,7 @@ jobs:
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
           CRADLE_DESKTOP_SPARKLE_APPCAST_URL: ${{ needs.resolve.outputs.sparkle_appcast_url }}
           CRADLE_ELECTRON_REBUILD_ARCH: x64
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm --filter @cradle/desktop build
 
       - name: Package unpacked Windows app
@@ -531,12 +528,10 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - name: Checkout Cradle source
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: wibus-wee/cradle-app
-          token: ${{ secrets.PRIVATE_REPO_PAT }}
-          ref: ${{ needs.resolve.outputs.source_ref }}
+          ref: ${{ needs.resolve.outputs.checkout_ref }}
 
       - name: Setup pnpm & Node.js
         uses: ./.github/actions/setup
@@ -598,7 +593,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
           CRADLE_ELECTRON_REBUILD_ARCH: x64
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm --filter @cradle/desktop build
 
@@ -607,7 +602,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
-          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm exec electron-builder --config electron-builder.mjs --linux AppImage deb --x64 --publish never
 
       - name: Upload artifacts

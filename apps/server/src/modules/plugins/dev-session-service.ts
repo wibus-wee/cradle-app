@@ -6,6 +6,7 @@ import type { PluginLayer, PluginManifest } from '@cradle/plugin-sdk'
 import { parseCradlePluginPackageJsonText } from '@cradle/plugin-sdk/manifest'
 
 import { AppError } from '../../errors/app-error'
+import { openSseEventStream } from '../../infra/sse-event-stream'
 import {
   activateDevelopmentPlugin,
   deactivateDevelopmentPlugin,
@@ -218,26 +219,16 @@ export class PluginDevSessionService {
   }
 
   stream(signal: AbortSignal): ReadableStream<Uint8Array> {
-    const encoder = new TextEncoder()
-    let unsubscribe = (): void => undefined
-    return new ReadableStream({
-      start: (controller) => {
-        const listener: EventListener = event => controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-        )
-        const onAbort = (): void => {
-          unsubscribe()
-          controller.close()
-        }
-        unsubscribe = (): void => {
-          this.listeners.delete(listener)
-          signal.removeEventListener('abort', onAbort)
-        }
-        this.listeners.add(listener)
-        signal.addEventListener('abort', onAbort, { once: true })
-        if (signal.aborted) { onAbort() }
+    return openSseEventStream({
+      signal,
+      source: {
+        subscribe: (listener) => {
+          this.listeners.add(listener)
+          return () => {
+            this.listeners.delete(listener)
+          }
+        },
       },
-      cancel: () => unsubscribe(),
     })
   }
 

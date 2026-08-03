@@ -5,7 +5,7 @@ description: Trigger the public desktop release workflow and monitor it with Cra
 
 # Release Desktop
 
-Trigger `wibus-wee/cradle-app`'s public `release-desktop.yml` workflow and monitor it until the release is published.
+Trigger `wibus-wee/cradle-app`'s `release-desktop.yml` workflow and monitor it until the release is published.
 
 ## Usage
 
@@ -16,9 +16,12 @@ Trigger `wibus-wee/cradle-app`'s public `release-desktop.yml` workflow and monit
 
 ## Rules
 
-- The release entrypoint is the public repo: `/Users/wibus/dev/cradle-app`.
-- Do not create release tags in the private `wibus-wee/Cradle` repo.
-- The tag-triggered public workflow releases private `wibus-wee/Cradle` from `main`.
+- Release tags live in this repository (`wibus-wee/cradle-app`). Tag the commit you want to ship (usually `origin/main`).
+- The workflow builds the tagged commit itself (or the pushed `main` SHA for bleeding-edge). There is no separate private source repo and no `PRIVATE_REPO_PAT` self-checkout.
+- Channels:
+  - `bleeding-edge` — every push to `main`
+  - `dev` — `dev-YYYYMMDD.N` tags
+  - `release` — `vX.Y.Z` tags (stable)
 - Leave unrelated local files alone, including untracked workflow drafts.
 - Use Cradle awaits for workflow completion; do not watch the run with a long polling loop.
 - Use only short bounded retries to let GitHub materialize run/check IDs.
@@ -38,8 +41,7 @@ When the user runs `/release <arg>`, execute these steps in order.
 ### 1. Resolve tag
 
 ```bash
-PUBLIC_REPO=/Users/wibus/dev/cradle-app
-cd "$PUBLIC_REPO"
+cd "$(git rev-parse --show-toplevel)"
 git fetch origin main --tags
 
 ARG="<user argument>"
@@ -71,13 +73,13 @@ if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; the
   exit 1
 fi
 
-PUBLIC_SHA=$(git rev-parse origin/main)
+RELEASE_SHA=$(git rev-parse origin/main)
 ```
 
-### 2. Push public release tag
+### 2. Push release tag
 
 ```bash
-git tag -a "$TAG" "$PUBLIC_SHA" -m "Release $TAG"
+git tag -a "$TAG" "$RELEASE_SHA" -m "Release $TAG"
 git push origin "$TAG"
 ```
 
@@ -130,7 +132,7 @@ fi
 
 cradle session await github-ci wibus-wee/cradle-app \
   --run-id "$CHECK_RUN_ID" \
-  --reason "Waiting for public desktop release $TAG. $NEXT_STEP"
+  --reason "Waiting for desktop release $TAG. $NEXT_STEP"
 ```
 
 After registering the await, end the turn and let Cradle resume the session.
@@ -165,7 +167,7 @@ PUBLISH_CHECK_RUN_ID=$(
 if [ -n "$PUBLISH_CHECK_RUN_ID" ]; then
   cradle session await github-ci wibus-wee/cradle-app \
     --run-id "$PUBLISH_CHECK_RUN_ID" \
-    --reason "Waiting for public desktop release $TAG to publish."
+    --reason "Waiting for desktop release $TAG to publish."
 fi
 ```
 
@@ -181,7 +183,7 @@ Report success with the release URL. If the workflow failed, report the run URL 
 
 ## Notes
 
-- The public workflow builds desktop artifacts for mac-arm64, windows-x64, and linux-x64 (AppImage + deb).
+- The workflow builds desktop artifacts for mac-arm64, windows-x64, and linux-x64 (AppImage + deb).
 - Release assets are uploaded to `wibus-wee/cradle-app` GitHub releases.
 - Release builds use `https://github.com/wibus-wee/cradle-app/releases/latest/download/`.
 - Dev builds publish both their own `dev-*` release and the rolling `feed-dev` update feed.

@@ -25,8 +25,8 @@ export interface CodexAppServerCapabilityManifest {
 }
 
 const CODEX_APP_SERVER_PROTOCOL = 'codex-app-server'
-const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.145.0'
-const CODEX_APP_SERVER_GENERATED_DATE = '2026-07-28'
+const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.146.0'
+const CODEX_APP_SERVER_GENERATED_DATE = '2026-07-31'
 
 export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'initialize', paramsType: 'InitializeParams', category: 'initialize', operation: 'initialize', interaction: 'request' },
@@ -146,6 +146,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'config/read', paramsType: 'ConfigReadParams', category: 'config', operation: 'read', interaction: 'request' },
   { method: 'externalAgentConfig/detect', paramsType: 'ExternalAgentConfigDetectParams', category: 'external-agent-config', operation: 'detect', interaction: 'request' },
   { method: 'externalAgentConfig/import', paramsType: 'ExternalAgentConfigImportParams', category: 'external-agent-config', operation: 'import', interaction: 'stream' },
+  { method: 'externalAgentConfig/import/recordHistory', paramsType: 'ExternalAgentConfigImportHistoryRecordParams', category: 'external-agent-config', operation: 'import/recordHistory', interaction: 'request' },
   { method: 'externalAgentConfig/import/readHistories', paramsType: null, category: 'external-agent-config', operation: 'import/readHistories', interaction: 'request' },
   { method: 'config/value/write', paramsType: 'ConfigValueWriteParams', category: 'config', operation: 'value/write', interaction: 'request' },
   { method: 'config/batchWrite', paramsType: 'ConfigBatchWriteParams', category: 'config', operation: 'batchWrite', interaction: 'request' },

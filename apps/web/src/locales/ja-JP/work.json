@@ -46,7 +46,7 @@
   "new.title": "新しい Work",
   "new.tryAgain": "再試行",
   "new.workspace": "ワークスペース",
-  "new.workspaceRequired": "Work を開始するローカル Git ワークスペースを選択してください。",
+  "new.workspaceRequired": "Work を開始するにはローカルの単一フォルダー Git ワークスペースを選択してください。マルチフォルダーワークスペースは非対応です。",
   "sidebar.archive": "Work をアーカイブ",
   "sidebar.draft": "Draft PR #{{number}}",
   "sidebar.merged": "マージ済み PR #{{number}}",

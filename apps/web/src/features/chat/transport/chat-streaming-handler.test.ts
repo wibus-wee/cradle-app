@@ -256,6 +256,44 @@ describe('chat streaming handler store boundary', () => {
     )
   })
 
+  it('clones into the store at flush so later chunks cannot mutate published snapshots', async () => {
+    let streamController!: ReadableStreamDefaultController<ChatStreamChunk>
+    const stream = new ReadableStream<ChatStreamChunk>({
+      start(controller) {
+        streamController = controller
+      },
+    })
+    const handler = new ChatStreamingHandler('session-1', 'assistant-local', 0)
+
+    handler.start(new AbortController())
+    const consumePromise = handler.consume(stream)
+
+    streamController.enqueue(liveChatStreamChunk({ type: 'start', messageId: 'assistant-stream' }))
+    streamController.enqueue(liveChatStreamChunk({ type: 'text-start', id: 'text-1' }))
+    streamController.enqueue(liveChatStreamChunk({ type: 'text-delta', id: 'text-1', delta: 'Hello' }))
+
+    await vi.waitFor(() => {
+      expect(chatSelectors.messages('session-1')(useChatStore.getState())[0]).toMatchObject({
+        id: 'assistant-stream',
+        parts: [{ type: 'text', text: 'Hello' }],
+      })
+    })
+
+    const published = chatSelectors.messages('session-1')(useChatStore.getState())[0]!
+    const publishedTextPart = published.parts[0]
+
+    streamController.enqueue(liveChatStreamChunk({ type: 'text-delta', id: 'text-1', delta: ' world' }))
+    streamController.close()
+    await consumePromise
+    handler.finish()
+
+    // Live target mutations must not rewrite the previously published object graph.
+    expect(publishedTextPart).toMatchObject({ type: 'text', text: 'Hello' })
+    const latest = chatSelectors.messages('session-1')(useChatStore.getState())[0]!
+    expect(latest).not.toBe(published)
+    expect(latest.parts[0]).toMatchObject({ type: 'text', text: 'Hello world' })
+  })
+
   it('applies replay chunks as a single store update when replay catches up', async () => {
     let resolveStreamController!: (controller: ReadableStreamDefaultController<ChatStreamChunk>) => void
     const streamControllerPromise = new Promise<ReadableStreamDefaultController<ChatStreamChunk>>((resolve) => {

@@ -50,6 +50,7 @@ import { createKimiRuntimePresentation } from './presentation'
 import {
   closeTerminal,
   getApiV1McpServers,
+  getApiV1OauthUsage,
   getApiV1Sessions,
   getApiV1SessionsBySessionId,
   getApiV1SessionsBySessionIdApprovals,
@@ -78,6 +79,7 @@ import {
   projectKimiTranscriptTurns,
 } from './transcript-projector'
 import { KimiUsageEventProjector } from './usage-event-projector'
+import { projectKimiOauthUsageSlotState } from './usage-slot-projector'
 import { isKimiSessionEvent, requiresKimiTranscriptHydration } from './websocket/client'
 
 const KIMI_COMMAND = process.env.KIMI_COMMAND || 'kimi'
@@ -223,7 +225,7 @@ updatedAt: Date.now(),
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
     const lease = await this.acquire(profile)
     try {
-      const [status, goal, approvals, questions, tasks, terminals, mcp, skills, transcript] = await Promise.all([
+      const [status, goal, approvals, questions, tasks, terminals, mcp, skills, transcript, oauthUsage] = await Promise.all([
         lease.resource.http.request(getApiV1SessionsBySessionIdStatus({ client: lease.resource.http.client, path: { session_id: providerSessionId } })),
         lease.resource.http.request(getApiV1SessionsBySessionIdGoal({ client: lease.resource.http.client, path: { session_id: providerSessionId } })),
         lease.resource.http.request(getApiV1SessionsBySessionIdApprovals({ client: lease.resource.http.client, path: { session_id: providerSessionId }, query: { status: 'pending' } })),
@@ -237,9 +239,18 @@ updatedAt: Date.now(),
           path: { session_id: providerSessionId },
           query: { agent_id: 'main', page_size: 50 },
         })),
+        lease.resource.http.request(getApiV1OauthUsage({ client: lease.resource.http.client })).catch(() => null),
       ])
       const updatedAt = Date.now()
       const states: RuntimeUiSlotState[] = []
+      const usageState = projectKimiOauthUsageSlotState({
+        threadId: providerSessionId,
+        data: oauthUsage,
+        updatedAt,
+      })
+      if (usageState) {
+        states.push(usageState)
+      }
       if (status && 'busy' in status) {
         states.push({ kind: 'status', slotId: 'kimi:status', threadId: providerSessionId, status: status.busy ? 'active' : 'idle', activeFlags: [], updatedAt })
         states.push({ kind: 'model', slotId: 'kimi:model', threadId: providerSessionId, modelId: status.model ?? null, modelLabel: status.model ?? null, modelProvider: null, serviceTier: null, supportsImages: null, supportsWebSearch: null, supportsNamespaceTools: null, updatedAt })

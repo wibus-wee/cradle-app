@@ -47,7 +47,8 @@ interface AgentRailProps {
   }) => Promise<CradleDiffReview>
   onDelete: (agentFixId: string) => void
   onCollapse: () => void
-  width: number
+  /** Omit to fill the parent (e.g. ReviewDetailView overlay sheet). */
+  width?: number
 }
 
 const STATUS_TONE: Record<ReviewAgentFix['status'], string> = {
@@ -127,8 +128,11 @@ export function AgentRail({
 
   return (
     <aside
-      className="flex min-h-0 shrink-0 flex-col border-l border-border/60 bg-background"
-      style={{ width }}
+      className={cn(
+        'flex min-h-0 shrink-0 flex-col bg-background',
+        width === undefined ? 'h-full w-full border-0' : 'border-l border-border/60',
+      )}
+      style={width === undefined ? undefined : { width }}
       data-testid="agent-rail"
     >
       <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border/60 px-3">

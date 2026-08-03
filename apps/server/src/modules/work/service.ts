@@ -16,6 +16,7 @@ import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
 import type { SessionAwaitSource } from '../session-await/types'
+import * as Workspace from '../workspace/service'
 import * as Worktree from '../worktree/service'
 
 const logger = createChildLogger({ module: 'work' })
@@ -268,6 +269,23 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
   }
 
   const baseStrategy: WorkBaseStrategy = input.baseStrategy ?? 'source-head'
+  const sourceWorkspace = Workspace.get(input.workspaceId)
+  if (!sourceWorkspace) {
+    throw new AppError({
+      code: 'workspace_not_found',
+      status: 404,
+      message: 'Workspace not found',
+      details: { workspaceId: input.workspaceId },
+    })
+  }
+  if (Workspace.isMultiFolderWorkspace(sourceWorkspace)) {
+    throw new AppError({
+      code: 'work_multi_folder_unsupported',
+      status: 400,
+      message: 'Work requires a single-folder local Git workspace. Multi-folder workspaces are for Agent context only.',
+      details: { workspaceId: input.workspaceId },
+    })
+  }
   // Remote-default isolation never copies uncommitted local files into the
   // managed worktree, so a dirty source checkout is safe. Source-head still
   // requires a clean tree so Work does not silently drop or mix WIP.
