@@ -37,7 +37,7 @@ describe('cradleFetch credential injection', () => {
       },
     } as unknown as typeof window.cradle
 
-    const fetchMock = vi.fn(async () => new Response('ok'))
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('ok'))
     vi.stubGlobal('fetch', fetchMock)
 
     await cradleFetch(new URL('/health', CRADLE_SERVER_LOCAL_BASE))
@@ -63,7 +63,7 @@ describe('cradleFetch credential injection', () => {
       },
     } as unknown as typeof window.cradle
 
-    const fetchMock = vi.fn(async () => new Response('ok'))
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('ok'))
     vi.stubGlobal('fetch', fetchMock)
 
     await cradleFetch(new URL('/health', 'http://127.0.0.1:21423'))
@@ -84,7 +84,7 @@ describe('cradleFetch credential injection', () => {
       },
     })
 
-    const fetchMock = vi.fn(async () => new Response('ok'))
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('ok'))
     vi.stubGlobal('fetch', fetchMock)
 
     await cradleFetch(new Request('http://127.0.0.1:21423/sessions', {

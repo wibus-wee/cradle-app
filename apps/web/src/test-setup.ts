@@ -44,7 +44,7 @@ if (typeof globalThis.MessageEvent === 'undefined') {
       super(type)
       this.data = init?.data ?? null
     }
-  } as typeof MessageEvent
+  } as unknown as typeof MessageEvent
 }
 
 if (typeof globalThis.ResizeObserver === 'undefined') {

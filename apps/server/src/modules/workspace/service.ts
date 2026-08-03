@@ -426,7 +426,14 @@ export function createMultiFolderWorkspace(input: MultiFolderWorkspaceConfig): W
   assertMultiWorkspacePocEnabled()
   // Create path requires already-registered local members. Config import keeps
   // path-only validation so recognition can reopen an existing composite root.
-  const config = normalizeMultiFolderWorkspaceConfig(input, { requireRegisteredMembers: true })
+  return createMultiFolderWorkspaceFromConfig(input, { requireRegisteredMembers: true })
+}
+
+function createMultiFolderWorkspaceFromConfig(
+  input: MultiFolderWorkspaceConfig,
+  options: { requireRegisteredMembers?: boolean } = {},
+): WorkspaceView {
+  const config = normalizeMultiFolderWorkspaceConfig(input, options)
   const workspaceRoot = resolveMultiWorkspacePath(config.name)
 
   // Idempotent re-import / cradle open: if the managed root is already registered,
@@ -478,7 +485,10 @@ export function createMultiFolderWorkspaceFromConfigPath(path: string): Workspac
     })
   }
 
-  return createMultiFolderWorkspace(readMultiFolderWorkspaceConfig(path))
+  // Imported configs are also used to recognize and re-register an existing
+  // composite root, so validate their folder paths without requiring every
+  // member to be present in the current workspace registry.
+  return createMultiFolderWorkspaceFromConfig(readMultiFolderWorkspaceConfig(path))
 }
 
 export function update(input: { id: string, name?: string, pinned?: boolean }): WorkspaceView | null {
