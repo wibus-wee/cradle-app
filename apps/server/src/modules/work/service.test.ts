@@ -688,6 +688,12 @@ describe('work delivery control', () => {
   })
 
   it('rejects creation before Session persistence when the source checkout is dirty', async () => {
+    db().insert(workspaces).values({
+      id: WORKSPACE_ID,
+      name: 'Work Service Workspace',
+      locatorJson: localWorkspaceLocatorJson('/tmp/work-service'),
+      identifier: 'WSW',
+    }).run()
     vi.spyOn(Worktree, 'assertWorkspaceCleanForManagedIsolation').mockRejectedValue(new AppError({
       code: 'work_source_dirty',
       status: 409,

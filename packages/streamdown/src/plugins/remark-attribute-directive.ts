@@ -1,4 +1,4 @@
-import type { BlockContent, Paragraph, PhrasingContent, Root, RootContent } from 'mdast'
+import type { Paragraph, PhrasingContent, Root, RootContent } from 'mdast'
 import type {
   CompileContext,
   Extension as FromMarkdownExtension,
@@ -403,7 +403,7 @@ function liftAttributeDirectives(tree: Root, name: string) {
     for (const child of children) {
       if (child.type === name) {
         flushBuffer()
-        replacement.push(child as unknown as BlockContent)
+        replacement.push(child as unknown as RootContent)
         continue
       }
       buffer.push(child)

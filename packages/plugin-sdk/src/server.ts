@@ -446,10 +446,14 @@ export interface PluginChatRuntime {
   readonly runtimeKind: string
   readonly metadata: PluginChatRuntimeMetadata
   readonly capabilities: PluginChatRuntimeCapabilities
-  startChatSession: (input: PluginStartChatSessionInput) => Promise<PluginChatRuntimeSession>
-  resumeChatSession: (input: PluginResumeChatSessionInput) => Promise<PluginChatRuntimeSession>
-  streamTurn: (input: PluginStreamTurnInput) => AsyncIterable<unknown>
-  cancelTurn: (input: PluginCancelTurnInput) => Promise<void>
+  // eslint-disable-next-line ts/method-signature-style -- method bivariance keeps this SDK contract assignable to the host runtime
+  startChatSession(input: PluginStartChatSessionInput): Promise<PluginChatRuntimeSession>
+  // eslint-disable-next-line ts/method-signature-style -- method bivariance keeps this SDK contract assignable to the host runtime
+  resumeChatSession(input: PluginResumeChatSessionInput): Promise<PluginChatRuntimeSession>
+  // eslint-disable-next-line ts/method-signature-style -- method bivariance keeps this SDK contract assignable to the host runtime
+  streamTurn(input: PluginStreamTurnInput): AsyncIterable<unknown>
+  // eslint-disable-next-line ts/method-signature-style -- method bivariance keeps this SDK contract assignable to the host runtime
+  cancelTurn(input: PluginCancelTurnInput): Promise<void>
 }
 
 export interface ServerPluginRuntimeRegistry {
