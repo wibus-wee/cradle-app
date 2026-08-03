@@ -26,8 +26,7 @@ If trusted publishing is not configured, CI publish will fail with authenticatio
 
 ## Rules
 
-- The release entrypoint is the public repo: `/Users/wibus/dev/cradle-app`.
-- Do not create SDK release tags in the private `wibus-wee/Cradle` repo.
+- Release tags live in this repository (`wibus-wee/cradle-app`). Tag the commit you want to publish (usually `origin/main`).
 - SDK tags use the `sdk-` prefix and are independent from desktop `v*` / `dev-*` tags.
 - Leave unrelated local files alone.
 - Use Cradle awaits for workflow completion; do not watch the run with a long polling loop.
@@ -50,8 +49,7 @@ When the user runs `/release-sdk <arg>`, execute these steps in order.
 ### 1. Resolve tag
 
 ```bash
-PUBLIC_REPO=/Users/wibus/dev/cradle-app
-cd "$PUBLIC_REPO"
+cd "$(git rev-parse --show-toplevel)"
 git fetch origin main --tags
 
 ARG="<user argument>"
@@ -83,13 +81,13 @@ if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; the
   exit 1
 fi
 
-PUBLIC_SHA=$(git rev-parse origin/main)
+RELEASE_SHA=$(git rev-parse origin/main)
 ```
 
-### 2. Push public release tag
+### 2. Push release tag
 
 ```bash
-git tag -a "$TAG" "$PUBLIC_SHA" -m "Release $TAG"
+git tag -a "$TAG" "$RELEASE_SHA" -m "Release $TAG"
 git push origin "$TAG"
 ```
 

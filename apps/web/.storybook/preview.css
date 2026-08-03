@@ -1,0 +1,7 @@
+/* App shell owns viewport overflow; Storybook needs document scroll. */
+html,
+body {
+  height: auto;
+  min-height: 100%;
+  overflow: auto;
+}

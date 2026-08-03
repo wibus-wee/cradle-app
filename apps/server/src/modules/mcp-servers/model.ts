@@ -24,8 +24,41 @@ const streamableHttpBody = t.Object({
   secretValues: t.Optional(secretValues),
 })
 
+const registryInstallHint = t.Union([
+  t.Object({
+    transport: t.Literal('stdio'),
+    command: t.String(),
+    args: t.Array(t.String()),
+  }),
+  t.Object({
+    transport: t.Literal('streamable-http'),
+    url: t.String(),
+  }),
+])
+
 export const McpServersModel = {
   idParams: t.Object({ id: t.String({ minLength: 1 }) }),
+  registryQuery: t.Object({
+    search: t.Optional(t.String()),
+    cursor: t.Optional(t.String()),
+  }),
+  registryPage: t.Object({
+    servers: t.Array(t.Object({
+      name: t.String(),
+      title: t.Union([t.String(), t.Null()]),
+      description: t.Union([t.String(), t.Null()]),
+      version: t.Union([t.String(), t.Null()]),
+      publishedAt: t.Union([t.String(), t.Null()]),
+      packageRegistry: t.Union([t.Literal('npm'), t.Literal('pypi'), t.Literal('oci'), t.Null()]),
+      env: t.Array(t.Object({
+        name: t.String(),
+        description: t.Union([t.String(), t.Null()]),
+        required: t.Boolean(),
+      })),
+      installHint: t.Union([registryInstallHint, t.Null()]),
+    })),
+    nextCursor: t.Union([t.String(), t.Null()]),
+  }),
   saveBody: t.Union([stdioBody, streamableHttpBody]),
   enabledBody: t.Object({ enabled: t.Boolean() }),
   summary: t.Object({

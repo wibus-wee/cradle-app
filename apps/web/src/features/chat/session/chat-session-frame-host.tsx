@@ -20,6 +20,7 @@ export interface ChatSessionFrameDescriptor {
   sessionThinkingEffort: SendMessageOptions['thinkingEffort'] | null
   runtimeKind: RuntimeKind | undefined
   workspaceId: string | null
+  workspacePath?: string | null
   agentId: string | null
   /** Remote host id when this session executes via Upstream Gateway. */
   remoteHostId?: string | null
@@ -112,6 +113,7 @@ const ChatSessionFrame = ({
           sessionThinkingEffort={descriptor.sessionThinkingEffort}
           runtimeKind={descriptor.runtimeKind}
           workspaceId={descriptor.workspaceId}
+          workspacePath={descriptor.workspacePath ?? null}
           agentId={descriptor.agentId}
           remoteHostId={descriptor.remoteHostId ?? null}
         />
@@ -180,6 +182,7 @@ function areFrameListsEqual(
       && frame.sessionThinkingEffort === nextFrame.sessionThinkingEffort
       && frame.runtimeKind === nextFrame.runtimeKind
       && frame.workspaceId === nextFrame.workspaceId
+      && (frame.workspacePath ?? null) === (nextFrame.workspacePath ?? null)
       && frame.agentId === nextFrame.agentId
       && (frame.remoteHostId ?? null) === (nextFrame.remoteHostId ?? null)
   })

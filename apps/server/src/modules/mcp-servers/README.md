@@ -18,9 +18,16 @@ This module owns user-managed MCP server metadata, encrypted sensitive values, a
 ## Routes
 
 - `GET /mcp-servers` lists definitions without secret values.
+- `GET /mcp-servers/registry/servers` proxies `registry.modelcontextprotocol.io` (cached) and returns install-ready candidates for Discover.
 - `POST /mcp-servers` creates a definition and encrypts `secretValues`.
 - `PUT /mcp-servers/:id` replaces metadata; omitted `secretValues` preserve the encrypted payload.
 - `PATCH /mcp-servers/:id/enabled` enables or disables a definition.
 - `DELETE /mcp-servers/:id` removes the definition and its owned secret.
 
 Secret-bearing create and update routes intentionally have no generated CLI command so values are not encouraged into shell history.
+
+## Registry proxy
+
+- Upstream: `https://registry.modelcontextprotocol.io/v0.1/servers`.
+- Query params: optional `search` and `cursor` for pagination.
+- Responses are cached in Cradle KV for a short TTL; install hints map npm/pypi packages and streamable HTTP remotes into the custom-server create form.

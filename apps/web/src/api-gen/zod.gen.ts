@@ -917,6 +917,11 @@ export const zPutModelRegistryMappingsByModelIdPath = z.object({
     modelId: z.string().min(1)
 });
 
+export const zGetMcpServersRegistryServersQuery = z.object({
+    search: z.string().optional(),
+    cursor: z.string().optional()
+});
+
 export const zPostMcpServersBody = z.union([
     z.object({
         transport: z.enum(['stdio']),

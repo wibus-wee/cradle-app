@@ -1,12 +1,22 @@
 import { Elysia, t } from 'elysia'
 
 import { McpServersModel } from './model'
+import { getMcpRegistryService } from './registry'
 import { getCustomMcpServerService } from './service'
 
 export const mcpServers = new Elysia({
   prefix: '/mcp-servers',
   detail: { tags: ['mcp-servers'] },
 })
+  .get('/registry/servers', async ({ query }) =>
+    await getMcpRegistryService().search({ search: query.search, cursor: query.cursor }), {
+    detail: {
+      summary: 'Search the official MCP registry',
+      description: 'Proxies registry.modelcontextprotocol.io and returns install-ready candidates for custom MCP servers.',
+    },
+    query: McpServersModel.registryQuery,
+    response: { 200: McpServersModel.registryPage },
+  })
   .get('/', async () => await getCustomMcpServerService().list(), {
     detail: {
       'summary': 'List custom MCP servers',

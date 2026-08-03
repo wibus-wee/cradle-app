@@ -8,8 +8,10 @@ import {
   DownLine as ExpandIcon,
   GithubLine as GithubIcon,
   Refresh2Line as RefreshIcon,
+  RobotLine as AgentIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { cn } from '~/lib/cn'
 
@@ -71,10 +73,24 @@ export interface ReviewDetailViewProps {
   submitPending?: boolean
   threadsOpen: boolean
   onToggleThreads: () => void
+  /** Optional agent-rail toggle; when omitted the control is hidden. */
+  agentOpen?: boolean
+  onToggleAgent?: () => void
+  agentFixCount?: number
+  /**
+   * Extra header controls (display prefs, GitHub merge, close, …) rendered
+   * before the primary submit control. Keeps the View free of product mutations.
+   */
+  extraActions?: ReactNode
+  /**
+   * Replaces the default Approve button when the container needs the full
+   * review popover (approve / request changes / comment).
+   */
+  submitControl?: ReactNode
   railWidth?: number
   /** The diff itself, supplied by the container so this View stays runtime-free. */
   diffSlot: ReactNode
-  /** Open-thread list rendered as an overlay sheet, not a permanent column. */
+  /** Open-thread / agent list rendered as an overlay sheet, not a permanent column. */
   threadsSlot?: ReactNode
 }
 
@@ -86,6 +102,10 @@ export interface ReviewDetailViewProps {
  * that is permanently squeezed between two panels is the thing reviewers
  * actually complain about — the code should get the width by default and give
  * it up only when you ask for something else.
+ *
+ * The overview band scrolls away with the page. The file rail + diff stick to
+ * the scrollport once it is gone, so a deep read is just those two columns
+ * under the top bar — the title migrates into the bar via intersection.
  */
 export function ReviewDetailView({
   review,
@@ -105,6 +125,11 @@ export function ReviewDetailView({
   submitPending = false,
   threadsOpen,
   onToggleThreads,
+  agentOpen = false,
+  onToggleAgent,
+  agentFixCount = 0,
+  extraActions,
+  submitControl,
   railWidth = 248,
   diffSlot,
   threadsSlot,
@@ -112,6 +137,85 @@ export function ReviewDetailView({
   const identity = reviewIdentity(review)
   const status = reviewStatusBadge(review)
   const openThreads = review.threads.filter(thread => thread.state !== 'resolved').length
+
+  const overviewSentinelRef = useRef<HTMLDivElement | null>(null)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const readingPairRef = useRef<HTMLDivElement | null>(null)
+  const [overviewInView, setOverviewInView] = useState(true)
+
+  useEffect(() => {
+    if (overviewCollapsed) {
+      setOverviewInView(false)
+      return
+    }
+
+    const outer = scrollRef.current
+    const sentinel = overviewSentinelRef.current
+    if (!outer || !sentinel) {
+      return
+    }
+
+    const syncFromScroll = () => {
+      // Once the overview has left the scrollport, promote the title into the
+      // top bar. scrollTop is the reliable signal; intersection alone can lag
+      // behind sticky layout.
+      setOverviewInView(outer.scrollTop < Math.max(8, sentinel.offsetHeight * 0.15))
+    }
+
+    syncFromScroll()
+    outer.addEventListener('scroll', syncFromScroll, { passive: true })
+    return () => outer.removeEventListener('scroll', syncFromScroll)
+  }, [overviewCollapsed])
+
+  useEffect(() => {
+    const outer = scrollRef.current
+    const pair = readingPairRef.current
+    if (!outer || !pair || overviewCollapsed) {
+      return
+    }
+
+    const nestedScrollTop = (): number => {
+      let top = 0
+      for (const node of pair.querySelectorAll('*')) {
+        if (!(node instanceof HTMLElement)) {
+          continue
+        }
+        if (node.scrollHeight > node.clientHeight + 1) {
+          top = Math.max(top, node.scrollTop)
+        }
+      }
+      return top
+    }
+
+    /**
+     * CodeView owns its own overflow. While the overview can still move, wheel
+     * over the sticky pair would otherwise never lift the band — so prefer the
+     * outer scroller until the overview is gone, and reclaim upward wheels once
+     * the nested diff is back at its top.
+     */
+    const onWheel = (event: WheelEvent) => {
+      const maxOuter = outer.scrollHeight - outer.clientHeight
+      if (maxOuter <= 0) {
+        return
+      }
+
+      if (event.deltaY > 0 && outer.scrollTop < maxOuter - 0.5) {
+        event.preventDefault()
+        outer.scrollTop = Math.min(maxOuter, outer.scrollTop + event.deltaY)
+        return
+      }
+
+      if (event.deltaY < 0 && outer.scrollTop > 0.5 && nestedScrollTop() <= 0) {
+        event.preventDefault()
+        outer.scrollTop = Math.max(0, outer.scrollTop + event.deltaY)
+      }
+    }
+
+    pair.addEventListener('wheel', onWheel, { passive: false })
+    return () => pair.removeEventListener('wheel', onWheel)
+  }, [overviewCollapsed])
+
+  const showTitleInBar = overviewCollapsed || !overviewInView
 
   return (
     <div
@@ -142,28 +246,30 @@ export function ReviewDetailView({
             </span>
           )}
 
-          {/* When the overview is hidden the bar becomes the title, so the page
-              never loses its subject while scrolling deep into a diff. */}
-          {overviewCollapsed && (
+          {/* Title lives in the bar once the overview has scrolled (or been
+              collapsed) away — the page never loses its subject mid-diff. */}
+          {showTitleInBar && (
             <>
               <span aria-hidden className="shrink-0 text-[var(--rv-fg-subtle)]">/</span>
               <StatusDot tone={status.tone} filled={status.filled} />
               <span className="min-w-0 truncate text-[12.5px] font-medium text-[var(--rv-fg)]">
                 {identity.title}
               </span>
-              <button
-                type="button"
-                onClick={onToggleOverview}
-                title="Show details"
-                aria-label="Show details"
-                className={cn(
-                  'inline-flex size-6 shrink-0 items-center justify-center rounded-[4px]',
-                  'text-[var(--rv-fg-subtle)] transition-colors duration-100',
-                  'hover:bg-[var(--rv-bg-hover)] hover:text-[var(--rv-fg)]',
-                )}
-              >
-                <ExpandIcon className="size-3.5" aria-hidden />
-              </button>
+              {overviewCollapsed && (
+                <button
+                  type="button"
+                  onClick={onToggleOverview}
+                  title="Show details"
+                  aria-label="Show details"
+                  className={cn(
+                    'inline-flex size-6 shrink-0 items-center justify-center rounded-[4px]',
+                    'text-[var(--rv-fg-subtle)] transition-colors duration-100',
+                    'hover:bg-[var(--rv-bg-hover)] hover:text-[var(--rv-fg)]',
+                  )}
+                >
+                  <ExpandIcon className="size-3.5" aria-hidden />
+                </button>
+              )}
             </>
           )}
         </div>
@@ -175,14 +281,16 @@ export function ReviewDetailView({
             <RefreshIcon className={cn('size-4', refreshPending && 'animate-spin')} aria-hidden />
           </IconAction>
 
+          {extraActions}
+
           <button
             type="button"
             onClick={onToggleThreads}
-            aria-pressed={threadsOpen}
+            aria-pressed={threadsOpen && !agentOpen}
             className={cn(
               'inline-flex h-7 items-center gap-1.5 rounded-[var(--rv-radius)] px-2',
               'text-[11.5px] font-medium transition-colors duration-100',
-              threadsOpen
+              threadsOpen && !agentOpen
                 ? 'bg-[var(--rv-bg-active)] text-[var(--rv-fg)]'
                 : 'text-[var(--rv-fg-muted)] hover:bg-[var(--rv-bg-hover)] hover:text-[var(--rv-fg)]',
             )}
@@ -191,58 +299,95 @@ export function ReviewDetailView({
             <span data-rv-num>{openThreads}</span>
           </button>
 
+          {onToggleAgent && (
+            <button
+              type="button"
+              onClick={onToggleAgent}
+              aria-pressed={agentOpen}
+              className={cn(
+                'inline-flex h-7 items-center gap-1.5 rounded-[var(--rv-radius)] px-2',
+                'text-[11.5px] font-medium transition-colors duration-100',
+                agentOpen
+                  ? 'bg-[var(--rv-bg-active)] text-[var(--rv-fg)]'
+                  : 'text-[var(--rv-fg-muted)] hover:bg-[var(--rv-bg-hover)] hover:text-[var(--rv-fg)]',
+              )}
+            >
+              <AgentIcon className="size-3.5" aria-hidden />
+              <span data-rv-num>{agentFixCount}</span>
+            </button>
+          )}
+
           <span aria-hidden className="mx-1 h-4 w-px bg-[var(--rv-line)]" />
 
-          <button
-            type="button"
-            onClick={() => onSubmit('approve')}
-            disabled={submitPending}
-            className={cn(
-              'inline-flex h-7 items-center rounded-[var(--rv-radius)] px-2.5',
-              'bg-[var(--rv-accent)] text-[11.5px] font-medium text-[var(--rv-accent-fg)]',
-              'transition-opacity duration-100 hover:opacity-90',
-              'disabled:pointer-events-none disabled:opacity-50',
-            )}
-          >
-            Approve
-          </button>
+          {submitControl ?? (
+            <button
+              type="button"
+              onClick={() => onSubmit('approve')}
+              disabled={submitPending}
+              className={cn(
+                'inline-flex h-7 items-center rounded-[var(--rv-radius)] px-2.5',
+                'bg-[var(--rv-accent)] text-[11.5px] font-medium text-[var(--rv-accent-fg)]',
+                'transition-opacity duration-100 hover:opacity-90',
+                'disabled:pointer-events-none disabled:opacity-50',
+              )}
+            >
+              Approve
+            </button>
+          )}
         </div>
       </header>
 
-      <ReviewOverview
-        review={review}
-        collapsed={overviewCollapsed}
-        onToggleCollapsed={onToggleOverview}
-      />
-
-      <div className="relative flex min-h-0 flex-1">
-        <ReviewFileRail
-          files={files}
-          selectedFileId={selectedFileId}
-          onSelectFile={onSelectFile}
-          onToggleViewed={onToggleViewed}
-          hiddenFileCount={hiddenFileCount}
-          width={railWidth}
-        />
-
-        <main data-rv-code className="min-h-0 min-w-0 flex-1 bg-[var(--rv-bg)]">
-          {diffSlot}
-        </main>
-
-        {threadsOpen && threadsSlot && (
-          <div
-            className={cn(
-              'absolute inset-y-0 right-0 z-20 w-[340px] max-w-[80%]',
-              'border-l border-[var(--rv-edge)] bg-[var(--rv-bg-raised)]',
-              'shadow-[var(--rv-shadow-pop)]',
-              'motion-safe:animate-in motion-safe:slide-in-from-right-2 motion-safe:duration-150',
-            )}
-            role="complementary"
-            aria-label="Review threads"
-          >
-            {threadsSlot}
+      {/* Overview scrolls away; the sticky reading pair fills the scrollport. */}
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain [container-type:size]"
+        data-testid="review-detail-scroll"
+      >
+        {!overviewCollapsed && (
+          <div ref={overviewSentinelRef}>
+            <ReviewOverview
+              review={review}
+              collapsed={false}
+              onToggleCollapsed={onToggleOverview}
+            />
           </div>
         )}
+
+        <div
+          ref={readingPairRef}
+          className={cn(
+            'sticky top-0 z-10 flex h-[100cqh] min-h-0',
+            'bg-[var(--rv-bg)]',
+          )}
+        >
+          <ReviewFileRail
+            files={files}
+            selectedFileId={selectedFileId}
+            onSelectFile={onSelectFile}
+            onToggleViewed={onToggleViewed}
+            hiddenFileCount={hiddenFileCount}
+            width={railWidth}
+          />
+
+          <main data-rv-code className="relative min-h-0 min-w-0 flex-1 bg-[var(--rv-bg)]">
+            {diffSlot}
+
+            {threadsOpen && threadsSlot && (
+              <div
+                className={cn(
+                  'absolute inset-y-0 right-0 z-20 w-[340px] max-w-[80%]',
+                  'border-l border-[var(--rv-edge)] bg-[var(--rv-bg-raised)]',
+                  'shadow-[var(--rv-shadow-pop)]',
+                  'motion-safe:animate-in motion-safe:slide-in-from-right-2 motion-safe:duration-150',
+                )}
+                role="complementary"
+                aria-label={agentOpen ? 'Agent fixes' : 'Review threads'}
+              >
+                {threadsSlot}
+              </div>
+            )}
+          </main>
+        </div>
       </div>
     </div>
   )

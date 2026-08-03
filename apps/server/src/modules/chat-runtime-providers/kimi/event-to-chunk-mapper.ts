@@ -46,14 +46,20 @@ export class KimiEventToChunkMapper {
           ? [providerChunk.toolOutputError(payload.toolCallId, String(payload.output))]
           : [providerChunk.toolOutputAvailable({ toolCallId: payload.toolCallId, output: buildKimiToolOutput(this.toolNames.get(payload.toolCallId) ?? 'unknown', this.toolArgs.get(payload.toolCallId), payload.output) })]
       case 'turn.ended':
-        return this.finish(payload.reason)
+        return this.finishTurn({
+          turnId: payload.turnId,
+          reason: payload.reason,
+          interruptReason: payload.interruptReason,
+          durationMs: payload.durationMs,
+          error: payload.error,
+        })
       default:
         return []
     }
   }
 
   finishFromRecovery(reason: 'completed' | 'cancelled' | 'failed' | 'blocked'): UIMessageChunk[] {
-    return this.finish(reason)
+    return this.finishTurn({ reason })
   }
 
   reconcileTranscriptTurn(turn: KimiTranscriptTurn): UIMessageChunk[] {
@@ -113,10 +119,35 @@ export class KimiEventToChunkMapper {
     return [providerChunk.reasoningStart(id), providerChunk.reasoningDelta(id, delta)]
   }
 
-  private finish(reason: 'completed' | 'cancelled' | 'failed' | 'blocked'): UIMessageChunk[] {
+  private finishTurn(input: {
+    turnId?: number
+    reason: 'completed' | 'cancelled' | 'failed' | 'blocked'
+    interruptReason?: 'user_cancelled' | 'aborted' | 'max_steps' | 'error' | 'filtered' | 'blocked'
+    durationMs?: number
+    error?: { code: string, message: string, retryable: boolean }
+  }): UIMessageChunk[] {
+    const interruptIsFailure = input.interruptReason === 'max_steps'
+      || input.interruptReason === 'error'
+      || input.interruptReason === 'filtered'
+      || input.interruptReason === 'blocked'
+    const finishReason = input.reason === 'failed' || input.reason === 'blocked' || interruptIsFailure
+      ? 'error'
+      : 'stop'
+
     return [
       ...this.closeActiveBlocks(),
-      providerChunk.finish(reason === 'failed' || reason === 'blocked' ? 'error' : 'stop'),
+      {
+        type: 'data-runtime-event',
+        data: {
+          kind: 'kimi.turn.ended',
+          turnId: input.turnId ?? null,
+          reason: input.reason,
+          interruptReason: input.interruptReason ?? null,
+          durationMs: input.durationMs ?? null,
+          error: input.error ?? null,
+        },
+      },
+      providerChunk.finish(finishReason),
     ]
   }
 

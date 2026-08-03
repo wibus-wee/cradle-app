@@ -3,7 +3,12 @@ import { createIpcProxy } from '@cradle/ipc/client'
 import type { SurfaceRoute } from '~/navigation/surface-identity'
 
 import { cradleFetch } from './server-credential'
-import { getConfiguredServerUrl } from './server-endpoint-preferences'
+import {
+  getRendererServerUrl,
+  getServerNetworkUrl as getTransportServerNetworkUrl,
+  isCradleServerLocalUrl,
+  isCustomSchemeProxyMode,
+} from './server-transport/base-url'
 
 /**
  * Whether we're running inside Electron.
@@ -19,26 +24,40 @@ export function isLocalMode(): boolean {
   if (!isElectron) {
     return false
   }
-  const serverUrl = getServerUrl()
+  // Use the network/loopback URL — never the cradle-server custom scheme.
+  const serverUrl = getServerNetworkUrl()
   return serverUrl.startsWith('http://127.0.0.1') || serverUrl.startsWith('http://localhost')
 }
 
 /**
- * The server URL — from renderer-local override, Electron preload, or Vite env.
+ * Renderer-facing Server base URL (`cradle-server://local` when Main proxies).
  * WARNING: Unless you need to bypass api-gen's react-query integration, do not use this client directly.
+ * For native WebSocket (PTY, /sync), use `getServerNetworkUrl()` instead.
  */
 export function getServerUrl(): string {
-  return getConfiguredServerUrl()
+  return getRendererServerUrl()
 }
 
 /**
- * Build a WebSocket URL from the configured server base URL.
+ * Loopback/network Server URL from Desktop status.`serverUrl`.
+ * Always HTTP(S) — never `cradle-server:`. Use for native WebSocket.
+ */
+export function getServerNetworkUrl(): string {
+  return getTransportServerNetworkUrl()
+}
+
+/**
+ * Build a WebSocket URL from the network Server base (never cradle-server).
  */
 export function getServerWebSocketUrl(
   path: string,
   query?: Record<string, string | number | boolean | null | undefined>,
 ): string {
-  const url = new URL(path, getServerUrl())
+  const networkBase = getServerNetworkUrl()
+  if (isCradleServerLocalUrl(networkBase)) {
+    throw new Error('WebSocket cannot use cradle-server://; getServerNetworkUrl() returned a custom scheme')
+  }
+  const url = new URL(path, networkBase)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
 
   if (query) {
@@ -57,6 +76,8 @@ export async function getAuthenticatedServerWebSocketUrl(
   path: string,
   query?: Record<string, string | number | boolean | null | undefined>,
 ): Promise<string> {
+  // Ticket minting goes through renderer fetch (custom scheme in proxy mode).
+  // The WebSocket URL itself always targets the network/loopback base.
   const response = await cradleFetch(new URL('/auth/websocket-ticket', getServerUrl()), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -69,7 +90,15 @@ export async function getAuthenticatedServerWebSocketUrl(
   return getServerWebSocketUrl(path, { ...query, ticket: payload.ticket })
 }
 
+/**
+ * @deprecated Prefer `openServerEventSource` (fetch-backed SSE via cradleFetch).
+ * Kept for residual HTTP ticket flows until all call sites migrate.
+ */
 export async function getAuthenticatedEventSourceUrl(url: string): Promise<string> {
+  // Custom-scheme proxy mode: Main injects credentials; tickets are unnecessary.
+  if (isCustomSchemeProxyMode()) {
+    return new URL(url, getServerUrl()).toString()
+  }
   const target = new URL(url, getServerUrl())
   const audience = `sse:${target.pathname}`
   const response = await cradleFetch(new URL('/auth/websocket-ticket', getServerUrl()), {

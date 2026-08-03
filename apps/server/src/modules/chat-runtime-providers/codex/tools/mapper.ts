@@ -37,6 +37,8 @@ export interface CodexAppServerItem {
   error?: McpToolCallError | null
   mcpAppResourceUri?: string
   pluginId?: string | null
+  /** Safe plugin-relative path when a commandExecution resolves to one plugin script. */
+  scriptPath?: string | null
   namespace?: string | null
   success?: boolean | null
   contentItems?: Array<{ type: string, text?: string, imageUrl?: string }> | null
@@ -401,6 +403,8 @@ function projectCodexCommandExecutionArgs(item: CodexAppServerItem, bufferedComm
   source?: CommandExecutionSource
   status?: string
   commandActions?: CommandAction[]
+  pluginId?: string | null
+  scriptPath?: string | null
 } {
   return {
     command: item.command ?? bufferedCommand ?? '',
@@ -409,6 +413,8 @@ function projectCodexCommandExecutionArgs(item: CodexAppServerItem, bufferedComm
     ...(item.source === undefined ? {} : { source: item.source }),
     ...(item.status === undefined ? {} : { status: item.status }),
     ...(item.commandActions === undefined ? {} : { commandActions: item.commandActions }),
+    ...(item.pluginId === undefined ? {} : { pluginId: item.pluginId }),
+    ...(item.scriptPath === undefined ? {} : { scriptPath: item.scriptPath }),
   }
 }
 

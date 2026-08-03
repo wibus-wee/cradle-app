@@ -403,6 +403,14 @@ export interface ChatRuntimeFilesystemUiSlotState {
   updatedAt: number
 }
 
+export interface ChatRuntimeSkillsUiSlotItem {
+  name: string
+  enabled: boolean
+  displayName: string | null
+  iconUrl: string | null
+  brandColor: string | null
+}
+
 export interface ChatRuntimeSkillsUiSlotState {
   kind: 'skills'
   slotId: string
@@ -411,6 +419,7 @@ export interface ChatRuntimeSkillsUiSlotState {
   disabledCount: number
   errorCount: number
   roots: string[]
+  items?: ChatRuntimeSkillsUiSlotItem[]
   updatedAt: number
 }
 

@@ -5,6 +5,7 @@ import { toastManager } from '~/components/ui/toast'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import { chatSurfaceId } from '~/navigation/surface-identity'
 import { useBrowserPanelStore } from '~/store/browser-panel'
+import { useChatStore } from '~/store/chat'
 import type { ComposerDraft } from '~/store/composer-draft'
 
 import type { PlanRefineEditorSaveDetail } from '../../browser/plan-refine-editor'
@@ -13,7 +14,9 @@ import type {
   ChatRuntimeGoalUiSlotState,
   ChatRuntimePlanUiSlotState,
 } from '../capabilities/chat-capabilities'
+import { annotateBangCommandMessage, annotateBangResultMessage } from '../commands/bang-command-metadata'
 import type { ChatQueueEnqueueBody, ChatQueueItem } from '../commands/chat-response-command'
+import { persistBangTranscript } from '../commands/chat-response-command'
 import type {
   ComposerSlashCommandActionContext,
   ComposerSlashCommandActionResult,
@@ -30,6 +33,7 @@ import type {
   ComposerUsageSlotActions,
 } from '../composer/composer-slot-states'
 import { ComposerSlotStates } from '../composer/composer-slot-states'
+import { ComposerBangPtyContainer } from '../composer/containers/composer-bang-pty-container'
 import type { ComposerDecoration, ComposerRuntimeSettingsController } from '../composer/containers/composer-container'
 import { Composer } from '../composer/containers/composer-container'
 import type { ChatComposerRuntime } from '../composer/use-chat-composer-runtime'
@@ -76,6 +80,7 @@ function readPlanSlotContent(state: ChatRuntimePlanUiSlotState): string {
 
 export function ChatComposerSection({
   sessionId,
+  workspacePath = null,
   runtimeKind = null,
   awaitSummary,
   queueItems,
@@ -109,6 +114,8 @@ export function ChatComposerSection({
   contextIngress,
 }: {
   sessionId: string | null
+  /** Absolute local workspace path; required for Composer bang PTY. */
+  workspacePath?: string | null
   runtimeKind?: RuntimeKind | null
   awaitSummary: Awaited<ReturnType<typeof useSessionAwaitSummary>['data']>
   queueItems: ChatQueueItem[]
@@ -168,8 +175,11 @@ export function ChatComposerSection({
   const [dismissPlanSignal, setDismissPlanSignal] = useState(0)
   const [composerHasDraft, setComposerHasDraft] = useState(false)
   const [activePlanRefineTabId, setActivePlanRefineTabId] = useState<string | null>(null)
+  const [bangPtyOpen, setBangPtyOpen] = useState(false)
+  const bangPtyActionsRef = useRef<import('../composer/containers/composer-bang-pty-container').ComposerBangPtyActions | null>(null)
   const editingQueueItemIdRef = useRef<string | null>(null)
   const [editingQueueItemId, setEditingQueueItemId] = useState<string | null>(null)
+  const bangPtyEnabled = Boolean(sessionId && workspacePath)
   const pendingComposerInsert = useComposerInsertStore(
     state => sessionId ? state.requests[sessionId]?.[0] ?? null : null,
   )
@@ -245,8 +255,14 @@ export function ChatComposerSection({
   )
 
   const handleComposerDraftChange = useCallback((value: string) => {
-    setComposerHasDraft(Boolean(value.trim()))
-  }, [])
+    setComposerHasDraft(Boolean(value.trim()) || bangPtyOpen)
+  }, [bangPtyOpen])
+
+  useEffect(() => {
+    if (bangPtyOpen) {
+      setComposerHasDraft(true)
+    }
+  }, [bangPtyOpen])
 
   const handleEditQueueItem = useCallback(
     (item: ChatQueueItem) => {
@@ -419,6 +435,48 @@ export function ChatComposerSection({
     submitComposerMessage,
   ])
 
+  useEffect(() => {
+    setBangPtyOpen(false)
+  }, [sessionId])
+
+  const handleBangPtyPersisted = useCallback((result: import('../commands/chat-response-command').BangCommandResult) => {
+    if (!sessionId) {
+      return
+    }
+    const store = useChatStore.getState()
+    const latestMessages = store.messagesMap.get(sessionId) ?? []
+    const userMessage = annotateBangCommandMessage(result.userMessage, result.command)
+    const resultMessage = annotateBangResultMessage(result.resultMessage, {
+      command: result.command,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+      durationMs: result.durationMs,
+      timedOut: result.timedOut,
+      truncated: result.truncated,
+    })
+    if (!latestMessages.some(message => message.id === userMessage.id)) {
+      store.appendMessage(sessionId, userMessage)
+    }
+    if (!latestMessages.some(message => message.id === resultMessage.id)) {
+      store.appendMessage(sessionId, resultMessage)
+    }
+  }, [sessionId])
+
+  const bangPtySurface = bangPtyEnabled && sessionId && workspacePath
+    ? (
+        <ComposerBangPtyContainer
+          sessionId={sessionId}
+          workspacePath={workspacePath}
+          open={bangPtyOpen}
+          onClose={() => setBangPtyOpen(false)}
+          onPersisted={handleBangPtyPersisted}
+          persistTranscript={persistBangTranscript}
+          actionsRef={bangPtyActionsRef}
+        />
+      )
+    : null
+
   return (
     <div className="pointer-events-auto mx-auto w-full max-w-208 bg-transparent">
       <ChatAwaitBanner awaitSummary={awaitSummary} />
@@ -471,6 +529,16 @@ export function ChatComposerSection({
           slots={{
             toolbar,
             contextBar,
+            bangPty: bangPtyEnabled
+              ? {
+                  enabled: true,
+                  active: bangPtyOpen,
+                  surface: bangPtySurface,
+                  onEnter: () => setBangPtyOpen(true),
+                  onWriteBack: () => bangPtyActionsRef.current?.writeBack(),
+                  onDiscard: () => bangPtyActionsRef.current?.discard(),
+                }
+              : undefined,
           }}
           externalSignals={{
             appendText: shouldAppendComment ? composerAppendText : (droppedPath ? `${droppedPath.text}` : undefined),

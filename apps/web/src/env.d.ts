@@ -15,11 +15,32 @@ interface ImportMeta {
   readonly env: ImportMetaEnv
 }
 
+type DesktopServerConnectionProjection
+  = | {
+    kind: 'owned-proxy'
+    serverUrl: string
+    rendererBaseUrl: 'cradle-server://local' | string
+    generation?: number
+    mainProxyTarget?: string
+  }
+  | {
+    kind: 'attached-http'
+    serverUrl: string
+    rendererBaseUrl: 'cradle-server://local' | string
+    mainProxyTarget?: string
+  }
+
 type DesktopServerStatus
   = | { state: 'starting' }
     | { state: 'migrating', phase: string }
     | { state: 'bootstrapping', bootstrap: DesktopServerBootstrapSnapshot }
-    | { state: 'ready', serverUrl: string, bootstrap: DesktopServerBootstrapSnapshot }
+    | {
+      state: 'ready'
+      serverUrl: string
+      bootstrap: DesktopServerBootstrapSnapshot
+      /** Absent on older Desktop builds — Web falls back to HTTP(S) serverUrl. */
+      connection?: DesktopServerConnectionProjection
+    }
     | { state: 'failed', message: string, bootstrap: DesktopServerBootstrapSnapshot | null }
 
 type DesktopServerBootstrapSnapshot = {

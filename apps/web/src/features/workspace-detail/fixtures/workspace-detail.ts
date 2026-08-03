@@ -18,6 +18,7 @@ export const localWorkspaceDetailFixture = {
   },
   identifier: 'local:/Users/demo/Projects/cradle-app',
   availability: 'available',
+  multiFolder: false,
   pinned: 1,
   createdAt: 1_784_800_000,
   updatedAt: 1_784_865_000,
@@ -34,6 +35,7 @@ export const remoteWorkspaceDetailFixture = {
   },
   identifier: 'studio-mac:/Volumes/Projects/product-docs',
   availability: 'remote',
+  multiFolder: false,
 } satisfies Workspace
 
 export const workspaceAgentsFixture = `# Working Agreement

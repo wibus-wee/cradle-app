@@ -31,5 +31,6 @@ export const CODEX_RUNTIME_CAPABILITIES = {
   supportsUiSlotStates: true,
   supportsDynamicCapabilities: false,
   supportsTitleGeneration: true,
+  supportsNativeReview: true,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities

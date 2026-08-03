@@ -51,3 +51,15 @@ Kimi exposes terminal metadata and close operations, which Cradle supports throu
 The Usage module now owns canonical cross-runtime P50/P95 time-to-first-token and total-run duration, derived from completed run snapshots. Kimi participates through the same runtime-neutral run events as other providers.
 
 Kimi transcript steps additionally expose request-build, server-decode, stream-duration, and client-consume timing fields. Those detailed phases remain native transcript facts until Cradle defines a shared phase taxonomy; they should not be projected into misleading Kimi-only Usage metrics.
+
+## PR #106 / Kimi 0.31.1 protocol deltas
+
+| Native fact | Class | Notes |
+|---|---|---|
+| `turn.ended.interruptReason` | **Projected** | Emitted as `data-runtime-event` (`kimi.turn.ended`) and influences finishReason for max_steps/error/filtered/blocked. |
+| OAuth usage `name` / `reset_at` / `window` | **Projected** | `kimi:usage` slot reads `/api/v1/oauth/usage` (legacy `label`/`reset_hint` still accepted). |
+| `/api/v1/oauth/userinfo` | Follow up | Can enrich account identity later; not required for usage slot. |
+| `secondary_model` config | Follow up | Needs product meaning vs draft/effort models before a settings contract. |
+| `/api/v1/search`, `/api/v1/workspace/fs:search` | Follow up | Needs a shared runtime reference/search kit (also noted in OpenCode GAP). |
+| workspace `trust` / `untrust` | Leave native / Follow up | Ownership clash with Cradle workspace trust; do not dual-write. |
+| `/api/v1/fs:mkdir` | Leave native | Writes stay on agent tools or Cradle workspace FS. |
