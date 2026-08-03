@@ -18,6 +18,7 @@ import { Divider, HStack, Stack, Text } from './components/stack'
 import { Table } from './components/table'
 
 export type { ArtifactActionContextValue } from './action-context'
+export { ARTIFACT_THEME_STYLE } from './theme'
 export { ArtifactActionProvider, useArtifactAction } from './action-context'
 export type { ActionButtonProps } from './components/action-button'
 export { ActionButton } from './components/action-button'

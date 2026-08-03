@@ -13,15 +13,15 @@ export interface SectionProps {
 
 export function Section({ title, description, children, className, flush }: SectionProps) {
   return (
-    <section className={cn(flush ? 'py-3' : 'border-b border-border py-3', className)}>
+    <section className={cn(flush ? 'py-3' : 'border-b border-[var(--color-border-content)] py-3', className)}>
       {(title || description)
         ? (
           <div className="mb-2">
             {title
-              ? <h2 className="text-[13px] font-medium text-foreground">{title}</h2>
+              ? <h2 className="text-[13px] font-medium text-[var(--text-primary)]">{title}</h2>
               : null}
             {description
-              ? <p className="mt-0.5 text-[12px] leading-4 text-text-secondary">{description}</p>
+              ? <p className="mt-0.5 text-[12px] leading-4 text-[var(--text-secondary)]">{description}</p>
               : null}
           </div>
         )

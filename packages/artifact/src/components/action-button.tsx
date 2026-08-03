@@ -37,14 +37,14 @@ export function ActionButton({
         action.runPrompt(prompt.trim())
       }}
       className={cn(
-        'inline-flex h-8 items-center justify-center rounded-md px-3 text-[12px] font-medium transition-colors duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
-        'disabled:pointer-events-none disabled:opacity-50',
-        'active:scale-[0.98]',
+        'inline-flex h-8 items-center justify-center rounded-[var(--radius-md)] px-3 text-[12px] font-medium',
+        'transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-standard)]',
+        'focus-visible:outline-none focus-visible:shadow-[var(--shadow-inset-ring)]',
+        'disabled:pointer-events-none disabled:text-[var(--text-dim)]',
         {
-          'bg-foreground text-background hover:bg-foreground/90': variant === 'primary',
-          'border border-border bg-background hover:bg-muted': variant === 'secondary',
-          'text-text-secondary hover:bg-muted hover:text-foreground': variant === 'ghost',
+          'bg-[var(--color-neutral-9)] text-[var(--color-neutral-1)] hover:bg-[var(--color-neutral-8)]': variant === 'primary',
+          'bg-[var(--color-surface)] text-[var(--text-primary)] shadow-[var(--shadow-xs)] hover:bg-[var(--color-fill)]': variant === 'secondary',
+          'text-[var(--text-secondary)] hover:bg-[var(--color-fill)] hover:text-[var(--text-primary)]': variant === 'ghost',
         },
         className,
       )}

@@ -24,22 +24,22 @@ export function Table<T extends Record<string, unknown> = Record<string, unknown
 }: TableProps<T>) {
   if (rows.length === 0) {
     return (
-      <div className={cn('rounded-md border border-border/70 px-3 py-4 text-[12px] text-text-tertiary', className)}>
+      <div className={cn('rounded-[var(--radius-lg)] px-3 py-4 text-[12px] text-[var(--text-tertiary)] shadow-[var(--shadow-inset-ring)]', className)}>
         {emptyMessage}
       </div>
     )
   }
 
   return (
-    <div className={cn('overflow-x-auto rounded-md border border-border/70', className)}>
+    <div className={cn('overflow-x-auto rounded-[var(--radius-lg)] shadow-[var(--shadow-inset-ring)]', className)}>
       <table className="w-full border-collapse text-left text-[12px]">
         <thead>
-          <tr className="border-b border-border/70 bg-muted/40">
+          <tr className="border-b border-[var(--color-border-content)] bg-[var(--color-fill)]">
             {columns.map(column => (
               <th
                 key={column.key}
                 className={cn(
-                  'px-3 py-2 font-medium text-text-secondary',
+                  'px-3 py-2 font-medium text-[var(--text-secondary)]',
                   column.align === 'right' && 'text-right',
                 )}
               >
@@ -48,16 +48,16 @@ export function Table<T extends Record<string, unknown> = Record<string, unknown
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-border/60">
+        <tbody className="divide-y divide-[var(--color-border-content)]">
           {rows.map((row) => {
             const rowKey = columns.map(column => String(row[column.key] ?? '')).join('|') || JSON.stringify(row)
             return (
-              <tr key={rowKey} className="hover:bg-muted/30">
+              <tr key={rowKey} className="transition-colors duration-[var(--duration-quick)] ease-[var(--ease-standard)] hover:bg-[var(--color-fill)]">
                 {columns.map(column => (
                   <td
                     key={column.key}
                     className={cn(
-                      'px-3 py-2 tabular-nums text-foreground',
+                      'px-3 py-2 tabular-nums text-[var(--text-primary)]',
                       column.align === 'right' && 'text-right',
                     )}
                   >
@@ -77,7 +77,7 @@ export function Table<T extends Record<string, unknown> = Record<string, unknown
 
 function formatCell(value: unknown): ReactNode {
   if (value == null) {
-    return <span className="text-text-dim">—</span>
+    return <span className="text-[var(--text-dim)]">—</span>
   }
   if (typeof value === 'boolean') {
     return value ? 'Yes' : 'No'

@@ -12,26 +12,26 @@ export interface HeaderProps {
 
 export function Header({ eyebrow, title, summary, meta, className }: HeaderProps) {
   return (
-    <header className={cn('border-b border-border pb-3', className)}>
+    <header className={cn('border-b border-[var(--color-border-content)] pb-3', className)}>
       {(eyebrow || meta)
         ? (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-text-tertiary">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--text-tertiary)]">
             {eyebrow ? <span>{eyebrow}</span> : null}
             {eyebrow && meta
-              ? <span className="size-1 rounded-full bg-border" aria-hidden="true" />
+              ? <span className="size-1 rounded-full bg-[var(--color-border-content)]" aria-hidden="true" />
               : null}
             {meta}
           </div>
         )
         : null}
       <div className={cn('flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1', eyebrow || meta ? 'mt-1' : undefined)}>
-        <h1 className="min-w-0 text-balance text-[17px] font-semibold leading-6 text-foreground">
+        <h1 className="min-w-0 text-balance text-[17px] font-semibold leading-6 text-[var(--text-primary)]">
           {title}
         </h1>
       </div>
       {summary
         ? (
-          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-text-secondary">
+          <p className="mt-2 max-w-2xl text-[13px] leading-5 text-[var(--text-secondary)]">
             {summary}
           </p>
         )

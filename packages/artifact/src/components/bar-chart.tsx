@@ -25,11 +25,11 @@ export function BarChart({ items, className, height = 120 }: BarChartProps) {
           const ratio = max > 0 ? item.value / max : 0
           return (
             <div key={item.label} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
-              <span className="text-[10px] tabular-nums text-text-tertiary">
+              <span className="text-[10px] tabular-nums text-[var(--text-tertiary)]">
                 {item.value.toLocaleString('en-US')}
               </span>
               <div
-                className="w-full max-w-10 rounded-t-sm bg-blue-500/80"
+                className="w-full max-w-10 rounded-t-[var(--radius-sm)] bg-[var(--color-accent)]"
                 style={{ height: `${Math.max(4, ratio * (height - 28))}px` }}
                 title={`${item.label}: ${item.value}`}
               />
@@ -41,7 +41,7 @@ export function BarChart({ items, className, height = 120 }: BarChartProps) {
         {items.map(item => (
           <div
             key={`label:${item.label}`}
-            className="min-w-0 flex-1 truncate text-center text-[10px] text-text-tertiary"
+            className="min-w-0 flex-1 truncate text-center text-[10px] text-[var(--text-tertiary)]"
           >
             {item.label}
           </div>

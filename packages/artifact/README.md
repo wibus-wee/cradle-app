@@ -48,3 +48,15 @@ export default function ReviewBoard() {
 - Default-export a React component (or named `export default`).
 - Import only `cradle/artifact` and optionally `react`.
 - Do not import Cradle app modules, Electron, or network SDKs.
+
+## Design System contract
+
+The kit is rendered inside an `Artifact` root, which maps the host theme to Cradle's
+surface, text, status, accent, spacing, radius, shadow, and motion tokens. Components
+must use those semantic tokens instead of raw palette colors or app-specific classes.
+
+`SegmentedBar` uses semantic tones (`workspace`, `session`, `global`, `scope`, `agent`,
+`legacy`, `diff`, and `summary`) so visual meaning stays consistent with the host UI.
+
+The complete component gallery is available in Storybook at
+`Design System/Artifact Kit`.

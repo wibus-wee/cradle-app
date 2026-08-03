@@ -10,8 +10,8 @@ export interface StackProps {
 
 const GAP: Record<NonNullable<StackProps['gap']>, string> = {
   sm: 'gap-2',
-  md: 'gap-3',
-  lg: 'gap-4',
+  md: 'gap-4',
+  lg: 'gap-6',
 }
 
 export function Stack({ children, className, gap = 'md' }: StackProps) {
@@ -41,12 +41,12 @@ export function Text({
     <span
       className={cn(
         {
-          'text-foreground': tone === 'primary',
-          'text-text-secondary': tone === 'secondary',
-          'text-text-tertiary': tone === 'tertiary',
+          'text-[var(--text-primary)]': tone === 'primary',
+          'text-[var(--text-secondary)]': tone === 'secondary',
+          'text-[var(--text-tertiary)]': tone === 'tertiary',
           'text-[11px] leading-4': size === 'sm',
           'text-[13px] leading-5': size === 'md',
-          'text-[15px] leading-6': size === 'lg',
+          'text-[14px] leading-5': size === 'lg',
           'font-mono tabular-nums': mono,
         },
         className,
@@ -62,7 +62,7 @@ export interface DividerProps {
 }
 
 export function Divider({ className }: DividerProps) {
-  return <hr className={cn('border-0 border-t border-border', className)} />
+  return <hr className={cn('border-0 border-t border-[var(--color-border-content)]', className)} />
 }
 
 export interface HStackProps {
