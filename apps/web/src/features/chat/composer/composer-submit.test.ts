@@ -2,8 +2,8 @@ import type { FileUIPart } from 'ai'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { ComposerAction } from './composer-state'
-import type { PromptEditorController } from './prompt-editor'
 import { submitAndClearDraft } from './composer-submit'
+import type { PromptEditorController } from './prompt-editor'
 
 function createPromptEditor(initialText: string): PromptEditorController {
   let text = initialText
