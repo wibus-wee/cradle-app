@@ -1294,6 +1294,9 @@ function readToolTitle(
   if (kind === 'plan-implementation') {
     return 'Implement this plan?'
   }
+  if (kind === 'artifact') {
+    return 'Artifact'
+  }
 
   const description = input.description
   if (description) {
@@ -1363,6 +1366,10 @@ function readToolTarget(kind: ToolUiKind, input: ToolPayload, output: ToolPayloa
       return input.mode === 'plan' || output.mode === 'plan'
         ? 'plan'
         : output.filePath
+          ?? input.description
+          ?? null
+    case 'artifact':
+      return readArtifactTitle(input, output)
     case 'question': {
       const count = readQuestionCount(input, output)
       return count === null ? null : `${count} question${count === 1 ? '' : 's'}`
@@ -1404,6 +1411,8 @@ function readToolSummary(kind: ToolUiKind, input: ToolPayload, output: ToolPaylo
         : output.plan || output.text || input.plan || input.text || output.rawText
           ? 'Plan ready'
           : null
+    case 'artifact':
+      return readArtifactSummary(input, output)
     case 'question':
       return output.answers ? 'Answered' : null
     case 'mcp':
@@ -1413,6 +1422,59 @@ function readToolSummary(kind: ToolUiKind, input: ToolPayload, output: ToolPaylo
     case 'generic':
       return null
   }
+}
+
+function readArtifactTitle(input: ToolPayload, output: ToolPayload): string | null {
+  const fromOutput = readArtifactField(output.rawValue, 'title')
+  const fromInput = readArtifactField(input.rawValue, 'title')
+  return fromOutput ?? fromInput ?? input.description
+}
+
+function readArtifactSummary(input: ToolPayload, output: ToolPayload): string | null {
+  const revision = readArtifactNumberField(output.rawValue, 'revision')
+    ?? readArtifactNumberField(input.rawValue, 'revision')
+  if (revision === 1) {
+    return 'Artifact created'
+  }
+  if (revision != null && revision > 1) {
+    return `Artifact updated (rev ${revision})`
+  }
+  if (readArtifactField(output.rawValue, 'source') || readArtifactField(input.rawValue, 'source')) {
+    return 'Artifact ready'
+  }
+  return null
+}
+
+function readArtifactField(value: unknown, key: string): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (typeof value === 'string') {
+      try {
+        return readArtifactField(JSON.parse(value), key)
+      }
+      catch {
+        return null
+      }
+    }
+    return null
+  }
+  const field = (value as Record<string, unknown>)[key]
+  return typeof field === 'string' ? field : null
+}
+
+function readArtifactNumberField(value: unknown, key: string): number | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (typeof value === 'string') {
+      try {
+        return readArtifactNumberField(JSON.parse(value), key)
+      }
+      catch {
+        return null
+      }
+    }
+    return null
+  }
+  const field = (value as Record<string, unknown>)[key]
+  return typeof field === 'number' ? field : null
 }
 
 function readFirstLine(value: string | null): string | null {

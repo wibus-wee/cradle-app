@@ -28,6 +28,13 @@ describe('classifyCodexToolKind', () => {
     expect(classifyCodexToolKind('command_execution')).toBe('terminal')
     expect(classifyCodexToolKind('server/tool', 'mcpToolCall')).toBe('mcp')
   })
+
+  it('classifies write_artifact tool names as artifact', () => {
+    expect(classifyCodexToolKind('write_artifact')).toBe('artifact')
+    expect(classifyCodexToolKind('cradle/write_artifact')).toBe('artifact')
+    expect(classifyCodexToolKind('mcp__cradle__write_artifact')).toBe('artifact')
+    expect(classifyCodexToolKind('cradle/write_artifact', 'mcpToolCall')).toBe('artifact')
+  })
 })
 
 describe('buildCodexToolInput for commandExecution provenance', () => {

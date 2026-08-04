@@ -58,6 +58,8 @@ export function hasHeroContent(
         ?? output.rawText
         ?? input.rawText
       )
+    case 'artifact':
+      return hasArtifactHeroContent(input, output)
     case 'question':
       return output.answers !== null
     case 'mcp':
@@ -78,4 +80,42 @@ export function hasHeroContent(
         || output.text !== null
       )
   }
+}
+
+function hasArtifactHeroContent(input: ToolPayload, output: ToolPayload): boolean {
+  return Boolean(
+    readArtifactSource(output.rawValue)
+    || readArtifactSource(input.rawValue)
+    || output.rawText
+    || input.rawText,
+  )
+}
+
+function readArtifactSource(value: unknown): string | null {
+  if (!value) {
+    return null
+  }
+  if (typeof value === 'string') {
+    try {
+      return readArtifactSource(JSON.parse(value))
+    }
+    catch {
+      return null
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const block of value) {
+      if (block && typeof block === 'object' && 'text' in block && typeof (block as { text: unknown }).text === 'string') {
+        const nested = readArtifactSource((block as { text: string }).text)
+        if (nested) {
+          return nested
+        }
+      }
+    }
+    return null
+  }
+  if (typeof value === 'object' && 'source' in value && typeof (value as { source: unknown }).source === 'string') {
+    return (value as { source: string }).source
+  }
+  return null
 }

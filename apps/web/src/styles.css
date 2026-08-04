@@ -13,6 +13,7 @@
 }
 
 @source "../../../plugins/system-info/src/**/*.tsx";
+@source "../../../packages/artifact/src/**/*.{ts,tsx}";
 @import "@fontsource-variable/geist";
 @import "@cradle/streamdown/styles";
 

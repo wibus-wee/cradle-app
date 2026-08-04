@@ -7,6 +7,7 @@
 import type { Permission, ToolPart } from '@opencode-ai/sdk'
 
 import type { CradleToolKind } from '../../../chat-runtime/runtime-provider-types'
+import { isCradleWriteArtifactToolName } from '../../tools/artifact-tool'
 import {
   createBuiltinToolCallInputPayload,
   createBuiltinToolCallResultPayload,
@@ -40,6 +41,9 @@ const OPENCODE_MCP_TOOL_NAME_PATTERN = /^mcp[_:]/i
  * tools use stable lowercase names; MCP tools are prefixed with `mcp_` or `mcp:`.
  */
 export function classifyOpencodeToolKind(apiName: string): CradleToolKind {
+  if (isCradleWriteArtifactToolName(apiName)) {
+    return 'artifact'
+  }
   if (OPENCODE_MCP_TOOL_NAME_PATTERN.test(apiName)) {
     return 'mcp'
   }
