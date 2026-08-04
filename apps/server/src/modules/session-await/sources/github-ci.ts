@@ -654,17 +654,31 @@ export const githubCISource: SessionAwaitSource = {
         }
 
         const workspacePatterns = getMatchingBypassPatterns(row.workspaceId, `${target.owner}/${target.repo}`)
+        const hasBypassRules = perAwaitBypassed.length > 0 || workspacePatterns.length > 0
         let requiredContexts: string[]
-        try {
-          requiredContexts = target.baseBranch
-            ? (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))
-                ?.required_status_checks
-?.contexts ?? []
-            : []
+        if (!hasBypassRules || !target.baseBranch) {
+          requiredContexts = []
         }
-        catch {
-          results.push({ awaitId: row.id, matched: false, transientError: 'GitHub branch protection API unavailable' })
-          continue
+        else {
+          try {
+            requiredContexts = (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))
+              ?.required_status_checks
+?.contexts ?? []
+          }
+          catch (err) {
+            if (!(err instanceof GitHubApiError && err.status === 403)) {
+              results.push({ awaitId: row.id, matched: false, transientError: 'GitHub branch protection API unavailable' })
+              continue
+            }
+
+            // Branch protection is only needed to decide whether a bypass rule
+            // may remove a signal. If the connected GitHub App cannot read it,
+            // fail closed and keep every visible signal in the aggregate.
+            requiredContexts = [
+              ...aggregate.checkRuns.map(run => run.name),
+              ...aggregate.statuses.map(status => status.context),
+            ]
+          }
         }
         aggregate = filterBypassedCI(aggregate, perAwaitBypassed, workspacePatterns, new Set(requiredContexts))
 
