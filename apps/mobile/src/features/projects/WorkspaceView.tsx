@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder, GitBranch, MessageSquareText } from 'lucide-react-native'
+import { ChevronRight, File, Folder, GitBranch, Info, MessageSquareText } from 'lucide-react-native'
 import { useRef } from 'react'
 import { Keyboard, StyleSheet, View } from 'react-native'
 
@@ -9,6 +9,7 @@ import type {
   GetWorksResponse,
   PostWorksData,
 } from '@/api-gen'
+import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -35,7 +36,8 @@ export interface WorkspaceViewProps {
   isRefreshing?: boolean
   onCreate: (input: PostWorksData['body']) => void
   onOpenSession: (sessionId: string) => void
-  onOpenWork: (workId: string) => void
+  onOpenWork: (sessionId: string) => void
+  onOpenWorkInfo: (workId: string) => void
   onRefresh?: () => void
 }
 
@@ -56,6 +58,7 @@ export function WorkspaceView({
   onCreate,
   onOpenSession,
   onOpenWork,
+  onOpenWorkInfo,
   onRefresh,
 }: WorkspaceViewProps) {
   const theme = useTheme()
@@ -92,15 +95,23 @@ export function WorkspaceView({
             {works.map(work => (
               <Item
                 actions={(
-                  <StatusPill
-                    label={work.activity}
-                    tone={work.activity === 'running' ? 'success' : work.activity === 'blocked' ? 'danger' : 'neutral'}
-                  />
+                  <>
+                    <StatusPill
+                      label={work.activity}
+                      tone={work.activity === 'running' ? 'success' : work.activity === 'blocked' ? 'danger' : 'neutral'}
+                    />
+                    <IconButton
+                      accessibilityLabel={`Open info for ${work.title}`}
+                      icon={Info}
+                      onPress={() => onOpenWorkInfo(work.id)}
+                      stopPropagation
+                    />
+                  </>
                 )}
                 description={relativeTime(work.updatedAt)}
                 key={work.id}
                 media={<GitBranch color={theme.workspace} size={16} />}
-                onPress={() => onOpenWork(work.id)}
+                onPress={() => onOpenWork(work.primarySessionId)}
                 title={work.title}
                 variant="muted"
               />

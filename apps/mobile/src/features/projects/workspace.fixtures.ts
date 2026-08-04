@@ -34,4 +34,5 @@ export const workspaceFixture: WorkspaceViewProps = {
   onCreate: () => {},
   onOpenSession: () => {},
   onOpenWork: () => {},
+  onOpenWorkInfo: () => {},
 }

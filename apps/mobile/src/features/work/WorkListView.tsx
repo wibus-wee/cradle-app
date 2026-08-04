@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react-native'
 import { useRef } from 'react'
 import { Keyboard, StyleSheet, Text, View } from 'react-native'
 
@@ -5,6 +6,7 @@ import type { GetWorkspacesResponse, GetWorksResponse, PostWorksData } from '@/a
 import type { AppSection } from '@/components/common/app-menu-button'
 import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -27,7 +29,8 @@ export interface WorkListViewProps {
   isRefreshing?: boolean
   onCreate: (input: PostWorksData['body']) => void
   onNavigate: (section: AppSection) => void
-  onOpen: (workId: string) => void
+  onOpen: (sessionId: string) => void
+  onOpenInfo: (workId: string) => void
   onOpenUsage: () => void
   onRefresh?: () => void
 }
@@ -55,6 +58,7 @@ export function WorkListView({
   onCreate,
   onNavigate,
   onOpen,
+  onOpenInfo,
   onOpenUsage,
   onRefresh,
 }: WorkListViewProps) {
@@ -109,7 +113,15 @@ export function WorkListView({
                       )}
                       key={work.id}
                       media={<View style={[styles.workDot, { backgroundColor: activityTone(work.activity) === 'neutral' ? theme.dimForeground : activityTone(work.activity) === 'success' ? theme.success : activityTone(work.activity) === 'danger' ? theme.destructive : theme.warning }]} />}
-                      onPress={() => onOpen(work.id)}
+                      onPress={() => onOpen(work.primarySessionId)}
+                      actions={(
+                        <IconButton
+                          accessibilityLabel={`Open info for ${work.title}`}
+                          icon={Info}
+                          onPress={() => onOpenInfo(work.id)}
+                          stopPropagation
+                        />
+                      )}
                       title={work.title}
                     />
                   ))}

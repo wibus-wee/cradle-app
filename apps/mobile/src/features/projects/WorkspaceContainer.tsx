@@ -75,7 +75,8 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
         isRefreshing={isRefreshing}
         onCreate={input => create.mutate(input)}
         onOpenSession={sessionId => router.push(`/session/${sessionId}`)}
-        onOpenWork={workId => router.push(`/work/${workId}`)}
+        onOpenWork={sessionId => router.push(`/session/${sessionId}`)}
+        onOpenWorkInfo={workId => router.push(`/work/${workId}`)}
         onRefresh={() => void refresh()}
       />
     </>

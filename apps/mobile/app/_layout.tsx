@@ -50,7 +50,7 @@ export default function RootLayout() {
             <Stack.Screen name="connection/server" options={{ title: 'Server' }} />
             <Stack.Screen name="connection/token" options={{ title: 'Authentication' }} />
             <Stack.Screen name="workspace/[workspaceId]" options={{ title: 'Project' }} />
-            <Stack.Screen name="work/[workId]" options={{ title: 'Work' }} />
+            <Stack.Screen name="work/[workId]" options={{ presentation: 'modal', title: 'Work info' }} />
             <Stack.Screen name="session/[sessionId]" options={{ title: 'Conversation' }} />
             <Stack.Screen name="usage" options={{ title: 'Usage' }} />
             <Stack.Screen

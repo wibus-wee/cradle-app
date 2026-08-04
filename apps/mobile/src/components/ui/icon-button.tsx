@@ -9,6 +9,7 @@ interface IconButtonProps {
   accessibilityLabel: string
   icon: LucideIcon
   onPress: () => void
+  stopPropagation?: boolean
   tone?: 'default' | 'primary'
 }
 
@@ -16,6 +17,7 @@ export function IconButton({
   accessibilityLabel,
   icon: Icon,
   onPress,
+  stopPropagation = false,
   tone = 'default',
 }: IconButtonProps) {
   const theme = useTheme()
@@ -26,7 +28,12 @@ export function IconButton({
       accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       haptic
-      onPress={onPress}
+      onPress={event => {
+        if (stopPropagation) {
+          event.stopPropagation()
+        }
+        onPress()
+      }}
       style={[
         styles.button,
         {

@@ -42,12 +42,11 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
   if (query.error) { return <ErrorState title="Could not open Work" description={errorMessage(query.error)} /> }
   return (
     <>
-      <Stack.Screen options={{ title: 'Work' }} />
+      <Stack.Screen options={{ title: 'Work info' }} />
       <WorkDetailView
         detail={query.data}
         isPreparing={prepare.isPending}
         isSubmitting={submit.isPending}
-        onOpenChat={sessionId => router.push(`/session/${sessionId}`)}
         onOpenPullRequest={(owner, repo, number) => router.push(`/pull-request/${owner}/${repo}/${number}`)}
         onPrepare={handoff => prepare.mutate(handoff)}
         onSubmit={handoff => submit.mutate(handoff)}

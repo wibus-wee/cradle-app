@@ -1,4 +1,4 @@
-import { GitPullRequest, MessageSquareText } from 'lucide-react-native'
+import { GitPullRequest } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
@@ -23,7 +23,6 @@ export interface WorkDetailViewProps {
   detail: GetWorksByIdResponse
   isPreparing?: boolean
   isSubmitting?: boolean
-  onOpenChat: (sessionId: string) => void
   onOpenPullRequest: (owner: string, repo: string, number: number) => void
   onPrepare: (handoff: WorkHandoff) => void
   onSubmit: (handoff: WorkHandoff) => void
@@ -33,7 +32,6 @@ export function WorkDetailView({
   detail,
   isPreparing = false,
   isSubmitting = false,
-  onOpenChat,
   onOpenPullRequest,
   onPrepare,
   onSubmit,
@@ -57,12 +55,6 @@ export function WorkDetailView({
         <SectionHeading title="Objective" />
         <Text style={[styles.objectiveText, { color: theme.foreground }]}>{detail.work.objective}</Text>
       </View>
-
-      <Button
-        icon={MessageSquareText}
-        label={detail.primaryThread.status === 'streaming' ? 'Follow active conversation' : 'Continue conversation'}
-        onPress={() => onOpenChat(detail.primaryThread.id)}
-      />
 
       <View style={[styles.stats, { borderColor: theme.border }]}>
         <View style={styles.stat}>

@@ -50,7 +50,8 @@ export function WorkListContainer() {
       isRefreshing={isRefreshing}
       onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onCreate={input => create.mutate(input)}
-      onOpen={workId => router.push(`/work/${workId}`)}
+      onOpen={sessionId => router.push(`/session/${sessionId}`)}
+      onOpenInfo={workId => router.push(`/work/${workId}`)}
       onOpenUsage={() => router.push('/usage')}
       onRefresh={() => void refresh()}
       {...query.data}
