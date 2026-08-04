@@ -74,10 +74,17 @@ describe('providerTargetModelsQueryKey', () => {
     ])
   })
 
-  it('can scope provider target cache by workspace', () => {
+  it('reuses ordinary local provider target cache across workspaces', () => {
     expect(providerTargetModelsQueryKey({ kind: 'external', id: 'target-1' }, 'workspace-1')).toEqual([
       ...AGENT_MODELS_QUERY_KEY,
       'provider-target:target-1',
+    ])
+  })
+
+  it('scopes runtime-owned provider target cache by workspace', () => {
+    expect(providerTargetModelsQueryKey({ kind: 'external', id: 'runtime-native:opencode:test' }, 'workspace-1')).toEqual([
+      ...AGENT_MODELS_QUERY_KEY,
+      'provider-target:runtime-native:opencode:test',
       'workspace:workspace-1',
     ])
   })
@@ -153,6 +160,50 @@ describe('shouldLiveRefreshModelInventory', () => {
 })
 
 describe('useProviderTargetModelMap', () => {
+  it('uses the provider-target cache directly and keeps cached models out of loading state', async () => {
+    let rejectRefresh!: (reason: Error) => void
+    apiMocks.getModelsCache.mockResolvedValue({
+      data: {
+        models: [{
+          id: 'cached-model',
+          label: 'Cached Model',
+          providerKind: 'openai-compatible',
+          capabilities: {},
+        }],
+        cached: true,
+        stale: true,
+        coolingDown: false,
+        providerLabel: 'Provider 1',
+      },
+    })
+    apiMocks.postModels.mockReturnValue(new Promise((_, reject) => {
+      rejectRefresh = reject
+    }))
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    const target = {
+      id: 'provider-1',
+      kind: 'external' as const,
+      enabled: true,
+      name: 'Provider 1',
+      providerKind: 'openai-compatible' as const,
+      enabledModelsJson: '[]',
+    }
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children)
+
+    const { result } = renderHook(() => useProviderTargetModelMap([target], [target.id]), { wrapper })
+
+    await waitFor(() => expect(apiMocks.postModels).toHaveBeenCalledTimes(1))
+    expect(apiMocks.getModelSettings).not.toHaveBeenCalled()
+    expect(result.current.modelsByProviderTargetId[target.id]).toHaveLength(1)
+    expect(result.current.loadingProviderTargetIds.has(target.id)).toBe(false)
+
+    rejectRefresh(new Error('background refresh failed'))
+    await waitFor(() => expect(result.current.loadingProviderTargetIds.has(target.id)).toBe(false))
+  })
+
   it('settles the cache query before a background refresh and does not toast on refresh failure', async () => {
     let rejectRefresh!: (reason: Error) => void
     apiMocks.postModels.mockReturnValue(new Promise((_, reject) => {

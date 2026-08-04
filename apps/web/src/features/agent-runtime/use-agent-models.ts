@@ -33,15 +33,17 @@ export function agentModelsQueryKey(profileId: string | null) {
 }
 
 export function providerTargetModelsQueryKey(
-  target: ProviderTarget | null,
+  target: (ProviderTarget & { sourceKey?: string | null }) | null,
   workspaceId?: string | null,
   hostId?: string | null,
 ) {
   return [
     ...AGENT_MODELS_QUERY_KEY,
     target ? `provider-target:${target.id}` : 'no-provider-target',
-    ...(workspaceId ? [`workspace:${workspaceId}`] : []),
     ...(hostId ? [`host:${hostId}`] : []),
+    ...(workspaceId && (hostId || isRuntimeOwnedProviderTarget(target ?? { id: '' }))
+      ? [`workspace:${workspaceId}`]
+      : []),
   ] as const
 }
 
@@ -118,6 +120,7 @@ type ProviderTargetModelRequestTarget = ProviderTarget & {
   enabled: boolean
   name: string
   providerKind: ProviderKind
+  enabledModelsJson?: string
   sourceKey?: string | null
 }
 
@@ -208,16 +211,35 @@ async function readProviderTargetModelInventory(
   cache: z.infer<typeof ProviderTargetModelsCacheSchema>
 }> {
   const hostId = options?.hostId ?? null
+
+  const cachePromise = hostId
+    ? fetchRemoteUpstreamJson<z.infer<typeof ProviderTargetModelsCacheSchema>>(
+        hostId,
+        `/providers/targets/${encodeURIComponent(target.id)}/models-cache`,
+      )
+    : getProvidersTargetsByProviderTargetIdModelsCache({
+        path: { providerTargetId: target.id },
+        throwOnError: true,
+      }).then(result => result.data)
+
+  // Provider-target listings already carry the visibility config. Use the
+  // cache endpoint directly when it is available instead of waiting for the
+  // separate model-settings request to return.
+  if ('enabledModelsJson' in target && typeof target.enabledModelsJson === 'string') {
+    const visibility = ModelVisibilitySchema.parse(JSON.parse(target.enabledModelsJson))
+    return {
+      visibility,
+      cache: ProviderTargetModelsCacheSchema.parse(await cachePromise),
+    }
+  }
+
   if (hostId) {
     const [settings, cache] = await Promise.all([
       fetchRemoteUpstreamJson<{ configJson: string }>(
         hostId,
         `/provider-targets/${encodeURIComponent(target.id)}/model-settings`,
       ),
-      fetchRemoteUpstreamJson<z.infer<typeof ProviderTargetModelsCacheSchema>>(
-        hostId,
-        `/providers/targets/${encodeURIComponent(target.id)}/models-cache`,
-      ),
+      cachePromise,
     ])
     const parsedSettings = ProviderTargetModelSettingsSchema.parse(settings)
     const config = ProfileConfigJsonSchema.parse(parsedSettings.configJson)
@@ -232,10 +254,7 @@ async function readProviderTargetModelInventory(
       path: { providerTargetId: target.id },
       throwOnError: true,
     }),
-    getProvidersTargetsByProviderTargetIdModelsCache({
-      path: { providerTargetId: target.id },
-      throwOnError: true,
-    }),
+    cachePromise.then(data => ({ data })),
   ])
   const settings = ProviderTargetModelSettingsSchema.parse(settingsResult.data)
   const config = ProfileConfigJsonSchema.parse(settings.configJson)
@@ -636,7 +655,8 @@ export function useProviderTargetModelMap(
     modelsByProviderTargetId[target.id] = ModelDescriptorListSchema.parse(
       query?.data,
     ) satisfies ModelDescriptor[]
-    if (query?.isLoading || query?.isFetching || refreshingProviderTargetIds.has(target.id)) {
+    const hasModels = (query?.data?.length ?? 0) > 0
+    if (query?.isLoading || (refreshingProviderTargetIds.has(target.id) && !hasModels)) {
       loadingProviderTargetIds.add(target.id)
     }
     if (query?.isSuccess) {
