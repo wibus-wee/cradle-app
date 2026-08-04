@@ -100,7 +100,7 @@ export function ContextUsageDetailPanelView({
 
       {runtimeUsageState && (
         <div className="border-b border-border px-3 py-2">
-          <UsageSlotContent state={runtimeUsageState} className="text-[11px]" />
+          <UsageSlotContent state={runtimeUsageState} layout="stacked" className="text-[11px]" />
         </div>
       )}
 

@@ -11,10 +11,12 @@ export function UsageSlotContent({
   state,
   action,
   className,
+  layout = 'inline',
 }: {
   state: ChatRuntimeUsageUiSlotState
   action?: ReactNode
   className?: string
+  layout?: 'inline' | 'stacked'
 }) {
   const rows = readUsageRows(state)
   const toneClassName = readUsageToneClassName(state)
@@ -29,6 +31,7 @@ export function UsageSlotContent({
             key={row.key}
             row={row}
             title={index === 0 ? (state.rateLimitReachedType ? 'Usage limited' : 'Usage') : null}
+            layout={layout}
           />
         ))}
       </div>
@@ -44,26 +47,57 @@ interface UsageWindowRowState {
   resetLabel: string | null
 }
 
-function UsageWindowRow({ row, title }: { row: UsageWindowRowState, title: string | null }) {
-  return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(5rem,9rem)] items-center gap-2">
-      <div className="flex min-w-0 items-baseline gap-1.5">
-        {title && <span className="shrink-0 font-medium text-foreground/75">{title}</span>}
-        <span className="shrink-0 text-foreground/80">{row.label}</span>
-        <span className="shrink-0 font-mono tabular-nums text-foreground/80">
-          {formatRemainingPercent(row.remainingPercent)}
-        </span>
-        {row.resetLabel && (
-          <>
-            <span className="shrink-0 text-muted-foreground/70" aria-hidden="true">
-              ·
-            </span>
-            <span className="min-w-0 truncate text-muted-foreground">{row.resetLabel}</span>
-          </>
+function UsageWindowRow({
+  row,
+  title,
+  layout,
+}: {
+  row: UsageWindowRowState
+  title: string | null
+  layout: 'inline' | 'stacked'
+}) {
+  if (layout === 'stacked') {
+    return (
+      <div className="min-w-0 space-y-1">
+        <UsageWindowLabel row={row} title={title} />
+        {row.remainingPercent !== null && (
+          <Progress value={row.remainingPercent} className="h-1 min-w-0 bg-muted/60" />
         )}
       </div>
+    )
+  }
+
+  return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(5rem,9rem)] items-center gap-2">
+      <UsageWindowLabel row={row} title={title} />
       {row.remainingPercent !== null && (
         <Progress value={row.remainingPercent} className="h-0.5 min-w-0 bg-muted/60" />
+      )}
+    </div>
+  )
+}
+
+function UsageWindowLabel({
+  row,
+  title,
+}: {
+  row: UsageWindowRowState
+  title: string | null
+}) {
+  return (
+    <div className="flex min-w-0 items-baseline gap-1.5">
+      {title && <span className="shrink-0 font-medium text-foreground/75">{title}</span>}
+      <span className="shrink-0 text-foreground/80">{row.label}</span>
+      <span className="shrink-0 font-mono tabular-nums text-foreground/80">
+        {formatRemainingPercent(row.remainingPercent)}
+      </span>
+      {row.resetLabel && (
+        <>
+          <span className="shrink-0 text-muted-foreground/70" aria-hidden="true">
+            ·
+          </span>
+          <span className="min-w-0 truncate text-muted-foreground">{row.resetLabel}</span>
+        </>
       )}
     </div>
   )
