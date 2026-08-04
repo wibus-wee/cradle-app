@@ -12,7 +12,9 @@ import {
 } from '../../telemetry/metrics'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { getCodexAppServerResources } from '../chat-runtime-providers/codex/app-server/resources'
+import type { KimiServerResources } from '../chat-runtime-providers/kimi/resources'
 import { getKimiServerResources } from '../chat-runtime-providers/kimi/resources'
+import type { OpencodeServerResources } from '../chat-runtime-providers/opencode/runtime-context'
 import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/runtime-context'
 import { getDaemonResources } from '../chronicle/daemon-manager'
 import * as Health from '../health/service'
@@ -29,6 +31,23 @@ function toMB(bytes: number): number {
 
 function incrementBucket(buckets: Record<string, number>, key: string, amount = 1): void {
   buckets[key] = (buckets[key] ?? 0) + amount
+}
+
+function summarizeOpencodeServerResources(resources: OpencodeServerResources[]) {
+  const summary = summarizeRuntimeProcessResources(resources)
+  return {
+    ...summary,
+    url: resources[0]?.url ?? null,
+    startedAt: resources.length > 0 ? Math.min(...resources.map(resource => resource.startedAt ?? 0)) : null,
+    uptimeSeconds: resources.length > 0 ? Math.max(...resources.map(resource => resource.uptimeSeconds ?? 0)) : null,
+  }
+}
+
+function summarizeKimiServerResources(resources: KimiServerResources[]) {
+  return {
+    ...summarizeRuntimeProcessResources(resources),
+    url: resources[0]?.url ?? null,
+  }
 }
 
 function readActiveResourceCount(name: '_getActiveHandles' | '_getActiveRequests'): number {
@@ -348,8 +367,8 @@ export async function getRuntimeSnapshot() {
   const providerHosts = providerRuntimeHostManager.listHosts()
   const pty = await Pty.listResources()
   const chronicle = getDaemonResources()
-  const opencodeServer = getOpencodeServerResources()
-  const kimiServer = getKimiServerResources()
+  const opencodeServer = summarizeOpencodeServerResources(getOpencodeServerResources())
+  const kimiServer = summarizeKimiServerResources(getKimiServerResources())
   const codexAppServer = summarizeRuntimeProcessResources(getCodexAppServerResources())
   const observability = getQueueHealth()
   const desktop = {

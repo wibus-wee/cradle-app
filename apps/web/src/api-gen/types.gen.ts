@@ -25656,7 +25656,8 @@ export type GetOpencodeServerResourcesResponses = {
     /**
      * Response for status 200
      */
-    200: {
+    200: Array<{
+        hostId: string;
         running: boolean;
         pid: number | null;
         url: string | null;
@@ -25664,7 +25665,7 @@ export type GetOpencodeServerResourcesResponses = {
         uptimeSeconds: number | null;
         rssMB: number | null;
         cpuPercent: number | null;
-    };
+    }>;
 };
 
 export type GetOpencodeServerResourcesResponse = GetOpencodeServerResourcesResponses[keyof GetOpencodeServerResourcesResponses];
@@ -25680,13 +25681,16 @@ export type GetKimiServerResourcesResponses = {
     /**
      * Response for status 200
      */
-    200: {
+    200: Array<{
+        hostId: string;
+        providerTargetId: string;
+        scopeId: string;
         running: boolean;
         pid: number | null;
         rssMB: number | null;
         cpuPercent: number | null;
         url: string | null;
-    };
+    }>;
 };
 
 export type GetKimiServerResourcesResponse = GetKimiServerResourcesResponses[keyof GetKimiServerResourcesResponses];

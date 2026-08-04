@@ -9665,7 +9665,7 @@ export const postManagedResourcesByNamespaceByResourceTypeByResourceIdUpdateMuta
 export const getOpencodeServerResourcesQueryKey = (options?: Options<GetOpencodeServerResourcesData>) => createQueryKey('getOpencodeServerResources', options);
 
 /**
- * Get one active pooled opencode host process resource sample
+ * Get active pooled opencode host process resource samples
  */
 export const getOpencodeServerResourcesOptions = (options?: Options<GetOpencodeServerResourcesData>) => queryOptions<GetOpencodeServerResourcesResponse, DefaultError, GetOpencodeServerResourcesResponse, ReturnType<typeof getOpencodeServerResourcesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

@@ -77,6 +77,13 @@ describe('opencodeRuntimePool', () => {
 
     expect(startHost).toHaveBeenCalledTimes(3)
     expect(first.resource).toBe(second.resource)
+    const resources = pool.getResources()
+    expect(resources).toHaveLength(3)
+    expect(resources.map(resource => resource.url)).toEqual(expect.arrayContaining([
+      'http://opencode-a:/workspace/a:0',
+      'http://opencode-a:/workspace/b:1',
+      'http://opencode-b:/workspace/a:2',
+    ]))
     first.release()
     await vi.advanceTimersByTimeAsync(100)
     expect(hosts[0]?.close).not.toHaveBeenCalled()

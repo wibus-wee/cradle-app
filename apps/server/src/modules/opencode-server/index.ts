@@ -5,12 +5,13 @@ import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/r
 export const opencodeServer = new Elysia({ prefix: '/opencode' })
   .get('/server/resources', () => getOpencodeServerResources(), {
     detail: {
-      'summary': 'Get one active pooled opencode host process resource sample',
+      'summary': 'Get active pooled opencode host process resource samples',
       'tags': ['opencode'],
       'x-cradle-cli': { command: ['opencode', 'server', 'resources'] },
     },
     response: {
-      200: t.Object({
+      200: t.Array(t.Object({
+        hostId: t.String(),
         running: t.Boolean(),
         pid: t.Nullable(t.Number()),
         url: t.Nullable(t.String()),
@@ -18,6 +19,6 @@ export const opencodeServer = new Elysia({ prefix: '/opencode' })
         uptimeSeconds: t.Nullable(t.Number()),
         rssMB: t.Nullable(t.Number()),
         cpuPercent: t.Nullable(t.Number()),
-      }),
+      })),
     },
   })

@@ -7950,7 +7950,7 @@ export const postManagedResourcesByNamespaceByResourceTypeByResourceIdUpdate = <
 });
 
 /**
- * Get one active pooled opencode host process resource sample
+ * Get active pooled opencode host process resource samples
  */
 export const getOpencodeServerResources = <ThrowOnError extends boolean = false>(options?: Options<GetOpencodeServerResourcesData, ThrowOnError>) => (options?.client ?? client).get<GetOpencodeServerResourcesResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({
