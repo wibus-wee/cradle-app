@@ -5,7 +5,7 @@ const PACKAGE_NAME = 'MarkdownView'
 const PACKAGE_VERSION = '4.1.0'
 
 function withMarkdownView(config) {
-  return withXcodeProject(config, config => {
+  return withXcodeProject(config, (config) => {
     const project = config.modResults
     const objects = project.hash.project.objects
     const firstProject = project.getFirstProject().firstProject

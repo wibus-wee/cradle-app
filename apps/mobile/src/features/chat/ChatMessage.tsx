@@ -20,7 +20,7 @@ interface ChatMessageProps {
   status?: 'streaming' | 'complete' | 'aborted' | 'failed'
 }
 
-export const ChatMessage = memo(function ChatMessage({
+function ChatMessageContent({
   errorText = null,
   message,
   status = 'complete',
@@ -173,7 +173,9 @@ export const ChatMessage = memo(function ChatMessage({
       )}
     </View>
   )
-})
+}
+
+export const ChatMessage = memo(ChatMessageContent)
 
 const styles = StyleSheet.create({
   assistantMessage: {
