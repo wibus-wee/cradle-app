@@ -68,7 +68,11 @@ import { useComposerAttachments } from '../composer-attachment-state'
 import type { PendingAppshotAttachment } from '../composer-attachments'
 import { ComposerAttachmentInput, ComposerAttachmentList } from '../composer-attachments'
 import { composerReducer, INITIAL_COMPOSER_STATE } from '../composer-state'
-import type { ComposerSendHandler, ComposerSendResult } from '../composer-submit'
+import type {
+  ComposerSendHandler,
+  ComposerSendResult,
+  ComposerSubmitOutcome,
+} from '../composer-submit'
 import {
   isComposerSendPromise,
   readBangCommandDraft,
@@ -369,10 +373,27 @@ export function ComposerView({
   const handleAttachmentPaste = attachmentController.handlePaste
   const promptEditorRef = useRef<PromptEditorController>(null)
   const [pastedTexts, setPastedTexts] = useState<ComposerPastedText[]>([])
+  const preserveDraftOnPendingSubmitRef = useRef(false)
   const historyIndexRef = useRef<number | null>(null)
   const historyDraftRef = useRef<ComposerDraft | null>(null)
   const historyAppliedTextRef = useRef<string | null>(null)
   const actionTargetRef = useRef<HTMLDivElement>(null)
+  const handleSubmitResult = useCallback((outcome: ComposerSubmitOutcome) => {
+    preserveDraftOnPendingSubmitRef.current = false
+
+    if (!outcome.accepted && !outcome.restored) {
+      return
+    }
+
+    if (outcome.accepted && surfaceId) {
+      clearSyncedDraft()
+    }
+    if (outcome.accepted || outcome.restored) {
+      setPastedTexts([])
+      historyIndexRef.current = null
+      historyDraftRef.current = null
+    }
+  }, [clearSyncedDraft, surfaceId])
   const setActionTargetElement = useCallback(
     (element: HTMLDivElement | null) => {
       actionTargetRef.current = element
@@ -630,6 +651,7 @@ export function ComposerView({
         }
 
         dispatch({ type: 'slash/selected', inputValue: currentState.inputValue, command: null })
+        preserveDraftOnPendingSubmitRef.current = true
         submitAndClearDraft({
           appendFileParts: appendComposerFileParts,
           clearAttachments: clearComposerAttachments,
@@ -639,6 +661,7 @@ export function ComposerView({
           promptEditor: promptEditorRef.current,
           submit,
           text: submitText,
+          onResult: handleSubmitResult,
         })
         requestAnimationFrame(() => promptEditorRef.current?.focus())
         return
@@ -671,6 +694,7 @@ export function ComposerView({
       clearComposerAttachments,
       composerAttachments,
       disabled,
+      handleSubmitResult,
       isSending,
       onSlashCommandAction,
       sendDisabled,
@@ -731,6 +755,7 @@ export function ComposerView({
         }
       }
 
+      preserveDraftOnPendingSubmitRef.current = true
       submitAndClearDraft({
         appendFileParts: appendComposerFileParts,
         clearAttachments: clearComposerAttachments,
@@ -741,14 +766,8 @@ export function ComposerView({
         promptEditor: promptEditorRef.current,
         submit: submitHandler,
         text,
+        onResult: handleSubmitResult,
       })
-      // Clear persisted draft on send
-      if (surfaceId) {
-        clearSyncedDraft()
-      }
-      setPastedTexts([])
-      historyIndexRef.current = null
-      historyDraftRef.current = null
     },
     [
       allowEmptySend,
@@ -764,9 +783,8 @@ export function ComposerView({
       sendBlocked,
       sendDisabled,
       submit,
-      clearSyncedDraft,
+      handleSubmitResult,
       pastedTexts,
-      surfaceId,
     ],
   )
 
@@ -998,7 +1016,7 @@ export function ComposerView({
   useEffect(() => {
     onDraftChange?.(state.inputValue)
     onDraftPartsChange?.(state.inputValue, state.contextParts)
-    if (!suspendDraftPersistence) {
+    if (!suspendDraftPersistence && !preserveDraftOnPendingSubmitRef.current) {
       handleDraftPartsChange(state.inputValue, state.contextParts, composerAttachments, pastedTexts)
     }
   }, [

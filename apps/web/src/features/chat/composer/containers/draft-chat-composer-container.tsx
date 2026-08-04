@@ -382,7 +382,7 @@ function DraftChatComposerContent({
           contextParts,
           submitOptions,
         ))
-      .then(() => true)
+      .then(result => result !== false)
       .finally(() => {
         setSending(false)
       })

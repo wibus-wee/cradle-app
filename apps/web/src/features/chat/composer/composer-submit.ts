@@ -11,6 +11,11 @@ import type { PromptEditorController } from './prompt-editor'
 
 export type ComposerSendResult = SendMessageResult | boolean
 
+export interface ComposerSubmitOutcome {
+  accepted: boolean
+  restored: boolean
+}
+
 export type ComposerSendHandler = (
   text: string,
   files: FileUIPart[],
@@ -94,6 +99,7 @@ export function submitAndClearDraft({
   promptEditor,
   submit,
   text,
+  onResult,
 }: {
   appendFileParts: (fileParts: FileUIPart[]) => void
   clearAttachments: () => void
@@ -104,6 +110,7 @@ export function submitAndClearDraft({
   promptEditor: PromptEditorController | null
   submit: ComposerSendHandler
   text: string
+  onResult?: (outcome: ComposerSubmitOutcome) => void
 }) {
   let result: ComposerSendResult | Promise<ComposerSendResult>
   try {
@@ -113,27 +120,33 @@ export function submitAndClearDraft({
   }
   catch (error) {
     reportComposerSubmitError(error)
+    onResult?.({ accepted: false, restored: false })
     return
   }
 
   if (result === false) {
+    onResult?.({ accepted: false, restored: false })
     return
   }
 
   clearSubmittedDraft({ clearAttachments, dispatch, promptEditor })
-
-  if (isComposerSendPromise(result)) {
-    void result
-      .then((resolved) => {
-        if (resolved === false) {
-          restoreSubmittedDraft({ appendFileParts, contextParts, dispatch, files, promptEditor, text })
-        }
-      })
-      .catch((error) => {
-        reportComposerSubmitError(error)
-        restoreSubmittedDraft({ appendFileParts, contextParts, dispatch, files, promptEditor, text })
-      })
+  if (!isComposerSendPromise(result)) {
+    onResult?.({ accepted: true, restored: false })
+    return
   }
+
+  void result
+    .then((resolved) => {
+      if (resolved === false) {
+        restoreSubmittedDraft({ appendFileParts, contextParts, dispatch, files, promptEditor, text })
+      }
+      onResult?.({ accepted: resolved !== false, restored: resolved === false })
+    })
+    .catch((error) => {
+      reportComposerSubmitError(error)
+      restoreSubmittedDraft({ appendFileParts, contextParts, dispatch, files, promptEditor, text })
+      onResult?.({ accepted: false, restored: true })
+    })
 }
 
 export function readBangCommandDraft(text: string): string | null {
