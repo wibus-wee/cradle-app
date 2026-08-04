@@ -28,6 +28,7 @@
     "expo-glass-effect": "~57.0.1",
     "expo-haptics": "~57.0.1",
     "expo-linking": "~57.0.3",
+    "expo-modules-core": "57.0.8",
     "expo-router": "~57.0.8",
     "expo-secure-store": "~57.0.1",
     "expo-status-bar": "~57.0.1",

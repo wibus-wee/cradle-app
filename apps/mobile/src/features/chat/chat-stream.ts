@@ -25,6 +25,8 @@ interface ConsumeChatMessageStreamOptions {
   response: Response
 }
 
+const STREAM_RENDER_INTERVAL_MS = 50
+
 export async function consumeChatMessageStream({
   messageId,
   onMessage,
@@ -39,6 +41,7 @@ export async function consumeChatMessageStream({
     state: createUIMessageStreamState(),
   }
   const reader = createUIMessageChunkStream(response).getReader()
+  const renderUpdates = createStreamMessageEmitter(target, onMessage)
 
   try {
     while (true) {
@@ -55,14 +58,59 @@ export async function consumeChatMessageStream({
       if (chunk.type === 'tool-input-delta') {
         await flushUIMessageStreamToolInputs(target)
       }
-      onMessage(structuredClone(target.message))
+      renderUpdates.request()
     }
     finalizeUIMessageStreamState(target)
-    onMessage(structuredClone(target.message))
+    renderUpdates.flush()
   }
   finally {
+    renderUpdates.cancel()
     reader.releaseLock()
   }
+}
+
+function createStreamMessageEmitter(
+  target: UIMessageStreamTarget,
+  onMessage: (message: UIMessage) => void,
+) {
+  let lastEmittedAt = 0
+  let pending = false
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  const flush = () => {
+    if (timer !== null) {
+      clearTimeout(timer)
+      timer = null
+    }
+    if (!pending) {
+      return
+    }
+    pending = false
+    lastEmittedAt = Date.now()
+    onMessage(structuredClone(target.message))
+  }
+
+  const cancel = () => {
+    if (timer !== null) {
+      clearTimeout(timer)
+      timer = null
+    }
+    pending = false
+  }
+
+  const request = () => {
+    pending = true
+    const remaining = STREAM_RENDER_INTERVAL_MS - (Date.now() - lastEmittedAt)
+    if (remaining <= 0) {
+      flush()
+      return
+    }
+    if (timer === null) {
+      timer = setTimeout(flush, remaining)
+    }
+  }
+
+  return { cancel, flush, request }
 }
 
 export function createUIMessageChunkStream(response: Response): ReadableStream<UIMessageChunk> {

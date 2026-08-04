@@ -46,3 +46,11 @@ Settings.
 - `src/api-gen/` is generated from the authoritative server OpenAPI document.
 - Access tokens are stored in the platform keychain through Expo SecureStore
   on iOS and Android, and in browser storage on Web.
+
+## iOS Markdown rendering
+
+Assistant Markdown is rendered by the native `MarkdownView` UIKit view on iOS.
+The Expo config plugin adds the Swift Package to generated Xcode projects, and
+the inline Expo module keeps the bridge in source control without committing a
+generated `ios/` directory. Use an iOS development build or a locally
+generated native project; Expo Go cannot load this custom native view.

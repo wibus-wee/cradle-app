@@ -32,11 +32,18 @@
         {
           "android": {
             "usesCleartextTraffic": true
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
           }
         }
-      ]
+      ],
+      "./plugins/with-markdown-view"
     ],
     "experiments": {
+      "inlineModules": {
+        "watchedDirectories": ["src"]
+      },
       "typedRoutes": true,
       "reactCompiler": true
     }

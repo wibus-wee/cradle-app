@@ -6,9 +6,11 @@ import {
   isToolUIPart,
 } from 'ai'
 import { Check, CircleAlert, Wrench } from 'lucide-react-native'
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { memo } from 'react'
+import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
 
+import { NativeMarkdown } from '@/components/ui/native-markdown'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
@@ -18,7 +20,7 @@ interface ChatMessageProps {
   status?: 'streaming' | 'complete' | 'aborted' | 'failed'
 }
 
-export function ChatMessage({
+export const ChatMessage = memo(function ChatMessage({
   errorText = null,
   message,
   status = 'complete',
@@ -42,68 +44,70 @@ export function ChatMessage({
       {message.parts.map((part, index) => {
         if (isTextUIPart(part)) {
           if (!part.text) { return null }
-          return (
-            <Markdown
-              // Text parts have no protocol id; their position is stable for the life of a message.
-              // eslint-disable-next-line react/no-array-index-key
-              key={`text-${index}`}
-              style={{
-                body: {
-                  color: theme.foreground,
-                  fontSize: 14,
-                  lineHeight: 22,
-                  marginBottom: 0,
-                  marginTop: 0,
-                },
-                bullet_list: {
-                  marginBottom: spacing.sm,
-                  marginTop: spacing.xs,
-                },
-                code_inline: {
-                  backgroundColor: theme.muted,
-                  borderRadius: radius.sm,
-                  color: theme.foreground,
-                  fontFamily: 'GeistMono_400Regular',
-                  fontSize: 12,
-                  paddingHorizontal: spacing.xs,
-                },
-                fence: {
-                  backgroundColor: theme.muted,
-                  borderColor: theme.border,
-                  borderRadius: radius.md,
-                  color: theme.foreground,
-                  fontFamily: 'GeistMono_400Regular',
-                  fontSize: 11,
-                  lineHeight: 17,
-                  marginVertical: spacing.sm,
-                  padding: spacing.sm,
-                },
-                heading1: {
-                  color: theme.foreground,
-                  fontSize: 18,
-                  lineHeight: 24,
-                  marginBottom: spacing.sm,
-                  marginTop: spacing.md,
-                },
-                heading2: {
-                  color: theme.foreground,
-                  fontSize: 16,
-                  lineHeight: 22,
-                  marginBottom: spacing.sm,
-                  marginTop: spacing.md,
-                },
-                link: {
-                  color: theme.info,
-                },
-                paragraph: {
-                  marginBottom: spacing.sm,
-                  marginTop: 0,
-                },
-              }}
-            >
-              {part.text}
-            </Markdown>
-          )
+          return Platform.OS === 'ios'
+            ? <NativeMarkdown key={`text-${index}`} markdown={part.text} streaming={status === 'streaming'} />
+            : (
+                <Markdown
+                  // Text parts have no protocol id; their position is stable for the life of a message.
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={`text-${index}`}
+                  style={{
+                    body: {
+                      color: theme.foreground,
+                      fontSize: 14,
+                      lineHeight: 22,
+                      marginBottom: 0,
+                      marginTop: 0,
+                    },
+                    bullet_list: {
+                      marginBottom: spacing.sm,
+                      marginTop: spacing.xs,
+                    },
+                    code_inline: {
+                      backgroundColor: theme.muted,
+                      borderRadius: radius.sm,
+                      color: theme.foreground,
+                      fontFamily: 'GeistMono_400Regular',
+                      fontSize: 12,
+                      paddingHorizontal: spacing.xs,
+                    },
+                    fence: {
+                      backgroundColor: theme.muted,
+                      borderColor: theme.border,
+                      borderRadius: radius.md,
+                      color: theme.foreground,
+                      fontFamily: 'GeistMono_400Regular',
+                      fontSize: 11,
+                      lineHeight: 17,
+                      marginVertical: spacing.sm,
+                      padding: spacing.sm,
+                    },
+                    heading1: {
+                      color: theme.foreground,
+                      fontSize: 18,
+                      lineHeight: 24,
+                      marginBottom: spacing.sm,
+                      marginTop: spacing.md,
+                    },
+                    heading2: {
+                      color: theme.foreground,
+                      fontSize: 16,
+                      lineHeight: 22,
+                      marginBottom: spacing.sm,
+                      marginTop: spacing.md,
+                    },
+                    link: {
+                      color: theme.info,
+                    },
+                    paragraph: {
+                      marginBottom: spacing.sm,
+                      marginTop: 0,
+                    },
+                  }}
+                >
+                  {part.text}
+                </Markdown>
+              )
         }
 
         if (isReasoningUIPart(part)) {
@@ -169,7 +173,7 @@ export function ChatMessage({
       )}
     </View>
   )
-}
+})
 
 const styles = StyleSheet.create({
   assistantMessage: {
