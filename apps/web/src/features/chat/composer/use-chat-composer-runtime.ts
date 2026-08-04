@@ -12,9 +12,9 @@ import { isElectron, platform } from '~/lib/electron'
 
 import type {
   ChatRuntimeCompactUiSlotState,
-  ChatRuntimeUsageUiSlotState,
   ChatRuntimeUiSlot,
   ChatRuntimeUiSlotState,
+  ChatRuntimeUsageUiSlotState,
 } from '../capabilities/chat-capabilities'
 import {
   getChatRuntimeCapabilities,
