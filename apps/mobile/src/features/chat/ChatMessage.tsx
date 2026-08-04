@@ -20,11 +20,11 @@ interface ChatMessageProps {
   status?: 'streaming' | 'complete' | 'aborted' | 'failed'
 }
 
-export const ChatMessage = memo(function ChatMessage({
+export const ChatMessage = memo(({
   errorText = null,
   message,
   status = 'complete',
-}: ChatMessageProps) {
+}: ChatMessageProps) => {
   const theme = useTheme()
 
   if (message.role === 'user') {
