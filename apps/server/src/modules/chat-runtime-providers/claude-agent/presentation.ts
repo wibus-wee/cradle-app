@@ -20,7 +20,6 @@ import { buildClaudeQueryOptions, createClaudeStderrSink } from './input-project
 import { projectClaudeAgentPresentation } from './metadata'
 import type { ActiveClaudeQuery, ContextUsageRuntimeInput } from './provider-internals'
 import {
-  projectClaudeAgentAlertUiSlotState,
   projectClaudeAgentCrewUiSlotState,
   projectClaudeAgentPlanUiSlotState,
   projectClaudeAgentProgressUiSlotState,
@@ -84,14 +83,12 @@ export class ClaudeAgentPresentation {
     const progressState = projectClaudeAgentProgressUiSlotState(runtimeSession)
     const crewState = projectClaudeAgentCrewUiSlotState(runtimeSession)
     const toolActivityState = projectClaudeAgentToolActivityUiSlotState(runtimeSession)
-    const alertState = projectClaudeAgentAlertUiSlotState(runtimeSession)
     const compactState = await this.readCompactState({ ...input, runtimeSession })
     const states: RuntimeUiSlotState[] = []
     if (planState) { states.push(planState) }
     if (progressState) { states.push(progressState) }
     if (crewState) { states.push(crewState) }
     if (toolActivityState) { states.push(toolActivityState) }
-    if (alertState) { states.push(alertState) }
     const usageState = projectClaudeAgentUsageUiSlotState(input.runtimeSession)
     if (usageState) { states.push(usageState) }
     if (compactState) { states.push(compactState) }

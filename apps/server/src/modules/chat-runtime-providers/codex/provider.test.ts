@@ -799,7 +799,6 @@ describe('codexProvider app-server integration', () => {
         expect.objectContaining({ id: 'codex:reasoning', name: 'reasoning', iconKey: 'reasoning', surfaces: ['toolbarPicker', 'runtimePanel'] }),
         expect.objectContaining({ id: 'codex:approvals', name: 'approvals', iconKey: 'approvals', surfaces: ['runtimePanel'] }),
         expect.objectContaining({ id: 'codex:user-input', name: 'ask-user', iconKey: 'user-input', surfaces: ['composerState', 'runtimePanel', 'streamEvidence'] }),
-        expect.objectContaining({ id: 'codex:alerts', name: 'alerts', iconKey: 'alert', surfaces: ['runtimePanel'] }),
         expect.objectContaining({
           id: 'codex:usage',
           name: 'usage',
@@ -2795,7 +2794,7 @@ describe('codexProvider app-server integration', () => {
     expect(client.requests.map(request => request.method)).toContain('mcpServerStatus/list')
   })
 
-  it('projects Codex diff, terminal, approvals, and alerts into UI slot state', async () => {
+  it('projects Codex diff, terminal, and approvals into UI slot state', async () => {
     const client = new FakeCodexAppServerClient({})
     const provider = createProvider(client)
     const runtimeSession = createRuntimeSession()
@@ -2882,13 +2881,6 @@ describe('codexProvider app-server integration', () => {
       },
     })
     client.pushNotification({
-      method: 'warning',
-      params: {
-        threadId: 'codex-thread-1',
-        message: 'Sandbox warning',
-      },
-    })
-    client.pushNotification({
       method: 'item/agentMessage/delta',
       params: {
         threadId: 'codex-thread-1',
@@ -2941,14 +2933,6 @@ describe('codexProvider app-server integration', () => {
         approvedCount: 1,
         deniedCount: 0,
         recentItems: [expect.objectContaining({ id: 'approval-1', status: 'approved', label: 'Command' })],
-      }),
-      expect.objectContaining({
-        kind: 'alert',
-        slotId: 'codex:alerts',
-        threadId: 'codex-thread-1',
-        warningCount: 1,
-        errorCount: 0,
-        recentItems: [expect.objectContaining({ message: 'Sandbox warning', source: 'warning' })],
       }),
     ]))
   })

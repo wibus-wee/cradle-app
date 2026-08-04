@@ -166,6 +166,42 @@ describe('kimi event to chunk mapper', () => {
       { type: 'finish', finishReason: 'error' },
     ])
   })
+
+  it('projects recovered warning notices into the inline warning chain', () => {
+    const mapper = new KimiEventToChunkMapper()
+    mapper.map(event({ type: 'assistant.delta', turnId: 7, delta: 'Before' }))
+
+    expect(mapper.reconcileTranscriptTurn({
+      kind: 'turn',
+      turnId: 't7',
+      ordinal: 1,
+      origin: { kind: 'user' },
+      state: 'completed',
+      steps: [{
+        kind: 'step',
+        stepId: 'step-1',
+        turnId: 't7',
+        ordinal: 1,
+        state: 'completed',
+        frames: [{
+          kind: 'notice',
+          frameId: 'notice-1',
+          level: 'warning',
+          message: 'Kimi is retrying the request.',
+          detail: { attempt: 2 },
+        }],
+      }],
+    } as KimiTranscriptTurn)).toEqual([
+      { type: 'text-end', id: 'kimi-text-7' },
+      {
+        type: 'data-runtime-warning',
+        data: {
+          message: 'Kimi is retrying the request.',
+          additionalDetails: '{"attempt":2}',
+        },
+      },
+    ])
+  })
 })
 
 function event(payload: Parameters<KimiEventToChunkMapper['map']>[0]['payload']): Parameters<KimiEventToChunkMapper['map']>[0] {

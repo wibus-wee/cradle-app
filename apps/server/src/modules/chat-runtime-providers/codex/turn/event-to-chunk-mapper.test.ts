@@ -51,6 +51,27 @@ describe('mapCodexAppServerNotificationToChunks', () => {
     ])
   })
 
+  it.each([
+    ['warning', { message: 'Sandbox warning', details: 'The sandbox was adjusted.' }, 'Sandbox warning', 'The sandbox was adjusted.'],
+    ['guardianWarning', { message: 'Guardian warning' }, 'Guardian warning', null],
+    ['configWarning', { summary: 'Invalid config', details: 'Using the default value.' }, 'Invalid config', 'Using the default value.'],
+    ['deprecationNotice', { summary: 'Legacy setting', details: 'Migrate to the new setting.' }, 'Legacy setting', 'Migrate to the new setting.'],
+    ['windows/worldWritableWarning', { samplePaths: ['C:\\Users\\Public'], extraCount: 1, failedScan: false }, 'Codex detected a world-writable Windows path', 'C:\\Users\\Public\nand 1 more path.'],
+  ] as const)('projects native %s notifications as inline warnings', (method, params, message, additionalDetails) => {
+    const state = createCodexAppServerMapperState('text-1')
+
+    expect(mapCodexAppServerNotificationToChunks({
+      method,
+      params,
+    }, state)).toEqual([{
+      type: 'data-runtime-warning',
+      data: {
+        message,
+        additionalDetails,
+      },
+    }])
+  })
+
   it('projects Codex moderation metadata as AI SDK message metadata', () => {
     const state = createCodexAppServerMapperState('text-1')
 

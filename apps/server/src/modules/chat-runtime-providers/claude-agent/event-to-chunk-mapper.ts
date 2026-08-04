@@ -10,6 +10,7 @@ import type {
   SDKAssistantMessage,
   SDKMessage,
   SDKPartialAssistantMessage,
+  SDKPermissionDeniedMessage,
   SDKResultMessage,
   SDKTaskNotificationMessage,
   SDKTaskProgressMessage,
@@ -334,6 +335,18 @@ function mapSystemOrUnknown(msg: SDKMessage, state: ClaudeAgentChunkMapperState,
 
   const systemEvent = readClaudeSystemLifecycleEvent(msg)
   const chunks: UIMessageChunk[] = []
+
+  if (msg.type === 'system' && msg.subtype === 'permission_denied') {
+    const permissionDenied = msg as SDKPermissionDeniedMessage
+    const message = permissionDenied.decision_reason?.trim() || permissionDenied.message
+    if (message) {
+      chunks.push(providerChunk.runtimeWarning({
+        message,
+        additionalDetails: null,
+      }))
+    }
+    return { ...base, chunks, sessionId }
+  }
 
   // Handle task lifecycle events — emit as step markers with metadata
   if (systemEvent?.subtype === 'task_started') {

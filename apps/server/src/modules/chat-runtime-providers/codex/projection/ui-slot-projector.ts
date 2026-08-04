@@ -4,7 +4,7 @@
  * Position: Codex provider package owner for runtime UI slot projection.
  */
 
-import type { RuntimeAlertUiSlotState, RuntimeApprovalsUiSlotState, RuntimeBackgroundTerminal, RuntimeCompactUiSlotState, RuntimeConfigUiSlotState, RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimeDiffUiSlotState, RuntimeFilesystemUiSlotState, RuntimeMcpUiSlotState, RuntimeModelUiSlotState, RuntimePlanUiSlotState, RuntimePluginUiSlotState, RuntimeReasoningUiSlotState, RuntimeSearchUiSlotState, RuntimeSkillsUiSlotItem, RuntimeSkillsUiSlotState, RuntimeStatusUiSlotState, RuntimeTerminalUiSlotState, RuntimeToolActivityStatus, RuntimeToolActivityUiSlotState, RuntimeUiSlot, RuntimeUiSlotState, RuntimeUsageUiSlotState } from '../../../chat-runtime/runtime-provider-types'
+import type { RuntimeApprovalsUiSlotState, RuntimeBackgroundTerminal, RuntimeCompactUiSlotState, RuntimeConfigUiSlotState, RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimeDiffUiSlotState, RuntimeFilesystemUiSlotState, RuntimeMcpUiSlotState, RuntimeModelUiSlotState, RuntimePlanUiSlotState, RuntimePluginUiSlotState, RuntimeReasoningUiSlotState, RuntimeSearchUiSlotState, RuntimeSkillsUiSlotItem, RuntimeSkillsUiSlotState, RuntimeStatusUiSlotState, RuntimeTerminalUiSlotState, RuntimeToolActivityStatus, RuntimeToolActivityUiSlotState, RuntimeUiSlot, RuntimeUiSlotState, RuntimeUsageUiSlotState } from '../../../chat-runtime/runtime-provider-types'
 import {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
@@ -178,18 +178,6 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
       'serverRequest/handled',
       'serverRequest/resolved',
     ],
-  },
-  {
-    id: 'codex:alerts',
-    name: 'alerts',
-    label: 'Alerts',
-    description: 'Show recent warnings and recovery notices.',
-    argumentHint: '',
-    aliases: ['warnings'],
-    iconKey: 'alert',
-    commandText: '/alerts ',
-    surfaces: ['runtimePanel'],
-    anyNotifications: ['warning', 'guardianWarning', 'configWarning', 'deprecationNotice'],
   },
   {
     id: 'codex:filesystem',
@@ -557,7 +545,6 @@ export async function projectCodexUiSlotStates(
     projectCodexDiffState(input.threadId, snapshot),
     projectCodexTerminalState(input.threadId, snapshot, input.backgroundTerminals),
     projectCodexApprovalsState(input.threadId, snapshot),
-    projectCodexAlertState(input.threadId, snapshot),
     projectCodexFilesystemState(input.threadId, snapshot),
     projectCodexSkillsState(input.threadId, input.skills),
     projectCodexPluginState(input.threadId, input.plugins, input.apps),
@@ -936,29 +923,6 @@ function projectCodexApprovalsState(
     deniedCount: approvals.items.filter(item => item.status === 'denied').length,
     recentItems: approvals.items,
     updatedAt: approvals.updatedAt,
-  }
-}
-
-function projectCodexAlertState(
-  threadId: string,
-  snapshot: CodexProviderSnapshot,
-): RuntimeAlertUiSlotState | null {
-  const alert = snapshot.codex?.alert
-  if (
-    !alert
-    || (alert.threadId !== null && alert.threadId !== threadId)
-    || alert.items.length === 0
-  ) {
-    return null
-  }
-  return {
-    kind: 'alert',
-    slotId: 'codex:alerts',
-    threadId: alert.threadId,
-    warningCount: alert.items.filter(item => item.severity === 'warning').length,
-    errorCount: alert.items.filter(item => item.severity === 'error').length,
-    recentItems: alert.items,
-    updatedAt: alert.updatedAt,
   }
 }
 

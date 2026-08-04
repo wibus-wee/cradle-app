@@ -27,10 +27,8 @@ import {
 import type { CodexAppServerMessage } from '../app-server/client'
 import { isCodexAppServerToolApprovalRequest } from '../app-server/server-request-methods'
 import type { Turn } from '../app-server-protocol/v2/Turn'
-import { isRetryableCodexAppServerError } from '../turn/stream-diagnostics'
 import type {
   AccountRateLimitsUpdatedNotificationParams,
-  CodexAlertSnapshot,
   CodexApprovalsSnapshot,
   CodexCompactSnapshot,
   CodexDiffSnapshot,
@@ -47,7 +45,6 @@ import type {
   CodexTokenUsageBreakdown,
   CommandExecutionOutputDeltaNotificationParams,
   ContextCompactedNotificationParams,
-  ErrorNotificationParams,
   FileChangePatchUpdatedNotificationParams,
   FsChangedNotificationParams,
   FuzzyFileSearchSessionNotificationParams,
@@ -67,7 +64,6 @@ import type {
   TurnDiffUpdatedNotificationParams,
   TurnNotificationParams,
   TurnPlanUpdatedNotificationParams,
-  WarningNotificationParams,
 } from '../types'
 
 export interface CodexNativeHistorySnapshot {
@@ -162,7 +158,6 @@ export function projectCodexProviderStateSnapshot(
   projectCodexDiffSnapshot(runtimeSession, notification, fallbackThreadId)
   projectCodexTerminalSnapshot(runtimeSession, notification, fallbackThreadId)
   projectCodexApprovalsSnapshot(runtimeSession, notification, fallbackThreadId)
-  projectCodexAlertSnapshot(runtimeSession, notification, fallbackThreadId)
   projectCodexFilesystemSnapshot(runtimeSession, notification, fallbackThreadId)
   projectCodexSearchSnapshot(runtimeSession, notification, fallbackThreadId)
   projectCodexUsageSnapshot(runtimeSession, notification, fallbackThreadId)
@@ -1030,63 +1025,6 @@ function updateResolvedApproval(
   })
 }
 
-function projectCodexAlertSnapshot(
-  runtimeSession: RuntimeSession,
-  notification: CodexAppServerMessage,
-  fallbackThreadId: string,
-): void {
-  if (notification.method !== 'warning'
-    && notification.method !== 'guardianWarning'
-    && notification.method !== 'configWarning'
-    && notification.method !== 'deprecationNotice'
-    && notification.method !== 'error') {
-    return
-  }
-  if (notification.method === 'error' && isRetryableCodexAppServerError(notification)) {
-    return
-  }
-  const params = notification.params as WarningNotificationParams | ErrorNotificationParams | undefined
-  const message = readAlertMessage(notification.method, params)
-  if (!message) {
-    return
-  }
-  writeCodexAlertItem(runtimeSession, {
-    threadId: readAlertThreadId(notification.method, params, fallbackThreadId),
-    item: {
-      id: `${notification.method}:${Date.now()}`,
-      severity: notification.method === 'error' ? 'error' : 'warning',
-      message,
-      source: notification.method,
-      updatedAt: Date.now(),
-    },
-  })
-}
-
-function writeCodexAlertItem(
-  runtimeSession: RuntimeSession,
-  input: {
-    threadId: string | null
-    item: CodexAlertSnapshot['items'][number]
-  },
-): void {
-  const snapshot = readCodexProviderSnapshot(runtimeSession.providerStateSnapshot)
-  const existing = snapshot.codex?.alert
-  runtimeSession.providerStateSnapshot = JSON.stringify({
-    ...snapshot,
-    codex: {
-      ...snapshot.codex,
-      alert: {
-        threadId: input.threadId,
-        items: [
-          input.item,
-          ...(existing?.items ?? []),
-        ].slice(0, 8),
-        updatedAt: Date.now(),
-      },
-    },
-  })
-}
-
 function projectCodexFilesystemSnapshot(
   runtimeSession: RuntimeSession,
   notification: CodexAppServerMessage,
@@ -1310,31 +1248,6 @@ function readString(value: unknown): string | null {
 
 function readNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
-}
-
-function readAlertMessage(method: string, params: WarningNotificationParams | ErrorNotificationParams | undefined): string | null {
-  if (method === 'configWarning') {
-    const warning = params as WarningNotificationParams | undefined
-    return [warning?.summary, warning?.details].filter(Boolean).join(': ') || null
-  }
-  if (method === 'error') {
-    const error = params as ErrorNotificationParams | undefined
-    return error?.message ?? error?.error?.message ?? null
-  }
-  const warning = params as WarningNotificationParams | undefined
-  return warning?.message ?? warning?.summary ?? null
-}
-
-function readAlertThreadId(
-  method: string,
-  params: WarningNotificationParams | ErrorNotificationParams | undefined,
-  fallbackThreadId: string,
-): string | null {
-  if (method === 'configWarning' || method === 'deprecationNotice') {
-    return null
-  }
-  const warning = params as WarningNotificationParams | undefined
-  return warning?.threadId ?? fallbackThreadId
 }
 
 export function isCodexGoalStatus(value: unknown): value is RuntimeGoalStatus {
