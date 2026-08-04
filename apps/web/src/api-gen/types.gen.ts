@@ -21626,6 +21626,59 @@ export type PostChatSessionsBySessionIdBangCommandResponses = {
 
 export type PostChatSessionsBySessionIdBangCommandResponse = PostChatSessionsBySessionIdBangCommandResponses[keyof PostChatSessionsBySessionIdBangCommandResponses];
 
+export type PostChatSessionsBySessionIdBangTranscriptData = {
+    body: {
+        transcript: string;
+        command?: string;
+        durationMs?: number;
+        exitCode?: number | null;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/bang-transcript';
+};
+
+export type PostChatSessionsBySessionIdBangTranscriptResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        command: string;
+        stdout: string;
+        stderr: string;
+        exitCode: number | null;
+        durationMs: number;
+        timedOut: boolean;
+        truncated: boolean;
+        userMessageId: string;
+        resultMessageId: string;
+        userMessage: {
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        };
+        resultMessage: {
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        };
+    };
+};
+
+export type PostChatSessionsBySessionIdBangTranscriptResponse = PostChatSessionsBySessionIdBangTranscriptResponses[keyof PostChatSessionsBySessionIdBangTranscriptResponses];
+
 export type PostChatSessionsBySessionIdObservationsData = {
     body: {
         text: string;
@@ -25649,12 +25702,15 @@ export type GetCodexAppServerResourcesResponses = {
     /**
      * Response for status 200
      */
-    200: {
+    200: Array<{
+        hostId: string;
+        providerTargetId: string;
+        scopeId: string;
         running: boolean;
         pid: number | null;
         rssMB: number | null;
         cpuPercent: number | null;
-    };
+    }>;
 };
 
 export type GetCodexAppServerResourcesResponse = GetCodexAppServerResourcesResponses[keyof GetCodexAppServerResourcesResponses];

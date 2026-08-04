@@ -1,5 +1,6 @@
+import type { ProviderRuntimeHostSnapshot } from '../../../provider-runtime/host-manager'
 import { providerRuntimeHostManager } from '../../../provider-runtime/host-manager'
-import type { RuntimeProcessResources } from '../../../provider-runtime/process-resources'
+import type { RuntimeProcessResource } from '../../../provider-runtime/process-resources'
 import {
   emptyRuntimeProcessResources,
   readProcessResourceUsage,
@@ -15,10 +16,18 @@ function isCodexAppServerHostResource(resource: unknown): resource is CodexAppSe
   )
 }
 
-function readCodexHostResources(resource: CodexAppServerHostResource): RuntimeProcessResources {
+function readCodexHostResources(
+  resource: CodexAppServerHostResource,
+  host: ProviderRuntimeHostSnapshot,
+): RuntimeProcessResource {
   const pid = resource.client.pid
   if (!pid) {
-    return emptyRuntimeProcessResources()
+    return {
+      ...emptyRuntimeProcessResources(),
+      hostId: host.hostId,
+      providerTargetId: host.providerTargetId,
+      scopeId: host.scopeId,
+    }
   }
   const usage = readProcessResourceUsage(pid)
   return {
@@ -26,14 +35,17 @@ function readCodexHostResources(resource: CodexAppServerHostResource): RuntimePr
     pid,
     rssMB: usage?.rssMB ?? null,
     cpuPercent: usage?.cpuPercent ?? null,
+    hostId: host.hostId,
+    providerTargetId: host.providerTargetId,
+    scopeId: host.scopeId,
   }
 }
 
-export function getCodexAppServerResources(): RuntimeProcessResources {
-  return providerRuntimeHostManager.forEachResource('codex', (resource) => {
+export function getCodexAppServerResources(): RuntimeProcessResource[] {
+  return providerRuntimeHostManager.collectResources('codex', (resource, host) => {
     if (isCodexAppServerHostResource(resource)) {
-      return readCodexHostResources(resource)
+      return readCodexHostResources(resource, host)
     }
     return undefined
-  }) ?? emptyRuntimeProcessResources()
+  })
 }

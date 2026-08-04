@@ -115,7 +115,7 @@ export const zPostWorkspacesMultiFolderBody = z.object({
     folders: z.array(z.object({
         name: z.string().min(1).regex(/.*\S.*/),
         path: z.string().min(1).regex(/.*\S.*/)
-    })).min(1)
+    })).min(2)
 });
 
 export const zPostWorkspacesMultiFolderFromConfigBody = z.object({
@@ -3852,6 +3852,17 @@ export const zPostChatSessionsBySessionIdBangCommandBody = z.object({
 });
 
 export const zPostChatSessionsBySessionIdBangCommandPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdBangTranscriptBody = z.object({
+    transcript: z.string(),
+    command: z.string().min(1).optional(),
+    durationMs: z.number().gte(0).optional(),
+    exitCode: z.number().nullish()
+});
+
+export const zPostChatSessionsBySessionIdBangTranscriptPath = z.object({
     sessionId: z.string().min(1)
 });
 

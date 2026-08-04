@@ -58,4 +58,37 @@ describe('provider runtime host manager', () => {
     expect(disposeResource).toHaveBeenCalledWith({ pid: 1234 })
     expect(manager.listHosts()).toEqual([])
   })
+
+  it('collects every active resource for a runtime kind', async () => {
+    const manager = new ProviderRuntimeHostManager()
+    const disposeResource = vi.fn()
+    const firstLease = await manager.acquireResource({
+      runtimeKind: 'codex',
+      providerTargetId: 'target-1',
+      scopeId: 'chat-session:session-1',
+      retainOnRelease: true,
+      createResource: () => ({ pid: 1234 }),
+      disposeResource,
+    })
+    const secondLease = await manager.acquireResource({
+      runtimeKind: 'codex',
+      providerTargetId: 'target-2',
+      scopeId: 'chat-session:session-2',
+      retainOnRelease: true,
+      createResource: () => ({ pid: 5678 }),
+      disposeResource,
+    })
+
+    expect(manager.collectResources('codex', (resource, host) => ({
+      hostId: host.hostId,
+      resource,
+    }))).toEqual([
+      { hostId: 'codex:target-1:chat-session:session-1', resource: { pid: 1234 } },
+      { hostId: 'codex:target-2:chat-session:session-2', resource: { pid: 5678 } },
+    ])
+
+    firstLease.release()
+    secondLease.release()
+    await manager.clear()
+  })
 })

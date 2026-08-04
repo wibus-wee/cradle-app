@@ -105,12 +105,15 @@ const KimiServerResourcesSchema = z.object({
   url: z.string().nullable(),
 })
 
-const CodexAppServerResourcesSchema = z.object({
+const CodexAppServerResourcesSchema = z.array(z.object({
+  hostId: z.string(),
+  providerTargetId: z.string(),
+  scopeId: z.string(),
   running: z.boolean(),
   pid: z.number().nullable(),
   rssMB: z.number().nullable(),
   cpuPercent: z.number().nullable().default(null),
-})
+}))
 
 export interface ServerHealth {
   memory: {
@@ -183,6 +186,9 @@ interface KimiServerResources {
 }
 
 interface CodexAppServerResources {
+  hostId: string
+  providerTargetId: string
+  scopeId: string
   running: boolean
   pid: number | null
   rssMB: number | null
@@ -223,9 +229,9 @@ export interface ResourceSnapshot {
   kimiRss: number
   kimiCpuPercent: number | null
   codexAppServerRunning: boolean
-  codexAppServerPid: number | null
   codexAppServerRss: number
   codexAppServerCpuPercent: number | null
+  codexAppServerResources: CodexAppServerResources[]
   terminals: PtyResourceItem[]
   timestamp: number
   updatedAtLabel: string
@@ -242,7 +248,7 @@ interface ResourceSnapshotInput {
   opencodeWarning: string | null
   kimi: KimiServerResources | null
   kimiWarning: string | null
-  codexAppServer: CodexAppServerResources | null
+  codexAppServer: CodexAppServerResources[] | null
   codexAppServerWarning: string | null
   timestamp: number
 }
@@ -336,10 +342,20 @@ function createResourceSnapshot({
     kimiPid: kimi?.pid ?? null,
     kimiRss: kimi?.rssMB ? mbToBytes(kimi.rssMB) : 0,
     kimiCpuPercent: kimi?.cpuPercent ?? null,
-    codexAppServerRunning: codexAppServer?.running ?? false,
-    codexAppServerPid: codexAppServer?.pid ?? null,
-    codexAppServerRss: codexAppServer?.rssMB ? mbToBytes(codexAppServer.rssMB) : 0,
-    codexAppServerCpuPercent: codexAppServer?.cpuPercent ?? null,
+    codexAppServerRunning: codexAppServer?.some(resource => resource.running) ?? false,
+    codexAppServerRss: mbToBytes(codexAppServer?.reduce(
+      (total, resource) => total + (resource.rssMB ?? 0),
+      0,
+    ) ?? 0),
+    codexAppServerCpuPercent: codexAppServer
+      ? codexAppServer.reduce<number | null>(
+          (total, resource) => resource.cpuPercent === null
+            ? total
+            : (total ?? 0) + resource.cpuPercent,
+          null,
+        )
+      : null,
+    codexAppServerResources: codexAppServer ?? [],
     terminals: pty?.terminals ?? [],
     timestamp,
     updatedAtLabel: formatTimestampLabel(timestamp),
@@ -454,6 +470,7 @@ function RuntimeProvider({
   processLabel,
   rssMB,
   cpuPercent,
+  processes,
   isLast,
 }: {
   label: string
@@ -463,8 +480,13 @@ function RuntimeProvider({
   processLabel?: string
   rssMB?: number | null
   cpuPercent?: number | null
+  processes?: Array<Pick<CodexAppServerResources, 'pid' | 'rssMB' | 'cpuPercent'>>
   isLast?: boolean
 }) {
+  const processRows = processes ?? (running
+    ? [{ pid: pid ?? null, rssMB: rssMB ?? null, cpuPercent: cpuPercent ?? null }]
+    : [])
+
   return (
     <div className="relative">
       <SectionRow
@@ -472,16 +494,17 @@ function RuntimeProvider({
         value={value}
         dimLabel={false}
       />
-      {running && processLabel
-        ? (
+      {processRows.length > 0 && processLabel
+        ? processRows.map((process, index) => (
           <SectionRow
+            key={`${processLabel}-${process.pid ?? index}`}
             label={processLabel}
-            detail={pid ? `pid ${pid}` : undefined}
-            value={`${rssMB && rssMB > 0 ? formatMegabytes(rssMB, 1) : '—'} / ${formatCpuPercent(cpuPercent ?? null)}`}
+            detail={process.pid ? `pid ${process.pid}` : undefined}
+            value={`${process.rssMB && process.rssMB > 0 ? formatMegabytes(process.rssMB, 1) : '—'} / ${formatCpuPercent(process.cpuPercent ?? null)}`}
             dimLabel
-            branch={isLast ? 'last' : 'middle'}
+            branch={isLast && index === processRows.length - 1 ? 'last' : 'middle'}
           />
-        )
+        ))
         : (
           <SectionRow label="Not running" value="0 MB / 0%" dimLabel branch={isLast ? 'last' : 'middle'} />
         )}
@@ -539,12 +562,7 @@ const KIMI_OFF_RESOURCES: KimiServerResources = {
   url: null,
 }
 
-const CODEX_APP_SERVER_OFF_RESOURCES: CodexAppServerResources = {
-  running: false,
-  pid: null,
-  rssMB: null,
-  cpuPercent: null,
-}
+const CODEX_APP_SERVER_OFF_RESOURCES: CodexAppServerResources[] = []
 
 function parseServerHealth(data: unknown): ServerHealth {
   return ServerHealthSchema.parse(data)
@@ -570,7 +588,7 @@ function parseKimiServerResources(data: unknown): KimiServerResources {
   return KimiServerResourcesSchema.parse(data)
 }
 
-function parseCodexAppServerResources(data: unknown): CodexAppServerResources {
+function parseCodexAppServerResources(data: unknown): CodexAppServerResources[] {
   return CodexAppServerResourcesSchema.parse(data)
 }
 
@@ -905,10 +923,24 @@ export function ResourcesPopover() {
         {snap && (
           <div className="px-3 pt-2 pb-1">
             <MemoryBar
-              used={snap.rendererHeapUsed + snap.serverRss + snap.cliTuiRss + snap.bottomPanelRss + snap.chronicleRss + snap.opencodeRss}
+              used={snap.rendererHeapUsed
+                + snap.serverRss
+                + snap.cliTuiRss
+                + snap.bottomPanelRss
+                + snap.chronicleRss
+                + snap.opencodeRss
+                + snap.kimiRss
+                + snap.codexAppServerRss}
               total={Math.max(
                 snap.rendererHeapLimit,
-                (snap.rendererHeapUsed + snap.serverRss + snap.cliTuiRss + snap.bottomPanelRss + snap.chronicleRss + snap.opencodeRss) * 2,
+                (snap.rendererHeapUsed
+                  + snap.serverRss
+                  + snap.cliTuiRss
+                  + snap.bottomPanelRss
+                  + snap.chronicleRss
+                  + snap.opencodeRss
+                  + snap.kimiRss
+                  + snap.codexAppServerRss) * 2,
               )}
             />
           </div>
@@ -1034,10 +1066,8 @@ export function ResourcesPopover() {
                   ? formatResourceUsage(bytesToMegabytes(snap.codexAppServerRss), snap.codexAppServerCpuPercent)
                   : 'Off'}
                 running={snap?.codexAppServerRunning ?? false}
-                pid={snap?.codexAppServerPid}
                 processLabel="codex-app-server"
-                rssMB={snap?.codexAppServerRss ? bytesToMegabytes(snap.codexAppServerRss) : null}
-                cpuPercent={snap?.codexAppServerCpuPercent}
+                processes={snap?.codexAppServerResources}
                 isLast={false}
               />
 

@@ -17,6 +17,7 @@ import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/r
 import { getDaemonResources } from '../chronicle/daemon-manager'
 import * as Health from '../health/service'
 import { providerRuntimeHostManager } from '../provider-runtime/host-manager'
+import { summarizeRuntimeProcessResources } from '../provider-runtime/process-resources'
 import * as Pty from '../pty/service'
 import { getDesktopRuntimeSamples, getQueueHealth } from './service'
 
@@ -349,7 +350,7 @@ export async function getRuntimeSnapshot() {
   const chronicle = getDaemonResources()
   const opencodeServer = getOpencodeServerResources()
   const kimiServer = getKimiServerResources()
-  const codexAppServer = getCodexAppServerResources()
+  const codexAppServer = summarizeRuntimeProcessResources(getCodexAppServerResources())
   const observability = getQueueHealth()
   const desktop = {
     latestSamples: getDesktopRuntimeSamples(),

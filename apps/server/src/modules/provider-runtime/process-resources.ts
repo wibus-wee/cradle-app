@@ -14,6 +14,34 @@ export interface RuntimeProcessResources {
   cpuPercent: number | null
 }
 
+export interface RuntimeProcessResource extends RuntimeProcessResources {
+  hostId: string
+  providerTargetId: string
+  scopeId: string
+}
+
+export function summarizeRuntimeProcessResources(
+  resources: RuntimeProcessResources[],
+): RuntimeProcessResources {
+  const runningResources = resources.filter(resource => resource.running)
+  const rssMB = runningResources
+    .map(resource => resource.rssMB)
+    .filter((value): value is number => value !== null)
+    .reduce((total, value) => total + value, 0)
+  const cpuPercentValues = runningResources
+    .map(resource => resource.cpuPercent)
+    .filter((value): value is number => value !== null)
+
+  return {
+    running: runningResources.length > 0,
+    pid: runningResources[0]?.pid ?? null,
+    rssMB: runningResources.length > 0 && rssMB > 0 ? rssMB : null,
+    cpuPercent: cpuPercentValues.length > 0
+      ? cpuPercentValues.reduce((total, value) => total + value, 0)
+      : null,
+  }
+}
+
 const PROCESS_RESOURCE_FIELD_SEPARATOR_PATTERN = /\s+/
 
 export function readManagedProcessPid(proc: ManagedChildProcess): number | null {
