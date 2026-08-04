@@ -169,4 +169,52 @@ describe('createPtyChannel', () => {
 
     channel.close()
   })
+
+  it('coalesces concurrent connection attempts', async () => {
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
+    const channel = createPtyChannel({
+      socketPath: '/pty/session-1',
+      onSnapshot: vi.fn(),
+      onOutput: vi.fn(),
+      onExit: vi.fn(),
+    })
+
+    await Promise.all([channel.connect(), channel.connect(), channel.connect()])
+
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    channel.close()
+  })
+
+  it('ignores stale socket events after a newer connection replaces it', async () => {
+    vi.useFakeTimers()
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
+    const channel = createPtyChannel({
+      socketPath: '/pty/session-1',
+      reconnectDelayMs: 250,
+      onSnapshot: vi.fn(),
+      onOutput: vi.fn(),
+      onExit: vi.fn(),
+    })
+
+    await channel.connect()
+    const firstSocket = FakeWebSocket.instances[0]!
+    firstSocket.open()
+    firstSocket.close()
+    vi.advanceTimersByTime(250)
+    await Promise.resolve()
+
+    const secondSocket = FakeWebSocket.instances[1]!
+    secondSocket.open()
+    firstSocket.emitMessage(JSON.stringify({
+      type: 'snapshot',
+      seq: 1,
+      buffer: 'stale',
+      running: true,
+    }))
+    firstSocket.close()
+
+    expect(channel.getLastSeq()).toBeNull()
+    expect(FakeWebSocket.instances).toHaveLength(2)
+    channel.close()
+  })
 })
