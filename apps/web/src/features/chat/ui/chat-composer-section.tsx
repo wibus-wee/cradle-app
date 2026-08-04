@@ -565,6 +565,7 @@ export function ChatComposerSection({
             sessionTokens: composerRuntime.tokenUsage?.tokens,
             sessionContextWindow: composerRuntime.tokenUsage?.contextWindow,
             compactState: composerRuntime.compactState,
+            runtimeUsageState: composerRuntime.usageState,
             surfaceId: sessionId ? chatSurfaceId(sessionId) : undefined,
             promptHistory,
           }}

@@ -20,6 +20,7 @@ export interface ProviderTargetOption {
   providerKind: ProviderKind
   enabled: boolean
   iconSlug: string | null
+  enabledModelsJson?: string
   sourceKey: string | null
   externalRecordId: string | null
 }
@@ -36,6 +37,7 @@ function toProviderTargetOption(target: ProviderTargetRecord): ProviderTargetOpt
     providerKind: target.providerKind,
     enabled: target.enabled,
     iconSlug: nullableString(target.iconSlug),
+    enabledModelsJson: target.enabledModelsJson,
     sourceKey: nullableString(target.sourceKey),
     externalRecordId: nullableString(target.externalRecordId),
   }

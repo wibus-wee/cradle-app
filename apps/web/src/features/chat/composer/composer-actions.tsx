@@ -21,7 +21,10 @@ import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 import { formatTokenCount } from '~/lib/number-format'
 
-import type { ChatRuntimeCompactUiSlotState } from '../capabilities/chat-capabilities'
+import type {
+  ChatRuntimeCompactUiSlotState,
+  ChatRuntimeUsageUiSlotState,
+} from '../capabilities/chat-capabilities'
 import { ContextUsageDetailPanelContainer } from '../context/containers/context-usage-detail-panel-container'
 import type { ComposerAttachmentController } from './composer-attachment-state'
 import { ComposerAttachmentButton } from './composer-attachments'
@@ -41,11 +44,13 @@ function TokenProgress({
   contextWindow,
   sessionId,
   compactState,
+  runtimeUsageState,
 }: {
   tokens: number
   contextWindow: number | null | undefined
   sessionId?: string | null
   compactState?: ChatRuntimeCompactUiSlotState | null
+  runtimeUsageState?: ChatRuntimeUsageUiSlotState | null
 }) {
   const [open, setOpen] = useState(false)
 
@@ -117,6 +122,7 @@ function TokenProgress({
         <ContextUsageDetailPanelContainer
           sessionId={sessionId ?? null}
           compactState={compactState}
+          runtimeUsageState={runtimeUsageState}
           onClose={() => setOpen(false)}
         />
       </PopoverContent>
@@ -178,6 +184,7 @@ export function ComposerActions({
   sessionTokens,
   sessionContextWindow,
   compactState,
+  runtimeUsageState,
   sendButtonAriaLabel,
   sendButtonText,
   sendVariants,
@@ -206,6 +213,7 @@ export function ComposerActions({
   sessionTokens?: number
   sessionContextWindow?: number | null
   compactState?: ChatRuntimeCompactUiSlotState | null
+  runtimeUsageState?: ChatRuntimeUsageUiSlotState | null
   sendButtonAriaLabel?: string
   sendButtonText?: string
   sendVariants?: ComposerSendVariantAction[]
@@ -309,6 +317,7 @@ export function ComposerActions({
             contextWindow={sessionContextWindow}
             sessionId={sessionId}
             compactState={compactState}
+            runtimeUsageState={runtimeUsageState}
           />
         )}
       {isStreaming && hasDraft && (

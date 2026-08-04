@@ -14,11 +14,9 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
 - Work creation requires a local Git workspace and an immediately active
   managed Worktree. Multi-folder (symlink composition) workspaces are rejected;
   Work needs a single primary repository root.
-- Default creation bases the managed Worktree on a clean local `HEAD`
-  (`baseStrategy: source-head`). When the source checkout is dirty, clients may
-  explicitly opt into `baseStrategy: remote-default` to start from the remote
-  tracking default branch tip (for example `origin/main`) without touching local
-  WIP.
+- Default creation bases the managed Worktree on a clean local `HEAD`. Clients
+  may pass an explicit local or remote branch ref (for example `origin/main`)
+  to start from that branch without touching local WIP.
 - Work stores facts only. Activity labels are derived and no Work status machine
   exists.
 - Listing Work detects the current state of each bound pull request through the

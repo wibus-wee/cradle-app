@@ -712,7 +712,7 @@ describe('work delivery control', () => {
     expect(db().select().from(sessions).all()).toHaveLength(0)
   })
 
-  it('skips the clean-source preflight when creating Work from the remote default base', async () => {
+  it('skips the clean-source preflight when creating Work from an explicit base branch', async () => {
     db().insert(workspaces).values({
       id: WORKSPACE_ID,
       name: 'Work Service Workspace',
@@ -751,7 +751,7 @@ describe('work delivery control', () => {
       title: 'Remote-default Work',
       objective: 'Start from origin/main despite local WIP.',
       runtimeKind: 'opencode',
-      baseStrategy: 'remote-default',
+      baseBranch: 'origin/main',
     })
 
     expect(assertClean).not.toHaveBeenCalled()
@@ -759,7 +759,7 @@ describe('work delivery control', () => {
     expect(createWorktree).toHaveBeenCalledWith(expect.objectContaining({
       sourceWorkspaceId: WORKSPACE_ID,
       sessionId: SESSION_ID,
-      baseStrategy: 'remote-default',
+      baseBranch: 'origin/main',
     }))
     expect(bind).toHaveBeenCalledWith({
       sessionId: SESSION_ID,

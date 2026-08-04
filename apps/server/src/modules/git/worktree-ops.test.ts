@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { AppError } from '../../errors/app-error'
 import * as GitCommand from './git-command'
-import { resolveRemoteDefaultBaseRef } from './worktree-ops'
+import { resolveBaseRef, resolveRemoteDefaultBaseRef } from './worktree-ops'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -41,5 +41,26 @@ describe('resolveRemoteDefaultBaseRef', () => {
       code: 'work_remote_base_unavailable',
     })
     await expect(resolveRemoteDefaultBaseRef('/repo')).rejects.toBeInstanceOf(AppError)
+  })
+})
+
+describe('resolveBaseRef', () => {
+  it('resolves an explicit local or remote branch to a commit SHA', async () => {
+    const run = vi.spyOn(GitCommand, 'runGitCommand').mockResolvedValue('branch-sha\n')
+
+    await expect(resolveBaseRef('/repo', 'origin/release/next')).resolves.toBe('branch-sha')
+    expect(run).toHaveBeenCalledWith('/repo', [
+      'rev-parse',
+      '--verify',
+      'origin/release/next^{commit}',
+    ])
+  })
+
+  it('returns a stable error when the explicit branch cannot be resolved', async () => {
+    vi.spyOn(GitCommand, 'runGitCommand').mockRejectedValue(new Error('missing'))
+
+    await expect(resolveBaseRef('/repo', 'origin/missing')).rejects.toMatchObject({
+      code: 'work_base_branch_unavailable',
+    })
   })
 })

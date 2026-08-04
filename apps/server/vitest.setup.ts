@@ -34,5 +34,10 @@ afterAll(async () => {
   ])
   destroyWorkspaceFileIndexes()
   shutdownInfra()
-  rmSync(testDataDir, { recursive: true, force: true })
+  rmSync(testDataDir, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100,
+  })
 })

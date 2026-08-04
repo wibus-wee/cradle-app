@@ -978,7 +978,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     )
   })
 
-  it('projects SDK permission denials into the Claude alerts UI slot', async () => {
+  it('projects SDK permission denials as inline runtime warnings', async () => {
     sdkMocks.query.mockReturnValue(
       createAsyncQuery([
         {
@@ -1002,40 +1002,24 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     const runtimeSession = createRuntimeSession()
     const provider = new ClaudeAgentProvider({ readSecret: () => 'sk-ant-test' })
-    for await (const _chunk of provider.streamTurn({
+    const chunks: UIMessageChunk[] = []
+    for await (const chunk of provider.streamTurn({
       runId: 'run-claude-agent-denied',
       runtimeSession,
       profile: createProfile(),
       message: createUserMessage('Run a shell command'),
       workspaceId: 'workspace-1',
     })) {
-      // Drain stream.
+      chunks.push(chunk)
     }
 
-    const states = await provider.getUiSlotStates({
-      runtimeSession,
-      profile: createProfile(),
-      workspacePath: '/tmp/cradle-workspace',
-      workspaceId: 'workspace-1',
+    expect(chunks).toContainEqual({
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Shell commands are disabled in plan mode.',
+        additionalDetails: null,
+      },
     })
-    expect(states).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          kind: 'alert',
-          slotId: 'claude-agent:alerts',
-          warningCount: 1,
-          errorCount: 0,
-          recentItems: [
-            expect.objectContaining({
-              id: 'permission-denied:toolu_denied_1',
-              severity: 'warning',
-              message: 'Shell commands are disabled in plan mode.',
-              source: 'Claude Bash',
-            }),
-          ],
-        }),
-      ]),
-    )
   })
 
   it('leaves Claude disallowed tools empty and captures ExitPlanMode through Cradle', async () => {
@@ -2890,17 +2874,6 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
           aliases: ['activity'],
           iconKey: 'tool-activity',
           commandText: '/tools ',
-          surfaces: ['runtimePanel'],
-        },
-        {
-          id: 'claude-agent:alerts',
-          name: 'alerts',
-          label: 'Alerts',
-          description: 'Show recent Claude permission denials and runtime warnings.',
-          argumentHint: '',
-          aliases: ['warnings'],
-          iconKey: 'alert',
-          commandText: '/alerts ',
           surfaces: ['runtimePanel'],
         },
         {

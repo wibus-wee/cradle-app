@@ -11,9 +11,7 @@ export interface NewWorkErrorViewProps {
   kind: NewWorkFailureKind
   message: string | null
   canOpenChanges: boolean
-  canStartFromRemoteDefault: boolean
   onOpenChanges: () => void
-  onStartFromRemoteDefault: () => void
   onDismiss: () => void
 }
 
@@ -21,9 +19,7 @@ export function NewWorkErrorView({
   kind,
   message,
   canOpenChanges,
-  canStartFromRemoteDefault,
   onOpenChanges,
-  onStartFromRemoteDefault,
   onDismiss,
 }: NewWorkErrorViewProps) {
   const { t } = useTranslation('work')
@@ -62,22 +58,9 @@ export function NewWorkErrorView({
               </Button>
             )
           : null}
-        {canStartFromRemoteDefault
-          ? (
-              <Button
-                type="button"
-                size="sm"
-                onClick={onStartFromRemoteDefault}
-                data-testid="new-work-start-from-remote-default"
-              >
-                {t('new.startFromRemoteDefault')}
-              </Button>
-            )
-          : null}
         <Button
           type="button"
           size="sm"
-          variant={canStartFromRemoteDefault ? 'outline' : 'default'}
           onClick={onDismiss}
         >
           {t('new.tryAgain')}

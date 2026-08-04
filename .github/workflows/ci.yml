@@ -41,6 +41,24 @@ jobs:
       - name: Check Model API Simulator Protocol Coverage
         run: pnpm --filter @cradle/model-api-simulator coverage:check
 
+  # ─── Mobile (Expo / React Native merge gate) ───────────────────────────────
+  mobile:
+    name: Mobile
+    runs-on: ubuntu-latest
+    env:
+      EXPO_NO_TELEMETRY: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Typecheck Mobile (apps/mobile)
+        run: pnpm typecheck:mobile
+      - name: Check Expo dependency versions
+        run: pnpm --filter @cradle/mobile exec expo install --check
+      - name: Export iOS production bundle
+        run: pnpm --filter @cradle/mobile exec expo export --platform ios --output-dir ${{ runner.temp }}/cradle-mobile-ios
+      - name: Export Android production bundle
+        run: pnpm --filter @cradle/mobile exec expo export --platform android --output-dir ${{ runner.temp }}/cradle-mobile-android
+
   # ─── Unit Tests (src + packages) ──────────────────────────────────────────
   unit-tests:
     name: Unit Tests
