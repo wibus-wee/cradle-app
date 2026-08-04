@@ -8,7 +8,7 @@ Cradle-owned session isolation via git worktrees. Worktrees are backend plumbing
 
 - `index.ts`: global managed worktree settings routes and workspace-scoped worktree lifecycle routes
 - `model.ts`: TypeBox schemas
-- `service.ts`: clean-source preflight, optional remote-default base strategy, compensated create/bind/cleanup, execution root resolution, issue isolation context, and cached low-priority `du` storage measurement registered with Maintenance and Background Activity. Automatic measurement checks every 15 minutes, requires no active/pending chat run and at most 5% Server CPU, and only scans worktrees whose measurement is at least six hours old. Explicit manual runs bypass those gates and measure every active worktree.
+- `service.ts`: clean-source preflight, explicit branch-base resolution, compensated create/bind/cleanup, execution root resolution, issue isolation context, and cached low-priority `du` storage measurement registered with Maintenance and Background Activity. Automatic measurement checks every 15 minutes, requires no active/pending chat run and at most 5% Server CPU, and only scans worktrees whose measurement is at least six hours old. Explicit manual runs bypass those gates and measure every active worktree.
 
 Session isolation routes live in `modules/session/index.ts`. Issue isolation context lives in `modules/issue/index.ts`.
 

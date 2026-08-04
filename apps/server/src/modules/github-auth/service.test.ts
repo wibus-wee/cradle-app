@@ -74,6 +74,7 @@ describe('gitHub App Device Flow', () => {
   })
 
   it('persists an encrypted connection, rotates it before expiry, and redacts status', async () => {
+    vi.useFakeTimers()
     const responses = [
       { device_code: 'device-secret', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 1 },
       { access_token: 'access-token-one', refresh_token: 'refresh-token-one', expires_in: 1, refresh_token_expires_in: 3600 },
@@ -84,7 +85,7 @@ describe('gitHub App Device Flow', () => {
     setGitHubAuthFetchForTests(async () => jsonResponse(responses.shift() ?? {}))
 
     const start = await startGitHubDeviceLogin()
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await vi.advanceTimersByTimeAsync(0)
     expect(getGitHubDeviceLogin(start.loginId).state).toBe('completed')
 
     const connection = await getGitHubAppConnection()

@@ -17,6 +17,35 @@ export async function getHeadSha(repoPath: string): Promise<string> {
   return (await runGitCommand(repoPath, ['rev-parse', 'HEAD'])).trim()
 }
 
+export async function resolveBaseRef(repoPath: string, ref: string): Promise<string> {
+  const normalizedRef = ref.trim()
+  if (!normalizedRef || normalizedRef.startsWith('-') || /[\0\n\r]/.test(normalizedRef)) {
+    throw new AppError({
+      code: 'work_base_branch_invalid',
+      status: 400,
+      message: 'The selected base branch is invalid.',
+      details: { repoPath, ref },
+    })
+  }
+
+  try {
+    const sha = (await runGitCommand(repoPath, ['rev-parse', '--verify', `${normalizedRef}^{commit}`])).trim()
+    if (sha) {
+      return sha
+    }
+  }
+  catch {
+    // Convert the git error into a stable Work-facing error below.
+  }
+
+  throw new AppError({
+    code: 'work_base_branch_unavailable',
+    status: 409,
+    message: `Could not resolve the selected base branch: ${normalizedRef}.`,
+    details: { repoPath, ref: normalizedRef },
+  })
+}
+
 export async function isWorkingTreeDirty(repoPath: string): Promise<boolean> {
   const status = await simpleGit(repoPath).status()
   return status.files.length > 0

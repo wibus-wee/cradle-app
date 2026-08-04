@@ -88,6 +88,15 @@ export class KimiEventToChunkMapper {
             chunks.push(...this.reconcileTool(turnId, frame))
             break
           case 'notice':
+            if (frame.level !== 'info') {
+              chunks.push(
+                ...this.closeActiveBlocks(turnId),
+                providerChunk.runtimeWarning({
+                  message: frame.message,
+                  additionalDetails: readKimiNoticeDetails(frame.detail),
+                }),
+              )
+            }
             break
         }
       }
@@ -229,4 +238,14 @@ export class KimiEventToChunkMapper {
     }))
     return chunks
   }
+}
+
+function readKimiNoticeDetails(detail: unknown): string | null {
+  if (detail === undefined || detail === null) {
+    return null
+  }
+  if (typeof detail === 'string') {
+    return detail
+  }
+  return JSON.stringify(detail) ?? null
 }

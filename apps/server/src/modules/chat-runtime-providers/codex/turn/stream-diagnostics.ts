@@ -8,7 +8,9 @@ import type { RuntimeWarningPartData } from '../../../chat-runtime/runtime-provi
 import { OBSERVABILITY_CODES } from '../../../observability/contract'
 import type { RuntimeKind } from '../../../provider-contracts/types'
 import type { CodexAppServerMessage } from '../app-server/client'
+import type { WindowsWorldWritableWarningNotification } from '../app-server-protocol/v2/WindowsWorldWritableWarningNotification'
 import { CODEX_RUNTIME_KIND } from '../metadata'
+import type { WarningNotificationParams } from '../types'
 
 const MAX_EVENT_SAMPLES = 20
 const MAX_DIAGNOSTIC_STRING_LENGTH = 2_000
@@ -184,23 +186,51 @@ export function isRetryableCodexAppServerError(notification: CodexAppServerMessa
   return (notification.params as ErrorNotificationParams | undefined)?.willRetry === true
 }
 
-export function readRetryableCodexAppServerWarning(
+export function readCodexAppServerRuntimeWarning(
   notification: Pick<CodexAppServerMessage, 'method' | 'params'>,
 ): RuntimeWarningPartData | null {
-  if (notification.method !== 'error') {
+  const params = notification.params as ErrorNotificationParams | WarningNotificationParams | WindowsWorldWritableWarningNotification | undefined
+  let message: string | null = null
+  let additionalDetails: string | null = null
+
+  if (notification.method === 'error') {
+    if ((params as ErrorNotificationParams | undefined)?.willRetry !== true) {
+      return null
+    }
+    const error = params as ErrorNotificationParams | undefined
+    message = normalizeProviderErrorMessage(error?.error?.message ?? error?.message)
+    additionalDetails = normalizeProviderErrorMessage(error?.error?.additionalDetails)
+  }
+  else if (
+    notification.method === 'warning'
+    || notification.method === 'guardianWarning'
+    || notification.method === 'configWarning'
+    || notification.method === 'deprecationNotice'
+  ) {
+    const warning = params as WarningNotificationParams | undefined
+    message = normalizeProviderErrorMessage(warning?.message ?? warning?.summary)
+    additionalDetails = normalizeProviderErrorMessage(warning?.details)
+  }
+  else if (notification.method === 'windows/worldWritableWarning') {
+    const warning = params as WindowsWorldWritableWarningNotification | undefined
+    message = warning?.failedScan
+      ? 'Codex could not verify Windows writable paths'
+      : 'Codex detected a world-writable Windows path'
+    const samplePaths = warning?.samplePaths.join('\n') ?? ''
+    const extraCount = warning?.extraCount ?? 0
+    additionalDetails = samplePaths || extraCount > 0
+      ? `${samplePaths}${samplePaths && extraCount > 0 ? '\n' : ''}${extraCount > 0 ? `and ${extraCount} more path${extraCount === 1 ? '' : 's'}.` : ''}`
+      : null
+  }
+  else {
     return null
   }
-  const params = notification.params as ErrorNotificationParams | undefined
-  if (params?.willRetry !== true) {
-    return null
-  }
-  const message = normalizeProviderErrorMessage(params.error?.message ?? params.message)
-  const additionalDetails = normalizeProviderErrorMessage(params.error?.additionalDetails)
+
   if (!message && !additionalDetails) {
     return null
   }
   return {
-    message: message ?? 'Codex is reconnecting',
+    message: message ?? (notification.method === 'error' ? 'Codex is reconnecting' : 'Codex reported a warning'),
     additionalDetails,
   }
 }

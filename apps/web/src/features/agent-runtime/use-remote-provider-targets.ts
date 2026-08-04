@@ -27,6 +27,7 @@ function toProviderTargetOption(target: GetProviderTargetsResponse[number]): Pro
     providerKind: target.providerKind as ProviderKind,
     enabled: target.enabled,
     iconSlug: nullableString(target.iconSlug),
+    enabledModelsJson: target.enabledModelsJson,
     sourceKey: nullableString(target.sourceKey),
     externalRecordId: nullableString(target.externalRecordId),
   }

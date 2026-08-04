@@ -68,7 +68,6 @@ function mapOpencodePartToChunks(part: OpencodePart): UIMessageChunk[] {
     case 'step-start':
     case 'step-finish':
     case 'agent':
-    case 'retry':
     case 'compaction':
     case 'subtask':
       return [{
@@ -78,7 +77,18 @@ function mapOpencodePartToChunks(part: OpencodePart): UIMessageChunk[] {
           part,
         },
       }]
+    case 'retry':
+      return [mapOpencodeRetryPartToWarning(part)]
   }
+}
+
+export function mapOpencodeRetryPartToWarning(
+  part: Extract<OpencodePart, { type: 'retry' }>,
+): UIMessageChunk {
+  return providerChunk.runtimeWarning({
+    message: `OpenCode is retrying (attempt ${part.attempt}).`,
+    additionalDetails: part.error.data.message,
+  })
 }
 
 function mapOpencodeToolPartToChunks(part: Extract<OpencodePart, { type: 'tool' }>): UIMessageChunk[] {

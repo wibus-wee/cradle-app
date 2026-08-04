@@ -24,6 +24,7 @@ export interface ProviderModelOption {
   providerKind: ProviderKind
   enabled: boolean
   iconSlug: string | null
+  enabledModelsJson?: string
   sourceKey?: string | null
   externalRecordId?: string | null
 }

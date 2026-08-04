@@ -6,7 +6,6 @@
 
 import type {
   ProviderContext,
-  RuntimeAlertSeverity,
   RuntimeApprovalStatus,
   RuntimeCompactUiSlotState,
   RuntimeGoalStatus,
@@ -487,18 +486,6 @@ export interface CodexApprovalsSnapshot {
   updatedAt: number
 }
 
-export interface CodexAlertSnapshot {
-  threadId: string | null
-  items: Array<{
-    id: string
-    severity: RuntimeAlertSeverity
-    message: string
-    source: string
-    updatedAt: number
-  }>
-  updatedAt: number
-}
-
 export interface CodexFilesystemSnapshot {
   threadId: string
   recentPaths: string[]
@@ -622,7 +609,6 @@ export interface CodexProviderSnapshot {
     diff?: CodexDiffSnapshot
     terminal?: CodexTerminalSnapshot
     approvals?: CodexApprovalsSnapshot
-    alert?: CodexAlertSnapshot
     filesystem?: CodexFilesystemSnapshot
     search?: CodexSearchSnapshot
     usage?: CodexUsageSnapshot

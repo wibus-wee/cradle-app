@@ -11,9 +11,7 @@ export interface NewWorkPageViewProps {
   failureKind: NewWorkFailureKind | null
   failureMessage: string | null
   canOpenChanges: boolean
-  canStartFromRemoteDefault: boolean
   onOpenChanges: () => void
-  onStartFromRemoteDefault: () => void
   onDismissFailure: () => void
 }
 
@@ -24,9 +22,7 @@ export function NewWorkPageView({
   failureKind,
   failureMessage,
   canOpenChanges,
-  canStartFromRemoteDefault,
   onOpenChanges,
-  onStartFromRemoteDefault,
   onDismissFailure,
 }: NewWorkPageViewProps) {
   const { t } = useTranslation('work')
@@ -63,9 +59,7 @@ export function NewWorkPageView({
                   kind={failureKind}
                   message={failureMessage}
                   canOpenChanges={canOpenChanges}
-                  canStartFromRemoteDefault={canStartFromRemoteDefault}
                   onOpenChanges={onOpenChanges}
-                  onStartFromRemoteDefault={onStartFromRemoteDefault}
                   onDismiss={onDismissFailure}
                 />
               )

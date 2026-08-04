@@ -39,7 +39,6 @@ export interface WorkDetail {
 }
 
 type SessionCreateInput = Parameters<typeof Session.create>[0]
-export type WorkBaseStrategy = Worktree.WorkBaseStrategy
 export type CreateWorkInput = Omit<
   SessionCreateInput,
   'id' | 'workspaceId' | 'title' | 'origin' | 'linkedIssueId' | 'sessionGroupId' | 'worktreeId'
@@ -50,11 +49,10 @@ export type CreateWorkInput = Omit<
   objective?: string
   linkedIssueId?: string | null
   /**
-   * Isolation base selection. Defaults to `source-head` (clean local HEAD).
-   * Pass `remote-default` to start from origin's default branch tip even when
-   * the source checkout has uncommitted changes.
+   * Exact local or remote branch ref to use as the isolation base.
+   * When omitted, the current workspace HEAD is used.
    */
-  baseStrategy?: WorkBaseStrategy
+  baseBranch?: string
 }
 
 function now(): number {
@@ -268,7 +266,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
     })
   }
 
-  const baseStrategy: WorkBaseStrategy = input.baseStrategy ?? 'source-head'
+  const baseBranch = input.baseBranch?.trim() || null
   const sourceWorkspace = Workspace.get(input.workspaceId)
   if (!sourceWorkspace) {
     throw new AppError({
@@ -286,10 +284,10 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
       details: { workspaceId: input.workspaceId },
     })
   }
-  // Remote-default isolation never copies uncommitted local files into the
-  // managed worktree, so a dirty source checkout is safe. Source-head still
-  // requires a clean tree so Work does not silently drop or mix WIP.
-  if (baseStrategy === 'source-head') {
+  // An explicit branch never copies uncommitted local files into the managed
+  // worktree, so a dirty source checkout is safe. Current HEAD still requires
+  // a clean tree so Work does not silently drop or mix WIP.
+  if (!baseBranch) {
     await Worktree.assertWorkspaceCleanForManagedIsolation(input.workspaceId)
   }
 
@@ -300,7 +298,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
 
   try {
     const {
-      baseStrategy: _baseStrategy,
+      baseBranch: _baseBranch,
       title: _title,
       goal: _goal,
       objective: _objective,
@@ -321,7 +319,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
       sourceWorkspaceId: input.workspaceId,
       sessionId,
       slug: title,
-      baseStrategy,
+      baseBranch: baseBranch ?? undefined,
     })
     worktreeId = worktree.id
     await Worktree.bindSessionWorktree({ sessionId, worktreeId, pending: false })

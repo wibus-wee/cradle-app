@@ -3,7 +3,6 @@ import type {
   Query,
   SDKAuthStatusMessage,
   SDKMessage,
-  SDKPermissionDeniedMessage,
   SDKRateLimitEvent,
 } from '@anthropic-ai/claude-agent-sdk'
 import {
@@ -59,7 +58,6 @@ import {
 import {
   writeClaudeAgentAccountSnapshot,
   writeClaudeAgentAuthStatusSnapshot,
-  writeClaudeAgentPermissionDeniedSnapshot,
   writeClaudeAgentRateLimitSnapshot,
 } from './state-projector'
 import { createClaudeCodeToolInputPayload, createClaudeCodeToolResultPayload } from './tools/mapper'
@@ -257,13 +255,6 @@ export class ClaudeAgentSessionArtifacts {
       writeClaudeAgentRateLimitSnapshot(
         runtimeSession,
         (message as SDKRateLimitEvent).rate_limit_info,
-      )
-      return
-    }
-    if (message.type === 'system' && message.subtype === 'permission_denied') {
-      writeClaudeAgentPermissionDeniedSnapshot(
-        runtimeSession,
-        message as SDKPermissionDeniedMessage,
       )
     }
   }

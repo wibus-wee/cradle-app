@@ -22,7 +22,7 @@ import {
   readCodexToolError,
   readCodexToolName,
 } from '../tools/mapper'
-import { readRetryableCodexAppServerWarning } from './stream-diagnostics'
+import { readCodexAppServerRuntimeWarning } from './stream-diagnostics'
 
 export interface CodexAppServerMapperState {
   openReasoningItemIds: Set<string>
@@ -158,17 +158,22 @@ export function mapCodexAppServerNotificationToChunks(
     case 'serverRequest/handled':
       return mapHandledServerRequest(notification.params, state)
     case 'error':
-      return mapRetryableError(notification, state)
+    case 'warning':
+    case 'guardianWarning':
+    case 'configWarning':
+    case 'deprecationNotice':
+    case 'windows/worldWritableWarning':
+      return mapRuntimeWarning(notification, state)
     default:
       return []
   }
 }
 
-function mapRetryableError(
+function mapRuntimeWarning(
   notification: CodexAppServerNotification,
   state: CodexAppServerMapperState,
 ): UIMessageChunk[] {
-  const warning = readRetryableCodexAppServerWarning(notification)
+  const warning = readCodexAppServerRuntimeWarning(notification)
   if (!warning) {
     return []
   }

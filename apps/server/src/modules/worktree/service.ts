@@ -21,6 +21,7 @@ import {
   pruneGitWorktrees,
   removeGitWorktree,
   renameLocalBranch,
+  resolveBaseRef,
   resolveGitRepoRoot,
   resolveRemoteDefaultBaseRef,
   stashAndPopAcrossCheckouts,
@@ -520,11 +521,11 @@ export async function createWorktree(input: {
   slug: string
   confirmedSetupHooks?: boolean
   /**
-   * How to choose the commit the managed branch starts from.
-   * - `source-head` (default): current local HEAD. Requires a clean source when used by Work.
-   * - `remote-default`: remote-tracking default branch tip (e.g. origin/main). Safe with a dirty
-   *   source checkout because uncommitted local files never enter the new worktree.
+   * Exact local or remote branch ref to use as the commit the managed branch starts from.
+   * When omitted, the current local HEAD is used.
    */
+  baseBranch?: string
+  /** Internal automation-only compatibility until automation recipes expose a branch ref. */
   baseStrategy?: WorkBaseStrategy
 }): Promise<WorktreeView> {
   const workspacePath = Workspace.getLocalWorkspacePath(input.sourceWorkspaceId)
@@ -541,8 +542,9 @@ export async function createWorktree(input: {
   const name = buildWorktreeName(input.sessionId, input.slug)
   const branch = `${BRANCH_PREFIX}${name}`
   const absolutePath = resolveWorktreeCheckoutPath(input.sourceWorkspaceId, name)
-  const baseStrategy = input.baseStrategy ?? 'source-head'
-  const baseRef = baseStrategy === 'remote-default'
+  const baseRef = input.baseBranch
+    ? await resolveBaseRef(repoRoot, input.baseBranch)
+    : input.baseStrategy === 'remote-default'
     ? await resolveRemoteDefaultBaseRef(repoRoot)
     : await getHeadSha(repoRoot)
 

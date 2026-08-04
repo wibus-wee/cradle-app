@@ -4,10 +4,10 @@
  * Position: Claude Agent provider package owner for providerStateSnapshot updates.
  */
 
-import type { AccountInfo, SDKAuthStatusMessage, SDKPermissionDeniedMessage, SDKRateLimitInfo } from '@anthropic-ai/claude-agent-sdk'
+import type { AccountInfo, SDKAuthStatusMessage, SDKRateLimitInfo } from '@anthropic-ai/claude-agent-sdk'
 
 import { readObjectRecord as readRecord } from '../../../helpers/json-record'
-import type { RuntimeAlertItem, RuntimeAlertUiSlotState, RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimePlanStepStatus, RuntimePlanUiSlotState, RuntimeProgressUiSlotState, RuntimeSession, RuntimeToolActivityItem, RuntimeToolActivityUiSlotState, RuntimeUsageUiSlotState } from '../../chat-runtime/runtime-provider-types'
+import type { RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimePlanStepStatus, RuntimePlanUiSlotState, RuntimeProgressUiSlotState, RuntimeSession, RuntimeToolActivityItem, RuntimeToolActivityUiSlotState, RuntimeUsageUiSlotState } from '../../chat-runtime/runtime-provider-types'
 import type { WorkspaceProviderStateSnapshot } from '../kit/state-snapshot'
 import { readWorkspaceProviderStateSnapshot } from '../kit/state-snapshot'
 import type { ClaudeAgentCapturedPlan, ClaudeAgentCapturedTaskActivity, ClaudeAgentCapturedTodos } from './event-to-chunk-mapper'
@@ -56,13 +56,6 @@ interface ClaudeAgentRateLimitSnapshot {
   updatedAt: number
 }
 
-interface ClaudeAgentAlertSnapshot {
-  threadId: string
-  items: RuntimeAlertItem[]
-  updatedAt: number
-}
-
-const CLAUDE_AGENT_RECENT_ALERT_LIMIT = 12
 const CLAUDE_AGENT_RECENT_CREW_CALL_LIMIT = 24
 const CLAUDE_AGENT_RECENT_WORKFLOW_EXECUTION_LIMIT = 12
 const CLAUDE_AGENT_RECENT_TASK_ACTIVITY_LIMIT = 24
@@ -320,55 +313,6 @@ export function writeClaudeAgentRateLimitSnapshot(
   })
 }
 
-export function writeClaudeAgentPermissionDeniedSnapshot(
-  runtimeSession: RuntimeSession,
-  message: SDKPermissionDeniedMessage,
-  updatedAt: number = Date.now(),
-): void {
-  const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
-  const claudeAgentState = { ...readRecord(snapshot.claudeAgent) }
-  const previous = readClaudeAgentAlertSnapshot(claudeAgentState.alert)
-  const id = `permission-denied:${message.tool_use_id}`
-  const item: RuntimeAlertItem = {
-    id,
-    severity: 'warning',
-    message: message.decision_reason?.trim() || message.message,
-    source: `Claude ${message.tool_name}`,
-    updatedAt,
-  }
-  const items = [
-    item,
-    ...(previous?.items.filter(candidate => candidate.id !== id) ?? []),
-  ].slice(0, CLAUDE_AGENT_RECENT_ALERT_LIMIT)
-
-  claudeAgentState.alert = {
-    threadId: runtimeSession.chatSessionId,
-    items,
-    updatedAt,
-  } satisfies ClaudeAgentAlertSnapshot
-  runtimeSession.providerStateSnapshot = JSON.stringify({
-    ...snapshot,
-    claudeAgent: claudeAgentState,
-  })
-}
-
-export function projectClaudeAgentAlertUiSlotState(runtimeSession: RuntimeSession): RuntimeAlertUiSlotState | null {
-  const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
-  const alert = readClaudeAgentAlertSnapshot(readRecord(snapshot.claudeAgent).alert)
-  if (!alert || alert.threadId !== runtimeSession.chatSessionId || alert.items.length === 0) {
-    return null
-  }
-  return {
-    kind: 'alert',
-    slotId: 'claude-agent:alerts',
-    threadId: alert.threadId,
-    warningCount: alert.items.filter(item => item.severity === 'warning').length,
-    errorCount: alert.items.filter(item => item.severity === 'error').length,
-    recentItems: alert.items,
-    updatedAt: alert.updatedAt,
-  }
-}
-
 export function projectClaudeAgentUsageUiSlotState(runtimeSession: RuntimeSession): RuntimeUsageUiSlotState | null {
   const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
   const claudeAgentState = readRecord(snapshot.claudeAgent)
@@ -471,37 +415,6 @@ function readClaudeAgentRateLimitSnapshot(value: unknown): ClaudeAgentRateLimitS
     },
     updatedAt,
   }
-}
-
-function readClaudeAgentAlertSnapshot(value: unknown): ClaudeAgentAlertSnapshot | null {
-  const alert = readRecord(value)
-  const threadId = typeof alert.threadId === 'string' ? alert.threadId : ''
-  const updatedAt = typeof alert.updatedAt === 'number' ? alert.updatedAt : 0
-  const items = Array.isArray(alert.items)
-    ? alert.items.flatMap((value): RuntimeAlertItem[] => {
-        const item = readRecord(value)
-        if (
-          typeof item.id !== 'string'
-          || (item.severity !== 'warning' && item.severity !== 'error')
-          || typeof item.message !== 'string'
-          || typeof item.source !== 'string'
-          || typeof item.updatedAt !== 'number'
-        ) {
-          return []
-        }
-        return [{
-          id: item.id,
-          severity: item.severity,
-          message: item.message,
-          source: item.source,
-          updatedAt: item.updatedAt,
-        }]
-      })
-    : []
-  if (!threadId || updatedAt <= 0 || items.length === 0) {
-    return null
-  }
-  return { threadId, items, updatedAt }
 }
 
 function isClaudeAgentRateLimitStatus(value: unknown): value is SDKRateLimitInfo['status'] {

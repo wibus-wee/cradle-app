@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Cradle",
+    "slug": "cradle-mobile",
+    "scheme": "cradle",
+    "version": "0.1.0",
+    "icon": "../../build/icon.png",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.cradle.mobile",
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Cradle connects to your Cradle Server on the local network.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "app.cradle.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "../../build/icon.png",
+        "backgroundColor": "#fafafa"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          },
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
+      "./plugins/with-markdown-view"
+    ],
+    "experiments": {
+      "inlineModules": {
+        "watchedDirectories": ["src"]
+      },
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
