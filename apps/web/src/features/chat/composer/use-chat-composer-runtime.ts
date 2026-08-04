@@ -12,6 +12,7 @@ import { isElectron, platform } from '~/lib/electron'
 
 import type {
   ChatRuntimeCompactUiSlotState,
+  ChatRuntimeUsageUiSlotState,
   ChatRuntimeUiSlot,
   ChatRuntimeUiSlotState,
 } from '../capabilities/chat-capabilities'
@@ -69,6 +70,7 @@ export interface ChatComposerRuntime {
     contextWindow: number
   }
   compactState: ChatRuntimeCompactUiSlotState | null
+  usageState: ChatRuntimeUsageUiSlotState | null
 }
 
 interface UseChatComposerRuntimeOptions {
@@ -306,6 +308,13 @@ export function useChatComposerRuntime({
   }, [compactSlotState])
   const uiSlots = runtimeCapabilities?.uiSlots ?? EMPTY_RUNTIME_UI_SLOTS
   const slotStates = runtimeUiSlotStates?.states ?? EMPTY_RUNTIME_UI_SLOT_STATES
+  const usageState = useMemo(
+    () =>
+      slotStates.find(
+        (state): state is ChatRuntimeUsageUiSlotState => state.kind === 'usage',
+      ) ?? null,
+    [slotStates],
+  )
 
   const send = useCallback(
     async (
@@ -367,6 +376,7 @@ export function useChatComposerRuntime({
     usesLightOcr,
     tokenUsage,
     compactState: compactSlotState,
+    usageState,
   }
 }
 

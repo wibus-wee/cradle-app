@@ -5,20 +5,22 @@ import {
   compactContextUsageFixture,
   contextUsageFixture,
   contextUsageNearLimitFixture,
+  runtimeUsageFixture,
 } from '../fixtures/context-usage-fixtures'
 import { ContextUsageDetailPanelView } from '../views/context-usage-detail-panel-view'
 import { ContextWindowViewerView } from '../views/context-window-viewer-view'
 
 interface ContextUsageStorySceneProps {
-  state: 'detailed' | 'near-limit' | 'compact' | 'loading' | 'error'
+  state: 'detailed' | 'near-limit' | 'provider-usage' | 'compact' | 'loading' | 'error'
 }
 
 function ContextUsageStoryScene({ state }: ContextUsageStorySceneProps) {
   const [lastAction, setLastAction] = useState('No action yet')
   const usage = state === 'near-limit'
     ? contextUsageNearLimitFixture
-    : state === 'detailed' ? contextUsageFixture : null
+    : state === 'detailed' || state === 'provider-usage' ? contextUsageFixture : null
   const compactState = state === 'compact' ? compactContextUsageFixture : undefined
+  const runtimeUsageState = state === 'provider-usage' ? runtimeUsageFixture : undefined
   const loadState = state === 'loading' ? 'loading' : state === 'error' ? 'error' : 'ready'
 
   return (
@@ -27,6 +29,7 @@ function ContextUsageStoryScene({ state }: ContextUsageStorySceneProps) {
         <ContextUsageDetailPanelView
           usage={usage}
           compactState={compactState}
+          runtimeUsageState={runtimeUsageState}
           loadState={loadState}
           onClose={() => setLastAction('Closed detail panel')}
           onOpenReport={() => setLastAction('Opened context report')}
@@ -65,6 +68,7 @@ type Story = StoryObj<typeof meta>
 
 export const Detailed: Story = {}
 export const NearLimit: Story = { args: { state: 'near-limit' } }
+export const ProviderUsage: Story = { args: { state: 'provider-usage' } }
 export const CompactFallback: Story = { args: { state: 'compact' } }
 export const Loading: Story = { args: { state: 'loading' } }
 export const Error: Story = { args: { state: 'error' } }

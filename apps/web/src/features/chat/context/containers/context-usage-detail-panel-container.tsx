@@ -2,19 +2,24 @@ import { useQuery } from '@tanstack/react-query'
 
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
-import type { ChatRuntimeCompactUiSlotState } from '../../capabilities/chat-capabilities'
+import type {
+  ChatRuntimeCompactUiSlotState,
+  ChatRuntimeUsageUiSlotState,
+} from '../../capabilities/chat-capabilities'
 import { getChatRuntimeContextUsage } from '../../capabilities/chat-capabilities'
 import { ContextUsageDetailPanelView } from '../views/context-usage-detail-panel-view'
 
 interface ContextUsageDetailPanelContainerProps {
   sessionId: string | null
   compactState?: ChatRuntimeCompactUiSlotState | null
+  runtimeUsageState?: ChatRuntimeUsageUiSlotState | null
   onClose: () => void
 }
 
 export function ContextUsageDetailPanelContainer({
   sessionId,
   compactState,
+  runtimeUsageState,
   onClose,
 }: ContextUsageDetailPanelContainerProps) {
   const openContextUsageReportTab = useBrowserPanelStore(
@@ -38,6 +43,7 @@ export function ContextUsageDetailPanelContainer({
     <ContextUsageDetailPanelView
       usage={data?.usage ?? null}
       compactState={compactState}
+      runtimeUsageState={runtimeUsageState}
       loadState={isLoading ? 'loading' : isError ? 'error' : 'ready'}
       onClose={onClose}
       onOpenReport={() => {

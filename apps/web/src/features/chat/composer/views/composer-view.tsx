@@ -18,7 +18,10 @@ import { cn } from '~/lib/cn'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import type { ComposerDraft } from '~/store/composer-draft'
 
-import type { ChatRuntimeCompactUiSlotState } from '../../capabilities/chat-capabilities'
+import type {
+  ChatRuntimeCompactUiSlotState,
+  ChatRuntimeUsageUiSlotState,
+} from '../../capabilities/chat-capabilities'
 import { readBangCommand } from '../../commands/bang-command'
 import type {
   ChatRuntimeSettings,
@@ -208,6 +211,7 @@ export interface ComposerViewOptions {
   sessionTokens?: number
   sessionContextWindow?: number | null
   compactState?: ChatRuntimeCompactUiSlotState | null
+  runtimeUsageState?: ChatRuntimeUsageUiSlotState | null
   /**
    * When provided, the composer persists its draft to per-surface localStorage
    * and restores it on remount. This prevents draft loss on tab switches.
@@ -348,6 +352,7 @@ export function ComposerView({
     sessionTokens,
     sessionContextWindow,
     compactState,
+    runtimeUsageState,
     promptHistory = [],
   } = view ?? {}
   const { textareaAriaLabel = 'Message', sendButtonAriaLabel } = accessibility ?? {}
@@ -1304,6 +1309,7 @@ export function ComposerView({
               sessionTokens={sessionTokens}
               sessionContextWindow={sessionContextWindow}
               compactState={compactState}
+              runtimeUsageState={runtimeUsageState}
               contextBar={contextBar}
               disabled={effectiveDisabled}
               sendVariants={sendVariantActions}
