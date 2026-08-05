@@ -51,6 +51,26 @@ async function stopProcessGroup(proc: ChildProcess | null, timeoutMs: number): P
   })
 }
 
+async function runProcess(command: string, args: string[], options: Parameters<typeof spawn>[2]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, options)
+    let stderr = ''
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
+    child.once('error', reject)
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolve()
+        return
+      }
+
+      reject(new Error(`${command} ${args.join(' ')} failed (${signal ?? `exit ${code}`}):\n${stderr}`))
+    })
+  })
+}
+
 const ROOT = resolve(__dirname, '..', '..', '..')
 const CODEX_APP_SERVER_PATH_ENV = 'CRADLE_CODEX_APP_SERVER_PATH'
 const CODEX_APP_SERVER_PACKAGE_PATH = '@openai/codex/bin/codex.js'
@@ -213,12 +233,24 @@ BeforeAll({ timeout: 120_000 }, async () => {
       console.warn('[e2e] Codex app-server not resolved — Codex scenarios will fail until sync:codex-runtime')
     }
 
-    // Start a web dev server pointing to the managed API server
+    // Build and serve the production web bundle so E2E measures application startup,
+    // not Vite's on-demand module transformation on a cold runner.
     let webUrl: string | null = null
 
     if (!process.env.CRADLE_WEB_URL) {
       const webPort = await reserveAvailablePort()
-      webProcess = spawn(join(ROOT, 'apps', 'web', 'node_modules', '.bin', 'vite'), ['--port', String(webPort), '--strictPort'], {
+      const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+      await runProcess(pnpm, ['--filter', '@cradle/web', 'build'], {
+        cwd: ROOT,
+        env: {
+          ...process.env,
+          CRADLE_E2E: '1',
+          VITE_SERVER_URL: serverUrl,
+        },
+        stdio: process.env.CRADLE_E2E_VERBOSE ? 'inherit' : ['ignore', 'ignore', 'pipe'],
+      })
+
+      webProcess = spawn(join(ROOT, 'apps', 'web', 'node_modules', '.bin', 'vite'), ['preview', '--host', '127.0.0.1', '--port', String(webPort), '--strictPort'], {
         cwd: join(ROOT, 'apps', 'web'),
         env: {
           ...process.env,
@@ -243,7 +275,7 @@ BeforeAll({ timeout: 120_000 }, async () => {
       webUrl = `http://localhost:${webPort}`
       await waitForReady(webUrl, 'Managed E2E Web', 30_000)
 
-      console.log(`[e2e] Managed web dev server started at ${webUrl}`)
+      console.log(`[e2e] Managed web production preview started at ${webUrl}`)
     }
 
     instance = { serverProcess, webProcess, dataDir, serverUrl, webUrl }
