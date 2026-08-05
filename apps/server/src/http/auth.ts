@@ -6,7 +6,7 @@ import { loadServerAuthConfig } from '../config/server-config'
 import { AppError } from '../errors/app-error'
 import { issueBrowserAuthSession, verifyBrowserAuthSession } from './browser-auth-session'
 import { OPENAPI_DOCS_PATH, OPENAPI_JSON_ALIAS_PATH, OPENAPI_JSON_PATH } from './openapi'
-import { consumeWebSocketTicket, issueWebSocketTicket } from './websocket-ticket'
+import { consumeWebSocketTicket, hasWebSocketTicket, issueWebSocketTicket } from './websocket-ticket'
 
 export const CRADLE_TOKEN_HEADER = 'x-cradle-token'
 export const CRADLE_RELAY_TOKEN_HEADER = 'x-cradle-relay-token'
@@ -20,6 +20,12 @@ interface AuthConfig {
 interface VerifyRequestTokenOptions {
   token?: string | null
   config?: AuthConfig
+}
+
+interface VerifyWebSocketRequestTokenOptions {
+  config?: AuthConfig
+  audience?: string
+  consume?: boolean
 }
 
 function readAuthConfig(): AuthConfig {
@@ -99,7 +105,7 @@ export function verifyRequestToken(
 
 export function verifyWebSocketRequestToken(
   request: Request,
-  options: Pick<VerifyRequestTokenOptions, 'config'> & { audience?: string } = {},
+  options: VerifyWebSocketRequestTokenOptions = {},
 ): boolean {
   const url = new URL(request.url)
   const config = options.config ?? readAuthConfig()
@@ -107,7 +113,13 @@ export function verifyWebSocketRequestToken(
     return true
   }
   const ticket = url.searchParams.get('ticket')
-  return Boolean(ticket && consumeWebSocketTicket(ticket, options.audience ?? url.pathname))
+  if (!ticket) {
+    return false
+  }
+  const audience = options.audience ?? url.pathname
+  return options.consume === false
+    ? hasWebSocketTicket(ticket, audience)
+    : consumeWebSocketTicket(ticket, audience)
 }
 
 export function createAuthPlugin(config: AuthConfig = readAuthConfig()) {
@@ -125,6 +137,17 @@ export function createAuthPlugin(config: AuthConfig = readAuthConfig()) {
         && eventTicket
         && consumeWebSocketTicket(eventTicket, `sse:${pathname}`)
       ) {
+        return undefined
+      }
+
+      if (
+        request.method === 'GET'
+        && request.headers.get('upgrade')?.toLowerCase() === 'websocket'
+        && verifyWebSocketRequestToken(request, { config, audience: pathname, consume: false })
+      ) {
+        // Native browser WebSocket upgrades cannot send Authorization headers.
+        // Leave ticket consumption to the matched WebSocket route so this global
+        // hook does not consume the single-use ticket before route validation.
         return undefined
       }
 

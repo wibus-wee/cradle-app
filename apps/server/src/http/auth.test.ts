@@ -109,6 +109,31 @@ describe('hTTP auth plugin', () => {
     })).toBe(false)
   })
 
+  it('lets the global auth hook pre-validate, but not consume, WebSocket tickets', async () => {
+    resetWebSocketTicketsForTests()
+    const { ticket } = issueWebSocketTicket('/protected')
+    const app = createTestApp({ authRequired: true, authToken: 'secret-token' })
+
+    const response = await app.handle(new Request(`http://localhost/protected?ticket=${ticket}`, {
+      headers: { upgrade: 'websocket' },
+    }))
+
+    expect(response.status).toBe(200)
+    expect(verifyWebSocketRequestToken(new Request(`http://localhost/protected?ticket=${ticket}`), {
+      config: { authRequired: true, authToken: 'secret-token' },
+    })).toBe(true)
+  })
+
+  it('does not bypass HTTP auth for a ticket without a WebSocket upgrade', async () => {
+    resetWebSocketTicketsForTests()
+    const { ticket } = issueWebSocketTicket('/protected')
+    const app = createTestApp({ authRequired: true, authToken: 'secret-token' })
+
+    const response = await app.handle(new Request(`http://localhost/protected?ticket=${ticket}`))
+
+    expect(response.status).toBe(401)
+  })
+
   it('rejects a WebSocket ticket issued for a different audience', () => {
     resetWebSocketTicketsForTests()
     const { ticket } = issueWebSocketTicket('/sync')

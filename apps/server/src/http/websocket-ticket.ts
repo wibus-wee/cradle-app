@@ -42,8 +42,13 @@ export function issueWebSocketTicket(audience: string, now = Date.now()): {
 
 export function consumeWebSocketTicket(ticket: string, audience: string, now = Date.now()): boolean {
   const digest = digestTicket(ticket)
-  const record = tickets.get(digest)
+  const valid = hasWebSocketTicket(ticket, audience, now)
   tickets.delete(digest)
+  return valid
+}
+
+export function hasWebSocketTicket(ticket: string, audience: string, now = Date.now()): boolean {
+  const record = tickets.get(digestTicket(ticket))
   return Boolean(record && record.expiresAt > now && record.audience === audience)
 }
 
