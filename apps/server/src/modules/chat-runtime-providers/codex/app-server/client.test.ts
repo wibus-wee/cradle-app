@@ -13,6 +13,7 @@ import {
   readCradleCodexClientVersion,
   resolveCodexAppServerHome,
   resolveCodexAppServerLaunch,
+  summarizeCodexAppServerStderr,
 } from './client'
 
 const spawnMock = vi.hoisted(() => vi.fn())
@@ -199,6 +200,23 @@ describe('isCodexAppServerUnknownMethodError', () => {
 })
 
 describe('codexAppServerClient', () => {
+  it('summarizes repeated process diagnostics into actionable core errors', () => {
+    const stderr = [
+      '\u001B[2m2026-08-06T02:01:00.179537Z\u001B[0m \u001B[31mERROR\u001B[0m \u001B[2mrmcp::transport::worker\u001B[0m: worker quit with fatal: Transport channel closed, when UnexpectedServerResponse("HTTP 502: ")',
+      '\u001B[2m2026-08-06T02:01:04.796556Z\u001B[0m \u001B[31mERROR\u001B[0m \u001B[2mrmcp::transport::worker\u001B[0m: worker quit with fatal: Transport channel closed, when UnexpectedServerResponse("HTTP 502: ")',
+      '\u001B[2m2026-08-06T02:01:05.190902Z\u001B[0m \u001B[31mERROR\u001B[0m \u001B[2mcodex_api::endpoint::responses_websocket\u001B[0m: failed to connect to websocket: IO error: tls handshake eof, url: wss://chatgpt.com/backend-api/codex/responses',
+      '\u001B[2m2026-08-06T02:08:30.440279Z\u001B[0m \u001B[31mERROR\u001B[0m \u001B[2mcodex_core::tools::router\u001B[0m: apply_patch verification failed: unrelated tool output',
+    ].join('\n')
+
+    expect(summarizeCodexAppServerStderr(stderr)).toBe(
+      'worker quit with fatal: Transport channel closed, when UnexpectedServerResponse("HTTP 502: "); failed to connect to websocket: IO error: tls handshake eof',
+    )
+  })
+
+  it('returns no process diagnostic suffix when stderr has no useful error lines', () => {
+    expect(summarizeCodexAppServerStderr('notice: shutting down\n')).toBeNull()
+  })
+
   it('passes Cradle context environment into the app-server process', () => {
     managedProcessMock.mockReturnValueOnce(asManagedProcess({
       stdin: new Writable({ write: (_chunk, _encoding, callback) => callback() }),
