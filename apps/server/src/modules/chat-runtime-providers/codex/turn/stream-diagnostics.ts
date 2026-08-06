@@ -337,6 +337,10 @@ function summarizeCodexFailureDetails(
     if (additionalDetails) {
       parts.push(additionalDetails)
     }
+    const errorInfo = formatCodexErrorInfo(errorParams?.error?.codexErrorInfo)
+    if (errorInfo) {
+      parts.push(`error type: ${errorInfo}`)
+    }
     const statusText = readCodexStatusText(errorParams)
     if (statusText) {
       parts.push(statusText)
@@ -357,6 +361,42 @@ function summarizeCodexFailureDetails(
   parts.push(`events: ${diagnostics.totalEvents} total, ${diagnostics.mappedEvents} mapped`)
   parts.push(`event types: ${formatCounts(diagnostics.eventTypeCounts)}`)
   return parts.length > 0 ? parts.join('; ') : null
+}
+
+/**
+ * ErrorNotification has a deliberately small user-relevant core:
+ * error.message, error.additionalDetails, and error.codexErrorInfo. Keep
+ * protocol envelope fields (threadId, turnId, willRetry) and raw diagnostics
+ * out of the visible failure text.
+ */
+function formatCodexErrorInfo(value: unknown): string | null {
+  if (typeof value === 'string') {
+    return value
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null
+  }
+  const [entry] = Object.entries(value as Record<string, unknown>)
+  if (!entry) {
+    return null
+  }
+  const [kind, details] = entry
+  const label = kind
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, character => character.toUpperCase())
+  if (!details || typeof details !== 'object' || Array.isArray(details)) {
+    return label
+  }
+  const record = details as Record<string, unknown>
+  const httpStatusCode = typeof record.httpStatusCode === 'number' ? record.httpStatusCode : null
+  const turnKind = typeof record.turnKind === 'string' ? record.turnKind : null
+  if (httpStatusCode !== null) {
+    return `${label} (HTTP ${httpStatusCode})`
+  }
+  if (turnKind) {
+    return `${label} (${turnKind})`
+  }
+  return label
 }
 
 function readCodexStatusText(params: ErrorNotificationParams | undefined): string | null {
