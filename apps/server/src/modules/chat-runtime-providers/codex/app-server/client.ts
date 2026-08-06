@@ -52,6 +52,8 @@ export interface CodexAppServerClientOptions {
 
 const CODEX_NATIVE_CLIENT_INFO_FALLBACK_VERSION = '0.0.0'
 const CODEX_APP_SERVER_PATH_ENV = 'CRADLE_CODEX_APP_SERVER_PATH'
+const MAX_EXIT_ERROR_DIAGNOSTICS = 3
+const MAX_STDERR_BUFFER_LENGTH = 64_000
 const codexNativeClientVersionByPath = new Map<string, Promise<string>>()
 
 export function buildCradleCodexAppServerEnv(input: {
@@ -147,7 +149,7 @@ export class CodexAppServerClient {
     }
     this.childStdin = childStdin
     childStderr.on('data', (chunk: Buffer) => {
-      this.stderrText += chunk.toString('utf8')
+      this.stderrText = `${this.stderrText}${chunk.toString('utf8')}`.slice(-MAX_STDERR_BUFFER_LENGTH)
     })
     childStdin.on('error', error => this.terminate(error))
     this.child.once('error', error => this.terminate(error))
@@ -252,7 +254,8 @@ export class CodexAppServerClient {
       return new Error('Codex app-server exited')
     }
     const detail = signal ? `signal ${signal}` : `code ${code ?? 1}`
-    return new Error(`Codex app-server exited with ${detail}: ${this.stderrText}`)
+    const stderrSummary = summarizeCodexAppServerStderr(this.stderrText)
+    return new Error(`Codex app-server exited with ${detail}${stderrSummary ? `: ${stderrSummary}` : ''}`)
   }
 
   private terminate(error: Error): void {
@@ -415,6 +418,40 @@ export class CodexAppServerClient {
       }
     })
   }
+}
+
+/**
+ * Keep process failures actionable without copying the app-server's entire
+ * stderr buffer into the user-facing Error.message. The buffer often contains
+ * the same retry/transport failure hundreds of times, plus unrelated agent
+ * tool output from earlier in the process lifetime.
+ */
+export function summarizeCodexAppServerStderr(stderr: string): string | null {
+  const lines = stripAnsi(stderr)
+    .split(/\r?\n/)
+    .map(normalizeCodexAppServerStderrLine)
+    .filter((line): line is string => line !== null)
+
+  const candidates = lines.filter(line => /fatal|panic|error|failed|transport|websocket|handshake|http\s+\d{3}|server|startup/i.test(line))
+  const infrastructureCandidates = candidates.filter(line => /fatal|panic|transport|websocket|handshake|http\s+\d{3}|server|startup/i.test(line))
+  const selected = (infrastructureCandidates.length > 0 ? infrastructureCandidates : candidates)
+    .filter((line, index, all) => all.findIndex(candidate => candidate.toLowerCase() === line.toLowerCase()) === index)
+    .slice(0, MAX_EXIT_ERROR_DIAGNOSTICS)
+
+  return selected.length > 0 ? selected.join('; ') : null
+}
+
+function normalizeCodexAppServerStderrLine(line: string): string | null {
+  const normalized = line
+    .replace(/^\d{4}-\d{2}-\d{2}T\S+\s+(?:ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\s+\S+:\s*/i, '')
+    .replace(/,?\s*url:\s*\S+/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return normalized.length > 0 ? normalized : null
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\u001B\[[0-9;]*m/g, '')
 }
 
 export function readCradleCodexClientVersion(env: Record<string, string | undefined> = process.env): string {
