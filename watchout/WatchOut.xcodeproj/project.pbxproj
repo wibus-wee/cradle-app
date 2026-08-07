@@ -1,0 +1,292 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A46FED3CF3F1408AAA427583 /* WatchOutApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B48A5E38503B42EA9D03E06F /* WatchOutApp.swift */; };
+		A55ET5CAT00000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A55ET5CAT00000000000002 /* Assets.xcassets */; };
+		D31CAED00A764502A12DD647 /* WatchOutUI in Frameworks */ = {isa = PBXBuildFile; productRef = 1918CFC233514A3E9857FE5C /* WatchOutUI */; };
+		443C2C29D7A74C12BB97B7E0 /* WatchOutCore in Frameworks */ = {isa = PBXBuildFile; productRef = 9957D4A7EBF24951A0E77FCE /* WatchOutCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B48A5E38503B42EA9D03E06F /* WatchOutApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchOutApp.swift; sourceTree = "<group>"; };
+		A11NF0PL15T000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A55ET5CAT00000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F4E77257352F4FFBB23795F4 /* WatchOut.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WatchOut.entitlements; sourceTree = "<group>"; };
+		D657CD84B49C420389E7D981 /* WatchOut.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WatchOut.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		3EAAE4CBFDBD4887A8D77233 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D31CAED00A764502A12DD647 /* WatchOutUI in Frameworks */,
+				443C2C29D7A74C12BB97B7E0 /* WatchOutCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		248AAA22CF4C457DAA84B816 = {
+			isa = PBXGroup;
+			children = (
+				9B2F49A116C34728A0FFF8A8 /* Apps */,
+				73F07E5B9CF94C76BB670636 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		9B2F49A116C34728A0FFF8A8 /* Apps */ = {
+			isa = PBXGroup;
+			children = (
+				DAAA006FBAEA471E9486C29D /* WatchOut */,
+			);
+			path = Apps;
+			sourceTree = "<group>";
+		};
+		DAAA006FBAEA471E9486C29D /* WatchOut */ = {
+			isa = PBXGroup;
+			children = (
+				B48A5E38503B42EA9D03E06F /* WatchOutApp.swift */,
+				A55ET5CAT00000000000002 /* Assets.xcassets */,
+				A11NF0PL15T000000000001 /* Info.plist */,
+				F4E77257352F4FFBB23795F4 /* WatchOut.entitlements */,
+			);
+			path = WatchOut;
+			sourceTree = "<group>";
+		};
+		73F07E5B9CF94C76BB670636 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				D657CD84B49C420389E7D981 /* WatchOut.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		4775DBEF844C49B787235947 /* WatchOut */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B58B00BC00C040BDB5E5D646 /* Build configuration list for PBXNativeTarget "WatchOut" */;
+			buildPhases = (
+				6AD881AECE3E4C3885085D35 /* Sources */,
+				3EAAE4CBFDBD4887A8D77233 /* Frameworks */,
+				EBFF9CF04AD644A995C06EC6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WatchOut;
+			packageProductDependencies = (
+				1918CFC233514A3E9857FE5C /* WatchOutUI */,
+				9957D4A7EBF24951A0E77FCE /* WatchOutCore */,
+			);
+			productName = WatchOut;
+			productReference = D657CD84B49C420389E7D981 /* WatchOut.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FEC0FBCA136D4799B29B39F9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					4775DBEF844C49B787235947 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 43B486D3C40E4094BDA435EF /* Build configuration list for PBXProject "WatchOut" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 248AAA22CF4C457DAA84B816;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9231475004554A649ABC6147 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 73F07E5B9CF94C76BB670636 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				4775DBEF844C49B787235947 /* WatchOut */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		EBFF9CF04AD644A995C06EC6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A55ET5CAT00000000000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6AD881AECE3E4C3885085D35 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A46FED3CF3F1408AAA427583 /* WatchOutApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		477203ED040243B58351DF3F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		FD02D1C2AA02414FB4BD191A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		080DAB98E10B482CB7BE0CE5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Apps/WatchOut/WatchOut.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Apps/WatchOut/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WatchOut;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © WatchOut";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.watchout.WatchOut;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		719CF74A75AA4E9DB2033321 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Apps/WatchOut/WatchOut.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Apps/WatchOut/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = WatchOut;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © WatchOut";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.4.0;
+				PRODUCT_BUNDLE_IDENTIFIER = app.watchout.WatchOut;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		43B486D3C40E4094BDA435EF /* Build configuration list for PBXProject "WatchOut" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				477203ED040243B58351DF3F /* Debug */,
+				FD02D1C2AA02414FB4BD191A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B58B00BC00C040BDB5E5D646 /* Build configuration list for PBXNativeTarget "WatchOut" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				080DAB98E10B482CB7BE0CE5 /* Debug */,
+				719CF74A75AA4E9DB2033321 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		9231475004554A649ABC6147 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1918CFC233514A3E9857FE5C /* WatchOutUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9231475004554A649ABC6147 /* XCLocalSwiftPackageReference "." */;
+			productName = WatchOutUI;
+		};
+		9957D4A7EBF24951A0E77FCE /* WatchOutCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9231475004554A649ABC6147 /* XCLocalSwiftPackageReference "." */;
+			productName = WatchOutCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = FEC0FBCA136D4799B29B39F9 /* Project object */;
+}

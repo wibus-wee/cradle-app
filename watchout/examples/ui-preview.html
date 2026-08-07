@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WatchOut — Liquid Glass direction</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      font: 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      --ink: #17181c;
+      --secondary: #656a73;
+      --tertiary: #8b919a;
+      --hairline: rgba(25, 30, 40, .11);
+      --glass: rgba(250, 251, 255, .50);
+      --glass-strong: rgba(250, 251, 255, .74);
+      --content: rgba(250, 250, 252, .24);
+      --blue: #2878ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 48px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 10%, #f8d6c5 0, transparent 28%),
+        radial-gradient(circle at 80% 5%, #cbdcff 0, transparent 28%),
+        linear-gradient(135deg, #e7e6e4 0%, #b9c3d0 50%, #e1d9d0 100%);
+      -webkit-font-smoothing: antialiased;
+    }
+    .intro { max-width: 820px; margin: 0 auto 30px; }
+    h1 { margin: 0 0 7px; font-size: 28px; letter-spacing: -.04em; }
+    .intro p { margin: 0; color: var(--secondary); font-size: 14px; }
+    .stage { display: flex; justify-content: center; align-items: flex-start; gap: 34px; flex-wrap: wrap; }
+    .label { margin: 0 0 10px 4px; color: var(--secondary); font-weight: 650; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+    .artboard { position: relative; }
+    .window {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.70);
+      background: linear-gradient(145deg, rgba(255,255,255,.40), rgba(238,241,248,.17));
+      box-shadow: 0 22px 65px rgba(28,39,61,.24), inset 0 1px rgba(255,255,255,.76);
+      backdrop-filter: blur(34px) saturate(1.4);
+    }
+    .menu-window { width: 340px; height: 480px; border-radius: 28px; padding: 14px; }
+    .floating-window { width: 560px; height: 560px; border-radius: 34px; padding: 20px; }
+    .capture-window { width: 720px; min-height: 196px; border-radius: 30px; padding: 22px; }
+    .toolbar {
+      display: flex; align-items: center; gap: 9px;
+      min-height: 40px; padding: 6px 8px;
+      border: 1px solid rgba(255,255,255,.62);
+      background: var(--glass);
+      box-shadow: 0 8px 25px rgba(34,42,58,.10), inset 0 1px rgba(255,255,255,.62);
+      backdrop-filter: blur(30px) saturate(1.45);
+    }
+    .toolbar.round { border-radius: 16px; }
+    .toolbar.capsule { border-radius: 999px; }
+    .app-icon { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 8px; color: white; background: linear-gradient(145deg,#8ba7ff,#2f63d9); box-shadow: inset 0 1px rgba(255,255,255,.5); }
+    .app-icon::before { content: "◌"; font-size: 22px; line-height: 1; transform: rotate(-22deg); }
+    .title { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
+    .title.large { font-size: 17px; }
+    .count { color: var(--secondary); font-variant-numeric: tabular-nums; font-size: 11px; padding: 2px 7px; border: 1px solid var(--hairline); border-radius: 999px; background: rgba(255,255,255,.28); }
+    .spacer { flex: 1; }
+    .segmented { display: flex; padding: 2px; gap: 2px; border-radius: 9px; background: rgba(20,25,35,.07); }
+    .segmented span { padding: 4px 8px; border-radius: 7px; color: var(--secondary); font-size: 11px; }
+    .segmented .selected { color: var(--ink); background: var(--glass-strong); box-shadow: 0 1px 5px rgba(20,25,35,.12); }
+    .icon-button { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; color: var(--secondary); font-size: 17px; }
+    .search { display: flex; align-items: center; gap: 8px; margin: 10px 2px; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 10px; color: var(--tertiary); background: rgba(25,30,40,.045); }
+    .search b { color: var(--secondary); font-size: 15px; }
+    .content { display: flex; min-height: 0; flex-direction: column; gap: 8px; height: 320px; overflow: hidden; padding: 2px; }
+    .floating-window .content { height: 380px; }
+    .item { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid transparent; border-radius: 16px; background: var(--content); }
+    .item.focused { border-color: rgba(40,120,255,.48); background: rgba(40,120,255,.10); }
+    .check { flex: 0 0 22px; color: var(--secondary); font-size: 18px; line-height: 20px; }
+    .check.done { color: var(--blue); }
+    .item-body { flex: 1; min-width: 0; }
+    .item-title { font-size: 13px; font-weight: 650; }
+    .item-body p { margin: 4px 0 0; color: var(--secondary); font-size: 12px; }
+    .meta { display: flex; gap: 7px; margin-top: 7px; color: var(--tertiary); font-size: 10px; }
+    .meta span + span::before { content: "·"; margin-right: 7px; }
+    .row-action { color: var(--tertiary); opacity: .8; font-size: 12px; }
+    .capture { display: flex; align-items: center; gap: 9px; margin-top: 10px; padding: 9px 10px; border: 1px solid rgba(255,255,255,.64); border-radius: 999px; background: var(--glass-strong); box-shadow: 0 8px 25px rgba(34,42,58,.10), inset 0 1px rgba(255,255,255,.7); backdrop-filter: blur(30px) saturate(1.45); }
+    .capture .placeholder { flex: 1; color: var(--tertiary); }
+    .capture .clipboard { color: var(--secondary); font-size: 16px; }
+    .park { display: flex; align-items: center; gap: 5px; padding: 6px 11px; color: white; border: 0; border-radius: 999px; background: linear-gradient(180deg, #458aff, #2468e6); box-shadow: inset 0 1px rgba(255,255,255,.35), 0 3px 7px rgba(36,104,230,.25); font-weight: 650; }
+    .hint { margin: 12px 3px 0; color: var(--tertiary); font-size: 11px; }
+    .stats { display: flex; gap: 8px; margin: 15px 2px 12px; }
+    .stat { flex: 1; padding: 10px 12px; border-radius: 14px; background: rgba(25,30,40,.045); }
+    .stat strong { display: block; font-size: 19px; letter-spacing: -.04em; }
+    .stat span { color: var(--secondary); font-size: 10px; }
+    .capture-window .capture { margin-top: 20px; padding: 14px 16px; }
+    .capture-window .placeholder { color: var(--ink); font-size: 15px; }
+    .capture-window .hint { font-size: 12px; }
+    .shortcut { color: var(--tertiary); border: 1px solid var(--hairline); border-radius: 5px; padding: 2px 5px; font-size: 10px; }
+    @media (prefers-color-scheme: dark) {
+      :root { --ink: #f5f6f8; --secondary: #b7bdc8; --tertiary: #8b919b; --hairline: rgba(255,255,255,.13); --glass: rgba(35,40,51,.55); --glass-strong: rgba(35,40,51,.76); --content: rgba(255,255,255,.065); }
+      body { background: radial-gradient(circle at 10% 10%, #57443e 0, transparent 28%), radial-gradient(circle at 80% 5%, #263a67 0, transparent 28%), linear-gradient(135deg,#22242a,#354052 50%,#383330); }
+    }
+  </style>
+</head>
+<body>
+  <header class="intro">
+    <h1>WatchOut</h1>
+    <p>Attention should be parked, not amplified. A macOS Liquid Glass direction: calm content, floating controls, one-tap capture.</p>
+  </header>
+
+  <main class="stage">
+    <section class="artboard" id="menu-bar">
+      <p class="label">Menu bar panel</p>
+      <div class="window menu-window">
+        <div class="toolbar round">
+          <div class="app-icon"></div><span class="title">WatchOut</span><span class="count">3 open</span><span class="spacer"></span><span class="icon-button">•••</span>
+        </div>
+        <div class="search"><b>⌕</b><span>Search attention</span><span class="shortcut">⌘F</span></div>
+        <div class="segmented" style="width:max-content; margin: 0 2px 4px"><span class="selected">Open 3</span><span>Done</span></div>
+        <div class="content">
+          <div class="item focused"><div class="check">○</div><div class="item-body"><div class="item-title">Review PR #113 outcome</div><p>WatchOut integration needs a product pass before merge.</p><div class="meta"><span>Cradle</span><span>2 hours ago</span><span>Link</span></div></div><div class="row-action">↗</div></div>
+          <div class="item"><div class="check">○</div><div class="item-body"><div class="item-title">Check the WatchOut CI run</div><div class="meta"><span>CLI</span><span>Yesterday</span></div></div><div class="row-action">⋯</div></div>
+          <div class="item"><div class="check">○</div><div class="item-body"><div class="item-title">Ask the agent for a concise summary</div><div class="meta"><span>Agent</span><span>3 days ago</span></div></div><div class="row-action">⋯</div></div>
+        </div>
+        <div class="capture"><span class="placeholder">Park for later…</span><span class="clipboard">⌘</span><button class="park">↓ Park</button></div>
+        <p class="hint">Double-click an item to edit · ⌥⌘N quick capture</p>
+      </div>
+    </section>
+
+    <section class="artboard" id="floating-panel">
+      <p class="label">Floating attention window</p>
+      <div class="window floating-window">
+        <div class="toolbar round"><div class="app-icon"></div><span class="title large">Attention</span><span class="count">3 open</span><span class="spacer"></span><span class="icon-button">⌘</span><span class="icon-button">•••</span></div>
+        <div class="stats"><div class="stat"><strong>3</strong><span>open now</span></div><div class="stat"><strong>3</strong><span>in view</span></div><div class="stat"><strong>1</strong><span>from agents</span></div></div>
+        <div class="content">
+          <div class="item"><div class="check">○</div><div class="item-body"><div class="item-title">Review PR #113 outcome</div><p>Decide whether the new macOS surface belongs in Cradle.</p><div class="meta"><span>Cradle</span><span>2 hours ago</span><span>Open link</span></div></div><div class="row-action">↗</div></div>
+          <div class="item"><div class="check">○</div><div class="item-body"><div class="item-title">Check the WatchOut CI run</div><div class="meta"><span>CLI</span><span>Yesterday</span></div></div><div class="row-action">⋯</div></div>
+          <div class="item"><div class="check done">●</div><div class="item-body"><div class="item-title">Reply to design notes</div><div class="meta"><span>Manual</span><span>3 days ago</span></div></div><div class="row-action">↻</div></div>
+        </div>
+        <div class="capture"><span class="placeholder">Capture the next loose end…</span><span class="clipboard">⌘</span><button class="park">↓ Park</button></div>
+      </div>
+    </section>
+
+    <section class="artboard" id="quick-capture">
+      <p class="label">Quick capture</p>
+      <div class="window capture-window">
+        <div class="toolbar capsule"><div class="app-icon"></div><span class="title">WatchOut</span><span class="count">⌥⌘N</span><span class="spacer"></span><span class="icon-button">×</span></div>
+        <div class="capture"><span class="placeholder">Park “what needs attention when I return?”</span><span class="shortcut">⌘↵</span><button class="park">↓ Park</button></div>
+        <p class="hint">Add a URL or paste a longer note later. Capture first, enrich only when it matters.</p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

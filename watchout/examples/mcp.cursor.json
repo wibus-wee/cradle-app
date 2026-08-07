@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "watchout": {
+      "command": "swift",
+      "args": ["run", "--package-path", "/ABS/PATH/TO/watchout", "watchout-mcp"]
+    }
+  }
+}
