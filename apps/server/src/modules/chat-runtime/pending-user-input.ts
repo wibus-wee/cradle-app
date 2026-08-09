@@ -80,6 +80,15 @@ export async function requestRuntimeUserInput(
       questionCount: input.questions.length,
       createdAt,
     })
+    publisher?.(input.runId, {
+      type: 'data-cradle-runtime-user-input-request',
+      transient: true,
+      data: {
+        sessionId: input.sessionId,
+        requestId: input.providerRequestId,
+        questions: input.questions,
+      },
+    })
   }
  catch (error) {
     const current = pendingUserInputById.get(pendingKey)

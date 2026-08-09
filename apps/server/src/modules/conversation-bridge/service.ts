@@ -10,7 +10,7 @@ import {
   conversationBridgeThreadBindings,
   messages,
 } from '@cradle/db'
-import type { ConversationBridgeControlBlock, ConversationBridgeControlElement, ConversationBridgeControlOption, ConversationBridgeControlResponse, NormalizedConversationControl, NormalizedConversationInboundMessage } from '@cradle/plugin-sdk/server'
+import type { ConversationBridgeCompleteDeliveryInput, ConversationBridgeControlBlock, ConversationBridgeControlElement, ConversationBridgeControlOption, ConversationBridgeControlResponse, ConversationBridgeFailDeliveryInput, ConversationBridgeInteractionInput, ConversationBridgeTurnEvent, ConversationBridgeUserInputQuestion, NormalizedConversationControl, NormalizedConversationInboundMessage } from '@cradle/plugin-sdk/server'
 import {
   CONVERSATION_BRIDGE_CHANNEL_UNBIND_ACTION,
   CONVERSATION_BRIDGE_SESSION_MODEL_SELECT_ACTION,
@@ -18,6 +18,7 @@ import {
   CONVERSATION_BRIDGE_STATUS_REFRESH_ACTION,
   CONVERSATION_BRIDGE_WORKSPACE_SELECT_ACTION,
 } from '@cradle/plugin-sdk/server'
+import type { UIMessageChunk } from 'ai'
 import { and, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
@@ -28,7 +29,9 @@ import { db } from '../../infra'
 import { listConversationBridgeAdapters } from '../../plugins/conversation-adapter-registry'
 import * as Agents from '../agent-identity/service'
 import { listRuntimeCatalog } from '../chat-runtime/chat-runtime-provider-registry'
+import { submitChatRuntimeUserInput } from '../chat-runtime/interaction/user-input'
 import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-store'
+import { submitRuntimeToolApproval } from '../chat-runtime/pending-tool-approval'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { extractMessageText, parseStoredMessageSnapshot } from '../chat-runtime/ui-message'
 import { getCachedModelsForTarget } from '../provider-catalog/model-cache'
@@ -193,8 +196,14 @@ function titleFromText(text: string): string {
 }
 
 function buildProvenanceText(event: NormalizedConversationInboundMessage): string {
-  const actor = event.externalActorId ? `External actor: ${event.externalActorId}\n` : ''
-  return `${actor}External channel: ${event.externalChannelId}\nExternal thread: ${event.externalThreadId}\n\n${event.text}`
+  const actor = event.externalActorId
+    ? `External actor: ${event.externalActorName ? `${event.externalActorName} (${event.externalActorId})` : event.externalActorId}\n`
+    : ''
+  const channel = event.externalChannelName
+    ? `#${event.externalChannelName} (${event.externalChannelId})`
+    : event.externalChannelId
+  const topic = event.externalChannelTopic ? `Channel topic: ${event.externalChannelTopic}\n` : ''
+  return `${actor}External channel: ${channel}\n${topic}External thread: ${event.externalThreadId}\n\n${event.text}`
 }
 
 function parseControlCommand(text: string | undefined): string[] {
@@ -1354,52 +1363,61 @@ function readAssistantText(messageId: string): string {
   return extractMessageText(parseStoredMessageSnapshot(row.messageJson))
 }
 
-async function runSessionTurn(
-  sessionId: string,
-  text: string,
-): Promise<{
-  runId: string
-  assistantMessageId: string
-  userMessageId: string
-  text: string
-}> {
-  const response = await ChatRuntime.streamResponse({ sessionId, text })
-  const reader = response.stream.getReader()
-  void (async () => {
-    try {
-      while (!(await reader.read()).done) {
-        // Drain the stream so the runtime can complete while the caller awaits the final run.
+async function* readUIMessageChunks(
+  stream: ReadableStream<Uint8Array>,
+): AsyncGenerator<UIMessageChunk> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      buffer += decoder.decode(value, { stream: !done })
+      const frames = buffer.split('\n\n')
+      buffer = frames.pop() ?? ''
+      for (const frame of frames) {
+        const data = frame
+          .split('\n')
+          .filter(line => line.startsWith('data:'))
+          .map(line => line.slice(5).trimStart())
+          .join('\n')
+        if (data && data !== '[DONE]') {
+          yield JSON.parse(data) as UIMessageChunk
+        }
+      }
+      if (done) {
+        break
       }
     }
- finally {
-      reader.releaseLock()
-    }
-  })()
-  const run = await ChatRuntime.waitForRunCompletion(response.runId)
-  if (run.status === 'failed') {
-    throw new AppError({
-      code: 'conversation_bridge_run_failed',
-      status: 500,
-      message: run.errorText ?? 'Conversation bridge chat run failed',
-      details: { runId: run.id },
-    })
   }
-  return {
-    runId: response.runId,
-    assistantMessageId: response.assistantMessageId,
-    userMessageId: response.userMessageId,
-    text: readAssistantText(response.assistantMessageId),
+  finally {
+    reader.releaseLock()
   }
 }
 
-async function deliverResponse(input: {
+function describeToolOutput(output: unknown): string | undefined {
+  if (typeof output === 'string') {
+    return output.slice(0, 256)
+  }
+  if (output === undefined || output === null) {
+    return undefined
+  }
+  try {
+    return JSON.stringify(output).slice(0, 256)
+  }
+  catch {
+    return undefined
+  }
+}
+
+function createDeliveryAttempt(input: {
   binding: ConversationBridgeThreadBindingView
   text: string
   runId: string
   assistantMessageId: string
-}): Promise<void> {
+}): string {
   const timestamp = now()
-  const attempt = db()
+  return db()
     .insert(conversationBridgeDeliveryAttempts)
     .values({
       id: randomUUID(),
@@ -1418,48 +1436,75 @@ async function deliverResponse(input: {
     })
     .returning()
     .get()
-  try {
-    const delivered = await deliverBridgeMessage({
-      connectionId: input.binding.connectionId,
-      externalWorkspaceId: input.binding.externalWorkspaceId,
-      externalChannelId: input.binding.externalChannelId,
-      externalThreadId: input.binding.externalThreadId,
-      text: input.text,
-      payload: { text: input.text },
-    })
-    db()
-      .update(conversationBridgeDeliveryAttempts)
-      .set({
-        status: 'delivered',
-        attemptCount: attempt.attemptCount + 1,
-        externalMessageId: delivered.externalMessageId,
-        errorText: null,
-        updatedAt: now(),
-      })
-      .where(eq(conversationBridgeDeliveryAttempts.id, attempt.id))
-      .run()
+    .id
+}
+
+function markDelivery(input: ConversationBridgeCompleteDeliveryInput | ConversationBridgeFailDeliveryInput): void {
+  const attempt = db()
+    .select()
+    .from(conversationBridgeDeliveryAttempts)
+    .where(eq(conversationBridgeDeliveryAttempts.id, input.deliveryId))
+    .get()
+  if (!attempt || attempt.status !== 'pending') {
+    return
   }
- catch (error) {
-    db()
-      .update(conversationBridgeDeliveryAttempts)
-      .set({
-        status: 'failed',
-        attemptCount: attempt.attemptCount + 1,
-        errorText: error instanceof Error ? error.message : String(error),
-        updatedAt: now(),
-      })
-      .where(eq(conversationBridgeDeliveryAttempts.id, attempt.id))
-      .run()
-    throw error
+  db()
+    .update(conversationBridgeDeliveryAttempts)
+    .set('result' in input
+      ? {
+          status: 'delivered',
+          attemptCount: attempt.attemptCount + 1,
+          externalMessageId: input.result.externalMessageId,
+          errorText: null,
+          updatedAt: now(),
+        }
+      : {
+          status: 'failed',
+          attemptCount: attempt.attemptCount + 1,
+          errorText: input.error,
+          updatedAt: now(),
+        })
+    .where(eq(conversationBridgeDeliveryAttempts.id, input.deliveryId))
+    .run()
+}
+
+export function completeDelivery(input: ConversationBridgeCompleteDeliveryInput): void {
+  markDelivery(input)
+}
+
+export function failDelivery(input: ConversationBridgeFailDeliveryInput): void {
+  markDelivery(input)
+}
+
+export async function abortTurn(runId: string): Promise<void> {
+  await ChatRuntime.abortRun(runId)
+}
+
+export async function submitInteraction(input: ConversationBridgeInteractionInput): Promise<void> {
+  if (input.type === 'tool_approval') {
+    await submitRuntimeToolApproval(input)
+    return
+  }
+  await submitChatRuntimeUserInput(input)
+}
+
+type RuntimeUserInputRequestChunk = UIMessageChunk & {
+  type: 'data-cradle-runtime-user-input-request'
+  data: {
+    sessionId: string
+    requestId: string
+    questions: ConversationBridgeUserInputQuestion[]
   }
 }
 
-export async function handleInboundMessage(
+export async function* startTurn(
   event: NormalizedConversationInboundMessage,
-): Promise<void> {
+): AsyncGenerator<ConversationBridgeTurnEvent> {
   if (recordInboundEvent(event) === 'duplicate') {
+    yield { type: 'ignored', reason: 'duplicate event' }
     return
   }
+  let runId: string | null = null
   try {
     let binding = getThreadBinding(event)
     if (!binding) {
@@ -1469,6 +1514,7 @@ export async function handleInboundMessage(
           'ignored',
           'message did not mention the adapter and thread is not bound',
         )
+        yield { type: 'ignored', reason: 'message did not mention the adapter and thread is not bound' }
         return
       }
       const channelBinding = getChannelBinding(
@@ -1478,10 +1524,12 @@ export async function handleInboundMessage(
       )
       if (!channelBinding) {
         markInboundEvent(event, 'ignored', 'external channel is not bound to a Cradle workspace')
+        yield { type: 'ignored', reason: 'external channel is not bound to a Cradle workspace' }
         return
       }
       if (!channelBinding.sessionAgentId && !channelBinding.sessionProviderTargetId) {
         markInboundEvent(event, 'ignored', 'external channel has no default Cradle runtime target')
+        yield { type: 'ignored', reason: 'external channel has no default Cradle runtime target' }
         return
       }
       const session = await Session.create({
@@ -1496,18 +1544,115 @@ export async function handleInboundMessage(
       binding = createThreadBinding(event, session.id, channelBinding.cradleWorkspaceId)
     }
 
-    const response = await runSessionTurn(binding.sessionId, buildProvenanceText(event))
-    await deliverResponse({
+    const response = await ChatRuntime.streamResponse({
+      sessionId: binding.sessionId,
+      text: buildProvenanceText(event),
+    })
+    runId = response.runId
+    yield {
+      type: 'accepted',
+      runId,
+      sessionId: binding.sessionId,
+      assistantMessageId: response.assistantMessageId,
+    }
+
+    const toolTitles = new Map<string, string>()
+    for await (const chunk of readUIMessageChunks(response.stream)) {
+      switch (chunk.type) {
+        case 'text-delta':
+          yield { type: 'text_delta', delta: chunk.delta }
+          break
+        case 'tool-input-start':
+        case 'tool-input-available': {
+          const title = chunk.title ?? chunk.toolName
+          const alreadyStarted = toolTitles.has(chunk.toolCallId)
+          toolTitles.set(chunk.toolCallId, title)
+          if (!alreadyStarted) {
+            yield { type: 'tool_started', toolCallId: chunk.toolCallId, title }
+          }
+          break
+        }
+        case 'tool-output-available':
+          yield {
+            type: 'tool_completed',
+            toolCallId: chunk.toolCallId,
+            title: toolTitles.get(chunk.toolCallId) ?? 'Tool',
+            detail: describeToolOutput(chunk.output),
+          }
+          break
+        case 'tool-input-error':
+        case 'tool-output-error':
+          yield {
+            type: 'tool_failed',
+            toolCallId: chunk.toolCallId,
+            title: toolTitles.get(chunk.toolCallId) ?? ('toolName' in chunk ? chunk.toolName : 'Tool'),
+            detail: chunk.errorText,
+          }
+          break
+        case 'tool-output-denied':
+          yield {
+            type: 'tool_failed',
+            toolCallId: chunk.toolCallId,
+            title: toolTitles.get(chunk.toolCallId) ?? 'Tool',
+            detail: 'Denied by user',
+          }
+          break
+        case 'tool-approval-request':
+          yield {
+            type: 'approval_required',
+            sessionId: binding.sessionId,
+            requestId: chunk.approvalId,
+            toolCallId: chunk.toolCallId,
+            title: toolTitles.get(chunk.toolCallId) ?? 'Tool approval',
+          }
+          break
+        case 'data-cradle-runtime-user-input-request': {
+          const request = chunk as RuntimeUserInputRequestChunk
+          yield {
+            type: 'user_input_required',
+            sessionId: request.data.sessionId,
+            requestId: request.data.requestId,
+            title: request.data.questions[0]?.header ?? 'Cradle needs your input',
+            questions: request.data.questions,
+          }
+          break
+        }
+      }
+    }
+
+    const run = await ChatRuntime.waitForRunCompletion(runId)
+    if (run.status === 'aborted') {
+      markInboundEvent(event, 'processed', 'run aborted by user')
+      yield { type: 'aborted', runId }
+      return
+    }
+    if (run.status === 'failed') {
+      const message = run.errorText ?? 'Conversation bridge chat run failed'
+      markInboundEvent(event, 'failed', message)
+      yield { type: 'failed', runId, message }
+      return
+    }
+
+    const text = readAssistantText(response.assistantMessageId)
+    const deliveryId = createDeliveryAttempt({
       binding,
-      text: response.text,
-      runId: response.runId,
+      text,
+      runId,
       assistantMessageId: response.assistantMessageId,
     })
     markInboundEvent(event, 'processed', null)
+    yield {
+      type: 'completed',
+      runId,
+      assistantMessageId: response.assistantMessageId,
+      deliveryId,
+      text,
+    }
   }
  catch (error) {
-    markInboundEvent(event, 'failed', error instanceof Error ? error.message : String(error))
-    throw error
+    const message = error instanceof Error ? error.message : String(error)
+    markInboundEvent(event, 'failed', message)
+    yield { type: 'failed', runId, message }
   }
 }
 
