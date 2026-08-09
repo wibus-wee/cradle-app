@@ -494,7 +494,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     expect(readQueryOptions(0)).toEqual(
       expect.objectContaining({
         permissionMode: 'default',
-        allowDangerouslySkipPermissions: true,
+        allowDangerouslySkipPermissions: false,
         persistSession: true,
         settingSources: ['project', 'local'],
         env: expect.objectContaining({
@@ -568,7 +568,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
 
     expect(readQueryOptions(0)).toEqual(expect.objectContaining({
       permissionMode: 'default',
-      allowDangerouslySkipPermissions: true,
+      allowDangerouslySkipPermissions: false,
     }))
     expect(activeQuery.setPermissionMode).not.toHaveBeenCalled()
   })
@@ -2742,7 +2742,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     expect(readQueryOptions(0)).toEqual(
       expect.objectContaining({
         permissionMode: 'default',
-        allowDangerouslySkipPermissions: true,
+        allowDangerouslySkipPermissions: false,
       }),
     )
   })
