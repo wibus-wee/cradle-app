@@ -1,9 +1,3 @@
-/**
- * Output: opencode runtime-owned provider target projection.
- * Input: opencode native provider catalog and runtime target ids.
- * Position: opencode provider package owner for native provider target semantics.
- */
-
 import type {
   RuntimeOwnedProviderTarget,
   RuntimeOwnedProviderTargets,

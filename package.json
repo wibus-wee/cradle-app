@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "packageManager": "pnpm@11.2.2",
   "engines": {
-    "node": ">=22.15.0"
+    "node": "^22.18.0 || >=24.11.0"
   },
   "description": "Cradle - AI agent management platform",
   "author": "example.com",

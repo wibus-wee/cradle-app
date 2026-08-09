@@ -1,9 +1,3 @@
-/**
- * Output: jar-core provider/model options projected from Cradle provider config and model registry data.
- * Input: provider kind, System Agent config, preferences thinking level, and model-registry lookups.
- * Position: System Agent provider package bridge to Cradle-owned model registry.
- */
-
 import type { DefaultRuntimeConfigOptions } from '@hijarvis/core'
 
 import { lookupModelRaw } from '../../model-registry/model-info-registry'

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   SessionRuntimeConfigJsonSchema,
-  writeCodexCliSessionBindingToSessionConfig,
   writeProviderSessionBindingToSessionConfig,
 } from '../src/helpers/agent-runtime-config'
 
@@ -19,14 +18,18 @@ describe('agent runtime config helpers', () => {
       unrelated: { value: true },
     })
 
-    const next = writeCodexCliSessionBindingToSessionConfig({
+    const next = writeProviderSessionBindingToSessionConfig({
       configJson: initial,
       binding: {
-        sessionId: CODEX_SESSION_ID,
+        source: 'cradle:codex',
+        agent: 'codex',
+        kind: 'id',
+        value: CODEX_SESSION_ID,
         capturedAt: 1_779_123_000,
         startedAt: 1_779_122_900,
         workspacePath: '/tmp/workspace',
         sourcePath: '/tmp/codex/sessions/rollout.jsonl',
+        confidence: 'exact',
       },
     })
 
@@ -48,17 +51,10 @@ describe('agent runtime config helpers', () => {
       sourcePath: '/tmp/codex/sessions/rollout.jsonl',
       confidence: 'exact',
     })
-    expect(config.codexCliSession).toEqual({
-      sessionId: CODEX_SESSION_ID,
-      capturedAt: 1_779_123_000,
-      startedAt: 1_779_122_900,
-      workspacePath: '/tmp/workspace',
-      sourcePath: '/tmp/codex/sessions/rollout.jsonl',
-    })
     expect(JSON.parse(next).unrelated).toEqual({ value: true })
   })
 
-  it('writes generalized providerSession bindings and keeps Codex legacy fields in sync', () => {
+  it('writes generalized providerSession bindings', () => {
     const next = writeProviderSessionBindingToSessionConfig({
       configJson: JSON.stringify({ cliTuiLaunch: { executable: 'codex', args: [] } }),
       binding: {
@@ -76,6 +72,5 @@ describe('agent runtime config helpers', () => {
 
     const config = SessionRuntimeConfigJsonSchema.parse(next)
     expect(config.providerSession?.value).toBe(CODEX_SESSION_ID)
-    expect(config.codexCliSession?.sessionId).toBe(CODEX_SESSION_ID)
   })
 })

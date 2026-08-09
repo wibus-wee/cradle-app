@@ -23,13 +23,7 @@ type RunSettledHandler = (data: ChatRunSettledPayload) => void
 type ChatRunBroadcastEvent
   = | { kind: 'activity', payload: ChatRunActivityPayload }
     | { kind: 'settled', payload: ChatRunSettledPayload }
-type UIMessageChunkValidationResult
-  = | { success: true, value: UIMessageChunk }
-    | { success: false, error: unknown }
-
-interface UIMessageChunkValidator {
-  validate?: (value: unknown) => UIMessageChunkValidationResult | PromiseLike<UIMessageChunkValidationResult>
-}
+type UIMessageChunkValidator = ReturnType<typeof uiMessageChunkSchema>
 
 const globalHandlers = new Set<RunActivityHandler>()
 const settledHandlers = new Set<RunSettledHandler>()
@@ -249,7 +243,7 @@ function parseUIMessageChunkEventStream(
   stream: ReadableStream<Uint8Array>,
   initialReplay = false,
 ): ReadableStream<ParsedUIMessageChunk> {
-  const schema = uiMessageChunkSchema() as unknown as UIMessageChunkValidator
+  const schema = uiMessageChunkSchema()
   if (!schema.validate) {
     throw new Error('AI SDK UIMessageChunk schema is unavailable')
   }

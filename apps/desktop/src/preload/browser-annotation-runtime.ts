@@ -4817,13 +4817,13 @@ class BrowserAnnotationRuntime {
     if (!fiberKey) {
       return null
     }
-    const value = (element as unknown as Record<string, unknown>)[fiberKey]
+    const value = Object.getOwnPropertyDescriptor(element, fiberKey)?.value
     if (!fiberKey.startsWith('__reactProps$')) {
       return value
     }
     const fallbackKey = keys.find(key =>
       key.startsWith('__reactFiber$') || key.startsWith('__reactInternalInstance$'))
-    return fallbackKey ? (element as unknown as Record<string, unknown>)[fallbackKey] : null
+    return fallbackKey ? Object.getOwnPropertyDescriptor(element, fallbackKey)?.value : null
   }
 
   private reactComponentName(type: unknown): string | null {

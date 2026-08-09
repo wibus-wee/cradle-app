@@ -12,6 +12,7 @@ import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
 import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
+import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
 import { WorkspaceView } from './WorkspaceView'
@@ -19,18 +20,28 @@ import { WorkspaceView } from './WorkspaceView'
 export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
   const { connection } = useConnection()
   const create = useCreateWork()
+  const isRouteActive = useRouteIsActive()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
-    enabled: Boolean(connection),
+    enabled: Boolean(connection) && isRouteActive,
     queryKey: ['workspace', connection?.url, workspaceId],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [workspaces, sessions, works, files] = await Promise.all([
-        cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces'),
-        cradleRequest<GetSessionsResponse>(connection!, `/sessions/?workspaceId=${encodeURIComponent(workspaceId)}&archived=false`),
-        cradleRequest<GetWorksResponse>(connection!, `/works?workspaceId=${encodeURIComponent(workspaceId)}&archived=false`),
+        cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
+        cradleRequest<GetSessionsResponse>(
+          connection!,
+          `/sessions/?workspaceId=${encodeURIComponent(workspaceId)}&archived=false`,
+          { signal },
+        ),
+        cradleRequest<GetWorksResponse>(
+          connection!,
+          `/works?workspaceId=${encodeURIComponent(workspaceId)}&archived=false`,
+          { signal },
+        ),
         cradleRequest<GetWorkspacesByWorkspaceIdFilesChildrenResponse>(
           connection!,
           `/workspaces/${encodeURIComponent(workspaceId)}/files/children`,
+          { signal },
         ),
       ])
       const workspace = workspaces.find(candidate => candidate.id === workspaceId)
@@ -42,16 +53,17 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
         sessions,
         works,
         files,
-        workspaces: workspaces.filter(candidate =>
-          candidate.availability === 'available' && candidate.locator.kind !== 'managed-worktree'),
+        workspaces: workspaces.filter(
+          candidate =>
+            candidate.availability === 'available' && candidate.locator.kind !== 'managed-worktree',
+        ),
       }
     },
-    refetchInterval: data => (
+    refetchInterval: data =>
       data.state.data?.sessions.some(session => session.status === 'streaming')
       || data.state.data?.works.some(work => work.activity === 'running')
-    )
-? 2_000
-: 15_000,
+        ? 5_000
+        : false,
   })
 
   const refresh = async () => {
@@ -64,8 +76,12 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
     }
   }
 
-  if (query.isPending) { return <LoadingState /> }
-  if (query.error) { return <ErrorState title="Could not open project" description={errorMessage(query.error)} /> }
+  if (query.isPending) {
+    return <LoadingState />
+  }
+  if (query.error) {
+    return <ErrorState title="Could not open project" description={errorMessage(query.error)} />
+  }
   return (
     <>
       <Stack.Screen options={{ title: '' }} />

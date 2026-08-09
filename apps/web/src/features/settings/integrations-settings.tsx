@@ -77,6 +77,66 @@ const EMPTY_AGENTS: GetAgentsResponse = []
 const EMPTY_PROVIDER_TARGETS: GetProviderTargetsResponse = []
 const EMPTY_RUNTIMES: GetChatRuntimesResponse['items'] = []
 
+const SLACK_APP_MANIFEST_URL = `https://api.slack.com/apps?new_app=1&manifest_json=${encodeURIComponent(JSON.stringify({
+  display_information: {
+    name: 'Cradle',
+    description: 'Run local-first Cradle Agents from Slack.',
+  },
+  features: {
+    app_home: {
+      home_tab_enabled: false,
+      messages_tab_enabled: true,
+      messages_tab_read_only_enabled: false,
+    },
+    agent_view: {
+      agent_description: 'A local-first coding Agent powered by your Cradle desktop app.',
+      suggested_prompts: [
+        { title: 'Continue my work', message: 'Review the current workspace and tell me what to do next.' },
+        { title: 'Investigate an issue', message: 'Help me investigate a problem in this workspace.' },
+      ],
+    },
+    bot_user: {
+      display_name: 'cradle',
+      always_online: false,
+    },
+    slash_commands: [{
+      command: '/cradle',
+      description: 'Configure and inspect the Cradle connection for this conversation.',
+      usage_hint: 'bind workspace | status | unbind',
+      should_escape: false,
+    }],
+  },
+  oauth_config: {
+    scopes: {
+      bot: [
+        'app_mentions:read',
+        'channels:history',
+        'chat:write',
+        'commands',
+        'groups:history',
+        'im:history',
+        'mpim:history',
+      ],
+    },
+  },
+  settings: {
+    event_subscriptions: {
+      bot_events: [
+        'app_home_opened',
+        'app_mention',
+        'message.channels',
+        'message.groups',
+        'message.im',
+        'message.mpim',
+      ],
+    },
+    interactivity: { is_enabled: true },
+    org_deploy_enabled: false,
+    socket_mode_enabled: true,
+    token_rotation_enabled: false,
+  },
+}))}`
+
 interface RuntimeTargetOption {
   value: string
   label: string
@@ -759,7 +819,6 @@ function ConnectionDetail({
     ? [
       { refKey: 'botToken', labelKey: 'integrations.slack.botToken' as const },
       { refKey: 'appToken', labelKey: 'integrations.slack.appToken' as const },
-      { refKey: 'signingSecret', labelKey: 'integrations.slack.signingSecret' as const },
     ]
     : []
   const logLevel = isSlack ? (connection.config as { logLevel?: string } | null)?.logLevel : undefined
@@ -1664,13 +1723,13 @@ function SlackSetupGuide() {
       icon: KeyIcon,
       title: t('integrations.slackGuide.step.botScopes.title'),
       description: t('integrations.slackGuide.step.botScopes.description'),
-      items: ['chat:write', 'app_mentions:read', 'channels:history', 'groups:history', 'commands'],
+      items: ['chat:write', 'app_mentions:read', 'channels:history', 'groups:history', 'im:history', 'mpim:history', 'commands'],
     },
     {
       icon: SendIcon,
       title: t('integrations.slackGuide.step.events.title'),
       description: t('integrations.slackGuide.step.events.description'),
-      items: ['app_mention', 'message.channels', 'message.groups'],
+      items: ['app_home_opened', 'app_mention', 'message.channels', 'message.groups', 'message.im', 'message.mpim'],
     },
     {
       icon: TerminalIcon,
@@ -1686,7 +1745,7 @@ function SlackSetupGuide() {
       icon: KeyIcon,
       title: t('integrations.slackGuide.step.credentials.title'),
       description: t('integrations.slackGuide.step.credentials.description'),
-      items: ['xoxb-...', 'xapp-...', 'signing secret'],
+      items: ['xoxb-...', 'xapp-...'],
     },
     {
       icon: HashIcon,
@@ -1709,6 +1768,17 @@ function SlackSetupGuide() {
         bare
         className="p-4"
       >
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+          <div className="min-w-0">
+            <div className="text-[12px] font-medium text-foreground">{t('integrations.slackGuide.manifest.title')}</div>
+            <p className="mt-0.5 text-[12px] leading-5 text-muted-foreground">{t('integrations.slackGuide.manifest.description')}</p>
+          </div>
+          <Button asChild size="sm" className="shrink-0">
+            <a href={SLACK_APP_MANIFEST_URL} target="_blank" rel="noreferrer">
+              {t('integrations.slackGuide.manifest.action')}
+            </a>
+          </Button>
+        </div>
         <div className="flex flex-col gap-2">
           {slackAppSteps.map(step => (
             <SlackGuideStep

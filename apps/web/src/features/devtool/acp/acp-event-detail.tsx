@@ -1,7 +1,3 @@
-// Input: ACP devtool store, cn utility
-// Output: AcpEventDetail — metadata and raw output viewer for a selected ACP runtime event
-// Position: Right pane of the ACP runtime mode inside the devtool page
-
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 

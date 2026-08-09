@@ -1,9 +1,3 @@
-/**
- * Output: Claude Agent provider snapshot projections for session-local runtime state.
- * Input: workspace provider snapshots and requested model ids.
- * Position: Claude Agent provider package owner for providerStateSnapshot updates.
- */
-
 import type { AccountInfo, SDKAuthStatusMessage, SDKRateLimitInfo } from '@anthropic-ai/claude-agent-sdk'
 
 import { readObjectRecord as readRecord } from '../../../helpers/json-record'

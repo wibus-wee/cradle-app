@@ -25,7 +25,7 @@ interface ConsumeChatMessageStreamOptions {
   response: Response
 }
 
-const STREAM_RENDER_INTERVAL_MS = 50
+const STREAM_RENDER_INTERVAL_MS = 125
 
 export async function consumeChatMessageStream({
   messageId,

@@ -1,9 +1,3 @@
-/**
- * Output: AI SDK UIMessageChunk events projected from jar-core assistant message events.
- * Input: jar-core assistant message event payloads and per-turn bridge state.
- * Position: System Agent provider package event mapper between jar-core and Chat Runtime chunks.
- */
-
 import { randomUUID } from 'node:crypto'
 
 import type { UIMessageChunk } from 'ai'

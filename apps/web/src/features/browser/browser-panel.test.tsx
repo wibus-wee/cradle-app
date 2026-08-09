@@ -131,9 +131,11 @@ function installTestBrowserBridge() {
     },
   }
 
-  window.cradle = {
-    browser: bridge,
-  } as unknown as Window['cradle']
+  Object.defineProperty(window, 'cradle', {
+    configurable: true,
+    writable: true,
+    value: { browser: bridge },
+  })
 
   return bridge
 }
@@ -373,7 +375,16 @@ describe('browserPanel rendering', () => {
       viewport!.getBoundingClientRect = () => new DOMRect(0, 0, 600, 400)
       const popover = originalCreateElement('div')
       popover.setAttribute('data-slot', 'popover-content')
-      popover.getClientRects = () => [new DOMRect(100, 100, 200, 120)] as unknown as DOMRectList
+      const rect = new DOMRect(100, 100, 200, 120)
+      const rects: DOMRectList = {
+        0: rect,
+        length: 1,
+        item: index => index === 0 ? rect : null,
+        [Symbol.iterator]() {
+          return [rect].values()
+        },
+      }
+      popover.getClientRects = () => rects
       document.body.append(popover)
 
       await waitFor(() => {

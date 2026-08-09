@@ -1,9 +1,3 @@
-/**
- * Output: Codex stream diagnostics, notification helpers, and provider stream errors.
- * Input: Codex app-server notifications and bounded diagnostic samples.
- * Position: Codex provider package owner for stream failure reporting.
- */
-
 import type { RuntimeWarningPartData } from '../../../chat-runtime/runtime-provider-types'
 import { OBSERVABILITY_CODES } from '../../../observability/contract'
 import type { RuntimeKind } from '../../../provider-contracts/types'

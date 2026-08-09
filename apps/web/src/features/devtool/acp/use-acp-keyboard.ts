@@ -1,7 +1,3 @@
-// Input: window keydown events, acp-devtool stores (selection / paused / clear), filtered events
-// Output: useAcpKeyboard hook wiring arrow-key row navigation plus pause/clear/search shortcuts
-// Position: Called once from IpcDevtoolPage — owns the ACP pane's global keybindings
-
 import { useEffect } from 'react'
 
 import { useAcpDevtoolStore, useAcpFilteredEvents } from './use-acp-events'

@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "private": true,
   "description": "Cradle desktop app",
+  "desktopName": "Cradle.desktop",
   "author": {
     "email": "wibus_wee@outlook.com",
     "name": "wibus-wee",
@@ -32,6 +33,7 @@
     "smoke:update": "node scripts/run-update-smoke.mjs",
     "dist:win": "pnpm build && electron-builder --config electron-builder.mjs --win",
     "dist:linux": "pnpm build && electron-builder --config electron-builder.mjs --linux",
+    "verify:linux-release": "node scripts/verify-linux-release.mjs",
     "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {

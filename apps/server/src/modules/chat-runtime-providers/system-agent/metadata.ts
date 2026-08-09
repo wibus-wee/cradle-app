@@ -1,9 +1,3 @@
-/**
- * Output: System Agent runtime identity and static capabilities.
- * Input: no runtime data.
- * Position: System Agent provider package metadata owner.
- */
-
 import type {
   ChatRuntimeCapabilities,
   ChatRuntimeMetadata,

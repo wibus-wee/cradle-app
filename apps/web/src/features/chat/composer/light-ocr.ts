@@ -1,20 +1,7 @@
 import type { FileUIPart } from 'ai'
 
-import { getServerUrl } from '~/lib/electron'
-import { cradleFetch } from '~/lib/server-credential'
-
-interface LightOcrResponse {
-  items: Array<{
-    index: number
-    text: string
-    lineCount: number
-    modelBundleId: string
-  }>
-}
-
-interface LightOcrErrorResponse {
-  message?: string
-}
+import { postImageOcrRecognize } from '~/api-gen/sdk.gen'
+import type { PostImageOcrRecognizeResponse } from '~/api-gen/types.gen'
 
 type LightOcrFilePart = FileUIPart & {
   providerMetadata?: Record<string, unknown>
@@ -26,7 +13,7 @@ function isImageAttachment(file: FileUIPart): boolean {
 
 function withLightOcrMetadata(
   file: FileUIPart,
-  item: LightOcrResponse['items'][number],
+  item: PostImageOcrRecognizeResponse['items'][number],
 ): FileUIPart {
   const metadata = (file as LightOcrFilePart).providerMetadata ?? {}
   const cradle = typeof metadata.cradle === 'object' && metadata.cradle !== null
@@ -55,22 +42,10 @@ export async function prepareLightOcrAttachments(files: FileUIPart[]): Promise<F
     return files
   }
 
-  const response = await cradleFetch(new URL('/image-ocr/recognize', getServerUrl()), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ files: images }),
+  const { data: payload } = await postImageOcrRecognize({
+    body: { files: images },
+    throwOnError: true,
   })
-  const payload = (await response.json().catch(() => null)) as
-    | LightOcrResponse
-    | LightOcrErrorResponse
-    | null
-  if (!response.ok || !payload || !('items' in payload)) {
-    const detail
-      = payload && 'message' in payload && typeof payload.message === 'string'
-        ? payload.message
-        : `Local image text recognition failed (${response.status}).`
-    throw new Error(detail)
-  }
 
   const itemsByIndex = new Map(payload.items.map(item => [item.index, item]))
   let imageIndex = 0

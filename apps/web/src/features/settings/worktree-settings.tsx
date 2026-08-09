@@ -8,6 +8,13 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
+  getWorktreesManagedOptions,
+  getWorktreesManagedQueryKey,
+  postWorkspacesByWorkspaceIdWorktreesByWorktreeIdCleanupMutation,
+  postWorktreesCleanupMutation,
+} from '~/api-gen/@tanstack/react-query.gen'
+import type { GetWorktreesManagedResponse } from '~/api-gen/types.gen'
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -29,7 +36,6 @@ import {
 } from '~/components/ui/number-field'
 import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
-import { getServerUrl } from '~/lib/electron'
 
 import { SettingsGroup, SettingsPage } from './settings-container'
 import { SettingsRow } from './settings-row'
@@ -37,37 +43,7 @@ import type { AppPreferences } from './use-app-preferences'
 import { useAppPreferences } from './use-app-preferences'
 
 type SettingsKey = keyof typeof import('~/locales/default').default.settings
-
-interface ManagedWorktree {
-  id: string
-  sourceWorkspaceId: string
-  workspaceName: string
-  name: string
-  path: string
-  branch: string
-  baseRef: string
-  status: 'active' | 'merged' | 'abandoned'
-  createdBySessionId: string | null
-  createdAt: number
-  updatedAt: number
-  sizeBytes: number
-  sizeMeasuredAt: number | null
-  sizeMeasurementError: string | null
-  sessionCount: number
-}
-
-interface ManagedWorktreeListResponse {
-  worktrees: ManagedWorktree[]
-  totalSizeBytes: number
-}
-
-interface CleanupResponse {
-  cleaned: ManagedWorktree[]
-  skipped: number
-  totalSizeBytes: number
-}
-
-const MANAGED_WORKTREES_QUERY_KEY = ['managed-worktrees']
+type ManagedWorktree = GetWorktreesManagedResponse['worktrees'][number]
 
 function formatBytes(bytes: number): string {
   if (bytes <= 0) {
@@ -95,40 +71,17 @@ function clampNumber(value: number | null | undefined, min: number, max: number)
   return Math.min(Math.max(Math.round(value), min), max)
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(new URL(path, getServerUrl()), {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      ...init?.headers,
-    },
-  })
-  if (!response.ok) {
-    throw new Error(await response.text())
-  }
-  return await response.json() as T
-}
-
 function useManagedWorktrees() {
-  return useQuery({
-    queryKey: MANAGED_WORKTREES_QUERY_KEY,
-    queryFn: () => requestJson<ManagedWorktreeListResponse>('/worktrees/managed'),
-  })
+  return useQuery(getWorktreesManagedOptions())
 }
 
 function useCleanupWorktree() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (worktree: ManagedWorktree) => requestJson<{ ok: true }>(
-      `/workspaces/${encodeURIComponent(worktree.sourceWorkspaceId)}/worktrees/${encodeURIComponent(worktree.id)}/cleanup`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ mode: 'abandon' }),
-      },
-    ),
+    ...postWorkspacesByWorkspaceIdWorktreesByWorktreeIdCleanupMutation(),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: MANAGED_WORKTREES_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: getWorktreesManagedQueryKey() })
     },
   })
 }
@@ -137,12 +90,9 @@ function useCleanupPolicy() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (policy: AppPreferences['worktreeCleanup']) => requestJson<CleanupResponse>('/worktrees/cleanup', {
-      method: 'POST',
-      body: JSON.stringify(policy),
-    }),
+    ...postWorktreesCleanupMutation(),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: MANAGED_WORKTREES_QUERY_KEY })
+      await queryClient.invalidateQueries({ queryKey: getWorktreesManagedQueryKey() })
     },
   })
 }
@@ -230,7 +180,10 @@ export function WorktreeSettings() {
   const cleanupPolicy = useCleanupPolicy()
   const [confirmWorktree, setConfirmWorktree] = useState<ManagedWorktree | null>(null)
 
-  const worktrees = worktreesQuery.data?.worktrees ?? []
+  const worktrees = useMemo(
+    () => worktreesQuery.data?.worktrees ?? [],
+    [worktreesQuery.data?.worktrees],
+  )
   const totalSizeBytes = worktreesQuery.data?.totalSizeBytes ?? 0
   const sortedWorktrees = useMemo(
     () => [...worktrees].sort((left, right) => right.createdAt - left.createdAt),
@@ -256,7 +209,13 @@ export function WorktreeSettings() {
     if (!confirmWorktree) {
       return
     }
-    cleanupOne.mutate(confirmWorktree, {
+    cleanupOne.mutate({
+      path: {
+        workspaceId: confirmWorktree.sourceWorkspaceId,
+        worktreeId: confirmWorktree.id,
+      },
+      body: { mode: 'abandon' },
+    }, {
       onSettled: () => setConfirmWorktree(null),
     })
   }
@@ -276,7 +235,7 @@ export function WorktreeSettings() {
             variant="outline"
             size="sm"
             disabled={!prefs || cleanupBusy || prefsLoading}
-            onClick={() => cleanupPolicy.mutate(policy)}
+            onClick={() => cleanupPolicy.mutate({ body: policy })}
           >
             {cleanupPolicy.isPending ? <Spinner className="size-3.5" /> : <RefreshIcon className="size-3.5" />}
             {t('worktrees.action.runCleanup' as SettingsKey)}
@@ -350,7 +309,7 @@ export function WorktreeSettings() {
                     <WorktreeRow
                       key={worktree.id}
                       worktree={worktree}
-                      busy={cleanupOne.isPending && cleanupOne.variables?.id === worktree.id}
+                      busy={cleanupOne.isPending && cleanupOne.variables?.path.worktreeId === worktree.id}
                       onCleanup={setConfirmWorktree}
                     />
                   ))}

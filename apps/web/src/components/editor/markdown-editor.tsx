@@ -8,6 +8,7 @@ import Typography from '@tiptap/extension-typography'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { MarkdownStorage } from 'tiptap-markdown'
 import { Markdown } from 'tiptap-markdown'
 
 import { toastManager } from '~/components/ui/toast'
@@ -24,9 +25,14 @@ import { SlashCommand } from './slash-command'
 import { SmartMention } from './smart-mention'
 import type { SmartMentionAttrs, SmartMentionItem } from './smart-mention-utils'
 
-function getMarkdownContent(storage: unknown): string {
-  const s = storage as { markdown: { getMarkdown: () => string } }
-  return s.markdown.getMarkdown()
+declare module '@tiptap/core' {
+  interface Storage {
+    markdown: MarkdownStorage
+  }
+}
+
+function getMarkdownContent(storage: { markdown: MarkdownStorage }): string {
+  return storage.markdown.getMarkdown()
 }
 
 const EDITOR_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp'

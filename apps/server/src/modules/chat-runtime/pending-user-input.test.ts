@@ -73,6 +73,28 @@ describe('pending runtime user input', () => {
       {
         runId: 'run-pending-user-input-1',
         chunk: {
+          type: 'data-cradle-runtime-user-input-request',
+          transient: true,
+          data: {
+            sessionId: 'session-pending-user-input-1',
+            requestId: 'request-1',
+            questions: [
+              {
+                id: 'scope',
+                header: 'Scope',
+                question: 'Which scope should I use?',
+                isOther: false,
+                isSecret: false,
+                multiSelect: false,
+                options: [{ label: 'Small', description: 'Limit the change' }],
+              },
+            ],
+          },
+        },
+      },
+      {
+        runId: 'run-pending-user-input-1',
+        chunk: {
           type: 'tool-output-available',
           toolCallId: 'server-request-request-1',
           output: expect.objectContaining({
@@ -80,6 +102,28 @@ describe('pending runtime user input', () => {
             requestId: 'request-1',
             answers: { scope: ['Small'] },
           }),
+        },
+      },
+      {
+        runId: 'run-pending-user-input-1',
+        chunk: {
+          type: 'data-cradle-runtime-user-input-request',
+          transient: true,
+          data: {
+            sessionId: 'session-pending-user-input-1',
+            requestId: 'request-1',
+            questions: [
+              {
+                id: 'scope',
+                header: 'Scope',
+                question: 'Which scope should I use?',
+                isOther: false,
+                isSecret: false,
+                multiSelect: false,
+                options: [{ label: 'Small', description: 'Limit the change' }],
+              },
+            ],
+          },
         },
       },
     ])

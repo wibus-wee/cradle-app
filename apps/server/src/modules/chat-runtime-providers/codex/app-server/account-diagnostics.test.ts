@@ -135,8 +135,8 @@ describe('codex account diagnostics', () => {
       planType: 'pro',
       requiresOpenaiAuth: false,
     })
-    expect(diagnostics.rateLimits?.primary?.usedPercent).toBe(40)
-    expect(diagnostics.rateLimits?.individualLimit).toEqual({
+    expect(diagnostics.rateLimitsByLimitId?.codex?.primary?.usedPercent).toBe(40)
+    expect(diagnostics.rateLimitsByLimitId?.codex?.individualLimit).toEqual({
       limit: '100.00',
       used: '12.34',
       remainingPercent: 87.66,

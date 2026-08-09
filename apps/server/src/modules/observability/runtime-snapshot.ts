@@ -21,6 +21,7 @@ import * as Health from '../health/service'
 import { providerRuntimeHostManager } from '../provider-runtime/host-manager'
 import { summarizeRuntimeProcessResources } from '../provider-runtime/process-resources'
 import * as Pty from '../pty/service'
+import type { DesktopRuntimeSample } from './service'
 import { getDesktopRuntimeSamples, getQueueHealth } from './service'
 
 const TOP_DRILLDOWN_LIMIT = 10
@@ -51,7 +52,11 @@ function summarizeKimiServerResources(resources: KimiServerResources[]) {
 }
 
 function readActiveResourceCount(name: '_getActiveHandles' | '_getActiveRequests'): number {
-  const reader = (process as unknown as Record<string, unknown>)[name]
+  const runtimeProcess = process as NodeJS.Process & {
+    _getActiveHandles?: () => unknown[]
+    _getActiveRequests?: () => unknown[]
+  }
+  const reader = runtimeProcess[name]
   if (typeof reader !== 'function') {
     return 0
   }
@@ -101,10 +106,8 @@ function toBytesFromKiB(value: number | null): number | null {
   return value === null ? null : value * 1024
 }
 
-function summarizeRendererDrilldowns(latestDesktopSample: Record<string, unknown> | undefined) {
-  const diagnostics = latestDesktopSample
-    ? readNestedRecord(latestDesktopSample, 'diagnostics')
-    : undefined
+function summarizeRendererDrilldowns(latestDesktopSample: DesktopRuntimeSample | undefined) {
+  const diagnostics = latestDesktopSample?.diagnostics
   const renderers = readNestedArray(diagnostics ?? {}, 'renderers')
   const topChatSessions: Array<Record<string, unknown>> = []
   const activeStreamingMessages: Array<Record<string, unknown>> = []
@@ -247,10 +250,8 @@ function summarizeRendererDrilldowns(latestDesktopSample: Record<string, unknown
   }
 }
 
-function summarizeBrowserPanelDrilldowns(latestDesktopSample: Record<string, unknown> | undefined) {
-  const diagnostics = latestDesktopSample
-    ? readNestedRecord(latestDesktopSample, 'diagnostics')
-    : undefined
+function summarizeBrowserPanelDrilldowns(latestDesktopSample: DesktopRuntimeSample | undefined) {
+  const diagnostics = latestDesktopSample?.diagnostics
   const browser = readNestedRecord(diagnostics ?? {}, 'browser')
   const panel = readNestedRecord(browser ?? {}, 'panel')
   const limits = readNestedRecord(browser ?? {}, 'limits')
@@ -427,9 +428,6 @@ export async function getRuntimeSnapshot() {
   }
 
   const latestDesktopSample = desktop.latestSamples.at(-1)
-  const latestDesktopSampleRecord = latestDesktopSample as unknown as
-    | Record<string, unknown>
-    | undefined
   const appProcessCountByType: Record<string, number> = {}
   const appProcessMemoryBytesByType: Record<string, number> = {}
   for (const metric of latestDesktopSample?.appMetrics ?? []) {
@@ -453,9 +451,7 @@ export async function getRuntimeSnapshot() {
   const rendererChatStoreTotals: Record<string, number> = {}
   const rendererDocumentTotals: Record<string, number> = {}
   const rendererPerformanceTotals: Record<string, number> = {}
-  const diagnostics = latestDesktopSampleRecord
-    ? readNestedRecord(latestDesktopSampleRecord, 'diagnostics')
-    : undefined
+  const diagnostics = latestDesktopSample?.diagnostics
   for (const item of readNestedArray(diagnostics ?? {}, 'renderers')) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
       continue
@@ -569,8 +565,8 @@ export async function getRuntimeSnapshot() {
   updateObservabilityMetrics(observability)
 
   const drilldowns = {
-    renderer: summarizeRendererDrilldowns(latestDesktopSampleRecord),
-    browserPanel: summarizeBrowserPanelDrilldowns(latestDesktopSampleRecord),
+    renderer: summarizeRendererDrilldowns(latestDesktopSample),
+    browserPanel: summarizeBrowserPanelDrilldowns(latestDesktopSample),
     runStreams: {
       topRuns: summarizeRunStreamDrilldowns(activeRuns, runStreams),
     },

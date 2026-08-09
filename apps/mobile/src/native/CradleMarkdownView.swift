@@ -7,6 +7,8 @@ final class CradleMarkdownView: ExpoView {
   private var markdown = ""
   private var streaming = true
   private var lastReportedSize = CGSize.zero
+  private var needsRender = false
+  private var renderScheduled = false
 
   let onContentSizeChange = EventDispatcher()
 
@@ -16,7 +18,7 @@ final class CradleMarkdownView: ExpoView {
     var theme = MarkdownTheme.default
     theme.align(to: 14)
     markdownView.theme = theme
-    markdownView.throttleInterval = 1 / 20
+    markdownView.throttleInterval = 1 / 8
     markdownView.backgroundColor = .clear
 
     backgroundColor = .clear
@@ -50,19 +52,39 @@ final class CradleMarkdownView: ExpoView {
     markdownView.intrinsicContentSize
   }
 
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window != nil, needsRender {
+      scheduleRender()
+    }
+  }
+
   func setMarkdown(_ value: String) {
     guard value != markdown else { return }
     markdown = value
-    render()
+    scheduleRender()
   }
 
   func setStreaming(_ value: Bool) {
     guard value != streaming else { return }
     streaming = value
-    render()
+    scheduleRender()
+  }
+
+  private func scheduleRender() {
+    needsRender = true
+    guard window != nil, !renderScheduled else { return }
+    renderScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.renderScheduled = false
+      guard self.window != nil, self.needsRender else { return }
+      self.render()
+    }
   }
 
   private func render() {
+    needsRender = false
     let content = MarkdownContent(markdown: markdown, theme: markdownView.theme)
     if streaming {
       markdownView.setContent(content)

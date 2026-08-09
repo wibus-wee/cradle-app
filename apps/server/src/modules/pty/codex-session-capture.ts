@@ -6,8 +6,6 @@ import { createInterface } from 'node:readline'
 
 import { z } from 'zod'
 
-import type { CodexCliSessionBinding } from '../../helpers/agent-runtime-config'
-
 const MAX_FILES_PER_DIRECTORY = 80
 const MAX_CANDIDATE_FILES = 120
 const CAPTURE_LOOKBACK_MS = 5_000
@@ -39,7 +37,12 @@ interface CodexSessionMeta {
   originator: string
 }
 
-export interface CapturedCodexCliSession extends CodexCliSessionBinding {
+export interface CapturedCodexCliSession {
+  sessionId: string
+  capturedAt: number
+  startedAt: number
+  workspacePath: string
+  sourcePath: string
   title?: string
 }
 
