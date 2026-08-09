@@ -1,7 +1,3 @@
-// Input: Stable string → palette mapping for IPC flow id color chips
-// Output: flowColor(id) — Tailwind bg class chosen deterministically per flowId
-// Position: Small helper used by ipc-events-table and ipc-event-detail for visual grouping
-
 const PALETTE = [
   'bg-sky-500',
   'bg-violet-500',

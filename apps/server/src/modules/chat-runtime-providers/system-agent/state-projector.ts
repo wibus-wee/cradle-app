@@ -1,9 +1,3 @@
-/**
- * Output: System Agent provider snapshot projections.
- * Input: existing provider snapshot and selected model id.
- * Position: System Agent provider package owner for providerStateSnapshot updates.
- */
-
 import { readProviderStateSnapshot } from '../kit/state-snapshot'
 
 export function projectSystemAgentModelSnapshot(rawSnapshot: string | null | undefined, currentModelId: string): string {

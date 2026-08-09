@@ -1,9 +1,3 @@
-/**
- * Output: opencode runtime presentation projection.
- * Input: opencode SDK command records.
- * Position: opencode provider package boundary from SDK-native presentation to Chat Runtime presentation.
- */
-
 import type { Command as OpencodeCommand } from '@opencode-ai/sdk'
 
 import type {

@@ -8,6 +8,7 @@ import {
   getChatSessionsBySessionIdQueue,
   patchChatSessionsBySessionIdQueueByQueueItemId,
   postChatSessionsBySessionIdBangCommand,
+  postChatSessionsBySessionIdBangTranscript,
   postChatSessionsBySessionIdCancel,
   postChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApproval,
   postChatSessionsBySessionIdQueue,
@@ -34,7 +35,7 @@ export interface ChatResponseRequestBody {
   providerTargetId?: string
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort
-  runtimeSettings?: ChatRuntimeSettingsPatch
+  runtimeSettings?: RuntimeSettingsPatch
   reviewTarget?: RuntimeReviewTarget
 }
 
@@ -50,11 +51,6 @@ export type RuntimeSettingsPatchValue = RuntimeSettingsValue | null
 export type RuntimeSettingsPatch = Record<string, RuntimeSettingsPatchValue | undefined>
 export type RuntimeSettingsPayload = Record<string, RuntimeSettingsPatchValue>
 
-/** @deprecated Use RuntimeSettings — provider-native session settings. */
-export type ChatRuntimeSettings = RuntimeSettings
-/** @deprecated Use RuntimeSettingsPatch */
-export type ChatRuntimeSettingsPatch = RuntimeSettingsPatch
-
 export interface ChatQueueItem {
   id: string
   sessionId: string
@@ -66,7 +62,7 @@ export interface ChatQueueItem {
   providerTargetId: string | null
   modelId: string | null
   thinkingEffort: ChatThinkingEffort | null
-  runtimeSettings: ChatRuntimeSettings
+  runtimeSettings: RuntimeSettings
   position: number
   sourceRunId: string | null
   startedRunId: string | null
@@ -372,26 +368,17 @@ export async function persistBangTranscript(args: {
   exitCode?: number | null
   signal?: AbortSignal
 }): Promise<BangCommandResult> {
-  const response = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/bang-transcript`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const result = await postChatSessionsBySessionIdBangTranscript({
+    path: { sessionId: args.sessionId },
+    body: {
       transcript: args.transcript,
       command: args.command,
       durationMs: args.durationMs,
       exitCode: args.exitCode,
-    }),
+    },
     signal: args.signal,
   })
-  if (!response.ok) {
-    const message = await response.text().catch(() => '')
-    throw new Error(message || `Failed to persist bang transcript (${response.status})`)
-  }
-  const payload = await response.json() as { data?: BangCommandResult } | BangCommandResult
-  if (payload && typeof payload === 'object' && 'data' in payload && payload.data) {
-    return payload.data
-  }
-  return payload as BangCommandResult
+  return readSdkData(result, 'Failed to persist bang transcript') as BangCommandResult
 }
 
 export async function createSideChat(args: {

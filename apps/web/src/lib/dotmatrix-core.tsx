@@ -6,6 +6,10 @@ import type { CSSProperties } from 'react'
 
 import { useDotMatrixPhases, usePrefersReducedMotion } from '~/lib/dotmatrix-hooks'
 
+type DotMatrixStyle = CSSProperties & {
+  [property in `--dmx-${string}`]?: string | number
+}
+
 export type MatrixPattern = 'diamond' | 'full' | 'outline' | 'rose' | 'cross' | 'rings'
 export type DotShape = 'circle' | 'square' | 'diamond' | 'hearts'
 export type DotMatrixPhase = 'idle' | 'collapse' | 'hoverRipple' | 'loadingRipple'
@@ -735,7 +739,7 @@ export function DotMatrixBase({
   const unit = dotSize + gap
   const { resolvedColor, dotFill } = resolveDmxColorTokens(color, colorPreset)
 
-  const dmxVarStyle = {
+  const dmxVarStyle: DotMatrixStyle = {
     'width': matrixSpan,
     'height': matrixSpan,
     '--dmx-speed': speedScale,
@@ -752,7 +756,7 @@ export function DotMatrixBase({
         transformOrigin: 'center center' as const,
       }
       : { minWidth: minSize, minHeight: minSize }),
-  } as unknown as CSSProperties
+  }
 
   const dots = Array.from({ length: MATRIX_SIZE * MATRIX_SIZE }).map((_, index) => {
     const { row, col } = indexToCoord(index)

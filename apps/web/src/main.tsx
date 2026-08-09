@@ -11,20 +11,18 @@ import { I18nProvider } from './i18n/client'
 import { bootstrapBrowserAuthSession } from './lib/server-credential'
 import { waitForServer } from './lib/server-readiness'
 
-type SharedModuleRegistry = Window & {
-  [key: symbol]: Record<string, unknown>
-}
-
 // Expose shared React modules for plugin runtime
 // Plugins loaded via dynamic import() need access to the SAME React instance
-const sharedModuleRegistry = window as unknown as SharedModuleRegistry
-sharedModuleRegistry[Symbol.for('cradle:modules')] = {
-  'react': React,
-  'react-dom': ReactDOM,
-  'react-dom/client': ReactDOMClient,
-  'react/jsx-dev-runtime': ReactJSXDevRuntime,
-  'react/jsx-runtime': ReactJSXRuntime,
-}
+Object.defineProperty(window, Symbol.for('cradle:modules'), {
+  configurable: true,
+  value: {
+    'react': React,
+    'react-dom': ReactDOM,
+    'react-dom/client': ReactDOMClient,
+    'react/jsx-dev-runtime': ReactJSXDevRuntime,
+    'react/jsx-runtime': ReactJSXRuntime,
+  },
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {

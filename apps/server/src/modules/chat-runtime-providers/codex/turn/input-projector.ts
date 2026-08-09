@@ -1,9 +1,3 @@
-/**
- * Output: Codex app-server user input and provider-native command projections.
- * Input: Cradle UIMessage/string turns, file parts, and selected skill context parts.
- * Position: Codex provider package boundary from Chat Runtime input to app-server UserInput.
- */
-
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'

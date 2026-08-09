@@ -89,9 +89,37 @@ function toRuntimeConfig(connection: ConversationBridgeConnection): Conversation
 
 function createHost(): ConversationBridgeHost {
   return {
-    async handleInboundMessage(event) {
+    async* startTurn(event) {
       const service = await import('./service')
-      await service.handleInboundMessage(event)
+      yield* service.startTurn(event)
+    },
+    async abortTurn(input) {
+      const service = await import('./service')
+      await service.abortTurn(input.runId)
+    },
+    async submitInteraction(input) {
+      const service = await import('./service')
+      await service.submitInteraction(input)
+    },
+    completeDelivery(input) {
+      void import('./service')
+        .then(service => service.completeDelivery(input))
+        .catch((error) => {
+          logger.error('failed to record conversation bridge delivery', {
+            deliveryId: input.deliveryId,
+            err: error,
+          })
+        })
+    },
+    failDelivery(input) {
+      void import('./service')
+        .then(service => service.failDelivery(input))
+        .catch((error) => {
+          logger.error('failed to record conversation bridge delivery failure', {
+            deliveryId: input.deliveryId,
+            err: error,
+          })
+        })
     },
     async handleControl(input) {
       const service = await import('./service')

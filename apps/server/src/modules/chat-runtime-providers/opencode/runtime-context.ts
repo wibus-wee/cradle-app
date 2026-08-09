@@ -1,8 +1,4 @@
 /**
- * Output: cwd-scoped OpenCode SDK server resources.
- * Input: OpenCode binary path and workspace directory.
- * Position: OpenCode provider package runtime process owner.
- *
  * Each managed `opencode serve` process inherits the user's native OpenCode
  * config, auth, and project scope. Hosts are pooled by binary path and cwd so
  * sessions in the same workspace can share a process without crossing project

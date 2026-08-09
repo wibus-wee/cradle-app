@@ -59,7 +59,7 @@ describe('planCliTuiLaunch', () => {
     expect(resume.args).toEqual(['--resume', SESSION_ID])
   })
 
-  it('resumes Codex from providerSession and falls back to legacy codexCliSession', () => {
+  it('resumes Codex from providerSession', () => {
     const fromProvider = planCliTuiLaunch({
       sessionId: SESSION_ID,
       executable: 'codex',
@@ -86,24 +86,6 @@ describe('planCliTuiLaunch', () => {
       CODEX_SESSION_ID,
     ])
     expect(fromProvider.needsCapture).toBe(false)
-
-    const fromLegacy = planCliTuiLaunch({
-      sessionId: SESSION_ID,
-      executable: 'codex',
-      args: [],
-      running: false,
-      ptyStartedAt: 1_700_000_000,
-      workspacePath: WORKSPACE,
-      codexCliSession: {
-        sessionId: CODEX_SESSION_ID,
-        capturedAt: 1_700_000_100,
-        startedAt: 1_700_000_000,
-        workspacePath: WORKSPACE,
-        sourcePath: '/tmp/rollout.jsonl',
-      },
-    })
-    expect(fromLegacy.mode).toBe('resume')
-    expect(fromLegacy.args).toEqual(['resume', CODEX_SESSION_ID])
   })
 
   it('does not resume Codex when workspace mismatches and schedules capture', () => {
@@ -114,12 +96,16 @@ describe('planCliTuiLaunch', () => {
       running: false,
       ptyStartedAt: null,
       workspacePath: WORKSPACE,
-      codexCliSession: {
-        sessionId: CODEX_SESSION_ID,
+      providerSession: {
+        source: 'cradle:codex',
+        agent: 'codex',
+        kind: 'id',
+        value: CODEX_SESSION_ID,
         capturedAt: 1_700_000_100,
         startedAt: 1_700_000_000,
         workspacePath: '/tmp/other',
         sourcePath: '/tmp/rollout.jsonl',
+        confidence: 'exact',
       },
     })
 

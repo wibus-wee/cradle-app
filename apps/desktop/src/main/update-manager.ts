@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events'
 import { app } from 'electron'
 
 import type { DesktopDownloadCenterService } from './download-center'
+import { ElectronDesktopUpdateAdapter } from './electron-updater-adapter'
 import { MacOSSparkleUpdateAdapter } from './macos-sparkle-update-adapter'
 import {
   readSparkleAppcastUrl,
@@ -14,7 +15,6 @@ import type {
   DesktopUpdateStatus,
 } from './update-types'
 import { readErrorMessage } from './update-types'
-import { WindowsDesktopUpdateAdapter } from './windows-update-adapter'
 
 export type {
   DesktopUpdateFile,
@@ -37,9 +37,9 @@ export type DesktopUpdateManagerOptions = {
   updateFeedUrl?: string | null
   preferences?: Partial<DesktopUpdatePreferences>
   prepareQuitForUpdate?: () => void | Promise<void>
-  downloadCenter?: Pick<DesktopDownloadCenterService, 'execute' | 'release'>
+  downloadCenter?: Pick<DesktopDownloadCenterService, 'beginExternal' | 'reportExternal'>
   sparkleAdapter?: MacOSSparkleUpdateAdapter
-  windowsUpdater?: WindowsDesktopUpdateAdapter
+  electronUpdater?: ElectronDesktopUpdateAdapter
 }
 
 type CheckForUpdatesOptions = {
@@ -73,14 +73,13 @@ export class DesktopUpdateManager {
   private readonly events = new EventEmitter()
   private readonly prepareQuitForUpdate: (() => void | Promise<void>) | null
   private readonly sparkleAdapter: MacOSSparkleUpdateAdapter | null
-  private readonly windowsUpdater: WindowsDesktopUpdateAdapter | null
+  private readonly electronUpdater: ElectronDesktopUpdateAdapter | null
   private preferences: DesktopUpdatePreferences
   private statusSnapshot: DesktopUpdateStatus
   private backgroundTimer: NodeJS.Timeout | null = null
   private backgroundCheckRunning = false
   private downloadInProgress = false
   private sparkleReadyPromise: Promise<void> | null = null
-  private downloadCenter: Pick<DesktopDownloadCenterService, 'execute' | 'release'> | null
 
   constructor(options: DesktopUpdateManagerOptions = {}) {
     const currentVersion = app.getVersion()
@@ -89,16 +88,17 @@ export class DesktopUpdateManager {
     const updatePlatform = unsupportedReason ? null : readUpdatePlatform()
 
     this.prepareQuitForUpdate = options.prepareQuitForUpdate ?? null
-    this.downloadCenter = options.downloadCenter ?? null
     this.sparkleAdapter = updatePlatform === 'darwin'
       ? (options.sparkleAdapter ?? new MacOSSparkleUpdateAdapter({
           updateFeedUrl,
         }))
       : null
-    this.windowsUpdater = updatePlatform === 'win32'
-      ? (options.windowsUpdater ?? new WindowsDesktopUpdateAdapter({
+    this.electronUpdater = updatePlatform === 'win32' || updatePlatform === 'linux'
+      ? (options.electronUpdater ?? new ElectronDesktopUpdateAdapter({
+          platform: updatePlatform,
           updateFeedUrl: updateFeedUrl!,
           onStatusChanged: patch => this.setStatus(patch),
+          downloadCenter: options.downloadCenter,
         }))
       : null
     this.preferences = {
@@ -111,7 +111,7 @@ export class DesktopUpdateManager {
         ? null
         : updatePlatform === 'darwin'
           ? 'sparkle'
-          : updatePlatform === 'win32'
+          : updatePlatform === 'win32' || updatePlatform === 'linux'
             ? 'electron-updater'
             : null,
       currentVersion,
@@ -131,9 +131,8 @@ export class DesktopUpdateManager {
     return this.statusSnapshot
   }
 
-  setDownloadCenter(downloadCenter: Pick<DesktopDownloadCenterService, 'execute' | 'release' | 'beginExternal' | 'reportExternal'>): void {
-    this.downloadCenter = downloadCenter
-    this.windowsUpdater?.setDownloadCenter(downloadCenter)
+  setDownloadCenter(downloadCenter: Pick<DesktopDownloadCenterService, 'beginExternal' | 'reportExternal'>): void {
+    this.electronUpdater?.setDownloadCenter(downloadCenter)
   }
 
   /**
@@ -171,7 +170,7 @@ export class DesktopUpdateManager {
 
   startBackgroundChecks(): void {
     if (
-      (!this.sparkleAdapter && !this.windowsUpdater)
+      (!this.sparkleAdapter && !this.electronUpdater)
       || this.backgroundTimer
       || this.backgroundCheckRunning
       || !this.preferences.autoCheckForUpdates
@@ -238,8 +237,8 @@ export class DesktopUpdateManager {
   }
 
   async checkForUpdates(options: CheckForUpdatesOptions = {}): Promise<DesktopUpdateStatus> {
-    if (this.windowsUpdater) {
-      return await this.checkForWindowsUpdates(options)
+    if (this.electronUpdater) {
+      return await this.checkForElectronUpdates(options)
     }
 
     if (this.sparkleAdapter) {
@@ -250,8 +249,8 @@ export class DesktopUpdateManager {
   }
 
   async downloadUpdate(): Promise<DesktopUpdateStatus> {
-    if (this.windowsUpdater) {
-      return await this.downloadWindowsUpdate()
+    if (this.electronUpdater) {
+      return await this.downloadElectronUpdate()
     }
 
     if (this.sparkleAdapter) {
@@ -263,8 +262,8 @@ export class DesktopUpdateManager {
   }
 
   async applyUpdate(): Promise<void> {
-    if (this.windowsUpdater) {
-      await this.applyWindowsUpdate()
+    if (this.electronUpdater) {
+      await this.applyElectronUpdate()
       return
     }
 
@@ -346,7 +345,7 @@ export class DesktopUpdateManager {
     this.events.emit('statusChanged', this.statusSnapshot)
   }
 
-  private async checkForWindowsUpdates(options: CheckForUpdatesOptions): Promise<DesktopUpdateStatus> {
+  private async checkForElectronUpdates(options: CheckForUpdatesOptions): Promise<DesktopUpdateStatus> {
     if (this.statusSnapshot.isCheckingForUpdates || this.downloadInProgress || this.statusSnapshot.isPreparingUpdate) {
       return this.statusSnapshot
     }
@@ -357,7 +356,7 @@ export class DesktopUpdateManager {
     })
 
     try {
-      const updateInfo = await retryWithBackoff(() => this.windowsUpdater!.checkForUpdates())
+      const updateInfo = await retryWithBackoff(() => this.electronUpdater!.checkForUpdates())
       this.setStatus({
         isCheckingForUpdates: false,
         updateInfo,
@@ -376,7 +375,7 @@ export class DesktopUpdateManager {
     return this.statusSnapshot
   }
 
-  private async downloadWindowsUpdate(): Promise<DesktopUpdateStatus> {
+  private async downloadElectronUpdate(): Promise<DesktopUpdateStatus> {
     if (this.downloadInProgress || !this.statusSnapshot.updateInfo) {
       return this.statusSnapshot
     }
@@ -385,7 +384,7 @@ export class DesktopUpdateManager {
     this.setStatus({ isPreparingUpdate: false, updateDownloaded: false, errorMessage: null })
 
     try {
-      await this.windowsUpdater!.downloadUpdate()
+      await this.electronUpdater!.downloadUpdate()
       this.setStatus({
         isPreparingUpdate: false,
         updateDownloaded: true,
@@ -405,7 +404,7 @@ export class DesktopUpdateManager {
     return this.statusSnapshot
   }
 
-  private async applyWindowsUpdate(): Promise<void> {
+  private async applyElectronUpdate(): Promise<void> {
     if (!this.statusSnapshot.updateDownloaded) {
       this.setStatus({
         errorMessage: 'No prepared desktop update is available',
@@ -421,7 +420,7 @@ export class DesktopUpdateManager {
 
     try {
       await this.prepareQuitForUpdate()
-      this.windowsUpdater!.applyUpdate()
+      this.electronUpdater!.applyUpdate()
     }
     catch (error) {
       this.setStatus({
@@ -432,8 +431,8 @@ export class DesktopUpdateManager {
 }
 
 function readUnsupportedReason(updateFeedUrl: string | null): string | null {
-  if (process.platform !== 'darwin' && process.platform !== 'win32') {
-    return 'Desktop self-updates are only available on macOS and Windows'
+  if (process.platform !== 'darwin' && process.platform !== 'linux' && process.platform !== 'win32') {
+    return `Desktop self-updates are unavailable on ${process.platform}`
   }
   if (process.platform === 'darwin') {
     if (!readSparkleAppcastUrl(updateFeedUrl)) {
@@ -449,8 +448,8 @@ function readUnsupportedReason(updateFeedUrl: string | null): string | null {
   return null
 }
 
-function readUpdatePlatform(): 'darwin' | 'win32' | null {
-  if (process.platform === 'darwin' || process.platform === 'win32') {
+function readUpdatePlatform(): 'darwin' | 'linux' | 'win32' | null {
+  if (process.platform === 'darwin' || process.platform === 'linux' || process.platform === 'win32') {
     return process.platform
   }
   return null

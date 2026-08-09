@@ -152,7 +152,7 @@ export async function createClaudeAgentIntegrationHarness(input: {
       }
       return chunks
     },
-    activeQueryCount: () => (provider as unknown as { activeQueries: Map<string, unknown> }).activeQueries.size,
+    activeQueryCount: () => provider.getActiveQueryCount(),
     async cleanup(): Promise<void> {
       await provider.dispose()
       if (ownsWorkspace) {

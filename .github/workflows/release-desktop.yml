@@ -620,13 +620,17 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm --filter @cradle/desktop build
 
-      - name: Package Linux AppImage and deb
+      - name: Package Linux AppImage, deb, and rpm
         working-directory: apps/desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm exec electron-builder --config electron-builder.mjs --linux AppImage deb --x64 --publish never
+        run: pnpm exec electron-builder --config electron-builder.mjs --linux AppImage deb rpm --x64 --publish never
+
+      - name: Verify Linux release artifacts and updater metadata
+        working-directory: apps/desktop
+        run: pnpm verify:linux-release
 
       - name: Upload artifacts
         uses: ./.github/actions/desktop-upload-artifacts
@@ -682,7 +686,7 @@ jobs:
           mkdir -p release-assets
 
           shopt -s globstar nullglob
-          for file in artifacts/**/*.{dmg,zip,exe,blockmap,yml,xml,AppImage,deb,delta}; do
+          for file in artifacts/**/*.{dmg,zip,exe,blockmap,yml,xml,AppImage,deb,rpm,delta}; do
             basename="$(basename "$file")"
             if [[ "$basename" == "builder-debug.yml" ]]; then
               continue
@@ -746,10 +750,12 @@ jobs:
             const exe = assets.find(f => f.endsWith('.exe'))
             const appImage = assets.find(f => f.endsWith('.AppImage'))
             const deb = assets.find(f => f.endsWith('.deb'))
+            const rpm = assets.find(f => f.endsWith('.rpm'))
             if (dmg) downloadLinks.push(`[macOS (arm64)](${releaseDownloadUrl}/${encodeURIComponent(dmg)})`)
             if (exe) downloadLinks.push(`[Windows (x64)](${releaseDownloadUrl}/${encodeURIComponent(exe)})`)
             if (appImage) downloadLinks.push(`[Linux AppImage (x64)](${releaseDownloadUrl}/${encodeURIComponent(appImage)})`)
             if (deb) downloadLinks.push(`[Linux deb (x64)](${releaseDownloadUrl}/${encodeURIComponent(deb)})`)
+            if (rpm) downloadLinks.push(`[Linux rpm (x64)](${releaseDownloadUrl}/${encodeURIComponent(rpm)})`)
 
             return template
               .replace(/\{\{title\}\}/g, title)
@@ -765,7 +771,7 @@ jobs:
               if (entry.isDirectory()) {
                 walk(entryPath, files)
               }
-              else if (entry.isFile() && entry.name.endsWith('.yml')) {
+              else if (entry.isFile() && /^latest(?:-[^.]+)?\.yml$/.test(entry.name)) {
                 files.push(entryPath)
               }
             }
@@ -925,6 +931,9 @@ jobs:
             fi
             if [ -f release-assets/latest.yml ]; then
               cp release-assets/latest.yml feed-assets/
+            fi
+            if [ -f release-assets/latest-linux.yml ]; then
+              cp release-assets/latest-linux.yml feed-assets/
             fi
             # Versioned mac zips for the feed channel.
             find release-assets -maxdepth 1 -type f \( -name 'Cradle-*-mac-*.zip' -o -name '*.delta' \) -exec cp {} feed-assets/ \;

@@ -221,6 +221,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
     return this.presentation.getDraftPresentation()
   }
 
+  getActiveQueryCount(): number {
+    return this.activeQueries.size
+  }
+
   async getUiSlotStates(input: GetUiSlotStatesInput): Promise<RuntimeUiSlotState[]> {
     return await this.presentation.getUiSlotStates(input)
   }

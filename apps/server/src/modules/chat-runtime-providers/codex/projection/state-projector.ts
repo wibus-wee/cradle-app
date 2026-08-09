@@ -1,9 +1,3 @@
-/**
- * Output: Codex providerStateSnapshot projections for notifications, goal state, and native history.
- * Input: runtime session snapshots, Codex app-server notifications, and full app-server turn history.
- * Position: Codex provider package owner for provider snapshot state projection.
- */
-
 import { Buffer } from 'node:buffer'
 
 import { readObjectRecord as readRecord } from '../../../../helpers/json-record'

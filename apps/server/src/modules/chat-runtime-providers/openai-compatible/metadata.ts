@@ -1,9 +1,3 @@
-/**
- * Output: Standard runtime identity and static capabilities.
- * Input: no runtime data.
- * Position: OpenAI-compatible provider package metadata owner.
- */
-
 import type {
   ChatRuntimeCapabilities,
   ChatRuntimeMetadata,

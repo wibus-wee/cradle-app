@@ -13,7 +13,7 @@ import {
   sessions,
   workspaces,
 } from '@cradle/db'
-import type { ConversationBridgeDeliveryInput } from '@cradle/plugin-sdk/server'
+import type { ConversationBridgeDeliveryInput, ConversationBridgeTurnEvent } from '@cradle/plugin-sdk/server'
 import {
   CONVERSATION_BRIDGE_WORKSPACE_SELECT_ACTION,
 } from '@cradle/plugin-sdk/server'
@@ -46,7 +46,7 @@ let dataDir: string
 let deliveredMessages: ConversationBridgeDeliveryInput[]
 
 function makeInboundEvent(
-  overrides: Partial<Parameters<typeof ConversationBridge.handleInboundMessage>[0]> = {},
+  overrides: Partial<Parameters<typeof ConversationBridge.startTurn>[0]> = {},
 ) {
   return {
     connectionId: 'connection-1',
@@ -62,6 +62,20 @@ function makeInboundEvent(
     payload: { source: 'test' },
     ...overrides,
   }
+}
+
+async function consumeTurn(event: ReturnType<typeof makeInboundEvent>) {
+  const events: ConversationBridgeTurnEvent[] = []
+  for await (const turnEvent of ConversationBridge.startTurn(event)) {
+    events.push(turnEvent)
+    if (turnEvent.type === 'completed') {
+      ConversationBridge.completeDelivery({
+        deliveryId: turnEvent.deliveryId,
+        result: { externalMessageId: 'delivered-1' },
+      })
+    }
+  }
+  return events
 }
 
 function seedCradleRuntimeTarget(): void {
@@ -200,7 +214,7 @@ describe('conversation bridge service', () => {
       enabled: true,
     })
 
-    await ConversationBridge.handleInboundMessage(makeInboundEvent({ connectionId: connection.id }))
+    await consumeTurn(makeInboundEvent({ connectionId: connection.id }))
 
     const event = db()
       .select()
@@ -386,8 +400,8 @@ describe('conversation bridge service', () => {
     })
     const inboundEvent = makeInboundEvent({ connectionId: connection.id })
 
-    await ConversationBridge.handleInboundMessage(inboundEvent)
-    await ConversationBridge.handleInboundMessage(inboundEvent)
+    const firstEvents = await consumeTurn(inboundEvent)
+    const duplicateEvents = await consumeTurn(inboundEvent)
 
     expect(db().select().from(sessions).all()).toEqual([
       expect.objectContaining({
@@ -409,14 +423,13 @@ describe('conversation bridge service', () => {
         externalMessageId: 'delivered-1',
       }),
     ])
-    expect(deliveredMessages).toEqual([
-      expect.objectContaining({
-        connectionId: connection.id,
-        externalThreadId: 'external-thread-1',
-        text: 'Bridge response',
-      }),
-    ])
+    expect(deliveredMessages).toHaveLength(0)
     expect(chatRuntimeMock.streamResponse).toHaveBeenCalledTimes(1)
+    expect(firstEvents).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'accepted', runId: 'run-1' }),
+      expect.objectContaining({ type: 'completed', text: 'Bridge response' }),
+    ]))
+    expect(duplicateEvents).toEqual([{ type: 'ignored', reason: 'duplicate event' }])
     expect(chatRuntimeMock.streamResponse).toHaveBeenCalledWith(
       expect.objectContaining({
         text: expect.stringContaining('hello bridge'),

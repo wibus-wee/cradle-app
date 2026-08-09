@@ -1,9 +1,3 @@
-/**
- * Output: ACP Chat runtime identity and static capabilities.
- * Input: no runtime data.
- * Position: ACP provider package metadata owner.
- */
-
 import type {
   ChatRuntimeCapabilities,
   ChatRuntimeMetadata,

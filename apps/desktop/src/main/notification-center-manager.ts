@@ -45,6 +45,25 @@ interface NativeNotification {
   on: (eventName: 'reply' | 'click' | 'close', listener: (event: unknown, reply?: string) => void) => void
 }
 
+function createNativeNotification(options: Electron.NotificationConstructorOptions): NativeNotification {
+  const notification = new Notification(options)
+  return {
+    show: () => notification.show(),
+    close: () => notification.close(),
+    on(eventName, listener) {
+      if (eventName === 'reply') {
+        notification.on('reply', (event, reply) => listener(event, reply))
+        return
+      }
+      if (eventName === 'click') {
+        notification.on('click', event => listener(event))
+        return
+      }
+      notification.on('close', event => listener(event))
+    },
+  }
+}
+
 interface NotificationCenterManagerOptions {
   serverUrl: string
   chatStreamBroker: ChatStreamBroker
@@ -83,8 +102,7 @@ export class NotificationCenterManager {
     this.chatStreamBroker = options.chatStreamBroker
     this.getMainWindow = options.getMainWindow ?? (() => null)
     this.fetchFn = options.fetchFn ?? fetch
-    this.createNotification = options.createNotification
-      ?? (notificationOptions => new Notification(notificationOptions) as unknown as NativeNotification)
+    this.createNotification = options.createNotification ?? createNativeNotification
     this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
     this.nowSeconds = options.nowSeconds ?? (() => Math.floor(Date.now() / 1000))
     this.platform = options.platform ?? process.platform

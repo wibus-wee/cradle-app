@@ -1,9 +1,6 @@
 import { basename } from 'node:path'
 
-import type {
-  CodexCliSessionBinding,
-  ProviderSessionBinding,
-} from '../../helpers/agent-runtime-config'
+import type { ProviderSessionBinding } from '../../helpers/agent-runtime-config'
 
 export type CliTuiLaunchMode = 'live-attach' | 'resume' | 'fresh'
 
@@ -32,8 +29,6 @@ export interface PlanCliTuiLaunchInput {
   ptyStartedAt: number | null
   workspacePath: string
   providerSession?: ProviderSessionBinding | null
-  /** @deprecated Prefer providerSession; kept for stored session config. */
-  codexCliSession?: CodexCliSessionBinding | null
   harnessSystemPrompt?: string | null
 }
 
@@ -158,7 +153,6 @@ export function detectAgent(executable: string): CliTuiAgent {
 
 export function resolveProviderSessionBinding(input: {
   providerSession?: ProviderSessionBinding | null
-  codexCliSession?: CodexCliSessionBinding | null
   workspacePath: string
   expectedAgent?: CliTuiAgent
 }): ProviderSessionBinding | null {
@@ -174,26 +168,7 @@ export function resolveProviderSessionBinding(input: {
     }
     return input.providerSession
   }
-
-  const legacy = input.codexCliSession
-  if (!legacy || legacy.workspacePath !== input.workspacePath) {
-    return null
-  }
-  if (input.expectedAgent && input.expectedAgent !== 'codex' && input.expectedAgent !== 'generic') {
-    return null
-  }
-
-  return {
-    source: 'cradle:codex',
-    agent: 'codex',
-    kind: 'id',
-    value: legacy.sessionId,
-    workspacePath: legacy.workspacePath,
-    capturedAt: legacy.capturedAt,
-    startedAt: legacy.startedAt,
-    sourcePath: legacy.sourcePath,
-    confidence: 'exact',
-  }
+  return null
 }
 
 export function providerSessionDedupeKey(binding: ProviderSessionBinding): string {
@@ -325,7 +300,6 @@ function planCodexLaunch(
   const autoResumeAllowed = !hasCodexPositionalArg(args) && !hasCodexResumeArg(args)
   const binding = resolveProviderSessionBinding({
     providerSession: input.providerSession,
-    codexCliSession: input.codexCliSession,
     workspacePath: input.workspacePath,
     expectedAgent: 'codex',
   })
@@ -366,7 +340,6 @@ function planBoundProviderResume(
 ): CliTuiLaunchPlan {
   const binding = resolveProviderSessionBinding({
     providerSession: input.providerSession,
-    codexCliSession: input.codexCliSession,
     workspacePath: input.workspacePath,
     expectedAgent: agent,
   })

@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-/**
- * Output: Creates apps/server/dist/desktop-plugins as the first-party plugin artifact consumed by Cradle desktop packaging.
- * Input: plugins/* package manifests and built plugin dist directories.
- * Position: Server-owned desktop plugin packaging boundary; desktop includes this artifact without enumerating plugin packages.
- */
 import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'

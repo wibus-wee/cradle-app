@@ -1,7 +1,3 @@
-// Input: Zustand ipc-devtool stores, @cradle/ipc status/side types, cn utility
-// Output: IpcFilterBar — search / status / side toggles + pause & clear controls for the devtool
-// Position: Top toolbar inside the IPC devtool page
-
 import { useTranslation } from 'react-i18next'
 
 import { cn } from '~/lib/cn'

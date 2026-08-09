@@ -15,7 +15,7 @@ Opt-in durable screen history lives under `$CRADLE_DATA_DIR/terminal-history` wh
 - `pty.runtime.ts`: `node-pty` runtime registry, process lifecycle hooks, and process tree memory/CPU resource sampling.
 - `pty.timeline.ts`: Sequence-aware snapshots, replay windows, exit history, and restore metadata.
 - `pty.socket.ts`: WebSocket adapter that bridges runtime/timeline to clients.
-- `launch-planner.ts`: Pure CLI TUI launch planner. Decides `live-attach` / `resume` / `fresh`, builds Claude/Codex/Kimi argv, resolves generalized `providerSession` bindings (with legacy `codexCliSession` compat), and decides when provider filesystem capture is needed.
+- `launch-planner.ts`: Pure CLI TUI launch planner. Decides `live-attach` / `resume` / `fresh`, builds Claude/Codex/Kimi argv, resolves generalized `providerSession` bindings, and decides when provider filesystem capture is needed.
 - `service.ts`: Session/profile/workspace ownership rules, start-or-attach orchestration, host diagnostics, session archive/delete PTY release hooks, memory/CPU resource totals, explicit bottom-panel shell lifecycle, and module shutdown. `startOrAttach` returns `{ sessionId, running, mode, restore }`.
 # PTY lifecycle and activity
 

@@ -1,9 +1,3 @@
-/**
- * Output: Codex turn notification stream helpers and provider-thread event fanout.
- * Input: app-server client notifications, active goal snapshots, and provider-thread subscribers.
- * Position: Codex provider package owner for single-turn stream notification orchestration.
- */
-
 import type { UIMessageChunk } from 'ai'
 
 import type { ProviderThreadEvent } from '../../../chat-runtime/runtime-provider-types'

@@ -10,7 +10,7 @@ import { useChatStore } from '~/store/chat'
 
 import { MessageBubbleById } from './message-bubble-by-id'
 
-const fullMessage = {
+const fullMessage: UIMessage = {
   id: 'visible',
   role: 'assistant' as const,
   parts: [
@@ -23,7 +23,7 @@ const fullMessage = {
       output: { ok: true },
     },
   ],
-} as unknown as UIMessage
+}
 
 function shellMessage(id: string): UIMessage {
   return {

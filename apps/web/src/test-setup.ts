@@ -38,13 +38,18 @@ if (typeof globalThis.Event === 'undefined') {
 }
 
 if (typeof globalThis.MessageEvent === 'undefined') {
-  globalThis.MessageEvent = class MessageEvent extends Event {
+  class TestMessageEvent extends Event {
     data: unknown
     constructor(type: string, init?: MessageEventInit) {
       super(type)
       this.data = init?.data ?? null
     }
-  } as unknown as typeof MessageEvent
+  }
+  Object.defineProperty(globalThis, 'MessageEvent', {
+    configurable: true,
+    value: TestMessageEvent,
+    writable: true,
+  })
 }
 
 if (typeof globalThis.ResizeObserver === 'undefined') {

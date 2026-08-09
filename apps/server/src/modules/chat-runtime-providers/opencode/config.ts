@@ -1,9 +1,3 @@
-/**
- * Output: opencode-native provider config and model selection.
- * Input: Cradle runtime provider target profile, requested model, and secret reader.
- * Position: opencode provider package boundary from Cradle provider targets to opencode config.
- */
-
 import type { Config } from '@opencode-ai/sdk'
 
 import type { RegisteredMcpServer } from '../../../plugins/mcp-registry'

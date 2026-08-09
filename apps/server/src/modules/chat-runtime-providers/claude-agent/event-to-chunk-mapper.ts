@@ -1,9 +1,3 @@
-/**
- * Output: AI SDK UIMessageChunk events projected from Claude Agent SDK messages.
- * Input: Claude Agent SDK stream messages, tool-use snapshots, result messages, and subagent parent tool ids.
- * Position: Claude Agent provider package event mapper between SDK-native events and Chat Runtime chunks.
- */
-
 import { randomUUID } from 'node:crypto'
 
 import type {

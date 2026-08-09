@@ -1,7 +1,3 @@
-// Input: ACP devtool preload API, ACP runtime event types, Zustand selectors
-// Output: ACP devtool stores and derived hooks for filtered ACP process events
-// Position: Core state layer for the ACP runtime pane inside the devtool feature
-
 import { useMemo } from 'react'
 import { create } from 'zustand'
 

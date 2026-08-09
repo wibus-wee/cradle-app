@@ -1,9 +1,3 @@
-/**
- * Output: Codex runtime UI slot descriptors and provider-owned runtime UI slot states.
- * Input: app-server capability manifest, provider snapshot state, and app-server config/list reads.
- * Position: Codex provider package owner for runtime UI slot projection.
- */
-
 import type { RuntimeApprovalsUiSlotState, RuntimeBackgroundTerminal, RuntimeCompactUiSlotState, RuntimeConfigUiSlotState, RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimeDiffUiSlotState, RuntimeFilesystemUiSlotState, RuntimeMcpUiSlotState, RuntimeModelUiSlotState, RuntimePlanUiSlotState, RuntimePluginUiSlotState, RuntimeReasoningUiSlotState, RuntimeSearchUiSlotState, RuntimeSkillsUiSlotItem, RuntimeSkillsUiSlotState, RuntimeStatusUiSlotState, RuntimeTerminalUiSlotState, RuntimeToolActivityStatus, RuntimeToolActivityUiSlotState, RuntimeUiSlot, RuntimeUiSlotState, RuntimeUsageUiSlotState } from '../../../chat-runtime/runtime-provider-types'
 import {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
