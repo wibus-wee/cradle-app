@@ -1,9 +1,3 @@
-/**
- * Output: Codex app-server thread lifecycle and history hydration helpers.
- * Input: runtime sessions, app-server clients, transcript snapshots, and native Codex history snapshots.
- * Position: Codex provider package owner for opening, restoring, and hydrating app-server threads.
- */
-
 import type { UIMessage } from 'ai'
 
 import type {

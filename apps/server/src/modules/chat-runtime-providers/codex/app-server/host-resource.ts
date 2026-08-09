@@ -10,15 +10,21 @@ export function createCodexAppServerHostResource(input: {
   clientOptions: CodexAppServerClientOptions
   createClient: (options: CodexAppServerClientOptions) => CodexAppServerClientLike
 }): CodexAppServerHostResource {
-  const resource = {
-    client: undefined as unknown as CodexAppServerClientLike,
+  let resource: CodexAppServerHostResource | null = null
+  const client = input.createClient({
+    ...input.clientOptions,
+    serverRequestHandler: (request) => {
+      if (!resource) {
+        throw new Error('Codex app-server host received a request before resource initialization')
+      }
+      return dispatchCodexAppServerHostRequest(resource, request)
+    },
+  })
+  resource = {
+    client,
     serverRequestHandlers: new Set<CodexAppServerResourceRequestHandler>(),
     notificationSubscribers: new Set<CodexAppServerNotificationSubscriber>(),
-  } satisfies CodexAppServerHostResource
-  resource.client = input.createClient({
-    ...input.clientOptions,
-    serverRequestHandler: request => dispatchCodexAppServerHostRequest(resource, request),
-  })
+  }
   return resource
 }
 

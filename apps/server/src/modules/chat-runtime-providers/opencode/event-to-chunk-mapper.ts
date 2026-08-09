@@ -1,9 +1,3 @@
-/**
- * Output: AI SDK UIMessageChunk events projected from opencode message parts.
- * Input: opencode session.prompt response parts.
- * Position: opencode provider package event mapper between SDK-native parts and Chat Runtime chunks.
- */
-
 import type { AssistantMessage as OpencodeAssistantMessage, Part as OpencodePart } from '@opencode-ai/sdk'
 import type { UIMessageChunk } from 'ai'
 

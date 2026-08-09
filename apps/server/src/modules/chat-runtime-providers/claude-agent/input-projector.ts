@@ -1,9 +1,3 @@
-/**
- * Output: Claude Agent SDK user content and query options projected from Chat Runtime input.
- * Input: Cradle UIMessage turns, history, provider target config, workspace snapshot, and ProviderContext.
- * Position: Claude Agent provider package boundary from Cradle runtime contracts to SDK-native input.
- */
-
 import type { McpServerConfig, Options } from '@anthropic-ai/claude-agent-sdk'
 import type { UIMessage } from 'ai'
 

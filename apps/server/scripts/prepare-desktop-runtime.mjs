@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-/**
- * Output: Creates apps/server/dist/desktop-runtime as the server-owned artifact consumed by Cradle desktop packaging.
- * Input: apps/server/dist from Vite, apps/server/package.json, and the workspace pnpm lockfile.
- * Position: Server runtime packaging boundary; desktop includes this artifact without installing or copying server internals.
- */
 import { spawnSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'

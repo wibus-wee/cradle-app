@@ -318,8 +318,10 @@ const config = {
     target: [
       'AppImage',
       'deb',
+      'rpm',
     ],
     category: 'Development',
+    syncDesktopName: true,
     artifactName: ['$', '{productName}-', '$', '{os}-', '$', '{arch}.', '$', '{ext}'].join(''),
   },
 

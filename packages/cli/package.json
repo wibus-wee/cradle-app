@@ -7,7 +7,7 @@
     "cradle": "./dist/index.cjs"
   },
   "scripts": {
-    "build": "tsup && chmod +x dist/index.cjs",
+    "build": "tsdown && chmod +x dist/index.cjs",
     "gen:cli": "tsx scripts/generate-cli.ts",
     "typecheck": "tsc --noEmit",
     "cradle": "tsx src/index.ts"
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.1",
-    "tsup": "^8.0.0",
+    "tsdown": "^0.22.14",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }

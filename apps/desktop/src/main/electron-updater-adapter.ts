@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+
 import type {
   AppUpdater,
   CancellationToken,
@@ -14,35 +17,44 @@ import type {
   DesktopUpdateStatus,
 } from './update-types'
 
-export type WindowsDesktopUpdateAdapterOptions = {
+export type ElectronUpdaterPlatform = 'linux' | 'win32'
+export type ElectronUpdaterArtifactType = 'AppImage' | 'deb' | 'exe' | 'rpm'
+
+export type ElectronDesktopUpdateAdapterOptions = {
+  platform: ElectronUpdaterPlatform
+  artifactType?: ElectronUpdaterArtifactType
   updateFeedUrl: string
   updater?: AppUpdater
   onStatusChanged: (patch: Partial<DesktopUpdateStatus>) => void
   downloadCenter?: Pick<DesktopDownloadCenterService, 'beginExternal' | 'reportExternal'>
 }
 
-export class WindowsDesktopUpdateAdapter {
+export class ElectronDesktopUpdateAdapter {
   private readonly updater: AppUpdater
   private readonly onStatusChanged: (patch: Partial<DesktopUpdateStatus>) => void
   private downloadedFilePath: string | null = null
   private cancellationToken: CancellationToken | null = null
   private readonly updateFeedUrl: string
+  private readonly platform: ElectronUpdaterPlatform
+  private readonly artifactType: ElectronUpdaterArtifactType
   private downloadCenter: Pick<DesktopDownloadCenterService, 'beginExternal' | 'reportExternal'> | null
   private projectedTaskId: string | null = null
   private latestUpdateInfo: UpdateInfo | null = null
 
-  constructor(options: WindowsDesktopUpdateAdapterOptions) {
+  constructor(options: ElectronDesktopUpdateAdapterOptions) {
     this.updater = options.updater ?? autoUpdater
     this.onStatusChanged = options.onStatusChanged
     this.updateFeedUrl = options.updateFeedUrl
+    this.platform = options.platform
+    this.artifactType = options.artifactType ?? readArtifactType(options.platform)
     this.downloadCenter = options.downloadCenter ?? null
 
     this.updater.autoDownload = false
     this.updater.autoInstallOnAppQuit = false
     this.updater.allowPrerelease = true
-    this.updater.disableWebInstaller = true
+    this.updater.disableWebInstaller = options.platform === 'win32'
     this.updater.logger = console
-    this.updater.setFeedURL(resolveWindowsUpdaterFeedUrl(options.updateFeedUrl))
+    this.updater.setFeedURL(resolveElectronUpdaterFeedUrl(options.updateFeedUrl))
 
     this.updater.on('checking-for-update', () => {
       this.onStatusChanged({
@@ -55,7 +67,7 @@ export class WindowsDesktopUpdateAdapter {
       this.downloadedFilePath = null
       this.onStatusChanged({
         isCheckingForUpdates: false,
-        updateInfo: projectUpdateInfo(info),
+        updateInfo: projectUpdateInfo(info, this.artifactType),
         updateDownloaded: false,
       })
     })
@@ -110,7 +122,7 @@ export class WindowsDesktopUpdateAdapter {
       return null
     }
     this.latestUpdateInfo = result.updateInfo
-    return projectUpdateInfo(result.updateInfo)
+    return projectUpdateInfo(result.updateInfo, this.artifactType)
   }
 
   setDownloadCenter(downloadCenter: Pick<DesktopDownloadCenterService, 'beginExternal' | 'reportExternal'>): void {
@@ -120,7 +132,12 @@ export class WindowsDesktopUpdateAdapter {
   async downloadUpdate(): Promise<string | null> {
     if (this.downloadCenter && this.latestUpdateInfo) {
       const task = await this.downloadCenter.beginExternal(
-        createWindowsDownloadRequest(this.latestUpdateInfo, this.updateFeedUrl),
+        createDownloadRequest(
+          this.latestUpdateInfo,
+          this.updateFeedUrl,
+          this.platform,
+          this.artifactType,
+        ),
         () => this.cancelDownload(),
       )
       this.projectedTaskId = task.taskId
@@ -162,38 +179,71 @@ export class WindowsDesktopUpdateAdapter {
   }
 }
 
-function createWindowsDownloadRequest(info: UpdateInfo, updateFeedUrl: string) {
-  const file = info.files[0]
+function createDownloadRequest(
+  info: UpdateInfo,
+  updateFeedUrl: string,
+  platform: ElectronUpdaterPlatform,
+  artifactType: ElectronUpdaterArtifactType,
+) {
+  const file = info.files.find(candidate => hasArtifactExtension(candidate.url, artifactType))
   if (!file || !file.size || file.size <= 0) {
-    throw new Error('Windows update file size is required')
+    throw new Error(`${artifactType} update file with a valid size is required`)
   }
-  const url = new URL(file.url, resolveWindowsUpdaterFeedUrl(updateFeedUrl)).toString()
+  const artifactUrl = new URL(file.url, resolveElectronUpdaterFeedUrl(updateFeedUrl))
   return {
     owner: {
       namespace: 'desktop-update',
-      resourceType: 'windows-update',
+      resourceType: platform === 'linux' ? 'linux-update' : 'windows-update',
       resourceId: info.version,
       displayName: `Cradle ${info.version}`,
     },
-    fileName: file.url.split('/').at(-1) || `Cradle-${info.version}.exe`,
-    sources: [{ id: 'electron-updater', url }],
+    fileName: decodeURIComponent(path.posix.basename(artifactUrl.pathname)) || defaultArtifactName(info.version, artifactType),
+    sources: [{ id: 'electron-updater', url: artifactUrl.toString() }],
     integrity: file.sha512 ? { expectedBytes: file.size, checksum: { algorithm: 'sha512' as const, value: file.sha512 } } : { expectedBytes: file.size },
     maxBytes: file.size,
   }
 }
 
-export function resolveWindowsUpdaterFeedUrl(updateFeedUrl: string): string {
-  return resolveElectronUpdaterFeedUrl(updateFeedUrl)
+function defaultArtifactName(version: string, artifactType: ElectronUpdaterArtifactType): string {
+  return `Cradle-${version}.${artifactType}`
 }
 
-function projectUpdateInfo(info: UpdateInfo): DesktopUpdateInfo {
+function projectUpdateInfo(
+  info: UpdateInfo,
+  artifactType: ElectronUpdaterArtifactType,
+): DesktopUpdateInfo {
   return {
     version: info.version,
     releaseName: info.releaseName ?? null,
     releaseNotes: projectReleaseNotes(info.releaseNotes),
     releaseDate: info.releaseDate,
-    files: info.files.map(projectUpdateFile),
+    files: info.files
+      .filter(file => hasArtifactExtension(file.url, artifactType))
+      .map(projectUpdateFile),
   }
+}
+
+function hasArtifactExtension(url: string, artifactType: ElectronUpdaterArtifactType): boolean {
+  const pathname = new URL(url, 'https://updates.invalid/').pathname
+  return pathname.toLowerCase().endsWith(`.${artifactType.toLowerCase()}`)
+}
+
+function readArtifactType(platform: ElectronUpdaterPlatform): ElectronUpdaterArtifactType {
+  if (platform === 'win32') {
+    return 'exe'
+  }
+
+  try {
+    const packageType = readFileSync(path.join(process.resourcesPath, 'package-type'), 'utf8').trim()
+    if (packageType === 'deb' || packageType === 'rpm') {
+      return packageType
+    }
+  }
+  catch {
+    // AppImage builds intentionally do not contain electron-updater's package-type marker.
+  }
+
+  return 'AppImage'
 }
 
 function projectUpdateFile(file: UpdateInfo['files'][number]): DesktopUpdateFile {

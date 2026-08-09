@@ -2309,7 +2309,7 @@ function codexProviderThreadPartMetadata(
   turnId: string,
   itemId: string,
   itemType: string,
-  item: unknown,
+  _item: CodexAppServerItem,
 ): ProviderMetadata {
   return {
     codex: {
@@ -2317,9 +2317,8 @@ function codexProviderThreadPartMetadata(
       turnId,
       itemId,
       itemType,
-      item,
     },
-  } as unknown as ProviderMetadata
+  }
 }
 
 function readThreadStatusType(status: Thread['status']): string {

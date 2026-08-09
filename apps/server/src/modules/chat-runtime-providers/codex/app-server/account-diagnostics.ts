@@ -68,7 +68,6 @@ export interface CodexAccountDiagnostics {
     planType: string | null
     requiresOpenaiAuth: boolean | null
   } | null
-  rateLimits: CodexRateLimitSnapshotDiagnostics | null
   rateLimitsByLimitId: Record<string, CodexRateLimitSnapshotDiagnostics> | null
   rateLimitResetCredits: {
     availableCount: string
@@ -190,7 +189,6 @@ export async function readCodexAccountDiagnostics(
       unavailableReason: resolved.unavailableReason,
       refreshedAt: null,
       account: null,
-      rateLimits: null,
       rateLimitsByLimitId: null,
       rateLimitResetCredits: null,
       tokenUsage: null,
@@ -219,8 +217,7 @@ export async function readCodexAccountDiagnostics(
       supported: true,
       unavailableReason: null,
       refreshedAt: Date.now(),
-      account: projectAccountDiagnostics(accountResponse, chatgptAuth, rateLimitsResponse.rateLimits),
-      rateLimits: projectRateLimitSnapshot(rateLimitsResponse.rateLimits),
+      account: projectAccountDiagnostics(accountResponse, chatgptAuth),
       rateLimitsByLimitId: projectRateLimitsByLimitId(rateLimitsResponse.rateLimitsByLimitId),
       rateLimitResetCredits: rateLimitsResponse.rateLimitResetCredits
         ? {
@@ -405,7 +402,6 @@ async function acquireDiagnosticsHostLease(input: {
 function projectAccountDiagnostics(
   response: GetAccountResponse,
   chatgptAuth: NonNullable<ReturnType<typeof readCodexChatgptAuth>>,
-  rateLimits: RateLimitSnapshot,
 ): NonNullable<CodexAccountDiagnostics['account']> {
   const account = response.account
   const chatgptAccount = account?.type === 'chatgpt' ? account : null
@@ -414,7 +410,7 @@ function projectAccountDiagnostics(
     authMode: 'chatgptAuthTokens',
     accountType: account?.type ?? null,
     email: chatgptAccount?.email ?? null,
-    planType: chatgptAccount?.planType ?? chatgptAuth.chatgptPlanType ?? rateLimits.planType,
+    planType: chatgptAccount?.planType ?? chatgptAuth.chatgptPlanType,
     requiresOpenaiAuth: response.requiresOpenaiAuth,
   }
 }

@@ -1,9 +1,3 @@
-/**
- * Output: Claude Agent SDK user-message async input stream.
- * Input: provider-projected Claude Agent user content and close signals.
- * Position: Claude Agent provider package stream primitive built on shared provider infrastructure.
- */
-
 import { randomUUID } from 'node:crypto'
 
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'

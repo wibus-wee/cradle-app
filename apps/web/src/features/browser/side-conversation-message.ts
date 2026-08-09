@@ -2,7 +2,7 @@ import type { FileUIPart, UIMessage } from 'ai'
 
 import { useRendererChatStore } from '~/store/renderer-chat'
 
-import type { ChatRuntimeSettingsPatch, ChatThinkingEffort } from '../chat/commands/chat-response-command'
+import type { ChatThinkingEffort, RuntimeSettingsPatch } from '../chat/commands/chat-response-command'
 import { startSideConversationResponse } from '../chat/commands/chat-response-command'
 import type { ChatContextPart } from '../chat/context/chat-context-parts'
 import { toOrderedUserMessageParts } from '../chat/context/chat-context-parts'
@@ -16,7 +16,7 @@ export interface SubmitSideConversationMessageInput {
   contextParts?: ChatContextPart[]
   modelId?: string
   thinkingEffort?: ChatThinkingEffort | null | undefined
-  runtimeSettings?: ChatRuntimeSettingsPatch
+  runtimeSettings?: RuntimeSettingsPatch
 }
 
 export function buildSideConversationViewId(sideConversationId: string): string {

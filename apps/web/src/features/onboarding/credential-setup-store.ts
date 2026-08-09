@@ -93,6 +93,3 @@ export const useFirstRunSetupStore = create<FirstRunSetupState>()(
     },
   ),
 )
-
-/** @deprecated Prefer useFirstRunSetupStore. */
-export const useCredentialSetupStore = useFirstRunSetupStore

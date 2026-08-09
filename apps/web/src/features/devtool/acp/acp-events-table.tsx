@@ -1,7 +1,3 @@
-// Input: ACP devtool stores, filtered ACP process events, cn utility
-// Output: AcpEventsTable — selectable event timeline for ACP lifecycle and stream output
-// Position: Left pane of the ACP runtime mode inside the devtool page
-
 import { cn } from '~/lib/cn'
 
 import { useAcpDevtoolStore, useAcpFilteredEvents } from './use-acp-events'

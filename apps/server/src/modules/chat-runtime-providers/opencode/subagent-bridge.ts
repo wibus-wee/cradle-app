@@ -1,9 +1,3 @@
-/**
- * Output: OpenCode task/subagent provider-thread resolution and live stream fanout helpers.
- * Input: task tool parts, session.created events, and provider-thread threadId aliases.
- * Position: opencode provider package bridge between child sessions and Cradle provider-thread APIs.
- */
-
 import type {
   AssistantMessage as OpencodeAssistantMessage,
   Message as OpencodeMessage,

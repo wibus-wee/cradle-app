@@ -63,4 +63,8 @@ export type Namespace = keyof DefaultResources
 
 export const allNamespaces = Object.keys(resources) as Namespace[]
 
+export function isNamespace(value: string): value is Namespace {
+  return value in resources
+}
+
 export default resources

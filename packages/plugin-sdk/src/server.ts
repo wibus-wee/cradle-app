@@ -486,6 +486,9 @@ export const CONVERSATION_BRIDGE_CHANNEL_UNBIND_ACTION = 'cradle_channel_unbind'
 export const CONVERSATION_BRIDGE_WORKSPACE_SELECT_ACTION = 'cradle_workspace_select'
 export const CONVERSATION_BRIDGE_SESSION_TARGET_SELECT_ACTION = 'cradle_session_target_select'
 export const CONVERSATION_BRIDGE_SESSION_MODEL_SELECT_ACTION = 'cradle_session_model_select'
+export const CONVERSATION_BRIDGE_TURN_ABORT_ACTION = 'cradle_turn_abort'
+export const CONVERSATION_BRIDGE_TOOL_APPROVAL_ACTION = 'cradle_tool_approval'
+export const CONVERSATION_BRIDGE_USER_INPUT_ACTION = 'cradle_user_input'
 
 export interface ConversationBridgeAdapterRuntimeContext {
   logger: Logger
@@ -511,9 +514,122 @@ export interface ConversationBridgeConnectionRuntimeConfig {
 }
 
 export interface ConversationBridgeHost {
-  handleInboundMessage: (event: NormalizedConversationInboundMessage) => Promise<void>
+  startTurn: (event: NormalizedConversationInboundMessage) => AsyncIterable<ConversationBridgeTurnEvent>
+  abortTurn: (input: ConversationBridgeAbortTurnInput) => Promise<void>
+  submitInteraction: (input: ConversationBridgeInteractionInput) => Promise<void>
+  completeDelivery: (input: ConversationBridgeCompleteDeliveryInput) => void
+  failDelivery: (input: ConversationBridgeFailDeliveryInput) => void
   handleControl: (input: NormalizedConversationControl) => Promise<ConversationBridgeControlResponse>
   reportConnectionHealth: (input: ConversationBridgeConnectionHealth) => void
+}
+
+export type ConversationBridgeTurnEvent
+  = | ConversationBridgeTurnAcceptedEvent
+    | ConversationBridgeTurnTextDeltaEvent
+    | ConversationBridgeTurnToolEvent
+    | ConversationBridgeTurnApprovalRequiredEvent
+    | ConversationBridgeTurnUserInputRequiredEvent
+    | ConversationBridgeTurnCompletedEvent
+    | ConversationBridgeTurnAbortedEvent
+    | ConversationBridgeTurnFailedEvent
+    | ConversationBridgeTurnIgnoredEvent
+
+export interface ConversationBridgeTurnAcceptedEvent {
+  type: 'accepted'
+  runId: string
+  sessionId: string
+  assistantMessageId: string
+}
+
+export interface ConversationBridgeTurnTextDeltaEvent {
+  type: 'text_delta'
+  delta: string
+}
+
+export interface ConversationBridgeTurnToolEvent {
+  type: 'tool_started' | 'tool_completed' | 'tool_failed'
+  toolCallId: string
+  title: string
+  detail?: string
+}
+
+export interface ConversationBridgeTurnApprovalRequiredEvent {
+  type: 'approval_required'
+  sessionId: string
+  requestId: string
+  toolCallId: string
+  title: string
+}
+
+export interface ConversationBridgeUserInputQuestion {
+  id: string
+  header: string
+  question: string
+  isOther: boolean
+  isSecret: boolean
+  multiSelect: boolean
+  options: Array<{ label: string, description: string }> | null
+}
+
+export interface ConversationBridgeTurnUserInputRequiredEvent {
+  type: 'user_input_required'
+  sessionId: string
+  requestId: string
+  title: string
+  questions: ConversationBridgeUserInputQuestion[]
+}
+
+export interface ConversationBridgeTurnCompletedEvent {
+  type: 'completed'
+  runId: string
+  assistantMessageId: string
+  deliveryId: string
+  text: string
+}
+
+export interface ConversationBridgeTurnAbortedEvent {
+  type: 'aborted'
+  runId: string
+}
+
+export interface ConversationBridgeTurnFailedEvent {
+  type: 'failed'
+  runId: string | null
+  message: string
+}
+
+export interface ConversationBridgeTurnIgnoredEvent {
+  type: 'ignored'
+  reason: string
+}
+
+export interface ConversationBridgeAbortTurnInput {
+  runId: string
+}
+
+export type ConversationBridgeInteractionInput
+  = | {
+    type: 'tool_approval'
+    sessionId: string
+    requestId: string
+    approved: boolean
+    reason?: string
+  }
+  | {
+      type: 'user_input'
+      sessionId: string
+      requestId: string
+      answers: Record<string, string[]>
+    }
+
+export interface ConversationBridgeCompleteDeliveryInput {
+  deliveryId: string
+  result: ConversationBridgeDeliveryResult
+}
+
+export interface ConversationBridgeFailDeliveryInput {
+  deliveryId: string
+  error: string
 }
 
 export interface NormalizedConversationInboundMessage {
@@ -524,6 +640,9 @@ export interface NormalizedConversationInboundMessage {
   externalThreadId: string
   externalMessageId: string
   externalActorId: string | null
+  externalActorName?: string | null
+  externalChannelName?: string | null
+  externalChannelTopic?: string | null
   text: string
   mentionedAdapter: boolean
   eventType: string

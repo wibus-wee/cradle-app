@@ -1,9 +1,3 @@
-/**
- * Output: Claude Agent AskUserQuestion tool input/output projected to Runtime user input.
- * Input: Claude Agent SDK AskUserQuestion tool payloads and Runtime user input answers.
- * Position: Claude Agent provider-owned bridge between SDK-native question tools and Chat Runtime pending input.
- */
-
 import type { AskUserQuestionInput, AskUserQuestionOutput } from '@anthropic-ai/claude-agent-sdk/sdk-tools'
 
 import type { RuntimeUserInputQuestion } from '../../chat-runtime/runtime-provider-types'

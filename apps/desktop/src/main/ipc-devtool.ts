@@ -1,7 +1,3 @@
-// Input: @cradle/ipc observer registration, Electron ipcMain/WebContents, IpcDevtoolStore
-// Output: Shared main-process IPC devtool backend — observer wiring, IPC handler registration
-// Position: Main-process integration point that connects IPC instrumentation to the devtool window
-
 import type { IpcObservedEvent } from '@cradle/ipc'
 import { setIpcObserver } from '@cradle/ipc'
 import type { WebContents } from 'electron'

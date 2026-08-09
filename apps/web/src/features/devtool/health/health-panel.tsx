@@ -1,61 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
-import { getServerUrl } from '~/lib/electron'
+import { getHealthOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { formatUptimeSeconds } from '~/lib/number-format'
-
-const SERVER_BASE = getServerUrl()
-
-interface HealthData {
-  status: string
-  uptime: number
-  memory: {
-    heapUsed: number
-    heapTotal: number
-    rss: number
-    external: number
-  }
-  timestamp: number
-}
 
 export function HealthPanel() {
   const { t } = useTranslation('devtool')
-  const [health, setHealth] = useState<HealthData | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const healthQuery = useQuery({
+    ...getHealthOptions(),
+    refetchInterval: 10_000,
+  })
 
-  const fetchHealth = async () => {
-    try {
-      const res = await fetch(`${SERVER_BASE}/health`)
-      if (!res.ok) {
-        setError(`HTTP ${res.status}`)
-        return
-      }
-      const data: HealthData = await res.json()
-      setHealth(data)
-      setError(null)
-    }
-    catch (err) {
-      setError(String(err))
-    }
-  }
-
-  useEffect(() => {
-    void fetchHealth()
-    const id = setInterval(() => void fetchHealth(), 10_000)
-    return () => clearInterval(id)
-  }, [fetchHealth])
-
-  if (error) {
+  if (healthQuery.error) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-xs text-muted-foreground/50">
         {t('health.fetchError')}
 {' '}
-{error}
+        {healthQuery.error.message}
       </div>
     )
   }
 
-  if (!health) {
+  if (!healthQuery.data) {
     return (
       <div className="flex h-full items-center justify-center text-xs text-muted-foreground/50">
         {t('status.loading')}
@@ -63,6 +29,7 @@ export function HealthPanel() {
     )
   }
 
+  const health = healthQuery.data
   const rows: [string, string][] = [
     [t('health.status'), health.status],
     [t('health.uptime'), formatUptimeSeconds(health.uptime, { includeSeconds: true })],

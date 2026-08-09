@@ -57,14 +57,6 @@ interface DesktopStreamState {
   closed: boolean
 }
 
-type UIMessageChunkValidationResult
-  = | { success: true, value: UIMessageChunk }
-    | { success: false, error: unknown }
-
-interface UIMessageChunkValidator {
-  validate?: (value: unknown) => UIMessageChunkValidationResult | PromiseLike<UIMessageChunkValidationResult>
-}
-
 const PENDING_DESKTOP_STREAM_LIMIT = 32
 const PENDING_DESKTOP_EVENTS_PER_STREAM = 512
 const CLOSED_DESKTOP_STREAM_LIMIT = 512
@@ -238,7 +230,7 @@ function routeDesktopEvent(event: BufferedDesktopEvent): void {
       return
     }
     if (event.kind === 'chunk') {
-      const schema = uiMessageChunkSchema() as unknown as UIMessageChunkValidator
+      const schema = uiMessageChunkSchema()
       if (!schema.validate) {
         closeDesktopStreamWithError(state, new Error('AI SDK UIMessageChunk schema is unavailable'))
         return
