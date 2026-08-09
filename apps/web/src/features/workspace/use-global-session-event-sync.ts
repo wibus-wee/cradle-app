@@ -10,7 +10,10 @@ import { createGlobalSessionEventSource } from '~/features/chat/transport/chat-e
 import { getServerUrl } from '~/lib/electron'
 
 import { GlobalSessionSyncEngine } from './global-session-sync-engine'
-import { isSessionsQueryKey } from './use-session'
+import {
+  isSessionsQueryKey,
+  SESSION_LIST_REFRESH_INTERVAL_MS,
+} from './use-session'
 
 const RUNTIME_EVENT_TYPES = new Set<ChatSessionTailEventType>([
   'RunStarted',
@@ -40,15 +43,36 @@ export function useGlobalSessionEventSync(queryClient: QueryClient): void {
   }, [queryClient])
 
   useEffect(() => {
+    let pollTimeout: ReturnType<typeof setTimeout> | null = null
+    let pollGeneration = 0
+
+    const scheduleNextSessionListPoll = () => {
+      pollGeneration += 1
+      const scheduledGeneration = pollGeneration
+      if (pollTimeout !== null) {
+        clearTimeout(pollTimeout)
+      }
+      pollTimeout = setTimeout(() => {
+        pollTimeout = null
+        void invalidateSessionLists(queryClientRef.current).finally(() => {
+          if (pollGeneration === scheduledGeneration) {
+            scheduleNextSessionListPoll()
+          }
+        })
+      }, SESSION_LIST_REFRESH_INTERVAL_MS)
+    }
+
     const engine = new GlobalSessionSyncEngine({
       serverBaseUrl: getServerUrl(),
       eventSourceFactory: createGlobalSessionEventSource,
       callbacks: {
-        onSessionChanged: event => invalidateSessionProjection(queryClientRef.current, event),
+        onSessionChanged: (event) => {
+          invalidateSessionProjection(queryClientRef.current, event)
+          scheduleNextSessionListPoll()
+        },
         onSnapshotRequired: () => {
-          void queryClientRef.current.invalidateQueries({
-            predicate: query => isSessionsQueryKey(query.queryKey),
-          })
+          void invalidateSessionLists(queryClientRef.current)
+          scheduleNextSessionListPoll()
         },
         onError: (error) => {
           console.warn('[global-session-sync-engine] event tail error', error)
@@ -56,10 +80,21 @@ export function useGlobalSessionEventSync(queryClient: QueryClient): void {
       },
     })
     engine.start()
+    scheduleNextSessionListPoll()
     return () => {
       engine.stop()
+      pollGeneration += 1
+      if (pollTimeout !== null) {
+        clearTimeout(pollTimeout)
+      }
     }
   }, [])
+}
+
+function invalidateSessionLists(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries({
+    predicate: query => isSessionsQueryKey(query.queryKey),
+  })
 }
 
 function invalidateSessionProjection(
@@ -69,7 +104,7 @@ function invalidateSessionProjection(
   void queryClient.invalidateQueries({
     queryKey: getSessionsByIdQueryKey({ path: { id: event.sessionId } }),
   })
-  void queryClient.invalidateQueries({ predicate: query => isSessionsQueryKey(query.queryKey) })
+  void invalidateSessionLists(queryClient)
 
   if (RUNTIME_EVENT_TYPES.has(event.type)) {
     void queryClient.invalidateQueries({ queryKey: runtimeSessionStatusQueryKey(event.sessionId) })

@@ -15,6 +15,8 @@ import { queryRefreshPolicy } from '~/lib/query-refresh-policy'
 
 let unreadSessionIdsSnapshot: string[] = []
 
+export const SESSION_LIST_REFRESH_INTERVAL_MS = 5_000
+
 export function readUnreadSessionIdsSnapshot(): string[] {
   return unreadSessionIdsSnapshot
 }

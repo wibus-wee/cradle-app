@@ -38,6 +38,7 @@ import type {
   WorkspaceSessionMenuAnchor,
 } from './workspace-session-item-view'
 import { WorkspaceSessionItemView } from './workspace-session-item-view'
+import { useWorkspaceSessionListNow } from './workspace-session-list-clock-context'
 
 export interface WorkspaceSessionItemMenuRequest {
   sessionId: string
@@ -66,9 +67,10 @@ export interface WorkspaceSessionItemProps {
 
 function formatRelativeTime(
   unixTimestamp: number,
+  nowMs: number,
   t: ReturnType<typeof useTranslation<'workspace'>>['t'],
 ): string {
-  const now = Math.floor(Date.now() / 1000)
+  const now = Math.floor(nowMs / 1000)
   const diff = now - unixTimestamp
   if (diff < 60) {
     return t('session.relative.now')
@@ -102,6 +104,7 @@ export const WorkspaceSessionItem = memo(
     onOpenSessionMenu,
   }: WorkspaceSessionItemProps) => {
     const { t } = useTranslation('workspace')
+    const nowMs = useWorkspaceSessionListNow()
     const previewCard = usePreviewCard()
     const sessionSurfaceId = work
       ? workSurfaceId(work.id)
@@ -268,7 +271,7 @@ export const WorkspaceSessionItem = memo(
         isRenaming={isRenaming}
         isRegeneratingTitle={isRegeneratingTitle}
         runtimeIcon={runtimeIcon}
-        relativeTime={formatRelativeTime(session.listActivityAt, t)}
+        relativeTime={formatRelativeTime(session.listActivityAt, nowMs, t)}
         draggable={!isRenaming && !work}
         canOpenInNewWindow={isElectron}
         onOpen={() => {

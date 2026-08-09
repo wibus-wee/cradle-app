@@ -94,6 +94,7 @@ import { partitionWorkspaceSessions } from './workspace-session-group-partition'
 import { WorkspaceSessionGroupSection } from './workspace-session-groups'
 import type { WorkspaceSessionItemMenuRequest } from './workspace-session-item'
 import type { WorkspaceSessionAttentionKind } from './workspace-session-item-view'
+import { WorkspaceSessionListClock } from './workspace-session-list-clock'
 import type { WorkspaceRuntimeIconByKind } from './workspace-session-list-section'
 import { WorkspaceSessionListSection } from './workspace-session-list-section'
 import { isWorkspaceSessionRunning } from './workspace-session-status'
@@ -1614,25 +1615,27 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
         viewportClassName="min-w-0 max-w-full overflow-x-hidden"
         contentClassName="min-w-0 max-w-full overflow-x-hidden"
       >
-        <div className={cn(collapsed ? 'hidden' : 'contents')}>
-          <WorkspaceSidebarBody
-            workspaces={workspaces}
-            workspacesReady={workspacesReady}
-            sessionsByWorkspaceId={sessionsByWorkspaceId}
-            workByPrimarySessionId={workByPrimarySessionId}
-            runtimeIconByKind={runtimeIconByKind}
-            adding={adding}
-            multiWorkspaceEnabled={multiWorkspaceEnabled}
-            multiFolderCreating={creatingMultiFolderWorkspace}
-            onAddFromPicker={() => setAddWorkspaceDialogOpen(true)}
-            onCreateMultiFolder={handleCreateMultiFolderWorkspace}
-            hasUnreadWorkspaceSessions={unreadWorkspaceSessions.length > 0}
-            markingAllSessionsRead={markingAllSessionsRead}
-            onMarkAllAsRead={handleMarkAllAsRead}
-            onDelete={handleDelete}
-            onTogglePin={handleToggleWorkspacePin}
-          />
-        </div>
+        <WorkspaceSessionListClock>
+          <div className={cn(collapsed ? 'hidden' : 'contents')}>
+            <WorkspaceSidebarBody
+              workspaces={workspaces}
+              workspacesReady={workspacesReady}
+              sessionsByWorkspaceId={sessionsByWorkspaceId}
+              workByPrimarySessionId={workByPrimarySessionId}
+              runtimeIconByKind={runtimeIconByKind}
+              adding={adding}
+              multiWorkspaceEnabled={multiWorkspaceEnabled}
+              multiFolderCreating={creatingMultiFolderWorkspace}
+              onAddFromPicker={() => setAddWorkspaceDialogOpen(true)}
+              onCreateMultiFolder={handleCreateMultiFolderWorkspace}
+              hasUnreadWorkspaceSessions={unreadWorkspaceSessions.length > 0}
+              markingAllSessionsRead={markingAllSessionsRead}
+              onMarkAllAsRead={handleMarkAllAsRead}
+              onDelete={handleDelete}
+              onTogglePin={handleToggleWorkspacePin}
+            />
+          </div>
+        </WorkspaceSessionListClock>
       </ScrollArea>
       <WorkspaceAddDialog
         open={addWorkspaceDialogOpen}
