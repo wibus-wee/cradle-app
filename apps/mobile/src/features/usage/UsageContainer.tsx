@@ -9,6 +9,7 @@ import type {
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
 import { cradleRequest } from '@/lib/api'
+import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
 import type { UsageRange } from './usage-range'
@@ -17,6 +18,7 @@ import { UsageView } from './UsageView'
 
 export function UsageContainer() {
   const { connection } = useConnection()
+  const isRouteActive = useRouteIsActive()
   const [range, setRange] = useState<UsageRange>('30d')
   const days = usageRangeDays(range)
   const rangeFrom = useMemo(() => {
@@ -25,19 +27,23 @@ export function UsageContainer() {
     return date.toISOString().slice(0, 10)
   }, [days])
   const query = useQuery({
-    enabled: Boolean(connection),
+    enabled: Boolean(connection) && isRouteActive,
     queryKey: ['usage', connection?.url, range],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [daily, summary, stats] = await Promise.all([
-        cradleRequest<GetUsageDailyResponse>(connection!, `/usage/daily?days=${days}`),
-        cradleRequest<GetUsageSummaryResponse>(connection!, `/usage/summary?from=${rangeFrom}`),
-        cradleRequest<GetUsageStatsResponse>(connection!, '/usage/stats'),
+        cradleRequest<GetUsageDailyResponse>(connection!, `/usage/daily?days=${days}`, { signal }),
+        cradleRequest<GetUsageSummaryResponse>(connection!, `/usage/summary?from=${rangeFrom}`, {
+          signal,
+        }),
+        cradleRequest<GetUsageStatsResponse>(connection!, '/usage/stats', { signal }),
       ])
       return { daily, stats, summary }
     },
   })
 
-  if (query.isPending) { return <LoadingState /> }
+  if (query.isPending) {
+    return <LoadingState />
+  }
   if (query.error) {
     return <ErrorState title="Could not load Usage" description={errorMessage(query.error)} />
   }

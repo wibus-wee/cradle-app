@@ -6,6 +6,7 @@ import type { GetWorkspacesResponse, GetWorksResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
 import { cradleRequest } from '@/lib/api'
+import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
 import { useCreateWork } from './use-create-work'
@@ -14,22 +15,26 @@ import { WorkListView } from './WorkListView'
 export function WorkListContainer() {
   const { connection } = useConnection()
   const create = useCreateWork()
+  const isRouteActive = useRouteIsActive()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
-    enabled: Boolean(connection),
+    enabled: Boolean(connection) && isRouteActive,
     queryKey: ['works', connection?.url],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [works, workspaces] = await Promise.all([
-        cradleRequest<GetWorksResponse>(connection!, '/works?archived=false'),
-        cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces'),
+        cradleRequest<GetWorksResponse>(connection!, '/works?archived=false', { signal }),
+        cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
       ])
       return {
         works: works.sort((a, b) => b.updatedAt - a.updatedAt),
-        workspaces: workspaces.filter(workspace =>
-          workspace.availability === 'available' && workspace.locator.kind !== 'managed-worktree'),
+        workspaces: workspaces.filter(
+          workspace =>
+            workspace.availability === 'available' && workspace.locator.kind !== 'managed-worktree',
+        ),
       }
     },
-    refetchInterval: data => data.state.data?.works.some(work => work.activity === 'running') ? 2_000 : 12_000,
+    refetchInterval: data =>
+      data.state.data?.works.some(work => work.activity === 'running') ? 5_000 : false,
   })
 
   const refresh = async () => {
@@ -42,8 +47,12 @@ export function WorkListContainer() {
     }
   }
 
-  if (query.isPending) { return <LoadingState /> }
-  if (query.error) { return <ErrorState title="Could not load Work" description={errorMessage(query.error)} /> }
+  if (query.isPending) {
+    return <LoadingState />
+  }
+  if (query.error) {
+    return <ErrorState title="Could not load Work" description={errorMessage(query.error)} />
+  }
   return (
     <WorkListView
       isCreating={create.isPending}

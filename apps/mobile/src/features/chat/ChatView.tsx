@@ -1,6 +1,6 @@
 import type { UIMessage } from 'ai'
 import { Square } from 'lucide-react-native'
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import type { NativeSyntheticEvent, NativeTouchEvent } from 'react-native'
 import {
   ActivityIndicator,
@@ -25,6 +25,7 @@ import { durationLabel } from '@/lib/format'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
+import { ChatActivitySheet } from './ChatActivitySheet'
 import type { ChatSubmitInput } from './ChatComposer'
 import { ChatComposer } from './ChatComposer'
 import { ChatMessage } from './ChatMessage'
@@ -94,31 +95,51 @@ export function ChatView({
   })
   const listTouchStartRef = useRef({ pageX: 0, pageY: 0 })
   const listTouchMovedRef = useRef(false)
-  const durableIds = new Set(messages.map(row => row.messageId))
-  const showPendingUser = pendingUser
-    && (!pendingUser.id || !durableIds.has(pendingUser.id))
-  const showLiveMessage = liveMessage && !durableIds.has(liveMessage.id)
-  const items: TranscriptItem[] = [
-    ...messages.map(row => ({ kind: 'message' as const, row })),
-    ...(showPendingUser && pendingUser
-      ? [{
-          kind: 'pending' as const,
-          id: pendingUser.id ?? 'pending-user',
-          message: {
-            id: pendingUser.id ?? 'pending-user',
-            parts: [{ text: pendingUser.text, type: 'text' as const }],
-            role: 'user' as const,
-          },
-        }]
-      : []),
-    ...(showLiveMessage && liveMessage
-      ? [{ kind: 'live' as const, id: liveMessage.id, message: liveMessage }]
-      : []),
-  ]
-
-  const displayItems = [...items].reverse()
+  const items = useMemo<TranscriptItem[]>(() => {
+    const durableIds = new Set(messages.map(row => row.messageId))
+    const showPendingUser = pendingUser && (!pendingUser.id || !durableIds.has(pendingUser.id))
+    const showLiveMessage = liveMessage && !durableIds.has(liveMessage.id)
+    return [
+      ...messages.map(row => ({ kind: 'message' as const, row })),
+      ...(showPendingUser && pendingUser
+        ? [
+            {
+              kind: 'pending' as const,
+              id: pendingUser.id ?? 'pending-user',
+              message: {
+                id: pendingUser.id ?? 'pending-user',
+                parts: [{ text: pendingUser.text, type: 'text' as const }],
+                role: 'user' as const,
+              },
+            },
+          ]
+        : []),
+      ...(showLiveMessage && liveMessage
+        ? [{ kind: 'live' as const, id: liveMessage.id, message: liveMessage }]
+        : []),
+    ]
+  }, [liveMessage, messages, pendingUser])
+  const displayItems = useMemo(() => [...items].reverse(), [items])
+  const activityMessage = useMemo(() => {
+    if (!detailMessageId) {
+      return undefined
+    }
+    if (detailMessage?.id === detailMessageId) {
+      return detailMessage
+    }
+    const item = items.find(
+      candidate =>
+        (candidate.kind === 'message' ? candidate.row.messageId : candidate.id) === detailMessageId,
+    )
+    if (!item) {
+      return undefined
+    }
+    return item.kind === 'message' ? (item.row.message as UIMessage) : item.message
+  }, [detailMessage, detailMessageId, items])
   const handleEndReached = () => {
-    if (hasEarlier && !isLoadingEarlier) { onLoadEarlier() }
+    if (hasEarlier && !isLoadingEarlier) {
+      onLoadEarlier()
+    }
   }
   const handleListTouchStart = (event: NativeSyntheticEvent<NativeTouchEvent>) => {
     listTouchStartRef.current = {
@@ -130,10 +151,14 @@ export function ChatView({
   const handleListTouchMove = (event: NativeSyntheticEvent<NativeTouchEvent>) => {
     const dx = event.nativeEvent.pageX - listTouchStartRef.current.pageX
     const dy = event.nativeEvent.pageY - listTouchStartRef.current.pageY
-    if (Math.hypot(dx, dy) > 8) { listTouchMovedRef.current = true }
+    if (Math.hypot(dx, dy) > 8) {
+      listTouchMovedRef.current = true
+    }
   }
   const handleListTouchEnd = () => {
-    if (!listTouchMovedRef.current) { Keyboard.dismiss() }
+    if (!listTouchMovedRef.current) {
+      Keyboard.dismiss()
+    }
     listTouchMovedRef.current = false
   }
 
@@ -151,19 +176,29 @@ export function ChatView({
             keyboardDismissMode="none"
             keyboardShouldPersistTaps="always"
             ListHeaderComponent={(
-              <Animated.View pointerEvents="none" style={[styles.keyboardSpacer, { height: keyboardInset }]} />
+              <Animated.View
+                pointerEvents="none"
+                style={[styles.keyboardSpacer, { height: keyboardInset }]}
+              />
             )}
-            keyExtractor={item => `${item.kind}-${item.kind === 'message' ? item.row.messageId : item.id}`}
+            keyExtractor={item =>
+              `${item.kind}-${item.kind === 'message' ? item.row.messageId : item.id}`}
             ListEmptyComponent={(
-              <Text style={[styles.emptyText, { color: theme.mutedForeground }]}>Start the conversation</Text>
+              <Text style={[styles.emptyText, { color: theme.mutedForeground }]}>
+                Start the conversation
+              </Text>
             )}
-            ListFooterComponent={hasEarlier
-              ? (
-                  <View style={styles.earlierHeader}>
-                    {isLoadingEarlier && <ActivityIndicator color={theme.mutedForeground} size="small" />}
-                  </View>
+            ListFooterComponent={
+              hasEarlier
+                ? (
+                <View style={styles.earlierHeader}>
+                  {isLoadingEarlier && (
+                    <ActivityIndicator color={theme.mutedForeground} size="small" />
+                  )}
+                </View>
               )
-              : null}
+                : null
+            }
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.2}
@@ -172,39 +207,40 @@ export function ChatView({
             onTouchStart={handleListTouchStart}
             renderItem={({ item }) => {
               if (item.kind === 'message') {
-                const message = liveMessage?.id === item.row.messageId
-                  ? liveMessage
-                  : detailMessage?.id === item.row.messageId
-                    ? detailMessage
-                    : item.row.message as UIMessage
+                const message
+                  = liveMessage?.id === item.row.messageId
+                    ? liveMessage
+                    : detailMessage?.id === item.row.messageId
+                      ? detailMessage
+                      : (item.row.message as UIMessage)
                 return (
                   <ChatMessage
-                    activityError={detailMessageId === item.row.messageId ? messageDetailError : null}
-                    activityMessage={detailMessageId === item.row.messageId ? detailMessage : undefined}
                     errorText={item.row.errorText}
-                    isActivityLoading={detailMessageId === item.row.messageId && isLoadingMessageDetail}
                     message={message}
-                    onActivityClose={() => onRequestMessageDetail(null)}
-                    onActivityPress={() => onRequestMessageDetail(item.row.messageId)}
-                    showActivitySheet={detailMessageId === item.row.messageId}
+                    onActivityPress={onRequestMessageDetail}
                     status={liveMessage?.id === item.row.messageId ? 'streaming' : item.row.status}
                   />
                 )
               }
               return (
                 <ChatMessage
-                  activityError={detailMessageId === item.id ? messageDetailError : null}
-                  activityMessage={detailMessageId === item.id ? detailMessage : undefined}
-                  isActivityLoading={detailMessageId === item.id && isLoadingMessageDetail}
                   message={item.message}
-                  onActivityClose={() => onRequestMessageDetail(null)}
-                  onActivityPress={item.kind === 'live' ? () => onRequestMessageDetail(item.id) : undefined}
-                  status={item.kind === 'live' ? (isStreaming ? 'streaming' : 'complete') : undefined}
-                  showActivitySheet={detailMessageId === item.id}
+                  onActivityPress={item.kind === 'live' ? onRequestMessageDetail : undefined}
+                  status={
+                    item.kind === 'live' ? (isStreaming ? 'streaming' : 'complete') : undefined
+                  }
                 />
               )
             }}
             scrollEventThrottle={32}
+          />
+
+          <ChatActivitySheet
+            error={messageDetailError}
+            isLoading={isLoadingMessageDetail}
+            message={activityMessage}
+            onClose={() => onRequestMessageDetail(null)}
+            visible={detailMessageId !== null}
           />
 
           <Animated.View
@@ -239,8 +275,12 @@ export function ChatView({
                   style={[styles.stopButton, { backgroundColor: theme.muted }]}
                 >
                   {isCancelling
-                    ? <ActivityIndicator color={theme.foreground} size="small" />
-                    : <Square color={theme.foreground} fill={theme.foreground} size={11} />}
+                  ? (
+                    <ActivityIndicator color={theme.foreground} size="small" />
+                  )
+                  : (
+                    <Square color={theme.foreground} fill={theme.foreground} size={11} />
+                  )}
                 </PressableScale>
               </View>
             )}

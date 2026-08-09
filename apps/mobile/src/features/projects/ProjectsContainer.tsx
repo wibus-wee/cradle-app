@@ -7,6 +7,7 @@ import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
 import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
+import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
 import { ProjectsView } from './ProjectsView'
@@ -14,14 +15,15 @@ import { ProjectsView } from './ProjectsView'
 export function ProjectsContainer() {
   const { connection } = useConnection()
   const create = useCreateWork()
+  const isRouteActive = useRouteIsActive()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
-    enabled: Boolean(connection),
+    enabled: Boolean(connection) && isRouteActive,
     queryKey: ['projects', connection?.url],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const [workspaces, sessions] = await Promise.all([
-        cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces'),
-        cradleRequest<GetSessionsResponse>(connection!, '/sessions/?archived=false'),
+        cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
+        cradleRequest<GetSessionsResponse>(connection!, '/sessions/?archived=false', { signal }),
       ])
       return workspaces
         .filter(workspace => workspace.locator.kind !== 'managed-worktree')
@@ -29,12 +31,16 @@ export function ProjectsContainer() {
           workspace,
           sessions: sessions.filter(session => session.workspaceId === workspace.id),
         }))
-        .sort((a, b) => b.workspace.pinned - a.workspace.pinned || b.workspace.updatedAt - a.workspace.updatedAt)
+        .sort(
+          (a, b) =>
+            b.workspace.pinned - a.workspace.pinned || b.workspace.updatedAt - a.workspace.updatedAt,
+        )
     },
-    refetchInterval: data => data.state.data?.some(project =>
-      project.sessions.some(session => session.status === 'streaming'))
-? 2_000
-: 15_000,
+    refetchInterval: data =>
+      data.state.data?.some(project =>
+        project.sessions.some(session => session.status === 'streaming'))
+        ? 5_000
+        : false,
   })
 
   const refresh = async () => {

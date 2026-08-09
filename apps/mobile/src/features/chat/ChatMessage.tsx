@@ -1,9 +1,6 @@
 import type { UIMessage } from 'ai'
-import {
-  isReasoningUIPart,
-  isTextUIPart,
-  isToolUIPart,
-} from 'ai'
+/* eslint-disable react/no-array-index-key -- AI SDK text parts have no protocol id and their position is stable. */
+import { isReasoningUIPart, isTextUIPart, isToolUIPart } from 'ai'
 import { Check, CircleAlert, Wrench } from 'lucide-react-native'
 import { memo } from 'react'
 import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native'
@@ -14,30 +11,18 @@ import { PressableScale } from '@/components/ui/pressable-scale'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-import { ChatActivitySheet } from './ChatActivitySheet'
-
 interface ChatMessageProps {
   errorText?: string | null
-  activityError?: string | null
-  activityMessage?: UIMessage
-  isActivityLoading?: boolean
   message: UIMessage
-  onActivityClose?: () => void
-  onActivityPress?: () => void
+  onActivityPress?: (messageId: string) => void
   status?: 'streaming' | 'complete' | 'aborted' | 'failed'
-  showActivitySheet?: boolean
 }
 
 function ChatMessageContent({
-  activityError = null,
-  activityMessage,
   errorText = null,
-  isActivityLoading = false,
   message,
-  onActivityClose,
   onActivityPress,
   status = 'complete',
-  showActivitySheet = false,
 }: ChatMessageProps) {
   const theme = useTheme()
 
@@ -48,89 +33,115 @@ function ChatMessageContent({
       .join('')
     return (
       <View style={[styles.userBubble, { backgroundColor: theme.muted }]}>
-        <Text selectable style={[styles.userText, { color: theme.foreground }]}>{text}</Text>
+        <Text selectable style={[styles.userText, { color: theme.foreground }]}>
+          {text}
+        </Text>
       </View>
     )
   }
 
-  const activityParts = message.parts.filter(part => isReasoningUIPart(part) || isToolUIPart(part))
+  const activityParts = message.parts.filter(
+    part => isReasoningUIPart(part) || isToolUIPart(part),
+  )
   const toolParts = message.parts.filter(isToolUIPart)
-  const running = toolParts.some(part => part.state === 'input-streaming'
-    || part.state === 'input-available'
-    || part.state === 'approval-requested')
-  const failed = toolParts.some(part => part.state === 'output-error' || part.state === 'output-denied')
+  const running = toolParts.some(
+    part =>
+      part.state === 'input-streaming'
+      || part.state === 'input-available'
+      || part.state === 'approval-requested',
+  )
+  const failed = toolParts.some(
+    part => part.state === 'output-error' || part.state === 'output-denied',
+  )
 
   return (
     <View style={styles.assistantMessage}>
       {message.parts.map((part, index) => {
         if (isTextUIPart(part)) {
-          if (!part.text) { return null }
-          return Platform.OS === 'ios'
-            // Text parts have no protocol id; their position is stable for the life of a message.
-            // eslint-disable-next-line react/no-array-index-key
-            ? <NativeMarkdown key={`text-${index}`} markdown={part.text} streaming={status === 'streaming'} />
-            : (
-                <Markdown
-                  // Text parts have no protocol id; their position is stable for the life of a message.
-                  // eslint-disable-next-line react/no-array-index-key
-                  key={`text-${index}`}
-                  style={{
-                    body: {
-                      color: theme.foreground,
-                      fontSize: 14,
-                      lineHeight: 22,
-                      marginBottom: 0,
-                      marginTop: 0,
-                    },
-                    bullet_list: {
-                      marginBottom: spacing.sm,
-                      marginTop: spacing.xs,
-                    },
-                    code_inline: {
-                      backgroundColor: theme.muted,
-                      borderRadius: radius.sm,
-                      color: theme.foreground,
-                      fontFamily: 'GeistMono_400Regular',
-                      fontSize: 12,
-                      paddingHorizontal: spacing.xs,
-                    },
-                    fence: {
-                      backgroundColor: theme.muted,
-                      borderColor: theme.border,
-                      borderRadius: radius.md,
-                      color: theme.foreground,
-                      fontFamily: 'GeistMono_400Regular',
-                      fontSize: 11,
-                      lineHeight: 17,
-                      marginVertical: spacing.sm,
-                      padding: spacing.sm,
-                    },
-                    heading1: {
-                      color: theme.foreground,
-                      fontSize: 18,
-                      lineHeight: 24,
-                      marginBottom: spacing.sm,
-                      marginTop: spacing.md,
-                    },
-                    heading2: {
-                      color: theme.foreground,
-                      fontSize: 16,
-                      lineHeight: 22,
-                      marginBottom: spacing.sm,
-                      marginTop: spacing.md,
-                    },
-                    link: {
-                      color: theme.info,
-                    },
-                    paragraph: {
-                      marginBottom: spacing.sm,
-                      marginTop: 0,
-                    },
-                  }}
-                >
-                  {part.text}
-                </Markdown>
-              )
+          if (!part.text) {
+            return null
+          }
+          // Text parts have no protocol id; their position is stable for the life of a message.
+          if (Platform.OS === 'ios') {
+            return (
+              <NativeMarkdown
+                key={`text-${index}`}
+                markdown={part.text}
+                streaming={status === 'streaming'}
+              />
+            )
+          }
+          if (status === 'streaming') {
+            return (
+              <Text
+                key={`text-${index}`}
+                style={[styles.streamingText, { color: theme.foreground }]}
+              >
+                {part.text}
+              </Text>
+            )
+          }
+
+          return (
+            <Markdown
+              key={`text-${index}`}
+              style={{
+                body: {
+                  color: theme.foreground,
+                  fontSize: 14,
+                  lineHeight: 22,
+                  marginBottom: 0,
+                  marginTop: 0,
+                },
+                bullet_list: {
+                  marginBottom: spacing.sm,
+                  marginTop: spacing.xs,
+                },
+                code_inline: {
+                  backgroundColor: theme.muted,
+                  borderRadius: radius.sm,
+                  color: theme.foreground,
+                  fontFamily: 'GeistMono_400Regular',
+                  fontSize: 12,
+                  paddingHorizontal: spacing.xs,
+                },
+                fence: {
+                  backgroundColor: theme.muted,
+                  borderColor: theme.border,
+                  borderRadius: radius.md,
+                  color: theme.foreground,
+                  fontFamily: 'GeistMono_400Regular',
+                  fontSize: 11,
+                  lineHeight: 17,
+                  marginVertical: spacing.sm,
+                  padding: spacing.sm,
+                },
+                heading1: {
+                  color: theme.foreground,
+                  fontSize: 18,
+                  lineHeight: 24,
+                  marginBottom: spacing.sm,
+                  marginTop: spacing.md,
+                },
+                heading2: {
+                  color: theme.foreground,
+                  fontSize: 16,
+                  lineHeight: 22,
+                  marginBottom: spacing.sm,
+                  marginTop: spacing.md,
+                },
+                link: {
+                  color: theme.info,
+                },
+                paragraph: {
+                  marginBottom: spacing.sm,
+                  marginTop: 0,
+                },
+              }}
+            >
+              {part.text}
+            </Markdown>
+          )
         }
 
         if (isReasoningUIPart(part)) {
@@ -149,15 +160,21 @@ function ChatMessageContent({
           accessibilityLabel="Open activity feed"
           accessibilityRole="button"
           disabled={!onActivityPress}
-          onPress={onActivityPress}
+          onPress={onActivityPress ? () => onActivityPress(message.id) : undefined}
           style={[styles.activitySummary, { backgroundColor: theme.surfaceInset }]}
         >
           <View style={styles.activityIcon}>
             {running
-              ? <ActivityIndicator color={theme.tertiaryForeground} size="small" />
+              ? (
+              <ActivityIndicator color={theme.tertiaryForeground} size="small" />
+            )
               : failed
-                ? <CircleAlert color={theme.destructive} size={15} />
-                : <Check color={theme.success} size={15} />}
+                ? (
+              <CircleAlert color={theme.destructive} size={15} />
+            )
+                : (
+              <Check color={theme.success} size={15} />
+            )}
           </View>
           <Wrench color={theme.tertiaryForeground} size={14} />
           <Text style={[styles.activityLabel, { color: theme.tertiaryForeground }]}>
@@ -168,7 +185,10 @@ function ChatMessageContent({
       )}
 
       {status === 'streaming' && (
-        <Text accessibilityLabel="Streaming response" style={[styles.cursor, { color: theme.foreground }]}>
+        <Text
+          accessibilityLabel="Streaming response"
+          style={[styles.cursor, { color: theme.foreground }]}
+        >
           {'\u258C'}
         </Text>
       )}
@@ -178,14 +198,6 @@ function ChatMessageContent({
       {status === 'failed' && errorText && (
         <Text style={[styles.terminalStatus, { color: theme.destructive }]}>{errorText}</Text>
       )}
-
-      <ChatActivitySheet
-        error={activityError}
-        isLoading={isActivityLoading}
-        message={activityMessage ?? message}
-        onClose={onActivityClose ?? (() => {})}
-        visible={showActivitySheet}
-      />
     </View>
   )
 }
@@ -227,6 +239,10 @@ const styles = StyleSheet.create({
   terminalStatus: {
     fontSize: 12,
     lineHeight: 18,
+  },
+  streamingText: {
+    fontSize: 14,
+    lineHeight: 22,
   },
   userBubble: {
     alignSelf: 'flex-end',

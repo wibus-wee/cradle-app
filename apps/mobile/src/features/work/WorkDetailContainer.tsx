@@ -5,6 +5,7 @@ import type { GetWorksByIdResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
 import { cradleRequest } from '@/lib/api'
+import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
 import type { WorkHandoff } from './WorkDetailView'
@@ -12,34 +13,44 @@ import { WorkDetailView } from './WorkDetailView'
 
 export function WorkDetailContainer({ workId }: { workId: string }) {
   const { connection } = useConnection()
+  const isRouteActive = useRouteIsActive()
   const queryClient = useQueryClient()
   const query = useQuery({
-    enabled: Boolean(connection),
+    enabled: Boolean(connection) && isRouteActive,
     queryKey: ['work', connection?.url, workId],
-    queryFn: () => cradleRequest<GetWorksByIdResponse>(connection!, `/works/${encodeURIComponent(workId)}`),
-    refetchInterval: data => data.state.data?.activity === 'running' ? 2_000 : 10_000,
+    queryFn: ({ signal }) =>
+      cradleRequest<GetWorksByIdResponse>(connection!, `/works/${encodeURIComponent(workId)}`, {
+        signal,
+      }),
+    refetchInterval: data => (data.state.data?.activity === 'running' ? 5_000 : false),
   })
 
   const prepare = useMutation({
-    mutationFn: (handoff: WorkHandoff) => cradleRequest<GetWorksByIdResponse>(
-      connection!,
-      `/works/${encodeURIComponent(workId)}/prepare`,
-      { method: 'POST', body: handoff },
-    ),
+    mutationFn: (handoff: WorkHandoff) =>
+      cradleRequest<GetWorksByIdResponse>(
+        connection!,
+        `/works/${encodeURIComponent(workId)}/prepare`,
+        { method: 'POST', body: handoff },
+      ),
     onSuccess: data => queryClient.setQueryData(['work', connection?.url, workId], data),
   })
 
   const submit = useMutation({
-    mutationFn: (handoff: WorkHandoff) => cradleRequest<GetWorksByIdResponse>(
-      connection!,
-      `/works/${encodeURIComponent(workId)}/submit`,
-      { method: 'POST', body: handoff },
-    ),
+    mutationFn: (handoff: WorkHandoff) =>
+      cradleRequest<GetWorksByIdResponse>(
+        connection!,
+        `/works/${encodeURIComponent(workId)}/submit`,
+        { method: 'POST', body: handoff },
+      ),
     onSuccess: data => queryClient.setQueryData(['work', connection?.url, workId], data),
   })
 
-  if (query.isPending) { return <LoadingState /> }
-  if (query.error) { return <ErrorState title="Could not open Work" description={errorMessage(query.error)} /> }
+  if (query.isPending) {
+    return <LoadingState />
+  }
+  if (query.error) {
+    return <ErrorState title="Could not open Work" description={errorMessage(query.error)} />
+  }
   return (
     <>
       <Stack.Screen options={{ title: 'Work info' }} />
@@ -47,7 +58,8 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
         detail={query.data}
         isPreparing={prepare.isPending}
         isSubmitting={submit.isPending}
-        onOpenPullRequest={(owner, repo, number) => router.push(`/pull-request/${owner}/${repo}/${number}`)}
+        onOpenPullRequest={(owner, repo, number) =>
+          router.push(`/pull-request/${owner}/${repo}/${number}`)}
         onPrepare={handoff => prepare.mutate(handoff)}
         onSubmit={handoff => submit.mutate(handoff)}
       />

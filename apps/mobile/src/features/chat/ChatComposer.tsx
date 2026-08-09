@@ -3,7 +3,7 @@ import { MenuView } from '@expo/ui/community/menu'
 import type { FileUIPart } from 'ai'
 import * as ImagePicker from 'expo-image-picker'
 import { Plus, Send, X } from 'lucide-react-native'
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Image,
@@ -42,7 +42,7 @@ export interface ChatComposerProps {
   runtimeSettings?: RuntimeSettings
 }
 
-export function ChatComposer({
+function ChatComposerContent({
   capabilities,
   isSending,
   isStreaming,
@@ -55,31 +55,52 @@ export function ChatComposer({
   const [files, setFiles] = useState<FileUIPart[]>([])
   const [continuationMode, setContinuationMode] = useState<'queue' | 'steer'>('queue')
   const [isPicking, setIsPicking] = useState(false)
-  const interactionMode = runtimeSettings?.runtimeSettings.interactionMode === 'plan' ? 'plan' : 'build'
+  const interactionMode
+    = runtimeSettings?.runtimeSettings.interactionMode === 'plan' ? 'plan' : 'build'
   const composerMenuActions: MenuAction[] = [
     { id: 'photo', image: 'photo.on.rectangle', title: 'Add photo' },
-    { id: 'build', image: 'hammer', state: interactionMode === 'build' ? 'on' : 'off', title: 'Build' },
-    { id: 'plan', image: 'list.bullet.rectangle', state: interactionMode === 'plan' ? 'on' : 'off', title: 'Plan' },
+    {
+      id: 'build',
+      image: 'hammer',
+      state: interactionMode === 'build' ? 'on' : 'off',
+      title: 'Build',
+    },
+    {
+      id: 'plan',
+      image: 'list.bullet.rectangle',
+      state: interactionMode === 'plan' ? 'on' : 'off',
+      title: 'Plan',
+    },
   ]
   const slashQuery = text.match(/(?:^|\s)\/([\w-]*)$/)?.[1] ?? null
   const mentionQuery = text.match(/(?:^|\s)@([\w-]*)$/)?.[1] ?? null
   const slashCommands = useMemo(
-    () => (capabilities?.slashCommands ?? [])
-      .filter(command => slashQuery !== null && command.name.toLowerCase().startsWith(slashQuery.toLowerCase()))
-      .slice(0, 5),
+    () =>
+      (capabilities?.slashCommands ?? [])
+        .filter(
+          command =>
+            slashQuery !== null && command.name.toLowerCase().startsWith(slashQuery.toLowerCase()),
+        )
+        .slice(0, 5),
     [capabilities?.slashCommands, slashQuery],
   )
   const skills = useMemo(
-    () => (capabilities?.skills ?? [])
-      .filter(skill => mentionQuery !== null && skill.toLowerCase().startsWith(mentionQuery.toLowerCase()))
-      .slice(0, 5),
+    () =>
+      (capabilities?.skills ?? [])
+        .filter(
+          skill =>
+            mentionQuery !== null && skill.toLowerCase().startsWith(mentionQuery.toLowerCase()),
+        )
+        .slice(0, 5),
     [capabilities?.skills, mentionQuery],
   )
   const suggestionsVisible = slashCommands.length > 0 || skills.length > 0
 
   const submit = () => {
     const nextText = text.trim()
-    if ((!nextText && files.length === 0) || isSending) { return }
+    if ((!nextText && files.length === 0) || isSending) {
+      return
+    }
     onSend({ continuationMode, files, text: nextText })
     setText('')
     setFiles([])
@@ -87,7 +108,9 @@ export function ChatComposer({
   }
 
   const pickPhoto = async () => {
-    if (isPicking) { return }
+    if (isPicking) {
+      return
+    }
     setIsPicking(true)
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -96,16 +119,22 @@ export function ChatComposer({
         mediaTypes: ['images'],
         quality: 0.9,
       })
-      if (result.canceled) { return }
+      if (result.canceled) {
+        return
+      }
       const nextFiles = result.assets.flatMap((asset) => {
-        if (!asset.base64) { return [] }
+        if (!asset.base64) {
+          return []
+        }
         const mediaType = asset.mimeType ?? 'image/jpeg'
-        return [{
-          filename: asset.fileName ?? `photo-${Date.now()}.jpg`,
-          mediaType,
-          type: 'file' as const,
-          url: `data:${mediaType};base64,${asset.base64}`,
-        }]
+        return [
+          {
+            filename: asset.fileName ?? `photo-${Date.now()}.jpg`,
+            mediaType,
+            type: 'file' as const,
+            url: `data:${mediaType};base64,${asset.base64}`,
+          },
+        ]
       })
       setFiles(current => [...current, ...nextFiles])
     }
@@ -120,32 +149,40 @@ export function ChatComposer({
   }
 
   return (
-    <View
-      style={[styles.frame, { backgroundColor: theme.chrome }]}
-    >
+    <View style={[styles.frame, { backgroundColor: theme.chrome }]}>
       {isStreaming && (
-          <View style={[styles.continuation, { backgroundColor: theme.muted }]}>
-            {(['queue', 'steer'] as const).map(mode => (
-              <PressableScale
-                accessibilityLabel={`${mode} next message`}
-                accessibilityRole="button"
-                key={mode}
-                onPress={() => setContinuationMode(mode)}
+        <View style={[styles.continuation, { backgroundColor: theme.muted }]}>
+          {(['queue', 'steer'] as const).map(mode => (
+            <PressableScale
+              accessibilityLabel={`${mode} next message`}
+              accessibilityRole="button"
+              key={mode}
+              onPress={() => setContinuationMode(mode)}
+              style={[
+                styles.continuationOption,
+                continuationMode === mode && { backgroundColor: theme.surface },
+              ]}
+            >
+              <Text
                 style={[
-                  styles.continuationOption,
-                  continuationMode === mode && { backgroundColor: theme.surface },
+                  styles.continuationText,
+                  { color: continuationMode === mode ? theme.foreground : theme.mutedForeground },
                 ]}
               >
-                <Text style={[styles.continuationText, { color: continuationMode === mode ? theme.foreground : theme.mutedForeground }]}>
-                  {mode === 'queue' ? 'Queue' : 'Steer'}
-                </Text>
-              </PressableScale>
-            ))}
-          </View>
+                {mode === 'queue' ? 'Queue' : 'Steer'}
+              </Text>
+            </PressableScale>
+          ))}
+        </View>
       )}
 
       {suggestionsVisible && (
-        <View style={[styles.suggestions, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+        <View
+          style={[
+            styles.suggestions,
+            { backgroundColor: theme.surface, borderColor: theme.border },
+          ]}
+        >
           {slashCommands.map(command => (
             <PressableScale
               accessibilityLabel={`Insert ${command.name}`}
@@ -154,8 +191,13 @@ export function ChatComposer({
               onPress={() => insertSuggestion(command.name, 'slash')}
               style={styles.suggestion}
             >
-              <Text style={[styles.suggestionTitle, { color: theme.foreground }]}>{`/${command.name}`}</Text>
-              <Text numberOfLines={1} style={[styles.suggestionDescription, { color: theme.mutedForeground }]}>
+              <Text style={[styles.suggestionTitle, { color: theme.foreground }]}>
+                {`/${command.name}`}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={[styles.suggestionDescription, { color: theme.mutedForeground }]}
+              >
                 {command.description}
               </Text>
             </PressableScale>
@@ -168,22 +210,31 @@ export function ChatComposer({
               onPress={() => insertSuggestion(skill, 'mention')}
               style={styles.suggestion}
             >
-              <Text style={[styles.suggestionTitle, { color: theme.foreground }]}>{`@${skill}`}</Text>
-              <Text style={[styles.suggestionDescription, { color: theme.mutedForeground }]}>Skill</Text>
+              <Text style={[styles.suggestionTitle, { color: theme.foreground }]}>
+                {`@${skill}`}
+              </Text>
+              <Text style={[styles.suggestionDescription, { color: theme.mutedForeground }]}>
+                Skill
+              </Text>
             </PressableScale>
           ))}
         </View>
       )}
 
       {files.length > 0 && (
-        <ScrollView contentContainerStyle={styles.attachments} horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.attachments}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+        >
           {files.map(file => (
             <View key={file.url} style={[styles.attachment, { backgroundColor: theme.surface }]}>
               <Image source={{ uri: file.url }} style={styles.attachmentImage} />
               <PressableScale
                 accessibilityLabel={`Remove ${file.filename ?? 'photo'}`}
                 accessibilityRole="button"
-                onPress={() => setFiles(current => current.filter(item => item.url !== file.url))}
+                onPress={() =>
+                  setFiles(current => current.filter(item => item.url !== file.url))}
                 style={[styles.removeAttachment, { backgroundColor: theme.overlay }]}
               >
                 <X color="#fff" size={12} />
@@ -226,8 +277,18 @@ export function ChatComposer({
           style={styles.addMenu}
           title="Composer options"
         >
-          <View accessibilityLabel="Composer options" accessibilityRole="button" style={styles.addButton}>
-            {isPicking ? <ActivityIndicator color={theme.mutedForeground} size="small" /> : <Plus color={theme.tertiaryForeground} size={20} />}
+          <View
+            accessibilityLabel="Composer options"
+            accessibilityRole="button"
+            style={styles.addButton}
+          >
+            {isPicking
+            ? (
+              <ActivityIndicator color={theme.mutedForeground} size="small" />
+            )
+            : (
+              <Plus color={theme.tertiaryForeground} size={20} />
+            )}
           </View>
         </MenuView>
         <TextInput
@@ -237,7 +298,13 @@ export function ChatComposer({
           multiline
           onChangeText={setText}
           onSubmitEditing={submit}
-          placeholder={isStreaming ? (continuationMode === 'steer' ? 'Steer the response…' : 'Add to queue…') : 'Message…'}
+          placeholder={
+            isStreaming
+              ? continuationMode === 'steer'
+                ? 'Steer the response…'
+                : 'Add to queue…'
+              : 'Message…'
+          }
           placeholderTextColor={theme.mutedForeground}
           selectionColor={theme.info}
           style={[styles.input, { color: theme.foreground }]}
@@ -249,16 +316,31 @@ export function ChatComposer({
           disabled={(!text.trim() && files.length === 0) || isSending}
           haptic
           onPress={submit}
-          style={[styles.sendButton, { backgroundColor: text.trim() || files.length > 0 ? theme.primary : theme.muted }]}
+          style={[
+            styles.sendButton,
+            { backgroundColor: text.trim() || files.length > 0 ? theme.primary : theme.muted },
+          ]}
         >
           {isSending
-            ? <ActivityIndicator color={theme.primaryForeground} size="small" />
-            : <Send color={text.trim() || files.length > 0 ? theme.primaryForeground : theme.mutedForeground} size={16} strokeWidth={2.4} />}
+          ? (
+            <ActivityIndicator color={theme.primaryForeground} size="small" />
+          )
+          : (
+            <Send
+              color={
+                text.trim() || files.length > 0 ? theme.primaryForeground : theme.mutedForeground
+              }
+              size={16}
+              strokeWidth={2.4}
+            />
+          )}
         </PressableScale>
       </View>
     </View>
   )
 }
+
+export const ChatComposer = memo(ChatComposerContent)
 
 const styles = StyleSheet.create({
   addButton: {
