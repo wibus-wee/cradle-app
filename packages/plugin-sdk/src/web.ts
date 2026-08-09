@@ -4,48 +4,24 @@ import type { Disposable, Logger } from './index'
 
 export type { Disposable, Logger } from './index'
 
-export type UiActivityEntityType
-  = | 'chat'
-    | 'file'
-    | 'settings'
-    | 'pr'
-    | 'diff'
-    | 'kanban'
-    | 'plugin'
-    | 'work'
-    | 'app'
-
-export type UiActivityEndReason = 'entity-changed' | 'idle' | 'hidden'
-
-export type UiActivityEvent
-  = | {
-    kind: 'ui.segment.started'
-    occurredAt: number
-    entity: string
-    entityType: UiActivityEntityType
-    previousEntity: string | null
-    previousEntityType: UiActivityEntityType | null
+export interface CodeActivityEvent {
+  kind: 'code.heartbeat'
+  occurredAt: number
+  workspace: {
+    id: string
+    name: string
   }
-  | {
-    kind: 'ui.segment.ended'
-    occurredAt: number
-    entity: string
-    entityType: UiActivityEntityType
-    durationMs: number
-    endReason: UiActivityEndReason
+  file: {
+    relativePath: string
+    language?: string
   }
-
-export interface UiActivitySegment {
-  entity: string
-  entityType: UiActivityEntityType
-  startedAt: number
+  isWrite: boolean
 }
 
-export type UiActivityHandler = (activity: UiActivityEvent) => void | Promise<void>
+export type CodeActivityHandler = (activity: CodeActivityEvent) => void | Promise<void>
 
-export interface UiActivitySubscription {
-  subscribe: (handler: UiActivityHandler) => Disposable
-  getCurrentSegment: () => UiActivitySegment | null
+export interface CodeActivitySubscription {
+  subscribe: (handler: CodeActivityHandler) => Disposable
 }
 
 /** Web plugin context — provided by host during activation */
@@ -63,10 +39,10 @@ export interface WebPluginContext {
   commands: WebPluginCommandRegistry
 
   /**
-   * Renderer UI activity segments (entity + duration).
-   * Requires declared `activity-subscription` capability and `ui.activity.read`.
+   * Metadata-only code heartbeats for active workspace files.
+   * Requires declared `code-activity-subscription` capability and `code.activity.read`.
    */
-  activities: UiActivitySubscription
+  codeActivities: CodeActivitySubscription
 
   /** Disposables that the host releases when this plugin layer deactivates */
   subscriptions: Disposable[]

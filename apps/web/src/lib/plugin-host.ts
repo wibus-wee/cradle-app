@@ -11,14 +11,13 @@ import type {
 import { z } from 'zod'
 
 import { toastManager } from '~/components/ui/toast'
-import { uiActivityBus } from '~/features/activity/activity-bus'
 import { readPluginDevSessions } from '~/features/plugins/api/plugin-dev'
 
 import { getServerUrl } from './electron'
 import { usePluginStore } from './plugin-store'
 import type { ServerEventSource } from './server-transport'
 import { openServerEventSource } from './server-transport'
-import { assertWebActivityReadAccess, registerWebActivitySubscription } from './web-activity-registry'
+import { registerWebCodeActivitySubscription } from './web-code-activity-registry'
 
 type WebPluginDescriptor = Pick<PluginDescriptor, 'name' | 'version' | 'displayName' | 'hasWeb'>
   & Partial<Pick<PluginDescriptor, 'identity' | 'routeSegment' | 'layers'>>
@@ -220,13 +219,9 @@ function createWebPluginContext(pluginName: string, descriptor?: PluginDescripto
     },
     storage: createWebPluginStorage(pluginName),
     logger,
-    activities: {
+    codeActivities: {
       subscribe(handler) {
-        return track(registerWebActivitySubscription(pluginName, handler, descriptor))
-      },
-      getCurrentSegment() {
-        assertWebActivityReadAccess(descriptor)
-        return uiActivityBus.getCurrentSegment()
+        return track(registerWebCodeActivitySubscription(pluginName, handler, descriptor))
       },
     },
   }

@@ -1,7 +1,7 @@
 import type { Disposable } from '@cradle/plugin-sdk'
-import type { UiActivityEvent } from '@cradle/plugin-sdk/web'
 
 import { uiActivityBus } from '~/features/activity/activity-bus'
+import type { UiActivityEvent } from '~/features/activity/types'
 import { isTearoffWindow } from '~/lib/electron'
 
 import { trackProductEvent } from './client'

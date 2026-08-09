@@ -670,9 +670,13 @@ function MyPanel({ isActive }: { isActive: boolean }) {
 
 Web panel and command registrations are tracked in `ctx.subscriptions` and are disposed by the host when the web plugin layer deactivates. Use namespace APIs such as `ctx.panels.register` and `ctx.commands.register`. Keep a returned `Disposable` only when the plugin needs to remove a panel or command before full deactivation.
 
-### `ctx.activities` — UI activity segments
+### `ctx.codeActivities` — Code activity heartbeats
 
-Subscribe to renderer-owned UI presence segments (what entity the user is on and how long they stayed). This is **not** the same as server plugin `activity.read` / committed chat-run activity (Plan 002): web UI activity observes user presence in the renderer; server activity observes agent run lifecycle after commit.
+Subscribe to metadata-only heartbeats for workspace files visible in an active
+chat. Cradle derives these events from its internal UI activity state, but does
+not expose generic UI entities, session IDs, file contents, or absolute paths
+to plugins. This web capability is separate from server `ctx.activities`, which
+reports committed chat-run lifecycle events.
 
 Declare both the capability and permission:
 
@@ -680,18 +684,18 @@ Declare both the capability and permission:
 {
   "capabilities": [
     {
-      "id": "ui-activity",
-      "type": "activity-subscription",
+      "id": "code-activity",
+      "type": "code-activity-subscription",
       "layer": "web",
-      "label": "Observe UI activity",
-      "permissions": ["ui.activity.read"]
+      "label": "Observe code activity",
+      "permissions": ["code.activity.read"]
     }
   ],
   "permissions": [
     {
-      "id": "ui.activity.read",
-      "label": "Read UI activity",
-      "description": "Observe user activity segment metadata (entity and duration only).",
+      "id": "code.activity.read",
+      "label": "Read code activity",
+      "description": "Observe workspace and relative file path heartbeats without file contents or absolute paths.",
       "required": true
     }
   ]
@@ -700,18 +704,23 @@ Declare both the capability and permission:
 
 ```ts
 export function activate(ctx: WebPluginContext): void {
-  const disposable = ctx.activities.subscribe((event) => {
-    if (event.kind === 'ui.segment.ended') {
-      // plugin-owned heartbeat may use event.entity + ctx.activities.getCurrentSegment()
-    }
+  ctx.codeActivities.subscribe((event) => {
+    sendHeartbeat({
+      project: event.workspace.name,
+      entity: event.file.relativePath,
+      language: event.file.language,
+      isWrite: event.isWrite,
+    })
   })
-  ctx.subscriptions.push(disposable)
 }
 ```
 
-`subscribe` fails at the host boundary when the capability is undeclared or `ui.activity.read` is not granted. Disposing the registration stops new delivery; in-flight async handlers are not cancelled.
-
-Reference consumer (not shipped): a future WakaTime-style plugin would heartbeat from `ui.segment.ended` and `getCurrentSegment()`.
+`subscribe` fails at the host boundary when the capability is undeclared or
+`code.activity.read` is not granted. A new subscriber immediately receives the
+current non-write heartbeat when a matching file is active. Later heartbeats
+arrive when the active file changes, the internal UI activity segment resumes,
+or the user edits that file. Disposing the registration stops new delivery;
+in-flight async handlers are not cancelled.
 
 ### `ctx.panels.register(panel)` — UI Panel Registration
 
@@ -1250,9 +1259,28 @@ interface WebPluginContext {
   notifications: WebPluginNotificationBridge
   panels: WebPluginPanelRegistry
   commands: WebPluginCommandRegistry
+  codeActivities: CodeActivitySubscription
   subscriptions: Disposable[]
   storage: WebPluginStorage
   logger: Logger
+}
+
+interface CodeActivityEvent {
+  kind: 'code.heartbeat'
+  occurredAt: number
+  workspace: {
+    id: string
+    name: string
+  }
+  file: {
+    relativePath: string
+    language?: string
+  }
+  isWrite: boolean
+}
+
+interface CodeActivitySubscription {
+  subscribe(handler: (activity: CodeActivityEvent) => void | Promise<void>): Disposable
 }
 
 interface WebPluginRouteClient {

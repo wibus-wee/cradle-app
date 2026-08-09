@@ -1,8 +1,12 @@
 import type { Disposable } from '@cradle/plugin-sdk'
-import type { UiActivityEvent, UiActivityHandler, UiActivitySegment } from '@cradle/plugin-sdk/web'
 
 import { dispatchUiActivityToHandlers, UiActivityEngine } from './activity-engine'
-import type { ResolvedUiActivityEntity } from './types'
+import type {
+  ResolvedUiActivityEntity,
+  UiActivityEvent,
+  UiActivityHandler,
+  UiActivitySegment,
+} from './types'
 
 type HostHandler = {
   owner: string
@@ -10,12 +14,11 @@ type HostHandler = {
 }
 
 /**
- * Process-wide UI activity bus: one engine, many sinks (analytics, Jarvis, plugins).
+ * Process-wide UI activity bus for Cradle-owned renderer sinks.
  */
 class UiActivityBus {
   private engine: UiActivityEngine | null = null
   private readonly hostHandlers = new Map<symbol, HostHandler>()
-  private readonly pluginHandlers = new Map<symbol, HostHandler>()
 
   start(options: {
     idleTimeoutMs?: number
@@ -46,10 +49,9 @@ class UiActivityBus {
     return this.engine?.getCurrentSegment() ?? null
   }
 
-  listSubscriberOwners(): { host: string[], plugin: string[] } {
+  listSubscriberOwners(): { host: string[] } {
     return {
       host: Array.from(this.hostHandlers.values(), handler => handler.owner),
-      plugin: Array.from(this.pluginHandlers.values(), handler => handler.owner),
     }
   }
 
@@ -64,23 +66,11 @@ class UiActivityBus {
     }
   }
 
-  /** Plugin subscriptions — isolated fan-out. */
-  subscribePlugin(owner: string, handler: UiActivityHandler): Disposable {
-    const key = Symbol(owner)
-    this.pluginHandlers.set(key, { owner, handler })
-    return {
-      dispose: () => {
-        this.pluginHandlers.delete(key)
-      },
-    }
-  }
-
   private dispatch(activity: UiActivityEvent): void {
     const logError = (owner: string, error: unknown) => {
       console.error('[ui-activity] handler failed', { owner, error })
     }
     dispatchUiActivityToHandlers(this.hostHandlers.values(), activity, logError)
-    dispatchUiActivityToHandlers(this.pluginHandlers.values(), activity, logError)
   }
 }
 
