@@ -41,6 +41,7 @@ export function OnboardingPage() {
     <div
       className="fixed inset-0 z-9999 flex cursor-pointer flex-col items-center justify-center bg-background px-6 text-foreground"
       onClick={complete}
+      data-testid="onboarding-page"
     >
       <div className="flex flex-col items-center">
         {/* Icon — establishes centre stage, then lifts as name reveals */}

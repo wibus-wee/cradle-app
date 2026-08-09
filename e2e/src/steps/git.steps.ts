@@ -64,6 +64,7 @@ function createGitWorkspaceFixture(world: CradleWorld): GitWorkspaceFixture {
   )
 
   initGitRepository(dir)
+  runGit(dir, ['add', 'AGENTS.md'])
   commitFile(dir, 'README.md', `# ${name}`, 'repo: initial commit')
   commitFile(dir, 'main.txt', 'main branch content', 'main: second commit')
 

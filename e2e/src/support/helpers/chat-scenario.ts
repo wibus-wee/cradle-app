@@ -18,6 +18,8 @@ const MULTI_TURN_RESPONSES = [
   '第二轮助手：你让我记住了苹果',
 ]
 export const SLOW_RESPONSE = '慢速助手回复完成'
+export const STOP_RECOVERY_RESPONSE = '停止后新一轮成功完成'
+export const ERROR_RECOVERY_RESPONSE = '错误后新一轮成功完成'
 const SLOW_GATE = 'e2e-slow-stream'
 export const CHAT_STATUS_TIMEOUT = 30_000
 const SESSION_ALIASES_KEY = 'chat.session-aliases'
@@ -73,6 +75,12 @@ export async function configureMultiTurnClaudeAgentSimulator(world: CradleWorld)
   ])
 }
 
+export async function configureAwaitClaudeAgentSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure Await resume Claude Agent simulator')
+  await world.configureClaudeAgentChat({ mode: 'text', text: 'Await 初始回复' })
+  world.remember('simulator.next-replies', ['Await 恢复后的真实回复'])
+}
+
 /** Provider + runtime only — no scripted conversation exchanges (Composer bang, etc.). */
 export async function configureClaudeAgentProviderWithoutExchanges(world: CradleWorld): Promise<void> {
   console.warn('[step] configure Claude Agent simulator provider without exchanges')
@@ -86,9 +94,26 @@ export async function configureSlowGatedClaudeAgentSimulator(world: CradleWorld)
   const simulator = requireSimulator(world)
   simulator.reset()
   world.enqueue(anthropicScenario([
-    anthropicTextExchange({ label: 'slow', text: SLOW_RESPONSE, gateAfterStart: SLOW_GATE }),
+    anthropicTextExchange({
+      label: 'slow',
+      text: SLOW_RESPONSE,
+      gateAfterStart: SLOW_GATE,
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
+    }),
   ]))
   world.remember('simulator.slow-gate', SLOW_GATE)
+}
+
+export async function configureStoppableClaudeAgentSimulator(world: CradleWorld): Promise<void> {
+  await configureSlowGatedClaudeAgentSimulator(world)
+  world.enqueue(anthropicScenario([
+    anthropicTextExchange({
+      label: 'after-stop-recovery',
+      text: STOP_RECOVERY_RESPONSE,
+      bodyTextIncludes: '停止后继续发送',
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
+    }),
+  ]))
 }
 
 export async function configureFailingClaudeAgentSimulator(world: CradleWorld): Promise<void> {
@@ -100,6 +125,12 @@ export async function configureFailingClaudeAgentSimulator(world: CradleWorld): 
       label: 'fail-provider',
       message: 'E2E simulator forced failure',
       bodyTextIncludes: '请触发 provider 错误',
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
+    }),
+    anthropicTextExchange({
+      label: 'after-error-recovery',
+      text: ERROR_RECOVERY_RESPONSE,
+      bodyTextIncludes: '错误后重新发送',
       bodyTextExcludes: 'You are naming a Claude Agent task session',
     }),
   ]))
@@ -164,6 +195,50 @@ export async function configureReadToolLoopSimulator(world: CradleWorld): Promis
   ]))
 }
 
+export async function configureWorkWriteToolLoopSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure Claude Agent Work write tool-loop simulator')
+  await world.configureClaudeAgentChat({ mode: 'text' })
+  requireSimulator(world).reset()
+  const excludeTitle = 'You are naming a Claude Agent task session'
+  const toolUseId = 'toolu_e2e_work_write'
+  world.enqueue(anthropicScenario([
+    anthropicToolUseExchange({
+      label: 'work-write-file',
+      toolUseId,
+      toolName: 'Write',
+      toolInput: {
+        file_path: 'e2e-work-result.txt',
+        content: 'created inside the managed Cradle worktree\n',
+      },
+      bodyTextIncludes: '在隔离 Work 中创建验证文件',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicTextExchange({
+      label: 'work-write-final',
+      text: 'Work 已完成，并在隔离 worktree 中创建了验证文件。',
+      bodyTextIncludes: toolUseId,
+      bodyTextExcludes: excludeTitle,
+    }),
+  ]))
+}
+
+export async function configureFileContextSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure Claude Agent file-context simulator')
+  await world.configureClaudeAgentChat({ mode: 'text' })
+  requireSimulator(world).reset()
+  world.enqueue(anthropicScenario([
+    anthropicTextExchange({
+      label: 'file-context',
+      text: '文件上下文已随真实请求到达 Claude Agent。',
+      bodyTextIncludes: [
+        '请根据被提及的文件回答',
+        'Workspace Detail overview content used for end-to-end verification.',
+      ],
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
+    }),
+  ]))
+}
+
 export async function configureCodexMultiTurnSimulator(world: CradleWorld): Promise<void> {
   console.warn('[step] configure Codex multi-turn simulator')
   await world.configureCodexChat({
@@ -172,6 +247,19 @@ export async function configureCodexMultiTurnSimulator(world: CradleWorld): Prom
   world.remember('simulator.next-replies', [
     'Codex 第二轮：你让我记住了香蕉',
   ])
+}
+
+export async function configureCodexRollbackSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure Codex last-turn rollback simulator')
+  await world.configureCodexChat({
+    texts: ['Codex 原始轮次回复'],
+  })
+  world.enqueueOpenAi(openAiTextExchange({
+    label: 'codex-rewritten-turn',
+    text: 'Codex 修改后的轮次回复',
+    bodyTextIncludes: '修改后的问题：请记住梨',
+    bodyTextExcludes: '原始问题：请记住香蕉',
+  }))
 }
 
 export async function navigateToNewChatWithSimulator(world: CradleWorld): Promise<void> {
@@ -193,11 +281,17 @@ export async function navigateToNewChatWithSimulator(world: CradleWorld): Promis
 export async function selectClaudeAgentSimulator(world: CradleWorld): Promise<void> {
   await world.newChat.selectRuntime('Claude Agent')
   await world.newChat.selectProvider(/E2E Claude Agent/i)
+  if (world.maybeRecall<string>('chat.claude-permission-mode') === 'default') {
+    await world.newChat.selectPermissionMode(/Approval required|需要审批|Requiere aprobación|承認が必要/i)
+  }
 }
 
 export async function selectCodexSimulator(world: CradleWorld): Promise<void> {
   await world.newChat.selectRuntime('Codex')
   await world.newChat.selectProvider(/E2E Codex/i)
+  if (process.getuid?.() === 0) {
+    await world.newChat.selectPermissionMode(/Approval required|需要审批|Requiere aprobación|承認が必要/i)
+  }
 }
 
 export async function releaseSlowStreamGate(world: CradleWorld): Promise<void> {

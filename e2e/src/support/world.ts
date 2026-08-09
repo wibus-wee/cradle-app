@@ -1,6 +1,5 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 import type { SimulatorExchange, SimulatorScenario } from '@cradle/model-api-simulator'
 import type { IWorldOptions } from '@cucumber/cucumber'
@@ -11,12 +10,17 @@ import { chromium, expect } from '@playwright/test'
 import type { E2ESimulator } from './model-api-simulator'
 import { startE2ESimulator } from './model-api-simulator'
 import { dismissTransientOverlays } from './overlays'
+import { AwaitPage } from './pages/await'
 import { ApprovalPage, ChatPage, NewChatPage } from './pages/chat'
+import { DiffPage } from './pages/diff'
+import { FirstRunPage } from './pages/first-run'
 import { GitPage } from './pages/git'
 import { KanbanPage } from './pages/kanban'
 import { SearchPage } from './pages/search'
 import { SettingsPage } from './pages/settings'
 import { TerminalPage } from './pages/terminal'
+import { UsagePage } from './pages/usage'
+import { WorkPage } from './pages/work'
 import { WorkspacePage } from './pages/workspace'
 import {
   configureClaudeAgentSimulatorProvider,
@@ -32,7 +36,7 @@ import {
   openAiScenario,
   openAiTextExchange,
 } from './scenarios/openai'
-import { getManagedServerUrl, getManagedWebUrl } from './server-lifecycle'
+import { getManagedDataDir, getManagedServerUrl, getManagedWebUrl } from './server-lifecycle'
 import type { ScenarioArtifactPaths } from './world-utils'
 import { buildScenarioArtifactPaths } from './world-utils'
 
@@ -53,7 +57,10 @@ export class CradleWorld extends World {
   scenarioName = ''
   consoleMessages: string[] = []
   simulator: E2ESimulator | null = null
+  /** Scenarios tagged @first-run start with no onboarding/setup persistence. */
+  firstRunMode = false
   private readonly scenarioState = new Map<string, unknown>()
+  private readonly tempWorkspaceDirs = new Set<string>()
 
   constructor(options: IWorldOptions) {
     super(options)
@@ -82,6 +89,14 @@ export class CradleWorld extends World {
     return new ApprovalPage(this.page)
   }
 
+  get awaitPage(): AwaitPage {
+    return new AwaitPage(this)
+  }
+
+  get diffPage(): DiffPage {
+    return new DiffPage(this.page)
+  }
+
   get search(): SearchPage {
     return new SearchPage(this.page)
   }
@@ -94,8 +109,20 @@ export class CradleWorld extends World {
     return new GitPage(this.page)
   }
 
+  get firstRunPage(): FirstRunPage {
+    return new FirstRunPage(this.page)
+  }
+
   get terminalPage(): TerminalPage {
     return new TerminalPage(this.page)
+  }
+
+  get usagePage(): UsagePage {
+    return new UsagePage(this.page)
+  }
+
+  get workPage(): WorkPage {
+    return new WorkPage(this)
   }
 
   get workspacePage(): WorkspacePage {
@@ -111,10 +138,15 @@ export class CradleWorld extends World {
     return CradleWorld.scenarioCounter
   }
 
-  prepareScenario(name: string, artifactsRoot = join(process.cwd(), 'e2e', 'artifacts')): void {
+  prepareScenario(
+    name: string,
+    tags: readonly string[] = [],
+    artifactsRoot = join(process.cwd(), 'e2e', 'artifacts'),
+  ): void {
     this.scenarioName = name
     this.consoleMessages = []
     this.scenarioState.clear()
+    this.firstRunMode = tags.includes('@first-run')
     this.scenarioArtifacts = buildScenarioArtifactPaths(
       artifactsRoot,
       name,
@@ -138,7 +170,15 @@ export class CradleWorld extends World {
   }
 
   createTempWorkspaceDir(prefix = 'cradle-e2e-ws-'): string {
-    return mkdtempSync(join(tmpdir(), prefix))
+    // Directory Browser rejects arbitrary OS temp paths by design. A sibling
+    // of the checkout is both allowed by the real browser and outside its git tree.
+    const fixtureRoot = getManagedDataDir()
+      ? join(getManagedDataDir()!, 'home')
+      : dirname(process.cwd())
+    const workspaceDir = mkdtempSync(join(fixtureRoot, prefix))
+    chmodSync(workspaceDir, 0o777)
+    this.tempWorkspaceDirs.add(workspaceDir)
+    return workspaceDir
   }
 
   async selectDirectoryInBrowser(dirPath: string): Promise<void> {
@@ -252,6 +292,7 @@ export class CradleWorld extends World {
     })
     this.remember('chat.preferred-runtime', 'claude-agent' as const)
     this.remember('chat.preferred-provider', E2E_CLAUDE_AGENT_NAME)
+    this.remember('chat.claude-permission-mode', options.mode === 'approval' ? 'default' : 'acceptEdits')
     await this.page?.reload({ waitUntil: 'domcontentloaded' })
   }
 
@@ -338,16 +379,18 @@ export class CradleWorld extends World {
         : {}),
       viewport: { width: 1280, height: 720 },
     })
-    await this.context.addInitScript(() => {
-      window.localStorage.setItem('cradle:onboarding:v1', JSON.stringify({
-        state: { completed: true, step: 4 },
-        version: 1,
-      }))
-      // Skip first-run provider/GitHub setup dialog so E2E can reach core surfaces.
-      window.localStorage.setItem('cradle:first-run-setup:v2', JSON.stringify({
-        state: { completedSteps: { provider: true, github: true } },
-        version: 2,
-      }))
+    await this.context.addInitScript(({ firstRunMode }) => {
+      if (!firstRunMode) {
+        window.localStorage.setItem('cradle:onboarding:v1', JSON.stringify({
+          state: { completed: true, step: 4 },
+          version: 1,
+        }))
+        // Most scenarios intentionally start after setup; @first-run owns the clean-install path.
+        window.localStorage.setItem('cradle:first-run-setup:v2', JSON.stringify({
+          state: { completedSteps: { provider: true, github: true } },
+          version: 2,
+        }))
+      }
       // Suppress What's New corner popup noise (dev mock versions + tips).
       window.localStorage.setItem('cradle:whats-new:v1', JSON.stringify({
         state: {
@@ -362,7 +405,7 @@ export class CradleWorld extends World {
         },
         version: 1,
       }))
-    })
+    }, { firstRunMode: this.firstRunMode })
     this.page = await this.context.newPage()
     await this.page.goto(this.params.webUrl)
     await this.page.waitForLoadState('domcontentloaded')
@@ -376,6 +419,10 @@ export class CradleWorld extends World {
     }
     await this.context?.close()
     await this.browser?.close()
+    for (const workspaceDir of this.tempWorkspaceDirs) {
+      rmSync(workspaceDir, { recursive: true, force: true })
+    }
+    this.tempWorkspaceDirs.clear()
   }
 
   async mainProcess<T = unknown>(_fn: unknown, _arg?: unknown): Promise<T> {

@@ -36,9 +36,15 @@ jobs:
             critical:
               - 'e2e/**'
               - 'packages/model-api-simulator/**'
+              - 'packages/chat-runtime-contracts/**'
+              - 'packages/db/**'
+              - 'packages/plugin-sdk/**'
+              - 'packages/streamdown/**'
+              - 'packages/ipc/**'
+              - 'plugins/**'
               - 'apps/web/**'
               - 'apps/server/**'
-              - 'apps/desktop/scripts/sync-codex-runtime.mjs'
+              - 'apps/desktop/**'
               - '.github/workflows/e2e-smoke.yml'
               - '.github/actions/setup/**'
 
@@ -76,6 +82,12 @@ jobs:
         with:
           node-version: 22
 
+      - name: Build plugin SDK
+        run: pnpm --filter @cradle/plugin-sdk build
+
+      - name: Build workspace plugins
+        run: pnpm --filter "./plugins/*" build
+
       - name: Install Playwright browsers
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium-headless-shell
@@ -109,6 +121,7 @@ jobs:
         env:
           NODE_ENV: test
           CRADLE_CREDENTIAL_SECRET: e2e-test-secret
+          CRADLE_E2E_VERBOSE: '1'
         run: |
           mkdir -p e2e/artifacts
           pnpm exec cucumber-js --config e2e/cucumber-ci.mjs \

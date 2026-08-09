@@ -12,6 +12,7 @@
     假如 我已配置 Claude Agent 多轮 Simulator
     而且 我已添加了一个工作区
     当 我点击"新建聊天"导航项
+    而且 我在新建聊天中选择当前工作区
     而且 我选择 Claude Agent 运行时与 Simulator Provider
     而且 我在新建聊天输入框中输入"第一轮：请记住苹果"
     而且 我点击发送按钮
@@ -26,8 +27,8 @@
     而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P0 @CRADLE-CHAT-002
-  场景: 流式回复进行中可以停止生成
-    假如 我已配置带门控的慢速 Claude Agent Simulator
+  场景: 流式回复停止后可以完成下一轮并在刷新后保持一致
+    假如 我已配置停止后可恢复的慢速 Claude Agent Simulator
     而且 我已添加了一个工作区
     而且 我已导航到新建聊天并选中 Simulator
     当 我在新建聊天输入框中输入"请生成一段较长说明"
@@ -42,10 +43,18 @@
     而且 停止后不应再刷 Claude stop-path 诊断错误
     而且 聊天中不应出现完整的慢速回复
     而且 聊天中不应出现错误提示
-    # Mid-stream stop leaves the gated simulator exchange unsettled — no assertExhausted.
+    当 我在聊天输入框中输入"停止后继续发送"
+    而且 我点击聊天发送按钮
+    那么 最后一条 AI 消息应包含"停止后新一轮成功完成"
+    而且 聊天流应结束于空闲状态
+    当 我重新加载当前页面
+    那么 我应该看到用户消息"停止后继续发送"
+    而且 最后一条 AI 消息应包含"停止后新一轮成功完成"
+    而且 聊天中不应出现错误提示
+    而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P0 @CRADLE-CHAT-003
-  场景: Provider 失败时显示错误状态
+  场景: Provider 失败后可以重新发送并恢复持久化会话
     假如 我已配置会失败的 Claude Agent Simulator
     而且 我已添加了一个工作区
     而且 我已导航到新建聊天并选中 Simulator
@@ -53,6 +62,15 @@
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
     而且 聊天错误提示应显示"E2E simulator forced failure"
+    当 我在聊天输入框中输入"错误后重新发送"
+    而且 我点击聊天发送按钮
+    那么 最后一条 AI 消息应包含"错误后新一轮成功完成"
+    而且 聊天流应结束于空闲状态
+    而且 聊天中不应出现错误提示
+    当 我重新加载当前页面
+    那么 我应该看到用户消息"错误后重新发送"
+    而且 最后一条 AI 消息应包含"错误后新一轮成功完成"
+    而且 聊天中不应出现错误提示
     而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-CHAT-004

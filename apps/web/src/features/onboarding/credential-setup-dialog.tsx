@@ -125,7 +125,12 @@ export function CredentialSetupDialog() {
         }
       }}
     >
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[520px]" showCloseButton={false}>
+      <DialogContent
+        className="gap-0 overflow-hidden p-0 sm:max-w-[520px]"
+        showCloseButton={false}
+        data-testid="first-run-setup-dialog"
+        data-setup-step={step ?? 'loading'}
+      >
         <div className="px-5 pt-5 pb-3">
           <div className="mb-3 flex items-center gap-1.5">
             {Array.from({ length: Math.max(visibleSteps.length, 1) }, (_, index) => (
@@ -226,20 +231,20 @@ export function CredentialSetupDialog() {
         </div>
 
         <DialogFooter variant="bare" className="justify-between border-t border-border px-4 py-3 sm:justify-between">
-          <Button variant="ghost" size="sm" onClick={dismissRemaining} className="h-7 text-xs text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={dismissRemaining} className="h-7 text-xs text-muted-foreground" data-testid="first-run-skip-all">
             {t('setup.skip')}
           </Button>
           <div className="flex items-center gap-2">
             {step === 'provider'
               ? (
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => advanceFrom('provider')}>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => advanceFrom('provider')} data-testid="first-run-provider-skip">
                     {t('setup.provider.skip')}
                   </Button>
                 )
               : null}
             {step === 'github'
               ? (
-                  <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => advanceFrom('github')}>
+                  <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => advanceFrom('github')} data-testid="first-run-github-continue">
                     {github.isConnected ? t('setup.continue') : t('setup.github.continueAnyway')}
                     <ArrowRightIcon className="size-3.5" />
                   </Button>
@@ -247,7 +252,7 @@ export function CredentialSetupDialog() {
               : null}
             {step === 'done'
               ? (
-                  <Button size="sm" className="h-7 text-xs" onClick={closeSession}>
+                  <Button size="sm" className="h-7 text-xs" onClick={closeSession} data-testid="first-run-finish">
                     {t('setup.finish')}
                   </Button>
                 )

@@ -25,10 +25,15 @@ describe('readClaudeAgentPermissionMode', () => {
 })
 
 describe('readClaudeAgentAllowDangerouslySkipPermissions', () => {
-  it('disables SDK permission skip in plan mode so canUseTool enforcement runs', () => {
-    expect(readClaudeAgentAllowDangerouslySkipPermissions({
-      permissionMode: 'plan',
-    })).toBe(false)
+  it.each(['default', 'acceptEdits', 'plan'] as const)(
+    'does not enable SDK permission skipping in %s mode',
+    (permissionMode) => {
+      expect(readClaudeAgentAllowDangerouslySkipPermissions({ permissionMode })).toBe(false)
+    },
+  )
+
+  it('does not enable SDK permission skipping when the mode is unset', () => {
+    expect(readClaudeAgentAllowDangerouslySkipPermissions({})).toBe(false)
   })
 
   it('keeps SDK permission skip in bypass permission mode', () => {

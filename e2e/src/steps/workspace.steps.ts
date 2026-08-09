@@ -34,10 +34,6 @@ Given('我已通过 API 添加了一个工作区', async function (this: CradleW
   await this.workspacePage.addApiWorkspace()
 })
 
-Given('我已通过 API 添加了一个包含 AGENTS.md 的工作区', async function (this: CradleWorld) {
-  await this.workspacePage.addApiWorkspaceWithAgentsFile()
-})
-
 Given('我已添加了一个包含 AGENTS.md 的工作区', async function (this: CradleWorld) {
   await this.workspacePage.addWorkspaceWithAgentsFromPicker()
 })

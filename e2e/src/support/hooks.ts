@@ -66,7 +66,7 @@ function collectWebmFiles(dir: string): string[] {
 }
 
 Before({ timeout: E2E_HOOK_TIMEOUT_MS }, async function (this: CradleWorld, scenario: ITestCaseHookParameter) {
-  this.prepareScenario(scenario.pickle.name)
+  this.prepareScenario(scenario.pickle.name, scenario.pickle.tags.map(tag => tag.name))
   writeArtifactsGuide()
   if (this.scenarioArtifacts) {
     mkdirSync(this.scenarioArtifacts.scenarioDir, { recursive: true })

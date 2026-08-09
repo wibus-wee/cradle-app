@@ -6,20 +6,20 @@
   背景:
     假如 应用已启动
 
-  @essence @P0 @CRADLE-WS-001
-  场景: API 创建工作区后详情 Overview 可见
-    假如 我已通过 API 添加了一个包含 AGENTS.md 的工作区
+  @essence @P1 @CRADLE-WS-001
+  场景: 通过目录选择器添加工作区后 Overview 读取真实 AGENTS.md
+    假如 我已添加了一个包含 AGENTS.md 的工作区
     当 我打开当前工作区的详情页
     那么 Overview 应该显示当前工作区的 AGENTS.md 内容
 
   @essence @P1 @CRADLE-WS-002
   场景: 多工作区创建后列表可见并可打开详情
-    假如 我已通过 API 添加了两个可区分的工作区
+    假如 我已添加了两个可区分的工作区
     那么 工作区列表中应该包含这 2 个工作区
     当 我打开第 1 个工作区的详情页
     那么 工作区详情页应该显示第 1 个工作区的真实内容
 
-  @essence @P0 @CRADLE-KANBAN-001
+  @essence @P1 @CRADLE-KANBAN-001
   场景: 创建看板与 Issue 并打开详情
     假如 我已通过 API 添加了一个工作区
     当 我点击看板导航按钮
@@ -70,7 +70,7 @@
 
   @essence @P1 @CRADLE-WS-003
   场景: 重命名工作区后可从菜单移除
-    假如 我已通过 API 添加了一个包含 AGENTS.md 的工作区
+    假如 我已添加了一个包含 AGENTS.md 的工作区
     当 我打开当前工作区的详情页
     而且 我将工作区重命名为 "Renamed Workspace"
     那么 工作区详情页标题应该是 "Renamed Workspace"

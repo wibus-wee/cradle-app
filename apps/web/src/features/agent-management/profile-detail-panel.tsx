@@ -1065,7 +1065,12 @@ function ProfileDetailHeader({
         <SaveIndicator state={saveState} />
 
         <div className="flex items-center gap-2 rounded-full bg-muted/50 px-2.5 py-1">
-          <Switch size="sm" checked={profile.enabled} onCheckedChange={onToggle} />
+          <Switch
+            size="sm"
+            checked={profile.enabled}
+            onCheckedChange={onToggle}
+            data-testid="provider-enabled-toggle"
+          />
           <span className="text-[11px] font-medium text-muted-foreground">
             {profile.enabled ? 'Active' : 'Off'}
           </span>

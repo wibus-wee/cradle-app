@@ -33,7 +33,10 @@ export class NewChatPage {
   }
 
   entry(): Locator {
-    return this.page.locator('[data-testid="new-chat-page"], [data-testid="home-dashboard"]').filter({ visible: true }).first()
+    return this.page
+      .locator('[data-testid="new-chat-page"], [data-testid="home-dashboard"], [data-testid="new-work-page"]')
+      .filter({ visible: true })
+      .first()
   }
 
   textBox(): Locator {
@@ -64,6 +67,9 @@ export class NewChatPage {
     const current = (await selector.textContent())?.trim() ?? ''
     const expected = typeof label === 'string' ? new RegExp(label, 'i') : label
     if (expected.test(current)) {
+      if (process.getuid?.() === 0 && /Claude Agent/i.test(current)) {
+        await this.selectPermissionMode(/Accept edits|接受编辑|Aceptar ediciones|編集を承認/i)
+      }
       return
     }
     await selector.click()
@@ -71,6 +77,9 @@ export class NewChatPage {
     await expect(menu).toBeVisible({ timeout: 10_000 })
     await menu.locator('[role="menuitem"]', { hasText: label }).first().click()
     await expect(selector).toContainText(expected, { timeout: 10_000 })
+    if (process.getuid?.() === 0 && /Claude Agent/i.test((await selector.textContent()) ?? '')) {
+      await this.selectPermissionMode(/Accept edits|接受编辑|Aceptar ediciones|編集を承認/i)
+    }
   }
 
   async selectProvider(label: string | RegExp): Promise<void> {
@@ -85,6 +94,18 @@ export class NewChatPage {
     await expect(menu).toBeVisible({ timeout: 10_000 })
     await menu.locator('[role="menuitem"]', { hasText: label }).first().click()
     await this.page.keyboard.press('Escape')
+  }
+
+  async selectPermissionMode(label: string | RegExp): Promise<void> {
+    const control = this.entry().getByRole('button', {
+      name: /Full access|完全访问|Acceso completo|フルアクセス|Accept edits|接受编辑|Aceptar ediciones|編集を承認|Approval required|需要审批|Requiere aprobación|承認が必要/i,
+    }).first()
+    await expect(control).toBeVisible({ timeout: 10_000 })
+    await control.click()
+    const menu = this.page.locator('[role="menu"]').last()
+    await expect(menu).toBeVisible({ timeout: 10_000 })
+    await menu.locator('[role="menuitemradio"]', { hasText: label }).first().click()
+    await expect(control).toContainText(label, { timeout: 10_000 })
   }
 }
 
@@ -139,6 +160,29 @@ export class ChatPage {
   async expectUserMessage(text: string | RegExp, timeout = CHAT_TIMEOUT): Promise<void> {
     await expect(this.page.locator('[data-testid="message-bubble-user"]').filter({ hasText: text }).last())
       .toBeVisible({ timeout })
+  }
+
+  async editLastUserMessage(): Promise<void> {
+    const userBubble = this.page.locator('[data-testid="message-bubble-user"]').last()
+    await expect(userBubble).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await userBubble.hover()
+    const edit = userBubble.locator('[data-testid="chat-edit-previous-btn"]')
+    await expect(edit).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await expect(edit).toBeEnabled()
+    await edit.click()
+    await expect(this.page.locator('[data-testid="chat-edit-last-message-indicator"]')).toBeVisible({ timeout: CHAT_TIMEOUT })
+  }
+
+  async expectComposerContains(text: string | RegExp): Promise<void> {
+    await expect(this.composer()).toContainText(text, { timeout: CHAT_TIMEOUT })
+  }
+
+  async expectNoUserMessage(text: string | RegExp): Promise<void> {
+    await expect(this.page.locator('[data-testid="message-bubble-user"]').filter({ hasText: text })).toHaveCount(0, { timeout: CHAT_TIMEOUT })
+  }
+
+  async expectNoAssistantMessage(text: string | RegExp): Promise<void> {
+    await expect(this.page.locator('[data-testid="message-bubble-assistant"]').filter({ hasText: text })).toHaveCount(0, { timeout: CHAT_TIMEOUT })
   }
 
   errorBanner(): Locator {

@@ -64,22 +64,10 @@ When('我关闭设置并返回首页', async function (this: CradleWorld) {
   await homeSurface.click()
 })
 
-When('我复制 Support 反馈模板', async function (this: CradleWorld) {
-  const settings = this.page.locator('[data-testid="support-settings"]')
-  await expect(settings).toBeVisible({ timeout: SETTINGS_TIMEOUT })
-  await settings.getByRole('button', { name: 'Copy' }).first().click()
-})
-
 When('我选择外观主题{string}', async function (this: CradleWorld, label: string) {
   const option = this.page.locator(`[data-testid="appearance-theme-${themeId(label)}"]`)
   await expect(option).toBeVisible({ timeout: SETTINGS_TIMEOUT })
   await option.click()
-})
-
-Then('我应该看到 Support 设置页面', async function (this: CradleWorld) {
-  const settings = this.page.locator('[data-testid="support-settings"]')
-  await expect(settings).toBeVisible({ timeout: SETTINGS_TIMEOUT })
-  await expect(settings).toHaveAttribute('data-settings-support-ready', 'true', { timeout: SETTINGS_TIMEOUT })
 })
 
 Then('我应该看到 Appearance 设置页面', async function (this: CradleWorld) {
@@ -195,17 +183,6 @@ Then('Jarvis 模型选择器应显示模型{string}', async function (this: Crad
     const text = await selector.textContent().catch(() => '')
     return (text ?? '').includes(model) ? true : text
   }, { timeout: 30_000, message: `Expected Jarvis selector to contain "${model}"` }).toBe(true)
-})
-
-Then('剪贴板中应包含文本{string}', async function (this: CradleWorld, text: string) {
-  await expect.poll(
-    async () => this.page.evaluate(() => navigator.clipboard.readText()),
-    { timeout: SETTINGS_TIMEOUT },
-  ).toContain(text)
-})
-
-Then('Support 设置状态应显示{string}', async function (this: CradleWorld, text: string) {
-  await expect(this.page.locator('[data-testid="support-settings-status"]')).toContainText(text, { timeout: SETTINGS_TIMEOUT })
 })
 
 Then('外观主题{string}应处于选中状态', async function (this: CradleWorld, label: string) {

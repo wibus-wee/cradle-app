@@ -17,7 +17,7 @@
     那么 底部终端应显示当前工作区路径哈希
     而且 Simulator 脚本化交换应全部耗尽
 
-  @essence @P0 @CRADLE-PTY-002
+  @essence @P1 @CRADLE-PTY-002
   场景: 多个终端会话同时存在时输入只进入当前活跃会话
     # 回归：多 PTY 挂载时若打到错误的 xterm helper textarea，输入会进错 session 或静默丢失。
     假如 我已配置 Claude Agent 多轮 Simulator

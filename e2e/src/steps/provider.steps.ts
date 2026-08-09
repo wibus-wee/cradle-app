@@ -1,6 +1,7 @@
 import { Given, Then, When } from '@cucumber/cucumber'
 import { expect } from '@playwright/test'
 
+import { anthropicScenario, anthropicTextExchange } from '../support/scenarios/anthropic'
 import type { CradleWorld } from '../support/world'
 
 const TIMEOUT = 15_000
@@ -97,4 +98,47 @@ Then('Provider 状态应为成功', async function (this: CradleWorld) {
 Then('Provider 列表中应显示名为{string}的 profile', async function (this: CradleWorld, name: string) {
   const row = this.page.locator('[data-testid^="agent-profile-row-"]').filter({ hasText: name })
   await expect(row).toBeVisible({ timeout: TIMEOUT })
+})
+
+When('我为 UI 创建的 Provider 准备真实 Claude 回复', async function (this: CradleWorld) {
+  const simulator = await this.ensureSimulator()
+  simulator.reset()
+  this.enqueue(anthropicScenario([
+    anthropicTextExchange({
+      label: 'ui-provider-chat',
+      text: 'UI Provider 已完成真实 Claude Agent 回复',
+      bodyTextIncludes: '验证 UI Provider 闭环',
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
+    }),
+  ]))
+})
+
+When('我在新建聊天选择名为{string}的 Claude Agent Provider', async function (this: CradleWorld, name: string) {
+  await this.newChat.selectRuntime('Claude Agent')
+  await this.newChat.selectProvider(new RegExp(name, 'i'))
+})
+
+When('我在 Providers 设置中打开名为{string}的 profile', async function (this: CradleWorld, name: string) {
+  await openProvidersSettings(this)
+  const row = this.page.locator('[data-testid^="agent-profile-row-"]').filter({ hasText: name }).first()
+  await expect(row).toBeVisible({ timeout: TIMEOUT })
+  await row.click()
+  await expect(this.page.locator('[data-testid="provider-detail-panel"]')).toBeVisible({ timeout: TIMEOUT })
+})
+
+When('我禁用当前 Provider', async function (this: CradleWorld) {
+  const toggle = this.page.locator('[data-testid="provider-enabled-toggle"]')
+  await expect(toggle).toBeVisible({ timeout: TIMEOUT })
+  await toggle.click()
+  await expect(this.page.locator('[data-testid="provider-detail-panel"]')).toContainText('Off', { timeout: TIMEOUT })
+})
+
+Then('新建聊天中不应提供名为{string}的 Provider', async function (this: CradleWorld, name: string) {
+  await this.newChat.openFromNav()
+  await this.newChat.selectRuntime('Claude Agent')
+  const selector = this.page.locator('[data-testid="provider-model-selector"], [data-testid="agent-selector"]').filter({ visible: true }).first()
+  await selector.click()
+  const menu = this.page.locator('[role="menu"]').last()
+  await expect(menu).toBeVisible({ timeout: TIMEOUT })
+  await expect(menu.locator('[role="menuitem"]', { hasText: name })).toHaveCount(0)
 })

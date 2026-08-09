@@ -1,5 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 
 import type { Locator, Page } from '@playwright/test'
@@ -222,8 +221,7 @@ export class WorkspacePage {
   }
 
   async addWorkspaceThroughNativeDialog(): Promise<void> {
-    // Directory browser only allows home (and similar) roots — not /tmp.
-    const dir = mkdtempSync(join(homedir(), 'cradle-e2e-ws-'))
+    const dir = this.owner.createTempWorkspaceDir()
     const fixture: WorkspaceFixture = {
       dir,
       name: basename(dir),
@@ -310,22 +308,6 @@ export class WorkspacePage {
       agentsHeading: 'API Workspace',
       agentsBody: 'API-created workspace overview.',
     }
-
-    await this.addWorkspaceViaApi(fixture)
-    this.rememberFixtures([fixture])
-    this.setCurrentWorkspace(fixture)
-    await this.page.reload({ waitUntil: 'domcontentloaded' })
-  }
-
-  async addApiWorkspaceWithAgentsFile(): Promise<void> {
-    const fixture: WorkspaceFixture = {
-      dir: this.owner.createTempWorkspaceDir(),
-      name: '',
-      agentsHeading: 'Single Workspace Operating Model',
-      agentsBody: 'Single workspace overview content used for end-to-end verification.',
-    }
-    fixture.name = basename(fixture.dir)
-    writeFileSync(join(fixture.dir, 'AGENTS.md'), `# ${fixture.agentsHeading}\n\n${fixture.agentsBody}\n`, 'utf8')
 
     await this.addWorkspaceViaApi(fixture)
     this.rememberFixtures([fixture])

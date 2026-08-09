@@ -10,9 +10,9 @@ Then('Composer 应显示 bang 命令预览', async function (this: CradleWorld) 
 })
 
 Then('聊天视图应显示 bang 结果，包含{string}', async function (this: CradleWorld, text: string) {
-  const result = this.page.locator('[data-testid="chat-bang-command-result"], [data-testid="chat-bang-command-prompt"]').first()
+  const result = this.page.locator('[data-testid="chat-bang-command-result"]').first()
   await expect(result).toBeVisible({ timeout: 30_000 })
-  await expect(this.page.locator('[data-testid="chat-view"]').filter({ visible: true }).first()).toContainText(text, {
+  await expect(result).toContainText(text, {
     timeout: 30_000,
   })
 })

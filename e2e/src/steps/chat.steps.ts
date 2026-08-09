@@ -10,11 +10,14 @@ import {
   configureClaudeApprovalSimulator,
   configureCodexMultiTurnSimulator,
   configureCodexQuickQuestionSimulator,
+  configureCodexRollbackSimulator,
   configureDefaultAiReply,
   configureFailingClaudeAgentSimulator,
+  configureFileContextSimulator,
   configureMultiTurnClaudeAgentSimulator,
   configureReadToolLoopSimulator,
   configureSlowGatedClaudeAgentSimulator,
+  configureStoppableClaudeAgentSimulator,
   configureThinkingClaudeAgentSimulator,
   createRememberedSession,
   expectChatStreaming,
@@ -36,6 +39,7 @@ import {
   selectClaudeAgentSimulator,
   selectCodexSimulator,
   selectNewChatWorkspace,
+  SLOW_RESPONSE,
 } from '../support/helpers/chat-scenario'
 import type { CradleWorld } from '../support/world'
 
@@ -48,12 +52,20 @@ Given('我已配置 Claude Agent 多轮 Simulator', async function (this: Cradle
   await configureMultiTurnClaudeAgentSimulator(this)
 })
 
+Given('我已配置 Claude Agent Simulator', async function (this: CradleWorld) {
+  await this.configureClaudeAgentChat()
+})
+
 Given('我已配置 Claude Agent Simulator Provider（不预置回复）', async function (this: CradleWorld) {
   await configureClaudeAgentProviderWithoutExchanges(this)
 })
 
 Given('我已配置带门控的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
   await configureSlowGatedClaudeAgentSimulator(this)
+})
+
+Given('我已配置停止后可恢复的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureStoppableClaudeAgentSimulator(this)
 })
 
 Given('我已配置会失败的 Claude Agent Simulator', async function (this: CradleWorld) {
@@ -76,8 +88,47 @@ Given('我已配置 Claude Agent Read 工具环 Simulator', async function (this
   await configureReadToolLoopSimulator(this)
 })
 
+Given('我已配置会校验文件上下文的 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureFileContextSimulator(this)
+})
+
+When('我在新建聊天中提及文件{string}并输入{string}', async function (this: CradleWorld, path: string, prompt: string) {
+  const editor = this.newChat.textBox()
+  await editor.click()
+  await editor.fill(`@${path}`)
+  await expect(this.page.getByText(path, { exact: true }).last()).toBeVisible({ timeout: 15_000 })
+  await this.page.keyboard.press('Enter')
+  await expect(editor.locator(`[data-file-mention-path="${path}"]`)).toBeVisible({ timeout: 10_000 })
+  await editor.pressSequentially(` ${prompt}`)
+})
+
+Then('Simulator 请求应包含文件内容{string}', function (this: CradleWorld, content: string) {
+  const requests = this.simulator?.requests() ?? []
+  expect(JSON.stringify(requests)).toContain(content)
+})
+
 Given('我已配置 Codex 多轮 Simulator', async function (this: CradleWorld) {
   await configureCodexMultiTurnSimulator(this)
+})
+
+Given('我已配置 Codex Edit last message Simulator', async function (this: CradleWorld) {
+  await configureCodexRollbackSimulator(this)
+})
+
+When('我点击编辑上一条消息', async function (this: CradleWorld) {
+  await this.chat.editLastUserMessage()
+})
+
+Then('聊天输入框应恢复上一条消息{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectComposerContains(text)
+})
+
+Then('聊天中不应再出现用户消息{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectNoUserMessage(text)
+})
+
+Then('聊天中不应再出现 AI 消息{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectNoAssistantMessage(text)
 })
 
 Given('我已配置 Codex btw Simulator', async function (this: CradleWorld) {
@@ -235,7 +286,6 @@ Then('停止生成按钮应消失', async function (this: CradleWorld) {
 
 Then('聊天中不应出现完整的慢速回复', async function (this: CradleWorld) {
   // Abort must cut the gated stream before the scripted completion text lands.
-  const { SLOW_RESPONSE } = await import('../support/helpers/chat-scenario')
   await expect(this.page.locator('[data-testid="chat-view"]').first())
     .not
     .toContainText(SLOW_RESPONSE, { timeout: 5_000 })

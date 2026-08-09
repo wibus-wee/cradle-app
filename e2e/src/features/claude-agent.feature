@@ -11,12 +11,16 @@
     假如 我已配置 Claude Agent 审批 Simulator
     而且 我已添加了一个工作区
     当 我点击"新建聊天"导航项
+    而且 我在新建聊天中选择当前工作区
     而且 我选择 Claude Agent 运行时与 Simulator Provider
     而且 我在新建聊天输入框中输入"请准备需要审批的计划"
     而且 我点击发送按钮
     那么 应该跳转到聊天视图
     当 审批卡片出现
-    而且 我点击"允许"按钮
+    那么 审批卡片应包含"implement this plan"
+    当 我重新加载当前页面
+    那么 审批请求在刷新后仍应保持待处理
+    当 我点击"允许"按钮
     那么 审批卡片应该消失
     而且 计划实施审批应为已批准
     而且 最后一条 AI 消息应包含"Approved. The command execution plan completed."
@@ -29,6 +33,7 @@
     假如 我已配置 Claude Agent 审批 Simulator
     而且 我已添加了一个工作区
     当 我点击"新建聊天"导航项
+    而且 我在新建聊天中选择当前工作区
     而且 我选择 Claude Agent 运行时与 Simulator Provider
     而且 我在新建聊天输入框中输入"请准备需要审批的计划"
     而且 我点击发送按钮
@@ -40,19 +45,6 @@
     而且 聊天中不应出现审批通过后的完成回复
     而且 聊天流应结束于空闲状态
     而且 聊天中不应出现错误提示
-    而且 Simulator 脚本化交换应全部耗尽
-
-  @essence @P1 @CRADLE-AGENT-003
-  场景: Tool Call 审批卡会展示计划确认入口
-    假如 我已配置 Claude Agent 审批 Simulator
-    而且 我已添加了一个工作区
-    当 我点击"新建聊天"导航项
-    而且 我选择 Claude Agent 运行时与 Simulator Provider
-    而且 我在新建聊天输入框中输入"请准备需要审批的计划"
-    而且 我点击发送按钮
-    那么 应该跳转到聊天视图
-    当 审批卡片出现
-    那么 审批卡片应包含"implement this plan"
     而且 Simulator 脚本化交换应全部耗尽
 
   @essence @P1 @CRADLE-AGENT-004
