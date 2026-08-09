@@ -17,6 +17,7 @@ import type {
 interface PendingUserInputState {
   request: RuntimeUserInputRequest
   createdAt: number
+  requestPublished: Promise<void>
   resolve: (resolution: RuntimeUserInputResolution) => void
   reject: (error: Error) => void
 }
@@ -58,10 +59,18 @@ export async function requestRuntimeUserInput(
   }
 
   const createdAt = currentUnixSeconds()
+  let resolveRequestPublished!: () => void
+  let rejectRequestPublished!: (error: Error) => void
+  const requestPublished = new Promise<void>((resolve, reject) => {
+    resolveRequestPublished = resolve
+    rejectRequestPublished = reject
+  })
+  void requestPublished.catch(() => undefined)
   const pending = new Promise<RuntimeUserInputResolution>((resolve, reject) => {
     pendingUserInputById.set(pendingKey, {
       request: input,
       createdAt,
+      requestPublished,
       resolve,
       reject,
     })
@@ -89,12 +98,15 @@ export async function requestRuntimeUserInput(
         questions: input.questions,
       },
     })
+    resolveRequestPublished()
   }
  catch (error) {
+    const requestError = error instanceof Error ? error : new Error(String(error))
+    rejectRequestPublished(requestError)
     const current = pendingUserInputById.get(pendingKey)
     if (current?.request === input) {
       pendingUserInputById.delete(pendingKey)
-      current.reject(error instanceof Error ? error : new Error(String(error)))
+      current.reject(requestError)
     }
     throw error
   }
@@ -110,6 +122,16 @@ export async function submitRuntimeUserInput(input: {
   const pendingKey = readPendingKey(input.sessionId, input.requestId)
   const pending = pendingUserInputById.get(pendingKey)
   if (!pending || pending.request.sessionId !== input.sessionId) {
+    throw new AppError({
+      code: 'chat_runtime_user_input_not_found',
+      status: 404,
+      message: 'Pending runtime user input request was not found',
+      details: { requestId: input.requestId, sessionId: input.sessionId },
+    })
+  }
+
+  await pending.requestPublished
+  if (pendingUserInputById.get(pendingKey) !== pending) {
     throw new AppError({
       code: 'chat_runtime_user_input_not_found',
       status: 404,
