@@ -1,9 +1,3 @@
-/**
- * Output: Codex provider-private types shared by package modules.
- * Input: provider context, app-server client options/messages, and active turn bookkeeping.
- * Position: Codex provider package type boundary.
- */
-
 import type {
   ProviderContext,
   RuntimeApprovalStatus,

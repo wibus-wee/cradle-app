@@ -1,9 +1,3 @@
-/**
- * Output: Claude Agent runtime identity, static capabilities, and presentation projection.
- * Input: Claude Agent SDK slash command metadata.
- * Position: Claude Agent provider package metadata owner.
- */
-
 import type { SlashCommand } from '@anthropic-ai/claude-agent-sdk'
 
 import type {

@@ -173,14 +173,6 @@ export function suggestCatalogPresetsByEndpoint(
   })
 }
 
-/** @deprecated Use suggestCatalogPresetsByEndpoint — identity must not be auto-resolved. */
-export function matchCatalogPresetByEndpoint(
-  presets: ProviderPreset[],
-  endpoint: string,
-): ProviderPreset | null {
-  return suggestCatalogPresetsByEndpoint(presets, endpoint)[0] ?? null
-}
-
 /** Auth methods for unbound profiles (no providerId). */
 export function unboundAuthMethods(): ProviderPresetAuthMethod[] {
   return API_KEY_ONLY

@@ -1,7 +1,3 @@
-// Input: Zustand ipc-devtool stores, IpcTrace model, cn utility
-// Output: IpcEventsTable — sortable, selectable table of IPC traces grouped by traceId
-// Position: Left/main pane inside the IPC devtool page
-
 import { useMemo, useState } from 'react'
 
 import { cn } from '~/lib/cn'

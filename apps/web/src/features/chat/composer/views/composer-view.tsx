@@ -24,8 +24,8 @@ import type {
 } from '../../capabilities/chat-capabilities'
 import { readBangCommand } from '../../commands/bang-command'
 import type {
-  ChatRuntimeSettings,
-  ChatRuntimeSettingsPatch,
+  RuntimeSettings,
+  RuntimeSettingsPatch,
 } from '../../commands/chat-response-command'
 import type { ChatContextPart } from '../../context/chat-context-parts'
 import type { MentionItem, MentionPickerItem, PluginMentionItem } from '../../mentions/mention-panel'
@@ -178,9 +178,9 @@ export interface ComposerExternalSignals {
 
 export interface ComposerRuntimeSettingsController {
   runtimeKind?: RuntimeKind | null
-  settings: ChatRuntimeSettings
+  settings: RuntimeSettings
   disabled?: boolean
-  onChange: (patch: ChatRuntimeSettingsPatch) => void
+  onChange: (patch: RuntimeSettingsPatch) => void
 }
 
 export interface ComposerViewOptions {
@@ -820,7 +820,7 @@ export function ComposerView({
 
   const handlePaste = useCallback(
     (event: ClipboardEvent) => {
-      handleAttachmentPaste(event as unknown as React.ClipboardEvent<HTMLElement>)
+      handleAttachmentPaste(event)
       if (event.defaultPrevented) {
         return
       }

@@ -1,9 +1,3 @@
-/**
- * Output: AI SDK UIMessageChunk events projected from Codex app-server notifications.
- * Input: Codex app-server item lifecycle, delta, patch, and server request notifications.
- * Position: Codex provider package event mapper between app-server protocol and Chat Runtime chunks.
- */
-
 import type { UIMessageChunk } from 'ai'
 
 import type { BoundedTextCollector } from '../../bounded-text-collector'

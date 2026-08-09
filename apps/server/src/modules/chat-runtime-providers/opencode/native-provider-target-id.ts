@@ -1,9 +1,3 @@
-/**
- * Output: opencode runtime-owned provider target id encoding.
- * Input: opencode native provider ids.
- * Position: lightweight opencode target identity helper without runtime host dependencies.
- */
-
 export const OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID = 'runtime-native-opencode'
 export const OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_PREFIX = 'runtime-native:opencode:'
 

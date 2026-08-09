@@ -1,9 +1,3 @@
-/**
- * Output: opencode prompt parts projected from Chat Runtime input.
- * Input: Cradle UIMessage.
- * Position: opencode provider package boundary from Cradle message input to opencode session.prompt body.
- */
-
 import type { FilePartInput, SessionPromptAsyncData, SessionPromptData, TextPartInput } from '@opencode-ai/sdk'
 import type { UIMessage } from 'ai'
 

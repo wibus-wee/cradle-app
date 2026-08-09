@@ -89,7 +89,21 @@ export async function refreshProtocolArtifactCache(
 
 export async function readGeneratedArtifactManifest(): Promise<GeneratedArtifactManifest> {
   const manifest = asRecord(await readJson(MANIFEST_PATH))
-  return manifest as unknown as GeneratedArtifactManifest
+  if (typeof manifest.inputFingerprint !== 'string') {
+    throw new TypeError('Generated artifact manifest is missing inputFingerprint')
+  }
+  const rawFiles = asRecord(manifest.files)
+  const files = Object.fromEntries(GENERATED_FILES.map((file) => {
+    const hash = rawFiles[file]
+    if (typeof hash !== 'string') {
+      throw new TypeError(`Generated artifact manifest is missing hash for ${file}`)
+    }
+    return [file, hash]
+  }))
+  return {
+    inputFingerprint: manifest.inputFingerprint,
+    files,
+  }
 }
 
 export async function protocolArtifactInputFingerprint(): Promise<string> {

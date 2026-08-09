@@ -1,7 +1,3 @@
-// Input: Zustand selection store, cn utility
-// Output: IpcEventDetail — selected trace metadata + args/result/error/stack tabs + flow timeline for push streams
-// Position: Right pane inside the IPC devtool page
-
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 

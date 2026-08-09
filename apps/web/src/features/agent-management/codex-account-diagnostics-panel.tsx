@@ -51,7 +51,7 @@ import { cn } from '~/lib/cn'
 import { clampPercent } from '~/lib/number-format'
 
 type CodexAccountDiagnostics = GetProviderTargetsByProviderTargetIdCodexAccountDiagnosticsResponse
-type RateLimitSnapshot = NonNullable<CodexAccountDiagnostics['rateLimits']>
+type RateLimitSnapshot = NonNullable<CodexAccountDiagnostics['rateLimitsByLimitId']>[string]
 type RateLimitWindow = NonNullable<RateLimitSnapshot['primary']>
 type DailyBucket = NonNullable<CodexAccountDiagnostics['tokenUsage']>['dailyUsageBuckets'][number]
 
@@ -501,25 +501,14 @@ function RateLimitsTab({
     return <div className="px-6 py-8">{body}</div>
   }
 
-  // The single-bucket `rateLimits` is a backward-compatible mirror of the
-  // primary limit; the multi-bucket `rateLimitsByLimitId` is the source of
-  // truth. Rendering both duplicates the same limit, so prefer the multi-bucket
-  // view when present and only fall back to the single bucket otherwise.
-  const defaultSnapshot = diagnostics?.rateLimits ?? null
   const byLimitId = diagnostics?.rateLimitsByLimitId ?? null
   const entries = byLimitId ? Object.entries(byLimitId) : []
 
-  const cards: Array<{ key: string, snapshot: RateLimitSnapshot, highlighted: boolean }> = []
-  if (entries.length > 0) {
-    const primaryLimitId = defaultSnapshot?.limitId ?? null
-    const highlightedKey = (primaryLimitId && byLimitId![primaryLimitId]) ? primaryLimitId : entries[0][0]
-    for (const [limitId, snapshot] of entries) {
-      cards.push({ key: limitId, snapshot, highlighted: limitId === highlightedKey })
-    }
-  }
-  else if (defaultSnapshot) {
-    cards.push({ key: defaultSnapshot.limitId ?? 'default', snapshot: defaultSnapshot, highlighted: true })
-  }
+  const cards = entries.map(([limitId, snapshot], index) => ({
+    key: limitId,
+    snapshot,
+    highlighted: index === 0,
+  }))
 
   const totalBuckets = cards.length
   const limitedCount = cards.filter(c => Boolean(c.snapshot.rateLimitReachedType)).length
@@ -1261,9 +1250,6 @@ function deriveStatusKind(
   }
   if (!diagnostics.supported) {
     return 'unsupported'
-  }
-  if (diagnostics.rateLimits?.rateLimitReachedType) {
-    return 'limited'
   }
   const byLimitId = Object.values(diagnostics.rateLimitsByLimitId ?? {})
   if (byLimitId.some(r => Boolean(r.rateLimitReachedType))) {

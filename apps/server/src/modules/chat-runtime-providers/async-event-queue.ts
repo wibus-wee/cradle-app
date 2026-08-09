@@ -1,9 +1,3 @@
-/**
- * Output: provider-agnostic async FIFO queue for runtime adapter event streams.
- * Input: pushed events, close/fail signals, and optional abort signals for waiters.
- * Position: shared chat-runtime-providers infrastructure with no provider protocol semantics.
- */
-
 export class AsyncEventQueue<TEvent> implements AsyncIterable<TEvent> {
   private readonly buffered: TEvent[] = []
   private readonly waiters: Array<{

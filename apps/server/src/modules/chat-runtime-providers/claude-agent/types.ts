@@ -1,9 +1,3 @@
-/**
- * Output: Claude Agent provider-private types shared by package modules.
- * Input: Claude Agent SDK message content and AI SDK UIMessage parts.
- * Position: Claude Agent provider package type boundary.
- */
-
 import type { SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { UIMessage } from 'ai'
 

@@ -5,7 +5,7 @@ import type { GetChatSessionsBySessionIdMessagesResponse } from '~/api-gen/types
 import type { ChatRunState } from '~/store/chat'
 import { useChatStore } from '~/store/chat'
 
-import type { ChatContinuationMode, ChatQueueItem, ChatRuntimeSettingsPatch, ChatThinkingEffort } from '../commands/chat-response-command'
+import type { ChatContinuationMode, ChatQueueItem, ChatThinkingEffort, RuntimeSettingsPatch } from '../commands/chat-response-command'
 import type { RuntimeSessionRunStatus } from '../commands/runtime-session-status-command'
 
 // ── Message Snapshot Types ──────────────────────────────────
@@ -17,7 +17,7 @@ export interface SendMessageOptions {
   providerTargetId?: string
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort | null | undefined
-  runtimeSettings?: ChatRuntimeSettingsPatch
+  runtimeSettings?: RuntimeSettingsPatch
   continuationMode?: ChatContinuationMode
   reviewTarget?: RuntimeReviewTarget
 }

@@ -1,4 +1,4 @@
-import type { Paragraph, PhrasingContent, Root, RootContent } from 'mdast'
+import type { Paragraph, PhrasingContent, Root } from 'mdast'
 import type {
   CompileContext,
   Extension as FromMarkdownExtension,
@@ -376,7 +376,7 @@ function liftAttributeDirectives(tree: Root, name: string) {
       return
     }
 
-    const children = node.children as PhrasingContent[]
+    const children = node.children
     let hasDirective = false
     for (const child of children) {
       if (child.type === name) {
@@ -388,7 +388,7 @@ function liftAttributeDirectives(tree: Root, name: string) {
       return
     }
 
-    const replacement: RootContent[] = []
+    const replacement: unknown[] = []
     let buffer: PhrasingContent[] = []
 
     const flushBuffer = () => {
@@ -403,16 +403,24 @@ function liftAttributeDirectives(tree: Root, name: string) {
     for (const child of children) {
       if (child.type === name) {
         flushBuffer()
-        replacement.push(child as unknown as RootContent)
+        replacement.push(child)
         continue
       }
       buffer.push(child)
     }
     flushBuffer()
 
-    parent.children.splice(index, 1, ...replacement)
+    replaceChild(parent, index, replacement)
     return [SKIP, index + replacement.length]
   })
+}
+
+function replaceChild(
+  parent: { children: unknown[] },
+  index: number,
+  replacement: unknown[],
+): void {
+  parent.children.splice(index, 1, ...replacement)
 }
 
 function trimParagraphChildren(children: PhrasingContent[]): PhrasingContent[] {

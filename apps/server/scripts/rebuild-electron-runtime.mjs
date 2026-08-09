@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-/**
- * Output: Rebuilds bundled server native dependencies for Cradle desktop's Electron runtime.
- * Input: apps/server/dist/desktop-runtime plus the target Electron version from CRADLE_ELECTRON_VERSION or apps/desktop/package.json.
- * Position: Server-owned desktop runtime artifact preparation; desktop packaging consumes the artifact without mutating it.
- */
 import { spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'

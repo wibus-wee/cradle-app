@@ -2438,33 +2438,6 @@ export type GetProviderTargetsByProviderTargetIdCodexAccountDiagnosticsResponses
             planType: string | null;
             requiresOpenaiAuth: boolean | null;
         } | null;
-        rateLimits: {
-            limitId: string | null;
-            limitName: string | null;
-            primary: {
-                usedPercent: number;
-                windowDurationMins: number | null;
-                resetsAt: number | null;
-            } | null;
-            secondary: {
-                usedPercent: number;
-                windowDurationMins: number | null;
-                resetsAt: number | null;
-            } | null;
-            credits: {
-                hasCredits: boolean;
-                unlimited: boolean;
-                balance: string | null;
-            } | null;
-            individualLimit: {
-                limit: string;
-                used: string;
-                remainingPercent: number;
-                resetsAt: number;
-            } | null;
-            planType: string | null;
-            rateLimitReachedType: string | null;
-        } | null;
         rateLimitsByLimitId: {
             [key: string]: {
                 limitId: string | null;

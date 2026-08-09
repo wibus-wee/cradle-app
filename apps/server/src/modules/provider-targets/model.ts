@@ -259,7 +259,6 @@ export const ProviderTargetsModel = {
       }, { additionalProperties: false }),
       t.Null(),
     ]),
-    rateLimits: t.Union([codexRateLimitSnapshotDiagnostics, t.Null()]),
     rateLimitsByLimitId: t.Union([
       t.Object({}, { additionalProperties: codexRateLimitSnapshotDiagnostics }),
       t.Null(),

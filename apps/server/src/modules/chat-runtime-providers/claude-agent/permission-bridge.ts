@@ -1,9 +1,3 @@
-/**
- * Output: Claude Agent SDK permission callback decisions.
- * Input: SDK tool permission requests and Cradle runtime pending-input hooks.
- * Position: Provider-owned bridge between SDK canUseTool and Chat Runtime semantics.
- */
-
 import type { CanUseTool, HookCallback, Options, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
 
 import type { GetCapabilitiesInput, ProviderContext, RuntimeSettings, StreamTurnInput } from '../../chat-runtime/runtime-provider-types'
