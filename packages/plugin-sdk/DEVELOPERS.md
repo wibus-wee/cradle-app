@@ -719,8 +719,11 @@ export function activate(ctx: WebPluginContext): void {
 `code.activity.read` is not granted. A new subscriber immediately receives the
 current non-write heartbeat when a matching file is active. Later heartbeats
 arrive when the active file changes, the internal UI activity segment resumes,
-or the user edits that file. Disposing the registration stops new delivery;
-in-flight async handlers are not cancelled.
+the built-in editor changes, or any process changes a file in the active chat's
+execution root. This includes AI runtimes and terminals, and follows isolated
+Work sessions into their managed worktrees. It emits only the source Workspace
+identity and changed relative path and never reads the file. Disposing the
+registration stops new delivery; in-flight async handlers are not cancelled.
 
 ### `ctx.panels.register(panel)` — UI Panel Registration
 

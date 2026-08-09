@@ -6,6 +6,23 @@ import type { CodeActivityTarget } from './code-activity-bus'
 
 type Workspace = GetWorkspacesResponse[number]
 
+export function createCodeActivityTarget(
+  workspace: Pick<Workspace, 'id' | 'name'>,
+  relativePath: string,
+): CodeActivityTarget {
+  const language = getMonacoLanguage(relativePath)
+  return {
+    workspace: {
+      id: workspace.id,
+      name: workspace.name,
+    },
+    file: {
+      relativePath,
+      ...(language === 'plaintext' ? {} : { language }),
+    },
+  }
+}
+
 export function resolveCodeActivityTarget(
   inputs: UiActivityResolutionInputs,
   workspaces: readonly Workspace[],
@@ -33,15 +50,5 @@ export function resolveCodeActivityTarget(
     return null
   }
 
-  const language = getMonacoLanguage(tab.path)
-  return {
-    workspace: {
-      id: workspace.id,
-      name: workspace.name,
-    },
-    file: {
-      relativePath: tab.path,
-      ...(language === 'plaintext' ? {} : { language }),
-    },
-  }
+  return createCodeActivityTarget(workspace, tab.path)
 }

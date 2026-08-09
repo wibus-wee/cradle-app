@@ -43,6 +43,21 @@ describe('code activity bus', () => {
     })
   })
 
+  it('reports workspace-observed writes without requiring an open editor target', () => {
+    const bus = new CodeActivityBus()
+    const handler = vi.fn()
+    bus.subscribe('plugin', handler)
+
+    bus.publishWrite(target, 123)
+
+    expect(handler).toHaveBeenCalledWith({
+      kind: 'code.heartbeat',
+      occurredAt: 123,
+      ...target,
+      isWrite: true,
+    })
+  })
+
   it('does not emit another read heartbeat for the same target', () => {
     const bus = new CodeActivityBus()
     const handler = vi.fn()

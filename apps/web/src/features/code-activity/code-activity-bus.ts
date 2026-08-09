@@ -43,7 +43,11 @@ export class CodeActivityBus {
     ) {
       return
     }
-    this.dispatch(this.createHeartbeat(target, true))
+    this.publishWrite(target)
+  }
+
+  publishWrite(target: CodeActivityTarget, occurredAt = Date.now()): void {
+    this.dispatch(this.createHeartbeat(target, true, occurredAt))
   }
 
   subscribe(owner: string, handler: CodeActivityHandler): Disposable {
@@ -59,10 +63,14 @@ export class CodeActivityBus {
     }
   }
 
-  private createHeartbeat(target: CodeActivityTarget, isWrite: boolean): CodeActivityEvent {
+  private createHeartbeat(
+    target: CodeActivityTarget,
+    isWrite: boolean,
+    occurredAt = Date.now(),
+  ): CodeActivityEvent {
     return {
       kind: 'code.heartbeat',
-      occurredAt: Date.now(),
+      occurredAt,
       workspace: { ...target.workspace },
       file: { ...target.file },
       isWrite,

@@ -42,6 +42,7 @@ import { createOpencodeManagedResourceAdapter } from './modules/chat-runtime-pro
 import { OpencodeRuntimeInstallationService } from './modules/chat-runtime-providers/opencode/runtime-installation'
 import { createChronicleModule } from './modules/chronicle'
 import { createChronicleManagedResourceAdapter } from './modules/chronicle/managed-resource-adapter'
+import { codeActivity } from './modules/code-activity'
 import { codexAppServer } from './modules/codex-app-server'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
@@ -224,6 +225,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(health)
   app.use(preferences)
   app.use(workspace)
+  app.use(codeActivity)
   app.use(filesystem)
   app.use(usage)
   app.use(profiles)
