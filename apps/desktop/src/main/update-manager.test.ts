@@ -246,6 +246,57 @@ describe('desktopUpdateManager', () => {
     expect(electronUpdaterMocks.autoUpdater.quitAndInstall).toHaveBeenCalledWith(false, true)
   })
 
+  it('checks, downloads, and applies Linux AppImage updates through electron-updater', async () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' })
+    const updateInfo = {
+      version: '2.0.0',
+      releaseName: 'Linux 2.0.0',
+      releaseNotes: 'linux notes',
+      releaseDate: '2026-08-09T00:00:00.000Z',
+      files: [
+        { url: 'Cradle-linux-x64.AppImage', size: 42, sha512: 'appimage-sha' },
+        { url: 'Cradle-linux-x64.deb', size: 43, sha512: 'deb-sha' },
+        { url: 'Cradle-linux-x64.rpm', size: 44, sha512: 'rpm-sha' },
+      ],
+    }
+    electronUpdaterMocks.autoUpdater.checkForUpdates.mockImplementation(async () => {
+      electronUpdaterMocks.autoUpdater.emit('update-available', updateInfo)
+      return { isUpdateAvailable: true, updateInfo }
+    })
+    electronUpdaterMocks.autoUpdater.downloadUpdate.mockImplementation(async () => {
+      electronUpdaterMocks.autoUpdater.emit('update-downloaded', {
+        ...updateInfo,
+        downloadedFile: '/tmp/Cradle-linux-x64.AppImage',
+      })
+      return ['/tmp/Cradle-linux-x64.AppImage']
+    })
+
+    const prepareQuitForUpdate = vi.fn(async () => undefined)
+    const { DesktopUpdateManager } = await import('./update-manager')
+    const manager = new DesktopUpdateManager({
+      updateFeedUrl: 'https://github.com/wibus-wee/cradle-app/releases/download/feed-dev/',
+      prepareQuitForUpdate,
+    })
+
+    await expect(manager.checkForUpdates()).resolves.toMatchObject({
+      unsupported: false,
+      provider: 'electron-updater',
+      updateInfo: {
+        version: '2.0.0',
+        files: [{ url: 'Cradle-linux-x64.AppImage', size: 42 }],
+      },
+    })
+    expect(electronUpdaterMocks.autoUpdater.disableWebInstaller).toBe(false)
+    expect(electronUpdaterMocks.autoUpdater.setFeedURL).toHaveBeenCalledWith(
+      'https://github.com/wibus-wee/cradle-app/releases/download/feed-dev/',
+    )
+
+    await expect(manager.downloadUpdate()).resolves.toMatchObject({ updateDownloaded: true })
+    await manager.applyUpdate()
+    expect(prepareQuitForUpdate).toHaveBeenCalled()
+    expect(electronUpdaterMocks.autoUpdater.quitAndInstall).toHaveBeenCalledWith(false, true)
+  })
+
   it('reports an error when apply is requested without a prepared Windows update', async () => {
     Object.defineProperty(process, 'platform', { value: 'win32' })
     const { DesktopUpdateManager } = await import('./update-manager')

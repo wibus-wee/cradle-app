@@ -49,7 +49,11 @@ export function DesktopUpdateSettings() {
 
   const updateDownload = downloadTasks.find(task => task.scope === 'desktop'
     && task.owner.namespace === 'desktop-update'
-    && (task.owner.resourceType === 'macos-update' || task.owner.resourceType === 'windows-update')
+    && (
+      task.owner.resourceType === 'macos-update'
+      || task.owner.resourceType === 'windows-update'
+      || task.owner.resourceType === 'linux-update'
+    )
     && isActiveDownload(task)) ?? null
   const busy = loading
     || status.isCheckingForUpdates
