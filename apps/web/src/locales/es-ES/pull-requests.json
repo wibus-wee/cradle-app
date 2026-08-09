@@ -62,6 +62,8 @@
   "page.loadMore": "Cargar más",
   "page.loadingMore": "Cargando…",
   "page.searchPlaceholder": "Buscar Pull requests",
+  "page.refresh": "Actualizar Pull requests desde GitHub",
+  "page.refreshError": "No se pudieron actualizar los Pull requests",
   "page.title": "Pull request",
   "status.closed": "Cerrado",
   "status.draft": "Draft",

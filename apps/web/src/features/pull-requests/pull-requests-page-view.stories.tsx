@@ -38,6 +38,7 @@ const meta = {
     selectedRef: pullRequestEntriesFixture[0].id,
     now: pullRequestFixtureNow,
     onPrefetch: () => {},
+    onRefresh: () => {},
     onSelect: () => {},
   },
 } satisfies Meta<typeof PullRequestsPageView>
@@ -46,6 +47,12 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Populated: Story = {}
+
+export const Refreshing: Story = {
+  args: {
+    refreshing: true,
+  },
+}
 
 export const Loading: Story = {
   args: {

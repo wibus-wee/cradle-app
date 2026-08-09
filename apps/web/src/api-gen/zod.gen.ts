@@ -1788,12 +1788,26 @@ export const zGetPullRequestsReviewingQuery = z.object({
     after: z.string().optional()
 });
 
+export const zPostPullRequestsRefreshBody = z.object({
+    login: z.string().min(1)
+});
+
 export const zGetPullRequestsByOwnerByRepoAssignableUsersPath = z.object({
     owner: z.string().min(1),
     repo: z.string().min(1)
 });
 
 export const zGetPullRequestsByOwnerByRepoByNumberDetailPath = z.object({
+    owner: z.string().min(1),
+    repo: z.string().min(1),
+    number: z.string().min(1)
+});
+
+export const zPostPullRequestsByOwnerByRepoByNumberRefreshBody = z.object({
+    force: z.boolean().optional()
+});
+
+export const zPostPullRequestsByOwnerByRepoByNumberRefreshPath = z.object({
     owner: z.string().min(1),
     repo: z.string().min(1),
     number: z.string().min(1)

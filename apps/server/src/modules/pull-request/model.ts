@@ -191,6 +191,14 @@ export const PullRequestModel = {
     after: t.Optional(t.String()),
   }),
 
+  feedRefreshBody: t.Object({
+    login: t.String({ minLength: 1 }),
+  }),
+
+  detailRefreshBody: t.Object({
+    force: t.Optional(t.Boolean()),
+  }),
+
   createBody: t.Object({
     title: t.String({ minLength: 1 }),
     body: t.Optional(t.String()),
@@ -236,6 +244,10 @@ export const PullRequestModel = {
     pullRequest: pullRequestDetail,
     timeline: t.Array(pullRequestTimelineItem),
     files: t.Array(pullRequestFile),
+  }),
+
+  refreshResponse: t.Object({
+    refreshed: t.Literal(true),
   }),
 
   fingerprintResponse: t.Object({

@@ -82,6 +82,18 @@ export function PullRequestDetailPanel({
     })
   }
 
+  const refreshMutation = useMutation({
+    ...pullRequestMutations.refresh(),
+    onSuccess: async (detail) => {
+      queryClient.setQueryData(
+        getPullRequestsByOwnerByRepoByNumberDetailQueryKey({ path }),
+        detail,
+      )
+      await resetFingerprint()
+    },
+    onError: reportError,
+  })
+
   const commentMutation = useMutation({
     ...pullRequestMutations.comment(),
     onSuccess: async () => {
@@ -162,12 +174,9 @@ export function PullRequestDetailPanel({
         repo={repo}
         number={number}
         locale={i18n.language}
-        isFetching={detailQuery.isFetching}
+        isFetching={detailQuery.isFetching || refreshMutation.isPending}
         errorKind={resolvePullRequestErrorKind(detailQuery.error)}
-        onRefresh={() => {
-          void resetFingerprint()
-          void detailQuery.refetch()
-        }}
+        onRefresh={() => refreshMutation.mutate({ path, body: { force: true } })}
         onOpenWork={workId ? () => openWork(workId) : undefined}
       />
     )
@@ -180,12 +189,9 @@ export function PullRequestDetailPanel({
       repo={repo}
       number={number}
       locale={i18n.language}
-      isFetching={detailQuery.isFetching}
+      isFetching={detailQuery.isFetching || refreshMutation.isPending}
       errorKind={null}
-      onRefresh={() => {
-        void resetFingerprint()
-        void detailQuery.refetch()
-      }}
+      onRefresh={() => refreshMutation.mutate({ path, body: { force: true } })}
       onOpenWork={workId ? () => openWork(workId) : undefined}
       actions={detailQuery.data
         ? {

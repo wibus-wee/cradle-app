@@ -11,8 +11,10 @@ import {
   postPullRequestsByOwnerByRepoByNumberDraftMutation,
   postPullRequestsByOwnerByRepoByNumberMergeMutation,
   postPullRequestsByOwnerByRepoByNumberReadyMutation,
+  postPullRequestsByOwnerByRepoByNumberRefreshMutation,
   postPullRequestsByOwnerByRepoByNumberReviewersMutation,
   postPullRequestsByOwnerByRepoByNumberReviewMutation,
+  postPullRequestsRefreshMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type {
   GetPullRequestsAuthoredResponse,
@@ -40,6 +42,8 @@ export const pullRequestMutations = {
   draft: postPullRequestsByOwnerByRepoByNumberDraftMutation,
   merge: postPullRequestsByOwnerByRepoByNumberMergeMutation,
   ready: postPullRequestsByOwnerByRepoByNumberReadyMutation,
+  refresh: postPullRequestsByOwnerByRepoByNumberRefreshMutation,
   review: postPullRequestsByOwnerByRepoByNumberReviewMutation,
   reviewers: postPullRequestsByOwnerByRepoByNumberReviewersMutation,
+  refreshFeeds: postPullRequestsRefreshMutation,
 } as const

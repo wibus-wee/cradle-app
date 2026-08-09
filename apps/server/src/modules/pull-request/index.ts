@@ -110,6 +110,17 @@ export const pullRequestFeed = new Elysia({
     query: PullRequestModel.searchPageQuery,
     response: { 200: PullRequestModel.searchPageResponse },
   })
+  .post('/refresh', async ({ body }) => {
+    await PullRequest.refreshPullRequestFeeds(body.login)
+    return { refreshed: true as const }
+  }, {
+    detail: {
+      'summary': 'Force-refresh the authenticated user\'s pull request feeds from GitHub',
+      'x-cradle-cli': { command: ['pull-request', 'refresh'] },
+    },
+    body: PullRequestModel.feedRefreshBody,
+    response: { 200: PullRequestModel.refreshResponse },
+  })
   .get('/:owner/:repo/assignable-users', async ({ params }) => {
     return await ConsoleActions.listAssignableUsers(params.owner, params.repo)
   }, {
@@ -132,6 +143,22 @@ export const pullRequestFeed = new Elysia({
       'x-cradle-cli': { command: ['pull-request', 'detail'] },
     },
     params: PullRequestModel.refParams,
+    response: { 200: PullRequestModel.detailResponse },
+  })
+  .post('/:owner/:repo/:number/refresh', async ({ params, body }) => {
+    return await PullRequest.fetchPullRequestDetailByRef(
+      params.owner,
+      params.repo,
+      parsePullRequestNumber(params.number),
+      body.force === false ? 'probe' : 'force',
+    )
+  }, {
+    detail: {
+      'summary': 'Synchronously refresh pull request details from GitHub',
+      'x-cradle-cli': { command: ['pull-request', 'detail', 'refresh'] },
+    },
+    params: PullRequestModel.refParams,
+    body: PullRequestModel.detailRefreshBody,
     response: { 200: PullRequestModel.detailResponse },
   })
   .get('/:owner/:repo/:number/fingerprint', async ({ params }) => {
