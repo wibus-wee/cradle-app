@@ -388,10 +388,7 @@ export function SlashCommandPanel({
           <Fragment key={section.id}>
             <li
               role="presentation"
-              className={cn(
-                'px-2.5 pb-1 pt-1.5 text-[10px] font-medium tracking-wide text-muted-foreground/70',
-                section.rows[0]?.index > 0 && 'mt-0.5 border-t border-border/60 pt-2',
-              )}
+              className="px-2.5 pb-1 pt-1.5 text-[10px] font-medium tracking-wide text-muted-foreground/70"
             >
               {section.label}
             </li>
