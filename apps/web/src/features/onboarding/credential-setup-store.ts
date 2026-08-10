@@ -25,6 +25,15 @@ export function isFirstRunSetupStepCompleted(
   return completedSteps[key] === true
 }
 
+export function isProviderSetupSatisfied(input: {
+  targetsReady: boolean
+  providerOptionCount: number
+  externalProviderRecordCount: number
+}): boolean {
+  return input.targetsReady
+    && (input.providerOptionCount > 0 || input.externalProviderRecordCount > 0)
+}
+
 /**
  * Steps still owed by the user, after subtracting environmentally satisfied
  * capabilities (existing providers / connected GitHub).

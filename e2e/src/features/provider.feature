@@ -19,6 +19,7 @@
     那么 Provider 状态应为成功
     而且 Provider 列表中应显示名为"E2E UI Claude"的 profile
     当 我为 UI 创建的 Provider 准备真实 Claude 回复
+    而且 我关闭设置并返回首页
     而且 我已添加了一个工作区
     而且 我点击"新建聊天"导航项
     而且 我在新建聊天选择名为"E2E UI Claude"的 Claude Agent Provider

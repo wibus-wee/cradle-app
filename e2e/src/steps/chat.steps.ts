@@ -353,7 +353,7 @@ Then('聊天错误提示应显示{string}', async function (this: CradleWorld, t
 When('我重新加载当前页面', async function (this: CradleWorld) {
   await this.page.reload()
   await this.page.waitForLoadState('domcontentloaded')
-  await this.chat.waitVisible()
+  await expect(this.page.locator('[data-testid="app-sidebar"]')).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
 })
 
 Then('会话{string}应显示为已置顶', async function (this: CradleWorld, alias: string) {

@@ -23,7 +23,7 @@ export class DiffPage {
   }
 
   async expectFile(path: string): Promise<void> {
-    await expect(this.page.locator('[data-testid="file-list-aside"]').getByText(path, { exact: true }))
+    await expect(this.workingTree().locator('[data-testid="review-file-list"]').getByText(path, { exact: true }))
       .toBeVisible({ timeout: TIMEOUT })
   }
 

@@ -131,6 +131,7 @@ export function ReviewFileRail({
       className="flex min-h-0 shrink-0 flex-col border-r border-[var(--rv-line)] bg-[var(--rv-bg-subtle)]"
       style={{ width }}
       aria-label="Changed files"
+      data-testid="review-file-list"
     >
       <div className="flex h-9 shrink-0 items-center gap-2 border-b border-[var(--rv-line)] px-3">
         <SearchIcon className="size-3.5 shrink-0 text-[var(--rv-fg-subtle)]" aria-hidden />

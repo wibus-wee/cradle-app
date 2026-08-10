@@ -46,7 +46,10 @@ export class WorkspacePage {
 
   async dismissTransientOverlays(): Promise<void> {
     await dismissGlobalTransientOverlays(this.page)
-    await this.page.getByRole('button', { name: /Later|稍后/i }).first().click().catch(() => undefined)
+    const laterButton = this.page.getByRole('button', { name: /Later|稍后/i }).first()
+    if (await laterButton.isVisible({ timeout: 1_000 }).catch(() => false)) {
+      await laterButton.click()
+    }
     await this.page.keyboard.press('Escape').catch(() => undefined)
     await this.page.locator('[data-slot="dialog-overlay"][data-state="open"]')
       .waitFor({ state: 'hidden', timeout: 3_000 })
@@ -169,6 +172,12 @@ export class WorkspacePage {
   async addWorkspaceFromPicker(fixture: WorkspaceFixture): Promise<void> {
     await this.dismissTransientOverlays()
 
+    const beforeResponse = await fetch(`${this.owner.params.serverUrl}/workspaces`)
+    if (!beforeResponse.ok) {
+      throw new Error(`Failed to list workspaces before add: ${beforeResponse.status} ${await beforeResponse.text()}`)
+    }
+    const beforeWorkspaces = await beforeResponse.json() as ServerWorkspace[]
+
     const sidebar = this.page.locator('[data-testid="app-sidebar"]')
     await expect(sidebar).toBeVisible({ timeout: SIDEBAR_TIMEOUT })
 
@@ -205,18 +214,43 @@ export class WorkspacePage {
 
     await this.owner.selectDirectoryInBrowser(fixture.dir)
 
-    // Import may rename/display based on folder basename; wait for a project row then sync fixture.
-    await expect(this.workspaceGroups()).toHaveCount(1, { timeout: WORKSPACE_TIMEOUT })
-    const listRes = await fetch(`${this.owner.params.serverUrl}/workspaces`)
-    if (listRes.ok) {
-      const workspaces = await listRes.json() as Array<{ id: string, name?: string | null, path?: string | null }>
-      const match = workspaces.find(ws => ws.path === fixture.dir) ?? workspaces[0]
-      if (match?.name) {
-        fixture.name = match.name
+    // Other setup steps may already have created workspaces. Wait for this exact
+    // directory and assert that importing it adds one server record.
+    await expect.poll(async () => {
+      const response = await fetch(`${this.owner.params.serverUrl}/workspaces`)
+      if (!response.ok) {
+        return null
       }
+      const workspaces = await response.json() as ServerWorkspace[]
+      const match = workspaces.find(workspace => workspace.path === fixture.dir)
+      return match && workspaces.length === beforeWorkspaces.length + 1 ? match.id : null
+    }, { timeout: WORKSPACE_TIMEOUT }).not.toBeNull()
+
+    const afterResponse = await fetch(`${this.owner.params.serverUrl}/workspaces`)
+    if (!afterResponse.ok) {
+      throw new Error(`Failed to list workspaces after add: ${afterResponse.status} ${await afterResponse.text()}`)
     }
-    this.rememberFixtures([fixture])
+    const afterWorkspaces = await afterResponse.json() as ServerWorkspace[]
+    const addedWorkspace = afterWorkspaces.find(workspace => workspace.path === fixture.dir)
+    if (!addedWorkspace) {
+      throw new Error(`Workspace import completed without the requested path: ${fixture.dir}`)
+    }
+    if (addedWorkspace.name) {
+      fixture.name = addedWorkspace.name
+    }
+
+    const rememberedFixtures = this.recallFixtures()
+    const fixtureIndex = rememberedFixtures.findIndex(remembered => remembered.dir === fixture.dir)
+    if (fixtureIndex >= 0) {
+      rememberedFixtures[fixtureIndex] = fixture
+    }
+    else {
+      rememberedFixtures.push(fixture)
+    }
+    this.rememberFixtures(rememberedFixtures)
     this.setCurrentWorkspace(fixture)
+
+    await expect(this.workspaceGroups()).toHaveCount(afterWorkspaces.length, { timeout: WORKSPACE_TIMEOUT })
     await expect(this.workspaceButtonByName(fixture.name)).toBeVisible({ timeout: WORKSPACE_TIMEOUT })
   }
 

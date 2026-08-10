@@ -25,14 +25,13 @@ import type { FirstRunSetupStepKey } from './credential-setup-store'
 import {
   areAllFirstRunSetupStepsCompleted,
   isFirstRunSetupStepCompleted,
+  isProviderSetupSatisfied,
   resolvePendingFirstRunSetupSteps,
   useFirstRunSetupStore,
 } from './credential-setup-store'
 import { useOnboardingStore } from './onboarding-store'
 
 type DialogStep = FirstRunSetupStepKey | 'done'
-
-const CC_SWITCH_SOURCE_ID = 'cc-switch'
 
 /**
  * First-run setup dialog keyed by step.
@@ -50,19 +49,15 @@ export function CredentialSetupDialog() {
   const completeSteps = useFirstRunSetupStore(s => s.completeSteps)
 
   const { providerOptions, isSuccess: targetsReady } = useProviderTargets()
-  const { data: externalSources = [], isSuccess: sourcesReady } = useQuery(getExternalProviderSourcesOptions())
+  const { isSuccess: sourcesReady } = useQuery(getExternalProviderSourcesOptions())
   const { data: externalRecords = [], isSuccess: recordsReady } = useQuery(getExternalProviderSourcesRecordsOptions())
   const github = useGithubAppConnectionController()
 
-  const hasExternalProviderData = useMemo(() => {
-    const sources = externalSources as Array<{ sourceId?: string }>
-    const records = externalRecords as Array<{ sourceKind?: string, sourceKey?: string }>
-    return records.length > 0
-      || sources.some(source => source.sourceId === CC_SWITCH_SOURCE_ID)
-      || records.some(record => record.sourceKind === CC_SWITCH_SOURCE_ID || record.sourceKey === CC_SWITCH_SOURCE_ID)
-  }, [externalRecords, externalSources])
-
-  const providerSatisfied = targetsReady && (providerOptions.length > 0 || hasExternalProviderData)
+  const providerSatisfied = isProviderSetupSatisfied({
+    targetsReady,
+    providerOptionCount: providerOptions.length,
+    externalProviderRecordCount: externalRecords.length,
+  })
   const githubSatisfied = github.isConnected
   const inventoryReady = targetsReady && sourcesReady && recordsReady && !github.loading
 
