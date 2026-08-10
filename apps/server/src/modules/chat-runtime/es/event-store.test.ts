@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { db, shutdownInfra } from '../../../infra'
-import { appendSessionEvent } from './event-store'
+import { appendSessionEvent, appendSessionEvents } from './event-store'
 
 function restoreEnv(name: string, previousValue: string | undefined): void {
   if (previousValue === undefined) {
@@ -34,6 +34,30 @@ async function withTempDataDir<T>(callback: () => Promise<T> | T): Promise<T> {
 }
 
 describe('appendSessionEvent', () => {
+  it('allocates versions once across bounded multi-row insert batches', async () => {
+    await withTempDataDir(() => {
+      db().transaction((tx) => {
+        const stored = appendSessionEvents(tx, {
+          aggregateId: 'session-batch',
+          expectedVersion: 0,
+          events: Array.from({ length: 205 }, (_, index) => ({
+            type: 'TitleChanged' as const,
+            payload: {
+              sessionId: 'session-batch',
+              title: `Title ${index}`,
+              titleSource: 'provider' as const,
+              updatedAt: index,
+            },
+          })),
+        })
+        expect(stored).toHaveLength(205)
+        expect(stored.map(event => event.version)).toEqual(
+          Array.from({ length: 205 }, (_, index) => index + 1),
+        )
+      })
+    })
+  })
+
   it('rejects stale expectedVersion values with a typed concurrency conflict', async () => {
     await withTempDataDir(() => {
       db().transaction((tx) => {

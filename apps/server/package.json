@@ -32,6 +32,7 @@
     "check:boundaries": "tsx scripts/check-module-boundaries.ts",
     "test": "pnpm --filter @cradle/plugin-sdk build && pnpm --filter \"../../plugins/*\" build && vitest run",
     "test:watch": "vitest",
+    "benchmark:session-startup": "vite build --config vite.benchmark.config.ts && node --import tsx scripts/session-startup-benchmark.ts",
     "benchmark:relay": "vitest run tests/relay-transport/performance-compare.test.ts --reporter=verbose",
     "benchmark:relay:codec": "CRADLE_RELAY_BENCHMARK=1 vitest run tests/relay-transport/codec-throughput-benchmark.test.ts --reporter=verbose --maxWorkers=1 --no-file-parallelism",
     "benchmark:relay:full": "pnpm run benchmark:relay && pnpm run benchmark:relay:runtime",

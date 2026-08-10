@@ -2,7 +2,7 @@ import { kvCache, modelRegistryMappings } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { db } from '../../infra'
+import { db, registerBeforeDatabaseShutdown } from '../../infra'
 import type { ModelCapabilities, ModelDescriptor } from '../provider-contracts/types'
 import { aggregateModelsDevRecords } from './model-info-aggregation'
 
@@ -123,6 +123,12 @@ let memCache: ModelsDevData | null = null
 /** Wall-clock ms when the in-memory snapshot was fetched from the network. */
 let memFetchedAt = 0
 let refreshInFlight: Promise<ModelsDevData | null> | null = null
+let cacheGeneration = 0
+let dbCacheLoaded = false
+let mappingCacheLoaded = false
+const mappingCache = new Map<string, ModelRegistryMappingEntry>()
+const costCache = new Map<string, ModelsDevCost | null>()
+const contextWindowCache = new Map<string, number | null>()
 const DATE_SUFFIX_RE = /-\d{8}$/
 const VERSION_SUFFIX_RE = /-\d{4}-\d{2}-\d{2}$/
 const SEP_RE = /[.\-]+/
@@ -172,6 +178,25 @@ const ModelsDevDataJsonSchema = z.string()
   .transform(raw => JSON.parse(raw))
   .pipe(ModelsDevDataSchema)
 
+interface ModelsDevCost {
+  input: number
+  output: number
+  cacheRead?: number
+  cacheWrite?: number
+}
+
+registerBeforeDatabaseShutdown(() => {
+  cacheGeneration += 1
+  refreshInFlight = null
+  memCache = null
+  memFetchedAt = 0
+  dbCacheLoaded = false
+  mappingCacheLoaded = false
+  mappingCache.clear()
+  costCache.clear()
+  contextWindowCache.clear()
+})
+
 async function fetchFromNetwork(): Promise<ModelsDevData | null> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 8000)
@@ -218,10 +243,14 @@ function writeDbCache(data: ModelsDevData): void {
   }
 }
 
-function getLocalCache(): { data: ModelsDevData, fetchedAt: number } | null {
+function loadDbCacheIntoMemory(): { data: ModelsDevData, fetchedAt: number } | null {
   if (memCache) {
     return { data: memCache, fetchedAt: memFetchedAt }
   }
+  if (dbCacheLoaded) {
+    return null
+  }
+  dbCacheLoaded = true
   const fromDb = readDbCache()
   if (!fromDb) {
     return null
@@ -231,17 +260,52 @@ function getLocalCache(): { data: ModelsDevData, fetchedAt: number } | null {
   return fromDb
 }
 
+function getInMemoryCache(): { data: ModelsDevData, fetchedAt: number } | null {
+  return memCache ? { data: memCache, fetchedAt: memFetchedAt } : null
+}
+
+function loadMappingCache(): void {
+  if (mappingCacheLoaded) {
+    return
+  }
+  mappingCacheLoaded = true
+  try {
+    for (const row of db().select().from(modelRegistryMappings).all()) {
+      mappingCache.set(row.modelId, {
+        modelId: row.modelId,
+        registryModelId: row.registryModelId,
+        matchType: row.matchType,
+        ...(row.modelJson
+          ? { model: ModelsDevModelSchema.parse(JSON.parse(row.modelJson)) }
+          : {}),
+        updatedAt: row.updatedAt,
+      })
+    }
+  }
+  catch {
+    mappingCache.clear()
+  }
+}
+
+function invalidateDerivedModelCaches(): void {
+  costCache.clear()
+  contextWindowCache.clear()
+}
+
 function applyFresh(data: ModelsDevData): ModelsDevData {
   memCache = data
   memFetchedAt = Date.now()
+  dbCacheLoaded = true
+  invalidateDerivedModelCaches()
   writeDbCache(data)
   return data
 }
 
 async function refreshFromNetwork(): Promise<ModelsDevData | null> {
+  const generation = cacheGeneration
   try {
     const fresh = await fetchFromNetwork()
-    if (fresh) {
+    if (fresh && generation === cacheGeneration) {
       return applyFresh(fresh)
     }
   }
@@ -251,11 +315,21 @@ async function refreshFromNetwork(): Promise<ModelsDevData | null> {
   return null
 }
 
-function scheduleBackgroundRefresh(): void {
+function refreshModelsDevData(): Promise<ModelsDevData | null> {
   if (refreshInFlight) {
-    return
+    return refreshInFlight
   }
-  refreshInFlight = refreshFromNetwork().finally(() => {
+  const promise = refreshFromNetwork().finally(() => {
+    if (refreshInFlight === promise) {
+      refreshInFlight = null
+    }
+  })
+  refreshInFlight = promise
+  return promise
+}
+
+function scheduleBackgroundRefresh(): void {
+  void refreshModelsDevData().catch(() => {
     refreshInFlight = null
   })
 }
@@ -267,11 +341,11 @@ function scheduleBackgroundRefresh(): void {
  * - age ≥ hard (or miss) → await network; fall back to stale on failure
  */
 export async function fetchModelsDevData(options?: { forceRefresh?: boolean }): Promise<ModelsDevData | null> {
+  const cached = loadDbCacheIntoMemory()
   if (options?.forceRefresh) {
-    return (await refreshFromNetwork()) ?? getLocalCache()?.data ?? null
+    return (await refreshModelsDevData()) ?? cached?.data ?? getInMemoryCache()?.data ?? null
   }
 
-  const cached = getLocalCache()
   if (cached) {
     const age = Date.now() - cached.fetchedAt
     if (age < SOFT_TTL_MS) {
@@ -281,15 +355,17 @@ export async function fetchModelsDevData(options?: { forceRefresh?: boolean }): 
       scheduleBackgroundRefresh()
       return cached.data
     }
-    return (await refreshFromNetwork()) ?? cached.data
+    return (await refreshModelsDevData()) ?? cached.data
   }
 
-  return refreshFromNetwork()
+  return refreshModelsDevData()
 }
 
-/** Force-refresh models.dev on server startup (fire and forget; falls back to stale cache). */
+/** Load the durable snapshot once, then refresh models.dev without blocking requests. */
 export function warmupModelsDevCache(): void {
-  void fetchModelsDevData({ forceRefresh: true })
+  loadDbCacheIntoMemory()
+  loadMappingCache()
+  scheduleBackgroundRefresh()
 }
 
 /**
@@ -300,55 +376,89 @@ export function warmupModelsDevCache(): void {
  *  2. Fuzzy match modelId on local cache (DB-backed, falls back to in-memory).
  * Returns null if no cost data is found.
  */
-export function getCachedModelsDevCost(modelId: string): {
-  input: number
-  output: number
-  cacheRead?: number
-  cacheWrite?: number
-} | null {
-  try {
-    const row = db().select().from(modelRegistryMappings).where(eq(modelRegistryMappings.modelId, modelId)).get()
-    if (row) {
-      if (row.modelJson) {
-        const parsed = ModelsDevModelSchema.parse(JSON.parse(row.modelJson))
-        const cost = parsed.cost
+export function getCachedModelsDevCost(modelId: string): ModelsDevCost | null {
+  if (costCache.has(modelId)) {
+    return costCache.get(modelId) ?? null
+  }
+
+  loadMappingCache()
+  const mapping = mappingCache.get(modelId)
+  if (mapping) {
+    try {
+      if (mapping.model) {
+        const cost = mapping.model.cost
         if (cost && (cost.input != null || cost.output != null)) {
-          return projectModelsDevCost(cost)
+          const result = projectModelsDevCost(cost)
+          costCache.set(modelId, result)
+          return result
         }
       }
-      // Mapping has a registryModelId but no usable cost in modelJson — resolve from registry cache
-      if (row.registryModelId) {
-        const local = getLocalCache()
+      if (mapping.registryModelId) {
+        const local = getInMemoryCache()
         if (local) {
-          const exact = findModel(local.data, row.registryModelId)
+          const exact = findModel(local.data, mapping.registryModelId)
           const exactCost = exact?.cost
           if (exactCost && (exactCost.input != null || exactCost.output != null)) {
-            return projectModelsDevCost(exactCost)
+            const result = projectModelsDevCost(exactCost)
+            costCache.set(modelId, result)
+            return result
           }
-          const fuzzy = findModelFuzzy(local.data, row.registryModelId)
+          const fuzzy = findModelFuzzy(local.data, mapping.registryModelId)
           const fuzzyCost = fuzzy?.model?.cost
           if (fuzzyCost && (fuzzyCost.input != null || fuzzyCost.output != null)) {
-            return projectModelsDevCost(fuzzyCost)
+            const result = projectModelsDevCost(fuzzyCost)
+            costCache.set(modelId, result)
+            return result
           }
         }
       }
     }
-  }
-  catch {
-    // non-critical, fall through
+    catch {
+      // Invalid optional mapping metadata must not break usage persistence.
+    }
   }
 
-  // Fuzzy match on modelId using DB-backed local cache (not mem-only)
-  const local = getLocalCache()
+  const local = getInMemoryCache()
   if (!local) {
+    costCache.set(modelId, null)
     return null
   }
   const result = findModelFuzzy(local.data, modelId)
   const cost = result?.model?.cost
   if (!cost || (cost.input == null && cost.output == null)) {
+    costCache.set(modelId, null)
     return null
   }
-  return projectModelsDevCost(cost)
+  const projected = projectModelsDevCost(cost)
+  costCache.set(modelId, projected)
+  return projected
+}
+
+export function getCachedContextWindow(modelId: string): number | null {
+  if (contextWindowCache.has(modelId)) {
+    return contextWindowCache.get(modelId) ?? null
+  }
+  const data = getInMemoryCache()?.data
+  const contextWindow = data
+    ? findModelFuzzy(data, modelId)?.model.limit?.context ?? null
+    : null
+  contextWindowCache.set(modelId, contextWindow)
+  return contextWindow
+}
+
+export function updateCachedModelRegistryMapping(
+  modelId: string,
+  mapping: ModelRegistryMappingEntry | null,
+): void {
+  loadMappingCache()
+  if (mapping) {
+    mappingCache.set(modelId, mapping)
+  }
+  else {
+    mappingCache.delete(modelId)
+  }
+  costCache.delete(modelId)
+  contextWindowCache.delete(modelId)
 }
 
 function projectModelsDevCost(cost: NonNullable<ModelsDevModel['cost']>): {

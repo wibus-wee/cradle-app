@@ -82,28 +82,6 @@ export function deleteProviderRuntimeBinding(chatSessionId: string): void {
 
 export function writeProviderRuntimeBinding(input: ProviderRuntimeBindingWrite): BackendSessionBinding {
   const now = currentUnixSeconds()
-  const existing = readProviderRuntimeBinding(input.chatSessionId)
-
-  if (existing) {
-    db()
-      .update(backendSessionBindings)
-      .set({
-        providerTargetId: input.providerTargetId,
-        runtimeKind: input.runtimeKind,
-        backendSessionId: input.providerSessionId,
-        backendStateSnapshot: input.providerStateSnapshot,
-        requestedModelId: input.requestedModelId,
-        updatedAt: now,
-      })
-      .where(eq(backendSessionBindings.id, existing.id))
-      .run()
-    return db()
-      .select()
-      .from(backendSessionBindings)
-      .where(eq(backendSessionBindings.id, existing.id))
-      .get()!
-  }
-
   return db()
     .insert(backendSessionBindings)
     .values({
@@ -116,6 +94,17 @@ export function writeProviderRuntimeBinding(input: ProviderRuntimeBindingWrite):
       requestedModelId: input.requestedModelId,
       createdAt: now,
       updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: backendSessionBindings.chatSessionId,
+      set: {
+        providerTargetId: input.providerTargetId,
+        runtimeKind: input.runtimeKind,
+        backendSessionId: input.providerSessionId,
+        backendStateSnapshot: input.providerStateSnapshot,
+        requestedModelId: input.requestedModelId,
+        updatedAt: now,
+      },
     })
     .returning()
     .get()

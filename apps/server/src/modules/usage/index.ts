@@ -3,11 +3,15 @@ import { Elysia, t } from 'elysia'
 import { UsageModel } from './model'
 import { getRuntimePerformanceOverview } from './performance'
 import * as Usage from './service'
+import { flushUsageWriteBehind } from './write-behind'
 
 export const usage = new Elysia({
   prefix: '/usage',
   detail: { tags: ['usage'] },
 })
+  .onBeforeHandle(() => {
+    flushUsageWriteBehind()
+  })
   .post('/reconcile/claude', ({ query }) => Usage.reconcileCompletedClaudeUsage(query.maxBindings), {
     detail: {
       'summary': 'Backfill completed Claude usage from Cradle-owned transcripts',

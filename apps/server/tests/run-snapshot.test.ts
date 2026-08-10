@@ -27,6 +27,7 @@ import { createFinalMessageProjectionState } from '../src/modules/chat-runtime/r
 import type { ActiveRun } from '../src/modules/chat-runtime/run-registry'
 import {
   COMPACTED_SUCCESS_PAYLOAD_SCHEMA,
+  finalizeRunSnapshot,
   getRunSnapshot,
   getRunSnapshots,
   maintainRunSnapshots,
@@ -158,6 +159,44 @@ function setUpRun(sessionId: string, runId: string): ActiveRun {
 }
 
 describe('run snapshot recording', () => {
+  it('defers event inserts until a snapshot read requires read-your-writes', async () => {
+    await withTempDataDir(() => {
+      const sessionId = `session-${randomUUID()}`
+      const runId = `run-${randomUUID()}`
+      setUpRun(sessionId, runId)
+
+      expect(db().select().from(backendRunSnapshotEvents).all()).toHaveLength(0)
+
+      const snapshot = getRunSnapshot(runId)
+      expect(snapshot?.events.map(event => event.phase)).toContain('run_started')
+      expect(db().select().from(backendRunSnapshotEvents).all()).toHaveLength(1)
+    })
+  })
+
+  it('finalizes one snapshot without flushing events for concurrent runs', async () => {
+    await withTempDataDir(() => {
+      const firstRunId = `run-${randomUUID()}`
+      const secondRunId = `run-${randomUUID()}`
+      const first = setUpRun(`session-${randomUUID()}`, firstRunId)
+      const second = setUpRun(`session-${randomUUID()}`, secondRunId)
+
+      finalizeRunSnapshot({
+        snapshotId: first.runSnapshotId!,
+        status: 'complete',
+        completionReason: 'stop',
+      })
+
+      expect(db().select().from(backendRunSnapshotEvents)
+        .where(eq(backendRunSnapshotEvents.snapshotId, first.runSnapshotId!)).all())
+        .toHaveLength(1)
+      expect(db().select().from(backendRunSnapshotEvents)
+        .where(eq(backendRunSnapshotEvents.snapshotId, second.runSnapshotId!)).all())
+        .toHaveLength(0)
+
+      expect(getRunSnapshot(secondRunId)?.events).toHaveLength(1)
+    })
+  })
+
   it('coalesces repeated tool-output-available chunks for the same toolCallId onto one row', async () => {
     await withTempDataDir(() => {
       const sessionId = `session-${randomUUID()}`

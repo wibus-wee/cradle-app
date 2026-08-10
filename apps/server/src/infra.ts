@@ -15,6 +15,7 @@ let _serverConfig: ServerConfig | undefined
 let _logger: Logger | undefined
 let _dbProvider: DbProvider | undefined
 let _infraEnv: InfraEnvSnapshot | undefined
+const beforeDatabaseShutdownHooks = new Set<() => void>()
 
 interface InfraEnvSnapshot {
   host?: string
@@ -57,10 +58,40 @@ function isSameInfraEnv(a: InfraEnvSnapshot, b: InfraEnvSnapshot): boolean {
 }
 
 function clearCachedInfra(): void {
-  _dbProvider?.onApplicationShutdown()
+  const provider = _dbProvider
+  const failures: Error[] = []
+  if (provider) {
+    for (const hook of beforeDatabaseShutdownHooks) {
+      try {
+        hook()
+      }
+      catch (error) {
+        failures.push(error instanceof Error ? error : new Error(String(error)))
+      }
+    }
+    try {
+      provider.onApplicationShutdown()
+    }
+    catch (error) {
+      failures.push(error instanceof Error ? error : new Error(String(error)))
+    }
+  }
   _dbProvider = undefined
   _serverConfig = undefined
   _logger = undefined
+  if (failures.length > 0) {
+    throw new AggregateError(failures, 'Failed to flush database-owned runtime state')
+  }
+}
+
+/**
+ * Register a synchronous durability hook that runs immediately before the
+ * current SQLite connection closes. Feature modules use this to drain
+ * write-behind journals without making infrastructure depend on them.
+ */
+export function registerBeforeDatabaseShutdown(hook: () => void): () => void {
+  beforeDatabaseShutdownHooks.add(hook)
+  return () => beforeDatabaseShutdownHooks.delete(hook)
 }
 
 function refreshInfraForEnv(): void {

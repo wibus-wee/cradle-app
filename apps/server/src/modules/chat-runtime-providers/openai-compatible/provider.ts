@@ -19,7 +19,7 @@ import {
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { buildModelMessages, executeAiSdkTurn } from '../../chat-runtime-engine/ai-sdk-engine'
 import { createLanguageModel, detectApiFormat } from '../../chat-runtime-engine/providers'
-import { lookupContextWindow } from '../../model-registry/model-info-registry'
+import { getCachedContextWindow } from '../../model-registry/model-info-registry'
 import { readTrustedOpenAICompatibleConfig, readTrustedUniversalConfig } from '../../provider-contracts/provider-base'
 import { readProviderStateSnapshot } from '../kit/state-snapshot'
 import {
@@ -128,7 +128,9 @@ export class OpenAICompatibleProvider implements ChatRuntime {
         maxMessages,
       )
 
-      const contextWindow = await lookupContextWindow(effectiveModel) ?? 128_000
+      // Catalog metadata is optional. Never put network or SQLite catalog I/O
+      // on the first-token path; startup warmup populates this in-memory cache.
+      const contextWindow = getCachedContextWindow(effectiveModel) ?? 128_000
 
       yield* executeAiSdkTurn({
         model,

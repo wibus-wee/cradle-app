@@ -38,6 +38,10 @@ import type {
 } from './runtime-provider-types'
 
 const runtimeSessionLogger = createChildLogger({ module: 'chat-runtime.runtime-session' })
+const bindingByRuntimeSession = new WeakMap<RuntimeSession, {
+  signature: string
+  binding: BackendSessionBinding | undefined
+}>()
 
 export interface SessionRunContext {
   session: Session
@@ -225,7 +229,19 @@ export function attachBinding(input: {
   runtimeSession: RuntimeSession
   requestedModelId: string | null
 }): BackendSessionBinding | undefined {
-  return persistProviderRuntimeResolution({
+  const signature = JSON.stringify([
+    input.sessionId,
+    input.providerTargetId,
+    input.runtimeKind,
+    input.runtimeSession.providerSessionId,
+    input.runtimeSession.providerStateSnapshot,
+    input.requestedModelId,
+  ])
+  const cached = bindingByRuntimeSession.get(input.runtimeSession)
+  if (cached?.signature === signature) {
+    return cached.binding
+  }
+  const binding = persistProviderRuntimeResolution({
     chatSessionId: input.sessionId,
     providerTargetId: input.providerTargetId,
     runtimeKind: input.runtimeKind,
@@ -233,6 +249,8 @@ export function attachBinding(input: {
     requestedModelId: input.requestedModelId,
     durable: true,
   })
+  bindingByRuntimeSession.set(input.runtimeSession, { signature, binding })
+  return binding
 }
 
 export async function resolveExistingRuntimeSessionForContext(input: {

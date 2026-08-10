@@ -1,3 +1,5 @@
+import type { BackendRunSnapshotEvent } from '@cradle/db'
+
 import type { ChatRuntimeWriteDb } from './es/event-store'
 
 type ReadModelProjectionDb = Pick<ChatRuntimeWriteDb, 'delete' | 'insert' | 'select' | 'update'>
@@ -10,7 +12,7 @@ export interface ChatRuntimeReadModelProjector {
   projectRun?: (db: ReadModelProjectionDb, input: { runId: string }) => void
   projectRunSnapshotEvent?: (
     db: ReadModelProjectionDb,
-    input: { sourceEventId: string },
+    input: { sourceEvent: BackendRunSnapshotEvent, workspaceId: string | null },
   ) => void
 }
 
@@ -43,8 +45,11 @@ export function projectChatRuntimeRunReadModels(
 
 export function projectChatRuntimeRunSnapshotEventReadModels(
   db: ReadModelProjectionDb,
-  input: { sourceEventId: string },
+  input: { sourceEvent: BackendRunSnapshotEvent, workspaceId: string | null },
 ): void {
+  if (!input.sourceEvent.toolCallId) {
+    return
+  }
   for (const projector of readModelProjectors) {
     projector.projectRunSnapshotEvent?.(db, input)
   }

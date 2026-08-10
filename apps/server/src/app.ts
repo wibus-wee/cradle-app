@@ -36,6 +36,7 @@ import { linkedChatSessionProxyPlugin } from './modules/chat-runtime/http/linked
 import { registerMessageBlobBackfillMaintenance } from './modules/chat-runtime/message-blob-backfill'
 import { registerMessageSteerSplitBackfillMaintenance } from './modules/chat-runtime/message-steer-split-backfill'
 import { runRegistry } from './modules/chat-runtime/run-registry'
+import { flushRunSnapshotWriteBehind } from './modules/chat-runtime/run-snapshot-journal'
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
 import { ClaudeUsageReconciliationScheduler } from './modules/chat-runtime-providers/claude-agent/usage-reconciliation-scheduler'
 import { createOpencodeManagedResourceAdapter } from './modules/chat-runtime-providers/opencode/managed-resource-adapter'
@@ -99,6 +100,7 @@ import { threadHandoff } from './modules/thread-handoff'
 import { turnCheckpoint } from './modules/turn-checkpoint'
 import * as TurnCheckpoint from './modules/turn-checkpoint/service'
 import { usage } from './modules/usage'
+import { flushUsageWriteBehind } from './modules/usage/write-behind'
 import { sessionWork, work } from './modules/work'
 import { workflowRules } from './modules/workflow-rules'
 import { workspace } from './modules/workspace'
@@ -495,6 +497,16 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   const runtimeResources = new RuntimeResourceRegistry()
   const claudeUsageReconciliation = new ClaudeUsageReconciliationScheduler()
   const codexUsageReconciliation = new CodexUsageReconciliationScheduler()
+  runtimeResources.register({
+    name: 'run-snapshot-write-behind',
+    phase: 'drain',
+    stop: flushRunSnapshotWriteBehind,
+  })
+  runtimeResources.register({
+    name: 'usage-write-behind',
+    phase: 'drain',
+    stop: flushUsageWriteBehind,
+  })
   runtimeResources.register({
     name: 'download-center',
     phase: 'cancel',

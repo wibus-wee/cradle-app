@@ -15,7 +15,7 @@ const engineMocks = vi.hoisted(() => ({
   }),
   createLanguageModel: vi.fn(() => ({ provider: 'mock-model' })),
   detectApiFormat: vi.fn(() => 'openai'),
-  lookupContextWindow: vi.fn(async () => 32_000),
+  getCachedContextWindow: vi.fn(() => 32_000),
 }))
 
 vi.mock('../../chat-runtime-engine/ai-sdk-engine', async (importOriginal) => {
@@ -40,7 +40,7 @@ vi.mock('../../model-registry/model-info-registry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../model-registry/model-info-registry')>()
   return {
     ...actual,
-    lookupContextWindow: engineMocks.lookupContextWindow,
+    getCachedContextWindow: engineMocks.getCachedContextWindow,
   }
 })
 

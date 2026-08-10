@@ -13,7 +13,7 @@ import { RecallModel } from './model'
 import {
   projectRecallMessage,
   projectRecallRun,
-  projectRecallToolEvent,
+  projectRecallToolEventRecord,
   rebuildRecallProjection,
   reconcileRecallProjection,
 } from './service'
@@ -83,7 +83,7 @@ export function initializeRecallProjection(): void {
     registerChatRuntimeReadModelProjector({
       projectMessage: projectRecallMessage,
       projectRun: projectRecallRun,
-      projectRunSnapshotEvent: projectRecallToolEvent,
+      projectRunSnapshotEvent: projectRecallToolEventRecord,
     })
     recallProjectorRegistered = true
   }

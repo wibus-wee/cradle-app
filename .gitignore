@@ -28,6 +28,7 @@ apps/desktop/resources/relayd/**/relayd-runtime.json
 .expo/
 .claude/worktrees/
 apps/server/openapi.json
+apps/server/dist-benchmark/
 apps/web/i18n-hardcoded-report.json
 apps/web/i18n-missing-report.json
 apps/web/i18n-unused-keys-report.json

@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
 
-import { stepUsage as stepUsageTable, usageLogs } from '@cradle/db'
+import type { stepUsage as stepUsageTable } from '@cradle/db'
 
 import { currentUnixSeconds } from '../../../helpers/time'
-import { db } from '../../../infra'
 import { estimateCost } from '../../usage/pricing'
+import { enqueueStepUsage, enqueueUsageLog } from '../../usage/write-behind'
 import type { RuntimeStepUsage, TokenUsage } from '../runtime-provider-types'
 
 export type RuntimeStepUsageInput = RuntimeStepUsage
@@ -34,21 +34,21 @@ export function insertRunUsage(input: {
   modelId: string | null
   usage: TokenUsage
 }): void {
-  db()
-    .insert(usageLogs)
-    .values({
-      id: randomUUID(),
-      runId: input.runId,
-      sessionId: input.sessionId,
-      messageId: input.messageId,
-      providerTargetId: input.providerTargetId,
-      modelId: input.modelId,
-      promptTokens: input.usage.promptTokens,
-      completionTokens: input.usage.completionTokens,
-      totalTokens: input.usage.totalTokens,
-      createdAt: currentUnixSeconds(),
-    })
-    .run()
+  enqueueUsageLog({
+    id: randomUUID(),
+    runId: input.runId,
+    sessionId: input.sessionId,
+    messageId: input.messageId,
+    providerTargetId: input.providerTargetId,
+    modelId: input.modelId,
+    promptTokens: input.usage.promptTokens,
+    cachedInputTokens: input.usage.cachedInputTokens ?? 0,
+    cacheWriteInputTokens: input.usage.cacheWriteInputTokens ?? 0,
+    completionTokens: input.usage.completionTokens,
+    reasoningOutputTokens: input.usage.reasoningOutputTokens ?? 0,
+    totalTokens: input.usage.totalTokens,
+    createdAt: currentUnixSeconds(),
+  })
 }
 
 export function estimateRunUsageCost(modelId: string | null, usage: TokenUsage): number | null {
@@ -61,12 +61,19 @@ export function insertRuntimeStepUsages(input: {
   fallbackModelId: string
   steps: RuntimeStepUsageInput[]
 }): RecordedRuntimeStepUsage[] {
-  return input.steps.map((step) => {
+  const createdAt = currentUnixSeconds()
+  const rows = input.steps.map((step) => {
     const modelId = step.modelId ?? input.fallbackModelId
     const estimatedCostUsd = estimateCost(modelId, step.usage)
-    db()
-      .insert(stepUsageTable)
-      .values({
+    return {
+      recorded: {
+        stepNumber: step.stepNumber,
+        stepType: step.stepType,
+        modelId,
+        usage: step.usage,
+        estimatedCostUsd,
+      },
+      row: {
         id: randomUUID(),
         runId: input.runId,
         sessionId: input.sessionId,
@@ -77,15 +84,10 @@ export function insertRuntimeStepUsages(input: {
         completionTokens: step.usage.completionTokens,
         totalTokens: step.usage.totalTokens,
         estimatedCostUsd,
-        createdAt: currentUnixSeconds(),
-      })
-      .run()
-    return {
-      stepNumber: step.stepNumber,
-      stepType: step.stepType,
-      modelId,
-      usage: step.usage,
-      estimatedCostUsd,
+        createdAt,
+      } satisfies typeof stepUsageTable.$inferInsert,
     }
   })
+  enqueueStepUsage(rows.map(entry => entry.row))
+  return rows.map(entry => entry.recorded)
 }
