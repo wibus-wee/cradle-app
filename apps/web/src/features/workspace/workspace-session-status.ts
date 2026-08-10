@@ -7,3 +7,14 @@ export function isWorkspaceSessionRunning(
   return session.status === 'streaming'
     || locallyStreamingSessionIds.has(session.id)
 }
+
+export function hasUnreadWorkspaceSessionError(
+  session: WorkspaceSession,
+  locallyErroredSessionIds: ReadonlySet<string>,
+): boolean {
+  return session.unread
+    && (
+      session.status === 'error'
+      || locallyErroredSessionIds.has(session.id)
+    )
+}

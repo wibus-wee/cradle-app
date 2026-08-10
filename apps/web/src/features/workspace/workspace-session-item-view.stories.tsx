@@ -131,7 +131,7 @@ function WorkspaceSessionItemCatalog() {
               id: 'session-error',
               title: 'Provider connection failed',
               status: 'error',
-              unread: false,
+              unread: true,
             }}
             work={null}
             active={false}

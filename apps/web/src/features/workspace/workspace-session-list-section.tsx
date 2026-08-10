@@ -18,7 +18,10 @@ import type {
 import { WorkspaceSessionItem } from './workspace-session-item'
 import type { WorkspaceSessionAttentionKind } from './workspace-session-item-view'
 import { WorkspaceSessionListView } from './workspace-session-list-view'
-import { isWorkspaceSessionRunning } from './workspace-session-status'
+import {
+  hasUnreadWorkspaceSessionError,
+  isWorkspaceSessionRunning,
+} from './workspace-session-status'
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
 
 const SESSION_REVEAL_BATCH_SIZE = 64
@@ -186,9 +189,9 @@ export function WorkspaceSessionListSection({
             }
             hasError={
               !isStreaming
-              && (
-                session.status === 'error'
-                || locallyErroredSessionIds.has(session.id)
+              && hasUnreadWorkspaceSessionError(
+                session,
+                locallyErroredSessionIds,
               )
             }
             isRenaming={session.id === renamingSessionId}

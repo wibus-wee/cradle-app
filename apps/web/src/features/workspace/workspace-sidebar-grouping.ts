@@ -3,7 +3,10 @@ import type { WorkSummary } from '~/features/work/use-work'
 
 import type { Workspace } from './types'
 import type { WorkspaceSession } from './use-session'
-import { isWorkspaceSessionRunning } from './workspace-session-status'
+import {
+  hasUnreadWorkspaceSessionError,
+  isWorkspaceSessionRunning,
+} from './workspace-session-status'
 import type { WorkspaceSidebarSessionAttention } from './workspace-sidebar-list-filters'
 import { classifyWorkspaceSidebarEnvironment } from './workspace-sidebar-list-filters'
 import type {
@@ -92,7 +95,7 @@ export function classifyStatusBucket(
   ) {
     return 'needsYou'
   }
-  if (session.status === 'error' || locallyErroredSessionIds.has(session.id)) {
+  if (hasUnreadWorkspaceSessionError(session, locallyErroredSessionIds)) {
     return 'error'
   }
   if (session.unread) {
