@@ -102,7 +102,7 @@ export function SettingsSidebarView({
         )}
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2 pt-1">
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2 pt-1">
         {filteredSections.map(section => (
           <div key={section.id} className="flex flex-col gap-0.5">
             <span className="select-none px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground">

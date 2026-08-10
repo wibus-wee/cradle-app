@@ -1591,7 +1591,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
   }, [githubFeaturesDisabled])
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <WorkspaceSidebarNavigationView
         collapsed={collapsed}
         pullRequestsActive={pullRequestsActive}
