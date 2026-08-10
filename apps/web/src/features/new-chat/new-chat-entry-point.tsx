@@ -7,6 +7,7 @@ import { postSessions, postSessionsByIdIsolationStart } from '~/api-gen/sdk.gen'
 import type { PostSessionsData } from '~/api-gen/types.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { runtimeComposerUsesCollapsedInput, useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
+import { readBangCommand } from '~/features/chat/commands/bang-command'
 import { describeChatExecutionError } from '~/features/chat/commands/chat-execution-errors'
 import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/containers/draft-chat-composer-container'
 import { DraftChatComposerWithState } from '~/features/chat/composer/containers/draft-chat-composer-container'
@@ -18,6 +19,7 @@ import {
   readRunRuntimeSettingsPatch,
   resolveRuntimeCatalogItem,
 } from '~/features/chat/runtime/runtime-settings-presenter'
+import { executeOptimisticBangCommand } from '~/features/chat/session/optimistic-bang-command'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
 import { useComposerState } from '~/features/composer-toolbar'
 import type { IssueIsolationStartChoice } from '~/features/new-chat/issue-isolation-start-dialog'
@@ -285,28 +287,48 @@ function useNewChatPageOwner(
         runtimeKind: options.runtimeKind,
         sessionGroupId,
       }, { promote: true })
-      startOptimisticChatResponse({
-        sessionId: session.id,
-        queryClient,
-        body: {
-          text: trimmedText,
-          files,
-          contextParts,
-          modelId: options.modelId,
-          thinkingEffort: options.thinkingEffort,
-          runtimeSettings: readRunRuntimeSettingsPatch(options.runtimeSettings),
-          reviewTarget: options.reviewTarget,
-        },
-        onAccepted: () => {
-          void Promise.all([
-            queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
-            queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-          ])
-        },
-        onError: (err) => {
-          console.error('[NewChatPage] start response failed:', describeChatExecutionError(err) ?? err)
-        },
-      })
+      const bangCommand = files.length === 0 && contextParts.length === 0
+        ? readBangCommand(text)
+        : null
+      if (bangCommand) {
+        void executeOptimisticBangCommand({
+          sessionId: session.id,
+          command: bangCommand,
+          onSuccess: () => {
+            void Promise.all([
+              queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
+              queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
+            ])
+          },
+          onError: (error) => {
+            console.error('[NewChatPage] bang command failed:', describeChatExecutionError(error) ?? error)
+          },
+        })
+      }
+      else {
+        startOptimisticChatResponse({
+          sessionId: session.id,
+          queryClient,
+          body: {
+            text: trimmedText,
+            files,
+            contextParts,
+            modelId: options.modelId,
+            thinkingEffort: options.thinkingEffort,
+            runtimeSettings: readRunRuntimeSettingsPatch(options.runtimeSettings),
+            reviewTarget: options.reviewTarget,
+          },
+          onAccepted: () => {
+            void Promise.all([
+              queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
+              queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
+            ])
+          },
+          onError: (err) => {
+            console.error('[NewChatPage] start response failed:', describeChatExecutionError(err) ?? err)
+          },
+        })
+      }
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
         queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
