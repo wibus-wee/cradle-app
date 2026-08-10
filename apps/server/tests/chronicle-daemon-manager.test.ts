@@ -9,6 +9,7 @@ describe('chronicle daemon manager', () => {
     const args = createDaemonArgs({
       storageRoot: '/tmp/cradle-chronicle',
       audioCaptureEnabled: false,
+      audioCaptureMode: 'meeting',
       audioSource: 'microphone',
       audioSegmentMs: 5_000,
       audioSegmentIntervalMs: 60_000,
@@ -23,6 +24,7 @@ describe('chronicle daemon manager', () => {
     const args = createDaemonArgs({
       storageRoot: '/tmp/cradle-chronicle',
       audioCaptureEnabled: true,
+      audioCaptureMode: 'meeting',
       audioSource: 'microphone',
       audioSegmentMs: 1_500,
       audioSegmentIntervalMs: 10_000,
@@ -34,6 +36,8 @@ describe('chronicle daemon manager', () => {
       '--storage-root',
       '/tmp/cradle-chronicle',
       '--audio-capture',
+      '--audio-capture-mode',
+      'meeting',
       '--audio-source',
       'microphone',
       '--audio-segment-ms',
@@ -49,6 +53,7 @@ describe('chronicle daemon manager', () => {
     const args = createDaemonArgs({
       storageRoot: '/tmp/cradle-chronicle',
       audioCaptureEnabled: false,
+      audioCaptureMode: 'meeting',
       audioSource: 'microphone',
       audioSegmentMs: 5_000,
       audioSegmentIntervalMs: 60_000,

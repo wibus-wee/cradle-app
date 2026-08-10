@@ -6,9 +6,9 @@ mod native {
     use std::collections::VecDeque;
     use std::ffi::{c_uchar, c_void};
     use std::ptr;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::mpsc::{self, Receiver, Sender, SyncSender, TryRecvError, TrySendError};
+    use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
 
@@ -727,7 +727,11 @@ mod native {
             }
             let string = CFString::wrap_under_create_rule(value as CFStringRef);
             let text = string.to_string();
-            if text.is_empty() { None } else { Some(text) }
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
         }
     }
 
@@ -856,8 +860,10 @@ mod native {
                 rgba.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
             }
         }
-        let mut config = webp::WebPConfig::new().ok_or_else(|| {
-            ChronicleError::Process("failed to initialize lossless WebP encoder".to_string())
+        let mut config = webp::WebPConfig::new().map_err(|error| {
+            ChronicleError::Process(format!(
+                "failed to initialize lossless WebP encoder: {error:?}"
+            ))
         })?;
         config.lossless = 1;
         config.method = 6;
@@ -1173,8 +1179,8 @@ mod native {
 
 #[cfg(target_os = "macos")]
 pub use native::{
-    AxObserverNotification, AxObserverRuntime, MacosCaptureSource,
-    read_ax_observer_accessibility_capture,
+    read_ax_observer_accessibility_capture, AxObserverNotification, AxObserverRuntime,
+    MacosCaptureSource,
 };
 
 #[cfg(not(target_os = "macos"))]
