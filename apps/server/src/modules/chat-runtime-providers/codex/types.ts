@@ -53,14 +53,21 @@ export interface CodexAppServerResourceRequestHandler {
 export interface CodexAppServerNotificationSubscriber {
   onMessage: (message: CodexAppServerMessage) => boolean
   onClose: () => void
+  readThreadId?: () => string | null
 }
 
 export interface CodexAppServerHostResource {
   client: CodexAppServerClientLike
   serverRequestHandlers: Set<CodexAppServerResourceRequestHandler>
   notificationSubscribers: Set<CodexAppServerNotificationSubscriber>
+  pendingNotificationsByThreadId: Map<string, CodexAppServerMessage[]>
   notificationAbortController?: AbortController
   notificationPump?: Promise<void>
+  loadedThreadIds: Set<string>
+  threadBindPromises: Map<string, Promise<ThreadResponse>>
+  skillExtraRoots: Set<string>
+  skillExtraRootsSync?: Promise<void>
+  skillExtraRootsUnsupported?: boolean
   initialized?: Promise<void>
   chatgptAuthenticated?: Promise<void>
 }

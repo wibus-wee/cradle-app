@@ -4,7 +4,7 @@ import type { RuntimeProviderTargetProfile, RuntimeSession } from '../../../chat
 import { providerRuntimeHostManager } from '../../../provider-runtime/host-manager'
 import { CodexAppServerBridge } from './bridge'
 import type { CodexAppServerClientOptions, CodexAppServerMessage } from './client'
-import { codexChatSessionAppServerScopeId } from './host-lease'
+import { codexProviderAppServerScopeId } from './host-lease'
 
 afterEach(() => {
   providerRuntimeHostManager.clear()
@@ -34,6 +34,9 @@ class FakeBridgeAppServerClient {
     this.requests.push({ method, params })
     if (this.unsupportedMethods.has(method)) {
       throw new Error(`Invalid request: unknown variant \`${method}\`, expected one of \`initialize\`, \`turn/start\``)
+    }
+    if (method === 'thread/resume') {
+      return { thread: { id: 'codex-thread-1' }, model: 'gpt-5-codex' }
     }
     return this.responseByMethod[method] ?? {}
   }
@@ -184,7 +187,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
     ])
     expect(client.skillExtraRootsRequests).toEqual([{ extraRoots: ['/tmp/cradle-skill'] }])
     expect(events.map(event => event.event)).toEqual(['request_started', 'result', 'done'])
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('continues bridge calls when app-server does not support skill extra roots sync', async () => {
@@ -204,7 +207,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
       { method: 'config/read', params: { cwd: '/tmp/cradle-workspace' } },
     ])
     expect(result.result).toEqual({ config: { model: 'gpt-5-codex' } })
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('keeps turn start streams open until the turn completion notification', async () => {
@@ -219,7 +222,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
     const eventsPromise = readSseEvents(stream)
 
     await vi.waitFor(() => {
-      expect(client.requests.map(request => request.method)).toEqual(['turn/start'])
+      expect(client.requests.map(request => request.method)).toEqual(['thread/resume', 'turn/start'])
     })
     await Promise.resolve()
     expect(client.close).not.toHaveBeenCalled()
@@ -231,7 +234,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
 
     const events = await eventsPromise
     expect(events.map(event => event.event)).toEqual(['request_started', 'result', 'notification', 'done'])
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('reuses one scoped host while bridge streams overlap for the same session', async () => {
@@ -264,7 +267,11 @@ describe('codexAppServerBridge stream lifecycle', () => {
     const secondEventsPromise = readSseEvents(secondStream)
 
     await vi.waitFor(() => {
-      expect(clients[0]?.requests.map(request => request.method)).toEqual(['turn/start', 'turn/start'])
+      expect(clients[0]?.requests.map(request => request.method)).toEqual([
+        'thread/resume',
+        'turn/start',
+        'turn/start',
+      ])
     })
 
     expect(appServerOptions).toHaveLength(1)
@@ -275,7 +282,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'profile-codex',
-        scopeId: codexChatSessionAppServerScopeId('chat-session-1'),
+        scopeId: codexProviderAppServerScopeId(),
         refCount: 2,
         hasResource: true,
       }),
@@ -293,10 +300,10 @@ describe('codexAppServerBridge stream lifecycle', () => {
     const [firstEvents, secondEvents] = await Promise.all([firstEventsPromise, secondEventsPromise])
     expect(firstEvents.map(event => event.event)).toEqual(['request_started', 'result', 'notification', 'done'])
     expect(secondEvents.map(event => event.event)).toEqual(['request_started', 'result', 'notification', 'done'])
-    expect(clients[0]!.close).toHaveBeenCalledOnce()
+    expect(clients[0]!.close).not.toHaveBeenCalled()
   })
 
-  it('passes Cradle session context into bridge app-server clients', async () => {
+  it('keeps Cradle session context out of provider-scoped bridge clients', async () => {
     const appServerOptions: CodexAppServerClientOptions[] = []
     const client = new FakeBridgeAppServerClient({
       'config/read': { config: {} },
@@ -318,9 +325,6 @@ describe('codexAppServerBridge stream lifecycle', () => {
     })
 
     expect(appServerOptions[0]?.env).toEqual({
-      CRADLE_CHAT_SESSION_ID: 'chat-session-1',
-      CRADLE_WORKSPACE_ID: 'workspace-1',
-      CRADLE_WORKSPACE_PATH: '/tmp/cradle-workspace',
       CRADLE_CODEX_API_KEY: 'sk-test',
       CODEX_API_KEY: 'sk-test',
       OPENAI_API_KEY: 'sk-test',

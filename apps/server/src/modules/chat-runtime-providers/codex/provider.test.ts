@@ -22,13 +22,14 @@ import {
 import { providerRuntimeHostManager } from '../../provider-runtime/host-manager'
 import { assertValidProviderChunkSequence } from '../kit/testing/chunk-contract'
 import type { CodexAppServerClientOptions, CodexAppServerMessage, CodexAppServerServerRequest } from './app-server/client'
-import { codexChatSessionAppServerScopeId } from './app-server/host-lease'
+import { codexProviderAppServerScopeId } from './app-server/host-lease'
 import { isCodexAppServerInteractiveServerRequest } from './app-server/server-request-methods'
 import { CodexProvider } from './provider'
 import { classifyCodexToolKind } from './tools/mapper'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   providerRuntimeHostManager.clear()
 })
 
@@ -931,7 +932,8 @@ describe('codexProvider app-server integration', () => {
       fileChangesReverted: false,
     })
 
-    expect(client.requests).toEqual([
+    expect(client.requests.map(request => request.method)).toEqual(['thread/resume', 'thread/rollback'])
+    expect(client.requests[1]).toEqual(
       {
         method: 'thread/rollback',
         params: {
@@ -939,7 +941,7 @@ describe('codexProvider app-server integration', () => {
           numTurns: 3,
         },
       },
-    ])
+    )
     expect(client.requests.some(request => request.method === 'thread/fork')).toBe(false)
   })
 
@@ -1158,6 +1160,7 @@ describe('codexProvider app-server integration', () => {
   })
 
   it('forks side sessions as ephemeral Codex threads and injects the Cradle boundary', async () => {
+    vi.stubEnv('HOME', mkdtempSync(join(tmpdir(), 'cradle-codex-fork-home-')))
     const client = new FakeCodexAppServerClient({})
     const provider = createProvider(client)
 
@@ -1173,8 +1176,8 @@ describe('codexProvider app-server integration', () => {
 
     expect(client.initialize).toHaveBeenCalled()
     expect(client.close).not.toHaveBeenCalled()
-    expect(client.requests.map(request => request.method)).toEqual(['thread/fork', 'thread/inject_items'])
-    expect(client.requests[0]).toEqual({
+    expect(client.requests.map(request => request.method)).toEqual(['thread/resume', 'thread/fork', 'thread/inject_items'])
+    expect(client.requests[1]).toEqual({
       method: 'thread/fork',
       params: expect.objectContaining({
         threadId: 'codex-parent-thread-1',
@@ -1185,7 +1188,7 @@ describe('codexProvider app-server integration', () => {
         excludeTurns: true,
       }),
     })
-    expect(client.requests[1]).toEqual({
+    expect(client.requests[2]).toEqual({
       method: 'thread/inject_items',
       params: {
         threadId: 'codex-fork-thread-1',
@@ -1226,10 +1229,11 @@ describe('codexProvider app-server integration', () => {
     })
     expect(runtimeSession.providerRuntimeLease).toBeDefined()
     runtimeSession.providerRuntimeLease?.release()
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('keeps side Codex app-server clients host-managed across fork and side turns', async () => {
+    vi.stubEnv('HOME', mkdtempSync(join(tmpdir(), 'cradle-codex-fork-host-home-')))
     const client = new FakeCodexAppServerClient({})
     const provider = createProvider(client)
 
@@ -1249,7 +1253,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'profile-codex',
-        scopeId: codexChatSessionAppServerScopeId('child-chat-session-1'),
+        scopeId: codexProviderAppServerScopeId(),
         refCount: 1,
         pinnedCount: 1,
         hasResource: true,
@@ -1288,6 +1292,7 @@ describe('codexProvider app-server integration', () => {
 
     expect(client.initialize).toHaveBeenCalledOnce()
     expect(client.requests.map(request => request.method)).toEqual([
+      'thread/resume',
       'thread/fork',
       'thread/inject_items',
       'turn/start',
@@ -1297,8 +1302,10 @@ describe('codexProvider app-server integration', () => {
 
     runtimeSession.providerRuntimeLease?.release()
 
-    expect(client.close).toHaveBeenCalledOnce()
-    expect(providerRuntimeHostManager.listHosts()).toEqual([])
+    expect(client.close).not.toHaveBeenCalled()
+    expect(providerRuntimeHostManager.listHosts()).toEqual([
+      expect.objectContaining({ refCount: 0, hasResource: true }),
+    ])
   })
 
   it('reuses the chat-session host across provider turns and provider-native app-server invokes', async () => {
@@ -1347,7 +1354,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'profile-codex',
-        scopeId: codexChatSessionAppServerScopeId('chat-session-1'),
+        scopeId: codexProviderAppServerScopeId(),
         refCount: 1,
         hasResource: true,
       }),
@@ -1378,11 +1385,13 @@ describe('codexProvider app-server integration', () => {
     await drainPromise
 
     expect(clients).toHaveLength(1)
-    expect(clients[0]!.close).toHaveBeenCalledOnce()
-    expect(providerRuntimeHostManager.listHosts()).toEqual([])
+    expect(clients[0]!.close).not.toHaveBeenCalled()
+    expect(providerRuntimeHostManager.listHosts()).toEqual([
+      expect.objectContaining({ refCount: 0, hasResource: true }),
+    ])
   })
 
-  it('does not share app-server hosts across concurrent chat sessions', async () => {
+  it('shares one provider host across concurrent chat sessions without mixing thread notifications', async () => {
     const clients: FakeCodexAppServerClient[] = []
     const provider = new CodexProvider({
       readSecret: () => 'sk-secret',
@@ -1417,33 +1426,49 @@ describe('codexProvider app-server integration', () => {
     const secondDrain = drainStream(secondStream)
 
     await vi.waitFor(() => {
-      expect(clients).toHaveLength(2)
+      expect(clients).toHaveLength(1)
       expect(clients[0]?.requests.map(request => request.method)).toContain('turn/start')
-      expect(clients[1]?.requests.map(request => request.method)).toContain('turn/start')
+      expect(clients[0]?.requests.filter(request => request.method === 'turn/start')).toHaveLength(2)
     })
 
-    expect(clients[0]!.options.env?.CRADLE_CHAT_SESSION_ID).toBe('chat-session-1')
-    expect(clients[1]!.options.env?.CRADLE_CHAT_SESSION_ID).toBe('chat-session-2')
-    const hosts = providerRuntimeHostManager.listHosts()
-    expect(hosts).toHaveLength(2)
-    expect(hosts).toEqual(expect.arrayContaining([
+    expect(clients[0]!.options.env?.CRADLE_CHAT_SESSION_ID).toBeUndefined()
+    const resumeRequests = clients[0]!.requests.filter(request => request.method === 'thread/resume')
+    expect(resumeRequests).toHaveLength(2)
+    expect(resumeRequests).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        runtimeKind: 'codex',
-        providerTargetId: 'profile-codex',
-        scopeId: codexChatSessionAppServerScopeId('chat-session-1'),
-        refCount: 1,
-        hasResource: true,
+        params: expect.objectContaining({
+          threadId: 'codex-thread-1',
+          config: expect.objectContaining({
+            shell_environment_policy: expect.objectContaining({
+              set: expect.objectContaining({ CRADLE_CHAT_SESSION_ID: 'chat-session-1' }),
+            }),
+          }),
+        }),
       }),
       expect.objectContaining({
-        runtimeKind: 'codex',
-        providerTargetId: 'profile-codex',
-        scopeId: codexChatSessionAppServerScopeId('chat-session-2'),
-        refCount: 1,
-        hasResource: true,
+        params: expect.objectContaining({
+          threadId: 'codex-thread-2',
+          config: expect.objectContaining({
+            shell_environment_policy: expect.objectContaining({
+              set: expect.objectContaining({ CRADLE_CHAT_SESSION_ID: 'chat-session-2' }),
+            }),
+          }),
+        }),
       }),
     ]))
+    const hosts = providerRuntimeHostManager.listHosts()
+    expect(hosts).toHaveLength(1)
+    expect(hosts).toEqual([
+      expect.objectContaining({
+        runtimeKind: 'codex',
+        providerTargetId: 'profile-codex',
+        scopeId: codexProviderAppServerScopeId(),
+        refCount: 2,
+        hasResource: true,
+      }),
+    ])
 
-    clients[1]!.pushNotification({
+    clients[0]!.pushNotification({
       method: 'item/agentMessage/delta',
       params: {
         threadId: 'codex-thread-2',
@@ -1452,7 +1477,7 @@ describe('codexProvider app-server integration', () => {
         delta: 'Second done',
       },
     })
-    clients[1]!.pushNotification({
+    clients[0]!.pushNotification({
       method: 'turn/completed',
       params: {
         threadId: 'codex-thread-2',
@@ -1478,9 +1503,10 @@ describe('codexProvider app-server integration', () => {
 
     await Promise.all([firstDrain, secondDrain])
 
-    expect(clients[0]!.close).toHaveBeenCalledOnce()
-    expect(clients[1]!.close).toHaveBeenCalledOnce()
-    expect(providerRuntimeHostManager.listHosts()).toEqual([])
+    expect(clients[0]!.close).not.toHaveBeenCalled()
+    expect(providerRuntimeHostManager.listHosts()).toEqual([
+      expect.objectContaining({ refCount: 0, hasResource: true }),
+    ])
   })
 
   it('shares the same chat-session host between turn execution and UI slot reads', async () => {
@@ -1626,7 +1652,7 @@ describe('codexProvider app-server integration', () => {
       truncated: false,
     })
     expect(client.requests.map(request => request.method)).toContain('thread/turns/list')
-    expect(client.close).toHaveBeenCalled()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('maps image attachments to Codex app-server user input', async () => {
@@ -1880,8 +1906,6 @@ describe('codexProvider app-server integration', () => {
           client.threadStartName = null
           client.threadStartTitle = null
           client.threadStartPreview = null
-        }
-        else {
           client.autoCompleteGeneratedTitle = false
           client.generatedThreadTitle = 'Goal Session Title.'
         }
@@ -1914,7 +1938,7 @@ describe('codexProvider app-server integration', () => {
     })
 
     await vi.waitFor(() => {
-      expect(clients[1]?.requests).toContainEqual({
+      expect(clients[0]?.requests).toContainEqual({
         method: 'turn/start',
         params: expect.objectContaining({
           threadId: 'codex-title-thread-1',
@@ -1930,7 +1954,7 @@ describe('codexProvider app-server integration', () => {
         }),
       })
     })
-    expect(clients[1]?.requests).not.toContainEqual({
+    expect(clients[0]?.requests).not.toContainEqual({
       method: 'turn/start',
       params: expect.objectContaining({
         input: [
@@ -1943,7 +1967,7 @@ describe('codexProvider app-server integration', () => {
       }),
     })
 
-    clients[1]?.completeGeneratedTitle()
+    clients[0]?.completeGeneratedTitle()
     await vi.waitFor(() => {
       expect(clients[0]?.requests).toContainEqual({
         method: 'thread/name/set',
@@ -3399,8 +3423,6 @@ describe('codexProvider app-server integration', () => {
         const client = new FakeCodexAppServerClient(options)
         if (clients.length === 0) {
           client.threadStartName = null
-        }
-        else {
           client.autoCompleteGeneratedTitle = false
           client.generatedThreadTitle = 'Generated Codex title.'
         }
@@ -3427,17 +3449,17 @@ describe('codexProvider app-server integration', () => {
         params: expect.objectContaining({ threadId: 'codex-thread-1' }),
       })
     })
-    expect(clients[0]?.requests.map(request => request.method)).toEqual(['thread/start', 'turn/start'])
+    expect(clients[0]?.requests.map(request => request.method).slice(0, 2)).toEqual(['thread/start', 'turn/start'])
     expect(reportSessionTitle).not.toHaveBeenCalled()
 
     await vi.waitFor(() => {
-      expect(clients[1]?.requests).toContainEqual({
+      expect(clients[0]?.requests).toContainEqual({
         method: 'turn/start',
         params: expect.objectContaining({ threadId: 'codex-title-thread-1' }),
       })
     })
-    const titleClient = clients[1]!
-    expect(titleClient.requests[0]).toEqual({
+    const titleClient = clients[0]!
+    expect(titleClient.requests[2]).toEqual({
       method: 'thread/start',
       params: expect.objectContaining({
         model: 'gpt-5-codex',
@@ -3455,7 +3477,7 @@ describe('codexProvider app-server integration', () => {
         }),
       }),
     })
-    expect(titleClient.requests[1]).toEqual({
+    expect(titleClient.requests[3]).toEqual({
       method: 'turn/start',
       params: expect.objectContaining({
         threadId: 'codex-title-thread-1',
@@ -3473,8 +3495,14 @@ describe('codexProvider app-server integration', () => {
         params: { threadId: 'codex-thread-1', name: 'Generated Codex title' },
       })
     })
-    expect(clients[0]?.requests.map(request => request.method)).toEqual(['thread/start', 'turn/start', 'thread/name/set'])
-    expect(titleClient.requests.map(request => request.method)).not.toContain('thread/name/set')
+    expect(clients[0]?.requests.map(request => request.method)).toEqual([
+      'thread/start',
+      'turn/start',
+      'thread/start',
+      'turn/start',
+      'thread/unsubscribe',
+      'thread/name/set',
+    ])
     expect(reportSessionTitle).toHaveBeenCalledWith('Generated Codex title')
     expect(titleClient.requests.map(request => request.method)).toContain('thread/unsubscribe')
 
@@ -3771,11 +3799,10 @@ describe('codexProvider app-server integration', () => {
 
   it('reads the final Codex thread title after the turn finishes when start and notifications omit it', async () => {
     const client = new FakeCodexAppServerClient({})
-    const titleClient = new FakeCodexAppServerClient({})
     client.threadStartName = null
     client.threadReadName = 'Final Codex title'
-    titleClient.generatedThreadTitle = null
-    const provider = createProviderWithClients([client, titleClient])
+    client.generatedThreadTitle = null
+    const provider = createProvider(client)
     const reportSessionTitle = vi.fn()
     const runtimeSession = createRuntimeSession()
     const stream = provider.streamTurn({
@@ -3872,12 +3899,11 @@ describe('codexProvider app-server integration', () => {
 
   it('falls back to the final Codex thread preview when name and title are omitted', async () => {
     const client = new FakeCodexAppServerClient({})
-    const titleClient = new FakeCodexAppServerClient({})
     client.threadStartName = null
     client.threadReadName = null
     client.threadReadPreview = 'Final Codex preview'
-    titleClient.generatedThreadTitle = null
-    const provider = createProviderWithClients([client, titleClient])
+    client.generatedThreadTitle = null
+    const provider = createProvider(client)
     const reportSessionTitle = vi.fn()
     const runtimeSession = createRuntimeSession()
     const stream = provider.streamTurn({
@@ -4332,9 +4358,6 @@ describe('codexProvider app-server integration', () => {
 
     expect(options.apiKey).toBe('sk-test')
     expect(options.config).toEqual(expect.objectContaining({
-      approval_policy: 'never',
-      sandbox_mode: 'danger-full-access',
-      model: 'gpt-test',
       model_provider: 'cradle-openai-compatible',
       model_providers: {
         'cradle-openai-compatible': {
@@ -4351,6 +4374,11 @@ describe('codexProvider app-server integration', () => {
       params: expect.objectContaining({
         approvalPolicy: 'never',
         sandbox: 'danger-full-access',
+        config: expect.objectContaining({
+          approval_policy: 'never',
+          sandbox_mode: 'danger-full-access',
+          model: 'gpt-test',
+        }),
       }),
     })
     expect(createdClient.requests[1]).toEqual({
@@ -4422,15 +4450,15 @@ describe('codexProvider app-server integration', () => {
       throw new Error('Expected Codex app-server client to be created')
     }
 
-    expect(client.options.config).toEqual(expect.objectContaining({
-      approval_policy: 'untrusted',
-      sandbox_mode: 'read-only',
-    }))
     expect(client.requests[0]).toEqual({
       method: 'thread/start',
       params: expect.objectContaining({
         approvalPolicy: 'untrusted',
         sandbox: 'read-only',
+        config: expect.objectContaining({
+          approval_policy: 'untrusted',
+          sandbox_mode: 'read-only',
+        }),
       }),
     })
     expect(client.requests[1]).toEqual({
@@ -4997,12 +5025,9 @@ describe('codexProvider app-server integration', () => {
 
     expect(appServerOptions[0]?.apiKey).toBeUndefined()
     expect(appServerOptions[0]?.env).toEqual({
-      CRADLE_CHAT_SESSION_ID: 'chat-session-1',
-      CRADLE_WORKSPACE_ID: 'workspace-1',
-      CRADLE_WORKSPACE_PATH: '/tmp/cradle-workspace',
       CODEX_ACCESS_TOKEN: 'pat-token-1',
     })
-    expect(appServerOptions[0]?.config).not.toHaveProperty('model_provider')
+    expect(appServerOptions[0]?.config).toBeUndefined()
 
     clients[0]?.pushNotification({
       method: 'item/agentMessage/delta',
@@ -5065,9 +5090,6 @@ describe('codexProvider app-server integration', () => {
 
     expect(appServerOptions[0]?.apiKey).toBeUndefined()
     expect(appServerOptions[0]?.env).toEqual({
-      CRADLE_CHAT_SESSION_ID: 'chat-session-1',
-      CRADLE_WORKSPACE_ID: 'workspace-1',
-      CRADLE_WORKSPACE_PATH: '/tmp/cradle-workspace',
       AWS_BEARER_TOKEN_BEDROCK: 'bedrock-token-1',
       AWS_REGION: 'us-west-2',
     })
@@ -5102,7 +5124,7 @@ describe('codexProvider app-server integration', () => {
     await drainStream(stream)
   })
 
-  it('passes Cradle session context into the Codex app-server environment', async () => {
+  it('keeps Cradle session context out of the provider-scoped app-server environment', async () => {
     const appServerOptions: CodexAppServerClientOptions[] = []
     const clients: FakeCodexAppServerClient[] = []
     const provider = new CodexProvider({
@@ -5127,9 +5149,6 @@ describe('codexProvider app-server integration', () => {
 
     await vi.waitFor(() => {
       expect(appServerOptions[0]?.env).toEqual({
-        CRADLE_CHAT_SESSION_ID: 'chat-session-1',
-        CRADLE_WORKSPACE_ID: 'workspace-1',
-        CRADLE_WORKSPACE_PATH: '/tmp/cradle-workspace',
         CRADLE_CODEX_API_KEY: 'sk-test',
         CODEX_API_KEY: 'sk-test',
         OPENAI_API_KEY: 'sk-test',
@@ -5308,11 +5327,6 @@ describe('codexProvider app-server integration', () => {
         expect(clients[0]?.requests.map(request => request.method)).toEqual(['thread/start', 'turn/start'])
       })
       expect(appServerOptions[0]?.env).toEqual({
-        CRADLE_CHAT_SESSION_ID: 'chat-session-1',
-        CRADLE_WORKSPACE_ID: 'workspace-1',
-        CRADLE_WORKSPACE_PATH: '/tmp/cradle-workspace',
-        CRADLE_AGENT_ID: 'agent-007',
-        CRADLE_AGENT_HOME: agentHome,
         CRADLE_CODEX_API_KEY: 'sk-test',
         CODEX_API_KEY: 'sk-test',
         OPENAI_API_KEY: 'sk-test',
@@ -5322,6 +5336,18 @@ describe('codexProvider app-server integration', () => {
         params: expect.objectContaining({
           cwd: agentHome,
           runtimeWorkspaceRoots: [agentHome, '/tmp/cradle-workspace'],
+          config: expect.objectContaining({
+            shell_environment_policy: {
+              inherit: 'all',
+              set: expect.objectContaining({
+                CRADLE_CHAT_SESSION_ID: 'chat-session-1',
+                CRADLE_WORKSPACE_ID: 'workspace-1',
+                CRADLE_WORKSPACE_PATH: '/tmp/cradle-workspace',
+                CRADLE_AGENT_ID: 'agent-007',
+                CRADLE_AGENT_HOME: agentHome,
+              }),
+            },
+          }),
         }),
       })
       expect(clients[0]?.requests[1]).toEqual({
@@ -5435,7 +5461,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({ type: 'text-end' }),
     ]))
     expect(runtimeSession.providerSessionId).toBe('codex-thread-1')
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('continues streaming when app-server does not support skill extra roots sync', async () => {
@@ -5491,7 +5517,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({ type: 'text-end' }),
     ]))
     expect(runtimeSession.providerSessionId).toBe('codex-thread-1')
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('pauses an active Codex goal before interrupting a cancelled turn', async () => {
@@ -5568,7 +5594,7 @@ describe('codexProvider app-server integration', () => {
         },
       },
     })
-    expect(client.close).toHaveBeenCalledOnce()
+    expect(client.close).not.toHaveBeenCalled()
     await stream.return(undefined)
   })
 
@@ -6087,10 +6113,7 @@ describe('codexProvider app-server integration', () => {
     const resumedFirstChunk = resumedStream.next()
 
     await vi.waitFor(() => {
-      expect(client.requests.map(request => request.method).slice(0, 2)).toEqual([
-        'thread/resume',
-        'turn/start',
-      ])
+      expect(client.requests.map(request => request.method)).toEqual(['turn/start'])
     })
     client.pushNotification({
       method: 'item/agentMessage/delta',

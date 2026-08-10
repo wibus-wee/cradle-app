@@ -21,7 +21,12 @@ import { createCodexAppServerHostFingerprint } from './host-fingerprint'
 import {
   addCodexAppServerHostRequestHandler,
   createCodexAppServerHostResource,
+  createCodexAppServerLeaseClient,
+  disposeCodexAppServerHostResource,
 } from './host-resource'
+
+const CODEX_APP_SERVER_SCOPE_ID = 'provider-host'
+export const CODEX_APP_SERVER_IDLE_TTL_MS = 30 * 60 * 1000
 
 export interface CodexAppServerHostLeaseDeps {
   readSecret: (credentialRef: string) => string
@@ -35,22 +40,20 @@ export interface CodexAppServerHostLeaseDeps {
 export interface AcquireCodexAppServerHostLeaseInput {
   runtimeKind: RuntimeKind
   providerTargetId: string
-  scopeId: string
   options: CodexAppServerClientOptions
   chatgptAuth: CodexChatgptAuthCredential | null
   deps: CodexAppServerHostLeaseDeps
   authenticateChatgpt?: boolean
   pinned?: boolean
+  readThreadId?: () => string | null
 }
 
-export type CodexAppServerHostLease = ProviderProcessHostLease<CodexAppServerHostResource>
-
-export function codexChatSessionAppServerScopeId(chatSessionId: string): string {
-  return `chat-session:${chatSessionId}`
+export type CodexAppServerHostLease = ProviderProcessHostLease<CodexAppServerHostResource> & {
+  client: CodexAppServerClientLike
 }
 
-export function codexProviderTargetDiagnosticsAppServerScopeId(providerTargetId: string): string {
-  return `provider-target-diagnostics:${providerTargetId}`
+export function codexProviderAppServerScopeId(): string {
+  return CODEX_APP_SERVER_SCOPE_ID
 }
 
 export async function acquireCodexAppServerHostLease(
@@ -58,26 +61,41 @@ export async function acquireCodexAppServerHostLease(
 ): Promise<CodexAppServerHostLease> {
   const clientOptions = configureCodexAppServerClientOptions(input.options, input.deps)
   const { serverRequestHandler, ...hostClientOptions } = clientOptions
+  const processClientOptions = sanitizeCodexAppServerProcessOptions(hostClientOptions)
   const lease = await acquireProviderProcessHostResource({
     runtimeKind: input.runtimeKind,
     providerTargetId: input.providerTargetId,
-    scopeId: input.scopeId,
+    scopeId: codexProviderAppServerScopeId(),
+    ttlMs: CODEX_APP_SERVER_IDLE_TTL_MS,
     pinned: input.pinned ?? false,
+    retainOnRelease: true,
     resourceFingerprint: createCodexAppServerHostFingerprint({
-      options: hostClientOptions,
+      options: processClientOptions,
       chatgptAuth: input.chatgptAuth,
     }),
     createResource: (): CodexAppServerHostResource => createCodexAppServerHostResource({
-      clientOptions: hostClientOptions,
+      clientOptions: processClientOptions,
       createClient: options => input.deps.createAppServerClient?.(options) ?? new CodexAppServerClient(options),
     }),
-    disposeResource: resource => resource.client.close(),
+    disposeResource: disposeCodexAppServerHostResource,
   })
+  let inferredThreadId: string | null = null
   const releaseRequestHandler = serverRequestHandler
-    ? addCodexAppServerHostRequestHandler(lease.resource, serverRequestHandler)
+    ? addCodexAppServerHostRequestHandler(lease.resource, Object.assign(serverRequestHandler, {
+        readThreadId: () => inferredThreadId ?? input.readThreadId?.() ?? null,
+      }))
     : () => undefined
+  const client = createCodexAppServerLeaseClient(
+    lease.resource,
+    () => inferredThreadId ?? input.readThreadId?.() ?? null,
+    (threadId) => {
+      inferredThreadId = threadId
+      lease.resource.loadedThreadIds.add(threadId)
+    },
+  )
   registerProcessHostLeaseCleanup(lease, () => {
     releaseRequestHandler()
+    void client.close()
   })
 
   try {
@@ -88,12 +106,33 @@ export async function acquireCodexAppServerHostLease(
       authenticateChatgpt: input.authenticateChatgpt ?? true,
       mapChatgptAuthError: input.deps.mapChatgptAuthError,
     })
-    return lease
+    return Object.assign(lease, { client })
   }
   catch (error) {
     await invalidateProviderProcessHostResource(lease.hostId)
     lease.release()
     throw error
+  }
+}
+
+function sanitizeCodexAppServerProcessOptions(
+  options: CodexAppServerClientOptions,
+): CodexAppServerClientOptions {
+  const config = options.config
+    ? Object.fromEntries(Object.entries(options.config).filter(([key]) => (
+        key === 'model_provider' || key === 'model_providers'
+      ))) as NonNullable<CodexAppServerClientOptions['config']>
+    : undefined
+  const env = { ...options.env }
+  delete env.CRADLE_CHAT_SESSION_ID
+  delete env.CRADLE_WORKSPACE_ID
+  delete env.CRADLE_WORKSPACE_PATH
+  delete env.CRADLE_AGENT_ID
+  delete env.CRADLE_AGENT_HOME
+  return {
+    ...options,
+    ...(config && Object.keys(config).length > 0 ? { config } : { config: undefined }),
+    env,
   }
 }
 

@@ -26,7 +26,7 @@ import {
 } from './chatgpt-auth'
 import type { CodexAppServerClientOptions } from './client'
 import { buildCodexAppServerEnv } from './env'
-import { acquireCodexAppServerHostLease, codexProviderTargetDiagnosticsAppServerScopeId } from './host-lease'
+import { acquireCodexAppServerHostLease } from './host-lease'
 
 export interface CodexRateLimitWindowDiagnostics {
   usedPercent: number
@@ -204,7 +204,7 @@ export async function readCodexAccountDiagnostics(
       auth,
       deps,
     })
-    const client = hostLease.resource.client
+    const client = hostLease.client
 
     try {
       const [accountResponse, rateLimitsResponse, usageResponse] = await Promise.all([
@@ -266,7 +266,7 @@ export async function consumeCodexRateLimitResetCredit(
     auth: resolved.auth,
     deps,
   })
-  const client = hostLease.resource.client
+  const client = hostLease.client
 
   try {
     const params: ConsumeAccountRateLimitResetCreditParams = {
@@ -379,19 +379,17 @@ async function acquireDiagnosticsHostLease(input: {
 }) {
   const workspacePath = process.cwd()
   const runtimeContext = resolveCodexRuntimeContext(workspacePath, null)
-  const diagnosticsScopeId = codexProviderTargetDiagnosticsAppServerScopeId(input.providerTargetId)
   const chatgptAuth = readCodexChatgptAuth(input.auth)
 
   return await acquireCodexAppServerHostLease({
     runtimeKind: CODEX_RUNTIME_KIND,
     providerTargetId: input.providerTargetId,
-    scopeId: diagnosticsScopeId,
     chatgptAuth,
     options: {
       apiKey: readCodexApiKeyAuth(input.auth) ?? undefined,
       config: buildCodexConfig(input.config, workspacePath, () => [], input.config.model, input.auth),
       env: buildCodexAppServerEnv({
-        chatSessionId: diagnosticsScopeId,
+        chatSessionId: `provider-diagnostics:${input.providerTargetId}`,
         workspacePath,
         agentId: null,
         agentHome: runtimeContext.agentHome,

@@ -9,6 +9,7 @@ import {
 } from '../config/runtime-config'
 import { resolveCodexRuntimeContext } from '../config/runtime-context'
 import { buildCodexServerRequestToolInput, buildCodexServerRequestToolOutput } from '../tools/mapper'
+import { startOrResumeThread, syncCodexSkillExtraRoots } from '../turn/thread-lifecycle'
 import type { CodexAppServerClientLike } from '../types'
 import type { CodexAppServerCapabilityManifest, CodexAppServerMethodCapability } from './capabilities'
 import { CODEX_APP_SERVER_CAPABILITIES, CODEX_APP_SERVER_CLIENT_METHOD_SET, readCodexAppServerMethodCapability } from './capabilities'
@@ -20,11 +21,9 @@ import {
   resolveFreshCodexChatgptAuthCredential,
 } from './chatgpt-auth'
 import type { CodexAppServerClientOptions, CodexAppServerServerRequest } from './client'
-import { isCodexAppServerUnknownMethodError } from './client'
 import { buildCodexAppServerEnv } from './env'
 import type { CodexAppServerHostLease } from './host-lease'
-import { acquireCodexAppServerHostLease, codexChatSessionAppServerScopeId, invalidateCodexAppServerHost } from './host-lease'
-import { subscribeCodexAppServerHostNotifications } from './host-resource'
+import { acquireCodexAppServerHostLease, invalidateCodexAppServerHost } from './host-lease'
 
 export type { CodexAppServerCapabilityManifest } from './capabilities'
 
@@ -36,22 +35,6 @@ function resolveBridgeCodexSkillExtraRoots(
   return config.skillPaths.length > 0
     ? config.skillPaths
     : resolveSkillPaths(workspacePath)
-}
-
-async function syncBridgeCodexSkillExtraRoots(client: CodexAppServerClientLike, extraRoots: string[]): Promise<void> {
-  if (extraRoots.length === 0) {
-    return
-  }
-  try {
-    await client.request('skills/extraRoots/set', { extraRoots })
-  }
-  catch (error) {
-    if (isCodexAppServerUnknownMethodError(error, 'skills/extraRoots/set')) {
-      return
-    }
-    const detail = error instanceof Error ? error.message : String(error)
-    throw new Error(`Codex app-server skills/extraRoots/set failed: ${detail}`)
-  }
 }
 
 interface CodexAppServerBridgeDeps {
@@ -109,7 +92,7 @@ export class CodexAppServerBridge {
         updateSecretValue: this.deps.updateSecretValue,
       }),
     })
-    const client = hostLease.resource.client
+    const client = hostLease.client
     try {
       const result = await client.request(input.method, normalizeParams(capability, input.params))
       return { method: input.method, capability, result }
@@ -131,7 +114,6 @@ export class CodexAppServerBridge {
       input.closeOnMethods !== undefined,
     )
     let hostLease: CodexAppServerHostLease | null = null
-    let unsubscribeNotifications: (() => void) | null = null
 
     return new ReadableStream<Uint8Array>({
       start: (controller) => {
@@ -157,27 +139,19 @@ export class CodexAppServerBridge {
             if (abortController.signal.aborted) {
               return
             }
-            const waitForNotifications = new Promise<void>((resolve) => {
-              unsubscribeNotifications = subscribeCodexAppServerHostNotifications(
-                hostLease!.resource,
-                {
-                  onMessage: (message) => {
-                    if (abortController.signal.aborted) {
-                      resolve()
-                      return true
-                    }
-                    writeSse(controller, encoder, 'notification', message)
-                    if (message.method && closeOnMethods.has(message.method)) {
-                      resolve()
-                      return true
-                    }
-                    return false
-                  },
-                  onClose: resolve,
-                },
-              )
-            })
-            const resultPromise = hostLease.resource.client.request(input.method, normalizeParams(capability, input.params))
+            const waitForNotifications = (async () => {
+              while (!abortController.signal.aborted) {
+                const message = await hostLease!.client.nextNotification(abortController.signal)
+                if (!message) {
+                  return
+                }
+                writeSse(controller, encoder, 'notification', message)
+                if (message.method && closeOnMethods.has(message.method)) {
+                  return
+                }
+              }
+            })()
+            const resultPromise = hostLease.client.request(input.method, normalizeParams(capability, input.params))
             writeSse(controller, encoder, 'request_started', { method: input.method, capability })
 
             const abortPromise = new Promise<void>((resolve) => {
@@ -209,21 +183,19 @@ export class CodexAppServerBridge {
             writeDone(controller, encoder)
           }
           finally {
-            unsubscribeNotifications?.()
             hostLease?.release()
           }
         })()
       },
       cancel: () => {
         abortController.abort()
-        unsubscribeNotifications?.()
         hostLease?.release()
       },
     })
   }
 
   private async acquireHostLease(
-    context: CodexAppServerBridgeContext,
+    context: CodexAppServerInvokeInput,
     requestedMethod: string,
     options: { serverRequestHandler?: CodexAppServerBridgeRequestHandler } = {},
   ): Promise<CodexAppServerHostLease> {
@@ -246,21 +218,22 @@ export class CodexAppServerBridge {
       agentId: context.agentId,
       agentHome: runtimeContext.agentHome,
     }, auth)
+    const threadConfig = bindCodexCradleMcpInvocation(
+      buildCodexConfig(config, context.workspacePath, this.deps.resolveSkillPaths, context.modelId, auth),
+      appServerEnvironment,
+    )
     const clientOptions: CodexAppServerClientOptions = {
       apiKey: readCodexApiKeyAuth(auth) ?? undefined,
-      config: bindCodexCradleMcpInvocation(
-        buildCodexConfig(config, context.workspacePath, this.deps.resolveSkillPaths, context.modelId, auth),
-        appServerEnvironment,
-      ),
+      config: threadConfig,
       env: appServerEnvironment,
       serverRequestHandler: requestHandler,
     }
     const hostLease = await acquireCodexAppServerHostLease({
       runtimeKind: context.runtimeSession.runtimeKind,
       providerTargetId: context.profile.providerTargetId,
-      scopeId: codexChatSessionAppServerScopeId(context.runtimeSession.chatSessionId),
       options: clientOptions,
       chatgptAuth,
+      readThreadId: () => readBridgeRequestThreadId(context.params),
       authenticateChatgpt: !isAccountAuthMutationMethod(requestedMethod),
       deps: {
         readSecret: this.deps.readSecret,
@@ -271,7 +244,22 @@ export class CodexAppServerBridge {
       },
     })
     try {
-      await syncBridgeCodexSkillExtraRoots(hostLease.resource.client, skillExtraRoots)
+      await syncCodexSkillExtraRoots(hostLease.resource, skillExtraRoots)
+      const requestedThreadId = readBridgeRequestThreadId(context.params)
+      if (
+        requestedThreadId
+        && requestedThreadId === context.runtimeSession.providerSessionId
+        && requestedMethod !== 'thread/resume'
+      ) {
+        await startOrResumeThread(hostLease.client, hostLease.resource, context.runtimeSession, {
+          model: context.modelId ?? config.model,
+          cwd: runtimeContext.cwd,
+          runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
+          approvalPolicy: config.approvalPolicy,
+          sandbox: config.sandboxMode,
+          config: threadConfig,
+        })
+      }
       return hostLease
     }
     catch (error) {
@@ -280,6 +268,14 @@ export class CodexAppServerBridge {
       throw error
     }
   }
+}
+
+function readBridgeRequestThreadId(params: unknown): string | null {
+  if (!params || typeof params !== 'object' || !('threadId' in params)) {
+    return null
+  }
+  const threadId = (params as { threadId?: unknown }).threadId
+  return typeof threadId === 'string' ? threadId : null
 }
 
 function isAccountAuthMutationMethod(method: string): boolean {

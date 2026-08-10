@@ -254,19 +254,21 @@ export function bindCodexCradleMcpInvocation(
   config: NonNullable<ThreadForkParams['config']>,
   appServerEnvironment: Record<string, string | undefined>,
 ): NonNullable<ThreadForkParams['config']> {
-  if (!config.mcp_servers) {
-    return config
-  }
+  const invocationEnvironment = Object.fromEntries(
+    CRADLE_MCP_INVOCATION_ENV_NAMES.flatMap((name) => {
+      const value = appServerEnvironment[name]
+      return value ? [[name, value]] : []
+    }),
+  )
   return {
     ...config,
-    mcp_servers: buildCodexMcpServersConfig(
-      Object.fromEntries(
-        CRADLE_MCP_INVOCATION_ENV_NAMES.flatMap((name) => {
-          const value = appServerEnvironment[name]
-          return value ? [[name, value]] : []
-        }),
-      ),
-    ),
+    shell_environment_policy: {
+      inherit: 'all',
+      set: invocationEnvironment,
+    },
+    ...(config.mcp_servers
+      ? { mcp_servers: buildCodexMcpServersConfig(invocationEnvironment) }
+      : {}),
   }
 }
 
