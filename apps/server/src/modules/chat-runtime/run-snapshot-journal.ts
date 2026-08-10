@@ -6,6 +6,7 @@ import type { db } from '../../infra'
 import { registerBeforeDatabaseShutdown } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
 import { projectChatRuntimeRunSnapshotEventReadModels } from './read-model-projectors'
+import { compactSuccessfulSnapshotEvent } from './run-snapshot-compaction'
 
 type SnapshotDatabase = ReturnType<typeof db>
 export type SnapshotTransaction = Parameters<Parameters<SnapshotDatabase['transaction']>[0]>[0]
@@ -22,7 +23,17 @@ interface SnapshotJournal {
   pendingUpdates: Map<string, SnapshotEventUpdate>
   eventById: Map<string, BackendRunSnapshotEvent>
   workspaceBySnapshotId: Map<string, string | null>
+  persistedSnapshotIds: Set<string>
   timer: ReturnType<typeof setTimeout> | null
+}
+
+interface SnapshotFlushContext {
+  hadPreviouslyPersistedEvents: boolean
+}
+
+interface SnapshotFlushOptions<Result> {
+  compactSuccessfulPayloads?: (result: Result | undefined) => boolean
+  finalSnapshot?: boolean
 }
 
 const logger = createChildLogger({ module: 'chat-runtime.run-snapshot-journal' })
@@ -93,15 +104,21 @@ export function updateQueuedRunSnapshotEvent(
 export function flushRunSnapshotJournalForSnapshot<Result>(
   database: SnapshotDatabase,
   snapshotId: string,
-  withinTransaction?: (transaction: SnapshotTransaction) => Result,
+  withinTransaction?: (
+    transaction: SnapshotTransaction,
+    context: SnapshotFlushContext,
+  ) => Result,
+  options: SnapshotFlushOptions<Result> = {},
 ): Result | undefined {
   const journal = journals.get(database)
   if (!journal) {
-    return withinTransaction ? database.transaction(withinTransaction) : undefined
+    return withinTransaction
+      ? database.transaction(tx => withinTransaction(tx, { hadPreviouslyPersistedEvents: false }))
+      : undefined
   }
   cancelTimer(journal)
   try {
-    return flushJournal(journal, withinTransaction, snapshotId)
+    return flushJournal(journal, withinTransaction, snapshotId, options)
   }
   catch (error) {
     scheduleFlush(journal, RETRY_DELAY_MS)
@@ -132,6 +149,7 @@ export function releaseRunSnapshotContext(database: SnapshotDatabase, snapshotId
     return
   }
   journal.workspaceBySnapshotId.delete(snapshotId)
+  journal.persistedSnapshotIds.delete(snapshotId)
   for (const [eventId, event] of journal.eventById) {
     if (event.snapshotId === snapshotId) {
       journal.eventById.delete(eventId)
@@ -149,6 +167,7 @@ function journalFor(database: SnapshotDatabase): SnapshotJournal {
       pendingUpdates: new Map(),
       eventById: new Map(),
       workspaceBySnapshotId: new Map(),
+      persistedSnapshotIds: new Set(),
       timer: null,
     }
     journals.set(database, journal)
@@ -175,8 +194,12 @@ function scheduleFlush(journal: SnapshotJournal, delayMs: number): void {
 
 function flushJournal<Result>(
   journal: SnapshotJournal,
-  withinTransaction?: (transaction: SnapshotTransaction) => Result,
+  withinTransaction?: (
+    transaction: SnapshotTransaction,
+    context: SnapshotFlushContext,
+  ) => Result,
   snapshotId?: string,
+  options: SnapshotFlushOptions<Result> = {},
 ): Result | undefined {
   const inserts = [...journal.pendingInserts.values()]
     .filter(event => snapshotId === undefined || event.snapshotId === snapshotId)
@@ -185,9 +208,16 @@ function flushJournal<Result>(
       snapshotId === undefined || journal.eventById.get(eventId)?.snapshotId === snapshotId)
   let result: Result | undefined
   journal.database.transaction((tx) => {
-    for (let offset = 0; offset < inserts.length; offset += INSERT_BATCH_SIZE) {
+    result = withinTransaction?.(tx, {
+      hadPreviouslyPersistedEvents: snapshotId !== undefined
+        && journal.persistedSnapshotIds.has(snapshotId),
+    })
+    const persistedInserts = options.compactSuccessfulPayloads?.(result)
+      ? inserts.map(compactSuccessfulSnapshotEvent)
+      : inserts
+    for (let offset = 0; offset < persistedInserts.length; offset += INSERT_BATCH_SIZE) {
       tx.insert(backendRunSnapshotEvents)
-        .values(inserts.slice(offset, offset + INSERT_BATCH_SIZE))
+        .values(persistedInserts.slice(offset, offset + INSERT_BATCH_SIZE))
         .run()
     }
     for (const [eventId, update] of updates) {
@@ -211,13 +241,17 @@ function flushJournal<Result>(
         })
       }
     }
-    result = withinTransaction?.(tx)
   })
   for (const event of inserts) {
     journal.pendingInserts.delete(event.id)
   }
   for (const [eventId] of updates) {
     journal.pendingUpdates.delete(eventId)
+  }
+  if (!options.finalSnapshot) {
+    for (const event of inserts) {
+      journal.persistedSnapshotIds.add(event.snapshotId)
+    }
   }
   if (journal.pendingInserts.size > 0 || journal.pendingUpdates.size > 0) {
     scheduleFlush(journal, FLUSH_DELAY_MS)

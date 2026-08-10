@@ -18,6 +18,11 @@ import { OBSERVABILITY_CODES } from '../observability/contract'
 import * as Observability from '../observability/service'
 import { projectChatRuntimeRunSnapshotEventReadModels } from './read-model-projectors'
 import {
+  COMPACTED_SUCCESS_PAYLOAD_PREFIX,
+  compactSuccessfulPayload,
+  isCompactedSuccessPayload,
+} from './run-snapshot-compaction'
+import {
   enqueueRunSnapshotEvent,
   flushRunSnapshotJournalForSnapshot,
   flushRunSnapshotWriteBehind,
@@ -25,6 +30,8 @@ import {
   releaseRunSnapshotContext,
   updateQueuedRunSnapshotEvent,
 } from './run-snapshot-journal'
+
+export { COMPACTED_SUCCESS_PAYLOAD_SCHEMA } from './run-snapshot-compaction'
 
 const logger = createChildLogger({ module: 'chat-runtime.run-snapshot' })
 
@@ -151,8 +158,6 @@ const DEFAULT_SNAPSHOT_EVENTS_READ_LIMIT = 2_000
 const DEFAULT_SNAPSHOT_EVENTS_MAX = 2_000
 const DEFAULT_RETENTION_BATCH_SIZE = 250
 const DEFAULT_COMPACTION_SNAPSHOT_BATCH_SIZE = 25
-export const COMPACTED_SUCCESS_PAYLOAD_SCHEMA = 'cradle.run-snapshot-success-metadata.v1'
-const COMPACTED_SUCCESS_PAYLOAD_PREFIX = `{"schema":"${COMPACTED_SUCCESS_PAYLOAD_SCHEMA}"`
 
 /**
  * Hard cap on how many event rows a single run snapshot may accumulate.
@@ -204,7 +209,7 @@ export function startRunSnapshot(input: StartRunSnapshotInput): ChatRunSnapshot 
     const d = db()
     d.insert(backendRunSnapshots).values(row).run()
     registerRunSnapshotContext(d, id, input.workspaceId ?? null)
-    return toChatRunSnapshot(row as BackendRunSnapshot, [])
+    return toChatRunSnapshot(row as BackendRunSnapshot, [], 0)
   }
  catch (error) {
     logger.error('failed to start run snapshot', { input, error })
@@ -312,7 +317,7 @@ export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
 
   try {
     const d = db()
-    const { previous, changes } = flushRunSnapshotJournalForSnapshot(d, input.snapshotId, (tx) => {
+    const { previous, changes } = flushRunSnapshotJournalForSnapshot(d, input.snapshotId, (tx, context) => {
       const previous = tx
         .select()
         .from(backendRunSnapshots)
@@ -326,11 +331,18 @@ export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
             .where(eq(backendRunSnapshots.id, input.snapshotId))
             .run()
 
-      if (result.changes > 0 && input.status === 'complete') {
+      if (
+        result.changes > 0
+        && input.status === 'complete'
+        && context.hadPreviouslyPersistedEvents
+      ) {
         compactSuccessfulRunSnapshotEventPayloads(tx, input.snapshotId)
       }
 
       return { previous, changes: result.changes }
+    }, {
+      compactSuccessfulPayloads: result => input.status === 'complete' && (result?.changes ?? 0) > 0,
+      finalSnapshot: true,
     })!
     releaseRunSnapshotContext(d, input.snapshotId)
     if (changes === 0 && previous && previous.status !== 'running' && previous.status !== input.status) {
@@ -437,8 +449,9 @@ function countSnapshotEvents(snapshotId: string): number {
 function toChatRunSnapshot(
   row: BackendRunSnapshot,
   events: BackendRunSnapshotEvent[],
+  knownEventCount?: number,
 ): ChatRunSnapshot {
-  const eventCount = countSnapshotEvents(row.id)
+  const eventCount = knownEventCount ?? countSnapshotEvents(row.id)
   return {
     id: row.id,
     schemaVersion: row.schemaVersion,
@@ -594,24 +607,6 @@ function compactSuccessfulRunSnapshotEventPayloads(
     compacted += 1
   }
   return compacted
-}
-
-function compactSuccessfulPayload(payloadJson: string): string {
-  const parsed = SnapshotRecordSchema.safeParse(payloadJson)
-  const coalescedCount
-    = parsed.success && typeof parsed.data.coalescedCount === 'number'
-      ? parsed.data.coalescedCount
-      : undefined
-  return JSON.stringify({
-    schema: COMPACTED_SUCCESS_PAYLOAD_SCHEMA,
-    originalLength: payloadJson.length,
-    ...(coalescedCount !== undefined ? { coalescedCount } : {}),
-  })
-}
-
-function isCompactedSuccessPayload(payloadJson: string): boolean {
-  const parsed = SnapshotRecordSchema.safeParse(payloadJson)
-  return parsed.success && parsed.data.schema === COMPACTED_SUCCESS_PAYLOAD_SCHEMA
 }
 
 function readExpiredRunSnapshotIds(d: RunSnapshotMaintenanceDb, now: number): string[] {

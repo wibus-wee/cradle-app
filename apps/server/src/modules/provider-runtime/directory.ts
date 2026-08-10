@@ -5,7 +5,7 @@ import { backendSessionBindings } from '@cradle/db'
 import { and, eq } from 'drizzle-orm'
 
 import { currentUnixSeconds } from '../../helpers/time'
-import { db } from '../../infra'
+import { db, registerBeforeDatabaseShutdown } from '../../infra'
 import type { RuntimeKind } from '../provider-contracts/types'
 
 export interface ProviderRuntimeBindingWrite {
@@ -19,12 +19,47 @@ export interface ProviderRuntimeBindingWrite {
 
 export type ProviderRuntimeBindingDirectoryWriter = Pick<ReturnType<typeof db>, 'update'>
 
+type ProviderRuntimeDatabase = ReturnType<typeof db>
+const absentBindings = new Map<ProviderRuntimeDatabase, Set<string>>()
+const MAX_ABSENT_BINDINGS = 4_096
+
+registerBeforeDatabaseShutdown(() => absentBindings.clear())
+
+function absentBindingIdsFor(database: ProviderRuntimeDatabase): Set<string> {
+  let sessionIds = absentBindings.get(database)
+  if (!sessionIds) {
+    sessionIds = new Set()
+    absentBindings.set(database, sessionIds)
+  }
+  return sessionIds
+}
+
+function rememberAbsentBinding(database: ProviderRuntimeDatabase, chatSessionId: string): void {
+  const sessionIds = absentBindingIdsFor(database)
+  if (sessionIds.size >= MAX_ABSENT_BINDINGS) {
+    const oldestSessionId = sessionIds.values().next().value
+    if (oldestSessionId) {
+      sessionIds.delete(oldestSessionId)
+    }
+  }
+  sessionIds.add(chatSessionId)
+}
+
 export function readProviderRuntimeBinding(chatSessionId: string): BackendSessionBinding | undefined {
-  return db()
+  const database = db()
+  const absentSessionIds = absentBindingIdsFor(database)
+  if (absentSessionIds.has(chatSessionId)) {
+    return undefined
+  }
+  const binding = database
     .select()
     .from(backendSessionBindings)
     .where(eq(backendSessionBindings.chatSessionId, chatSessionId))
     .get()
+  if (!binding) {
+    rememberAbsentBinding(database, chatSessionId)
+  }
+  return binding
 }
 
 export function listProviderRuntimeBindingsByProviderSession(input: {
@@ -74,15 +109,22 @@ export function isResumableProviderRuntimeBinding(binding: BackendSessionBinding
 }
 
 export function deleteProviderRuntimeBinding(chatSessionId: string): void {
-  db()
+  const database = db()
+  const absentSessionIds = absentBindingIdsFor(database)
+  if (absentSessionIds.has(chatSessionId)) {
+    return
+  }
+  database
     .delete(backendSessionBindings)
     .where(eq(backendSessionBindings.chatSessionId, chatSessionId))
     .run()
+  rememberAbsentBinding(database, chatSessionId)
 }
 
 export function writeProviderRuntimeBinding(input: ProviderRuntimeBindingWrite): BackendSessionBinding {
   const now = currentUnixSeconds()
-  return db()
+  const database = db()
+  const binding = database
     .insert(backendSessionBindings)
     .values({
       id: randomUUID(),
@@ -108,4 +150,6 @@ export function writeProviderRuntimeBinding(input: ProviderRuntimeBindingWrite):
     })
     .returning()
     .get()
+  absentBindingIdsFor(database).delete(input.chatSessionId)
+  return binding
 }

@@ -354,6 +354,56 @@ describe('run snapshot recording', () => {
     })
   })
 
+  it('compacts successful payloads that were flushed before finalization', async () => {
+    await withTempDataDir(() => {
+      const sessionId = `session-${randomUUID()}`
+      const runId = `run-${randomUUID()}`
+      const activeRun = setUpRun(sessionId, runId)
+
+      recordActiveRunSnapshotEvent(activeRun, {
+        phase: 'tool_call_output_available',
+        chunk: {
+          type: 'tool-output-available',
+          toolCallId: 'toolu_preflushed',
+          output: { stdout: 'payload flushed before completion' },
+        },
+      })
+      expect(getRunSnapshot(runId)?.events).toHaveLength(2)
+
+      finalizeActiveRunSnapshot(
+        activeRun,
+        { type: 'finish', finishReason: 'stop' },
+        {
+          modelId: 'gpt-4o-mini',
+          diagnostics: {
+            emittedEventCount: 1,
+            assistantBoundaryCount: 0,
+            assistantTextCharCount: 0,
+            reasoningTextCharCount: 0,
+            toolInputDeltaCharCount: 0,
+            toolEventCount: 1,
+            otherOutputEventCount: 0,
+          },
+          profile: {
+            enabled: false,
+            streamStartedAtMs: 0,
+            streamFinishedAtMs: null,
+            finalizeStartedAtMs: null,
+            finalizeFinishedAtMs: null,
+            finalMessageJsonBytes: null,
+          },
+        },
+      )
+
+      const toolEvent = getRunSnapshot(runId)?.events.find(event => event.toolCallId === 'toolu_preflushed')
+      expect(toolEvent?.payload).toEqual(expect.objectContaining({
+        schema: COMPACTED_SUCCESS_PAYLOAD_SCHEMA,
+        originalLength: expect.any(Number),
+      }))
+      expect(JSON.stringify(toolEvent?.payload)).not.toContain('payload flushed before completion')
+    })
+  })
+
   it('retains runtime chunk payloads after failed finalization', async () => {
     await withTempDataDir(() => {
       const sessionId = `session-${randomUUID()}`

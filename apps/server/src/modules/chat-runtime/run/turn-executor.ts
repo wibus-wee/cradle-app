@@ -15,6 +15,8 @@ import type {
   RuntimeProviderTargetProfile,
   RuntimeReviewTarget,
   RuntimeSettings,
+  RuntimeStepUsage,
+  RuntimeTurnResult,
   TokenUsage,
 } from '../runtime-provider-types'
 import { attachBinding, isProviderTargetAvailable } from '../runtime-session-context'
@@ -125,6 +127,7 @@ export interface TurnExecutorDeps {
 interface RunStreamPumpResult {
   finalChunk: UIMessageChunk
   failurePayload: SerializedChatError['payload'] | undefined
+  turnResult: RuntimeTurnResult
 }
 
 export async function executeRun(
@@ -160,14 +163,14 @@ export async function executeRun(
         })
       })
     }
-    const { finalChunk, failurePayload } = await pumpRuntimeStream(
+    const { finalChunk, failurePayload, turnResult } = await pumpRuntimeStream(
       activeRun,
       input,
       diagnostics,
       profile,
       deps,
     )
-    const actualModelId = activeRun.runtime.lastModelId ?? activeRun.modelId
+    const actualModelId = turnResult.modelId ?? activeRun.runtime.lastModelId ?? activeRun.modelId
     let handoff: ActiveTurnHandoff = { kind: 'queue' }
     const completion = await deps.completeActiveTurn(activeRun, {
       source: 'normal',
@@ -198,6 +201,7 @@ export async function executeRun(
           failurePayload,
           diagnostics,
           actualModelId,
+          turnResult,
           deps,
         )
         if (activeRun.internalContinuation !== 'runtimeGoal') {
@@ -226,7 +230,7 @@ export async function executeRun(
     const settledFinalChunk = completion.terminalChunk ?? finalChunk
     const usage = activeRun.runtime.usageAccounting === 'provider-events'
       ? activeRun.usageEventAggregate
-      : activeRun.runtime.totalUsage ?? activeRun.runtime.lastUsage ?? null
+      : turnResult.usage ?? activeRun.runtime.totalUsage ?? activeRun.runtime.lastUsage ?? null
     return {
       modelId: actualModelId,
       usage,
@@ -256,6 +260,7 @@ async function pumpRuntimeStream(
 ): Promise<RunStreamPumpResult> {
   let finalChunk: UIMessageChunk = { type: 'finish', finishReason: 'stop' }
   let failurePayload: SerializedChatError['payload'] | undefined
+  let turnResult: RuntimeTurnResult = {}
   const onProviderSyntheticTurnEvent = createProviderSyntheticTurnEventHandler(activeRun, {
     stream: deps.stream,
     completeActiveTurn: deps.completeActiveTurn,
@@ -326,6 +331,13 @@ async function pumpRuntimeStream(
           isTerminalChunk: isTerminalUIMessageChunk,
         }),
       onProviderSyntheticTurnEvent,
+      reportTurnResult: (result) => {
+        turnResult = {
+          ...turnResult,
+          ...result,
+          ...(result.stepUsages ? { stepUsages: [...result.stepUsages] } : {}),
+        }
+      },
     })) {
       if (activeRun.terminalStatus) {
         break
@@ -422,7 +434,7 @@ async function pumpRuntimeStream(
     })
   }
 
-  return { finalChunk, failurePayload }
+  return { finalChunk, failurePayload, turnResult }
 }
 
 function recordRunUsageAndFailure(
@@ -431,6 +443,7 @@ function recordRunUsageAndFailure(
   failurePayload: SerializedChatError['payload'] | undefined,
   diagnostics: TurnOutputDiagnostics,
   actualModelId: string | null,
+  turnResult: RuntimeTurnResult,
   deps: TurnExecutorDeps,
 ): void {
   if (activeRun.cancelRequested) {
@@ -462,7 +475,7 @@ function recordRunUsageAndFailure(
 
       const usage = activeRun.runtime.usageAccounting === 'provider-events'
         ? activeRun.usageEventAggregate
-        : activeRun.runtime?.totalUsage ?? activeRun.runtime?.lastUsage
+        : turnResult.usage ?? activeRun.runtime?.totalUsage ?? activeRun.runtime?.lastUsage
       if (usage) {
         if (activeRun.runtime.usageAccounting !== 'provider-events') {
           insertRunUsage({
@@ -482,12 +495,14 @@ function recordRunUsageAndFailure(
           payload: {
             source: activeRun.runtime.usageAccounting === 'provider-events'
               ? 'runtime.usageEvents'
-              : activeRun.runtime?.totalUsage ? 'runtime.totalUsage' : 'runtime.lastUsage',
+              : turnResult.usage
+                ? 'runtime.turnResult'
+                : activeRun.runtime?.totalUsage ? 'runtime.totalUsage' : 'runtime.lastUsage',
           },
         })
       }
 
-      const steps = activeRun.runtime.lastStepUsages ?? []
+      const steps: RuntimeStepUsage[] = turnResult.stepUsages ?? activeRun.runtime.lastStepUsages ?? []
       if (steps.length > 0) {
         const fallbackModelId = actualModelId ?? UNKNOWN_MODEL_ID
         const recordedSteps = insertRuntimeStepUsages({
@@ -560,8 +575,9 @@ function recordRunCompletion(
   actualModelId: string | null,
   deps: TurnExecutorDeps,
 ): ActiveTurnHandoff {
+  let persistedBinding: ReturnType<typeof attachBinding>
   try {
-    attachBinding({
+    persistedBinding = attachBinding({
       sessionId: activeRun.sessionId,
       providerTargetId: activeRun.providerTargetId,
       runtimeKind: activeRun.runtimeSession.runtimeKind,
@@ -579,7 +595,9 @@ function recordRunCompletion(
     },
     finalChunk,
   )
-  const binding = readDurableProviderRuntimeBinding(activeRun.sessionId)
+  const binding = activeRun.runtime.goalContinuation
+    ? persistedBinding ?? readDurableProviderRuntimeBinding(activeRun.sessionId)
+    : undefined
   const shouldContinueRuntimeGoal = shouldScheduleRuntimeGoalContinuation({
     run: {
       sessionId: activeRun.sessionId,

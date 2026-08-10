@@ -279,7 +279,7 @@ export async function createRun(
       })
     }
 
-    attachBinding({
+    const binding = attachBinding({
       sessionId: input.sessionId,
       providerTargetId: context.providerTarget?.id ?? null,
       runtimeKind: runtimeSession.runtimeKind,
@@ -297,6 +297,7 @@ export async function createRun(
           : createAssistantMessage(draft.assistantMessageId),
       userMessage: draft.appendUserMessage ? draft.userMessage : undefined,
       queueItemId: input.queueItemId ?? null,
+      bindingId: binding?.id ?? null,
     })
     const activeRun: ActiveRun = {
       runId: run.id,
