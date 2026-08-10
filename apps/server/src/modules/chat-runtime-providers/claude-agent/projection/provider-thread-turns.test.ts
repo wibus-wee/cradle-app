@@ -23,7 +23,7 @@ describe('claudeAgentProviderThreadTurns', () => {
     vi.clearAllMocks()
   })
 
-  it('emits only final assistant usage events', async () => {
+  it('emits final message-delta usage instead of the interim assistant snapshot', async () => {
     const provider = new ClaudeAgentProvider({
       readSecret: () => 'sk-ant-test',
     })
@@ -31,7 +31,14 @@ describe('claudeAgentProviderThreadTurns', () => {
     const activeQuery = createAsyncQuery([
       {
         type: 'stream_event',
-        event: { type: 'message_delta', usage: { input_tokens: 100, output_tokens: 50 } },
+        event: {
+          type: 'message_start',
+          message: {
+            id: 'msg-final',
+            model: 'claude-opus-4-8',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          },
+        },
         session_id: 'claude-session-1',
       },
       {
@@ -41,22 +48,17 @@ describe('claudeAgentProviderThreadTurns', () => {
           id: 'msg-final',
           model: 'claude-opus-4-8',
           content: [{ type: 'text', text: 'Hello' }],
-          usage: { input_tokens: 0, output_tokens: 0 },
+          usage: { input_tokens: 1, output_tokens: 1 },
         },
       },
       {
-        type: 'assistant',
+        type: 'stream_event',
         session_id: 'claude-session-1',
-        message: {
-          id: 'msg-final',
-          model: 'claude-opus-4-8',
-          content: [{ type: 'text', text: 'Hello' }],
-          usage: { input_tokens: 100, output_tokens: 50 },
-        },
+        event: { type: 'message_delta', usage: { input_tokens: 1, output_tokens: 3 } },
       },
       {
         type: 'result',
-        usage: { input_tokens: 100, output_tokens: 50 },
+        usage: { input_tokens: 1, output_tokens: 3 },
         session_id: 'claude-session-1',
       },
     ])
@@ -82,7 +84,7 @@ describe('claudeAgentProviderThreadTurns', () => {
         providerThreadId: 'claude-session-1',
         providerTurnId: 'msg-final',
         modelId: 'claude-opus-4-8',
-        usage: expect.objectContaining({ totalTokens: 150 }),
+        usage: expect.objectContaining({ totalTokens: 4 }),
       }),
     ])
   })

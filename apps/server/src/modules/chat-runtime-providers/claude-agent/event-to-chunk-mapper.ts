@@ -33,6 +33,7 @@ import {
 } from './tools/task-progress-state'
 import type { TodoPluginItem } from './tools/todo-plugin-state'
 import { isTodoWriteToolName, synthesizeTodoWritePluginState } from './tools/todo-plugin-state'
+import type { ClaudeLiveUsageProjectionState } from './usage-event-projector'
 import type { ClaudeWorkflowExecutionRecord } from './workflow'
 import {
   createClaudeWorkflowExecutionRecord,
@@ -124,6 +125,8 @@ export interface ClaudeAgentChunkMapperState {
   capturedExitPlanToolCallIds: Set<string>
   /** Latest plan body written through Claude plan mode before ExitPlanMode. */
   latestPlanFileContent: string | null
+  /** Tracks immutable model-call identity until the final streaming usage delta arrives. */
+  usageProjection: ClaudeLiveUsageProjectionState
 }
 
 interface TextAccumulator {
@@ -232,6 +235,7 @@ function normalizeClaudeAgentChunkMapperState(state: ClaudeAgentChunkMapperState
   state.pendingModelMessageBoundary ??= false
   state.capturedExitPlanToolCallIds ??= new Set()
   state.latestPlanFileContent ??= null
+  state.usageProjection ??= { pendingMessage: null }
 }
 
 /**
@@ -271,6 +275,7 @@ export function createClaudeAgentChunkMapperState(
     pendingModelMessageBoundary: false,
     capturedExitPlanToolCallIds: new Set(),
     latestPlanFileContent: null,
+    usageProjection: { pendingMessage: null },
   }
 }
 
@@ -290,6 +295,7 @@ export function resetClaudeAgentChunkMapperForTurn(state: ClaudeAgentChunkMapper
   state.pendingModelMessageBoundary = false
   state.capturedExitPlanToolCallIds.clear()
   state.latestPlanFileContent = null
+  state.usageProjection.pendingMessage = null
 }
 
 export async function mapClaudeAgentMessageToChunksWithoutParentProjection(msg: SDKMessage, state: ClaudeAgentChunkMapperState): Promise<ClaudeAgentChunkMapperResult> {
