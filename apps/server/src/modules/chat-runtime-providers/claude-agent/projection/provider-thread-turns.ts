@@ -42,10 +42,8 @@ import {
   createClaudeCodeToolResultPayload,
 } from '../tools/mapper'
 import type { ClaudeAgentProviderDeps } from '../types'
-import {
-  type ClaudeLiveUsageProjectionState,
-  projectClaudeLiveUsageEvent,
-} from '../usage-event-projector'
+import type { ClaudeLiveUsageProjectionState } from '../usage-event-projector'
+import { projectClaudeLiveUsageEvent } from '../usage-event-projector'
 
 export interface ClaudeAgentProviderThreadTurnsContext {
   activeQueries: Map<string, ActiveClaudeQuery>

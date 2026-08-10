@@ -9,7 +9,6 @@ import {
   projectClaudeLiveUsageEvent,
 } from './usage-event-projector'
 
-
 describe('projectClaudeLiveUsageEvent', () => {
   it('waits for the final message delta instead of recording the interim assistant snapshot', () => {
     const state = createClaudeLiveUsageProjectionState()
