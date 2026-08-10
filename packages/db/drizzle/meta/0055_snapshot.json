@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0054_provider_targets_provider_id",
-  "prevId": "f5b3bd2d-d0bc-44a6-a899-4414cbf09d7b",
+  "id": "23476902-1010-4ac1-af21-2174b080e289",
+  "prevId": "0054_provider_targets_provider_id",
   "tables": {
     "acp_agents": {
       "name": "acp_agents",
@@ -4981,9 +4981,31 @@
           "notNull": false,
           "autoincrement": false
         },
+        "speaker_profile_id": {
+          "name": "speaker_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "speaker_label": {
           "name": "speaker_label",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "speaker_assignment_source": {
+          "name": "speaker_assignment_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'unassigned'"
+        },
+        "speaker_match_confidence_bps": {
+          "name": "speaker_match_confidence_bps",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -5047,6 +5069,13 @@
           "name": "chronicle_audio_segments_transcript_id_idx",
           "columns": [
             "transcript_id"
+          ],
+          "isUnique": false
+        },
+        "chronicle_audio_segments_speaker_profile_id_idx": {
+          "name": "chronicle_audio_segments_speaker_profile_id_idx",
+          "columns": [
+            "speaker_profile_id"
           ],
           "isUnique": false
         },
@@ -8132,6 +8161,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "identity_source": {
+          "name": "identity_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'automatic'"
         },
         "sample_count": {
           "name": "sample_count",
@@ -14248,13 +14285,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "provider_id": {
-          "name": "provider_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "connection_config_json": {
           "name": "connection_config_json",
           "type": "text",
@@ -14285,6 +14315,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'[]'"
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "source_key": {
           "name": "source_key",

@@ -263,6 +263,10 @@ export const zPostWorkspacesByWorkspaceIdMigratePath = z.object({
     workspaceId: z.string().min(1)
 });
 
+export const zGetCodeActivitySessionsBySessionIdEventsPath = z.object({
+    sessionId: z.string().min(1)
+});
+
 export const zGetFilesystemBrowseQuery = z.object({
     path: z.string().optional()
 });
@@ -4081,6 +4085,7 @@ export const zPutChronicleConfigBody = z.object({
     dreamSchedulerIntervalMs: z.number().optional().default(86400000),
     dreamSchedulerApplyMerge: z.boolean().optional().default(false),
     audioCaptureEnabled: z.boolean(),
+    audioCaptureMode: z.enum(['meeting', 'continuous']).optional(),
     audioSource: z.enum([
         'microphone',
         'system',
@@ -4288,6 +4293,9 @@ export const zPostChronicleAudioTranscriptsBody = z.object({
         startMs: z.number().gte(0),
         endMs: z.number().gte(0).nullish(),
         speakerLabel: z.string().nullish(),
+        speakerCandidateKey: z.string().nullish(),
+        speakerEmbedding: z.array(z.number()).max(4096).nullish(),
+        speakerEmbeddingModelId: z.string().nullish(),
         text: z.string().min(1),
         confidence: z.number().gte(0).lte(1).nullish(),
         language: z.string().nullish(),
@@ -4304,6 +4312,30 @@ export const zPostChronicleSpeakerProfilesBody = z.object({
     sampleCount: z.number().gte(0).optional(),
     lastSeenAt: z.string().nullish(),
     metadata: z.record(z.string(), z.unknown()).optional()
+});
+
+export const zDeleteChronicleSpeakerProfilesByProfileIdPath = z.object({
+    profileId: z.string().min(1)
+});
+
+export const zPatchChronicleSpeakerProfilesByProfileIdBody = z.object({
+    displayName: z.string().min(1)
+});
+
+export const zPatchChronicleSpeakerProfilesByProfileIdPath = z.object({
+    profileId: z.string().min(1)
+});
+
+export const zDeleteChronicleSpeakerProfilesByProfileIdVoiceprintPath = z.object({
+    profileId: z.string().min(1)
+});
+
+export const zPatchChronicleAudioSegmentsBySegmentIdSpeakerBody = z.object({
+    speakerProfileId: z.string().nullable()
+});
+
+export const zPatchChronicleAudioSegmentsBySegmentIdSpeakerPath = z.object({
+    segmentId: z.string().min(1)
 });
 
 export const zGetChronicleAudioRawSegmentsQuery = z.object({

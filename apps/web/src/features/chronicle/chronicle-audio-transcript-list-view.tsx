@@ -3,16 +3,22 @@ import { useTranslation } from 'react-i18next'
 
 import { ChronicleAudioTranscriptCardView } from './chronicle-audio-transcript-card-view'
 import { ChronicleEmptyState } from './chronicle-empty-state'
-import type { ChronicleAudioTranscript } from './use-chronicle'
+import type { ChronicleAudioTranscript, ChronicleSpeakerProfile } from './use-chronicle'
 
 export interface ChronicleAudioTranscriptListViewProps {
   loading: boolean
   transcripts: ChronicleAudioTranscript[]
+  speakerProfiles: ChronicleSpeakerProfile[]
+  assigningSpeaker: boolean
+  onAssignSpeaker: (segmentId: string, speakerProfileId: string | null) => Promise<void>
 }
 
 export function ChronicleAudioTranscriptListView({
   loading,
   transcripts,
+  speakerProfiles,
+  assigningSpeaker,
+  onAssignSpeaker,
 }: ChronicleAudioTranscriptListViewProps) {
   const { t } = useTranslation('chronicle')
 
@@ -40,6 +46,9 @@ export function ChronicleAudioTranscriptListView({
         <ChronicleAudioTranscriptCardView
           key={transcript.id}
           transcript={transcript}
+          speakerProfiles={speakerProfiles}
+          assigningSpeaker={assigningSpeaker}
+          onAssignSpeaker={onAssignSpeaker}
         />
       ))}
     </div>

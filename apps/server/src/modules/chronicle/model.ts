@@ -46,6 +46,10 @@ export const ChronicleModel = {
     dreamSchedulerIntervalMs: t.Optional(t.Number({ default: 86_400_000 })),
     dreamSchedulerApplyMerge: t.Optional(t.Boolean({ default: false })),
     audioCaptureEnabled: t.Boolean(),
+    audioCaptureMode: t.Optional(t.Union([
+      t.Literal('meeting'),
+      t.Literal('continuous'),
+    ], { default: 'meeting' })),
     audioSource: t.Optional(t.Union([
       t.Literal('microphone'),
       t.Literal('system'),
@@ -360,7 +364,14 @@ export const ChronicleModel = {
     segmentIndex: t.Number(),
     startMs: t.Number(),
     endMs: t.Nullable(t.Number()),
+    speakerProfileId: t.Nullable(t.String()),
     speakerLabel: t.Nullable(t.String()),
+    speakerAssignmentSource: t.Union([
+      t.Literal('automatic'),
+      t.Literal('user'),
+      t.Literal('unassigned'),
+    ]),
+    speakerMatchConfidence: t.Nullable(t.Number()),
     text: t.String(),
     confidence: t.Nullable(t.Number()),
     language: t.Nullable(t.String()),
@@ -387,7 +398,14 @@ export const ChronicleModel = {
       segmentIndex: t.Number(),
       startMs: t.Number(),
       endMs: t.Nullable(t.Number()),
+      speakerProfileId: t.Nullable(t.String()),
       speakerLabel: t.Nullable(t.String()),
+      speakerAssignmentSource: t.Union([
+        t.Literal('automatic'),
+        t.Literal('user'),
+        t.Literal('unassigned'),
+      ]),
+      speakerMatchConfidence: t.Nullable(t.Number()),
       text: t.String(),
       confidence: t.Nullable(t.Number()),
       language: t.Nullable(t.String()),
@@ -398,6 +416,9 @@ export const ChronicleModel = {
     startMs: t.Number({ minimum: 0 }),
     endMs: t.Optional(t.Nullable(t.Number({ minimum: 0 }))),
     speakerLabel: t.Optional(t.Nullable(t.String())),
+    speakerCandidateKey: t.Optional(t.Nullable(t.String())),
+    speakerEmbedding: t.Optional(t.Nullable(t.Array(t.Number(), { maxItems: 4_096 }))),
+    speakerEmbeddingModelId: t.Optional(t.Nullable(t.String())),
     text: t.String({ minLength: 1 }),
     confidence: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 1 }))),
     language: t.Optional(t.Nullable(t.String())),
@@ -420,6 +441,9 @@ export const ChronicleModel = {
       startMs: t.Number({ minimum: 0 }),
       endMs: t.Optional(t.Nullable(t.Number({ minimum: 0 }))),
       speakerLabel: t.Optional(t.Nullable(t.String())),
+      speakerCandidateKey: t.Optional(t.Nullable(t.String())),
+      speakerEmbedding: t.Optional(t.Nullable(t.Array(t.Number(), { maxItems: 4_096 }))),
+      speakerEmbeddingModelId: t.Optional(t.Nullable(t.String())),
       text: t.String({ minLength: 1 }),
       confidence: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 1 }))),
       language: t.Optional(t.Nullable(t.String())),
@@ -434,9 +458,10 @@ export const ChronicleModel = {
     displayName: t.String(),
     normalizedLabel: t.String(),
     aliases: t.Array(t.String()),
-    embedding: t.Nullable(t.Array(t.Number())),
+    hasVoiceprint: t.Boolean(),
     embeddingDimensions: t.Nullable(t.Number()),
     embeddingModelId: t.Nullable(t.String()),
+    identitySource: t.Union([t.Literal('automatic'), t.Literal('user')]),
     sampleCount: t.Number(),
     lastSeenAt: t.Nullable(t.String()),
     lastSeenAtUnix: t.Nullable(t.Number()),
@@ -457,6 +482,14 @@ export const ChronicleModel = {
     sampleCount: t.Optional(t.Number({ minimum: 0 })),
     lastSeenAt: t.Optional(t.Nullable(t.String())),
     metadata: t.Optional(t.Record(t.String(), t.Any())),
+  }),
+
+  speakerProfilePatchBody: t.Object({
+    displayName: t.String({ minLength: 1 }),
+  }),
+
+  audioSegmentSpeakerPatchBody: t.Object({
+    speakerProfileId: t.Nullable(t.String()),
   }),
 
   audioRawSegment: t.Object({
@@ -614,6 +647,7 @@ export const ChronicleModel = {
       activityPipelineIntervalMs: t.Number(),
       activityPipelineBatchSize: t.Number(),
       audioCaptureEnabled: t.Boolean(),
+      audioCaptureMode: t.Union([t.Literal('meeting'), t.Literal('continuous')]),
       audioSource: t.Union([t.Literal('microphone'), t.Literal('system'), t.Literal('mixed')]),
       closedEyesDiscardEnabled: t.Boolean(),
       closedEyesMode: t.Union([t.Literal('auto'), t.Literal('always-record'), t.Literal('always-pause')]),
@@ -1342,6 +1376,7 @@ export const ChronicleModel = {
     activityPipelineIntervalMs: t.Number(),
     activityPipelineBatchSize: t.Number(),
     audioCaptureEnabled: t.Boolean(),
+    audioCaptureMode: t.Union([t.Literal('meeting'), t.Literal('continuous')]),
     audioRuntimeStatus: t.Union([
       t.Literal('disabled'),
       t.Literal('armed'),

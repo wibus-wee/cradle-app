@@ -5,14 +5,20 @@ import { Badge } from '~/components/ui/badge'
 
 import { formatChronicleAudioTranscriptStatus } from './chronicle-audio-presenter'
 import { formatChronicleDateTime } from './chronicle-time-presenter'
-import type { ChronicleAudioTranscript } from './use-chronicle'
+import type { ChronicleAudioTranscript, ChronicleSpeakerProfile } from './use-chronicle'
 
 export interface ChronicleAudioTranscriptCardViewProps {
   transcript: ChronicleAudioTranscript
+  speakerProfiles: ChronicleSpeakerProfile[]
+  assigningSpeaker: boolean
+  onAssignSpeaker: (segmentId: string, speakerProfileId: string | null) => Promise<void>
 }
 
 export function ChronicleAudioTranscriptCardView({
   transcript,
+  speakerProfiles,
+  assigningSpeaker,
+  onAssignSpeaker,
 }: ChronicleAudioTranscriptCardViewProps) {
   const { t } = useTranslation('chronicle')
 
@@ -30,6 +36,27 @@ export function ChronicleAudioTranscriptCardView({
       <p className="line-clamp-4 text-[13px] leading-5 text-foreground">
         {transcript.previewText || t('audioTranscript.emptyPreview')}
       </p>
+      {transcript.segments.length > 0 && (
+        <div className="mt-3 space-y-2 border-t border-border/60 pt-2.5">
+          {transcript.segments.map(segment => (
+            <div key={segment.id} className="grid gap-1.5 rounded-md bg-muted/35 p-2">
+              <select
+                className="h-7 w-full rounded-md border border-border bg-background px-2 text-[12px] text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                value={segment.speakerProfileId ?? ''}
+                disabled={assigningSpeaker}
+                aria-label={t('audioTranscript.assignSpeaker')}
+                onChange={event => void onAssignSpeaker(segment.id, event.target.value || null)}
+              >
+                <option value="">{t('audioTranscript.unknownSpeaker')}</option>
+                {speakerProfiles.map(profile => (
+                  <option key={profile.id} value={profile.id}>{profile.displayName}</option>
+                ))}
+              </select>
+              <p className="text-[12px] leading-4 text-foreground">{segment.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
         <span className="font-mono">
           {formatChronicleDateTime(t, transcript.startedAt)}

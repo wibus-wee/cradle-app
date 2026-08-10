@@ -18,6 +18,7 @@ pub enum ModelId {
     OcrModel,
     EmbeddingModel,
     SpeakerEmbeddingExtractor,
+    SpeakerSegmentation,
 }
 
 impl ModelId {
@@ -32,6 +33,7 @@ impl ModelId {
                 "speaker",
                 "speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
             ),
+            ModelId::SpeakerSegmentation => ("speaker", "speaker/pyannote-segmentation-3.0.onnx"),
             ModelId::OcrModel => ("ocr", "ocr/model.onnx"),
         }
     }
@@ -197,6 +199,7 @@ impl ModelManager {
             ModelId::GlinerPii,
             ModelId::EmbeddingModel,
             ModelId::SpeakerEmbeddingExtractor,
+            ModelId::SpeakerSegmentation,
             ModelId::OcrModel,
         ];
         all.iter()
@@ -232,6 +235,10 @@ mod tests {
             PathBuf::from(
                 "/tmp/test-models/speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
             )
+        );
+        assert_eq!(
+            mgr.model_path(ModelId::SpeakerSegmentation),
+            PathBuf::from("/tmp/test-models/speaker/pyannote-segmentation-3.0.onnx")
         );
     }
 
@@ -279,5 +286,6 @@ mod tests {
         assert_eq!(ModelId::GlinerPii.category(), "pii");
         assert_eq!(ModelId::EmbeddingModel.category(), "embedding");
         assert_eq!(ModelId::SpeakerEmbeddingExtractor.category(), "speaker");
+        assert_eq!(ModelId::SpeakerSegmentation.category(), "speaker");
     }
 }

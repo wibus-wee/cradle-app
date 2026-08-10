@@ -96,6 +96,18 @@ jobs:
           path: apps/server/coverage/
           retention-days: 7
 
+  chronicle-macos:
+    name: Chronicle macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: chronicle
+      - name: Test Chronicle with default native features
+        run: cargo test --manifest-path chronicle/Cargo.toml --all-targets
+
   # ─── Build ────────────────────────────────────────────────────────────────
   build:
     name: Build

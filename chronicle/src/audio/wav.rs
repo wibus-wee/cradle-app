@@ -3,6 +3,8 @@
 use std::fs::{self, OpenOptions};
 use std::io::{BufWriter, ErrorKind, Write};
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "macos")]
+use std::process::Command;
 
 use crate::error::{ChronicleError, ChronicleResult};
 use crate::time::Timestamp;
@@ -10,6 +12,12 @@ use crate::time::Timestamp;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WavArtifact {
     pub wav_path: PathBuf,
+    pub metadata_path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AudioSegmentArtifact {
+    pub audio_path: PathBuf,
     pub metadata_path: PathBuf,
 }
 
@@ -59,8 +67,92 @@ pub fn write_audio_segment_artifact(
     storage_root: impl AsRef<Path>,
     samples: &[f32],
     metadata: &AudioArtifactMetadata,
-) -> ChronicleResult<WavArtifact> {
-    write_audio_artifact(storage_root, samples, metadata, AudioArtifactKind::Segment)
+) -> ChronicleResult<AudioSegmentArtifact> {
+    let audio_root = storage_root
+        .as_ref()
+        .join("audio")
+        .join(AudioArtifactKind::Segment.directory());
+    fs::create_dir_all(&audio_root).map_err(|source| ChronicleError::io_at(&audio_root, source))?;
+    write_unique_m4a_artifact(&audio_root, samples, metadata)
+}
+
+#[cfg(target_os = "macos")]
+fn write_unique_m4a_artifact(
+    audio_root: &Path,
+    samples: &[f32],
+    metadata: &AudioArtifactMetadata,
+) -> ChronicleResult<AudioSegmentArtifact> {
+    let timestamp = metadata.recorded_at.filesystem();
+    let pid = std::process::id();
+    let metadata_body = metadata_json(metadata, AudioArtifactKind::Segment);
+    for sequence in 0..10_000_u32 {
+        let base_name = format!(
+            "{timestamp}-{pid}-{sequence:04}-{}",
+            artifact_filename_suffix(metadata, AudioArtifactKind::Segment)
+        );
+        let audio_path = audio_root.join(format!("{base_name}.m4a"));
+        let metadata_path = audio_root.join(format!("{base_name}.json"));
+        if audio_path.exists() || metadata_path.exists() {
+            continue;
+        }
+        let temporary_wav = std::env::temp_dir().join(format!(
+            "cradle-chronicle-{pid}-{sequence:04}-{}.wav",
+            metadata.recorded_at.compact()
+        ));
+        write_mono_i16_wav_exclusive(&temporary_wav, samples, metadata.sample_rate)?;
+        let conversion = Command::new("/usr/bin/afconvert")
+            .args(["-f", "m4af", "-d", "aac", "-b", "32000", "-q", "127"])
+            .arg(&temporary_wav)
+            .arg(&audio_path)
+            .output();
+        let _ = fs::remove_file(&temporary_wav);
+        match conversion {
+            Ok(output) if output.status.success() => {}
+            Ok(output) => {
+                let _ = fs::remove_file(&audio_path);
+                return Err(ChronicleError::Process(format!(
+                    "afconvert failed to encode 32 kbps AAC-LC M4A: {}",
+                    String::from_utf8_lossy(&output.stderr).trim()
+                )));
+            }
+            Err(source) => {
+                let _ = fs::remove_file(&audio_path);
+                return Err(ChronicleError::Process(format!(
+                    "failed to launch afconvert for M4A encoding: {source}"
+                )));
+            }
+        }
+        match write_metadata_exclusive(&metadata_path, &metadata_body) {
+            Ok(()) => {
+                return Ok(AudioSegmentArtifact {
+                    audio_path,
+                    metadata_path,
+                });
+            }
+            Err(error) => {
+                let _ = fs::remove_file(&audio_path);
+                if is_already_exists(&error) {
+                    continue;
+                }
+                return Err(error);
+            }
+        }
+    }
+    Err(ChronicleError::Process(format!(
+        "failed to reserve M4A audio segment path under {}",
+        audio_root.display()
+    )))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn write_unique_m4a_artifact(
+    _audio_root: &Path,
+    _samples: &[f32],
+    _metadata: &AudioArtifactMetadata,
+) -> ChronicleResult<AudioSegmentArtifact> {
+    Err(ChronicleError::Process(
+        "production M4A audio artifacts currently require macOS afconvert".to_string(),
+    ))
 }
 
 fn write_audio_artifact(
@@ -241,9 +333,9 @@ fn sanitize_artifact_source(source: &str) -> String {
 mod tests {
     use std::fs;
 
-    use crate::audio::wav::{
-        AudioArtifactMetadata, write_audio_diagnostics_artifact, write_audio_segment_artifact,
-    };
+    #[cfg(target_os = "macos")]
+    use crate::audio::wav::write_audio_segment_artifact;
+    use crate::audio::wav::{AudioArtifactMetadata, write_audio_diagnostics_artifact};
     use crate::time::Timestamp;
 
     #[test]
@@ -278,6 +370,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn writes_segment_artifact_under_segments_directory() {
         let root = std::env::temp_dir().join(format!(
@@ -301,12 +394,19 @@ mod tests {
         let artifact = write_audio_segment_artifact(&root, &[0.25, -0.25], &metadata)
             .expect("audio segment artifact should write");
 
-        assert!(artifact.wav_path.to_string_lossy().contains("/segments/"));
+        assert!(artifact.audio_path.to_string_lossy().contains("/segments/"));
         assert!(
             artifact
-                .wav_path
+                .audio_path
                 .to_string_lossy()
                 .contains("system-segment")
+        );
+        assert_eq!(
+            artifact
+                .audio_path
+                .extension()
+                .and_then(|value| value.to_str()),
+            Some("m4a")
         );
         let json = fs::read_to_string(artifact.metadata_path).expect("metadata should read");
         assert!(json.contains("\"runtime\":\"system-segment\""));

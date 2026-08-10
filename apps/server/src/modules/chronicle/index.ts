@@ -205,6 +205,28 @@ export function createChronicleModule(downloadCenter?: Chronicle.ModelResourceDo
     body: ChronicleModel.speakerProfileBody,
     response: { 200: ChronicleModel.speakerProfile },
   })
+  .patch('/speaker-profiles/:profileId', ({ params, body }) => Chronicle.updateSpeakerProfile(params.profileId, body), {
+    detail: { summary: 'Rename a Chronicle speaker profile', tags: ['chronicle'] },
+    params: t.Object({ profileId: t.String({ minLength: 1 }) }),
+    body: ChronicleModel.speakerProfilePatchBody,
+    response: { 200: ChronicleModel.speakerProfile },
+  })
+  .delete('/speaker-profiles/:profileId/voiceprint', ({ params }) => Chronicle.deleteSpeakerVoiceprint(params.profileId), {
+    detail: { summary: 'Delete a Chronicle speaker voiceprint', tags: ['chronicle'] },
+    params: t.Object({ profileId: t.String({ minLength: 1 }) }),
+    response: { 200: ChronicleModel.speakerProfile },
+  })
+  .delete('/speaker-profiles/:profileId', ({ params }) => Chronicle.deleteSpeakerProfile(params.profileId), {
+    detail: { summary: 'Delete a Chronicle speaker profile without deleting transcript text', tags: ['chronicle'] },
+    params: t.Object({ profileId: t.String({ minLength: 1 }) }),
+    response: { 200: t.Object({ ok: t.Literal(true) }) },
+  })
+  .patch('/audio-segments/:segmentId/speaker', ({ params, body }) => Chronicle.updateAudioSegmentSpeaker(params.segmentId, body), {
+    detail: { summary: 'Assign or unassign a Chronicle transcript speaker', tags: ['chronicle'] },
+    params: t.Object({ segmentId: t.String({ minLength: 1 }) }),
+    body: ChronicleModel.audioSegmentSpeakerPatchBody,
+    response: { 200: ChronicleModel.audioSegment },
+  })
   .get('/audio-raw-segments', ({ query }) => Chronicle.listAudioRawSegments(query.limit), {
     detail: {
       'summary': 'List Chronicle raw audio segment artifacts',

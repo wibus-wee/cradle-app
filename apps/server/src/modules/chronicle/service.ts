@@ -59,6 +59,7 @@ interface ChronicleConfig {
   dreamSchedulerIntervalMs: number
   dreamSchedulerApplyMerge: boolean
   audioCaptureEnabled: boolean
+  audioCaptureMode: 'meeting' | 'continuous'
   audioSource: 'microphone' | 'system' | 'mixed'
   audioSegmentMs: number
   audioSegmentIntervalMs: number
@@ -83,6 +84,7 @@ const defaultConfig: ChronicleConfig = {
   dreamSchedulerIntervalMs: 86_400_000,
   dreamSchedulerApplyMerge: false,
   audioCaptureEnabled: false,
+  audioCaptureMode: 'meeting',
   audioSource: 'microphone',
   audioSegmentMs: 5_000,
   audioSegmentIntervalMs: 60_000,
@@ -133,6 +135,7 @@ const ChronicleConfigSchema = z.object({
   dreamSchedulerIntervalMs: z.number().finite().positive().default(defaultConfig.dreamSchedulerIntervalMs),
   dreamSchedulerApplyMerge: z.boolean().default(defaultConfig.dreamSchedulerApplyMerge),
   audioCaptureEnabled: z.boolean().default(defaultConfig.audioCaptureEnabled),
+  audioCaptureMode: z.enum(['meeting', 'continuous']).default(defaultConfig.audioCaptureMode),
   audioSource: z.enum(['microphone', 'system', 'mixed']).default(defaultConfig.audioSource),
   audioSegmentMs: z.number().finite().positive().default(defaultConfig.audioSegmentMs),
   audioSegmentIntervalMs: z.number().finite().positive().default(defaultConfig.audioSegmentIntervalMs),
@@ -288,6 +291,7 @@ const SpeakerAliasesSchema = z.array(z.string())
 
 const SpeakerEmbeddingSchema = z.array(z.coerce.number().finite())
   .min(1, 'Speaker embedding must contain finite numeric values')
+  .max(4_096, 'Speaker embedding is too large')
   .nullable()
   .optional()
 
@@ -361,6 +365,9 @@ const AudioTranscriptSegmentInputSchema = z.object({
   startMs: z.number().finite().transform(value => Math.floor(value)),
   endMs: z.number().finite().nullable().optional().default(null).transform(value => value === null ? null : Math.floor(value)),
   speakerLabel: NullableStringSchema,
+  speakerCandidateKey: NullableStringSchema,
+  speakerEmbedding: SpeakerEmbeddingSchema,
+  speakerEmbeddingModelId: NullableStringSchema,
   text: z.string(),
   confidence: RatioBpsSchema.nullable().optional().default(null),
   language: NullableStringSchema,
@@ -430,6 +437,14 @@ const SpeakerProfileInputSchema = z.object({
   sampleCount: NonNegativeIntegerSchema.optional(),
   lastSeenAt: NullableStringSchema.transform(value => value === null ? null : UnixTimestampTextSchema.parse(value)),
   metadata: JsonRecordSchema,
+})
+
+const SpeakerProfilePatchInputSchema = z.object({
+  displayName: SpeakerDisplayNameSchema,
+})
+
+const AudioSegmentSpeakerPatchInputSchema = z.object({
+  speakerProfileId: NullableStringSchema,
 })
 
 const AccessibilitySnapshotReportInputSchema = z.object({
@@ -1015,10 +1030,12 @@ const ChronicleSummarizeInputSchema = z.object({
 
 const SpeakerProfileUpsertInputSchema = z.object({
   workspaceId: z.string().nullable(),
+  stableKey: z.string().trim().min(1).optional(),
   displayName: SpeakerDisplayNameSchema,
   aliases: SpeakerAliasesSchema,
   embedding: SpeakerEmbeddingSchema,
   embeddingModelId: NullableStringSchema,
+  identitySource: z.enum(['automatic', 'user']).default('automatic'),
   sampleCount: z.number().finite().nonnegative().default(1).transform(value => Math.floor(value)),
   seenAt: z.number().finite().nullable().optional(),
   transcriptId: NullableStringSchema,
@@ -1199,21 +1216,32 @@ const rawBuiltInModelManifests = {
   },
   'speaker': {
     category: 'speaker',
-    displayName: 'Speaker Embedding Extractor',
-    version: '3dspeaker-campplus-zh-en-16k',
+    displayName: 'Speaker Diarization',
+    version: 'pyannote-segmentation-3.0-campplus-zh-en-16k',
     runtime: 'sherpa-onnx',
     required: false,
-    message: 'Sherpa speaker embedding extractor model for local speaker profiles and meeting speaker labeling.',
-    files: [{
-      path: 'speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
-      sourceUrl: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
-      sha256: 'aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2',
-      sizeBytes: 28_281_164,
-      required: true,
-    }],
+    message: 'Sherpa Pyannote segmentation and CAMPPlus embedding models for local meeting speaker labeling.',
+    files: [
+      {
+        path: 'speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
+        sourceUrl: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
+        sha256: 'aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2',
+        sizeBytes: 28_281_164,
+        required: true,
+      },
+      {
+        path: 'speaker/pyannote-segmentation-3.0.onnx',
+        sourceUrl: 'https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx',
+        fallbackUrls: [
+          'https://hf-mirror.com/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx',
+        ],
+        sha256: '220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079',
+        required: true,
+      },
+    ],
     metadata: {
       requiredFor: ['speaker-labeling', 'meeting-transcription'],
-      function: 'speaker-embedding-extractor',
+      function: 'pyannote-segmentation-plus-campplus',
       sampleRate: 16_000,
       languages: ['zh', 'en'],
     },
@@ -1440,6 +1468,7 @@ export interface ChronicleStatus {
   activityPipelineIntervalMs: number
   activityPipelineBatchSize: number
   audioCaptureEnabled: boolean
+  audioCaptureMode: 'meeting' | 'continuous'
   audioSource: 'microphone' | 'system' | 'mixed'
   audioRuntimeStatus: 'disabled' | 'armed' | 'unavailable'
   closedEyesDiscardEnabled: boolean
@@ -1482,6 +1511,7 @@ export interface ActivityMonitorStatusEntry {
     activityPipelineIntervalMs: number
     activityPipelineBatchSize: number
     audioCaptureEnabled: boolean
+    audioCaptureMode: 'meeting' | 'continuous'
     audioSource: 'microphone' | 'system' | 'mixed'
     closedEyesDiscardEnabled: boolean
     closedEyesMode: 'auto' | 'always-record' | 'always-pause'
@@ -1856,6 +1886,9 @@ export interface AudioTranscriptSegmentInput {
   startMs: number
   endMs?: number | null
   speakerLabel?: string | null
+  speakerCandidateKey?: string | null
+  speakerEmbedding?: number[] | null
+  speakerEmbeddingModelId?: string | null
   text: string
   confidence?: number | null
   language?: string | null
@@ -1883,7 +1916,10 @@ export interface AudioTranscriptSegmentEntry {
   segmentIndex: number
   startMs: number
   endMs: number | null
+  speakerProfileId: string | null
   speakerLabel: string | null
+  speakerAssignmentSource: 'automatic' | 'user' | 'unassigned'
+  speakerMatchConfidence: number | null
   text: string
   confidence: number | null
   language: string | null
@@ -1914,9 +1950,10 @@ export interface SpeakerProfileEntry {
   displayName: string
   normalizedLabel: string
   aliases: string[]
-  embedding: number[] | null
+  hasVoiceprint: boolean
   embeddingDimensions: number | null
   embeddingModelId: string | null
+  identitySource: 'automatic' | 'user'
   sampleCount: number
   lastSeenAt: string | null
   lastSeenAtUnix: number | null
@@ -1937,6 +1974,14 @@ export interface SpeakerProfileInput {
   sampleCount?: number
   lastSeenAt?: string | null
   metadata?: Record<string, unknown>
+}
+
+export interface SpeakerProfilePatchInput {
+  displayName: string
+}
+
+export interface AudioSegmentSpeakerPatchInput {
+  speakerProfileId: string | null
 }
 
 export interface AudioRawSegmentReportInput {
@@ -2129,6 +2174,7 @@ function toDaemonOptions(config: ChronicleConfig): DaemonManager.ChronicleDaemon
   return {
     storageRoot: config.storageRoot,
     audioCaptureEnabled: config.audioCaptureEnabled,
+    audioCaptureMode: config.audioCaptureMode,
     audioSource: config.audioSource,
     audioSegmentMs: config.audioSegmentMs,
     audioSegmentIntervalMs: config.audioSegmentIntervalMs,
@@ -2142,6 +2188,7 @@ function toDaemonOptions(config: ChronicleConfig): DaemonManager.ChronicleDaemon
 function daemonLaunchConfigChanged(previous: ChronicleConfig, next: ChronicleConfig): boolean {
   return previous.storageRoot !== next.storageRoot
     || previous.audioCaptureEnabled !== next.audioCaptureEnabled
+    || previous.audioCaptureMode !== next.audioCaptureMode
     || previous.audioSource !== next.audioSource
     || previous.audioSegmentMs !== next.audioSegmentMs
     || previous.audioSegmentIntervalMs !== next.audioSegmentIntervalMs
@@ -2257,6 +2304,7 @@ export async function updateConfig(input: unknown): Promise<ChronicleConfig> {
     audioRmsThreshold: boundedNumber(config.audioRmsThreshold, 0, 1),
     storageRoot: resolve(config.storageRoot),
     audioSource: config.audioSource,
+    audioCaptureMode: config.audioCaptureMode,
   }
   await saveConfig(next)
   recordEvent({
@@ -2274,6 +2322,7 @@ export async function updateConfig(input: unknown): Promise<ChronicleConfig> {
       dreamSchedulerIntervalMs: next.dreamSchedulerIntervalMs,
       dreamSchedulerApplyMerge: next.dreamSchedulerApplyMerge,
       audioCaptureEnabled: next.audioCaptureEnabled,
+      audioCaptureMode: next.audioCaptureMode,
       audioSource: next.audioSource,
       audioSegmentMs: next.audioSegmentMs,
       audioSegmentIntervalMs: next.audioSegmentIntervalMs,
@@ -2466,6 +2515,7 @@ export async function getStatus(): Promise<ChronicleStatus> {
     activityPipelineIntervalMs: config.activityPipelineIntervalMs,
     activityPipelineBatchSize: config.activityPipelineBatchSize,
     audioCaptureEnabled: config.audioCaptureEnabled,
+    audioCaptureMode: config.audioCaptureMode,
     audioSource: config.audioSource,
     audioRuntimeStatus: runtimeAllowed ? getAudioRuntimeStatus(config, daemonInfo) : 'disabled',
     closedEyesDiscardEnabled: config.closedEyesDiscardEnabled,
@@ -3805,6 +3855,7 @@ export async function getActivityMonitorStatus(): Promise<ActivityMonitorStatusE
       activityPipelineIntervalMs: status.activityPipelineIntervalMs,
       activityPipelineBatchSize: status.activityPipelineBatchSize,
       audioCaptureEnabled: status.audioCaptureEnabled,
+      audioCaptureMode: status.audioCaptureMode,
       audioSource: status.audioSource,
       closedEyesDiscardEnabled: status.closedEyesDiscardEnabled,
       closedEyesMode: status.closedEyesMode,
@@ -6161,10 +6212,12 @@ function uniqueStrings(values: string[]): string[] {
 
 interface SpeakerProfileUpsertInput {
   workspaceId: string | null
+  stableKey?: string
   displayName: string
   aliases?: string[]
   embedding?: number[] | null
   embeddingModelId?: string | null
+  identitySource?: 'automatic' | 'user'
   sampleCount?: number
   seenAt?: number | null
   transcriptId?: string | null
@@ -6182,7 +6235,7 @@ function upsertSpeakerProfileFromLabel(
   const displayName = input.displayName
   const normalizedLabel = normalizeSpeakerDisplayName(displayName).toLocaleLowerCase()
   const workspaceId = input.workspaceId || null
-  const stableKey = buildSpeakerStableKey(workspaceId, normalizedLabel)
+  const stableKey = input.stableKey ?? buildSpeakerStableKey(workspaceId, normalizedLabel)
   const existing = d
     .select()
     .from(chronicleSpeakerProfiles)
@@ -6216,6 +6269,7 @@ function upsertSpeakerProfileFromLabel(
       ? null
       : input.embeddingModelId ?? existing?.embeddingModelId ?? 'speaker-embedding-extractor'
   const lastSeenAt = input.seenAt ?? (existing ? existing.lastSeenAt : null)
+  const identitySource = existing?.identitySource === 'user' ? 'user' : input.identitySource
 
   if (existing) {
     d.update(chronicleSpeakerProfiles).set({
@@ -6225,6 +6279,7 @@ function upsertSpeakerProfileFromLabel(
       embeddingJson,
       embeddingDimensions,
       embeddingModelId,
+      identitySource,
       sampleCount: nextSampleCount,
       lastSeenAt,
       sourceTranscriptId: input.transcriptId === null ? existing.sourceTranscriptId : input.transcriptId,
@@ -6246,6 +6301,7 @@ function upsertSpeakerProfileFromLabel(
     embeddingJson,
     embeddingDimensions,
     embeddingModelId,
+    identitySource,
     sampleCount: nextSampleCount,
     lastSeenAt,
     sourceTranscriptId: input.transcriptId,
@@ -6278,6 +6334,122 @@ function normalizeSpeakerAliases(values: string[]): string[] {
 
 function buildSpeakerStableKey(workspaceId: string | null, normalizedLabel: string): string {
   return `${workspaceId ?? 'global'}:${normalizedLabel}`
+}
+
+const SPEAKER_MATCH_MINIMUM = 0.78
+const SPEAKER_MATCH_AMBIGUITY_MARGIN = 0.05
+
+interface SpeakerAssignment {
+  profileId: string | null
+  label: string
+  source: 'automatic' | 'user' | 'unassigned'
+  confidenceBps: number | null
+}
+
+function speakerCosineSimilarity(left: number[], right: number[]): number | null {
+  if (left.length !== right.length || left.length === 0) {
+    return null
+  }
+  let dot = 0
+  let leftMagnitude = 0
+  let rightMagnitude = 0
+  for (let index = 0; index < left.length; index += 1) {
+    dot += left[index] * right[index]
+    leftMagnitude += left[index] * left[index]
+    rightMagnitude += right[index] * right[index]
+  }
+  if (leftMagnitude === 0 || rightMagnitude === 0) {
+    return null
+  }
+  return dot / Math.sqrt(leftMagnitude * rightMagnitude)
+}
+
+function mergeSpeakerEmbedding(existing: number[], sampleCount: number, incoming: number[]): number[] {
+  const denominator = Math.max(1, sampleCount) + 1
+  return existing.map((value, index) => ((value * Math.max(1, sampleCount)) + incoming[index]) / denominator)
+}
+
+function resolveSpeakerAssignment(
+  d: ChronicleDb | ChronicleTx,
+  input: {
+    workspaceId: string | null
+    transcriptSource: 'asr' | 'manual' | 'imported'
+    speakerLabel: string | null
+    embedding: number[] | null | undefined
+    embeddingModelId: string | null
+    seenAt: number
+    transcriptId: string
+    segmentId: string | null
+  },
+): SpeakerAssignment {
+  if (!input.embedding) {
+    if (input.speakerLabel && input.transcriptSource !== 'asr') {
+      const profile = upsertSpeakerProfileFromLabel(d, {
+        workspaceId: input.workspaceId,
+        displayName: input.speakerLabel,
+        identitySource: 'user',
+        seenAt: input.seenAt,
+        transcriptId: input.transcriptId,
+        segmentId: input.segmentId,
+      })
+      return { profileId: profile.id, label: profile.displayName, source: 'user', confidenceBps: null }
+    }
+    return { profileId: null, label: 'Unknown', source: 'unassigned', confidenceBps: null }
+  }
+
+  const embeddingModelId = input.embeddingModelId ?? 'speaker-embedding-extractor'
+  const candidates = d
+    .select()
+    .from(chronicleSpeakerProfiles)
+    .all()
+    .filter(profile => profile.workspaceId === input.workspaceId
+      && profile.embeddingModelId === embeddingModelId
+      && profile.embeddingDimensions === input.embedding!.length
+      && profile.embeddingJson !== null)
+    .map((profile) => {
+      const similarity = speakerCosineSimilarity(NumberListTextSchema.parse(profile.embeddingJson), input.embedding!)
+      return similarity === null ? null : { profile, similarity }
+    })
+    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
+    .sort((left, right) => right.similarity - left.similarity)
+
+  const best = candidates[0]
+  const runnerUp = candidates[1]
+  if (best && best.similarity >= SPEAKER_MATCH_MINIMUM) {
+    if (runnerUp && best.similarity - runnerUp.similarity < SPEAKER_MATCH_AMBIGUITY_MARGIN) {
+      return { profileId: null, label: 'Unknown', source: 'unassigned', confidenceBps: Math.round(best.similarity * 10_000) }
+    }
+    const existingEmbedding = NumberListTextSchema.parse(best.profile.embeddingJson)
+    const mergedEmbedding = mergeSpeakerEmbedding(existingEmbedding, best.profile.sampleCount, input.embedding)
+    d.update(chronicleSpeakerProfiles).set({
+      embeddingJson: JSON.stringify(mergedEmbedding),
+      sampleCount: best.profile.sampleCount + 1,
+      lastSeenAt: input.seenAt,
+      sourceTranscriptId: input.transcriptId,
+      sourceSegmentId: input.segmentId,
+      updatedAt: currentUnixSeconds(),
+    }).where(eq(chronicleSpeakerProfiles.id, best.profile.id)).run()
+    return {
+      profileId: best.profile.id,
+      label: best.profile.displayName,
+      source: 'automatic',
+      confidenceBps: Math.round(best.similarity * 10_000),
+    }
+  }
+
+  const profile = upsertSpeakerProfileFromLabel(d, {
+    workspaceId: input.workspaceId,
+    stableKey: `${input.workspaceId ?? 'global'}:voice:${randomUUID()}`,
+    displayName: 'Unknown',
+    embedding: input.embedding,
+    embeddingModelId,
+    identitySource: 'automatic',
+    sampleCount: 1,
+    seenAt: input.seenAt,
+    transcriptId: input.transcriptId,
+    segmentId: input.segmentId,
+  })
+  return { profileId: profile.id, label: profile.displayName, source: 'automatic', confidenceBps: null }
 }
 
 function normalizeActivityBoundary(value: string | null): string {
@@ -6477,6 +6649,27 @@ export function recordAudioTranscript(rawInput: AudioTranscriptReportInput): Aud
     .where(eq(chronicleAudioTranscripts.sourceId, input.sourceId))
     .get()
   const transcriptId = existing?.id ?? randomUUID()
+  const preservedUserAssignments = new Map<number, { profileId: string, displayName: string }>()
+  if (existing) {
+    const previousSegments = db()
+      .select()
+      .from(chronicleAudioSegments)
+      .where(eq(chronicleAudioSegments.transcriptId, transcriptId))
+      .all()
+    for (const segment of previousSegments) {
+      if (segment.speakerAssignmentSource !== 'user' || !segment.speakerProfileId) {
+        continue
+      }
+      const profile = db()
+        .select()
+        .from(chronicleSpeakerProfiles)
+        .where(eq(chronicleSpeakerProfiles.id, segment.speakerProfileId))
+        .get()
+      if (profile) {
+        preservedUserAssignments.set(segment.segmentIndex, { profileId: profile.id, displayName: profile.displayName })
+      }
+    }
+  }
   const transcriptText = buildAudioTranscriptMemoryContent({
     title: input.title,
     startedAt,
@@ -6528,16 +6721,43 @@ export function recordAudioTranscript(rawInput: AudioTranscriptReportInput): Aud
       }).run()
     }
 
+    const candidateAssignments = new Map<string, SpeakerAssignment>()
     for (const [segmentIndex, segment] of input.segments.entries()) {
       const segmentId = randomUUID()
-      const speakerLabel = segment.speakerLabel
+      const preservedAssignment = preservedUserAssignments.get(segmentIndex)
+      const cachedAssignment = segment.speakerCandidateKey
+        ? candidateAssignments.get(segment.speakerCandidateKey)
+        : undefined
+      const speakerAssignment: SpeakerAssignment = preservedAssignment
+        ? {
+            profileId: preservedAssignment.profileId,
+            label: preservedAssignment.displayName,
+            source: 'user',
+            confidenceBps: null,
+          }
+        : cachedAssignment ?? resolveSpeakerAssignment(tx, {
+            workspaceId: config.workspaceId || null,
+            transcriptSource: source,
+            speakerLabel: segment.speakerLabel,
+            embedding: segment.speakerEmbedding,
+            embeddingModelId: segment.speakerEmbeddingModelId,
+            seenAt: startedAt + Math.floor(segment.startMs / 1000),
+            transcriptId,
+            segmentId: null,
+          })
+      if (segment.speakerCandidateKey && !cachedAssignment) {
+        candidateAssignments.set(segment.speakerCandidateKey, speakerAssignment)
+      }
       tx.insert(chronicleAudioSegments).values({
         id: segmentId,
         transcriptId,
         segmentIndex,
         startMs: segment.startMs,
         endMs: segment.endMs,
-        speakerLabel,
+        speakerProfileId: speakerAssignment.profileId,
+        speakerLabel: speakerAssignment.label,
+        speakerAssignmentSource: speakerAssignment.source,
+        speakerMatchConfidenceBps: speakerAssignment.confidenceBps,
         text: segment.text,
         confidenceBps: segment.confidenceBps,
         language: segment.language ?? input.language,
@@ -6545,19 +6765,11 @@ export function recordAudioTranscript(rawInput: AudioTranscriptReportInput): Aud
         createdAt: now,
         updatedAt: now,
       }).run()
-      if (speakerLabel) {
-        upsertSpeakerProfileFromLabel(tx, {
-          workspaceId: config.workspaceId || null,
-          displayName: speakerLabel,
-          seenAt: startedAt + Math.floor(segment.startMs / 1000),
-          transcriptId,
-          segmentId,
-          metadata: {
-            source: 'audio-transcript',
-            transcriptSourceId: input.sourceId,
-            transcriptTitle: input.title,
-          },
-        })
+      if (speakerAssignment.profileId) {
+        tx.update(chronicleSpeakerProfiles).set({
+          sourceSegmentId: segmentId,
+          updatedAt: now,
+        }).where(eq(chronicleSpeakerProfiles.id, speakerAssignment.profileId)).run()
       }
     }
   })
@@ -6647,6 +6859,7 @@ export function upsertSpeakerProfile(rawInput: SpeakerProfileInput): SpeakerProf
     aliases,
     embedding,
     embeddingModelId: input.embeddingModelId,
+    identitySource: 'user',
     sampleCount,
     seenAt: lastSeenAt,
     metadata: {
@@ -6656,6 +6869,102 @@ export function upsertSpeakerProfile(rawInput: SpeakerProfileInput): SpeakerProf
     now,
   })
   return toSpeakerProfileEntry(row)
+}
+
+export function updateSpeakerProfile(profileId: string, rawInput: SpeakerProfilePatchInput): SpeakerProfileEntry {
+  const input = SpeakerProfilePatchInputSchema.parse(rawInput)
+  const row = db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()
+  if (!row) {
+    throw new AppError({ code: 'chronicle_speaker_profile_not_found', status: 404, message: 'Chronicle speaker profile not found' })
+  }
+  const now = currentUnixSeconds()
+  const aliases = normalizeSpeakerAliases([
+    ...StringListTextSchema.parse(row.aliasesJson),
+    row.displayName,
+    input.displayName,
+  ])
+  db().transaction((tx) => {
+    tx.update(chronicleSpeakerProfiles).set({
+      displayName: input.displayName,
+      normalizedLabel: input.displayName.toLocaleLowerCase(),
+      aliasesJson: JSON.stringify(aliases),
+      identitySource: 'user',
+      updatedAt: now,
+    }).where(eq(chronicleSpeakerProfiles.id, profileId)).run()
+    tx.update(chronicleAudioSegments).set({
+      speakerLabel: input.displayName,
+      updatedAt: now,
+    }).where(eq(chronicleAudioSegments.speakerProfileId, profileId)).run()
+  })
+  return toSpeakerProfileEntry(db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()!)
+}
+
+export function deleteSpeakerVoiceprint(profileId: string): SpeakerProfileEntry {
+  const row = db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()
+  if (!row) {
+    throw new AppError({ code: 'chronicle_speaker_profile_not_found', status: 404, message: 'Chronicle speaker profile not found' })
+  }
+  db().update(chronicleSpeakerProfiles).set({
+    embeddingJson: null,
+    embeddingDimensions: null,
+    embeddingModelId: null,
+    updatedAt: currentUnixSeconds(),
+  }).where(eq(chronicleSpeakerProfiles.id, profileId)).run()
+  return toSpeakerProfileEntry(db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()!)
+}
+
+export function deleteSpeakerProfile(profileId: string): { ok: true } {
+  const row = db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()
+  if (!row) {
+    throw new AppError({ code: 'chronicle_speaker_profile_not_found', status: 404, message: 'Chronicle speaker profile not found' })
+  }
+  const now = currentUnixSeconds()
+  db().transaction((tx) => {
+    tx.update(chronicleAudioSegments).set({
+      speakerProfileId: null,
+      speakerLabel: 'Unknown',
+      speakerAssignmentSource: 'unassigned',
+      speakerMatchConfidenceBps: null,
+      updatedAt: now,
+    }).where(eq(chronicleAudioSegments.speakerProfileId, profileId)).run()
+    tx.delete(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).run()
+  })
+  return { ok: true }
+}
+
+export function updateAudioSegmentSpeaker(
+  segmentId: string,
+  rawInput: AudioSegmentSpeakerPatchInput,
+): AudioTranscriptSegmentEntry {
+  const input = AudioSegmentSpeakerPatchInputSchema.parse(rawInput)
+  const segment = db().select().from(chronicleAudioSegments).where(eq(chronicleAudioSegments.id, segmentId)).get()
+  if (!segment) {
+    throw new AppError({ code: 'chronicle_audio_segment_not_found', status: 404, message: 'Chronicle audio segment not found' })
+  }
+  const now = currentUnixSeconds()
+  if (input.speakerProfileId === null) {
+    db().update(chronicleAudioSegments).set({
+      speakerProfileId: null,
+      speakerLabel: 'Unknown',
+      speakerAssignmentSource: 'unassigned',
+      speakerMatchConfidenceBps: null,
+      updatedAt: now,
+    }).where(eq(chronicleAudioSegments.id, segmentId)).run()
+  }
+  else {
+    const profile = db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, input.speakerProfileId)).get()
+    if (!profile) {
+      throw new AppError({ code: 'chronicle_speaker_profile_not_found', status: 404, message: 'Chronicle speaker profile not found' })
+    }
+    db().update(chronicleAudioSegments).set({
+      speakerProfileId: profile.id,
+      speakerLabel: profile.displayName,
+      speakerAssignmentSource: 'user',
+      speakerMatchConfidenceBps: null,
+      updatedAt: now,
+    }).where(eq(chronicleAudioSegments.id, segmentId)).run()
+  }
+  return toAudioSegmentEntry(db().select().from(chronicleAudioSegments).where(eq(chronicleAudioSegments.id, segmentId)).get()!)
 }
 
 export async function syncSlackSource(
@@ -7822,7 +8131,10 @@ function toAudioSegmentEntry(row: typeof chronicleAudioSegments.$inferSelect): A
     segmentIndex: row.segmentIndex,
     startMs: row.startMs,
     endMs: row.endMs,
+    speakerProfileId: row.speakerProfileId,
     speakerLabel: row.speakerLabel,
+    speakerAssignmentSource: row.speakerAssignmentSource,
+    speakerMatchConfidence: row.speakerMatchConfidenceBps === null ? null : row.speakerMatchConfidenceBps / 10_000,
     text: row.text,
     confidence: row.confidenceBps === null ? null : row.confidenceBps / 10_000,
     language: row.language,
@@ -7830,16 +8142,16 @@ function toAudioSegmentEntry(row: typeof chronicleAudioSegments.$inferSelect): A
 }
 
 function toSpeakerProfileEntry(row: typeof chronicleSpeakerProfiles.$inferSelect): SpeakerProfileEntry {
-  const embedding = row.embeddingJson ? NumberListTextSchema.parse(row.embeddingJson) : null
   return {
     id: row.id,
     workspaceId: row.workspaceId,
     displayName: row.displayName,
     normalizedLabel: row.normalizedLabel,
     aliases: StringListTextSchema.parse(row.aliasesJson),
-    embedding,
+    hasVoiceprint: row.embeddingJson !== null,
     embeddingDimensions: row.embeddingDimensions,
     embeddingModelId: row.embeddingModelId,
+    identitySource: row.identitySource,
     sampleCount: row.sampleCount,
     lastSeenAt: row.lastSeenAt === null ? null : new Date(row.lastSeenAt * 1000).toISOString(),
     lastSeenAtUnix: row.lastSeenAt,

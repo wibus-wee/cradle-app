@@ -17,7 +17,11 @@ const meta = {
   ],
   args: {
     loading: false,
+    busy: false,
     profiles: chronicleSpeakerProfileFixtures,
+    onRename: async () => {},
+    onDeleteVoiceprint: async () => {},
+    onDeleteProfile: async () => {},
   },
 } satisfies Meta<typeof ChronicleSpeakerProfileGridView>
 

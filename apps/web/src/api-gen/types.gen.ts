@@ -1312,6 +1312,24 @@ export type PostWorkspacesByWorkspaceIdMigrateResponses = {
 
 export type PostWorkspacesByWorkspaceIdMigrateResponse = PostWorkspacesByWorkspaceIdMigrateResponses[keyof PostWorkspacesByWorkspaceIdMigrateResponses];
 
+export type GetCodeActivitySessionsBySessionIdEventsData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/code-activity/sessions/{sessionId}/events';
+};
+
+export type GetCodeActivitySessionsBySessionIdEventsResponses = {
+    /**
+     * Server-sent Code Activity source events.
+     */
+    200: string;
+};
+
+export type GetCodeActivitySessionsBySessionIdEventsResponse = GetCodeActivitySessionsBySessionIdEventsResponses[keyof GetCodeActivitySessionsBySessionIdEventsResponses];
+
 export type GetFilesystemBrowseData = {
     body?: never;
     path?: never;
@@ -22848,6 +22866,7 @@ export type GetChronicleConfigResponses = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -22876,6 +22895,7 @@ export type PutChronicleConfigData = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -22908,6 +22928,7 @@ export type PutChronicleConfigResponses = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -23123,6 +23144,7 @@ export type GetChronicleStatusResponses = {
         activityPipelineIntervalMs: number;
         activityPipelineBatchSize: number;
         audioCaptureEnabled: boolean;
+        audioCaptureMode: 'meeting' | 'continuous';
         audioRuntimeStatus: 'disabled' | 'armed' | 'unavailable';
         closedEyesDiscardEnabled: boolean;
         closedEyesMode: 'auto' | 'always-record' | 'always-pause';
@@ -23577,7 +23599,10 @@ export type GetChronicleAudioTranscriptsResponses = {
             segmentIndex: number;
             startMs: number;
             endMs: number | null;
+            speakerProfileId: string | null;
             speakerLabel: string | null;
+            speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+            speakerMatchConfidence: number | null;
             text: string;
             confidence: number | null;
             language: string | null;
@@ -23604,6 +23629,9 @@ export type PostChronicleAudioTranscriptsData = {
             startMs: number;
             endMs?: number | null;
             speakerLabel?: string | null;
+            speakerCandidateKey?: string | null;
+            speakerEmbedding?: Array<number> | null;
+            speakerEmbeddingModelId?: string | null;
             text: string;
             confidence?: number | null;
             language?: string | null;
@@ -23645,7 +23673,10 @@ export type PostChronicleAudioTranscriptsResponses = {
             segmentIndex: number;
             startMs: number;
             endMs: number | null;
+            speakerProfileId: string | null;
             speakerLabel: string | null;
+            speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+            speakerMatchConfidence: number | null;
             text: string;
             confidence: number | null;
             language: string | null;
@@ -23672,9 +23703,10 @@ export type GetChronicleSpeakerProfilesResponses = {
         displayName: string;
         normalizedLabel: string;
         aliases: Array<string>;
-        embedding: Array<number> | null;
+        hasVoiceprint: boolean;
         embeddingDimensions: number | null;
         embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
         sampleCount: number;
         lastSeenAt: string | null;
         lastSeenAtUnix: number | null;
@@ -23719,9 +23751,10 @@ export type PostChronicleSpeakerProfilesResponses = {
         displayName: string;
         normalizedLabel: string;
         aliases: Array<string>;
-        embedding: Array<number> | null;
+        hasVoiceprint: boolean;
         embeddingDimensions: number | null;
         embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
         sampleCount: number;
         lastSeenAt: string | null;
         lastSeenAtUnix: number | null;
@@ -23738,6 +23771,140 @@ export type PostChronicleSpeakerProfilesResponses = {
 };
 
 export type PostChronicleSpeakerProfilesResponse = PostChronicleSpeakerProfilesResponses[keyof PostChronicleSpeakerProfilesResponses];
+
+export type DeleteChronicleSpeakerProfilesByProfileIdData = {
+    body?: never;
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}';
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdResponse = DeleteChronicleSpeakerProfilesByProfileIdResponses[keyof DeleteChronicleSpeakerProfilesByProfileIdResponses];
+
+export type PatchChronicleSpeakerProfilesByProfileIdData = {
+    body: {
+        displayName: string;
+    };
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}';
+};
+
+export type PatchChronicleSpeakerProfilesByProfileIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        displayName: string;
+        normalizedLabel: string;
+        aliases: Array<string>;
+        hasVoiceprint: boolean;
+        embeddingDimensions: number | null;
+        embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
+        sampleCount: number;
+        lastSeenAt: string | null;
+        lastSeenAtUnix: number | null;
+        sourceTranscriptId: string | null;
+        sourceSegmentId: string | null;
+        metadata: {
+            [key: string]: unknown;
+        };
+        createdAt: string;
+        createdAtUnix: number;
+        updatedAt: string;
+        updatedAtUnix: number;
+    };
+};
+
+export type PatchChronicleSpeakerProfilesByProfileIdResponse = PatchChronicleSpeakerProfilesByProfileIdResponses[keyof PatchChronicleSpeakerProfilesByProfileIdResponses];
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintData = {
+    body?: never;
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}/voiceprint';
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        displayName: string;
+        normalizedLabel: string;
+        aliases: Array<string>;
+        hasVoiceprint: boolean;
+        embeddingDimensions: number | null;
+        embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
+        sampleCount: number;
+        lastSeenAt: string | null;
+        lastSeenAtUnix: number | null;
+        sourceTranscriptId: string | null;
+        sourceSegmentId: string | null;
+        metadata: {
+            [key: string]: unknown;
+        };
+        createdAt: string;
+        createdAtUnix: number;
+        updatedAt: string;
+        updatedAtUnix: number;
+    };
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponse = DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses[keyof DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses];
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerData = {
+    body: {
+        speakerProfileId: string | null;
+    };
+    path: {
+        segmentId: string;
+    };
+    query?: never;
+    url: '/chronicle/audio-segments/{segmentId}/speaker';
+};
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        segmentIndex: number;
+        startMs: number;
+        endMs: number | null;
+        speakerProfileId: string | null;
+        speakerLabel: string | null;
+        speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+        speakerMatchConfidence: number | null;
+        text: string;
+        confidence: number | null;
+        language: string | null;
+    };
+};
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerResponse = PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses[keyof PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses];
 
 export type GetChronicleAudioRawSegmentsData = {
     body?: never;
@@ -24636,6 +24803,7 @@ export type GetChronicleActivityMonitorStatusResponses = {
             activityPipelineIntervalMs: number;
             activityPipelineBatchSize: number;
             audioCaptureEnabled: boolean;
+            audioCaptureMode: 'meeting' | 'continuous';
             audioSource: 'microphone' | 'system' | 'mixed';
             closedEyesDiscardEnabled: boolean;
             closedEyesMode: 'auto' | 'always-record' | 'always-pause';

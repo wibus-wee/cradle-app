@@ -377,7 +377,12 @@ export const chronicleAudioSegments = sqliteTable('chronicle_audio_segments', {
   segmentIndex: int('segment_index').notNull(),
   startMs: int('start_ms').notNull(),
   endMs: int('end_ms'),
+  speakerProfileId: text('speaker_profile_id'),
   speakerLabel: text('speaker_label'),
+  speakerAssignmentSource: text('speaker_assignment_source', {
+    enum: ['automatic', 'user', 'unassigned'],
+  }).notNull().default('unassigned'),
+  speakerMatchConfidenceBps: int('speaker_match_confidence_bps'),
   text: text('text').notNull(),
   confidenceBps: int('confidence_bps'),
   language: text('language'),
@@ -386,6 +391,7 @@ export const chronicleAudioSegments = sqliteTable('chronicle_audio_segments', {
 }, table => ({
   byTranscriptSegment: uniqueIndex('chronicle_audio_segments_transcript_segment_unique').on(table.transcriptId, table.segmentIndex),
   byTranscript: index('chronicle_audio_segments_transcript_id_idx').on(table.transcriptId),
+  bySpeakerProfile: index('chronicle_audio_segments_speaker_profile_id_idx').on(table.speakerProfileId),
   bySpeaker: index('chronicle_audio_segments_speaker_label_idx').on(table.speakerLabel),
 }))
 
@@ -400,6 +406,9 @@ export const chronicleSpeakerProfiles = sqliteTable('chronicle_speaker_profiles'
   embeddingJson: text('embedding_json'),
   embeddingDimensions: int('embedding_dimensions'),
   embeddingModelId: text('embedding_model_id'),
+  identitySource: text('identity_source', {
+    enum: ['automatic', 'user'],
+  }).notNull().default('automatic'),
   sampleCount: int('sample_count').notNull().default(0),
   lastSeenAt: int('last_seen_at'),
   sourceTranscriptId: text('source_transcript_id')

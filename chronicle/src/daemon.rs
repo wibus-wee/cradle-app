@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
+use crate::audio::admission::AudioAdmissionController;
 use crate::audio::{
     AudioArtifactMetadata, LocalTranscriptionPipeline, RmsActivityGate, TranscriptionResult,
     TranscriptionRuntime, capture_microphone_samples, capture_mixed_audio_samples,
@@ -68,8 +69,19 @@ pub fn run(config: ChronicleConfig) -> ChronicleResult<String> {
         process_transcripts(&config.inbox_root, &outbox);
         let onnx_runtime = crate::onnx::OnnxRuntime::new_local_only();
         let local_transcription = LocalTranscriptionPipeline::new(&onnx_runtime);
+        let mut is_in_meeting = false;
+        if let Some(latest_frame) = report.persisted_frames.last() {
+            check_meeting_state(latest_frame, &mut is_in_meeting);
+        }
+        let mut audio_admission = AudioAdmissionController::new(config.audio_capture_mode);
         if config.audio_capture {
-            process_audio_segment(&config, &outbox, &local_transcription);
+            process_audio_segment(
+                &config,
+                &outbox,
+                &local_transcription,
+                &mut audio_admission,
+                is_in_meeting,
+            );
         }
         record_snapshots(&outbox, &report.persisted_frames);
         drop(lock);
@@ -112,6 +124,7 @@ fn daemon_loop(config: &ChronicleConfig) -> ChronicleResult<String> {
 
     // Meeting detection state
     let mut is_in_meeting = false;
+    let mut audio_admission = AudioAdmissionController::new(config.audio_capture_mode);
 
     // ONNX Runtime — local model inference (VAD, ASR, speaker embedding).
     // Models are loaded lazily from the local model root; daemon capture never
@@ -130,6 +143,8 @@ fn daemon_loop(config: &ChronicleConfig) -> ChronicleResult<String> {
             &outbox,
             &local_transcription,
             &mut last_audio_segment_time,
+            &mut audio_admission,
+            is_in_meeting,
         );
         #[cfg(target_os = "macos")]
         refresh_ax_observer(config, &mut ax_observer);
@@ -682,6 +697,8 @@ fn process_audio_segment_if_due(
     outbox: &ChronicleOutbox,
     local_transcription: &LocalTranscriptionPipeline<'_>,
     last_audio_segment_time: &mut Option<Instant>,
+    audio_admission: &mut AudioAdmissionController,
+    visual_meeting_signal: bool,
 ) {
     if !config.audio_capture {
         return;
@@ -690,7 +707,13 @@ fn process_audio_segment_if_due(
     if !audio_segment_due(*last_audio_segment_time, interval) {
         return;
     }
-    process_audio_segment(config, outbox, local_transcription);
+    process_audio_segment(
+        config,
+        outbox,
+        local_transcription,
+        audio_admission,
+        visual_meeting_signal,
+    );
     *last_audio_segment_time = Some(Instant::now());
 }
 
@@ -702,17 +725,43 @@ fn process_audio_segment(
     config: &ChronicleConfig,
     outbox: &ChronicleOutbox,
     local_transcription: &LocalTranscriptionPipeline<'_>,
+    audio_admission: &mut AudioAdmissionController,
+    visual_meeting_signal: bool,
 ) {
-    match write_audio_segment(config) {
-        Ok(report) => {
+    match capture_audio_segment(config) {
+        Ok(captured) => {
+            let speech_detected = match local_transcription
+                .contains_speech(&captured.samples, captured.sample_rate)
+            {
+                Ok(detected) => detected,
+                Err(error) => {
+                    eprintln!(
+                        "cradle chronicle audio VAD error; segment was not persisted: {error}"
+                    );
+                    return;
+                }
+            };
+            if !audio_admission.admit(visual_meeting_signal, speech_detected) {
+                eprintln!(
+                    "cradle chronicle audio segment discarded before persistence: speech={speech_detected} meeting={visual_meeting_signal}"
+                );
+                return;
+            }
+            let report = match persist_audio_segment(config, captured) {
+                Ok(report) => report,
+                Err(error) => {
+                    eprintln!("cradle chronicle audio artifact error: {error}");
+                    return;
+                }
+            };
             eprintln!(
-                "cradle chronicle audio segment written: samples={} dropped={} rms={:.6} peak={:.6} active={} wav={} metadata={}",
+                "cradle chronicle audio segment written: samples={} dropped={} rms={:.6} peak={:.6} active={} audio={} metadata={}",
                 report.sample_count,
                 report.dropped_samples,
                 report.rms,
                 report.peak,
                 report.active,
-                report.wav_path.display(),
+                report.audio_path.display(),
                 report.metadata_path.display()
             );
             record_audio_raw_segment(outbox, &report);
@@ -731,13 +780,13 @@ fn record_audio_raw_segment(outbox: &ChronicleOutbox, report: &AudioSegmentArtif
         ChronicleOutboxEvent {
             id: source_id,
             kind: "audio-raw-segment".to_string(),
-            created_at: report.recorded_at.clone(),
+            created_at: report.recorded_at.filesystem(),
             payload: serde_json::json!({
             "sourceId": audio_segment_source_id(report.source, &report.metadata_path),
-            "recordedAt": report.recorded_at,
+            "recordedAt": report.recorded_at.filesystem(),
             "source": report.source.as_str(),
             "status": "captured",
-            "audioPath": artifact_path_text(&report.wav_path),
+            "audioPath": artifact_path_text(&report.audio_path),
             "metadataPath": artifact_path_text(&report.metadata_path),
             "sampleRate": report.sample_rate,
             "channels": report.channels,
@@ -768,12 +817,8 @@ fn process_audio_transcription(
         return;
     }
 
-    match local_transcription.process_wav_with_fallback(
-        &report.samples,
-        report.sample_rate,
-        &report.wav_path,
-    ) {
-        Ok(output) if output.result.text.trim().is_empty() => {
+    match local_transcription.process(&report.samples, report.sample_rate) {
+        Ok(result) if result.text.trim().is_empty() => {
             record_audio_processing_result(
                 outbox,
                 &source_id,
@@ -781,24 +826,23 @@ fn process_audio_transcription(
                 None,
                 Vec::new(),
                 None,
-                Some(output.runtime),
+                Some(TranscriptionRuntime::SenseVoiceOnnx),
             );
         }
-        Ok(output) => {
+        Ok(result) => {
             let transcript_source_id = format!("transcript:{source_id}");
             let transcript = build_audio_transcript_event_payload(
                 &transcript_source_id,
                 report,
-                &output.result,
-                output.runtime,
+                &result,
+                TranscriptionRuntime::SenseVoiceOnnx,
             );
-            let speaker_profile_ids = record_speaker_profiles(outbox, &output.result);
             record_outbox_event(
                 outbox,
                 ChronicleOutboxEvent {
                     id: transcript_source_id.clone(),
                     kind: "audio-transcript".to_string(),
-                    created_at: report.recorded_at.clone(),
+                    created_at: report.recorded_at.filesystem(),
                     payload: transcript,
                 },
             );
@@ -807,9 +851,9 @@ fn process_audio_transcription(
                 &source_id,
                 "processed",
                 Some(transcript_source_id),
-                speaker_profile_ids,
+                Vec::new(),
                 None,
-                Some(output.runtime),
+                Some(TranscriptionRuntime::SenseVoiceOnnx),
             );
         }
         Err(error) => {
@@ -837,6 +881,9 @@ fn build_audio_transcript_event_payload(
         "startMs": 0,
         "endMs": result.duration_ms.max(report.duration_ms),
         "speakerLabel": serde_json::Value::Null,
+        "speakerCandidateKey": serde_json::Value::Null,
+        "speakerEmbedding": serde_json::Value::Null,
+        "speakerEmbeddingModelId": serde_json::Value::Null,
         "text": result.text.clone(),
         "confidence": result.confidence,
         "language": result.language.clone(),
@@ -849,10 +896,19 @@ fn build_audio_transcript_event_payload(
             .segments
             .iter()
             .map(|segment| {
+                let speaker_profile = segment.speaker_label.as_ref().and_then(|label| {
+                    result
+                        .speaker_profiles
+                        .iter()
+                        .find(|profile| &profile.display_name == label)
+                });
                 serde_json::json!({
                     "startMs": segment.start_ms,
                     "endMs": segment.end_ms,
                     "speakerLabel": segment.speaker_label.clone(),
+                    "speakerCandidateKey": segment.speaker_label.clone(),
+                    "speakerEmbedding": speaker_profile.map(|profile| profile.embedding.clone()),
+                    "speakerEmbeddingModelId": speaker_profile.map(|profile| profile.embedding_model_id.clone()),
                     "text": segment.text.clone(),
                     "confidence": segment.confidence,
                     "language": result.language.clone(),
@@ -867,12 +923,12 @@ fn build_audio_transcript_event_payload(
         "title": format!("{} audio transcript", report.source.as_str()),
         "source": "asr",
         "status": "completed",
-        "startedAt": report.recorded_at.clone(),
-        "endedAt": report.recorded_at.clone(),
+        "startedAt": report.recorded_at.filesystem(),
+        "endedAt": report.recorded_at.filesystem(),
         "language": result.language.clone(),
         "appBundleId": "cradle-chronicle-audio",
         "windowTitle": format!("Chronicle {} audio", report.source.as_str()),
-        "audioPath": artifact_path_text(&report.wav_path),
+        "audioPath": artifact_path_text(&report.audio_path),
         "transcriptPath": serde_json::Value::Null,
         "segments": segments,
         "metadata": {
@@ -921,40 +977,10 @@ fn record_audio_processing_result(
     );
 }
 
-fn record_speaker_profiles(outbox: &ChronicleOutbox, result: &TranscriptionResult) -> Vec<String> {
-    let mut profile_ids = Vec::new();
-    for profile in &result.speaker_profiles {
-        let payload = serde_json::json!({
-            "displayName": profile.display_name,
-            "aliases": [],
-            "embedding": profile.embedding,
-            "embeddingModelId": profile.embedding_model_id,
-            "sampleCount": profile.sample_count,
-            "metadata": {
-                "runtime": "local-onnx-speaker",
-                "source": "audio-transcription"
-            }
-        });
-        record_outbox_event(
-            outbox,
-            ChronicleOutboxEvent {
-                id: format!("speaker-profile:{}", profile.display_name),
-                kind: "speaker-profile".to_string(),
-                created_at: Timestamp::now()
-                    .map(|ts| ts.filesystem())
-                    .unwrap_or_else(|_| "1970-01-01T00-00-00Z".to_string()),
-                payload,
-            },
-        );
-        profile_ids.push(profile.display_name.clone());
-    }
-    profile_ids
-}
-
 #[derive(Debug, Clone, PartialEq)]
 struct AudioSegmentArtifactReport {
     source: AudioCaptureSource,
-    recorded_at: String,
+    recorded_at: Timestamp,
     sample_rate: u32,
     channels: u16,
     source_sample_format: String,
@@ -965,16 +991,24 @@ struct AudioSegmentArtifactReport {
     peak: f32,
     active: bool,
     samples: Vec<f32>,
-    wav_path: PathBuf,
+    audio_path: PathBuf,
     metadata_path: PathBuf,
 }
 
-fn write_audio_segment(config: &ChronicleConfig) -> ChronicleResult<AudioSegmentArtifactReport> {
-    let capture = match config.audio_source {
+fn capture_audio_segment(config: &ChronicleConfig) -> ChronicleResult<AudioSegmentArtifactReport> {
+    let mut capture = match config.audio_source {
         AudioCaptureSource::Microphone => capture_microphone_samples(config.audio_segment_ms)?,
         AudioCaptureSource::System => capture_system_audio_samples(config.audio_segment_ms)?,
         AudioCaptureSource::Mixed => capture_mixed_audio_samples(config.audio_segment_ms)?,
     };
+    if capture.sample_rate != 16_000 {
+        capture.samples =
+            crate::audio::capture::resample_linear(&capture.samples, capture.sample_rate, 16_000);
+        capture.source_sample_format =
+            format!("normalized-16k-mono:{}", capture.source_sample_format);
+        capture.sample_rate = 16_000;
+        capture.channels = 1;
+    }
     let gate = RmsActivityGate::new(config.audio_rms_threshold);
     let activity = gate.analyze(&capture.samples);
     let metadata = AudioArtifactMetadata {
@@ -989,10 +1023,9 @@ fn write_audio_segment(config: &ChronicleConfig) -> ChronicleResult<AudioSegment
         peak: activity.peak,
         active: activity.active,
     };
-    let artifact = write_audio_segment_artifact(&config.storage_root, &capture.samples, &metadata)?;
     Ok(AudioSegmentArtifactReport {
         source: config.audio_source,
-        recorded_at: metadata.recorded_at.filesystem(),
+        recorded_at: metadata.recorded_at,
         sample_rate: metadata.sample_rate,
         channels: metadata.channels,
         source_sample_format: metadata.source_sample_format,
@@ -1003,9 +1036,31 @@ fn write_audio_segment(config: &ChronicleConfig) -> ChronicleResult<AudioSegment
         peak: metadata.peak,
         active: metadata.active,
         samples: capture.samples,
-        wav_path: artifact.wav_path,
-        metadata_path: artifact.metadata_path,
+        audio_path: PathBuf::new(),
+        metadata_path: PathBuf::new(),
     })
+}
+
+fn persist_audio_segment(
+    config: &ChronicleConfig,
+    mut report: AudioSegmentArtifactReport,
+) -> ChronicleResult<AudioSegmentArtifactReport> {
+    let metadata = AudioArtifactMetadata {
+        recorded_at: report.recorded_at,
+        source: report.source.as_str().to_string(),
+        sample_rate: report.sample_rate,
+        channels: report.channels,
+        source_sample_format: report.source_sample_format.clone(),
+        sample_count: report.sample_count,
+        dropped_samples: report.dropped_samples,
+        rms: report.rms,
+        peak: report.peak,
+        active: report.active,
+    };
+    let artifact = write_audio_segment_artifact(&config.storage_root, &report.samples, &metadata)?;
+    report.audio_path = artifact.audio_path;
+    report.metadata_path = artifact.metadata_path;
+    Ok(report)
 }
 
 fn audio_segment_source_id(source: AudioCaptureSource, metadata_path: &Path) -> String {

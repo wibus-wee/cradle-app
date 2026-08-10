@@ -4,6 +4,7 @@
 //! Models are downloaded on demand via [`crate::models::ModelManager`].
 
 pub mod asr;
+pub mod diarization;
 pub mod embedding;
 pub mod pii;
 pub mod runtime;

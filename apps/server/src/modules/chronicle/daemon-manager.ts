@@ -18,6 +18,7 @@ let pendingRestartOptions: ChronicleDaemonOptions | null = null
 export interface ChronicleDaemonOptions {
   storageRoot: string
   audioCaptureEnabled: boolean
+  audioCaptureMode: 'meeting' | 'continuous'
   audioSource: 'microphone' | 'system' | 'mixed'
   audioSegmentMs: number
   audioSegmentIntervalMs: number
@@ -30,6 +31,7 @@ export interface ChronicleDaemonOptions {
 const ChronicleDaemonOptionsSchema = z.object({
   storageRoot: z.string(),
   audioCaptureEnabled: z.boolean(),
+  audioCaptureMode: z.enum(['meeting', 'continuous']),
   audioSource: z.enum(['microphone', 'system', 'mixed']),
   audioSegmentMs: z.number().finite().positive(),
   audioSegmentIntervalMs: z.number().finite().positive(),
@@ -73,6 +75,8 @@ export function createDaemonArgs(rawOptions: ChronicleDaemonOptions): string[] {
   if (options.audioCaptureEnabled) {
     args.push(
       '--audio-capture',
+      '--audio-capture-mode',
+      options.audioCaptureMode,
       '--audio-source',
       options.audioSource,
       '--audio-segment-ms',
@@ -257,6 +261,7 @@ export function getDaemonInfo() {
     lastExitCode,
     lastExitAt,
     audioCaptureEnabled: options ? options.audioCaptureEnabled : false,
+    audioCaptureMode: options ? options.audioCaptureMode : 'meeting',
     audioSource: options ? options.audioSource : 'microphone',
     restartPending: pendingRestartOptions !== null,
   }
@@ -303,6 +308,7 @@ export function startDaemon(options: ChronicleDaemonOptions): boolean {
       env: buildChronicleEnv({
         CRADLE_URL: cradleUrl,
         CRADLE_CHRONICLE_AUDIO_CAPTURE: options.audioCaptureEnabled ? '1' : '0',
+        CRADLE_CHRONICLE_AUDIO_CAPTURE_MODE: options.audioCaptureMode,
         CRADLE_CHRONICLE_AUDIO_SOURCE: options.audioSource,
       }),
       stdin: 'ignore',
