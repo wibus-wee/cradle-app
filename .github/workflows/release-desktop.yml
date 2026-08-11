@@ -628,6 +628,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: pnpm exec electron-builder --config electron-builder.mjs --linux AppImage deb rpm --x64 --publish never
 
+      - name: Generate Linux updater metadata
+        working-directory: apps/desktop
+        run: pnpm generate:linux-update-manifest
+
       - name: Verify Linux release artifacts and updater metadata
         working-directory: apps/desktop
         run: pnpm verify:linux-release

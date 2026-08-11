@@ -33,6 +33,7 @@
     "smoke:update": "node scripts/run-update-smoke.mjs",
     "dist:win": "pnpm build && electron-builder --config electron-builder.mjs --win",
     "dist:linux": "pnpm build && electron-builder --config electron-builder.mjs --linux",
+    "generate:linux-update-manifest": "node scripts/generate-linux-update-manifest.mjs",
     "verify:linux-release": "node scripts/verify-linux-release.mjs",
     "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json"
   },
