@@ -517,6 +517,9 @@ jobs:
       - name: Set desktop version
         run: pnpm --filter @cradle/desktop run set-version ${{ needs.resolve.outputs.desktop_version }}
 
+      - name: Run packaged M0 custom-scheme gate
+        run: pnpm --filter @cradle/desktop m0:custom-scheme:packaged
+
       - name: Build Windows desktop runtime and app bundles
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

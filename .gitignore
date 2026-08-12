@@ -16,6 +16,7 @@ data
 !.env.example
 chronicle/target/
 apps/desktop/release
+apps/desktop/.m0-results
 apps/desktop/resources/codex/**/codex
 apps/desktop/resources/codex/**/codex.exe
 apps/desktop/resources/codex/**/codex-app-server

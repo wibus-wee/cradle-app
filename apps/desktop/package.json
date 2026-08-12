@@ -24,7 +24,7 @@
     "rebuild:sparkle": "node scripts/rebuild-sparkle.mjs",
     "record:appshot-parity": "node scripts/record-appshot-parity.mjs",
     "set-version": "node scripts/set-version.mjs",
-    "pack": "pnpm build && electron-builder --config electron-builder.mjs --dir",
+    "pack": "pnpm build && electron-builder --config electron-builder.mjs --dir && pnpm m0:custom-scheme:packaged",
     "verify:macos-distribution-credentials": "node scripts/verify-macos-distribution-credentials.mjs",
     "dist": "pnpm build && electron-builder --config electron-builder.mjs",
     "dist:publish": "pnpm build && electron-builder --config electron-builder.mjs --publish always",
@@ -35,7 +35,13 @@
     "dist:linux": "pnpm build && electron-builder --config electron-builder.mjs --linux",
     "generate:linux-update-manifest": "node scripts/generate-linux-update-manifest.mjs",
     "verify:linux-release": "node scripts/verify-linux-release.mjs",
-    "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json"
+    "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json",
+    "m0:custom-scheme:prepare": "pnpm --filter @cradle/system-info build && node src/main/desktop-server-transport/fixtures/m0/prepare-real-plugin.mjs",
+    "m0:custom-scheme:build": "pnpm m0:custom-scheme:prepare && electron-vite build --config src/main/desktop-server-transport/fixtures/m0/electron.vite.config.ts",
+    "m0:custom-scheme:dev": "node src/main/desktop-server-transport/fixtures/m0/run-m0.mjs --mode development",
+    "m0:custom-scheme:pack": "pnpm m0:custom-scheme:build && electron-builder --config src/main/desktop-server-transport/fixtures/m0/electron-builder.mjs --dir --publish never",
+    "m0:custom-scheme:packaged": "pnpm m0:custom-scheme:pack && node src/main/desktop-server-transport/fixtures/m0/run-m0.mjs --mode packaged",
+    "m0:custom-scheme:gate": "pnpm m0:custom-scheme:dev && pnpm m0:custom-scheme:packaged"
   },
   "dependencies": {
     "@cradle/browser-use": "workspace:*",
@@ -48,6 +54,7 @@
     "electron-window-state": "^5.0.3",
     "get-port": "^7.1.0",
     "tar": "^7.5.13",
+    "undici": "7.25.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -59,6 +66,9 @@
     "electron": "42.4.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "es-module-lexer": "2.3.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
     "typescript": "^5.9.3",
     "vite": "^7.2.6"
   }

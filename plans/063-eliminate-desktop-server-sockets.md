@@ -13,21 +13,28 @@
 > process hosts, or PTY duplex over process IPC. Main proxies ordinary HTTP with
 > undici to the existing Elysia listener; WebSocket stays native.
 >
-> **Drift check (run first)**:
+> **Drift check (run before every delivery slice)**:
 >
 > ```bash
-> git diff --stat 00ba970e..HEAD -- \
+> git diff --stat d40f895e..HEAD -- \
 >   apps/desktop/src/main \
 >   apps/desktop/src/preload \
 >   apps/desktop/src/shared/server-runtime.ts \
+>   apps/desktop/electron.vite.config.ts \
+>   apps/desktop/electron-builder.mjs \
 >   apps/desktop/package.json \
 >   apps/server/src/index.ts \
 >   apps/server/src/bootstrap-lifecycle.ts \
 >   apps/server/src/app.ts \
+>   apps/server/src/http \
 >   apps/server/src/modules/pty \
 >   apps/server/src/modules/sync-gateway \
 >   apps/server/package.json \
 >   apps/web/src/api-gen \
+>   apps/web/src/lib/authenticated-server-url.ts \
+>   apps/web/src/lib/plugin-host.ts \
+>   apps/web/src/lib/server-credential.ts \
+>   apps/web/src/lib/server-transport \
 >   apps/web/src/features/chat \
 >   apps/web/src/features/download-center/transport.ts \
 >   apps/web/src/features/tui/pty-channel.ts \
@@ -36,16 +43,20 @@
 >   apps/web/src/main.tsx \
 >   apps/web/src/tearoff-main.tsx \
 >   apps/web/src/env.d.ts \
+>   e2e \
 >   packages \
+>   .github/workflows \
 >   package.json \
 >   pnpm-lock.yaml
 > ```
 >
-> The original audit was at `598007aa`; facts were revalidated at `00ba970e`. Architecture
-> was rewritten on 2026-08-02 away from multiplexed process IPC framing. Plan 061 remains
-> in progress and Plan 071 owns snapshot-first Chat recovery. Transport-only drift may be
-> reconciled; any change to Chat admission, completion, cursor, queue, provider, or
-> snapshot-recovery ownership is a STOP condition for this plan.
+> The original audit was at `598007aa`, the first revalidation was at `00ba970e`, and the
+> current implementation baseline is `d40f895e` (2026-08-13). Architecture was rewritten
+> on 2026-08-02 away from multiplexed process IPC framing. The 2026-08-13 rebaseline
+> incorporates the Web transport scaffold and the Server's audience-bound single-use
+> ticket APIs. Plan 061 remains in progress and Plan 071 owns snapshot-first Chat recovery.
+> Transport-only drift may be reconciled; any change to Chat admission, completion,
+> cursor, queue, provider, or snapshot-recovery ownership is a STOP condition.
 
 ## Status
 
@@ -57,17 +68,36 @@
   transport only and must preserve snapshot-first recovery
 - **Category**: migration / tech-debt
 - **Planned at**: commit `598007aa`, 2026-07-23
-- **Revalidated at**: commit `00ba970e`, 2026-07-31
+- **Revalidated at**: commit `d40f895e`, 2026-08-13
 - **Architecture rewrite**: 2026-08-02 (custom-scheme + undici proxy; IPC framing deleted)
+- **Execution state**: replan complete; M0–M4 and M6–M7 not started, M5 scaffold only
+
+### 2026-08-13 current-state baseline
+
+- Desktop has no privileged `cradle-server` registration, protocol handler, or
+  `DesktopServerTransport`; renderer HTTP/SSE still falls back to the loopback Server.
+- `startServer()` still returns a URL string, reused locators are not represented by a
+  connection discriminant, and child restarts do not publish a new transport generation.
+- Main and Tearoff windows still receive `--server-auth-token`; removal remains mandatory.
+- Web already has `base-url.ts`, `cradleFetch`, `eventsource-parser@3.1.0`, and a
+  fetch-backed SSE adapter. There is no production native `EventSource`, but the adapter
+  has only a small conformance suite and is not proof that owned traffic uses the custom
+  scheme.
+- Native PTY and `/sync` WebSockets already obtain audience-bound, 30-second, single-use
+  tickets through authenticated HTTP. Browser resource URLs can similarly obtain
+  path-bound single-use resource tickets. This supersedes the old cookie-bootstrap design.
+- The Web/Desktop typechecks pass and the focused transport suite is 7/7 at this baseline.
+  The main-branch Desktop build passes. The root and Server suites have two pre-existing
+  Chat Runtime failures in `tests/chat-runtime.test.ts`; record them as baseline, do not
+  alter Chat semantics in this transport plan, and do not classify any new failure as
+  pre-existing.
 
 ## Decision and confidence
 
 **Decision: GO, conditionally on the packaged M0 gate.** Development Electron 42.4.1
 already proved custom-protocol first-byte streaming and cancellation, multipart
 `FormData`, image loading, dynamic module import, binary bodies, renderer streamed
-upload, and default-session isolation without `bypassCSP` or `codeCache`. A disposable
-session probe also showed `session.defaultSession.fetch` retaining an HttpOnly
-browser-session cookie.
+upload, and default-session isolation without `bypassCSP` or `codeCache`.
 
 That is deliberately not the production acceptance claim: packaged Electron and a 64 MiB
 resource bound remain version- and packaging-sensitive. Milestone 0 is the sole hard
@@ -89,22 +119,28 @@ renderer fetch / subresource / SSE-via-fetch
 
 renderer WebSocket (PTY, /sync)
   -> native WS to loopback
-  -> authenticated via HttpOnly browser-session cookie
+  -> URL receives a short-lived, audience-bound, single-use ticket acquired through
+     cradle-server://local
   -> WS does NOT consume Chromium's HTTP/1.1 6-connection pool
 
 Auth
   - renderer NEVER receives the owned Server bearer token
   - Main owns the bearer
-  - for owned-proxy AND attached-http, Main establishes an HttpOnly session
-    cookie in session.defaultSession before authenticated renderer traffic
   - custom-scheme requests: Main injects bearer after stripping renderer
     Authorization / Cookie / proxy-authorization / Cradle credential headers
+  - native WebSocket obtains only an audience-bound single-use ticket; no bearer or
+    long-lived browser session credential enters the renderer
+  - HTTP(S) resource tickets remain only for explicit browser/attached fallback;
+    owned-proxy subresources and dynamic imports use cradle-server://local directly
 ```
 
 For a Server discovered through the locator rather than spawned by this Desktop process,
-the custom-scheme proxy still may be used only when Main can reach that listener and mint
-a session cookie; the connection kind remains explicitly `attached-http` and does not claim
-the owned-proxy invariant. Never silently label attached traffic as owned.
+the custom-scheme proxy may be used only when Main can reach and authenticate to that
+listener. The connection kind remains explicitly `attached-http` and does not claim
+owned lifecycle/generation invariants. Explicit HTTP(S) fallback remains an attached-mode
+capability only when the endpoint is unauthenticated or an existing browser-owned session
+has been verified; it must never return the Server bearer to the renderer and must never
+be selected for an owned child.
 
 ### Why not `owned-ipc`
 
@@ -123,7 +159,7 @@ Prefer the discriminant names:
 | Kind | Meaning |
 | --- | --- |
 | `owned-proxy` | This Desktop spawned the Server child. Renderer HTTP/SSE uses `cradle-server://local`; Main proxies with undici to the owned listener (loopback v1 / UDS v2). |
-| `attached-http` | Locator reuse / external live process. Explicit HTTP(S) base; no claim of owned-proxy invariants. |
+| `attached-http` | Locator reuse / external live process. Its `rendererTransport` explicitly selects `main-proxy` when Main owns valid credentials or a verified `direct-http` browser-auth/unauthenticated adapter; it never claims owned lifecycle/generation invariants. |
 
 Do **not** resurrect `owned-ipc`. If code or docs still say `owned-ipc`, treat that as drift
 to rename during implementation.
@@ -139,7 +175,7 @@ The invariant is therefore:
 ```text
 renderer -> owned Server over Chromium HTTP/1.1 pool (http/https fetch/SSE)  = 0
 renderer -> owned Server via cradle-server:// (protocol.handle, not that pool) = allowed
-renderer -> owned Server native WebSocket (cookie auth; not HTTP/1.1 pool)     = allowed
+renderer -> owned Server native WebSocket (single-use ticket; not HTTP/1.1 pool) = allowed
 Electron main -> owned Server                                                  = undici
                                                                                loopback (v1)
                                                                                or UDS (v2)
@@ -163,8 +199,8 @@ expose as a reliable product contract. In Desktop-owned mode:
 
 1. All renderer Fetch / subresource / SSE traffic uses `cradle-server://local`, handled in
    Main and proxied with undici to the existing Server listener.
-2. WebSocket (PTY, `/sync`) stays native to loopback and authenticates with an HttpOnly
-   session cookie established by Main.
+2. WebSocket (PTY, `/sync`) stays native to loopback and authenticates with the existing
+   audience-bound single-use ticket issued through the authenticated custom-scheme path.
 3. The Server keeps listening on HTTP for CLI and attached clients; Desktop does not replace
    `app.handle` over a private framing layer.
 
@@ -196,17 +232,20 @@ The following facts are the revalidated starting point for implementation.
 ### Requests are concentrated enough to adapt once
 
 - `apps/web/src/lib/client.config.ts` injects `cradleFetch` into the generated client.
-- `apps/web/src/lib/server-credential.ts` resolves the configured base URL, adds the
-  renderer-visible bearer token, and calls global `fetch`.
+- `apps/web/src/lib/server-credential.ts` already rebases same-Server requests onto the
+  runtime renderer base. It strips credentials for custom-scheme requests, but still adds
+  the renderer-visible bearer on HTTP(S) fallback because Desktop has not published a
+  connection projection yet.
 - The generated client exposes hundreds of operations. Creating one IPC method per route
   would duplicate the HTTP contract; this plan never does that.
 - Binary, `FormData`, module, image, PDF, and download consumers exist in addition to JSON
   APIs. Raw traffic also includes asset uploads and plugin descriptor fetches.
-- Production files instantiate native `EventSource` (Chat, workflow, Download Center,
-  workspace, plugin host). All owned-mode sites must move to fetch-backed SSE through
-  `cradle-server://local`.
+- Production no longer instantiates native `EventSource`; the relevant sites use the
+  fetch-backed adapter or Desktop bridges. M5 must finish conformance coverage and prove
+  the runtime base becomes `cradle-server://local` in owned mode.
 - Production files instantiate native `WebSocket` for PTY and `/sync`. Those remain native
-  WebSocket to loopback after cookie bootstrap; they are not migrated to process IPC.
+  WebSocket to loopback with one fresh audience-bound ticket per connect/reconnect; they
+  are not migrated to process IPC.
 
 Inventory commands to rerun before implementation:
 
@@ -284,9 +323,10 @@ web contents use explicit partitions and must not gain access to this handler.
 - A disposable development Electron probe passed custom-scheme streaming, cancellation,
   `FormData`, `<img>`, dynamic `import()`, binary bytes, streamed upload, and partition
   denial.
-- A disposable Electron session probe received an HttpOnly `cradle-session` cookie from a
-  local response and sent it on the next `session.defaultSession.fetch`. Main-owned cookie
-  bootstrap therefore has a supported development path.
+- A disposable Electron session cookie probe passed, but its result is historical only:
+  the current Server/Web implementation uses audience-bound single-use tickets for native
+  WebSocket and HTTP(S) resource fallbacks, so this plan no longer schedules cookie
+  bootstrap.
 - Earlier two-hop advanced-serialization IPC probes are **historical only**. They justified
   the rejected framing design; they are not acceptance evidence for this rewrite and must
   not be reintroduced as production work.
@@ -336,8 +376,6 @@ vary slightly; keep the boundary clear):
   HTTP (v1) or UDS/named pipe (v2).
 - `protocol-handler.ts` owns `cradle-server://local` validation, credential stripping,
   bearer injection, and default-session registration.
-- `session-cookie.ts` owns Main-side browser-session cookie establishment for owned and
-  attached modes.
 - `index.ts` exports the narrow surface consumed by `main-app.ts`, brokers, and services.
 
 Consumers receive a `DesktopServerTransport` dependency. They must not choose credentials
@@ -348,14 +386,16 @@ themselves and must not open ambient global `fetch` to the owned Server.
 
 ### Web transport owner
 
-Keep `cradleFetch` as the generated client's fetch hook. In Desktop `owned-proxy` mode its
-runtime base URL becomes `cradle-server://local`; in browser/attached mode it retains
-HTTP(S). Create a fetch-backed SSE adapter under `apps/web/src/lib/server-transport/` and
-route all owned-mode native EventSource sites through it. Keep feature parsers and cursor
-ownership in their current feature modules.
+Keep the already-landed `cradleFetch` as the generated client's fetch hook. In Desktop
+`owned-proxy` mode its runtime base URL becomes `cradle-server://local`; browser mode and
+an explicit attached fallback retain HTTP(S). Harden the existing fetch-backed SSE adapter
+under `apps/web/src/lib/server-transport/` and route all owned-mode streams through it.
+Keep feature parsers and cursor ownership in their current feature modules.
 
-PTY and `/sync` keep native WebSocket clients. After Main establishes the HttpOnly session
-cookie, those sockets authenticate like ordinary browser clients. Do not build a
+PTY and `/sync` keep native WebSocket clients and the already-landed
+`getAuthenticatedServerWebSocketUrl()` ticket flow. The ticket request goes through
+`cradleFetch`; in proxied modes Main injects the bearer for ticket issuance, while the
+renderer receives only the short-lived audience-bound ticket. Do not build a
 transport-neutral PTY process-IPC adapter in this plan.
 
 ### Server surface
@@ -363,7 +403,8 @@ transport-neutral PTY process-IPC adapter in this plan.
 Unchanged for this plan's critical path:
 
 - Keep `app.listen()` / HTTP listener for CLI and Desktop undici proxy.
-- Keep existing auth plugins, including browser-session cookie minting.
+- Keep the existing bearer auth plus audience-bound single-use WebSocket/resource tickets.
+- Do not add or revive a cookie bootstrap solely for Desktop transport.
 - Optional later: accept HTTP over UDS/named pipe without changing route semantics.
 - Do not add IPC Request/Response framing hosts.
 
@@ -375,6 +416,7 @@ Replace `startServer(): Promise<string>` with a discriminated result:
 export type DesktopServerConnection =
   | {
       kind: 'owned-proxy'
+      rendererTransport: 'main-proxy'
       serverUrl: string // loopback listener / CLI locator / diagnostics
       rendererBaseUrl: 'cradle-server://local'
       generation: number
@@ -386,24 +428,31 @@ export type DesktopServerConnection =
     }
   | {
       kind: 'attached-http'
+      rendererTransport: 'main-proxy'
       serverUrl: string // loopback/network URL for WS + diagnostics
-      /**
-       * Prefer `cradle-server://local` when Main can reach the listener and mint a
-       * session cookie (same Tearoff pool problem). Fall back to explicit HTTP(S)
-       * only when Main cannot proxy. Never claim owned-proxy crash/generation invariants.
-       */
-      rendererBaseUrl: 'cradle-server://local' | string
-      mainProxyTarget?: string
+      rendererBaseUrl: 'cradle-server://local'
+      mainProxyTarget: string
+      authentication: 'main-bearer'
+    }
+  | {
+      kind: 'attached-http'
+      rendererTransport: 'direct-http'
+      serverUrl: string
+      rendererBaseUrl: string
+      authentication: 'browser-session' | 'none'
     }
 ```
 
 - `owned-proxy` means this Desktop instance created the child, the listener is ready, and
-  Main can proxy after cookie/bearer ownership is established.
+  Main owns the bearer needed to proxy.
 - `attached-http` means `readHealthyLocatedServerUrl()` found another live process. When
   Main can reach that listener, renderer Fetch/SSE still uses `cradle-server://local` so
   Tearoffs do not re-enter the Chromium HTTP/1.1 pool; the kind remains `attached-http`
   for ownership/credential semantics and must not claim owned generation/crash invariants.
-  If Main cannot proxy, `rendererBaseUrl` stays explicit HTTP(S).
+  `direct-http` is valid only after proving that the endpoint needs no auth or that a
+  browser-owned session is already valid. An auth-required attached endpoint for which
+  Main owns neither a bearer nor a verified browser session fails explicitly; it does not
+  expose the bearer or create an unauthenticated renderer fallback.
 - WebSocket clients always use `serverUrl` (loopback/network HTTP(S) URL), never
   `cradle-server://`. No separate `wsBaseUrl` field in v1; expose
   `getServerNetworkUrl()` from status.`serverUrl` for PTY/`/sync`.
@@ -417,8 +466,9 @@ export type DesktopServerConnection =
 
 `DesktopServerStatus` must retain its existing bootstrap snapshot and expose the complete
 connection projection in its ready state, including `connection.kind`,
-`rendererBaseUrl`, and `serverUrl` (network base for native WebSocket). Web readiness must
-use the ready status directly in Electron; it must not probe `/health` from the renderer.
+`rendererTransport`, `rendererBaseUrl`, and `serverUrl` (network base for native
+WebSocket). Web readiness must use the ready status directly in Electron; it must not
+probe `/health` from the renderer.
 
 ## Proxy and protocol semantics
 
@@ -454,13 +504,14 @@ use the ready status directly in Electron; it must not probe `/health` from the 
 ### WebSocket (PTY, `/sync`)
 
 - Remain native `WebSocket` to the loopback listener.
-- Authenticate with the HttpOnly browser-session cookie Main established in
-  `session.defaultSession`.
+- Authenticate with a fresh audience-bound single-use ticket. Ticket issuance is an
+  ordinary authenticated request through `cradleFetch`, so owned/proxied-attached modes
+  acquire it through `cradle-server://local` and Main credential injection.
 - Do not carry PTY frames over process IPC.
 - Do not claim WebSocket uses the HTTP/1.1 six-connection pool; the Tearoff starvation
   bug is about long-lived HTTP/SSE slots.
-- If an owned-mode feature incorrectly opens EventSource tickets or bearer-query WS URLs
-  that re-expose credentials, that is a defect against the auth invariants below.
+- A single-use ticket may appear in a native WebSocket URL. A bearer, reusable browser
+  session credential, or cross-audience ticket may not.
 
 ### Cancellation and failure
 
@@ -473,20 +524,22 @@ use the ready status directly in Electron; it must not probe `/health` from the 
 ## Security invariants
 
 1. The renderer never receives the Desktop-owned Server's long-lived bearer token.
-2. For both `owned-proxy` and `attached-http`, Main establishes the existing
-   browser-session cookie in `session.defaultSession` (via session fetch or explicit
-   cookie API) before the renderer starts authenticated traffic that depends on cookies
-   (notably WebSocket).
+2. Native WebSocket authentication uses the existing 30-second, audience-bound,
+   single-use ticket. Ticket issuance is bearer-authenticated through the custom-scheme
+   proxy; ticket consumption stays at the matched WebSocket route.
 3. The custom protocol handler accepts only the exact `local` authority and the app
    default session. BrowserPanel partitions are not registered.
 4. Every proxied HTTP request still runs through the Server's normal HTTP stack: auth,
    validation, CORS, request-id, error mapping, and route middleware.
 5. Main injects credentials after stripping renderer-controlled credential headers.
-6. Request ids, URLs, status, sizes, duration, and cancellation reason may be observed;
-   authorization headers, cookies, request bodies, response bodies, and PTY contents may
-   not be logged.
+6. Request ids, redacted URLs, status, sizes, duration, and cancellation reason may be
+   observed. `ticket`, `eventTicket`, and `resourceTicket` query values, authorization
+   headers, cookies, request bodies, response bodies, and PTY contents may not be logged.
 7. Remote-host proxy behavior inside the Server remains Server-owned and continues to obey
    Plan 038 credential-audience rules.
+8. In owned-proxy mode, images, PDF/binary responses, and plugin module imports use
+   `cradle-server://local` directly. HTTP(S) resource tickets are permitted only for a
+   named browser/attached fallback and must remain path-bound, short-lived, and single-use.
 
 Endpoint settings remain HTTP(S)-only for user-entered values. A separate internal
 runtime-base setter may accept the custom scheme, and endpoint identity checks must
@@ -501,7 +554,7 @@ compare protocol/host/port rather than opaque custom origins.
 | Desktop typecheck | `pnpm --filter @cradle/desktop typecheck` | exit 0 |
 | Web typecheck | `pnpm --filter @cradle/web typecheck` | exit 0 |
 | Focused Desktop tests | `pnpm exec vitest run apps/desktop/src/main/desktop-server-transport --maxWorkers=1` | all pass |
-| Focused Web tests | `pnpm --filter @cradle/web exec vitest run src/lib/server-transport src/features/chat/transport --maxWorkers=1` | all pass |
+| Focused Web tests | `pnpm exec vitest run --config apps/web/vitest.transport.config.ts apps/web/src/lib/server-transport apps/web/src/lib/authenticated-server-url.test.ts` | all pass |
 | Server suite | `pnpm --filter @cradle/server test` | all pass or only recorded pre-existing failures |
 | Web suite | `pnpm --filter @cradle/web test` | all pass |
 | Root suite | `pnpm test` | all pass or only recorded pre-existing failures |
@@ -530,8 +583,8 @@ new failure as baseline.
   whose destination is the Cradle Server.
 - Web base-URL/fetch adapter changes, fetch-backed SSE migration, binary/FormData/module/
   image/PDF parity, and removal of the Desktop-owned token from renderer arguments.
-- Main-owned HttpOnly browser-session cookie bootstrap for owned and attached modes so
-  native WebSocket (PTY, `/sync`) authenticates without renderer bearer exposure.
+- Preservation and hardening of the existing audience-bound single-use ticket flow for
+  native WebSocket (PTY, `/sync`) and explicit HTTP(S) resource fallbacks.
 - A static transport-boundary ratchet and a targeted Electron packaged Tearoff stress smoke.
 - Documentation in affected Desktop, Web, Chat, and PTY module READMEs.
 - Optional design note / non-blocking spike path for v2 UDS/named-pipe undici targets.
@@ -561,11 +614,12 @@ new failure as baseline.
 - Use the managed Work branch and preserve unrelated changes in the worktree. Re-run the
   drift command before each slice instead of relying on the original planned-at diff.
 - Use conventional commit messages consistent with the repository.
-- Deliver in independently reviewable slices after Milestone 0:
-  1. connection model + undici proxy fetch + protocol handler;
-  2. Desktop main consumer migration + chat broker injection;
-  3. Web `cradleFetch` / SSE / subresource migration;
-  4. credential removal + session cookie bootstrap;
+- Deliver in independently reviewable slices:
+  0. this current-state replan only;
+  1. M0 fixture + development/packaged CI gate, with no production routing;
+  2. connection model + undici proxy fetch + protocol handler;
+  3. Desktop Main consumer migration + chat broker injection;
+  4. Web transport hardening + subresource migration + credential removal;
   5. ratchet + packaged Tearoff stress + docs.
 - Commit each coherent slice after its focused verification and use the managed Work PR
   delivery flow for the resulting commit.
@@ -574,9 +628,9 @@ new failure as baseline.
 
 Establish packaged custom-scheme facts before production seams. Then make Desktop lifecycle
 own the `owned-proxy` / `attached-http` choice, implement undici proxy fetch behind
-`cradle-server://local`, migrate Main and Web HTTP/SSE consumers, establish HttpOnly
-cookies so native WebSocket stays correct without renderer bearer tokens, and ratchet the
-Chromium-pool invariant so it cannot regress.
+`cradle-server://local`, migrate Main and Web HTTP/SSE consumers, preserve the existing
+single-use ticket path for native WebSocket, remove renderer bearer exposure, and ratchet
+the Chromium-pool invariant so it cannot regress.
 
 ## Milestones
 
@@ -610,7 +664,11 @@ of chunks rather than body size.
 **Verify**: the focused fixture tests pass, `pnpm build:desktop` exits 0, and the unpacked
 artifact smoke runs from the `pack` output. Store the exact launch command, artifact path,
 RSS result, and platform result in this plan's Progress section when executing. A bundle
-build alone is not packaged-runtime evidence.
+build alone is not packaged-runtime evidence. The fixture must run on a CI runner that can
+actually launch Electron (for Linux, install/use Xvfb; the current Work container has no
+display server). At minimum gate one Linux packaged artifact and the existing Windows
+packaged pipeline; add macOS when the release runner can execute the same smoke without
+special product code.
 
 **Gate**: if any required custom-protocol behavior cannot be made reliable in the packaged
 artifact using supported Electron APIs, STOP. Do not start the production migration, do not
@@ -625,6 +683,13 @@ Cover JSON, typed errors, redirects, empty bodies, repeated headers (including r
 `set-cookie`), SSE, binary range/full responses, multipart upload, abort before headers,
 abort mid-body, and slow-consumer backpressure. Add current connection-mode tests for new
 child versus reused locator.
+
+Characterize the already-landed auth seams rather than replacing them: ticket issuance
+requires bearer-authenticated HTTP, tickets are audience/path bound, expire after 30
+seconds, and are consumed exactly once. Cover `/auth/websocket-ticket`,
+`/auth/resource-ticket`, global-auth preflight versus route consumption, retry with a
+consumed ticket, wrong audience/path, and expiry. Cookie bootstrap is not part of this
+rebaseline.
 
 Characterize the existing snapshot-first Chat recovery boundary as a transport fixture:
 proxy migration may carry the same frames but must neither retain active-run history nor
@@ -641,6 +706,8 @@ response is buffered, altered, or loses cancellation.
 
 Implement `DesktopServerTransport.fetch` with undici:
 
+- add `undici` as a direct Desktop dependency rather than relying on Node's global fetch
+  implementation details or a transitive package;
 - rewrite/proxy to the owned listener;
 - stream bodies;
 - honor abort;
@@ -674,9 +741,13 @@ on `session.defaultSession`. Validate protocol, hostname, and an empty port dire
 unavailable response before owned readiness; never fall through to renderer HTTP. Do not
 install a handler on `session.fromPartition(...)` BrowserPanel sessions.
 
-Publish `DesktopServerStatus` with the connection discriminant. In owned-proxy mode, Web
-runtime base URL is `cradle-server://local`; in attached mode it remains the explicit HTTP
-URL. Keep persisted user-entered endpoint validation HTTP(S)-only; the custom scheme is an
+Publish `DesktopServerStatus` with the connection discriminant. In `owned-proxy`, Web
+runtime base URL is always `cradle-server://local`. In `attached-http`, use the custom
+scheme only when Main can reach and authenticate to the located listener; otherwise keep
+an explicit HTTP(S) adapter only after verifying `browser-session` or `none`
+authentication, and report that it does not satisfy the owned invariant. An auth-required
+attached connection with no Main credential and no verified browser session fails closed.
+Keep persisted user-entered endpoint validation HTTP(S)-only; the custom scheme is an
 internal runtime value, not a setting users can store.
 
 **Verify**: M0 fixture becomes a production-handler integration test; invalid authorities
@@ -704,17 +775,18 @@ for non-Server main-process fetches and rejects new unclassified matches.
 
 ### M5 - Move Web HTTP/SSE/subresource traffic to `cradle-server://local`
 
-Teach the Web endpoint runtime to distinguish internal `cradle-server://local` from stored
-HTTP(S) endpoints. Keep the persisted/user-entered endpoint normalizer HTTP(S)-only and add
-a separate internal runtime-base setter for the custom scheme. `cradleFetch` must preserve
-Request objects and bodies when rebasing, and must not forward renderer auth/cookie headers
-in owned-proxy mode (Main owns injection). The generated client continues to use its
-existing fetch hook; do not edit generated files manually.
+Treat the already-landed Web transport as scaffold, not as a completed milestone. Retain
+the separation between internal `cradle-server://local` and stored HTTP(S) endpoints.
+`cradleFetch` must preserve Request objects and bodies when rebasing, and must not forward
+renderer auth/cookie headers in proxy mode (Main owns injection). The generated client
+continues to use its existing fetch hook; do not edit generated files manually.
 
-Create one fetch-backed SSE transport that accepts `Request`, `AbortSignal`, reconnect
-policy, event name/id/retry fields, and last-event/cursor construction supplied by the
-feature owner. Add `eventsource-parser` as a direct Web dependency at the currently locked
-3.x version; do not rely on a transitive copy and do not hand-roll frame parsing.
+Harden the existing `eventsource-parser@3.1.0` fetch-backed SSE transport. It must accept
+`Request`, `AbortSignal`, reconnect policy, event name/id/retry fields, and
+last-event/cursor construction supplied by the feature owner. Preserve listener identity
+so object listeners can be removed; apply empty `id:` reset semantics; do not reset
+backoff merely because headers opened; and cancel/release each prior response reader
+before reconnect or disposal.
 
 Migrate every owned-mode native EventSource site. Preserve each feature's existing event
 name, snapshot-before-events, reconnect, cursor, parse-error, and disposal behavior. Chat
@@ -724,7 +796,10 @@ browser/attached adapters where required.
 
 Audit URL consumers and the raw-fetch allowlist. Exercise actual paths for generated JSON,
 `FormData`, assets/images, binary downloads, workspace PDF preview, plugin `web.mjs`
-dynamic import, and plugin descriptor fetch. External URLs and data URLs continue using
+dynamic import, and plugin descriptor fetch. In custom-scheme mode,
+`getAuthenticatedServerResourceUrl()` must return the `cradle-server://local` resource
+directly rather than minting an HTTP(S) resource ticket. Ticket URLs remain only for an
+explicit browser/attached HTTP(S) adapter. External URLs and data URLs continue using
 ordinary fetch.
 
 **Verify**:
@@ -737,7 +812,7 @@ ordinary fetch.
 - `rg -n 'new EventSource' apps/web/src --glob '!**/*.test.*'` returns only an explicitly
   documented non-owned adapter, never an owned-proxy call path.
 
-### M6 - Remove renderer bearer credentials; bootstrap HttpOnly session cookies
+### M6 - Remove renderer bearer credentials; retain only scoped single-use tickets
 
 Remove `--server-auth-token` from main and Tearoff `additionalArguments` entirely, then
 remove `serverAuthToken` from preload and Web environment types. Main is the credential
@@ -745,16 +820,15 @@ owner:
 
 - custom-scheme path: inject bearer into undici-proxied Requests after stripping renderer
   credential headers;
-- WebSocket / cookie-authenticated browser APIs: Main establishes the existing
-  browser-session cookie in `session.defaultSession` with its bearer credential before the
-  renderer starts authenticated owned or attached traffic.
-
-Verify that Electron session fetch persists the server `Set-Cookie`; if it does not, parse
-and set that exact cookie through the Electron cookie API. Do not retain a renderer
-bearer-token fallback.
+- native WebSocket path: use the existing `postAuthWebsocketTicket()` request through
+  `cradleFetch`, then connect to `serverUrl` with only its short-lived audience-bound
+  single-use ticket;
+- native HTTP(S) resource fallback: keep `postAuthResourceTicket()` only outside
+  custom-scheme mode, with the existing path-bound single-use semantics.
 
 PTY and `/sync` continue to use native WebSocket URLs derived from the loopback listener,
-now relying on the HttpOnly cookie. Do not add process-IPC PTY bridges.
+requesting a new ticket for every connection/reconnect. Do not add a cookie bootstrap,
+bearer-query fallback, reusable ticket, or process-IPC PTY bridge.
 
 **Verify**:
 
@@ -764,8 +838,9 @@ rg -n -- '--server-auth-token|serverAuthToken' \
 ```
 
 returns no owned-mode credential exposure. Security tests prove renderer-supplied auth is
-stripped, main injection succeeds, cookie bootstrap allows PTY/`/sync` WebSocket auth, and
-BrowserPanel content cannot call the custom scheme.
+stripped, Main injection succeeds, PTY/`/sync` tickets are single-use/audience-bound,
+resource tickets are not minted in custom-scheme mode, and BrowserPanel content cannot
+call the custom scheme.
 
 ### M7 - Add the ratchet and targeted many-Tearoff packaged smoke
 
@@ -782,7 +857,9 @@ Desktop/Web production code. It must fail on a new owned-proxy:
 
 The checker must allow:
 
-- native WebSocket to loopback for PTY/`/sync` after cookie bootstrap;
+- native WebSocket to loopback for PTY/`/sync` with an audience-bound single-use ticket;
+- explicit HTTP(S) resource URLs with path-bound single-use tickets only in a named
+  browser/attached adapter;
 - explicit browser/attached HTTP adapters;
 - non-Server destinations;
 
@@ -828,7 +905,8 @@ follow-up if product wants it; do not block the Tearoff pool fix on it.
   starvation.
 - Auth middleware executes on proxied requests; uncredentialed internal requests are
   rejected when expected.
-- Repeated `set-cookie` values survive attached/owned cookie bootstrap.
+- Repeated response headers, including multiple `set-cookie` values, survive proxy parity
+  even though this plan does not use cookie bootstrap for Desktop auth.
 
 ### Connection lifecycle
 
@@ -855,7 +933,11 @@ follow-up if product wants it; do not block the Tearoff pool fix on it.
 - Existing Chat broker fanout/dedup behavior with the new injected upstream fetch.
 - Plan 054 cursor/resume regression suites remain valid, and Plan 071 snapshot-first
   recovery is unchanged (no active-run replay is reintroduced).
-- PTY and `/sync` remain native WebSocket with cookie auth; no process-IPC PTY adapter.
+- PTY and `/sync` remain native WebSocket with fresh audience-bound single-use tickets;
+  no process-IPC PTY adapter.
+- WebSocket tickets expire after 30 seconds, match exactly one route audience, are consumed
+  once, and are reissued for reconnect. Ticket query values are redacted from every log
+  and diagnostic surface.
 - Owned-proxy renderer code does not open `http:`/`https:` EventSource or fetch against
   the owned Server.
 
@@ -882,7 +964,7 @@ For Desktop-owned local Server (`owned-proxy`) and every Tearoff count `N >= 0`:
 ```text
 renderer -> owned Server via Chromium HTTP/1.1 http(s) fetch/SSE   = 0
 renderer -> owned Server via cradle-server:// protocol.handle      = allowed
-renderer -> owned Server native WebSocket (cookie auth)            = allowed
+renderer -> owned Server native WebSocket (single-use ticket)      = allowed
 Electron main -> owned Server                                      = undici loopback (v1)
                                                                      or UDS/pipe (v2)
 private multiplexed process Request/Response framing               = 0
@@ -895,6 +977,8 @@ All boxes must be machine-verified:
 - [ ] M0 passes in both development and packaged Electron 42.4.1 with bounded streaming,
   cancellation, binary, FormData, image, PDF, module import, and session isolation.
 - [ ] `DesktopServerConnection` cannot represent a locator-backed process as `owned-proxy`.
+- [ ] `DesktopServerConnection` cannot represent an auth-required `direct-http` attached
+  renderer without a verified browser-owned session.
 - [ ] No production code path names or implements `owned-ipc` framing.
 - [ ] Generated and hand-written Server fetches preserve status, statusText, headers,
   errors, binary bodies, multipart bodies, streaming, and cancellation versus HTTP.
@@ -903,7 +987,10 @@ All boxes must be machine-verified:
 - [ ] Every Desktop main Server consumer uses one injected transport.
 - [ ] Every owned-proxy SSE consumer uses a fetch-backed or existing Desktop broker path;
   no native EventSource opens an owned Server `http:`/`https:` connection.
-- [ ] PTY and `/sync` use native WebSocket with HttpOnly cookie auth in Desktop.
+- [ ] PTY and `/sync` use native WebSocket with fresh audience-bound single-use tickets;
+  no bearer or reusable browser-session credential reaches the renderer.
+- [ ] Ticket issuance/consumption remains 30-second, audience/path-bound, single-use, and
+  ticket values are redacted from logs and diagnostics.
 - [ ] BrowserPanel partitions cannot resolve `cradle-server://local`.
 - [ ] Attached/browser HTTP behavior and authentication remain functional and explicitly
   identified as not satisfying the owned-proxy invariant.
@@ -940,8 +1027,8 @@ Stop and report; do not improvise if any condition occurs:
 - The executor would need to modify Plan 061 Chat admission/completion/queue ownership,
   Plan 054 cursor semantics, or Plan 071 snapshot-first recovery rather than only transport
   adapters.
-- Electron default-session cookie bootstrap cannot preserve WebSocket / attached
-  authentication without returning the bearer credential to the renderer.
+- The existing single-use ticket flow cannot support native PTY/`/sync` WebSocket after
+  renderer bearer removal without weakening audience, expiry, or single-use semantics.
 - BrowserPanel partitions must receive the custom protocol handler to make an app feature
   work; that is a security-boundary change requiring separate review.
 - A verification gate fails twice after a reasonable correction, or the planned-at
@@ -956,8 +1043,8 @@ Stop and report; do not improvise if any condition occurs:
   bug reports. A successful attached HTTP run is not evidence for the owned-proxy
   invariant.
 - Reviewers should scrutinize cancellation, generation fencing, repeated headers, auth
-  injection, cookie bootstrap, partition isolation, and cleanup more than happy-path JSON
-  calls.
+  injection, ticket audience/consumption, partition isolation, and cleanup more than
+  happy-path JSON calls.
 - Plan 028 intentionally used Desktop-main HTTP because no proxy seam existed. This plan
   supersedes that transport limitation while preserving Plan 028's plugin ownership.
 - The HTTP listener remains useful for CLI, undici proxy targets, and attached clients.
@@ -974,8 +1061,8 @@ Stop and report; do not improvise if any condition occurs:
   Desktop build and `electron-builder --dir`. `pnpm build:desktop` is useful bundle/type
   evidence but is not a packaged-runtime test.
 - Re-run the drift command at the top of this document before starting each delivery slice;
-  `00ba970e` is the revalidation baseline, while `598007aa` remains the historical plan
-  origin.
+  `d40f895e` is the implementation baseline, `00ba970e` is the earlier revalidation, and
+  `598007aa` remains the historical plan origin.
 - Historical note: drafts before 2026-08-02 described `packages/desktop-server-contracts`,
   managed-runner binary Request/Response relay, Server `desktop-transport/` process host,
   and PTY duplex over IPC (old M2–M5/M10). Those sections are deleted on purpose.
@@ -990,8 +1077,27 @@ Stop and report; do not improvise if any condition occurs:
 - [x] (2026-07-31) Development-only protocol and session cookie probes passed; disposable
   source removed. Evidence for custom-scheme mechanics, not completion of M0.
 - [x] (2026-08-02) Architecture rewritten: custom-scheme + undici loopback/UDS proxy;
-  native cookie-authenticated WebSocket for PTY/`/sync`; delete process IPC framing scope;
-  rename connection kind to `owned-proxy` / `attached-http`; effort reduced XL → M–L.
+  native cookie-authenticated WebSocket for PTY/`/sync` (auth detail superseded on
+  2026-08-13); delete process IPC framing scope; rename connection kind to `owned-proxy` /
+  `attached-http`; effort reduced XL → M–L.
+- [x] (2026-08-13) Revalidated at `d40f895e`: Web base/SSE scaffold exists but Desktop
+  does not publish or serve the custom scheme; Desktop Main transport/lifecycle and
+  credential removal remain unimplemented.
+- [x] (2026-08-13) Superseded cookie bootstrap with the already-landed audience-bound
+  single-use WebSocket/resource ticket APIs. Expanded drift scope to include Server auth,
+  authenticated resource URL construction, plugin loading, and CI workflows.
+- [x] (2026-08-13) Recorded baseline: Desktop/Web typechecks and focused transport tests
+  pass; the Build job passes in [CI run 31613048466](https://github.com/wibus-wee/cradle-app/actions/runs/31613048466);
+  two unrelated Chat Runtime tests are already failing on main. The current Work container
+  cannot supply packaged Electron evidence because it has no display server and native
+  dependency installation is constrained.
+- [x] (2026-08-13) Implemented and independently reviewed the isolated M0 fixture, exact
+  result/evidence validator, bounded process-tree launcher, direct undici dependency,
+  package scripts, and Linux/Windows/release CI gates. Focused fixture tests pass 10/10,
+  Desktop direct typecheck and fixture lint pass, and the isolated bundle builds. Two
+  failed reviews found and drove fixes for malformed-result acceptance and timeout-owned
+  descendant cleanup; the third review passed code readiness. Production routing remains
+  untouched and this is not packaged-runtime acceptance.
 - [ ] M0 packaged Electron feasibility gate.
 - [ ] M1–M7 implementation and verification.
 
@@ -1007,6 +1113,9 @@ Stop and report; do not improvise if any condition occurs:
 - Multiplexed process framing was solving Main↔Server transport aesthetics, not the
   Tearoff pool bug. Custom scheme removes renderer traffic from the pool; undici is enough
   for Main.
+- The M0 launcher must retain ownership of a timed-out process group after its direct
+  child exits. Otherwise an `electron-vite` parent can terminate on `SIGTERM` while a
+  signal-ignoring Electron descendant survives and defeats the runner's hard timeout.
 
 ## Decision Log
 
@@ -1014,23 +1123,26 @@ Stop and report; do not improvise if any condition occurs:
 | ---------- | -------- | --------- |
 | 2026-07-23 | Reuse ordinary Server HTTP/`app.handle` semantics instead of route RPC. | Preserves Elysia middleware and avoids generated-client contract drift. |
 | 2026-07-31 | Keep `attached-http` explicit and retain the HTTP listener. | Locator/CLI/parallel-process cases remain real. |
-| 2026-07-31 | Remove renderer bearer arguments; bootstrap cookies in Main. | Static window argv cannot safely express connection-specific credential ownership. |
+| 2026-07-31 | Remove renderer bearer arguments; bootstrap cookies in Main. **Auth mechanism superseded 2026-08-13.** | Static window argv cannot safely express connection-specific credential ownership. |
 | 2026-08-02 | **Reject** multiplexed child-process Request/Response framing. | Custom-scheme + undici solves Chromium pool starvation without a private protocol. |
 | 2026-08-02 | Rename `owned-ipc` → `owned-proxy`. | Name must not imply process IPC framing; Main proxies HTTP to the existing listener. |
-| 2026-08-02 | Keep PTY/`/sync` on native WebSocket with HttpOnly cookie auth. | WS is outside the HTTP/1.1 six-connection pool; IPC duplex was unnecessary risk. |
+| 2026-08-02 | Keep PTY/`/sync` on native WebSocket with HttpOnly cookie auth. **Cookie detail superseded 2026-08-13.** | WS is outside the HTTP/1.1 six-connection pool; IPC duplex was unnecessary risk. |
 | 2026-08-02 | v1 undici loopback; v2 optional UDS/named pipe. | Optional zero-TCP is an undici target change, not a framing project. |
 | 2026-08-02 | Plan B if M0 fails: local HTTP/2 TLS (separate plan), not IPC framing. | Failed custom-scheme packaging must not resurrect the rejected design. |
 | 2026-08-02 | `attached-http` also uses `cradle-server://` when Main can proxy. | Attached Tearoffs hit the same Chromium pool; kind stays attached for ownership. |
 | 2026-08-02 | WS base = status `serverUrl`; no v1 `wsBaseUrl` field. | Custom scheme cannot do WS upgrade; loopback HTTP(S) URL is enough. |
 | 2026-08-02 | Defer UDS/named pipe until after M7. | Optional zero-TCP; not required to fix pool starvation. |
+| 2026-08-13 | Use the existing audience-bound single-use tickets for native WebSocket instead of Desktop cookie bootstrap. | Ticket issuance can travel through the authenticated custom-scheme proxy; the renderer gets no long-lived credential or global session state. |
+| 2026-08-13 | In custom-scheme mode, load Server subresources and plugin modules directly through `cradle-server://local`; reserve resource tickets for explicit HTTP(S) fallback. | HTTP(S) resource URLs would re-enter Chromium's owned-Server pool and violate the zero-pool invariant. |
+| 2026-08-13 | Treat the existing Web transport as M5 scaffold, not milestone completion. | Desktop does not yet publish the connection projection, and SSE conformance/cleanup coverage is incomplete. |
 
 ## Outcomes & Retrospective
 
 This is an architecture rewrite of the plan, not an implementation completion. The product
 goal is Tearoff-safe Desktop networking: renderer HTTP/SSE leave Chromium's six-connection
 pool via `cradle-server://local`, Main proxies with undici, WebSocket stays native with
-Main-owned cookies, and the Server HTTP listener remains the one contract for CLI and
-proxy targets.
+audience-bound single-use tickets, and the Server HTTP listener remains the one contract
+for CLI and proxy targets.
 
 If M0 passes, execute M1–M7 in order. If M0 fails, stop with artifact measurements and
 consider Plan B (local HTTP/2 TLS) as a new plan — do not implement process IPC framing.
@@ -1043,5 +1155,15 @@ consider Plan B (local HTTP/2 TLS) as a new plan — do not implement process IP
 > runner Request/Response protocol, Server process host, PTY-over-IPC, old M2–M5/M10).
 > Locked architecture is custom-scheme → Main credential injection → undici
 > loopback/UDS → existing Elysia listener; native cookie-authenticated WebSocket for
-> PTY/`/sync`. Connection kind is `owned-proxy` / `attached-http`. Effort honestly
-> reduced from XL to M–L.
+> PTY/`/sync` (later superseded by the ticket decision below). Connection kind is
+> `owned-proxy` / `attached-http`. Effort honestly reduced from XL to M–L.
+>
+> Revision note (2026-08-13): rebased implementation facts to `d40f895e`, incorporated
+> the landed Web transport and single-use ticket APIs, removed cookie bootstrap from the
+> execution path, expanded the drift boundary, and made M0 a CI-executed packaged gate
+> before any production routing.
+>
+> Revision note (2026-08-13, M0 code-ready): added the isolated M0 application, strict
+> evidence validator, bounded process-tree runner, direct undici dependency, and required
+> Linux/Windows workflow gates. Independent review passed the fixture code after two
+> fix/re-review loops; development/packaged runtime evidence remains the hard predecessor.

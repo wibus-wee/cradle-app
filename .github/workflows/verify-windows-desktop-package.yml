@@ -7,6 +7,16 @@ on:
         description: Git ref in this repository to checkout (branch, tag, or SHA)
         required: true
         default: main
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/desktop/src/main/desktop-server-transport/fixtures/m0/**'
+      - 'apps/desktop/package.json'
+      - 'apps/desktop/electron.vite.config.ts'
+      - 'apps/desktop/electron-builder.mjs'
+      - 'plugins/system-info/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/verify-windows-desktop-package.yml'
 
 permissions:
   contents: read
@@ -25,12 +35,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || 'main' }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
 
       - name: Setup desktop build environment
         uses: ./.github/actions/desktop-build-setup
         with:
           node-version: '24'
+
+      - name: Run packaged M0 custom-scheme gate
+        run: pnpm --filter @cradle/desktop m0:custom-scheme:packaged
 
       - name: Build desktop runtime and app bundles
         run: pnpm --filter @cradle/desktop build
@@ -231,6 +244,8 @@ jobs:
           name: cradle-windows-package
           if-no-files-found: warn
           path: |
+            apps/desktop/.m0-results/**
+            apps/desktop/release/m0/builder-effective-config.yaml
             apps/desktop/release/*.exe
             apps/desktop/release/*.blockmap
             apps/desktop/release/builder-effective-config.yaml
