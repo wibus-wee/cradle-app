@@ -207,6 +207,10 @@ describe('work delivery control', () => {
         workspaceId: WORKSPACE_ID,
         title: 'Create managed Work',
         goal: 'Create an isolated local Work container.',
+        acceptanceCriteria: [
+          'The Work uses a managed checkout.',
+          'The primary Session survives a reload.',
+        ],
         runtimeKind: 'opencode',
       })
 
@@ -214,6 +218,10 @@ describe('work delivery control', () => {
       expect(detail.execution.isIsolated).toBe(true)
       expect(detail.execution.worktreeHealth).toBe('ok')
       expect(detail.readiness.commitsAhead).toBe(0)
+      expect(detail.work.acceptanceCriteria).toEqual([
+        'The Work uses a managed checkout.',
+        'The primary Session survives a reload.',
+      ])
       expect(detail.initialRun?.runId).toBe('initial-work-run')
       expect(createRun).toHaveBeenCalledWith({
         sessionId: detail.primaryThread.id,

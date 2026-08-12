@@ -1684,6 +1684,7 @@ export const zPostWorksBody = z.object({
     title: z.string().min(1),
     goal: z.string().min(1).optional(),
     objective: z.string().min(1).optional(),
+    acceptanceCriteria: z.array(z.string().min(1)).max(50).optional(),
     linkedIssueId: z.string().min(1).optional(),
     baseBranch: z.string().min(1).optional(),
     providerTargetId: z.string().min(1).optional(),
@@ -1728,6 +1729,10 @@ export const zPostWorksByIdArchiveBody = z.object({
 });
 
 export const zPostWorksByIdArchivePath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostWorksByIdRedetectPath = z.object({
     id: z.string().min(1)
 });
 

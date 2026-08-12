@@ -19,6 +19,13 @@ export const work = new Elysia({
     query: WorkModel.listQuery,
     response: { 200: t.Array(WorkModel.summary) },
   })
+  .get('/attention', () => Work.listAttention(), {
+    detail: {
+      'summary': 'List actionable Work attention items',
+      'x-cradle-cli': { command: ['work', 'attention'] },
+    },
+    response: { 200: t.Array(WorkModel.attentionItem) },
+  })
   .get('/:id', async ({ params }) => {
     const detail = await Work.get(params.id)
     if (!detail) {
@@ -54,6 +61,14 @@ export const work = new Elysia({
     },
     params: WorkModel.idParams,
     body: WorkModel.archiveBody,
+    response: { 200: WorkModel.detail },
+  })
+  .post('/:id/redetect', async ({ params }) => await Work.redetect(params.id), {
+    detail: {
+      'summary': 'Redetect Work state from authoritative owner facts',
+      'x-cradle-cli': { command: ['work', 'redetect'] },
+    },
+    params: WorkModel.idParams,
     response: { 200: WorkModel.detail },
   })
   .post('/:id/prepare', async ({ params, body }) => await Work.prepare({

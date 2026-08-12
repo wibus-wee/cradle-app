@@ -4,21 +4,26 @@ import {
   getSessionsByIdQueryKey,
   getSessionsByIdWorkOptions,
   getSessionsByIdWorkQueryKey,
+  getWorksAttentionOptions,
+  getWorksAttentionQueryKey,
   getWorksByIdOptions,
   getWorksByIdQueryKey,
   getWorksOptions,
   getWorksQueryKey,
   postWorksByIdArchiveMutation,
+  postWorksByIdRedetectMutation,
   postWorksByIdSubmitMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type {
   GetSessionsByIdWorkResponse,
+  GetWorksAttentionResponse,
   GetWorksByIdResponse,
   GetWorksResponse,
 } from '~/api-gen/types.gen'
 
 export type WorkDetail = GetWorksByIdResponse
 export type WorkSummary = GetWorksResponse[number]
+export type WorkAttentionItem = GetWorksAttentionResponse[number]
 export type SessionWorkResolution = GetSessionsByIdWorkResponse
 
 export const WORK_PULL_REQUEST_REFRESH_INTERVAL_MS = 30_000
@@ -73,6 +78,15 @@ export function useSessionWork(sessionId: string | null | undefined) {
   })
 }
 
+export function useWorkAttention() {
+  return useQuery({
+    ...getWorksAttentionOptions(),
+    staleTime: 3_000,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: true,
+  })
+}
+
 function invalidateWorkQueries(
   queryClient: ReturnType<typeof useQueryClient>,
   detail: WorkDetail,
@@ -103,5 +117,16 @@ export function useArchiveWork() {
   return useMutation({
     ...postWorksByIdArchiveMutation(),
     onSuccess: detail => invalidateWorkQueries(queryClient, detail),
+  })
+}
+
+export function useRedetectWork() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...postWorksByIdRedetectMutation(),
+    onSuccess: (detail) => {
+      invalidateWorkQueries(queryClient, detail)
+      void queryClient.invalidateQueries({ queryKey: getWorksAttentionQueryKey() })
+    },
   })
 }

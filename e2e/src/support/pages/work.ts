@@ -20,7 +20,7 @@ interface WorkSummary {
 }
 
 interface WorkDetail {
-  work: { objective: string }
+  work: { objective: string, acceptanceCriteria: string[] }
   primaryThread: { id: string }
   execution: {
     isIsolated: boolean
@@ -29,6 +29,18 @@ interface WorkDetail {
   }
   readiness: {
     changedFiles: number
+  }
+  state: string
+  stateSinceAt: number
+  stateExplanation: {
+    trigger: string
+    evidence: string
+    authority: string
+    nextAction: string
+  }
+  recovery: {
+    level: string
+    evidence: string
   }
 }
 
@@ -68,13 +80,19 @@ export class WorkPage {
     await fillPromptEditor(this.page.locator('[data-testid="new-work-textarea"]'), goal)
   }
 
+  async fillAcceptanceCriteria(criterion: string): Promise<void> {
+    const input = this.page.locator('[data-testid="new-work-acceptance-criteria"]')
+    await expect(input).toBeVisible({ timeout: TIMEOUT })
+    await input.fill(criterion)
+  }
+
   async start(): Promise<void> {
     const send = this.page.locator('[data-testid="new-work-send-btn"]')
     await expect(send).toBeEnabled({ timeout: TIMEOUT })
     await send.click()
   }
 
-  async expectPersisted(goal: string, sessionId: string): Promise<void> {
+  async expectPersisted(goal: string, sessionId: string): Promise<string> {
     let matchedWorkId: string | null = null
     await expect.poll(async () => {
       const response = await fetch(`${this.owner.params.serverUrl}/works`)
@@ -101,8 +119,41 @@ export class WorkPage {
     })
     expect(detail.readiness.changedFiles).toBeGreaterThanOrEqual(1)
     expect(detail.execution.worktreePath).not.toBeNull()
+    expect(detail.state.length).toBeGreaterThan(0)
+    expect(detail.stateExplanation.authority.length).toBeGreaterThan(0)
+    expect(detail.stateExplanation.evidence.length).toBeGreaterThan(0)
+    expect(detail.stateExplanation.nextAction.length).toBeGreaterThan(0)
+    expect(detail.recovery.level).not.toBe('unknown')
+    expect(detail.recovery.evidence.length).toBeGreaterThan(0)
     expect(readFileSync(join(detail.execution.worktreePath!, 'e2e-work-result.txt'), 'utf8'))
       .toBe('created inside the managed Cradle worktree\n')
+    return matchedWorkId
+  }
+
+  async expectExplainableState(): Promise<void> {
+    await expect(this.page.locator('[data-testid="work-state-badge"]')).toBeVisible({ timeout: TIMEOUT })
+    await expect(this.page.locator('[data-testid="work-recovery-badge"]')).toBeVisible({ timeout: TIMEOUT })
+    await expect(this.page.locator('[data-testid="work-state-badge"]')).not.toHaveText('')
+    await expect(this.page.locator('[data-testid="work-recovery-badge"]')).not.toHaveText('')
+  }
+
+  async expectAcceptanceCriterion(workId: string, criterion: string): Promise<void> {
+    const response = await fetch(`${this.owner.params.serverUrl}/works/${workId}`)
+    expect(response.ok).toBe(true)
+    const detail = await response.json() as WorkDetail
+    expect(detail.work.acceptanceCriteria).toContain(criterion)
+  }
+
+  async expectAttentionDirectAction(workId: string): Promise<void> {
+    const nav = this.page.locator('[data-testid="nav-needs-me"]')
+    await expect(nav).toBeVisible({ timeout: TIMEOUT })
+    await nav.click()
+    await expect(this.page.locator('[data-testid="work-attention"]')).toBeVisible({ timeout: TIMEOUT })
+    const item = this.page.locator(`[data-testid="attention-item-${workId}"]`)
+    await expect(item).toBeVisible({ timeout: TIMEOUT })
+    await item.locator('button').first().click()
+    await expect(this.page).toHaveURL(new RegExp(`/work/${workId}$`), { timeout: TIMEOUT })
+    await expect(this.page.locator('[data-testid="work-state-badge"]')).toBeVisible({ timeout: TIMEOUT })
   }
 
   async openRuntimePanel(): Promise<void> {

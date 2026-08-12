@@ -11,6 +11,7 @@ import { hasPendingRuntimeToolApproval } from '../chat-runtime/pending-tool-appr
 import { listPendingRuntimeUserInputSummaries } from '../chat-runtime/pending-user-input'
 import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
 import * as ChatRuntime from '../chat-runtime/runtime'
+import { readDurableProviderRuntimeBinding } from '../provider-runtime/service'
 import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
@@ -18,24 +19,67 @@ import * as SessionAwait from '../session-await/service'
 import type { SessionAwaitSource } from '../session-await/types'
 import * as Workspace from '../workspace/service'
 import * as Worktree from '../worktree/service'
+import type { WorkDeliveryState, WorkProjection, WorkRecovery, WorkStateExplanation } from './projection'
+import {
+  deriveWorkProjection,
+} from './projection'
 
 const logger = createChildLogger({ module: 'work' })
 
 export type WorkActivity = 'idle' | 'running' | 'waiting' | 'blocked'
-export type WorkSummary = Work & {
+export type WorkView = Omit<Work, 'acceptanceCriteriaJson'> & {
+  acceptanceCriteria: string[]
+}
+export type WorkSummary = WorkView & {
   workspaceId: string
   primarySessionId: string
   activity: WorkActivity
   pullRequest: PullRequest.SessionPullRequestView | null
+  state: WorkDeliveryState
+  stateSinceAt: number
+  stateExplanation: WorkStateExplanation
+  recovery: WorkRecovery
 }
 export interface WorkDetail {
-  work: Work
+  work: WorkView
   primaryThread: Session.SessionView
   execution: Worktree.SessionIsolationView
   readiness: PullRequest.PullRequestReadiness
   pullRequest: PullRequest.SessionPullRequestView | null
   activity: WorkActivity
+  state: WorkDeliveryState
+  stateSinceAt: number
+  stateExplanation: WorkStateExplanation
+  recovery: WorkRecovery
   initialRun?: CreateRunResult
+}
+
+export type WorkAttentionCategory
+  = | 'approve_or_answer'
+    | 'handle_failure'
+    | 'review_work'
+    | 'merge_or_archive'
+
+export type WorkAttentionRisk = 'low' | 'medium' | 'high'
+
+export interface WorkAttentionItem {
+  id: string
+  category: WorkAttentionCategory
+  risk: WorkAttentionRisk
+  workId: string
+  workTitle: string
+  workspaceId: string
+  sessionId: string
+  runtimeKind: string
+  providerTargetId: string | null
+  agentId: string | null
+  state: WorkDeliveryState
+  stateSinceAt: number
+  waitingSeconds: number
+  reason: string
+  authority: WorkStateExplanation['authority']
+  nextAction: string
+  recovery: WorkRecovery
 }
 
 type SessionCreateInput = Parameters<typeof Session.create>[0]
@@ -47,6 +91,7 @@ export type CreateWorkInput = Omit<
   title: string
   goal?: string
   objective?: string
+  acceptanceCriteria?: string[]
   linkedIssueId?: string | null
   /**
    * Exact local or remote branch ref to use as the isolation base.
@@ -128,9 +173,26 @@ async function archiveWorkForPrimarySession(sessionId: string): Promise<void> {
 
 Session.onSessionArchiving(archiveWorkForPrimarySession)
 
-function projectConversationTitle(work: Work, primaryThread: Session.SessionView): Work {
+function readAcceptanceCriteria(work: Work): string[] {
+  try {
+    const parsed = JSON.parse(work.acceptanceCriteriaJson)
+    return Array.isArray(parsed)
+      ? parsed.filter((criterion): criterion is string => typeof criterion === 'string')
+      : []
+  }
+  catch {
+    return []
+  }
+}
+
+function projectWorkView(work: Work, primaryThread: Session.SessionView): WorkView {
+  const { acceptanceCriteriaJson: _acceptanceCriteriaJson, ...record } = work
   const title = primaryThread.title?.trim()
-  return title && title !== work.title ? { ...work, title } : work
+  return {
+    ...record,
+    title: title || work.title,
+    acceptanceCriteria: readAcceptanceCriteria(work),
+  }
 }
 
 export function deriveActivity(input: {
@@ -151,19 +213,84 @@ export function deriveActivity(input: {
   return 'idle'
 }
 
-function readActivity(session: Session.SessionView): WorkActivity {
-  const awaitSummary = SessionAwait.getSessionSummary(session.id)
-  const waitingForInteraction = listPendingRuntimeUserInputSummaries({ sessionId: session.id }).length > 0
-    || hasPendingRuntimeToolApproval(session.id)
+interface WorkSignals {
+  awaitSummary: ReturnType<typeof SessionAwait.getSessionSummary>
+  pendingUserInputs: ReturnType<typeof listPendingRuntimeUserInputSummaries>
+  pendingToolApproval: boolean
+  hasActiveRun: boolean
+  hasDurableProviderBinding: boolean
+}
+
+function readWorkSignals(session: Session.SessionView): WorkSignals {
+  return {
+    awaitSummary: SessionAwait.getSessionSummary(session.id),
+    pendingUserInputs: listPendingRuntimeUserInputSummaries({ sessionId: session.id }),
+    pendingToolApproval: hasPendingRuntimeToolApproval(session.id),
+    hasActiveRun: ChatRuntime.getActiveSessionRun(session.id) !== null,
+    hasDurableProviderBinding: readDurableProviderRuntimeBinding(session.id) !== undefined,
+  }
+}
+
+function readActivity(
+  session: Session.SessionView,
+  signals: WorkSignals = readWorkSignals(session),
+): WorkActivity {
   return deriveActivity({
     sessionStatus: session.status,
     worktreeHealth: session.worktreeHealth,
-    awaiting: awaitSummary.awaiting,
-    waitingForInteraction,
+    awaiting: signals.awaitSummary.awaiting,
+    waitingForInteraction: signals.pendingUserInputs.length > 0 || signals.pendingToolApproval,
   })
 }
 
-function toSummary(work: Work, primaryThread: Session.SessionView): WorkSummary {
+function projectWorkState(input: {
+  work: Work
+  primaryThread: Session.SessionView
+  pullRequest: PullRequest.SessionPullRequestView | null
+  signals?: WorkSignals
+}): WorkProjection {
+  const signals = input.signals ?? readWorkSignals(input.primaryThread)
+  const firstPendingInput = signals.pendingUserInputs[0]
+  const pendingHumanEvidence = firstPendingInput
+    ? firstPendingInput.firstQuestion
+      ? `The Agent asked: ${firstPendingInput.firstQuestion}`
+      : `The Agent requested ${firstPendingInput.providerMethod} input.`
+    : signals.pendingToolApproval
+      ? 'The Agent requested approval for a tool call.'
+      : null
+  const pendingDependencyEvidence = signals.awaitSummary.awaiting
+    ? [signals.awaitSummary.primarySource, signals.awaitSummary.reason].filter(Boolean).join(': ')
+    : null
+
+  return deriveWorkProjection({
+    observedAt: now(),
+    workUpdatedAt: input.work.updatedAt,
+    sessionUpdatedAt: input.primaryThread.updatedAt,
+    archivedAt: input.work.archivedAt,
+    sessionArchivedAt: input.primaryThread.archivedAt,
+    sessionStatus: input.primaryThread.status,
+    worktreeHealth: input.primaryThread.worktreeHealth,
+    isIsolated: input.primaryThread.isIsolated,
+    hasPersistedSession: true,
+    hasDurableProviderBinding: signals.hasDurableProviderBinding,
+    hasActiveRun: signals.hasActiveRun,
+    pendingHumanInteraction: signals.pendingUserInputs.length > 0 || signals.pendingToolApproval,
+    pendingHumanSinceAt: firstPendingInput?.createdAt ?? null,
+    pendingHumanEvidence,
+    pendingDependency: signals.awaitSummary.awaiting,
+    pendingDependencySinceAt: null,
+    pendingDependencyEvidence,
+    preparedAt: input.work.preparedAt,
+    lastSubmittedAt: input.work.lastSubmittedAt,
+    pullRequest: input.pullRequest,
+  })
+}
+
+function toSummary(
+  work: Work,
+  primaryThread: Session.SessionView,
+  pullRequest: PullRequest.SessionPullRequestView | null = PullRequest.getBoundPullRequest(primaryThread.id),
+): WorkSummary {
   if (!primaryThread.workspaceId) {
     throw new AppError({
       code: 'work_workspace_missing',
@@ -172,21 +299,24 @@ function toSummary(work: Work, primaryThread: Session.SessionView): WorkSummary 
       details: { workId: work.id, sessionId: primaryThread.id },
     })
   }
+  const signals = readWorkSignals(primaryThread)
+  const projection = projectWorkState({ work, primaryThread, pullRequest, signals })
   return {
-    ...projectConversationTitle(work, primaryThread),
+    ...projectWorkView(work, primaryThread),
     workspaceId: primaryThread.workspaceId,
     primarySessionId: primaryThread.id,
-    activity: readActivity(primaryThread),
-    pullRequest: PullRequest.getBoundPullRequest(primaryThread.id),
+    activity: readActivity(primaryThread, signals),
+    pullRequest,
+    state: projection.state,
+    stateSinceAt: projection.stateSinceAt,
+    stateExplanation: projection.explanation,
+    recovery: projection.recovery,
   }
 }
 
 async function toLiveSummary(work: Work, primaryThread: Session.SessionView): Promise<WorkSummary> {
-  const summary = toSummary(work, primaryThread)
-  return {
-    ...summary,
-    pullRequest: await PullRequest.getPullRequest(primaryThread.id),
-  }
+  const pullRequest = await PullRequest.getPullRequest(primaryThread.id)
+  return toSummary(work, primaryThread, pullRequest)
 }
 
 export async function list(input: {
@@ -232,14 +362,99 @@ export async function get(id: string): Promise<WorkDetail | null> {
     PullRequest.inspectPullRequestReadiness(primaryThread.id),
     PullRequest.getPullRequest(primaryThread.id),
   ])
+  const livePrimaryThread = { ...primaryThread, ...execution }
+  const signals = readWorkSignals(livePrimaryThread)
+  const projection = projectWorkState({
+    work,
+    primaryThread: livePrimaryThread,
+    pullRequest,
+    signals,
+  })
   return {
-    work: projectConversationTitle(work, primaryThread),
+    work: projectWorkView(work, primaryThread),
     primaryThread,
     execution,
     readiness,
     pullRequest,
-    activity: readActivity({ ...primaryThread, ...execution }),
+    activity: readActivity(livePrimaryThread, signals),
+    state: projection.state,
+    stateSinceAt: projection.stateSinceAt,
+    stateExplanation: projection.explanation,
+    recovery: projection.recovery,
   }
+}
+
+function attentionCategoryForState(state: WorkDeliveryState): {
+  category: WorkAttentionCategory
+  risk: WorkAttentionRisk
+} | null {
+  switch (state) {
+    case 'awaiting_human':
+      return { category: 'approve_or_answer', risk: 'medium' }
+    case 'failed':
+      return { category: 'handle_failure', risk: 'high' }
+    case 'unknown':
+      return { category: 'handle_failure', risk: 'medium' }
+    case 'ready_for_review':
+      return { category: 'review_work', risk: 'low' }
+    case 'merging':
+      return { category: 'merge_or_archive', risk: 'medium' }
+    case 'done':
+    case 'cancelled':
+      return { category: 'merge_or_archive', risk: 'low' }
+    default:
+      return null
+  }
+}
+
+const attentionRiskRank: Record<WorkAttentionRisk, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+}
+
+export async function listAttention(): Promise<WorkAttentionItem[]> {
+  const observedAt = now()
+  const summaries = await list()
+  return summaries
+    .flatMap((summary): WorkAttentionItem[] => {
+      const attention = attentionCategoryForState(summary.state)
+      if (!attention) {
+        return []
+      }
+      const primaryThread = requirePrimaryThread(summary.id)
+      return [{
+        id: `work:${summary.id}:${attention.category}`,
+        category: attention.category,
+        risk: attention.risk,
+        workId: summary.id,
+        workTitle: summary.title,
+        workspaceId: summary.workspaceId,
+        sessionId: summary.primarySessionId,
+        runtimeKind: primaryThread.runtimeKind,
+        providerTargetId: primaryThread.providerTargetId,
+        agentId: primaryThread.agentId,
+        state: summary.state,
+        stateSinceAt: summary.stateSinceAt,
+        waitingSeconds: Math.max(0, observedAt - summary.stateSinceAt),
+        reason: summary.stateExplanation.evidence,
+        authority: summary.stateExplanation.authority,
+        nextAction: summary.stateExplanation.nextAction,
+        recovery: summary.recovery,
+      }]
+    })
+    .sort((left, right) =>
+      attentionRiskRank[right.risk] - attentionRiskRank[left.risk]
+      || right.waitingSeconds - left.waitingSeconds
+      || left.workTitle.localeCompare(right.workTitle))
+}
+
+export async function redetect(id: string): Promise<WorkDetail> {
+  const detail = await get(id)
+  if (!detail) {
+    throw new AppError({ code: 'work_not_found', status: 404, message: 'Work not found' })
+  }
+  return detail
 }
 
 export function getBySessionId(sessionId: string): WorkSummary | null {
@@ -302,6 +517,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
       title: _title,
       goal: _goal,
       objective: _objective,
+      acceptanceCriteria: _acceptanceCriteria,
       linkedIssueId: _linkedIssueId,
       workspaceId: _workspaceId,
       ...sessionInput
@@ -330,6 +546,9 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
         id: workId,
         title,
         objective: goal,
+        acceptanceCriteriaJson: JSON.stringify(
+          (input.acceptanceCriteria ?? []).map(criterion => criterion.trim()).filter(Boolean),
+        ),
         linkedIssueId: input.linkedIssueId ?? null,
         createdAt: timestamp,
         updatedAt: timestamp,

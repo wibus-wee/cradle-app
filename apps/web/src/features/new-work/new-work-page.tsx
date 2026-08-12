@@ -21,6 +21,7 @@ import { apiErrorMessage } from '~/lib/api-error'
 import { openWork, openWorkspaceDiffs } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 
+import { NewWorkAcceptanceCriteriaView } from './new-work-acceptance-criteria-view'
 import { NewWorkBaseBranchControlView } from './new-work-base-branch-control-view'
 import type { NewWorkFailureKind } from './new-work-error-view'
 import { NewWorkPageView } from './new-work-page-view'
@@ -59,6 +60,7 @@ export function NewWorkPage() {
   const selectedWorkspace = localWorkspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? null
   const { data: branches, isLoading: branchesLoading } = useGitBranches(selectedWorkspace?.id)
   const [selectedBaseBranch, setSelectedBaseBranch] = useState<string | null>(null)
+  const [acceptanceCriteriaText, setAcceptanceCriteriaText] = useState('')
   const composerState = useComposerState({
     context: 'new-chat',
     workspaceId: selectedWorkspace?.id ?? null,
@@ -118,6 +120,10 @@ export function NewWorkPage() {
       workspaceId: selectedWorkspace.id,
       title,
       goal,
+      acceptanceCriteria: acceptanceCriteriaText
+        .split('\n')
+        .map(criterion => criterion.trim())
+        .filter(Boolean),
       linkedIssueId: search.issueId,
       runtimeKind: options.runtimeKind,
       runtimeSettings: options.runtimeSettings,
@@ -229,6 +235,12 @@ export function NewWorkPage() {
 
   return (
     <NewWorkPageView
+      acceptanceCriteria={(
+        <NewWorkAcceptanceCriteriaView
+          value={acceptanceCriteriaText}
+          onChange={setAcceptanceCriteriaText}
+        />
+      )}
       composer={composer}
       workspaceCount={localWorkspaces.length}
       loadingWorkspaces={loading}

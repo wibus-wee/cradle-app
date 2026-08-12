@@ -1,8 +1,9 @@
 # Work module
 
-The Work module owns the local outcome container: its objective, primary-thread
-membership, prepared handoff metadata, archive fact, and composition of existing
-Session, Worktree, Pull Request, Chat Runtime, and Await read models.
+The Work module owns the local outcome container: its objective, acceptance
+criteria, primary-thread membership, prepared handoff metadata, archive fact,
+and composition of existing Session, Worktree, Pull Request, Chat Runtime,
+Provider Runtime, and Await read models.
 
 ## Invariants
 
@@ -17,8 +18,23 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
 - Default creation bases the managed Worktree on a clean local `HEAD`. Clients
   may pass an explicit local or remote branch ref (for example `origin/main`)
   to start from that branch without touching local WIP.
-- Work stores facts only. Activity labels are derived and no Work status machine
-  exists.
+- Work persists delivery facts, not mutable status labels. `projection.ts`
+  deterministically derives delivery state, explanation, attention ownership,
+  and the strongest honest recovery promise from canonical owner facts.
+- Projection precedence is explicit and unit tested. Archive/merge/failure and
+  unhealthy worktree facts override weaker runtime or handoff facts; an
+  unclassifiable Work is `unknown` and stays diagnosable instead of being
+  guessed into progress.
+- Every projected state includes its trigger, evidence, authority, responsible
+  party, next action, and observation time. Fresh redetection rereads owner
+  facts; it never changes a label by itself.
+- Attention is a derived, cross-Work read model with four actionable categories:
+  approve or answer, handle failure, review, and merge or archive. It is sorted
+  by risk and waiting time.
+- Recovery exposes the strongest currently supported contract: `live`,
+  `resumable`, `restorable`, `reproducible`, or `unknown`. Provider bindings,
+  persisted Sessions, and healthy isolated worktrees keep their original
+  ownership; Work only composes their evidence.
 - Listing Work detects the current state of each bound pull request through the
   Pull Request owner, so sidebar summaries reflect GitHub merges without
   opening the individual Work surface.
@@ -54,6 +70,7 @@ Session, Worktree, Pull Request, Chat Runtime, and Await read models.
 - Worktree owns Git checkout creation, binding, health, and cleanup.
 - Pull Request owns Git comparison, push, GitHub API calls, and PR persistence.
 - Chat Runtime owns runs and pending interaction state.
+- Provider Runtime owns durable provider-session bindings.
 - Session Await owns external waiting facts.
 
 Work reads and composes those services but does not duplicate their semantics.
@@ -63,6 +80,10 @@ Work reads and composes those services but does not duplicate their semantics.
 - `index.ts`: HTTP/OpenAPI/CLI routes.
 - `agent-context.ts`: Work-owned primary-Session harness fragment registration.
 - `model.ts`: TypeBox request and response schemas.
+- `projection.ts`: pure delivery-state, authority, attention, and recovery
+  projection policy.
 - `service.ts`: Work persistence, aggregate reads, compensated creation,
-  preparation, and explicit delivery orchestration.
+  preparation, explicit delivery orchestration, attention aggregation, and
+  redetection.
 - `service.test.ts`: critical Work invariants and delivery-control tests.
+- `projection.test.ts`: precedence and recovery-contract table tests.
