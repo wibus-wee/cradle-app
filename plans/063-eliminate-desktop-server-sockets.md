@@ -70,7 +70,7 @@
 - **Planned at**: commit `598007aa`, 2026-07-23
 - **Revalidated at**: commit `d40f895e`, 2026-08-13
 - **Architecture rewrite**: 2026-08-02 (custom-scheme + undici proxy; IPC framing deleted)
-- **Execution state**: replan complete; M0–M4 and M6–M7 not started, M5 scaffold only
+- **Execution state**: M0 executed and failed; **ARCHITECTURE STOP**; M1–M7 prohibited, M5 scaffold left unchanged
 
 ### 2026-08-13 current-state baseline
 
@@ -1119,8 +1119,22 @@ Stop and report; do not improvise if any condition occurs:
   acceptance threshold. Five failed sanitizer reviews drove the finite terminal-redaction
   rule and original-index ASCII matcher; Review Q passed. Local fixture tests pass 31/31,
   Desktop Node typecheck/lint and the isolated bundle pass. No runtime gate has passed.
-- [ ] M0 packaged Electron feasibility gate.
-- [ ] M1–M7 implementation and verification.
+- [x] (2026-08-13) Executed the third evidence-preserving hosted revision. Linux run
+  31631897209/job 94232462008/artifact 9155455275 and Windows run 31631897216/job
+  94232461652/artifact 9155482787 retained complete PID-scoped failed temp results,
+  lifecycle/runner traces, exact counters, and RSS samples. No canonical result was
+  published because last-window exit raced the final write/rename; this independently
+  blocks PASS but does not invalidate the complete negative measurements.
+- [x] (2026-08-13) Classified M0 as **failed / ARCHITECTURE STOP** after Exploration R/S,
+  adversarial Critique T, and final Synthesis U. Renderer 64-to-128 MiB peak-delta growth
+  was 34,212 KiB in Linux development, 37,340 KiB in Linux packaged, and 40,836 KiB in
+  Windows packaged against the locked 16,384 KiB maximum. All three modes also recorded
+  `requestSignalAborts: 0`; real-plugin assertions failed for separately correctable
+  preparation reasons. The replicated non-calibratable renderer slope is independently
+  decisive, so no additional Plan 063 feasibility rerun or production migration is
+  authorized.
+- [x] M0 packaged Electron feasibility gate executed: **FAILED / ARCHITECTURE STOP**.
+- [ ] M1–M7 implementation and verification — deliberately not executed because M0 failed.
 
 ## Surprises & Discoveries
 
@@ -1160,6 +1174,22 @@ Stop and report; do not improvise if any condition occurs:
   persisted new query, credential, escaped-delimiter, or multi-scheme markers through the
   real JSON/JSONL writers. Structured checkpoints and file/process metadata carry the
   actionable M0 evidence; ambiguous message suffixes are expendable.
+- The third hosted evidence proved the earlier code-0/no-result symptom was a fixture
+  finalization race: destroying the last windows allowed Electron to exit while the
+  temporary result write or rename was in flight. The complete retained temp results are
+  insufficient for PASS but sufficient, with exact lifecycle and runner attribution, to
+  diagnose a failed gate. Requiring a canonical rename before acting on failure evidence
+  would add a no-information rerun not authorized by the bounded M0 decision.
+- Renderer peak working-set growth from the 64 MiB case to the 128 MiB case exceeded the
+  locked 16 MiB slope in Linux development and in both Linux and Windows packaged modes.
+  Main's initial 64 MiB growth can be calibrated below the 64 MiB absolute ceiling, but
+  the renderer slope cannot be raised or averaged away. This cross-platform repeated hard
+  failure is the independent Architecture STOP basis.
+- Response cancellation did close upstream and return active requests to zero, but the
+  incoming Electron protocol `Request.signal` never aborted. Real-plugin packaged routing
+  reached the custom-scheme handler and then hit an unreplaced browser bundle
+  `process.env.NODE_ENV`. Both remain conjunctive M0 failures; neither needs to carry the
+  STOP decision because the renderer RSS slope is already decisive.
 
 ## Decision Log
 
@@ -1182,6 +1212,7 @@ Stop and report; do not improvise if any condition occurs:
 | 2026-08-13 | Allow M0 process `--no-sandbox` only for exact Linux GitHub Actions requests, with result-contract verification and sandboxed BrowserWindows retained. | The hosted runner cannot satisfy Electron's SUID helper ownership/mode, while the exception must not leak into product launch or hide renderer security settings. |
 | 2026-08-13 | After the first real Linux behavior failure, run one evidence-preservation-only revision before selecting a behavior correction or architecture STOP. | Composite sequencing and hidden-file upload discarded packaged behavior, raw RSS traces, assertion details, and Windows startup logs. Fixing observability changes no assertion or product behavior and does not consume the one evidence-based correction. |
 | 2026-08-13 | Use terminal redaction for arbitrary diagnostic strings: at the first syntactic absolute-URL marker, Bearer value, or recognized secret assignment, keep only the safe prefix plus a fixed marker and discard the rest. | Reconstructing URL/value boundaries remained bypassable across four independent reviews. Coarse loss of diagnostic prose is safer and does not remove structured lifecycle, settlement, file, process, or runtime-result evidence. |
+| 2026-08-13 | Declare Plan 063 M0 **failed / ARCHITECTURE STOP**; do not execute M1–M7. | Complete attributable third-run diagnostics reproduce the locked renderer 64-to-128 MiB RSS slope violation in Linux development, Linux packaged, and Windows packaged. Canonical atomic JSON remains required for PASS, but fixing its separate last-window publication race cannot change the recorded behavior. Critique T and Synthesis U found no presently evidenced permissible single correction that could rescue the conjunctive gate. |
 
 ## Outcomes & Retrospective
 
@@ -1191,7 +1222,9 @@ pool via `cradle-server://local`, Main proxies with undici, WebSocket stays nati
 audience-bound single-use tickets, and the Server HTTP listener remains the one contract
 for CLI and proxy targets.
 
-If M0 passes, execute M1–M7 in order. If M0 fails, stop with artifact measurements and
+M0 failed with retained artifact measurements, so this plan stops before M1–M7. The
+custom-scheme production migration was not started and the existing M5 Web scaffold was
+not promoted to completion. If the product still requires a pool-starvation solution,
 consider Plan B (local HTTP/2 TLS) as a new plan — do not implement process IPC framing.
 
 > Revision note (2026-07-31): rebased from `598007aa` to current-state facts at
@@ -1230,3 +1263,10 @@ consider Plan B (local HTTP/2 TLS) as a new plan — do not implement process IP
 > and replaced heuristic diagnostic reconstruction with finite terminal redaction after
 > five failed adversarial reviews. Review Q passed local code/evidence readiness at 31/31
 > fixture tests. Runtime M0 and production routing remain blocked pending the hosted rerun.
+>
+> Revision note (2026-08-13, M0 Architecture STOP): third-run Linux and Windows artifacts
+> retained complete negative payloads. The renderer 64-to-128 MiB RSS slope exceeded the
+> locked 16 MiB maximum in development and both packaged operating systems. Critique T and
+> Synthesis U rejected a canonical-rename-only rerun as irrelevant to these measurements
+> and selected immediate Architecture STOP. Production routing remains untouched; M1–M7
+> are not authorized, and local HTTP/2 TLS remains a separate future plan.

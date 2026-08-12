@@ -1,10 +1,17 @@
 export const M0_NO_SANDBOX_ENV = 'CRADLE_M0_NO_SANDBOX'
 
-export function resolveM0LaunchPolicy({
-  platform = process.platform,
-  githubActions = process.env.GITHUB_ACTIONS,
-  noSandboxRequest = process.env[M0_NO_SANDBOX_ENV],
-} = {}) {
+export function resolveM0LaunchPolicy(options = {}) {
+  const {
+    platform,
+    githubActions,
+    noSandboxRequest,
+  } = {
+    platform: process.platform,
+    githubActions: process.env.GITHUB_ACTIONS,
+    noSandboxRequest: process.env[M0_NO_SANDBOX_ENV],
+    ...options,
+  }
+
   if (noSandboxRequest !== undefined && noSandboxRequest !== '' && noSandboxRequest !== '1') {
     throw new Error(`${M0_NO_SANDBOX_ENV} must be unset or 1`)
   }

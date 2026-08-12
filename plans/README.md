@@ -232,7 +232,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
 | 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
 | 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | DONE |
-| 063  | Eliminate Desktop Tearoff HTTP/1.1 pool starvation via custom-scheme + undici proxy | P0 | M–L | 038, 040, 054, 071 | TODO (revalidated `d40f895e`: M5 scaffold only; native WS uses scoped single-use tickets; M0 packaged CI gate remains) |
+| 063  | Eliminate Desktop Tearoff HTTP/1.1 pool starvation via custom-scheme + undici proxy | P0 | M–L | 038, 040, 054, 071 | REJECTED (M0 Architecture STOP: packaged renderer 64→128 MiB RSS slope exceeded locked 16 MiB bound on Linux/Windows; production migration not started) |
 | 064  | Connect GitHub through the Cradle App and attribute PR actions to the user | P1 | L | current PR Console work reconciled | IN PROGRESS (implementation complete; real GitHub App acceptance pending) |
 | 065  | Make the Claude Agent SDK integration honest (permission modes, dispose, settle-on-cancel teardown, presentation, snapshot bounds) | P0 | L | — | DONE |
 | 066  | Make the long-lived Claude Query the authority for history and live config | P0 | M | 065 | DONE |
