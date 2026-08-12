@@ -151,4 +151,13 @@ describe('m0 result contract', () => {
       allowExtensions: false,
     })
   })
+
+  it('requires the result to record the requested launcher sandbox state', () => {
+    expect(validateM0Result(passingResult(), { noSandbox: false })).toEqual({ ok: true, errors: [] })
+
+    const result = passingResult()
+    result.launch.noSandbox = true
+    expect(validateM0Result(result, { noSandbox: true })).toEqual({ ok: true, errors: [] })
+    expect(validateM0Result(result, { noSandbox: false }).errors).toContain('launch.noSandbox must be false')
+  })
 })

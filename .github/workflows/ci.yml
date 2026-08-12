@@ -121,6 +121,10 @@ jobs:
           sudo apt-get install --yes xvfb
           pnpm exec playwright install-deps chromium
       - name: Run development and packaged custom-scheme gate
+        env:
+          # GitHub's Linux Electron install cannot use its non-root-owned SUID sandbox.
+          # The fixture records this process switch; BrowserWindow sandboxing remains enabled.
+          CRADLE_M0_NO_SANDBOX: '1'
         run: xvfb-run -a pnpm --filter @cradle/desktop m0:custom-scheme:gate
       - name: Upload M0 failure evidence
         if: failure()

@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { runCommand } from './command-runner.mjs'
+import { resolveM0LaunchPolicy } from './launch-policy.mjs'
 import { validateM0Result } from './result-contract.mjs'
 
 const fixtureRoot = dirname(fileURLToPath(import.meta.url))
@@ -21,6 +22,7 @@ const stdoutPath = resolve(resultDirectory, `${mode}-${platformKey}.stdout.log`)
 const stderrPath = resolve(resultDirectory, `${mode}-${platformKey}.stderr.log`)
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const timeoutMs = process.platform === 'win32' ? 180_000 : 120_000
+const launchPolicy = resolveM0LaunchPolicy()
 
 function packagedArtifactPath() {
   if (process.platform === 'linux' && process.arch === 'x64') {
@@ -66,6 +68,7 @@ async function main() {
         'exec',
         'electron-vite',
         'dev',
+        ...launchPolicy.developmentArgs,
         '--config',
         'src/main/desktop-server-transport/fixtures/m0/electron.vite.config.ts',
         '--entry',
@@ -84,8 +87,7 @@ async function main() {
     else {
       artifactPath = packagedArtifactPath()
       await access(artifactPath, fsConstants.X_OK)
-      const args = process.env.CRADLE_M0_NO_SANDBOX === '1' ? ['--no-sandbox'] : []
-      outcome = await runCommand(artifactPath, args, {
+      outcome = await runCommand(artifactPath, launchPolicy.packagedArgs, {
         cwd: desktopRoot,
         env: {
           ...process.env,
@@ -118,6 +120,7 @@ async function main() {
     artifactPath,
     platform: process.platform,
     arch: process.arch,
+    noSandbox: launchPolicy.noSandbox,
   })
   if (!validation.ok) {
     throw new Error(`M0 result validation failed:\n${validation.errors.map(error => `- ${error}`).join('\n')}`)

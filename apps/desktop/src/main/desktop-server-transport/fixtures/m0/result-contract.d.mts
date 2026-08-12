@@ -63,5 +63,6 @@ export function validateM0Result(
     artifactPath?: string | null
     platform?: NodeJS.Platform
     arch?: string
+    noSandbox?: boolean
   },
 ): M0ResultValidation

@@ -44,6 +44,13 @@ let proxy: M0Proxy | undefined
 let activeMemoryTrace: ActiveMemoryTrace | undefined
 let finishing = false
 
+const M0_SANDBOXED_WEB_PREFERENCES = {
+  sandbox: true,
+  contextIsolation: true,
+  nodeIntegration: false,
+  webSecurity: true,
+} as const
+
 function assertion(passed: boolean, details: Record<string, number | string | boolean> = {}): M0Assertion {
   return { passed, details }
 }
@@ -141,10 +148,7 @@ async function runPartitionProbe(): Promise<Record<string, number | string | boo
     show: false,
     webPreferences: {
       partition: 'persist:cradle-browser-m0',
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
-      webSecurity: true,
+      ...M0_SANDBOXED_WEB_PREFERENCES,
     },
   })
   await partitionWindow.loadURL(rendererLocation('partition.html'))
@@ -277,7 +281,7 @@ async function finish(report: M0RendererReport) {
     counters,
     launch: {
       noSandbox: app.commandLine.hasSwitch('no-sandbox'),
-      rendererSandbox: true,
+      rendererSandbox: M0_SANDBOXED_WEB_PREFERENCES.sandbox,
     },
   }
   result.passed = process.versions.electron === M0_ELECTRON_VERSION
@@ -325,10 +329,7 @@ async function main() {
     show: false,
     webPreferences: {
       preload: resolve(fixtureDirectory, '../preload/index.js'),
-      sandbox: true,
-      contextIsolation: true,
-      nodeIntegration: false,
-      webSecurity: true,
+      ...M0_SANDBOXED_WEB_PREFERENCES,
       backgroundThrottling: false,
     },
   })

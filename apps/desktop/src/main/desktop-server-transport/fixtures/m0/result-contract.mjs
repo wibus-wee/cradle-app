@@ -375,6 +375,9 @@ export function validateM0Result(value, expected = {}) {
   else {
     validateExactKeys(value.launch, ['noSandbox', 'rendererSandbox'], 'launch', errors)
     if (typeof value.launch.noSandbox !== 'boolean') { errors.push('launch.noSandbox must be a boolean') }
+    if (expected.noSandbox !== undefined && value.launch.noSandbox !== expected.noSandbox) {
+      errors.push(`launch.noSandbox must be ${expected.noSandbox}`)
+    }
     if (value.launch.rendererSandbox !== true) { errors.push('launch.rendererSandbox must be true') }
   }
   validateEvidenceInvariants(value, assertions, memory, counters, errors)

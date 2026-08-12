@@ -1093,11 +1093,20 @@ Stop and report; do not improvise if any condition occurs:
   dependency installation is constrained.
 - [x] (2026-08-13) Implemented and independently reviewed the isolated M0 fixture, exact
   result/evidence validator, bounded process-tree launcher, direct undici dependency,
-  package scripts, and Linux/Windows/release CI gates. Focused fixture tests pass 10/10,
+  package scripts, and Linux/Windows/release CI gates. Focused fixture tests pass 15/15,
   Desktop direct typecheck and fixture lint pass, and the isolated bundle builds. Two
   failed reviews found and drove fixes for malformed-result acceptance and timeout-owned
   descendant cleanup; the third review passed code readiness. Production routing remains
   untouched and this is not packaged-runtime acceptance.
+- [x] (2026-08-13) Ran the first hosted M0 revision on draft PR #163. Linux development
+  reached Electron 42.4.1 but aborted because the hosted pnpm `chrome-sandbox` is not
+  root-owned/mode 4755; the permitted Linux-GitHub-Actions-only process no-sandbox policy
+  is implemented, records requested/observed launch state, retains both BrowserWindows'
+  `sandbox: true`, and passed independent narrow re-review. Corrected runtime is pending.
+- [ ] Diagnose Windows run 31622852684/job 94201752466, where the packaged executable
+  built and returned code 0 after about 13 seconds but wrote no result or captured output.
+  Preserve direct lifecycle/startup evidence before deciding whether this is a runner,
+  packaging, or fixture-runtime failure; ENOENT alone is not an acceptable second result.
 - [ ] M0 packaged Electron feasibility gate.
 - [ ] M1–M7 implementation and verification.
 
@@ -1116,6 +1125,15 @@ Stop and report; do not improvise if any condition occurs:
 - The M0 launcher must retain ownership of a timed-out process group after its direct
   child exits. Otherwise an `electron-vite` parent can terminate on `SIGTERM` while a
   signal-ignoring Electron descendant survives and defeats the runner's hard timeout.
+- GitHub's Ubuntu Electron install cannot use the package SUID sandbox because its
+  `chrome-sandbox` is not root-owned with mode 4755. M0 therefore permits the process
+  `--no-sandbox` switch only for an exact Linux GitHub Actions request, records that
+  observed switch, and keeps renderer `sandbox: true`, context isolation, disabled Node
+  integration, and web security. This is runner launch evidence, not runtime acceptance.
+- The first Windows packaged M0 launcher returned success without writing the atomic
+  result and without captured stdout/stderr. The executable was built and signed, so the
+  next diagnostic must make packaged fixture startup/lifecycle observable rather than
+  collapsing the failure to a missing-result read.
 
 ## Decision Log
 
@@ -1135,6 +1153,7 @@ Stop and report; do not improvise if any condition occurs:
 | 2026-08-13 | Use the existing audience-bound single-use tickets for native WebSocket instead of Desktop cookie bootstrap. | Ticket issuance can travel through the authenticated custom-scheme proxy; the renderer gets no long-lived credential or global session state. |
 | 2026-08-13 | In custom-scheme mode, load Server subresources and plugin modules directly through `cradle-server://local`; reserve resource tickets for explicit HTTP(S) fallback. | HTTP(S) resource URLs would re-enter Chromium's owned-Server pool and violate the zero-pool invariant. |
 | 2026-08-13 | Treat the existing Web transport as M5 scaffold, not milestone completion. | Desktop does not yet publish the connection projection, and SSE conformance/cleanup coverage is incomplete. |
+| 2026-08-13 | Allow M0 process `--no-sandbox` only for exact Linux GitHub Actions requests, with result-contract verification and sandboxed BrowserWindows retained. | The hosted runner cannot satisfy Electron's SUID helper ownership/mode, while the exception must not leak into product launch or hide renderer security settings. |
 
 ## Outcomes & Retrospective
 
@@ -1167,3 +1186,8 @@ consider Plan B (local HTTP/2 TLS) as a new plan — do not implement process IP
 > evidence validator, bounded process-tree runner, direct undici dependency, and required
 > Linux/Windows workflow gates. Independent review passed the fixture code after two
 > fix/re-review loops; development/packaged runtime evidence remains the hard predecessor.
+>
+> Revision note (2026-08-13, first hosted run): recorded the Linux SUID sandbox runner
+> abort and independently reviewed Linux-only launch exception, plus the unresolved
+> Windows packaged no-result failure. Production routing remains frozen pending corrected
+> Linux development/packaged and Windows packaged runtime evidence.

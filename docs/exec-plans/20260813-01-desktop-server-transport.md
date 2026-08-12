@@ -17,6 +17,8 @@ The ordinary Server HTTP listener remains the single API contract for the CLI, a
 - [x] (2026-08-12 16:22Z) Reconciled the exploration findings into this ExecPlan and fixed the implementation DAG and architecture decisions below.
 - [x] (2026-08-12 16:27Z) Captured the fresh local pre-edit baseline available in the partial dependency install: Desktop direct TypeScript check passed and the focused Web transport suite passed 9/9; Web direct TypeScript check failed at the pre-existing `plugin-host.ts` descriptor nullable-description mismatch before any M0 or production edit.
 - [x] (2026-08-12 17:24Z) Implemented Node A's isolated fixture, exact result validator, bounded process-tree runner, direct undici dependency, package commands, and Linux/Windows/release CI gates. The first two independent reviews failed the evidence validator and two generations of timeout cleanup; both defects and the authority/privilege ratchets were fixed, and Review C passed code readiness after a repeated parent-exits/descendant-ignores adversarial probe.
+- [x] (2026-08-13 13:45JST) Published the first M0 revision on draft PR #163. Linux run 31622852716/job 94201758906 reached Electron 42.4.1 but aborted before fixture startup because the hosted runner's pnpm `chrome-sandbox` is not root-owned/mode 4755. Added the permitted, fail-closed Linux-GitHub-Actions-only process `--no-sandbox` launch policy; both BrowserWindows remain `sandbox: true`, focused tests now pass 15/15, and independent Review D passed the narrow code-readiness correction. Corrected runtime evidence is still pending.
+- [ ] Diagnose the first Windows packaged run 31622852684/job 94201752466: the artifact built and its launcher returned code 0 after about 13 seconds, but no result JSON or stdout/stderr was produced. Treat this as a runtime failure and observability gap, not acceptance; preserve the next run's exact process/fixture evidence.
 - [ ] Execute M0 in development and an ASAR-packaged unpacked Electron 42.4.1 artifact, record exact artifacts/RSS/cancellation evidence, and stop if it fails.
 - [ ] Implement and review Node B, HTTP/auth/ticket characterization fixtures.
 - [ ] Implement and review Node C, the connection discriminant, credential owner, undici transport, generation fencing, and protocol handler.
@@ -46,6 +48,10 @@ The ordinary Server HTTP listener remains the single API contract for the CLI, a
   Evidence: `node apps/web/node_modules/typescript/bin/tsc --noEmit -p apps/web/tsconfig.json` fails at `apps/web/src/lib/plugin-host.ts:174`; the immediately preceding Desktop direct TypeScript check passed and the focused Web transport run then passed 9/9. Treat this as an unresolved baseline/dependency fact, not as one of the two accepted Chat Runtime failures and not as permission to edit plugin semantics inside M0.
 - Observation: a launcher can report its direct process exited while leaving a signal-ignoring descendant in the same process group; clearing escalation timers on the direct exit made the advertised timeout untrue.
   Evidence: Review B reproduced the orphan after the first timeout fix. The accepted runner retains the captured group identifier and timeout-owned settlement until group `SIGKILL` and bounded force settlement; Review C repeated the adversarial shape five times with no surviving descendant.
+- Observation: GitHub's Ubuntu Electron install cannot use its SUID sandbox because the package-provided `chrome-sandbox` is not root-owned with mode 4755.
+  Evidence: run 31622852716/job 94201758906 reached development Electron and aborted in `setuid_sandbox_host.cc:166` before writing a result. The accepted correction enables Electron's process-level no-sandbox switch only for an exact request on Linux GitHub Actions, records the observed switch in the result contract, and retains sandboxed/context-isolated BrowserWindows. Review D passed code readiness but no corrected runtime has passed yet.
+- Observation: the first Windows packaged launcher returned success without a fixture result or captured output.
+  Evidence: run 31622852684/job 94201752466 built and signed `release/m0/win-unpacked/cradle-m0-gate.exe`, invoked it for about 13 seconds, then failed reading the absent `.m0-results/packaged-win32-x64.json`; artifact upload confirmed that `.m0-results` contained no files. Root cause remains under diagnosis and must not be hidden behind a second ENOENT-only failure.
 
 ## Decision Log
 
@@ -82,10 +88,13 @@ The ordinary Server HTTP listener remains the single API contract for the CLI, a
 - Decision: the boundary checker uses the TypeScript AST plus exact non-Server manifests and rejects stale allowlist entries.
   Rationale: grep-only checks miss aliases and encourage broad exemptions; the policy must classify each constructor, destination, and reason.
   Date/Author: 2026-08-13 / Codex
+- Decision: permit the M0 launcher to request Electron `--no-sandbox` only when the request is exactly `CRADLE_M0_NO_SANDBOX=1` on a Linux GitHub Actions runner; reject all other requested environments and require emitted launch evidence to match.
+  Rationale: this is the hosted-runner exception anticipated by the M0 plan. It does not change production launchers or the two fixture BrowserWindows' `sandbox: true`, context isolation, disabled Node integration, and web security settings.
+  Date/Author: 2026-08-13 / Codex
 
 ## Outcomes & Retrospective
 
-Node A implementation and code review are complete, but runtime M0 is not accepted. The fixture, package/workflow gates, exact evidence validator, and bounded launcher are ready to publish; local focused tests are 10/10, Desktop direct typecheck and fixture lint pass, and the isolated bundle builds. The hard uncertainty is still whether development and packaged Electron 42.4.1 provide bounded, cancellable, secure custom-scheme streaming for all required content shapes. Production routing remains unchanged until Linux development/packaged and Windows packaged results pass. If the runtime gate fails after one evidence-based correction, this plan stops with measurements; Plan B is a separate local HTTP/2-over-TLS decision, never private process framing.
+Node A implementation and code review are complete, but runtime M0 is not accepted. The fixture, package/workflow gates, exact evidence validator, bounded launcher, and narrowly reviewed Linux runner launch policy are ready; local focused tests are 15/15, Desktop direct typecheck and fixture lint pass, and the isolated bundle builds. The first hosted runs did not reach behavior acceptance: Linux hit the anticipated SUID sandbox runner condition, while Windows returned from the packaged launcher without a result and needs an evidence-preserving diagnosis. Production routing remains unchanged until corrected Linux development/packaged and Windows packaged results pass. If the custom-scheme behavior itself fails after the allowed evidence-based correction, this plan stops with measurements; Plan B is a separate local HTTP/2-over-TLS decision, never private process framing.
 
 ## Context and Orientation
 
@@ -248,3 +257,5 @@ The Server HTTP/auth/ticket surface is unchanged except for tests or a narrowly 
 Revision note (2026-08-13): Created from the three Multi-Work exploration handoffs and current source. Locked M0 as the packaged predecessor, resolved attached-auth/shutdown/redirect/unavailable/status-listener decisions, and decomposed M1-M7 into independently reviewed DAG nodes.
 
 Revision note (2026-08-13 17:24Z): Recorded Node A code completion, two failed review/fix loops, the final code-readiness pass, focused validation, and the still-unmet Linux/Windows Electron runtime gate. Production migration remains blocked.
+
+Revision note (2026-08-13 13:45JST): Recorded the first hosted Linux and Windows runtime failures, the independently reviewed Linux-only sandbox launch correction, 15/15 focused tests, and the unresolved Windows no-result observability failure. No production routing work has begun.
