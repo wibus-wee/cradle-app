@@ -30,7 +30,7 @@ The ordinary Server HTTP listener remains the single API contract for the CLI, a
 - [ ] Implement and review Node E, Web base/fetch/SSE/subresource migrations and renderer-bearer removal — **stopped; M0 predecessor failed**.
 - [ ] Implement and review Node F, the static transport-boundary ratchet and documentation — **stopped; M0 predecessor failed**.
 - [ ] Implement and review Node G, the packaged twenty-Tearoff/socket-ownership smoke — **stopped; M0 predecessor failed**.
-- [ ] Finalize the stopped M0 slice: repeat local focused validation, update Plan 063 and `plans/README.md`, commit, publish the branch, and update draft PR #163.
+- [x] (2026-08-13 04:53JST) Finalized the stopped M0 slice. Main repeated the fixture suite (31/31), Desktop Node typecheck, fixture lint, launch-policy syntax, and diff hygiene; Review Y passed the final integration re-review with no open review debt. Local commit `fa307a2` and its identical tree were published as remote commit `d0d20a5`; draft PR #163 remains open and its title/body now report the measured Architecture STOP, exact hosted evidence, unchanged production-routing boundary, and prohibited M1-M7 scope.
 
 ## Surprises & Discoveries
 
