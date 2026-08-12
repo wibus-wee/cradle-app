@@ -1103,10 +1103,22 @@ Stop and report; do not improvise if any condition occurs:
   root-owned/mode 4755; the permitted Linux-GitHub-Actions-only process no-sandbox policy
   is implemented, records requested/observed launch state, retains both BrowserWindows'
   `sandbox: true`, and passed independent narrow re-review. Corrected runtime is pending.
-- [ ] Diagnose Windows run 31622852684/job 94201752466, where the packaged executable
-  built and returned code 0 after about 13 seconds but wrote no result or captured output.
-  Preserve direct lifecycle/startup evidence before deciding whether this is a runner,
-  packaging, or fixture-runtime failure; ENOENT alone is not an acceptable second result.
+- [x] (2026-08-13) Corrected Linux run 31624242438/job 94206416048 reached a real
+  development result and rejected cancellation propagation, 64/128 MiB RSS, and real
+  plugin/dependency custom-scheme assertions. Packaged was skipped by command
+  short-circuiting and raw evidence was lost because hidden `.m0-results` files were not
+  included in the artifact. Exploration E authorizes evidence preservation only before
+  deciding one concrete correction or architecture STOP; no gate may be weakened.
+- [x] (2026-08-13) Windows run 31624242350/job 94206415491 reproduced the earlier
+  packaged code-0/no-result outcome. Exploration D keeps Windows M0 at runtime STOP until
+  a runner envelope and earliest-Main checkpoints identify the first missing boundary;
+  the hidden-file upload warning does not prove the runner logs were absent.
+- [x] (2026-08-13) Completed and independently reviewed the evidence-preservation-only
+  rerun: independent dev/packaged execution, always-retained hidden artifacts, runner
+  envelope, and earliest-Main lifecycle checkpoints change no behavior assertion or
+  acceptance threshold. Five failed sanitizer reviews drove the finite terminal-redaction
+  rule and original-index ASCII matcher; Review Q passed. Local fixture tests pass 31/31,
+  Desktop Node typecheck/lint and the isolated bundle pass. No runtime gate has passed.
 - [ ] M0 packaged Electron feasibility gate.
 - [ ] M1–M7 implementation and verification.
 
@@ -1134,6 +1146,20 @@ Stop and report; do not improvise if any condition occurs:
   result and without captured stdout/stderr. The executable was built and signed, so the
   next diagnostic must make packaged fixture startup/lifecycle observable rather than
   collapsing the failure to a missing-result read.
+- The first corrected Linux development fixture produced a failed result covering three
+  hard feasibility areas: cancellation propagation/counting, bounded/non-linear RSS, and
+  real plugin plus dependency loading through the custom scheme. The validator summary
+  rejects M0, but the workflow short-circuited packaged mode and excluded hidden evidence,
+  so it cannot yet distinguish a concrete fixture defect from architecture STOP.
+- `actions/upload-artifact@v4` excludes dot-prefixed directories unless
+  `include-hidden-files: true` is explicit. Because the runner writes its JSON/logs under
+  `.m0-results`, both Linux and Windows workflows discarded precisely the failure evidence
+  M0 was designed to preserve.
+- Arbitrary diagnostic strings do not have a trustworthy URL/quote boundary that permits
+  both suffix preservation and a proof of confidentiality. Reviews G, I, K, and M each
+  persisted new query, credential, escaped-delimiter, or multi-scheme markers through the
+  real JSON/JSONL writers. Structured checkpoints and file/process metadata carry the
+  actionable M0 evidence; ambiguous message suffixes are expendable.
 
 ## Decision Log
 
@@ -1154,6 +1180,8 @@ Stop and report; do not improvise if any condition occurs:
 | 2026-08-13 | In custom-scheme mode, load Server subresources and plugin modules directly through `cradle-server://local`; reserve resource tickets for explicit HTTP(S) fallback. | HTTP(S) resource URLs would re-enter Chromium's owned-Server pool and violate the zero-pool invariant. |
 | 2026-08-13 | Treat the existing Web transport as M5 scaffold, not milestone completion. | Desktop does not yet publish the connection projection, and SSE conformance/cleanup coverage is incomplete. |
 | 2026-08-13 | Allow M0 process `--no-sandbox` only for exact Linux GitHub Actions requests, with result-contract verification and sandboxed BrowserWindows retained. | The hosted runner cannot satisfy Electron's SUID helper ownership/mode, while the exception must not leak into product launch or hide renderer security settings. |
+| 2026-08-13 | After the first real Linux behavior failure, run one evidence-preservation-only revision before selecting a behavior correction or architecture STOP. | Composite sequencing and hidden-file upload discarded packaged behavior, raw RSS traces, assertion details, and Windows startup logs. Fixing observability changes no assertion or product behavior and does not consume the one evidence-based correction. |
+| 2026-08-13 | Use terminal redaction for arbitrary diagnostic strings: at the first syntactic absolute-URL marker, Bearer value, or recognized secret assignment, keep only the safe prefix plus a fixed marker and discard the rest. | Reconstructing URL/value boundaries remained bypassable across four independent reviews. Coarse loss of diagnostic prose is safer and does not remove structured lifecycle, settlement, file, process, or runtime-result evidence. |
 
 ## Outcomes & Retrospective
 
@@ -1191,3 +1219,14 @@ consider Plan B (local HTTP/2 TLS) as a new plan — do not implement process IP
 > abort and independently reviewed Linux-only launch exception, plus the unresolved
 > Windows packaged no-result failure. Production routing remains frozen pending corrected
 > Linux development/packaged and Windows packaged runtime evidence.
+>
+> Revision note (2026-08-13, first behavior result): Linux development reached and failed
+> cancellation, RSS, and real-plugin/dependency gates; Windows reproduced its early exit.
+> Independent explorations authorize only an evidence-preserving rerun before the plan
+> chooses one concrete correction or declares architecture STOP.
+>
+> Revision note (2026-08-13, evidence-preservation code-ready): split Linux modes, retained
+> hidden Linux/Windows artifacts, added atomic runner and earliest-Main lifecycle evidence,
+> and replaced heuristic diagnostic reconstruction with finite terminal redaction after
+> five failed adversarial reviews. Review Q passed local code/evidence readiness at 31/31
+> fixture tests. Runtime M0 and production routing remain blocked pending the hosted rerun.

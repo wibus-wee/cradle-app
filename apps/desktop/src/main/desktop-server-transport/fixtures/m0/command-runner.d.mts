@@ -1,7 +1,11 @@
 export interface CommandOutcome {
+  pid: number | null
   code: number | null
   signal: NodeJS.Signals | 'SIGKILL' | null
   timedOut: boolean
+  startedAt: string
+  settledAt: string
+  elapsedMs: number
   stdout: string
   stderr: string
 }

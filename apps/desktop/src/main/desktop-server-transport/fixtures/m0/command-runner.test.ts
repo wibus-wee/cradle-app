@@ -37,6 +37,10 @@ describe('m0 command runner', () => {
     })
 
     expect(outcome.timedOut).toBe(true)
+    expect(outcome.pid).toEqual(expect.any(Number))
+    expect(outcome.startedAt).toEqual(expect.any(String))
+    expect(outcome.settledAt).toEqual(expect.any(String))
+    expect(outcome.elapsedMs).toBeGreaterThanOrEqual(500)
     expect(performance.now() - startedAt).toBeLessThan(2_000)
     if (process.platform !== 'win32') { expect(outcome.signal).toBe('SIGKILL') }
   })

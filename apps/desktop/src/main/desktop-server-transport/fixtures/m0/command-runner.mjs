@@ -28,6 +28,8 @@ function signalProcessTree(child, processGroupId, signal) {
 
 export async function runCommand(command, args, options = {}) {
   return await new Promise((resolvePromise, rejectPromise) => {
+    const startedAt = new Date()
+    const startedAtMonotonic = performance.now()
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env ?? process.env,
@@ -61,7 +63,15 @@ export async function runCommand(command, args, options = {}) {
       if (settled) { return }
       settled = true
       clearTimers()
-      resolvePromise({ ...outcome, timedOut, ...output() })
+      resolvePromise({
+        ...outcome,
+        pid: processGroupId ?? null,
+        timedOut,
+        startedAt: startedAt.toISOString(),
+        settledAt: new Date().toISOString(),
+        elapsedMs: Math.round(performance.now() - startedAtMonotonic),
+        ...output(),
+      })
     }
     const forceCleanup = () => {
       child.stdout.destroy()

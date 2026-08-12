@@ -243,6 +243,7 @@ jobs:
         with:
           name: cradle-windows-package
           if-no-files-found: warn
+          include-hidden-files: true
           path: |
             apps/desktop/.m0-results/**
             apps/desktop/release/m0/builder-effective-config.yaml

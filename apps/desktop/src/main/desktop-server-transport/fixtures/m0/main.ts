@@ -13,6 +13,7 @@ import {
 
 import type { FakeUpstream } from './fake-upstream'
 import { startFakeUpstream } from './fake-upstream'
+import { createM0LifecycleRecorder } from './lifecycle-diagnostics'
 import type { M0Proxy } from './proxy-handler'
 import { createM0Proxy } from './proxy-handler'
 import type { M0Assertion, M0MemorySample, M0MemoryTrace, M0Mode, M0RendererReport, M0Result } from './result-schema'
@@ -24,12 +25,25 @@ import {
   validateM0Result,
 } from './result-schema'
 
-protocol.registerSchemesAsPrivileged([M0_SCHEME_REGISTRATION])
-
 const fixtureDirectory = dirname(fileURLToPath(import.meta.url))
 const resultPath = process.env.CRADLE_M0_RESULT_PATH
 const mode = process.env.CRADLE_M0_MODE as M0Mode | undefined
 const artifactPath = process.env.CRADLE_M0_ARTIFACT_PATH || null
+const lifecycle = createM0LifecycleRecorder(process.env.CRADLE_M0_LIFECYCLE_PATH, {
+  mode: mode ?? null,
+  resultPath: resultPath ?? null,
+  artifactPath,
+})
+
+lifecycle.record('main.module-evaluated', {
+  electronVersion: process.versions.electron,
+  execPath: process.execPath,
+})
+protocol.registerSchemesAsPrivileged([M0_SCHEME_REGISTRATION])
+lifecycle.record('main.scheme-registered', {
+  enabledPrivileges: 5,
+  disabledPrivileges: 4,
+})
 
 interface ActiveMemoryTrace {
   startedAt: number
@@ -53,6 +67,23 @@ const M0_SANDBOXED_WEB_PREFERENCES = {
 
 function assertion(passed: boolean, details: Record<string, number | string | boolean> = {}): M0Assertion {
   return { passed, details }
+}
+
+function errorDetails(error: unknown): Record<string, string> {
+  return {
+    errorName: error instanceof Error ? error.name : 'NonError',
+    errorMessage: error instanceof Error ? error.message : String(error),
+  }
+}
+
+function diagnosticUrl(value: string): string {
+  try {
+    const url = new URL(value)
+    return `${url.protocol}//${url.host}${url.pathname}`
+  }
+  catch {
+    return 'invalid-url'
+  }
 }
 
 function currentMemory(): { main: number, renderer: number } {
@@ -177,13 +208,18 @@ async function runPartitionProbe(): Promise<Record<string, number | string | boo
 async function writeResult(result: M0Result) {
   if (!resultPath || !isAbsolute(resultPath)) { throw new Error('CRADLE_M0_RESULT_PATH must be absolute') }
   const temporaryPath = `${resultPath}.tmp-${process.pid}`
+  lifecycle.record('finalize.result-temporary-write-start', { temporaryPath })
   await writeFile(temporaryPath, `${JSON.stringify(result, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
+  lifecycle.record('finalize.result-temporary-write-complete', { temporaryPath })
+  lifecycle.record('finalize.result-rename-start', { resultPath })
   await rename(temporaryPath, resultPath)
+  lifecycle.record('finalize.result-rename-complete', { resultPath })
 }
 
 async function finish(report: M0RendererReport) {
   if (finishing) { return }
   finishing = true
+  lifecycle.record('finalize.start', { rendererAssertionCount: Object.keys(report.assertions).length })
   const assertions: Record<string, M0Assertion> = {}
   for (const [name, reportedAssertion] of Object.entries(report.assertions)) {
     if (reportedAssertion) { assertions[name] = reportedAssertion }
@@ -200,17 +236,22 @@ async function finish(report: M0RendererReport) {
   assertions['security.noBypassCsp'] = assertion(!M0_SCHEME_PRIVILEGES.bypassCSP, { bypassCSP: false })
 
   try {
+    lifecycle.record('finalize.partition-probe-start')
     assertions['scheme.browserPanelPartition.unhandled'] = assertion(true, await runPartitionProbe())
+    lifecycle.record('finalize.partition-probe-complete')
   }
   catch (error) {
+    lifecycle.record('finalize.partition-probe-failed', errorDetails(error))
     assertions['scheme.browserPanelPartition.unhandled'] = assertion(false, {
       error: error instanceof Error ? error.message : String(error),
     })
   }
 
   if (activeMemoryTrace) { stopMemoryTrace() }
+  lifecycle.record('finalize.settle-wait-start', { settleMs: 5_000 })
   await new Promise(resolve => setTimeout(resolve, 5_000))
   const settledKiB = currentMemory()
+  lifecycle.record('finalize.settle-wait-complete')
 
   assertions['cleanup.activeRequestsZero'] = assertion(
     proxy?.diagnostics.activeRequests === 0 && fakeUpstream?.diagnostics.activeRequests === 0,
@@ -222,7 +263,9 @@ async function finish(report: M0RendererReport) {
 
   mainWindow?.destroy()
   partitionWindow?.destroy()
+  lifecycle.record('finalize.windows-destroyed')
   session.defaultSession.protocol.unhandle('cradle-server')
+  lifecycle.record('finalize.protocol-unhandled')
   let agentClosed = false
   let serverClosed = false
   try {
@@ -240,6 +283,7 @@ async function finish(report: M0RendererReport) {
     console.error('[m0] failed to close fake upstream', error)
   }
   assertions['cleanup.agentAndServerClosed'] = assertion(agentClosed && serverClosed, { agentClosed, serverClosed })
+  lifecycle.record('finalize.resources-closed', { agentClosed, serverClosed })
 
   for (const name of REQUIRED_M0_ASSERTIONS) {
     if (!assertions[name]) {
@@ -289,21 +333,36 @@ async function finish(report: M0RendererReport) {
     && Object.values(assertions).every(item => item.passed)
 
   await writeResult(result)
+  lifecycle.record('finalize.complete', { passed: result.passed, exitCode: result.passed ? 0 : 1 })
   console.log(`[m0] ${result.passed ? 'PASS' : 'FAIL'} ${mode} ${process.platform}-${process.arch}`)
   app.exit(result.passed ? 0 : 1)
 }
 
 async function main() {
+  lifecycle.record('main.start')
   if (mode !== 'development' && mode !== 'packaged') { throw new Error('CRADLE_M0_MODE must be development or packaged') }
   if (!resultPath || !isAbsolute(resultPath)) { throw new Error('CRADLE_M0_RESULT_PATH must be absolute') }
+  lifecycle.record('main.when-ready-wait')
   await app.whenReady()
+  lifecycle.record('main.when-ready-complete', {
+    appIsPackaged: app.isPackaged,
+    appPath: app.getAppPath(),
+    resourcesPath: process.resourcesPath,
+    noSandbox: app.commandLine.hasSwitch('no-sandbox'),
+  })
 
   const resourceRoot = app.isPackaged
     ? resolve(process.resourcesPath, 'm0')
     : resolve(app.getAppPath(), 'dist/m0/fixture-resources')
+  lifecycle.record('main.upstream-start', { resourceRoot })
   fakeUpstream = await startFakeUpstream(resourceRoot)
+  lifecycle.record('main.upstream-ready', { origin: fakeUpstream.origin })
   proxy = createM0Proxy(fakeUpstream.origin)
+  lifecycle.record('main.protocol-handle-start')
   session.defaultSession.protocol.handle('cradle-server', proxy.handle)
+  lifecycle.record('main.protocol-handle-complete', {
+    defaultSessionHandled: session.defaultSession.protocol.isProtocolHandled('cradle-server'),
+  })
 
   ipcMain.handle('m0:memory:start', (event) => {
     assertMainRenderer(event)
@@ -319,12 +378,15 @@ async function main() {
   })
   ipcMain.on('m0:complete', (event, report: M0RendererReport) => {
     assertMainRenderer(event)
+    lifecycle.record('renderer.complete-received', { assertionCount: Object.keys(report.assertions).length })
     void finish(report).catch((error) => {
+      lifecycle.record('finalize.fatal', errorDetails(error))
       console.error('[m0] failed to finalize result', error)
       app.exit(1)
     })
   })
 
+  lifecycle.record('renderer.window-create-start')
   mainWindow = new BrowserWindow({
     show: false,
     webPreferences: {
@@ -333,13 +395,73 @@ async function main() {
       backgroundThrottling: false,
     },
   })
+  lifecycle.record('renderer.window-created', {
+    rendererPid: mainWindow.webContents.getOSProcessId(),
+    sandbox: M0_SANDBOXED_WEB_PREFERENCES.sandbox,
+    contextIsolation: M0_SANDBOXED_WEB_PREFERENCES.contextIsolation,
+    nodeIntegration: M0_SANDBOXED_WEB_PREFERENCES.nodeIntegration,
+    webSecurity: M0_SANDBOXED_WEB_PREFERENCES.webSecurity,
+  })
   mainWindow.webContents.on('console-message', (_event, level, message) => {
     console.log(`[m0:renderer:${level}] ${message}`)
   })
-  await mainWindow.loadURL(rendererLocation('index.html'))
+  mainWindow.webContents.on('did-finish-load', () => {
+    lifecycle.record('renderer.did-finish-load')
+  })
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    lifecycle.record('renderer.did-fail-load', {
+      errorCode,
+      errorDescription,
+      url: diagnosticUrl(validatedURL),
+      isMainFrame,
+    })
+  })
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    lifecycle.record('renderer.process-gone', {
+      reason: details.reason,
+      exitCode: details.exitCode,
+    })
+  })
+  mainWindow.on('unresponsive', () => {
+    lifecycle.record('renderer.unresponsive')
+  })
+  mainWindow.on('responsive', () => {
+    lifecycle.record('renderer.responsive')
+  })
+  const rendererUrl = rendererLocation('index.html')
+  lifecycle.record('renderer.navigation-start', { url: diagnosticUrl(rendererUrl) })
+  try {
+    await mainWindow.loadURL(rendererUrl)
+    lifecycle.record('renderer.navigation-complete', { url: diagnosticUrl(rendererUrl) })
+  }
+  catch (error) {
+    lifecycle.record('renderer.navigation-failed', { ...errorDetails(error), url: diagnosticUrl(rendererUrl) })
+    throw error
+  }
 }
 
+app.on('child-process-gone', (_event, details) => {
+  lifecycle.record('main.child-process-gone', {
+    type: details.type,
+    reason: details.reason,
+    exitCode: details.exitCode,
+    serviceName: details.serviceName ?? null,
+    name: details.name ?? null,
+  })
+})
+
+process.on('uncaughtException', (error) => {
+  lifecycle.record('main.uncaught-exception', errorDetails(error))
+  app.exit(1)
+})
+
+process.on('unhandledRejection', (reason) => {
+  lifecycle.record('main.unhandled-rejection', errorDetails(reason))
+  app.exit(1)
+})
+
 void main().catch((error) => {
+  lifecycle.record('main.fatal', errorDetails(error))
   console.error('[m0] fatal fixture error', error)
   app.exit(1)
 })
