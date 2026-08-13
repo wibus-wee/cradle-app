@@ -42,7 +42,8 @@
     "cli": "pnpm --filter @cradle/cli cradle",
     "gen:cli": "pnpm --filter @cradle/cli gen:cli",
     "knip": "knip",
-    "db:studio": "pnpm --filter @cradle/db studio"
+    "db:studio": "pnpm --filter @cradle/db studio",
+    "e2e:check": "node e2e/scripts/check-suite.mjs"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.2.1",

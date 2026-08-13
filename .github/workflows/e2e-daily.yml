@@ -43,6 +43,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Validate E2E suite contract
+        run: pnpm e2e:check
+
       # The server imports @cradle/plugin-sdk from dist/ and discovers plugin
       # runtime entries from each plugin's dist/ directory.
       - name: Build plugin SDK

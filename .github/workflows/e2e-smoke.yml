@@ -82,6 +82,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Validate E2E suite contract
+        run: pnpm e2e:check
+
       - name: Build plugin SDK
         run: pnpm --filter @cradle/plugin-sdk build
 
