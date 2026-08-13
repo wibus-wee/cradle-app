@@ -180,6 +180,7 @@ export function ChatQueueList({
                 disabled={pendingIndex === 0}
                 onClick={() => moveItem(pendingIndex, -1)}
                 aria-label={t('continuation.queue.moveUp', { label: itemLabel })}
+                data-testid="chat-queue-item-move-up"
               >
                 <ArrowUpIcon className="size-3" aria-hidden="true" />
               </Button>
@@ -190,6 +191,7 @@ export function ChatQueueList({
                 disabled={pendingIndex === pendingItems.length - 1}
                 onClick={() => moveItem(pendingIndex, 1)}
                 aria-label={t('continuation.queue.moveDown', { label: itemLabel })}
+                data-testid="chat-queue-item-move-down"
               >
                 <ArrowDownIcon className="size-3" aria-hidden="true" />
               </Button>
@@ -199,6 +201,7 @@ export function ChatQueueList({
                 size="icon-xs"
                 onClick={() => onCancel(item.id)}
                 aria-label={t('continuation.queue.cancel', { label: itemLabel })}
+                data-testid="chat-queue-item-cancel"
               >
                 <XIcon className="size-3" aria-hidden="true" />
               </Button>

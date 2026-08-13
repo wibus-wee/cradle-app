@@ -320,6 +320,54 @@ export class ChatPage {
     await this.sendFromComposer()
   }
 
+  queueList(): Locator {
+    return this.page.locator('[data-testid="chat-queue-list"]')
+  }
+
+  queueItem(text: string): Locator {
+    return this.queueList().locator('[data-testid="chat-queue-item"]').filter({ hasText: text })
+  }
+
+  async expectQueued(text: string): Promise<void> {
+    await expect(this.queueItem(text)).toBeVisible({ timeout: CHAT_TIMEOUT })
+  }
+
+  async expectNotQueued(text: string): Promise<void> {
+    await expect(this.queueItem(text)).toHaveCount(0, { timeout: CHAT_TIMEOUT })
+  }
+
+  async expectQueueOrder(texts: readonly string[]): Promise<void> {
+    const items = this.queueList().locator('[data-testid="chat-queue-item"]')
+    await expect(items).toHaveCount(texts.length, { timeout: CHAT_TIMEOUT })
+    for (const [index, text] of texts.entries()) {
+      await expect(items.nth(index)).toContainText(text, { timeout: CHAT_TIMEOUT })
+    }
+  }
+
+  async editQueuedMessage(currentText: string, nextText: string): Promise<void> {
+    const item = this.queueItem(currentText)
+    await expect(item).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await item.locator('[data-testid="chat-queue-item-edit"]').click()
+    await this.expectComposerContains(currentText)
+    await this.fillComposer(nextText)
+    await this.sendFromComposer()
+    await this.expectNotQueued(currentText)
+    await this.expectQueued(nextText)
+  }
+
+  async moveQueuedMessageUp(text: string): Promise<void> {
+    const item = this.queueItem(text)
+    await expect(item).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await item.locator('[data-testid="chat-queue-item-move-up"]').click()
+  }
+
+  async cancelQueuedMessage(text: string): Promise<void> {
+    const item = this.queueItem(text)
+    await expect(item).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await item.locator('[data-testid="chat-queue-item-cancel"]').click()
+    await this.expectNotQueued(text)
+  }
+
   sessionItem(sessionId: string): Locator {
     return this.page.locator(`[data-testid="session-item-${sessionId}"]`)
   }
