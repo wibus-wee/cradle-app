@@ -32,6 +32,7 @@ export interface SettingsSidebarViewProps {
   clearSearchLabel: string
   noResultsLabel: string
   onSetSection: (section: string) => void
+  onSectionIntent?: (section: string) => void
   onClose: () => void
 }
 
@@ -45,6 +46,7 @@ export function SettingsSidebarView({
   clearSearchLabel,
   noResultsLabel,
   onSetSection,
+  onSectionIntent,
   onClose,
 }: SettingsSidebarViewProps) {
   const [query, setQuery] = useState('')
@@ -115,6 +117,9 @@ export function SettingsSidebarView({
                   key={item.id}
                   type="button"
                   onClick={() => (item.onActivate ? item.onActivate() : onSetSection(item.id))}
+                  onFocus={() => onSectionIntent?.(item.id)}
+                  onPointerDown={() => onSectionIntent?.(item.id)}
+                  onPointerEnter={() => onSectionIntent?.(item.id)}
                   data-testid={`settings-nav-${item.id}`}
                   className={cn(
                     'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',

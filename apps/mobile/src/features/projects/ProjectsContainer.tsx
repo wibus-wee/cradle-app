@@ -9,6 +9,7 @@ import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
+import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 
 import { ProjectsView } from './ProjectsView'
 
@@ -23,25 +24,21 @@ export function ProjectsContainer() {
     queryFn: async ({ signal }) => {
       const [workspaces, sessions] = await Promise.all([
         cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
-        cradleRequest<GetSessionsResponse>(connection!, '/sessions/?archived=false', { signal }),
+        cradleRequest<GetSessionsResponse>(connection!, '/sessions/?archived=false&limit=200', { signal }),
       ])
       return workspaces
         .filter(workspace => workspace.locator.kind !== 'managed-worktree')
         .map(workspace => ({
           workspace,
-          sessions: sessions.filter(session => session.workspaceId === workspace.id),
+          sessions: sessions.items.filter(session => session.workspaceId === workspace.id),
         }))
         .sort(
           (a, b) =>
             b.workspace.pinned - a.workspace.pinned || b.workspace.updatedAt - a.workspace.updatedAt,
         )
     },
-    refetchInterval: data =>
-      data.state.data?.some(project =>
-        project.sessions.some(session => session.status === 'streaming'))
-        ? 5_000
-        : false,
   })
+  useSessionSummaryEvents(connection, isRouteActive, () => { void query.refetch() })
 
   const refresh = async () => {
     setIsRefreshing(true)

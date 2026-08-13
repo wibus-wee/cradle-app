@@ -7120,6 +7120,8 @@ export type GetSessionsData = {
         origin?: string;
         sessionGroupId?: string;
         archived?: boolean;
+        cursor?: string;
+        limit?: string | number;
     };
     url: '/sessions/';
 };
@@ -7128,44 +7130,47 @@ export type GetSessionsResponses = {
     /**
      * Response for status 200
      */
-    200: Array<{
-        id: string;
-        execution: {
-            kind: 'local';
-        } | {
-            kind: 'remote-host';
-            hostId: string;
-            remoteSessionId: string;
-        };
-        parentSessionId: string | null;
-        sideContextSource: 'provider-native' | 'cradle-context' | null;
-        workspaceId: string | null;
-        title: string | null;
-        origin: string;
-        providerTargetId: string | null;
-        agentId: string | null;
-        modelId: string | null;
-        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
-        linkedIssueId: string | null;
-        sessionGroupId: string | null;
-        runtimeKind: string;
-        status: 'idle' | 'streaming' | 'error';
-        pinned: number;
-        archivedAt: number | null;
-        lastReadAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-        latestUserMessageAt: number | null;
-        latestAssistantMessageAt: number | null;
-        unread: boolean;
-        isIsolated: boolean;
-        worktreeId: string | null;
-        worktreeBranch: string | null;
-        worktreePath: string | null;
-        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
-        pendingWorktreeId: string | null;
-        isolationBoundaryRequired: boolean;
-    }>;
+    200: {
+        items: Array<{
+            id: string;
+            execution: {
+                kind: 'local';
+            } | {
+                kind: 'remote-host';
+                hostId: string;
+                remoteSessionId: string;
+            };
+            parentSessionId: string | null;
+            sideContextSource: 'provider-native' | 'cradle-context' | null;
+            workspaceId: string | null;
+            title: string | null;
+            origin: string;
+            providerTargetId: string | null;
+            agentId: string | null;
+            modelId: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
+            linkedIssueId: string | null;
+            sessionGroupId: string | null;
+            runtimeKind: string;
+            status: 'idle' | 'streaming' | 'error';
+            pinned: number;
+            archivedAt: number | null;
+            lastReadAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+            latestUserMessageAt: number | null;
+            latestAssistantMessageAt: number | null;
+            unread: boolean;
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        }>;
+        nextCursor: string | null;
+    };
 };
 
 export type GetSessionsResponse = GetSessionsResponses[keyof GetSessionsResponses];
@@ -8425,6 +8430,8 @@ export type GetWorksData = {
         workspaceId?: string;
         linkedIssueId?: string;
         archived?: boolean;
+        cursor?: string;
+        limit?: string | number;
     };
     url: '/works';
 };
@@ -8433,46 +8440,49 @@ export type GetWorksResponses = {
     /**
      * Response for status 200
      */
-    200: Array<{
-        id: string;
-        title: string;
-        objective: string;
-        linkedIssueId: string | null;
-        handoffTitle: string | null;
-        handoffSummary: string | null;
-        handoffTestPlan: string | null;
-        preparedAt: number | null;
-        lastSubmittedAt: number | null;
-        closedAt: number | null;
-        archivedAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-        workspaceId: string;
-        primarySessionId: string;
-        activity: 'idle' | 'running' | 'waiting' | 'blocked';
-        pullRequest: {
-            owner: string;
-            repo: string;
-            number: number;
-            url: string;
+    200: {
+        items: Array<{
+            id: string;
             title: string;
-            isDraft: boolean;
-            state: 'open' | 'closed';
-            merged: boolean;
-            headRef: string;
-            baseRef: string;
-            headSha: string | null;
+            objective: string;
+            linkedIssueId: string | null;
+            handoffTitle: string | null;
+            handoffSummary: string | null;
+            handoffTestPlan: string | null;
+            preparedAt: number | null;
+            lastSubmittedAt: number | null;
+            closedAt: number | null;
+            archivedAt: number | null;
             createdAt: number;
             updatedAt: number;
-            author?: {
-                login: string;
-                avatarUrl: string;
+            workspaceId: string;
+            primarySessionId: string;
+            activity: 'idle' | 'running' | 'waiting' | 'blocked';
+            pullRequest: {
+                owner: string;
+                repo: string;
+                number: number;
                 url: string;
+                title: string;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                createdAt: number;
+                updatedAt: number;
+                author?: {
+                    login: string;
+                    avatarUrl: string;
+                    url: string;
+                } | null;
+                additions?: number;
+                deletions?: number;
             } | null;
-            additions?: number;
-            deletions?: number;
-        } | null;
-    }>;
+        }>;
+        nextCursor: string | null;
+    };
 };
 
 export type GetWorksResponse = GetWorksResponses[keyof GetWorksResponses];

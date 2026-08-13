@@ -378,8 +378,16 @@ export async function startPluginDevSessionWatcher(): Promise<() => void> {
       })
   }
 
-  const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
-  for (const session of sessions) { reconcile(session) }
+  try {
+    const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
+    for (const session of sessions) { reconcile(session) }
+  }
+  catch (error) {
+    // Development sessions are optional and the event stream below reconnects.
+    // A transient localhost reset during packaged startup must not abort the
+    // entire post-render bootstrap or prevent the main application from loading.
+    console.warn('[plugin-host] initial development session read failed; continuing with event stream', error)
+  }
 
   if (disposed) { return () => undefined }
   const eventsUrl = new URL('/plugins/dev-sessions/events', getServerUrl()).toString()

@@ -125,7 +125,7 @@ describe('session capability', () => {
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       const list = await listRes.json()
-      expect(list).toEqual(
+      expect(list.items).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' }),
         ]),
@@ -133,7 +133,8 @@ describe('session capability', () => {
 
       const allListRes = await app.handle(new Request('http://localhost/sessions'))
       expect(allListRes.status).toBe(200)
-      expect(await allListRes.json()).toEqual(
+      const allList = await allListRes.json()
+      expect(allList.items).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' }),
         ]),
@@ -222,7 +223,7 @@ describe('session capability', () => {
           new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
         )
       ).json()
-      expect(activeListAfterArchive).toEqual([])
+      expect(activeListAfterArchive.items).toEqual([])
 
       const archivedList = await (
         await app.handle(
@@ -231,7 +232,7 @@ describe('session capability', () => {
           ),
         )
       ).json()
-      expect(archivedList).toEqual([
+      expect(archivedList.items).toEqual([
         expect.objectContaining({ id: sessionId, archivedAt: expect.any(Number) }),
       ])
 
@@ -312,7 +313,8 @@ describe('session capability', () => {
       const unreadListRes = await app.handle(
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
-      expect(await unreadListRes.json()).toEqual(
+      const unreadList = await unreadListRes.json()
+      expect(unreadList.items).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             id: sessionId,
@@ -462,7 +464,8 @@ describe('session capability', () => {
       const streamingListRes = await app.handle(
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
-      expect(await streamingListRes.json()).toEqual(
+      const streamingList = await streamingListRes.json()
+      expect(streamingList.items).toEqual(
         expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'streaming' })]),
       )
 
@@ -506,7 +509,8 @@ describe('session capability', () => {
       const failedListRes = await app.handle(
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
-      expect(await failedListRes.json()).toEqual(
+      const failedList = await failedListRes.json()
+      expect(failedList.items).toEqual(
         expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'error' })]),
       )
 
@@ -567,7 +571,8 @@ describe('session capability', () => {
       const activeGoalListRes = await app.handle(
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
-      expect(await activeGoalListRes.json()).toEqual(
+      const activeGoalList = await activeGoalListRes.json()
+      expect(activeGoalList.items).toEqual(
         expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'idle' })]),
       )
 
@@ -602,7 +607,8 @@ describe('session capability', () => {
       const staleStreamingListRes = await app.handle(
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
-      expect(await staleStreamingListRes.json()).toEqual(
+      const staleStreamingList = await staleStreamingListRes.json()
+      expect(staleStreamingList.items).toEqual(
         expect.arrayContaining([expect.objectContaining({ id: sessionId, status: 'idle' })]),
       )
 
@@ -679,7 +685,7 @@ describe('session capability', () => {
           new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
         )
       ).json()
-      expect(afterList).toEqual([
+      expect(afterList.items).toEqual([
         expect.objectContaining({
           id: expect.any(String),
           runtimeKind: 'cli-tui',
@@ -865,7 +871,8 @@ describe('session capability', () => {
         ),
       )
       expect(automationListRes.status).toBe(200)
-      expect(await automationListRes.json()).toEqual([
+      const automationList = await automationListRes.json()
+      expect(automationList.items).toEqual([
         expect.objectContaining({
           id: automationSessionId,
           origin: 'automation',
@@ -878,7 +885,8 @@ describe('session capability', () => {
         ),
       )
       expect(manualListRes.status).toBe(200)
-      expect(await manualListRes.json()).toEqual([
+      const manualList = await manualListRes.json()
+      expect(manualList.items).toEqual([
         expect.objectContaining({
           id: manualSessionId,
           origin: 'manual',
@@ -1112,7 +1120,8 @@ describe('session capability', () => {
       const listRes = await app.handle(
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
-      expect(await listRes.json()).toEqual([
+      const list = await listRes.json()
+      expect(list.items).toEqual([
         expect.objectContaining({
           id: sessionId,
           modelId: null,

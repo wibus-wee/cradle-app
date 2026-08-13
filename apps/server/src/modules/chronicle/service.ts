@@ -21,6 +21,7 @@ import {
   chronicleKnowledgeVersions,
   chronicleMemories,
   chronicleMemoryChunks,
+  chronicleMemoryEmbeddingBuckets,
   chronicleMemoryEmbeddings,
   chronicleMemoryKeywords,
   chronicleMessages,
@@ -33,7 +34,7 @@ import {
 import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
 import type { LanguageModel } from 'ai'
 import { generateText } from 'ai'
-import { count, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import formatDuration from 'format-duration'
 import sharp from 'sharp'
 import { z } from 'zod'
@@ -544,25 +545,23 @@ const ONNX_TEXT_EMBEDDING_MODEL_ID = 'all-MiniLM-L6-v2'
 const ONNX_TEXT_EMBEDDING_MODEL_VERSION = 'onnx-minilm-l6-v2'
 const MEMORY_SEMANTIC_SCORE_WEIGHT = 12
 const MEMORY_SEMANTIC_MIN_SCORE = 0.28
+const MEMORY_EMBEDDING_CANDIDATE_BUCKET_COUNT = 16
+const MEMORY_SEARCH_CANDIDATE_LIMIT = 256
+const MEMORY_EMBEDDING_ASYNC_BATCH_SIZE = 64
 const ACTIVITY_IDLE_BOUNDARY_SECONDS = 10 * 60
 const ACTIVITY_MAX_SEGMENT_SECONDS = 30 * 60
 // A fixed owner guard against local disk exhaustion. This is not a claimed source
 // size: manifest `sizeBytes`, when present, remains the precise validation.
 const MODEL_RESOURCE_DOWNLOAD_MAX_BYTES = 100 * 1024 ** 3
-const EMBEDDING_RUNTIME_HEALTH_TIMEOUT_MS = 5_000
-const EMBEDDING_RUNTIME_HEALTH_CACHE_MS = 60_000
 const DREAM_SCHEDULER_MIN_INTERVAL_MS = 3_600_000
 const DREAM_SCHEDULER_MAX_INTERVAL_MS = 7 * 86_400_000
 const ACTIVITY_SESSION_GAP_SECONDS = 6 * 60 * 60
 
-let embeddingRuntimeHealth: {
-  checkedAtMs: number
-  ok: boolean
-  error: string | null
-} | null = null
-
 type ChronicleDb = ReturnType<typeof db>
 type ChronicleTx = Parameters<Parameters<ChronicleDb['transaction']>[0]>[0]
+
+let memoryEmbeddingIndexerAccepting = true
+const pendingMemoryEmbeddingUpgrades = new Set<Promise<void>>()
 
 export type ModelResourceCategory = 'ocr' | 'audio-vad' | 'audio-asr' | 'speaker' | 'embedding' | 'pii'
 const ModelResourceCategorySchema = z.enum(['ocr', 'audio-vad', 'audio-asr', 'speaker', 'embedding', 'pii'])
@@ -2899,6 +2898,7 @@ export function updateMemory(memoryId: string, rawInput: ChronicleMemoryUpdateIn
     memoryId,
     attrs: { contentChanged: content !== existing.content },
   })
+  scheduleMemoryOnnxEmbeddingUpgrade(updated.id)
   return toMemoryEntry(updated)
 }
 
@@ -3227,7 +3227,7 @@ export function exportPrivacyRedacted(rawInput: {
   return { format, content, entityCount, sources }
 }
 
-export function searchMemories(query: string, limit = 20): MemoryEntry[] {
+export async function searchMemories(query: string, limit = 20): Promise<MemoryEntry[]> {
   reconcileMemorySearchIndex()
   const needle = query.trim()
   if (!needle) {
@@ -3238,25 +3238,69 @@ export function searchMemories(query: string, limit = 20): MemoryEntry[] {
     return []
   }
 
+  const keywordScore = sql<number>`sum(${chronicleMemoryKeywords.occurrences} * ${chronicleMemoryKeywords.weight} + 1)`
   const keywordRows = db()
-    .select()
+    .select({
+      memoryId: chronicleMemoryKeywords.memoryId,
+      keywordScore,
+    })
     .from(chronicleMemoryKeywords)
     .where(inArray(chronicleMemoryKeywords.term, terms))
+    .groupBy(chronicleMemoryKeywords.memoryId)
+    .orderBy(desc(keywordScore))
+    .limit(MEMORY_SEARCH_CANDIDATE_LIMIT)
     .all()
 
   const scoreByMemoryId = new Map<string, MemorySearchScore>()
   for (const row of keywordRows) {
-    const phraseBoost = terms.includes(row.term) ? 1 : 0
-    const current = scoreByMemoryId.get(row.memoryId) ?? { keywordScore: 0, semanticScore: 0 }
-    current.keywordScore += row.occurrences * row.weight + phraseBoost
-    scoreByMemoryId.set(row.memoryId, current)
+    scoreByMemoryId.set(row.memoryId, { keywordScore: row.keywordScore, semanticScore: 0 })
   }
 
-  const queryEmbedding = buildTextEmbeddingVector(needle)
-  const embeddingRows = db()
+  const queryEmbedding = await buildQueryTextEmbeddingVector(needle)
+  const buckets = buildEmbeddingCandidateBuckets(queryEmbedding.vector)
+  const bucketConditions = buckets.map(bucket => and(
+    eq(chronicleMemoryEmbeddingBuckets.bandIndex, bucket.bandIndex),
+    eq(chronicleMemoryEmbeddingBuckets.bucketKey, bucket.bucketKey),
+  ))
+  const embeddingCandidateIds = bucketConditions.length === 0
+    ? []
+    : db()
+        .select({
+          embeddingId: chronicleMemoryEmbeddingBuckets.embeddingId,
+          matches: count(),
+        })
+        .from(chronicleMemoryEmbeddingBuckets)
+        .where(and(
+          eq(chronicleMemoryEmbeddingBuckets.modelId, queryEmbedding.modelId),
+          eq(chronicleMemoryEmbeddingBuckets.modelVersion, queryEmbedding.modelVersion),
+          or(...bucketConditions),
+        ))
+        .groupBy(chronicleMemoryEmbeddingBuckets.embeddingId)
+        .orderBy(desc(count()))
+        .limit(MEMORY_SEARCH_CANDIDATE_LIMIT)
+        .all()
+        .map(row => row.embeddingId)
+  const keywordMemoryIds = keywordRows.map(row => row.memoryId)
+  const candidateConditions = [
+    ...(embeddingCandidateIds.length > 0
+      ? [inArray(chronicleMemoryEmbeddings.id, embeddingCandidateIds)]
+      : []),
+    ...(keywordMemoryIds.length > 0
+      ? [inArray(chronicleMemoryEmbeddings.memoryId, keywordMemoryIds)]
+      : []),
+  ]
+  const embeddingRows = candidateConditions.length === 0
+    ? []
+    : db()
     .select()
     .from(chronicleMemoryEmbeddings)
-    .where(sql`${chronicleMemoryEmbeddings.status} = 'ready' AND ${chronicleMemoryEmbeddings.modelId} = ${queryEmbedding.modelId} AND ${chronicleMemoryEmbeddings.modelVersion} = ${queryEmbedding.modelVersion}`)
+    .where(and(
+      eq(chronicleMemoryEmbeddings.status, 'ready'),
+      eq(chronicleMemoryEmbeddings.modelId, queryEmbedding.modelId),
+      eq(chronicleMemoryEmbeddings.modelVersion, queryEmbedding.modelVersion),
+      or(...candidateConditions),
+    ))
+    .limit(MEMORY_SEARCH_CANDIDATE_LIMIT)
     .all()
 
   for (const row of embeddingRows) {
@@ -3307,7 +3351,7 @@ export function searchMemories(query: string, limit = 20): MemoryEntry[] {
     .map(({ row, match }) => toMemoryEntry(row, match))
 }
 
-export function embedTexts(input: EmbeddingRequestInput): EmbeddingResponse {
+export async function embedTexts(input: EmbeddingRequestInput): Promise<EmbeddingResponse> {
   const texts = input.texts.map(text => text.trim()).filter(Boolean)
   if (texts.length === 0 || texts.length > 64) {
     throw new AppError({
@@ -3316,16 +3360,15 @@ export function embedTexts(input: EmbeddingRequestInput): EmbeddingResponse {
       message: 'Embedding request must include 1-64 non-empty texts',
     })
   }
-  const health = getOnnxEmbeddingRuntimeHealth()
-  if (!health.ok) {
+  if (!onnxEmbeddingResourceAvailable()) {
     throw new AppError({
       code: 'chronicle_embedding_model_unavailable',
       status: 503,
-      message: health.error ?? 'Chronicle ONNX embedding runtime is not available',
+      message: 'Chronicle ONNX embedding model is not installed',
     })
   }
   try {
-    const response = EmbeddingBatchSchema.parse(DaemonManager.runEmbeddingBatch(texts, getModelResourcesRoot()))
+    const response = EmbeddingBatchSchema.parse(await DaemonManager.runEmbeddingBatch(texts, getModelResourcesRoot()))
     if (response.embeddings.length !== texts.length) {
       throw new Error('embedding response has an invalid embedding count')
     }
@@ -3339,7 +3382,7 @@ export function embedTexts(input: EmbeddingRequestInput): EmbeddingResponse {
   catch (error) {
     throw new AppError({
       code: 'chronicle_embedding_failed',
-      status: 500,
+      status: 503,
       message: error instanceof Error ? error.message : String(error),
     })
   }
@@ -3414,7 +3457,7 @@ async function verifyModelResourceInternal(
   options: { recordEventOnSuccess?: boolean } = {},
 ): Promise<ModelResourceEntry> {
   if (category === 'embedding') {
-    clearEmbeddingRuntimeHealth()
+    resetEmbeddingRuntime()
   }
   const manifest = getModelResourceManifest(category)
   const current = getModelResourceRow(category)
@@ -3522,7 +3565,7 @@ async function installModelResourceInternal(
   downloadCenter?: ModelResourceDownloadCenter,
 ): Promise<ModelResourceEntry> {
   if (category === 'embedding') {
-    clearEmbeddingRuntimeHealth()
+    resetEmbeddingRuntime()
   }
   const input = ModelResourceInstallInputSchema.parse(rawInput)
   const manifest = getModelResourceManifest(category)
@@ -3642,7 +3685,7 @@ async function installModelResourceInternal(
 
 export async function removeModelResource(category: ModelResourceCategory): Promise<ModelResourceEntry> {
   if (category === 'embedding') {
-    clearEmbeddingRuntimeHealth()
+    resetEmbeddingRuntime()
   }
   const manifest = getModelResourceManifest(category)
   for (const file of manifest.files) {
@@ -7506,6 +7549,7 @@ export function recordMemory(
         attrs: { sourceId: input.sourceId, duplicateOfSourceId: duplicate.sourceId, contentHash, removedMemoryId: existing.id },
       })
       assignMemoryToActivity(input, merged.id, createdAt, config.workspaceId || null, options)
+      scheduleMemoryOnnxEmbeddingUpgrade(merged.id)
       return merged
     }
 
@@ -7516,6 +7560,7 @@ export function recordMemory(
       return updated
     })
     assignMemoryToActivity(input, updated.id, createdAt, config.workspaceId || null, options)
+    scheduleMemoryOnnxEmbeddingUpgrade(updated.id)
     return updated
   }
 
@@ -7535,6 +7580,7 @@ export function recordMemory(
       attrs: { sourceId: input.sourceId, duplicateOfSourceId: duplicate.sourceId, contentHash },
     })
     assignMemoryToActivity(input, merged.id, createdAt, config.workspaceId || null, options)
+    scheduleMemoryOnnxEmbeddingUpgrade(merged.id)
     return merged
   }
 
@@ -7553,6 +7599,7 @@ export function recordMemory(
     attrs: { sourceId: input.sourceId, source: input.summaryKind },
   })
   assignMemoryToActivity(input, inserted.id, createdAt, config.workspaceId || null, options)
+  scheduleMemoryOnnxEmbeddingUpgrade(inserted.id)
   return inserted
 }
 
@@ -9046,8 +9093,9 @@ function insertMemoryEmbedding(
 ): void {
   const embedding = buildTextEmbeddingVector(content)
   const vectorJson = JSON.stringify(embedding.vector)
+  const embeddingId = randomUUID()
   tx.insert(chronicleMemoryEmbeddings).values({
-    id: randomUUID(),
+    id: embeddingId,
     memoryId,
     chunkId,
     modelId: embedding.modelId,
@@ -9063,6 +9111,14 @@ function insertMemoryEmbedding(
     createdAt: now,
     updatedAt: now,
   }).run()
+  insertEmbeddingCandidateBuckets(tx, {
+    embeddingId,
+    memoryId,
+    modelId: embedding.modelId,
+    modelVersion: embedding.modelVersion,
+    vector: embedding.vector,
+    createdAt: now,
+  })
 
   if (embedding.provider === 'onnx') {
     tx.update(chronicleMemoryChunks).set({
@@ -9071,6 +9127,190 @@ function insertMemoryEmbedding(
       updatedAt: now,
     }).where(eq(chronicleMemoryChunks.id, chunkId)).run()
   }
+}
+
+export function startMemoryEmbeddingIndexer(): void {
+  memoryEmbeddingIndexerAccepting = true
+}
+
+export async function stopMemoryEmbeddingIndexer(): Promise<void> {
+  memoryEmbeddingIndexerAccepting = false
+  await Promise.allSettled([...pendingMemoryEmbeddingUpgrades])
+}
+
+function scheduleMemoryOnnxEmbeddingUpgrade(memoryId: string): void {
+  if (!memoryEmbeddingIndexerAccepting || !onnxEmbeddingResourceAvailable()) {
+    return
+  }
+  const operation = upgradeMemoryOnnxEmbeddings(memoryId)
+    .catch((error) => {
+      recordEvent({
+        type: 'model-resource',
+        status: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        attrs: { category: 'embedding', runtime: 'local-onnx', phase: 'memory-index' },
+      })
+    })
+  pendingMemoryEmbeddingUpgrades.add(operation)
+  void operation.then(() => pendingMemoryEmbeddingUpgrades.delete(operation))
+}
+
+async function upgradeMemoryOnnxEmbeddings(memoryId: string): Promise<void> {
+  const chunks = db()
+    .select()
+    .from(chronicleMemoryChunks)
+    .where(eq(chronicleMemoryChunks.memoryId, memoryId))
+    .all()
+  for (let offset = 0; offset < chunks.length; offset += MEMORY_EMBEDDING_ASYNC_BATCH_SIZE) {
+    const batch = chunks.slice(offset, offset + MEMORY_EMBEDDING_ASYNC_BATCH_SIZE)
+    const response = EmbeddingBatchSchema.parse(await DaemonManager.runEmbeddingBatch(
+      batch.map(chunk => chunk.content),
+      getModelResourcesRoot(),
+    ))
+    if (response.embeddings.length !== batch.length) {
+      throw new Error('embedding response has an invalid embedding count')
+    }
+    const now = currentUnixSeconds()
+    db().transaction((tx) => {
+      for (const [index, chunk] of batch.entries()) {
+        const currentChunk = tx
+          .select()
+          .from(chronicleMemoryChunks)
+          .where(eq(chronicleMemoryChunks.id, chunk.id))
+          .get()
+        if (!currentChunk || currentChunk.contentHash !== chunk.contentHash) {
+          continue
+        }
+        tx.delete(chronicleMemoryEmbeddings).where(and(
+          eq(chronicleMemoryEmbeddings.chunkId, chunk.id),
+          eq(chronicleMemoryEmbeddings.modelId, response.modelId),
+          eq(chronicleMemoryEmbeddings.modelVersion, response.modelVersion),
+        )).run()
+        const vector = response.embeddings[index]!
+        const vectorJson = JSON.stringify(vector)
+        const embeddingId = randomUUID()
+        tx.insert(chronicleMemoryEmbeddings).values({
+          id: embeddingId,
+          memoryId,
+          chunkId: chunk.id,
+          modelId: response.modelId,
+          modelVersion: response.modelVersion,
+          dimensions: response.dimensions,
+          vectorJson,
+          vectorHash: hashText(vectorJson),
+          status: 'ready',
+          metadataJson: JSON.stringify({ provider: 'chronicle-onnx', runtime: 'local-onnx' }),
+          createdAt: now,
+          updatedAt: now,
+        }).run()
+        insertEmbeddingCandidateBuckets(tx, {
+          embeddingId,
+          memoryId,
+          modelId: response.modelId,
+          modelVersion: response.modelVersion,
+          vector,
+          createdAt: now,
+        })
+        tx.update(chronicleMemoryChunks).set({
+          embeddingStatus: 'ready',
+          embeddingModelId: response.modelId,
+          updatedAt: now,
+        }).where(eq(chronicleMemoryChunks.id, chunk.id)).run()
+      }
+    })
+  }
+}
+
+/**
+ * Rebuilds missing ANN bucket rows outside the request path. The projection is derived
+ * exclusively from Chronicle-owned canonical embedding rows and is safe to rerun.
+ */
+export function reconcileMemoryEmbeddingCandidateIndex(): number {
+  const indexedEmbeddingIds = new Set(db()
+    .select({ embeddingId: chronicleMemoryEmbeddingBuckets.embeddingId })
+    .from(chronicleMemoryEmbeddingBuckets)
+    .groupBy(chronicleMemoryEmbeddingBuckets.embeddingId)
+    .all()
+    .map(row => row.embeddingId))
+  const embeddings = db()
+    .select()
+    .from(chronicleMemoryEmbeddings)
+    .where(eq(chronicleMemoryEmbeddings.status, 'ready'))
+    .all()
+    .filter(row => !indexedEmbeddingIds.has(row.id))
+  if (embeddings.length === 0) {
+    return 0
+  }
+
+  db().transaction((tx) => {
+    for (const embedding of embeddings) {
+      const vector = NumberListTextSchema.parse(embedding.vectorJson)
+      if (vector.length !== embedding.dimensions) {
+        throw new AppError({
+          code: 'chronicle_memory_embedding_invalid',
+          status: 500,
+          message: 'Stored Chronicle memory embedding has invalid dimensions',
+          details: {
+            embeddingId: embedding.id,
+            expectedDimensions: embedding.dimensions,
+            actualDimensions: vector.length,
+          },
+        })
+      }
+      insertEmbeddingCandidateBuckets(tx, {
+        embeddingId: embedding.id,
+        memoryId: embedding.memoryId,
+        modelId: embedding.modelId,
+        modelVersion: embedding.modelVersion,
+        vector,
+        createdAt: embedding.createdAt,
+      })
+    }
+  })
+  return embeddings.length
+}
+
+function insertEmbeddingCandidateBuckets(
+  tx: ChronicleTx,
+  input: {
+    embeddingId: string
+    memoryId: string
+    modelId: string
+    modelVersion: string
+    vector: number[]
+    createdAt: number
+  },
+): void {
+  const buckets = buildEmbeddingCandidateBuckets(input.vector)
+  if (buckets.length === 0) {
+    return
+  }
+  tx.insert(chronicleMemoryEmbeddingBuckets).values(buckets.map(bucket => ({
+    id: randomUUID(),
+    embeddingId: input.embeddingId,
+    memoryId: input.memoryId,
+    modelId: input.modelId,
+    modelVersion: input.modelVersion,
+    bandIndex: bucket.bandIndex,
+    bucketKey: bucket.bucketKey,
+    createdAt: input.createdAt,
+  }))).run()
+}
+
+function buildEmbeddingCandidateBuckets(vector: number[]): Array<{ bandIndex: number, bucketKey: string }> {
+  if (vector.length === 0) {
+    return []
+  }
+  return vector
+    .map((value, dimensionIndex) => ({ value, dimensionIndex }))
+    .filter(entry => entry.value !== 0)
+    .sort((left, right) => Math.abs(right.value) - Math.abs(left.value)
+      || left.dimensionIndex - right.dimensionIndex)
+    .slice(0, MEMORY_EMBEDDING_CANDIDATE_BUCKET_COUNT)
+    .map(entry => ({
+      bandIndex: entry.dimensionIndex,
+      bucketKey: entry.value < 0 ? 'negative' : 'positive',
+    }))
 }
 
 function insertMemoryKeywords(
@@ -9142,15 +9382,34 @@ function buildCombinedMemorySearchScore(match: MemorySearchScore, phraseContaine
 }
 
 function currentTextEmbeddingVectorMode(): string {
-  return getOnnxEmbeddingRuntimeHealth().ok
-    ? `${ONNX_TEXT_EMBEDDING_MODEL_ID}/${ONNX_TEXT_EMBEDDING_MODEL_VERSION}`
-    : `${MEMORY_EMBEDDING_MODEL_ID}/${MEMORY_EMBEDDING_MODEL_VERSION}`
+  return `${MEMORY_EMBEDDING_MODEL_ID}/${MEMORY_EMBEDDING_MODEL_VERSION}`
 }
 
 function buildTextEmbeddingVector(text: string): TextEmbeddingVector {
-  if (getOnnxEmbeddingRuntimeHealth().ok) {
+  return {
+    vector: buildLexicalEmbeddingVector(text),
+    modelId: MEMORY_EMBEDDING_MODEL_ID,
+    modelVersion: MEMORY_EMBEDDING_MODEL_VERSION,
+    provider: 'lexical',
+  }
+}
+
+async function buildQueryTextEmbeddingVector(text: string): Promise<TextEmbeddingVector> {
+  const hasOnnxCandidates = db()
+    .select({ id: chronicleMemoryEmbeddingBuckets.id })
+    .from(chronicleMemoryEmbeddingBuckets)
+    .where(and(
+      eq(chronicleMemoryEmbeddingBuckets.modelId, ONNX_TEXT_EMBEDDING_MODEL_ID),
+      eq(chronicleMemoryEmbeddingBuckets.modelVersion, ONNX_TEXT_EMBEDDING_MODEL_VERSION),
+    ))
+    .limit(1)
+    .get()
+  if (hasOnnxCandidates && onnxEmbeddingResourceAvailable()) {
     try {
-      const response = EmbeddingBatchSchema.parse(DaemonManager.runEmbeddingBatch([text], getModelResourcesRoot()))
+      const response = EmbeddingBatchSchema.parse(await DaemonManager.runEmbeddingBatch(
+        [text],
+        getModelResourcesRoot(),
+      ))
       if (response.embeddings.length !== 1) {
         throw new Error('embedding response has an invalid embedding count')
       }
@@ -9170,13 +9429,7 @@ function buildTextEmbeddingVector(text: string): TextEmbeddingVector {
       })
     }
   }
-
-  return {
-    vector: buildLexicalEmbeddingVector(text),
-    modelId: MEMORY_EMBEDDING_MODEL_ID,
-    modelVersion: MEMORY_EMBEDDING_MODEL_VERSION,
-    provider: 'lexical',
-  }
+  return buildTextEmbeddingVector(text)
 }
 
 function onnxEmbeddingResourceAvailable(): boolean {
@@ -9186,60 +9439,15 @@ function onnxEmbeddingResourceAvailable(): boolean {
     .every(file => existsSync(getModelResourceAbsolutePath(file.path)))
 }
 
-function clearEmbeddingRuntimeHealth(): void {
-  embeddingRuntimeHealth = null
-}
-
-function getOnnxEmbeddingRuntimeHealth(): { ok: boolean, error: string | null } {
-  if (!onnxEmbeddingResourceAvailable()) {
-    return {
-      ok: false,
-      error: 'Chronicle ONNX embedding model is not installed',
-    }
-  }
-
-  const now = Date.now()
-  if (embeddingRuntimeHealth && now - embeddingRuntimeHealth.checkedAtMs < EMBEDDING_RUNTIME_HEALTH_CACHE_MS) {
-    return {
-      ok: embeddingRuntimeHealth.ok,
-      error: embeddingRuntimeHealth.error,
-    }
-  }
-
-  try {
-    const response = EmbeddingBatchSchema.parse(DaemonManager.runEmbeddingBatch(
-      ['chronicle embedding health probe'],
-      getModelResourcesRoot(),
-      { timeoutMs: EMBEDDING_RUNTIME_HEALTH_TIMEOUT_MS },
-    ))
-    if (response.embeddings.length !== 1) {
-      throw new Error('embedding response has an invalid embedding count')
-    }
-    embeddingRuntimeHealth = {
-      checkedAtMs: now,
-      ok: true,
-      error: null,
-    }
-  }
-  catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    embeddingRuntimeHealth = {
-      checkedAtMs: now,
-      ok: false,
-      error: errorMessage,
-    }
+function resetEmbeddingRuntime(): void {
+  void DaemonManager.resetEmbeddingWorker().catch((error) => {
     recordEvent({
       type: 'model-resource',
       status: 'error',
-      message: errorMessage,
-      attrs: { category: 'embedding', runtime: 'local-onnx', phase: 'health-check' },
+      message: error instanceof Error ? error.message : String(error),
+      attrs: { category: 'embedding', runtime: 'local-onnx', phase: 'worker-reset' },
     })
-  }
-
-  return {
-    ok: embeddingRuntimeHealth.ok,
-    error: embeddingRuntimeHealth.error,
-  }
+  })
 }
 
 function buildLexicalEmbeddingVector(text: string): number[] {

@@ -10,7 +10,7 @@ import type {
   GetChatSessionsBySessionIdMessagesByMessageIdResponse,
   GetChatSessionsBySessionIdRuntimeSettingsResponse,
   GetChatSessionsBySessionIdRuntimeStatusResponse,
-  GetSessionsResponse,
+  GetSessionsByIdResponse,
 } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
@@ -47,7 +47,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
     enabled: Boolean(connection) && isRouteActive,
     queryKey: ['chat-session', connection?.url, sessionId],
     queryFn: ({ signal }) =>
-      cradleRequest<GetSessionsResponse[number]>(
+      cradleRequest<GetSessionsByIdResponse>(
         connection!,
         `/sessions/${encodeURIComponent(sessionId)}`,
         { signal },

@@ -1,6 +1,6 @@
 import { ChevronRight, Folder, FolderX } from 'lucide-react-native'
 import { useRef } from 'react'
-import { Keyboard, StyleSheet, Text, View } from 'react-native'
+import { FlatList, Keyboard, StyleSheet, Text, View } from 'react-native'
 
 import type { GetSessionsResponse, GetWorkspacesResponse, PostWorksData } from '@/api-gen'
 import type { AppSection } from '@/components/common/app-menu-button'
@@ -14,7 +14,7 @@ import { WorkComposer } from '@/features/work/WorkComposer'
 import { useTheme } from '@/theme/use-theme'
 
 type Workspace = GetWorkspacesResponse[number]
-type Session = GetSessionsResponse[number]
+type Session = GetSessionsResponse['items'][number]
 
 export interface WorkspaceSummary {
   workspace: Workspace
@@ -67,39 +67,39 @@ export function ProjectsView({
         composerRef.current?.collapse()
         Keyboard.dismiss()
       }}
-      onRefresh={onRefresh}
-      refreshing={isRefreshing}
+      scroll={false}
       title="Workspaces"
     >
-      {projects.length === 0
-        ? (
-            <EmptyState
-              description="Add a Workspace from Cradle Desktop, then refresh this page."
-              title="No projects yet"
-            />
-          )
-        : (
-            <View style={styles.list}>
-              {projects.map(({ workspace, sessions }) => {
-                return (
-                  <Item
-                    actions={(
-                      <View style={styles.actions}>
-                        <Text style={[styles.count, { color: theme.mutedForeground }]}>{sessions.length}</Text>
-                        <ChevronRight color={theme.dimForeground} size={20} />
-                      </View>
-                    )}
-                    key={workspace.id}
-                    media={workspace.availability === 'missing'
-                      ? <FolderX color={theme.destructive} size={22} strokeWidth={1.7} />
-                      : <Folder color={theme.mutedForeground} size={22} strokeWidth={1.7} />}
-                    onPress={() => onOpenProject(workspace.id)}
-                    title={workspace.name}
-                  />
-                )
-              })}
-            </View>
-          )}
+      <FlatList
+        contentContainerStyle={projects.length === 0 ? styles.emptyList : styles.list}
+        data={projects}
+        keyExtractor={({ workspace }) => workspace.id}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={(
+          <EmptyState
+            description="Add a Workspace from Cradle Desktop, then refresh this page."
+            title="No projects yet"
+          />
+        )}
+        onRefresh={onRefresh}
+        refreshing={isRefreshing}
+        renderItem={({ item: { workspace, sessions } }) => (
+          <Item
+            actions={(
+              <View style={styles.actions}>
+                <Text style={[styles.count, { color: theme.mutedForeground }]}>{sessions.length}</Text>
+                <ChevronRight color={theme.dimForeground} size={20} />
+              </View>
+            )}
+            media={workspace.availability === 'missing'
+              ? <FolderX color={theme.destructive} size={22} strokeWidth={1.7} />
+              : <Folder color={theme.mutedForeground} size={22} strokeWidth={1.7} />}
+            onPress={() => onOpenProject(workspace.id)}
+            title={workspace.name}
+          />
+        )}
+        style={styles.virtualList}
+      />
     </Screen>
   )
 }
@@ -115,7 +115,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontVariant: ['tabular-nums'],
   },
+  emptyList: {
+    flexGrow: 1,
+  },
   list: {
     marginTop: 8,
+  },
+  virtualList: {
+    flex: 1,
   },
 })

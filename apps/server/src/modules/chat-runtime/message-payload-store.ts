@@ -1,6 +1,6 @@
 import type { Message, NewMessage } from '@cradle/db'
 import { chatMessagePayloads, messages } from '@cradle/db'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 
 import type { ChatRuntimeWriteDb } from './es/event-store'
 
@@ -77,6 +77,22 @@ export function readMessagePayload(
     .from(chatMessagePayloads)
     .where(eq(chatMessagePayloads.id, payloadId))
     .get()
+}
+
+export function readMessagePayloads(
+  d: Pick<ChatRuntimeWriteDb, 'select'>,
+  payloadIds: readonly string[],
+): Map<string, StoredMessagePayload> {
+  const uniquePayloadIds = [...new Set(payloadIds)]
+  if (uniquePayloadIds.length === 0) {
+    return new Map()
+  }
+  const rows = d
+    .select()
+    .from(chatMessagePayloads)
+    .where(inArray(chatMessagePayloads.id, uniquePayloadIds))
+    .all()
+  return new Map(rows.map(row => [row.id, row]))
 }
 
 export function toMessageProjectionValues(

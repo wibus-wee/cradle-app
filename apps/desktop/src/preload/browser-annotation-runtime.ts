@@ -342,6 +342,18 @@ class BrowserAnnotationRuntime {
   private wireframeMode = false
   private wireframeOpacity = 0.22
   private wireframePurpose = ''
+  private stableElementMetadata = new WeakMap<Element, { role: string, selector: string }>()
+  private readonly metadataObserver = new MutationObserver((records) => {
+    const pageChanged = records.some((record) => {
+      const target = record.target instanceof Element
+        ? record.target
+        : record.target.parentElement
+      return !target?.closest('#cradle-browser-comment-root')
+    })
+    if (pageChanged) {
+      this.stableElementMetadata = new WeakMap()
+    }
+  })
 
   constructor() {
     this.applySettings(this.loadSettings())
@@ -394,6 +406,9 @@ class BrowserAnnotationRuntime {
     this.selectionEnabled = true
     this.stage = 'selecting'
     this.mount()
+    if (document.body) {
+      this.metadataObserver.observe(document.body, { attributes: true, childList: true, subtree: true })
+    }
     this.emit({ type: 'ready', surfaceSize: this.surfaceSize(), elements: this.scanElements() })
   }
 
@@ -433,6 +448,8 @@ class BrowserAnnotationRuntime {
       this.noticeTimer = null
     }
     this.active = false
+    this.metadataObserver.disconnect()
+    this.stableElementMetadata = new WeakMap()
     this.selectionEnabled = true
     this.stage = 'selecting'
     this.clearDesign()
@@ -4182,10 +4199,48 @@ class BrowserAnnotationRuntime {
   }
 
   private scanElements(): BrowserAnnotationElement[] {
-    return Array.from(document.querySelectorAll('body *'))
-      .map((element, index) => this.readElement(element, index))
-      .filter(element => element !== null)
-      .slice(0, 250)
+    const body = document.body
+    if (!body) {
+      return []
+    }
+    const elements: BrowserAnnotationElement[] = []
+    const visited = new Set<Element>()
+    const collect = (element: Element) => {
+      if (visited.has(element) || !body.contains(element)) { return }
+      visited.add(element)
+      const scanned = this.readElement(element, elements.length)
+      if (scanned) { elements.push(scanned) }
+    }
+
+    // Sample viewport hit stacks first. Dense interactive surfaces generally
+    // satisfy the result budget here, avoiding a walk through off-screen DOM.
+    const columns = 6
+    const rows = 6
+    for (let row = 0; row < rows && elements.length < 250; row++) {
+      for (let column = 0; column < columns && elements.length < 250; column++) {
+        const x = ((column + 0.5) / columns) * window.innerWidth
+        const y = ((row + 0.5) / rows) * window.innerHeight
+        for (const element of document.elementsFromPoint(x, y)) {
+          collect(element)
+          if (elements.length >= 250) { break }
+        }
+      }
+    }
+
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (node) => {
+        const element = node as Element
+        return element.matches('#cradle-browser-comment-root, script, style, meta, link, noscript')
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT
+      },
+    })
+    let node = walker.nextNode()
+    while (node && elements.length < 250) {
+      collect(node as Element)
+      node = walker.nextNode()
+    }
+    return elements
   }
 
   private readElement(element: Element, index: number): BrowserAnnotationElement | null {
@@ -4193,7 +4248,6 @@ class BrowserAnnotationRuntime {
       return null
     }
     const rect = element.getBoundingClientRect()
-    const style = window.getComputedStyle(element)
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
     if (
@@ -4203,23 +4257,28 @@ class BrowserAnnotationRuntime {
       || rect.bottom < 0
       || rect.left > viewportWidth
       || rect.top > viewportHeight
-      || style.visibility === 'hidden'
-      || style.display === 'none'
-      || Number(style.opacity) === 0
     ) {
+      return null
+    }
+    const style = window.getComputedStyle(element)
+    if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) {
       return null
     }
 
     const attributes = this.attributesFor(element)
+    let stableMetadata = this.stableElementMetadata.get(element)
+    if (!stableMetadata) {
+      stableMetadata = { role: this.roleFor(element), selector: this.cssPath(element) }
+      this.stableElementMetadata.set(element, stableMetadata)
+    }
     const label = this.labelFor(element)
-    const role = this.roleFor(element)
     return {
       id: `element-${index}`,
       tagName: element.tagName,
       label,
       description: this.descriptionFor(attributes),
-      role,
-      selector: this.cssPath(element),
+      role: stableMetadata.role,
+      selector: stableMetadata.selector,
       attributes,
       pageUrl: window.location.href,
       nearbyText: this.nearbyTextFor(element),

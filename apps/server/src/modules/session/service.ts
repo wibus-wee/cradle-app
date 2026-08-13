@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 
 import type { Session } from '@cradle/db'
@@ -14,7 +15,7 @@ import {
   turnCheckpoints,
   usageLogs,
 } from '@cradle/db'
-import { and, desc, eq, inArray, isNotNull, isNull, max, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, lt, max, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
@@ -55,7 +56,11 @@ import {
 } from '../provider-targets/service'
 import * as Workspace from '../workspace/service'
 import { isLocalWorkspaceLocator } from '../workspace/workspace-locator'
-import { attachSessionToWorktree, readSessionIsolation } from '../worktree/service'
+import {
+  attachSessionToWorktree,
+  readSessionIsolation,
+  readSessionIsolations,
+} from '../worktree/service'
 import type { SessionArchive } from './export-archive'
 import { sessionArchiveFileName, threadExportBlockedReason } from './export-archive'
 import type { SessionExecutionTarget } from './remote-projection'
@@ -63,12 +68,15 @@ import {
   createRemoteProjectedSession,
   isRemoteProjectedSession,
   readSessionExecutionTarget,
+  readSessionExecutionTargets,
   removeRemoteProjectedSession,
 } from './remote-projection'
 
 export type { SessionExecutionTarget }
 
 export type SessionStatus = 'idle' | 'streaming' | 'error'
+export const SESSION_LIST_DEFAULT_LIMIT = 100
+export const SESSION_LIST_MAX_LIMIT = 200
 type SessionDb = ReturnType<typeof db>
 export type SessionTransaction = Parameters<Parameters<SessionDb['transaction']>[0]>[0]
 export type SessionView = Session & {
@@ -86,6 +94,27 @@ export type SessionView = Session & {
   worktreeHealth: 'ok' | 'missing' | 'stale' | null
   pendingWorktreeId: string | null
   isolationBoundaryRequired: boolean
+}
+
+export interface SessionPage {
+  items: SessionView[]
+  nextCursor: string | null
+}
+
+export interface SessionListInput {
+  workspaceId?: string
+  origin?: string
+  archived?: boolean
+  sessionGroupId?: string
+  linkedIssueId?: string
+  cursor?: string
+  limit?: number
+}
+
+interface SessionListCursor {
+  activityAt: number
+  createdAt: number
+  id: string
 }
 
 const SessionCreateInputSchema = z.object({
@@ -109,19 +138,11 @@ const SessionCreateInputSchema = z.object({
   configJson: z.string().optional(),
 })
 
-function listRequestedModelsBySessionIds(sessionIds: string[]): Map<string, string | null> {
-  if (sessionIds.length === 0) {
+function listRequestedModelsBySessions(sessionRows: readonly Session[]): Map<string, string | null> {
+  if (sessionRows.length === 0) {
     return new Map()
   }
-
-  const sessionRows = db()
-    .select({
-      id: sessions.id,
-      configJson: sessions.configJson,
-    })
-    .from(sessions)
-    .where(inArray(sessions.id, sessionIds))
-    .all()
+  const sessionIds = sessionRows.map(row => row.id)
   const modelsBySessionId = new Map(
     sessionRows.map(row => [row.id, readSessionModelPreference(row.configJson)]),
   )
@@ -289,7 +310,7 @@ function assertSessionGroupAssignment(input: {
   return input.sessionGroupId
 }
 
-function listStatusesBySessionIds(sessionIds: string[]): Map<string, SessionStatus> {
+export function listStatusesBySessionIds(sessionIds: string[]): Map<string, SessionStatus> {
   if (sessionIds.length === 0) {
     return new Map()
   }
@@ -360,13 +381,34 @@ function toSessionView(
   latestAssistantMessageAt: number | null = null,
 ): SessionView {
   const isolation = readSessionIsolation(session)
+  return buildSessionView({
+    session,
+    modelId,
+    status,
+    latestUserMessageAt,
+    latestAssistantMessageAt,
+    isolation,
+    execution: readSessionExecutionTarget(session.id),
+  })
+}
+
+function buildSessionView(input: {
+  session: Session
+  modelId: string | null
+  status: SessionStatus
+  latestUserMessageAt: number | null
+  latestAssistantMessageAt: number | null
+  isolation: ReturnType<typeof readSessionIsolation>
+  execution: SessionExecutionTarget
+}): SessionView {
+  const { session, isolation, latestAssistantMessageAt, latestUserMessageAt } = input
   return {
     ...session,
-    execution: readSessionExecutionTarget(session.id),
+    execution: input.execution,
     providerTargetId: session.providerTargetId ?? readSessionProviderPreference(session.configJson),
-    modelId,
+    modelId: input.modelId,
     thinkingEffort: readSessionThinkingEffortPreference(session.configJson),
-    status,
+    status: input.status,
     latestUserMessageAt,
     latestAssistantMessageAt,
     unread:
@@ -382,68 +424,155 @@ function toSessionView(
   }
 }
 
-function listRowsByActivity(where: ReturnType<typeof and> | undefined): Array<{
+export function projectSessionRows(
+  sessionRows: readonly Session[],
+  activityBySessionId: ReadonlyMap<string, {
+    latestUserMessageAt: number | null
+    latestAssistantMessageAt: number | null
+  }> = new Map(),
+): SessionView[] {
+  const sessionIds = sessionRows.map(row => row.id)
+  const modelsBySessionId = listRequestedModelsBySessions(sessionRows)
+  const statusesBySessionId = listStatusesBySessionIds(sessionIds)
+  const isolationsBySessionId = readSessionIsolations(sessionRows)
+  const executionBySessionId = readSessionExecutionTargets(sessionIds)
+
+  return sessionRows.map((session) => {
+    const activity = activityBySessionId.get(session.id)
+    return buildSessionView({
+      session,
+      modelId: modelsBySessionId.get(session.id) ?? null,
+      status: statusesBySessionId.get(session.id) ?? 'idle',
+      latestUserMessageAt: activity?.latestUserMessageAt ?? null,
+      latestAssistantMessageAt: activity?.latestAssistantMessageAt ?? null,
+      isolation: isolationsBySessionId.get(session.id) ?? readSessionIsolation(session),
+      execution: executionBySessionId.get(session.id) ?? { kind: 'local' },
+    })
+  })
+}
+
+function encodeSessionListCursor(cursor: SessionListCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString('base64url')
+}
+
+function decodeSessionListCursor(cursor: string): SessionListCursor {
+  try {
+    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as SessionListCursor
+    if (
+      !Number.isFinite(value.activityAt)
+      || !Number.isFinite(value.createdAt)
+      || typeof value.id !== 'string'
+      || value.id.length === 0
+    ) {
+      throw new Error('invalid cursor fields')
+    }
+    return value
+  }
+  catch {
+    throw new AppError({
+      code: 'invalid_session_cursor',
+      status: 400,
+      message: 'Session cursor is invalid',
+    })
+  }
+}
+
+function listRowsByActivity(input: SessionListInput): {
+  rows: Array<{
   session: Session
   latestUserMessageAt: number | null
   latestAssistantMessageAt: number | null
-}> {
-  // Restrict message aggregation to the sessions being listed so GROUP BY scales
-  // with the returned set (uses messages_session_created_at_idx), not the global corpus.
-  const sessionQuery = db().select().from(sessions)
-  const sessionRows = (where ? sessionQuery.where(where) : sessionQuery).all()
-  if (sessionRows.length === 0) {
-    return []
-  }
-
-  const sessionIds = sessionRows.map(row => row.id)
-
-  const latestUserRows = db()
+    activityAt: number
+  }>
+  nextCursor: string | null
+} {
+  const limit = Math.min(Math.max(input.limit ?? SESSION_LIST_DEFAULT_LIMIT, 1), SESSION_LIST_MAX_LIMIT)
+  const cursor = input.cursor ? decodeSessionListCursor(input.cursor) : null
+  const latestUserMessageAtExpression = sql<number | null>`(
+    SELECT MAX(session_user_messages.created_at)
+    FROM messages AS session_user_messages
+    WHERE session_user_messages.session_id = ${sessions.id}
+      AND session_user_messages.role = 'user'
+  )`
+  const activityAtExpression = sql<number>`COALESCE(${latestUserMessageAtExpression}, ${sessions.createdAt})`
+  const predicates = [
+    input.workspaceId ? eq(sessions.workspaceId, input.workspaceId) : undefined,
+    input.origin ? eq(sessions.origin, input.origin) : undefined,
+    input.sessionGroupId ? eq(sessions.sessionGroupId, input.sessionGroupId) : undefined,
+    input.linkedIssueId ? eq(sessions.linkedIssueId, input.linkedIssueId) : undefined,
+    input.archived ? isNotNull(sessions.archivedAt) : isNull(sessions.archivedAt),
+    cursor
+      ? or(
+          lt(activityAtExpression, cursor.activityAt),
+          and(eq(activityAtExpression, cursor.activityAt), lt(sessions.createdAt, cursor.createdAt)),
+          and(
+            eq(activityAtExpression, cursor.activityAt),
+            eq(sessions.createdAt, cursor.createdAt),
+            lt(sessions.id, cursor.id),
+          ),
+        )
+      : undefined,
+  ].filter(predicate => predicate !== undefined)
+  const rows = db()
     .select({
-      sessionId: messages.sessionId,
-      latestUserMessageAt: max(messages.createdAt),
+      session: sessions,
+      activityAt: activityAtExpression.as('activity_at'),
     })
-    .from(messages)
-    .where(and(inArray(messages.sessionId, sessionIds), eq(messages.role, 'user')))
-    .groupBy(messages.sessionId)
+    .from(sessions)
+    .where(and(...predicates))
+    .orderBy(desc(activityAtExpression), desc(sessions.createdAt), desc(sessions.id))
+    .limit(limit + 1)
     .all()
-
-  const latestAssistantRows = db()
-    .select({
-      sessionId: messages.sessionId,
-      latestAssistantMessageAt: max(messages.createdAt),
-    })
-    .from(messages)
-    .where(
-      and(
-        inArray(messages.sessionId, sessionIds),
-        eq(messages.role, 'assistant'),
-        inArray(messages.status, ['complete', 'aborted', 'failed']),
-      ),
-    )
-    .groupBy(messages.sessionId)
-    .all()
-
+  const hasNextPage = rows.length > limit
+  const pageRows = hasNextPage ? rows.slice(0, limit) : rows
+  const sessionIds = pageRows.map(row => row.session.id)
+  const latestUserRows = sessionIds.length === 0
+    ? []
+    : db()
+        .select({
+          sessionId: messages.sessionId,
+          latestUserMessageAt: max(messages.createdAt),
+        })
+        .from(messages)
+        .where(and(inArray(messages.sessionId, sessionIds), eq(messages.role, 'user')))
+        .groupBy(messages.sessionId)
+        .all()
+  const latestAssistantRows = sessionIds.length === 0
+    ? []
+    : db()
+        .select({
+          sessionId: messages.sessionId,
+          latestAssistantMessageAt: max(messages.createdAt),
+        })
+        .from(messages)
+        .where(and(
+          inArray(messages.sessionId, sessionIds),
+          eq(messages.role, 'assistant'),
+          inArray(messages.status, ['complete', 'aborted', 'failed']),
+        ))
+        .groupBy(messages.sessionId)
+        .all()
   const latestUserBySessionId = new Map(
     latestUserRows.map(row => [row.sessionId, row.latestUserMessageAt ?? null]),
   )
   const latestAssistantBySessionId = new Map(
     latestAssistantRows.map(row => [row.sessionId, row.latestAssistantMessageAt ?? null]),
   )
-
-  return sessionRows
-    .map(session => ({
-      session,
-      latestUserMessageAt: latestUserBySessionId.get(session.id) ?? null,
-      latestAssistantMessageAt: latestAssistantBySessionId.get(session.id) ?? null,
-    }))
-    .sort((a, b) => {
-      const aActivity = a.latestUserMessageAt ?? a.session.createdAt
-      const bActivity = b.latestUserMessageAt ?? b.session.createdAt
-      if (bActivity !== aActivity) {
-        return bActivity - aActivity
-      }
-      return b.session.createdAt - a.session.createdAt
-    })
+  const last = pageRows.at(-1)
+  return {
+    rows: pageRows.map(row => ({
+      ...row,
+      latestUserMessageAt: latestUserBySessionId.get(row.session.id) ?? null,
+      latestAssistantMessageAt: latestAssistantBySessionId.get(row.session.id) ?? null,
+    })),
+    nextCursor: hasNextPage && last
+      ? encodeSessionListCursor({
+          activityAt: last.activityAt,
+          createdAt: last.session.createdAt,
+          id: last.session.id,
+        })
+      : null,
+  }
 }
 
 function readLatestUserMessageAt(sessionId: string): number | null {
@@ -520,49 +649,24 @@ function assertRuntimeOwnedProviderTargetForRuntime(input: {
   })
 }
 
-export function list(
-  input: { workspaceId?: string, origin?: string, archived?: boolean, sessionGroupId?: string } = {},
-): SessionView[] {
-  const predicates = [
-    input.workspaceId ? eq(sessions.workspaceId, input.workspaceId) : undefined,
-    input.origin ? eq(sessions.origin, input.origin) : undefined,
-    input.sessionGroupId ? eq(sessions.sessionGroupId, input.sessionGroupId) : undefined,
-    input.archived ? isNotNull(sessions.archivedAt) : isNull(sessions.archivedAt),
-  ].filter(predicate => predicate !== undefined)
-  const where = predicates.length > 0 ? and(...predicates) : undefined
-  const rows = listRowsByActivity(where)
-
-  const sessionIds = rows.map(row => row.session.id)
-  const modelsBySessionId = listRequestedModelsBySessionIds(sessionIds)
-  const statusesBySessionId = listStatusesBySessionIds(sessionIds)
-  return rows.map(row =>
-    toSessionView(
-      row.session,
-      modelsBySessionId.get(row.session.id) ?? null,
-      statusesBySessionId.get(row.session.id) ?? 'idle',
-      row.latestUserMessageAt,
-      row.latestAssistantMessageAt,
-    ))
+export function list(input: SessionListInput = {}): SessionPage {
+  const page = listRowsByActivity(input)
+  const activityBySessionId = new Map(page.rows.map(row => [row.session.id, {
+    latestUserMessageAt: row.latestUserMessageAt,
+    latestAssistantMessageAt: row.latestAssistantMessageAt,
+  }]))
+  return {
+    items: projectSessionRows(page.rows.map(row => row.session), activityBySessionId),
+    nextCursor: page.nextCursor,
+  }
 }
 
 export function listLinkedToIssue(issueId: string): SessionView[] {
-  const rows = listRowsByActivity(and(eq(sessions.linkedIssueId, issueId)))
-
-  const sessionIds = rows.map(row => row.session.id)
-  const modelsBySessionId = listRequestedModelsBySessionIds(sessionIds)
-  const statusesBySessionId = listStatusesBySessionIds(sessionIds)
-  return rows.map(row =>
-    toSessionView(
-      row.session,
-      modelsBySessionId.get(row.session.id) ?? null,
-      statusesBySessionId.get(row.session.id) ?? 'idle',
-      row.latestUserMessageAt,
-      row.latestAssistantMessageAt,
-    ))
+  return list({ linkedIssueId: issueId, limit: SESSION_LIST_MAX_LIMIT }).items
 }
 
 export function listBySessionGroupId(sessionGroupId: string): SessionView[] {
-  return list({ sessionGroupId, archived: false })
+  return list({ sessionGroupId, archived: false, limit: SESSION_LIST_MAX_LIMIT }).items
 }
 
 export async function setArchived(input: { id: string, archived: boolean }): Promise<SessionView | null> {

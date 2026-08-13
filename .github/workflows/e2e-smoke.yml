@@ -82,6 +82,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Validate E2E suite contract
+        run: pnpm e2e:check
+
       - name: Build plugin SDK
         run: pnpm --filter @cradle/plugin-sdk build
 
@@ -93,6 +96,8 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium-headless-shell
 
       - name: Provision Codex app-server for E2E
+        env:
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
         run: pnpm --filter @cradle/desktop sync:codex-runtime
 
       - name: Prepare Cucumber CI config

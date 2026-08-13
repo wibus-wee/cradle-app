@@ -20,4 +20,6 @@ The module does not own product artifacts. Product modules register an owner pro
 
 Source observations are written to `background_jobs` before an owner projector runs. Terminal rows keep `projectedAt` empty until their owner callback succeeds, so startup and periodic polling can retry a projection after a crash. Source polling only changes pending or running rows; once cancellation or another terminal state is persisted, late source completion cannot overwrite it.
 
+Running observations are normalized to stable JSON key order and compared with the persisted row before update. An unchanged poll therefore preserves `updatedAt` and produces no SQLite write; only a semantic source-state change advances the durable job row.
+
 Cancellation first marks the job cancelled, then asks the source adapter to abort its work, and finally projects cancellation into the owner domain. Repeated cancellation returns the existing terminal job.

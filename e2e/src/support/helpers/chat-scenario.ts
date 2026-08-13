@@ -20,6 +20,10 @@ const MULTI_TURN_RESPONSES = [
 export const SLOW_RESPONSE = '慢速助手回复完成'
 export const STOP_RECOVERY_RESPONSE = '停止后新一轮成功完成'
 export const ERROR_RECOVERY_RESPONSE = '错误后新一轮成功完成'
+export const QUEUED_RESPONSE = '持久化队列跟进已完成'
+const QUEUED_PROMPT = '这是需要持久化的跟进'
+export const EDITED_QUEUE_PROMPT = '已编辑的队列跟进'
+export const EDITED_QUEUE_RESPONSE = '已编辑的队列跟进已完成'
 const SLOW_GATE = 'e2e-slow-stream'
 export const CHAT_STATUS_TIMEOUT = 30_000
 const SESSION_ALIASES_KEY = 'chat.session-aliases'
@@ -114,6 +118,22 @@ export async function configureStoppableClaudeAgentSimulator(world: CradleWorld)
       bodyTextExcludes: 'You are naming a Claude Agent task session',
     }),
   ]))
+}
+
+export async function configureDurableQueueClaudeAgentSimulator(world: CradleWorld): Promise<void> {
+  await configureSlowGatedClaudeAgentSimulator(world)
+  world.remember('simulator.reply-on-release', {
+    text: QUEUED_RESPONSE,
+    bodyTextIncludes: QUEUED_PROMPT,
+  })
+}
+
+export async function configureManagedQueueClaudeAgentSimulator(world: CradleWorld): Promise<void> {
+  await configureSlowGatedClaudeAgentSimulator(world)
+  world.remember('simulator.reply-on-release', {
+    text: EDITED_QUEUE_RESPONSE,
+    bodyTextIncludes: EDITED_QUEUE_PROMPT,
+  })
 }
 
 export async function configureFailingClaudeAgentSimulator(world: CradleWorld): Promise<void> {
@@ -297,6 +317,17 @@ export async function selectCodexSimulator(world: CradleWorld): Promise<void> {
 export async function releaseSlowStreamGate(world: CradleWorld): Promise<void> {
   const gate = world.recall<string>('simulator.slow-gate')
   const simulator = requireSimulator(world)
+  const reply = world.maybeRecall<{ text: string, bodyTextIncludes: string }>('simulator.reply-on-release')
+  if (reply) {
+    world.enqueue(anthropicScenario([
+      anthropicTextExchange({
+        label: `after-gate-${Date.now()}`,
+        text: reply.text,
+        bodyTextIncludes: reply.bodyTextIncludes,
+        bodyTextExcludes: 'You are naming a Claude Agent task session',
+      }),
+    ]))
+  }
   await simulator.waitForGate(gate)
   simulator.release(gate)
 }
@@ -358,7 +389,11 @@ export async function enqueueNextScriptedReply(world: CradleWorld, fallbackText?
     return
   }
   world.enqueue(anthropicScenario([
-    anthropicTextExchange({ label: `scripted-${Date.now()}`, text: next }),
+    anthropicTextExchange({
+      label: `scripted-${Date.now()}`,
+      text: next,
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
+    }),
   ]))
 }
 

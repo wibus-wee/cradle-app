@@ -1412,7 +1412,12 @@ export const zGetSessionsQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     origin: z.string().min(1).optional(),
     sessionGroupId: z.string().min(1).optional(),
-    archived: z.boolean().optional()
+    archived: z.boolean().optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.union([
+        z.string(),
+        z.number().gte(1).lte(200)
+    ]).optional()
 });
 
 export const zPostSessionsBody = z.object({
@@ -1676,7 +1681,12 @@ export const zPostSessionsByIdTurnCheckpointsByCheckpointIdRewindPath = z.object
 export const zGetWorksQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     linkedIssueId: z.string().min(1).optional(),
-    archived: z.boolean().optional()
+    archived: z.boolean().optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.union([
+        z.string(),
+        z.number().gte(1).lte(200)
+    ]).optional()
 });
 
 export const zPostWorksBody = z.object({

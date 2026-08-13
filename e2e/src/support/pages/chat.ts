@@ -320,6 +320,54 @@ export class ChatPage {
     await this.sendFromComposer()
   }
 
+  queueList(): Locator {
+    return this.page.locator('[data-testid="chat-queue-list"]')
+  }
+
+  queueItem(text: string): Locator {
+    return this.queueList().locator('[data-testid="chat-queue-item"]').filter({ hasText: text })
+  }
+
+  async expectQueued(text: string): Promise<void> {
+    await expect(this.queueItem(text)).toBeVisible({ timeout: CHAT_TIMEOUT })
+  }
+
+  async expectNotQueued(text: string): Promise<void> {
+    await expect(this.queueItem(text)).toHaveCount(0, { timeout: CHAT_TIMEOUT })
+  }
+
+  async expectQueueOrder(texts: readonly string[]): Promise<void> {
+    const items = this.queueList().locator('[data-testid="chat-queue-item"]')
+    await expect(items).toHaveCount(texts.length, { timeout: CHAT_TIMEOUT })
+    for (const [index, text] of texts.entries()) {
+      await expect(items.nth(index)).toContainText(text, { timeout: CHAT_TIMEOUT })
+    }
+  }
+
+  async editQueuedMessage(currentText: string, nextText: string): Promise<void> {
+    const item = this.queueItem(currentText)
+    await expect(item).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await item.locator('[data-testid="chat-queue-item-edit"]').click()
+    await this.expectComposerContains(currentText)
+    await this.fillComposer(nextText)
+    await this.sendFromComposer()
+    await this.expectNotQueued(currentText)
+    await this.expectQueued(nextText)
+  }
+
+  async moveQueuedMessageUp(text: string): Promise<void> {
+    const item = this.queueItem(text)
+    await expect(item).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await item.locator('[data-testid="chat-queue-item-move-up"]').click()
+  }
+
+  async cancelQueuedMessage(text: string): Promise<void> {
+    const item = this.queueItem(text)
+    await expect(item).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await item.locator('[data-testid="chat-queue-item-cancel"]').click()
+    await this.expectNotQueued(text)
+  }
+
   sessionItem(sessionId: string): Locator {
     return this.page.locator(`[data-testid="session-item-${sessionId}"]`)
   }
@@ -349,11 +397,17 @@ export class ChatPage {
 
   async expandExecutionDetails(assistantBubble?: Locator): Promise<Locator> {
     const bubble = assistantBubble ?? await this.expectAssistantVisible()
-    const foldButton = bubble.getByRole('button', { name: 'Show execution details' })
+    let foldButton = bubble.getByRole('button', { name: 'Show execution details' })
+    if (await foldButton.count() === 0) {
+      foldButton = this.view().getByRole('button', { name: 'Show execution details' }).last()
+    }
     if (await foldButton.count() > 0) {
       await foldButton.click()
     }
-    const worked = bubble.getByRole('button').filter({ hasText: /^Worked/ }).first()
+    let worked = bubble.getByRole('button').filter({ hasText: /^Worked/ }).first()
+    if (await worked.count() === 0) {
+      worked = this.view().getByRole('button').filter({ hasText: /^Worked/ }).last()
+    }
     if (await worked.count() > 0) {
       const expanded = await worked.getAttribute('aria-expanded')
       if (expanded !== 'true') {
@@ -365,13 +419,16 @@ export class ChatPage {
 
   async openReasoningEntry(): Promise<Locator> {
     const bubble = await this.expandExecutionDetails()
-    const legacy = bubble.locator('[data-testid="chat-reasoning-toggle"]').last()
+    let legacy = bubble.locator('[data-testid="chat-reasoning-toggle"]').last()
+    if (await legacy.count() === 0) {
+      legacy = this.view().locator('[data-testid="chat-reasoning-toggle"]').last()
+    }
     if (await legacy.count() > 0) {
       await expect(legacy).toBeVisible({ timeout: 10_000 })
       await legacy.click()
       return bubble
     }
-    const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
+    const feed = this.view().locator('[data-testid="chat-activity-feed"]').last()
     await expect(feed).toBeVisible({ timeout: 10_000 })
     const feedSummary = feed.locator('button').first()
     if (await feedSummary.count() > 0) {
@@ -387,8 +444,8 @@ export class ChatPage {
   }
 
   async expectThoughtEntryVisible(): Promise<void> {
-    const bubble = await this.expandExecutionDetails()
-    const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
+    await this.expandExecutionDetails()
+    const feed = this.view().locator('[data-testid="chat-activity-feed"]').last()
     await expect(feed).toBeVisible({ timeout: 10_000 })
     await expect(feed).toContainText(/Thought|Thinking|Reasoning/i, { timeout: 10_000 })
   }
@@ -402,14 +459,15 @@ export class ChatPage {
       await expect(legacy).toContainText(text, { timeout: 10_000 })
       return
     }
-    const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
+    const feed = this.view().locator('[data-testid="chat-activity-feed"]').last()
     await expect(feed).toContainText(text, { timeout: 10_000 })
   }
 
   async expectActivityContains(text: string | RegExp, timeout = CHAT_TIMEOUT): Promise<void> {
+    await this.waitStatus('idle', timeout)
     const bubble = await this.expectAssistantVisible(timeout)
     await this.expandExecutionDetails(bubble)
-    const feed = bubble.locator('[data-testid="chat-activity-feed"]').first()
+    const feed = this.view().locator('[data-testid="chat-activity-feed"]').last()
     await expect(feed).toBeVisible({ timeout })
     // Collapsed feed only shows the summary verb (e.g. "Explored 1 file").
     const feedSummary = feed.locator('button').first()

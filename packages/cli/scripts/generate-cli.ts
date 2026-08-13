@@ -322,9 +322,9 @@ export function register(program: Command): void {
 `
 }
 
-function renderIndex(imports: Array<{ importName: string, relativePath: string }>): string {
+function renderGroup(imports: Array<{ importName: string, relativePath: string }>): string {
   const importLines = imports
-    .map(item => `import { register as ${item.importName} } from './${item.relativePath}'`)
+    .map(item => `import { register as ${item.importName} } from '../${item.relativePath}'`)
     .join('\n')
   const callLines = imports
     .map(item => `  ${item.importName}(program)`)
@@ -336,6 +336,44 @@ ${importLines}
 
 export function registerGeneratedCommands(program: Command): void {
 ${callLines || '  void program'}
+}
+`
+}
+
+function renderIndex(groups: string[]): string {
+  const groupNames = groups.map(group => JSON.stringify(group)).join(', ')
+  const loaders = groups
+    .map(group => `  ${JSON.stringify(group)}: () => import('./groups.generated/${group}'),`)
+    .join('\n')
+  const descriptions = groups
+    .map(group => `  ${JSON.stringify(group)}: ${JSON.stringify(moduleDescriptions[group] ?? `Manage ${group} commands.`)},`)
+    .join('\n')
+
+  return `import type { Command } from 'commander'
+
+export const generatedCommandGroups = [${groupNames}] as const
+
+const groupLoaders: Record<string, () => Promise<{ registerGeneratedCommands: (program: Command) => void }>> = {
+${loaders}
+}
+
+const groupDescriptions: Record<string, string> = {
+${descriptions}
+}
+
+export async function registerGeneratedCommandGroup(program: Command, group: string | undefined): Promise<void> {
+  if (!group) { return }
+  const load = groupLoaders[group]
+  if (!load) { return }
+  const module = await load()
+  module.registerGeneratedCommands(program)
+}
+
+export function registerGeneratedCommandPlaceholders(program: Command, loadedGroup: string | undefined): void {
+  for (const group of generatedCommandGroups) {
+    if (group === loadedGroup || program.commands.some(command => command.name() === group)) { continue }
+    program.command(group).description(groupDescriptions[group] ?? \`Manage \${group} commands.\`)
+  }
 }
 `
 }
@@ -386,7 +424,7 @@ async function writeGeneratedFiles(operations: CliOperationSpec[]): Promise<void
   await rm(generatedRoot, { force: true, recursive: true })
   await mkdir(generatedRoot, { recursive: true })
 
-  const indexImports: Array<{ importName: string, relativePath: string }> = []
+  const groupImports = new Map<string, Array<{ importName: string, relativePath: string }>>()
 
   await writeFile(path.join(generatedRoot, 'README.md'), `<!-- Once this directory changes, update this README.md -->
 
@@ -402,13 +440,22 @@ through server route \`x-cradle-cli\` metadata and rerun the generator.
     const filePath = toGeneratedPath(operation.command)
     await mkdir(path.dirname(filePath), { recursive: true })
     await writeFile(filePath, renderCommandModule(operation))
-    indexImports.push({
+    const group = operation.command[0]
+    const imports = groupImports.get(group) ?? []
+    imports.push({
       importName: createImportName(operation.command),
       relativePath: path.relative(generatedRoot, filePath).replace(TS_EXTENSION_RE, '').split(path.sep).join('/'),
     })
+    groupImports.set(group, imports)
   }
 
-  await writeFile(path.join(generatedRoot, 'index.generated.ts'), renderIndex(indexImports))
+  const groupsRoot = path.join(generatedRoot, 'groups.generated')
+  await mkdir(groupsRoot, { recursive: true })
+  const groups = Array.from(groupImports.keys()).sort((left, right) => left.localeCompare(right))
+  for (const group of groups) {
+    await writeFile(path.join(groupsRoot, `${group}.ts`), renderGroup(groupImports.get(group) ?? []))
+  }
+  await writeFile(path.join(generatedRoot, 'index.generated.ts'), renderIndex(groups))
 }
 
 function escapeMarkdownCell(value: string): string {

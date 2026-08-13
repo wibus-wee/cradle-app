@@ -1,55 +1,13 @@
-import { AgentList } from '~/features/agent-management/agent-list'
-import { AgentRuntimeSettings } from '~/features/agent-management/agent-runtime-settings'
-import { RuntimesSettings } from '~/features/agent-runtimes/runtimes-settings'
-import { ChronicleSettings } from '~/features/chronicle/chronicle-settings'
-import { ManagedResourcesPage } from '~/features/managed-resources/managed-resources-page'
-import { McpServersSettings } from '~/features/mcp-servers/mcp-servers-settings'
+import type { ComponentType } from 'react'
+import { lazy, Suspense } from 'react'
+
 import { cn } from '~/lib/cn'
 
-import { AboutSettings } from './about-settings'
-import { AppearanceSettings } from './appearance-settings'
-import { AwaitSettings } from './await-settings'
-import { ChatSettings } from './chat-settings'
-import { DataBackupSettings } from './data-backup-settings'
-import { DesktopUpdateSettings } from './desktop-update-settings'
-import { ExternalIssueSourceSettings } from './external-issue-source-settings'
-import { ExternalWorkImportSettings } from './external-work-import-settings'
-import { FeatureSettings } from './feature-settings'
-import { IntegrationsSettings } from './integrations-settings'
-import { JarvisSettings } from './jarvis-settings'
-import { ModelRegistrySettings } from './model-registry-settings'
-import { RemoteHostsSettings } from './remote-hosts-settings'
-import { ServerEndpointSettings } from './server-endpoint-settings'
-import { ShortcutSettings } from './shortcut-settings'
-import { SupportSettings } from './support-settings'
-import { WorktreeSettings } from './worktree-settings'
+import { settingsSectionLoaders } from './settings-section-loaders'
 
-const SECTION_MAP: Record<string, React.ComponentType> = {
-  appearance: AppearanceSettings,
-  providers: AgentRuntimeSettings,
-  registry: ModelRegistrySettings,
-  agents: AgentList,
-  runtimes: RuntimesSettings,
-  chat: ChatSettings,
-  await: AwaitSettings,
-  worktrees: WorktreeSettings,
-  jarvis: JarvisSettings,
-  chronicle: ChronicleSettings,
-  remoteHosts: RemoteHostsSettings,
-  integrations: IntegrationsSettings,
-  mcpServers: McpServersSettings,
-  shortcut: ShortcutSettings,
-  serverEndpoint: ServerEndpointSettings,
-  network: ServerEndpointSettings,
-  desktop: DesktopUpdateSettings,
-  backup: DataBackupSettings,
-  downloads: ManagedResourcesPage,
-  features: FeatureSettings,
-  externalIssues: ExternalIssueSourceSettings,
-  import: ExternalWorkImportSettings,
-  support: SupportSettings,
-  about: AboutSettings,
-}
+const SECTION_MAP: Record<string, ComponentType> = Object.fromEntries(
+  Object.entries(settingsSectionLoaders).map(([section, loader]) => [section, lazy(loader)]),
+)
 
 const FIXED_HEIGHT_SECTIONS = new Set(['import', 'providers', 'agents', 'runtimes', 'integrations', 'downloads'])
 
@@ -59,7 +17,7 @@ interface SettingsContentProps {
 
 export function SettingsContent({ section }: SettingsContentProps) {
   const activeSection = !import.meta.env.DEV && (section === 'chronicle' || section === 'externalIssues') ? 'appearance' : section
-  const ActiveSection = SECTION_MAP[activeSection] ?? AppearanceSettings
+  const ActiveSection = SECTION_MAP[activeSection] ?? SECTION_MAP.appearance
   const fixedHeight = FIXED_HEIGHT_SECTIONS.has(activeSection)
   const fullBleed = activeSection === 'downloads'
 
@@ -72,7 +30,9 @@ export function SettingsContent({ section }: SettingsContentProps) {
           fixedHeight ? 'overflow-hidden' : 'overflow-y-auto pb-10',
         )}
       >
-        <ActiveSection />
+        <Suspense fallback={<div className="h-full w-full animate-pulse rounded-lg bg-muted/30" />}>
+          <ActiveSection />
+        </Suspense>
       </div>
     </div>
   )

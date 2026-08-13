@@ -142,7 +142,13 @@ try {
   const beforeOnboardingState = await capturePageState(page)
   console.log(`[packaged-e2e] before onboarding: ${JSON.stringify(beforeOnboardingState, null, 2)}`)
   if (!beforeOnboardingState.hasHomeDashboard && !beforeOnboardingState.hasAppSidebar) {
-    await page.keyboard.press('Enter')
+    const onboarding = page.locator('[data-testid="onboarding-page"]')
+    if (await onboarding.isVisible().catch(() => false)) {
+      await onboarding.click()
+    }
+    else {
+      await page.keyboard.press('Enter')
+    }
   }
   await waitForReadyAppContent(page, 60_000)
 

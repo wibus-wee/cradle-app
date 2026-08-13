@@ -4,12 +4,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  chatMessagePayloads,
   chronicleKnowledgeCards,
   chronicleMemories,
   providerTargets,
   sessions,
   workspaces,
 } from '@cradle/db'
+import { eq, sql } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
@@ -103,6 +105,17 @@ describe('search capability', () => {
         },
       ])
 
+      expect(d.all<{ messageId: string }>(sql`
+        SELECT message_id AS messageId FROM messages_fts ORDER BY message_id
+      `).map(row => row.messageId)).toEqual([
+        assistantMessageId,
+        userMessageOneId,
+        userMessageTwoId,
+      ].sort())
+      expect(d.all<{ sessionId: string }>(sql`
+        SELECT session_id AS sessionId FROM sessions_fts ORDER BY session_id
+      `).map(row => row.sessionId)).toEqual([sessionOneId, sessionTwoId].sort())
+
       const assistantSearch = await app.handle(new Request('http://localhost/search/threads?query=assistant%20solved'))
       expect(assistantSearch.status).toBe(200)
       const assistantHits = await assistantSearch.json()
@@ -114,9 +127,27 @@ describe('search capability', () => {
         sessionTitle: 'Alpha deployment',
       }))
       expect(assistantHits[0].snippets).toEqual([
-        expect.objectContaining({ messageRole: 'assistant' }),
+        expect.objectContaining({
+          messageRole: 'assistant',
+          messageId: assistantMessageId,
+          createdAt: now + 1,
+        }),
       ])
       expect(assistantHits[0].snippets[0].text).toContain('assistant solved')
+
+      d.update(chatMessagePayloads)
+        .set({ content: 'assistant resolved the refreshed search sentinel' })
+        .where(eq(chatMessagePayloads.id, assistantMessageId))
+        .run()
+      const refreshedSearch = await app.handle(
+        new Request('http://localhost/search/threads?query=refreshed%20search%20sentinel'),
+      )
+      expect(await refreshedSearch.json()).toEqual([
+        expect.objectContaining({
+          sessionId: sessionOneId,
+          snippets: [expect.objectContaining({ messageId: assistantMessageId })],
+        }),
+      ])
 
       const titleScoped = await app.handle(new Request(`http://localhost/search/threads?query=deployment&workspaceId=${encodeURIComponent(workspaceOneId)}`))
       expect(titleScoped.status).toBe(200)
@@ -128,14 +159,31 @@ describe('search capability', () => {
       expect(noMatchScoped.status).toBe(200)
       expect(await noMatchScoped.json()).toEqual([])
 
+      d.update(sessions)
+        .set({ title: 'Renamed search sentinel' })
+        .where(eq(sessions.id, sessionOneId))
+        .run()
+      const renamedTitleSearch = await app.handle(
+        new Request('http://localhost/search/threads?query=renamed%20search%20sentinel'),
+      )
+      expect(await renamedTitleSearch.json()).toEqual([
+        expect.objectContaining({
+          sessionId: sessionOneId,
+          sessionTitle: 'Renamed search sentinel',
+          snippets: [],
+        }),
+      ])
+
       const deleteRes = await app.handle(new Request(`http://localhost/sessions/${sessionOneId}`, {
         method: 'DELETE',
       }))
       expect(deleteRes.status).toBe(200)
 
-      const afterDeleteSearch = await app.handle(new Request('http://localhost/search/threads?query=assistant%20solved'))
+      const afterDeleteSearch = await app.handle(new Request('http://localhost/search/threads?query=refreshed%20search%20sentinel'))
       expect(afterDeleteSearch.status).toBe(200)
       expect(await afterDeleteSearch.json()).toEqual([])
+      expect(d.all(sql`SELECT session_id FROM sessions_fts WHERE session_id = ${sessionOneId}`)).toEqual([])
+      expect(d.all(sql`SELECT message_id FROM messages_fts WHERE session_id = ${sessionOneId}`)).toEqual([])
 
       const invalidQuery = await app.handle(new Request('http://localhost/search/threads?query='))
       expect(invalidQuery.status).toBe(400)

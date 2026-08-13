@@ -42,6 +42,7 @@ function initGitRepository(dir: string): void {
 
   runGit(dir, ['config', 'user.name', 'Cradle E2E'])
   runGit(dir, ['config', 'user.email', 'cradle-e2e@example.com'])
+  runGit(dir, ['config', 'commit.gpgSign', 'false'])
 }
 
 function commitFile(dir: string, fileName: string, content: string, message: string): void {

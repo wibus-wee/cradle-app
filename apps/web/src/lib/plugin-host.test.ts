@@ -1,9 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { activateWebPluginModule, deactivateWebPlugin, isWebLayerLoadable, loadWebPlugins } from './plugin-host'
+import {
+  activateWebPluginModule,
+  deactivateWebPlugin,
+  isWebLayerLoadable,
+  loadWebPlugins,
+  startPluginDevSessionWatcher,
+} from './plugin-host'
 
 const mocks = vi.hoisted(() => ({
   getPlugins: vi.fn(),
+  openServerEventSource: vi.fn(),
+  readPluginDevSessions: vi.fn(),
 }))
 
 vi.mock('~/api-gen/sdk.gen', () => ({
@@ -12,6 +20,14 @@ vi.mock('~/api-gen/sdk.gen', () => ({
 
 vi.mock('./authenticated-server-url', () => ({
   getAuthenticatedServerResourceUrl: vi.fn(),
+}))
+
+vi.mock('~/features/plugins/api/plugin-dev', () => ({
+  readPluginDevSessions: mocks.readPluginDevSessions,
+}))
+
+vi.mock('./server-transport', () => ({
+  openServerEventSource: mocks.openServerEventSource,
 }))
 
 function createLayers(webStatus: 'discovered' | 'failed') {
@@ -79,5 +95,21 @@ describe('plugin host web layer filtering', () => {
 
     expect(deactivate).toHaveBeenCalledOnce()
     expect(disposeDevelopmentStyles).toHaveBeenCalledOnce()
+  })
+
+  it('keeps startup alive when the optional development session snapshot resets', async () => {
+    const close = vi.fn()
+    mocks.readPluginDevSessions.mockRejectedValueOnce(new TypeError('fetch failed'))
+    mocks.openServerEventSource.mockReturnValueOnce({
+      close,
+      onerror: null,
+      onmessage: null,
+    })
+
+    const dispose = await startPluginDevSessionWatcher()
+
+    expect(mocks.openServerEventSource).toHaveBeenCalledOnce()
+    dispose()
+    expect(close).toHaveBeenCalledOnce()
   })
 })

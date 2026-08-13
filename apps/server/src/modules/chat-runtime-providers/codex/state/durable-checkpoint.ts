@@ -1,6 +1,6 @@
 import type { WorkspaceProviderStateSnapshot } from '../../kit/state-snapshot'
 import { readWorkspaceProviderStateSnapshot } from '../../kit/state-snapshot'
-import type { CodexThreadTokenUsage } from '../types'
+import type { CodexGoalSnapshot, CodexThreadTokenUsage } from '../types'
 
 export interface CodexNativeContextUsageCheckpoint {
   threadId: string
@@ -13,6 +13,7 @@ export interface CodexNativeContextUsageCheckpoint {
 export interface CodexDurableCheckpointState {
   durableVersion: 1
   contextUsage: CodexNativeContextUsageCheckpoint | null
+  goal?: CodexGoalSnapshot | null
 }
 
 export interface CodexDurableCheckpoint extends WorkspaceProviderStateSnapshot {
@@ -28,6 +29,7 @@ export interface DecodedCodexDurableCheckpoint {
 interface LegacyCodexCheckpointSource {
   durableVersion?: number
   contextUsage?: CodexNativeContextUsageCheckpoint | null
+  goal?: CodexGoalSnapshot | null
   compact?: {
     threadId?: string
     tokenUsage?: CodexThreadTokenUsage
@@ -51,6 +53,7 @@ export function decodeCodexDurableCheckpoint(
     codex: {
       durableVersion: 1,
       contextUsage: readCodexContextUsageCheckpoint(source.codex),
+      ...(source.codex?.goal !== undefined ? { goal: source.codex.goal } : {}),
     },
   }
   const serialized = JSON.stringify(checkpoint)

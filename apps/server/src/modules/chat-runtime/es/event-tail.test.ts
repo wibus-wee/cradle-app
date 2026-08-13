@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type { ChatSessionTailEvent } from '@cradle/chat-runtime-contracts'
-import { sessionEvents, sessions, workspaces } from '@cradle/db'
-import { describe, expect, it } from 'vitest'
+import { chatMessagePayloads, messages, sessionEvents, sessions, workspaces } from '@cradle/db'
+import { describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../../../infra'
 import { subscribeChatRunActivity } from './activity-tail'
@@ -13,6 +13,10 @@ import {
   openSessionEventTailStream,
   openTailStream,
   publishSessionTailEvents,
+  readGlobalSessionTailEvents,
+  readSessionTailEvents,
+  readTailStreamBufferLimits,
+  subscribeChatGlobalSessionTail,
   subscribeChatSessionTail,
   toChatSessionTailEvent,
 } from './event-tail'
@@ -289,6 +293,214 @@ describe('chat session event tail', () => {
         },
       })
     })
+  })
+
+  it('reads global message events from headers without hydrating missing message payloads', async () => {
+    await withTempDataDir(() => {
+      const sessionId = 'session-global-header-only'
+      seedSession(sessionId)
+      db()
+        .insert(sessionEvents)
+        .values({
+          aggregateId: sessionId,
+          aggregateType: 'ChatSession',
+          version: 1,
+          eventType: 'UserMessageAppended',
+          payload: JSON.stringify({
+            v: 4,
+            message: {
+              id: 'missing-message-payload',
+              sessionId,
+              payloadId: 'does-not-exist',
+              parentMessageId: null,
+              parentToolCallId: null,
+              taskId: null,
+              depth: 0,
+              role: 'user',
+              status: 'complete',
+              createdAt: 100,
+              updatedAt: 100,
+            },
+          }),
+          occurredAt: 100,
+        })
+        .run()
+
+      expect(readGlobalSessionTailEvents({ afterSequenceId: 0 })).toEqual([
+        expect.objectContaining({
+          scope: 'sessions',
+          sessionId,
+          type: 'UserMessageAppended',
+          payload: { messageId: 'missing-message-payload' },
+        }),
+      ])
+    })
+  })
+
+  it('hydrates a scoped replay with one payload batch and one structural batch', async () => {
+    await withTempDataDir(() => {
+      const sessionId = 'session-batched-tail-hydration'
+      seedSession(sessionId)
+      const messageIds = ['user-batch-1', 'user-batch-2', 'assistant-batch-1', 'assistant-batch-2']
+      db().insert(chatMessagePayloads).values(messageIds.map((id, index) => ({
+        id,
+        sessionId,
+        content: `message ${index}`,
+        messageJson: JSON.stringify({
+          id,
+          role: id.startsWith('user') ? 'user' : 'assistant',
+          parts: [{ type: 'text', text: `message ${index}` }],
+        }),
+        errorText: null,
+        createdAt: 100 + index,
+        updatedAt: 100 + index,
+      }))).run()
+      db().insert(messages).values(messageIds.slice(2).map((id, index) => ({
+        id,
+        sessionId,
+        parentMessageId: null,
+        parentToolCallId: null,
+        taskId: null,
+        depth: 0,
+        role: 'assistant' as const,
+        status: 'complete' as const,
+        payloadId: id,
+        createdAt: 102 + index,
+        updatedAt: 102 + index,
+      }))).run()
+      db().insert(sessionEvents).values(messageIds.map((id, index) => ({
+        aggregateId: sessionId,
+        aggregateType: 'ChatSession',
+        version: index + 1,
+        eventType: index < 2 ? 'UserMessageAppended' : 'AssistantMessageCompleted',
+        payload: index < 2
+          ? JSON.stringify({
+              v: 4,
+              message: {
+                id,
+                sessionId,
+                payloadId: id,
+                parentMessageId: null,
+                parentToolCallId: null,
+                taskId: null,
+                depth: 0,
+                role: 'user',
+                status: 'complete',
+                createdAt: 100 + index,
+                updatedAt: 100 + index,
+              },
+            })
+          : JSON.stringify({
+              v: 4,
+              message: {
+                id,
+                sessionId,
+                payloadId: id,
+                status: 'complete',
+                updatedAt: 100 + index,
+              },
+            }),
+        occurredAt: 100 + index,
+      }))).run()
+
+      const selectSpy = vi.spyOn(db(), 'select')
+      try {
+        const events = readSessionTailEvents({ sessionId, afterVersion: 0 })
+        expect(events).toHaveLength(4)
+        expect(events.every(event => 'snapshot' in event.payload)).toBe(true)
+        expect(selectSpy).toHaveBeenCalledTimes(3)
+      }
+      finally {
+        selectSpy.mockRestore()
+      }
+    })
+  })
+
+  it('replaces a slow reader backlog with one terminal reconnect cursor', async () => {
+    const { maxEvents } = readTailStreamBufferLimits()
+    let publish: ((event: ChatSessionTailEvent) => void) | null = null
+    let unsubscribed = false
+    const stream = openTailStream<ChatSessionTailEvent>({
+      replay: { events: [], cursor: 0, snapshotRequired: null },
+      subscribe: (subscriber) => {
+        publish = subscriber
+        return () => {
+          unsubscribed = true
+        }
+      },
+      readCatchupReplay: () => ({ events: [], cursor: 0, snapshotRequired: null }),
+    })
+
+    for (let version = 1; version <= maxEvents + 1; version += 1) {
+      publish!({
+        scope: 'session',
+        sessionId: 'session-slow-reader',
+        sequenceId: version,
+        version,
+        type: 'TitleChanged',
+        occurredAt: 100 + version,
+        payload: { title: `Title ${version}`, titleSource: 'provider' },
+      })
+    }
+
+    const reader = stream.getReader()
+    const terminal = await reader.read()
+    expect(terminal.done).toBe(false)
+    const text = new TextDecoder().decode(terminal.value)
+    const dataLine = text.split('\n').find(line => line.startsWith('data: '))
+    expect(JSON.parse(dataLine!.slice('data: '.length))).toMatchObject({
+      sessionId: 'session-slow-reader',
+      sequenceId: maxEvents + 1,
+      version: maxEvents + 1,
+      type: 'SnapshotRequired',
+      payload: {
+        reason: 'tail_gap',
+        latestVersion: maxEvents + 1,
+        latestSequenceId: maxEvents + 1,
+      },
+    })
+    await expect(reader.read()).resolves.toEqual({ done: true, value: undefined })
+    expect(unsubscribed).toBe(true)
+  })
+
+  it('publishes header-only global message events when no session subscriber needs hydration', () => {
+    const received: unknown[] = []
+    const unsubscribe = subscribeChatGlobalSessionTail(null, event => received.push(event))
+    try {
+      publishSessionTailEvents([
+        storedEvent({
+          aggregateId: 'session-global-live-header',
+          type: 'UserMessageAppended',
+          payload: {
+            message: {
+              id: 'message-global-live',
+              sessionId: 'session-global-live-header',
+              parentMessageId: null,
+              parentToolCallId: null,
+              taskId: null,
+              depth: 0,
+              role: 'user',
+              status: 'complete',
+              content: 'must not be published',
+              messageJson: '{not valid JSON',
+              errorText: null,
+              createdAt: 100,
+              updatedAt: 100,
+            },
+          },
+        }),
+      ])
+    }
+    finally {
+      unsubscribe()
+    }
+
+    expect(received).toEqual([
+      expect.objectContaining({
+        scope: 'sessions',
+        payload: { messageId: 'message-global-live' },
+      }),
+    ])
   })
 
   it('runs catch-up replay after subscription to close the read/subscribe race', async () => {

@@ -4,7 +4,7 @@ import type { Components } from 'react-markdown'
 import { Block } from './blocks/block'
 import { StreamErrorBoundary } from './components/error-boundary'
 import type { BlockInfo } from './hooks/use-block-queue'
-import { tokenizeBlocks, useStreamQueue } from './hooks/use-block-queue'
+import { tokenizeBlocksIncremental, useStreamQueue } from './hooks/use-block-queue'
 import { useDelayedAnimated } from './hooks/use-delayed-animated'
 import type { SmoothPreset } from './hooks/use-smooth-content'
 import { useSmoothContent } from './hooks/use-smooth-content'
@@ -73,11 +73,14 @@ export const StreamdownRender = memo<StreamdownRenderProps>(({
   const fadeDuration = animPreset.fadeDuration || DEFAULT_FADE_DURATION
   const smoothed = useSmoothContent(content, streaming, preset, profilerCtx?.profiler)
   const showStreamingClass = useDelayedAnimated(streaming, animatedTailMs)
+  const tokenizationRef = useRef({ content: '', blocks: [] as BlockInfo[] })
 
   // Tokenize content into blocks with stable startOffset keys
   const blocks: BlockInfo[] = useMemo(() => {
     const patched = streaming ? patchIncomplete(smoothed) : smoothed
-    return tokenizeBlocks(patched)
+    const nextBlocks = tokenizeBlocksIncremental(patched, tokenizationRef.current)
+    tokenizationRef.current = { content: patched, blocks: nextBlocks }
+    return nextBlocks
   }, [smoothed, streaming])
 
   // Block-level state machine

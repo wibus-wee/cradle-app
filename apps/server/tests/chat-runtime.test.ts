@@ -75,6 +75,7 @@ import {
   ProviderErrors,
   ProviderRuntimeError,
 } from '../src/modules/chat-runtime/runtime-provider-types'
+import { replaceRuntimeSessionProviderCheckpoint } from '../src/modules/chat-runtime/runtime-session-checkpoint'
 import type {
   CodexAppServerInvokeInput,
   CodexAppServerInvokeResponse,
@@ -469,7 +470,7 @@ class TestCodexGoalContinuationRuntime implements ChatRuntime {
     return {
       id: input.chatSessionId,
       chatSessionId: input.chatSessionId,
-      providerTargetId: 'profile-codex-goal-auto',
+      providerTargetId: input.profile.providerTargetId,
       runtimeKind: 'codex',
       providerSessionId: 'codex-thread-goal-auto',
       providerStateSnapshot:
@@ -502,7 +503,7 @@ class TestCodexGoalContinuationRuntime implements ChatRuntime {
       throw new Error('exceeded retry limit, last status: 429 Too Many Requests')
     }
 
-    input.runtimeSession.providerStateSnapshot = JSON.stringify({
+    replaceRuntimeSessionProviderCheckpoint(input.runtimeSession, JSON.stringify({
       models: { currentModelId: null },
       codex: {
         goal: {
@@ -516,7 +517,7 @@ class TestCodexGoalContinuationRuntime implements ChatRuntime {
           updatedAt: 3,
         },
       },
-    })
+    }))
     yield { type: 'text-start', id: 'continuation-text' }
     yield { type: 'text-delta', id: 'continuation-text', delta: 'Goal continued' }
     yield { type: 'text-end', id: 'continuation-text' }
@@ -2057,8 +2058,9 @@ describe('chat runtime capability', () => {
         }),
       )
       expect(JSON.parse(binding?.backendStateSnapshot ?? '{}')).toEqual({
+        schemaVersion: 1,
         models: { currentModelId: 'codex-app-server-stream-model' },
-        appServer: { streamed: true },
+        codex: { contextUsage: null, durableVersion: 1 },
       })
     }
  finally {

@@ -378,6 +378,8 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       createChronicleManagedResourceAdapter(downloadCenterService),
       createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
     ])
+    chronicleService.startMemoryEmbeddingIndexer()
+    chronicleService.reconcileMemoryEmbeddingCandidateIndex()
     const app = await createServerContractApp({
       includeRuntimeHttpPlugins: true,
       downloadCenterService,
@@ -594,6 +596,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     name: 'chronicle-slack-sync',
     phase: 'stop',
     stop: () => chronicleService.stopSlackBackgroundSync(),
+  })
+  runtimeResources.register({
+    name: 'chronicle-embedding-indexer',
+    phase: 'drain',
+    stop: () => chronicleService.stopMemoryEmbeddingIndexer(),
   })
   runtimeResources.register({ name: 'chronicle-daemon', phase: 'stop', stop: chronicleCleanup })
   runtimeResources.register({ name: 'trace-streams', phase: 'stop', stop: shutdownTraceStreams })

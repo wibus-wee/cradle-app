@@ -19,6 +19,7 @@ import {
   chronicleKnowledgeVersions,
   chronicleMemories,
   chronicleMemoryChunks,
+  chronicleMemoryEmbeddingBuckets,
   chronicleMemoryEmbeddings,
   chronicleMemoryKeywords,
   chronicleMessages,
@@ -1083,6 +1084,13 @@ describe('chronicle module', () => {
       expect(embeddingRows).toHaveLength(1)
       expect(embeddingRows[0].modelId).toBe('chronicle-lexical')
       expect(embeddingRows[0].dimensions).toBe(64)
+      const candidateBuckets = db()
+        .select()
+        .from(chronicleMemoryEmbeddingBuckets)
+        .where(eq(chronicleMemoryEmbeddingBuckets.embeddingId, embeddingRows[0].id))
+        .all()
+      expect(candidateBuckets.length).toBeGreaterThan(0)
+      expect(candidateBuckets.length).toBeLessThanOrEqual(16)
       const indexedChunk = db().select().from(chronicleMemoryChunks).where(eq(chronicleMemoryChunks.memoryId, indexedMemory!.id)).get()
       expect(indexedChunk?.embeddingStatus).toBe('missing')
       expect(indexedChunk?.embeddingModelId).toBeNull()
@@ -1095,6 +1103,15 @@ describe('chronicle module', () => {
         })
         expect(response.status).toBe(200)
       }
+
+      // An unindexed corrupt vector must remain invisible to request-time reranking;
+      // search selects candidates from ANN/keyword indexes instead of scanning it.
+      db().run(sql`DELETE FROM chronicle_memory_embedding_buckets WHERE memory_id = (
+        SELECT id FROM chronicle_memories WHERE source_id = 'memory-noise-24'
+      )`)
+      db().run(sql`UPDATE chronicle_memory_embeddings SET vector_json = 'malformed' WHERE memory_id = (
+        SELECT id FROM chronicle_memories WHERE source_id = 'memory-noise-24'
+      )`)
 
       const searchResponse = await requestJson(app, '/chronicle/memories/search?q=TargetAlpha&limit=5')
       expect(searchResponse.status).toBe(200)
@@ -1217,9 +1234,8 @@ describe('chronicle module', () => {
       expect(fallbackChunk?.embeddingStatus).toBe('missing')
       expect(fallbackChunk?.embeddingModelId).toBeNull()
       expect(runEmbeddingBatchMock).toHaveBeenCalledWith(
-        ['chronicle embedding health probe'],
+        ['TargetAlpha'],
         join(dataDir, 'chronicle', 'models'),
-        { timeoutMs: 5_000 },
       )
       const speakerResource = resources.find(resource => resource.category === 'speaker')
       expect(speakerResource?.displayName).toBe('Speaker Diarization')

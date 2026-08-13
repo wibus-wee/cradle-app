@@ -97,7 +97,7 @@ type Message = {
 
 HTTP endpoints (Tsuki/Hono controller):
 
-- `GET /sessions?workspaceId=` → `Session[]`
+- `GET /sessions?workspaceId=&limit=&cursor=` → `{ items: Session[], nextCursor: string | null }`（默认 100，最大 200）
 - `GET /sessions/:id` → `Session`（不存在时返回 `session_not_found` / 404）
 - `POST /sessions` `{ workspaceId, title, providerTargetId?, agentId?, runtimeKind?, modelId?, id? }` → `Session`
 - `PATCH /sessions/:id` `{ title?, pinned? }` → `Session`

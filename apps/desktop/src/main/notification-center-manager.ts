@@ -1,6 +1,7 @@
 import type { BrowserWindow } from 'electron'
 import { Notification } from 'electron'
 
+import type { ChatEventTailBroker } from './chat-event-tail-broker'
 import type { ChatStreamBroker } from './chat-stream-broker'
 import { getDesktopServerAuthHeaders } from './server-process'
 
@@ -67,61 +68,74 @@ function createNativeNotification(options: Electron.NotificationConstructorOptio
 interface NotificationCenterManagerOptions {
   serverUrl: string
   chatStreamBroker: ChatStreamBroker
+  chatEventTailBroker: ChatEventTailBroker
   getMainWindow?: () => BrowserWindow | null
   fetchFn?: typeof fetch
   createNotification?: (options: Electron.NotificationConstructorOptions) => NativeNotification
-  pollIntervalMs?: number
   nowSeconds?: () => number
   platform?: NodeJS.Platform
 }
 
 const COMPLETED_RUNS_PATH = '/chat/runs/completed'
 const USER_INPUT_REQUESTS_PATH = '/desktop/user-input-requests'
-const DEFAULT_POLL_INTERVAL_MS = 3_000
+const EVENT_REFRESH_DELAY_MS = 50
+const TAIL_RECONNECT_DELAY_MS = 5_000
 const MAX_SEEN_RUN_IDS = 500
 const MAX_SEEN_USER_INPUT_REQUEST_IDS = 500
 
 export class NotificationCenterManager {
   private readonly serverUrl: string
   private readonly chatStreamBroker: ChatStreamBroker
+  private readonly chatEventTailBroker: ChatEventTailBroker
   private readonly getMainWindow: () => BrowserWindow | null
   private readonly fetchFn: typeof fetch
   private readonly createNotification: (options: Electron.NotificationConstructorOptions) => NativeNotification
-  private readonly pollIntervalMs: number
   private readonly nowSeconds: () => number
   private readonly platform: NodeJS.Platform
   private seenRunIds = new Set<string>()
   private seenUserInputRequestIds = new Set<string>()
   private activeNotifications = new Set<NativeNotification>()
-  private timer: ReturnType<typeof setInterval> | null = null
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private stopEventTail: (() => void) | null = null
   private lastFinishedAt = 0
+  private lastSequenceId = 0
   private polling = false
+  private pollRequested = false
+  private stopped = true
 
   constructor(options: NotificationCenterManagerOptions) {
     this.serverUrl = options.serverUrl
     this.chatStreamBroker = options.chatStreamBroker
+    this.chatEventTailBroker = options.chatEventTailBroker
     this.getMainWindow = options.getMainWindow ?? (() => null)
     this.fetchFn = options.fetchFn ?? fetch
     this.createNotification = options.createNotification ?? createNativeNotification
-    this.pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
     this.nowSeconds = options.nowSeconds ?? (() => Math.floor(Date.now() / 1000))
     this.platform = options.platform ?? process.platform
   }
 
   start(): void {
-    if (this.timer) {
+    if (!this.stopped) {
       return
     }
+    this.stopped = false
     this.lastFinishedAt = this.nowSeconds()
-    this.timer = setInterval(() => {
-      void this.poll()
-    }, this.pollIntervalMs)
+    void this.poll()
+    this.openEventTail()
   }
 
   stop(): void {
-    if (this.timer) {
-      clearInterval(this.timer)
-      this.timer = null
+    this.stopped = true
+    this.stopEventTail?.()
+    this.stopEventTail = null
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer)
+      this.refreshTimer = null
+    }
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
     }
     for (const notification of this.activeNotifications) {
       notification.close()
@@ -129,8 +143,73 @@ export class NotificationCenterManager {
     this.activeNotifications.clear()
   }
 
+  private openEventTail(): void {
+    if (this.stopped || this.stopEventTail) {
+      return
+    }
+    this.stopEventTail = this.chatEventTailBroker.subscribeGlobalSessionEventsListener(
+      { afterSequenceId: this.lastSequenceId },
+      {
+        onEvent: (event) => {
+          this.rememberEventCursor(event)
+          const type = readEventType(event)
+          if (
+            type === 'RunCompleted'
+            || type === 'RunFailed'
+            || type === 'RunAborted'
+            || type === 'InteractionRequested'
+            || type === 'InteractionResolved'
+            || type === 'SnapshotRequired'
+          ) {
+            this.scheduleRefresh()
+          }
+        },
+        onClosed: () => this.scheduleReconnect(),
+        onError: (message) => {
+          console.warn('[notification-center] global event tail failed:', message)
+          this.scheduleReconnect()
+        },
+      },
+    )
+  }
+
+  private scheduleRefresh(): void {
+    if (this.stopped || this.refreshTimer) {
+      return
+    }
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = null
+      void this.poll()
+    }, EVENT_REFRESH_DELAY_MS)
+  }
+
+  private scheduleReconnect(): void {
+    this.stopEventTail?.()
+    this.stopEventTail = null
+    if (this.stopped || this.reconnectTimer) {
+      return
+    }
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      this.openEventTail()
+    }, TAIL_RECONNECT_DELAY_MS)
+  }
+
+  private rememberEventCursor(event: unknown): void {
+    if (!event || typeof event !== 'object') {
+      return
+    }
+    const sequenceId = (event as { sequenceId?: unknown }).sequenceId
+    if (typeof sequenceId === 'number' && Number.isFinite(sequenceId)) {
+      this.lastSequenceId = Math.max(this.lastSequenceId, sequenceId)
+    }
+  }
+
   async poll(): Promise<void> {
     if (this.polling) {
+      if (!this.stopped) {
+        this.pollRequested = true
+      }
       return
     }
     this.polling = true
@@ -144,6 +223,10 @@ export class NotificationCenterManager {
     }
     finally {
       this.polling = false
+      if (this.pollRequested) {
+        this.pollRequested = false
+        this.scheduleRefresh()
+      }
     }
   }
 
@@ -350,4 +433,12 @@ export class NotificationCenterManager {
       ids.delete(oldest)
     }
   }
+}
+
+function readEventType(event: unknown): string | null {
+  if (!event || typeof event !== 'object') {
+    return null
+  }
+  const type = (event as { type?: unknown }).type
+  return typeof type === 'string' ? type : null
 }
