@@ -1,0 +1,7 @@
+{
+  "extends": "../../../../web/tsconfig.json",
+  "include": [
+    "renderer/**/*.ts",
+    "../../../../web/src/env.d.ts"
+  ]
+}

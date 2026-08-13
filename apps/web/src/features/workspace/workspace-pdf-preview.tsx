@@ -4,6 +4,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { useEffect, useRef, useState } from 'react'
 
 import { Spinner } from '~/components/ui/spinner'
+import { cradleFetch } from '~/lib/server-credential'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -23,7 +24,7 @@ export function WorkspacePdfPreview({ url, title }: WorkspacePdfPreviewProps) {
     setErrorText(null)
 
     async function loadPdf() {
-      const response = await fetch(url)
+      const response = await cradleFetch(url)
       if (!response.ok) {
         const text = await response.text().catch(() => '')
         throw new Error(readServerErrorMessage(text) ?? `PDF preview failed with status ${response.status}.`)

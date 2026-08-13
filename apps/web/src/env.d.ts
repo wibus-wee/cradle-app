@@ -17,17 +17,15 @@ interface ImportMeta {
 
 type DesktopServerConnectionProjection
   = | {
-    kind: 'owned-proxy'
+    kind: 'owned-ipc'
     serverUrl: string
-    rendererBaseUrl: 'cradle-server://local' | string
-    generation?: number
-    mainProxyTarget?: string
+    rendererBaseUrl: string
+    generation: number
   }
   | {
     kind: 'attached-http'
     serverUrl: string
-    rendererBaseUrl: 'cradle-server://local' | string
-    mainProxyTarget?: string
+    rendererBaseUrl: string
   }
 
 type DesktopServerStatus
@@ -121,6 +119,27 @@ interface Window {
     serverRuntime?: {
       getStatus: () => Promise<DesktopServerStatus>
       onStatusChanged: (handler: (status: DesktopServerStatus) => void) => () => void
+    }
+    serverFetch?: {
+      open: (request: {
+        requestId: string
+        generation: number
+        method: string
+        path: string
+        headers: Array<[string, string]>
+        body: Uint8Array | null
+      }) => Promise<{
+        requestId: string
+        status: number
+        statusText: string
+        headers: Array<[string, string]>
+        url: string
+      }>
+      credit: (requestId: string, credit: number) => void
+      cancel: (requestId: string) => void
+      onChunk: (handler: (event: { requestId: string, bytes: Uint8Array }) => void) => () => void
+      onClosed: (handler: (event: { requestId: string }) => void) => () => void
+      onError: (handler: (event: { requestId: string, message: string }) => void) => () => void
     }
     desktopAppBadge?: {
       setUnreadCount: (count: number) => Promise<unknown>

@@ -36,7 +36,7 @@ export interface OpenServerEventSourceOptions {
 
 /**
  * Minimal EventSource-compatible surface backed by fetch + eventsource-parser.
- * Safe on `cradle-server://` custom schemes where native EventSource is not.
+ * Uses the injected Fetch transport, including Desktop IPC mode where native EventSource cannot route.
  */
 export interface ServerEventSource {
   readonly url: string

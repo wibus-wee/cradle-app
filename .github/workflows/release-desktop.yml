@@ -517,20 +517,20 @@ jobs:
       - name: Set desktop version
         run: pnpm --filter @cradle/desktop run set-version ${{ needs.resolve.outputs.desktop_version }}
 
-      - name: Run packaged M0 custom-scheme gate
-        run: pnpm --filter @cradle/desktop m0:custom-scheme:packaged
+      - name: Run packaged Server fetch smoke
+        run: pnpm --filter @cradle/desktop smoke:server-fetch:packaged
 
-      - name: Upload Windows M0 evidence
+      - name: Upload Windows Server fetch smoke evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-win-x64-m0-${{ github.run_id }}
+          name: desktop-win-x64-server-fetch-smoke-${{ github.run_id }}
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 7
           path: |
-            apps/desktop/.m0-results/**
-            apps/desktop/release/m0/builder-effective-config.yaml
+            apps/desktop/.server-fetch-smoke/**
+            apps/desktop/release/server-fetch-smoke/builder-effective-config.yaml
 
       - name: Build Windows desktop runtime and app bundles
         env:

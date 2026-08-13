@@ -116,6 +116,15 @@ WebSocket ticket；custom-scheme 模式的 image/PDF/plugin module 直接走 sch
 交付顺序改为独立 replan → M0 fixture + packaged CI gate → Main transport/scheme → Main/Web
 migration + bearer removal → ratchet/stress；M0 前不得接入生产 routing。
 
+2026-08-13 在 PR #163 head `2b372814` 上补充 Plan 075，作为 Plan 063
+`FAILED / ARCHITECTURE STOP` 之后的独立 successor：不绑本地 TLS，不复活 custom scheme，
+也不自研 socket transport。生成 OpenAPI Client 继续使用标准 Fetch 接口，但 Desktop owned
+mode 的 `cradleFetch` 经 Electron IPC 交给 Main，由可配置 Undici pool 请求现有 localhost
+HTTP Server。response head 先返回，body 按 Renderer pull credit 以不超过 64 KiB 的 chunk
+流送；Web/remote/attached 请求仍用 native Fetch，PTY 与 `/sync` 保持票据化 WebSocket。
+首个实现与真实 localhost 21 并发测试、类型检查及 Electron production bundle 已通过；仍需
+完成 raw fetch 清单、bearer 移除与 packaged main+20 Tearoff smoke。
+
 2026-07-26 在 commit `cc3facef` 上补充 Plans 065-069：Claude Agent SDK 集成正确性系列，
 源自对该 provider 的完整审查（advisor 会话转录）。065 修权限启动竞态、dispose 未接线、
 getPresentation 子进程风暴与 snapshot 无界数组；066 让长生命周期 Query 成为历史与配置的
@@ -245,6 +254,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 073  | Cradle Platform Constitution — Jarvis as Agent Kind | P0 | — | 061, 062 (conceptual) | FINAL — awaiting human accept / amend / reject (direction only; not an implementation plan) |
 | 073  | Provider first-class identity + dual-endpoint platform (no Kimi OAuth) | P1 | XL | — | TODO |
 | 074  | Bound Codex runtime state, native Context Usage, and shared-host pressure | P0 | XL | 052 | DONE (scoped implementation/tests pass; repository typechecks remain red on unrelated plugin-SDK drift) |
+| 075  | Route Desktop Server fetch through Electron Main | P0 | L | 063 STOP; existing Desktop Server lifecycle | IN PROGRESS (core carrier and 21-request proof pass; coverage and packaged smoke remain) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 

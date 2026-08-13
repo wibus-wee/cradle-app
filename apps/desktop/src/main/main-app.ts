@@ -81,6 +81,7 @@ import {
   syncAllDesktopLayerSources,
 } from './plugin-source-sync'
 import { QuitGuard } from './quit-guard'
+import { DesktopServerFetchBroker } from './server-fetch-broker'
 import {
   getDesktopServerAuthHeaders,
   getDesktopServerAuthToken,
@@ -102,6 +103,7 @@ let macBridgeManager: MacBridgeManager | null = null
 let chatStreamBroker: ChatStreamBroker | null = null
 let chatEventTailBroker: ChatEventTailBroker | null = null
 let stopPluginDevSessionSync: (() => void) | null = null
+let desktopServerGeneration = 0
 
 let notificationCenterManager: NotificationCenterManager | null = null
 let isQuitting = false
@@ -121,6 +123,12 @@ const pendingPluginInstallUrls: string[] = []
 let canProcessOpenWorkspaceLinks = false
 const pendingOpenWorkspaceUrls: string[] = []
 const browserManager = new DesktopBrowserManager()
+const serverFetchBroker = new DesktopServerFetchBroker({
+  isAllowedSender: sender => BrowserWindow.getAllWindows().some(
+    window => !window.isDestroyed() && window.webContents.id === sender.id,
+  ),
+  readAuthHeaders: getDesktopServerAuthHeaders,
+})
 let desktopServerStatus: DesktopServerStatus = { state: 'starting' }
 let desktopServerBootstrapSnapshot: DesktopServerBootstrapSnapshot | null = null
 
@@ -162,6 +170,7 @@ setDesktopRuntimeDiagnosticsProvider(async () => ({
   browser: browserManager.getPerformanceSnapshot(),
   chatEventTail: chatEventTailBroker?.diagnostics() ?? null,
   chatStream: chatStreamBroker?.diagnostics() ?? null,
+  serverFetch: serverFetchBroker.diagnostics(),
   renderers: await readRendererRuntimeDiagnostics(),
 }))
 
@@ -509,6 +518,7 @@ async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): 
   await macBridgeManager?.stop()
   macBridgeManager = null
   await deactivateDesktopPlugins()
+  await serverFetchBroker.close()
   await stopServer()
 }
 
@@ -633,6 +643,8 @@ async function syncDesktopPreferencesFromServer(serverUrl: string): Promise<void
 }
 
 function initializeDesktopServicesForServer(serverUrl: string): void {
+  desktopServerGeneration += 1
+  serverFetchBroker.setServerUrl(serverUrl, desktopServerGeneration)
   setPluginSourceSyncServerUrl(serverUrl)
   bindDesktopObservabilityServerUrl(serverUrl)
   startDesktopResourceReporting()
@@ -685,6 +697,7 @@ export async function startDesktopApp(): Promise<void> {
   registerProcessShutdownHandlers()
   registerPluginInstallProtocol()
   registerBrowserIpcHandlers(ipcMain, browserManager)
+  serverFetchBroker.register(ipcMain)
   initializeIpcDevtool()
   browserManager.subscribe((state) => {
     for (const window of BrowserWindow.getAllWindows()) {
@@ -875,6 +888,12 @@ export async function startDesktopApp(): Promise<void> {
             state: 'ready',
             serverUrl,
             bootstrap: desktopServerBootstrapSnapshot ?? createDesktopServerBootstrapSnapshot(),
+            connection: {
+              kind: 'owned-ipc',
+              serverUrl,
+              rendererBaseUrl: serverUrl,
+              generation: desktopServerGeneration,
+            },
           })
         }
  catch (error) {

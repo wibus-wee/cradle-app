@@ -70,7 +70,8 @@
 - **Planned at**: commit `598007aa`, 2026-07-23
 - **Revalidated at**: commit `d40f895e`, 2026-08-13
 - **Architecture rewrite**: 2026-08-02 (custom-scheme + undici proxy; IPC framing deleted)
-- **Execution state**: M0 executed and failed; **ARCHITECTURE STOP**; M1–M7 prohibited, M5 scaffold left unchanged
+- **Execution state**: M0 executed and failed; **ARCHITECTURE STOP**; M1–M7 prohibited.
+  Plan 075 later replaced the architecture and removed this plan's obsolete custom-scheme fixture.
 
 ### 2026-08-13 current-state baseline
 

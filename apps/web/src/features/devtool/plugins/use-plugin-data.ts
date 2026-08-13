@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { getServerUrl } from '~/lib/electron'
 import { usePluginStore } from '~/lib/plugin-store'
+import { cradleFetch } from '~/lib/server-credential'
 
 export interface PluginInfo {
   identity?: string
@@ -58,7 +59,7 @@ export function usePluginData() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${getServerUrl()}/api/plugins`)
+      const res = await cradleFetch(`${getServerUrl()}/api/plugins`)
       if (!res.ok) {
         throw new Error(`${res.status} ${res.statusText}`)
       }

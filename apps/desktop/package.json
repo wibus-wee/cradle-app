@@ -24,7 +24,7 @@
     "rebuild:sparkle": "node scripts/rebuild-sparkle.mjs",
     "record:appshot-parity": "node scripts/record-appshot-parity.mjs",
     "set-version": "node scripts/set-version.mjs",
-    "pack": "pnpm build && electron-builder --config electron-builder.mjs --dir && pnpm m0:custom-scheme:packaged",
+    "pack": "pnpm build && electron-builder --config electron-builder.mjs --dir",
     "verify:macos-distribution-credentials": "node scripts/verify-macos-distribution-credentials.mjs",
     "dist": "pnpm build && electron-builder --config electron-builder.mjs",
     "dist:publish": "pnpm build && electron-builder --config electron-builder.mjs --publish always",
@@ -36,12 +36,11 @@
     "generate:linux-update-manifest": "node scripts/generate-linux-update-manifest.mjs",
     "verify:linux-release": "node scripts/verify-linux-release.mjs",
     "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json",
-    "m0:custom-scheme:prepare": "pnpm --filter @cradle/system-info build && node src/main/desktop-server-transport/fixtures/m0/prepare-real-plugin.mjs",
-    "m0:custom-scheme:build": "pnpm m0:custom-scheme:prepare && electron-vite build --config src/main/desktop-server-transport/fixtures/m0/electron.vite.config.ts",
-    "m0:custom-scheme:dev": "node src/main/desktop-server-transport/fixtures/m0/run-m0.mjs --mode development",
-    "m0:custom-scheme:pack": "pnpm m0:custom-scheme:build && electron-builder --config src/main/desktop-server-transport/fixtures/m0/electron-builder.mjs --dir --publish never",
-    "m0:custom-scheme:packaged": "pnpm m0:custom-scheme:pack && node src/main/desktop-server-transport/fixtures/m0/run-m0.mjs --mode packaged",
-    "m0:custom-scheme:gate": "pnpm m0:custom-scheme:dev && pnpm m0:custom-scheme:packaged"
+    "smoke:server-fetch:build": "tsc --noEmit -p src/main/server-fetch-smoke/tsconfig.renderer.json && electron-vite build --config src/main/server-fetch-smoke/electron.vite.config.ts",
+    "smoke:server-fetch:development": "pnpm smoke:server-fetch:build && node src/main/server-fetch-smoke/run-smoke.mjs --mode development",
+    "smoke:server-fetch:pack": "pnpm smoke:server-fetch:build && electron-builder --config src/main/server-fetch-smoke/electron-builder.mjs --dir --publish never",
+    "smoke:server-fetch:packaged": "pnpm smoke:server-fetch:pack && node src/main/server-fetch-smoke/run-smoke.mjs --mode packaged",
+    "smoke:server-fetch:gate": "pnpm smoke:server-fetch:development && pnpm smoke:server-fetch:packaged"
   },
   "dependencies": {
     "@cradle/browser-use": "workspace:*",

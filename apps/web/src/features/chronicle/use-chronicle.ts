@@ -13,6 +13,7 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import { postSecrets, putChronicleConfig } from '~/api-gen/sdk.gen'
 import { getServerUrl } from '~/lib/electron'
+import { cradleFetch } from '~/lib/server-credential'
 
 export interface ChronicleConfig {
   profileId: string
@@ -943,7 +944,7 @@ function toResourceState(
 }
 
 async function requestChronicleJson(path: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(`${getServerUrl()}${path}`, init)
+  const response = await cradleFetch(`${getServerUrl()}${path}`, init)
   if (!response.ok) {
     throw new Error(`Chronicle request failed: ${response.status}`)
   }

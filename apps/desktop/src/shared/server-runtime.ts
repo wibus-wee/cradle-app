@@ -39,11 +39,23 @@ export interface DesktopServerBootstrapPhaseReport {
   error?: string
 }
 
+export interface DesktopServerConnectionProjection {
+  kind: 'owned-ipc'
+  serverUrl: string
+  rendererBaseUrl: string
+  generation: number
+}
+
 export type DesktopServerStatus
   = | { state: 'starting' }
     | { state: 'migrating', phase: string }
     | { state: 'bootstrapping', bootstrap: DesktopServerBootstrapSnapshot }
-    | { state: 'ready', serverUrl: string, bootstrap: DesktopServerBootstrapSnapshot }
+    | {
+      state: 'ready'
+      serverUrl: string
+      bootstrap: DesktopServerBootstrapSnapshot
+      connection: DesktopServerConnectionProjection
+    }
     | { state: 'failed', message: string, bootstrap: DesktopServerBootstrapSnapshot | null }
 
 export function createDesktopServerBootstrapSnapshot(
