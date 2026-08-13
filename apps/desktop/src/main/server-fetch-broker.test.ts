@@ -27,7 +27,7 @@ afterEach(async () => {
 })
 
 describe('desktop server fetch broker', () => {
-  it('injects Main credentials and advances a bounded response only with renderer credit', async () => {
+  it('strips renderer credentials and advances a bounded response only with renderer credit', async () => {
     const bytes = new Uint8Array(DESKTOP_SERVER_FETCH_CHUNK_BYTES + 17).fill(7)
     const fetchFn = vi.fn(async (_url: URL, _init: RequestInit) => new Response(
       new ReadableStream<Uint8Array>({
@@ -60,7 +60,6 @@ describe('desktop server fetch broker', () => {
     const broker = new DesktopServerFetchBroker({
       fetchFn: fetchFn as never,
       isAllowedSender: candidate => candidate.id === sender.id,
-      readAuthHeaders: () => ({ authorization: 'Bearer main-owned-token' }),
     })
     brokers.push(broker)
     broker.register(ipcMain as never)
@@ -88,7 +87,7 @@ describe('desktop server fetch broker', () => {
     expect(sender.send).not.toHaveBeenCalled()
     const [target, init] = fetchFn.mock.calls[0]!
     expect(target.toString()).toBe('http://127.0.0.1:21423/sessions?limit=2')
-    expect(new Headers(init.headers).get('authorization')).toBe('Bearer main-owned-token')
+    expect(new Headers(init.headers).has('authorization')).toBe(false)
     expect(init.redirect).toBe('error')
 
     listeners.get(DESKTOP_SERVER_FETCH_CREDIT_CHANNEL)!({ sender }, 'request-1', 1)
@@ -132,7 +131,6 @@ describe('desktop server fetch broker', () => {
     }
     const broker = new DesktopServerFetchBroker({
       isAllowedSender: () => true,
-      readAuthHeaders: () => ({ authorization: 'Bearer main-owned-token' }),
     })
     brokers.push(broker)
     broker.register(ipcMain as never)
@@ -183,7 +181,6 @@ describe('desktop server fetch broker', () => {
     const broker = new DesktopServerFetchBroker({
       fetchFn: fetchFn as never,
       isAllowedSender: () => true,
-      readAuthHeaders: () => ({ authorization: 'Bearer main-owned-token' }),
     })
     brokers.push(broker)
     broker.register(ipcMain as never)
@@ -219,7 +216,6 @@ describe('desktop server fetch broker', () => {
     const broker = new DesktopServerFetchBroker({
       fetchFn: fetchFn as never,
       isAllowedSender: () => true,
-      readAuthHeaders: () => ({ authorization: 'Bearer main-owned-token' }),
     })
     brokers.push(broker)
     broker.register({
@@ -271,7 +267,6 @@ describe('desktop server fetch broker', () => {
     const broker = new DesktopServerFetchBroker({
       fetchFn: fetchFn as never,
       isAllowedSender: () => true,
-      readAuthHeaders: () => ({ authorization: 'Bearer main-owned-token' }),
     })
     brokers.push(broker)
     broker.register({

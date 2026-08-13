@@ -4,6 +4,7 @@ import type { FileUIPart, UIMessage } from 'ai'
 
 import { AppError } from '../../../errors/app-error'
 import type { RuntimeKind } from '../../provider-contracts/types'
+import { ensureProviderTargetReadyForRuntime } from '../../provider-targets/service'
 import { getRuntimeRegistry } from '../chat-runtime-provider-registry'
 import type { ChatContextPart } from '../context-parts'
 import { cancelQueuedSessionItem } from '../es/commands'
@@ -135,7 +136,7 @@ export async function createRun(
     }
 
     const requestedProviderTargetId = input.providerTargetId
-    const context = getSessionRunContext(input.sessionId, {
+    let context = getSessionRunContext(input.sessionId, {
       providerTargetId: requestedProviderTargetId,
     })
     if (!context) {
@@ -184,6 +185,21 @@ export async function createRun(
             session: context.session,
             requestedProviderTargetId,
           })
+    if (context.providerTarget) {
+      await ensureProviderTargetReadyForRuntime(context.providerTarget, runtimeKind)
+      const routedContext = getSessionRunContext(input.sessionId, {
+        providerTargetId: requestedProviderTargetId,
+        modelId: requestedModelId,
+      })
+      if (!routedContext) {
+        throw new AppError({
+          code: 'chat_provider_target_not_available',
+          status: 409,
+          message: 'Provider target is no longer available',
+        })
+      }
+      context = assertRuntimeCompatibleTarget(routedContext, requestedProviderTargetId)
+    }
     const requestedThinkingEffort
       = input.thinkingEffort
         ?? readSessionRequestedThinkingEffort({
@@ -387,8 +403,10 @@ export async function createRun(
       message: await projectProviderInputMessage(draft.userMessage),
       profile: context.profile,
       modelId:
-        requestedModelId !== undefined
-          ? requestedModelId
+        context.effectiveModelId !== null
+          ? context.effectiveModelId
+          : requestedModelId !== undefined
+            ? requestedModelId
           : (runtimeResolution.requestedModelId ?? undefined),
       reviewTarget: input.reviewTarget,
       thinkingEffort: requestedThinkingEffort,

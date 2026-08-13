@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto'
 
-import { agentCredentials } from '@cradle/db'
-import { asc, eq } from 'drizzle-orm'
+import { agentCredentials, providerExtensionBindings, providerTargets } from '@cradle/db'
+import { and, asc, eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
@@ -225,6 +225,24 @@ function ensureConfigured(): void {
   }
 }
 
+function assertHostOwnsCredential(id: string): void {
+  const target = db().select({ id: providerTargets.id }).from(providerTargets).where(eq(providerTargets.credentialRef, id)).get()
+  const leased = target
+    ? db().select({ id: providerExtensionBindings.id }).from(providerExtensionBindings).where(and(
+        eq(providerExtensionBindings.providerTargetId, target.id),
+        eq(providerExtensionBindings.credentialOwner, 'extension'),
+      )).get()
+    : null
+  if (leased) {
+    throw new AppError({
+      code: 'credential_leased_to_provider_extension',
+      status: 409,
+      message: 'Credential is temporarily owned by an enabled Provider extension',
+      details: { id },
+    })
+  }
+}
+
 // ── public API ──
 
 export function saveSecret(input: SaveSecretInput): SecretMetadata {
@@ -313,10 +331,12 @@ export function upsertSecretInDb(database: ReturnType<typeof db>, input: UpsertS
 }
 
 export function upsertSecret(input: UpsertSecretInput): SecretMetadata {
+  assertHostOwnsCredential(input.id)
   return upsertSecretInDb(db(), input)
 }
 
 export function updateSecretValue(id: string, secret: string): void {
+  assertHostOwnsCredential(id)
   ensureConfigured()
   const keyVersion = readActiveCredentialKey().version
   const encryptedSecret = encrypt(secret)
@@ -336,6 +356,7 @@ export function updateSecretValue(id: string, secret: string): void {
 }
 
 export function removeSecret(id: string): void {
+  assertHostOwnsCredential(id)
   db().delete(agentCredentials).where(eq(agentCredentials.id, id)).run()
 }
 
@@ -375,6 +396,7 @@ export function listSecrets(): SecretMetadata[] {
 }
 
 export function readSecret(id: string): string {
+  assertHostOwnsCredential(id)
   ensureConfigured()
   const secret = db().select().from(agentCredentials).where(eq(agentCredentials.id, id)).get()
   if (!secret) {
@@ -389,6 +411,7 @@ export function readSecret(id: string): string {
 }
 
 export function readSecretValueWithMetadata(id: string): SecretValueWithMetadata {
+  assertHostOwnsCredential(id)
   ensureConfigured()
   const secret = db().select().from(agentCredentials).where(eq(agentCredentials.id, id)).get()
   if (!secret) {

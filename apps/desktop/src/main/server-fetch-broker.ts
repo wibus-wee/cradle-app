@@ -62,13 +62,11 @@ type ServerFetch = typeof undiciFetch
 interface DesktopServerFetchBrokerOptions {
   fetchFn?: ServerFetch
   isAllowedSender: (sender: WebContents) => boolean
-  readAuthHeaders: () => HeadersInit
 }
 
 export class DesktopServerFetchBroker {
   private readonly fetchFn: ServerFetch
   private readonly isAllowedSender: (sender: WebContents) => boolean
-  private readonly readAuthHeaders: () => HeadersInit
   private readonly finiteDispatcher = new Agent({ connections: 128, pipelining: 1 })
   private readonly streamDispatcher = new Agent({ connections: 256, pipelining: 1 })
   private readonly active = new Map<string, ActiveRequest>()
@@ -79,7 +77,6 @@ export class DesktopServerFetchBroker {
   constructor(options: DesktopServerFetchBrokerOptions) {
     this.fetchFn = options.fetchFn ?? undiciFetch
     this.isAllowedSender = options.isAllowedSender
-    this.readAuthHeaders = options.readAuthHeaders
   }
 
   register(ipcMain: IpcMain): void {
@@ -175,7 +172,6 @@ export class DesktopServerFetchBroker {
 
     const controller = new AbortController()
     const headers = sanitizeRequestHeaders(request.headers)
-    new Headers(this.readAuthHeaders()).forEach((value, name) => headers.set(name, value))
     const active: ActiveRequest = {
       key,
       requestId: request.requestId,
@@ -201,7 +197,7 @@ export class DesktopServerFetchBroker {
           ? this.streamDispatcher
           : this.finiteDispatcher,
         // The broker is authority for exactly one Desktop-owned origin. Never let
-        // an authenticated request follow a redirect to another origin.
+        // a request escape that origin through an upstream redirect.
         redirect: 'error',
         signal: controller.signal,
       })

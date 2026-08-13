@@ -69,18 +69,13 @@ describe('server config', () => {
   )
 
   it.each(['0.0.0.0', '::', '192.168.1.20', 'cradle.internal'])(
-    'requires a configured token for the non-loopback bind host %s',
+    'does not enable authentication from the non-loopback bind host %s',
     (host) => {
       expect(isLoopbackBindHost(host)).toBe(false)
-      expect(() => loadServerConfig({
-        CRADLE_DATA_DIR: '/tmp/cradle-data',
-        CRADLE_HOST: host,
-      })).toThrow(/CRADLE_AUTH_TOKEN is required/)
       expect(loadServerConfig({
-        CRADLE_AUTH_TOKEN: 'network-token',
         CRADLE_DATA_DIR: '/tmp/cradle-data',
         CRADLE_HOST: host,
-      }).authRequired).toBe(true)
+      }).authRequired).toBe(false)
     },
   )
 })

@@ -47,7 +47,7 @@ import {
   AgentRuntimeConfigSchema,
 } from '~/features/agent-runtime/agent-config-schema'
 import { buildAvatarUrl } from '~/features/agent-runtime/avatar-url'
-import { runtimeSupportsProviderKind } from '~/features/agent-runtime/runtime-compatibility'
+import { runtimeSupportsAnyProviderKind } from '~/features/agent-runtime/runtime-compatibility'
 import type { RuntimeSelectorOption } from '~/features/agent-runtime/runtime-selector'
 import {
   RuntimeSelector,
@@ -451,7 +451,7 @@ function listSelectableProviderTargets(
   return providerTargets.filter(
     target =>
       target.enabled
-      && runtimeSupportsProviderKind(runtimeKind, target.providerKind, runtimeCatalog),
+      && runtimeSupportsAnyProviderKind(runtimeKind, target.effectiveProviderKinds, runtimeCatalog),
   )
 }
 

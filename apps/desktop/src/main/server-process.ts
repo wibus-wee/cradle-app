@@ -46,7 +46,6 @@ const LOGIN_SHELL_PATH_TIMEOUT_MS = 1500
 const SHELL_PATH_MARKER_START = '__CRADLE_SHELL_PATH_START__'
 const SHELL_PATH_MARKER_END = '__CRADLE_SHELL_PATH_END__'
 const CREDENTIAL_SECRET_FILE = 'credential-secret'
-const SERVER_AUTH_TOKEN_FILE = 'server-auth-token'
 const CODEX_APP_SERVER_PATH_ENV = 'CRADLE_CODEX_APP_SERVER_PATH'
 const SAFE_STORAGE_PREFIX = 'v1-safe:'
 const PLAIN_STORAGE_PREFIX = 'v1-plain:'
@@ -115,7 +114,6 @@ const DesktopServerAccessModeSchema = z
   })
   .passthrough()
 let currentServerUrl = ''
-let currentServerAuthToken = ''
 const recentServerOutputLines: string[] = []
 
 interface DesktopServerExitExpectation {
@@ -182,7 +180,6 @@ export async function startServer(
 
   const dataDir = getDesktopDataDirectoryState().serverDataRoot
   const credentialSecret = resolveDesktopCredentialSecret(dataDir)
-  currentServerAuthToken = getDesktopServerAuthToken()
   const existingServer = await readHealthyLocatedServerUrl(app.getPath('userData'))
   if (existingServer) {
     currentServerUrl = existingServer.serverUrl
@@ -206,7 +203,6 @@ export async function startServer(
     port,
     dataDir,
     credentialSecret,
-    serverAuthToken: currentServerAuthToken,
     bootstrapWatchdog,
     onBootstrapEvent: (event) => {
       bootstrapSnapshot = applyServerBootstrapEvent(bootstrapSnapshot, event)
@@ -276,11 +272,10 @@ async function spawnServer(opts: {
   port: number
   dataDir: string
   credentialSecret: string
-  serverAuthToken: string
   bootstrapWatchdog?: ServerBootstrapWatchdog
   onBootstrapEvent?: (event: ServerBootstrapEvent) => void
 }): Promise<void> {
-  const { host, port, dataDir, credentialSecret, serverAuthToken } = opts
+  const { host, port, dataDir, credentialSecret } = opts
 
   // In dev, use tsx to run the TS source directly
   // In production, run the compiled server entry
@@ -311,8 +306,6 @@ async function spawnServer(opts: {
     CRADLE_DATA_DIR: dataDir,
     CRADLE_VERSION: app.getVersion(),
     CRADLE_CREDENTIAL_SECRET: credentialSecret,
-    // Non-loopback binds (network access mode) require this; local mode also uses it for auth.
-    CRADLE_AUTH_TOKEN: serverAuthToken,
     CRADLE_DESKTOP_PID: String(process.pid),
     CRADLE_PLUGINS_DIR: pluginsDir,
     CRADLE_PLUGINS_SOURCE_KIND: pluginsSourceKind,
@@ -763,33 +756,6 @@ function resolveDesktopCredentialSecret(dataDir: string): string {
   return secret
 }
 
-function resolveDesktopServerAuthToken(dataDir: string): string {
-  mkdirSync(dataDir, { recursive: true })
-  const tokenPath = join(dataDir, SERVER_AUTH_TOKEN_FILE)
-  if (existsSync(tokenPath)) {
-    const token = readFileSync(tokenPath, 'utf8').trim()
-    if (token) {
-      return token
-    }
-  }
-  const token = randomBytes(32).toString('base64url')
-  writeFileSync(tokenPath, `${token}\n`, { encoding: 'utf8', mode: 0o600 })
-  return token
-}
-
-export function getDesktopServerAuthToken(): string {
-  if (!currentServerAuthToken) {
-    currentServerAuthToken = resolveDesktopServerAuthToken(
-      getDesktopDataDirectoryState().serverDataRoot,
-    )
-  }
-  return currentServerAuthToken
-}
-
-export function getDesktopServerAuthHeaders(): HeadersInit {
-  return currentServerAuthToken ? { authorization: `Bearer ${currentServerAuthToken}` } : {}
-}
-
 function readDesktopCredentialSecret(secretPath: string): string {
   const serializedSecret = readFileSync(secretPath, 'utf8').trim()
   if (serializedSecret.startsWith(SAFE_STORAGE_PREFIX)) {
@@ -1039,7 +1005,7 @@ export async function waitForServer(
       throw createServerStartupError(url, { watchdogFailure, bootstrapSnapshot })
     }
     try {
-      const res = await fetch(`${url}/health`, { headers: getDesktopServerAuthHeaders() })
+      const res = await fetch(`${url}/health`)
       if (res.ok && isBootstrapReady(bootstrapSnapshot)) {
         return
       }

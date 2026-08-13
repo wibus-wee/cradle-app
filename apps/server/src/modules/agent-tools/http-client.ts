@@ -38,11 +38,6 @@ export async function requestAgentToolJson<T>(input: {
   const headers: Record<string, string> = {
     'content-type': 'application/json',
   }
-  const authToken = process.env.CRADLE_AUTH_TOKEN?.trim()
-  if (authToken) {
-    headers['x-cradle-token'] = authToken
-  }
-
   const response = await fetch(new URL(input.path, requireServerUrl()), {
     method: 'POST',
     headers,

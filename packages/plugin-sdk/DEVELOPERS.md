@@ -10,7 +10,7 @@ The Cradle Plugin System runs across **3 runtime layers**:
 
 | Layer | Runtime | Entry Point | Capabilities |
 |-------|---------|-------------|-------------|
-| **Server** | Node.js (Elysia) | `src/server.ts` | HTTP routes, MCP servers, skills, external provider sources, external issue sources, Chat/Jarvis runtimes, activity subscriptions, KV storage |
+| **Server** | Node.js (Elysia) | `src/server.ts` | HTTP routes, MCP servers, skills, external provider sources, per-Provider extensions, external issue sources, Chat/Jarvis runtimes, activity subscriptions, KV storage |
 | **Web** | Browser (React) | `dist/web.mjs` | UI panels, commands, localStorage |
 | **Desktop** | Electron main | `src/desktop.ts` | System-level access, CDP, IPC, shared config |
 
@@ -331,7 +331,7 @@ export function activate(ctx: ServerPluginContext): void {
 }
 ```
 
-Server registrations return `Disposable` handles and are also tracked in `ctx.subscriptions`. Use namespace APIs such as `ctx.routes.register`, `ctx.mcp.registerServer`, `ctx.skills.register`, `ctx.providers.externalSources.register`, and `ctx.runtimes.register`. When `when` is asynchronous, await the result if later initialization depends on the MCP server being registered.
+Server registrations return `Disposable` handles and are also tracked in `ctx.subscriptions`. Use namespace APIs such as `ctx.routes.register`, `ctx.mcp.registerServer`, `ctx.skills.register`, `ctx.providers.externalSources.register`, `ctx.providers.extensions.register`, and `ctx.runtimes.register`. When `when` is asynchronous, await the result if later initialization depends on the MCP server being registered.
 
 **`McpServerConfig` fields:**
 
@@ -419,6 +419,96 @@ Provider source contract 的边界是：
 - 插件不拥有 provider profile 的 enabled/disabled 状态；Cradle host 负责初始启用策略和用户开关。
 - 插件不贡献 badge、button、React component、surface descriptor 或 action ref。
 - Cradle host 固定渲染 external source UI，并负责 profile read-only guard。
+
+### `ctx.providers.extensions.register(extension)` — Per-Provider Extension
+
+A Provider extension augments one existing Provider with additional runtime
+protocol kinds. The Host owns the binding, toggle, conflicts, lifecycle order,
+credential ownership, and runtime projection. The plugin owns conversion
+semantics and its external process or service. Enabling an extension must never
+create or import another Provider.
+
+Declare the runtime capability and credential permission before registering:
+
+```json
+{
+  "capabilities": [
+    {
+      "id": "provider-extension.my-converter",
+      "type": "provider-extension",
+      "layer": "server",
+      "label": "My converter",
+      "permissions": ["provider.credentials.use"]
+    }
+  ],
+  "permissions": [
+    {
+      "id": "provider.credentials.use",
+      "label": "Use credentials for explicitly enabled Providers",
+      "required": true
+    }
+  ]
+}
+```
+
+```ts
+export function activate(ctx: ServerPluginContext): void {
+  ctx.providers.extensions.register({
+    id: 'my-converter',
+    label: 'My converter',
+    conversions: [{
+      fromProviderKind: 'openai-compatible',
+      routedProviderKinds: ['anthropic'],
+      addedProviderKinds: ['anthropic'],
+    }],
+    getApplicability(target) {
+      return target.credentialKind === 'api-key'
+        ? { applicable: true, credentialStrategy: 'borrowed-static' }
+        : { applicable: false, reason: 'An API key is required.' }
+    },
+    async onEnable({ bindingId, target, sourceCredential }) {
+      const route = await converter.enable(bindingId, target, sourceCredential)
+      return {
+        providerKinds: ['anthropic'],
+        state: route.state,
+        outputCredential: route.outputCredential,
+      }
+    },
+    async onDisable({ bindingId, reason }) {
+      await converter.disable(bindingId, reason)
+    },
+    async onReconcile({ bindingId, target, sourceCredential }) {
+      return await converter.reconcile(bindingId, target, sourceCredential)
+    },
+    resolveRuntime({ activationState, publicModelId }) {
+      return {
+        providerKind: 'anthropic',
+        config: { baseUrl: activationState.baseUrl, authMode: 'apiKey' },
+        effectiveModelId: `${activationState.prefix}/${publicModelId}`,
+      }
+    },
+  })
+}
+```
+
+`getApplicability` and `resolveRuntime` are synchronous, secret-free, and
+side-effect-free. Enable, Disable, and Reconcile are awaited and serialized per
+binding. A borrowed-static source secret remains Host-owned and is valid only
+during the callback. Persist non-secret route metadata in `state`; return a
+data-plane secret through `outputCredential` so the Host encrypts it.
+
+A refreshable credential that the converter must own requires
+`credentialLease`. Prepare Acquire stages an unusable copy, Commit Acquire makes
+it usable after the Host commits extension ownership, Prepare Release stops use
+and returns the latest typed credential while retaining recovery state, and
+Commit Release deletes the copy after the Host commits the returned secret.
+Every lease callback must be idempotent by binding id and lease epoch.
+
+Plugin Disable invokes `onDisable` while registration is available, preserves
+the user's desired state, and reconciles after reactivation. Plugin uninstall
+returns leased credentials and removes bindings before plugin-owned uninstall
+cleanup runs. Lifecycle events are post-commit notifications; plugins must not
+use event listeners as a second lifecycle authority.
 
 ### `ctx.issues.externalSources.register(source)` — External Issue Source
 

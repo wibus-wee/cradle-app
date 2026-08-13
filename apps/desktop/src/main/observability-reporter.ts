@@ -1,7 +1,5 @@
 import { app, BrowserWindow } from 'electron'
 
-import { getDesktopServerAuthHeaders } from './server-process'
-
 interface DesktopObservabilityEvent {
   source: 'desktop-main'
   code: string
@@ -69,7 +67,7 @@ async function sendEvent(event: DesktopObservabilityEvent): Promise<void> {
   }
   await fetch(new URL('/observability/events', serverUrl), {
     method: 'POST',
-    headers: { ...getDesktopServerAuthHeaders(), 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(event),
   })
 }
@@ -137,7 +135,7 @@ async function sendRuntimeSample(sample: DesktopRuntimeSample): Promise<void> {
   }
   await fetch(new URL('/observability/runtime-samples', serverUrl), {
     method: 'POST',
-    headers: { ...getDesktopServerAuthHeaders(), 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(sample),
   })
 }

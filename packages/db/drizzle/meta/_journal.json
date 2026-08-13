@@ -407,6 +407,13 @@
       "when": 1786590000000,
       "tag": "0057_chronicle_embedding_candidates",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1786601689506,
+      "tag": "0058_parallel_karma",
+      "breakpoints": true
     }
   ]
 }

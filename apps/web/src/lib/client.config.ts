@@ -1,20 +1,13 @@
 import type { createConfig } from '../api-gen/client'
 import { createClient } from '../api-gen/client'
 import { getServerUrl } from './electron'
-import { cradleFetch, readServerToken } from './server-credential'
-import { isDesktopIpcProxyMode } from './server-transport/base-url'
+import { cradleFetch } from './server-credential'
 
 // createClientConfig is called by the generated code to inject per-request config.
 // Return a config object that merges baseUrl into every request.
 export function createClientConfig(config: Parameters<typeof createConfig>[0]) {
   return {
     ...config,
-    // Desktop IPC mode: Main injects credentials; do not attach renderer Bearer.
-    auth: () => (
-      isDesktopIpcProxyMode()
-        ? undefined
-        : (readServerToken() ?? undefined)
-    ),
     baseUrl: getServerUrl(),
     fetch: cradleFetch,
     throwOnError: true,

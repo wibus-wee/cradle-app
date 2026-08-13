@@ -7,21 +7,11 @@ import {
 } from './server-transport/base-url'
 import { desktopIpcFetch, isDesktopIpcFetchAvailable } from './server-transport/desktop-ipc-fetch'
 
-let browserServerToken: string | null = null
-
-export function setBrowserServerToken(token: string | null): void {
-  browserServerToken = token?.trim() || null
-}
-
-export function readServerToken(): string | null {
-  return window.cradle?.env?.serverAuthToken?.trim() || browserServerToken
-}
-
 /**
  * Fetch hook for Cradle Server traffic.
  * Classifies requests against the active renderer and network Server bases. In owned Desktop
- * mode, Main injects credentials and Renderer headers are stripped. Browser/attached HTTP may
- * still attach Bearer.
+ * mode, Main owns the bounded localhost transport and Renderer credential headers are stripped.
+ * Browser/attached HTTP continues to use native Fetch.
  */
 export async function cradleFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const rendererBase = getRendererServerUrl()
@@ -66,25 +56,7 @@ export async function cradleFetch(input: RequestInfo | URL, init: RequestInit = 
     return await desktopIpcFetch(request)
   }
 
-  const token = readServerToken()
-  if (token && !headers.has('authorization')) {
-    headers.set('authorization', `Bearer ${token}`)
-  }
   return await fetch(resolvedInput, { ...init, credentials: 'include', headers })
-}
-
-export async function bootstrapBrowserAuthSession(serverUrl: string): Promise<void> {
-  // Main owns credentials in Desktop IPC mode; browser cookie bootstrap is unnecessary.
-  if (isDesktopIpcProxyMode()) {
-    return
-  }
-  if (!readServerToken()) {
-    return
-  }
-  const response = await cradleFetch(new URL('/auth/browser-session', serverUrl), { method: 'POST' })
-  if (!response.ok) {
-    throw new Error(`Failed to bootstrap browser authentication: HTTP ${response.status}`)
-  }
 }
 
 function isAlreadyOnBase(inputUrl: URL, serverBase: string): boolean {

@@ -82,12 +82,7 @@ import {
 } from './plugin-source-sync'
 import { QuitGuard } from './quit-guard'
 import { DesktopServerFetchBroker } from './server-fetch-broker'
-import {
-  getDesktopServerAuthHeaders,
-  getDesktopServerAuthToken,
-  startServer,
-  stopServer,
-} from './server-process'
+import { startServer, stopServer } from './server-process'
 import { TrayManager } from './tray-manager'
 import { DesktopUpdateManager } from './update-manager'
 import { WindowManager } from './window-manager'
@@ -127,7 +122,6 @@ const serverFetchBroker = new DesktopServerFetchBroker({
   isAllowedSender: sender => BrowserWindow.getAllWindows().some(
     window => !window.isDestroyed() && window.webContents.id === sender.id,
   ),
-  readAuthHeaders: getDesktopServerAuthHeaders,
 })
 let desktopServerStatus: DesktopServerStatus = { state: 'starting' }
 let desktopServerBootstrapSnapshot: DesktopServerBootstrapSnapshot | null = null
@@ -232,7 +226,6 @@ async function createMainWindow(): Promise<BrowserWindow> {
       sandbox: true,
       webviewTag: true,
       additionalArguments: [
-        `--server-auth-token=${getDesktopServerAuthToken()}`,
         `--browser-panel-preload-url=${resolveDesktopBrowserPanelPreloadUrl(__dirname)}`,
       ],
     },
@@ -608,9 +601,7 @@ async function applyAppshotHotkeyPreference(
 
 async function syncDesktopPreferencesFromServer(serverUrl: string): Promise<void> {
   try {
-    const response = await fetch(new URL('/preferences/desktop', serverUrl), {
-      headers: getDesktopServerAuthHeaders(),
-    })
+    const response = await fetch(new URL('/preferences/desktop', serverUrl))
     if (!response.ok) {
       await applyAppshotHotkeyPreference(true)
       updateManager?.configurePreferences({

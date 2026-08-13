@@ -15,6 +15,8 @@ function provider(overrides: Partial<ProviderModelOption> & Pick<ProviderModelOp
     name: overrides.name ?? overrides.id,
     kind: overrides.kind ?? 'manual',
     providerKind: overrides.providerKind ?? 'openai-compatible',
+    effectiveProviderKinds: overrides.effectiveProviderKinds
+      ?? [overrides.providerKind ?? 'openai-compatible'],
     enabled: overrides.enabled ?? true,
     iconSlug: overrides.iconSlug ?? null,
   }
@@ -84,6 +86,20 @@ describe('listSelectableComposerProfiles', () => {
       runtimes: [runtime('claude-agent', ['anthropic'])],
     }).map(item => item.id))
       .toEqual(['anthropic-provider'])
+  })
+
+  it('uses extension-projected Provider kinds without changing Provider identity', () => {
+    const profiles = [provider({
+      id: 'extended-openai-provider',
+      providerKind: 'openai-compatible',
+      effectiveProviderKinds: ['openai-compatible', 'anthropic'],
+    })]
+
+    expect(listSelectableComposerProfiles({
+      profiles,
+      runtimeKind: 'claude-agent',
+      runtimes: [runtime('claude-agent', ['anthropic'])],
+    }).map(item => item.id)).toEqual(['extended-openai-provider'])
   })
 
   it('does not fall back to a hard-coded runtime provider table', () => {

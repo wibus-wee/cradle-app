@@ -17,6 +17,18 @@ provider-owned value migration 压缩并由现有 Drizzle directory 回写；同
 stale tail replay、routing 与 dead-generation reuse 收敛成 operation-owned backpressure。
 不改 DB schema，不用 transcript/tokenizer heuristic 冒充 Codex prompt composition。
 
+2026-08-12 在 `cradle-app` commit `d40f895e` 与 `cradle-plugins` commit
+`04942ba` 上补充 Plan 075（XL）：新增 Host-owned、逐 Provider opt-in 的
+Provider Extension binding 与 awaited Enable/Disable/Reconcile lifecycle；Plugin 只声明固定
+conversion 并实现 side effect，用户不选择转换方向。CPA 是首个实现：把 API-key
+OpenAI-compatible Provider 扩展为可供 Anthropic runtime 使用，保留同一个 Provider identity，
+并通过 crash-recoverable exclusive credential lease 复用已有 Codex OAuth（无需 CPA 二次登录）。
+OAuth lease 期间 CPA 独占刷新与全部路由；关闭时两阶段归还最新 token。删除 CPA aggregate
+external Provider 与手动 OAuth/login surface，禁止 token 文件同步或双 refresh owner。
+2026-08-13 已实现并验证 API-key extension、Host 生命周期/路由/UI 与 CPA binding sidecar；
+Codex OAuth codec/两阶段 lease 已实现但按 M0 gate 保持不可启用，等待授权测试账号完成
+`7.2.130` 真实 refresh 后的 prefix/account 隔离验证，Plan 075 尚未完成。
+
 Supplemented on 2026-07-14 against commit `e3d008c` from the five-direction
 web/server architecture review. Plans 042-046 were independently audited and
 then vetted against current source; they do not reopen completed Plans 024,
@@ -255,6 +267,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 073  | Provider first-class identity + dual-endpoint platform (no Kimi OAuth) | P1 | XL | — | TODO |
 | 074  | Bound Codex runtime state, native Context Usage, and shared-host pressure | P0 | XL | 052 | DONE (scoped implementation/tests pass; repository typechecks remain red on unrelated plugin-SDK drift) |
 | 075  | Route Desktop Server fetch through Electron Main | P0 | L | 063 STOP; existing Desktop Server lifecycle | IN PROGRESS (core carrier and 21-request proof pass; coverage and packaged smoke remain) |
+| 075  | Add per-Provider extensions and make CPA the first protocol converter | P1 | XL | — (coordinate with 073 if active) | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 
@@ -377,6 +390,7 @@ splitting until this track is stable.
 - 051 follows 050 so Issue association mutations reuse the Session projection gateway. Server-side workspace invariants and participant-owned writes are mandatory before Web cache reconciliation.
 - 052 follows completed Plan 041's lifecycle ownership rules and is independent of Plans 042-051. Its internal order is mandatory: characterize isolation -> retain idle hosts -> establish the provider host/router -> move session env to thread config -> bind/resume threads -> migrate all callers -> ratchet docs/tests. Do not land a rollback-only resume patch first.
 - 074 follows completed Plan 052 and repairs its warm-host pressure, routing, and generation-lifecycle gaps while removing Codex's history-bearing snapshot. Blocked Plan 069 is precedent for the durable/live ownership boundary but is not a dependency: 074 must not use provider transcript or Cradle transcript as exact cold prompt reconstruction.
+- 075 has no functional dependency, but it overlaps Plan 073's Provider target/API/detail files. Do not execute them concurrently: reconcile 073 first if active. Its cross-repository order is Host + public SDK, SDK release, then CPA migration; do not bridge the release gap with copied private types or a committed filesystem link.
 - 054 follows completed Plans 024 and 040: chat-runtime owns the run cursor/log, while persisted Session projections remain the recovery authority when exact in-memory replay is impossible. It does not depend on unfinished Plans 044 or 050, but those plans must preserve its terminal-publication and snapshot-recovery contracts.
 - 056 consumes Plan 047's already-landed thin Download Center but adds a separate declaration/dispatch layer: Managed Resources owns catalog projection and exact-key command routing; each adapter keeps discovery, versions, installation truth, storage, activation, rollback, and uninstall; Download Center keeps bytes/cancel/resume/history. Chronicle model manifests are the first adapter. Reconcile 047's stale TODO row and execute from a clean worktree because current Server composition, Chronicle, navigation, locale, and generated-client paths overlap operator work.
 - 057 follows 056 and declares `{ opencode, runtime, cli }` through the shared catalog. OpenCode owns release identity, archive extraction, executable verification, installation truth, process leases, and uninstall; its archive transfer uses the same exact resource identity. It must not add an OpenCode-only Settings installer or parallel HTTP command surface.
@@ -445,6 +459,11 @@ A scoped Effect.TS experiment inside a _new, isolated_ subsystem (e.g. a future 
 orchestration layer) would be reasonable; a whole-codebase migration is negative-value.
 
 ## Findings considered and rejected (so they aren't re-audited)
+
+- **Project CPA as a second aggregate/mirrored Provider** — rejected by Plan 075. Conversion augments one existing Provider identity; it does not create, import, refresh, or rename a Provider target.
+- **Enable a converter globally for every compatible Provider** — rejected by product decision. Provider extensions are explicit per-Provider bindings, because users may not want a plugin to receive every Provider credential.
+- **Ask the user to select OpenAI→Anthropic/Universal direction or extension priority** — rejected. Each plugin declares fixed conversions and one toggle enables them as a unit; overlapping output kinds return 409 instead of applying hidden priority.
+- **Periodically copy/sync Cradle-owned Codex OAuth tokens into CPA** — rejected by Plan 075 because it creates two possible refresh owners. Codex OAuth instead uses an exclusive, two-phase credential lease: CPA owns refresh and all routing while enabled, then returns the latest state before Host native routing resumes.
 
 - **Fix inline attachment bytes at each producer** — rejected in favor of Plan 072's single persistence seam. There are six known producers of `data:` URLs (web composer, browser appshot, three provider event mappers, Codex local-image reader); patching each is six diffs and still misses the seventh.
 - **Truncate oversized tool payloads at persist time** — rejected by Plan 072. It is the current behavior and it is silent data loss: the bytes exist nowhere afterwards, and `apps/web` never learned to read the truncation marker, so large tool results render as empty blocks. Truncation stays only on transient surfaces (streaming checkpoints, observability snapshots).

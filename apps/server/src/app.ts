@@ -39,6 +39,7 @@ import { runRegistry } from './modules/chat-runtime/run-registry'
 import { flushRunSnapshotWriteBehind } from './modules/chat-runtime/run-snapshot-journal'
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
 import { ClaudeUsageReconciliationScheduler } from './modules/chat-runtime-providers/claude-agent/usage-reconciliation-scheduler'
+import { readCodexChatgptAuthCredential } from './modules/chat-runtime-providers/codex/app-server/chatgpt-auth'
 import { createOpencodeManagedResourceAdapter } from './modules/chat-runtime-providers/opencode/managed-resource-adapter'
 import { OpencodeRuntimeInstallationService } from './modules/chat-runtime-providers/opencode/runtime-installation'
 import { createChronicleModule } from './modules/chronicle'
@@ -77,6 +78,9 @@ import { createPluginsModule } from './modules/plugins'
 import { preferences } from './modules/preferences'
 import { profiles } from './modules/profiles'
 import { providerPresets, providers } from './modules/provider-catalog'
+import { providerExtensions } from './modules/provider-extensions'
+import { configureProviderExtensionHost } from './modules/provider-extensions/host'
+import { releaseLiveProviderRuntimeSessionsForProviderTarget } from './modules/provider-runtime/service'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
 import { pullRequest, pullRequestFeed } from './modules/pull-request'
@@ -159,6 +163,17 @@ async function runBootstrapPhase<T>(
 }
 
 export async function createServerContractApp(options: CreateServerContractAppOptions = {}) {
+  configureProviderExtensionHost({
+    findActiveRunId: (providerTargetId) => {
+      const activeRun = runRegistry.listActiveRuns()
+        .find(run => run.providerTargetId === providerTargetId)
+      return activeRun?.runId ?? null
+    },
+    releaseRuntimeSessions: releaseLiveProviderRuntimeSessionsForProviderTarget,
+    validateRefreshableCredential: (credentialRef, value) => Boolean(
+      readCodexChatgptAuthCredential(credentialRef, value),
+    ),
+  })
   setGitHubAuthProvider(GitHubAuth.resolveGitHubAppIdentity)
   registerTurnCheckpointHooks({
     captureStart: async (input) => {
@@ -209,12 +224,10 @@ export async function createServerContractApp(options: CreateServerContractAppOp
     }),
   )
   app.use(createRequestIdPlugin())
-  app.use(
-    createAuthPlugin({
-      ...loadServerAuthConfig(),
-      listRelayAuthTokens: listActiveRelayAuthTokens,
-    }),
-  )
+  app.use(createAuthPlugin({
+    ...loadServerAuthConfig(),
+    listRelayAuthTokens: listActiveRelayAuthTokens,
+  }))
   if (includeRuntimeHttpPlugins) {
     const [{ createRequestLoggerPlugin }, { createErrorHandler }] = await Promise.all([
       import('./http/request-logger'),
@@ -232,6 +245,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(usage)
   app.use(profiles)
   app.use(providerTargets)
+  app.use(providerExtensions)
   app.use(relayServers)
   app.use(relayTransport)
   app.use(remoteHosts)

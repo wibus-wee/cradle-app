@@ -8,21 +8,16 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { DesktopServerFetchBroker } from '../server-fetch-broker'
 
 const WINDOW_COUNT = 21
-const AUTHORIZATION = 'Bearer server-fetch-smoke'
 const resultPath = process.env.CRADLE_SERVER_FETCH_SMOKE_RESULT
 const windows = new Map<number, BrowserWindow>()
 const windowIndexes = new Map<number, number>()
 const finiteResponses: Array<{ response: ServerResponse, window: number }> = []
 const completed = new Map<number, { finite: string, stream?: string }>()
-let authenticatedRequests = 0
+let acceptedRequests = 0
 let settled = false
 
 const server = createServer((request, response) => {
-  if (request.headers.authorization !== AUTHORIZATION) {
-    response.writeHead(401).end('unauthorized')
-    return
-  }
-  authenticatedRequests += 1
+  acceptedRequests += 1
   const url = new URL(request.url ?? '/', 'http://127.0.0.1')
   if (url.pathname === '/finite') {
     const window = Number(url.searchParams.get('window'))
@@ -49,7 +44,6 @@ const server = createServer((request, response) => {
 
 const broker = new DesktopServerFetchBroker({
   isAllowedSender: sender => windows.has(sender.id),
-  readAuthHeaders: () => ({ authorization: AUTHORIZATION }),
 })
 
 async function finish(passed: boolean, error?: unknown): Promise<void> {
@@ -62,7 +56,7 @@ async function finish(passed: boolean, error?: unknown): Promise<void> {
     passed,
     windowCount: WINDOW_COUNT,
     finiteRequests: finiteResponses.length,
-    authenticatedRequests,
+    acceptedRequests,
     diagnostics: broker.diagnostics(),
     error: error instanceof Error ? error.message : error ? String(error) : null,
   }
@@ -100,7 +94,7 @@ async function run(): Promise<void> {
       allFinite
       && stream === 'data: alpha\n\ndata: beta\n\n'
       && finiteResponses.length === WINDOW_COUNT
-      && authenticatedRequests === WINDOW_COUNT + 1,
+      && acceptedRequests === WINDOW_COUNT + 1,
       allFinite ? undefined : new Error('At least one renderer returned an invalid finite result.'),
     )
   })
