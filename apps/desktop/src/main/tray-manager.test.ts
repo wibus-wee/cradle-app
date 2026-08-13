@@ -348,9 +348,9 @@ describe('trayManager', () => {
     expect(electronMocks.nativeImage.createFromPath.mock.results[0]?.value.setTemplateImage)
       .toHaveBeenCalledWith(true)
     expect(electronMocks.nativeImage.createEmpty).not.toHaveBeenCalled()
-    expect(globalThis.fetch).toHaveBeenCalledWith(new URL('/desktop/summary', 'http://127.0.0.1:21423'), { headers: {} })
-    expect(globalThis.fetch).toHaveBeenCalledWith(new URL('/desktop/recent-sessions', 'http://127.0.0.1:21423'), { headers: {} })
-    expect(globalThis.fetch).toHaveBeenCalledWith(new URL('/desktop/health', 'http://127.0.0.1:21423'), { headers: {} })
+    expect(globalThis.fetch).toHaveBeenCalledWith(new URL('/desktop/summary', 'http://127.0.0.1:21423'))
+    expect(globalThis.fetch).toHaveBeenCalledWith(new URL('/desktop/recent-sessions', 'http://127.0.0.1:21423'))
+    expect(globalThis.fetch).toHaveBeenCalledWith(new URL('/desktop/health', 'http://127.0.0.1:21423'))
     const template = lastMenuTemplate()
     expect(template).toEqual(expect.arrayContaining([
       expect.objectContaining({
