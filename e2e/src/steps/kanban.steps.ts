@@ -1,6 +1,15 @@
 import type { DataTable } from '@cucumber/cucumber'
 import { Given, Then, When } from '@cucumber/cucumber'
 
+import {
+  configureCancelableIssueDelegation,
+  configureCompletedIssueDelegation,
+  configureIsolatedIssueDelegation,
+  enqueueIssueAgentRerunResponse,
+  ISSUE_AGENT_WORK_CONTENT,
+  ISSUE_AGENT_WORK_FILE,
+  releaseIssueAgentRerun,
+} from '../support/helpers/issue-agent-scenario'
 import type { CradleWorld } from '../support/world'
 
 Then('我应该看到看板侧栏', async function (this: CradleWorld) {
@@ -197,4 +206,88 @@ When('我在看板中搜索{string}', async function (this: CradleWorld, query: 
 
 When('我清空看板搜索', async function (this: CradleWorld) {
   await this.kanbanPage.clearSearch()
+})
+
+Given('我已配置 Issue {string}的完成与重跑 Claude Agent Simulator', async function (
+  this: CradleWorld,
+  issueTitle: string,
+) {
+  await configureCompletedIssueDelegation(this, issueTitle)
+})
+
+Given('我已配置 Issue {string}的可取消慢速 Claude Agent Simulator', async function (
+  this: CradleWorld,
+  issueTitle: string,
+) {
+  await configureCancelableIssueDelegation(this, issueTitle)
+})
+
+Given('我已配置 Issue {string}的隔离 Work Claude Agent Simulator', async function (
+  this: CradleWorld,
+  issueTitle: string,
+) {
+  await configureIsolatedIssueDelegation(this, issueTitle)
+})
+
+When('我启用当前 Issue 的隔离 Work 委派', async function (this: CradleWorld) {
+  await this.kanbanPage.enableOpenIssueIsolatedDelegation()
+})
+
+When('我将当前 Issue 委派给 Agent {string}', async function (this: CradleWorld, agentName: string) {
+  await this.kanbanPage.delegateOpenIssueToAgent(agentName)
+})
+
+When('我取消当前 Issue 的委派', async function (this: CradleWorld) {
+  await this.kanbanPage.undelegateOpenIssue()
+})
+
+Then('当前 Issue 的 Agent Session 阶段应为{string}', async function (this: CradleWorld, phase: string) {
+  await this.kanbanPage.expectAgentSessionPhase(phase)
+})
+
+Then('当前 Issue 活动应包含{string}', async function (this: CradleWorld, text: string) {
+  await this.kanbanPage.expectIssueActivity(text)
+})
+
+When('我重跑当前 Issue 的 Agent Session', async function (this: CradleWorld) {
+  enqueueIssueAgentRerunResponse(this)
+  await this.kanbanPage.rerunOpenIssueAgentSession()
+})
+
+When('我释放当前 Issue 的重跑门控', async function (this: CradleWorld) {
+  await releaseIssueAgentRerun(this)
+})
+
+When('我打开当前 Issue 的 Agent Chat', async function (this: CradleWorld) {
+  await this.kanbanPage.openIssueAgentChat()
+})
+
+When('我打开当前 Issue 的已链接 Chat', async function (this: CradleWorld) {
+  await this.kanbanPage.openLinkedIssueChat()
+})
+
+When('我重新加载并重新打开 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.reloadAndReopenIssue(title)
+})
+
+Then('当前 Issue 委派应创建关联的隔离 Work {string}', async function (
+  this: CradleWorld,
+  issueTitle: string,
+) {
+  await this.workPage.expectIssueDelegationWork({
+    issueTitle,
+    sessionId: await this.chat.sessionId(),
+    fileName: ISSUE_AGENT_WORK_FILE,
+    fileContent: ISSUE_AGENT_WORK_CONTENT,
+  })
+})
+
+Then('已取消的隔离 Issue 委派应保留关联 Work {string}', async function (
+  this: CradleWorld,
+  issueTitle: string,
+) {
+  await this.workPage.expectRetainedCanceledIssueWork({
+    issueTitle,
+    sessionId: await this.chat.sessionId(),
+  })
 })

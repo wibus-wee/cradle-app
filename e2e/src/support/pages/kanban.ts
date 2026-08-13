@@ -4,6 +4,7 @@ import { expect } from '@playwright/test'
 
 interface KanbanPageOwner {
   page: Page
+  params: { serverUrl: string }
   remember: <T>(key: string, value: T) => void
   maybeRecall: <T>(key: string) => T | undefined
 }
@@ -113,6 +114,26 @@ export class KanbanPage {
     const boardButton = this.boardButtonByName(name)
     await expect(boardButton).toBeVisible({ timeout: 10_000 })
     return boardButton
+  }
+
+  private async synchronizeWorkspaceStatuses(name: string): Promise<number> {
+    const boardButton = await this.getBoardButtonByName(name)
+    const boardId = await this.extractIdFromTestId(boardButton, 'kanban-board-')
+    const boardResponse = await fetch(`${this.owner.params.serverUrl}/kanban/boards`)
+    expect(boardResponse.ok).toBe(true)
+    const boards = await boardResponse.json() as Array<{ id: string, workspaceId: string }>
+    const board = boards.find(candidate => candidate.id === boardId)
+    if (!board) {
+      throw new Error(`Board ${boardId} was not returned by the Kanban API`)
+    }
+    const statusesResponse = await fetch(
+      `${this.owner.params.serverUrl}/issues/statuses?workspaceId=${encodeURIComponent(board.workspaceId)}`,
+    )
+    expect(statusesResponse.ok).toBe(true)
+    const statuses = await statusesResponse.json() as Array<{ id: string }>
+    await expect(this.visibleKanbanBoard().locator(KanbanPage.KANBAN_COLUMN))
+      .toHaveCount(statuses.length, { timeout: 10_000 })
+    return statuses.length
   }
 
   private async getIssueCardByTitle(title: string): Promise<Locator> {
@@ -274,8 +295,9 @@ export class KanbanPage {
   async createNamedBoard(name: string): Promise<void> {
     await this.open()
     await this.createBoard(name)
+    this.owner.remember('currentBoardName', name)
 
-    if (await this.visibleKanbanBoard().locator(KanbanPage.KANBAN_COLUMN).count() === 0) {
+    if (await this.synchronizeWorkspaceStatuses(name) === 0) {
       await this.ensureDefaultStatuses()
       return
     }
@@ -645,5 +667,89 @@ export class KanbanPage {
     const input = this.page.locator(KanbanPage.KANBAN_SEARCH_INPUT)
     await expect(input).toBeVisible({ timeout: 10_000 })
     await input.fill('')
+  }
+
+  async delegateOpenIssueToAgent(agentName: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const trigger = panel.locator('[data-testid="issue-agent-trigger"]')
+    await expect(trigger).toBeVisible({ timeout: 10_000 })
+
+    const option = this.page
+      .locator('[data-testid^="issue-agent-option-"]')
+      .filter({ hasText: agentName })
+      .first()
+    if (!await option.isVisible()) {
+      await trigger.click()
+    }
+    await expect(option).toBeVisible({ timeout: 10_000 })
+    await option.click()
+    await expect(trigger).toContainText(agentName, { timeout: 10_000 })
+  }
+
+  async enableOpenIssueIsolatedDelegation(): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const trigger = panel.locator('[data-testid="issue-agent-trigger"]')
+    await expect(trigger).toBeVisible({ timeout: 10_000 })
+    await trigger.click()
+
+    const isolation = this.page.locator('[data-testid="issue-delegate-isolation"]')
+    await expect(isolation).toBeVisible({ timeout: 10_000 })
+    await isolation.click()
+    await expect(isolation).toHaveAttribute('data-state', 'checked', { timeout: 10_000 })
+  }
+
+  async undelegateOpenIssue(): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const trigger = panel.locator('[data-testid="issue-agent-trigger"]')
+    await expect(trigger).toBeVisible({ timeout: 10_000 })
+    await trigger.click()
+
+    const noneOption = this.page.locator('[data-testid="issue-agent-option-none"]')
+    await expect(noneOption).toBeVisible({ timeout: 10_000 })
+    await noneOption.click()
+    await expect(trigger).toContainText('No agent', { timeout: 10_000 })
+  }
+
+  async expectAgentSessionPhase(phase: string): Promise<void> {
+    const phaseLabel = this.page.locator('[data-testid="issue-agent-session-phase"]')
+    await expect(phaseLabel).toHaveText(phase, { timeout: 30_000 })
+  }
+
+  async expectIssueActivity(text: string): Promise<void> {
+    const timeline = this.page.locator('[data-testid="issue-activity-timeline"]')
+    await expect(timeline).toContainText(text, { timeout: 15_000 })
+  }
+
+  async rerunOpenIssueAgentSession(): Promise<void> {
+    const rerun = this.page.locator('[data-testid="issue-agent-rerun-btn"]')
+    await expect(rerun).toBeEnabled({ timeout: 10_000 })
+    await rerun.click()
+  }
+
+  async openIssueAgentChat(): Promise<void> {
+    const openChat = this.page.locator('[data-testid="issue-agent-session-open-chat"]')
+    await expect(openChat).toBeEnabled({ timeout: 10_000 })
+    await openChat.click()
+  }
+
+  async openLinkedIssueChat(): Promise<void> {
+    const openChat = this.page.locator('[data-testid="issue-linked-session-open-chat"]').last()
+    await expect(openChat).toBeVisible({ timeout: 10_000 })
+    await openChat.click()
+  }
+
+  async reloadAndReopenIssue(title: string): Promise<void> {
+    await this.page.reload({ waitUntil: 'domcontentloaded' })
+    if (!await this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL).isVisible().catch(() => false)) {
+      const boardName = this.owner.maybeRecall<string>('currentBoardName')
+      if (boardName) {
+        const boardButton = this.boardButtonByName(boardName)
+        await expect(boardButton).toBeVisible({ timeout: 10_000 })
+        await boardButton.click()
+        await expect(this.visibleKanbanBoard()).toBeVisible({ timeout: 10_000 })
+      }
+      await this.openIssueDetail(title)
+    }
+    await this.expectPanelTitle(title)
   }
 }

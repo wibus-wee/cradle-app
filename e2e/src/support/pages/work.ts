@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { Locator, Page } from '@playwright/test'
@@ -15,6 +15,7 @@ interface WorkPageOwner {
 
 interface WorkSummary {
   id: string
+  linkedIssueId: string | null
   objective: string
   primarySessionId: string
 }
@@ -28,6 +29,7 @@ interface WorkDetail {
     worktreeHealth: string | null
   }
   readiness: {
+    clean: boolean
     changedFiles: number
   }
 }
@@ -103,6 +105,86 @@ export class WorkPage {
     expect(detail.execution.worktreePath).not.toBeNull()
     expect(readFileSync(join(detail.execution.worktreePath!, 'e2e-work-result.txt'), 'utf8'))
       .toBe('created inside the managed Cradle worktree\n')
+  }
+
+  async expectIssueDelegationWork(input: {
+    issueTitle: string
+    sessionId: string
+    fileName: string
+    fileContent: string
+  }): Promise<void> {
+    let matchedWorkId: string | null = null
+    await expect.poll(async () => {
+      const response = await fetch(`${this.owner.params.serverUrl}/works`)
+      if (!response.ok) {
+        return null
+      }
+      const works = await response.json() as WorkSummary[]
+      const match = works.find(work =>
+        work.primarySessionId === input.sessionId
+        && work.linkedIssueId !== null
+        && work.objective.includes(`# Cradle Issue: ${input.issueTitle}`))
+      matchedWorkId = match?.id ?? null
+      return matchedWorkId
+    }, { timeout: TIMEOUT }).not.toBeNull()
+
+    if (!matchedWorkId) {
+      throw new Error(`Isolated Work for Issue ${input.issueTitle} was not persisted`)
+    }
+    const response = await fetch(`${this.owner.params.serverUrl}/works/${matchedWorkId}`)
+    expect(response.ok).toBe(true)
+    const detail = await response.json() as WorkDetail
+    expect(detail.execution).toMatchObject({
+      isIsolated: true,
+      worktreeHealth: 'ok',
+    })
+    expect(detail.readiness.changedFiles).toBeGreaterThanOrEqual(1)
+    const worktreePath = detail.execution.worktreePath
+    if (!worktreePath) {
+      throw new Error(`Isolated Work ${matchedWorkId} lost its worktree binding`)
+    }
+    expect(readFileSync(join(worktreePath, input.fileName), 'utf8'))
+      .toBe(input.fileContent)
+
+    await this.openRuntimePanel()
+    const panel = this.page.locator('[data-testid="right-aside-panel-runtime"]')
+    await expect(panel).toContainText('Work')
+    await expect(panel).toContainText(`Issue: ${input.issueTitle}`)
+  }
+
+  async expectRetainedCanceledIssueWork(input: {
+    issueTitle: string
+    sessionId: string
+  }): Promise<void> {
+    const worksResponse = await fetch(`${this.owner.params.serverUrl}/works`)
+    expect(worksResponse.ok).toBe(true)
+    const works = await worksResponse.json() as WorkSummary[]
+    const work = works.find(candidate =>
+      candidate.primarySessionId === input.sessionId
+      && candidate.linkedIssueId !== null
+      && candidate.objective.includes(`# Cradle Issue: ${input.issueTitle}`))
+    if (!work) {
+      throw new Error(`Canceled isolated Work for Issue ${input.issueTitle} was not retained`)
+    }
+
+    const detailResponse = await fetch(`${this.owner.params.serverUrl}/works/${work.id}`)
+    expect(detailResponse.ok).toBe(true)
+    const detail = await detailResponse.json() as WorkDetail
+    expect(detail.execution).toMatchObject({
+      isIsolated: true,
+      worktreeHealth: 'ok',
+    })
+    expect(detail.readiness).toMatchObject({ clean: true, changedFiles: 0 })
+    const worktreePath = detail.execution.worktreePath
+    if (!worktreePath) {
+      throw new Error(`Canceled isolated Work ${work.id} lost its worktree binding`)
+    }
+    expect(existsSync(worktreePath)).toBe(true)
+
+    await this.openRuntimePanel()
+    const panel = this.page.locator('[data-testid="right-aside-panel-runtime"]')
+    await expect(panel).toContainText('Work')
+    await expect(panel).toContainText(`Issue: ${input.issueTitle}`)
   }
 
   async openRuntimePanel(): Promise<void> {
