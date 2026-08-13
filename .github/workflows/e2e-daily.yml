@@ -1,13 +1,9 @@
-name: E2E Full Suite
+name: Daily E2E
 
 on:
   # Run every day at 02:00 UTC (10:00 CST)
   schedule:
     - cron: '0 2 * * *'
-  # Push a namespaced tag at a PR head to run the full active suite on that exact commit.
-  push:
-    tags:
-      - 'e2e/full/**'
   # Allow manual triggering
   workflow_dispatch:
     inputs:
@@ -27,11 +23,10 @@ on:
 permissions:
   contents: read
   issues: write
-  pull-requests: write
 
 jobs:
   e2e:
-    name: Full E2E (@P0 or @P1)
+    name: Daily E2E (@P0 or @P1)
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -42,8 +37,7 @@ jobs:
         with:
           repository: wibus-wee/cradle-app
           token: ${{ secrets.PRIVATE_REPO_PAT }}
-          # Tag runs must test the immutable commit the tag points to, not a moving branch.
-          ref: ${{ github.event_name == 'push' && github.sha || github.event.inputs.source_ref || github.event.inputs.ref || 'main' }}
+          ref: ${{ github.event.inputs.source_ref || github.event.inputs.ref || 'main' }}
 
       - uses: ./.github/actions/setup
         with:
@@ -436,95 +430,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      # ── Comment the PR associated with a tagged commit ─────────────────────
-      - name: Comment associated PRs for tagged run
-        if: steps.e2e.outcome == 'failure' && github.event_name == 'push'
-        uses: actions/github-script@v7
-        env:
-          COMMIT_SHA: ${{ github.sha }}
-          TAG_NAME: ${{ github.ref_name }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TAGS_FILTER: '@P0 or @P1'
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { readJson, formatFailureArtifactsSection } = require('./e2e/scripts/format-failure-issue.cjs')
-
-            const commitSha = process.env.COMMIT_SHA
-            const tagName = process.env.TAG_NAME
-            const runId = process.env.RUN_ID
-            const runUrl = process.env.RUN_URL
-            const tagsFilter = process.env.TAGS_FILTER
-            const summary = readJson('e2e/artifacts/e2e-summary.json', {
-              resultLine: 'no parsed scenario data',
-              markdown: '_No E2E summary was generated. Check the raw run logs._',
-              nonPassedScenarios: [],
-            })
-            const failureIndex = readJson('e2e/artifacts/failure-index.json', [])
-            const marker = `<!-- cradle-e2e-full:${commitSha}:${tagName} -->`
-            const body = [
-              marker,
-              '## ❌ Full E2E Failed',
-              '',
-              '| Field | Value |',
-              '|-------|-------|',
-              `| Source tag | \`${tagName}\` |`,
-              `| Commit | [\`${commitSha.slice(0, 12)}\`](${context.payload.repository.html_url}/commit/${commitSha}) |`,
-              `| Tags filter | \`${tagsFilter}\` |`,
-              `| Result | ${summary.resultLine} |`,
-              `| Run | [View run](${runUrl}) |`,
-              `| Artifacts | [Download \`e2e-artifacts-${runId}\`](${runUrl}/artifacts) |`,
-              '',
-              summary.markdown,
-              '',
-              '## Failure evidence',
-              '',
-              formatFailureArtifactsSection(failureIndex),
-            ].join('\n')
-
-            const { data: associatedPrs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              commit_sha: commitSha,
-            })
-            const openPrs = associatedPrs.filter((pr) => pr.state === 'open')
-
-            if (openPrs.length === 0) {
-              core.notice(`No open PR is associated with tagged commit ${commitSha}.`)
-              return
-            }
-
-            for (const pr of openPrs) {
-              const comments = await github.paginate(github.rest.issues.listComments, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-                per_page: 100,
-              })
-              const existing = comments.find((comment) => comment.body?.includes(marker))
-
-              if (existing) {
-                await github.rest.issues.updateComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: existing.id,
-                  body,
-                })
-                core.info(`Updated tagged full E2E comment on PR #${pr.number}.`)
-              } else {
-                await github.rest.issues.createComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr.number,
-                  body,
-                })
-                core.info(`Commented tagged full E2E failure on PR #${pr.number}.`)
-              }
-            }
       # ── Create GitHub Issue on Failure ────────────────────────────────────
       - name: Create failure issue
-        if: steps.e2e.outcome == 'failure' && github.event_name != 'push'
+        if: steps.e2e.outcome == 'failure'
         uses: actions/github-script@v7
         env:
           RUN_ID: ${{ github.run_id }}
