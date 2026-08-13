@@ -32,7 +32,7 @@ export class DiffPage {
   }
 
   async refresh(): Promise<void> {
-    const refresh = this.page.locator('[data-testid="review-top-bar"]').getByRole('button', { name: 'Refresh' })
+    const refresh = this.workingTree().getByRole('button', { name: 'Refresh' })
     await expect(refresh).toBeEnabled({ timeout: TIMEOUT })
     await refresh.click()
     await expect(refresh).toBeEnabled({ timeout: TIMEOUT })

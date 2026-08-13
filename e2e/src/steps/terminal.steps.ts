@@ -30,16 +30,11 @@ async function getActiveChatWorkspacePath(world: CradleWorld): Promise<string> {
     throw new Error(`Failed to load workspace ${session.workspaceId}: ${workspaceResponse.status} ${await workspaceResponse.text()}`)
   }
 
-  const workspace = await workspaceResponse.json() as {
-    path?: string | null
-    locator?: { path?: string | null } | null
+  const workspace = await workspaceResponse.json() as { locator: { path: string } } | null
+  if (!workspace) {
+    throw new Error(`Expected workspace ${session.workspaceId} to exist`)
   }
-  const path = workspace.path ?? workspace.locator?.path ?? null
-  if (!path) {
-    throw new Error(`Expected workspace ${session.workspaceId} to have a path`)
-  }
-
-  return path
+  return workspace.locator.path
 }
 
 When('我打开底部终端面板', async function (this: CradleWorld) {

@@ -33,8 +33,8 @@ interface WorkspacePageOwner {
 
 interface ServerWorkspace {
   id: string
-  name?: string
-  path?: string
+  name: string
+  locator: { path: string }
 }
 
 export class WorkspacePage {
@@ -222,7 +222,7 @@ export class WorkspacePage {
         return null
       }
       const workspaces = await response.json() as ServerWorkspace[]
-      const match = workspaces.find(workspace => workspace.path === fixture.dir)
+      const match = workspaces.find(workspace => workspace.locator.path === fixture.dir)
       return match && workspaces.length === beforeWorkspaces.length + 1 ? match.id : null
     }, { timeout: WORKSPACE_TIMEOUT }).not.toBeNull()
 
@@ -231,7 +231,7 @@ export class WorkspacePage {
       throw new Error(`Failed to list workspaces after add: ${afterResponse.status} ${await afterResponse.text()}`)
     }
     const afterWorkspaces = await afterResponse.json() as ServerWorkspace[]
-    const addedWorkspace = afterWorkspaces.find(workspace => workspace.path === fixture.dir)
+    const addedWorkspace = afterWorkspaces.find(workspace => workspace.locator.path === fixture.dir)
     if (!addedWorkspace) {
       throw new Error(`Workspace import completed without the requested path: ${fixture.dir}`)
     }
@@ -281,8 +281,8 @@ export class WorkspacePage {
       if (workspaces.length > 0) {
         const first = workspaces[0]!
         const fixture: WorkspaceFixture = {
-          dir: first.path ?? first.id,
-          name: first.name ?? basename(first.path ?? first.id),
+          dir: first.locator.path,
+          name: first.name,
           agentsHeading: 'Single Workspace Operating Model',
           agentsBody: 'Single workspace overview content used for end-to-end verification.',
         }

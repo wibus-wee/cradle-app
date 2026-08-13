@@ -134,6 +134,9 @@ When('我禁用当前 Provider', async function (this: CradleWorld) {
 })
 
 Then('新建聊天中不应提供名为{string}的 Provider', async function (this: CradleWorld, name: string) {
+  const closeSettings = this.page.locator('[data-testid="settings-close"]')
+  await expect(closeSettings).toBeVisible({ timeout: TIMEOUT })
+  await closeSettings.click()
   await this.newChat.openFromNav()
   await this.newChat.selectRuntime('Claude Agent')
   const selector = this.page.locator('[data-testid="provider-model-selector"], [data-testid="agent-selector"]').filter({ visible: true }).first()

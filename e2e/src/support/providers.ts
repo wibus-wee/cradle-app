@@ -176,9 +176,9 @@ export async function ensureWorkspace(input: {
 }): Promise<string> {
   const listRes = await fetch(`${input.serverUrl}/workspaces`)
   if (listRes.ok) {
-    const workspaces = await listRes.json() as Array<{ id?: string, path?: string }>
+    const workspaces = await listRes.json() as Array<{ locator: { path: string } }>
     if (workspaces.length > 0) {
-      return workspaces[0]?.path ?? workspaces[0]?.id ?? 'existing'
+      return workspaces[0]!.locator.path
     }
   }
   const dir = input.createTempDir()
