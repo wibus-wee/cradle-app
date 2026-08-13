@@ -137,7 +137,7 @@ try {
   }
 
   const health = await waitForJson(`${desktopEnv.serverUrl}/health`, 60_000)
-  await page.waitForFunction(() => document.body.textContent?.trim().length > 0, undefined, { timeout: 30_000 })
+  await waitForInitialAppSurface(page, 30_000)
 
   const beforeOnboardingState = await capturePageState(page)
   console.log(`[packaged-e2e] before onboarding: ${JSON.stringify(beforeOnboardingState, null, 2)}`)
@@ -292,6 +292,26 @@ async function waitForJson(url, timeoutMs) {
     await delay(250)
   }
   throw new Error(`Timed out waiting for JSON endpoint ${url}`)
+}
+
+async function waitForInitialAppSurface(page, timeoutMs) {
+  const selector = [
+    '[data-testid="onboarding-page"]',
+    '[data-testid="home-dashboard"]',
+    '[data-testid="app-sidebar"]',
+    '[data-testid="chat-view"]',
+  ].join(', ')
+  await page.waitForFunction((targetSelector) => {
+    return Array.from(document.querySelectorAll(targetSelector)).some((element) => {
+      const style = window.getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && style.opacity !== '0'
+        && rect.width > 0
+        && rect.height > 0
+    })
+  }, selector, { timeout: timeoutMs })
 }
 
 async function waitForReadyAppContent(page, timeoutMs) {
