@@ -8,17 +8,14 @@ import { issueBrowserAuthSession, verifyBrowserAuthSession } from './browser-aut
 import { OPENAPI_DOCS_PATH, OPENAPI_JSON_ALIAS_PATH, OPENAPI_JSON_PATH } from './openapi'
 import { consumeSingleUseTicket, hasSingleUseTicket, issueSingleUseTicket } from './single-use-ticket'
 
-export const CRADLE_TOKEN_HEADER = 'x-cradle-token'
 export const CRADLE_RELAY_TOKEN_HEADER = 'x-cradle-relay-token'
 
 interface AuthConfig {
   authRequired: boolean
-  authToken: string | null
   listRelayAuthTokens?: () => string[]
 }
 
 interface VerifyRequestTokenOptions {
-  token?: string | null
   config?: AuthConfig
 }
 
@@ -31,8 +28,7 @@ interface VerifyWebSocketRequestTokenOptions {
 const consumedWebSocketTicketRequests = new WeakMap<Request, string>()
 
 function readAuthConfig(): AuthConfig {
-  const { authRequired, authToken } = loadServerAuthConfig()
-  return { authRequired, authToken }
+  return loadServerAuthConfig()
 }
 
 function hashToken(token: string): Buffer {
@@ -41,27 +37,6 @@ function hashToken(token: string): Buffer {
 
 function tokenMatches(actual: string, expected: string): boolean {
   return timingSafeEqual(hashToken(actual), hashToken(expected))
-}
-
-function readBearerToken(authorization: string | null): string | null {
-  if (!authorization) {
-    return null
-  }
-
-  const [scheme, ...parts] = authorization.trim().split(/\s+/)
-  if (scheme?.toLowerCase() !== 'bearer' || parts.length !== 1) {
-    return null
-  }
-
-  return parts[0] || null
-}
-
-function readPresentedToken(headers: Headers, options: VerifyRequestTokenOptions): string | null {
-  return readBearerToken(headers.get('authorization'))
-    ?? headers.get(CRADLE_TOKEN_HEADER)?.trim()
-    ?? headers.get(CRADLE_RELAY_TOKEN_HEADER)?.trim()
-    ?? options.token?.trim()
-    ?? null
 }
 
 function isPublicAuthPath(method: string, pathname: string): boolean {
@@ -94,17 +69,9 @@ export function verifyRequestToken(
     return true
   }
 
-  const presentedToken = readPresentedToken(headers, options)
-  if (!presentedToken) {
-    return verifyBrowserAuthSession(headers)
-  }
-
-  if (config.authToken && tokenMatches(presentedToken, config.authToken)) {
-    return true
-  }
-
-  return readRelayAuthTokens(config).some(token => tokenMatches(presentedToken, token))
-    || verifyBrowserAuthSession(headers)
+  const relayToken = headers.get(CRADLE_RELAY_TOKEN_HEADER)?.trim()
+  return verifyBrowserAuthSession(headers)
+    || Boolean(relayToken && readRelayAuthTokens(config).some(token => tokenMatches(relayToken, token)))
 }
 
 export function verifyWebSocketRequestToken(

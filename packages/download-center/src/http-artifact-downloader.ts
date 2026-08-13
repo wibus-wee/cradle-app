@@ -331,7 +331,11 @@ export class HttpArtifactDownloader {
           offset = 0
           input.observation.transferredBytes = 0
         }
-        totalBytes = this.parseContentLength(response.headers.get('content-length'))
+        // Fetch implementations commonly transparently decode compressed bodies
+        // while leaving the wire-level Content-Length header untouched. In that
+        // case the header describes the compressed payload, not the bytes we
+        // stream to disk, so it cannot be used to validate the decoded body.
+        totalBytes = this.responseContentLength(response)
         expectedBodyBytes = totalBytes
         input.observation.etag = isStrongEtag(responseEtag) ? responseEtag : null
       }
@@ -343,7 +347,7 @@ export class HttpArtifactDownloader {
       if (!response.body) {
         throw new DownloadError('invalid_response', false)
       }
-      const remainingLength = this.parseContentLength(response.headers.get('content-length'))
+      const remainingLength = this.responseContentLength(response)
       if (expectedBodyBytes !== null && remainingLength !== null && expectedBodyBytes !== remainingLength) {
         await response.body.cancel()
         throw new DownloadError('invalid_response', false)
@@ -383,6 +387,7 @@ export class HttpArtifactDownloader {
   ): Promise<Response> {
     let url = new URL(source.url)
     let headers = new Headers(source.headers)
+    headers.set('accept-encoding', 'identity')
     if (offset > 0 && etag !== null) {
       headers.set('range', `bytes=${offset}-`)
       headers.set('if-range', etag)
@@ -420,6 +425,7 @@ export class HttpArtifactDownloader {
       }
       if (nextUrl.origin !== url.origin) {
         headers = new Headers()
+        headers.set('accept-encoding', 'identity')
         if (offset > 0 && etag !== null) {
           headers.set('range', `bytes=${offset}-`)
           headers.set('if-range', etag)
@@ -747,6 +753,14 @@ export class HttpArtifactDownloader {
     }
     const parsed = Number(value)
     return Number.isSafeInteger(parsed) ? parsed : null
+  }
+
+  private responseContentLength(response: Response): number | null {
+    const contentEncoding = response.headers.get('content-encoding')?.trim().toLowerCase()
+    if (contentEncoding !== undefined && contentEncoding !== '' && contentEncoding !== 'identity') {
+      return null
+    }
+    return this.parseContentLength(response.headers.get('content-length'))
   }
 
   private parseContentRange(value: string | null): { start: number, end: number, total: number | null } | null {

@@ -2215,6 +2215,7 @@ export type GetProviderTargetsResponses = {
         sourceKey: string | null;
         externalRecordId: string | null;
         sourceFingerprint: string | null;
+        effectiveProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
         createdAt: number;
         updatedAt: number;
     }>;
@@ -2278,6 +2279,7 @@ export type PutProviderTargetsByProviderTargetIdResponses = {
         sourceKey: string | null;
         externalRecordId: string | null;
         sourceFingerprint: string | null;
+        effectiveProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
         createdAt: number;
         updatedAt: number;
     };
@@ -2755,6 +2757,82 @@ export type PostProviderTargetsByProviderTargetIdTestResponses = {
 };
 
 export type PostProviderTargetsByProviderTargetIdTestResponse = PostProviderTargetsByProviderTargetIdTestResponses[keyof PostProviderTargetsByProviderTargetIdTestResponses];
+
+export type GetProviderTargetsByProviderTargetIdExtensionsData = {
+    body?: never;
+    path: {
+        providerTargetId: string;
+    };
+    query?: never;
+    url: '/provider-targets/{providerTargetId}/extensions/';
+};
+
+export type GetProviderTargetsByProviderTargetIdExtensionsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        providerTargetId: string;
+        extensionOwner: string;
+        extensionId: string;
+        extensionKey: string;
+        label: string;
+        description: string | null;
+        applicable: boolean;
+        unavailableReason: string | null;
+        desiredEnabled: boolean;
+        status: 'disabled' | 'enabling' | 'enabled' | 'disabling' | 'suspended' | 'error';
+        credentialStrategy: 'borrowed-static' | 'exclusive-refreshable' | null;
+        credentialOwner: 'host' | 'extension';
+        providerKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        addedProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        lastError: string | null;
+        updatedAt: number;
+    }>;
+};
+
+export type GetProviderTargetsByProviderTargetIdExtensionsResponse = GetProviderTargetsByProviderTargetIdExtensionsResponses[keyof GetProviderTargetsByProviderTargetIdExtensionsResponses];
+
+export type PutProviderTargetsByProviderTargetIdExtensionsData = {
+    body: {
+        owner: string;
+        id: string;
+        enabled: boolean;
+    };
+    path: {
+        providerTargetId: string;
+    };
+    query?: never;
+    url: '/provider-targets/{providerTargetId}/extensions/';
+};
+
+export type PutProviderTargetsByProviderTargetIdExtensionsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        providerTargetId: string;
+        extensionOwner: string;
+        extensionId: string;
+        extensionKey: string;
+        label: string;
+        description: string | null;
+        applicable: boolean;
+        unavailableReason: string | null;
+        desiredEnabled: boolean;
+        status: 'disabled' | 'enabling' | 'enabled' | 'disabling' | 'suspended' | 'error';
+        credentialStrategy: 'borrowed-static' | 'exclusive-refreshable' | null;
+        credentialOwner: 'host' | 'extension';
+        providerKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        addedProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        lastError: string | null;
+        updatedAt: number;
+    };
+};
+
+export type PutProviderTargetsByProviderTargetIdExtensionsResponse = PutProviderTargetsByProviderTargetIdExtensionsResponses[keyof PutProviderTargetsByProviderTargetIdExtensionsResponses];
 
 export type GetRelayServersData = {
     body?: never;

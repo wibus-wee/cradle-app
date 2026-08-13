@@ -18,6 +18,7 @@ export interface ProviderTargetOption {
   kind: ProviderTargetKind
   name: string
   providerKind: ProviderKind
+  effectiveProviderKinds: ProviderKind[]
   enabled: boolean
   iconSlug: string | null
   enabledModelsJson?: string
@@ -35,6 +36,7 @@ function toProviderTargetOption(target: ProviderTargetRecord): ProviderTargetOpt
     kind: target.kind,
     name: target.displayName,
     providerKind: target.providerKind,
+    effectiveProviderKinds: target.effectiveProviderKinds,
     enabled: target.enabled,
     iconSlug: nullableString(target.iconSlug),
     enabledModelsJson: target.enabledModelsJson,

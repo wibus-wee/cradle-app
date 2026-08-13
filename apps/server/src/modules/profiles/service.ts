@@ -107,9 +107,9 @@ function assertManualProfileOperation(profileId: string): void {
   })
 }
 
-export function upsertProfile(input: UpsertProfileInput): AgentProfile {
+export async function upsertProfile(input: UpsertProfileInput): Promise<AgentProfile> {
   assertManualProfileOperation(input.id)
-  return toProfile(ProviderTargets.upsertManualProviderTarget({
+  return toProfile(await ProviderTargets.upsertManualProviderTarget({
     id: input.id,
     displayName: input.name,
     providerKind: input.providerKind,
@@ -126,10 +126,10 @@ export function upsertProfile(input: UpsertProfileInput): AgentProfile {
  * Never infers identity from baseUrl. Optional applyEndpointDefaults rewrites
  * connection URLs from the contribution defaults when the client opts in.
  */
-export function bindProfileProvider(
+export async function bindProfileProvider(
   profileId: string,
   input: { providerId: string, applyEndpointDefaults?: boolean },
-): AgentProfile {
+): Promise<AgentProfile> {
   assertManualProfileOperation(profileId)
   const existing = getProfile(profileId)
   if (!existing) {
@@ -183,7 +183,7 @@ export function bindProfileProvider(
     }
   }
 
-  return upsertProfile({
+  return await upsertProfile({
     id: profileId,
     name: existing.name,
     providerKind,
@@ -200,9 +200,9 @@ export function updateIcon(profileId: string, iconSlug: string | null): AgentPro
   return toProfile(ProviderTargets.updateProviderTargetIcon(profileId, iconSlug))
 }
 
-export function removeProfile(id: string): void {
+export async function removeProfile(id: string): Promise<void> {
   assertManualProfileOperation(id)
-  ProviderTargets.removeProviderTarget(id)
+  await ProviderTargets.removeProviderTarget(id)
 }
 
 // ── custom models ──

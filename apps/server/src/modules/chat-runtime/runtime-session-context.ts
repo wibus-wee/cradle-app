@@ -55,6 +55,7 @@ export interface SessionRunContext {
   workspacePath: string
   profile: RuntimeProviderTargetProfile | null
   providerTarget: { id: string, kind: 'manual' | 'external' } | null
+  effectiveModelId: string | null
 }
 
 export type ProviderBoundSessionRunContext = SessionRunContext & {
@@ -82,7 +83,7 @@ export function assertProviderBoundRunContext(
 
 export function getSessionRunContext(
   sessionId: string,
-  input: { providerTargetId?: string } = {},
+  input: { providerTargetId?: string, modelId?: string | null } = {},
 ): SessionRunContext | null {
   const session = db().select().from(sessions).where(eq(sessions.id, sessionId)).get()
   if (!session) {
@@ -118,6 +119,7 @@ export function getSessionRunContext(
       workspacePath: workspacePath ?? '',
       profile: null,
       providerTarget: null,
+      effectiveModelId: null,
     }
   }
   const runtime = getRuntimeRegistry().get(runtimeKind)
@@ -146,6 +148,7 @@ export function getSessionRunContext(
         workspacePath: workspacePath ?? '',
         profile: null,
         providerTarget: null,
+        effectiveModelId: null,
       }
     }
     if (runtime?.metadata.providerBinding === 'none') {
@@ -158,12 +161,13 @@ export function getSessionRunContext(
         workspacePath: workspacePath ?? '',
         profile,
         providerTarget: null,
+        effectiveModelId: null,
       }
     }
     return null
   }
 
-  const resolvedTarget = resolveProviderTargetForRuntime(providerTarget, runtimeKind)
+  const resolvedTarget = resolveProviderTargetForRuntime(providerTarget, runtimeKind, input.modelId)
   const profileConfig = parseJsonObject(resolvedTarget.configJson)
   const targetModelRegistryConfig = {
     modelRegistryMappings: ModelRegistry.listMappingEntries(),
@@ -191,6 +195,7 @@ export function getSessionRunContext(
     workspacePath: workspacePath ?? '',
     profile: effectiveProfile,
     providerTarget: resolvedTarget.target,
+    effectiveModelId: resolvedTarget.effectiveModelId,
   }
 }
 
@@ -292,7 +297,7 @@ export async function resolveExistingRuntimeSessionForContext(input: {
     profile: input.context.profile,
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
-    modelId: input.modelId,
+    modelId: input.context.effectiveModelId ?? input.modelId,
   })
   return resolution
     ? {
@@ -321,7 +326,7 @@ export async function resolveRuntimeSessionForContext(input: {
     profile: input.context.profile,
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
-    modelId: input.modelId,
+    modelId: input.context.effectiveModelId ?? input.modelId,
   })
   try {
     validateResolvedRuntimeSessionContext({
@@ -349,7 +354,7 @@ export async function resolveRuntimeSessionForContext(input: {
   }
   return {
     runtimeSession: resolution.runtimeSession,
-    requestedModelId: resolution.requestedModelId,
+    requestedModelId: input.modelId ?? resolution.requestedModelId,
   }
 }
 

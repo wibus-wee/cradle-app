@@ -3,7 +3,6 @@ import { Notification } from 'electron'
 
 import type { ChatEventTailBroker } from './chat-event-tail-broker'
 import type { ChatStreamBroker } from './chat-stream-broker'
-import { getDesktopServerAuthHeaders } from './server-process'
 
 interface CompletedRun {
   runId: string
@@ -234,7 +233,7 @@ export class NotificationCenterManager {
     const response = await this.fetchFn(this.buildUrl(COMPLETED_RUNS_PATH, {
       since: String(Math.max(0, this.lastFinishedAt - 1)),
       limit: '50',
-    }), { headers: getDesktopServerAuthHeaders() })
+    }))
     if (!response.ok) {
       return
     }
@@ -253,7 +252,7 @@ export class NotificationCenterManager {
   }
 
   private async pollUserInputRequests(): Promise<void> {
-    const response = await this.fetchFn(this.buildUrl(USER_INPUT_REQUESTS_PATH), { headers: getDesktopServerAuthHeaders() })
+    const response = await this.fetchFn(this.buildUrl(USER_INPUT_REQUESTS_PATH))
     if (!response.ok) {
       return
     }
@@ -396,7 +395,7 @@ export class NotificationCenterManager {
   }
 
   private async readRuntimeStatus(sessionId: string): Promise<RuntimeStatusResponse> {
-    const response = await this.fetchFn(this.buildUrl(`/chat/sessions/${encodeURIComponent(sessionId)}/runtime-status`), { headers: getDesktopServerAuthHeaders() })
+    const response = await this.fetchFn(this.buildUrl(`/chat/sessions/${encodeURIComponent(sessionId)}/runtime-status`))
     if (!response.ok) {
       throw new Error(`Runtime status failed: ${response.status}`)
     }
@@ -406,7 +405,7 @@ export class NotificationCenterManager {
   private async enqueueReply(sessionId: string, text: string): Promise<void> {
     const response = await this.fetchFn(this.buildUrl(`/chat/sessions/${encodeURIComponent(sessionId)}/queue`), {
       method: 'POST',
-      headers: { ...getDesktopServerAuthHeaders(), 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'queue', text }),
     })
     if (!response.ok) {

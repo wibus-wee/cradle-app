@@ -23,7 +23,7 @@ import {
 } from '~/components/ui/empty'
 import { Input } from '~/components/ui/input'
 import { ScrollArea } from '~/components/ui/scroll-area'
-import { runtimeSupportsProviderKind } from '~/features/agent-runtime/runtime-compatibility'
+import { runtimeSupportsAnyProviderKind } from '~/features/agent-runtime/runtime-compatibility'
 import type { ModelDescriptor, ProviderTarget } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import type { Agent, PreviewLocalConfigImportResult } from '~/features/agent-runtime/use-agents'
@@ -124,7 +124,7 @@ function providerTargetCompatibleWithAgents(
   return agents.every(
     agent =>
       !agentUsesProviderTarget(agent, runtimeCatalog)
-      || runtimeSupportsProviderKind(agent.runtimeKind, target.providerKind, runtimeCatalog),
+      || runtimeSupportsAnyProviderKind(agent.runtimeKind, target.effectiveProviderKinds, runtimeCatalog),
   )
 }
 

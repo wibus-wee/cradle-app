@@ -24,6 +24,7 @@ import { registerExternalIssueSource } from './external-issue-source-registry'
 import { registerExternalProviderSource } from './external-provider-source-registry'
 import { registerPluginMcpServer } from './mcp-registry'
 import { createPluginProcessService } from './process-registry'
+import { registerProviderExtension } from './provider-extension-registry'
 import { normalizePluginRoutePath, registerPluginRoute, unregisterPluginRoute } from './route-registry'
 import { registerPluginCapability, unregisterPluginCapability } from './runtime-registry'
 import { registerOwnedPluginSkill } from './skill-registry'
@@ -183,6 +184,11 @@ export function createServerPluginContext(
     externalSources: {
       register(source) {
         return track(registerExternalProviderSource(manifest.name, source))
+      },
+    },
+    extensions: {
+      register(extension) {
+        return track(registerProviderExtension(manifest.name, extension))
       },
     },
   } satisfies ServerPluginContext['providers']

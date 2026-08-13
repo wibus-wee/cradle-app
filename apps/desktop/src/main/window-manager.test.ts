@@ -132,9 +132,7 @@ vi.mock('./ipc-devtool', () => ({
   subscribeAcpDevtool: vi.fn(() => vi.fn()),
   subscribeIpcDevtool: vi.fn(() => vi.fn()),
 }))
-vi.mock('./server-process', () => ({
-  getDesktopServerAuthToken: vi.fn(() => 'test-server-auth-token'),
-}))
+vi.mock('./server-process', () => ({}))
 
 const previousRendererUrl = process.env.ELECTRON_RENDERER_URL
 const tempRoots: string[] = []

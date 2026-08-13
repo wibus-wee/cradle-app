@@ -4,6 +4,7 @@ import {
   agents,
   externalProviderRecords,
   externalProviderSources,
+  providerExtensionBindings,
   providerTargets,
 } from '@cradle/db'
 import type {
@@ -29,6 +30,10 @@ import {
   readClaudeAgentConfig,
 } from '../provider-contracts/claude-agent-config'
 import type { ProviderKind } from '../provider-contracts/types'
+import {
+  reconcileProviderExtensionsForTarget,
+  suspendProviderExtensionsForTarget,
+} from '../provider-extensions/service'
 import { upsertSecretInDb } from '../secrets/service'
 import {
   createLocalAgentConfigExternalProviderSource,
@@ -505,7 +510,16 @@ function syncRuntimeTarget(
       ),
     )
     .get()
-  const credentialRef = record.credential
+  const credentialLeased = existing
+    ? !!database.select({ id: providerExtensionBindings.id })
+        .from(providerExtensionBindings)
+        .where(and(
+          eq(providerExtensionBindings.providerTargetId, existing.id),
+          eq(providerExtensionBindings.credentialOwner, 'extension'),
+        ))
+        .get()
+    : false
+  const credentialRef = record.credential && !credentialLeased
     ? upsertSecretInDb(database, {
         id: deriveCredentialId(sourceKey, record.externalId),
         kind: record.credential.kind,
@@ -548,10 +562,14 @@ function syncRuntimeTarget(
     .onConflictDoUpdate({
       target: [providerTargets.sourceKey, providerTargets.externalRecordId],
       set: {
-        providerKind: record.providerKind,
         displayName: record.name,
-        connectionConfigJson: JSON.stringify(connectionConfig),
-        credentialRef,
+        ...(!credentialLeased
+          ? {
+              providerKind: record.providerKind,
+              connectionConfigJson: JSON.stringify(connectionConfig),
+              credentialRef,
+            }
+          : {}),
         iconSlug: sourceIconSlug,
         sourceFingerprint: recordFingerprint(record),
         ...(bootstrappedCustomModelsJson ? { customModelsJson } : {}),
@@ -625,11 +643,18 @@ export function getExternalRuntimeTarget(
   return row ? toRuntimeTargetView(row) : null
 }
 
-export function updateExternalRuntimeTargetEnabled(
+export async function updateExternalRuntimeTargetEnabled(
   sourceKey: string,
   externalRecordId: string,
   enabled: boolean,
-): ExternalRuntimeTargetView | null {
+): Promise<ExternalRuntimeTargetView | null> {
+  const existing = db().select().from(providerTargets).where(and(
+    eq(providerTargets.sourceKey, sourceKey),
+    eq(providerTargets.externalRecordId, externalRecordId),
+  )).get()
+  if (existing?.enabled && !enabled) {
+    await suspendProviderExtensionsForTarget(existing.id)
+  }
   const now = nowUnix()
   const updated = db().transaction((tx) => {
     const row = tx
@@ -651,6 +676,9 @@ export function updateExternalRuntimeTargetEnabled(
     }
     return row
   })
+  if (updated?.enabled) {
+    await reconcileProviderExtensionsForTarget(updated.id)
+  }
   return updated ? toRuntimeTargetView(updated) : null
 }
 
@@ -677,8 +705,21 @@ async function refreshSourceSnapshot(
     )
 
     const status = sourceStatusFromWarnings(snapshot.warnings)
-    const seenRecordIds = new Set<string>()
+    const reconciledTargetIds: string[] = []
     let missingCount = 0
+
+    const existingRecordIds = db()
+      .select({ externalId: externalProviderRecords.externalId })
+      .from(externalProviderRecords)
+      .where(eq(externalProviderRecords.sourceKey, sourceKey))
+      .all()
+    const missing = existingRecordIds
+      .filter(row => !snapshot.providers.some(record => record.externalId === row.externalId))
+      .map(row => row.externalId)
+    const missingTargetIds = missing.map(externalId => deriveRuntimeTargetId(sourceKey, externalId))
+    for (const targetId of missingTargetIds) {
+      await suspendProviderExtensionsForTarget(targetId)
+    }
 
     db().transaction((tx) => {
       syncSourceRow(
@@ -697,23 +738,14 @@ async function refreshSourceSnapshot(
       for (const record of snapshot.providers) {
         const recordStatus = record.readonly ? 'unsupported' : 'active'
         syncRecordRow(tx, sourceKey, record, recordStatus)
-        syncRuntimeTarget(tx, sourceKey, record)
-        seenRecordIds.add(record.externalId)
+        const targetId = syncRuntimeTarget(tx, sourceKey, record)
+        if (targetId) {
+          reconciledTargetIds.push(targetId)
+        }
       }
 
-      const existing = tx
-        .select({ externalId: externalProviderRecords.externalId })
-        .from(externalProviderRecords)
-        .where(eq(externalProviderRecords.sourceKey, sourceKey))
-        .all()
-
-      const missing = existing
-        .filter(row => !seenRecordIds.has(row.externalId))
-        .map(row => row.externalId)
       missingCount = missing.length
       if (missing.length > 0) {
-        const missingTargetIds = missing.map(externalId =>
-          deriveRuntimeTargetId(sourceKey, externalId))
         tx.update(externalProviderRecords)
           .set({ status: 'missing', updatedAt: nowUnix() })
           .where(
@@ -733,6 +765,10 @@ async function refreshSourceSnapshot(
           .run()
       }
     })
+
+    for (const targetId of reconciledTargetIds) {
+      await reconcileProviderExtensionsForTarget(targetId)
+    }
 
     return {
       sourceKey,

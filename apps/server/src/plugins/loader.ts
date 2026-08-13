@@ -25,6 +25,7 @@ import { resetExternalIssueSourceRegistry } from './external-issue-source-regist
 import { resetExternalProviderSourceRegistry } from './external-provider-source-registry'
 import { calculatePluginPackageChecksum } from './package-checksum'
 import { listPluginProcesses, stopAllPluginProcesses, stopPluginProcesses } from './process-registry'
+import { resetProviderExtensionRegistry } from './provider-extension-registry'
 import { clearPluginRoutes, dispatchPluginRoute, resetPluginRouteRegistry } from './route-registry'
 import {
   classifyPluginSource,
@@ -329,6 +330,10 @@ async function preparePluginWebLayer(manifest: PluginManifest): Promise<void> {
 
 async function deactivatePluginServerLayer(pluginName: string): Promise<void> {
   const plugin = activePlugins.get(pluginName)
+  if (plugin) {
+    const { suspendProviderExtensionsForOwner } = await import('../modules/provider-extensions/service')
+    await suspendProviderExtensionsForOwner(pluginName)
+  }
   activePlugins.delete(pluginName)
   if (plugin) {
     disposeSubscriptions(pluginName, plugin.subscriptions)
@@ -385,6 +390,7 @@ async function activatePluginServerLayer(manifest: PluginManifest, moduleRevisio
 
   const entryPath = resolve(manifest.packageDir, manifest.cradle.server)
   let subscriptions: Disposable[] = []
+  let deactivate: (() => void | Promise<void>) | undefined
   try {
     setPluginLayerState(manifest.name, 'server', 'activating')
     const moduleUrl = new URL(pathToFileURL(entryPath).href)
@@ -393,6 +399,7 @@ async function activatePluginServerLayer(manifest: PluginManifest, moduleRevisio
     }
     const mod = await import(moduleUrl.href)
     validatePluginModule(mod, manifest.name, 'server')
+    deactivate = mod.deactivate as (() => void | Promise<void>) | undefined
 
     const ctx = createServerPluginContext(manifest, {
       routeSegment: descriptor.routeSegment,
@@ -401,8 +408,11 @@ async function activatePluginServerLayer(manifest: PluginManifest, moduleRevisio
     subscriptions = ctx.subscriptions
     await mod.activate(ctx)
 
+    const { reconcileProviderExtensionsForOwner } = await import('../modules/provider-extensions/service')
+    await reconcileProviderExtensionsForOwner(manifest.name)
+
     activePlugins.set(manifest.name, {
-      deactivate: mod.deactivate as (() => void | Promise<void>) | undefined,
+      deactivate,
       subscriptions: ctx.subscriptions,
     })
     setPluginLayerState(manifest.name, 'server', 'active')
@@ -411,6 +421,18 @@ async function activatePluginServerLayer(manifest: PluginManifest, moduleRevisio
  catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     setPluginLayerState(manifest.name, 'server', 'failed', message)
+    try {
+      await deactivate?.()
+    }
+    catch (cleanupError) {
+      logger.error('plugin activation rollback failed', { plugin: manifest.name, err: cleanupError })
+    }
+    try {
+      await stopPluginProcesses(manifest.name)
+    }
+    catch (cleanupError) {
+      logger.error('plugin activation process rollback failed', { plugin: manifest.name, err: cleanupError })
+    }
     disposeSubscriptions(manifest.name, subscriptions)
     clearPluginRoutes(manifest.name)
     logger.error('plugin activation failed', { plugin: manifest.name, err })
@@ -492,6 +514,7 @@ export async function activateServerPlugins(
   resetPluginRuntimeRegistry()
   resetPluginRouteRegistry()
   resetExternalProviderSourceRegistry()
+  resetProviderExtensionRegistry()
   resetExternalIssueSourceRegistry()
   resetConversationBridgeAdapterRegistry()
 
@@ -721,6 +744,8 @@ async function executeDiscoveredSourceCleanup(plan: PluginSourceRemovalPlan): Pr
     })
   }
   for (const plugin of plan.plugins) {
+    const { removeProviderExtensionsForOwner } = await import('../modules/provider-extensions/service')
+    await removeProviderExtensionsForOwner(plugin.identity)
     await stopPluginProcesses(plugin.identity)
     if (!pluginHostServices && plugin.resources.length > 0) {
       throw new Error('Plugin managed resources are unavailable in this host.')
@@ -796,6 +821,7 @@ function requirePluginManifest(pluginName: string): PluginManifest {
 export async function disablePlugin(pluginName: string, reason?: string): Promise<PluginDescriptor> {
   const descriptor = requirePluginDescriptor(pluginName)
   const manifest = requirePluginManifest(descriptor.identity)
+  await deactivatePluginServerLayer(descriptor.identity)
   const policy = setPluginActivationPolicy(descriptor.identity, {
     enabled: false,
     reason: toDisabledReason(reason),
@@ -806,8 +832,6 @@ export async function disablePlugin(pluginName: string, reason?: string): Promis
     reason: policy.reason ?? undefined,
     updatedAt: policy.updatedAt,
   })
-
-  await deactivatePluginServerLayer(descriptor.identity)
   markPluginLayersDisabled(manifest, toDisabledReason(policy.reason))
   return requirePluginDescriptor(descriptor.identity)
 }
@@ -851,6 +875,7 @@ export async function deactivateAllPlugins(): Promise<void> {
   resetPluginSkillRegistry()
   resetPluginRouteRegistry()
   resetExternalProviderSourceRegistry()
+  resetProviderExtensionRegistry()
   resetExternalIssueSourceRegistry()
   resetConversationBridgeAdapterRegistry()
   resetPluginUninstallRegistry()

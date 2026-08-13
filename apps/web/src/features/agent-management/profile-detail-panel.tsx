@@ -84,6 +84,7 @@ import {
 import { CustomModelsEditor } from './custom-models-editor'
 import { ModelsPanel } from './models-panel'
 import { ProviderConnectionTestControls } from './provider-connection-test'
+import { ProviderExtensionsContainer } from './provider-extensions/provider-extensions-container'
 import {
   ALL_DISABLED_SENTINEL,
   presetForProviderKind,
@@ -1339,6 +1340,10 @@ function ProfileGeneralSettings({
             </div>
           </div>
         </section>
+      )}
+
+      {supportsModels && (
+        <ProviderExtensionsContainer providerTargetId={profile.id} disabled={readOnly} />
       )}
     </div>
   )

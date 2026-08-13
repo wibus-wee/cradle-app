@@ -5310,11 +5310,9 @@ describe('chat runtime capability', () => {
     const workspaceRoot = makeTempDir('cradle-workspace-')
     const previousDataDir = process.env.CRADLE_DATA_DIR
     const previousSecret = process.env.CRADLE_CREDENTIAL_SECRET
-    const previousAuthToken = process.env.CRADLE_AUTH_TOKEN
     const previousAuthRequired = process.env.CRADLE_AUTH_REQUIRED
     process.env.CRADLE_DATA_DIR = dataDir
     process.env.CRADLE_CREDENTIAL_SECRET = 'chat-runtime-secret'
-    delete process.env.CRADLE_AUTH_TOKEN
     delete process.env.CRADLE_AUTH_REQUIRED
 
     const runtime = new TestProviderSyntheticTurnRuntime(25, null, true)
@@ -5429,7 +5427,6 @@ describe('chat runtime capability', () => {
       rmSync(workspaceRoot, { recursive: true, force: true })
       restoreEnv('CRADLE_DATA_DIR', previousDataDir)
       restoreEnv('CRADLE_CREDENTIAL_SECRET', previousSecret)
-      restoreEnv('CRADLE_AUTH_TOKEN', previousAuthToken)
       restoreEnv('CRADLE_AUTH_REQUIRED', previousAuthRequired)
     }
   })

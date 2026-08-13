@@ -45,6 +45,7 @@ export const providerTargetFixtures = [
     kind: 'manual',
     name: 'OpenAI',
     providerKind: 'openai-compatible',
+    effectiveProviderKinds: ['openai-compatible'],
     enabled: true,
     iconSlug: 'openai',
     sourceKey: null,

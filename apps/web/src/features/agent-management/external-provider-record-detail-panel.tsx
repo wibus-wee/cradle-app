@@ -34,6 +34,7 @@ import { ClaudeModelMatrixEditor } from './claude-model-matrix-editor'
 import { CustomModelsEditor } from './custom-models-editor'
 import { ModelsPanel } from './models-panel'
 import { ProviderConnectionTestControls } from './provider-connection-test'
+import { ProviderExtensionsContainer } from './provider-extensions/provider-extensions-container'
 import type {
   ExternalProviderRecordView,
   ExternalProviderRuntimeTargetView,
@@ -548,6 +549,13 @@ export function ExternalProviderRecordDetailPanel({
             <SettingsRow label="Connection test" description="Probe the endpoint and credentials on demand">
               <ProviderConnectionTestControls providerTargetId={record.providerTargetId} />
             </SettingsRow>
+          </>
+        )}
+
+        {record.providerTargetId && (
+          <>
+            <Separator className="bg-foreground/6" />
+            <ProviderExtensionsContainer providerTargetId={record.providerTargetId} />
           </>
         )}
 

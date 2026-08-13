@@ -84,6 +84,31 @@ describe('httpArtifactDownloader', () => {
     expect(existsSync(path.join(rootDir, 'partial', 'task-200.part'))).toBe(false)
   })
 
+  it('requests identity encoding for fresh responses', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(streamResponse([
+      new TextEncoder().encode('abcdef'),
+    ], { headers: { 'content-length': '6' } }))
+    const downloader = new HttpArtifactDownloader({ rootDir, fetch: fetchMock })
+
+    await downloader.download({ taskId: 'identity', request: request() })
+
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('accept-encoding')).toBe('identity')
+  })
+
+  it('does not compare a transparently decoded body with compressed Content-Length', async () => {
+    const downloader = new HttpArtifactDownloader({
+      rootDir,
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(streamResponse([
+        new TextEncoder().encode('abcdef'),
+      ], { headers: { 'content-encoding': 'gzip', 'content-length': '3' } })),
+    })
+
+    const result = await downloader.download({ taskId: 'decoded-body', request: request() })
+
+    expect(result.artifact.bytes).toBe(6)
+    expect(await readFile(result.artifact.filePath, 'utf8')).toBe('abcdef')
+  })
+
   it('waits for the destination writer to close before promotion resolves', async () => {
     let writerClosed = false
     const downloader = new HttpArtifactDownloader({

@@ -317,6 +317,157 @@ export interface ServerPluginSkillRegistry {
 export interface ServerPluginProviderRegistries {
   /** External provider sources that return host-rendered provider snapshots */
   externalSources: ExternalProviderSourceRegistry
+
+  /** Per-Provider protocol and credential extensions owned by this plugin. */
+  extensions: ProviderExtensionRegistry
+}
+
+export type ProviderExtensionProviderKind = 'openai-compatible' | 'anthropic' | 'universal'
+export type ProviderExtensionCredentialStrategy = 'borrowed-static' | 'exclusive-refreshable'
+export type ProviderExtensionCredentialKind = 'api-key' | 'chatgpt-auth'
+
+export type ProviderExtensionJsonValue
+  = | string
+    | number
+    | boolean
+    | null
+    | ProviderExtensionJsonValue[]
+    | { [key: string]: ProviderExtensionJsonValue }
+
+export interface ProviderExtensionTargetDescriptor {
+  id: string
+  name: string
+  enabled: boolean
+  targetKind: 'manual' | 'external'
+  providerKind: ProviderExtensionProviderKind
+  config: { [key: string]: ProviderExtensionJsonValue }
+  connectionConfig: { [key: string]: ProviderExtensionJsonValue }
+  credentialKind: ProviderExtensionCredentialKind | null
+  modelIds: string[]
+}
+
+export type ProviderExtensionApplicability
+  = | {
+    applicable: true
+    credentialStrategy: ProviderExtensionCredentialStrategy
+  }
+  | {
+      applicable: false
+      reason: string
+    }
+
+export interface ProviderExtensionConversion {
+  fromProviderKind: ProviderExtensionProviderKind
+  routedProviderKinds: ProviderExtensionProviderKind[]
+  addedProviderKinds: ProviderExtensionProviderKind[]
+}
+
+export interface ProviderExtensionCredentialMaterial {
+  kind: ProviderExtensionCredentialKind
+  value: string
+}
+
+export interface ProviderExtensionOutputCredential {
+  kind: string
+  label: string
+  value: string
+}
+
+export interface ProviderExtensionActivation {
+  providerKinds: ProviderExtensionProviderKind[]
+  state: { [key: string]: ProviderExtensionJsonValue }
+  outputCredential?: ProviderExtensionOutputCredential
+}
+
+export type ProviderExtensionDisableReason
+  = | 'user-disabled'
+    | 'provider-disabled'
+    | 'provider-deleted'
+    | 'plugin-disabled'
+    | 'plugin-uninstalled'
+    | 'permission-revoked'
+    | 'extension-inapplicable'
+
+export interface ProviderExtensionLifecycleContext {
+  bindingId: string
+  target: ProviderExtensionTargetDescriptor
+  activationState: { [key: string]: ProviderExtensionJsonValue }
+}
+
+export interface ProviderExtensionEnableContext extends ProviderExtensionLifecycleContext {
+  sourceCredential: ProviderExtensionCredentialMaterial | null
+}
+
+export interface ProviderExtensionDisableContext extends ProviderExtensionLifecycleContext {
+  reason: ProviderExtensionDisableReason
+}
+
+export interface ProviderExtensionDisableResult {
+  state?: { [key: string]: ProviderExtensionJsonValue }
+}
+
+export interface ProviderExtensionReconcileContext extends ProviderExtensionLifecycleContext {
+  sourceCredential: ProviderExtensionCredentialMaterial | null
+  credentialStrategy: ProviderExtensionCredentialStrategy
+  leaseEpoch: number
+}
+
+export interface ProviderExtensionResolveContext extends ProviderExtensionLifecycleContext {
+  runtimeProviderKinds: ProviderExtensionProviderKind[]
+  publicModelId?: string
+}
+
+export interface ProviderExtensionRuntimeProjection {
+  providerKind: ProviderExtensionProviderKind
+  config: { [key: string]: ProviderExtensionJsonValue }
+  effectiveModelId?: string
+}
+
+export interface ProviderExtensionCredentialLeaseContext extends ProviderExtensionLifecycleContext {
+  leaseEpoch: number
+  leaseState: { [key: string]: ProviderExtensionJsonValue }
+}
+
+export interface ProviderExtensionCredentialLeasePrepareAcquireContext
+  extends Omit<ProviderExtensionCredentialLeaseContext, 'leaseState'> {
+  sourceCredential: ProviderExtensionCredentialMaterial
+}
+
+export interface ProviderExtensionCredentialLeasePrepareAcquireResult {
+  leaseState: { [key: string]: ProviderExtensionJsonValue }
+}
+
+export interface ProviderExtensionCredentialLeasePrepareReleaseResult {
+  credential: ProviderExtensionCredentialMaterial
+  leaseState: { [key: string]: ProviderExtensionJsonValue }
+}
+
+export interface ProviderExtensionExclusiveCredentialLease {
+  prepareAcquire: (
+    ctx: ProviderExtensionCredentialLeasePrepareAcquireContext,
+  ) => Promise<ProviderExtensionCredentialLeasePrepareAcquireResult>
+  commitAcquire: (ctx: ProviderExtensionCredentialLeaseContext) => Promise<void>
+  prepareRelease: (
+    ctx: ProviderExtensionCredentialLeaseContext,
+  ) => Promise<ProviderExtensionCredentialLeasePrepareReleaseResult>
+  commitRelease: (ctx: ProviderExtensionCredentialLeaseContext) => Promise<void>
+}
+
+export interface ProviderExtension {
+  id: string
+  label: string
+  description?: string
+  conversions: ProviderExtensionConversion[]
+  getApplicability: (target: ProviderExtensionTargetDescriptor) => ProviderExtensionApplicability
+  onEnable: (ctx: ProviderExtensionEnableContext) => Promise<ProviderExtensionActivation>
+  onDisable: (ctx: ProviderExtensionDisableContext) => Promise<ProviderExtensionDisableResult | void>
+  onReconcile: (ctx: ProviderExtensionReconcileContext) => Promise<ProviderExtensionActivation>
+  resolveRuntime: (ctx: ProviderExtensionResolveContext) => ProviderExtensionRuntimeProjection
+  credentialLease?: ProviderExtensionExclusiveCredentialLease
+}
+
+export interface ProviderExtensionRegistry {
+  register: (extension: ProviderExtension) => Disposable
 }
 
 export interface ServerPluginIssueRegistries {
