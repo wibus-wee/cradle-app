@@ -118,7 +118,7 @@ export function useCradlePullRequests() {
   const entries = useMemo(() => {
     const authoredItems = authoredQuery.data?.pages.flatMap(page => page.items) ?? []
     const reviewingItems = reviewingQuery.data?.pages.flatMap(page => page.items) ?? []
-    const workByRef = indexWorksByPullRequestRef(workQuery.data ?? [])
+    const workByRef = indexWorksByPullRequestRef(workQuery.data?.items ?? [])
     const authored = toEntries(authoredItems, 'authored', workByRef)
     const authoredRefs = new Set(authored.map(entry => entry.id))
     const reviewingByRef = new Map<string, PullRequestView>()

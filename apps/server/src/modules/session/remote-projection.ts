@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { remoteSessionLinks, sessions } from '@cradle/db'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
@@ -82,6 +82,27 @@ export function readSessionExecutionTarget(localSessionId: string): SessionExecu
     hostId: link.hostId,
     remoteSessionId: link.remoteSessionId,
   }
+}
+
+/** Read execution projections for a bounded Session page in one query. */
+export function readSessionExecutionTargets(
+  localSessionIds: readonly string[],
+): Map<string, SessionExecutionTarget> {
+  if (localSessionIds.length === 0) {
+    return new Map()
+  }
+  const links = db()
+    .select()
+    .from(remoteSessionLinks)
+    .where(inArray(remoteSessionLinks.localSessionId, [...localSessionIds]))
+    .all()
+  const linksBySessionId = new Map(links.map(link => [link.localSessionId, link]))
+  return new Map(localSessionIds.map((sessionId) => {
+    const link = linksBySessionId.get(sessionId)
+    return [sessionId, link
+      ? { kind: 'remote-host', hostId: link.hostId, remoteSessionId: link.remoteSessionId }
+      : { kind: 'local' }] as const
+  }))
 }
 
 function readRemoteWorkspaceLocator(workspaceId: string) {

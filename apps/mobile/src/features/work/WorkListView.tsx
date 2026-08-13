@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react-native'
 import { useRef } from 'react'
-import { Keyboard, StyleSheet, Text, View } from 'react-native'
+import { Keyboard, SectionList, StyleSheet, Text, View } from 'react-native'
 
 import type { GetWorkspacesResponse, GetWorksResponse, PostWorksData } from '@/api-gen'
 import type { AppSection } from '@/components/common/app-menu-button'
@@ -19,7 +19,7 @@ import { useTheme } from '@/theme/use-theme'
 import type { WorkComposerHandle } from './WorkComposer'
 import { WorkComposer } from './WorkComposer'
 
-type Work = GetWorksResponse[number]
+type Work = GetWorksResponse['items'][number]
 type Workspace = GetWorkspacesResponse[number]
 
 export interface WorkListViewProps {
@@ -86,61 +86,63 @@ export function WorkListView({
         composerRef.current?.collapse()
         Keyboard.dismiss()
       }}
-      onRefresh={onRefresh}
-      refreshing={isRefreshing}
+      scroll={false}
       title="Work"
     >
-      {works.length === 0
-        ? (
-            <EmptyState
-              description="Create an isolated Work to let an agent build against a project."
-              title="No active Work"
-            />
-          )
-        : (
-            <View>
-              {groups.map(group => (
-                <View key={group.title} style={styles.group}>
-                  <SectionHeading title={group.title} />
-                  {group.works.map(work => (
-                    <Item
-                      description={work.objective}
-                      footer={(
-                        <View style={styles.meta}>
-                          <StatusPill label={work.activity} tone={activityTone(work.activity)} />
-                          <Text style={[styles.time, { color: theme.mutedForeground }]}>{relativeTime(work.updatedAt)}</Text>
-                        </View>
-                      )}
-                      key={work.id}
-                      media={<View style={[styles.workDot, { backgroundColor: activityTone(work.activity) === 'neutral' ? theme.dimForeground : activityTone(work.activity) === 'success' ? theme.success : activityTone(work.activity) === 'danger' ? theme.destructive : theme.warning }]} />}
-                      onPress={() => onOpen(work.primarySessionId)}
-                      actions={(
-                        <IconButton
-                          accessibilityLabel={`Open info for ${work.title}`}
-                          icon={Info}
-                          onPress={() => onOpenInfo(work.id)}
-                          stopPropagation
-                        />
-                      )}
-                      title={work.title}
-                    />
-                  ))}
-                </View>
-              ))}
-            </View>
-          )}
+      <SectionList
+        contentContainerStyle={works.length === 0 ? styles.emptyList : undefined}
+        keyboardShouldPersistTaps="handled"
+        ListEmptyComponent={(
+          <EmptyState
+            description="Create an isolated Work to let an agent build against a project."
+            title="No active Work"
+          />
+        )}
+        onRefresh={onRefresh}
+        refreshing={isRefreshing}
+        renderSectionHeader={({ section }) => <SectionHeading title={section.title} />}
+        renderItem={({ item: work }) => (
+          <Item
+            description={work.objective}
+            footer={(
+              <View style={styles.meta}>
+                <StatusPill label={work.activity} tone={activityTone(work.activity)} />
+                <Text style={[styles.time, { color: theme.mutedForeground }]}>{relativeTime(work.updatedAt)}</Text>
+              </View>
+            )}
+            media={<View style={[styles.workDot, { backgroundColor: activityTone(work.activity) === 'neutral' ? theme.dimForeground : activityTone(work.activity) === 'success' ? theme.success : activityTone(work.activity) === 'danger' ? theme.destructive : theme.warning }]} />}
+            onPress={() => onOpen(work.primarySessionId)}
+            actions={(
+              <IconButton
+                accessibilityLabel={`Open info for ${work.title}`}
+                icon={Info}
+                onPress={() => onOpenInfo(work.id)}
+                stopPropagation
+              />
+            )}
+            title={work.title}
+          />
+        )}
+        sections={groups.map(group => ({ title: group.title, data: group.works }))}
+        stickySectionHeadersEnabled={false}
+        style={styles.list}
+      />
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  group: {
-    marginBottom: spacing.md,
+  emptyList: {
+    flexGrow: 1,
   },
   meta: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  list: {
+    flex: 1,
+    marginBottom: spacing.md,
   },
   time: {
     fontSize: 12,

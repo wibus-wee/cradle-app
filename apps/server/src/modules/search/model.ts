@@ -74,8 +74,8 @@ export const SearchModel = {
     query: t.String({ minLength: 1 }),
     workspaceId: t.Optional(t.String()),
     origin: t.Optional(t.String({ minLength: 1 })),
-    limit: t.Optional(t.Numeric({ minimum: 1 })),
-    snippetsPerHit: t.Optional(t.Numeric({ minimum: 1 })),
+    limit: t.Optional(t.Numeric({ minimum: 1, maximum: 100 })),
+    snippetsPerHit: t.Optional(t.Numeric({ minimum: 1, maximum: 10 })),
   }),
 
   chronicleSearchQuery: t.Object({

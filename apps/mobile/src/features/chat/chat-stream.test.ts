@@ -29,9 +29,11 @@ describe('mobile chat stream', () => {
       'data: [DONE]\n\n',
     ].join(''), [1, 2, 7, 3, 11, 5, 13])
     const chunks: UIMessageChunk[] = []
-
-    for await (const chunk of createUIMessageChunkStream(response)) {
-      chunks.push(chunk)
+    const reader = createUIMessageChunkStream(response).getReader()
+    while (true) {
+      const next = await reader.read()
+      if (next.done) { break }
+      chunks.push(next.value)
     }
 
     expect(chunks).toEqual([

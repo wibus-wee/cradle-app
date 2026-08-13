@@ -393,6 +393,20 @@
       "when": 1786324272266,
       "tag": "0055_outgoing_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "6",
+      "when": 1786588364345,
+      "tag": "0056_thread_search_fts",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1786590000000,
+      "tag": "0057_chronicle_embedding_candidates",
+      "breakpoints": true
     }
   ]
 }

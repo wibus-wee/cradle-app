@@ -13,16 +13,7 @@ export const session = new Elysia({
   prefix: '/sessions',
   detail: { tags: ['session'] },
 })
-  .get('/', ({ query }) => {
-    const sessions = Session.list(query)
-    // Best-effort: sync titles from remote host for any remote-projected sessions.
-    for (const s of sessions) {
-      if (s.execution.kind === 'remote-host') {
-        void syncRemoteSessionTitle(s.id)
-      }
-    }
-    return sessions
-  }, {
+  .get('/', ({ query }) => Session.list(query), {
     detail: {
       'summary': 'List sessions',
       'x-cradle-cli': {
@@ -30,7 +21,7 @@ export const session = new Elysia({
       },
     },
     query: SessionModel.listQuery,
-    response: { 200: t.Array(SessionModel.session) },
+    response: { 200: SessionModel.page },
   })
   .get(
     '/:id',

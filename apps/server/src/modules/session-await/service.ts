@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { awaitBypassRules, sessionAwaits, sessions, workspaces } from '@cradle/db'
-import { and, asc, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
@@ -615,6 +615,24 @@ export function getSessionSummary(sessionId: string): SessionAwaitSummary {
     primarySource: first.source,
     reason: first.reason,
   }
+}
+
+export function listAwaitingSessionIds(sessionIds: readonly string[]): Set<string> {
+  if (sessionIds.length === 0) {
+    return new Set()
+  }
+  return new Set(
+    db()
+      .select({ sessionId: sessionAwaits.chatSessionId })
+      .from(sessionAwaits)
+      .where(and(
+        inArray(sessionAwaits.chatSessionId, [...sessionIds]),
+        eq(sessionAwaits.status, 'pending'),
+      ))
+      .groupBy(sessionAwaits.chatSessionId)
+      .all()
+      .map(row => row.sessionId),
+  )
 }
 
 // ── bypass rules ──

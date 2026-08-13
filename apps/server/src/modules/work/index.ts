@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia'
+import { Elysia } from 'elysia'
 
 import { AppError } from '../../errors/app-error'
 import { registerWorkHarnessContextSource } from './agent-context'
@@ -17,7 +17,7 @@ export const work = new Elysia({
       'x-cradle-cli': { command: ['work', 'list'] },
     },
     query: WorkModel.listQuery,
-    response: { 200: t.Array(WorkModel.summary) },
+    response: { 200: WorkModel.page },
   })
   .get('/:id', async ({ params }) => {
     const detail = await Work.get(params.id)

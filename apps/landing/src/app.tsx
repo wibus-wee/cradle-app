@@ -1,8 +1,5 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 
-import { BlogPage } from './components/blog'
-import { BlogPostPage } from './components/blog-post'
-import { ChangelogPage } from './components/changelog'
 import { CTASection } from './components/cta-section'
 import { DetailsSection } from './components/details'
 import { FAQ } from './components/faq'
@@ -13,6 +10,7 @@ import { Hero } from './components/hero'
 import { HowItWorks } from './components/how-it-works'
 import { Nav } from './components/nav'
 import { ProductPreview } from './components/product-preview'
+import { BlogPage, BlogPostPage, ChangelogPage } from './lazy-routes'
 
 type Route = { name: 'home' } | { name: 'changelog' } | { name: 'blog' } | { name: 'blog-post', slug: string }
 
@@ -108,7 +106,9 @@ export function App() {
   return (
     <div style={{ position: 'relative' }}>
       <Nav />
-      {routeContent}
+      <Suspense fallback={<main style={{ minHeight: '70vh' }} />}>
+        {routeContent}
+      </Suspense>
       <Footer />
     </div>
   )

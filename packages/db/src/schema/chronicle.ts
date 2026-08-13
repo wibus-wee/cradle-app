@@ -228,6 +228,26 @@ export const chronicleMemoryEmbeddings = sqliteTable('chronicle_memory_embedding
   byVectorHash: index('chronicle_memory_embeddings_vector_hash_idx').on(table.vectorHash),
 }))
 
+/** Rebuildable ANN bucket projection used to select bounded embedding candidates. */
+export const chronicleMemoryEmbeddingBuckets = sqliteTable('chronicle_memory_embedding_buckets', {
+  id: textPk(),
+  embeddingId: text('embedding_id')
+    .notNull()
+    .references(() => chronicleMemoryEmbeddings.id, { onDelete: 'cascade' }),
+  memoryId: text('memory_id')
+    .notNull()
+    .references(() => chronicleMemories.id, { onDelete: 'cascade' }),
+  modelId: text('model_id').notNull(),
+  modelVersion: text('model_version').notNull(),
+  bandIndex: int('band_index').notNull(),
+  bucketKey: text('bucket_key').notNull(),
+  createdAt: int('created_at').notNull(),
+}, table => ({
+  byEmbeddingBand: uniqueIndex('chronicle_memory_embedding_buckets_embedding_band_unique').on(table.embeddingId, table.bandIndex),
+  byCandidate: index('chronicle_memory_embedding_buckets_candidate_idx').on(table.modelId, table.modelVersion, table.bandIndex, table.bucketKey),
+  byMemory: index('chronicle_memory_embedding_buckets_memory_id_idx').on(table.memoryId),
+}))
+
 export const chronicleKnowledgeCards = sqliteTable('chronicle_knowledge_cards', {
   id: textPk(),
   workspaceId: text('workspace_id')
@@ -689,6 +709,8 @@ export type ChronicleMemoryKeyword = typeof chronicleMemoryKeywords.$inferSelect
 export type NewChronicleMemoryKeyword = typeof chronicleMemoryKeywords.$inferInsert
 export type ChronicleMemoryEmbedding = typeof chronicleMemoryEmbeddings.$inferSelect
 export type NewChronicleMemoryEmbedding = typeof chronicleMemoryEmbeddings.$inferInsert
+export type ChronicleMemoryEmbeddingBucket = typeof chronicleMemoryEmbeddingBuckets.$inferSelect
+export type NewChronicleMemoryEmbeddingBucket = typeof chronicleMemoryEmbeddingBuckets.$inferInsert
 export type ChronicleKnowledgeCard = typeof chronicleKnowledgeCards.$inferSelect
 export type NewChronicleKnowledgeCard = typeof chronicleKnowledgeCards.$inferInsert
 export type ChronicleKnowledgeVersion = typeof chronicleKnowledgeVersions.$inferSelect

@@ -156,3 +156,36 @@ export function tokenizeBlocks(content: string): BlockInfo[] {
   }
   return result
 }
+
+export interface BlockTokenizationSnapshot {
+  content: string
+  blocks: BlockInfo[]
+}
+
+/**
+ * Retokenize only the active tail when streaming content grows. Markdown can
+ * change the meaning of the final block as text is appended, while every block
+ * before it is structurally closed and can keep both its parse boundary and
+ * React identity.
+ */
+export function tokenizeBlocksIncremental(
+  content: string,
+  previous: BlockTokenizationSnapshot,
+): BlockInfo[] {
+  const previousTail = previous.blocks.at(-1)
+  if (!previousTail) {
+    return tokenizeBlocks(content)
+  }
+
+  const tailOffset = previousTail.startOffset
+  if (content.slice(0, tailOffset) !== previous.content.slice(0, tailOffset)) {
+    return tokenizeBlocks(content)
+  }
+
+  const stableBlocks = previous.blocks.slice(0, -1)
+  const tailBlocks = tokenizeBlocks(content.slice(tailOffset)).map(block => ({
+    content: block.content,
+    startOffset: block.startOffset + tailOffset,
+  }))
+  return [...stableBlocks, ...tailBlocks]
+}

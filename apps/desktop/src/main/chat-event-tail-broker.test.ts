@@ -145,6 +145,44 @@ describe('chat event tail broker', () => {
     ])
   })
 
+  it('supports an internal global listener and aborts its unobserved upstream', async () => {
+    const controlled = createControlledSseResponse()
+    let upstreamSignal: AbortSignal | null = null
+    const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      upstreamSignal = init?.signal ?? null
+      return controlled.response
+    })
+    const broker = new ChatEventTailBroker({
+      serverUrl: 'http://127.0.0.1:21423',
+      fetchFn: fetchFn as typeof fetch,
+    })
+    const onEvent = vi.fn()
+
+    const unsubscribe = broker.subscribeGlobalSessionEventsListener(
+      { afterSequenceId: 4 },
+      { onEvent },
+    )
+    await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1))
+    controlled.controller.enqueue(encodeGlobalSessionEvent({
+      scope: 'sessions',
+      sessionId: 'session-internal',
+      sequenceId: 5,
+      version: 2,
+      type: 'RunCompleted',
+      occurredAt: 100,
+      payload: { runId: 'run-internal' },
+    }, 5))
+
+    await vi.waitFor(() => expect(onEvent).toHaveBeenCalledWith(expect.objectContaining({
+      sequenceId: 5,
+      type: 'RunCompleted',
+    })))
+    unsubscribe()
+
+    expect((upstreamSignal as AbortSignal | null)?.aborted).toBe(true)
+    expect(broker.diagnostics().tails).toEqual([])
+  })
+
   it('shares one upstream session event tail across multiple renderer subscribers', async () => {
     const controlled = createControlledSseResponse()
     const fetchFn = vi.fn(async () => controlled.response)

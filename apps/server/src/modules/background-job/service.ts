@@ -16,6 +16,7 @@ import type {
   BackgroundJobTerminalStatus,
   BackgroundJobView,
   JsonObject,
+  JsonValue,
 } from './types'
 
 const ACTIVE_STATUSES = ['pending', 'running'] as const
@@ -55,7 +56,21 @@ function parseJsonObject(value: string | null): JsonObject | null {
 }
 
 function stringifyJsonObject(value: JsonObject | null | undefined): string | null {
-  return value === null || value === undefined ? null : JSON.stringify(value)
+  return value === null || value === undefined ? null : JSON.stringify(normalizeJsonValue(value))
+}
+
+function normalizeJsonValue(value: JsonValue): JsonValue {
+  if (Array.isArray(value)) {
+    return value.map(normalizeJsonValue)
+  }
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, child]) => [key, normalizeJsonValue(child)]),
+    )
+  }
+  return value
 }
 
 function toView(row: BackgroundJob): BackgroundJobView {
@@ -130,7 +145,7 @@ export function enqueue(input: EnqueueBackgroundJobInput): BackgroundJobView {
       sourceRunId: input.sourceRunId ?? null,
       attempts: input.attempts ?? 1,
       maxAttempts: input.maxAttempts ?? 1,
-      contextJson: JSON.stringify(input.context ?? {}),
+      contextJson: stringifyJsonObject(input.context ?? {}) ?? '{}',
       progressJson: stringifyJsonObject(input.progress),
       startedAt: status === 'running' ? now : null,
       createdAt: now,
@@ -192,25 +207,42 @@ function writeSourceObservation(
 ): BackgroundJob {
   const now = currentUnixSeconds()
   const terminal = TERMINAL_STATUSES.includes(observation.status as BackgroundJobTerminalStatus)
+  const next = {
+    status: observation.status,
+    progressJson:
+      observation.progress === undefined
+        ? row.progressJson
+        : stringifyJsonObject(observation.progress),
+    resultJson: stringifyJsonObject(observation.result),
+    errorCode: observation.errorCode ?? null,
+    errorMessage: observation.errorMessage ?? null,
+    errorDetailsJson: stringifyJsonObject(observation.errorDetails),
+    startedAt:
+      observation.startedAt
+      ?? row.startedAt
+      ?? (observation.status === 'running' || terminal ? now : null),
+    finishedAt: terminal ? (observation.finishedAt ?? now) : null,
+    projectedAt: terminal ? null : row.projectedAt,
+    projectionError: terminal ? null : row.projectionError,
+  }
+  const unchanged
+    = row.status === next.status
+      && row.progressJson === next.progressJson
+      && row.resultJson === next.resultJson
+      && row.errorCode === next.errorCode
+      && row.errorMessage === next.errorMessage
+      && row.errorDetailsJson === next.errorDetailsJson
+      && row.startedAt === next.startedAt
+      && row.finishedAt === next.finishedAt
+      && row.projectedAt === next.projectedAt
+      && row.projectionError === next.projectionError
+  if (unchanged) {
+    return row
+  }
   db()
     .update(backgroundJobs)
     .set({
-      status: observation.status,
-      progressJson:
-        observation.progress === undefined
-          ? row.progressJson
-          : stringifyJsonObject(observation.progress),
-      resultJson: stringifyJsonObject(observation.result),
-      errorCode: observation.errorCode ?? null,
-      errorMessage: observation.errorMessage ?? null,
-      errorDetailsJson: stringifyJsonObject(observation.errorDetails),
-      startedAt:
-        observation.startedAt
-        ?? row.startedAt
-        ?? (observation.status === 'running' || terminal ? now : null),
-      finishedAt: terminal ? (observation.finishedAt ?? now) : null,
-      projectedAt: terminal ? null : row.projectedAt,
-      projectionError: terminal ? null : row.projectionError,
+      ...next,
       updatedAt: now,
     })
     .where(and(eq(backgroundJobs.id, row.id), inArray(backgroundJobs.status, ACTIVE_STATUSES)))
@@ -288,13 +320,20 @@ export async function reconcileOne(id: string): Promise<BackgroundJobView> {
       try {
         row = writeSourceObservation(row, await adapter.read(toView(row)))
       }
- catch (error) {
+      catch (error) {
         const now = currentUnixSeconds()
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        if (
+          row.errorCode === 'background_job_source_poll_failed'
+          && row.errorMessage === errorMessage
+        ) {
+          return get(row.id)
+        }
         db()
           .update(backgroundJobs)
           .set({
             errorCode: 'background_job_source_poll_failed',
-            errorMessage: error instanceof Error ? error.message : String(error),
+            errorMessage,
             updatedAt: now,
           })
           .where(

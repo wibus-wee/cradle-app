@@ -8,6 +8,7 @@ import { useConnection } from '@/features/connection/connection-context'
 import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
+import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 
 import { useCreateWork } from './use-create-work'
 import { WorkListView } from './WorkListView'
@@ -22,20 +23,19 @@ export function WorkListContainer() {
     queryKey: ['works', connection?.url],
     queryFn: async ({ signal }) => {
       const [works, workspaces] = await Promise.all([
-        cradleRequest<GetWorksResponse>(connection!, '/works?archived=false', { signal }),
+        cradleRequest<GetWorksResponse>(connection!, '/works?archived=false&limit=200', { signal }),
         cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
       ])
       return {
-        works: works.sort((a, b) => b.updatedAt - a.updatedAt),
+        works: works.items.sort((a, b) => b.updatedAt - a.updatedAt),
         workspaces: workspaces.filter(
           workspace =>
             workspace.availability === 'available' && workspace.locator.kind !== 'managed-worktree',
         ),
       }
     },
-    refetchInterval: data =>
-      data.state.data?.works.some(work => work.activity === 'running') ? 5_000 : false,
   })
+  useSessionSummaryEvents(connection, isRouteActive, () => { void query.refetch() })
 
   const refresh = async () => {
     setIsRefreshing(true)

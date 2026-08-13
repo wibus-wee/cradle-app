@@ -3461,6 +3461,33 @@ export const getSessionsOptions = (options?: Options<GetSessionsData>) => queryO
     queryKey: getSessionsQueryKey(options)
 });
 
+export const getSessionsInfiniteQueryKey = (options?: Options<GetSessionsData>): QueryKey<Options<GetSessionsData>> => createQueryKey('getSessions', options, true);
+
+/**
+ * List sessions
+ */
+export const getSessionsInfiniteOptions = (options?: Options<GetSessionsData>) => infiniteQueryOptions<GetSessionsResponse, DefaultError, InfiniteData<GetSessionsResponse>, QueryKey<Options<GetSessionsData>>, string | Pick<QueryKey<Options<GetSessionsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+// @ts-ignore
+{
+    queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<QueryKey<Options<GetSessionsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+            query: {
+                cursor: pageParam
+            }
+        };
+        const params = createInfiniteParams(queryKey, page);
+        const { data } = await getSessions({
+            ...options,
+            ...params,
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getSessionsInfiniteQueryKey(options)
+});
+
 /**
  * Create session
  */
@@ -4029,6 +4056,33 @@ export const getWorksOptions = (options?: Options<GetWorksData>) => queryOptions
         return data;
     },
     queryKey: getWorksQueryKey(options)
+});
+
+export const getWorksInfiniteQueryKey = (options?: Options<GetWorksData>): QueryKey<Options<GetWorksData>> => createQueryKey('getWorks', options, true);
+
+/**
+ * List Work containers
+ */
+export const getWorksInfiniteOptions = (options?: Options<GetWorksData>) => infiniteQueryOptions<GetWorksResponse, DefaultError, InfiniteData<GetWorksResponse>, QueryKey<Options<GetWorksData>>, string | Pick<QueryKey<Options<GetWorksData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+// @ts-ignore
+{
+    queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<QueryKey<Options<GetWorksData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+            query: {
+                cursor: pageParam
+            }
+        };
+        const params = createInfiniteParams(queryKey, page);
+        const { data } = await getWorks({
+            ...options,
+            ...params,
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getWorksInfiniteQueryKey(options)
 });
 
 /**

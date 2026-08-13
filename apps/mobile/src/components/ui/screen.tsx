@@ -98,7 +98,7 @@ export function Screen({
               {dismissibleContent}
             </ScrollView>
           )
-        : <View style={styles.content}>{dismissibleContent}</View>}
+        : <View style={[styles.content, styles.staticContent]}>{dismissibleContent}</View>}
       {footer && (
         <Animated.View
           style={[
@@ -171,6 +171,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   scroll: {
+    flex: 1,
+  },
+  staticContent: {
     flex: 1,
   },
   page: {

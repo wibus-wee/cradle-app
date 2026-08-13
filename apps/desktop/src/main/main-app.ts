@@ -667,6 +667,7 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
   notificationCenterManager = new NotificationCenterManager({
     serverUrl,
     chatStreamBroker,
+    chatEventTailBroker,
     getMainWindow: () => mainWindow,
   })
   notificationCenterManager.start()
