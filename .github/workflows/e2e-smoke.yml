@@ -1,4 +1,4 @@
-name: E2E Smoke (PR)
+name: E2E PR Suite
 
 # Runs against the PR head when:
 # The checkout below intentionally follows the PR head SHA after main is merged.
