@@ -34,8 +34,14 @@ executable; CI installs the Playwright-pinned browser instead.
   **or** when the `e2e` label is present (force / keep running).
 - Always checks out the **PR head**, provisions Codex via `sync:codex-runtime`.
 - Both workflows run `pnpm e2e:check` before expensive builds and browser setup.
+- Full E2E tag runs: push `e2e/full/<name>` at an open PR head. The workflow
+  checks out the exact tagged commit, runs the same `@P0 or @P1` full active
+  priority suite, and updates a failure comment on every associated open PR.
+  If the commit is not associated with an open PR, the run still executes but
+  only reports through Actions.
 - Daily (`e2e-daily.yml`) defaults to **`@P0 or @P1`** (full active priority suite).
-  Failures open a GitHub Issue labeled `daily-e2e-failure` assigned to `wibus-wee`.
+  Scheduled/manual failures open a GitHub Issue labeled `daily-e2e-failure`
+  assigned to `wibus-wee`.
 - Tag model:
   - `@P0` — smoke / must-never-break core path
   - `@P1` — important journeys (daily with P0)
