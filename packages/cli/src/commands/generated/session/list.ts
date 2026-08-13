@@ -38,6 +38,18 @@ const spec = {
       "required": false,
       "target": "query.archived",
       "type": "boolean"
+    },
+    {
+      "name": "cursor",
+      "required": false,
+      "target": "query.cursor",
+      "type": "string"
+    },
+    {
+      "name": "limit",
+      "required": false,
+      "target": "query.limit",
+      "type": "string"
     }
   ],
   "method": "get",

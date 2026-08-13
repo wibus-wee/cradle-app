@@ -117,7 +117,7 @@ describe('session list activity and status projection', () => {
       },
     ])
 
-    const rows = list({ workspaceId: 'ws-listed' })
+    const rows = list({ workspaceId: 'ws-listed' }).items
     expect(rows.map(row => row.id)).toEqual(['sess-newer-activity', 'sess-older-activity'])
     expect(rows[0]?.latestUserMessageAt).toBe(400)
     expect(rows[0]?.latestAssistantMessageAt).toBe(410)
@@ -166,9 +166,28 @@ describe('session list activity and status projection', () => {
       },
     ]).run()
 
-    const row = list().find(session => session.id === 'sess-status')
+    const row = list().items.find(session => session.id === 'sess-status')
     expect(row?.status).toBe('streaming')
     expect(aggregateSessionStatus(['sess-status'])).toBe('streaming')
     expect(get('sess-status')?.status).toBe('streaming')
+  })
+
+  it('returns stable bounded cursor pages', () => {
+    db().insert(sessions).values(Array.from({ length: 205 }, (_, index) => ({
+      id: `paged-session-${String(index).padStart(3, '0')}`,
+      title: `Paged session ${index}`,
+      createdAt: 1_000 - index,
+      updatedAt: 1_000 - index,
+    }))).run()
+
+    const first = list({ limit: 100 })
+    const second = list({ limit: 100, cursor: first.nextCursor ?? undefined })
+    const third = list({ limit: 100, cursor: second.nextCursor ?? undefined })
+
+    expect(first.items).toHaveLength(100)
+    expect(second.items).toHaveLength(100)
+    expect(third.items).toHaveLength(5)
+    expect(third.nextCursor).toBeNull()
+    expect(new Set([...first.items, ...second.items, ...third.items].map(row => row.id)).size).toBe(205)
   })
 })

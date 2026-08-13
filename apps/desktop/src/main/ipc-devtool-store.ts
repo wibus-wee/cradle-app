@@ -5,6 +5,7 @@ export interface IpcDevtoolStoreOptions {
   maxEvents?: number
   eventChannel?: string
   acpEventChannel?: string
+  onIpcSubscriberCountChanged?: (count: number) => void
 }
 
 const DEFAULT_MAX_EVENTS = 1000
@@ -19,11 +20,13 @@ export class IpcDevtoolStore {
   private readonly maxEvents: number
   private readonly eventChannel: string
   private readonly acpEventChannel: string
+  private readonly onIpcSubscriberCountChanged?: (count: number) => void
 
   constructor(options: IpcDevtoolStoreOptions = {}) {
     this.maxEvents = options.maxEvents ?? DEFAULT_MAX_EVENTS
     this.eventChannel = options.eventChannel ?? DEFAULT_EVENT_CHANNEL
     this.acpEventChannel = options.acpEventChannel ?? DEFAULT_ACP_EVENT_CHANNEL
+    this.onIpcSubscriberCountChanged = options.onIpcSubscriberCountChanged
   }
 
   record(event: IpcObservedEvent): void {
@@ -34,7 +37,7 @@ export class IpcDevtoolStore {
 
     for (const subscriber of [...this.subscribers]) {
       if ('isDestroyed' in subscriber && subscriber.isDestroyed()) {
-        this.subscribers.delete(subscriber)
+        this.removeIpcSubscriber(subscriber)
         continue
       }
 
@@ -42,7 +45,7 @@ export class IpcDevtoolStore {
         subscriber.send(this.eventChannel, event)
       }
       catch {
-        this.subscribers.delete(subscriber)
+        this.removeIpcSubscriber(subscriber)
       }
     }
   }
@@ -85,16 +88,20 @@ export class IpcDevtoolStore {
   }
 
   subscribe(webContents: WebContents): () => void {
+    const added = !this.subscribers.has(webContents)
     this.subscribers.add(webContents)
+    if (added) {
+      this.onIpcSubscriberCountChanged?.(this.subscribers.size)
+    }
 
     if ('once' in webContents) {
       webContents.once('destroyed', () => {
-        this.subscribers.delete(webContents)
+        this.removeIpcSubscriber(webContents)
       })
     }
 
     return () => {
-      this.subscribers.delete(webContents)
+      this.removeIpcSubscriber(webContents)
     }
   }
 
@@ -109,6 +116,12 @@ export class IpcDevtoolStore {
 
     return () => {
       this.acpSubscribers.delete(webContents)
+    }
+  }
+
+  private removeIpcSubscriber(webContents: WebContents): void {
+    if (this.subscribers.delete(webContents)) {
+      this.onIpcSubscriberCountChanged?.(this.subscribers.size)
     }
   }
 }

@@ -69,6 +69,10 @@ const thinkingEffort = t.Union([
 export const WorkModel = {
   work,
   summary,
+  page: t.Object({
+    items: t.Array(summary),
+    nextCursor: t.Nullable(t.String()),
+  }),
   detail,
   activity,
   readiness,
@@ -81,6 +85,8 @@ export const WorkModel = {
     workspaceId: t.Optional(t.String({ minLength: 1 })),
     linkedIssueId: t.Optional(t.String({ minLength: 1 })),
     archived: t.Optional(t.Boolean()),
+    cursor: t.Optional(t.String({ minLength: 1 })),
+    limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200 })),
   }),
 
   createBody: t.Object({

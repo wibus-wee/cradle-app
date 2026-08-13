@@ -6,20 +6,20 @@ This ExecPlan is a living document. The sections `Progress`, `Surprises & Discov
 
 Cradle should remain responsive when a user has many sessions, Works, messages, browser elements, and relay rooms. Today several request and render paths perform work proportional to all historical data, perform synchronous native inference on the server event loop, or poll complete collections. After this plan, the hot paths are bounded, incremental, or event-driven. A developer can verify the outcome with focused correctness tests plus repeatable benchmarks that show request latency, idle work, bundle loading, and memory use no longer grow without an explicit bound.
 
-The work is intentionally delivered as a chain of small pull requests. Search indexing, Chronicle inference, server projections, event streaming, client rendering, desktop background work, CI, relay scheduling, and simulator validation have different owners and failure modes. Each pull request must be independently testable and reviewable; later pull requests may be stacked on an earlier branch while review is in progress, then retargeted to `main` after their dependency merges.
+The work is delivered as independently committed, ownership-aligned slices in one draft pull request. Search indexing, Chronicle inference, server projections, event streaming, client rendering, desktop background work, CI, relay scheduling, and simulator validation retain separate validation and handoff records while sharing one integration branch, as requested by the user.
 
 ## Progress
 
 - [x] (2026-08-13 01:20Z) Audited all 22 reported findings against `main` at `d40f895e` and confirmed that each cited hot path still exists, with partial prior mitigation only in generic SSE infrastructure and relay queue cleanup.
-- [x] (2026-08-13 01:35Z) Chose seven ownership-aligned delivery slices instead of one cross-system pull request.
+- [x] (2026-08-13 01:35Z) Chose seven ownership-aligned implementation slices, later consolidated into one pull request at the user's direction.
 - [x] (2026-08-13 22:45Z) Completed the owned message/title FTS5 migration and bounded thread-search fallback. Focused Search, Session, and database coverage passed 17/17; Search passed again 3/3 after final title-trigger assertions; ESLint, TypeScript, module boundaries, and `git diff --check` passed.
-- [ ] Replace Chronicle synchronous embedding subprocess calls and full-vector scans with a supervised asynchronous inference worker and indexed candidate retrieval.
-- [ ] Add cursor pages and set-based summary projections for Work and Session lists, remove list-time remote title synchronization, and cache pull-request state outside list requests.
-- [ ] Make global chat tails header-only, batch any required message hydration, enforce per-client stream bounds, and read message-page revision without reducing all historical events.
-- [ ] Make streaming Markdown incremental, restore route-oriented Vite chunking, exclude generated API sources from React Compiler, virtualize mobile collections, and lazily load large web, landing, settings, and CLI feature graphs.
-- [ ] Gate IPC diagnostics by an active consumer, replace desktop notification polling, avoid unchanged background-job writes, and model CI as an artifact DAG without duplicate server execution.
-- [ ] Bound browser annotation discovery, remove the relay Hub write-lock from data forwarding, clear dequeued data references, and cache dynamic model-simulator validators.
-- [ ] Run the relevant package tests and before/after benchmarks for every slice, then record the results in this plan and in each PR body.
+- [x] (2026-08-13 03:05Z) Replaced Chronicle synchronous embedding subprocess calls and full-vector scans with a supervised asynchronous inference worker and indexed candidate retrieval.
+- [x] (2026-08-13 03:14Z) Added opaque cursor pages and page-bounded Session/Work summary projections, removed list-time title and GitHub refreshes, migrated generated clients and consumers, and deduplicated sidebar Work ownership.
+- [x] (2026-08-13 03:08Z) Made global chat tails header-only, batched message hydration, enforced per-client stream bounds, and indexed message-page revision lookup.
+- [x] (2026-08-13 03:27Z) Made streaming Markdown incremental, restored route-oriented chunking, excluded generated API sources from React Compiler, virtualized mobile collections, and lazy-loaded large web, landing, settings, and CLI graphs.
+- [x] (2026-08-13 03:22Z) Gated IPC diagnostics, replaced desktop notification polling, avoided unchanged background-job writes, and modeled CI as a shared-artifact DAG with one server-test owner.
+- [x] (2026-08-13 03:20Z) Bounded browser annotation discovery, removed the relay Hub write-lock from forwarding, cleared dequeued references, and cached simulator validators.
+- [x] (2026-08-13 03:28Z) Ran focused package tests, typechecks, builds, lint, boundary checks, and available benchmarks; recorded environment-limited Go/Rust checks in handoffs.
 
 ## Surprises & Discoveries
 
@@ -37,6 +37,9 @@ The work is intentionally delivered as a chain of small pull requests. Search in
 
 - Observation: keeping titles only as a column in the per-message FTS table makes title-only sessions unsearchable and tempts a bounded-but-incomplete recent-session scan.
   Evidence: a session may have no messages, and scanning even the latest 1,000 session titles would trade an unbounded path for a correctness cutoff. The migration now owns a separate `sessions_fts` projection instead.
+
+- Observation: the workspace sidebar requested the same Work summaries globally and once again for every rendered workspace.
+  Evidence: `WorkspaceSidebar` built the canonical global `workByPrimarySessionId` map while each `WorkspaceSidebarBody` also called `useWorkspaceWorks(workspace.id)` as a fallback. The child now derives its workspace slice from the canonical map.
 
 ## Decision Log
 
@@ -60,9 +63,17 @@ The work is intentionally delivered as a chain of small pull requests. Search in
   Rationale: event order is durable and already cursor-addressable. A slow client should re-snapshot from an authoritative cursor rather than receive an incomplete sequence.
   Date/Author: 2026-08-13 / Codex
 
+- Decision: change both list contracts to `{ items, nextCursor }`, with a default page of 100 and a maximum of 200, and preserve existing descending sort semantics with opaque base64url cursors.
+  Rationale: every response is bounded, generated clients expose continuation explicitly, and UI surfaces that display only a summary window can intentionally request one capped page.
+  Date/Author: 2026-08-13 / Codex
+
+- Decision: Work list summaries decode the Pull Request owner's cached projection from each already-loaded Session config and reserve remote GitHub refresh for explicit detail/reconciliation paths.
+  Rationale: a collection read must not make one network request and one persistence write per Work row.
+  Date/Author: 2026-08-13 / Codex
+
 ## Outcomes & Retrospective
 
-The campaign is in progress. The first slice converts thread search from a silently unindexed full-corpus scan into owned message and title FTS5 projections with bounded degradation behavior. Fresh-database tests prove insert/backfill, payload update, title update, canonical snippet metadata, scoped queries, and session-delete cleanup. The only validation caveat was that the repository's `tsx` CLI could not create its temporary IPC socket in this sandbox; the same boundary script passed through `node --import tsx`. No other reported hot path is considered complete until its focused tests and benchmark evidence are recorded here.
+All 22 findings are implemented in one draft pull request through ownership-aligned commits. Corpus and collection reads are indexed or cursor-bounded; Chronicle and chat event paths are asynchronous and backpressured; web, mobile, Streamdown, and CLI load or render incrementally; idle desktop work and duplicate CI execution are removed; and remaining relay, browser-annotation, and simulator hot paths have explicit bounds. Focused tests, TypeScript, lint, module boundaries, and web/landing builds pass. The only validation unavailable locally is Go race testing because Go tooling is absent; Chronicle's macOS Cargo job remains the authoritative native gate.
 
 ## Context and Orientation
 
@@ -153,6 +164,17 @@ First Search slice validation on 2026-08-13:
 
 The focused server tests log expected missing `dist` entries for optional plugins that were not built in the scratch checkout; those activation failures did not fail any selected test.
 
+Work/Session slice validation on 2026-08-13:
+
+    vitest: Session service, Work service, Background Job — 34 passed
+    vitest: web Session query-cache projection — 4 passed
+    eslint on owned server/web/mobile TypeScript — passed
+    server tsc --noEmit — passed
+    web tsc --noEmit — passed
+    CLI tsc --noEmit — passed
+
+The broader Session HTTP assertions were updated for the page envelope, but their rerun in the shared worktree was blocked before route execution by concurrent Chronicle composition code referencing an export that had not yet landed. Mobile TypeScript reached one unrelated `ReadableStream` async-iterator diagnostic in `chat-stream.test.ts`; the changed mobile page consumers produced no diagnostics.
+
 ## Interfaces and Dependencies
 
 The Search slice retains `ThreadSearchEngine.search(params): ThreadSearchHit[]`, `indexMessage(sessionId, sessionTitle, messageId, content): void`, and session cleanup behavior. `messages_fts` is a derived SQLite FTS5 table with unindexed `message_id` and `session_id`, plus indexed `session_title` and `searchable_text`; `sessions_fts` independently indexes canonical session titles. Public snippets must use canonical `messages.id`, `messages.role`, and `messages.created_at`.
@@ -166,4 +188,22 @@ The Chronicle worker must expose an asynchronous TypeScript interface equivalent
 
 Work and Session page contracts must use opaque cursors and bounded limits. Chat tail overflow must reuse the existing `SnapshotRequired` contract. Client data fetching should use generated API clients and TanStack Query rather than handwritten duplicate request shapes. Relay synchronization must use Go standard-library primitives and preserve race-detector safety. Simulator validator caching must remain internal to `JsonSchemaRegistry` and must not weaken validation or error labeling.
 
-Revision note (2026-08-13): created the campaign plan after source-level validation of all reported findings, recorded the first Search implementation decisions, then updated it after final validation and replacement of the interim title-scan idea with an owned title projection.
+Revision note (2026-08-13): created the campaign plan after source-level validation of all reported findings, recorded the first Search implementation decisions, updated it after final Search validation, and recorded the completed Work/Session pagination plus unchanged-background-observation slice and its validation evidence.
+
+Final integration validation on 2026-08-13:
+
+    Search/Session/database — 17 passed
+    Chronicle worker/service — 25 focused tests passed; event-loop timer delay 8.90 ms during 198 ms fake inference
+    Work/Session/background jobs — 34 server + 4 web tests passed
+    Chat tail/history/checkpoint/routes — 25 focused tests passed
+    Desktop/IPC/notification/browser — 19 focused tests passed
+    Simulator — 49 tests passed
+    Mobile event-tail/stream — 3 tests passed; mobile TypeScript and lint passed
+    CLI selection — 11 tests passed; typecheck/build/help smoke passed
+    Streamdown incremental parsing — focused tests passed
+    Web and landing TypeScript and production builds — passed; inactive features emitted as independent chunks
+    Server/Web/Desktop/Mobile/CLI TypeScript — passed
+    module boundaries — passed; largest runtime domain SCC remains 23
+    CI YAML parse, focused ESLint, and git diff check — passed
+
+Go test/race could not run because Go tooling is not installed in the execution environment. Cargo is likewise unavailable locally; the repository's Chronicle macOS CI job covers native Rust validation.

@@ -24,6 +24,7 @@ export class ProtocolValidationError extends Error {
 
 export class JsonSchemaRegistry {
   readonly #validators = new Map<ProtocolSchemaId, ValidateFunction>()
+  readonly #openAiDynamicValidators = new WeakMap<object, ValidateFunction>()
   readonly #draft07 = new Ajv({
     allErrors: true,
     discriminator: true,
@@ -59,11 +60,15 @@ export class JsonSchemaRegistry {
   }
 
   validateOpenAiSchema(schema: object, value: JsonValue, label: string): void {
-    const validate = this.#draft2020.compile({
-      $schema: 'https://json-schema.org/draft/2020-12/schema',
-      ...schema,
-      components: openAiDocument.components,
-    })
+    let validate = this.#openAiDynamicValidators.get(schema)
+    if (!validate) {
+      validate = this.#draft2020.compile({
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        ...schema,
+        components: openAiDocument.components,
+      })
+      this.#openAiDynamicValidators.set(schema, validate)
+    }
     if (!validate(value)) {
       throw new ProtocolValidationError(
         `openai:2020-12:${label}`,

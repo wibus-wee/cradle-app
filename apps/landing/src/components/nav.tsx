@@ -9,6 +9,7 @@
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 
+import { preloadLandingRoute } from '../lazy-routes'
 import { NavDownloadButton } from './download-cta'
 
 export function Nav() {
@@ -93,8 +94,13 @@ function NavLink({ href, children }: { href: string, children: React.ReactNode }
   return (
     <a
       href={href}
-      onMouseEnter={() => setHovered(true)}
+      onMouseEnter={() => {
+        setHovered(true)
+        preloadLandingRoute(href)
+      }}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => preloadLandingRoute(href)}
+      onPointerDown={() => preloadLandingRoute(href)}
       style={{
         fontSize: 13,
         fontWeight: 500,

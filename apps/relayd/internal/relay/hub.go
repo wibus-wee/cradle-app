@@ -45,7 +45,7 @@ type HubConfig struct {
 }
 
 type Hub struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	cfg    HubConfig
 	now    func() time.Time
 	rooms  map[string]*room
@@ -203,6 +203,7 @@ func (s *peerScheduler) next(ctx context.Context) (queuedEnvelope, error) {
 				continue
 			}
 			item := items[0]
+			items[0] = queuedEnvelope{}
 			if len(items) == 1 {
 				delete(s.dataByStream, streamID)
 				s.streamOrder = append(s.streamOrder[:index], s.streamOrder[index+1:]...)
@@ -442,10 +443,10 @@ func (h *Hub) forward(ctx context.Context, from *connState, data []byte, env Env
 		return fmt.Errorf("%w: room mismatch", ErrInvalidEnvelope)
 	}
 
-	h.mu.Lock()
+	h.mu.RLock()
 	room, ok := h.rooms[from.roomID]
 	if !ok {
-		h.mu.Unlock()
+		h.mu.RUnlock()
 		return ErrRoomNotFound
 	}
 	var peer *connState
@@ -455,10 +456,10 @@ func (h *Hub) forward(ctx context.Context, from *connState, data []byte, env Env
 		peer = room.host
 	}
 	if peer == nil {
-		h.mu.Unlock()
+		h.mu.RUnlock()
 		return ErrPeerNotConnected
 	}
-	h.mu.Unlock()
+	h.mu.RUnlock()
 	// data is the completed WebSocket message returned by Conn.Read. It has
 	// already passed the same V2 validation as env and is not mutated, so queue
 	// the original bytes instead of copying the opaque payload and re-encoding

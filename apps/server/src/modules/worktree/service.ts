@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 
 import type { Session, Worktree } from '@cradle/db'
 import { backendRuns, sessions, workspaces, worktrees } from '@cradle/db'
-import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
@@ -403,6 +403,35 @@ export function readSessionIsolation(session: Session): SessionIsolationView {
   const worktreeRecord = session.worktreeId ? getWorktreeRecord(session.worktreeId) : null
   const health = session.worktreeId ? assessWorktreeHealthSync(worktreeRecord) : null
   return buildIsolationView(session, worktreeRecord, health)
+}
+
+/**
+ * Project list-time isolation state with one Worktree read for the whole page.
+ * Filesystem health checks remain bounded by the page size and are shared by
+ * Sessions that point at the same managed Worktree.
+ */
+export function readSessionIsolations(
+  sessionRows: readonly Session[],
+): Map<string, SessionIsolationView> {
+  const worktreeIds = [...new Set(
+    sessionRows.flatMap(session => session.worktreeId ? [session.worktreeId] : []),
+  )]
+  const records = worktreeIds.length === 0
+    ? []
+    : db().select().from(worktrees).where(inArray(worktrees.id, worktreeIds)).all()
+  const recordsById = new Map(records.map(record => [record.id, record]))
+  const healthById = new Map(
+    worktreeIds.map((worktreeId) => {
+      const record = recordsById.get(worktreeId) ?? null
+      return [worktreeId, assessWorktreeHealthSync(record)] as const
+    }),
+  )
+
+  return new Map(sessionRows.map((session) => {
+    const record = session.worktreeId ? recordsById.get(session.worktreeId) ?? null : null
+    const health = session.worktreeId ? healthById.get(session.worktreeId) ?? null : null
+    return [session.id, buildIsolationView(session, record, health)] as const
+  }))
 }
 
 export async function readSessionIsolationAsync(session: Session): Promise<SessionIsolationView> {

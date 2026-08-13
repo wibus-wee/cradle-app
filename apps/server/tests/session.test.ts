@@ -125,7 +125,7 @@ describe('session capability', () => {
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
       const list = await listRes.json()
-      expect(list).toEqual(
+      expect(list.items).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ id: sessionId, modelId: null, status: 'idle' }),
         ]),
@@ -865,7 +865,8 @@ describe('session capability', () => {
         ),
       )
       expect(automationListRes.status).toBe(200)
-      expect(await automationListRes.json()).toEqual([
+      const automationList = await automationListRes.json()
+      expect(automationList.items).toEqual([
         expect.objectContaining({
           id: automationSessionId,
           origin: 'automation',
@@ -1112,7 +1113,8 @@ describe('session capability', () => {
       const listRes = await app.handle(
         new Request(`http://localhost/sessions?workspaceId=${encodeURIComponent(workspaceId)}`),
       )
-      expect(await listRes.json()).toEqual([
+      const list = await listRes.json()
+      expect(list.items).toEqual([
         expect.objectContaining({
           id: sessionId,
           modelId: null,

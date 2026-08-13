@@ -16,6 +16,7 @@ import { queryRefreshPolicy } from '~/lib/query-refresh-policy'
 let unreadSessionIdsSnapshot: string[] = []
 
 export const SESSION_LIST_REFRESH_INTERVAL_MS = 5_000
+const SESSION_LIST_PAGE_LIMIT = 200
 
 export function readUnreadSessionIdsSnapshot(): string[] {
   return unreadSessionIdsSnapshot
@@ -71,8 +72,8 @@ export function isManualSession(session: { origin?: string | null }): boolean {
   return !origin || origin === 'manual'
 }
 
-function sessionListOptions(workspaceId?: string | null, archived?: boolean): GetSessionsData | undefined {
-  const query: NonNullable<GetSessionsData['query']> = {}
+function sessionListOptions(workspaceId?: string | null, archived?: boolean): GetSessionsData {
+  const query: NonNullable<GetSessionsData['query']> = { limit: SESSION_LIST_PAGE_LIMIT }
 
   if (workspaceId) {
     query.workspaceId = workspaceId
@@ -81,9 +82,7 @@ function sessionListOptions(workspaceId?: string | null, archived?: boolean): Ge
     query.archived = archived
   }
 
-  return Object.keys(query).length > 0
-    ? { url: '/sessions/', query }
-    : undefined
+  return { url: '/sessions/', query }
 }
 
 export const sessionsQueryKey = (workspaceId?: string | null, archived?: boolean) =>
@@ -96,7 +95,7 @@ export function isSessionsQueryKey(queryKey: readonly unknown[]): boolean {
     && (head as { _id?: unknown })._id === 'getSessions'
 }
 
-type SessionListResponseRow = GetSessionsResponse[number] & {
+type SessionListResponseRow = GetSessionsResponse['items'][number] & {
   latestUserMessageAt?: unknown
 }
 
@@ -177,7 +176,7 @@ function createSessionListRow(
   updatedAt: number,
   latestUserMessageAt: number | null,
   fallbackStatus: SessionListResponseRow['status'],
-): GetSessionsResponse[number] {
+): GetSessionsResponse['items'][number] {
   return {
     workspaceId: null,
     title: null,
@@ -199,7 +198,7 @@ function createSessionListRow(
     updatedAt,
     latestUserMessageAt,
     status: patch.status ?? existing?.status ?? fallbackStatus,
-  } as GetSessionsResponse[number]
+  } as GetSessionsResponse['items'][number]
 }
 
 export function updateSessionInSessionLists(
@@ -219,14 +218,15 @@ export function updateSessionInSessionLists(
         && queryKeyMatchesWorkspace(query.queryKey, workspaceId)
         && queryKeyMatchesArchiveState(query.queryKey, archivedAt ?? null),
     },
-    (sessions) => {
-      if (!sessions) {
-        return sessions
+    (page) => {
+      if (!page) {
+        return page
       }
+      const sessions = page.items
       const index = sessions.findIndex(session => session.id === patch.id)
       const existing = index >= 0 ? sessions[index] as SessionListResponseRow : null
       if (!existing && patch.workspaceId === undefined) {
-        return sessions
+        return page
       }
       const updatedAt = patch.updatedAt ?? optimisticUpdatedAt ?? existing?.updatedAt ?? now
       const latestUserMessageAt
@@ -236,23 +236,24 @@ export function updateSessionInSessionLists(
 
       if (existing && !options.promote) {
         if (sessionListRowsEqual(existing, row as SessionListResponseRow)) {
-          return sessions
+          return page
         }
 
         const next = sessions.slice()
         next[index] = row
-        return next
+        return { ...page, items: next }
       }
 
       if (existing && index === 0 && sessionListRowsEqual(existing, row as SessionListResponseRow)) {
-        return sessions
+        return page
       }
 
       const next = existing
         ? sessions.filter(session => session.id !== patch.id)
         : sessions.slice()
       next.unshift(row)
-      return next
+      next.splice(SESSION_LIST_PAGE_LIMIT)
+      return { ...page, items: next }
     },
   )
 }
@@ -268,7 +269,7 @@ function readSessionStatus(value: unknown): WorkspaceSession['status'] {
   return 'idle'
 }
 
-function asWorkspaceSession(session: GetSessionsResponse[number]): WorkspaceSession {
+function asWorkspaceSession(session: GetSessionsResponse['items'][number]): WorkspaceSession {
   const archivedAt = (session as { archivedAt?: unknown }).archivedAt
   const lastReadAt = (session as { lastReadAt?: unknown }).lastReadAt
   const latestUserMessageAt = (session as { latestUserMessageAt?: unknown }).latestUserMessageAt
@@ -308,20 +309,20 @@ function asWorkspaceSession(session: GetSessionsResponse[number]): WorkspaceSess
   }
 }
 
-function asWorkspaceSessions(sessions: GetSessionsResponse): WorkspaceSession[] {
-  return sessions.map(asWorkspaceSession)
+function asWorkspaceSessions(page: GetSessionsResponse): WorkspaceSession[] {
+  return page.items.map(asWorkspaceSession)
 }
 
 function updateUnreadSessionIdsSnapshot(sessions: WorkspaceSession[]) {
   unreadSessionIdsSnapshot = sessions.filter(session => session.unread).map(session => session.id)
 }
 
-function selectUnreadSessionIds(sessions: GetSessionsResponse): string[] {
-  return sessions.filter(session => session.unread === true).map(session => session.id)
+function selectUnreadSessionIds(page: GetSessionsResponse): string[] {
+  return page.items.filter(session => session.unread === true).map(session => session.id)
 }
 
-function selectRunningSessionIds(sessions: GetSessionsResponse): string[] {
-  return sessions.filter(session => session.status === 'streaming').map(session => session.id)
+function selectRunningSessionIds(page: GetSessionsResponse): string[] {
+  return page.items.filter(session => session.status === 'streaming').map(session => session.id)
 }
 
 export function useUnreadSessionIds(): Set<string> {
@@ -369,12 +370,12 @@ export function useAllSessions(archived?: boolean) {
 
 export function useWorkspaceSessions(workspaceId: string | null, archived?: boolean) {
   const queryOptions = sessionListOptions(workspaceId, archived)
-  const { data: rawSessions = [], isPending: loading } = useQuery({
+  const { data: page, isPending: loading } = useQuery({
     ...getSessionsOptions(queryOptions),
     ...queryRefreshPolicy('interactive', { refetchInterval: false }),
     enabled: Boolean(workspaceId),
   })
-  const sessions = useMemo(() => rawSessions.map(asWorkspaceSession), [rawSessions])
+  const sessions = useMemo(() => page?.items.map(asWorkspaceSession) ?? [], [page])
 
   return { sessions, loading }
 }

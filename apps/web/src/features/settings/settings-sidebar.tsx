@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next'
 import { openWhatsNewDialog } from '~/features/changelog/whats-new-store'
 import { openPluginCenter } from '~/navigation/navigation-commands'
 
+import { preloadSettingsSection } from './settings-section-loaders'
 import type { SettingsNavigationSection } from './settings-sidebar-view'
 import { SettingsSidebarView } from './settings-sidebar-view'
 
@@ -309,6 +310,7 @@ export function SettingsSidebar({ activeSection, onSetSection, onClose }: Settin
       clearSearchLabel={t('sidebar.clearSearch')}
       noResultsLabel={t('sidebar.noResults')}
       onSetSection={onSetSection}
+      onSectionIntent={preloadSettingsSection}
       onClose={onClose}
     />
   )

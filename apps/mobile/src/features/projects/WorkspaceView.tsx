@@ -1,6 +1,7 @@
 import { ChevronRight, File, Folder, GitBranch, Info, MessageSquareText } from 'lucide-react-native'
+import type { ReactElement } from 'react'
 import { useRef } from 'react'
-import { Keyboard, StyleSheet, View } from 'react-native'
+import { FlatList, Keyboard, StyleSheet, View } from 'react-native'
 
 import type {
   GetSessionsResponse,
@@ -22,9 +23,15 @@ import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 type Workspace = GetWorkspacesResponse[number]
-type Session = GetSessionsResponse[number]
-type Work = GetWorksResponse[number]
+type Session = GetSessionsResponse['items'][number]
+type Work = GetWorksResponse['items'][number]
 type FileEntry = GetWorkspacesByWorkspaceIdFilesChildrenResponse[number]
+type WorkspaceRow
+  = | { key: string, kind: 'heading', title: string, meta: string }
+    | { key: string, kind: 'work', work: Work }
+    | { key: string, kind: 'session', session: Session }
+    | { key: string, kind: 'file', entry: FileEntry }
+    | { key: string, kind: 'empty', node: ReactElement }
 
 export interface WorkspaceViewProps {
   workspace: Workspace
@@ -64,6 +71,26 @@ export function WorkspaceView({
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
   const canCreateWork = workspaces.some(candidate => candidate.id === workspace.id)
+  const rows: WorkspaceRow[] = []
+  if (works.length > 0) {
+    rows.push({ key: 'heading-work', kind: 'heading', meta: `${works.length}`, title: 'Work' })
+    rows.push(...works.map(work => ({ key: `work-${work.id}`, kind: 'work' as const, work })))
+  }
+  rows.push({ key: 'heading-sessions', kind: 'heading', meta: `${sessions.length}`, title: 'Conversations' })
+  if (sessions.length === 0) {
+    rows.push({
+      key: 'empty-sessions',
+      kind: 'empty',
+      node: <EmptyState description="Start a conversation or Work from Cradle Desktop." title="No conversations" />,
+    })
+  }
+  else {
+    rows.push(...sessions.map(session => ({ key: `session-${session.id}`, kind: 'session' as const, session })))
+  }
+  if (files.length > 0) {
+    rows.push({ key: 'heading-files', kind: 'heading', meta: `${files.length} top-level`, title: 'Files' })
+    rows.push(...files.slice(0, 12).map(entry => ({ key: `file-${entry.path}`, entry, kind: 'file' as const })))
+  }
   return (
     <Screen
       avoidKeyboard={canCreateWork}
@@ -84,15 +111,23 @@ export function WorkspaceView({
         composerRef.current?.collapse()
         Keyboard.dismiss()
       }}
-      onRefresh={onRefresh}
-      refreshing={isRefreshing}
+      scroll={false}
       title={workspace.name}
     >
-      {works.length > 0 && (
-        <View style={styles.section}>
-          <SectionHeading meta={`${works.length}`} title="Work" />
-          <View style={styles.group}>
-            {works.map(work => (
+      <FlatList
+        data={rows}
+        keyExtractor={row => row.key}
+        keyboardShouldPersistTaps="handled"
+        onRefresh={onRefresh}
+        refreshing={isRefreshing}
+        renderItem={({ item }) => {
+          if (item.kind === 'heading') {
+            return <View style={styles.section}><SectionHeading meta={item.meta} title={item.title} /></View>
+          }
+          if (item.kind === 'empty') { return item.node }
+          if (item.kind === 'work') {
+            const { work } = item
+            return (
               <Item
                 actions={(
                   <>
@@ -115,59 +150,44 @@ export function WorkspaceView({
                 title={work.title}
                 variant="muted"
               />
-            ))}
-          </View>
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <SectionHeading meta={`${sessions.length}`} title="Conversations" />
-        {sessions.length === 0
-          ? <EmptyState description="Start a conversation or Work from Cradle Desktop." title="No conversations" />
-          : (
-              <View style={styles.group}>
-                {sessions.map(session => (
-                  <Item
-                    actions={<StatusPill label={session.status} tone={sessionTone(session.status)} />}
-                    description={relativeTime(session.latestAssistantMessageAt ?? session.latestUserMessageAt ?? session.updatedAt)}
-                    key={session.id}
-                    media={<MessageSquareText color={theme.session} size={16} />}
-                    onPress={() => onOpenSession(session.id)}
-                    title={session.title ?? 'Untitled conversation'}
-                    variant="muted"
-                  />
-                ))}
-              </View>
-            )}
-      </View>
-
-      {files.length > 0 && (
-        <View style={styles.section}>
-          <SectionHeading meta={`${files.length} top-level`} title="Files" />
-          <View style={styles.group}>
-            {files.slice(0, 12).map(entry => (
+            )
+          }
+          if (item.kind === 'session') {
+            const { session } = item
+            return (
               <Item
-                actions={entry.type === 'directory' && <ChevronRight color={theme.dimForeground} size={14} />}
-                key={entry.path}
-                media={entry.type === 'directory'
-                  ? <Folder color={theme.tertiaryForeground} size={15} />
-                  : <File color={theme.tertiaryForeground} size={15} />}
-                size="sm"
-                title={entry.name}
+                actions={<StatusPill label={session.status} tone={sessionTone(session.status)} />}
+                description={relativeTime(session.latestAssistantMessageAt ?? session.latestUserMessageAt ?? session.updatedAt)}
+                media={<MessageSquareText color={theme.session} size={16} />}
+                onPress={() => onOpenSession(session.id)}
+                title={session.title ?? 'Untitled conversation'}
+                variant="muted"
               />
-            ))}
-          </View>
-        </View>
-      )}
+            )
+          }
+          const { entry } = item
+          return (
+            <Item
+              actions={entry.type === 'directory' && <ChevronRight color={theme.dimForeground} size={14} />}
+              media={entry.type === 'directory'
+                ? <Folder color={theme.tertiaryForeground} size={15} />
+                : <File color={theme.tertiaryForeground} size={15} />}
+              size="sm"
+              title={entry.name}
+            />
+          )
+        }}
+        style={styles.list}
+      />
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
-  group: {
-    gap: 0,
+  list: {
+    flex: 1,
   },
   section: {
-    marginBottom: spacing.lg,
+    marginTop: spacing.md,
   },
 })
