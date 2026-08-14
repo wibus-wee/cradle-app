@@ -20,7 +20,6 @@ interface WorkSummary {
   primarySessionId: string
 }
 
-
 interface WorkListPage {
   items: WorkSummary[]
   nextCursor: string | null
@@ -47,14 +46,13 @@ export class WorkPage {
     return this.owner.page
   }
 
-
   private async findWork(
     predicate: (work: WorkSummary) => boolean,
   ): Promise<WorkSummary | null> {
     let cursor: string | null = null
     const seenCursors = new Set<string>()
 
-    do {
+    for (;;) {
       const serverUrl = this.owner.params.serverUrl.replace(/\/$/, '')
       const url = new URL(`${serverUrl}/works`)
       url.searchParams.set('limit', '200')
@@ -73,10 +71,13 @@ export class WorkPage {
         return match
       }
 
-      cursor = page.nextCursor
-    } while (cursor && !seenCursors.has(cursor) && seenCursors.add(cursor))
-
-    return null
+      const nextCursor = page.nextCursor
+      if (!nextCursor || seenCursors.has(nextCursor)) {
+        return null
+      }
+      seenCursors.add(nextCursor)
+      cursor = nextCursor
+    }
   }
 
   root(): Locator {
