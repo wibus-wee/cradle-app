@@ -15,7 +15,6 @@ import type {
   RuntimeUserInputRequest,
   RuntimeUserInputResolution,
 } from '../../chat-runtime/runtime-provider-types'
-import { resolveRuntimeSkillPaths } from '../../chat-runtime/chat-runtime-provider-registry'
 import {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
@@ -770,7 +769,8 @@ function createForkedNonSubagentThreadRecord() {
 describe('codexProvider app-server integration', () => {
   it('streams a Codex turn for a workspace-less Jarvis session', async () => {
     const client = new FakeCodexAppServerClient({})
-    const provider = createProviderWithClients([client], resolveRuntimeSkillPaths)
+    const resolveSkillPaths = vi.fn(() => ['/tmp/cradle-skill'])
+    const provider = createProviderWithClients([client], resolveSkillPaths)
 
     const stream = provider.streamTurn({
       runId: 'run-jarvis-codex-no-workspace',
@@ -804,7 +804,8 @@ describe('codexProvider app-server integration', () => {
     })
 
     await drainPromise
-    expect(client.skillExtraRootsRequests).toHaveLength(1)
+    expect(resolveSkillPaths).toHaveBeenCalledWith('')
+    expect(client.skillExtraRootsRequests).toEqual([{ extraRoots: ['/tmp/cradle-skill'] }])
   })
 
   it('projects Codex app-server capabilities into provider-owned UI slots', async () => {
