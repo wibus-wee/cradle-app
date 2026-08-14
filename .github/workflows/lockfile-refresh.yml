@@ -7,18 +7,26 @@ on:
       - apps/mobile/package.json
       - .github/workflows/lockfile-refresh.yml
 
+permissions:
+  contents: write
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - uses: ./.github/actions/setup
         with:
           install-deps: 'false'
       - name: Refresh the mobile lockfile
         run: pnpm install --lockfile-only --filter @cradle/mobile --no-frozen-lockfile
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mobile-lockfile-${{ github.run_id }}
-          path: pnpm-lock.yaml
-          retention-days: 1
+      - name: Commit the generated lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git rm .github/workflows/lockfile-refresh.yml
+          git commit -m "chore(mobile): refresh Expo lockfile"
+          git push origin HEAD:${{ github.head_ref }}
