@@ -411,14 +411,14 @@ export function resolveProviderTargetForRuntime(
       details: { providerTargetId: target.id, runtimeKind },
     })
   }
-  if (runtimeSupportsProviderKind(runtimeKind, target.providerKind)) {
-    return target
-  }
   if (target.providerKind === 'universal') {
     const projected = projectUniversalProviderTargetForRuntime(target, runtimeKind)
     if (runtimeSupportsProviderKind(runtimeKind, projected.providerKind)) {
       return projected
     }
+  }
+  if (runtimeSupportsProviderKind(runtimeKind, target.providerKind)) {
+    return target
   }
   const borrowedRoute = readProviderExtensionRuntimeRoute({
     providerTargetId: target.id,
