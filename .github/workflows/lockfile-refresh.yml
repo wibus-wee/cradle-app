@@ -1,0 +1,24 @@
+name: Refresh mobile lockfile
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - apps/mobile/package.json
+      - .github/workflows/lockfile-refresh.yml
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          install-deps: 'false'
+      - name: Refresh the mobile lockfile
+        run: pnpm install --lockfile-only --filter @cradle/mobile --no-frozen-lockfile
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-lockfile-${{ github.run_id }}
+          path: pnpm-lock.yaml
+          retention-days: 1
