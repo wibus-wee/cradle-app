@@ -2,8 +2,6 @@ import type { BackendRunSnapshotEvent } from '@cradle/db'
 import {
   backendRunSnapshotEvents,
   backendRunSnapshots,
-  backendRuns,
-  sessions,
 } from '@cradle/db'
 import { eq, inArray } from 'drizzle-orm'
 
@@ -316,57 +314,34 @@ function prepareSnapshotEventInserts(
     return { events: [], dropped: [] }
   }
 
-  const snapshotIds = new Set(
+  const snapshotParents = new Map(
     tx
-      .select({ id: backendRunSnapshots.id })
+      .select({
+        id: backendRunSnapshots.id,
+        chatSessionId: backendRunSnapshots.chatSessionId,
+        runId: backendRunSnapshots.runId,
+      })
       .from(backendRunSnapshots)
       .where(inArray(backendRunSnapshots.id, events.map(event => event.snapshotId)))
       .all()
-      .map(row => row.id),
+      .map(row => [row.id, row] as const),
   )
-  const sessionIdValues = [...new Set(
-    events.flatMap(event => event.chatSessionId ? [event.chatSessionId] : []),
-  )]
-  const sessionIds = sessionIdValues.length === 0
-    ? new Set<string>()
-    : new Set(
-        tx
-          .select({ id: sessions.id })
-          .from(sessions)
-          .where(inArray(sessions.id, sessionIdValues))
-          .all()
-          .map(row => row.id),
-      )
-  const runIdValues = [...new Set(
-    events.flatMap(event => event.runId ? [event.runId] : []),
-  )]
-  const runIds = runIdValues.length === 0
-    ? new Set<string>()
-    : new Set(
-        tx
-          .select({ id: backendRuns.id })
-          .from(backendRuns)
-          .where(inArray(backendRuns.id, runIdValues))
-          .all()
-          .map(row => row.id),
-      )
 
   const persisted: BackendRunSnapshotEvent[] = []
   const dropped: PreparedSnapshotEventInserts['dropped'] = []
   for (const event of events) {
-    if (!snapshotIds.has(event.snapshotId)) {
+    const parent = snapshotParents.get(event.snapshotId)
+    if (!parent) {
       dropped.push({ event, reason: 'snapshot-missing' })
       continue
     }
     persisted.push({
       ...event,
-      // These relationships are nullable in the schema. A parent can be
-      // deleted between enqueue and flush, so preserve the snapshot event
-      // while allowing SQLite's intended SET NULL semantics to apply.
-      chatSessionId: event.chatSessionId && sessionIds.has(event.chatSessionId)
-        ? event.chatSessionId
-        : null,
-      runId: event.runId && runIds.has(event.runId) ? event.runId : null,
+      // These relationships are nullable in the schema. The snapshot parent
+      // is the canonical owner of both values, and SQLite sets them to NULL
+      // when the session or run is deleted before this event is flushed.
+      chatSessionId: parent.chatSessionId,
+      runId: parent.runId,
     })
   }
   return { events: persisted, dropped }
