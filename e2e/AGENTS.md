@@ -34,6 +34,9 @@ executable; CI installs the Playwright-pinned browser instead.
   **or** when the `e2e` label is present (force / keep running).
 - Always checks out the **PR head**, provisions Codex via `sync:codex-runtime`.
 - Both workflows run `pnpm e2e:check` before expensive builds and browser setup.
+- PR full E2E: add the `e2e-full` label to a PR. The existing PR workflow then
+  runs the exact PR head with `@P0 or @P1`; while the label remains, later pushes
+  continue to run the full suite. Failures are commented on the PR with artifacts.
 - Daily (`e2e-daily.yml`) defaults to **`@P0 or @P1`** (full active priority suite).
   Failures open a GitHub Issue labeled `daily-e2e-failure` assigned to `wibus-wee`.
 - Tag model:

@@ -20,6 +20,11 @@ interface WorkSummary {
   primarySessionId: string
 }
 
+interface WorkListPage {
+  items: WorkSummary[]
+  nextCursor: string | null
+}
+
 interface WorkDetail {
   work: { objective: string }
   primaryThread: { id: string }
@@ -39,6 +44,40 @@ export class WorkPage {
 
   private get page(): Page {
     return this.owner.page
+  }
+
+  private async findWork(
+    predicate: (work: WorkSummary) => boolean,
+  ): Promise<WorkSummary | null> {
+    let cursor: string | null = null
+    const seenCursors = new Set<string>()
+
+    for (;;) {
+      const serverUrl = this.owner.params.serverUrl.replace(/\/$/, '')
+      const url = new URL(`${serverUrl}/works`)
+      url.searchParams.set('limit', '200')
+      if (cursor) {
+        url.searchParams.set('cursor', cursor)
+      }
+
+      const response = await fetch(url)
+      if (!response.ok) {
+        return null
+      }
+
+      const page = await response.json() as WorkListPage
+      const match = page.items.find(predicate)
+      if (match) {
+        return match
+      }
+
+      const nextCursor = page.nextCursor
+      if (!nextCursor || seenCursors.has(nextCursor)) {
+        return null
+      }
+      seenCursors.add(nextCursor)
+      cursor = nextCursor
+    }
   }
 
   root(): Locator {
@@ -79,12 +118,7 @@ export class WorkPage {
   async expectPersisted(goal: string, sessionId: string): Promise<void> {
     let matchedWorkId: string | null = null
     await expect.poll(async () => {
-      const response = await fetch(`${this.owner.params.serverUrl}/works`)
-      if (!response.ok) {
-        return null
-      }
-      const works = await response.json() as WorkSummary[]
-      const match = works.find(work => work.primarySessionId === sessionId)
+      const match = await this.findWork(work => work.primarySessionId === sessionId)
       matchedWorkId = match?.objective === goal ? match.id : null
       return matchedWorkId
     }, { timeout: TIMEOUT }).not.toBeNull()
@@ -115,12 +149,7 @@ export class WorkPage {
   }): Promise<void> {
     let matchedWorkId: string | null = null
     await expect.poll(async () => {
-      const response = await fetch(`${this.owner.params.serverUrl}/works`)
-      if (!response.ok) {
-        return null
-      }
-      const works = await response.json() as WorkSummary[]
-      const match = works.find(work =>
+      const match = await this.findWork(work =>
         work.primarySessionId === input.sessionId
         && work.linkedIssueId !== null
         && work.objective.includes(`# Cradle Issue: ${input.issueTitle}`))
@@ -156,10 +185,7 @@ export class WorkPage {
     issueTitle: string
     sessionId: string
   }): Promise<void> {
-    const worksResponse = await fetch(`${this.owner.params.serverUrl}/works`)
-    expect(worksResponse.ok).toBe(true)
-    const works = await worksResponse.json() as WorkSummary[]
-    const work = works.find(candidate =>
+    const work = await this.findWork(candidate =>
       candidate.primarySessionId === input.sessionId
       && candidate.linkedIssueId !== null
       && candidate.objective.includes(`# Cradle Issue: ${input.issueTitle}`))
