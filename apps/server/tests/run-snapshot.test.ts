@@ -32,6 +32,10 @@ import {
   getRunSnapshots,
   maintainRunSnapshots,
 } from '../src/modules/chat-runtime/run-snapshot'
+import {
+  flushRunSnapshotWriteBehind,
+  releaseRunSnapshotContext,
+} from '../src/modules/chat-runtime/run-snapshot-journal'
 import { createRunChunkSequencer } from '../src/modules/chat-runtime/stream/run-chunk-sequencer'
 
 function restoreEnv(name: string, previousValue: string | undefined): void {
@@ -194,6 +198,54 @@ describe('run snapshot recording', () => {
         .toHaveLength(0)
 
       expect(getRunSnapshot(secondRunId)?.events).toHaveLength(1)
+    })
+  })
+
+  it('drops queued events when a snapshot context is released before write-behind flush', async () => {
+    await withTempDataDir(() => {
+      const runId = `run-${randomUUID()}`
+      const activeRun = setUpRun(`session-${randomUUID()}`, runId)
+
+      releaseRunSnapshotContext(db(), activeRun.runSnapshotId!)
+
+      expect(() => flushRunSnapshotWriteBehind()).not.toThrow()
+      expect(db().select().from(backendRunSnapshotEvents).all()).toHaveLength(0)
+    })
+  })
+
+  it('nulls deleted session and run foreign keys instead of failing a queued event batch', async () => {
+    await withTempDataDir(() => {
+      const sessionId = `session-${randomUUID()}`
+      const runId = `run-${randomUUID()}`
+      const activeRun = setUpRun(sessionId, runId)
+
+      db().delete(sessions).where(eq(sessions.id, sessionId)).run()
+
+      const snapshots = getRunSnapshots({ includeEvents: true })
+      expect(snapshots).toHaveLength(1)
+      expect(snapshots[0].events).toHaveLength(1)
+      expect(snapshots[0].events[0]).toEqual(expect.objectContaining({
+        snapshotId: activeRun.runSnapshotId!,
+        chatSessionId: null,
+        runId: null,
+      }))
+    })
+  })
+
+  it('drops an orphaned snapshot event without blocking other snapshots in the batch', async () => {
+    await withTempDataDir(() => {
+      const first = setUpRun(`session-${randomUUID()}`, `run-${randomUUID()}`)
+      const second = setUpRun(`session-${randomUUID()}`, `run-${randomUUID()}`)
+
+      db()
+        .delete(backendRunSnapshots)
+        .where(eq(backendRunSnapshots.id, first.runSnapshotId!))
+        .run()
+
+      const snapshots = getRunSnapshots({ includeEvents: true })
+      expect(snapshots).toHaveLength(1)
+      expect(snapshots[0].id).toBe(second.runSnapshotId)
+      expect(snapshots[0].events).toHaveLength(1)
     })
   })
 
