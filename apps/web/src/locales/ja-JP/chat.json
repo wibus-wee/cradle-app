@@ -20,6 +20,7 @@
   "history.loadingEarlier": "以前のメッセージを読み込み中…",
   "minimap.assistantReply": "アシスタントの返信",
   "minimap.userMessage": "ユーザーメッセージ",
+  "messageSelection.quote": "選択範囲を引用",
   "pastedText.chars_many": "{{count}} 文字",
   "pastedText.chars_one": "{{count}} 文字",
   "pastedText.chars_other": "{{count}} 文字",
