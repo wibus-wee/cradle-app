@@ -93,7 +93,7 @@ export function resolveCodexStreamTurnContext(
   }
 
   const snapshot = readWorkspaceProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
-  const workspacePath = snapshot.workspacePath ?? '.'
+  const workspacePath = snapshot.workspacePath ?? input.workspacePath ?? '.'
   const agentId = input.agentId ?? snapshot.agentId ?? null
   const runtimeContext = resolveCodexRuntimeContext(workspacePath, agentId)
   const runtimeSettings = input.providerOptions?.runtimeSettings

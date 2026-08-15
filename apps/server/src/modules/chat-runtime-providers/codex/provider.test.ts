@@ -565,7 +565,11 @@ function createProfile(config: Record<string, unknown> = {}): RuntimeProviderTar
   }
 }
 
-function createRuntimeSession(providerSessionId: string | null = null, chatSessionId = 'chat-session-1'): RuntimeSession {
+function createRuntimeSession(
+  providerSessionId: string | null = null,
+  chatSessionId = 'chat-session-1',
+  workspacePath: string | null = '/tmp/cradle-workspace',
+): RuntimeSession {
   return {
     id: chatSessionId,
     chatSessionId,
@@ -573,7 +577,7 @@ function createRuntimeSession(providerSessionId: string | null = null, chatSessi
     runtimeKind: 'codex',
     providerSessionId,
     providerStateSnapshot: JSON.stringify({
-      workspacePath: '/tmp/cradle-workspace',
+      ...(workspacePath !== null ? { workspacePath } : {}),
       models: { currentModelId: null },
     }),
   }
@@ -625,11 +629,14 @@ function createProvider(client: FakeCodexAppServerClient): CodexProvider {
   return createProviderWithClients([client])
 }
 
-function createProviderWithClients(clients: FakeCodexAppServerClient[]): CodexProvider {
+function createProviderWithClients(
+  clients: FakeCodexAppServerClient[],
+  resolveSkillPaths: (workspacePath: string) => string[] = () => ['/tmp/cradle-skill'],
+): CodexProvider {
   let index = 0
   return new CodexProvider({
     readSecret: () => 'sk-secret',
-    resolveSkillPaths: () => ['/tmp/cradle-skill'],
+    resolveSkillPaths,
     recordObservability: vi.fn(),
     createAppServerClient: (options) => {
       const client = clients[Math.min(index, clients.length - 1)]!
@@ -760,6 +767,47 @@ function createForkedNonSubagentThreadRecord() {
 }
 
 describe('codexProvider app-server integration', () => {
+  it('streams a Codex turn for a workspace-less Jarvis session', async () => {
+    const client = new FakeCodexAppServerClient({})
+    const resolveSkillPaths = vi.fn(() => ['/tmp/cradle-skill'])
+    const provider = createProviderWithClients([client], resolveSkillPaths)
+
+    const stream = provider.streamTurn({
+      runId: 'run-jarvis-codex-no-workspace',
+      runtimeSession: createRuntimeSession(null, 'jarvis-session-1', null),
+      profile: createProfile(),
+      message: createUserMessage('Hello from Jarvis'),
+      workspaceId: null,
+      workspacePath: '',
+    })
+    const drainPromise = drainStream(stream)
+
+    await vi.waitFor(() => {
+      expect(client.requests.map(request => request.method)).toContain('turn/start')
+    })
+
+    client.pushNotification({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        itemId: 'jarvis-assistant-message-1',
+        delta: 'Hello',
+      },
+    })
+    client.pushNotification({
+      method: 'turn/completed',
+      params: {
+        threadId: 'codex-thread-1',
+        turn: { id: 'codex-turn-1', status: 'completed' },
+      },
+    })
+
+    await drainPromise
+    expect(resolveSkillPaths).toHaveBeenCalledWith('')
+    expect(client.skillExtraRootsRequests).toEqual([{ extraRoots: ['/tmp/cradle-skill'] }])
+  })
+
   it('projects Codex app-server capabilities into provider-owned UI slots', async () => {
     const client = new FakeCodexAppServerClient({})
     const provider = createProvider(client)
