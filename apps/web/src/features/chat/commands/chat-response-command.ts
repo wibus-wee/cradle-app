@@ -319,7 +319,7 @@ export async function startQuickQuestion(args: {
     // A quick question is a single ephemeral turn. Do not reconnect it as a
     // new provider request after a transport failure.
     sseMaxRetryAttempts: 1,
-    onSseError: error => {
+    onSseError: (error) => {
       if (args.signal?.aborted) {
         return
       }

@@ -10,6 +10,7 @@ import {
   QuestionLine as MessageCircleQuestionIcon,
   WarningLine as AlertTriangleIcon,
 } from '@mingcute/react'
+import { uiMessageChunkSchema } from 'ai'
 import type { UIMessageChunk } from 'ai'
 import type { AnchorHTMLAttributes } from 'react'
 import { useEffect, useRef, useState } from 'react'
@@ -167,10 +168,29 @@ async function streamQuickQuestion({
     signal,
   })
   for await (const chunk of stream) {
-    // The OpenAPI response is intentionally represented as an opaque SSE
-    // payload; the generated client has already decoded each data frame.
-    readQuickQuestionChunk(chunk as UIMessageChunk, onTextDelta)
+    const parsedChunk = await parseQuickQuestionChunk(chunk)
+    if (parsedChunk) {
+      readQuickQuestionChunk(parsedChunk, onTextDelta)
+    }
   }
+}
+
+async function parseQuickQuestionChunk(value: unknown): Promise<UIMessageChunk | null> {
+  if (value === '[DONE]') {
+    return null
+  }
+
+  const schema = uiMessageChunkSchema()
+  if (!schema.validate) {
+    throw new Error('AI SDK UIMessageChunk schema is unavailable.')
+  }
+
+  const input = typeof value === 'string' ? JSON.parse(value) as unknown : value
+  const result = await schema.validate(input)
+  if (!result.success) {
+    throw result.error
+  }
+  return result.value
 }
 
 function readQuickQuestionChunk(
