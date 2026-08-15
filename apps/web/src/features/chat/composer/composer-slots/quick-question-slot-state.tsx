@@ -10,8 +10,8 @@ import {
   QuestionLine as MessageCircleQuestionIcon,
   WarningLine as AlertTriangleIcon,
 } from '@mingcute/react'
-import { uiMessageChunkSchema } from 'ai'
 import type { UIMessageChunk } from 'ai'
+import { uiMessageChunkSchema } from 'ai'
 import type { AnchorHTMLAttributes } from 'react'
 import { useEffect, useRef, useState } from 'react'
 
