@@ -11,6 +11,7 @@ import {
   WarningLine as AlertTriangleIcon,
 } from '@mingcute/react'
 import type { UIMessageChunk } from 'ai'
+import { uiMessageChunkSchema } from 'ai'
 import type { AnchorHTMLAttributes } from 'react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -20,7 +21,6 @@ import { STREAMDOWN_RENDER_OPTIONS } from '~/store/streamdown'
 
 import { startQuickQuestion } from '../../commands/chat-response-command'
 import { MarkdownFileLink } from '../../rendering/markdown-file-link'
-import { buildRawUIMessageChunkStreamFromResponse } from '../../transport/sse-chat-transport'
 import { ComposerSlotIconAction, ComposerSlotShell } from './composer-slot-shell'
 import type { ComposerQuickQuestionSlotActions } from './types'
 
@@ -44,30 +44,37 @@ export function QuickQuestionSlotState({
       return
     }
 
-    const abortController = new AbortController()
     setContent('')
     setErrorText(null)
     setStreaming(true)
 
-    void streamQuickQuestion({
-      question,
-      sessionId: quickQuestion.sessionId,
-      signal: abortController.signal,
-      onTextDelta: delta => setContent(prev => prev + delta),
-    })
-      .catch((error) => {
-        if (error instanceof Error && error.name === 'AbortError') {
-          return
-        }
-        setErrorText(error instanceof Error ? error.message : 'Failed to stream quick question.')
+    let abortController: AbortController | null = null
+    const startTimer = window.setTimeout(() => {
+      const controller = new AbortController()
+      abortController = controller
+      void streamQuickQuestion({
+        question,
+        sessionId: quickQuestion.sessionId,
+        signal: controller.signal,
+        onTextDelta: delta => setContent(prev => prev + delta),
       })
-      .finally(() => {
-        if (!abortController.signal.aborted) {
-          setStreaming(false)
-        }
-      })
+        .catch((error) => {
+          if (error instanceof Error && error.name === 'AbortError') {
+            return
+          }
+          setErrorText(error instanceof Error ? error.message : 'Failed to stream quick question.')
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) {
+            setStreaming(false)
+          }
+        })
+    }, 0)
 
-    return () => abortController.abort()
+    return () => {
+      window.clearTimeout(startTimer)
+      abortController?.abort()
+    }
   }, [quickQuestion.open, quickQuestion.sessionId, question])
 
   useEffect(() => {
@@ -155,29 +162,35 @@ async function streamQuickQuestion({
   signal: AbortSignal
   onTextDelta: (delta: string) => void
 }) {
-  const response = await startQuickQuestion({
+  const { stream } = await startQuickQuestion({
     sessionId,
     body: { question },
     signal,
   })
-  if (!response.ok) {
-    const body = await response.text().catch(() => '')
-    throw new Error(`Failed to start quick question: ${response.status} ${body}`)
-  }
-
-  const reader = buildRawUIMessageChunkStreamFromResponse(response).getReader()
-  try {
-    while (true) {
-      const result = await reader.read()
-      if (result.done) {
-        break
-      }
-      readQuickQuestionChunk(result.value, onTextDelta)
+  for await (const chunk of stream) {
+    const parsedChunk = await parseQuickQuestionChunk(chunk)
+    if (parsedChunk) {
+      readQuickQuestionChunk(parsedChunk, onTextDelta)
     }
   }
-  finally {
-    reader.releaseLock()
+}
+
+async function parseQuickQuestionChunk(value: unknown): Promise<UIMessageChunk | null> {
+  if (value === '[DONE]') {
+    return null
   }
+
+  const schema = uiMessageChunkSchema()
+  if (!schema.validate) {
+    throw new Error('AI SDK UIMessageChunk schema is unavailable.')
+  }
+
+  const input = typeof value === 'string' ? JSON.parse(value) as unknown : value
+  const result = await schema.validate(input)
+  if (!result.success) {
+    throw result.error
+  }
+  return result.value
 }
 
 function readQuickQuestionChunk(
