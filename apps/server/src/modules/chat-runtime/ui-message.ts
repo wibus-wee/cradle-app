@@ -446,12 +446,19 @@ export interface BangCommandResultMetadata {
 export interface ChatRunResultMetadata {
   runId: string
   durationMs: number
+  timings?: {
+    acceptMs: number | null
+    ttfbMs: number | null
+    ttftMs: number | null
+    workedMs: number | null
+    totalMs: number
+  }
 }
 
 /**
- * Stamps the terminal assistant message with its run identity and wall-clock
- * duration so history restores can render "Worked for Ns" without querying
- * run snapshots.
+ * Stamps the terminal assistant message with a compact durable timing
+ * projection. Full forensic events retain their independent snapshot policy;
+ * this projection remains available for as long as the message does.
  */
 export function annotateRunResultMessage(
   message: UIMessage,

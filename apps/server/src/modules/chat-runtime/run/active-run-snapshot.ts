@@ -16,6 +16,8 @@ export function startActiveRunSnapshot(
   activeRun: ActiveRun,
   input: { workspaceId?: string | null, agentId?: string | null },
 ): void {
+  const runStartedAtMs = Date.now()
+  activeRun.runStartedAtMs = runStartedAtMs
   const snapshot = startRunSnapshot({
     chatSessionId: activeRun.sessionId,
     runId: activeRun.runId,
@@ -26,6 +28,7 @@ export function startActiveRunSnapshot(
     modelId: activeRun.modelId,
     workspaceId: input.workspaceId,
     agentId: input.agentId,
+    startedAt: runStartedAtMs,
     summary: {
       providerTargetKind: activeRun.providerTargetKind,
       queueItemId: activeRun.queueItemId ?? null,
@@ -34,6 +37,13 @@ export function startActiveRunSnapshot(
     },
   })
   activeRun.runSnapshotId = snapshot?.id ?? null
+  if (activeRun.admissionRequestedAtMs !== undefined) {
+    recordActiveRunSnapshotEvent(activeRun, {
+      phase: 'run_admission_requested',
+      occurredAt: activeRun.admissionRequestedAtMs,
+      payload: { source: 'http' },
+    })
+  }
   recordActiveRunSnapshotEvent(activeRun, {
     phase: 'run_started',
     payload: {
@@ -54,6 +64,7 @@ export function recordActiveRunSnapshotEvent(
     usage?: TokenUsage
     estimatedCostUsd?: number | null
     durationMs?: number | null
+    occurredAt?: number
     payload?: Record<string, unknown>
   },
 ): void {

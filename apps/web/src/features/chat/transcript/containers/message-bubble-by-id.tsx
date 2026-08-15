@@ -23,6 +23,7 @@ function areProjectedMessagesEqual(
       left?.id === right?.id
       && left?.role === right?.role
       && left?.parts === right?.parts
+      && left?.metadata === right?.metadata
     )
 }
 

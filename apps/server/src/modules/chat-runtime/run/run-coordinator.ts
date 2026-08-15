@@ -42,6 +42,7 @@ import type { ExecuteRunInput } from './turn-executor'
 
 export interface CreateRunInput {
   sessionId: string
+  admissionRequestedAtMs?: number
   text?: string
   files?: FileUIPart[]
   contextParts?: ChatContextPart[]
@@ -320,6 +321,7 @@ export async function createRun(
       sessionId: input.sessionId,
       messageId: draft.assistantMessageId,
       startedAtSeconds: run.startedAt,
+      admissionRequestedAtMs: input.admissionRequestedAtMs,
       providerTargetKind: context.providerTarget?.kind ?? null,
       providerTargetId: context.providerTarget?.id ?? null,
       runtime,
