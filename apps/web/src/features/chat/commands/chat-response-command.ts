@@ -13,6 +13,7 @@ import {
   postChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApproval,
   postChatSessionsBySessionIdQueue,
   postChatSessionsBySessionIdQueueReorder,
+  postChatSessionsBySessionIdQuickQuestion,
   postChatSessionsBySessionIdSideChat,
   postChatSessionsBySessionIdSteer,
   postChatSessionsBySessionIdToolApprovalByRequestId,
@@ -310,12 +311,20 @@ export async function startQuickQuestion(args: {
   sessionId: string
   body: ChatQuickQuestionRequestBody
   signal?: AbortSignal
-}): Promise<Response> {
-  return requestChatRuntimeSse({
-    sessionId: args.sessionId,
-    route: 'quick-question',
+}) {
+  return postChatSessionsBySessionIdQuickQuestion({
+    path: { sessionId: args.sessionId },
     body: args.body,
     signal: args.signal,
+    // A quick question is a single ephemeral turn. Do not reconnect it as a
+    // new provider request after a transport failure.
+    sseMaxRetryAttempts: 1,
+    onSseError: error => {
+      if (args.signal?.aborted) {
+        return
+      }
+      throw error instanceof Error ? error : new Error(String(error))
+    },
   })
 }
 
