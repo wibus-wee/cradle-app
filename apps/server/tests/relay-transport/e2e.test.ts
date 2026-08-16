@@ -908,18 +908,19 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
     expect(controllerResponse.status).toBe(204)
 
     const fakeHostPort = Number(new URL(fakeHost.baseUrl).port)
-    const nodeBridge = await startFabricNodeBridge({
-      relayUrl: relayd.relayUrl,
-      fabricId,
-      nodeId,
-      nodeCertificate,
-      identityPrivateKeyBase64: nodeIdentity.privateKeyBase64,
-      encryptionPrivateKeyBase64: nodeEncryption.privateKeyBase64,
-      targetHost: '127.0.0.1',
-      targetPort: fakeHostPort,
-    })
-
+    let nodeBridge: FabricNodeBridge | undefined
     try {
+      nodeBridge = await startFabricNodeBridge({
+        relayUrl: relayd.relayUrl,
+        fabricId,
+        nodeId,
+        nodeCertificate,
+        identityPrivateKeyBase64: nodeIdentity.privateKeyBase64,
+        encryptionPrivateKeyBase64: nodeEncryption.privateKeyBase64,
+        targetHost: '127.0.0.1',
+        targetPort: fakeHostPort,
+      })
+
       const listPath = `/v1/fabrics/${fabricId}/nodes`
       let discovered: { nodes: Array<{ nodeId: string, status: string }> } | null = null
       const deadline = Date.now() + 10_000
@@ -966,10 +967,10 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       const relaydState = relayd.child.exitCode === null
         ? 'relayd is still running'
         : `relayd exited with code ${relayd.child.exitCode}`
-      throw new Error(`${message}; ${relaydState}; node websocket ${nodeBridge.getWebSocketState()}\n${relayd.getOutput().trim()}`, { cause: error })
+      throw new Error(`${message}; ${relaydState}; node websocket ${nodeBridge?.getWebSocketState() ?? 'not connected'}\n${relayd.getOutput().trim()}`, { cause: error })
     }
     finally {
-      await nodeBridge.stop()
+      await nodeBridge?.stop()
     }
   }, 60_000)
 })
