@@ -5,6 +5,7 @@ import WebSocket from 'ws'
 import { AppError } from '../../errors/app-error'
 import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
 import { allocateLocalPort } from '../../runtime/local-tunnel'
+import { fabricHeadersRecord } from '../fabric/protocol'
 import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
 import { relayAssertionHeaders } from '../relay-servers/relay-signature-service'
 import { generateRelayKeyPair, publicKeyFromPrivate } from './crypto'
@@ -204,7 +205,7 @@ class ControllerTransport {
       let ws: WebSocket
       try {
         if (!this.options.fabric && !this.options.wsAssertion) { throw new AppError({ code: 'relay_assertion_required', status: 500, message: 'Room transport requires a relay assertion.' }) }
-        ws = new WebSocket(wsUrl, { headers: this.options.fabric ? Object.fromEntries(this.options.fabric.headers.entries()) : relayAssertionHeaders(this.options.wsAssertion!) })
+        ws = new WebSocket(wsUrl, { headers: this.options.fabric ? fabricHeadersRecord(this.options.fabric.headers) : relayAssertionHeaders(this.options.wsAssertion!) })
       }
  catch (error) {
         finish(error instanceof Error ? error : new Error(String(error)))

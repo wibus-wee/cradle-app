@@ -161,8 +161,14 @@ export function ownerProofHeaders(ownerPrivateKeyBase64: string, method: string,
   return headers
 }
 
+export function fabricHeadersRecord(headers: Headers): Record<string, string> {
+  const record: Record<string, string> = {}
+  headers.forEach((value, key) => { record[key] = value })
+  return record
+}
+
 export function assertFabricCertificate(certificate: MembershipCertificate, ownerPubkey: string, fabricId: string): void {
-  if (certificate.version !== 1 || certificate.fabricId !== fabricId || certificate.issuerPubkey !== ownerPubkey || certificate.expiresAt && certificate.expiresAt <= unixSeconds()) {
+  if (certificate.version !== 1 || certificate.fabricId !== fabricId || certificate.issuerPubkey !== ownerPubkey || (certificate.expiresAt && certificate.expiresAt <= unixSeconds())) {
     throw new AppError({ code: 'fabric_membership_invalid', status: 401, message: 'Fabric membership certificate is invalid.' })
   }
   const valid = ed25519.verify(fromBase64(certificate.signature), new TextEncoder().encode(JSON.stringify(certificatePayload(certificate))), fromBase64(ownerPubkey))

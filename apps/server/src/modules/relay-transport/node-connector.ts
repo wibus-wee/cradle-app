@@ -6,7 +6,7 @@ import WebSocket from 'ws'
 import { AppError } from '../../errors/app-error'
 import { CRADLE_RELAY_TOKEN_HEADER } from '../../http/auth'
 import type { MembershipCertificate } from '../fabric/protocol'
-import { assertFabricCertificate, fabricAuthHeaders } from '../fabric/protocol'
+import { assertFabricCertificate, fabricAuthHeaders, fabricHeadersRecord } from '../fabric/protocol'
 import { completeNodeEnrollment, getFabricMembership, hasPendingNodeEnrollment, requireFabricMembershipSecretRefs } from '../fabric/service'
 import { readSecret, upsertSecret } from '../secrets/service'
 import { decodeFabricEnvelope, encodeFabricEnvelope, toRelaySessionEnvelope } from './fabric-envelope'
@@ -55,7 +55,7 @@ export class FabricNodeConnector {
     const secretRefs = requireFabricMembershipSecretRefs()
     const headers = fabricAuthHeaders(membership.nodeCertificate, readSecret(secretRefs.identityKeySecretId), 'GET', '/v1/ws/nodes')
     const url = new URL('/v1/ws/nodes', `${membership.relayUrl}/`); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(url, { headers: Object.fromEntries(headers.entries()) })
+    const ws = new WebSocket(url, { headers: fabricHeadersRecord(headers) })
     this.ws = ws
     ws.on('message', (data) => {
       try { this.handleEnvelope(relayWebSocketDataView(data), membership.nodeCertificate, readSecret(secretRefs.encryptionKeySecretId), membership.fabricId) }
