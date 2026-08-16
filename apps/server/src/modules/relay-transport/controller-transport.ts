@@ -406,7 +406,6 @@ class ControllerTransport {
     }
     if (this.server) {
       const server = this.server
-      server.closeAllConnections()
       await new Promise<void>((resolve) => {
         server.close(() => resolve())
       })
