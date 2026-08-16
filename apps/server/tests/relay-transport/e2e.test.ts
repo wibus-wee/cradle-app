@@ -72,7 +72,7 @@ const goAvailable = (() => {
 interface RelaydHandle {
   relayUrl: string
   child: ChildProcess
-  getStderr: () => string
+  getOutput: () => string
 }
 
 function resolveRelaydSourceDir(): string | null {
@@ -120,29 +120,30 @@ async function spawnRelayd(): Promise<RelaydHandle> {
     detached: process.platform !== 'win32',
     stdio: ['pipe', 'pipe', 'pipe'],
   })
-  child.stdout?.on('data', () => {})
-  let stderr = ''
+  let output = ''
+  const captureOutput = (data: Buffer) => {
+    output = `${output}${data.toString()}`.slice(-24_000)
+  }
+  child.stdout?.on('data', captureOutput)
   let spawnError: Error | undefined
-  child.stderr?.on('data', (data: Buffer) => {
-    stderr = `${stderr}${data.toString()}`.slice(-16_000)
-  })
+  child.stderr?.on('data', captureOutput)
   child.once('error', (error) => {
     spawnError = error
   })
 
   try {
-    await waitForReady(relayUrl, child, () => stderr, () => spawnError)
+    await waitForReady(relayUrl, child, () => output, () => spawnError)
   }
  catch (error) {
     await stopRelayd(child)
     const message = error instanceof Error ? error.message : String(error)
-    const details = stderr.trim()
+    const details = output.trim()
     throw new Error(
       `relayd failed to start: ${message}${details ? `\n${details}` : ''}`,
       { cause: error },
     )
   }
-  return { relayUrl, child, getStderr: () => stderr }
+  return { relayUrl, child, getOutput: () => output }
 }
 
 function allocatePort(): Promise<number> {
@@ -165,7 +166,7 @@ function allocatePort(): Promise<number> {
 async function waitForReady(
   relayUrl: string,
   child: ChildProcess,
-  getStderr: () => string,
+  getOutput: () => string,
   getSpawnError: () => Error | undefined,
 ): Promise<void> {
   const deadline = Date.now() + 120_000 // `go run` may download and compile on first launch
@@ -177,7 +178,7 @@ async function waitForReady(
     }
     if (child.exitCode !== null || child.signalCode !== null) {
       throw new Error(
-        `relayd exited before readiness${getStderr().trim() ? `: ${getStderr().trim()}` : ''}`,
+        `relayd exited before readiness${getOutput().trim() ? `: ${getOutput().trim()}` : ''}`,
       )
     }
     try {
@@ -195,7 +196,7 @@ async function waitForReady(
     await new Promise(r => setTimeout(r, 200))
   }
   const timeoutMessage = lastError instanceof Error ? lastError.message : 'relayd did not become ready'
-  const details = getStderr().trim()
+  const details = getOutput().trim()
   throw new Error(`${timeoutMessage}${details ? `: ${details}` : ''}`)
 }
 
@@ -383,6 +384,7 @@ async function startHostBridge(opts: {
 
 interface FabricNodeBridge {
   stop: () => Promise<void>
+  getWebSocketState: () => string
 }
 
 async function startFabricNodeBridge(opts: {
@@ -399,6 +401,10 @@ async function startFabricNodeBridge(opts: {
   const sockets = new Map<string, Socket>()
   const headers = fabricAuthHeaders(opts.nodeCertificate, opts.identityPrivateKeyBase64, 'GET', '/v1/ws/nodes')
   const ws = new WebSocket(toWsUrl(opts.relayUrl, '/v1/ws/nodes'), { headers: Object.fromEntries(headers.entries()) })
+  let webSocketError = ''
+  let webSocketClose = ''
+  ws.on('error', (error) => { webSocketError = error.message })
+  ws.on('close', (code, reason) => { webSocketClose = `code=${code} reason=${reason.toString()}` })
 
   ws.on('message', (data: WebSocket.RawData) => {
     const envelope = decodeFabricEnvelope(relayWebSocketDataView(data))
@@ -448,6 +454,7 @@ async function startFabricNodeBridge(opts: {
     ws.once('error', rejectOpen)
   })
   return {
+    getWebSocketState: () => [webSocketError, webSocketClose].filter(Boolean).join('; ') || `readyState=${ws.readyState}`,
     stop: async () => {
       for (const session of sessions.values()) { session.close() }
       for (const socket of sockets.values()) { socket.destroy() }
@@ -953,7 +960,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       const relaydState = relayd.child.exitCode === null
         ? 'relayd is still running'
         : `relayd exited with code ${relayd.child.exitCode}`
-      throw new Error(`${message}; ${relaydState}\n${relayd.getStderr().trim()}`, { cause: error })
+      throw new Error(`${message}; ${relaydState}; node websocket ${nodeBridge.getWebSocketState()}\n${relayd.getOutput().trim()}`, { cause: error })
     }
     finally {
       await nodeBridge.stop()
