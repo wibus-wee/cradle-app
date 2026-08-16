@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="800" viewBox="0 0 1320 800">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbfaf8"/>
+      <stop offset="1" stop-color="#eef1f0"/>
+    </linearGradient>
+    <linearGradient id="peach" x1="0" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#f0ddce"/>
+      <stop offset="1" stop-color="#e7c7b1"/>
+    </linearGradient>
+    <filter id="box-shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#6d625b" flood-opacity="0.2"/>
+    </filter>
+    <filter id="soft-shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#3f454a" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <rect width="1320" height="800" fill="url(#paper)"/>
+  <path d="M0 0H540C602 134 604 294 543 417C483 539 386 654 331 800H0Z" fill="url(#peach)"/>
+  <path d="M0 738C170 692 342 705 504 800H0Z" fill="#dfb79e" fill-opacity="0.32"/>
+
+  <g fill="#20242a" font-family="Avenir Next Rounded, Arial Rounded MT Bold, Nunito, sans-serif">
+    <text x="72" y="82" fill="#a96e4e" font-size="18" font-weight="800" letter-spacing="5">CRADLE</text>
+    <text x="72" y="164" font-size="64" font-weight="800">Your tools,</text>
+    <text x="72" y="232" font-size="64" font-weight="800">in one place.</text>
+    <text x="74" y="278" fill="#6e6b6a" font-size="21" font-weight="600" letter-spacing="0.2">A calm home for your AI workflow.</text>
+  </g>
+
+  <!-- A friendly flat illustration of a cradle: graphic, rounded, and tactile. -->
+  <g transform="translate(62 380)" stroke="#20242a" stroke-linecap="round" stroke-linejoin="round" filter="url(#box-shadow)">
+    <ellipse cx="238" cy="334" rx="206" ry="24" fill="#8f7769" fill-opacity="0.2" stroke="none"/>
+
+    <!-- Open lid -->
+    <path d="M50 120L72 22Q76 6 94 6H306Q324 6 320 23L296 120Z" fill="#262c32" stroke-width="8"/>
+    <path d="M76 105L93 31Q96 20 108 20H288Q300 20 297 32L280 105Z" fill="#f3e9df" stroke="#20242a" stroke-width="5"/>
+    <path d="M107 56H268" fill="none" stroke="#d4b59e" stroke-width="8"/>
+    <path d="M120 79H233" fill="none" stroke="#d4b59e" stroke-width="8"/>
+
+    <!-- Lower box -->
+    <path d="M24 119Q24 100 43 100H300Q319 100 319 119V278Q319 296 301 303L190 337L42 303Q24 296 24 278Z" fill="#c28765" stroke-width="8"/>
+    <path d="M24 119L190 161L319 119" fill="#e7cdbd" stroke-width="8"/>
+    <path d="M24 119L190 161V337L42 303Q24 296 24 278Z" fill="#d9a183" stroke-width="8"/>
+    <path d="M190 161L319 119V278Q319 296 301 303L190 337Z" fill="#b87555" stroke-width="8"/>
+
+    <!-- Cards nested in the cradle -->
+    <g filter="url(#soft-shadow)" stroke-width="6">
+      <rect x="104" y="81" width="68" height="116" rx="16" fill="#fffaf5" transform="rotate(-9 104 81)"/>
+      <rect x="164" y="72" width="68" height="126" rx="16" fill="#20242a" transform="rotate(5 164 72)"/>
+      <rect x="222" y="84" width="68" height="112" rx="16" fill="#f5bd87" transform="rotate(14 222 84)"/>
+    </g>
+    <path d="M127 117H149M127 136H154" stroke="#c18b5a" stroke-width="7"/>
+    <path d="M187 111H209M187 130H216" stroke="#f7e8dc" stroke-width="7"/>
+    <path d="M243 121H265M243 140H271" stroke="#20242a" stroke-width="7"/>
+
+    <!-- Cradle mark on the front -->
+    <path d="M129 250C129 274 148 290 174 290C200 290 219 274 219 250" fill="none" stroke="#f5e5d8" stroke-width="13"/>
+    <circle cx="174" cy="248" r="8" fill="#f5e5d8" stroke="none"/>
+  </g>
+
+  <!-- Quiet visual rhythm in the reserved Finder area. -->
+  <path d="M650 690H1215" fill="none" stroke="#c8ced0" stroke-width="2" stroke-dasharray="2 16" stroke-linecap="round"/>
+  <text x="650" y="730" fill="#a0a7a9" font-family="Avenir Next Rounded, Arial Rounded MT Bold, Nunito, sans-serif" font-size="16" font-weight="700" letter-spacing="3">MAKE SPACE FOR BETTER WORK</text>
+</svg>

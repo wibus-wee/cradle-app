@@ -12,6 +12,8 @@ import { fixMacOSFrameworkSymlinks } from '../apps/desktop/scripts/fix-macos-fra
 const REPO_ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ICON = resolve(REPO_ROOT, '.github', 'Cradle.png')
 const DEFAULT_COMMAND = resolve(import.meta.dirname, 'Install Cradle.command')
+const DEFAULT_INSTRUCTIONS = resolve(import.meta.dirname, 'Install Instructions.txt')
+const DEFAULT_BACKGROUND = resolve(import.meta.dirname, 'assets', 'dmg-background.png')
 const DEFAULT_OUTPUT = resolve(import.meta.dirname, 'dist', 'Cradle-Installer.dmg')
 const VOLUME_NAME = 'Install Cradle'
 
@@ -135,6 +137,12 @@ function stageCommand(stageDir) {
   return dest
 }
 
+function stageInstructions(stageDir) {
+  const dest = resolve(stageDir, 'Install Instructions.txt')
+  cpSync(DEFAULT_INSTRUCTIONS, dest)
+  return dest
+}
+
 function applyCommandIcon(commandPath, iconPath) {
   if (!iconPath || !existsSync(iconPath)) { return }
   const script = `
@@ -201,6 +209,7 @@ async function main() {
 
     console.log('Staging installer command...')
     const commandPath = stageCommand(stageDir)
+    const instructionsPath = stageInstructions(stageDir)
     applyCommandIcon(commandPath, args.icon)
 
     const iconStaged = args.icon && existsSync(args.icon) ? resolve(stageDir, 'volume.icns') : null
@@ -214,7 +223,7 @@ async function main() {
     await buildDmg({
       'title': VOLUME_NAME,
       ...(iconStaged ? { icon: iconStaged } : {}),
-      'background-color': '#1c1c1c',
+      'background': DEFAULT_BACKGROUND,
       'icon-size': 80,
       'format': 'UDRW',
       'window': {
@@ -223,6 +232,7 @@ async function main() {
       'contents': [
         { x: 80, y: 320, type: 'file', path: payloadDir, name: '.payload' },
         { x: 330, y: 200, type: 'file', path: commandPath, name: 'Install Cradle' },
+        { x: 530, y: 200, type: 'file', path: instructionsPath, name: 'Install Instructions.txt' },
       ],
       'basepath': stageDir,
     }, rwDmg)
@@ -234,6 +244,10 @@ async function main() {
     // Flush filesystem buffers so the rw image is fully written before convert
     try { execFileSync('/bin/sync', { stdio: 'ignore' }) }
  catch {}
+
+    // hdiutil does not overwrite an existing output image by default. Remove
+    // the previous artifact so local rebuilds and CI retries are deterministic.
+    rmSync(outputAbs, { force: true })
 
     // hdiutil convert can transiently fail on CI runners when a prior detach
     // hasn't fully released the image.  Retry up to 3 times with a short delay.

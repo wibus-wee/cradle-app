@@ -7,7 +7,9 @@ macOS does not support DMG autorun, and an unsigned SwiftUI installer app is its
 ## Files
 
 - `Install Cradle.command` installs Cradle from a hidden bundled payload, or downloads the latest GitHub release when no payload is bundled.
-- `build-dmg.sh` creates a DMG with `Install Cradle.command` visible, a custom Finder icon from `.github/Cradle.png`, and `.payload/Cradle.app` hidden.
+- `Install Instructions.txt` explains the macOS Gatekeeper steps for opening the command file.
+- `build-dmg.mjs` creates the release DMG with a branded retina background, the installer and instructions visible, a custom Finder icon from `.github/Cradle.png`, and `.payload/Cradle.app` hidden.
+- `build-dmg.sh` provides the simpler command-line staging path with the same visible installer files.
 
 ## Build A Bundled DMG
 
@@ -35,7 +37,7 @@ The command icon defaults to `.github/Cradle.png`. Override it with:
 installer/build-dmg.sh --app apps/desktop/release/mac-arm64/Cradle.app --icon path/to/Icon.png
 ```
 
-When users open that DMG, they double-click `Install Cradle.command`. The command copies the hidden `.payload/Cradle.app` to `/Applications/Cradle.app`, runs `xattr -cr`, fixes ownership when admin permission is needed, and opens Cradle.
+When users open that DMG, they double-click `Install Cradle.command`. If Gatekeeper blocks it, they should Control-click/right-click the file and choose Open, then use System Settings > Privacy & Security > Open Anyway if needed. The command copies the hidden `.payload/Cradle.app` to `/Applications/Cradle.app`, runs `xattr -cr`, fixes ownership when admin permission is needed, and opens Cradle.
 
 ## Ship The Command Alone
 
