@@ -25,6 +25,7 @@ jobs:
       build_web: ${{ steps.push.outputs.build_web || steps.filter.outputs.build_web }}
       build_server: ${{ steps.push.outputs.build_server || steps.filter.outputs.build_server }}
       build_desktop: ${{ steps.push.outputs.build_desktop || steps.filter.outputs.build_desktop }}
+      build_targets: ${{ steps.matrix.outputs.build_targets }}
     steps:
       - name: Run the complete gate for pushes to main
         id: push
@@ -106,6 +107,35 @@ jobs:
               - 'pnpm-workspace.yaml'
               - '.github/actions/setup/**'
               - '.github/workflows/ci.yml'
+
+      - name: Resolve build matrix
+        id: matrix
+        shell: bash
+        env:
+          BUILD_WEB: ${{ steps.push.outputs.build_web || steps.filter.outputs.build_web }}
+          BUILD_SERVER: ${{ steps.push.outputs.build_server || steps.filter.outputs.build_server }}
+          BUILD_DESKTOP: ${{ steps.push.outputs.build_desktop || steps.filter.outputs.build_desktop }}
+        run: |
+          targets=()
+          if [ "$BUILD_WEB" = 'true' ]; then targets+=(web); fi
+          if [ "$BUILD_SERVER" = 'true' ]; then targets+=(server); fi
+          if [ "$BUILD_DESKTOP" = 'true' ]; then targets+=(desktop); fi
+
+          # Keep the matrix non-empty for an unusual code/config path that is
+          # not covered by a target-specific filter. The complete build is
+          # the safe fallback; ordinary web-only/server-only PRs stay narrow.
+          if [ "${#targets[@]}" -eq 0 ]; then
+            targets=(web server desktop)
+          fi
+
+          targets_json='['
+          separator=''
+          for target in "${targets[@]}"; do
+            targets_json+="${separator}\"${target}\""
+            separator=','
+          done
+          targets_json+=']'
+          echo "build_targets=$targets_json" >> "$GITHUB_OUTPUT"
 
   shared-artifacts:
     name: Shared build artifacts
@@ -260,17 +290,12 @@ jobs:
     name: Build (${{ matrix.target }})
     runs-on: ubuntu-latest
     needs: [changes, shared-artifacts, typecheck]
-    if: >
-      needs.changes.outputs.code == 'true' && (
-        (matrix.target == 'web' && needs.changes.outputs.build_web == 'true') ||
-        (matrix.target == 'server' && needs.changes.outputs.build_server == 'true') ||
-        (matrix.target == 'desktop' && needs.changes.outputs.build_desktop == 'true')
-      )
+    if: needs.changes.outputs.code == 'true'
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        target: [web, server, desktop]
+        target: ${{ fromJSON(needs.changes.outputs.build_targets) }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
