@@ -398,17 +398,17 @@ class ControllerTransport {
       closeRelayWebSocket(this.ws)
       this.ws = null
     }
-    if (this.server) {
-      await new Promise<void>((resolve) => {
-        this.server?.close(() => resolve())
-      })
-      this.server = null
-    }
     for (const { socket } of this.streams.values()) {
       socket.destroy()
     }
     for (const streamId of [...this.streams.keys()]) {
       this.completeStream(streamId)
+    }
+    if (this.server) {
+      await new Promise<void>((resolve) => {
+        this.server?.close(() => resolve())
+      })
+      this.server = null
     }
   }
 
