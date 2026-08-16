@@ -923,18 +923,27 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
 
       const listPath = `/v1/fabrics/${fabricId}/nodes`
       let discovered: { nodes: Array<{ nodeId: string, status: string }> } | null = null
+      let lastListError = ''
       const deadline = Date.now() + 10_000
       while (Date.now() < deadline) {
-        const listHeaders = fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', listPath)
-        const response = await fetch(new URL(listPath, `${relayd.relayUrl}/`), { headers: listHeaders })
-        if (response.ok) {
-          const candidate = (await response.json()) as { nodes: Array<{ nodeId: string, status: string }> }
-          if (candidate.nodes.some(node => node.nodeId === nodeId && node.status === 'online')) {
-            discovered = candidate
-            break
+        try {
+          const listHeaders = fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', listPath)
+          const response = await fetch(new URL(listPath, `${relayd.relayUrl}/`), { headers: listHeaders })
+          if (response.ok) {
+            const candidate = (await response.json()) as { nodes: Array<{ nodeId: string, status: string }> }
+            if (candidate.nodes.some(node => node.nodeId === nodeId && node.status === 'online')) {
+              discovered = candidate
+              break
+            }
           }
         }
+        catch (error) {
+          lastListError = error instanceof Error ? error.message : String(error)
+        }
         await new Promise(resolveWait => setTimeout(resolveWait, 100))
+      }
+      if (!discovered && lastListError) {
+        throw new Error(`Fabric Node discovery did not become ready: ${lastListError}`)
       }
       expect(discovered?.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ nodeId, status: 'online' })]))
 
