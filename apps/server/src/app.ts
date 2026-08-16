@@ -54,8 +54,7 @@ import { DownloadCenterService } from './modules/download-center/service'
 import { externalIssueSources } from './modules/external-issue-sources'
 import { externalProviderSources } from './modules/external-provider-sources'
 import { externalSessionImport } from './modules/external-session-import'
-import { fabric, nodes, registerFabricWebSocketRoutes } from './modules/fabric'
-import { FabricNodeConnector, listActiveFabricNodeAuthTokens } from './modules/fabric/node-connector'
+import { createFabricNodeRoutes, fabric, registerFabricWebSocketRoutes } from './modules/fabric'
 import { filesystem } from './modules/filesystem'
 import { git } from './modules/git'
 import { githubAuth } from './modules/github-auth'
@@ -90,6 +89,8 @@ import { recall } from './modules/recall'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { assertRelayCompressionRuntimeSupport } from './modules/relay-transport/compression'
+import { FabricNodeConnector, listActiveFabricNodeAuthTokens } from './modules/relay-transport/node-connector'
+import { getFabricNodeLinkManager } from './modules/relay-transport/node-link-manager'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
 import { registerRemoteHostWebSocketRoutes, remoteHosts } from './modules/remote-hosts'
 import { search } from './modules/search'
@@ -252,7 +253,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(relayTransport)
   app.use(remoteHosts)
   app.use(fabric)
-  app.use(nodes)
+  app.use(createFabricNodeRoutes(getFabricNodeLinkManager()))
   app.use(externalIssueSources)
   app.use(githubAuth)
   app.use(externalProviderSources)
@@ -674,10 +675,10 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     try {
       hostConnector.startAll()
     }
-    fabricNodeConnector.start()
  catch (error) {
       console.error('[relay-host-connector] startAll failed:', error)
     }
+    fabricNodeConnector.start()
   }
 
   return app

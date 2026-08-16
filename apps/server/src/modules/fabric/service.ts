@@ -1,26 +1,26 @@
 import { randomUUID } from 'node:crypto'
 import { hostname, platform } from 'node:os'
 
+import type { FabricMembership } from '@cradle/db'
 import { fabricMembership } from '@cradle/db'
-import { asc, eq } from 'drizzle-orm'
+import { asc } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { readSecret, upsertSecret } from '../secrets/service'
 import { FabricDirectoryClient } from './directory-client'
+import type { MembershipCertificate, NodeSummary } from './protocol'
 import {
+  assertFabricCertificate,
   fabricAuthHeaders,
   generateFabricEncryptionKeyPair,
   generateFabricSigningKeyPair,
   ownerProofHeaders,
   randomFabricSecret,
-  assertFabricCertificate,
   signFabricCertificate,
   signFabricCreateRequest,
   signFabricJoinRequest,
-  type MembershipCertificate,
-  type NodeSummary,
 } from './protocol'
 
 interface StoredCertificates {
@@ -39,6 +39,8 @@ export interface FabricMembershipView {
   createdAt: number
   updatedAt: number
 }
+
+type FabricMembershipSecretRefs = Pick<FabricMembership, 'ownerKeySecretId' | 'identityKeySecretId' | 'encryptionKeySecretId'>
 
 export interface FabricNodeInvitation {
   version: 1
@@ -62,6 +64,22 @@ export function getFabricMembership(): FabricMembershipView | null {
   return row ? toView(row) : null
 }
 
+export function requireFabricMembershipSecretRefs(): FabricMembershipSecretRefs {
+  const row = db()
+    .select({
+      ownerKeySecretId: fabricMembership.ownerKeySecretId,
+      identityKeySecretId: fabricMembership.identityKeySecretId,
+      encryptionKeySecretId: fabricMembership.encryptionKeySecretId,
+    })
+    .from(fabricMembership)
+    .orderBy(asc(fabricMembership.createdAt))
+    .get()
+  if (!row) {
+    throw new AppError({ code: 'fabric_membership_required', status: 409, message: 'This Cradle Server has not joined a Fabric yet.' })
+  }
+  return row
+}
+
 export async function createFabric(input: CreateFabricInput): Promise<FabricMembershipView> {
   if (getFabricMembership()) {
     throw new AppError({ code: 'fabric_already_configured', status: 409, message: 'This Cradle Server already belongs to a Fabric.' })
@@ -79,27 +97,40 @@ export async function createFabric(input: CreateFabricInput): Promise<FabricMemb
   const created = await directory.createFabric(signFabricCreateRequest(owner.privateKeyBase64))
   const nodeCertificate = signFabricCertificate(owner.privateKeyBase64, {
     fabricId: created.fabric.fabricId,
-    subjectKind: 'node', subjectId: nodeId,
-    identityPubkey: identity.publicKeyBase64, encryptionPubkey: encryption.publicKeyBase64,
+    subjectKind: 'node',
+subjectId: nodeId,
+    identityPubkey: identity.publicKeyBase64,
+encryptionPubkey: encryption.publicKeyBase64,
     scopes: ['admin'],
   })
   const controllerCertificate = signFabricCertificate(owner.privateKeyBase64, {
     fabricId: created.fabric.fabricId,
-    subjectKind: 'controller', subjectId: nodeId,
-    identityPubkey: identity.publicKeyBase64, encryptionPubkey: encryption.publicKeyBase64,
+    subjectKind: 'controller',
+subjectId: nodeId,
+    identityPubkey: identity.publicKeyBase64,
+encryptionPubkey: encryption.publicKeyBase64,
     scopes: ['admin', 'approve', 'control', 'view'],
   })
   const deliverySecret = randomFabricSecret()
   const joinRequest = signFabricJoinRequest({
-    fabricId: created.fabric.fabricId, subjectId: nodeId, identityPrivateKeyBase64: identity.privateKeyBase64,
-    encryptionPubkey: encryption.publicKeyBase64, displayName: input.displayName?.trim() || hostname(),
-    platform: input.platform ?? platform(), version: input.version ?? 'cradle-server',
-    capabilities: input.capabilities ?? ['chat', 'workspace', 'terminal'], deliverySecret,
+    fabricId: created.fabric.fabricId,
+subjectId: nodeId,
+identityPrivateKeyBase64: identity.privateKeyBase64,
+    encryptionPubkey: encryption.publicKeyBase64,
+displayName: input.displayName?.trim() || hostname(),
+    platform: input.platform ?? platform(),
+version: input.version ?? 'cradle-server',
+    capabilities: input.capabilities ?? ['chat', 'workspace', 'terminal'],
+deliverySecret,
   })
   const join = await directory.createJoinRequest(joinRequest)
   await directory.approveJoinRequest(join.requestId, nodeCertificate, ownerProofHeaders(owner.privateKeyBase64, 'POST', `/v1/join-requests/${join.requestId}/approve`))
   await directory.registerController(created.fabric.fabricId, controllerCertificate, [{
-    grantId: `grant_${randomUUID()}`, fabricId: created.fabric.fabricId, controllerId: nodeId, nodeId, scope: 'admin',
+    grantId: `grant_${randomUUID()}`,
+fabricId: created.fabric.fabricId,
+controllerId: nodeId,
+nodeId,
+scope: 'admin',
   }], ownerProofHeaders(owner.privateKeyBase64, 'POST', `/v1/fabrics/${created.fabric.fabricId}/controllers`))
 
   upsertSecret({ id: ownerKeySecretId, kind: 'system-fabric-owner-key', label: 'Cradle Fabric owner key', secret: owner.privateKeyBase64 })
@@ -107,15 +138,24 @@ export async function createFabric(input: CreateFabricInput): Promise<FabricMemb
   upsertSecret({ id: encryptionKeySecretId, kind: 'system-fabric-encryption-key', label: 'Cradle Fabric encryption key', secret: encryption.privateKeyBase64 })
   const now = currentUnixSeconds()
   const row = db().insert(fabricMembership).values({
-    fabricId: created.fabric.fabricId, relayUrl, localNodeId: nodeId, role: 'owner', ownerKeySecretId,
-    identityKeySecretId, encryptionKeySecretId, certificateJson: JSON.stringify({ node: nodeCertificate, controller: controllerCertificate }),
-    createdAt: now, updatedAt: now,
+    fabricId: created.fabric.fabricId,
+relayUrl,
+localNodeId: nodeId,
+role: 'owner',
+ownerKeySecretId,
+    identityKeySecretId,
+encryptionKeySecretId,
+certificateJson: JSON.stringify({ node: nodeCertificate, controller: controllerCertificate }),
+    createdAt: now,
+updatedAt: now,
   }).returning().get()
   return toView(row)
 }
 
-/** Begin enrollment on this Node. The returned object is safe to encode as a
- * QR code; its delivery secret is short-lived and never stored by relayd. */
+/**
+ * Begin enrollment on this Node. The returned object is safe to encode as a
+ * QR code; its delivery secret is short-lived and never stored by relayd.
+ */
 export async function createNodeInvitation(input: CreateFabricInput & { fabricId: string }): Promise<FabricNodeInvitation> {
   if (getFabricMembership()) {
     throw new AppError({ code: 'fabric_already_configured', status: 409, message: 'This Cradle Server already belongs to a Fabric.' })
@@ -126,10 +166,15 @@ export async function createNodeInvitation(input: CreateFabricInput & { fabricId
   const nodeId = `node_${randomUUID()}`
   const deliverySecret = randomFabricSecret()
   const request = signFabricJoinRequest({
-    fabricId: input.fabricId, subjectId: nodeId, identityPrivateKeyBase64: identity.privateKeyBase64,
-    encryptionPubkey: encryption.publicKeyBase64, displayName: input.displayName?.trim() || hostname(),
-    platform: input.platform ?? platform(), version: input.version ?? 'cradle-server',
-    capabilities: input.capabilities ?? ['chat', 'workspace', 'terminal'], deliverySecret,
+    fabricId: input.fabricId,
+subjectId: nodeId,
+identityPrivateKeyBase64: identity.privateKeyBase64,
+    encryptionPubkey: encryption.publicKeyBase64,
+displayName: input.displayName?.trim() || hostname(),
+    platform: input.platform ?? platform(),
+version: input.version ?? 'cradle-server',
+    capabilities: input.capabilities ?? ['chat', 'workspace', 'terminal'],
+deliverySecret,
   })
   const created = await new FabricDirectoryClient(relayUrl).createJoinRequest(request)
   const identityKeySecretId = `fabric-identity-${randomUUID()}`
@@ -138,15 +183,23 @@ export async function createNodeInvitation(input: CreateFabricInput & { fabricId
   upsertSecret({ id: encryptionKeySecretId, kind: 'system-fabric-encryption-key', label: 'Cradle Fabric encryption key', secret: encryption.privateKeyBase64 })
   const now = currentUnixSeconds()
   db().insert(fabricMembership).values({
-    fabricId: input.fabricId, relayUrl, localNodeId: nodeId, role: 'pending-node', ownerKeySecretId: null,
-    identityKeySecretId, encryptionKeySecretId, certificateJson: JSON.stringify({ requestId: created.requestId, deliverySecret }), createdAt: now, updatedAt: now,
+    fabricId: input.fabricId,
+relayUrl,
+localNodeId: nodeId,
+role: 'pending-node',
+ownerKeySecretId: null,
+    identityKeySecretId,
+encryptionKeySecretId,
+certificateJson: JSON.stringify({ requestId: created.requestId, deliverySecret }),
+createdAt: now,
+updatedAt: now,
   }).run()
   return { version: 1, relayUrl, fabricId: input.fabricId, requestId: created.requestId, deliverySecret, expiresAt: created.expiresAt }
 }
 
 export async function approveNodeInvitation(invitation: FabricNodeInvitation): Promise<NodeSummary> {
   const membership = requireFabricMembership()
-  const ownerPrivateKey = requireOwnerKey(membership)
+  const ownerPrivateKey = requireOwnerKey()
   if (invitation.fabricId !== membership.fabricId || invitation.relayUrl !== membership.relayUrl) {
     throw new AppError({ code: 'fabric_invitation_wrong_fabric', status: 409, message: 'This Node invitation belongs to a different Fabric.' })
   }
@@ -157,8 +210,12 @@ export async function approveNodeInvitation(invitation: FabricNodeInvitation): P
   }
   const request = pending.request
   const nodeCertificate = signFabricCertificate(ownerPrivateKey, {
-    fabricId: membership.fabricId, subjectKind: 'node', subjectId: requiredString(request, 'subjectId'),
-    identityPubkey: requiredString(request, 'identityPubkey'), encryptionPubkey: requiredString(request, 'encryptionPubkey'), scopes: ['admin'],
+    fabricId: membership.fabricId,
+subjectKind: 'node',
+subjectId: requiredString(request, 'subjectId'),
+    identityPubkey: requiredString(request, 'identityPubkey'),
+encryptionPubkey: requiredString(request, 'encryptionPubkey'),
+scopes: ['admin'],
   })
   return await directory.approveJoinRequest(invitation.requestId, nodeCertificate, ownerProofHeaders(ownerPrivateKey, 'POST', `/v1/join-requests/${invitation.requestId}/approve`))
 }
@@ -172,7 +229,7 @@ export async function openNodeLink(nodeId: string): Promise<{ linkId: string, ex
   const membership = requireFabricMembership()
   const link = await new FabricDirectoryClient(membership.relayUrl).openLink(nodeId, controllerHeaders(membership, 'POST', `/v1/nodes/${nodeId}/links`))
   assertFabricCertificate(link.nodeCertificate, membership.ownerPubkey, membership.fabricId)
-  if (link.nodeCertificate.subjectKind !== 'node' || link.nodeCertificate.subjectId !== nodeId) throw new AppError({ code: 'fabric_node_certificate_invalid', status: 502, message: 'Fabric relay returned a mismatched Node certificate.' })
+  if (link.nodeCertificate.subjectKind !== 'node' || link.nodeCertificate.subjectId !== nodeId) { throw new AppError({ code: 'fabric_node_certificate_invalid', status: 502, message: 'Fabric relay returned a mismatched Node certificate.' }) }
   return link
 }
 
@@ -185,12 +242,14 @@ export function requireFabricMembership(): FabricMembershipView {
 }
 
 function controllerHeaders(membership: FabricMembershipView, method: string, path: string): Headers {
-  return fabricAuthHeaders(membership.controllerCertificate, readSecret(membership.identityKeySecretId), method, path)
+  const secretRefs = requireFabricMembershipSecretRefs()
+  return fabricAuthHeaders(membership.controllerCertificate, readSecret(secretRefs.identityKeySecretId), method, path)
 }
 
-function requireOwnerKey(membership: FabricMembershipView): string {
-  if (!membership.ownerKeySecretId) throw new AppError({ code: 'fabric_owner_required', status: 403, message: 'Only the Fabric owner can approve Nodes.' })
-  return readSecret(membership.ownerKeySecretId)
+function requireOwnerKey(): string {
+  const secretRefs = requireFabricMembershipSecretRefs()
+  if (!secretRefs.ownerKeySecretId) { throw new AppError({ code: 'fabric_owner_required', status: 403, message: 'Only the Fabric owner can approve Nodes.' }) }
+  return readSecret(secretRefs.ownerKeySecretId)
 }
 
 function toView(row: typeof fabricMembership.$inferSelect): FabricMembershipView {
@@ -202,11 +261,12 @@ function toView(row: typeof fabricMembership.$inferSelect): FabricMembershipView
 }
 
 function normalizeRelayUrl(value: string): string {
-  try { const parsed = new URL(value); if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error(); return parsed.toString().replace(/\/$/, '') } catch { throw new AppError({ code: 'fabric_relay_url_invalid', status: 400, message: 'Fabric relay URL must be an HTTP or HTTPS URL.' }) }
+  try { const parsed = new URL(value); if (!['http:', 'https:'].includes(parsed.protocol)) { throw new Error('Unsupported relay URL protocol') } return parsed.toString().replace(/\/$/, '') }
+ catch { throw new AppError({ code: 'fabric_relay_url_invalid', status: 400, message: 'Fabric relay URL must be an HTTP or HTTPS URL.' }) }
 }
 
 function requiredString(value: Record<string, unknown>, field: string): string {
   const result = value[field]
-  if (typeof result !== 'string' || !result.trim()) throw new AppError({ code: 'fabric_invitation_invalid', status: 400, message: `Node invitation is missing ${field}.` })
+  if (typeof result !== 'string' || !result.trim()) { throw new AppError({ code: 'fabric_invitation_invalid', status: 400, message: `Node invitation is missing ${field}.` }) }
   return result
 }

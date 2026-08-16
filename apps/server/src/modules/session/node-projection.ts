@@ -5,20 +5,19 @@ import { eq, inArray } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
-import { db } from '../../infra'
-import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
-import type { ChatRuntimeSettingsUpdatePatch } from '../chat-runtime/runtime-settings-api'
-import type { RuntimeKind } from '../provider-contracts/types'
-import { getFabricNodeLinkManager } from '../fabric/node-link-manager'
 import {
   proxyUpstreamRequestByBaseUrl,
   upstreamFetchByBaseUrl,
   upstreamJsonByBaseUrl,
-} from '../remote-hosts/upstream'
+} from '../../http/upstream'
+import { db } from '../../infra'
+import type { ChatThinkingEffort } from '../chat-runtime/runtime-provider-types'
+import type { ChatRuntimeSettingsUpdatePatch } from '../chat-runtime/runtime-settings-api'
+import type { RuntimeKind } from '../provider-contracts/types'
+import { getFabricNodeLinkManager } from '../relay-transport/node-link-manager'
 import * as Workspace from '../workspace/service'
-import {
-  isLocalWorkspaceLocator,
-} from '../workspace/workspace-locator'
+import type { WorkspaceLocator } from '../workspace/workspace-locator'
+import { isLocalWorkspaceLocator } from '../workspace/workspace-locator'
 
 export interface NodeSessionLinkView {
   localSessionId: string
@@ -119,19 +118,19 @@ function readNodeWorkspaceLocator(workspaceId: string) {
 }
 
 export async function resolveRemoteWorkspaceIdForLocator(
-  locator: { nodeId: string, path: string, sourceWorkspaceId?: string | null },
+  locator: WorkspaceLocator,
 ): Promise<string> {
   if (locator.sourceWorkspaceId) {
     return locator.sourceWorkspaceId
   }
-  const baseUrl = (await getFabricNodeLinkManager().ensure(locator.nodeId)).localBaseUrl
+  const baseUrl = (await getFabricNodeLinkManager().ensure(locator.hostId)).localBaseUrl
   const remoteWorkspace = await upstreamJsonByBaseUrl<{ id: string } | null>(baseUrl, `/workspaces/resolve?path=${encodeURIComponent(locator.path)}`)
   if (!remoteWorkspace) {
     throw new AppError({
       code: 'remote_cradle_workspace_not_resolved',
       status: 409,
       message: 'Remote workspace could not be resolved for session projection.',
-      details: { nodeId: locator.nodeId, path: locator.path },
+      details: { nodeId: locator.hostId, path: locator.path },
     })
   }
   return remoteWorkspace.id
@@ -167,7 +166,7 @@ export async function createNodeProjectedSession(input: {
   const remoteWorkspaceId = await resolveRemoteWorkspaceIdForLocator(locator)
   const localSessionId = input.id ?? randomUUID()
 
-  const baseUrl = (await getFabricNodeLinkManager().ensure(locator.nodeId)).localBaseUrl
+  const baseUrl = (await getFabricNodeLinkManager().ensure(locator.hostId)).localBaseUrl
   let remoteSession: NodeSessionCreateResponse
   try {
     remoteSession = await upstreamJsonByBaseUrl<NodeSessionCreateResponse>(baseUrl, '/sessions', {
@@ -194,7 +193,7 @@ export async function createNodeProjectedSession(input: {
           code: 'remote_session_create_failed',
           status: 502,
           message: 'Remote Cradle Server session creation failed.',
-          details: { nodeId: locator.nodeId },
+          details: { nodeId: locator.hostId },
         })
   }
 
@@ -224,7 +223,7 @@ export async function createNodeProjectedSession(input: {
       tx.insert(nodeSessionLinks)
         .values({
           localSessionId,
-          nodeId: locator.nodeId,
+          nodeId: locator.hostId,
           remoteSessionId: remoteSession.id,
           remoteWorkspaceId,
         })

@@ -5,10 +5,11 @@ import WebSocket from 'ws'
 import { AppError } from '../../errors/app-error'
 import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
 import { allocateLocalPort } from '../../runtime/local-tunnel'
-import { decodeFabricEnvelope, encodeFabricEnvelope, toRelaySessionEnvelope, type FabricEnvelopeRoute } from '../fabric/fabric-envelope'
 import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
 import { relayAssertionHeaders } from '../relay-servers/relay-signature-service'
 import { generateRelayKeyPair, publicKeyFromPrivate } from './crypto'
+import type { FabricEnvelopeRoute } from './fabric-envelope'
+import { decodeFabricEnvelope, encodeFabricEnvelope, toRelaySessionEnvelope } from './fabric-envelope'
 import type { RelayEnvelope } from './protocol'
 import { decodeRelayEnvelope } from './protocol'
 import { RelaySession } from './session'
@@ -46,8 +47,10 @@ export interface RelayControllerTransportOptions {
   /** Optional label sent in `hello` so the host can show who paired with it. */
   controllerName?: string
   readyTimeoutMs?: number
-  /** Fabric v3 route and authenticated WebSocket headers. When present, this
-   * transport uses the durable Node/link relay endpoint instead of a room. */
+  /**
+   * Fabric v3 route and authenticated WebSocket headers. When present, this
+   * transport uses the durable Node/link relay endpoint instead of a room.
+   */
   fabric?: FabricEnvelopeRoute & { headers: Headers }
 }
 
@@ -200,7 +203,7 @@ class ControllerTransport {
 
       let ws: WebSocket
       try {
-        if (!this.options.fabric && !this.options.wsAssertion) throw new AppError({ code: 'relay_assertion_required', status: 500, message: 'Room transport requires a relay assertion.' })
+        if (!this.options.fabric && !this.options.wsAssertion) { throw new AppError({ code: 'relay_assertion_required', status: 500, message: 'Room transport requires a relay assertion.' }) }
         ws = new WebSocket(wsUrl, { headers: this.options.fabric ? Object.fromEntries(this.options.fabric.headers.entries()) : relayAssertionHeaders(this.options.wsAssertion!) })
       }
  catch (error) {
@@ -261,10 +264,10 @@ class ControllerTransport {
           const raw = relayWebSocketDataView(data)
           if (this.options.fabric) {
             const envelope = decodeFabricEnvelope(raw)
-            if (envelope.fabricId !== this.options.fabric.fabricId || envelope.nodeId !== this.options.fabric.nodeId || envelope.linkId !== this.options.fabric.linkId) throw new AppError({ code: 'fabric_protocol_route_mismatch', status: 400, message: 'Fabric relay route mismatch.' })
+            if (envelope.fabricId !== this.options.fabric.fabricId || envelope.nodeId !== this.options.fabric.nodeId || envelope.linkId !== this.options.fabric.linkId) { throw new AppError({ code: 'fabric_protocol_route_mismatch', status: 400, message: 'Fabric relay route mismatch.' }) }
             session.handleEnvelope(toRelaySessionEnvelope(envelope))
           }
-          else session.handleEnvelope(decodeRelayEnvelope(raw) as RelayEnvelope)
+          else { session.handleEnvelope(decodeRelayEnvelope(raw) as RelayEnvelope) }
         }
  catch (error) {
           finish(error instanceof Error ? error : new Error(String(error)))
