@@ -15,12 +15,12 @@ function createTempDir(): string {
   return tempDir
 }
 
-function createSkillPackage(root: string): string {
-  const skillDir = join(root, 'plugin-extra-root')
+function createSkillPackage(root: string, name = 'plugin-extra-root'): string {
+  const skillDir = join(root, name)
   fs.mkdirSync(skillDir, { recursive: true })
   fs.writeFileSync(join(skillDir, 'SKILL.md'), [
     '---',
-    'name: plugin-extra-root',
+    `name: ${name}`,
     'description: Plugin extra root',
     '---',
     '',
@@ -54,6 +54,22 @@ describe('runtime skill path resolution', () => {
 
     resetPluginSkillRegistry()
     expect(resolveRuntimeSkillPaths(workspacePath)).not.toContain(skillDir)
+  })
+
+  it('skips the workspace skill scope for workspace-less runtime sessions', () => {
+    const root = createTempDir()
+    const workspacePath = join(root, 'workspace')
+    const pluginSkillDir = createSkillPackage(root)
+    const workspaceSkillDir = createSkillPackage(join(workspacePath, '.cradle', 'skills'), 'workspace-only')
+    registerPluginSkill('@cradle/plugin-extra-root', {
+      name: 'plugin-extra-root',
+      description: 'Plugin extra root',
+      skillFile: join(pluginSkillDir, 'SKILL.md'),
+    })
+
+    expect(resolveRuntimeSkillPaths('')).toContain(pluginSkillDir)
+    expect(resolveRuntimeSkillPaths('')).not.toContain(workspaceSkillDir)
+    expect(resolveRuntimeSkillPaths(workspacePath)).toContain(workspaceSkillDir)
   })
 })
 

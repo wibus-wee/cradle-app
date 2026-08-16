@@ -330,13 +330,13 @@ async function preparePluginWebLayer(manifest: PluginManifest): Promise<void> {
 
 async function deactivatePluginServerLayer(pluginName: string): Promise<void> {
   const plugin = activePlugins.get(pluginName)
-  if (plugin) {
-    const { suspendProviderExtensionsForOwner } = await import('../modules/provider-extensions/service')
-    await suspendProviderExtensionsForOwner(pluginName)
-  }
   activePlugins.delete(pluginName)
   if (plugin) {
     disposeSubscriptions(pluginName, plugin.subscriptions)
+  }
+  if (plugin) {
+    const { suspendProviderExtensionsForOwner } = await import('../modules/provider-extensions/service')
+    await suspendProviderExtensionsForOwner(pluginName)
   }
   try {
     await stopConversationBridgeConnectionsForOwner(pluginName)

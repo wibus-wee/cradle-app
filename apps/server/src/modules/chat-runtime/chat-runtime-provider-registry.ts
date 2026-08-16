@@ -412,10 +412,10 @@ export function resolveRuntimeSkillPaths(workspacePath: string): string[] {
     return [...cached.paths]
   }
 
-  const roots = [
-    resolveScopeRoot('builtin', {}),
-    resolveScopeRoot('workspace', { workspacePath }),
-  ]
+  const roots = [resolveScopeRoot('builtin', {})]
+  if (workspacePath.trim().length > 0) {
+    roots.push(resolveScopeRoot('workspace', { workspacePath }))
+  }
   const paths: string[] = []
   const seenPaths = new Set<string>()
   const pushPath = (skillDir: string): void => {
