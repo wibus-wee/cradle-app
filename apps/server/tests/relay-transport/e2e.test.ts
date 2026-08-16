@@ -120,9 +120,27 @@ async function spawnRelayd(): Promise<RelaydHandle> {
     stdio: ['pipe', 'pipe', 'pipe'],
   })
   child.stdout?.on('data', () => {})
-  child.stderr?.on('data', () => {})
+  let stderr = ''
+  let spawnError: Error | undefined
+  child.stderr?.on('data', (data: Buffer) => {
+    stderr = `${stderr}${data.toString()}`.slice(-16_000)
+  })
+  child.once('error', (error) => {
+    spawnError = error
+  })
 
-  await waitForReady(relayUrl)
+  try {
+    await waitForReady(relayUrl, child, () => stderr, () => spawnError)
+  }
+ catch (error) {
+    await stopRelayd(child)
+    const message = error instanceof Error ? error.message : String(error)
+    const details = stderr.trim()
+    throw new Error(
+      `relayd failed to start: ${message}${details ? `\n${details}` : ''}`,
+      { cause: error },
+    )
+  }
   return { relayUrl, child }
 }
 
@@ -143,10 +161,24 @@ function allocatePort(): Promise<number> {
   })
 }
 
-async function waitForReady(relayUrl: string): Promise<void> {
-  const deadline = Date.now() + 30_000 // `go run` compiles on first launch
+async function waitForReady(
+  relayUrl: string,
+  child: ChildProcess,
+  getStderr: () => string,
+  getSpawnError: () => Error | undefined,
+): Promise<void> {
+  const deadline = Date.now() + 120_000 // `go run` may download and compile on first launch
   let lastError: unknown
   while (Date.now() < deadline) {
+    const childError = getSpawnError()
+    if (childError) {
+      throw childError
+    }
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(
+        `relayd exited before readiness${getStderr().trim() ? `: ${getStderr().trim()}` : ''}`,
+      )
+    }
     try {
       const response = await fetch(new URL('/readyz', `${relayUrl}/`), {
         signal: AbortSignal.timeout(500),
@@ -161,7 +193,9 @@ async function waitForReady(relayUrl: string): Promise<void> {
     }
     await new Promise(r => setTimeout(r, 200))
   }
-  throw lastError instanceof Error ? lastError : new Error('relayd did not become ready')
+  const timeoutMessage = lastError instanceof Error ? lastError.message : 'relayd did not become ready'
+  const details = getStderr().trim()
+  throw new Error(`${timeoutMessage}${details ? `: ${details}` : ''}`)
 }
 
 async function stopRelayd(child: ChildProcess): Promise<void> {
@@ -492,21 +526,27 @@ function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, reque
 }
 
 describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real relayd)', () => {
-  let relayd: RelaydHandle
-  let fakeHost: { baseUrl: string, server: Server, requests: string[] }
-  let dataDir: string
+  let relayd!: RelaydHandle
+  let fakeHost!: { baseUrl: string, server: Server, requests: string[] }
+  let dataDir!: string
 
   beforeAll(async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'cradle-relay-e2e-'))
     process.env.CRADLE_DATA_DIR = dataDir
     relayd = await spawnRelayd()
     fakeHost = await startFakeHostServer()
-  }, 60_000)
+  }, 180_000)
 
   afterAll(async () => {
-    await stopRelayd(relayd.child)
-    await new Promise<void>(resolve => fakeHost.server.close(() => resolve()))
-    rmSync(dataDir, { recursive: true, force: true })
+    if (relayd) {
+      await stopRelayd(relayd.child)
+    }
+    if (fakeHost) {
+      await new Promise<void>(resolve => fakeHost.server.close(() => resolve()))
+    }
+    if (dataDir) {
+      rmSync(dataDir, { recursive: true, force: true })
+    }
   })
 
   it('pairs, tunnels an HTTP request end-to-end, and reconnects with pinned pubkeys', async () => {
