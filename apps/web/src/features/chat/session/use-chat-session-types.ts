@@ -146,6 +146,19 @@ export function releaseSessionStreamingStateForTerminalRun(
     }
   }
 
+  const sessionMessageIds = new Set(
+    (state.messagesMap.get(sessionId) ?? []).map(message => message.id),
+  )
+  for (const [messageId, displayMeta] of state.runDisplayMetaMap) {
+    if (
+      displayMeta.runId === run.runId
+      && (messageId === run.messageId || sessionMessageIds.has(messageId))
+    ) {
+      state.finishGeneration(messageId)
+      return true
+    }
+  }
+
   return false
 }
 
