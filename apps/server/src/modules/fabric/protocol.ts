@@ -150,14 +150,14 @@ export function signFabricJoinRequest(input: {
 
 export function fabricAuthHeaders(certificate: MembershipCertificate, identityPrivateKeyBase64: string, method: string, path: string): Headers {
   const headers = new Headers()
-  headers.set('x-cradle-fabric-certificate', toBase64(new TextEncoder().encode(JSON.stringify(certificate))))
-  headers.set('x-cradle-fabric-proof', toBase64(new TextEncoder().encode(JSON.stringify(signFabricRequestProof(identityPrivateKeyBase64, method, path)))))
+  headers.set('x-cradle-fabric-certificate', toRawBase64(new TextEncoder().encode(JSON.stringify(certificate))))
+  headers.set('x-cradle-fabric-proof', toRawBase64(new TextEncoder().encode(JSON.stringify(signFabricRequestProof(identityPrivateKeyBase64, method, path)))))
   return headers
 }
 
 export function ownerProofHeaders(ownerPrivateKeyBase64: string, method: string, path: string): Headers {
   const headers = new Headers()
-  headers.set('x-cradle-fabric-proof', toBase64(new TextEncoder().encode(JSON.stringify(signFabricRequestProof(ownerPrivateKeyBase64, method, path)))))
+  headers.set('x-cradle-fabric-proof', toRawBase64(new TextEncoder().encode(JSON.stringify(signFabricRequestProof(ownerPrivateKeyBase64, method, path)))))
   return headers
 }
 
@@ -202,4 +202,5 @@ function sign(privateKeyBase64: string, payload: Record<string, unknown>): strin
 
 function unixSeconds(): number { return Math.floor(Date.now() / 1000) }
 function toBase64(value: Uint8Array): string { return Buffer.from(value).toString('base64') }
+function toRawBase64(value: Uint8Array): string { return Buffer.from(value).toString('base64').replace(/=+$/u, '') }
 function fromBase64(value: string): Uint8Array { return new Uint8Array(Buffer.from(value, 'base64')) }
