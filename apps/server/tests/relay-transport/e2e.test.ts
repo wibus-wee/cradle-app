@@ -54,11 +54,13 @@ import { relayWebSocketDataView } from '../../src/modules/relay-transport/websoc
  * the full controller<->host tunnel through it — pairing, E2E handshake,
  * stream multiplexing, an HTTP request round-trip, and a pinned-pubkey
  * reconnect. This is the only test that exercises the WebSocket wiring against
- * the actual relay.
+ * the actual relay. Run it explicitly with `CRADLE_RELAY_E2E=1`; the default
+ * server suite must not depend on a Go toolchain or network module downloads.
  */
 
 const moduleDir = fileURLToPath(new URL('.', import.meta.url))
 const relaydSourceDir = resolveRelaydSourceDir()
+const runRealRelayE2E = process.env.CRADLE_RELAY_E2E === '1'
 const goAvailable = (() => {
   try {
     execFileSync('go', ['version'], { stdio: 'ignore' })
@@ -535,7 +537,7 @@ function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, reque
   })
 }
 
-describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real relayd)', () => {
+describe.skipIf(!runRealRelayE2E || !relaydSourceDir || !goAvailable)('relay transport e2e (real relayd)', () => {
   let relayd!: RelaydHandle
   let fakeHost!: { baseUrl: string, server: Server, requests: string[] }
   let dataDir!: string
