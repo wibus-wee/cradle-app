@@ -399,6 +399,8 @@ async function startFabricNodeBridge(opts: {
 }): Promise<FabricNodeBridge> {
   const sessions = new Map<string, RelaySession>()
   const sockets = new Map<string, Socket>()
+  const sessionErrors: string[] = []
+  const socketErrors: string[] = []
   const headers = fabricAuthHeaders(opts.nodeCertificate, opts.identityPrivateKeyBase64, 'GET', '/v1/ws/nodes')
   const ws = new WebSocket(toWsUrl(opts.relayUrl, '/v1/ws/nodes'), { headers: Object.fromEntries(headers.entries()) })
   let webSocketError = ''
@@ -425,7 +427,7 @@ async function startFabricNodeBridge(opts: {
           sockets.set(streamId, socket)
           socket.on('data', chunk => session.writeStreamData(streamId, new Uint8Array(chunk)))
           socket.on('close', () => { session.closeStream(streamId, 'target closed'); sockets.delete(streamId) })
-          socket.on('error', () => { session.closeStream(streamId, 'target error'); sockets.delete(streamId) })
+          socket.on('error', (error) => { socketErrors.push(`stream=${streamId} ${error.message}`); session.closeStream(streamId, 'target error'); sockets.delete(streamId) })
         },
         onStreamData: (streamId, dataToSend) => {
           const socket = sockets.get(streamId)
@@ -437,7 +439,7 @@ async function startFabricNodeBridge(opts: {
 })
         },
         onStreamClose: (streamId) => { sockets.get(streamId)?.destroy(); sockets.delete(streamId) },
-        onError: () => {},
+        onError: (error) => { sessionErrors.push(error.message) },
       })
       if (controller.subjectKind !== 'controller') { throw new Error('Fabric link did not deliver a controller certificate') }
       sessions.set(envelope.linkId, session)
@@ -454,7 +456,7 @@ async function startFabricNodeBridge(opts: {
     ws.once('error', rejectOpen)
   })
   return {
-    getWebSocketState: () => [webSocketError, webSocketClose].filter(Boolean).join('; ') || `readyState=${ws.readyState}`,
+    getWebSocketState: () => [...sessionErrors, ...socketErrors, webSocketError, webSocketClose].filter(Boolean).join('; ') || `readyState=${ws.readyState}`,
     stop: async () => {
       for (const session of sessions.values()) { session.close() }
       for (const socket of sockets.values()) { socket.destroy() }
@@ -910,6 +912,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
     const fakeHostPort = Number(new URL(fakeHost.baseUrl).port)
     let nodeBridge: FabricNodeBridge | undefined
     let fabricStage = 'starting node bridge'
+    let controllerExit = ''
     try {
       nodeBridge = await startFabricNodeBridge({
         relayUrl: relayd.relayUrl,
@@ -968,6 +971,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
         pinnedHostPubkey: link.nodeCertificate.encryptionPubkey,
         fabric: { fabricId, nodeId, linkId: link.linkId, headers: fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', `/v1/ws/controllers/${link.linkId}`) },
       })
+      transport.onExit((exit) => { controllerExit = `code=${exit.code} signal=${exit.signal}` })
       try {
         fabricStage = 'round-tripping tunneled HTTP'
         const response = await fetch(`${transport.localBaseUrl}/fabric-e2e`, { method: 'GET' })
@@ -983,7 +987,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       const relaydState = relayd.child.exitCode === null
         ? 'relayd is still running'
         : `relayd exited with code ${relayd.child.exitCode}`
-      throw new Error(`${message}; stage=${fabricStage}; ${relaydState}; node websocket ${nodeBridge?.getWebSocketState() ?? 'not connected'}\n${relayd.getOutput().trim()}`, { cause: error })
+      throw new Error(`${message}; stage=${fabricStage}; ${relaydState}; node websocket ${nodeBridge?.getWebSocketState() ?? 'not connected'}; controller ${controllerExit || 'still connected'}\n${relayd.getOutput().trim()}`, { cause: error })
     }
     finally {
       await nodeBridge?.stop()
