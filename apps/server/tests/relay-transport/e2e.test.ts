@@ -10,7 +10,7 @@ import { join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 
 import {
@@ -544,6 +544,8 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
   let relayd!: RelaydHandle
   let fakeHost!: { baseUrl: string, server: Server, requests: string[] }
   let dataDir!: string
+  const activeTransports = new Set<Awaited<ReturnType<typeof startRelayControllerTransport>>>()
+  const activeBridges = new Set<{ stop: () => Promise<void> }>()
 
   beforeAll(async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'cradle-relay-e2e-'))
@@ -551,6 +553,17 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
     relayd = await spawnRelayd()
     fakeHost = await startFakeHostServer()
   }, 180_000)
+
+  afterEach(async () => {
+    for (const transport of activeTransports) {
+      await transport.close()
+      activeTransports.delete(transport)
+    }
+    for (const bridge of activeBridges) {
+      await bridge.stop()
+      activeBridges.delete(bridge)
+    }
+  })
 
   afterAll(async () => {
     if (relayd) {
@@ -603,6 +616,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       targetHost: '127.0.0.1',
       targetPort: fakeHostPort,
     })
+    activeBridges.add(hostBridge)
 
     // ── Controller: claim the pairing ──
     const claimAssertion = signRelayAssertion(controllerSigningKeys.privateKeyBase64, {
@@ -630,6 +644,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       pairingCode,
       readyTimeoutMs: 15_000,
     })
+    activeTransports.add(handle)
 
     expect(handle.hostPublicKeyBase64).toBe(hostKeys.publicKeyBase64)
     expect(relayPublicKeyFingerprint(handle.hostPublicKeyBase64!)).toBe(hostFingerprint)
@@ -775,7 +790,9 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
     }
 
     await handle.close()
+    activeTransports.delete(handle)
     await hostBridge.stop()
+    activeBridges.delete(hostBridge)
 
     // ── Reconnect with pinned pubkeys (no pairing code) ──
     // Re-create the room (host-session) and reconnect both sides.
@@ -807,6 +824,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       targetHost: '127.0.0.1',
       targetPort: fakeHostPort,
     })
+    activeBridges.add(hostBridgeReconnect)
 
     const controllerWs2 = signRelayAssertion(controllerSigningKeys.privateKeyBase64, {
       role: 'controller',
@@ -823,6 +841,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       pinnedHostPubkey: hostKeys.publicKeyBase64,
       readyTimeoutMs: 15_000,
     })
+    activeTransports.add(handle2)
 
     const response2 = await fetch(`${handle2.localBaseUrl}/again`, { method: 'GET' })
     expect(response2.status).toBe(200)
@@ -831,7 +850,9 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
     expect(json2.path).toBe('/again')
 
     await handle2.close()
+    activeTransports.delete(handle2)
     await hostBridgeReconnect.stop()
+    activeBridges.delete(hostBridgeReconnect)
   }, 120_000)
 
   it('enrolls a Node, discovers it, and tunnels through real Fabric relayd', async () => {
@@ -933,6 +954,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
         targetHost: '127.0.0.1',
         targetPort: fakeHostPort,
       })
+      activeBridges.add(nodeBridge)
 
       fabricStage = 'discovering node'
       const listPath = `/v1/fabrics/${fabricId}/nodes`
@@ -980,6 +1002,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
         pinnedHostPubkey: link.nodeCertificate.encryptionPubkey,
         fabric: { fabricId, nodeId, linkId: link.linkId, headers: fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', `/v1/ws/controllers/${link.linkId}`) },
       })
+      activeTransports.add(controllerTransport)
       controllerTransport.onExit((exit) => { controllerExit = `code=${exit.code} signal=${exit.signal}` })
       try {
         fabricStage = 'round-tripping tunneled HTTP'
@@ -989,6 +1012,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       }
       finally {
         await controllerTransport.close()
+        activeTransports.delete(controllerTransport)
       }
     }
     catch (error) {
@@ -1000,6 +1024,9 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
     }
     finally {
       await nodeBridge?.stop()
+      if (nodeBridge) {
+        activeBridges.delete(nodeBridge)
+      }
     }
   }, 60_000)
 })
