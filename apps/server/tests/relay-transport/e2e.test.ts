@@ -909,6 +909,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
 
     const fakeHostPort = Number(new URL(fakeHost.baseUrl).port)
     let nodeBridge: FabricNodeBridge | undefined
+    let fabricStage = 'starting node bridge'
     try {
       nodeBridge = await startFabricNodeBridge({
         relayUrl: relayd.relayUrl,
@@ -921,6 +922,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
         targetPort: fakeHostPort,
       })
 
+      fabricStage = 'discovering node'
       const listPath = `/v1/fabrics/${fabricId}/nodes`
       let discovered: { nodes: Array<{ nodeId: string, status: string }> } | null = null
       let lastListError = ''
@@ -928,6 +930,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       while (Date.now() < deadline) {
         try {
           const listHeaders = fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', listPath)
+          listHeaders.set('connection', 'close')
           const response = await fetch(new URL(listPath, `${relayd.relayUrl}/`), { headers: listHeaders })
           if (response.ok) {
             const candidate = (await response.json()) as { nodes: Array<{ nodeId: string, status: string }> }
@@ -947,12 +950,15 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       }
       expect(discovered?.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ nodeId, status: 'online' })]))
 
+      fabricStage = 'opening node link'
       const openPath = `/v1/nodes/${nodeId}/links`
       const openHeaders = fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'POST', openPath)
+      openHeaders.set('connection', 'close')
       const openResponse = await fetch(new URL(openPath, `${relayd.relayUrl}/`), { method: 'POST', headers: openHeaders })
       expect(openResponse.status).toBe(201)
       const link = (await openResponse.json()) as { linkId: string, nodeCertificate: typeof nodeCertificate }
 
+      fabricStage = 'starting controller transport'
       const transport = await startRelayControllerTransport({
         hostId: nodeId,
         relayUrl: relayd.relayUrl,
@@ -963,6 +969,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
         fabric: { fabricId, nodeId, linkId: link.linkId, headers: fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', `/v1/ws/controllers/${link.linkId}`) },
       })
       try {
+        fabricStage = 'round-tripping tunneled HTTP'
         const response = await fetch(`${transport.localBaseUrl}/fabric-e2e`, { method: 'GET' })
         expect(response.status).toBe(200)
         expect(((await response.json()) as { ok: boolean, path: string }).path).toBe('/fabric-e2e')
@@ -976,7 +983,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       const relaydState = relayd.child.exitCode === null
         ? 'relayd is still running'
         : `relayd exited with code ${relayd.child.exitCode}`
-      throw new Error(`${message}; ${relaydState}; node websocket ${nodeBridge?.getWebSocketState() ?? 'not connected'}\n${relayd.getOutput().trim()}`, { cause: error })
+      throw new Error(`${message}; stage=${fabricStage}; ${relaydState}; node websocket ${nodeBridge?.getWebSocketState() ?? 'not connected'}\n${relayd.getOutput().trim()}`, { cause: error })
     }
     finally {
       await nodeBridge?.stop()
