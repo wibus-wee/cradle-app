@@ -913,6 +913,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
     let nodeBridge: FabricNodeBridge | undefined
     let fabricStage = 'starting node bridge'
     let controllerExit = ''
+    let controllerTransport: Awaited<ReturnType<typeof startRelayControllerTransport>> | undefined
     try {
       nodeBridge = await startFabricNodeBridge({
         relayUrl: relayd.relayUrl,
@@ -962,7 +963,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       const link = (await openResponse.json()) as { linkId: string, nodeCertificate: typeof nodeCertificate }
 
       fabricStage = 'starting controller transport'
-      const transport = await startRelayControllerTransport({
+      controllerTransport = await startRelayControllerTransport({
         hostId: nodeId,
         relayUrl: relayd.relayUrl,
         roomId: link.linkId,
@@ -971,15 +972,15 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
         pinnedHostPubkey: link.nodeCertificate.encryptionPubkey,
         fabric: { fabricId, nodeId, linkId: link.linkId, headers: fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', `/v1/ws/controllers/${link.linkId}`) },
       })
-      transport.onExit((exit) => { controllerExit = `code=${exit.code} signal=${exit.signal}` })
+      controllerTransport.onExit((exit) => { controllerExit = `code=${exit.code} signal=${exit.signal}` })
       try {
         fabricStage = 'round-tripping tunneled HTTP'
-        const response = await fetch(`${transport.localBaseUrl}/fabric-e2e`, { method: 'GET' })
+        const response = await fetch(`${controllerTransport.localBaseUrl}/fabric-e2e`, { method: 'GET' })
         expect(response.status).toBe(200)
         expect(((await response.json()) as { ok: boolean, path: string }).path).toBe('/fabric-e2e')
       }
       finally {
-        await transport.close()
+        await controllerTransport.close()
       }
     }
     catch (error) {
@@ -987,7 +988,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       const relaydState = relayd.child.exitCode === null
         ? 'relayd is still running'
         : `relayd exited with code ${relayd.child.exitCode}`
-      throw new Error(`${message}; stage=${fabricStage}; ${relaydState}; node websocket ${nodeBridge?.getWebSocketState() ?? 'not connected'}; controller ${controllerExit || 'still connected'}\n${relayd.getOutput().trim()}`, { cause: error })
+      throw new Error(`${message}; stage=${fabricStage}; ${relaydState}; node websocket ${nodeBridge?.getWebSocketState() ?? 'not connected'}; controller ${controllerExit || 'still connected'}; streams ${JSON.stringify(controllerTransport?.getPerformanceSnapshot() ?? null)}; fake host requests ${JSON.stringify(fakeHost.requests)}\n${relayd.getOutput().trim()}`, { cause: error })
     }
     finally {
       await nodeBridge?.stop()
