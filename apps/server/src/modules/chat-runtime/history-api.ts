@@ -4,6 +4,7 @@ import { and, desc, eq, lt, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
+import { projectChatMessageForClient } from './client-message-projection'
 import { readCurrentSessionEventVersion } from './es/event-store'
 import { messagePayloadJoinCondition } from './message-payload-store'
 import type { ChatMessageStatus } from './run/stream-chunks'
@@ -199,7 +200,7 @@ export async function getMessageSnapshot(
   sessionId: string,
   input: ChatMessagePageInput = {},
 ): Promise<ChatMessageSnapshot> {
-  const page = await getMessagePage(sessionId, input)
+  const page = await getMessagePage(sessionId, input, projectChatMessageForClient)
   return {
     revision: page.revision,
     rows: page.rows,
@@ -266,7 +267,7 @@ export function getMessageDetail(sessionId: string, messageId: string): ChatMess
     { id: row.message.id, messageJson: row.payload.messageJson },
     role,
   )
-  return { message }
+  return { message: projectChatMessageForClient(message) }
 }
 
 function encodeMessageCursor(beforeRowId: number): string {

@@ -1,5 +1,6 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 
+import { projectChatChunkForClient } from '../client-message-projection'
 import { serializeChatError } from '../run/errors'
 import type { FinalMessageProjectionRun } from '../run/final-message-projection'
 import {
@@ -48,7 +49,11 @@ export function createLiveSideConversationStream(
         if (terminalPublished) {
           return
         }
-        streamController.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`))
+        const clientChunk = projectChatChunkForClient(chunk)
+        if (!clientChunk) {
+          return
+        }
+        streamController.enqueue(encoder.encode(`data: ${JSON.stringify(clientChunk)}\n\n`))
         if (terminal) {
           terminalPublished = true
           streamController.enqueue(encoder.encode('data: [DONE]\n\n'))
