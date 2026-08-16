@@ -509,8 +509,9 @@ async function callPairingClaim(
   return (await response.json()) as { roomId: string }
 }
 
-function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, requests: string[] }> {
+function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, requests: string[], sockets: Set<Socket> }> {
   const requests: string[] = []
+  const sockets = new Set<Socket>()
   const server = createServer((req, res) => {
     if (req.url?.startsWith('/hang/')) {
       req.resume()
@@ -526,11 +527,15 @@ function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, reque
       res.end(JSON.stringify({ ok: true, echo: body, path: req.url }))
     })
   })
+  server.on('connection', (socket) => {
+    sockets.add(socket)
+    socket.once('close', () => sockets.delete(socket))
+  })
   return new Promise((resolve, reject) => {
     server.once('error', reject)
     server.listen(0, '127.0.0.1', () => {
       const address = server.address() as AddressInfo
-      resolve({ baseUrl: `http://127.0.0.1:${address.port}`, server, requests })
+      resolve({ baseUrl: `http://127.0.0.1:${address.port}`, server, requests, sockets })
     })
   })
 }
@@ -552,6 +557,9 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       await stopRelayd(relayd.child)
     }
     if (fakeHost) {
+      for (const socket of fakeHost.sockets) {
+        socket.destroy()
+      }
       await new Promise<void>(resolve => fakeHost.server.close(() => resolve()))
     }
     if (dataDir) {

@@ -121,6 +121,7 @@ export async function startRelayControllerTransport(
 
 class ControllerTransport {
   private readonly streams = new Map<string, ActiveStream>()
+  private readonly localSockets = new Set<net.Socket>()
   private readonly exitListeners = new Set<
     (exit: { code: number | null, signal: NodeJS.Signals | null }) => void
   >()
@@ -288,6 +289,8 @@ class ControllerTransport {
 
   private startLocalServer(): Promise<void> {
     const server = net.createServer((socket) => {
+      this.localSockets.add(socket)
+      socket.once('close', () => this.localSockets.delete(socket))
       this.handleLocalConnection(socket)
     })
     this.server = server
@@ -399,6 +402,9 @@ class ControllerTransport {
       this.ws = null
     }
     for (const { socket } of this.streams.values()) {
+      socket.destroy()
+    }
+    for (const socket of this.localSockets) {
       socket.destroy()
     }
     for (const streamId of [...this.streams.keys()]) {
