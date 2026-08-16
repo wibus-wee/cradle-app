@@ -376,7 +376,7 @@ async function startHostBridge(opts: {
       streams.clear()
       ws.removeAllListeners()
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close()
+        ws.terminate()
       }
     },
   }
@@ -463,7 +463,7 @@ async function startFabricNodeBridge(opts: {
       sessions.clear()
       sockets.clear()
       ws.removeAllListeners()
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) { ws.close() }
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) { ws.terminate() }
     },
   }
 }
@@ -1097,7 +1097,7 @@ async function startHostBridgePinned(opts: {
       streams.clear()
       ws.removeAllListeners()
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close()
+        ws.terminate()
       }
     },
   }

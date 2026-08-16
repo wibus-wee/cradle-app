@@ -36,7 +36,7 @@ export class FabricNodeConnector {
     if (hasPendingNodeEnrollment()) { void this.completeEnrollment() }
   }
 
-  stop(): void { this.stopped = true; if (this.reconnectTimer) { clearTimeout(this.reconnectTimer) } if (this.enrollmentTimer) { clearTimeout(this.enrollmentTimer) } this.reconnectTimer = null; this.enrollmentTimer = null; this.ws?.close(); this.ws = null; this.sessions.clear(); for (const streams of this.streams.values()) { for (const stream of streams.values()) { stream.socket.destroy() } } this.streams.clear() }
+  stop(): void { this.stopped = true; if (this.reconnectTimer) { clearTimeout(this.reconnectTimer) } if (this.enrollmentTimer) { clearTimeout(this.enrollmentTimer) } this.reconnectTimer = null; this.enrollmentTimer = null; this.ws?.terminate(); this.ws = null; this.sessions.clear(); for (const streams of this.streams.values()) { for (const stream of streams.values()) { stream.socket.destroy() } } this.streams.clear() }
 
   private async completeEnrollment(): Promise<void> {
     if (this.stopped || !hasPendingNodeEnrollment()) { return }
