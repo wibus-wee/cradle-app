@@ -825,6 +825,12 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
   }, 120_000)
 
   it('enrolls a Node, discovers it, and tunnels through real Fabric relayd', async () => {
+    // Keep the Fabric scenario independent from the legacy room scenario. A
+    // fresh port also prevents undici from reusing an idle HTTP socket that
+    // the previous relayd instance already closed.
+    await stopRelayd(relayd.child)
+    relayd = await spawnRelayd()
+
     const owner = generateFabricSigningKeyPair()
     const nodeIdentity = generateFabricSigningKeyPair()
     const nodeEncryption = generateFabricEncryptionKeyPair()
