@@ -72,6 +72,7 @@ const goAvailable = (() => {
 interface RelaydHandle {
   relayUrl: string
   child: ChildProcess
+  getStderr: () => string
 }
 
 function resolveRelaydSourceDir(): string | null {
@@ -141,7 +142,7 @@ async function spawnRelayd(): Promise<RelaydHandle> {
       { cause: error },
     )
   }
-  return { relayUrl, child }
+  return { relayUrl, child, getStderr: () => stderr }
 }
 
 function allocatePort(): Promise<number> {
@@ -946,6 +947,13 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
       finally {
         await transport.close()
       }
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const relaydState = relayd.child.exitCode === null
+        ? 'relayd is still running'
+        : `relayd exited with code ${relayd.child.exitCode}`
+      throw new Error(`${message}; ${relaydState}\n${relayd.getStderr().trim()}`, { cause: error })
     }
     finally {
       await nodeBridge.stop()
