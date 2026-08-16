@@ -405,8 +405,10 @@ class ControllerTransport {
       this.completeStream(streamId)
     }
     if (this.server) {
+      const server = this.server
+      server.closeAllConnections()
       await new Promise<void>((resolve) => {
-        this.server?.close(() => resolve())
+        server.close(() => resolve())
       })
       this.server = null
     }
