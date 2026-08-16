@@ -893,6 +893,7 @@ describe.skipIf(!relaydSourceDir || !goAvailable)('relay transport e2e (real rel
     })
     expect(controllerResponse.status).toBe(204)
 
+    const fakeHostPort = Number(new URL(fakeHost.baseUrl).port)
     const nodeBridge = await startFabricNodeBridge({
       relayUrl: relayd.relayUrl,
       fabricId,
