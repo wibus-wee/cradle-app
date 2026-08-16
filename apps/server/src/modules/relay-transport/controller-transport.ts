@@ -218,7 +218,7 @@ class ControllerTransport {
         {
           roomId: this.options.roomId,
           ourPublicKeyBase64: this.keypair.publicKeyBase64,
-          ...(this.options.pairingCode ? { pairingCode: this.options.pairingCode } : {}),
+          ...((this.options.pairingCode || this.options.fabric) ? { pairingCode: this.options.fabric?.fabricId ?? this.options.pairingCode } : {}),
           ...(this.options.pinnedHostPubkey
             ? { pinnedPeerPubkey: this.options.pinnedHostPubkey }
             : {}),

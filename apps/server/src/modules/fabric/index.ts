@@ -10,6 +10,7 @@ export const fabric = new Elysia({ prefix: '/fabric', detail: { tags: ['fabric']
   .get('', () => Fabric.getFabricMembership(), { detail: { summary: 'Read this Cradle Server Fabric membership' }, response: { 200: FabricModel.nullableMembership } })
   .post('', ({ body }) => Fabric.createFabric(body), { detail: { summary: 'Create a Cradle Fabric and enroll this Node' }, body: FabricModel.createBody, response: { 200: FabricModel.membership } })
   .post('/node-invitations', ({ body }) => Fabric.createNodeInvitation(body), { detail: { summary: 'Create a short-lived Node enrollment invitation' }, body: FabricModel.beginNodeEnrollmentBody, response: { 200: FabricModel.invitation } })
+  .post('/node-invitations/complete', () => Fabric.completeNodeEnrollment(), { detail: { summary: 'Complete an approved Node enrollment' }, response: { 200: FabricModel.nullableMembership } })
   .post('/node-invitations/approve', ({ body }) => Fabric.approveNodeInvitation(body), { detail: { summary: 'Approve a Node enrollment invitation' }, body: FabricModel.invitation, response: { 200: FabricModel.nodeSummary } })
 
 export interface FabricNodeLinkProvider {

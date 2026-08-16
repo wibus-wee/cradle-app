@@ -17,7 +17,7 @@ export class FabricDirectoryClient {
         message: payload?.error ?? `Fabric directory returned HTTP ${response.status}.`,
       })
     }
-    if (response.status === 204) return undefined as T
+    if (response.status === 204) { return undefined as T }
     return await response.json() as T
   }
 
@@ -42,7 +42,7 @@ export class FabricDirectoryClient {
   }
 
   listNodes(fabricId: string, headers: Headers) {
-    return this.request<NodeSummary[]>(`/v1/fabrics/${encodeURIComponent(fabricId)}/nodes`, { headers })
+    return this.request<{ nodes: NodeSummary[] }>(`/v1/fabrics/${encodeURIComponent(fabricId)}/nodes`, { headers }).then(result => result.nodes)
   }
 
   openLink(nodeId: string, headers: Headers) {

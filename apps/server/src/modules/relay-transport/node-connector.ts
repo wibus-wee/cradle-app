@@ -7,7 +7,7 @@ import { AppError } from '../../errors/app-error'
 import { CRADLE_RELAY_TOKEN_HEADER } from '../../http/auth'
 import type { MembershipCertificate } from '../fabric/protocol'
 import { assertFabricCertificate, fabricAuthHeaders } from '../fabric/protocol'
-import { getFabricMembership, requireFabricMembershipSecretRefs } from '../fabric/service'
+import { completeNodeEnrollment, getFabricMembership, hasPendingNodeEnrollment, requireFabricMembershipSecretRefs } from '../fabric/service'
 import { readSecret, upsertSecret } from '../secrets/service'
 import { decodeFabricEnvelope, encodeFabricEnvelope, toRelaySessionEnvelope } from './fabric-envelope'
 import { RelaySession } from './session'
@@ -24,13 +24,29 @@ export class FabricNodeConnector {
   private ws: WebSocket | null = null
   private stopped = false
   private reconnectTimer: NodeJS.Timeout | null = null
+  private enrollmentTimer: NodeJS.Timeout | null = null
   private readonly sessions = new Map<string, RelaySession>()
   private readonly streams = new Map<string, Map<string, ActiveStream>>()
 
   constructor(private readonly localServerHost: string, private readonly localServerPort: number) {}
 
-  start(): void { this.stopped = false; if (getFabricMembership()?.role !== 'pending-node') { void readFabricNodeAuthToken() } void this.connect() }
-  stop(): void { this.stopped = true; if (this.reconnectTimer) { clearTimeout(this.reconnectTimer) } this.reconnectTimer = null; this.ws?.close(); this.ws = null; this.sessions.clear(); for (const streams of this.streams.values()) { for (const stream of streams.values()) { stream.socket.destroy() } } this.streams.clear() }
+  start(): void {
+    this.stopped = false
+    if (getFabricMembership()) { void readFabricNodeAuthToken(); void this.connect(); return }
+    if (hasPendingNodeEnrollment()) { void this.completeEnrollment() }
+  }
+
+  stop(): void { this.stopped = true; if (this.reconnectTimer) { clearTimeout(this.reconnectTimer) } if (this.enrollmentTimer) { clearTimeout(this.enrollmentTimer) } this.reconnectTimer = null; this.enrollmentTimer = null; this.ws?.close(); this.ws = null; this.sessions.clear(); for (const streams of this.streams.values()) { for (const stream of streams.values()) { stream.socket.destroy() } } this.streams.clear() }
+
+  private async completeEnrollment(): Promise<void> {
+    if (this.stopped || !hasPendingNodeEnrollment()) { return }
+    try {
+      const membership = await completeNodeEnrollment()
+      if (membership) { readFabricNodeAuthToken(); void this.connect(); return }
+    }
+ catch { /* Retry while the owner is deciding. */ }
+    if (!this.stopped) { this.enrollmentTimer = setTimeout(() => void this.completeEnrollment(), 1_000); this.enrollmentTimer.unref?.() }
+  }
 
   private async connect(): Promise<void> {
     if (this.stopped) { return }
