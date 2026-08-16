@@ -63,14 +63,14 @@ import {
 } from '../worktree/service'
 import type { SessionArchive } from './export-archive'
 import { sessionArchiveFileName, threadExportBlockedReason } from './export-archive'
-import type { SessionExecutionTarget } from './remote-projection'
+import type { SessionExecutionTarget } from './node-projection'
 import {
-  createRemoteProjectedSession,
-  isRemoteProjectedSession,
+  createNodeProjectedSession,
+  isNodeProjectedSession,
   readSessionExecutionTarget,
   readSessionExecutionTargets,
-  removeRemoteProjectedSession,
-} from './remote-projection'
+  removeNodeProjectedSession,
+} from './node-projection'
 
 export type { SessionExecutionTarget }
 
@@ -859,7 +859,7 @@ export async function create(input: {
   if (workspaceId) {
     const workspace = Workspace.get(workspaceId)
     if (workspace && !isLocalWorkspaceLocator(workspace.locator)) {
-      const projected = await createRemoteProjectedSession({
+      const projected = await createNodeProjectedSession({
         id: parsed.id,
         workspaceId,
         title: parsed.title,
@@ -1338,8 +1338,8 @@ function cleanupSessionResources(id: string): void {
 }
 
 export async function remove(id: string): Promise<void> {
-  if (isRemoteProjectedSession(id)) {
-    await removeRemoteProjectedSession(id)
+  if (isNodeProjectedSession(id)) {
+    await removeNodeProjectedSession(id)
   }
   const checkpoint = db()
     .select({ id: turnCheckpoints.id })
