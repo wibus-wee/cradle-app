@@ -124,7 +124,21 @@ jobs:
           name: shared-build-${{ github.run_id }}
           path: .
       - name: Run Server Vitest
-        run: timeout --signal=TERM --kill-after=30s 10m pnpm --filter @cradle/server exec vitest run --reporter=verbose
+        run: |
+          setsid pnpm --filter @cradle/server exec vitest run --reporter=verbose &
+          test_pid=$!
+          (
+            sleep 600
+            kill -TERM -- "-${test_pid}" 2>/dev/null || true
+            sleep 30
+            kill -KILL -- "-${test_pid}" 2>/dev/null || true
+          ) &
+          watchdog_pid=$!
+          test_status=0
+          wait "${test_pid}" || test_status=$?
+          kill "${watchdog_pid}" 2>/dev/null || true
+          wait "${watchdog_pid}" 2>/dev/null || true
+          exit "${test_status}"
       - name: Upload server test results
         if: failure()
         uses: actions/upload-artifact@v4
