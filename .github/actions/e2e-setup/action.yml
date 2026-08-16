@@ -1,0 +1,49 @@
+name: Setup E2E runtime
+description: Build E2E workspace artifacts and provision cached browser/runtime dependencies
+
+runs:
+  using: composite
+  steps:
+    - name: Validate E2E suite contract
+      shell: bash
+      run: pnpm e2e:check
+
+    - name: Build plugin SDK
+      shell: bash
+      run: pnpm --filter @cradle/plugin-sdk build
+
+    - name: Build workspace plugins
+      shell: bash
+      run: pnpm --filter "./plugins/*" build
+
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - name: Install Playwright system dependencies
+      shell: bash
+      timeout-minutes: 15
+      run: pnpm exec playwright install-deps chromium-headless-shell
+
+    - name: Install Playwright browser
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      shell: bash
+      timeout-minutes: 15
+      run: pnpm exec playwright install chromium-headless-shell
+
+    - name: Cache Codex runtime
+      uses: actions/cache@v4
+      with:
+        path: apps/desktop/resources/codex
+        key: ${{ runner.os }}-${{ runner.arch }}-codex-runtime-${{ hashFiles('apps/desktop/scripts/sync-codex-runtime.mjs') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-codex-runtime-
+
+    - name: Provision Codex app-server for E2E
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: pnpm --filter @cradle/desktop sync:codex-runtime
