@@ -25,14 +25,12 @@ runs:
 
     - name: Install Playwright system dependencies
       shell: bash
-      timeout-minutes: 15
-      run: pnpm exec playwright install-deps chromium-headless-shell
+      run: timeout --preserve-status 15m pnpm exec playwright install-deps chromium-headless-shell
 
     - name: Install Playwright browser
       if: steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
-      timeout-minutes: 15
-      run: pnpm exec playwright install chromium-headless-shell
+      run: timeout --preserve-status 15m pnpm exec playwright install chromium-headless-shell
 
     - name: Cache Codex runtime
       uses: actions/cache@v4
