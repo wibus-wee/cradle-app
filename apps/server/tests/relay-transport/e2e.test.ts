@@ -201,9 +201,6 @@ async function waitForReady(
 }
 
 async function stopRelayd(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null || child.signalCode !== null) {
-    return
-  }
   closeRelaydOwnerPipe(child)
   await new Promise<void>((resolveDone) => {
     let resolved = false
@@ -218,12 +215,10 @@ async function stopRelayd(child: ChildProcess): Promise<void> {
       resolveDone()
     }
     timeout = setTimeout(() => {
-      if (child.exitCode === null && child.signalCode === null) {
-        const signaled = signalRelayd(child, 'SIGKILL')
-        if (!signaled) {
-          resolveOnce()
-        }
-      }
+      // `go run` can exit while its compiled child still owns the process
+      // group and stdio pipes. Kill the group even when the parent is gone.
+      signalRelayd(child, 'SIGKILL')
+      resolveOnce()
     }, 3_000)
     timeout.unref()
     child.once('exit', resolveOnce)
