@@ -124,7 +124,7 @@ jobs:
           name: shared-build-${{ github.run_id }}
           path: .
       - name: Run Server Vitest
-        run: pnpm --filter @cradle/server exec vitest run --reporter=verbose
+        run: timeout --signal=TERM --kill-after=30s 10m pnpm --filter @cradle/server exec vitest run --reporter=verbose
       - name: Upload server test results
         if: failure()
         uses: actions/upload-artifact@v4
