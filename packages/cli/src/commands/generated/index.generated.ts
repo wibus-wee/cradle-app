@@ -1,6 +1,6 @@
 import type { Command } from 'commander'
 
-export const generatedCommandGroups = ["acp", "agent", "automation", "background-activity", "background-job", "board", "chat", "chronicle", "codex", "download-center", "external-issue-source", "external-session-import", "health", "issue", "issue-agent-session", "kimi", "link-preview", "managed-resources", "mcp-server", "observability", "opencode", "plugin", "preferences", "profile", "provider", "pull-request", "relay-server", "relay-transport", "remote-host", "search", "secret", "session", "session-group", "skill", "usage", "work", "workflow-rule", "workspace"] as const
+export const generatedCommandGroups = ["acp", "agent", "automation", "background-activity", "background-job", "board", "chat", "chronicle", "codex", "download-center", "external-issue-source", "external-session-import", "health", "issue", "issue-agent-session", "kimi", "link-preview", "managed-resources", "mcp-server", "observability", "opencode", "plugin", "preferences", "profile", "provider", "pull-request", "search", "secret", "session", "session-group", "skill", "usage", "work", "workflow-rule", "workspace"] as const
 
 const groupLoaders: Record<string, () => Promise<{ registerGeneratedCommands: (program: Command) => void }>> = {
   "acp": () => import('./groups.generated/acp'),
@@ -29,9 +29,6 @@ const groupLoaders: Record<string, () => Promise<{ registerGeneratedCommands: (p
   "profile": () => import('./groups.generated/profile'),
   "provider": () => import('./groups.generated/provider'),
   "pull-request": () => import('./groups.generated/pull-request'),
-  "relay-server": () => import('./groups.generated/relay-server'),
-  "relay-transport": () => import('./groups.generated/relay-transport'),
-  "remote-host": () => import('./groups.generated/remote-host'),
   "search": () => import('./groups.generated/search'),
   "secret": () => import('./groups.generated/secret'),
   "session": () => import('./groups.generated/session'),
@@ -70,9 +67,6 @@ const groupDescriptions: Record<string, string> = {
   "profile": "Manage agent profiles.",
   "provider": "Inspect provider model availability.",
   "pull-request": "Manage pull-request commands.",
-  "relay-server": "Manage relay-server commands.",
-  "relay-transport": "Manage relay-transport commands.",
-  "remote-host": "Manage remote-host commands.",
   "search": "Search Cradle data.",
   "secret": "Manage secret metadata.",
   "session": "Manage chat sessions and session links.",

@@ -9,7 +9,7 @@ const spec = {
     "app-server",
     "resources"
   ],
-  "description": "Get the active codex app-server process resource sample",
+  "description": "Get active codex app-server process resource samples",
   "flags": [],
   "method": "get",
   "path": "/codex/app-server/resources"

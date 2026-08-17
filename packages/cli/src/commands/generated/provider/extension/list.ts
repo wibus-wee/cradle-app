@@ -5,21 +5,21 @@ import type { Command } from 'commander'
 const spec = {
   "arguments": [
     {
-      "name": "hostId",
+      "name": "providerTargetId",
       "required": true,
-      "target": "path.hostId",
+      "target": "path.providerTargetId",
       "type": "string"
     }
   ],
   "command": [
-    "remote-host",
-    "cradle-server",
-    "connect"
+    "provider",
+    "extension",
+    "list"
   ],
-  "description": "Connect to a remote Cradle Server",
+  "description": "List extensions for a Provider target",
   "flags": [],
-  "method": "post",
-  "path": "/remote-hosts/{hostId}/cradle-server/connect"
+  "method": "get",
+  "path": "/provider-targets/{providerTargetId}/extensions/"
 } satisfies CliOperationSpec
 
 export function register(program: Command): void {

@@ -11,9 +11,9 @@ const spec = {
   "description": "Resolve workspace by locator",
   "flags": [
     {
-      "name": "hostId",
+      "name": "nodeId",
       "required": true,
-      "target": "query.hostId",
+      "target": "query.nodeId",
       "type": "string"
     },
     {

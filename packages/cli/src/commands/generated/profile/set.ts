@@ -57,6 +57,12 @@ const spec = {
       "required": false,
       "target": "body.iconSlug",
       "type": "string"
+    },
+    {
+      "name": "providerId",
+      "required": false,
+      "target": "body.providerId",
+      "type": "string"
     }
   ],
   "method": "put",
