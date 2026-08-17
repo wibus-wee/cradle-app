@@ -58,7 +58,10 @@
     <circle cx="174" cy="248" r="8" fill="#f5e5d8" stroke="none"/>
   </g>
 
-  <!-- Quiet visual rhythm in the reserved Finder area. -->
-  <path d="M650 690H1215" fill="none" stroke="#c8ced0" stroke-width="2" stroke-dasharray="2 16" stroke-linecap="round"/>
-  <text x="650" y="730" fill="#a0a7a9" font-family="Avenir Next Rounded, Arial Rounded MT Bold, Nunito, sans-serif" font-size="16" font-weight="700" letter-spacing="3">MAKE SPACE FOR BETTER WORK</text>
+  <!-- A hand-drawn cue points back to the installer icon placed by Finder. -->
+  <g fill="none" stroke="#b87555" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M850 650C905 584 867 487 764 443" stroke-width="7"/>
+    <path d="M791 438L762 442L778 467" stroke-width="7"/>
+  </g>
+  <text x="930" y="730" text-anchor="middle" fill="#6e6b6a" font-family="Avenir Next Rounded, Arial Rounded MT Bold, Nunito, sans-serif" font-size="18" font-weight="700" letter-spacing="0.5">Double click to install app</text>
 </svg>
