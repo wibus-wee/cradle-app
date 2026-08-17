@@ -340,6 +340,25 @@ describe('desktop server inbound access preferences', () => {
       rmSync(dataDir, { recursive: true, force: true })
     }
   })
+
+  it('defaults the managed Relay to LAN access and derives a local address when needed', async () => {
+    const {
+      desktopRelayBindHostForAccessMode,
+      readDesktopRelayAccessPreferences,
+      resolveDesktopRelayAdvertisedUrl,
+    } = await import('./server-process')
+    const dataDir = mkdtempSync(join(tmpdir(), 'cradle-desktop-relay-access-'))
+
+    try {
+      expect(readDesktopRelayAccessPreferences(dataDir)).toEqual({ accessMode: 'network', publicUrl: null })
+      expect(desktopRelayBindHostForAccessMode('network')).toBe('0.0.0.0')
+      expect(resolveDesktopRelayAdvertisedUrl(8787, 'local', null)).toBe('http://127.0.0.1:8787')
+      expect(resolveDesktopRelayAdvertisedUrl(8787, 'network', 'https://relay.example.com/')).toBe('https://relay.example.com')
+    }
+ finally {
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('desktop server exit classification', () => {
