@@ -12,7 +12,7 @@ import {
 } from '~/api-gen/sdk.gen'
 import { toastManager } from '~/components/ui/toast'
 import type { AgentProfile, ApiProviderKind, ModelDescriptor, ProviderKind, ProviderTarget } from '~/features/agent-runtime/types'
-import { fetchRemoteUpstreamJson } from '~/features/remote-hosts/upstream-fetch'
+import { fetchNodeUpstreamJson } from '~/features/nodes/upstream-fetch'
 
 import { filterVisibleModels, ModelVisibilitySchema } from './model-visibility'
 import { ProfileConfigJsonSchema } from './profile-config-schema'
@@ -35,13 +35,13 @@ export function agentModelsQueryKey(profileId: string | null) {
 export function providerTargetModelsQueryKey(
   target: (ProviderTarget & { sourceKey?: string | null }) | null,
   workspaceId?: string | null,
-  hostId?: string | null,
+  nodeId?: string | null,
 ) {
   return [
     ...AGENT_MODELS_QUERY_KEY,
     target ? `provider-target:${target.id}` : 'no-provider-target',
-    ...(hostId ? [`host:${hostId}`] : []),
-    ...(workspaceId && (hostId || isRuntimeOwnedProviderTarget(target ?? { id: '' }))
+    ...(nodeId ? [`host:${nodeId}`] : []),
+    ...(workspaceId && (nodeId || isRuntimeOwnedProviderTarget(target ?? { id: '' }))
       ? [`workspace:${workspaceId}`]
       : []),
   ] as const
@@ -49,7 +49,7 @@ export function providerTargetModelsQueryKey(
 
 interface ProviderTargetModelFetchOptions {
   workspaceId?: string | null
-  hostId?: string | null
+  nodeId?: string | null
   refresh?: boolean
 }
 
@@ -164,7 +164,7 @@ function providerTargetModelRefreshKey(
   return [
     target.id,
     options?.workspaceId ?? '',
-    options?.hostId ?? '',
+    options?.nodeId ?? '',
   ].join('\0')
 }
 
@@ -210,11 +210,11 @@ async function readProviderTargetModelInventory(
   visibility: z.infer<typeof ModelVisibilitySchema>
   cache: z.infer<typeof ProviderTargetModelsCacheSchema>
 }> {
-  const hostId = options?.hostId ?? null
+  const nodeId = options?.nodeId ?? null
 
-  const cachePromise = hostId
-    ? fetchRemoteUpstreamJson<z.infer<typeof ProviderTargetModelsCacheSchema>>(
-        hostId,
+  const cachePromise = nodeId
+    ? fetchNodeUpstreamJson<z.infer<typeof ProviderTargetModelsCacheSchema>>(
+        nodeId,
         `/providers/targets/${encodeURIComponent(target.id)}/models-cache`,
       )
     : getProvidersTargetsByProviderTargetIdModelsCache({
@@ -233,10 +233,10 @@ async function readProviderTargetModelInventory(
     }
   }
 
-  if (hostId) {
+  if (nodeId) {
     const [settings, cache] = await Promise.all([
-      fetchRemoteUpstreamJson<{ configJson: string }>(
-        hostId,
+      fetchNodeUpstreamJson<{ configJson: string }>(
+        nodeId,
         `/provider-targets/${encodeURIComponent(target.id)}/model-settings`,
       ),
       cachePromise,
@@ -278,9 +278,9 @@ async function refreshProviderTargetModels(
     providerTargetId: target.id,
     workspaceId: options?.workspaceId ?? null,
   }
-  const hostId = options?.hostId ?? null
-  if (hostId) {
-    const data = await fetchRemoteUpstreamJson<unknown>(hostId, '/providers/models', {
+  const nodeId = options?.nodeId ?? null
+  if (nodeId) {
+    const data = await fetchNodeUpstreamJson<unknown>(nodeId, '/providers/models', {
       method: 'POST',
       body,
     })
@@ -376,10 +376,10 @@ export function useAgentModels(profileId: string | null) {
 
 export function useProviderTargetModels(
   target: ProviderTarget | null,
-  options: { workspaceId?: string | null, hostId?: string | null } = {},
+  options: { workspaceId?: string | null, nodeId?: string | null } = {},
 ) {
   const { data: models = [], isLoading } = useQuery({
-    queryKey: providerTargetModelsQueryKey(target, options.workspaceId, options.hostId),
+    queryKey: providerTargetModelsQueryKey(target, options.workspaceId, options.nodeId),
     enabled: target !== null,
     queryFn: async (): Promise<ModelDescriptor[]> => {
       if (!target) {
@@ -468,7 +468,7 @@ export function useAgentModelMap(
 export function useProviderTargetModelMap(
   providerTargets: ProviderTargetModelRequestTarget[],
   initialProviderTargetIds: ReadonlyArray<string | null> = EMPTY_INITIAL_PROFILE_IDS,
-  hookOptions: { workspaceId?: string | null, hostId?: string | null } = {},
+  hookOptions: { workspaceId?: string | null, nodeId?: string | null } = {},
 ) {
   const { t } = useTranslation('common')
   const queryClient = useQueryClient()
@@ -501,10 +501,10 @@ export function useProviderTargetModelMap(
 
   const queries = useQueries({
     queries: requestedTargets.map(target => ({
-      queryKey: providerTargetModelsQueryKey(target, hookOptions.workspaceId, hookOptions.hostId),
+      queryKey: providerTargetModelsQueryKey(target, hookOptions.workspaceId, hookOptions.nodeId),
       queryFn: () => fetchVisibleModelsForProviderTarget(target, {
         workspaceId: hookOptions.workspaceId,
-        hostId: hookOptions.hostId,
+        nodeId: hookOptions.nodeId,
       }),
       enabled: target.enabled,
       ...MODEL_INVENTORY_QUERY_OPTIONS,
@@ -545,12 +545,12 @@ export function useProviderTargetModelMap(
       return
     }
 
-    const queryKey = providerTargetModelsQueryKey(target, hookOptions.workspaceId, hookOptions.hostId)
+    const queryKey = providerTargetModelsQueryKey(target, hookOptions.workspaceId, hookOptions.nodeId)
     setRefreshingProviderTargetIds(current => new Set(current).add(target.id))
     const refresh = fetchVisibleModelsForProviderTarget(target, {
       refresh: true,
       workspaceId: hookOptions.workspaceId,
-      hostId: hookOptions.hostId,
+      nodeId: hookOptions.nodeId,
     })
     refreshesRef.current.set(target.id, refresh)
     void refresh
@@ -567,7 +567,7 @@ export function useProviderTargetModelMap(
           return next
         })
       })
-  }, [hookOptions.hostId, hookOptions.workspaceId, queryClient])
+  }, [hookOptions.nodeId, hookOptions.workspaceId, queryClient])
 
   const ensureProviderTargetModelsFresh = useCallback((target: ProviderTargetModelRequestTarget) => {
     if (!target.enabled || !isApiProviderKind(target.providerKind)) {
@@ -588,7 +588,7 @@ export function useProviderTargetModelMap(
       try {
         const { cache } = await readProviderTargetModelInventory(target, {
           workspaceId: hookOptions.workspaceId,
-          hostId: hookOptions.hostId,
+          nodeId: hookOptions.nodeId,
         })
         if (!shouldLiveRefreshModelInventory(cache)) {
           return
@@ -599,7 +599,7 @@ export function useProviderTargetModelMap(
         // Leave queryFn / explicit refresh to surface inventory errors.
       }
     })()
-  }, [hookOptions.hostId, hookOptions.workspaceId, liveRefreshProviderTargetModels])
+  }, [hookOptions.nodeId, hookOptions.workspaceId, liveRefreshProviderTargetModels])
 
   const inventorySyncKey = requestedTargets
     .map((target, index) => {

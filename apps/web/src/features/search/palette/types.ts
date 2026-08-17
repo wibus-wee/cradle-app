@@ -37,7 +37,7 @@ export interface WorkspaceSearchHit {
   id: string
   name: string
   locator: {
-    hostId: string
+    nodeId: string
     path: string
     kind?: 'project' | 'managed-worktree'
     sourceWorkspaceId?: string | null

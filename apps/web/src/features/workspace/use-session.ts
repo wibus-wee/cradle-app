@@ -58,7 +58,7 @@ export interface WorkspaceSession {
   isIsolated: boolean
   worktreeId: string | null
   worktreeBranch: string | null
-  /** Local vs remote-host execution affinity from session projection. */
+  /** Local vs Fabric Node execution affinity from session projection. */
   execution: SessionExecution
 }
 

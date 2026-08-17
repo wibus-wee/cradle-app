@@ -7,7 +7,7 @@ export const newWorkWorkspaceFixtures = [
     id: 'workspace-cradle',
     name: 'Cradle App',
     locator: {
-      hostId: 'local',
+      nodeId: 'local',
       path: '/Users/demo/cradle-app',
       kind: 'project',
     },
@@ -28,7 +28,7 @@ export const newWorkWorkspaceFixtures = [
     id: 'workspace-docs',
     name: 'Product documentation',
     locator: {
-      hostId: 'local',
+      nodeId: 'local',
       path: '/Users/demo/product-documentation',
       kind: 'project',
     },

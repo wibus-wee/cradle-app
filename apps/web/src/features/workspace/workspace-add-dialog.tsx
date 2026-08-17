@@ -1,21 +1,24 @@
-import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 
-import { getRemoteHostsOptions } from '~/api-gen/@tanstack/react-query.gen'
-import type { GetRemoteHostsResponse } from '~/api-gen/types.gen'
+import type {
+  NodeWorkspaceEntry,
+  NodeWorkspaceTarget,
+} from '~/features/nodes/node-grouping'
+import { mergeNodeWorkspaceInventories } from '~/features/nodes/node-grouping'
+import { NodeWorkspacePickerView } from '~/features/nodes/node-workspace-picker-view'
+import { useConnectNode, useFabricMembership, useNodes, useNodeWorkspaces } from '~/features/nodes/use-nodes'
+import type { CreateWorkspaceInput } from '~/features/workspace/use-workspace'
+import { useWorkspaces } from '~/features/workspace/use-workspace'
 
-import { RemoteWorkspaceBrowser } from './remote-workspace-browser'
-import type { CreateWorkspaceInput } from './use-workspace'
 import { WorkspaceAddDialogView } from './workspace-add-dialog-view'
-
-const EMPTY_REMOTE_HOSTS: GetRemoteHostsResponse = []
 
 export interface WorkspaceAddDialogProps {
   open: boolean
   creating: boolean
   onOpenChange: (open: boolean) => void
   onAddLocal: () => void
-  onCreateRemote: (input: CreateWorkspaceInput) => Promise<void>
+  /** Mount a workspace by locator (`nodeId` semantics). */
+  onAddFromLocator: (input: CreateWorkspaceInput) => Promise<void>
 }
 
 export function WorkspaceAddDialog({
@@ -23,45 +26,100 @@ export function WorkspaceAddDialog({
   creating,
   onOpenChange,
   onAddLocal,
-  onCreateRemote,
+  onAddFromLocator,
 }: WorkspaceAddDialogProps) {
-  const [selectedHostId, setSelectedHostId] = useState('local')
-  const remoteHostsQuery = useQuery({
-    ...getRemoteHostsOptions(),
-    enabled: open,
-  })
-  const remoteHosts = remoteHostsQuery.data ?? EMPTY_REMOTE_HOSTS
-  const selectedRemoteHost = remoteHosts.find(
-    host => host.id === selectedHostId,
-  ) ?? null
+  const nodesQuery = useNodes()
+  const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
+  const { workspaces } = useWorkspaces()
+  const membershipQuery = useFabricMembership()
+  const localNodeId = membershipQuery.data?.localNodeId ?? null
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+  const [addingTargetKey, setAddingTargetKey] = useState<string | null>(null)
+  const connectNode = useConnectNode()
 
-  useEffect(() => {
-    if (!open) {
-      setSelectedHostId('local')
+  const remoteNodes = useMemo(
+    () => nodes.filter(node => node.nodeId !== localNodeId),
+    [localNodeId, nodes],
+  )
+  const selectedNode = remoteNodes.find(node => node.nodeId === selectedNodeId) ?? null
+  const nodeWorkspacesQuery = useNodeWorkspaces(selectedNode, open)
+
+  const addedLocators = useMemo(
+    () => workspaces.map(workspace => ({
+      nodeId: workspace.locator.nodeId,
+      path: workspace.locator.path,
+    })),
+    [workspaces],
+  )
+  const entries = useMemo(() => {
+    if (!selectedNode) {
+      return []
     }
-  }, [open])
+    return mergeNodeWorkspaceInventories(
+      [{
+        node: { nodeId: selectedNode.nodeId, nodeName: selectedNode.displayName },
+        workspaces: nodeWorkspacesQuery.data ?? [],
+      }],
+      addedLocators,
+    )
+  }, [addedLocators, nodeWorkspacesQuery.data, selectedNode])
+
+  const handleAddWorkspace = async (entry: NodeWorkspaceEntry, target: NodeWorkspaceTarget) => {
+    const targetKey = `${target.nodeId}:${target.path}`
+    setAddingTargetKey(targetKey)
+    try {
+      await onAddFromLocator({
+        name: entry.name,
+        locator: {
+          nodeId: target.nodeId,
+          path: target.path,
+          ...(target.kind ? { kind: target.kind } : {}),
+          ...(target.sourceWorkspaceId ? { sourceWorkspaceId: target.sourceWorkspaceId } : {}),
+        },
+        ...(entry.originUrl || entry.repoRoot
+          ? {
+              gitIdentity: {
+                ...(entry.originUrl ? { originUrl: entry.originUrl } : {}),
+                ...(entry.repoRoot ? { repoRoot: entry.repoRoot } : {}),
+              },
+            }
+          : {}),
+      })
+      onOpenChange(false)
+    }
+    finally {
+      setAddingTargetKey(null)
+    }
+  }
+
+  const nodePicker = remoteNodes.length > 0
+    ? (
+        <NodeWorkspacePickerView
+          nodes={remoteNodes}
+          selectedNodeId={selectedNodeId}
+          entries={entries}
+          loading={nodeWorkspacesQuery.isPending}
+          selectedNodeOffline={selectedNode?.status === 'offline'}
+          addingTargetKey={addingTargetKey}
+          onSelectNode={setSelectedNodeId}
+          onReconnect={(nodeId) => {
+            void connectNode
+              .mutateAsync({ path: { nodeId } })
+              .then(() => nodeWorkspacesQuery.refetch())
+              .catch(() => {})
+          }}
+          onAddWorkspace={(entry, target) => void handleAddWorkspace(entry, target)}
+        />
+      )
+    : null
 
   return (
     <WorkspaceAddDialogView
       open={open}
       creating={creating}
-      remoteHosts={remoteHosts}
-      remoteHostsLoading={remoteHostsQuery.isLoading}
-      remoteHostsError={remoteHostsQuery.error?.message ?? null}
-      selectedHostId={selectedHostId}
-      remoteContent={selectedRemoteHost
-        ? (
-            <RemoteWorkspaceBrowser
-              key={selectedRemoteHost.id}
-              host={selectedRemoteHost}
-              creating={creating}
-              onCreate={onCreateRemote}
-            />
-          )
-        : null}
       onOpenChange={onOpenChange}
-      onSelectHost={setSelectedHostId}
       onAddLocal={onAddLocal}
+      nodePicker={nodePicker}
     />
   )
 }

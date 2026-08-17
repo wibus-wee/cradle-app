@@ -32,7 +32,7 @@ export function ChatRuntimeView({
   workspaceId,
   workspacePath = null,
   agentId,
-  remoteHostId = null,
+  nodeId = null,
   composerContextBar,
   composerToolbarAddon,
   hideRuntimeToolbar = false,
@@ -50,7 +50,7 @@ export function ChatRuntimeView({
   workspaceId: string | null
   workspacePath?: string | null
   agentId: string | null
-  remoteHostId?: string | null
+  nodeId?: string | null
   composerContextBar?: ReactNode
   composerToolbarAddon?: ReactNode
   hideRuntimeToolbar?: boolean
@@ -67,7 +67,7 @@ export function ChatRuntimeView({
     sessionModelId ?? '',
     sessionThinkingEffort ?? '',
     runtimeKind ?? '',
-    remoteHostId ?? '',
+    nodeId ?? '',
   ].join(':')
   const { runtimes } = useRuntimeCatalog()
   const runtimeDescriptor = runtimes.find(runtime => runtime.runtimeKind === runtimeKind) ?? null
@@ -75,7 +75,7 @@ export function ChatRuntimeView({
   const composerState = useComposerState({
     context: 'chat',
     workspaceId,
-    remoteHostId,
+    nodeId,
     boundAgentId: agentId,
     boundProviderTargetId: sessionProviderTargetId ?? undefined,
     boundModelId: sessionModelId,
@@ -237,7 +237,7 @@ export function ChatRuntimeView({
         runtimeKind={runtimeKind}
         workspaceId={workspaceId}
         workspacePath={workspacePath}
-        remoteHostId={remoteHostId}
+        nodeId={nodeId}
         searchFiles={searchFiles}
         searchPlugins={searchPlugins}
         searchSkills={searchSkills}

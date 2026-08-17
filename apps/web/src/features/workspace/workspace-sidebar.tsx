@@ -12,13 +12,14 @@ import {
   Refresh1Line as RefreshCwIcon,
   TransferVerticalLine as ArrowUpDownIcon,
 } from '@mingcute/react'
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { shallow } from 'zustand/shallow'
 
 import { patchSessionsById, postSessionsByIdRead } from '~/api-gen'
 import {
+  getNodesOptions,
   getSessionsByIdQueryKey,
   patchWorkspacesByWorkspaceIdLocationMutation,
   patchWorkspacesByWorkspaceIdMutation,
@@ -34,7 +35,6 @@ import { prefetchChatSession } from '~/features/chat/session/chat-session-prefet
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
 import { KanbanSidebar } from '~/features/kanban/kanban-sidebar'
 import { PluginsSidebar } from '~/features/plugins/plugins-sidebar'
-import { useRemoteHostsQuery } from '~/features/remote-hosts/use-remote-host-connection'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
 import { GithubRequiredDialog } from '~/features/settings/github-required-dialog'
 import { openGithubRequiredDialog } from '~/features/settings/github-required-dialog-store'
@@ -73,7 +73,6 @@ import {
   useSessionGroups,
   useUpdateSessionGroup,
 } from './use-session-group'
-import type { CreateWorkspaceInput } from './use-workspace'
 import {
   useAddWorkspace,
   useDeleteWorkspace,
@@ -1195,7 +1194,7 @@ const WorkspaceSidebarBody = memo(
       workByPrimarySessionId,
       workspaces,
     ])
-    const { data: remoteHosts = [] } = useRemoteHostsQuery(grouping === 'environment')
+    const { data: nodes = [] } = useQuery({ ...getNodesOptions(), enabled: grouping === 'environment' })
     const flatSections = useMemo(() => {
       if (grouping === 'workspace') {
         return []
@@ -1209,7 +1208,7 @@ const WorkspaceSidebarBody = memo(
         locallyStreamingSessionIds,
         locallyErroredSessionIds,
         attentionBySessionId: resolvedAttentionBySessionId,
-        remoteHosts,
+        nodes,
       })
     }, [
       filteredFlatEntries,
@@ -1217,7 +1216,7 @@ const WorkspaceSidebarBody = memo(
       locallyErroredSessionIds,
       locallyStreamingSessionIds,
       orderingDirection,
-      remoteHosts,
+      nodes,
       resolvedAttentionBySessionId,
       sessionOrdering,
       workByPrimarySessionId,
@@ -1549,27 +1548,6 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
     }
   }, [addAsSingleFolder, t])
 
-  const handleCreateRemoteWorkspace = useCallback(
-    async (input: CreateWorkspaceInput) => {
-      try {
-        await createFromLocator(input)
-        setAddWorkspaceDialogOpen(false)
-        toastManager.add({
-          type: 'success',
-          title: t('workspace.toast.remoteWorkspaceCreated'),
-        })
-      }
- catch (error) {
-        toastManager.add({
-          type: 'error',
-          title: t('workspace.toast.remoteWorkspaceCreateFailed'),
-          description: formatToastError(error),
-        })
-      }
-    },
-    [createFromLocator, t],
-  )
-
   const openSearch = useCallback(() => useGlobalSearchStore.getState().openSearch(), [])
 
   const handleNewWork = useCallback(() => {
@@ -1640,7 +1618,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
         creating={adding}
         onOpenChange={setAddWorkspaceDialogOpen}
         onAddLocal={addFromPicker}
-        onCreateRemote={handleCreateRemoteWorkspace}
+        onAddFromLocator={createFromLocator}
       />
       <WorkspaceRecognitionDialogView
         recognition={recognition}

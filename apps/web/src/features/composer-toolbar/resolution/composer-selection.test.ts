@@ -35,10 +35,10 @@ function model(overrides: Partial<ModelDescriptor> & { id: string }): ModelDescr
 }
 
 describe('resolveComposerCatalogSource', () => {
-  it('uses the remote catalog when a remote host id is present', () => {
+  it('uses the node catalog when a node id is present', () => {
     expect(resolveComposerCatalogSource(null)).toBe('local')
     expect(resolveComposerCatalogSource(undefined)).toBe('local')
-    expect(resolveComposerCatalogSource('host-1')).toBe('remote-host')
+    expect(resolveComposerCatalogSource('node-1')).toBe('node')
   })
 })
 

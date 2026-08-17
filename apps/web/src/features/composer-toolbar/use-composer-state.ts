@@ -5,8 +5,8 @@ import { ACP_CHAT_RUNTIME_KIND } from '~/features/agent-runtime/types'
 import { useProviderTargetModelMap } from '~/features/agent-runtime/use-agent-models'
 import type { Agent } from '~/features/agent-runtime/use-agents'
 import { useAgents } from '~/features/agent-runtime/use-agents'
+import { useNodeProviderTargets } from '~/features/agent-runtime/use-node-provider-targets'
 import { useProviderTargets } from '~/features/agent-runtime/use-provider-targets'
-import { useRemoteProviderTargets } from '~/features/agent-runtime/use-remote-provider-targets'
 import type { RuntimeCatalogComposer } from '~/features/agent-runtime/use-runtime-catalog'
 import {
   DEFAULT_RUNTIME_CATALOG_COMPOSER,
@@ -42,7 +42,7 @@ interface ComposerStateConfig {
    * When set, provider/model catalogs are loaded from the remote host via the
    * Upstream Gateway instead of local `/provider-targets`.
    */
-  remoteHostId?: string | null
+  nodeId?: string | null
   /** Enables Agent as a mutually exclusive new-chat target. Provider-only surfaces leave this off. */
   enableAgents?: boolean
   /** For 'chat' context — the session's bound agent identity */
@@ -99,7 +99,7 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
   const {
     context,
     workspaceId,
-    remoteHostId = null,
+    nodeId = null,
     enableAgents = false,
     boundAgentId,
     boundProviderTargetId,
@@ -108,7 +108,7 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
     boundRuntimeKind,
     resetKey,
   } = config
-  const usesRemoteCatalog = resolveComposerCatalogSource(remoteHostId) === 'remote-host'
+  const usesRemoteCatalog = resolveComposerCatalogSource(nodeId) === 'node'
 
   // Persisted state
   const lastRuntimeKind = useNewChatStore(s => s.lastRuntimeKind)
@@ -138,8 +138,8 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
   const {
     providerOptions: remoteBaseProviderOptions,
     isLoading: isLoadingRemoteBaseProviders,
-  } = useRemoteProviderTargets({
-    hostId: remoteHostId,
+  } = useNodeProviderTargets({
+    nodeId,
     enabled: usesRemoteCatalog,
   })
   const baseProviderOptions = usesRemoteCatalog ? remoteBaseProviderOptions : localBaseProviderOptions
@@ -343,8 +343,8 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
   const {
     providerOptions: remoteScopedProviderOptions,
     isLoading: isLoadingRemoteScopedProviders,
-  } = useRemoteProviderTargets({
-    hostId: remoteHostId,
+  } = useNodeProviderTargets({
+    nodeId,
     enabled: usesRemoteCatalog && usesRuntimeOwnedProviderTargets,
     runtimeKind,
     workspaceId,
@@ -407,7 +407,7 @@ export function useComposerState(config: ComposerStateConfig): ComposerStateResu
     requestProviderTargetModels,
   } = useProviderTargetModelMap(selectableProfiles, initialModelProfileIds, {
     workspaceId,
-    hostId: remoteHostId,
+    nodeId,
   })
   const modelsByProfileId = modelsByProviderTargetId
   const loadingProfileIds = loadingProviderTargetIds

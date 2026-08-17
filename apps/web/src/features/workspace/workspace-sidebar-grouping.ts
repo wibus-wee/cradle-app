@@ -1,4 +1,4 @@
-import type { RemoteHostRecord } from '~/features/remote-hosts/use-remote-host-connection'
+import type { GetNodesResponse } from '~/api-gen/types.gen'
 import type { WorkSummary } from '~/features/work/use-work'
 
 import type { Workspace } from './types'
@@ -14,6 +14,8 @@ import type {
   WorkspaceSidebarOrderingDirection,
   WorkspaceSidebarSessionOrdering,
 } from './workspace-sidebar-ui-store'
+
+export type FabricNodeSummary = GetNodesResponse[number]
 
 export interface SidebarSessionEntry {
   session: WorkspaceSession
@@ -32,7 +34,7 @@ export interface SidebarSessionSection {
   key: string
   /** i18n key in the `workspace` namespace for built-in buckets. */
   labelKey?: SidebarSectionLabelKey
-  /** Pre-resolved label for dynamic buckets (remote host names). */
+  /** Pre-resolved label for dynamic buckets (Node names). */
   label?: string
   entries: SidebarSessionEntry[]
 }
@@ -146,7 +148,7 @@ export interface GroupSidebarSessionsInput {
   locallyStreamingSessionIds: ReadonlySet<string>
   locallyErroredSessionIds: ReadonlySet<string>
   attentionBySessionId: ReadonlyMap<string, WorkspaceSidebarSessionAttention>
-  remoteHosts: readonly RemoteHostRecord[]
+  nodes: readonly FabricNodeSummary[]
   /** Injectable clock for tests; defaults to `Date.now()`. */
   now?: number
 }
@@ -210,22 +212,22 @@ export function groupSidebarSessions(input: GroupSidebarSessionsInput): SidebarS
       })
     }
     case 'environment': {
-      const hostNameById = new Map(input.remoteHosts.map(host => [host.id, host.displayName]))
+      const nodeNameById = new Map(input.nodes.map(node => [node.nodeId, node.displayName]))
       const localEntries: SidebarSessionEntry[] = []
-      const entriesByHostId = new Map<string, SidebarSessionEntry[]>()
+      const entriesByNodeId = new Map<string, SidebarSessionEntry[]>()
       for (const entry of input.entries) {
         if (classifyWorkspaceSidebarEnvironment(entry.session) === 'local') {
           localEntries.push(entry)
           continue
         }
         const execution = entry.session.execution
-        const hostId = execution.kind === 'remote-host' ? execution.hostId : ''
-        const hostEntries = entriesByHostId.get(hostId)
-        if (hostEntries) {
-          hostEntries.push(entry)
+        const nodeId = execution.kind === 'node' ? execution.nodeId : ''
+        const nodeEntries = entriesByNodeId.get(nodeId)
+        if (nodeEntries) {
+          nodeEntries.push(entry)
         }
         else {
-          entriesByHostId.set(hostId, [entry])
+          entriesByNodeId.set(nodeId, [entry])
         }
       }
 
@@ -237,13 +239,13 @@ export function groupSidebarSessions(input: GroupSidebarSessionsInput): SidebarS
           entries: sortEntries(localEntries),
         })
       }
-      const hostIds = [...entriesByHostId.keys()].toSorted((left, right) =>
-        (hostNameById.get(left) ?? left).localeCompare(hostNameById.get(right) ?? right))
-      for (const hostId of hostIds) {
+      const nodeIds = [...entriesByNodeId.keys()].toSorted((left, right) =>
+        (nodeNameById.get(left) ?? left).localeCompare(nodeNameById.get(right) ?? right))
+      for (const nodeId of nodeIds) {
         sections.push({
-          key: `environment:host:${hostId}`,
-          label: hostNameById.get(hostId) ?? hostId,
-          entries: sortEntries(entriesByHostId.get(hostId) ?? []),
+          key: `environment:node:${nodeId}`,
+          label: nodeNameById.get(nodeId) ?? nodeId,
+          entries: sortEntries(entriesByNodeId.get(nodeId) ?? []),
         })
       }
       return sections

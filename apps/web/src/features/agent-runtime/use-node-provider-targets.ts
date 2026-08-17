@@ -4,14 +4,14 @@ import { useMemo } from 'react'
 import type { GetProviderTargetsResponse } from '~/api-gen/types.gen'
 import type { ProviderKind, ProviderTargetKind } from '~/features/agent-runtime/types'
 import {
-  fetchRemoteUpstreamJson,
-  remoteHostUpstreamQueryKey,
-} from '~/features/remote-hosts/upstream-fetch'
+  fetchNodeUpstreamJson,
+  nodeUpstreamQueryKey,
+} from '~/features/nodes/upstream-fetch'
 
 import type { ProviderTargetOption, UseProviderTargetsOptions } from './use-provider-targets'
 
-export interface UseRemoteProviderTargetsOptions extends UseProviderTargetsOptions {
-  hostId: string | null | undefined
+export interface UseNodeProviderTargetsOptions extends UseProviderTargetsOptions {
+  nodeId: string | null | undefined
   enabled?: boolean
 }
 
@@ -46,33 +46,33 @@ function buildProviderTargetsPath(options: UseProviderTargetsOptions): string {
   return query ? `/provider-targets/?${query}` : '/provider-targets/'
 }
 
-export async function fetchRemoteProviderTargets(
-  hostId: string,
+export async function fetchNodeProviderTargets(
+  nodeId: string,
   options: UseProviderTargetsOptions = {},
 ): Promise<GetProviderTargetsResponse> {
-  return await fetchRemoteUpstreamJson<GetProviderTargetsResponse>(
-    hostId,
+  return await fetchNodeUpstreamJson<GetProviderTargetsResponse>(
+    nodeId,
     buildProviderTargetsPath(options),
   )
 }
 
 /**
- * Provider catalog for a remote Cradle Server host via the Upstream Gateway.
- * Used for new-chat on remote workspaces and for remote-execution sessions
+ * Provider catalog for a Fabric Node via the Upstream Gateway.
+ * Used for new-chat on node-execution workspaces and for node-execution sessions
  * whose model selector must not bind to local provider targets.
  */
-export function useRemoteProviderTargets(options: UseRemoteProviderTargetsOptions) {
-  const hostId = options.hostId ?? null
-  const enabled = (options.enabled ?? true) && !!hostId
+export function useNodeProviderTargets(options: UseNodeProviderTargetsOptions) {
+  const nodeId = options.nodeId ?? null
+  const enabled = (options.enabled ?? true) && !!nodeId
   const queryPath = buildProviderTargetsPath(options)
   const { data: providerTargets = [], isLoading, isSuccess, refetch } = useQuery({
-    queryKey: remoteHostUpstreamQueryKey(
-      hostId ?? '',
+    queryKey: nodeUpstreamQueryKey(
+      nodeId ?? '',
       'provider-targets',
       options.runtimeKind ?? '',
       options.workspaceId ?? '',
     ),
-    queryFn: () => fetchRemoteProviderTargets(hostId!, options),
+    queryFn: () => fetchNodeProviderTargets(nodeId!, options),
     enabled,
     staleTime: 30_000,
     retry: false,

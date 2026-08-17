@@ -47,7 +47,7 @@ export const STATUS_ICON: Record<PrStatus, StatusIconType> = {
  * Tailwind class for the status icon's color. Merged uses violet directly
  *  (no semantic token for it) to match GitHub/Linear's recognizable merged
  *  color - the same escape hatch used for one-off status colors elsewhere
- *  (see host-enrollments-section.tsx).
+ *  in the app.
  */
 export const STATUS_ICON_CLASS: Record<PrStatus, string> = {
   draft: 'text-muted-foreground',

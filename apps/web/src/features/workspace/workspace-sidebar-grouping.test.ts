@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { RemoteHostRecord } from '~/features/remote-hosts/use-remote-host-connection'
-
 import type { Workspace } from './types'
 import type { WorkspaceSession } from './use-session'
-import type { SidebarSessionEntry } from './workspace-sidebar-grouping'
+import type { FabricNodeSummary, SidebarSessionEntry } from './workspace-sidebar-grouping'
 import {
   classifyStatusBucket,
   classifyUpdatedBucket,
@@ -45,7 +43,7 @@ function createSession(overrides: Partial<WorkspaceSession> & Pick<WorkspaceSess
 const workspace: Workspace = {
   id: 'workspace-1',
   name: 'Cradle',
-  locator: { hostId: 'local', path: '/tmp/cradle' },
+  locator: { nodeId: 'local', path: '/tmp/cradle' },
   gitIdentity: {},
   identifier: 'cradle',
   availability: 'available',
@@ -59,17 +57,16 @@ function entry(session: WorkspaceSession): SidebarSessionEntry {
   return { session, workspace }
 }
 
-function createRemoteHost(overrides: Partial<RemoteHostRecord> & Pick<RemoteHostRecord, 'id'>): RemoteHostRecord {
+function createNode(overrides: Partial<FabricNodeSummary> & Pick<FabricNodeSummary, 'nodeId'>): FabricNodeSummary {
   return {
-    displayName: overrides.id,
-    enabled: true,
-    lastSeenAt: null,
-    connectionConfigJson: '{}',
-    capabilitiesJson: '{}',
-    createdAt: 1_700_000_000_000,
-    updatedAt: 1_700_000_000_000,
-    connectionState: 'connected',
-    lastError: null,
+    fabricId: 'fabric-1',
+    displayName: overrides.nodeId,
+    platform: 'darwin',
+    version: '0.0.0',
+    capabilities: [],
+    status: 'online',
+    lastSeenAt: '2026-07-20T00:00:00.000Z',
+    revision: 1,
     ...overrides,
   }
 }
@@ -145,7 +142,7 @@ function baseGroupingInput(entries: SidebarSessionEntry[]) {
     locallyStreamingSessionIds: new Set<string>(),
     locallyErroredSessionIds: new Set<string>(),
     attentionBySessionId: new Map<string, 'userInput' | 'toolApproval'>(),
-    remoteHosts: [],
+    nodes: [],
   }
 }
 
@@ -182,27 +179,27 @@ describe('groupSidebarSessions', () => {
     expect(section.entries.map(({ session }) => session.id)).toEqual(['pinned', 'new', 'old'])
   })
 
-  it('groups by environment with a local bucket and named remote host buckets', () => {
+  it('groups by environment with a local bucket and named Node buckets', () => {
     const sections = groupSidebarSessions({
       ...baseGroupingInput([
         entry(createSession({ id: 'local' })),
         entry(createSession({
           id: 'remote',
-          execution: { kind: 'remote-host', hostId: 'host-1', remoteSessionId: 'r1' },
+          execution: { kind: 'node', nodeId: 'node-1', remoteSessionId: 'r1' },
         })),
         entry(createSession({
-          id: 'unknown-host',
-          execution: { kind: 'remote-host', hostId: 'host-gone', remoteSessionId: 'r2' },
+          id: 'unknown-node',
+          execution: { kind: 'node', nodeId: 'node-gone', remoteSessionId: 'r2' },
         })),
       ]),
       grouping: 'environment',
-      remoteHosts: [createRemoteHost({ id: 'host-1', displayName: 'Build Server' })],
+      nodes: [createNode({ nodeId: 'node-1', displayName: 'Build Server' })],
     })
 
     expect(sections.map(section => [section.labelKey ?? null, section.label ?? null])).toEqual([
       ['sidebar.filter.environment.local', null],
       [null, 'Build Server'],
-      [null, 'host-gone'],
+      [null, 'node-gone'],
     ])
   })
 })
