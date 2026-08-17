@@ -37,11 +37,11 @@ const NetworkPreferencesSchema = z.object({
   customProxyUrl: z.string().nullable().default(null),
   inbound: z.object({
     serverAccessMode: z.enum(['local', 'network']).default('local'),
-    managedRelayAccessMode: z.enum(['local', 'network']).default('local'),
+    managedRelayAccessMode: z.enum(['local', 'network']).default('network'),
     managedRelayPublicUrl: z.string().nullable().default(null),
   }).default({
     serverAccessMode: 'local',
-    managedRelayAccessMode: 'local',
+    managedRelayAccessMode: 'network',
     managedRelayPublicUrl: null,
   }),
 })

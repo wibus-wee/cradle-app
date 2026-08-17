@@ -307,6 +307,28 @@ export function InboundAccessSettingsGroup() {
             </SettingsRow>
 
             <SettingsRow
+              label={t('network.inbound.relay.label' as SettingsKey)}
+              description={t('network.inbound.relay.description' as SettingsKey)}
+            >
+              <Select
+                value={prefs.inbound.managedRelayAccessMode}
+                onValueChange={value => saveInboundPreference({ managedRelayAccessMode: value as NetworkInboundAccessMode })}
+                disabled={disabled}
+              >
+                <SelectTrigger size="sm" className="w-[180px]" aria-label={t('network.inbound.relay.label' as SettingsKey)}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {INBOUND_ACCESS_OPTIONS.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {t(option.labelKey)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingsRow>
+
+            <SettingsRow
               label={t('network.inbound.apply.label' as SettingsKey)}
               description={t('network.inbound.apply.description' as SettingsKey)}
             >

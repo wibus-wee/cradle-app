@@ -6,20 +6,20 @@ import { client } from '~/api-gen/client.gen'
  * Transparent Upstream Gateway client helper.
  *
  * Uses the generated api-gen `client` (so `baseUrl` / Electron server URL apply).
- * We intentionally do **not** call `allRemoteHostsByHostIdUpstream_2`: OpenAPI
- * exports `/upstream/*`, and hey-api leaves the bare `*` unreplaced.
+ * We intentionally do **not** call the generated `/nodes/:id/upstream/*` helper:
+ * OpenAPI exports the path with a bare `*`, and hey-api leaves it unreplaced.
  *
- * `path` is a remote Cradle Server path, e.g. `/workspaces` or
- * `/workspaces/:id/files/children?path=src`.
+ * `path` is a path on the target Node's upstream Cradle Server, e.g. `/workspaces`
+ * or `/workspaces/:id/files/children?path=src`.
  */
-export type RemoteUpstreamRequestInit = {
+export type NodeUpstreamRequestInit = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'
   body?: unknown
   headers?: HeadersInit
   signal?: AbortSignal
 }
 
-function buildUpstreamRequestUrl(hostId: string, path: string): {
+function buildUpstreamRequestUrl(nodeId: string, path: string): {
   url: string
   query?: Record<string, string>
 } {
@@ -31,17 +31,17 @@ function buildUpstreamRequestUrl(hostId: string, path: string): {
   })
   return {
     // Concrete path (no `{*}` template) — hey-api cannot substitute bare `*`.
-    url: `/remote-hosts/${encodeURIComponent(hostId)}/upstream${parsed.pathname}`,
+    url: `/nodes/${encodeURIComponent(nodeId)}/upstream${parsed.pathname}`,
     query: Object.keys(query).length > 0 ? query : undefined,
   }
 }
 
-export async function fetchRemoteUpstreamJson<T>(
-  hostId: string,
+export async function fetchNodeUpstreamJson<T>(
+  nodeId: string,
   path: string,
-  init?: RemoteUpstreamRequestInit,
+  init?: NodeUpstreamRequestInit,
 ): Promise<T> {
-  const { url, query } = buildUpstreamRequestUrl(hostId, path)
+  const { url, query } = buildUpstreamRequestUrl(nodeId, path)
   const method = init?.method ?? 'GET'
   const { data } = await client.request({
     method,
@@ -55,18 +55,18 @@ export async function fetchRemoteUpstreamJson<T>(
   return data as T
 }
 
-export function remoteHostUpstreamQueryKey(hostId: string, ...parts: string[]) {
-  return ['remote-host-upstream', hostId, ...parts] as const
+export function nodeUpstreamQueryKey(nodeId: string, ...parts: string[]) {
+  return ['node-upstream', nodeId, ...parts] as const
 }
 
 /** React Query options for a GET upstream JSON path. */
-export function remoteHostUpstreamQueryOptions<T>(
-  hostId: string,
+export function nodeUpstreamQueryOptions<T>(
+  nodeId: string,
   path: string,
   keyParts: string[] = [path],
 ) {
   return queryOptions({
-    queryKey: remoteHostUpstreamQueryKey(hostId, ...keyParts),
-    queryFn: ({ signal }) => fetchRemoteUpstreamJson<T>(hostId, path, { signal }),
+    queryKey: nodeUpstreamQueryKey(nodeId, ...keyParts),
+    queryFn: ({ signal }) => fetchNodeUpstreamJson<T>(nodeId, path, { signal }),
   })
 }

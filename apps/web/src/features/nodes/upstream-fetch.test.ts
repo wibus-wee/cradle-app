@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { client } from '~/api-gen/client.gen'
 
 import {
-  fetchRemoteUpstreamJson,
-  remoteHostUpstreamQueryKey,
+  fetchNodeUpstreamJson,
+  nodeUpstreamQueryKey,
 } from './upstream-fetch'
 
 vi.mock('~/api-gen/client.gen', () => ({
@@ -13,7 +13,7 @@ vi.mock('~/api-gen/client.gen', () => ({
   },
 }))
 
-describe('fetchRemoteUpstreamJson', () => {
+describe('fetchNodeUpstreamJson', () => {
   it('calls api-gen client with concrete upstream path and query', async () => {
     vi.mocked(client.request).mockResolvedValueOnce({
       data: [{ id: 'ws-1' }],
@@ -21,7 +21,7 @@ describe('fetchRemoteUpstreamJson', () => {
       response: new Response(),
     })
 
-    const result = await fetchRemoteUpstreamJson<{ id: string }[]>(
+    const result = await fetchNodeUpstreamJson<{ id: string }[]>(
       'host-1',
       '/workspaces/ws-1/files/children?path=src',
     )
@@ -29,7 +29,7 @@ describe('fetchRemoteUpstreamJson', () => {
     expect(result).toEqual([{ id: 'ws-1' }])
     expect(client.request).toHaveBeenCalledWith(expect.objectContaining({
       method: 'GET',
-      url: '/remote-hosts/host-1/upstream/workspaces/ws-1/files/children',
+      url: '/nodes/host-1/upstream/workspaces/ws-1/files/children',
       query: { path: 'src' },
       throwOnError: true,
     }))
@@ -42,24 +42,24 @@ describe('fetchRemoteUpstreamJson', () => {
       response: new Response(),
     })
 
-    await fetchRemoteUpstreamJson('host-1', '/providers/models', {
+    await fetchNodeUpstreamJson('host-1', '/providers/models', {
       method: 'POST',
       body: { label: 'x' },
     })
 
     expect(client.request).toHaveBeenCalledWith(expect.objectContaining({
       method: 'POST',
-      url: '/remote-hosts/host-1/upstream/providers/models',
+      url: '/nodes/host-1/upstream/providers/models',
       body: { label: 'x' },
       throwOnError: true,
     }))
   })
 })
 
-describe('remoteHostUpstreamQueryKey', () => {
-  it('namespaces by host and path parts', () => {
-    expect(remoteHostUpstreamQueryKey('h1', 'workspaces')).toEqual([
-      'remote-host-upstream',
+describe('nodeUpstreamQueryKey', () => {
+  it('namespaces by node and path parts', () => {
+    expect(nodeUpstreamQueryKey('h1', 'workspaces')).toEqual([
+      'node-upstream',
       'h1',
       'workspaces',
     ])
