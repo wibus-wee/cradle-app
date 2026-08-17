@@ -63,5 +63,5 @@
     <path d="M850 650C905 584 867 487 764 443" stroke-width="7"/>
     <path d="M791 438L762 442L778 467" stroke-width="7"/>
   </g>
-  <text x="930" y="730" text-anchor="middle" fill="#6e6b6a" font-family="Avenir Next Rounded, Arial Rounded MT Bold, Nunito, sans-serif" font-size="18" font-weight="700" letter-spacing="0.5">Double click to install app</text>
+  <text x="850" y="700" text-anchor="middle" fill="#56585a" font-family="Avenir Next Rounded, Arial Rounded MT Bold, Nunito, sans-serif" font-size="24" font-weight="800" letter-spacing="0.5">Double click to install app</text>
 </svg>
