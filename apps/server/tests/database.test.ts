@@ -156,8 +156,10 @@ describe('database module', () => {
       `).run()
 
       const runMigration = sqlite.transaction(() => {
-        for (const statement of readMigrationStatements('0013_host_scoped_workspaces.sql')) {
-          sqlite.exec(statement)
+        for (const name of ['0013_host_scoped_workspaces.sql', '0061_workspace_locator_node_id.sql']) {
+          for (const statement of readMigrationStatements(name)) {
+            sqlite.exec(statement)
+          }
         }
       })
       runMigration()
@@ -181,7 +183,7 @@ describe('database module', () => {
       expect(workspace).toEqual({
         id: 'workspace_1',
         name: 'Workspace',
-        locatorJson: '{"hostId":"local","path":"/tmp/cradle-old"}',
+        locatorJson: '{"path":"/tmp/cradle-old","nodeId":"local"}',
         gitIdentityJson: '{}',
         identifier: 'CRA',
         pinned: 1,
