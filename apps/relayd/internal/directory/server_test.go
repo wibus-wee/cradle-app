@@ -138,9 +138,30 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	if len(discovered.Nodes) != 1 || discovered.Nodes[0].NodeID != "node-a" {
 		t.Fatalf("discovered nodes = %#v", discovered.Nodes)
 	}
+	if len(discovered.Nodes[0].Scopes) != 1 || discovered.Nodes[0].Scopes[0] != "view" {
+		t.Fatalf("discovered node caller scopes = %#v", discovered.Nodes[0].Scopes)
+	}
+
+	grantListHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodGet, "/v1/nodes/node-a/grants", clock, "list-grants")
+	var grantList struct {
+		Grants []fabric.Grant `json:"grants"`
+	}
+	getDirectoryJSON(t, httpServer.URL+"/v1/nodes/node-a/grants", grantListHeaders, http.StatusOK, &grantList)
+	if len(grantList.Grants) != 1 || grantList.Grants[0].ID != "grant-node-a-view" || grantList.Grants[0].Scope != membership.ScopeView || grantList.Grants[0].RevokedAt != nil {
+		t.Fatalf("node grants = %#v", grantList.Grants)
+	}
+	// Grant management is owner-only: a Controller proof must not list grants.
+	controllerGrantHeaders := directoryProofHeaders(t, controllerPrivate, http.MethodGet, "/v1/nodes/node-a/grants", clock, "list-grants-controller")
+	controllerGrantHeaders.Set(certificateHeader, directoryHeaderJSON(t, controllerCertificate))
+	getDirectoryJSON(t, httpServer.URL+"/v1/nodes/node-a/grants", controllerGrantHeaders, http.StatusUnauthorized, nil)
 
 	revokeHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodDelete, "/v1/nodes/node-a/grants/grant-node-a-view", clock, "revoke-controller")
 	deleteDirectory(t, httpServer.URL+"/v1/nodes/node-a/grants/grant-node-a-view", revokeHeaders, http.StatusNoContent)
+	grantListHeaders = directoryProofHeaders(t, ownerPrivate, http.MethodGet, "/v1/nodes/node-a/grants", clock, "list-grants-after-revoke")
+	getDirectoryJSON(t, httpServer.URL+"/v1/nodes/node-a/grants", grantListHeaders, http.StatusOK, &grantList)
+	if len(grantList.Grants) != 1 || grantList.Grants[0].RevokedAt == nil {
+		t.Fatalf("node grants after revocation = %#v", grantList.Grants)
+	}
 	controllerHeaders = directoryProofHeaders(t, controllerPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "list-nodes-after-revoke")
 	controllerHeaders.Set(certificateHeader, directoryHeaderJSON(t, controllerCertificate))
 	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", controllerHeaders, http.StatusOK, &discovered)

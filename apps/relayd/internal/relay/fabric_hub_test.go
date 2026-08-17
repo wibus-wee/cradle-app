@@ -13,7 +13,7 @@ import (
 )
 
 func TestFabricHubMultiplexesIndependentControllerLinks(t *testing.T) {
-	hub := NewFabricHub(HubConfig{
+	hub := NewFabricHub(FabricHubConfig{
 		MaxFrameBytes: 1024, MaxQueuedEnvelopes: 8, MaxQueuedBytes: 4096,
 	})
 	mux := http.NewServeMux()

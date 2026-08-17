@@ -16,12 +16,19 @@ var (
 	ErrNodeConnected    = errors.New("relay: node already connected")
 )
 
+// FabricHubConfig bounds the opaque envelope queues of one FabricHub.
+type FabricHubConfig struct {
+	MaxFrameBytes      int64
+	MaxQueuedEnvelopes int
+	MaxQueuedBytes     int64
+}
+
 // FabricHub replaces one permanent room with a durable Node socket and many
 // short-lived Controller links. It receives authorization decisions from the
 // directory; it never evaluates certificates itself.
 type FabricHub struct {
 	mu    sync.RWMutex
-	cfg   HubConfig
+	cfg   FabricHubConfig
 	nodes map[string]*fabricNode
 	links map[string]*fabricLink
 }
@@ -56,7 +63,7 @@ type fabricConn struct {
 	writeMu   sync.Mutex
 }
 
-func NewFabricHub(cfg HubConfig) *FabricHub {
+func NewFabricHub(cfg FabricHubConfig) *FabricHub {
 	return &FabricHub{cfg: cfg, nodes: map[string]*fabricNode{}, links: map[string]*fabricLink{}}
 }
 

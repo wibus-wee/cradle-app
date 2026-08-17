@@ -61,6 +61,9 @@ type NodeSummary struct {
 	Status       NodeStatus `json:"status"`
 	LastSeenAt   time.Time  `json:"lastSeenAt"`
 	Revision     int64      `json:"revision"`
+	// Scopes carries the requesting Controller's active grant scopes over this
+	// Node. It is populated only by ListAuthorizedNodes; other reads omit it.
+	Scopes []string `json:"scopes,omitempty"`
 }
 
 type JoinRequestResult struct {
@@ -341,11 +344,13 @@ func (s *Store) ListAuthorizedNodes(ctx context.Context, fabricID, controllerID 
 		return nil, 0, err
 	}
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT DISTINCT n.node_id, n.fabric_id, n.display_name, n.platform, n.version, n.capabilities_json, n.status, n.last_seen_at, n.revision
+		SELECT n.node_id, n.fabric_id, n.display_name, n.platform, n.version, n.capabilities_json, n.status, n.last_seen_at, n.revision,
+			GROUP_CONCAT(DISTINCT g.scope)
 		FROM nodes n
 		JOIN node_grants g ON g.fabric_id = n.fabric_id AND g.node_id = n.node_id
 		WHERE n.fabric_id = ? AND g.controller_id = ? AND g.revoked_at IS NULL
-		  AND g.scope IN ('view', 'control', 'admin')
+		  AND g.scope IN ('view', 'control', 'approve', 'admin')
+		GROUP BY n.node_id
 		ORDER BY n.display_name COLLATE NOCASE, n.node_id
 	`, fabricID, controllerID)
 	if err != nil {
@@ -354,10 +359,11 @@ func (s *Store) ListAuthorizedNodes(ctx context.Context, fabricID, controllerID 
 	defer rows.Close()
 	nodes := []NodeSummary{}
 	for rows.Next() {
-		node, err := scanNode(rows)
+		node, scopes, err := scanNodeWithScopes(rows)
 		if err != nil {
 			return nil, 0, err
 		}
+		node.Scopes = scopes
 		nodes = append(nodes, node)
 	}
 	if err := rows.Err(); err != nil {
@@ -471,6 +477,37 @@ func (s *Store) MarkAllOffline(ctx context.Context) error {
 		return fmt.Errorf("marking nodes offline: %w", err)
 	}
 	return nil
+}
+
+// ListNodeGrants returns every grant recorded for a Node, including revoked
+// rows, so an owner can audit and revoke access. Grants carry no secret data.
+func (s *Store) ListNodeGrants(ctx context.Context, fabricID, nodeID string) ([]Grant, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT grant_id, fabric_id, controller_id, node_id, scope, revoked_at FROM node_grants
+		WHERE fabric_id = ? AND node_id = ?
+		ORDER BY created_at, grant_id
+	`, fabricID, nodeID)
+	if err != nil {
+		return nil, fmt.Errorf("listing node grants: %w", err)
+	}
+	defer rows.Close()
+	grants := []Grant{}
+	for rows.Next() {
+		var grant Grant
+		var revokedAt sql.NullInt64
+		if err := rows.Scan(&grant.ID, &grant.FabricID, &grant.ControllerID, &grant.NodeID, &grant.Scope, &revokedAt); err != nil {
+			return nil, err
+		}
+		if revokedAt.Valid {
+			at := time.UnixMilli(revokedAt.Int64).UTC()
+			grant.RevokedAt = &at
+		}
+		grants = append(grants, grant)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return grants, nil
 }
 
 func (s *Store) RevokeGrant(ctx context.Context, fabricID, nodeID, grantID string) (Grant, error) {
@@ -676,6 +713,23 @@ func scanFabric(row rowScanner) (Fabric, error) {
 	}
 	fabric.CreatedAt = time.UnixMilli(createdAt).UTC()
 	return fabric, nil
+}
+
+func scanNodeWithScopes(row rowScanner) (NodeSummary, []string, error) {
+	var node NodeSummary
+	var capabilitiesJSON string
+	var status string
+	var lastSeenAt int64
+	var scopes string
+	if err := row.Scan(&node.NodeID, &node.FabricID, &node.DisplayName, &node.Platform, &node.Version, &capabilitiesJSON, &status, &lastSeenAt, &node.Revision, &scopes); err != nil {
+		return NodeSummary{}, nil, err
+	}
+	if err := json.Unmarshal([]byte(capabilitiesJSON), &node.Capabilities); err != nil {
+		return NodeSummary{}, nil, fmt.Errorf("decoding node capabilities: %w", err)
+	}
+	node.Status = NodeStatus(status)
+	node.LastSeenAt = time.UnixMilli(lastSeenAt).UTC()
+	return node, strings.Split(scopes, ","), nil
 }
 
 func scanNode(row rowScanner) (NodeSummary, error) {

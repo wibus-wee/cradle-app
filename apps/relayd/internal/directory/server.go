@@ -84,6 +84,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/nodes", s.listNodes)
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/events", s.events)
 	mux.HandleFunc("POST /v1/nodes/{nodeId}/links", s.openLink)
+	mux.HandleFunc("GET /v1/nodes/{nodeId}/grants", s.listNodeGrants)
 	mux.HandleFunc("DELETE /v1/nodes/{nodeId}/grants/{grantId}", s.revokeGrant)
 	mux.HandleFunc("GET /v1/ws/nodes", s.nodeWebSocket)
 	mux.HandleFunc("GET /v1/ws/controllers/{linkId}", s.controllerWebSocket)
@@ -259,7 +260,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 				if controller.NodeID != "" && update.Node.NodeID != controller.NodeID {
 					continue
 				}
-				allowed, err := s.store.HasActiveGrant(r.Context(), fabricID, controller.SubjectID, update.Node.NodeID, membership.ScopeView, membership.ScopeControl, membership.ScopeAdmin)
+				allowed, err := s.store.HasActiveGrant(r.Context(), fabricID, controller.SubjectID, update.Node.NodeID, membership.ScopeView, membership.ScopeControl, membership.ScopeApprove, membership.ScopeAdmin)
 				if err != nil || !allowed {
 					continue
 				}
@@ -270,6 +271,25 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 	}
+}
+
+func (s *Server) listNodeGrants(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("nodeId")
+	record, err := s.store.GetFabricForNode(r.Context(), nodeID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if err := s.requireOwner(r, record); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	grants, err := s.store.ListNodeGrants(r.Context(), record.ID, nodeID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"grants": grants})
 }
 
 func (s *Server) revokeGrant(w http.ResponseWriter, r *http.Request) {
