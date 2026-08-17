@@ -2,11 +2,10 @@ import { AppError } from '../../errors/app-error'
 import type { RelayCompressionKind } from './compression'
 
 /**
- * Relay transport protocol. relayd validates and schedules only this outer
- * envelope. All inner frames after the initial key exchange are encrypted end
- * to end, and data bytes never pass through JSON or Base64.
+ * Fabric Session protocol. The Fabric v3 envelope owns routing and relayd
+ * scheduling; this envelope only carries one encrypted session payload.
  */
-export const RELAY_PROTOCOL_VERSION = 2
+export const FABRIC_SESSION_PROTOCOL_VERSION = 1
 
 export const RELAY_MAX_FRAME_BYTES = 1 << 20 // 1 MiB
 export const RELAY_MAX_STREAM_CHUNK_BYTES = 64 * 1024 // 64 KiB
@@ -14,20 +13,20 @@ export const RELAY_STREAM_MIN_CREDIT_BYTES = 512 * 1024
 export const RELAY_STREAM_MAX_CREDIT_BYTES = 8 * 1024 * 1024
 export const RELAY_CONNECTION_MAX_CREDIT_BYTES = 16 * 1024 * 1024
 
-export const RELAY_ENVELOPE_KIND = {
+export const FABRIC_SESSION_ENVELOPE_KIND = {
   dataFrame: 'relay_data_frame',
   peerClosed: 'relay_peer_closed',
   relayError: 'relay_error',
 } as const
 
-export type RelayEnvelopeKind = (typeof RELAY_ENVELOPE_KIND)[keyof typeof RELAY_ENVELOPE_KIND]
+export type FabricSessionEnvelopeKind = (typeof FABRIC_SESSION_ENVELOPE_KIND)[keyof typeof FABRIC_SESSION_ENVELOPE_KIND]
 export type RelayPriority = 'control' | 'data'
 
-export interface RelayEnvelope {
-  version: typeof RELAY_PROTOCOL_VERSION
-  roomId: string
+export interface FabricSessionEnvelope {
+  version: typeof FABRIC_SESSION_PROTOCOL_VERSION
+  linkId: string
   seq: number
-  kind: RelayEnvelopeKind
+  kind: FabricSessionEnvelopeKind
   priority: RelayPriority
   streamId?: string
   payload: Uint8Array
@@ -44,7 +43,6 @@ export interface RelayErrorPayload {
 
 export const INNER_FRAME_KIND = {
   hello: 'hello',
-  helloConfirm: 'hello_confirm',
   streamOpen: 'stream_open',
   streamData: 'stream_data',
   streamAck: 'stream_ack',
@@ -56,11 +54,7 @@ export type InnerFrame
       kind: 'hello'
       version: number
       pubkey: string
-      pinnedPubkey?: string
-      name?: string
-      signingPubkey?: string
     }
-    | { kind: 'hello_confirm', confirm: string }
     | { kind: 'stream_open', streamId: string }
     | {
       kind: 'stream_data'
@@ -79,25 +73,24 @@ const OUTER_HEADER_BYTES = 16
 const FLAG_HAS_STREAM_ID = 1
 const COMPRESSED_STREAM_DATA_CODE = 7
 
-const envelopeKindCode: Record<RelayEnvelopeKind, number> = {
-  [RELAY_ENVELOPE_KIND.dataFrame]: 1,
-  [RELAY_ENVELOPE_KIND.peerClosed]: 2,
-  [RELAY_ENVELOPE_KIND.relayError]: 3,
+const envelopeKindCode: Record<FabricSessionEnvelopeKind, number> = {
+  [FABRIC_SESSION_ENVELOPE_KIND.dataFrame]: 1,
+  [FABRIC_SESSION_ENVELOPE_KIND.peerClosed]: 2,
+  [FABRIC_SESSION_ENVELOPE_KIND.relayError]: 3,
 }
 
-const envelopeKindFromCode: Record<number, RelayEnvelopeKind | undefined> = {
-  1: RELAY_ENVELOPE_KIND.dataFrame,
-  2: RELAY_ENVELOPE_KIND.peerClosed,
-  3: RELAY_ENVELOPE_KIND.relayError,
+const envelopeKindFromCode: Record<number, FabricSessionEnvelopeKind | undefined> = {
+  1: FABRIC_SESSION_ENVELOPE_KIND.dataFrame,
+  2: FABRIC_SESSION_ENVELOPE_KIND.peerClosed,
+  3: FABRIC_SESSION_ENVELOPE_KIND.relayError,
 }
 
 const innerFrameCode: Record<InnerFrame['kind'], number> = {
   [INNER_FRAME_KIND.hello]: 1,
-  [INNER_FRAME_KIND.helloConfirm]: 2,
-  [INNER_FRAME_KIND.streamOpen]: 3,
-  [INNER_FRAME_KIND.streamData]: 4,
-  [INNER_FRAME_KIND.streamAck]: 5,
-  [INNER_FRAME_KIND.streamClose]: 6,
+  [INNER_FRAME_KIND.streamOpen]: 2,
+  [INNER_FRAME_KIND.streamData]: 3,
+  [INNER_FRAME_KIND.streamAck]: 4,
+  [INNER_FRAME_KIND.streamClose]: 5,
 }
 
 function protocolError(message: string): AppError {
@@ -145,12 +138,12 @@ function base64ToBytes(value: string, label: string): Uint8Array {
   return bytes
 }
 
-export function encodeRelayEnvelope(envelope: RelayEnvelope): Uint8Array {
-  if (envelope.version !== RELAY_PROTOCOL_VERSION) {
+export function encodeFabricSessionEnvelope(envelope: FabricSessionEnvelope): Uint8Array {
+  if (envelope.version !== FABRIC_SESSION_PROTOCOL_VERSION) {
     throw protocolError(`Unsupported relay protocol version ${envelope.version}.`)
   }
   checkedUint32(envelope.seq, 'Relay sequence')
-  const roomId = bytesForString(envelope.roomId, 'Room id')
+  const linkId = bytesForString(envelope.linkId, 'Fabric link id')
   const streamId = envelope.streamId
     ? bytesForString(envelope.streamId, 'Stream id')
     : new Uint8Array()
@@ -162,31 +155,31 @@ export function encodeRelayEnvelope(envelope: RelayEnvelope): Uint8Array {
   ) {
     throw protocolError('Invalid relay envelope.')
   }
-  if (roomId.length > 0xFFFF || streamId.length > 0xFFFF || envelope.payload.length > 0xFFFF_FFFF) {
+  if (linkId.length > 0xFFFF || streamId.length > 0xFFFF || envelope.payload.length > 0xFFFF_FFFF) {
     throw protocolError('Relay envelope exceeds binary field bounds.')
   }
   const out = new Uint8Array(
-    OUTER_HEADER_BYTES + roomId.length + streamId.length + envelope.payload.length,
+    OUTER_HEADER_BYTES + linkId.length + streamId.length + envelope.payload.length,
   )
   const view = new DataView(out.buffer, out.byteOffset, out.byteLength)
-  out[0] = RELAY_PROTOCOL_VERSION
+  out[0] = FABRIC_SESSION_PROTOCOL_VERSION
   out[1] = kind
   out[2] = envelope.priority === 'control' ? 1 : 2
   out[3] = streamId.length > 0 ? FLAG_HAS_STREAM_ID : 0
-  view.setUint16(4, roomId.length)
+  view.setUint16(4, linkId.length)
   view.setUint16(6, streamId.length)
   view.setUint32(8, envelope.seq)
   view.setUint32(12, envelope.payload.length)
-  out.set(roomId, OUTER_HEADER_BYTES)
-  out.set(streamId, OUTER_HEADER_BYTES + roomId.length)
-  out.set(envelope.payload, OUTER_HEADER_BYTES + roomId.length + streamId.length)
+  out.set(linkId, OUTER_HEADER_BYTES)
+  out.set(streamId, OUTER_HEADER_BYTES + linkId.length)
+  out.set(envelope.payload, OUTER_HEADER_BYTES + linkId.length + streamId.length)
   return out
 }
 
-export function decodeRelayEnvelope(
+export function decodeFabricSessionEnvelope(
   bytes: Uint8Array,
   maxFrameBytes = RELAY_MAX_FRAME_BYTES,
-): RelayEnvelope {
+): FabricSessionEnvelope {
   if (bytes.length > maxFrameBytes) {
     throw new AppError({
       code: 'relay_protocol_frame_too_large',
@@ -198,23 +191,23 @@ export function decodeRelayEnvelope(
     throw protocolError('Relay envelope is too short.')
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  if (bytes[0] !== RELAY_PROTOCOL_VERSION) {
+  if (bytes[0] !== FABRIC_SESSION_PROTOCOL_VERSION) {
     throw protocolError(`Unsupported relay protocol version ${bytes[0]}.`)
   }
   const kind = envelopeKindFromCode[bytes[1]]
   const priority = bytes[2] === 1 ? 'control' : bytes[2] === 2 ? 'data' : undefined
   const flags = bytes[3]
-  const roomLength = view.getUint16(4)
+  const linkLength = view.getUint16(4)
   const streamLength = view.getUint16(6)
   const seq = view.getUint32(8)
   const payloadLength = view.getUint32(12)
-  const expectedLength = OUTER_HEADER_BYTES + roomLength + streamLength + payloadLength
+  const expectedLength = OUTER_HEADER_BYTES + linkLength + streamLength + payloadLength
   if (
     !kind
     || !priority
     || (flags & ~FLAG_HAS_STREAM_ID) !== 0
     || expectedLength !== bytes.length
-    || roomLength === 0
+    || linkLength === 0
     || payloadLength === 0
   ) {
     throw protocolError('Invalid relay envelope fields.')
@@ -222,14 +215,14 @@ export function decodeRelayEnvelope(
   if (Boolean(flags & FLAG_HAS_STREAM_ID) !== (streamLength > 0)) {
     throw protocolError('Relay envelope stream-id flag does not match its length.')
   }
-  const roomId = readString(bytes, OUTER_HEADER_BYTES, roomLength, 'room id')
-  const streamOffset = OUTER_HEADER_BYTES + roomLength
+  const linkId = readString(bytes, OUTER_HEADER_BYTES, linkLength, 'Fabric link id')
+  const streamOffset = OUTER_HEADER_BYTES + linkLength
   const streamId
     = streamLength > 0 ? readString(bytes, streamOffset, streamLength, 'stream id') : undefined
   const payload = bytes.subarray(streamOffset + streamLength)
   return {
-    version: RELAY_PROTOCOL_VERSION,
-    roomId,
+    version: FABRIC_SESSION_PROTOCOL_VERSION,
+    linkId,
     seq,
     kind,
     priority,
@@ -274,41 +267,18 @@ export function encodeInnerFrame(frame: InnerFrame): Uint8Array {
   switch (frame.kind) {
     case INNER_FRAME_KIND.hello: {
       const pubkey = base64ToBytes(frame.pubkey, 'hello public key')
-      const pinned = frame.pinnedPubkey
-        ? base64ToBytes(frame.pinnedPubkey, 'pinned public key')
-        : new Uint8Array()
-      if (pubkey.length !== 32 || (pinned.length > 0 && pinned.length !== 32)) {
+      if (pubkey.length !== 32) {
         throw protocolError('Hello public keys must be 32 bytes.')
       }
-      const name = optionalString(frame.name, 'Peer name', 128)
-      const signing = optionalString(frame.signingPubkey, 'Signing public key', 128)
-      const out = new Uint8Array(8 + pubkey.length + pinned.length + name.length + signing.length)
+      const out = new Uint8Array(8 + pubkey.length)
       const view = new DataView(out.buffer)
       out[0] = innerFrameCode[frame.kind]
       out[1] = frame.version
-      out[2] = (pinned.length ? 1 : 0) | (name.length ? 2 : 0) | (signing.length ? 4 : 0)
+      out[2] = 0
       out[3] = 0
-      view.setUint16(4, name.length)
-      view.setUint16(6, signing.length)
-      let offset = 8
-      out.set(pubkey, offset)
-      offset += pubkey.length
-      if (pinned.length) {
-        out.set(pinned, offset)
-        offset += pinned.length
-      }
-      out.set(name, offset)
-      offset += name.length
-      out.set(signing, offset)
-      return out
-    }
-    case INNER_FRAME_KIND.helloConfirm: {
-      const confirm = base64ToBytes(frame.confirm, 'hello confirmation')
-      if (confirm.length > 0xFFFF) { throw protocolError('Hello confirmation is too large.') }
-      const out = new Uint8Array(3 + confirm.length)
-      out[0] = innerFrameCode[frame.kind]
-      new DataView(out.buffer).setUint16(1, confirm.length)
-      out.set(confirm, 3)
+      view.setUint16(4, 0)
+      view.setUint16(6, 0)
+      out.set(pubkey, 8)
       return out
     }
     case INNER_FRAME_KIND.streamOpen:
@@ -382,18 +352,9 @@ export function decodeInnerFrame(bytes: Uint8Array): InnerFrame {
   switch (bytes[0]) {
     case 1:
       return decodeHelloFrame(bytes, view)
-    case 2: {
-      if (bytes.length < 3) { throw protocolError('Hello confirmation is too short.') }
-      const length = view.getUint16(1)
-      if (length === 0 || length + 3 !== bytes.length) { throw protocolError('Invalid hello confirmation length.') }
-      return {
-        kind: INNER_FRAME_KIND.helloConfirm,
-        confirm: Buffer.from(bytes.subarray(3)).toString('base64'),
-      }
-    }
-    case 3:
+    case 2:
       return decodeStreamStringFrame(bytes, view, INNER_FRAME_KIND.streamOpen)
-    case 4:
+    case 3:
     case COMPRESSED_STREAM_DATA_CODE: {
       const compressed = bytes[0] === COMPRESSED_STREAM_DATA_CODE
       const headerBytes = compressed ? 11 : 7
@@ -419,7 +380,7 @@ export function decodeInnerFrame(bytes: Uint8Array): InnerFrame {
         ...(compressed ? { compression: 'zstd' as const, uncompressedBytes } : {}),
       }
     }
-    case 5: {
+    case 4: {
       if (bytes.length < 7) { throw protocolError('Stream-ack frame is too short.') }
       const streamLength = view.getUint16(1)
       if (streamLength === 0 || 7 + streamLength !== bytes.length) { throw protocolError('Invalid stream-ack length.') }
@@ -429,7 +390,7 @@ export function decodeInnerFrame(bytes: Uint8Array): InnerFrame {
         ackedBytes: view.getUint32(3),
       }
     }
-    case 6:
+    case 5:
       return decodeStreamStringFrame(bytes, view, INNER_FRAME_KIND.streamClose)
     default:
       throw protocolError(`Unknown inner frame code ${bytes[0]}.`)
@@ -441,35 +402,13 @@ function decodeHelloFrame(bytes: Uint8Array, view: DataView): InnerFrame {
   const flags = bytes[2]
   const nameLength = view.getUint16(4)
   const signingLength = view.getUint16(6)
-  if ((flags & ~7) !== 0) { throw protocolError('Invalid hello flags.') }
-  let offset = 8
+  if (flags !== 0 || nameLength !== 0 || signingLength !== 0 || bytes.length !== 40) { throw protocolError('Invalid hello fields.') }
+  const offset = 8
   const pubkey = bytes.slice(offset, offset + 32)
-  offset += 32
-  let pinnedPubkey: string | undefined
-  if (flags & 1) {
-    if (offset + 32 > bytes.length) { throw protocolError('Hello pinned key is truncated.') }
-    pinnedPubkey = Buffer.from(bytes.subarray(offset, offset + 32)).toString('base64')
-    offset += 32
-  }
-  if (
-    offset + nameLength + signingLength !== bytes.length
-    || Boolean(flags & 2) !== (nameLength > 0)
-    || Boolean(flags & 4) !== (signingLength > 0)
-  ) {
-    throw protocolError('Invalid hello field lengths.')
-  }
-  const name = nameLength ? readString(bytes, offset, nameLength, 'peer name') : undefined
-  offset += nameLength
-  const signingPubkey = signingLength
-    ? readString(bytes, offset, signingLength, 'signing public key')
-    : undefined
   return {
     kind: INNER_FRAME_KIND.hello,
     version: bytes[1],
     pubkey: Buffer.from(pubkey).toString('base64'),
-    ...(pinnedPubkey ? { pinnedPubkey } : {}),
-    ...(name ? { name } : {}),
-    ...(signingPubkey ? { signingPubkey } : {}),
   }
 }
 
@@ -500,28 +439,29 @@ export function relayPriorityForInnerFrame(frame: InnerFrame): RelayPriority {
   return frame.kind === INNER_FRAME_KIND.streamData ? 'data' : 'control'
 }
 
-export function legacyV1WireBytesForStreamData(data: Uint8Array): number {
-  const legacyInner = JSON.stringify({
+/** Benchmark-only reference size; Fabric never accepts or emits this format. */
+export function referenceJsonWireBytesForStreamData(data: Uint8Array): number {
+  const referenceInner = JSON.stringify({
     kind: 'stream_data',
     streamId: 'benchmark',
     seq: 0,
     data: Buffer.from(data).toString('base64'),
   })
-  // V1 serialized nonce(24) || ciphertext || tag(16) as base64. The nonce
-  // and tag values are irrelevant to the exact wire length, so use zero bytes
-  // here instead of performing random encryption in a deterministic benchmark.
-  const legacyCiphertext = Buffer.concat([
+  // The reference serialized nonce(24) || ciphertext || tag(16) as base64.
+  // The nonce and tag values are irrelevant to the exact wire length, so use
+  // zero bytes here instead of performing random encryption.
+  const referenceCiphertext = Buffer.concat([
     Buffer.alloc(24),
-    Buffer.from(legacyInner),
+    Buffer.from(referenceInner),
     Buffer.alloc(16),
   ]).toString('base64')
   return Buffer.byteLength(
     JSON.stringify({
       version: 1,
-      roomId: 'room_benchmark',
+      linkId: 'fabric-benchmark-link',
       seq: 0,
       kind: 'relay_data_frame',
-      payload: { ciphertext: legacyCiphertext },
+      payload: { ciphertext: referenceCiphertext },
     }),
   )
 }

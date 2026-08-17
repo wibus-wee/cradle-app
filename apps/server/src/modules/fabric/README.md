@@ -10,3 +10,11 @@ Node link rather than a direct host address.
 listing, and link authorization. `directory-client.ts` owns the versioned
 relayd HTTP protocol. `protocol.ts` is the TypeScript implementation of the
 signed documents in `apps/relayd/internal/membership`.
+
+`index.ts` exposes the local control routes (`/fabric`, `/fabric/managed-relay`, `/nodes`,
+`POST /nodes/:nodeId/connect`) plus `ALL /nodes/:nodeId/upstream/*`, an
+HTTP/SSE proxy resolved through the on-demand link manager.
+`upstream-websocket.ts` bridges the matching WebSocket upgrades
+(`/nodes/:nodeId/upstream/*`) to the Node's Cradle Server: frames flow both
+ways, pre-open client frames are buffered, and close/error events propagate
+with mapped close codes.

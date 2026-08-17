@@ -9,15 +9,15 @@ import type { MembershipCertificate } from '../fabric/protocol'
 import { assertFabricCertificate, fabricAuthHeaders, fabricHeadersRecord } from '../fabric/protocol'
 import { completeNodeEnrollment, getFabricMembership, hasPendingNodeEnrollment, requireFabricMembershipSecretRefs } from '../fabric/service'
 import { readSecret, upsertSecret } from '../secrets/service'
-import { decodeFabricEnvelope, encodeFabricEnvelope, toRelaySessionEnvelope } from './fabric-envelope'
-import { RelaySession } from './session'
+import { decodeFabricEnvelope, encodeFabricEnvelope, toFabricSessionEnvelope } from './fabric-envelope'
+import { FabricSession } from './session'
 import { relayWebSocketDataView } from './websocket-data'
 
 interface ActiveStream { socket: net.Socket, writer: FabricHttpRequestWriter }
 
 /**
  * One authenticated WebSocket per local Node. Each Fabric link has its own
- * encrypted RelaySession and stream map, so a slow or revoked Controller can
+ * encrypted FabricSession and stream map, so a slow or revoked Controller can
  * never share byte accounting with another Controller.
  */
 export class FabricNodeConnector {
@@ -25,7 +25,7 @@ export class FabricNodeConnector {
   private stopped = false
   private reconnectTimer: NodeJS.Timeout | null = null
   private enrollmentTimer: NodeJS.Timeout | null = null
-  private readonly sessions = new Map<string, RelaySession>()
+  private readonly sessions = new Map<string, FabricSession>()
   private readonly streams = new Map<string, Map<string, ActiveStream>>()
 
   constructor(private readonly localServerHost: string, private readonly localServerPort: number) {}
@@ -71,7 +71,7 @@ export class FabricNodeConnector {
     if (envelope.kind === 'link_open') { this.openLink(envelope.linkId, envelope.payload, nodeCertificate, encryptionPrivateKey, fabricId); return }
     const session = this.sessions.get(envelope.linkId)
     if (!session) { throw new AppError({ code: 'fabric_link_not_open', status: 400, message: 'Fabric link has not been authorized by this Node.' }) }
-    session.handleEnvelope(toRelaySessionEnvelope(envelope))
+    session.handleEnvelope(toFabricSessionEnvelope(envelope))
   }
 
   private openLink(linkId: string, payload: Uint8Array, nodeCertificate: MembershipCertificate, encryptionPrivateKey: string, fabricId: string): void {
@@ -80,10 +80,11 @@ export class FabricNodeConnector {
     assertFabricCertificate(controller, nodeCertificate.issuerPubkey, fabricId)
     if (controller.subjectKind !== 'controller' || (controller.nodeId !== undefined && controller.nodeId !== nodeCertificate.subjectId) || !controller.scopes.some(scope => scope === 'control' || scope === 'admin')) { throw new AppError({ code: 'fabric_controller_unauthorized', status: 403, message: 'Controller certificate cannot control this Node.' }) }
     const streams = new Map<string, ActiveStream>(); this.streams.set(linkId, streams)
-    const session = new RelaySession('host', encryptionPrivateKey, {
-      roomId: linkId,
-ourPublicKeyBase64: nodeCertificate.encryptionPubkey,
-pairingCode: fabricId,
+    const session = new FabricSession('node', encryptionPrivateKey, {
+      fabricId,
+      linkId,
+      expectedPeerPubkey: controller.encryptionPubkey,
+      ourPublicKeyBase64: nodeCertificate.encryptionPubkey,
       encodeOutboundEnvelope: frame => encodeFabricEnvelope({ fabricId, nodeId: nodeCertificate.subjectId, linkId }, frame),
     }, {
       send: (data) => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(data) } },
@@ -98,7 +99,7 @@ onResumeStream: streamId => streams.get(streamId)?.socket.resume(),
     this.sessions.set(linkId, session); session.start()
   }
 
-  private openStream(linkId: string, streamId: string, session: RelaySession): void {
+  private openStream(linkId: string, streamId: string, session: FabricSession): void {
     const socket = net.connect({ host: this.localServerHost, port: this.localServerPort })
     const streams = this.streams.get(linkId)!; streams.set(streamId, { socket, writer: new FabricHttpRequestWriter(socket, readFabricNodeAuthToken(), () => session.closeStream(streamId, 'invalid relay request')) })
     socket.on('data', chunk => session.writeStreamData(streamId, new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength)))

@@ -42,6 +42,18 @@ export interface NodeSummary {
   status: 'online' | 'offline'
   lastSeenAt: string
   revision: number
+  /** This Controller's active grant scopes over the Node (directory listings only). */
+  scopes?: FabricScope[]
+}
+
+/** One Controller grant over a Node, as recorded by the relayd directory. */
+export interface FabricNodeGrant {
+  grantId: string
+  fabricId: string
+  controllerId: string
+  nodeId: string
+  scope: FabricScope
+  revokedAt?: string
 }
 
 export interface FabricKeyPair {

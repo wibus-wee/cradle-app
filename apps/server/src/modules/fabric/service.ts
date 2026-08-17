@@ -10,7 +10,7 @@ import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { readSecret, upsertSecret } from '../secrets/service'
 import { FabricDirectoryClient } from './directory-client'
-import type { MembershipCertificate, NodeSummary } from './protocol'
+import type { FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
 import {
   assertFabricCertificate,
   fabricAuthHeaders,
@@ -51,6 +51,24 @@ export interface FabricNodeInvitation {
   expiresAt: string
 }
 
+type FabricMembershipChangedListener = () => void
+
+const fabricMembershipChangedListeners = new Set<FabricMembershipChangedListener>()
+
+/** Register runtime owners that need to react to a membership becoming usable. */
+export function registerFabricMembershipChangedListener(
+  listener: FabricMembershipChangedListener,
+): () => void {
+  fabricMembershipChangedListeners.add(listener)
+  return () => fabricMembershipChangedListeners.delete(listener)
+}
+
+function notifyFabricMembershipChanged(): void {
+  for (const listener of fabricMembershipChangedListeners) {
+    listener()
+  }
+}
+
 export interface CreateFabricInput {
   relayUrl: string
   displayName?: string
@@ -62,6 +80,19 @@ export interface CreateFabricInput {
 export function getFabricMembership(): FabricMembershipView | null {
   const row = db().select().from(fabricMembership).orderBy(asc(fabricMembership.createdAt)).get()
   return row && row.role !== 'pending-node' ? toView(row) : null
+}
+
+/**
+ * Return the Desktop-owned relay endpoint when this Server is running inside
+ * Cradle Desktop. Standalone servers intentionally have no implicit relay.
+ */
+export function getManagedRelay(): { relayUrl: string, accessMode: 'local' | 'network' } | null {
+  const relayUrl = process.env.CRADLE_RELAYD_PUBLIC_URL?.trim()
+  if (!relayUrl) {
+    return null
+  }
+  const accessMode = process.env.CRADLE_RELAYD_ACCESS_MODE === 'network' ? 'network' : 'local'
+  return { relayUrl, accessMode }
 }
 
 export function hasPendingNodeEnrollment(): boolean {
@@ -151,8 +182,9 @@ ownerKeySecretId,
 encryptionKeySecretId,
 certificateJson: JSON.stringify({ node: nodeCertificate, controller: controllerCertificate }),
     createdAt: now,
-updatedAt: now,
+    updatedAt: now,
   }).returning().get()
+  notifyFabricMembershipChanged()
   return toView(row)
 }
 
@@ -226,6 +258,7 @@ export async function completeNodeEnrollment(): Promise<FabricMembershipView | n
   if (!updated) {
     throw new AppError({ code: 'fabric_membership_invalid', status: 500, message: 'Fabric membership disappeared during enrollment.' })
   }
+  notifyFabricMembershipChanged()
   return toView(updated)
 }
 
@@ -255,6 +288,35 @@ scopes: ['admin'],
 export async function listNodes(): Promise<NodeSummary[]> {
   const membership = requireFabricMembership()
   return await new FabricDirectoryClient(membership.relayUrl).listNodes(membership.fabricId, controllerHeaders(membership, 'GET', `/v1/fabrics/${membership.fabricId}/nodes`))
+}
+
+/**
+ * Read one Node's last-known directory summary. Offline Nodes remain visible
+ * because relayd persists Node records; presence is only a status field.
+ */
+export async function getNode(nodeId: string): Promise<NodeSummary> {
+  const nodes = await listNodes()
+  const node = nodes.find(candidate => candidate.nodeId === nodeId)
+  if (!node) {
+    throw new AppError({ code: 'fabric_node_not_found', status: 404, message: 'This Node is not visible to this Cradle Server Fabric membership.' })
+  }
+  return node
+}
+
+/** List every grant recorded for a Node, including revoked rows. Owner-only. */
+export async function listNodeGrants(nodeId: string): Promise<FabricNodeGrant[]> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  const path = `/v1/nodes/${nodeId}/grants`
+  return await new FabricDirectoryClient(membership.relayUrl).listNodeGrants(nodeId, ownerProofHeaders(ownerPrivateKey, 'GET', path))
+}
+
+/** Revoke one Controller grant. relayd closes matching live links immediately. */
+export async function revokeNodeGrant(nodeId: string, grantId: string): Promise<void> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  const path = `/v1/nodes/${nodeId}/grants/${grantId}`
+  await new FabricDirectoryClient(membership.relayUrl).revokeNodeGrant(nodeId, grantId, ownerProofHeaders(ownerPrivateKey, 'DELETE', path))
 }
 
 export async function openNodeLink(nodeId: string): Promise<{ linkId: string, expiresAt: string, nodeCertificate: MembershipCertificate }> {

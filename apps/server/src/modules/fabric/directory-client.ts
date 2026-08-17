@@ -1,5 +1,5 @@
 import { AppError } from '../../errors/app-error'
-import type { MembershipCertificate, NodeSummary } from './protocol'
+import type { FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
 
 export class FabricDirectoryClient {
   constructor(readonly relayUrl: string) {}
@@ -47,6 +47,14 @@ export class FabricDirectoryClient {
 
   openLink(nodeId: string, headers: Headers) {
     return this.request<{ linkId: string, expiresAt: string, nodeCertificate: MembershipCertificate }>(`/v1/nodes/${encodeURIComponent(nodeId)}/links`, { method: 'POST', headers })
+  }
+
+  listNodeGrants(nodeId: string, headers: Headers) {
+    return this.request<{ grants: FabricNodeGrant[] }>(`/v1/nodes/${encodeURIComponent(nodeId)}/grants`, { headers }).then(result => result.grants)
+  }
+
+  revokeNodeGrant(nodeId: string, grantId: string, headers: Headers) {
+    return this.request<void>(`/v1/nodes/${encodeURIComponent(nodeId)}/grants/${encodeURIComponent(grantId)}`, { method: 'DELETE', headers })
   }
 }
 

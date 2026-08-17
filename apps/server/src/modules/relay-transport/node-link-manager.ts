@@ -38,12 +38,10 @@ export class FabricNodeLinkManager {
     const link = await openNodeLink(nodeId)
     const headers = fabricAuthHeaders(membership.controllerCertificate, readSecret(secretRefs.identityKeySecretId), 'GET', `/v1/ws/controllers/${link.linkId}`)
     const handle = await startRelayControllerTransport({
-      hostId: nodeId,
 relayUrl: membership.relayUrl,
-roomId: link.linkId,
       controllerPrivateKeyBase64: readSecret(secretRefs.encryptionKeySecretId),
       controllerPublicKeyBase64: membership.controllerCertificate.encryptionPubkey,
-      pinnedHostPubkey: link.nodeCertificate.encryptionPubkey,
+      nodePublicKeyBase64: link.nodeCertificate.encryptionPubkey,
       fabric: { fabricId: membership.fabricId, nodeId, linkId: link.linkId, headers },
     })
     this.handles.set(nodeId, handle)
