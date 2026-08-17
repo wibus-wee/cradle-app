@@ -157,34 +157,6 @@ function applyCommandIcon(commandPath, iconPath) {
   execFileSync('/usr/bin/osascript', ['-l', 'JavaScript', '-e', script, iconPath, commandPath], { stdio: 'ignore' })
 }
 
-function hideExtension(dmgPath) {
-  const mountDir = mkdtempSync(resolve(tmpdir(), 'dmg-mount-'))
-  try {
-    execFileSync('/usr/bin/hdiutil', ['attach', dmgPath, '-nobrowse', '-readwrite', '-mountpoint', mountDir, '-quiet'], { stdio: 'ignore' })
-    const commandFile = resolve(mountDir, 'Install Cradle.command')
-    if (existsSync(commandFile)) {
-      try {
-        execFileSync('/usr/bin/SetFile', ['-a', 'E', commandFile], { stdio: 'ignore' })
-      }
- catch {
-        // SetFile may not be available; extension will still show
-      }
-    }
-  }
- finally {
-    try {
-      execFileSync('/usr/bin/hdiutil', ['detach', mountDir, '-quiet'], { stdio: 'ignore' })
-    }
- catch {
-      // Force-detach if the normal detach fails (e.g. a background process still holds a handle)
-      try { execFileSync('/usr/bin/hdiutil', ['detach', mountDir, '-force', '-quiet'], { stdio: 'ignore' }) }
- catch {}
-    }
-    try { rmSync(mountDir, { recursive: true, force: true }) }
- catch {}
-  }
-}
-
 async function buildDmg(spec, outputPath) {
   mkdirSync(resolve(outputPath, '..'), { recursive: true })
   return new Promise((ok, fail) => {
@@ -219,13 +191,13 @@ async function main() {
 
     console.log('Building DMG with appdmg...')
     const outputAbs = resolve(REPO_ROOT, args.output)
-    const rwDmg = resolve(stageDir, 'rw.dmg')
+    rmSync(outputAbs, { force: true })
     await buildDmg({
       'title': VOLUME_NAME,
       ...(iconStaged ? { icon: iconStaged } : {}),
       'background': DEFAULT_BACKGROUND,
       'icon-size': 80,
-      'format': 'UDRW',
+      'format': 'UDZO',
       'window': {
         size: { width: 660, height: 400 },
       },
@@ -235,40 +207,7 @@ async function main() {
         { x: 530, y: 200, type: 'file', path: instructionsPath, name: 'Install Instructions.txt' },
       ],
       'basepath': stageDir,
-    }, rwDmg)
-
-    console.log('Hiding .command extension in DMG...')
-    hideExtension(rwDmg)
-
-    console.log('Compressing DMG...')
-    // Flush filesystem buffers so the rw image is fully written before convert
-    try { execFileSync('/bin/sync', { stdio: 'ignore' }) }
- catch {}
-
-    // hdiutil does not overwrite an existing output image by default. Remove
-    // the previous artifact so local rebuilds and CI retries are deterministic.
-    rmSync(outputAbs, { force: true })
-
-    // hdiutil convert can transiently fail on CI runners when a prior detach
-    // hasn't fully released the image.  Retry up to 3 times with a short delay.
-    let convertErr
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        execFileSync('/usr/bin/hdiutil', ['convert', rwDmg, '-format', 'UDZO', '-o', outputAbs], { stdio: 'pipe' })
-        convertErr = null
-        break
-      }
- catch (err) {
-        convertErr = err
-        const stderr = err.stderr?.toString?.() ?? ''
-        console.error(`hdiutil convert attempt ${attempt} failed${stderr ? `: ${stderr.trim()}` : ''}`)
-        if (attempt < 3) {
-          // Wait before retrying — gives APFS time to release the image
-          execFileSync('/bin/sleep', ['2'])
-        }
-      }
-    }
-    if (convertErr) { throw convertErr }
+    }, outputAbs)
 
     console.log(`Wrote ${outputAbs}`)
   }
