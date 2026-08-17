@@ -76,7 +76,7 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
     id: 'remote-workspace-1',
     name: 'Remote Project',
     locator: {
-      hostId: 'local',
+      nodeId: 'local',
       path: '/remote/project',
     },
     gitIdentity: {},
@@ -225,14 +225,14 @@ function closeServer(server: Server): Promise<void> {
   })
 }
 
-async function createRemoteMountedWorkspace(app: ElysiaApp, hostId: string, path = '/remote/project'): Promise<string> {
+async function createRemoteMountedWorkspace(app: ElysiaApp, nodeId: string, path = '/remote/project'): Promise<string> {
   const createWorkspaceRes = await app.handle(new Request('http://localhost/workspaces', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       name: 'Remote Project',
       locator: {
-        hostId,
+        nodeId,
         path,
         sourceWorkspaceId: path === '/remote/project' ? 'remote-workspace-1' : undefined,
       },

@@ -48,12 +48,12 @@ describe('session list activity and status projection', () => {
       {
         id: 'ws-listed',
         name: 'Listed',
-        locatorJson: JSON.stringify({ hostId: 'local', path: '/tmp/listed' }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: '/tmp/listed' }),
       },
       {
         id: 'ws-other',
         name: 'Other',
-        locatorJson: JSON.stringify({ hostId: 'local', path: '/tmp/other' }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: '/tmp/other' }),
       },
     ]).run()
 

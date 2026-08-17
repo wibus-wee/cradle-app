@@ -44,7 +44,7 @@ describe('getGraph', () => {
     git('update-ref', 'refs/cradle/internal-head', 'HEAD')
 
     workspaceServiceMock.get.mockReturnValue({
-      locator: { hostId: 'local', path: repositoryPath },
+      locator: { nodeId: 'local', path: repositoryPath },
     })
 
     const graph = await getGraph('workspace-1', 100)

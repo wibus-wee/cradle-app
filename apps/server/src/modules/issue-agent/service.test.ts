@@ -36,7 +36,7 @@ function seedWorkspace(): string {
     id: workspaceId,
     name: 'ws',
     // locator_json is uniquely indexed — each seed needs a distinct path.
-    locatorJson: JSON.stringify({ hostId: 'local', path: `/tmp/issue-agent-${workspaceId}` }),
+    locatorJson: JSON.stringify({ nodeId: 'local', path: `/tmp/issue-agent-${workspaceId}` }),
   }).run()
   return workspaceId
 }

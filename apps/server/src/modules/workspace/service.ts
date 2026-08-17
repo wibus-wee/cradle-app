@@ -8,11 +8,18 @@ import { automationDefinitions, kanbanBoards, workspaces } from '@cradle/db'
 import { desc, eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
+import type {
+  RemoteWorkspaceFileContent,
+  RemoteWorkspaceFileEntry,
+  RemoteWorkspaceFileInfo,
+  RemoteWorkspaceView,
+} from '../../http/upstream'
+import { upstreamJsonWithReconnect } from '../../http/upstream'
 import { db, getServerConfig } from '../../infra'
 import type { MigrateIssuesOptions, MigrateIssuesResult } from '../issue/service'
 import { migrateIssues } from '../issue/service'
 import { assertAppFeatureFlagEnabled, isAppFeatureFlagEnabled } from '../preferences/service'
-import * as RemoteHosts from '../remote-hosts/service'
+import { getFabricNodeLinkManager } from '../relay-transport/node-link-manager'
 import { subscribeWorkspaceFileChanges } from './file-watch'
 import {
   createDirectory,
@@ -141,11 +148,11 @@ export function planHistoricalWorkspace(input: HistoricalWorkspaceEvidence): His
   const lexicalPath = input.sourceHostId === 'local' ? resolve(rawPath) : rawPath
   const canonicalPath = canonicalWorkspacePath(input.sourceHostId, rawPath)
   const locator: WorkspaceLocator = {
-    hostId: input.sourceHostId,
+    nodeId: input.sourceHostId,
     path: canonicalPath,
   }
   const exact = resolveByLocator({
-    hostId: input.sourceHostId,
+    nodeId: input.sourceHostId,
     path: lexicalPath,
   }) ?? resolveByLocator(locator)
   if (exact) {
@@ -153,7 +160,7 @@ export function planHistoricalWorkspace(input: HistoricalWorkspaceEvidence): His
   }
 
   const containing = findContainingWorkspace({
-    hostId: input.sourceHostId,
+    nodeId: input.sourceHostId,
     path: lexicalPath,
   }) ?? findContainingWorkspace(locator)
   if (containing) {
@@ -180,7 +187,7 @@ export function planHistoricalWorkspace(input: HistoricalWorkspaceEvidence): His
     historicalKey,
     name: basename(recoveredPath) || 'Recovered Workspace',
     locator: {
-      hostId: input.sourceHostId,
+      nodeId: input.sourceHostId,
       path: recoveredPath,
     },
     gitIdentity,
@@ -599,7 +606,10 @@ export async function getFiles(workspaceId: string) {
     return listFiles(locator.path)
   }
   const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
-  return await RemoteHosts.listRemoteCradleWorkspaceFiles(locator.hostId, remoteWorkspace.id)
+  return await nodeUpstreamJson<RemoteWorkspaceFileEntry[]>(
+    locator.nodeId,
+    `/workspaces/${encodeURIComponent(remoteWorkspace.id)}/files`,
+  )
 }
 
 export async function getFileChildren(workspaceId: string, relativePath = '') {
@@ -612,7 +622,9 @@ export async function getFileChildren(workspaceId: string, relativePath = '') {
     return listFileChildren(locator.path, relativePath)
   }
   const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
-  return await RemoteHosts.listRemoteCradleWorkspaceFileChildren(locator.hostId, remoteWorkspace.id, relativePath)
+  const childrenUrl = new URL(`/workspaces/${encodeURIComponent(remoteWorkspace.id)}/files/children`, 'http://127.0.0.1')
+  childrenUrl.searchParams.set('path', relativePath)
+  return await nodeUpstreamJson<RemoteWorkspaceFileEntry[]>(locator.nodeId, `${childrenUrl.pathname}${childrenUrl.search}`)
 }
 
 export async function searchFiles(workspaceId: string, input: { query?: string, limit?: number }) {
@@ -701,7 +713,9 @@ export async function getFileContent(workspaceId: string, relativePath: string):
     return readTextFile(locator.path, relativePath)
   }
   const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
-  return (await RemoteHosts.readRemoteCradleWorkspaceFileContent(locator.hostId, remoteWorkspace.id, relativePath)).content
+  const contentUrl = new URL(`/workspaces/${encodeURIComponent(remoteWorkspace.id)}/files/content`, 'http://127.0.0.1')
+  contentUrl.searchParams.set('path', relativePath)
+  return (await nodeUpstreamJson<RemoteWorkspaceFileContent>(locator.nodeId, `${contentUrl.pathname}${contentUrl.search}`)).content
 }
 
 export async function getFileInfo(workspaceId: string, relativePath: string) {
@@ -714,7 +728,9 @@ export async function getFileInfo(workspaceId: string, relativePath: string) {
     return getWorkspaceFileInfo(locator.path, relativePath)
   }
   const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
-  return await RemoteHosts.readRemoteCradleWorkspaceFileInfo(locator.hostId, remoteWorkspace.id, relativePath)
+  const infoUrl = new URL(`/workspaces/${encodeURIComponent(remoteWorkspace.id)}/files/info`, 'http://127.0.0.1')
+  infoUrl.searchParams.set('path', relativePath)
+  return await nodeUpstreamJson<RemoteWorkspaceFileInfo | null>(locator.nodeId, `${infoUrl.pathname}${infoUrl.search}`)
 }
 
 export async function getFileBytes(workspaceId: string, relativePath: string) {
@@ -918,7 +934,7 @@ export function isMultiFolderWorkspace(workspace: Pick<WorkspaceView, 'locator' 
 }
 
 function isMultiFolderWorkspaceLocator(locator: WorkspaceLocator): boolean {
-  if (locator.hostId !== 'local') {
+  if (locator.nodeId !== 'local') {
     return false
   }
   return existsSync(join(locator.path, MULTI_WORKSPACE_CONFIG_FILE))
@@ -932,7 +948,7 @@ function existingHistoricalWorkspacePlan(
     kind: 'existing',
     reason,
     historicalKey: historicalWorkspaceKey(
-      workspace.locator.hostId,
+      workspace.locator.nodeId,
       workspace.locator.path,
       workspace.gitIdentity,
     ),
@@ -940,8 +956,8 @@ function existingHistoricalWorkspacePlan(
   }
 }
 
-function canonicalWorkspacePath(hostId: string, path: string): string {
-  if (hostId !== 'local') {
+function canonicalWorkspacePath(nodeId: string, path: string): string {
+  if (nodeId !== 'local') {
     return path
   }
   const absolutePath = resolve(path)
@@ -955,7 +971,7 @@ function canonicalWorkspacePath(hostId: string, path: string): string {
 
 function findContainingWorkspace(locator: WorkspaceLocator): WorkspaceView | null {
   const candidates = list()
-    .filter(workspace => workspace.locator.hostId === locator.hostId)
+    .filter(workspace => workspace.locator.nodeId === locator.nodeId)
     .filter(workspace => isPathContainedBy(locator.path, workspace.locator.path))
     .sort((left, right) => right.locator.path.length - left.locator.path.length)
   return candidates[0] ?? null
@@ -970,7 +986,7 @@ function findWorkspaceByGitIdentity(
     return null
   }
   const matches = list().filter(workspace =>
-    workspace.locator.hostId === sourceHostId
+    workspace.locator.nodeId === sourceHostId
     && workspace.gitIdentity.originUrl?.trim() === originUrl)
   return matches.length === 1 ? matches[0]! : null
 }
@@ -993,14 +1009,14 @@ function findHistoricalProjectRoot(path: string, reportedRepoRoot: string | null
 }
 
 function historicalWorkspaceKey(
-  hostId: string,
+  nodeId: string,
   path: string,
   gitIdentity: WorkspaceGitIdentity,
 ): string {
   const originUrl = gitIdentity.originUrl?.trim()
   return originUrl
-    ? `${hostId}:git:${originUrl}`
-    : `${hostId}:path:${path}`
+    ? `${nodeId}:git:${originUrl}`
+    : `${nodeId}:path:${path}`
 }
 
 function isPathContainedBy(path: string, root: string): boolean {
@@ -1051,16 +1067,24 @@ function unsupportedRemoteWorkspaceOperation(operation: string): never {
 }
 
 async function resolveRemoteCradleWorkspace(locator: WorkspaceLocator) {
-  const remoteWorkspace = await RemoteHosts.resolveRemoteWorkspaceByPath(locator.hostId, locator.path)
+  const remoteWorkspaces = await nodeUpstreamJson<RemoteWorkspaceView[]>(locator.nodeId, '/workspaces')
+  const remoteWorkspace = remoteWorkspaces.find(workspace => workspace.locator.path === locator.path) ?? null
   if (!remoteWorkspace) {
     throw new AppError({
       code: 'remote_cradle_workspace_not_found',
       status: 404,
       message: 'Remote Cradle Server workspace was not found.',
-      details: { hostId: locator.hostId, path: locator.path },
+      details: { nodeId: locator.nodeId, path: locator.path },
     })
   }
   return remoteWorkspace
+}
+
+async function nodeUpstreamJson<T>(nodeId: string, upstreamPathWithQuery: string): Promise<T> {
+  return await upstreamJsonWithReconnect<T>(
+    async () => (await getFabricNodeLinkManager().ensure(nodeId)).localBaseUrl,
+    upstreamPathWithQuery,
+  )
 }
 
 function assertMultiWorkspacePocEnabled(): void {
@@ -1191,7 +1215,7 @@ function normalizeMultiFolderWorkspaceConfig(
  */
 function assertRegisteredMultiFolderMember(absolutePath: string): WorkspaceView {
   const workspace = resolveByPath(absolutePath)
-  if (!workspace || workspace.locator.hostId !== 'local') {
+  if (!workspace || workspace.locator.nodeId !== 'local') {
     throw new AppError({
       code: 'multi_workspace_member_not_registered',
       status: 400,

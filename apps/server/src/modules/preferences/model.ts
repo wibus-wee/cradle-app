@@ -333,7 +333,7 @@ export const NetworkPreferencesJsonSchema = z
         inbound: z
           .object({
             serverAccessMode: z.enum(['local', 'network']).default('local'),
-            managedRelayAccessMode: z.enum(['local', 'network']).default('local'),
+            managedRelayAccessMode: z.enum(['local', 'network']).default('network'),
             managedRelayPublicUrl: z
               .string()
               .trim()
@@ -343,7 +343,7 @@ export const NetworkPreferencesJsonSchema = z
           })
           .default({
             serverAccessMode: 'local',
-            managedRelayAccessMode: 'local',
+            managedRelayAccessMode: 'network',
             managedRelayPublicUrl: null,
           }),
       })
@@ -353,7 +353,7 @@ export const NetworkPreferencesJsonSchema = z
         customProxyUrl: null,
         inbound: {
           serverAccessMode: 'local',
-          managedRelayAccessMode: 'local',
+          managedRelayAccessMode: 'network',
           managedRelayPublicUrl: null,
         },
       }),

@@ -1,4 +1,4 @@
-import { relayHostEnrollments } from '@cradle/db'
+import { fabricMembership } from '@cradle/db'
 import type { PluginSourceDescriptor } from '@cradle/plugin-sdk'
 
 import { db } from '../infra'
@@ -10,7 +10,7 @@ import { validateMarketplacePackageIntegrity } from './validation'
 interface PluginTrustEvaluationInput {
   pluginName: string
   source: PluginSourceDescriptor
-  relayHostExposed?: boolean
+  fabricNodeExposed?: boolean
 }
 
 function isMarketplaceTrustedSource(source: PluginSourceDescriptor): boolean {
@@ -21,10 +21,10 @@ export function isExternalLocalCodeSource(source: PluginSourceDescriptor): boole
   return source.kind === 'externalLocal' && !isMarketplaceTrustedSource(source)
 }
 
-export function readRelayHostExposure(): boolean {
+export function readFabricNodeExposure(): boolean {
   return db()
-    .select({ id: relayHostEnrollments.id })
-    .from(relayHostEnrollments)
+    .select({ fabricId: fabricMembership.fabricId })
+    .from(fabricMembership)
     .limit(1)
     .get() !== undefined
 }
@@ -61,12 +61,12 @@ export async function evaluatePluginSourceTrust(
     }
   }
 
-  if (input.relayHostExposed ?? readRelayHostExposure()) {
+  if (input.fabricNodeExposed ?? readFabricNodeExposure()) {
     return {
       ...input.source,
       checksum,
       trusted: false,
-      reason: 'External local plugins are blocked while relay host enrollments expose this server.',
+      reason: 'External local plugins are blocked while this server is enrolled as a Fabric node.',
     }
   }
 

@@ -71,7 +71,7 @@ describe('javascript session await', () => {
       .values({
         id: workspaceId,
         name: 'ws',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceDir, kind: 'project' }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceDir, kind: 'project' }),
       })
       .run()
     d.insert(providerTargets)

@@ -33,7 +33,7 @@ import {
 } from '../../plugins/source-installer'
 import type { AddPluginSourceInput } from '../../plugins/source-registry'
 import { addPluginSource, deletePluginSource, listPluginSources, readPluginSource } from '../../plugins/source-registry'
-import { evaluatePluginSourceTrust, readRelayHostExposure } from '../../plugins/trust-policy'
+import { evaluatePluginSourceTrust, readFabricNodeExposure } from '../../plugins/trust-policy'
 
 export interface PluginMentionCapability {
   id: string
@@ -514,7 +514,7 @@ export async function previewSource(
 
   const pluginsDir = await resolvePluginSourceDirectory(tempSource, options)
   const packages = await discoverPluginPackages(pluginsDir)
-  const relayHostExposed = readRelayHostExposure()
+  const fabricNodeExposed = readFabricNodeExposure()
 
   const plugins: PluginPreviewItem[] = []
   const warnings: string[] = []
@@ -536,7 +536,7 @@ export async function previewSource(
       trustedSource = await evaluatePluginSourceTrust({
         pluginName: manifest.name,
         source: baseSource,
-        relayHostExposed,
+        fabricNodeExposed,
       })
     }
     catch (err) {
