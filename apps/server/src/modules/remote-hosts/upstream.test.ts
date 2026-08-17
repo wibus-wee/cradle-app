@@ -5,7 +5,7 @@ import {
   buildUpstreamResponseHeaders,
   proxyUpstreamRequestWithReconnect,
   upstreamJsonByBaseUrl,
-} from './upstream'
+} from '../../http/upstream'
 
 describe('remote-host upstream helpers', () => {
   afterEach(() => {

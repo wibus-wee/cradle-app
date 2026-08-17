@@ -25,8 +25,8 @@ const sessionExecutionSchema = t.Union([
     kind: t.Literal('local'),
   }),
   t.Object({
-    kind: t.Literal('remote-host'),
-    hostId: t.String(),
+    kind: t.Literal('node'),
+    nodeId: t.String(),
     remoteSessionId: t.String(),
   }),
 ])

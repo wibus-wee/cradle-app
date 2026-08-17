@@ -14,7 +14,10 @@ import (
 	"time"
 
 	"github.com/cradle/relayd/internal/config"
+	"github.com/cradle/relayd/internal/directory"
+	"github.com/cradle/relayd/internal/fabric"
 	"github.com/cradle/relayd/internal/httpapi"
+	"github.com/cradle/relayd/internal/membership"
 	"github.com/cradle/relayd/internal/metrics"
 	"github.com/cradle/relayd/internal/pairing"
 	"github.com/cradle/relayd/internal/relay"
@@ -35,6 +38,7 @@ func run() error {
 	var showVersion bool
 	flag.StringVar(&cfg.ListenAddr, "listen", envString("CRADLE_RELAYD_LISTEN", "127.0.0.1:8787"), "HTTP listen address")
 	flag.StringVar(&cfg.PublicURL, "public-url", envString("CRADLE_RELAYD_PUBLIC_URL", "http://127.0.0.1:8787"), "public relay URL")
+	flag.StringVar(&cfg.FabricDatabasePath, "fabric-db", envString("CRADLE_RELAYD_FABRIC_DB", "cradle-relayd.sqlite3"), "SQLite path for the durable Fabric directory")
 	flag.DurationVar(&cfg.PairingTTL, "pairing-ttl", envDuration("CRADLE_RELAYD_PAIRING_TTL", 5*time.Minute), "pairing code TTL")
 	flag.DurationVar(&cfg.RoomTTL, "room-ttl", envDuration("CRADLE_RELAYD_ROOM_TTL", 30*time.Minute), "room TTL")
 	flag.DurationVar(&cfg.HeartbeatInterval, "heartbeat-interval", envDuration("CRADLE_RELAYD_HEARTBEAT_INTERVAL", 15*time.Second), "WebSocket heartbeat interval")
@@ -69,7 +73,11 @@ func run() error {
 		Now:     time.Now,
 		MaxSkew: cfg.AssertionMaxSkew,
 	})
-
+	fabricStore, err := fabric.OpenStore(fabric.StoreConfig{Path: cfg.FabricDatabasePath, Now: time.Now})
+	if err != nil {
+		return fmt.Errorf("opening Fabric directory: %w", err)
+	}
+	defer fabricStore.Close()
 	counterSet := metrics.New()
 	pairingStore := pairing.NewStore(pairing.StoreConfig{
 		CodeTTL: cfg.PairingTTL,
@@ -87,11 +95,27 @@ func run() error {
 		Metrics:            counterSet,
 		Logger:             logger,
 	})
+	fabricHub := relay.NewFabricHub(relay.HubConfig{
+		MaxFrameBytes:      cfg.MaxFrameBytes,
+		MaxQueuedEnvelopes: cfg.MaxQueuedEnvelopes,
+		MaxQueuedBytes:     cfg.MaxQueuedBytes,
+	})
+	// The directory is the only component allowed to create Fabric links; the
+	// hub only routes already-authorized opaque v3 envelopes.
+	fabricDirectory, err := directory.NewServer(directory.Config{
+		Store:     fabricStore,
+		Validator: membership.NewValidator(time.Now, cfg.AssertionMaxSkew),
+		Links:     fabricHub,
+	})
+	if err != nil {
+		return fmt.Errorf("creating Fabric transport directory: %w", err)
+	}
 	api, err := httpapi.NewServer(httpapi.ServerConfig{
 		Config:    cfg,
 		Validator: validator,
 		Pairings:  pairingStore,
 		Hub:       hub,
+		Directory: fabricDirectory,
 		Metrics:   counterSet,
 		Logger:    logger,
 	})
