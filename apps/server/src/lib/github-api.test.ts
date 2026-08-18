@@ -182,7 +182,12 @@ describe('gitHub App identity', () => {
       customProxyUrl: 'http://127.0.0.1:7890',
     })
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      data: { viewer: { login: 'wibus-wee' } },
+      data: {
+        search: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [],
+        },
+      },
     }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
