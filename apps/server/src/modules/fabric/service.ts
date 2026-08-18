@@ -83,20 +83,26 @@ export function getFabricMembership(): FabricMembershipView | null {
 }
 
 /**
- * Return the Desktop-owned relay endpoint when this Server is running inside
- * Cradle Desktop. Standalone servers intentionally have no implicit relay.
+ * Return the Relay endpoint selected by Cradle Desktop. Standalone servers
+ * intentionally have no implicit relay.
  */
-export function getManagedRelay(): { relayUrl: string, accessMode: 'local' | 'network' } | null {
+export function getManagedRelay(): { relayUrl: string, accessMode: 'local' | 'network' | 'external' } | null {
   const relayUrl = process.env.CRADLE_RELAYD_PUBLIC_URL?.trim()
   if (!relayUrl) {
     return null
   }
-  const accessMode = process.env.CRADLE_RELAYD_ACCESS_MODE === 'network' ? 'network' : 'local'
+  const accessMode = process.env.CRADLE_RELAYD_ACCESS_MODE === 'external'
+    ? 'external'
+    : process.env.CRADLE_RELAYD_ACCESS_MODE === 'network' ? 'network' : 'local'
   return { relayUrl, accessMode }
 }
 
 export function hasPendingNodeEnrollment(): boolean {
   return db().select({ role: fabricMembership.role }).from(fabricMembership).orderBy(asc(fabricMembership.createdAt)).get()?.role === 'pending-node'
+}
+
+function hasStoredFabricMembership(): boolean {
+  return db().select({ fabricId: fabricMembership.fabricId }).from(fabricMembership).limit(1).get() !== undefined
 }
 
 export function requireFabricMembershipSecretRefs(): FabricMembershipSecretRefs {
@@ -116,7 +122,7 @@ export function requireFabricMembershipSecretRefs(): FabricMembershipSecretRefs 
 }
 
 export async function createFabric(input: CreateFabricInput): Promise<FabricMembershipView> {
-  if (getFabricMembership()) {
+  if (hasStoredFabricMembership()) {
     throw new AppError({ code: 'fabric_already_configured', status: 409, message: 'This Cradle Server already belongs to a Fabric.' })
   }
   const relayUrl = normalizeRelayUrl(input.relayUrl)
@@ -193,7 +199,7 @@ certificateJson: JSON.stringify({ node: nodeCertificate, controller: controllerC
  * QR code; its delivery secret is short-lived and never stored by relayd.
  */
 export async function createNodeInvitation(input: CreateFabricInput & { fabricId: string }): Promise<FabricNodeInvitation> {
-  if (db().select({ fabricId: fabricMembership.fabricId }).from(fabricMembership).limit(1).get()) {
+  if (hasStoredFabricMembership()) {
     throw new AppError({ code: 'fabric_already_configured', status: 409, message: 'This Cradle Server already belongs to a Fabric.' })
   }
   const relayUrl = normalizeRelayUrl(input.relayUrl)

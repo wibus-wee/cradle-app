@@ -34,6 +34,7 @@ const networkProxySource = t.Union(
   { default: 'none' },
 )
 const inboundAccessMode = t.Union([t.Literal('local'), t.Literal('network')], { default: 'local' })
+const relaySource = t.Union([t.Literal('managed'), t.Literal('external')], { default: 'managed' })
 const titleGenerationPreferences = t.Object(
   {
     providerTargetId: nullableString,
@@ -118,6 +119,8 @@ export const PreferencesModel = {
         t.Object(
           {
             serverAccessMode: inboundAccessMode,
+            relaySource,
+            relayUrl: nullableString,
             managedRelayAccessMode: inboundAccessMode,
             managedRelayPublicUrl: nullableString,
           },
@@ -333,6 +336,13 @@ export const NetworkPreferencesJsonSchema = z
         inbound: z
           .object({
             serverAccessMode: z.enum(['local', 'network']).default('local'),
+            relaySource: z.enum(['managed', 'external']).default('managed'),
+            relayUrl: z
+              .string()
+              .trim()
+              .transform(value => (value.length > 0 ? value : null))
+              .nullable()
+              .default(null),
             managedRelayAccessMode: z.enum(['local', 'network']).default('network'),
             managedRelayPublicUrl: z
               .string()
@@ -343,6 +353,8 @@ export const NetworkPreferencesJsonSchema = z
           })
           .default({
             serverAccessMode: 'local',
+            relaySource: 'managed',
+            relayUrl: null,
             managedRelayAccessMode: 'network',
             managedRelayPublicUrl: null,
           }),
@@ -353,6 +365,8 @@ export const NetworkPreferencesJsonSchema = z
         customProxyUrl: null,
         inbound: {
           serverAccessMode: 'local',
+          relaySource: 'managed',
+          relayUrl: null,
           managedRelayAccessMode: 'network',
           managedRelayPublicUrl: null,
         },

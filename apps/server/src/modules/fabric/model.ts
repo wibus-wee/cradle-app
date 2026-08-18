@@ -3,7 +3,7 @@ import { t } from 'elysia'
 const nonBlankString = t.String({ minLength: 1, pattern: '.*\\S.*' })
 
 const fabricScope = t.Union([t.Literal('view'), t.Literal('control'), t.Literal('approve'), t.Literal('admin')])
-const relayAccessMode = t.Union([t.Literal('local'), t.Literal('network')])
+const relayAccessMode = t.Union([t.Literal('local'), t.Literal('network'), t.Literal('external')])
 
 const nodeSummary = t.Object(
   {

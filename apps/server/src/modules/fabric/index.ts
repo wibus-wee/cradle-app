@@ -18,7 +18,7 @@ export const fabric = new Elysia({ prefix: '/fabric', detail: { tags: ['fabric']
     })
   }, { detail: { summary: 'Read this Cradle Server Fabric membership' }, response: { 200: FabricModel.nullableMembership } })
   .get('/managed-relay', () => Fabric.getManagedRelay(), {
-    detail: { summary: 'Read the Desktop-managed local Fabric relay endpoint' },
+    detail: { summary: 'Read the current Desktop Fabric relay endpoint' },
     response: { 200: FabricModel.managedRelay },
   })
   .post('', ({ body }) => Fabric.createFabric(body), { detail: { summary: 'Create a Cradle Fabric and enroll this Node' }, body: FabricModel.createBody, response: { 200: FabricModel.membership } })

@@ -227,4 +227,18 @@ describe('fabric node directory routes', () => {
       accessMode: 'network',
     })
   })
+
+  it('exposes an external Relay endpoint when Desktop is configured to use one', async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'cradle-fabric-grants-'))
+    process.env.CRADLE_DATA_DIR = dataDir
+    process.env.CRADLE_RELAYD_PUBLIC_URL = 'https://relay.example.com'
+    process.env.CRADLE_RELAYD_ACCESS_MODE = 'external'
+    const server = await createServerApp()
+    const response = await server.handle(new Request('http://localhost/fabric/managed-relay'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      relayUrl: 'https://relay.example.com',
+      accessMode: 'external',
+    })
+  })
 })
