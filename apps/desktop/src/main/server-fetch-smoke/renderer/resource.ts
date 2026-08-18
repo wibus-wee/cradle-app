@@ -2,7 +2,7 @@ import {
   createConversationAssistantReply,
   createConversationFollowUp,
   createInitialConversationHistory,
-} from '../../../../../../packages/model-api-simulator/src/conversation-load-pattern'
+} from '@cradle/model-api-simulator/conversation-load-pattern'
 
 import { cradleFetch } from '../../../../../web/src/lib/server-credential'
 import { applyDesktopServerReadyEndpoint } from '../../../../../web/src/lib/server-transport/base-url'

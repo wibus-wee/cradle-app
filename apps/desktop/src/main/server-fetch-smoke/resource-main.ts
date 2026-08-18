@@ -9,7 +9,7 @@ import {
   estimateConversationTokens,
   type ConversationLoadMessage,
   type GrowingConversationLoadPattern,
-} from '../../../../../packages/model-api-simulator/src/conversation-load-pattern'
+} from '@cradle/model-api-simulator/conversation-load-pattern'
 import { app, BrowserWindow, ipcMain } from 'electron'
 
 import { ChatStreamBroker } from '../chat-stream-broker'
@@ -186,12 +186,12 @@ async function sample(): Promise<void> {
       heapUsedBytes: heap.heapUsed,
       rssBytes: heap.rss,
       privateBytes: memory.private * 1024,
-      workingSetBytes: memory.workingSetSize * 1024,
+      workingSetBytes: memory.residentSet * 1024,
       cpuPercent: mainMetric?.cpu.percentCPUUsage ?? 0,
     },
     renderer: rendererMetric
       ? {
-          privateBytes: rendererMetric.memory.privateBytes * 1024,
+          privateBytes: (rendererMetric.memory.privateBytes ?? 0) * 1024,
           workingSetBytes: rendererMetric.memory.workingSetSize * 1024,
           cpuPercent: rendererMetric.cpu.percentCPUUsage,
         }
