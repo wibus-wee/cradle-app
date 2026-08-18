@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cradle.dev/protocol/fabric-v1.json",
+  "title": "Cradle Fabric v1 control-plane documents",
+  "type": "object",
+  "definitions": {
+    "scope": {
+      "type": "string",
+      "enum": ["view", "control", "approve", "admin"]
+    },
+    "certificate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "fabricId", "subjectKind", "subjectId", "identityPubkey", "encryptionPubkey", "scopes", "issuedAt", "nonce", "issuerPubkey", "signature"],
+      "properties": {
+        "version": { "const": 1 },
+        "fabricId": { "type": "string", "minLength": 1 },
+        "subjectKind": { "type": "string", "enum": ["node", "controller"] },
+        "subjectId": { "type": "string", "minLength": 1 },
+        "identityPubkey": { "type": "string", "minLength": 1 },
+        "encryptionPubkey": { "type": "string", "minLength": 1 },
+        "nodeId": { "type": "string", "minLength": 1 },
+        "scopes": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/scope" }, "uniqueItems": true },
+        "issuedAt": { "type": "integer" },
+        "expiresAt": { "type": "integer" },
+        "nonce": { "type": "string", "minLength": 1 },
+        "issuerPubkey": { "type": "string", "minLength": 1 },
+        "signature": { "type": "string", "minLength": 1 }
+      }
+    },
+    "nodeSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeId", "fabricId", "displayName", "platform", "version", "capabilities", "status", "lastSeenAt", "revision"],
+      "properties": {
+        "nodeId": { "type": "string", "minLength": 1 },
+        "fabricId": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string" },
+        "platform": { "type": "string" },
+        "version": { "type": "string" },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["online", "offline"] },
+        "lastSeenAt": { "type": "string", "format": "date-time" },
+        "revision": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "requestProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pubkey", "method", "path", "issuedAt", "nonce", "signature"],
+      "properties": {
+        "pubkey": { "type": "string", "minLength": 1 },
+        "method": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "issuedAt": { "type": "integer" },
+        "nonce": { "type": "string", "minLength": 1 },
+        "signature": { "type": "string", "minLength": 1 }
+      }
+    },
+    "fabricEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "fabricId", "nodeId", "linkId", "seq", "kind", "priority", "payload"],
+      "properties": {
+        "version": { "const": 3 },
+        "fabricId": { "type": "string", "minLength": 1 },
+        "nodeId": { "type": "string", "minLength": 1 },
+        "linkId": { "type": "string", "minLength": 1 },
+        "streamId": { "type": "string" },
+        "seq": { "type": "integer", "minimum": 0 },
+        "ack": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string", "enum": ["link_open", "link_ready", "relay_data_frame", "relay_peer_closed", "relay_error"] },
+        "priority": { "type": "string", "enum": ["control", "data"] },
+        "payload": { "type": "string", "contentEncoding": "base64" }
+      }
+    }
+  }
+}

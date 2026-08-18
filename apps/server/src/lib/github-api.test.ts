@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { initializeDatabase, shutdownInfra } from '../infra'
+import { setNetworkPreferences } from '../modules/preferences/service'
 import { resetGitHubAuthProviderForTests, setGitHubAuthProvider } from './github/auth-provider'
 import { cachedGitHubRead, clearGitHubReadInFlight } from './github/cache-gate'
 import {
@@ -172,6 +173,30 @@ describe('gitHub App identity', () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
     expect(request.query).toContain('commits(last: 1)')
     expect(request.query).toContain('statusCheckRollup { state }')
+  })
+
+  it('routes GitHub API requests through the configured outbound proxy', async () => {
+    await setNetworkPreferences({
+      proxyEnabled: true,
+      proxyMode: 'custom',
+      customProxyUrl: 'http://127.0.0.1:7890',
+    })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: {
+        search: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [],
+        },
+      },
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await searchAuthoredPullRequests('wibus-wee')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/graphql',
+      expect.objectContaining({ dispatcher: expect.anything() }),
+    )
   })
 })
 

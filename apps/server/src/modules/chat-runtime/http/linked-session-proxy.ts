@@ -3,11 +3,11 @@ import { Elysia } from 'elysia'
 import {
   buildProxiedJsonRequest,
   tryProxyLinkedSessionRequest,
-} from '../../session/remote-projection'
+} from '../../session/node-projection'
 
 /**
- * Paths under `/chat/sessions/:sessionId/...` for a projected remote session
- * are forwarded through the remote-host upstream gateway. Non-session chat
+ * Paths under `/chat/sessions/:sessionId/...` for a projected Node session
+ * are forwarded through the Fabric Node upstream gateway. Non-session chat
  * routes (composer drafts, global catalogs) stay local.
  */
 export function matchChatSessionPath(pathname: string): string | null {
@@ -39,8 +39,7 @@ export async function maybeProxyLinkedChatRequest(
     ? buildProxiedJsonRequest(request, parsedBody)
     : request
 
-  // Upstream path is the remote Cradle Server path (without /remote-hosts/.../upstream).
-  // rewritePathForRemoteSession swaps local session id → remoteSessionId.
+  // rewritePathForNodeSession swaps local session id → target session id.
   const pathWithQuery = `${url.pathname}${url.search}`
   return await tryProxyLinkedSessionRequest(localSessionId, pathWithQuery, proxiedRequest)
 }

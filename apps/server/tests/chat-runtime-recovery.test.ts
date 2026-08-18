@@ -409,7 +409,7 @@ describe('chat runtime recovery', () => {
     })
   })
 
-  it('hydrates the original UIMessage only through the message detail read', async () => {
+  it('keeps provider reconstruction metadata server-side while hydrating client history', async () => {
     await withTempDataDir(async () => {
       const sessionId = 'session-message-detail'
       const messageId = 'message-detail'
@@ -427,6 +427,30 @@ describe('chat runtime recovery', () => {
             output: { ok: true },
           },
         ],
+        metadata: {
+          codex: {
+            responseItems: [{
+              threadId: 'thread-1',
+              turnId: 'turn-1',
+              item: { type: 'function_call_output', output: { ok: true } },
+            }],
+            moderationMetadataByTurnId: {
+              'turn-1': { flagged: false },
+            },
+          },
+          cradle: { run: { runId: 'run-1', durationMs: 250 } },
+        },
+      }
+      const clientMessage = {
+        ...message,
+        metadata: {
+          codex: {
+            moderationMetadataByTurnId: {
+              'turn-1': { flagged: false },
+            },
+          },
+          cradle: { run: { runId: 'run-1', durationMs: 250 } },
+        },
       }
       seedSession(sessionId)
       putMessagePayload(db(), {
@@ -465,11 +489,16 @@ describe('chat runtime recovery', () => {
             state: 'output-available',
           },
         ],
+        metadata: clientMessage.metadata,
       })
       expect(JSON.stringify(preview)).not.toContain('README.md')
       expect(JSON.stringify(preview)).not.toContain('"ok":true')
 
-      expect(getMessageDetail(sessionId, messageId)).toEqual({ message })
+      await expect(getMessageSnapshot(sessionId)).resolves.toMatchObject({
+        rows: [{ message: clientMessage }],
+      })
+      expect(getMessageDetail(sessionId, messageId)).toEqual({ message: clientMessage })
+      await expect(getMessageGroups(sessionId)).resolves.toMatchObject([{ message }])
     })
   })
 

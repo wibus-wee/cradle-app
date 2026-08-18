@@ -4,8 +4,8 @@ const DB_NAME = 'cradle-chat-stable-message-cache'
 const DB_VERSION = 5
 const STORE_NAME = 'stable-message-rows'
 const CACHED_SESSION_LIMIT = 80
-// v5: rows carry the full UIMessage payload (no more preview-only shells).
-const CACHE_SCHEMA_VERSION = 5
+// v6: cached UIMessage metadata excludes provider-private reconstruction state.
+const CACHE_SCHEMA_VERSION = 6
 
 export interface StableMessageCacheSnapshot {
   sessionId: string

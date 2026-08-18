@@ -7,6 +7,17 @@ import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
+import type {
+  RemoteCradleServerHealthPayload,
+  RemoteWorkspaceFileContent,
+  RemoteWorkspaceFileEntry,
+  RemoteWorkspaceFileInfo,
+  RemoteWorkspaceView,
+} from '../../http/upstream'
+import {
+  proxyUpstreamRequestWithReconnect,
+  upstreamJsonWithReconnect,
+} from '../../http/upstream'
 import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
 import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
@@ -27,17 +38,6 @@ import {
   startRemoteCradleServerTunnel,
 } from './cradle-server-tunnel'
 import { remoteHostReconnectDelayMs } from './reconnect-policy'
-import type {
-  RemoteCradleServerHealthPayload,
-  RemoteWorkspaceFileContent,
-  RemoteWorkspaceFileEntry,
-  RemoteWorkspaceFileInfo,
-  RemoteWorkspaceView,
-} from './upstream'
-import {
-  proxyUpstreamRequestWithReconnect,
-  upstreamJsonWithReconnect,
-} from './upstream'
 
 const logger = createChildLogger({ module: 'remote-hosts' })
 
@@ -48,7 +48,7 @@ export type {
   RemoteWorkspaceFileInfo,
   RemoteWorkspaceLocator,
   RemoteWorkspaceView,
-} from './upstream'
+} from '../../http/upstream'
 
 export interface CreateRemoteHostInput {
   id?: string

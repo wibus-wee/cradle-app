@@ -23,7 +23,7 @@ import {
   resolveProviderRuntimeSession,
 } from '../provider-runtime/service'
 import { getProviderTarget, resolveProviderTargetForRuntime } from '../provider-targets/service'
-import { getRemoteSessionLink } from '../session/remote-projection'
+import { getNodeSessionLink } from '../session/node-projection'
 import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'
 import { assertIsolationExecutionReady, resolveSessionExecutionRoot } from '../worktree/service'
@@ -89,8 +89,8 @@ export function getSessionRunContext(
   if (!session) {
     return null
   }
-  const remoteLink = getRemoteSessionLink(sessionId)
-  if (remoteLink) {
+  const nodeLink = getNodeSessionLink(sessionId)
+  if (nodeLink) {
     return null
   }
   assertIsolationExecutionReady(session)
@@ -457,16 +457,16 @@ export function readSessionRequestedThinkingEffort(input: {
 }
 
 export function assertRunnableSession(sessionId: string): SessionRunContext {
-  const remoteLink = getRemoteSessionLink(sessionId)
-  if (remoteLink) {
+  const nodeLink = getNodeSessionLink(sessionId)
+  if (nodeLink) {
     throw new AppError({
-      code: 'chat_session_executes_on_remote_host',
+      code: 'chat_session_executes_on_fabric_node',
       status: 409,
-      message: 'This session executes on a remote Cradle Server; use the remote-host upstream APIs.',
+      message: 'This session executes on a Fabric Node; use the Node upstream APIs.',
       details: {
         sessionId,
-        hostId: remoteLink.hostId,
-        remoteSessionId: remoteLink.remoteSessionId,
+        nodeId: nodeLink.nodeId,
+        remoteSessionId: nodeLink.remoteSessionId,
       },
     })
   }

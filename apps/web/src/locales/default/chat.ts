@@ -23,6 +23,7 @@ export default {
   'execution.disconnected.unknownHost': 'Remote host {{hostName}} was not found. Reconnect it in Settings.',
   'minimap.assistantReply': 'Assistant reply',
   'minimap.userMessage': 'User message',
+  'messageSelection.quote': 'Quote selection',
   'pastedText.chars_many': '{{count}} characters',
   'pastedText.chars_one': '{{count}} character',
   'pastedText.chars_other': '{{count}} characters',

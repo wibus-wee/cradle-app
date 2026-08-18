@@ -9,6 +9,7 @@ import type { ChatScrollRuntime } from '../../ui/use-chat-scroll-runtime'
 import { ChatTranscriptView } from '../views/chat-transcript-view'
 import type { MessageBubbleEditAction } from '../views/message-bubble-actions-view'
 import { MessageBubbleById } from './message-bubble-by-id'
+import { MessageSelectionQuoteContainer } from './message-selection-quote-container'
 
 type ChatSessionProjection = ReturnType<typeof useChatSession>
 
@@ -53,31 +54,34 @@ export function ChatTranscriptContent({
   const { t } = useTranslation('chat')
 
   return (
-    <ChatTranscriptView
-      messages={displayRows}
-      renderMessage={row => (
-        <MessageBubbleById
-          key={row.rowKey}
-          sessionId={sessionId}
-          messageId={row.messageId}
-          partsProjection={row.partsProjection}
-          allowStreaming={row.allowStreaming}
-          onToolApprovalResponse={onToolApprovalResponse}
-          editAction={row.messageId === editPreviousMessageId ? editPreviousAction : undefined}
-          textTransform={messageTextTransform}
-        />
-      )}
-      status={status}
-      error={error}
-      isReady={isReady || messageCount > 0}
-      emptyLabel={t('empty.startConversation')}
-      errorFallbackLabel={t('error.loadMessages')}
-      viewportRef={viewportRef}
-      virtualizerRef={virtualizerRef}
-      keepMountedIndices={keepMountedIndices}
-      onVirtualScroll={onVirtualScroll}
-      compactInset={compactInset}
-      historyControl={historyControl}
-    />
+    <>
+      <ChatTranscriptView
+        messages={displayRows}
+        renderMessage={row => (
+          <MessageBubbleById
+            key={row.rowKey}
+            sessionId={sessionId}
+            messageId={row.messageId}
+            partsProjection={row.partsProjection}
+            allowStreaming={row.allowStreaming}
+            onToolApprovalResponse={onToolApprovalResponse}
+            editAction={row.messageId === editPreviousMessageId ? editPreviousAction : undefined}
+            textTransform={messageTextTransform}
+          />
+        )}
+        status={status}
+        error={error}
+        isReady={isReady || messageCount > 0}
+        emptyLabel={t('empty.startConversation')}
+        errorFallbackLabel={t('error.loadMessages')}
+        viewportRef={viewportRef}
+        virtualizerRef={virtualizerRef}
+        keepMountedIndices={keepMountedIndices}
+        onVirtualScroll={onVirtualScroll}
+        compactInset={compactInset}
+        historyControl={historyControl}
+      />
+      {sessionId && <MessageSelectionQuoteContainer sessionId={sessionId} rootRef={viewportRef} />}
+    </>
   )
 }

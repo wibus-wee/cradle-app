@@ -2,6 +2,7 @@ import { throttling } from '@octokit/plugin-throttling'
 import { Octokit, RequestError } from 'octokit'
 
 import { resolveLegacyGitHubToken } from '../github-api-token'
+import { outboundFetch } from '../outbound-network'
 import { resolveGitHubAppIdentity } from './auth-provider'
 
 const GITHUB_REQUEST_TIMEOUT_MS = 20_000
@@ -80,7 +81,7 @@ export function resetGitHubClientState(): void {
 
 function createOctokitFetch(): typeof fetch {
   return async (input, init) => {
-    const response = await globalThis.fetch(input, init)
+    const response = await outboundFetch(input, init)
     if (response.status === 204 || response.status === 304) {
       return response
     }

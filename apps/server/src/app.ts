@@ -54,6 +54,7 @@ import { DownloadCenterService } from './modules/download-center/service'
 import { externalIssueSources } from './modules/external-issue-sources'
 import { externalProviderSources } from './modules/external-provider-sources'
 import { externalSessionImport } from './modules/external-session-import'
+import { createFabricNodeRoutes, fabric, registerFabricWebSocketRoutes } from './modules/fabric'
 import { filesystem } from './modules/filesystem'
 import { git } from './modules/git'
 import { githubAuth } from './modules/github-auth'
@@ -88,6 +89,8 @@ import { recall } from './modules/recall'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { assertRelayCompressionRuntimeSupport } from './modules/relay-transport/compression'
+import { FabricNodeConnector, listActiveFabricNodeAuthTokens } from './modules/relay-transport/node-connector'
+import { getFabricNodeLinkManager } from './modules/relay-transport/node-link-manager'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
 import { registerRemoteHostWebSocketRoutes, remoteHosts } from './modules/remote-hosts'
 import { search } from './modules/search'
@@ -226,7 +229,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(createRequestIdPlugin())
   app.use(createAuthPlugin({
     ...loadServerAuthConfig(),
-    listRelayAuthTokens: listActiveRelayAuthTokens,
+    listRelayAuthTokens: () => [...listActiveRelayAuthTokens(), ...listActiveFabricNodeAuthTokens()],
   }))
   if (includeRuntimeHttpPlugins) {
     const [{ createRequestLoggerPlugin }, { createErrorHandler }] = await Promise.all([
@@ -249,6 +252,8 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(relayServers)
   app.use(relayTransport)
   app.use(remoteHosts)
+  app.use(fabric)
+  app.use(createFabricNodeRoutes(getFabricNodeLinkManager()))
   app.use(externalIssueSources)
   app.use(githubAuth)
   app.use(externalProviderSources)
@@ -304,6 +309,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(desktop)
   app.use(downloadCenter.routes)
   registerRemoteHostWebSocketRoutes(app)
+  registerFabricWebSocketRoutes(app)
   registerPtyRoutes(app)
   registerSyncGatewayRoutes(app)
   app.use(observability)
@@ -511,6 +517,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   })
 
   const runtimeResources = new RuntimeResourceRegistry()
+  const fabricNodeConnector = new FabricNodeConnector('127.0.0.1', serverConfig.port)
   const claudeUsageReconciliation = new ClaudeUsageReconciliationScheduler()
   const codexUsageReconciliation = new CodexUsageReconciliationScheduler()
   runtimeResources.register({
@@ -596,6 +603,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     phase: 'cancel',
     stop: () => getHostConnectorService()?.stopAll(),
   })
+  runtimeResources.register({ name: 'fabric-node-connector', phase: 'cancel', stop: () => fabricNodeConnector.stop() })
   runtimeResources.register({
     name: 'remote-host-connections',
     phase: 'cancel',
@@ -670,6 +678,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
  catch (error) {
       console.error('[relay-host-connector] startAll failed:', error)
     }
+    fabricNodeConnector.start()
   }
 
   return app

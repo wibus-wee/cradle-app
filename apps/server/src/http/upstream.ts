@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { AppError } from '../../errors/app-error'
+import { AppError } from '../errors/app-error'
 
 export interface RemoteWorkspaceLocator {
   hostId: string

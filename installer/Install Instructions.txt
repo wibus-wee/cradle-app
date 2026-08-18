@@ -1,0 +1,24 @@
+Cradle macOS installer
+======================
+
+1. Double-click "Install Cradle".
+2. If macOS blocks the file, close the warning, then Control-click (or
+   right-click) "Install Cradle" in Finder and choose Open. Confirm Open.
+3. If macOS still blocks it, open System Settings > Privacy & Security.
+   Scroll to Security and choose Open Anyway for "Install Cradle". Then
+   return to Finder and open the installer again.
+
+Last resort
+-----------
+
+If Open Anyway is not available, open Terminal and run:
+
+    sudo spctl --master-disable
+
+Open the installer, then restore the normal Gatekeeper setting after the
+installation finishes:
+
+    sudo spctl --master-enable
+
+The installer may ask for your macOS login password when it writes to
+/Applications.
