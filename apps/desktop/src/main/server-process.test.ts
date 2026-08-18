@@ -350,10 +350,27 @@ describe('desktop server inbound access preferences', () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'cradle-desktop-relay-access-'))
 
     try {
-      expect(readDesktopRelayAccessPreferences(dataDir)).toEqual({ accessMode: 'network', publicUrl: null })
+      expect(readDesktopRelayAccessPreferences(dataDir)).toEqual({
+        source: 'managed',
+        accessMode: 'network',
+        relayUrl: null,
+        publicUrl: null,
+      })
       expect(desktopRelayBindHostForAccessMode('network')).toBe('0.0.0.0')
       expect(resolveDesktopRelayAdvertisedUrl(8787, 'local', null)).toBe('http://127.0.0.1:8787')
       expect(resolveDesktopRelayAdvertisedUrl(8787, 'network', 'https://relay.example.com/')).toBe('https://relay.example.com')
+
+      mkdirSync(join(dataDir, 'preferences'), { recursive: true })
+      writeFileSync(
+        join(dataDir, 'preferences/network.json'),
+        JSON.stringify({ inbound: { relaySource: 'external', relayUrl: 'https://relay.example.com' } }),
+      )
+      expect(readDesktopRelayAccessPreferences(dataDir)).toEqual({
+        source: 'external',
+        accessMode: 'external',
+        relayUrl: 'https://relay.example.com',
+        publicUrl: null,
+      })
     }
  finally {
       rmSync(dataDir, { recursive: true, force: true })

@@ -121,10 +121,12 @@ const DesktopRelayAccessPreferencesSchema = z
   .object({
     inbound: z
       .object({
+        relaySource: z.enum(['managed', 'external']).default('managed'),
+        relayUrl: z.string().trim().nullable().default(null),
         managedRelayAccessMode: z.enum(['local', 'network']).default('network'),
         managedRelayPublicUrl: z.string().trim().nullable().default(null),
       })
-      .default({ managedRelayAccessMode: 'network', managedRelayPublicUrl: null }),
+      .default({ relaySource: 'managed', relayUrl: null, managedRelayAccessMode: 'network', managedRelayPublicUrl: null }),
   })
   .passthrough()
 let currentServerUrl = ''
@@ -181,25 +183,31 @@ export function readDesktopServerAccessMode(dataDir: string): DesktopServerAcces
   }
 }
 
-export type DesktopRelayAccessMode = 'local' | 'network'
+export type DesktopRelayAccessMode = 'local' | 'network' | 'external'
+
+export type DesktopRelaySource = 'managed' | 'external'
 
 export function readDesktopRelayAccessPreferences(dataDir: string): {
+  source: DesktopRelaySource
   accessMode: DesktopRelayAccessMode
+  relayUrl: string | null
   publicUrl: string | null
 } {
   const preferencesPath = join(dataDir, NETWORK_PREFERENCES_FILE)
   if (!existsSync(preferencesPath)) {
-    return { accessMode: 'network', publicUrl: null }
+    return { source: 'managed', accessMode: 'network', relayUrl: null, publicUrl: null }
   }
   try {
     const parsed = DesktopRelayAccessPreferencesSchema.parse(JSON.parse(readFileSync(preferencesPath, 'utf8')))
     return {
-      accessMode: parsed.inbound.managedRelayAccessMode,
+      source: parsed.inbound.relaySource,
+      accessMode: parsed.inbound.relaySource === 'external' ? 'external' : parsed.inbound.managedRelayAccessMode,
+      relayUrl: parsed.inbound.relayUrl,
       publicUrl: parsed.inbound.managedRelayPublicUrl,
     }
   }
  catch {
-    return { accessMode: 'network', publicUrl: null }
+    return { source: 'managed', accessMode: 'network', relayUrl: null, publicUrl: null }
   }
 }
 
@@ -341,7 +349,7 @@ interface ManagedRelayLaunch {
 }
 
 async function startManagedRelay(dataDir: string): Promise<{
-  relayUrl: string
+  relayUrl: string | null
   accessMode: DesktopRelayAccessMode
 }> {
   if (managedRelayProcess && managedRelayUrl) {
@@ -353,6 +361,12 @@ async function startManagedRelay(dataDir: string): Promise<{
 
   const isDev = !!process.env.ELECTRON_RENDERER_URL
   const access = readDesktopRelayAccessPreferences(dataDir)
+  if (access.source === 'external') {
+    return {
+      relayUrl: access.relayUrl ? normalizeDesktopRelayUrl(access.relayUrl) : null,
+      accessMode: 'external',
+    }
+  }
   const port = await getPort({ port: [8787, 8788, 8789, 8790] })
   const relayUrl = resolveDesktopRelayAdvertisedUrl(port, access.accessMode, access.publicUrl)
   const localUrl = `http://127.0.0.1:${port}`
@@ -485,12 +499,20 @@ function resolveDesktopLanAddress(): string {
   return '127.0.0.1'
 }
 
+function normalizeDesktopRelayUrl(value: string): string {
+  const parsed = new URL(value)
+  if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) {
+    throw new Error('External Relay URL must be an HTTP or HTTPS URL.')
+  }
+  return parsed.toString().replace(/\/$/, '')
+}
+
 async function spawnServer(opts: {
   host: string
   port: number
   dataDir: string
   credentialSecret: string
-  managedRelay: { relayUrl: string, accessMode: DesktopRelayAccessMode }
+  managedRelay: { relayUrl: string | null, accessMode: DesktopRelayAccessMode }
   bootstrapWatchdog?: ServerBootstrapWatchdog
   onBootstrapEvent?: (event: ServerBootstrapEvent) => void
 }): Promise<void> {
@@ -525,7 +547,7 @@ async function spawnServer(opts: {
     CRADLE_DATA_DIR: dataDir,
     CRADLE_VERSION: app.getVersion(),
     CRADLE_CREDENTIAL_SECRET: credentialSecret,
-    CRADLE_RELAYD_PUBLIC_URL: managedRelay.relayUrl,
+    ...(managedRelay.relayUrl ? { CRADLE_RELAYD_PUBLIC_URL: managedRelay.relayUrl } : {}),
     CRADLE_RELAYD_ACCESS_MODE: managedRelay.accessMode,
     CRADLE_DESKTOP_PID: String(process.pid),
     CRADLE_PLUGINS_DIR: pluginsDir,
@@ -537,6 +559,9 @@ async function spawnServer(opts: {
     ...(builtinSkillsDir ? { CRADLE_BUILTIN_SKILLS_DIR: builtinSkillsDir } : {}),
     NODE_ENV: isDev ? 'development' : 'production',
     FORCE_COLOR: '1',
+  }
+  if (!managedRelay.relayUrl) {
+    delete serverEnv.CRADLE_RELAYD_PUBLIC_URL
   }
   serverEnv.PATH = await resolveDesktopServerPath(serverEnv)
   delete serverEnv.NO_COLOR
