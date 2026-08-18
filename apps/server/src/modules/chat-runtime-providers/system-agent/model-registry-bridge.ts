@@ -3,6 +3,9 @@ import type { DefaultRuntimeConfigOptions } from '@hijarvis/core'
 import { lookupModelRaw } from '../../model-registry/model-info-registry'
 import * as ModelRegistry from '../../model-registry/service'
 import type { SystemAgentConfig } from '../../provider-contracts/provider-base'
+import {
+  readTrustedUniversalConfig,
+} from '../../provider-contracts/provider-base'
 import type { JarvisThinkingLevel } from './types'
 
 type RegistryModel = Awaited<ReturnType<typeof lookupModelRaw>>
@@ -17,11 +20,30 @@ export function inferSystemAgentProviderFromKind(providerKind: string): string {
   }
 }
 
-export function inferSystemAgentApiFromKind(providerKind: string): string {
-  switch (providerKind) {
-    case 'anthropic': return 'anthropic-messages'
-    case 'openai-compatible': return 'openai-completions'
-    default: return 'openai-completions'
+export function inferSystemAgentApiFromProvider(provider: string): string {
+  return provider === 'anthropic' ? 'anthropic-messages' : 'openai-completions'
+}
+
+export function resolveSystemAgentConnection(input: {
+  config: Pick<SystemAgentConfig, 'baseUrl' | 'provider'>
+  profileProviderKind: string
+  rawConfigJson: string
+}): {
+  api: string
+  baseUrl: string | null
+  provider: string
+} {
+  const provider = input.config.provider ?? inferSystemAgentProviderFromKind(input.profileProviderKind)
+  const universalConfig = readTrustedUniversalConfig(input.rawConfigJson)
+  const explicitBaseUrl = input.config.baseUrl?.trim()
+  const endpointBaseUrl = provider === 'anthropic'
+    ? universalConfig.anthropicBaseUrl
+    : universalConfig.openaiBaseUrl
+
+  return {
+    api: inferSystemAgentApiFromProvider(provider),
+    baseUrl: explicitBaseUrl || endpointBaseUrl,
+    provider,
   }
 }
 
