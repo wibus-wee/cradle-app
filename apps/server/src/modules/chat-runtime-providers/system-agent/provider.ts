@@ -135,7 +135,10 @@ export class SystemAgentProvider implements ChatRuntime {
     const sessionId = input.runtimeSession.chatSessionId
 
     const runtimeContext = resolveSystemAgentRuntimeContext()
-    const mcpTools = await createSystemAgentMcpTools(getRegisteredMcpServers(), this.deps.logger)
+    const mcpTools = await createSystemAgentMcpTools(
+      getRegisteredMcpServers({ chatSessionId: sessionId }),
+      this.deps.logger,
+    )
 
     const runtimeConfigOptions: DefaultRuntimeConfigOptions = {
       provider,

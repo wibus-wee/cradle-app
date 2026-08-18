@@ -16,6 +16,7 @@ describe('listRegisteredAcpMcpServers', () => {
       command: 'node',
       args: ['/plugins/browser-use/dist/mcp-server.mjs'],
       env: { BROWSER_BACKEND_SOCKET: '/tmp/cradle-browser.sock' },
+      scope: 'chat-session',
     })
     addHostMcpServer({
       transport: 'streamable-http',
@@ -24,14 +25,18 @@ describe('listRegisteredAcpMcpServers', () => {
       headers: { Authorization: 'Bearer secret-token' },
     })
 
-    expect(listRegisteredAcpMcpServers()).toEqual([
+    expect(listRegisteredAcpMcpServers()).toEqual([])
+    expect(listRegisteredAcpMcpServers('session-a')).toEqual([
       {
         name: 'browser-use',
         command: 'node',
         args: ['/plugins/browser-use/dist/mcp-server.mjs'],
-        env: [{ name: 'BROWSER_BACKEND_SOCKET', value: '/tmp/cradle-browser.sock' }],
+        env: [
+          { name: 'BROWSER_BACKEND_SOCKET', value: '/tmp/cradle-browser.sock' },
+          { name: 'CRADLE_CHAT_SESSION_ID', value: 'session-a' },
+        ],
       },
     ])
-    expect(JSON.stringify(listRegisteredAcpMcpServers())).not.toContain('secret-token')
+    expect(JSON.stringify(listRegisteredAcpMcpServers('session-a'))).not.toContain('secret-token')
   })
 })

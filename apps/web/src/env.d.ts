@@ -361,10 +361,10 @@ interface Window {
       >,
     ) => Promise<void>
   }
-  __cradleBrowserUseCreateTab?: (url?: string) => string | Promise<string>
-  __cradleBrowserUseActivateTab?: (tabId: string) => boolean | Promise<boolean>
-  __cradleBrowserUseGoOffScreen?: (tabId?: string) => boolean | Promise<boolean>
-  __cradleBrowserUseGetActiveTab?: () => string | undefined | Promise<string | undefined>
+  __cradleBrowserUseCreateTab?: (ownerId: string, url?: string) => string | Promise<string>
+  __cradleBrowserUseActivateTab?: (ownerId: string, tabId: string) => boolean | Promise<boolean>
+  __cradleBrowserUseGoOffScreen?: (ownerId: string, tabId?: string) => boolean | Promise<boolean>
+  __cradleBrowserUseGetActiveTab?: (ownerId: string) => string | undefined | Promise<string | undefined>
   __CRADLE_RENDERER_DIAGNOSTICS__?: () => Record<string, unknown>
   // eslint-disable-next-line ts/no-explicit-any
   __CRADLE_TAB_STORE__?: any

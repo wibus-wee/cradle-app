@@ -153,6 +153,41 @@ describe('server plugin context lifecycle', () => {
     expect(listPluginDescriptors()[0]?.capabilities).toHaveLength(0)
   })
 
+  it('projects chat-session MCP servers only with an immutable session binding', () => {
+    const pluginManifest = manifest('@cradle/context-session-mcp')
+    registerDescriptor(pluginManifest)
+    const ctx = createServerPluginContext(pluginManifest)
+
+    const disposable = ctx.mcp.registerServer({
+      transport: 'stdio',
+      name: 'context-session-mcp',
+      command: 'node',
+      args: ['server.mjs'],
+      env: { STATIC_VALUE: 'value' },
+      scope: 'chat-session',
+    }) as Disposable
+
+    expect(getRegisteredMcpServers()).not.toHaveProperty('context-session-mcp')
+    expect(getRegisteredMcpServers({ chatSessionId: 'session-a' })).toHaveProperty(
+      'context-session-mcp',
+      {
+        transport: 'stdio',
+        name: 'context-session-mcp',
+        command: 'node',
+        args: ['server.mjs'],
+        env: {
+          STATIC_VALUE: 'value',
+          CRADLE_CHAT_SESSION_ID: 'session-a',
+        },
+      },
+    )
+    expect(listPluginDescriptors()[0]?.capabilities[0]?.metadata).toEqual(
+      expect.objectContaining({ scope: 'chat-session' }),
+    )
+
+    disposable.dispose()
+  })
+
   it('tracks streamable HTTP MCP registrations without exposing headers in capability metadata', () => {
     const pluginManifest = manifest('@cradle/context-http-mcp')
     registerDescriptor(pluginManifest)

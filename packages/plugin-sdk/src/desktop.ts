@@ -28,10 +28,12 @@ export interface DesktopPluginContext {
 
 export interface DesktopPluginWebviewRegistry {
   /** Listen for webview creation through the host-owned webview facade. */
-  onCreated: (handler: (webview: DesktopWebview, tabId: string) => void) => Disposable
+  onCreated: (handler: (webview: DesktopWebview, tabId: string, ownerId: string) => void) => Disposable
 }
 
 export interface DesktopWebview {
+  /** Host browser-panel owner associated with this webview. */
+  readonly ownerId: string
   /** Host renderer tab id associated with this webview. */
   readonly tabId: string
   /** Whether the underlying webview has already been destroyed. */
@@ -64,14 +66,14 @@ export interface DesktopWebviewCdpSession {
 }
 
 export interface DesktopPluginBrowserTabBridge {
-  /** Ask the active renderer to create a visible browser panel tab */
-  request: (url?: string) => Promise<string | undefined>
-  /** Ask the active renderer to show a browser panel tab */
-  activate: (tabId: string) => Promise<boolean>
-  /** Ask the active renderer to hide the browser panel without closing tabs */
-  goOffScreen: (tabId?: string) => Promise<boolean>
-  /** Ask the active renderer which browser panel tab is visible */
-  getActive: () => Promise<string | undefined>
+  /** Create a browser panel tab for an explicit owner. */
+  request: (ownerId: string, url?: string) => Promise<string | undefined>
+  /** Show one owner's browser panel tab. */
+  activate: (ownerId: string, tabId: string) => Promise<boolean>
+  /** Hide one owner's browser panel without closing tabs. */
+  goOffScreen: (ownerId: string, tabId?: string) => Promise<boolean>
+  /** Read one owner's active browser panel tab. */
+  getActive: (ownerId: string) => Promise<string | undefined>
 }
 
 export interface DesktopPluginSharedConfigRegistry {

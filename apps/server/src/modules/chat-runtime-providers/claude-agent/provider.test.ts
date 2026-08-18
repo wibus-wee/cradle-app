@@ -327,6 +327,7 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
       command: 'node',
       args: ['/plugins/browser-use/dist/mcp-server.mjs'],
       env: { BROWSER_BACKEND_SOCKET: '/tmp/cradle-browser.sock' },
+      scope: 'chat-session',
     })
     sdkMocks.query.mockReturnValue(
       createAsyncQuery([
@@ -373,7 +374,10 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
               type: 'stdio',
               command: 'node',
               args: ['/plugins/browser-use/dist/mcp-server.mjs'],
-              env: { BROWSER_BACKEND_SOCKET: '/tmp/cradle-browser.sock' },
+              env: {
+                BROWSER_BACKEND_SOCKET: '/tmp/cradle-browser.sock',
+                CRADLE_CHAT_SESSION_ID: 'chat-session-1',
+              },
             },
           }),
         }),
