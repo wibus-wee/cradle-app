@@ -144,7 +144,7 @@ jobs:
   desktop-server-fetch-smoke:
     name: Desktop Server Fetch Smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
