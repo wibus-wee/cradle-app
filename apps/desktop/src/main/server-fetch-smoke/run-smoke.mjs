@@ -10,8 +10,13 @@ const mode = modeIndex >= 0 ? process.argv[modeIndex + 1] : undefined
 if (mode !== 'development' && mode !== 'packaged') {
   throw new Error('Usage: node run-smoke.mjs --mode <development|packaged>')
 }
+const profileIndex = process.argv.indexOf('--profile')
+const profile = profileIndex >= 0 ? process.argv[profileIndex + 1] : 'functional'
+if (profile !== 'functional' && profile !== 'resource') {
+  throw new Error('Usage: node run-smoke.mjs --mode <development|packaged> --profile <functional|resource>')
+}
 
-const resultPath = resolve(desktopRoot, '.server-fetch-smoke', `${mode}-${process.platform}-${process.arch}.json`)
+const resultPath = resolve(desktopRoot, '.server-fetch-smoke', `${profile}-${mode}-${process.platform}-${process.arch}.json`)
 
 function executable() {
   if (mode === 'development') {
@@ -48,13 +53,21 @@ async function main() {
   const outcome = await new Promise((resolveOutcome, reject) => {
     const child = spawn(command, args, {
       cwd: desktopRoot,
-      env: { ...process.env, CRADLE_SERVER_FETCH_SMOKE_RESULT: resultPath },
+      env: {
+        ...process.env,
+        CRADLE_SERVER_FETCH_SMOKE_PROFILE: profile,
+        CRADLE_SERVER_FETCH_SMOKE_RESULT: resultPath,
+      },
       stdio: 'inherit',
     })
+    const configuredDuration = Number(process.env.CRADLE_SERVER_FETCH_SOAK_DURATION_MS ?? 0)
+    const timeoutMs = profile === 'resource'
+      ? Math.max(180_000, configuredDuration + 120_000)
+      : 60_000
     const timeout = setTimeout(() => {
       child.kill('SIGKILL')
-      reject(new Error('Server fetch smoke timed out after 60 seconds.'))
-    }, 60_000)
+      reject(new Error(`Server fetch smoke timed out after ${timeoutMs}ms.`))
+    }, timeoutMs)
     child.once('error', reject)
     child.once('exit', (code, signal) => {
       clearTimeout(timeout)
@@ -73,7 +86,10 @@ async function main() {
     )
   }
   const result = JSON.parse(resultText)
-  if (outcome.code !== 0 || outcome.signal || result.passed !== true || result.windowCount !== 21) {
+  const contractPassed = profile === 'functional'
+    ? result.windowCount === 21
+    : result.profile === 'resource' && result.schemaVersion === 1
+  if (outcome.code !== 0 || outcome.signal || result.passed !== true || !contractPassed) {
     throw new Error(`Server fetch smoke failed: ${JSON.stringify({ outcome, result })}`)
   }
   console.log(JSON.stringify(result, null, 2))

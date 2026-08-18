@@ -38,6 +38,7 @@
     "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json",
     "smoke:server-fetch:build": "tsc --noEmit -p src/main/server-fetch-smoke/tsconfig.renderer.json && electron-vite build --config src/main/server-fetch-smoke/electron.vite.config.ts",
     "smoke:server-fetch:development": "pnpm smoke:server-fetch:build && node src/main/server-fetch-smoke/run-smoke.mjs --mode development",
+    "smoke:server-fetch:resource": "pnpm smoke:server-fetch:build && node src/main/server-fetch-smoke/run-smoke.mjs --mode development --profile resource",
     "smoke:server-fetch:pack": "pnpm smoke:server-fetch:build && electron-builder --config src/main/server-fetch-smoke/electron-builder.mjs --dir --publish never",
     "smoke:server-fetch:packaged": "pnpm smoke:server-fetch:pack && node src/main/server-fetch-smoke/run-smoke.mjs --mode packaged",
     "smoke:server-fetch:gate": "pnpm smoke:server-fetch:development && pnpm smoke:server-fetch:packaged"

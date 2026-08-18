@@ -136,9 +136,14 @@ function isCompletion(input: unknown): input is { finite: string, stream?: strin
     && (record.stream === undefined || typeof record.stream === 'string')
 }
 
-const timeout = setTimeout(() => {
-  void finish(false, new Error('Server fetch smoke timed out.'))
-}, 45_000)
-timeout.unref()
+if (process.env.CRADLE_SERVER_FETCH_SMOKE_PROFILE === 'resource') {
+  void import('./resource-main').catch(error => finish(false, error))
+}
+else {
+  const timeout = setTimeout(() => {
+    void finish(false, new Error('Server fetch smoke timed out.'))
+  }, 45_000)
+  timeout.unref()
 
-app.whenReady().then(run).catch(error => finish(false, error))
+  app.whenReady().then(run).catch(error => finish(false, error))
+}

@@ -5,6 +5,23 @@ declare global {
   interface Window {
     serverFetchSmoke: {
       complete: (result: { finite: string, stream?: string }) => void
+      resource: {
+        getConfig: () => Promise<{
+          durationMs: number
+          contextTokens: number
+          finiteRequests: number
+          finiteConcurrency: number
+          streamIntervalMs: number
+          backgroundBurstIntervalMs: number
+          settleMs: number
+        }>
+        markPhase: (phase: string) => void
+        startChat: (request: unknown) => Promise<{ streamId: string }>
+        complete: (result: unknown) => void
+        onChatChunk: (handler: (event: unknown) => void) => () => void
+        onChatClosed: (handler: (event: unknown) => void) => () => void
+        onChatError: (handler: (event: unknown) => void) => () => void
+      }
     }
   }
 }
@@ -36,6 +53,14 @@ async function run(): Promise<void> {
   window.serverFetchSmoke.complete(result)
 }
 
-void run().catch(error => window.serverFetchSmoke.complete({
-  finite: error instanceof Error ? error.message : String(error),
-}))
+if (new URLSearchParams(window.location.search).get('profile') === 'resource') {
+  void import('./resource').then(module => module.runResourceSmoke()).catch(error =>
+    window.serverFetchSmoke.resource.complete({
+      error: error instanceof Error ? error.message : String(error),
+    }))
+}
+else {
+  void run().catch(error => window.serverFetchSmoke.complete({
+    finite: error instanceof Error ? error.message : String(error),
+  }))
+}

@@ -1,0 +1,55 @@
+name: Desktop Resource Soak
+
+on:
+  pull_request:
+    types: [labeled, reopened, synchronize]
+  workflow_dispatch:
+    inputs:
+      duration_ms:
+        description: Real-time soak duration in milliseconds
+        required: true
+        default: '1800000'
+        type: string
+
+concurrency:
+  group: desktop-resource-soak-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  resource-soak:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'e2e-full')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CRADLE_SERVER_FETCH_SMOKE_NO_SANDBOX: '1'
+      CRADLE_SERVER_FETCH_SOAK_DURATION_MS: ${{ github.event_name == 'workflow_dispatch' && inputs.duration_ms || '1800000' }}
+      CRADLE_SERVER_FETCH_SOAK_CONTEXT_TOKENS: '200000'
+      CRADLE_SERVER_FETCH_SOAK_FINITE_REQUESTS: '5000'
+      CRADLE_SERVER_FETCH_SOAK_CONCURRENCY: '96'
+      CRADLE_SERVER_FETCH_SOAK_STREAM_INTERVAL_MS: '50'
+      CRADLE_SERVER_FETCH_SOAK_BACKGROUND_BURST_INTERVAL_MS: '1000'
+      CRADLE_SERVER_FETCH_SOAK_SETTLE_MS: '30000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Install Electron runtime dependencies and Xvfb
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb
+          pnpm exec playwright install-deps chromium
+      - name: Build and run the real-time resource soak
+        run: xvfb-run -a pnpm --filter @cradle/desktop smoke:server-fetch:resource
+      - name: Publish resource summary
+        if: always()
+        run: node .github/scripts/summarize-desktop-resource-soak.mjs
+      - name: Upload resource samples
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-resource-soak-${{ github.run_id }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
+          path: apps/desktop/.server-fetch-smoke/resource-*.json
