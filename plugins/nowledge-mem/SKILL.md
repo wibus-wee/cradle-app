@@ -1,30 +1,22 @@
 ---
 name: cradle-plugin-nowledge-mem
-description: Use Cradle's official Nowledge Mem plugin for guided Working Memory, Context Bundle, memory search, explicit memory writes, and thread lookup or append. Use when the task needs prior Nowledge memories, saved conversation context, or a durable memory distillation through Cradle plugin routes. Invoke as /cradle-plugin-nowledge-mem.
+description: Use the Nowledge Mem MCP tools registered by Cradle for Working Memory, Context Bundle, durable memory recall, explicit memory writes, and conversation thread lookup or capture. Invoke as /cradle-plugin-nowledge-mem when a task needs prior Nowledge context or a durable memory update.
 ---
 
 # Nowledge Mem
 
-Use this skill when a task needs Nowledge Mem context through Cradle. This M0 plugin provides guided operations through plugin routes. It does not provide automatic pre-turn recall, automatic session capture, or pre-compaction capture yet.
+Use the `nowledge-mem` MCP tools exposed by the runtime. Do not call Cradle plugin HTTP routes for memory, context, or thread operations; those proxy routes do not exist.
 
-## Available Cradle Plugin Routes
+## Recall
 
-The plugin is mounted under `/api/plugins/nowledge-mem`.
+At the start of a task that benefits from personal or project context, read the Context Bundle when the MCP server exposes it. Use Working Memory as the lighter fallback. Search durable memories for facts, preferences, decisions, procedures, and learnings. Search threads when the original conversation or message provenance matters.
 
-- `GET /status` checks plugin configuration and Nowledge reachability.
-- `GET /working-memory` reads Nowledge Working Memory.
-- `GET /context-bundle` reads a Context Bundle with `source_app=cradle`.
-- `GET /memories/search?q=<query>&limit=5` searches Nowledge memories. Memory search uses `q`, not `query`.
-- `POST /memories` explicitly creates a Nowledge memory.
-- `GET /threads/search?query=<query>&limit=5` searches Nowledge threads. Thread search uses `query`, not `q`.
-- `GET /threads/:threadId?limit=30&offset=0` reads a Nowledge thread.
-- `POST /threads` explicitly creates a Nowledge thread.
-- `POST /threads/:threadId/append` explicitly appends messages to a Nowledge thread.
+Prefer focused retrieval over loading broad history. When the server exposes Nowledge FS, search or recall first and read only the useful paths or line windows.
 
-## Usage Guidance
+## Writes
 
-Start with `GET /status` if the user is asking about setup, connection, endpoint, or credentials. Use `GET /working-memory` for a daily briefing or current memory state. Use memory search for durable facts, preferences, decisions, procedures, and learnings. Use thread search when the user asks about a prior conversation or needs full conversational provenance.
+Create or update a durable memory only when the user asks to save, preserve, or correct information, or when the active workflow explicitly requires a memory update. Search for an existing memory before creating a duplicate.
 
-Write memory only when the user asks you to save, distill, or preserve durable information, or when the task explicitly calls for updating Nowledge. Do not pretend that M0 automatically captures the current Cradle chat. Until lifecycle support lands, thread creation and append are explicit operations.
+Capture or append a thread only when the user or workflow requests conversation preservation. A thread keeps conversational provenance; a memory stores the durable takeaway. Do not substitute a generated summary for a real transcript when the user asked to save the thread.
 
-Nowledge owns memories, threads, spaces, and graph data. Cradle owns only this plugin adapter and its non-secret configuration.
+This plugin registers MCP tools but does not automatically inject recall, capture sessions, or save before compaction. Never claim those lifecycle behaviors occurred unless a separate runtime integration performed them.
