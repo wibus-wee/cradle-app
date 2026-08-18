@@ -1,3 +1,9 @@
+import {
+  createConversationAssistantReply,
+  createConversationFollowUp,
+  createInitialConversationHistory,
+} from '@cradle/model-api-simulator/conversation-load-pattern'
+
 import { cradleFetch } from '../../../../../web/src/lib/server-credential'
 import { applyDesktopServerReadyEndpoint } from '../../../../../web/src/lib/server-transport/base-url'
 
@@ -27,48 +33,8 @@ export async function runResourceSmoke(): Promise<void> {
   window.serverFetchSmoke.resource.markPhase('dense-finite')
   await runFiniteRequests(config.finiteRequests, config.finiteConcurrency, 0)
 
-  let chatChunksReceived = 0
-  const chatCompletion = new Promise<void>((resolve, reject) => {
-    let expectedStreamId: string | null = null
-    const unsubscribeChunk = window.serverFetchSmoke.resource.onChatChunk((input: unknown) => {
-      const event = input as ChatEvent
-      if (!expectedStreamId || event.streamId === expectedStreamId) {
-        chatChunksReceived += 1
-      }
-    })
-    const unsubscribeClosed = window.serverFetchSmoke.resource.onChatClosed((input: unknown) => {
-      const event = input as ChatEvent
-      if (expectedStreamId && event.streamId !== expectedStreamId) {
-        return
-      }
-      unsubscribeChunk()
-      unsubscribeClosed()
-      unsubscribeError()
-      resolve()
-    })
-    const unsubscribeError = window.serverFetchSmoke.resource.onChatError((input: unknown) => {
-      const event = input as ChatEvent
-      if (expectedStreamId && event.streamId !== expectedStreamId) {
-        return
-      }
-      unsubscribeChunk()
-      unsubscribeClosed()
-      unsubscribeError()
-      reject(new Error(event.message ?? 'Chat resource stream failed.'))
-    })
-    const context = 'x'.repeat(config.contextTokens * 4)
-    void window.serverFetchSmoke.resource.startChat({
-      sessionId: 'resource-session',
-      body: {
-        text: 'Continue the long session.',
-        messages: [{ id: 'resource-context', role: 'user', parts: [{ type: 'text', text: context }] }],
-      },
-    }).then((handle: ChatHandle) => {
-      expectedStreamId = handle.streamId
-    }, reject)
-  })
-
-  window.serverFetchSmoke.resource.markPhase('long-chat')
+  window.serverFetchSmoke.resource.markPhase('growing-history-chat')
+  const chatCompletion = runGrowingConversation(config.conversationPattern)
   const genericStream = cradleFetch(new URL('/resource-stream', serverUrl), {
     headers: { Accept: 'text/event-stream' },
   }).then(async (response) => {
@@ -105,9 +71,72 @@ export async function runResourceSmoke(): Promise<void> {
   window.serverFetchSmoke.resource.markPhase('settling')
   await delay(config.settleMs)
   window.serverFetchSmoke.resource.complete({
-    chatChunksReceived,
+    ...await chatCompletion,
     genericStreamBytes,
     backgroundFiniteRequests,
+  })
+}
+
+async function runGrowingConversation(pattern: Awaited<ReturnType<
+  typeof window.serverFetchSmoke.resource.getConfig
+>>['conversationPattern']): Promise<{ chatChunksReceived: number, chatTurnsCompleted: number }> {
+  const history = createInitialConversationHistory(pattern)
+  const startedAt = Date.now()
+  let chatChunksReceived = 0
+  for (let turnIndex = 0; turnIndex < pattern.turnCount; turnIndex += 1) {
+    const scheduledAt = startedAt + turnIndex * pattern.followUpIntervalMs
+    await delay(Math.max(0, scheduledAt - Date.now()))
+    history.push(createConversationFollowUp(pattern, turnIndex, history))
+    chatChunksReceived += await runChatTurn(history)
+    history.push(createConversationAssistantReply(pattern, turnIndex))
+  }
+  await delay(Math.max(0, startedAt + pattern.durationMs - Date.now()))
+  return { chatChunksReceived, chatTurnsCompleted: pattern.turnCount }
+}
+
+async function runChatTurn(messages: readonly unknown[]): Promise<number> {
+  let chunks = 0
+  let expectedStreamId: string | null = null
+  return await new Promise<number>((resolve, reject) => {
+    const cleanup = (): void => {
+      unsubscribeChunk()
+      unsubscribeClosed()
+      unsubscribeError()
+    }
+    const unsubscribeChunk = window.serverFetchSmoke.resource.onChatChunk((input: unknown) => {
+      const event = input as ChatEvent
+      if (!expectedStreamId || event.streamId === expectedStreamId) {
+        chunks += 1
+      }
+    })
+    const unsubscribeClosed = window.serverFetchSmoke.resource.onChatClosed((input: unknown) => {
+      const event = input as ChatEvent
+      if (expectedStreamId && event.streamId !== expectedStreamId) {
+        return
+      }
+      cleanup()
+      resolve(chunks)
+    })
+    const unsubscribeError = window.serverFetchSmoke.resource.onChatError((input: unknown) => {
+      const event = input as ChatEvent
+      if (expectedStreamId && event.streamId !== expectedStreamId) {
+        return
+      }
+      cleanup()
+      reject(new Error(event.message ?? 'Chat resource stream failed.'))
+    })
+    void window.serverFetchSmoke.resource.startChat({
+      sessionId: 'resource-session',
+      body: {
+        text: 'Continue the growing long-context session.',
+        messages,
+      },
+    }).then((handle: ChatHandle) => {
+      expectedStreamId = handle.streamId
+    }, (error: unknown) => {
+      cleanup()
+      reject(error instanceof Error ? error : new Error(String(error)))
+    })
   })
 }
 

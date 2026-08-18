@@ -236,6 +236,19 @@ scenario state, request ledger, gates, and stored OpenAI response resources.
 `close()` is idempotent, clears instance state, and cancels open streams before
 closing the listener.
 
+## Conversation load patterns
+
+Resource and endurance tests should import the declarative workload contract
+from `@cradle/model-api-simulator/conversation-load-pattern`. The
+`growing-full-history` pattern schedules repeated follow-up turns, requires the
+caller to resend the complete accumulated history on every turn, and grows the
+request envelope toward a configured token target. It also owns the simulated
+assistant response and stream cadence, leaving transport-specific harnesses to
+execute the pattern and collect their own process metrics.
+
+This keeps long-context behavior reusable across Electron, server, and SDK
+benchmarks instead of embedding a one-off request loop in any one harness.
+
 ## Protocol artifacts
 
 Provider snapshots and compatibility manifests live under `protocol/`.

@@ -3,6 +3,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 
+import {
+  createConversationAssistantReply,
+  createGrowingConversationLoadPattern,
+  estimateConversationTokens,
+  type ConversationLoadMessage,
+  type GrowingConversationLoadPattern,
+} from '@cradle/model-api-simulator/conversation-load-pattern'
 import { app, BrowserWindow, ipcMain } from 'electron'
 
 import { ChatStreamBroker } from '../chat-stream-broker'
@@ -13,9 +20,9 @@ interface ResourceConfig {
   contextTokens: number
   finiteRequests: number
   finiteConcurrency: number
-  streamIntervalMs: number
   backgroundBurstIntervalMs: number
   settleMs: number
+  conversationPattern: GrowingConversationLoadPattern
 }
 
 interface ResourceSample {
@@ -36,6 +43,8 @@ interface ResourceSample {
   serverFetch: ReturnType<DesktopServerFetchBroker['diagnostics']>
   chatStreams: number
   chatReplayChunks: number
+  chatTurnsAccepted: number
+  chatContextTokens: number
 }
 
 const config: ResourceConfig = {
@@ -43,12 +52,20 @@ const config: ResourceConfig = {
   contextTokens: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_CONTEXT_TOKENS', 200_000),
   finiteRequests: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_FINITE_REQUESTS', 2_000),
   finiteConcurrency: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_CONCURRENCY', 64),
-  streamIntervalMs: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_STREAM_INTERVAL_MS', 20),
   backgroundBurstIntervalMs: readPositiveInteger(
     'CRADLE_SERVER_FETCH_SOAK_BACKGROUND_BURST_INTERVAL_MS',
     1_000,
   ),
   settleMs: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_SETTLE_MS', 15_000),
+  conversationPattern: createGrowingConversationLoadPattern({
+    durationMs: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_DURATION_MS', 120_000),
+    targetContextTokens: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_CONTEXT_TOKENS', 200_000),
+    followUpIntervalMs: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_FOLLOW_UP_INTERVAL_MS', 5_000),
+    initialContextTokens: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_INITIAL_CONTEXT_TOKENS', 16_000),
+    responseTokensPerTurn: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_RESPONSE_TOKENS', 256),
+    streamChunksPerTurn: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_STREAM_CHUNKS', 16),
+    streamChunkIntervalMs: readPositiveInteger('CRADLE_SERVER_FETCH_SOAK_STREAM_INTERVAL_MS', 20),
+  }),
 }
 const resultPath = process.env.CRADLE_SERVER_FETCH_SMOKE_RESULT
 const startedAt = Date.now()
@@ -60,7 +77,11 @@ let settled = false
 let finiteRequestsAccepted = 0
 let streamBytesWritten = 0
 let chatRequestBytes = 0
+let chatRequestBytesTotal = 0
 let chatChunksWritten = 0
+let chatTurnsAccepted = 0
+let chatContextTokens = 0
+let previousChatMessageCount = 0
 let releaseBaseline: (() => void) | null = null
 const baselineReady = new Promise<void>((resolve) => {
   releaseBaseline = resolve
@@ -96,37 +117,51 @@ async function handleRequest(request: IncomingMessage, response: ServerResponse)
       const frame = `data: ${'s'.repeat(256)}\n\n`
       streamBytesWritten += Buffer.byteLength(frame)
       response.write(frame)
-      await delay(config.streamIntervalMs)
+      await delay(config.conversationPattern.streamChunkIntervalMs)
     }
     response.end('data: [DONE]\n\n')
     return
   }
   if (/^\/chat\/sessions\/[^/]+\/response$/.test(url.pathname)) {
     const body = await readBody(request)
-    chatRequestBytes = body.byteLength
-    JSON.parse(body.toString('utf8'))
+    const payload = JSON.parse(body.toString('utf8')) as { messages?: ConversationLoadMessage[] }
+    const messages = payload.messages ?? []
+    if (messages.length <= previousChatMessageCount) {
+      throw new Error('Each follow-up must carry a larger complete message history.')
+    }
+    previousChatMessageCount = messages.length
+    chatRequestBytes = Math.max(chatRequestBytes, body.byteLength)
+    chatRequestBytesTotal += body.byteLength
+    chatContextTokens = Math.max(
+      chatContextTokens,
+      estimateConversationTokens(messages, config.conversationPattern.charactersPerToken),
+    )
+    const turnIndex = chatTurnsAccepted
+    chatTurnsAccepted += 1
+    const assistant = createConversationAssistantReply(config.conversationPattern, turnIndex)
+    const assistantText = assistant.parts[0].text
+    const chunkSize = Math.ceil(assistantText.length / config.conversationPattern.streamChunksPerTurn)
     response.writeHead(200, {
       'cache-control': 'no-cache',
       'content-type': 'text/event-stream',
-      'x-cradle-run-id': 'resource-run',
-      'x-cradle-assistant-message-id': 'resource-assistant',
-      'x-cradle-user-message-id': 'resource-user',
+      'x-cradle-run-id': `resource-run-${turnIndex + 1}`,
+      'x-cradle-assistant-message-id': assistant.id,
+      'x-cradle-user-message-id': `load-user-${turnIndex + 1}`,
     })
-    response.write('data: {"type":"start","messageId":"resource-assistant"}\n\n')
-    response.write('data: {"type":"text-start","id":"resource-text"}\n\n')
-    const until = Date.now() + config.durationMs
-    while (Date.now() < until && !response.destroyed) {
+    response.write(`data: ${JSON.stringify({ type: 'start', messageId: assistant.id })}\n\n`)
+    response.write(`data: ${JSON.stringify({ type: 'text-start', id: assistant.id })}\n\n`)
+    for (let offset = 0; offset < assistantText.length && !response.destroyed; offset += chunkSize) {
       const chunk = {
         type: 'text-delta',
-        id: 'resource-text',
-        delta: 'c'.repeat(256),
+        id: assistant.id,
+        delta: assistantText.slice(offset, offset + chunkSize),
       }
       response.write(`data: ${JSON.stringify(chunk)}\n\n`)
       chatChunksWritten += 1
-      await delay(config.streamIntervalMs)
+      await delay(config.conversationPattern.streamChunkIntervalMs)
     }
     response.end([
-      'data: {"type":"text-end","id":"resource-text"}\n\n',
+      `data: ${JSON.stringify({ type: 'text-end', id: assistant.id })}\n\n`,
       'data: {"type":"finish","finishReason":"stop"}\n\n',
       'data: [DONE]\n\n',
     ].join(''))
@@ -167,6 +202,8 @@ async function sample(): Promise<void> {
       (total, stream) => total + stream.replayChunkCount,
       0,
     ) ?? 0,
+    chatTurnsAccepted,
+    chatContextTokens,
   })
 }
 
@@ -190,7 +227,9 @@ async function finish(rendererResult: unknown, error?: unknown): Promise<void> {
   const resultError = error instanceof Error ? error.message : error ? String(error) : null
   const passed = !resultError
     && finiteRequestsAccepted >= config.finiteRequests
-    && chatRequestBytes >= config.contextTokens * 4
+    && chatTurnsAccepted === config.conversationPattern.turnCount
+    && chatContextTokens >= config.contextTokens
+    && chatRequestBytesTotal > chatRequestBytes
     && chatChunksWritten > 0
     && streamBytesWritten > 0
     && finalDiagnostics.activeRequests === 0
@@ -208,7 +247,10 @@ async function finish(rendererResult: unknown, error?: unknown): Promise<void> {
       finiteRequestsAccepted,
       streamBytesWritten,
       chatRequestBytes,
+      chatRequestBytesTotal,
       chatChunksWritten,
+      chatTurnsAccepted,
+      chatContextTokens,
     },
     summary: {
       baselineMainPrivateBytes: baseline?.main.privateBytes ?? null,
@@ -277,13 +319,13 @@ async function run(): Promise<void> {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(__dirname, '../../preload/index.js'),
       sandbox: true,
     },
   })
   windows.add(window.webContents.id)
   rendererPid = window.webContents.getOSProcessId()
-  await window.loadFile(join(__dirname, '../renderer/index.html'), {
+  await window.loadFile(join(__dirname, '../../renderer/index.html'), {
     query: { profile: 'resource' },
   })
   rendererPid = window.webContents.getOSProcessId()
