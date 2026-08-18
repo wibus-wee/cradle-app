@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
-import { readSessionExecutionTarget } from '../session/remote-projection'
+import { readSessionExecutionTarget } from '../session/node-projection'
 import * as Session from '../session/service'
 import { commitSessionEvents } from './es/commands'
 import { toDurableMessagePayload } from './message-durable-payload'
@@ -42,11 +42,11 @@ function assertObservationSessionEligible(sessionId: string): void {
     })
   }
   const execution = readSessionExecutionTarget(sessionId)
-  if (execution.kind === 'remote-host') {
+  if (execution.kind === 'node') {
     throw new AppError({
-      code: 'session_remote_projection',
+      code: 'session_node_projection',
       status: 409,
-      message: 'Cannot append observations to a remote-projected session',
+      message: 'Cannot append observations to a Node-projected session',
       details: { sessionId },
     })
   }
