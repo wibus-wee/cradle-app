@@ -3,12 +3,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer } from 'node:http'
 import { dirname, join } from 'node:path'
 
+import type {
+  ConversationLoadMessage,
+  GrowingConversationLoadPattern,
+} from '@cradle/model-api-simulator/conversation-load-pattern'
 import {
   createConversationAssistantReply,
   createGrowingConversationLoadPattern,
   estimateConversationTokens,
-  type ConversationLoadMessage,
-  type GrowingConversationLoadPattern,
 } from '@cradle/model-api-simulator/conversation-load-pattern'
 import { app, BrowserWindow, ipcMain } from 'electron'
 
@@ -223,6 +225,10 @@ async function finish(rendererResult: unknown, error?: unknown): Promise<void> {
     0,
     ...samples.map(value => value.renderer?.privateBytes ?? 0),
   )
+  const peakRendererWorkingSetBytes = Math.max(
+    0,
+    ...samples.map(value => value.renderer?.workingSetBytes ?? 0),
+  )
   const finalDiagnostics = serverFetchBroker.diagnostics()
   const resultError = error instanceof Error ? error.message : error ? String(error) : null
   const passed = !resultError
@@ -235,8 +241,12 @@ async function finish(rendererResult: unknown, error?: unknown): Promise<void> {
     && finalDiagnostics.activeRequests === 0
     && baseline !== undefined
     && final !== undefined
+    && baseline.renderer !== null
+    && final.renderer !== null
     && final.main.privateBytes - baseline.main.privateBytes < 96 * 1024 * 1024
     && peakMainPrivateBytes - baseline.main.privateBytes < 256 * 1024 * 1024
+    && final.renderer.workingSetBytes - baseline.renderer.workingSetBytes < 96 * 1024 * 1024
+    && peakRendererWorkingSetBytes - baseline.renderer.workingSetBytes < 256 * 1024 * 1024
   const result = {
     schemaVersion: 1,
     profile: 'resource',
@@ -259,6 +269,15 @@ async function finish(rendererResult: unknown, error?: unknown): Promise<void> {
       peakMainHeapBytes,
       peakMainCpuPercent,
       peakRendererPrivateBytes,
+      peakRendererWorkingSetBytes,
+      baselineRendererWorkingSetBytes: baseline?.renderer?.workingSetBytes ?? null,
+      finalRendererWorkingSetBytes: final?.renderer?.workingSetBytes ?? null,
+      rendererSettledDeltaBytes: baseline?.renderer && final?.renderer
+        ? final.renderer.workingSetBytes - baseline.renderer.workingSetBytes
+        : null,
+      rendererPeakDeltaBytes: baseline?.renderer
+        ? peakRendererWorkingSetBytes - baseline.renderer.workingSetBytes
+        : null,
       mainSettledDeltaBytes: baseline && final
         ? final.main.privateBytes - baseline.main.privateBytes
         : null,

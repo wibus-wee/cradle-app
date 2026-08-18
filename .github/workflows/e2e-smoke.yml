@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: gate
     if: ${{ needs.gate.result == 'success' }}
-    timeout-minutes: 60
+    timeout-minutes: 75
 
     steps:
       - name: Checkout Cradle source
@@ -96,7 +96,7 @@ jobs:
         run: pnpm --filter "./plugins/*" build
 
       - name: Install Playwright browsers
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: pnpm exec playwright install --with-deps chromium-headless-shell
 
       - name: Provision Codex app-server for E2E

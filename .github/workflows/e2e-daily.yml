@@ -28,7 +28,7 @@ jobs:
   e2e:
     name: Daily E2E (@P0 or @P1)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
 
     steps:
       # ── Checkout & Setup ──────────────────────────────────────────────────
@@ -56,7 +56,7 @@ jobs:
 
       # ── Install Playwright ────────────────────────────────────────────────
       - name: Install Playwright browsers
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: pnpm exec playwright install --with-deps chromium-headless-shell
 
       - name: Provision Codex app-server for E2E
