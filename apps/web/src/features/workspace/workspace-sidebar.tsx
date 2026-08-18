@@ -94,6 +94,7 @@ import { WorkspaceSessionGroupSection } from './workspace-session-groups'
 import type { WorkspaceSessionItemMenuRequest } from './workspace-session-item'
 import type { WorkspaceSessionAttentionKind } from './workspace-session-item-view'
 import { WorkspaceSessionListClock } from './workspace-session-list-clock'
+import { useWorkspaceSessionListNow } from './workspace-session-list-clock-context'
 import type { WorkspaceRuntimeIconByKind } from './workspace-session-list-section'
 import { WorkspaceSessionListSection } from './workspace-session-list-section'
 import { isWorkspaceSessionRunning } from './workspace-session-status'
@@ -1049,6 +1050,7 @@ const WorkspaceSidebarBody = memo(
     onTogglePin,
   }: WorkspaceSidebarBodyProps) => {
     const { t } = useTranslation('workspace')
+    const nowMs = useWorkspaceSessionListNow()
     const pruneWorkspaceSidebarState = useWorkspaceSidebarUiStore(
       state => state.pruneWorkspaceSidebarState,
     )
@@ -1209,12 +1211,14 @@ const WorkspaceSidebarBody = memo(
         locallyErroredSessionIds,
         attentionBySessionId: resolvedAttentionBySessionId,
         nodes,
+        now: nowMs,
       })
     }, [
       filteredFlatEntries,
       grouping,
       locallyErroredSessionIds,
       locallyStreamingSessionIds,
+      nowMs,
       orderingDirection,
       nodes,
       resolvedAttentionBySessionId,

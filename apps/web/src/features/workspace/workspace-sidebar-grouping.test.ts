@@ -11,7 +11,7 @@ import {
 } from './workspace-sidebar-grouping'
 
 function createSession(overrides: Partial<WorkspaceSession> & Pick<WorkspaceSession, 'id'>): WorkspaceSession {
-  const now = 1_700_000_000_000
+  const now = 1_700_000_000
   return {
     workspaceId: 'workspace-1',
     title: overrides.id,
@@ -49,8 +49,8 @@ const workspace: Workspace = {
   availability: 'available',
   multiFolder: false,
   pinned: 0,
-  createdAt: 1_700_000_000_000,
-  updatedAt: 1_700_000_000_000,
+  createdAt: 1_700_000_000,
+  updatedAt: 1_700_000_000,
 }
 
 function entry(session: WorkspaceSession): SidebarSessionEntry {
@@ -71,17 +71,20 @@ function createNode(overrides: Partial<FabricNodeSummary> & Pick<FabricNodeSumma
   }
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
+const DAY_SECONDS = 24 * 60 * 60
 // A fixed local "now" at noon so calendar-day bucketing is deterministic.
-const NOW = new Date(2026, 6, 20, 12, 0, 0).getTime()
+const NOW_MS = new Date(2026, 6, 20, 12, 0, 0).getTime()
+const NOW_SECONDS = Math.floor(NOW_MS / 1000)
 
 describe('classifyUpdatedBucket', () => {
-  it('buckets by local calendar day distance', () => {
-    expect(classifyUpdatedBucket(NOW - 60_000, NOW)).toBe('today')
-    expect(classifyUpdatedBucket(NOW - DAY_MS, NOW)).toBe('yesterday')
-    expect(classifyUpdatedBucket(NOW - 3 * DAY_MS, NOW)).toBe('previous7Days')
-    expect(classifyUpdatedBucket(NOW - 7 * DAY_MS, NOW)).toBe('previous7Days')
-    expect(classifyUpdatedBucket(NOW - 8 * DAY_MS, NOW)).toBe('earlier')
+  it('splits the current day at one hour, then buckets by local calendar day distance', () => {
+    expect(classifyUpdatedBucket(NOW_SECONDS - 60, NOW_MS)).toBe('lastHour')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 3_599, NOW_MS)).toBe('lastHour')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 3_600, NOW_MS)).toBe('earlierToday')
+    expect(classifyUpdatedBucket(NOW_SECONDS - DAY_SECONDS, NOW_MS)).toBe('yesterday')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 3 * DAY_SECONDS, NOW_MS)).toBe('previous7Days')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 7 * DAY_SECONDS, NOW_MS)).toBe('previous7Days')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 8 * DAY_SECONDS, NOW_MS)).toBe('earlier')
   })
 })
 
@@ -150,16 +153,18 @@ describe('groupSidebarSessions', () => {
   it('groups by updated buckets in fixed order, skipping empty buckets', () => {
     const sections = groupSidebarSessions({
       ...baseGroupingInput([
-        entry(createSession({ id: 'today', listActivityAt: NOW - 60_000 })),
-        entry(createSession({ id: 'earlier', listActivityAt: NOW - 30 * DAY_MS })),
-        entry(createSession({ id: 'yesterday', listActivityAt: NOW - DAY_MS })),
+        entry(createSession({ id: 'last-hour', listActivityAt: NOW_SECONDS - 60 })),
+        entry(createSession({ id: 'earlier-today', listActivityAt: NOW_SECONDS - 3_600 })),
+        entry(createSession({ id: 'earlier', listActivityAt: NOW_SECONDS - 30 * DAY_SECONDS })),
+        entry(createSession({ id: 'yesterday', listActivityAt: NOW_SECONDS - DAY_SECONDS })),
       ]),
       grouping: 'updated',
-      now: NOW,
+      now: NOW_MS,
     })
 
     expect(sections.map(section => section.labelKey)).toEqual([
-      'sidebar.filter.bucket.today',
+      'sidebar.filter.bucket.lastHour',
+      'sidebar.filter.bucket.earlierToday',
       'sidebar.filter.bucket.yesterday',
       'sidebar.filter.bucket.earlier',
     ])
@@ -168,12 +173,12 @@ describe('groupSidebarSessions', () => {
   it('sorts pinned sessions first within a bucket, then by ordering', () => {
     const [section] = groupSidebarSessions({
       ...baseGroupingInput([
-        entry(createSession({ id: 'old', listActivityAt: NOW - 2 * 60_000 })),
-        entry(createSession({ id: 'pinned', pinned: 1, listActivityAt: NOW - 3 * 60_000 })),
-        entry(createSession({ id: 'new', listActivityAt: NOW - 60_000 })),
+        entry(createSession({ id: 'old', listActivityAt: NOW_SECONDS - 120 })),
+        entry(createSession({ id: 'pinned', pinned: 1, listActivityAt: NOW_SECONDS - 180 })),
+        entry(createSession({ id: 'new', listActivityAt: NOW_SECONDS - 60 })),
       ]),
       grouping: 'updated',
-      now: NOW,
+      now: NOW_MS,
     })
 
     expect(section.entries.map(({ session }) => session.id)).toEqual(['pinned', 'new', 'old'])

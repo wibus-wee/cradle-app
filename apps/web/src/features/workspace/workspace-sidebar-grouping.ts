@@ -22,7 +22,12 @@ export interface SidebarSessionEntry {
   workspace: Workspace
 }
 
-export type SidebarUpdatedBucket = 'today' | 'yesterday' | 'previous7Days' | 'earlier'
+export type SidebarUpdatedBucket
+  = | 'lastHour'
+    | 'earlierToday'
+    | 'yesterday'
+    | 'previous7Days'
+    | 'earlier'
 export type SidebarStatusBucket = 'streaming' | 'needsYou' | 'error' | 'unread' | 'idle'
 
 export type SidebarSectionLabelKey
@@ -42,7 +47,8 @@ export interface SidebarSessionSection {
 export type SidebarFlatGrouping = Exclude<WorkspaceSidebarGrouping, 'workspace'>
 
 const UPDATED_BUCKET_ORDER: readonly SidebarUpdatedBucket[] = [
-  'today',
+  'lastHour',
+  'earlierToday',
   'yesterday',
   'previous7Days',
   'earlier',
@@ -64,11 +70,12 @@ function startOfLocalDay(timestamp: number): number {
   return date.getTime()
 }
 
-/** Buckets by local calendar day distance from `now`. */
-export function classifyUpdatedBucket(activityAt: number, now: number): SidebarUpdatedBucket {
-  const dayDistance = Math.round((startOfLocalDay(now) - startOfLocalDay(activityAt)) / DAY_MS)
+/** Buckets a Unix-seconds activity timestamp by local calendar day distance from `now`. */
+export function classifyUpdatedBucket(activityAtSeconds: number, now: number): SidebarUpdatedBucket {
+  const activityAtMs = activityAtSeconds * 1000
+  const dayDistance = Math.round((startOfLocalDay(now) - startOfLocalDay(activityAtMs)) / DAY_MS)
   if (dayDistance <= 0) {
-    return 'today'
+    return now - activityAtMs < 60 * 60 * 1000 ? 'lastHour' : 'earlierToday'
   }
   if (dayDistance === 1) {
     return 'yesterday'
