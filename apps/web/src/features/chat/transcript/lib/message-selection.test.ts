@@ -21,8 +21,13 @@ describe('readMessageSelection', () => {
     const range = document.createRange()
     range.setStart(text, 0)
     range.setEnd(text, 5)
-    Object.defineProperty(range, 'getBoundingClientRect', {
-      value: () => ({ top: 100, bottom: 116, left: 24 }),
+    Object.defineProperties(range, {
+      getBoundingClientRect: {
+        value: () => ({ top: 100, bottom: 116, left: 24 }),
+      },
+      getClientRects: {
+        value: () => [],
+      },
     })
     const selection = window.getSelection() as Selection
     selection.removeAllRanges()
