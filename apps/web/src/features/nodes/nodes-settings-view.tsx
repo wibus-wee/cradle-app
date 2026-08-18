@@ -6,11 +6,13 @@ import {
   Refresh1Line as RefreshIcon,
   Settings3Line as SettingsIcon,
 } from '@mingcute/react'
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import { Spinner } from '~/components/ui/spinner'
 import { SettingsGroup, SettingsPage } from '~/features/settings/settings-container'
 import { SettingsRow } from '~/features/settings/settings-row'
 import { cn } from '~/lib/cn'
@@ -19,7 +21,9 @@ import type { FabricMembership, FabricNode } from './types'
 
 export interface NodesSettingsViewProps {
   membership: FabricMembership | null
-  managedRelay: { relayUrl: string, accessMode: 'local' | 'network' } | null
+  membershipLoading: boolean
+  membershipError: boolean
+  managedRelay: { relayUrl: string, accessMode: 'local' | 'network' | 'external' } | null
   nodes: FabricNode[]
   networkCode: string | null
   canManageAccess: boolean
@@ -27,10 +31,14 @@ export interface NodesSettingsViewProps {
   onLinkDevice: () => void
   onReconnect: (nodeId: string) => void
   onManageAccess: (nodeId: string) => void
+  onRefreshMembership: () => void
+  fabricSettings: ReactNode
 }
 
 export function NodesSettingsView({
   membership,
+  membershipLoading,
+  membershipError,
   managedRelay,
   nodes,
   networkCode,
@@ -39,6 +47,8 @@ export function NodesSettingsView({
   onLinkDevice,
   onReconnect,
   onManageAccess,
+  onRefreshMembership,
+  fabricSettings,
 }: NodesSettingsViewProps) {
   const { t } = useTranslation('nodes')
 
@@ -49,7 +59,28 @@ export function NodesSettingsView({
       maxWidth="4xl"
       data-testid="nodes-settings"
     >
-      {!membership && (
+      {membershipLoading && (
+        <SettingsGroup label={t('settings.setup.title')} description={t('settings.setup.description')}>
+          <div className="flex items-center gap-2 py-3 text-[12px] text-muted-foreground">
+            <Spinner className="size-3.5" />
+            {t('settings.loading')}
+          </div>
+        </SettingsGroup>
+      )}
+
+      {membershipError && !membershipLoading && (
+        <SettingsGroup label={t('settings.setup.title')} description={t('settings.setup.description')}>
+          <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[12px] text-muted-foreground">{t('settings.error')}</p>
+            <Button type="button" variant="outline" size="sm" onClick={onRefreshMembership}>
+              <RefreshIcon className="size-3.5" aria-hidden />
+              {t('action.retry')}
+            </Button>
+          </div>
+        </SettingsGroup>
+      )}
+
+      {!membershipLoading && !membershipError && !membership && (
         <SettingsGroup label={t('settings.setup.title')} description={t('settings.setup.description')}>
           <div className="flex flex-col gap-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
@@ -144,6 +175,8 @@ export function NodesSettingsView({
           </SettingsGroup>
         </>
       )}
+
+      {fabricSettings}
     </SettingsPage>
   )
 }

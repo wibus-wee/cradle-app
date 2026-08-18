@@ -16,7 +16,7 @@ import {
   postFabricNodeInvitationsMutation,
   postNodesByNodeIdConnectMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
-import type { GetWorkspacesResponse } from '~/api-gen/types.gen'
+import type { GetFabricResponse, GetWorkspacesResponse } from '~/api-gen/types.gen'
 
 import type { NodeWorkspaceSummary } from './node-grouping'
 import { resolveNodeDisplayName } from './node-grouping'
@@ -28,7 +28,7 @@ export function useFabricMembership() {
   return useQuery({ ...getFabricOptions(), staleTime: 30_000 })
 }
 
-/** Desktop's local relay endpoint used when creating the first Fabric. */
+/** Current Relay endpoint used when creating the first Fabric. */
 export function useManagedRelay() {
   return useQuery({ ...getFabricManagedRelayOptions(), staleTime: 30_000 })
 }
@@ -44,24 +44,28 @@ export function useNodeDisplayName(nodeId: string | null | undefined): string | 
   return resolveNodeDisplayName(nodes ?? [], nodeId)
 }
 
-function useInvalidateFabric() {
+function useRefreshFabric() {
   const queryClient = useQueryClient()
   return useCallback(
-    () =>
-      Promise.all([
+    async (membership?: GetFabricResponse) => {
+      if (membership) {
+        queryClient.setQueryData(getFabricQueryKey(), membership)
+      }
+      await Promise.all([
         queryClient.invalidateQueries({ queryKey: getFabricQueryKey() }),
         queryClient.invalidateQueries({ queryKey: getNodesQueryKey() }),
-      ]),
+      ])
+    },
     [queryClient],
   )
 }
 
 /** Create a Cradle Fabric and enroll this device as its first Node. */
 export function useCreateFabric() {
-  const invalidate = useInvalidateFabric()
+  const refresh = useRefreshFabric()
   return useMutation({
     ...postFabricMutation(),
-    onSuccess: invalidate,
+    onSuccess: membership => refresh(membership),
   })
 }
 
@@ -75,19 +79,19 @@ export function useCreateNodeInvitation() {
 
 /** Poll completion of an owner-approved enrollment on this device. */
 export function useCompleteNodeEnrollment() {
-  const invalidate = useInvalidateFabric()
+  const refresh = useRefreshFabric()
   return useMutation({
     ...postFabricNodeInvitationsCompleteMutation(),
-    onSuccess: invalidate,
+    onSuccess: membership => refresh(membership),
   })
 }
 
 /** Owner-side: approve a pasted Node invitation string. */
 export function useApproveNodeInvitation() {
-  const invalidate = useInvalidateFabric()
+  const refresh = useRefreshFabric()
   return useMutation({
     ...postFabricNodeInvitationsApproveMutation(),
-    onSuccess: invalidate,
+    onSuccess: () => refresh(),
   })
 }
 

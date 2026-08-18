@@ -1,4 +1,5 @@
 import { ConnectDeviceDialogView } from './connect-device-dialog-view'
+import { FabricSettingsGroup } from './fabric-settings'
 import { NodeAccessDialogView } from './node-access-dialog-view'
 import { NodesSettingsView } from './nodes-settings-view'
 import { useNodesController } from './use-nodes-controller'
@@ -11,6 +12,8 @@ export function NodesSettings() {
     <>
       <NodesSettingsView
         membership={controller.membership}
+        membershipLoading={controller.membershipLoading}
+        membershipError={controller.membershipError}
         managedRelay={controller.managedRelay}
         nodes={controller.nodes}
         networkCode={controller.networkCode}
@@ -19,6 +22,8 @@ export function NodesSettings() {
         onLinkDevice={() => controller.setConnectOpen(true)}
         onReconnect={nodeId => void controller.handleReconnect(nodeId)}
         onManageAccess={controller.setAccessNodeId}
+        onRefreshMembership={controller.refreshMembership}
+        fabricSettings={<FabricSettingsGroup />}
       />
       <ConnectDeviceDialogView
         open={controller.connectOpen}

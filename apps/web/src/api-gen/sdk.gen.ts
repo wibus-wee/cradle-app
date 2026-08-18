@@ -1330,7 +1330,7 @@ export const postFabric = <ThrowOnError extends boolean = false>(options: Option
 });
 
 /**
- * Read the Desktop-managed local Fabric relay endpoint
+ * Read the current Desktop Fabric relay endpoint
  */
 export const getFabricManagedRelay = <ThrowOnError extends boolean = false>(options?: Options<GetFabricManagedRelayData, ThrowOnError>) => (options?.client ?? client).get<GetFabricManagedRelayResponses, unknown, ThrowOnError>({
     requestValidator: async (data) => await z.object({

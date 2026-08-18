@@ -72,6 +72,8 @@ export const zPutPreferencesNetworkBody = z.object({
     customProxyUrl: z.string().nullable(),
     inbound: z.object({
         serverAccessMode: z.enum(['local', 'network']),
+        relaySource: z.enum(['managed', 'external']),
+        relayUrl: z.string().nullable(),
         managedRelayAccessMode: z.enum(['local', 'network']),
         managedRelayPublicUrl: z.string().nullable()
     }).optional()

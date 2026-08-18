@@ -1571,7 +1571,7 @@ export const postFabricMutation = (options?: Partial<Options<PostFabricData>>): 
 export const getFabricManagedRelayQueryKey = (options?: Options<GetFabricManagedRelayData>) => createQueryKey('getFabricManagedRelay', options);
 
 /**
- * Read the Desktop-managed local Fabric relay endpoint
+ * Read the current Desktop Fabric relay endpoint
  */
 export const getFabricManagedRelayOptions = (options?: Options<GetFabricManagedRelayData>) => queryOptions<GetFabricManagedRelayResponse, DefaultError, GetFabricManagedRelayResponse, ReturnType<typeof getFabricManagedRelayQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

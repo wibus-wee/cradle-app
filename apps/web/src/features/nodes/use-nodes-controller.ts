@@ -29,8 +29,7 @@ export function useNodesController() {
   const membershipQuery = useFabricMembership()
   const managedRelayQuery = useManagedRelay()
   const nodesQuery = useNodes()
-  const membershipData = membershipQuery.data ?? null
-  const membership = membershipData?.relayUrl && membershipData.fabricId ? membershipData : null
+  const membership = membershipQuery.data ?? null
   const managedRelay = managedRelayQuery.data ?? null
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
 
@@ -230,6 +229,9 @@ export function useNodesController() {
 
   return {
     membership,
+    membershipLoading: membershipQuery.isLoading,
+    membershipError: membershipQuery.isError,
+    refreshMembership: () => void membershipQuery.refetch(),
     managedRelay,
     nodes,
     networkCode,

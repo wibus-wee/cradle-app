@@ -36,7 +36,6 @@ const INBOUND_ACCESS_OPTIONS: Array<{ value: NetworkInboundAccessMode, labelKey:
   { value: 'local', labelKey: 'network.inbound.access.local' },
   { value: 'network', labelKey: 'network.inbound.access.network' },
 ]
-
 function normalizeProxyUrl(value: string): string | null {
   const raw = value.trim()
   if (!raw) {
@@ -252,7 +251,7 @@ export function ProxySettingsGroup() {
   )
 }
 
-export function InboundAccessSettingsGroup() {
+export function ServerAccessSettingsGroup() {
   const { t } = useTranslation('settings')
   const {
     prefs,
@@ -294,28 +293,6 @@ export function InboundAccessSettingsGroup() {
                 disabled={disabled}
               >
                 <SelectTrigger size="sm" className="w-[180px]" aria-label={t('network.inbound.server.label' as SettingsKey)}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {INBOUND_ACCESS_OPTIONS.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {t(option.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </SettingsRow>
-
-            <SettingsRow
-              label={t('network.inbound.relay.label' as SettingsKey)}
-              description={t('network.inbound.relay.description' as SettingsKey)}
-            >
-              <Select
-                value={prefs.inbound.managedRelayAccessMode}
-                onValueChange={value => saveInboundPreference({ managedRelayAccessMode: value as NetworkInboundAccessMode })}
-                disabled={disabled}
-              >
-                <SelectTrigger size="sm" className="w-[180px]" aria-label={t('network.inbound.relay.label' as SettingsKey)}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

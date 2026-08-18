@@ -347,6 +347,8 @@ export type GetPreferencesNetworkResponses = {
         customProxyUrl: string | null;
         inbound?: {
             serverAccessMode: 'local' | 'network';
+            relaySource: 'managed' | 'external';
+            relayUrl: string | null;
             managedRelayAccessMode: 'local' | 'network';
             managedRelayPublicUrl: string | null;
         };
@@ -362,6 +364,8 @@ export type PutPreferencesNetworkData = {
         customProxyUrl: string | null;
         inbound?: {
             serverAccessMode: 'local' | 'network';
+            relaySource: 'managed' | 'external';
+            relayUrl: string | null;
             managedRelayAccessMode: 'local' | 'network';
             managedRelayPublicUrl: string | null;
         };
@@ -2905,7 +2909,7 @@ export type GetFabricManagedRelayResponses = {
      */
     200: {
         relayUrl: string;
-        accessMode: 'local' | 'network';
+        accessMode: 'local' | 'network' | 'external';
     } | null;
 };
 

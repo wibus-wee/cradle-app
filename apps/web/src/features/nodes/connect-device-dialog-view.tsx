@@ -24,7 +24,7 @@ export interface ConnectDeviceDialogViewProps {
   open: boolean
   /** Whether this device already belongs to a Fabric. */
   fabricExists: boolean
-  managedRelay: { relayUrl: string, accessMode: 'local' | 'network' } | null
+  managedRelay: { relayUrl: string, accessMode: 'local' | 'network' | 'external' } | null
   busy: boolean
   /**
    * This Fabric's network code (`{ relayUrl, fabricId }`, compact-encoded).
@@ -213,7 +213,13 @@ export function ConnectDeviceDialogView({
                           {managedRelay.relayUrl}
                         </code>
                         <span className="text-muted-foreground">
-                          {t(managedRelay.accessMode === 'network' ? 'connect.start.networkHint' : 'connect.start.localHint')}
+                          {t(
+                            managedRelay.accessMode === 'network'
+                              ? 'connect.start.networkHint'
+                              : managedRelay.accessMode === 'external'
+                                ? 'connect.start.externalHint'
+                                : 'connect.start.localHint',
+                          )}
                         </span>
                       </>
                     )
