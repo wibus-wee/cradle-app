@@ -23,6 +23,16 @@ export const fabric = new Elysia({ prefix: '/fabric', detail: { tags: ['fabric']
   })
   .post('', ({ body }) => Fabric.createFabric(body), { detail: { summary: 'Create a Cradle Fabric and enroll this Node' }, body: FabricModel.createBody, response: { 200: FabricModel.membership } })
   .post('/node-invitations', ({ body }) => Fabric.createNodeInvitation(body), { detail: { summary: 'Create a short-lived Node enrollment invitation' }, body: FabricModel.beginNodeEnrollmentBody, response: { 200: FabricModel.invitation } })
+  .get('/node-invitations/pending', () => {
+    const pending = Fabric.getPendingNodeEnrollment()
+    return pending ?? new Response('null', {
+      headers: { 'content-type': 'application/json' },
+    })
+  }, { detail: { summary: 'Read this Server pending Node enrollment' }, response: { 200: FabricModel.pendingEnrollment } })
+  .delete('/node-invitations/pending', ({ set }) => {
+    Fabric.cancelPendingNodeEnrollment()
+    set.status = 204
+  }, { detail: { summary: 'Cancel this Server pending Node enrollment' }, response: { 204: t.Void() } })
   .post('/node-invitations/complete', () => Fabric.completeNodeEnrollment(), { detail: { summary: 'Complete an approved Node enrollment' }, response: { 200: FabricModel.nullableMembership } })
   .post('/node-invitations/approve', ({ body }) => Fabric.approveNodeInvitation(body), { detail: { summary: 'Approve a Node enrollment invitation' }, body: FabricModel.invitation, response: { 200: FabricModel.nodeSummary } })
 

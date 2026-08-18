@@ -13,10 +13,12 @@ const meta = {
     networkCode: null,
     inviteCode: null,
     awaitingApproval: false,
+    cancellingEnrollment: false,
     onOpenChange: fn(),
     onStart: fn(),
     onGetCode: fn(),
     onSubmitCode: fn(),
+    onCancelEnrollment: fn(),
   },
 } satisfies Meta<typeof ConnectDeviceDialogView>
 

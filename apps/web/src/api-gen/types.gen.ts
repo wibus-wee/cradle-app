@@ -2945,6 +2945,44 @@ export type PostFabricNodeInvitationsResponses = {
 
 export type PostFabricNodeInvitationsResponse = PostFabricNodeInvitationsResponses[keyof PostFabricNodeInvitationsResponses];
 
+export type DeleteFabricNodeInvitationsPendingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations/pending';
+};
+
+export type DeleteFabricNodeInvitationsPendingResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
+export type GetFabricNodeInvitationsPendingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations/pending';
+};
+
+export type GetFabricNodeInvitationsPendingResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        version: number;
+        relayUrl: string;
+        fabricId: string;
+        requestId: string;
+        deliverySecret: string;
+        expiresAt: string | null;
+        createdAt: number;
+    } | null;
+};
+
+export type GetFabricNodeInvitationsPendingResponse = GetFabricNodeInvitationsPendingResponses[keyof GetFabricNodeInvitationsPendingResponses];
+
 export type PostFabricNodeInvitationsCompleteData = {
     body?: never;
     path?: never;

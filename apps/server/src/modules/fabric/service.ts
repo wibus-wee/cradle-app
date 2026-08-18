@@ -8,7 +8,7 @@ import { asc, eq } from 'drizzle-orm'
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
-import { readSecret, upsertSecret } from '../secrets/service'
+import { readSecret, removeSecret, upsertSecret } from '../secrets/service'
 import { FabricDirectoryClient } from './directory-client'
 import type { FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
 import {
@@ -26,6 +26,12 @@ import {
 interface StoredCertificates {
   node: MembershipCertificate
   controller?: MembershipCertificate
+}
+
+interface StoredPendingEnrollment {
+  requestId?: string
+  deliverySecret?: string
+  expiresAt?: string
 }
 
 export interface FabricMembershipView {
@@ -49,6 +55,16 @@ export interface FabricNodeInvitation {
   requestId: string
   deliverySecret: string
   expiresAt: string
+}
+
+export interface PendingFabricEnrollmentView {
+  version: 1
+  relayUrl: string
+  fabricId: string
+  requestId: string
+  deliverySecret: string
+  expiresAt: string | null
+  createdAt: number
 }
 
 type FabricMembershipChangedListener = () => void
@@ -99,6 +115,37 @@ export function getManagedRelay(): { relayUrl: string, accessMode: 'local' | 'ne
 
 export function hasPendingNodeEnrollment(): boolean {
   return db().select({ role: fabricMembership.role }).from(fabricMembership).orderBy(asc(fabricMembership.createdAt)).get()?.role === 'pending-node'
+}
+
+export function getPendingNodeEnrollment(): PendingFabricEnrollmentView | null {
+  const row = db().select().from(fabricMembership).orderBy(asc(fabricMembership.createdAt)).get()
+  if (!row || row.role !== 'pending-node') {
+    return null
+  }
+  const pending = parsePendingEnrollment(row.certificateJson)
+  return {
+    version: 1,
+    relayUrl: row.relayUrl,
+    fabricId: row.fabricId,
+    requestId: pending.requestId,
+    deliverySecret: pending.deliverySecret,
+    expiresAt: pending.expiresAt ?? null,
+    createdAt: row.createdAt,
+  }
+}
+
+export function cancelPendingNodeEnrollment(): void {
+  const row = db().select().from(fabricMembership).orderBy(asc(fabricMembership.createdAt)).get()
+  if (!row) {
+    return
+  }
+  if (row.role !== 'pending-node') {
+    throw new AppError({ code: 'fabric_enrollment_not_pending', status: 409, message: 'This Cradle Server already has an active Fabric membership.' })
+  }
+  db().delete(fabricMembership).where(eq(fabricMembership.fabricId, row.fabricId)).run()
+  removeSecret(row.identityKeySecretId)
+  removeSecret(row.encryptionKeySecretId)
+  notifyFabricMembershipChanged()
 }
 
 function hasStoredFabricMembership(): boolean {
@@ -232,7 +279,7 @@ role: 'pending-node',
 ownerKeySecretId: null,
     identityKeySecretId,
 encryptionKeySecretId,
-certificateJson: JSON.stringify({ requestId: created.requestId, deliverySecret }),
+certificateJson: JSON.stringify({ requestId: created.requestId, deliverySecret, expiresAt: created.expiresAt }),
 createdAt: now,
 updatedAt: now,
   }).run()
@@ -245,10 +292,7 @@ export async function completeNodeEnrollment(): Promise<FabricMembershipView | n
   if (!row || row.role !== 'pending-node') {
     return row ? toView(row) : null
   }
-  const pending = JSON.parse(row.certificateJson) as { requestId?: string, deliverySecret?: string }
-  if (!pending.requestId || !pending.deliverySecret) {
-    throw new AppError({ code: 'fabric_membership_invalid', status: 500, message: 'Pending Fabric enrollment is missing its delivery credentials.' })
-  }
+  const pending = parsePendingEnrollment(row.certificateJson)
   const result = await new FabricDirectoryClient(row.relayUrl).readJoinRequest(pending.requestId, pending.deliverySecret)
   if (result.status === 'pending' || !result.certificate) {
     return null
@@ -374,4 +418,16 @@ function requiredString(value: Record<string, unknown>, field: string): string {
   const result = value[field]
   if (typeof result !== 'string' || !result.trim()) { throw new AppError({ code: 'fabric_invitation_invalid', status: 400, message: `Node invitation is missing ${field}.` }) }
   return result
+}
+
+function parsePendingEnrollment(value: string): { requestId: string, deliverySecret: string, expiresAt?: string } {
+  const pending = JSON.parse(value) as StoredPendingEnrollment
+  if (!pending.requestId || !pending.deliverySecret) {
+    throw new AppError({ code: 'fabric_membership_invalid', status: 500, message: 'Pending Fabric enrollment is missing its delivery credentials.' })
+  }
+  return {
+    requestId: pending.requestId,
+    deliverySecret: pending.deliverySecret,
+    ...(pending.expiresAt ? { expiresAt: pending.expiresAt } : {}),
+  }
 }

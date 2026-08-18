@@ -12,6 +12,8 @@ export function NodesSettings() {
     <>
       <NodesSettingsView
         membership={controller.membership}
+        pendingEnrollment={controller.pendingEnrollment}
+        pendingInviteCode={controller.inviteCode}
         membershipLoading={controller.membershipLoading}
         membershipError={controller.membershipError}
         managedRelay={controller.managedRelay}
@@ -19,10 +21,12 @@ export function NodesSettings() {
         networkCode={controller.networkCode}
         canManageAccess={controller.membership?.role === 'owner'}
         reconnectingNodeId={controller.connectingNodeId}
+        cancellingEnrollment={controller.cancellingEnrollment}
         onLinkDevice={() => controller.setConnectOpen(true)}
         onReconnect={nodeId => void controller.handleReconnect(nodeId)}
         onManageAccess={controller.setAccessNodeId}
         onRefreshMembership={controller.refreshMembership}
+        onCancelPendingEnrollment={() => void controller.handleCancelEnrollment()}
         fabricSettings={<FabricSettingsGroup />}
       />
       <ConnectDeviceDialogView
@@ -33,10 +37,12 @@ export function NodesSettings() {
         networkCode={controller.networkCode}
         inviteCode={controller.inviteCode}
         awaitingApproval={controller.awaitingApproval}
+        cancellingEnrollment={controller.cancellingEnrollment}
         onOpenChange={controller.handleConnectOpenChange}
         onStart={() => void controller.handleStart()}
         onGetCode={(code, displayName) => void controller.handleGetCode(code, displayName)}
         onSubmitCode={code => void controller.handleSubmitCode(code)}
+        onCancelEnrollment={() => void controller.handleCancelEnrollment()}
       />
       <NodeAccessDialogView
         open={controller.accessNodeId !== null}

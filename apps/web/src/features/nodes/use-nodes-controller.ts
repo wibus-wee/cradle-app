@@ -7,6 +7,7 @@ import { decodeInviteCode, encodeInviteCode } from './invite-code'
 import type { FabricNodeInvitation, NodeGrant } from './types'
 import {
   useApproveNodeInvitation,
+  useCancelPendingFabricEnrollment,
   useCompleteNodeEnrollment,
   useConnectNode,
   useCreateFabric,
@@ -15,6 +16,7 @@ import {
   useManagedRelay,
   useNodeGrants,
   useNodes,
+  usePendingFabricEnrollment,
   useRevokeNodeGrant,
 } from './use-nodes'
 
@@ -28,9 +30,11 @@ export function useNodesController() {
   const { t } = useTranslation('nodes')
   const membershipQuery = useFabricMembership()
   const managedRelayQuery = useManagedRelay()
+  const pendingEnrollmentQuery = usePendingFabricEnrollment()
   const nodesQuery = useNodes()
   const membership = membershipQuery.data ?? null
   const managedRelay = managedRelayQuery.data ?? null
+  const pendingEnrollment = pendingEnrollmentQuery.data ?? null
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
 
   const [connectOpen, setConnectOpen] = useState(false)
@@ -40,6 +44,7 @@ export function useNodesController() {
 
   const createFabric = useCreateFabric()
   const createInvitation = useCreateNodeInvitation()
+  const cancelEnrollment = useCancelPendingFabricEnrollment()
   const completeEnrollment = useCompleteNodeEnrollment()
   const approveInvitation = useApproveNodeInvitation()
   const connectNode = useConnectNode()
@@ -69,10 +74,25 @@ export function useNodesController() {
     [membership],
   )
   const inviteCode = useMemo(
-    () => (invitation ? encodeInviteCode(invitation) : null),
-    [invitation],
+    () => {
+      if (invitation) {
+        return encodeInviteCode(invitation)
+      }
+      if (!pendingEnrollment?.expiresAt) {
+        return null
+      }
+      return encodeInviteCode({
+        version: 1,
+        relayUrl: pendingEnrollment.relayUrl,
+        fabricId: pendingEnrollment.fabricId,
+        requestId: pendingEnrollment.requestId,
+        deliverySecret: pendingEnrollment.deliverySecret,
+        expiresAt: pendingEnrollment.expiresAt,
+      })
+    },
+    [invitation, pendingEnrollment],
   )
-  const awaitingApproval = invitation !== null
+  const awaitingApproval = invitation !== null || pendingEnrollment !== null
 
   useEffect(() => {
     if (!awaitingApproval) {
@@ -197,6 +217,21 @@ export function useNodesController() {
     [approveInvitation, t],
   )
 
+  const handleCancelEnrollment = useCallback(async () => {
+    try {
+      await cancelEnrollment.mutateAsync({})
+      setInvitation(null)
+      setConnectOpen(false)
+    }
+    catch (error) {
+      toastManager.add({
+        type: 'error',
+        title: t('toast.cancelFailed'),
+        description: errorMessage(error),
+      })
+    }
+  }, [cancelEnrollment, t])
+
   const handleRevokeGrant = useCallback(
     async (grantId: string) => {
       if (!accessNodeId) {
@@ -229,14 +264,16 @@ export function useNodesController() {
 
   return {
     membership,
-    membershipLoading: membershipQuery.isLoading,
-    membershipError: membershipQuery.isError,
-    refreshMembership: () => void membershipQuery.refetch(),
+    pendingEnrollment,
+    membershipLoading: membershipQuery.isLoading || pendingEnrollmentQuery.isLoading,
+    membershipError: membershipQuery.isError || pendingEnrollmentQuery.isError,
+    refreshMembership: () => void Promise.all([membershipQuery.refetch(), pendingEnrollmentQuery.refetch()]),
     managedRelay,
     nodes,
     networkCode,
     inviteCode,
     awaitingApproval,
+    cancellingEnrollment: cancelEnrollment.isPending,
     connectOpen,
     accessNode,
     accessNodeId,
@@ -250,6 +287,7 @@ export function useNodesController() {
     handleStart,
     handleGetCode,
     handleSubmitCode,
+    handleCancelEnrollment,
     handleRevokeGrant,
     handleConnectOpenChange,
   }

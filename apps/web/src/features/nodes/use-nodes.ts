@@ -2,8 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import {
+  deleteFabricNodeInvitationsPendingMutation,
   deleteNodesByNodeIdGrantsByGrantIdMutation,
   getFabricManagedRelayOptions,
+  getFabricNodeInvitationsPendingOptions,
+  getFabricNodeInvitationsPendingQueryKey,
   getFabricOptions,
   getFabricQueryKey,
   getNodesByNodeIdGrantsOptions,
@@ -33,6 +36,11 @@ export function useManagedRelay() {
   return useQuery({ ...getFabricManagedRelayOptions(), staleTime: 30_000 })
 }
 
+/** Enrollment this device is waiting for an existing Fabric owner to approve. */
+export function usePendingFabricEnrollment() {
+  return useQuery({ ...getFabricNodeInvitationsPendingOptions(), staleTime: 3_000 })
+}
+
 /** Nodes visible in this Fabric (`GET /nodes`). */
 export function useNodes() {
   return useQuery({ ...getNodesOptions(), staleTime: 15_000 })
@@ -53,6 +61,7 @@ function useRefreshFabric() {
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getFabricQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getFabricNodeInvitationsPendingQueryKey() }),
         queryClient.invalidateQueries({ queryKey: getNodesQueryKey() }),
       ])
     },
@@ -71,10 +80,24 @@ export function useCreateFabric() {
 
 /**
  * Begin enrolling this device into an existing Fabric. The returned invitation
- * string is a one-time secret: it is shown once and never list-readable.
+ * string contains a short-lived secret. The local pending-enrollment endpoint
+ * can restore it after a restart so the user can finish or cancel the flow.
  */
 export function useCreateNodeInvitation() {
-  return useMutation({ ...postFabricNodeInvitationsMutation() })
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...postFabricNodeInvitationsMutation(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getFabricNodeInvitationsPendingQueryKey() }),
+  })
+}
+
+/** Cancel this device's pending enrollment without affecting an active membership. */
+export function useCancelPendingFabricEnrollment() {
+  const refresh = useRefreshFabric()
+  return useMutation({
+    ...deleteFabricNodeInvitationsPendingMutation(),
+    onSuccess: () => refresh(),
+  })
 }
 
 /** Poll completion of an owner-approved enrollment on this device. */

@@ -1,10 +1,12 @@
 import {
   CheckLine as CheckIcon,
+  CloseCircleLine as CancelIcon,
   ComputerLine as ComputerIcon,
   CopyLine as CopyIcon,
   Link3Line as LinkIcon,
   Refresh1Line as RefreshIcon,
   Settings3Line as SettingsIcon,
+  TimeLine as PendingIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
@@ -17,10 +19,13 @@ import { SettingsGroup, SettingsPage } from '~/features/settings/settings-contai
 import { SettingsRow } from '~/features/settings/settings-row'
 import { cn } from '~/lib/cn'
 
-import type { FabricMembership, FabricNode } from './types'
+import { CancelPendingEnrollmentDialog } from './cancel-pending-enrollment-dialog'
+import type { FabricMembership, FabricNode, PendingFabricEnrollment } from './types'
 
 export interface NodesSettingsViewProps {
   membership: FabricMembership | null
+  pendingEnrollment: PendingFabricEnrollment | null
+  pendingInviteCode: string | null
   membershipLoading: boolean
   membershipError: boolean
   managedRelay: { relayUrl: string, accessMode: 'local' | 'network' | 'external' } | null
@@ -28,15 +33,19 @@ export interface NodesSettingsViewProps {
   networkCode: string | null
   canManageAccess: boolean
   reconnectingNodeId: string | null
+  cancellingEnrollment: boolean
   onLinkDevice: () => void
   onReconnect: (nodeId: string) => void
   onManageAccess: (nodeId: string) => void
   onRefreshMembership: () => void
+  onCancelPendingEnrollment: () => void
   fabricSettings: ReactNode
 }
 
 export function NodesSettingsView({
   membership,
+  pendingEnrollment,
+  pendingInviteCode,
   membershipLoading,
   membershipError,
   managedRelay,
@@ -44,13 +53,16 @@ export function NodesSettingsView({
   networkCode,
   canManageAccess,
   reconnectingNodeId,
+  cancellingEnrollment,
   onLinkDevice,
   onReconnect,
   onManageAccess,
   onRefreshMembership,
+  onCancelPendingEnrollment,
   fabricSettings,
 }: NodesSettingsViewProps) {
   const { t } = useTranslation('nodes')
+  const [cancelOpen, setCancelOpen] = useState(false)
 
   return (
     <SettingsPage
@@ -80,7 +92,50 @@ export function NodesSettingsView({
         </SettingsGroup>
       )}
 
-      {!membershipLoading && !membershipError && !membership && (
+      {!membershipLoading && !membershipError && !membership && pendingEnrollment && (
+        <SettingsGroup
+          label={t('settings.pending.title')}
+          description={t('settings.pending.description')}
+        >
+          <div className="flex min-w-0 flex-col gap-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                <PendingIcon className="size-4" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[13px] font-medium">{t('settings.pending.status')}</span>
+                  <Badge variant="secondary">{t('settings.status.pending')}</Badge>
+                </div>
+                <p className="mt-1 max-w-prose text-pretty text-[12px] leading-relaxed text-muted-foreground">
+                  {pendingInviteCode ? t('settings.pending.hint') : t('settings.pending.legacyHint')}
+                </p>
+                <code className="mt-2 block max-w-full truncate rounded-md bg-muted px-2 py-1 font-mono text-[11px] text-muted-foreground" title={pendingEnrollment.relayUrl}>
+                  {pendingEnrollment.relayUrl}
+                </code>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+              <Button type="button" variant="outline" size="sm" onClick={onLinkDevice}>
+                <LinkIcon className="size-3.5" aria-hidden />
+                {t('action.viewRequest')}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={cancellingEnrollment}
+                onClick={() => setCancelOpen(true)}
+              >
+                <CancelIcon className="size-3.5" aria-hidden />
+                {t('action.cancelJoin')}
+              </Button>
+            </div>
+          </div>
+        </SettingsGroup>
+      )}
+
+      {!membershipLoading && !membershipError && !membership && !pendingEnrollment && (
         <SettingsGroup label={t('settings.setup.title')} description={t('settings.setup.description')}>
           <div className="flex flex-col gap-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-3">
@@ -177,6 +232,13 @@ export function NodesSettingsView({
       )}
 
       {fabricSettings}
+
+      <CancelPendingEnrollmentDialog
+        open={cancelOpen}
+        busy={cancellingEnrollment}
+        onOpenChange={setCancelOpen}
+        onConfirm={onCancelPendingEnrollment}
+      />
     </SettingsPage>
   )
 }

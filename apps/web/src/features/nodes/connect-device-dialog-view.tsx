@@ -20,6 +20,8 @@ import {
 import { Input } from '~/components/ui/input'
 import { cn } from '~/lib/cn'
 
+import { CancelPendingEnrollmentDialog } from './cancel-pending-enrollment-dialog'
+
 export interface ConnectDeviceDialogViewProps {
   open: boolean
   /** Whether this device already belongs to a Fabric. */
@@ -35,6 +37,7 @@ export interface ConnectDeviceDialogViewProps {
   inviteCode: string | null
   /** True while waiting for the owner to approve this device. */
   awaitingApproval: boolean
+  cancellingEnrollment: boolean
   onOpenChange: (open: boolean) => void
   /** Create the network on this device (first-computer path). */
   onStart: () => void
@@ -42,6 +45,7 @@ export interface ConnectDeviceDialogViewProps {
   onGetCode: (networkCode: string, displayName: string) => void
   /** Approve another device's pasted invite code (owner path). */
   onSubmitCode: (code: string) => void
+  onCancelEnrollment: () => void
 }
 
 const EASE = 'ease-[cubic-bezier(0.23,1,0.32,1)]'
@@ -152,14 +156,17 @@ export function ConnectDeviceDialogView({
   networkCode,
   inviteCode,
   awaitingApproval,
+  cancellingEnrollment,
   onOpenChange,
   onStart,
   onGetCode,
   onSubmitCode,
+  onCancelEnrollment,
 }: ConnectDeviceDialogViewProps) {
   const { t } = useTranslation('nodes')
-  const [step, setStep] = useState<Step>(fabricExists ? 'add' : 'choose')
+  const [step, setStep] = useState<Step>(awaitingApproval ? 'code' : fabricExists ? 'add' : 'choose')
   const [code, setCode] = useState('')
+  const [cancelOpen, setCancelOpen] = useState(false)
 
   // Progress the flow when the outside world answers: a created network moves
   // us to "add a computer"; a generated invitation moves us to the code step.
@@ -170,17 +177,17 @@ export function ConnectDeviceDialogView({
     }
   }, [fabricExists, step])
   useEffect(() => {
-    if (inviteCode) {
+    if (awaitingApproval) {
       setStep('code')
     }
-  }, [inviteCode])
+  }, [awaitingApproval])
 
   useEffect(() => {
     if (!open) {
-      setStep(fabricExists ? 'add' : 'choose')
+      setStep(awaitingApproval ? 'code' : fabricExists ? 'add' : 'choose')
       setCode('')
     }
-  }, [open, fabricExists])
+  }, [open, fabricExists, awaitingApproval])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -333,14 +340,47 @@ export function ConnectDeviceDialogView({
             </div>
             <CodeBox code={inviteCode} testId="connect-invite-code" />
             {awaitingApproval && (
-              <p className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                <LoadingLine className="size-3.5 animate-spin" aria-hidden />
-                {t('connect.code.waiting')}
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="flex items-center gap-2 text-pretty text-[12px] text-muted-foreground">
+                  <LoadingLine className="size-3.5 animate-spin" aria-hidden />
+                  {t('connect.code.waiting')}
+                </p>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  disabled={cancellingEnrollment}
+                  onClick={() => setCancelOpen(true)}
+                >
+                  {t('action.cancelJoin')}
+                </Button>
+              </div>
             )}
           </div>
         )}
+
+        {step === 'code' && awaitingApproval && !inviteCode && (
+          <div className="flex min-w-0 flex-col gap-3">
+            <p className="text-pretty text-[12px] leading-snug text-muted-foreground">
+              {t('connect.code.legacyHint')}
+            </p>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={cancellingEnrollment}
+              onClick={() => setCancelOpen(true)}
+            >
+              {t('action.cancelJoin')}
+            </Button>
+          </div>
+        )}
       </DialogContent>
+      <CancelPendingEnrollmentDialog
+        open={cancelOpen}
+        busy={cancellingEnrollment}
+        onOpenChange={setCancelOpen}
+        onConfirm={onCancelEnrollment}
+      />
     </Dialog>
   )
 }

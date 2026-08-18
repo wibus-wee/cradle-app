@@ -1,4 +1,5 @@
 import type {
+  GetFabricNodeInvitationsPendingResponse,
   GetFabricResponse,
   GetNodesResponse,
   PostFabricNodeInvitationsResponse,
@@ -12,6 +13,9 @@ export type FabricMembership = NonNullable<GetFabricResponse>
 
 /** One-time Node enrollment invitation from `POST /fabric/node-invitations`. */
 export type FabricNodeInvitation = PostFabricNodeInvitationsResponse
+
+/** Local Node enrollment waiting for approval from an existing Fabric owner. */
+export type PendingFabricEnrollment = NonNullable<GetFabricNodeInvitationsPendingResponse>
 
 /**
  * Fabric grant scopes, ordered from least to most privileged.

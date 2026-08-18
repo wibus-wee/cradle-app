@@ -66,6 +66,21 @@ export const FabricModel = {
     },
     { additionalProperties: false },
   ),
+  pendingEnrollment: t.Union([
+    t.Object(
+      {
+        version: t.Literal(1),
+        relayUrl: t.String(),
+        fabricId: t.String(),
+        requestId: t.String(),
+        deliverySecret: t.String(),
+        expiresAt: t.Union([t.String(), t.Null()]),
+        createdAt: t.Number(),
+      },
+      { additionalProperties: false },
+    ),
+    t.Null(),
+  ]),
   nodeIdParams: t.Object({ nodeId: nonBlankString }, { additionalProperties: false }),
   nodeGrantParams: t.Object({ nodeId: nonBlankString, grantId: nonBlankString }, { additionalProperties: false }),
   nodeGrant,
