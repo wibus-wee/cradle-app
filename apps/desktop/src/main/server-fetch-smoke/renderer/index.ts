@@ -14,7 +14,7 @@ declare global {
           streamIntervalMs: number
           backgroundBurstIntervalMs: number
           settleMs: number
-          conversationPattern: import('@cradle/model-api-simulator/conversation-load-pattern').GrowingConversationLoadPattern
+          conversationPattern: import('../../../../../../packages/model-api-simulator/src/conversation-load-pattern').GrowingConversationLoadPattern
         }>
         markPhase: (phase: string) => void
         startChat: (request: unknown) => Promise<{ streamId: string }>

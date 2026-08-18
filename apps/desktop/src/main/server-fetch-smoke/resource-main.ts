@@ -9,7 +9,7 @@ import {
   estimateConversationTokens,
   type ConversationLoadMessage,
   type GrowingConversationLoadPattern,
-} from '@cradle/model-api-simulator/conversation-load-pattern'
+} from '../../../../../packages/model-api-simulator/src/conversation-load-pattern'
 import { app, BrowserWindow, ipcMain } from 'electron'
 
 import { ChatStreamBroker } from '../chat-stream-broker'

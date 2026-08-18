@@ -58,7 +58,6 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cradle/model-api-simulator": "workspace:*",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/router-plugin": "^1.168.18",
     "@types/node": "^22.19.1",
