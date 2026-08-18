@@ -56,6 +56,23 @@ export interface FabricNodeGrant {
   revokedAt?: string
 }
 
+export interface FabricJoinRequest {
+  requestId: string
+  fabricId: string
+  subjectKind: 'node'
+  subjectId: string
+  identityPubkey: string
+  encryptionPubkey: string
+  displayName: string
+  platform: string
+  version: string
+  capabilities: string[]
+  deliverySecretHash: string
+  issuedAt: number
+  expiresAt: number
+  signature: string
+}
+
 export interface FabricKeyPair {
   privateKeyBase64: string
   publicKeyBase64: string
@@ -141,7 +158,7 @@ export function signFabricJoinRequest(input: {
   version: string
   capabilities: string[]
   deliverySecret: string
-}): Record<string, unknown> {
+}): FabricJoinRequest {
   const request = {
     requestId: `join_${randomUUID()}`,
     fabricId: input.fabricId,

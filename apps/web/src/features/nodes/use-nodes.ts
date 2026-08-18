@@ -2,11 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 import {
+  deleteFabricMutation,
   deleteFabricNodeInvitationsPendingMutation,
+  deleteFabricNodeInvitationsRequestsByRequestIdMutation,
   deleteNodesByNodeIdGrantsByGrantIdMutation,
   getFabricManagedRelayOptions,
   getFabricNodeInvitationsPendingOptions,
   getFabricNodeInvitationsPendingQueryKey,
+  getFabricNodeInvitationsRequestsOptions,
+  getFabricNodeInvitationsRequestsQueryKey,
   getFabricOptions,
   getFabricQueryKey,
   getNodesByNodeIdGrantsOptions,
@@ -17,6 +21,7 @@ import {
   postFabricNodeInvitationsApproveMutation,
   postFabricNodeInvitationsCompleteMutation,
   postFabricNodeInvitationsMutation,
+  postFabricNodeInvitationsRequestsByRequestIdApproveMutation,
   postNodesByNodeIdConnectMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type { GetFabricResponse, GetWorkspacesResponse } from '~/api-gen/types.gen'
@@ -39,6 +44,16 @@ export function useManagedRelay() {
 /** Enrollment this device is waiting for an existing Fabric owner to approve. */
 export function usePendingFabricEnrollment() {
   return useQuery({ ...getFabricNodeInvitationsPendingOptions(), staleTime: 3_000 })
+}
+
+/** Owner inbox for pending Node enrollment requests. */
+export function usePendingFabricNodeRequests(enabled: boolean) {
+  return useQuery({
+    ...getFabricNodeInvitationsRequestsOptions(),
+    enabled,
+    retry: false,
+    refetchInterval: enabled ? 3_000 : false,
+  })
 }
 
 /** Nodes visible in this Fabric (`GET /nodes`). */
@@ -100,6 +115,15 @@ export function useCancelPendingFabricEnrollment() {
   })
 }
 
+/** Remove this non-owner device's active local Fabric membership. */
+export function useLeaveFabric() {
+  const refresh = useRefreshFabric()
+  return useMutation({
+    ...deleteFabricMutation(),
+    onSuccess: () => refresh(),
+  })
+}
+
 /** Poll completion of an owner-approved enrollment on this device. */
 export function useCompleteNodeEnrollment() {
   const refresh = useRefreshFabric()
@@ -115,6 +139,27 @@ export function useApproveNodeInvitation() {
   return useMutation({
     ...postFabricNodeInvitationsApproveMutation(),
     onSuccess: () => refresh(),
+  })
+}
+
+/** Owner-side: approve one request directly from the Fabric inbox. */
+export function useApprovePendingFabricNodeRequest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...postFabricNodeInvitationsRequestsByRequestIdApproveMutation(),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: getFabricNodeInvitationsRequestsQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getNodesQueryKey() }),
+    ]),
+  })
+}
+
+/** Owner-side: reject one request from the Fabric inbox. */
+export function useRejectPendingFabricNodeRequest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...deleteFabricNodeInvitationsRequestsByRequestIdMutation(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getFabricNodeInvitationsRequestsQueryKey() }),
   })
 }
 

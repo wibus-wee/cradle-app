@@ -10,7 +10,7 @@ import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
 import { readSecret, removeSecret, upsertSecret } from '../secrets/service'
 import { FabricDirectoryClient } from './directory-client'
-import type { FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
+import type { FabricJoinRequest, FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
 import {
   assertFabricCertificate,
   fabricAuthHeaders,
@@ -65,6 +65,16 @@ export interface PendingFabricEnrollmentView {
   deliverySecret: string
   expiresAt: string | null
   createdAt: number
+}
+
+export interface PendingFabricNodeRequestView {
+  requestId: string
+  displayName: string
+  platform: string
+  version: string
+  capabilities: string[]
+  requestedAt: string
+  expiresAt: string
 }
 
 type FabricMembershipChangedListener = () => void
@@ -148,6 +158,23 @@ export function cancelPendingNodeEnrollment(): void {
   notifyFabricMembershipChanged()
 }
 
+export function leaveFabric(): void {
+  const row = db().select().from(fabricMembership).orderBy(asc(fabricMembership.createdAt)).get()
+  if (!row) {
+    return
+  }
+  if (row.role === 'owner') {
+    throw new AppError({ code: 'fabric_owner_cannot_leave', status: 409, message: 'The Fabric owner cannot leave its own Fabric.' })
+  }
+  db().delete(fabricMembership).where(eq(fabricMembership.fabricId, row.fabricId)).run()
+  removeSecret(row.identityKeySecretId)
+  removeSecret(row.encryptionKeySecretId)
+  if (row.ownerKeySecretId) {
+    removeSecret(row.ownerKeySecretId)
+  }
+  notifyFabricMembershipChanged()
+}
+
 function hasStoredFabricMembership(): boolean {
   return db().select({ fabricId: fabricMembership.fabricId }).from(fabricMembership).limit(1).get() !== undefined
 }
@@ -197,6 +224,7 @@ encryptionPubkey: encryption.publicKeyBase64,
 subjectId: nodeId,
     identityPubkey: identity.publicKeyBase64,
 encryptionPubkey: encryption.publicKeyBase64,
+    nodeId,
     scopes: ['admin', 'approve', 'control', 'view'],
   })
   const deliverySecret = randomFabricSecret()
@@ -212,14 +240,7 @@ version: input.version ?? 'cradle-server',
 deliverySecret,
   })
   const join = await directory.createJoinRequest(joinRequest)
-  await directory.approveJoinRequest(join.requestId, nodeCertificate, ownerProofHeaders(owner.privateKeyBase64, 'POST', `/v1/join-requests/${join.requestId}/approve`))
-  await directory.registerController(created.fabric.fabricId, controllerCertificate, [{
-    grantId: `grant_${randomUUID()}`,
-fabricId: created.fabric.fabricId,
-controllerId: nodeId,
-nodeId,
-scope: 'admin',
-  }], ownerProofHeaders(owner.privateKeyBase64, 'POST', `/v1/fabrics/${created.fabric.fabricId}/controllers`))
+  await directory.approveJoinRequest(join.requestId, nodeCertificate, controllerCertificate, ownerProofHeaders(owner.privateKeyBase64, 'POST', `/v1/join-requests/${join.requestId}/approve`))
 
   upsertSecret({ id: ownerKeySecretId, kind: 'system-fabric-owner-key', label: 'Cradle Fabric owner key', secret: owner.privateKeyBase64 })
   upsertSecret({ id: identityKeySecretId, kind: 'system-fabric-identity-key', label: 'Cradle Fabric identity key', secret: identity.privateKeyBase64 })
@@ -294,15 +315,25 @@ export async function completeNodeEnrollment(): Promise<FabricMembershipView | n
   }
   const pending = parsePendingEnrollment(row.certificateJson)
   const result = await new FabricDirectoryClient(row.relayUrl).readJoinRequest(pending.requestId, pending.deliverySecret)
-  if (result.status === 'pending' || !result.certificate) {
+  if (result.status === 'pending') {
     return null
   }
-  if (result.certificate.fabricId !== row.fabricId || result.certificate.subjectKind !== 'node' || result.certificate.subjectId !== row.localNodeId) {
+  if (result.status === 'rejected') {
+    cancelPendingNodeEnrollment()
+    return null
+  }
+  if (!result.nodeCertificate || !result.controllerCertificate) {
+    throw new AppError({ code: 'fabric_membership_invalid', status: 502, message: 'Fabric relay returned an incomplete membership approval.' })
+  }
+  if (result.nodeCertificate.fabricId !== row.fabricId || result.nodeCertificate.subjectKind !== 'node' || result.nodeCertificate.subjectId !== row.localNodeId) {
     throw new AppError({ code: 'fabric_membership_invalid', status: 502, message: 'Fabric relay returned a mismatched Node certificate.' })
+  }
+  if (result.controllerCertificate.fabricId !== row.fabricId || result.controllerCertificate.subjectKind !== 'controller' || result.controllerCertificate.subjectId !== row.localNodeId) {
+    throw new AppError({ code: 'fabric_membership_invalid', status: 502, message: 'Fabric relay returned a mismatched Controller certificate.' })
   }
   const updated = db().update(fabricMembership).set({
     role: 'node',
-    certificateJson: JSON.stringify({ node: result.certificate }),
+    certificateJson: JSON.stringify({ node: result.nodeCertificate, controller: result.controllerCertificate }),
     updatedAt: currentUnixSeconds(),
   }).where(eq(fabricMembership.fabricId, row.fabricId)).returning().get()
   if (!updated) {
@@ -314,7 +345,7 @@ export async function completeNodeEnrollment(): Promise<FabricMembershipView | n
 
 export async function approveNodeInvitation(invitation: FabricNodeInvitation): Promise<NodeSummary> {
   const membership = requireFabricMembership()
-  const ownerPrivateKey = requireOwnerKey()
+  requireOwnerKey()
   if (invitation.fabricId !== membership.fabricId || invitation.relayUrl !== membership.relayUrl) {
     throw new AppError({ code: 'fabric_invitation_wrong_fabric', status: 409, message: 'This Node invitation belongs to a different Fabric.' })
   }
@@ -323,16 +354,82 @@ export async function approveNodeInvitation(invitation: FabricNodeInvitation): P
   if (pending.status === 'approved') {
     throw new AppError({ code: 'fabric_invitation_already_approved', status: 409, message: 'This Node invitation has already been approved.' })
   }
-  const request = pending.request
+  if (pending.status === 'rejected') {
+    throw new AppError({ code: 'fabric_invitation_rejected', status: 409, message: 'This Node invitation was rejected.' })
+  }
+  return await approveJoinRequest(pending.request)
+}
+
+export async function listPendingNodeRequests(): Promise<PendingFabricNodeRequestView[]> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  const path = `/v1/fabrics/${membership.fabricId}/join-requests`
+  const requests = await new FabricDirectoryClient(membership.relayUrl).listJoinRequests(
+    membership.fabricId,
+    ownerProofHeaders(ownerPrivateKey, 'GET', path),
+  )
+  return requests.map(request => ({
+    requestId: request.requestId,
+    displayName: request.displayName,
+    platform: request.platform,
+    version: request.version,
+    capabilities: request.capabilities,
+    requestedAt: new Date(request.issuedAt * 1000).toISOString(),
+    expiresAt: new Date(request.expiresAt * 1000).toISOString(),
+  }))
+}
+
+export async function approvePendingNodeRequest(requestId: string): Promise<NodeSummary> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  const path = `/v1/fabrics/${membership.fabricId}/join-requests`
+  const requests = await new FabricDirectoryClient(membership.relayUrl).listJoinRequests(
+    membership.fabricId,
+    ownerProofHeaders(ownerPrivateKey, 'GET', path),
+  )
+  const request = requests.find(candidate => candidate.requestId === requestId)
+  if (!request) {
+    throw new AppError({ code: 'fabric_join_request_not_found', status: 404, message: 'This Fabric join request is no longer pending.' })
+  }
+  return await approveJoinRequest(request)
+}
+
+export async function rejectPendingNodeRequest(requestId: string): Promise<void> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  const path = `/v1/fabrics/${membership.fabricId}/join-requests/${requestId}`
+  await new FabricDirectoryClient(membership.relayUrl).rejectJoinRequest(
+    membership.fabricId,
+    requestId,
+    ownerProofHeaders(ownerPrivateKey, 'DELETE', path),
+  )
+}
+
+async function approveJoinRequest(request: FabricJoinRequest): Promise<NodeSummary> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  if (request.fabricId !== membership.fabricId) {
+    throw new AppError({ code: 'fabric_invitation_wrong_fabric', status: 409, message: 'This Node invitation belongs to a different Fabric.' })
+  }
   const nodeCertificate = signFabricCertificate(ownerPrivateKey, {
     fabricId: membership.fabricId,
 subjectKind: 'node',
-subjectId: requiredString(request, 'subjectId'),
-    identityPubkey: requiredString(request, 'identityPubkey'),
-encryptionPubkey: requiredString(request, 'encryptionPubkey'),
+subjectId: request.subjectId,
+    identityPubkey: request.identityPubkey,
+encryptionPubkey: request.encryptionPubkey,
 scopes: ['admin'],
   })
-  return await directory.approveJoinRequest(invitation.requestId, nodeCertificate, ownerProofHeaders(ownerPrivateKey, 'POST', `/v1/join-requests/${invitation.requestId}/approve`))
+  const controllerCertificate = signFabricCertificate(ownerPrivateKey, {
+    fabricId: membership.fabricId,
+    subjectKind: 'controller',
+    subjectId: request.subjectId,
+    identityPubkey: request.identityPubkey,
+    encryptionPubkey: request.encryptionPubkey,
+    nodeId: request.subjectId,
+    scopes: ['admin', 'approve', 'control', 'view'],
+  })
+  const directory = new FabricDirectoryClient(membership.relayUrl)
+  return await directory.approveJoinRequest(request.requestId, nodeCertificate, controllerCertificate, ownerProofHeaders(ownerPrivateKey, 'POST', `/v1/join-requests/${request.requestId}/approve`))
 }
 
 export async function listNodes(): Promise<NodeSummary[]> {
@@ -412,12 +509,6 @@ function toView(row: typeof fabricMembership.$inferSelect): FabricMembershipView
 function normalizeRelayUrl(value: string): string {
   try { const parsed = new URL(value); if (!['http:', 'https:'].includes(parsed.protocol)) { throw new Error('Unsupported relay URL protocol') } return parsed.toString().replace(/\/$/, '') }
  catch { throw new AppError({ code: 'fabric_relay_url_invalid', status: 400, message: 'Fabric relay URL must be an HTTP or HTTPS URL.' }) }
-}
-
-function requiredString(value: Record<string, unknown>, field: string): string {
-  const result = value[field]
-  if (typeof result !== 'string' || !result.trim()) { throw new AppError({ code: 'fabric_invitation_invalid', status: 400, message: `Node invitation is missing ${field}.` }) }
-  return result
 }
 
 function parsePendingEnrollment(value: string): { requestId: string, deliverySecret: string, expiresAt?: string } {

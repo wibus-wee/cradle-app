@@ -75,9 +75,9 @@ function AddTargetControl({
         type="button"
         className={cn(
           'flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium',
-          'opacity-0 transition-all duration-120 group-hover:opacity-100 focus-visible:opacity-100',
+          'opacity-0 transition-[background-color,opacity,transform] duration-120 group-hover:opacity-100 focus-visible:opacity-100',
           EASE,
-          'bg-accent hover:bg-accent/80 active:scale-[0.97]',
+          'bg-accent hover:bg-accent/80 active:scale-[0.96]',
         )}
         disabled={adding}
         onClick={() => onAddWorkspace(entry, target)}
@@ -96,10 +96,10 @@ function AddTargetControl({
           type="button"
           className={cn(
             'flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium',
-            'opacity-0 transition-all duration-120 group-hover:opacity-100 focus-visible:opacity-100',
+            'opacity-0 transition-[background-color,opacity,transform] duration-120 group-hover:opacity-100 focus-visible:opacity-100',
             'data-[state=open]:opacity-100',
             EASE,
-            'bg-accent hover:bg-accent/80 active:scale-[0.97]',
+            'bg-accent hover:bg-accent/80 active:scale-[0.96]',
           )}
           disabled={anyAdding}
           data-testid={`node-workspace-add-menu-${entry.key}`}
@@ -137,7 +137,7 @@ export function NodeWorkspacePickerView({
   onAddWorkspace,
 }: NodeWorkspacePickerViewProps) {
   const { t } = useTranslation('nodes')
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
 
   return (
     <div className="flex min-w-0 flex-col" data-testid="node-workspace-picker">
@@ -174,9 +174,9 @@ EASE,
                   disabled={!online}
                   className={cn(
                     'flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px]',
-                    'transition-all duration-150',
+                    'transition-[background-color,border-color,color,transform] duration-150',
 EASE,
-                    'active:scale-[0.97]',
+                    'active:scale-[0.96]',
                     selected
                       ? 'border-foreground/25 bg-accent font-medium text-foreground'
                       : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
@@ -213,9 +213,9 @@ EASE,
                 type="button"
                 className={cn(
                   'flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium',
-                  'transition-all duration-120',
+                  'transition-[background-color,transform] duration-120',
 EASE,
-                  'hover:bg-accent active:scale-[0.97]',
+                  'hover:bg-accent active:scale-[0.96]',
                 )}
                 onClick={() => onReconnect(selectedNodeId)}
               >

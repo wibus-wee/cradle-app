@@ -2838,6 +2838,20 @@ export type PutProviderTargetsByProviderTargetIdExtensionsResponses = {
 
 export type PutProviderTargetsByProviderTargetIdExtensionsResponse = PutProviderTargetsByProviderTargetIdExtensionsResponses[keyof PutProviderTargetsByProviderTargetIdExtensionsResponses];
 
+export type DeleteFabricData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric';
+};
+
+export type DeleteFabricResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
 export type GetFabricData = {
     body?: never;
     path?: never;
@@ -3042,6 +3056,75 @@ export type PostFabricNodeInvitationsApproveResponses = {
 };
 
 export type PostFabricNodeInvitationsApproveResponse = PostFabricNodeInvitationsApproveResponses[keyof PostFabricNodeInvitationsApproveResponses];
+
+export type GetFabricNodeInvitationsRequestsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations/requests';
+};
+
+export type GetFabricNodeInvitationsRequestsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        requestId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        requestedAt: string;
+        expiresAt: string;
+    }>;
+};
+
+export type GetFabricNodeInvitationsRequestsResponse = GetFabricNodeInvitationsRequestsResponses[keyof GetFabricNodeInvitationsRequestsResponses];
+
+export type PostFabricNodeInvitationsRequestsByRequestIdApproveData = {
+    body?: never;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/fabric/node-invitations/requests/{requestId}/approve';
+};
+
+export type PostFabricNodeInvitationsRequestsByRequestIdApproveResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        nodeId: string;
+        fabricId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        status: 'online' | 'offline';
+        lastSeenAt: string;
+        revision: number;
+        scopes?: Array<'view' | 'control' | 'approve' | 'admin'>;
+    };
+};
+
+export type PostFabricNodeInvitationsRequestsByRequestIdApproveResponse = PostFabricNodeInvitationsRequestsByRequestIdApproveResponses[keyof PostFabricNodeInvitationsRequestsByRequestIdApproveResponses];
+
+export type DeleteFabricNodeInvitationsRequestsByRequestIdData = {
+    body?: never;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/fabric/node-invitations/requests/{requestId}';
+};
+
+export type DeleteFabricNodeInvitationsRequestsByRequestIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
 
 export type GetNodesData = {
     body?: never;

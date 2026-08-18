@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type {
   NodeWorkspaceEntry,
@@ -41,6 +41,17 @@ export function WorkspaceAddDialog({
     () => nodes.filter(node => node.nodeId !== localNodeId),
     [localNodeId, nodes],
   )
+
+  useEffect(() => {
+    if (!open || (selectedNodeId !== null && remoteNodes.some(node => node.nodeId === selectedNodeId))) {
+      return
+    }
+    const initialNode = remoteNodes.find(node => node.status === 'online') ?? remoteNodes[0]
+    if (initialNode) {
+      setSelectedNodeId(initialNode.nodeId)
+    }
+  }, [open, remoteNodes, selectedNodeId])
+
   const selectedNode = remoteNodes.find(node => node.nodeId === selectedNodeId) ?? null
   const nodeWorkspacesQuery = useNodeWorkspaces(selectedNode, open)
 

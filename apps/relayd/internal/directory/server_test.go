@@ -89,16 +89,71 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	joinedControllerCertificate, err := membership.SignCertificate(ownerPrivate, membership.Certificate{
+		Version:          1,
+		FabricID:         created.Fabric.ID,
+		SubjectKind:      membership.SubjectController,
+		SubjectID:        "node-a",
+		IdentityPubkey:   encodeDirectoryKey(nodePublic),
+		EncryptionPubkey: "node-x25519",
+		NodeID:           "node-a",
+		Scopes:           []membership.Scope{membership.ScopeAdmin},
+		IssuedAt:         clock.Unix(),
+		Nonce:            "joined-controller-certificate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pendingPath := "/v1/fabrics/" + created.Fabric.ID + "/join-requests"
+	pendingHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodGet, pendingPath, clock, "list-pending")
+	var pending struct {
+		Requests []membership.JoinRequest `json:"requests"`
+	}
+	getDirectoryJSON(t, httpServer.URL+pendingPath, pendingHeaders, http.StatusOK, &pending)
+	if len(pending.Requests) != 1 || pending.Requests[0].RequestID != join.RequestID {
+		t.Fatalf("pending join requests = %#v", pending.Requests)
+	}
 	ownerHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodPost, "/v1/join-requests/join-node-a/approve", clock, "approve-node")
-	postDirectoryJSON(t, httpServer.URL+"/v1/join-requests/join-node-a/approve", approveJoinRequest{Certificate: nodeCertificate}, ownerHeaders, http.StatusOK, &fabric.NodeSummary{})
+	postDirectoryJSON(t, httpServer.URL+"/v1/join-requests/join-node-a/approve", approveJoinRequest{NodeCertificate: nodeCertificate, ControllerCertificate: joinedControllerCertificate}, ownerHeaders, http.StatusOK, &fabric.NodeSummary{})
 
 	var approved struct {
-		Status      string                 `json:"status"`
-		Certificate membership.Certificate `json:"certificate"`
+		Status                string                 `json:"status"`
+		NodeCertificate       membership.Certificate `json:"nodeCertificate"`
+		ControllerCertificate membership.Certificate `json:"controllerCertificate"`
 	}
 	getDirectoryJSON(t, httpServer.URL+"/v1/join-requests/join-node-a?secret="+deliverySecret, nil, http.StatusOK, &approved)
-	if approved.Status != "approved" || approved.Certificate.SubjectID != "node-a" {
+	if approved.Status != "approved" || approved.NodeCertificate.SubjectID != "node-a" || approved.ControllerCertificate.SubjectKind != membership.SubjectController {
 		t.Fatalf("join request result = %#v", approved)
+	}
+
+	rejectedSecret := "rejected-delivery-secret"
+	rejectedJoin, err := membership.SignJoinRequest(nodePrivate, membership.JoinRequest{
+		RequestID:          "join-node-rejected",
+		FabricID:           created.Fabric.ID,
+		SubjectKind:        membership.SubjectNode,
+		SubjectID:          "node-rejected",
+		EncryptionPubkey:   "node-rejected-x25519",
+		DisplayName:        "Rejected Mac",
+		Platform:           "darwin",
+		Version:            "1.0.0",
+		Capabilities:       []string{"workspace"},
+		DeliverySecretHash: directorySecretHash(rejectedSecret),
+		IssuedAt:           clock.Unix(),
+		ExpiresAt:          clock.Add(5 * time.Minute).Unix(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	postDirectoryJSON(t, httpServer.URL+"/v1/join-requests", rejectedJoin, nil, http.StatusCreated, &map[string]any{})
+	rejectPath := "/v1/fabrics/" + created.Fabric.ID + "/join-requests/" + rejectedJoin.RequestID
+	rejectHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodDelete, rejectPath, clock, "reject-node")
+	deleteDirectory(t, httpServer.URL+rejectPath, rejectHeaders, http.StatusNoContent)
+	var rejected struct {
+		Status string `json:"status"`
+	}
+	getDirectoryJSON(t, httpServer.URL+"/v1/join-requests/"+rejectedJoin.RequestID+"?secret="+rejectedSecret, nil, http.StatusOK, &rejected)
+	if rejected.Status != "rejected" {
+		t.Fatalf("rejected join request result = %#v", rejected)
 	}
 
 	controllerPublic, controllerPrivate := directoryKey(t)
@@ -147,7 +202,7 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 		Grants []fabric.Grant `json:"grants"`
 	}
 	getDirectoryJSON(t, httpServer.URL+"/v1/nodes/node-a/grants", grantListHeaders, http.StatusOK, &grantList)
-	if len(grantList.Grants) != 1 || grantList.Grants[0].ID != "grant-node-a-view" || grantList.Grants[0].Scope != membership.ScopeView || grantList.Grants[0].RevokedAt != nil {
+	if len(grantList.Grants) != 2 || !hasActiveGrant(grantList.Grants, "grant-node-a-view", membership.ScopeView) {
 		t.Fatalf("node grants = %#v", grantList.Grants)
 	}
 	// Grant management is owner-only: a Controller proof must not list grants.
@@ -159,7 +214,7 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	deleteDirectory(t, httpServer.URL+"/v1/nodes/node-a/grants/grant-node-a-view", revokeHeaders, http.StatusNoContent)
 	grantListHeaders = directoryProofHeaders(t, ownerPrivate, http.MethodGet, "/v1/nodes/node-a/grants", clock, "list-grants-after-revoke")
 	getDirectoryJSON(t, httpServer.URL+"/v1/nodes/node-a/grants", grantListHeaders, http.StatusOK, &grantList)
-	if len(grantList.Grants) != 1 || grantList.Grants[0].RevokedAt == nil {
+	if len(grantList.Grants) != 2 || !hasRevokedGrant(grantList.Grants, "grant-node-a-view") {
 		t.Fatalf("node grants after revocation = %#v", grantList.Grants)
 	}
 	controllerHeaders = directoryProofHeaders(t, controllerPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "list-nodes-after-revoke")
@@ -172,6 +227,24 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	if _, err := directory.MarkNodePresence(t.Context(), created.Fabric.ID, "node-a", fabric.NodeOnline); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func hasActiveGrant(grants []fabric.Grant, id string, scope membership.Scope) bool {
+	for _, grant := range grants {
+		if grant.ID == id && grant.Scope == scope && grant.RevokedAt == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRevokedGrant(grants []fabric.Grant, id string) bool {
+	for _, grant := range grants {
+		if grant.ID == id && grant.RevokedAt != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func deleteDirectory(t *testing.T, url string, headers http.Header, wantStatus int) {

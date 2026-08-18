@@ -24,6 +24,7 @@ var (
 	ErrJoinRequestNotFound = errors.New("fabric: join request not found")
 	ErrJoinRequestExpired  = errors.New("fabric: join request expired")
 	ErrJoinRequestPending  = errors.New("fabric: join request pending")
+	ErrJoinRequestRejected = errors.New("fabric: join request rejected")
 	ErrAccessDenied        = errors.New("fabric: access denied")
 )
 
@@ -67,9 +68,11 @@ type NodeSummary struct {
 }
 
 type JoinRequestResult struct {
-	Request     membership.JoinRequest  `json:"request"`
-	Certificate *membership.Certificate `json:"certificate,omitempty"`
-	ApprovedAt  *time.Time              `json:"approvedAt,omitempty"`
+	Request               membership.JoinRequest  `json:"request"`
+	NodeCertificate       *membership.Certificate `json:"nodeCertificate,omitempty"`
+	ControllerCertificate *membership.Certificate `json:"controllerCertificate,omitempty"`
+	ApprovedAt            *time.Time              `json:"approvedAt,omitempty"`
+	RejectedAt            *time.Time              `json:"rejectedAt,omitempty"`
 }
 
 type Grant struct {
@@ -185,14 +188,14 @@ func (s *Store) CreateJoinRequest(ctx context.Context, request membership.JoinRe
 // lost after commit must not strand an already-enrolled Node.
 func (s *Store) ReadJoinRequest(ctx context.Context, requestID, deliverySecret string) (JoinRequestResult, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT request_json, secret_hash, certificate_json, approved_at, expires_at
+		SELECT request_json, secret_hash, certificate_json, controller_certificate_json, approved_at, rejected_at, expires_at
 		FROM join_requests WHERE request_id = ?
 	`, requestID)
 	var requestJSON, secretHash string
-	var certificateJSON sql.NullString
-	var approvedAt sql.NullInt64
+	var nodeCertificateJSON, controllerCertificateJSON sql.NullString
+	var approvedAt, rejectedAt sql.NullInt64
 	var expiresAt int64
-	if err := row.Scan(&requestJSON, &secretHash, &certificateJSON, &approvedAt, &expiresAt); err != nil {
+	if err := row.Scan(&requestJSON, &secretHash, &nodeCertificateJSON, &controllerCertificateJSON, &approvedAt, &rejectedAt, &expiresAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return JoinRequestResult{}, ErrJoinRequestNotFound
 		}
@@ -201,7 +204,7 @@ func (s *Store) ReadJoinRequest(ctx context.Context, requestID, deliverySecret s
 	if hashSecret(deliverySecret) != secretHash {
 		return JoinRequestResult{}, ErrAccessDenied
 	}
-	if !s.now().Before(time.Unix(expiresAt, 0)) && !certificateJSON.Valid {
+	if !s.now().Before(time.Unix(expiresAt, 0)) && !nodeCertificateJSON.Valid && !rejectedAt.Valid {
 		return JoinRequestResult{}, ErrJoinRequestExpired
 	}
 	var request membership.JoinRequest
@@ -213,44 +216,107 @@ func (s *Store) ReadJoinRequest(ctx context.Context, requestID, deliverySecret s
 		value := time.UnixMilli(approvedAt.Int64).UTC()
 		result.ApprovedAt = &value
 	}
-	if !certificateJSON.Valid {
+	if rejectedAt.Valid {
+		value := time.UnixMilli(rejectedAt.Int64).UTC()
+		result.RejectedAt = &value
+		return result, ErrJoinRequestRejected
+	}
+	if !nodeCertificateJSON.Valid || !controllerCertificateJSON.Valid {
 		return result, ErrJoinRequestPending
 	}
-	var certificate membership.Certificate
-	if err := json.Unmarshal([]byte(certificateJSON.String), &certificate); err != nil {
-		return JoinRequestResult{}, fmt.Errorf("decoding join certificate: %w", err)
+	var nodeCertificate membership.Certificate
+	if err := json.Unmarshal([]byte(nodeCertificateJSON.String), &nodeCertificate); err != nil {
+		return JoinRequestResult{}, fmt.Errorf("decoding Node join certificate: %w", err)
 	}
-	result.Certificate = &certificate
+	var controllerCertificate membership.Certificate
+	if err := json.Unmarshal([]byte(controllerCertificateJSON.String), &controllerCertificate); err != nil {
+		return JoinRequestResult{}, fmt.Errorf("decoding Controller join certificate: %w", err)
+	}
+	result.NodeCertificate = &nodeCertificate
+	result.ControllerCertificate = &controllerCertificate
 	return result, nil
 }
 
-func (s *Store) ApproveJoinRequest(ctx context.Context, requestID string, certificate membership.Certificate) (NodeSummary, error) {
+func (s *Store) ListPendingJoinRequests(ctx context.Context, fabricID string) ([]membership.JoinRequest, error) {
+	if _, err := s.GetFabric(ctx, fabricID); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT request_json FROM join_requests
+		WHERE fabric_id = ? AND certificate_json IS NULL AND rejected_at IS NULL AND expires_at > ?
+		ORDER BY created_at, request_id
+	`, fabricID, s.now().UTC().Unix())
+	if err != nil {
+		return nil, fmt.Errorf("listing pending join requests: %w", err)
+	}
+	defer rows.Close()
+	requests := []membership.JoinRequest{}
+	for rows.Next() {
+		var encoded string
+		if err := rows.Scan(&encoded); err != nil {
+			return nil, err
+		}
+		var request membership.JoinRequest
+		if err := json.Unmarshal([]byte(encoded), &request); err != nil {
+			return nil, fmt.Errorf("decoding pending join request: %w", err)
+		}
+		requests = append(requests, request)
+	}
+	return requests, rows.Err()
+}
+
+func (s *Store) RejectJoinRequest(ctx context.Context, fabricID, requestID string) error {
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE join_requests SET rejected_at = ?
+		WHERE fabric_id = ? AND request_id = ? AND certificate_json IS NULL AND rejected_at IS NULL
+	`, s.now().UTC().UnixMilli(), fabricID, requestID)
+	if err != nil {
+		return fmt.Errorf("rejecting join request: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected != 1 {
+		return ErrJoinRequestNotFound
+	}
+	return nil
+}
+
+func (s *Store) ApproveJoinRequest(ctx context.Context, requestID string, nodeCertificate, controllerCertificate membership.Certificate) (NodeSummary, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return NodeSummary{}, err
 	}
 	defer tx.Rollback()
 	row := tx.QueryRowContext(ctx, `
-		SELECT fabric_id, subject_id, identity_pubkey, encryption_pubkey, display_name, platform, version, capabilities_json, expires_at, certificate_json
+		SELECT fabric_id, subject_id, identity_pubkey, encryption_pubkey, display_name, platform, version, capabilities_json, expires_at, certificate_json, controller_certificate_json, rejected_at
 		FROM join_requests WHERE request_id = ?
 	`, requestID)
 	var fabricID, subjectID, identityPubkey, encryptionPubkey, displayName, platform, version, capabilitiesJSON string
 	var expiresAt int64
-	var existingCertificate sql.NullString
-	if err := row.Scan(&fabricID, &subjectID, &identityPubkey, &encryptionPubkey, &displayName, &platform, &version, &capabilitiesJSON, &expiresAt, &existingCertificate); err != nil {
+	var existingNodeCertificate, existingControllerCertificate sql.NullString
+	var rejectedAt sql.NullInt64
+	if err := row.Scan(&fabricID, &subjectID, &identityPubkey, &encryptionPubkey, &displayName, &platform, &version, &capabilitiesJSON, &expiresAt, &existingNodeCertificate, &existingControllerCertificate, &rejectedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return NodeSummary{}, ErrJoinRequestNotFound
 		}
 		return NodeSummary{}, fmt.Errorf("reading join request for approval: %w", err)
 	}
-	if !s.now().Before(time.Unix(expiresAt, 0)) && !existingCertificate.Valid {
+	if rejectedAt.Valid {
+		return NodeSummary{}, ErrJoinRequestRejected
+	}
+	if !s.now().Before(time.Unix(expiresAt, 0)) && !existingNodeCertificate.Valid {
 		return NodeSummary{}, ErrJoinRequestExpired
 	}
-	if certificate.FabricID != fabricID || certificate.SubjectKind != membership.SubjectNode || certificate.SubjectID != subjectID || certificate.IdentityPubkey != identityPubkey || certificate.EncryptionPubkey != encryptionPubkey {
+	if nodeCertificate.FabricID != fabricID || nodeCertificate.SubjectKind != membership.SubjectNode || nodeCertificate.SubjectID != subjectID || nodeCertificate.IdentityPubkey != identityPubkey || nodeCertificate.EncryptionPubkey != encryptionPubkey {
 		return NodeSummary{}, ErrAccessDenied
 	}
-	if existingCertificate.Valid {
-		if membership.CertificateFingerprint(certificate) != certificateFingerprintJSON(existingCertificate.String) {
+	if controllerCertificate.FabricID != fabricID || controllerCertificate.SubjectKind != membership.SubjectController || controllerCertificate.SubjectID != subjectID || controllerCertificate.IdentityPubkey != identityPubkey || controllerCertificate.EncryptionPubkey != encryptionPubkey {
+		return NodeSummary{}, ErrAccessDenied
+	}
+	if existingNodeCertificate.Valid || existingControllerCertificate.Valid {
+		if !existingNodeCertificate.Valid || !existingControllerCertificate.Valid || membership.CertificateFingerprint(nodeCertificate) != certificateFingerprintJSON(existingNodeCertificate.String) || membership.CertificateFingerprint(controllerCertificate) != certificateFingerprintJSON(existingControllerCertificate.String) {
 			return NodeSummary{}, ErrAccessDenied
 		}
 		return s.nodeInTx(ctx, tx, fabricID, subjectID)
@@ -264,7 +330,8 @@ func (s *Store) ApproveJoinRequest(ctx context.Context, requestID string, certif
 	if err != nil {
 		return NodeSummary{}, err
 	}
-	certificateJSON := mustJSON(certificate)
+	nodeCertificateJSON := mustJSON(nodeCertificate)
+	controllerCertificateJSON := mustJSON(controllerCertificate)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO principals (fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at)
 		VALUES (?, ?, 'node', ?, ?, ?, ?)
@@ -272,7 +339,7 @@ func (s *Store) ApproveJoinRequest(ctx context.Context, requestID string, certif
 			identity_pubkey = excluded.identity_pubkey,
 			encryption_pubkey = excluded.encryption_pubkey,
 			certificate_json = excluded.certificate_json
-	`, fabricID, subjectID, identityPubkey, encryptionPubkey, certificateJSON, now.UnixMilli())
+	`, fabricID, subjectID, identityPubkey, encryptionPubkey, nodeCertificateJSON, now.UnixMilli())
 	if err != nil {
 		return NodeSummary{}, fmt.Errorf("persisting node principal: %w", err)
 	}
@@ -290,7 +357,29 @@ func (s *Store) ApproveJoinRequest(ctx context.Context, requestID string, certif
 	if err != nil {
 		return NodeSummary{}, fmt.Errorf("persisting node: %w", err)
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE join_requests SET certificate_json = ?, approved_at = ? WHERE request_id = ?`, certificateJSON, now.UnixMilli(), requestID)
+	// An approved personal Fabric device is both a Node and a Controller. Add
+	// the new Controller to every Node and every existing Controller to the new
+	// Node so all approved devices can discover and control one another.
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO node_grants (grant_id, fabric_id, controller_id, node_id, scope, created_at)
+		SELECT 'grant_' || lower(hex(randomblob(18))), ?, ?, node_id, 'admin', ?
+		FROM nodes WHERE fabric_id = ?
+		ON CONFLICT(fabric_id, controller_id, node_id, scope) DO NOTHING
+	`, fabricID, subjectID, now.UnixMilli(), fabricID)
+	if err != nil {
+		return NodeSummary{}, fmt.Errorf("granting new Controller access: %w", err)
+	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO node_grants (grant_id, fabric_id, controller_id, node_id, scope, created_at)
+		SELECT 'grant_' || lower(hex(randomblob(18))), ?, subject_id, ?, 'admin', ?
+		FROM (SELECT DISTINCT controller_id AS subject_id FROM node_grants WHERE fabric_id = ?)
+		WHERE true
+		ON CONFLICT(fabric_id, controller_id, node_id, scope) DO NOTHING
+	`, fabricID, subjectID, now.UnixMilli(), fabricID)
+	if err != nil {
+		return NodeSummary{}, fmt.Errorf("granting existing Controllers access: %w", err)
+	}
+	_, err = tx.ExecContext(ctx, `UPDATE join_requests SET certificate_json = ?, controller_certificate_json = ?, approved_at = ? WHERE request_id = ?`, nodeCertificateJSON, controllerCertificateJSON, now.UnixMilli(), requestID)
 	if err != nil {
 		return NodeSummary{}, fmt.Errorf("completing join request: %w", err)
 	}
@@ -376,7 +465,7 @@ func (s *Store) ControllerExists(ctx context.Context, fabricID, controllerID, id
 	var found int
 	err := s.db.QueryRowContext(ctx, `
 		SELECT 1 FROM principals
-		WHERE fabric_id = ? AND subject_id = ? AND subject_kind = 'controller' AND identity_pubkey = ?
+		WHERE fabric_id = ? AND subject_id = ? AND identity_pubkey = ?
 		LIMIT 1
 	`, fabricID, controllerID, identityPubkey).Scan(&found)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -659,7 +748,9 @@ func (s *Store) migrate(ctx context.Context) error {
 			request_json TEXT NOT NULL,
 			secret_hash TEXT NOT NULL,
 			certificate_json TEXT,
+			controller_certificate_json TEXT,
 			approved_at INTEGER,
+			rejected_at INTEGER,
 			created_at INTEGER NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS join_requests_fabric_idx ON join_requests(fabric_id, expires_at)`,
@@ -675,6 +766,41 @@ func (s *Store) migrate(ctx context.Context) error {
 		if _, err := s.db.ExecContext(ctx, statement); err != nil {
 			return fmt.Errorf("migrating fabric store: %w", err)
 		}
+	}
+	if err := s.ensureColumn(ctx, "join_requests", "controller_certificate_json", "TEXT"); err != nil {
+		return err
+	}
+	if err := s.ensureColumn(ctx, "join_requests", "rejected_at", "INTEGER"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *Store) ensureColumn(ctx context.Context, table, column, definition string) error {
+	rows, err := s.db.QueryContext(ctx, `PRAGMA table_info(`+table+`)`)
+	if err != nil {
+		return fmt.Errorf("reading %s columns: %w", table, err)
+	}
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, kind string
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &kind, &notNull, &defaultValue, &primaryKey); err != nil {
+			return err
+		}
+		if name == column {
+			return rows.Close()
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `ALTER TABLE `+table+` ADD COLUMN `+column+` `+definition); err != nil {
+		return fmt.Errorf("adding %s.%s: %w", table, column, err)
 	}
 	return nil
 }

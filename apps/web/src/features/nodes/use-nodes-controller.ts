@@ -4,19 +4,23 @@ import { useTranslation } from 'react-i18next'
 import { toastManager } from '~/components/ui/toast'
 
 import { decodeInviteCode, encodeInviteCode } from './invite-code'
-import type { FabricNodeInvitation, NodeGrant } from './types'
+import type { FabricNodeInvitation, NodeGrant, PendingFabricNodeRequest } from './types'
 import {
   useApproveNodeInvitation,
+  useApprovePendingFabricNodeRequest,
   useCancelPendingFabricEnrollment,
   useCompleteNodeEnrollment,
   useConnectNode,
   useCreateFabric,
   useCreateNodeInvitation,
   useFabricMembership,
+  useLeaveFabric,
   useManagedRelay,
   useNodeGrants,
   useNodes,
   usePendingFabricEnrollment,
+  usePendingFabricNodeRequests,
+  useRejectPendingFabricNodeRequest,
   useRevokeNodeGrant,
 } from './use-nodes'
 
@@ -36,17 +40,26 @@ export function useNodesController() {
   const managedRelay = managedRelayQuery.data ?? null
   const pendingEnrollment = pendingEnrollmentQuery.data ?? null
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
+  const pendingRequestsQuery = usePendingFabricNodeRequests(membership?.role === 'owner')
+  const pendingRequests = useMemo<PendingFabricNodeRequest[]>(
+    () => pendingRequestsQuery.data ?? [],
+    [pendingRequestsQuery.data],
+  )
 
   const [connectOpen, setConnectOpen] = useState(false)
   const [accessNodeId, setAccessNodeId] = useState<string | null>(null)
   const [invitation, setInvitation] = useState<FabricNodeInvitation | null>(null)
   const [revokingGrantId, setRevokingGrantId] = useState<string | null>(null)
+  const [pendingRequestAction, setPendingRequestAction] = useState<{ requestId: string, kind: 'approve' | 'reject' } | null>(null)
 
   const createFabric = useCreateFabric()
   const createInvitation = useCreateNodeInvitation()
   const cancelEnrollment = useCancelPendingFabricEnrollment()
+  const leaveFabric = useLeaveFabric()
   const completeEnrollment = useCompleteNodeEnrollment()
   const approveInvitation = useApproveNodeInvitation()
+  const approvePendingRequest = useApprovePendingFabricNodeRequest()
+  const rejectPendingRequest = useRejectPendingFabricNodeRequest()
   const connectNode = useConnectNode()
   const revokeGrant = useRevokeNodeGrant()
 
@@ -232,6 +245,42 @@ export function useNodesController() {
     }
   }, [cancelEnrollment, t])
 
+  const handleLeaveFabric = useCallback(async () => {
+    try {
+      await leaveFabric.mutateAsync({})
+    }
+    catch (error) {
+      toastManager.add({ type: 'error', title: t('toast.leaveFailed'), description: errorMessage(error) })
+    }
+  }, [leaveFabric, t])
+
+  const handleApprovePendingRequest = useCallback(async (requestId: string) => {
+    setPendingRequestAction({ requestId, kind: 'approve' })
+    try {
+      const approved = await approvePendingRequest.mutateAsync({ path: { requestId } })
+      toastManager.add({ type: 'success', title: t('toast.linked', { name: approved.displayName }) })
+    }
+    catch (error) {
+      toastManager.add({ type: 'error', title: t('toast.approveFailed'), description: errorMessage(error) })
+    }
+    finally {
+      setPendingRequestAction(null)
+    }
+  }, [approvePendingRequest, t])
+
+  const handleRejectPendingRequest = useCallback(async (requestId: string) => {
+    setPendingRequestAction({ requestId, kind: 'reject' })
+    try {
+      await rejectPendingRequest.mutateAsync({ path: { requestId } })
+    }
+    catch (error) {
+      toastManager.add({ type: 'error', title: t('toast.rejectFailed'), description: errorMessage(error) })
+    }
+    finally {
+      setPendingRequestAction(null)
+    }
+  }, [rejectPendingRequest, t])
+
   const handleRevokeGrant = useCallback(
     async (grantId: string) => {
       if (!accessNodeId) {
@@ -270,10 +319,19 @@ export function useNodesController() {
     refreshMembership: () => void Promise.all([membershipQuery.refetch(), pendingEnrollmentQuery.refetch()]),
     managedRelay,
     nodes,
+    nodesLoading: nodesQuery.isLoading,
+    nodesError: nodesQuery.isError,
+    refreshNodes: () => void nodesQuery.refetch(),
+    pendingRequests,
+    pendingRequestsLoading: pendingRequestsQuery.isLoading,
+    pendingRequestsError: pendingRequestsQuery.isError,
+    refreshPendingRequests: () => void pendingRequestsQuery.refetch(),
+    pendingRequestAction,
     networkCode,
     inviteCode,
     awaitingApproval,
     cancellingEnrollment: cancelEnrollment.isPending,
+    leavingFabric: leaveFabric.isPending,
     connectOpen,
     accessNode,
     accessNodeId,
@@ -288,6 +346,9 @@ export function useNodesController() {
     handleGetCode,
     handleSubmitCode,
     handleCancelEnrollment,
+    handleLeaveFabric,
+    handleApprovePendingRequest,
+    handleRejectPendingRequest,
     handleRevokeGrant,
     handleConnectOpenChange,
   }

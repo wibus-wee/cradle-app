@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
+import type { MembershipCertificate } from '../src/modules/fabric/protocol'
 import {
   generateFabricEncryptionKeyPair,
   generateFabricSigningKeyPair,
@@ -22,6 +23,30 @@ type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
 interface FakeDirectoryState {
   requests: string[]
   revokedGrants: string[]
+  approvedRequestBodies: Array<{
+    nodeCertificate: MembershipCertificate
+    controllerCertificate: MembershipCertificate
+  }>
+  rejectedRequests: string[]
+}
+
+const pendingIdentity = generateFabricSigningKeyPair()
+const pendingEncryption = generateFabricEncryptionKeyPair()
+const pendingJoinRequest = {
+  requestId: 'join-pending',
+  fabricId: 'fabric-1',
+  subjectKind: 'node',
+  subjectId: 'node-pending',
+  identityPubkey: pendingIdentity.publicKeyBase64,
+  encryptionPubkey: pendingEncryption.publicKeyBase64,
+  displayName: 'Studio Mac',
+  platform: 'darwin',
+  version: '1.2.3',
+  capabilities: ['workspace', 'terminal'],
+  deliverySecretHash: 'not-exposed-to-web',
+  issuedAt: 1_776_000_000,
+  expiresAt: 1_776_000_900,
+  signature: 'relay-validated-signature',
 }
 
 const nodeASummary = {
@@ -51,7 +76,7 @@ const nodeAGrants = [
 ]
 
 function startFakeDirectory(state: FakeDirectoryState): Promise<{ baseUrl: string, close: () => Promise<void> }> {
-  const server: Server = createServer((request, response) => {
+  const server: Server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
     state.requests.push(`${request.method ?? 'GET'} ${url.pathname}`)
     const writeJson = (status: number, body: unknown) => {
@@ -60,6 +85,29 @@ function startFakeDirectory(state: FakeDirectoryState): Promise<{ baseUrl: strin
     }
     if (url.pathname === '/v1/fabrics/fabric-1/nodes' && request.method === 'GET') {
       writeJson(200, { revision: 3, nodes: [nodeASummary, offlineNodeSummary] })
+      return
+    }
+    if (url.pathname === '/v1/fabrics/fabric-1/join-requests' && request.method === 'GET') {
+      writeJson(200, { requests: [pendingJoinRequest] })
+      return
+    }
+    if (url.pathname === '/v1/join-requests/join-pending/approve' && request.method === 'POST') {
+      const chunks: Buffer[] = []
+      for await (const chunk of request) {
+        chunks.push(Buffer.from(chunk))
+      }
+      state.approvedRequestBodies.push(JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+        nodeCertificate: MembershipCertificate
+        controllerCertificate: MembershipCertificate
+      })
+      writeJson(200, { ...offlineNodeSummary, nodeId: 'node-pending', displayName: 'Studio Mac' })
+      return
+    }
+    const rejectRequestMatch = /^\/v1\/fabrics\/fabric-1\/join-requests\/(?<requestId>[\w-]+)$/u.exec(url.pathname)
+    if (rejectRequestMatch && request.method === 'DELETE') {
+      state.rejectedRequests.push(rejectRequestMatch.groups!.requestId!)
+      response.writeHead(204)
+      response.end()
       return
     }
     if (url.pathname === '/v1/nodes/node-a/grants' && request.method === 'GET') {
@@ -126,7 +174,7 @@ function seedFabricMembership(relayUrl: string): void {
 describe('fabric node directory routes', () => {
   let dataDir = ''
   let directory: { baseUrl: string, close: () => Promise<void> } | undefined
-  const state: FakeDirectoryState = { requests: [], revokedGrants: [] }
+  const state: FakeDirectoryState = { requests: [], revokedGrants: [], approvedRequestBodies: [], rejectedRequests: [] }
   const previousDataDir = process.env.CRADLE_DATA_DIR
   const previousCredentialSecret = process.env.CRADLE_CREDENTIAL_SECRET
 
@@ -155,6 +203,8 @@ describe('fabric node directory routes', () => {
     process.env.CRADLE_CREDENTIAL_SECRET = 'fabric-node-grants-test-secret'
     state.requests = []
     state.revokedGrants = []
+    state.approvedRequestBodies = []
+    state.rejectedRequests = []
     directory = await startFakeDirectory(state)
     const created = await createServerApp()
     seedFabricMembership(directory.baseUrl)
@@ -172,6 +222,36 @@ describe('fabric node directory routes', () => {
     const offlineBody = await offline.json()
     expect(offlineBody.status).toBe('offline')
     expect(offlineBody.scopes).toEqual(['view'])
+  })
+
+  it('projects pending join requests and sends dual certificates for owner decisions', async () => {
+    const server = await setup()
+    const listed = await server.handle(new Request('http://localhost/fabric/node-invitations/requests'))
+    expect(listed.status).toBe(200)
+    expect(await listed.json()).toEqual([{
+      requestId: 'join-pending',
+      displayName: 'Studio Mac',
+      platform: 'darwin',
+      version: '1.2.3',
+      capabilities: ['workspace', 'terminal'],
+      requestedAt: new Date(pendingJoinRequest.issuedAt * 1000).toISOString(),
+      expiresAt: new Date(pendingJoinRequest.expiresAt * 1000).toISOString(),
+    }])
+
+    const approved = await server.handle(new Request('http://localhost/fabric/node-invitations/requests/join-pending/approve', { method: 'POST' }))
+    expect(approved.status).toBe(200)
+    expect(state.approvedRequestBodies).toHaveLength(1)
+    expect(state.approvedRequestBodies[0]?.nodeCertificate).toMatchObject({ subjectKind: 'node', subjectId: 'node-pending' })
+    expect(state.approvedRequestBodies[0]?.controllerCertificate).toMatchObject({
+      subjectKind: 'controller',
+      subjectId: 'node-pending',
+      nodeId: 'node-pending',
+      scopes: ['admin', 'approve', 'control', 'view'],
+    })
+
+    const rejected = await server.handle(new Request('http://localhost/fabric/node-invitations/requests/join-pending', { method: 'DELETE' }))
+    expect(rejected.status).toBe(204)
+    expect(state.rejectedRequests).toEqual(['join-pending'])
   })
 
   it('rejects Nodes outside the caller grant filter', async () => {

@@ -1,5 +1,5 @@
 import { AppError } from '../../errors/app-error'
-import type { FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
+import type { FabricJoinRequest, FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
 
 export class FabricDirectoryClient {
   constructor(readonly relayUrl: string) {}
@@ -25,16 +25,29 @@ export class FabricDirectoryClient {
     return this.request<{ fabric: { fabricId: string, ownerPubkey: string } }>('/v1/fabrics', jsonRequest('POST', request))
   }
 
-  createJoinRequest(request: Record<string, unknown>) {
+  createJoinRequest(request: FabricJoinRequest) {
     return this.request<{ requestId: string, expiresAt: string }>('/v1/join-requests', jsonRequest('POST', request))
   }
 
   readJoinRequest(requestId: string, deliverySecret: string) {
-    return this.request<{ status: 'pending' | 'approved', request: Record<string, unknown>, certificate?: MembershipCertificate }>(`/v1/join-requests/${encodeURIComponent(requestId)}?secret=${encodeURIComponent(deliverySecret)}`)
+    return this.request<{
+      status: 'pending' | 'approved' | 'rejected'
+      request: FabricJoinRequest
+      nodeCertificate?: MembershipCertificate
+      controllerCertificate?: MembershipCertificate
+    }>(`/v1/join-requests/${encodeURIComponent(requestId)}?secret=${encodeURIComponent(deliverySecret)}`)
   }
 
-  approveJoinRequest(requestId: string, certificate: MembershipCertificate, headers: Headers) {
-    return this.request<NodeSummary>(`/v1/join-requests/${encodeURIComponent(requestId)}/approve`, jsonRequest('POST', { certificate }, headers))
+  listJoinRequests(fabricId: string, headers: Headers) {
+    return this.request<{ requests: FabricJoinRequest[] }>(`/v1/fabrics/${encodeURIComponent(fabricId)}/join-requests`, { headers }).then(result => result.requests)
+  }
+
+  approveJoinRequest(requestId: string, nodeCertificate: MembershipCertificate, controllerCertificate: MembershipCertificate, headers: Headers) {
+    return this.request<NodeSummary>(`/v1/join-requests/${encodeURIComponent(requestId)}/approve`, jsonRequest('POST', { nodeCertificate, controllerCertificate }, headers))
+  }
+
+  rejectJoinRequest(fabricId: string, requestId: string, headers: Headers) {
+    return this.request<void>(`/v1/fabrics/${encodeURIComponent(fabricId)}/join-requests/${encodeURIComponent(requestId)}`, { method: 'DELETE', headers })
   }
 
   registerController(fabricId: string, certificate: MembershipCertificate, grants: Array<{ grantId: string, fabricId: string, controllerId: string, nodeId: string, scope: string }>, headers: Headers) {

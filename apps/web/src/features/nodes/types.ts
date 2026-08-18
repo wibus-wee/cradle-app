@@ -1,5 +1,6 @@
 import type {
   GetFabricNodeInvitationsPendingResponse,
+  GetFabricNodeInvitationsRequestsResponse,
   GetFabricResponse,
   GetNodesResponse,
   PostFabricNodeInvitationsResponse,
@@ -16,6 +17,9 @@ export type FabricNodeInvitation = PostFabricNodeInvitationsResponse
 
 /** Local Node enrollment waiting for approval from an existing Fabric owner. */
 export type PendingFabricEnrollment = NonNullable<GetFabricNodeInvitationsPendingResponse>
+
+/** One owner-visible Node enrollment request waiting for a decision. */
+export type PendingFabricNodeRequest = GetFabricNodeInvitationsRequestsResponse[number]
 
 /**
  * Fabric grant scopes, ordered from least to most privileged.

@@ -18,15 +18,27 @@ export function NodesSettings() {
         membershipError={controller.membershipError}
         managedRelay={controller.managedRelay}
         nodes={controller.nodes}
+        nodesLoading={controller.nodesLoading}
+        nodesError={controller.nodesError}
+        pendingRequests={controller.pendingRequests}
+        pendingRequestsLoading={controller.pendingRequestsLoading}
+        pendingRequestsError={controller.pendingRequestsError}
+        pendingRequestAction={controller.pendingRequestAction}
         networkCode={controller.networkCode}
         canManageAccess={controller.membership?.role === 'owner'}
         reconnectingNodeId={controller.connectingNodeId}
         cancellingEnrollment={controller.cancellingEnrollment}
+        leavingFabric={controller.leavingFabric}
         onLinkDevice={() => controller.setConnectOpen(true)}
         onReconnect={nodeId => void controller.handleReconnect(nodeId)}
         onManageAccess={controller.setAccessNodeId}
         onRefreshMembership={controller.refreshMembership}
+        onRefreshNodes={controller.refreshNodes}
+        onRefreshPendingRequests={controller.refreshPendingRequests}
+        onApprovePendingRequest={requestId => void controller.handleApprovePendingRequest(requestId)}
+        onRejectPendingRequest={requestId => void controller.handleRejectPendingRequest(requestId)}
         onCancelPendingEnrollment={() => void controller.handleCancelEnrollment()}
+        onLeaveFabric={() => void controller.handleLeaveFabric()}
         fabricSettings={<FabricSettingsGroup />}
       />
       <ConnectDeviceDialogView

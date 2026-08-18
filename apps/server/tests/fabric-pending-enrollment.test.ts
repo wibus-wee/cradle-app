@@ -112,4 +112,43 @@ describe('pending Fabric enrollment routes', () => {
     expect(response.status).toBe(409)
     expect(db().select().from(fabricMembership).all()).toHaveLength(1)
   })
+
+  it('lets a non-owner device leave while preventing the owner from orphaning the Fabric', async () => {
+    const server = await setup()
+    upsertSecret({ id: 'identity-active', kind: 'system-fabric-identity-key', label: 'identity', secret: 'identity-secret' })
+    upsertSecret({ id: 'encryption-active', kind: 'system-fabric-encryption-key', label: 'encryption', secret: 'encryption-secret' })
+    db().insert(fabricMembership).values({
+      fabricId: 'fabric-active',
+      relayUrl: 'http://127.0.0.1:8787',
+      localNodeId: 'node-active',
+      role: 'node',
+      ownerKeySecretId: null,
+      identityKeySecretId: 'identity-active',
+      encryptionKeySecretId: 'encryption-active',
+      certificateJson: '{}',
+      createdAt: 100,
+      updatedAt: 100,
+    }).run()
+
+    const left = await server.handle(new Request('http://localhost/fabric', { method: 'DELETE' }))
+    expect(left.status).toBe(204)
+    expect(db().select().from(fabricMembership).all()).toEqual([])
+    expect(db().select().from(agentCredentials).all()).toEqual([])
+
+    db().insert(fabricMembership).values({
+      fabricId: 'fabric-owner',
+      relayUrl: 'http://127.0.0.1:8787',
+      localNodeId: 'node-owner',
+      role: 'owner',
+      ownerKeySecretId: null,
+      identityKeySecretId: 'identity-owner',
+      encryptionKeySecretId: 'encryption-owner',
+      certificateJson: '{}',
+      createdAt: 200,
+      updatedAt: 200,
+    }).run()
+    const ownerLeave = await server.handle(new Request('http://localhost/fabric', { method: 'DELETE' }))
+    expect(ownerLeave.status).toBe(409)
+    expect(db().select().from(fabricMembership).all()).toHaveLength(1)
+  })
 })

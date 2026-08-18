@@ -137,7 +137,22 @@ func enrollNode(t *testing.T, store *Store, owner ed25519.PrivateKey, fabricReco
 	if err != nil {
 		t.Fatal(err)
 	}
-	node, err := store.ApproveJoinRequest(t.Context(), request.RequestID, certificate)
+	controllerCertificate, err := membership.SignCertificate(owner, membership.Certificate{
+		Version:          1,
+		FabricID:         fabricRecord.ID,
+		SubjectKind:      membership.SubjectController,
+		SubjectID:        nodeID,
+		IdentityPubkey:   encodeKey(identityPublic),
+		EncryptionPubkey: request.EncryptionPubkey,
+		NodeID:           nodeID,
+		Scopes:           []membership.Scope{membership.ScopeAdmin},
+		IssuedAt:         now.Unix(),
+		Nonce:            "controller-cert-" + nodeID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	node, err := store.ApproveJoinRequest(t.Context(), request.RequestID, certificate, controllerCertificate)
 	if err != nil {
 		t.Fatal(err)
 	}

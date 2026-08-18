@@ -1,10 +1,12 @@
 import {
   CheckLine as CheckIcon,
   CloseCircleLine as CancelIcon,
+  CloseLine as RejectIcon,
   ComputerLine as ComputerIcon,
   CopyLine as CopyIcon,
   Link3Line as LinkIcon,
   Refresh1Line as RefreshIcon,
+  SafeShieldLine as ApprovalIcon,
   Settings3Line as SettingsIcon,
   TimeLine as PendingIcon,
 } from '@mingcute/react'
@@ -20,7 +22,8 @@ import { SettingsRow } from '~/features/settings/settings-row'
 import { cn } from '~/lib/cn'
 
 import { CancelPendingEnrollmentDialog } from './cancel-pending-enrollment-dialog'
-import type { FabricMembership, FabricNode, PendingFabricEnrollment } from './types'
+import { LeaveFabricDialog } from './leave-fabric-dialog'
+import type { FabricMembership, FabricNode, PendingFabricEnrollment, PendingFabricNodeRequest } from './types'
 
 export interface NodesSettingsViewProps {
   membership: FabricMembership | null
@@ -30,15 +33,27 @@ export interface NodesSettingsViewProps {
   membershipError: boolean
   managedRelay: { relayUrl: string, accessMode: 'local' | 'network' | 'external' } | null
   nodes: FabricNode[]
+  nodesLoading: boolean
+  nodesError: boolean
+  pendingRequests: PendingFabricNodeRequest[]
+  pendingRequestsLoading: boolean
+  pendingRequestsError: boolean
+  pendingRequestAction: { requestId: string, kind: 'approve' | 'reject' } | null
   networkCode: string | null
   canManageAccess: boolean
   reconnectingNodeId: string | null
   cancellingEnrollment: boolean
+  leavingFabric: boolean
   onLinkDevice: () => void
   onReconnect: (nodeId: string) => void
   onManageAccess: (nodeId: string) => void
   onRefreshMembership: () => void
+  onRefreshNodes: () => void
+  onRefreshPendingRequests: () => void
+  onApprovePendingRequest: (requestId: string) => void
+  onRejectPendingRequest: (requestId: string) => void
   onCancelPendingEnrollment: () => void
+  onLeaveFabric: () => void
   fabricSettings: ReactNode
 }
 
@@ -50,19 +65,32 @@ export function NodesSettingsView({
   membershipError,
   managedRelay,
   nodes,
+  nodesLoading,
+  nodesError,
+  pendingRequests,
+  pendingRequestsLoading,
+  pendingRequestsError,
+  pendingRequestAction,
   networkCode,
   canManageAccess,
   reconnectingNodeId,
   cancellingEnrollment,
+  leavingFabric,
   onLinkDevice,
   onReconnect,
   onManageAccess,
   onRefreshMembership,
+  onRefreshNodes,
+  onRefreshPendingRequests,
+  onApprovePendingRequest,
+  onRejectPendingRequest,
   onCancelPendingEnrollment,
+  onLeaveFabric,
   fabricSettings,
 }: NodesSettingsViewProps) {
   const { t } = useTranslation('nodes')
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
 
   return (
     <SettingsPage
@@ -206,13 +234,65 @@ export function NodesSettingsView({
             >
               {networkCode && <NetworkCode code={networkCode} />}
             </SettingsRow>
+            {membership.role !== 'owner' && (
+              <SettingsRow
+                label={t('settings.network.leaveLabel')}
+                description={t('settings.network.leaveDescription')}
+              >
+                <Button type="button" variant="destructive" className="h-10" onClick={() => setLeaveOpen(true)}>
+                  <CancelIcon className="size-3.5" aria-hidden />
+                  {t('action.leaveFabric')}
+                </Button>
+              </SettingsRow>
+            )}
           </SettingsGroup>
+
+          {canManageAccess && (
+            <SettingsGroup
+              label={t('settings.approvals.title')}
+              description={t('settings.approvals.description')}
+            >
+              {pendingRequestsLoading && (
+                <div className="flex items-center gap-2 py-3 text-[12px] text-muted-foreground">
+                  <Spinner className="size-3.5" />
+                  {t('settings.approvals.loading')}
+                </div>
+              )}
+              {pendingRequestsError && !pendingRequestsLoading && (
+                <QueryErrorState label={t('settings.approvals.error')} onRetry={onRefreshPendingRequests} />
+              )}
+              {!pendingRequestsLoading && !pendingRequestsError && pendingRequests.length === 0 && (
+                <div className="py-3 text-pretty text-[12px] text-muted-foreground">
+                  {t('settings.approvals.empty')}
+                </div>
+              )}
+              {!pendingRequestsLoading && !pendingRequestsError && pendingRequests.map(request => (
+                <PendingRequestRow
+                  key={request.requestId}
+                  request={request}
+                  action={pendingRequestAction?.requestId === request.requestId ? pendingRequestAction.kind : null}
+                  actionsDisabled={pendingRequestAction !== null}
+                  onApprove={onApprovePendingRequest}
+                  onReject={onRejectPendingRequest}
+                />
+              ))}
+            </SettingsGroup>
+          )}
 
           <SettingsGroup
             label={t('settings.devices.title')}
             description={t('settings.devices.description')}
           >
-            {nodes.length === 0
+            {nodesLoading && (
+              <div className="flex items-center gap-2 py-3 text-[12px] text-muted-foreground">
+                <Spinner className="size-3.5" />
+                {t('settings.devices.loading')}
+              </div>
+            )}
+            {nodesError && !nodesLoading && (
+              <QueryErrorState label={t('settings.devices.error')} onRetry={onRefreshNodes} />
+            )}
+            {!nodesLoading && !nodesError && (nodes.length === 0
               ? (
                   <div className="py-3 text-[12px] text-muted-foreground">{t('settings.devices.empty')}</div>
                 )
@@ -226,7 +306,7 @@ export function NodesSettingsView({
                     onReconnect={onReconnect}
                     onManageAccess={onManageAccess}
                   />
-                ))}
+                )))}
           </SettingsGroup>
         </>
       )}
@@ -239,7 +319,88 @@ export function NodesSettingsView({
         onOpenChange={setCancelOpen}
         onConfirm={onCancelPendingEnrollment}
       />
+      <LeaveFabricDialog
+        open={leaveOpen}
+        busy={leavingFabric}
+        onOpenChange={setLeaveOpen}
+        onConfirm={() => {
+          onLeaveFabric()
+          setLeaveOpen(false)
+        }}
+      />
     </SettingsPage>
+  )
+}
+
+function QueryErrorState({ label, onRetry }: { label: string, onRetry: () => void }) {
+  const { t } = useTranslation('nodes')
+  return (
+    <div className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-pretty text-[12px] text-destructive">{label}</p>
+      <Button type="button" variant="outline" className="h-10" onClick={onRetry}>
+        <RefreshIcon className="size-3.5" aria-hidden />
+        {t('action.retry')}
+      </Button>
+    </div>
+  )
+}
+
+function PendingRequestRow({
+  request,
+  action,
+  actionsDisabled,
+  onApprove,
+  onReject,
+}: {
+  request: PendingFabricNodeRequest
+  action: 'approve' | 'reject' | null
+  actionsDisabled: boolean
+  onApprove: (requestId: string) => void
+  onReject: (requestId: string) => void
+}) {
+  const { t } = useTranslation('nodes')
+  const requestedAt = new Date(request.requestedAt).toLocaleString()
+
+  return (
+    <div className="flex flex-col gap-3 border-b border-border/60 py-3 last:border-b-0 sm:flex-row sm:items-center">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300">
+        <ApprovalIcon className="size-4" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-[13px] font-medium">{request.displayName}</span>
+          <Badge variant="secondary">{t('settings.status.pending')}</Badge>
+        </div>
+        <p className="mt-1 text-pretty text-[12px] leading-relaxed text-muted-foreground">
+          {request.platform}
+          {' · '}
+          {t('popover.version', { version: request.version })}
+          {' · '}
+          <time dateTime={request.requestedAt}>{t('settings.approvals.requestedAt', { time: requestedAt })}</time>
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-10"
+          disabled={actionsDisabled}
+          onClick={() => onReject(request.requestId)}
+        >
+          {action === 'reject' ? <Spinner className="size-3.5" /> : <RejectIcon className="size-3.5" aria-hidden />}
+          {t('action.reject')}
+        </Button>
+        <Button
+          type="button"
+          className="h-10"
+          disabled={actionsDisabled}
+          onClick={() => onApprove(request.requestId)}
+        >
+          {action === 'approve' ? <Spinner className="size-3.5" /> : <CheckIcon className="size-3.5" aria-hidden />}
+          {t('action.approve')}
+        </Button>
+      </div>
+    </div>
   )
 }
 

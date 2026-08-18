@@ -28,6 +28,36 @@
         "signature": { "type": "string", "minLength": 1 }
       }
     },
+    "joinRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "fabricId", "subjectKind", "subjectId", "identityPubkey", "encryptionPubkey", "displayName", "platform", "version", "capabilities", "deliverySecretHash", "issuedAt", "expiresAt", "signature"],
+      "properties": {
+        "requestId": { "type": "string", "minLength": 1 },
+        "fabricId": { "type": "string", "minLength": 1 },
+        "subjectKind": { "const": "node" },
+        "subjectId": { "type": "string", "minLength": 1 },
+        "identityPubkey": { "type": "string", "minLength": 1 },
+        "encryptionPubkey": { "type": "string", "minLength": 1 },
+        "displayName": { "type": "string" },
+        "platform": { "type": "string" },
+        "version": { "type": "string" },
+        "capabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "deliverySecretHash": { "type": "string", "minLength": 1 },
+        "issuedAt": { "type": "integer" },
+        "expiresAt": { "type": "integer" },
+        "signature": { "type": "string", "minLength": 1 }
+      }
+    },
+    "joinApproval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeCertificate", "controllerCertificate"],
+      "properties": {
+        "nodeCertificate": { "$ref": "#/definitions/certificate" },
+        "controllerCertificate": { "$ref": "#/definitions/certificate" }
+      }
+    },
     "nodeSummary": {
       "type": "object",
       "additionalProperties": false,
