@@ -303,6 +303,7 @@ func newTestServerWithTiming(t *testing.T, heartbeatInterval time.Duration, idle
 	cfg := config.Config{
 		ListenAddr:            "127.0.0.1:0",
 		PublicURL:             "http://127.0.0.1:0",
+		FabricDatabasePath:    t.TempDir() + "/fabric.sqlite",
 		PairingTTL:            time.Minute,
 		RoomTTL:               time.Minute,
 		HeartbeatInterval:     heartbeatInterval,

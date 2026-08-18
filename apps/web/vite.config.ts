@@ -100,7 +100,7 @@ export default defineConfig({
       autoCodeSplitting: true,
     }),
     viteReact({
-      exclude: /[/\\]api-gen[/\\]/,
+      exclude: /[/\\](?:node_modules|api-gen)[/\\]/,
       babel: {
         plugins: ['babel-plugin-react-compiler'],
       },

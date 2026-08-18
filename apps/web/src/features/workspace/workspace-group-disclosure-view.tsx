@@ -7,8 +7,8 @@ import {
   PinLine as PinIcon,
 } from '@mingcute/react'
 import { FolderSymlink as FolderSymlinkIcon } from 'lucide-react'
-import type { MouseEvent, ReactNode } from 'react'
-import { Fragment } from 'react'
+import type { MouseEvent, PointerEvent, ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
@@ -28,6 +28,9 @@ import {
 } from '~/components/ui/menu'
 import type { Workspace } from '~/features/workspace/types'
 import { isLocalWorkspace } from '~/features/workspace/types'
+import { cn } from '~/lib/cn'
+
+const WORKSPACE_HOVER_PREVIEW_DELAY_MS = 450
 
 export interface WorkspaceMenuAction {
   key: string
@@ -109,12 +112,55 @@ export function WorkspaceGroupDisclosureView({
   onOpenWorkspace,
 }: WorkspaceGroupDisclosureViewProps) {
   const { t } = useTranslation('workspace')
+  const [hoverPreview, setHoverPreview] = useState(false)
+  const hoverPreviewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearHoverPreviewTimeout = useCallback(() => {
+    if (hoverPreviewTimeoutRef.current === null) {
+      return
+    }
+
+    clearTimeout(hoverPreviewTimeoutRef.current)
+    hoverPreviewTimeoutRef.current = null
+  }, [])
+
+  useEffect(() => {
+    if (expanded) {
+      clearHoverPreviewTimeout()
+      setHoverPreview(false)
+    }
+
+    return clearHoverPreviewTimeout
+  }, [clearHoverPreviewTimeout, expanded])
+
+  const handlePointerEnter = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse' || expanded || hoverPreview) {
+      return
+    }
+
+    clearHoverPreviewTimeout()
+    hoverPreviewTimeoutRef.current = setTimeout(() => {
+      hoverPreviewTimeoutRef.current = null
+      setHoverPreview(true)
+    }, WORKSPACE_HOVER_PREVIEW_DELAY_MS)
+  }
+
+  const handlePointerLeave = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'mouse') {
+      return
+    }
+
+    clearHoverPreviewTimeout()
+    setHoverPreview(false)
+  }
 
   const toggleExpanded = (event: MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
     onToggleExpanded()
   }
+
+  const visibleExpanded = expanded || hoverPreview
 
   const headerContent = (
     <div className="group flex min-w-0 items-center gap-2 rounded-lg px-2.5 py-1.5 hover:bg-accent/50">
@@ -123,12 +169,12 @@ export function WorkspaceGroupDisclosureView({
         onClick={toggleExpanded}
         onPointerDown={event => event.stopPropagation()}
         aria-label={t('workspace.aria.toggleExpanded')}
-        aria-expanded={expanded}
+        aria-expanded={visibleExpanded}
         className="-ml-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 hover:bg-fill/70 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         data-testid={`workspace-toggle-${workspace.id}`}
       >
         {isLocalWorkspace(workspace)
-          ? expanded
+          ? visibleExpanded
             ? <FolderOpenIcon className="size-3.5" aria-hidden="true" />
             : <FolderClosedIcon className="size-3.5" aria-hidden="true" />
           : <FolderSymlinkIcon className="size-3.5" aria-hidden="true" />}
@@ -162,7 +208,7 @@ export function WorkspaceGroupDisclosureView({
           : null}
       </button>
 
-      {!expanded && runningSessionCount > 0
+      {!visibleExpanded && runningSessionCount > 0
         ? (
             <span
               className="flex shrink-0 items-center gap-1 rounded-full bg-fill/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums"
@@ -204,8 +250,11 @@ export function WorkspaceGroupDisclosureView({
   return (
     <div
       className="flex min-w-0 flex-col"
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
       data-testid={`workspace-group-${workspace.id}`}
       data-workspace-pinned={workspacePinned ? 'true' : 'false'}
+      data-workspace-hover-preview={hoverPreview ? 'true' : 'false'}
     >
       <ContextMenu>
         <ContextMenuTrigger asChild>{headerContent}</ContextMenuTrigger>
@@ -214,7 +263,17 @@ export function WorkspaceGroupDisclosureView({
         </ContextMenuContent>
       </ContextMenu>
       {overlays}
-      {expanded ? children : null}
+      {visibleExpanded
+        ? (
+            <div
+              className={cn(
+                hoverPreview && 'motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-1 motion-safe:duration-150',
+              )}
+            >
+              {children}
+            </div>
+          )
+        : null}
     </div>
   )
 }

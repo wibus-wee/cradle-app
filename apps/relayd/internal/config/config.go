@@ -9,6 +9,7 @@ import (
 type Config struct {
 	ListenAddr            string
 	PublicURL             string
+	FabricDatabasePath    string
 	PairingTTL            time.Duration
 	RoomTTL               time.Duration
 	HeartbeatInterval     time.Duration
@@ -32,6 +33,9 @@ func (c Config) Validate() error {
 	}
 	if c.PublicURL == "" {
 		return errors.New("public url is required")
+	}
+	if c.FabricDatabasePath == "" {
+		return errors.New("fabric database path is required")
 	}
 	if c.PairingTTL <= 0 {
 		return fmt.Errorf("pairing ttl must be positive")

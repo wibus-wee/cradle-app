@@ -16,7 +16,7 @@ import {
   RelayCipher,
   relayPublicKeyFingerprint,
 } from './crypto'
-import type { InnerFrame, RelayEnvelope } from './protocol'
+import type { InnerFrame, RelayEnvelope, RelayEnvelopeKind, RelayPriority } from './protocol'
 import {
   decodeInnerFrame,
   decodeRelayErrorPayload,
@@ -73,6 +73,18 @@ export interface RelaySessionOptions {
   maxConnectionCreditBytes?: number
   /** Disable Zstandard and bulk AES together for controlled V2 before/after benchmarks. */
   optimizedCodecEnabled?: boolean
+  /** Override v2 room-envelope encoding. Fabric v3 supplies Fabric/Node/link
+   * routing outside the encrypted session while retaining this tested inner
+   * encryption and stream flow-control implementation. */
+  encodeOutboundEnvelope?: (frame: RelayOutboundEnvelope) => Uint8Array
+}
+
+export interface RelayOutboundEnvelope {
+  seq: number
+  kind: RelayEnvelopeKind
+  priority: RelayPriority
+  streamId?: string
+  payload: Uint8Array
 }
 
 export interface RelaySessionCallbacks {
@@ -182,6 +194,7 @@ export class RelaySession {
   private readonly maxStreamCreditBytes: number
   private readonly maxConnectionCreditBytes: number
   private readonly optimizedCodecEnabled: boolean
+  private readonly encodeOutboundEnvelope: (frame: RelayOutboundEnvelope) => Uint8Array
   private connectionInFlightBytes = 0
   private flushCursor = 0
   private flushingOutbound = false
@@ -214,6 +227,11 @@ export class RelaySession {
     this.maxConnectionCreditBytes
       = options.maxConnectionCreditBytes ?? RELAY_CONNECTION_MAX_CREDIT_BYTES
     this.optimizedCodecEnabled = options.optimizedCodecEnabled ?? true
+    this.encodeOutboundEnvelope = options.encodeOutboundEnvelope ?? (frame => encodeRelayEnvelope({
+      version: RELAY_PROTOCOL_VERSION,
+      roomId: this.roomId,
+      ...frame,
+    }))
     if (
       !Number.isSafeInteger(this.initialStreamCreditBytes)
       || !Number.isSafeInteger(this.maxStreamCreditBytes)
@@ -876,16 +894,14 @@ export class RelaySession {
 
   private sendPlainEnvelope(frame: InnerFrame): void {
     const streamId = streamIdForFrame(frame)
-    const env: RelayEnvelope = {
-      version: RELAY_PROTOCOL_VERSION,
-      roomId: this.roomId,
+    const env: RelayOutboundEnvelope = {
       seq: this.outboundSeq++,
       kind: RELAY_ENVELOPE_KIND.dataFrame,
       priority: relayPriorityForInnerFrame(frame),
       ...(streamId ? { streamId } : {}),
       payload: encodeInnerFrame(frame),
     }
-    this.cb.send(encodeRelayEnvelope(env))
+    this.cb.send(this.encodeOutboundEnvelope(env))
   }
 
   private sendEncryptedFrame(frame: InnerFrame): void {
@@ -897,16 +913,14 @@ export class RelaySession {
       })
     }
     const streamId = streamIdForFrame(frame)
-    const env: RelayEnvelope = {
-      version: RELAY_PROTOCOL_VERSION,
-      roomId: this.roomId,
+    const env: RelayOutboundEnvelope = {
       seq: this.outboundSeq++,
       kind: RELAY_ENVELOPE_KIND.dataFrame,
       priority: relayPriorityForInnerFrame(frame),
       ...(streamId ? { streamId } : {}),
       payload: this.sendCipher.encrypt(encodeInnerFrame(frame)),
     }
-    this.cb.send(encodeRelayEnvelope(env))
+    this.cb.send(this.encodeOutboundEnvelope(env))
   }
 
   private parsePlainFrame(payload: Uint8Array): InnerFrame {
