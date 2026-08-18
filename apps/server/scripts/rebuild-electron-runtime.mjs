@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -19,6 +19,11 @@ if (!existsSync(join(serverRuntimeDir, 'package.json')) || !existsSync(serverRun
     + 'Run pnpm --filter @cradle/server build:desktop-runtime to prepare it.',
   )
 }
+
+// pnpm deploy can link packages back to its content-addressed store. Native
+// rebuilds must operate on a private copy or they overwrite the workspace
+// binary with the Electron ABI.
+materializeNativePackage('better-sqlite3')
 
 const result = spawnPnpmSync(
   [
@@ -51,6 +56,24 @@ writeElectronRuntimeTarget()
 pruneElectronRuntimeArtifact()
 
 process.exit(0)
+
+function materializeNativePackage(packageName) {
+  const packagePath = join(serverRuntimeNodeModules, packageName)
+  if (!existsSync(packagePath)) {
+    return
+  }
+
+  const resolvedPath = realpathSync(packagePath)
+  if (resolvedPath === packagePath) {
+    return
+  }
+
+  const stagingPath = join(serverRuntimeDir, `.native-${packageName.replaceAll('/', '-')}-${process.pid}`)
+  rmSync(stagingPath, { recursive: true, force: true })
+  cpSync(resolvedPath, stagingPath, { recursive: true, dereference: true })
+  rmSync(packagePath, { recursive: true, force: true })
+  renameSync(stagingPath, packagePath)
+}
 
 function readDesktopElectronVersion() {
   const desktopPackageJsonPath = resolve(repoRoot, 'apps/desktop/package.json')
