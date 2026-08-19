@@ -17,8 +17,6 @@ export interface RuntimeActiveRunRefreshDecision {
 
 export interface RuntimeTerminalRunRefreshInput {
   runtimeStatus: RuntimeSessionStatus | null | undefined
-  snapshotMessageIds: ReadonlySet<string>
-  storeMessageIds: ReadonlySet<string>
   previousRefreshRunId: string | null
 }
 
@@ -83,8 +81,6 @@ export function deriveRuntimeTerminalRunRefresh(
     !latestRun?.runId
     || !latestRun.messageId
     || !isTerminalChatRunStatus(latestRun.status)
-    || input.snapshotMessageIds.has(latestRun.messageId)
-    || input.storeMessageIds.has(latestRun.messageId)
   ) {
     return {
       requestSnapshotRefresh: false,

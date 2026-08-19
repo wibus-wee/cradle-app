@@ -276,6 +276,7 @@
   "workspace.dialog.recognitionOpenExperimental": "打开（实验性）",
   "workspace.dialog.recognitionTitle": "添加检测到的项目",
   "workspace.dialog.addWorkspaceChooseLocal": "选择文件夹",
+  "workspace.dialog.addWorkspaceDescription": "从本机选择项目文件夹，或浏览 Fabric 中其他设备上的工作区。",
   "workspace.dialog.addWorkspaceLocalDescription": "本地工作区使用本机作为主机，文件仍保留在原位置。",
   "workspace.dialog.addWorkspaceLocalHost": "本机",
   "workspace.dialog.addWorkspaceLocalTitle": "选择本地项目文件夹",

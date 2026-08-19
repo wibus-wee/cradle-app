@@ -5,6 +5,7 @@ import {
   decodeFabricSessionEnvelope,
   encodeFabricSessionEnvelope,
   FABRIC_SESSION_PROTOCOL_VERSION,
+  RELAY_STREAM_MIN_CREDIT_BYTES,
 } from '../../src/modules/relay-transport/protocol'
 import type { FabricSessionCallbacks } from '../../src/modules/relay-transport/session'
 import { FabricSession } from '../../src/modules/relay-transport/session'
@@ -75,6 +76,49 @@ describe('fabric Session', () => {
     controller.writeStreamData('stream-1', payload)
     expect(received).toHaveLength(1)
     expect(received[0]).toEqual(payload)
+  })
+
+  it('flushes data queued beyond stream credit before closing', () => {
+    const nodeKeys = generateFabricSessionKeyPair()
+    const controllerKeys = generateFabricSessionKeyPair()
+    const received: Uint8Array[] = []
+    const events: string[] = []
+    let acknowledge = false
+    const node = session('node', nodeKeys, controllerKeys.publicKeyBase64, {
+      send: () => {},
+      onStreamData: (streamId, data) => {
+        received.push(data)
+        events.push('data')
+        if (acknowledge) {
+          node.reportStreamDataConsumed(streamId, data.byteLength, { flush: true })
+        }
+      },
+      onStreamClose: () => events.push('close'),
+    })
+    const controller = session('controller', controllerKeys, nodeKeys.publicKeyBase64, {
+      send: () => {},
+    })
+    wire(node, controller)
+    controller.start()
+    controller.openStream('stream-large')
+
+    const payload = new Uint8Array(RELAY_STREAM_MIN_CREDIT_BYTES + 128 * 1024).fill(7)
+    controller.writeStreamData('stream-large', payload)
+    controller.closeStream('stream-large', 'local socket closed')
+
+    expect(received.reduce((total, chunk) => total + chunk.byteLength, 0))
+      .toBe(RELAY_STREAM_MIN_CREDIT_BYTES)
+    expect(events).not.toContain('close')
+
+    acknowledge = true
+    node.reportStreamDataConsumed(
+      'stream-large',
+      RELAY_STREAM_MIN_CREDIT_BYTES,
+      { flush: true },
+    )
+
+    expect(received.reduce((total, chunk) => total + chunk.byteLength, 0)).toBe(payload.byteLength)
+    expect(events.at(-1)).toBe('close')
   })
 
   it('rejects a session when the peer key is not the Fabric certificate key', () => {

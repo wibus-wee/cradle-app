@@ -150,4 +150,17 @@ export const SessionModel = {
   archiveBody: t.Object({
     archived: t.Boolean(),
   }),
+
+  reconcileNodeBody: t.Object({
+    workspaceId: t.String({ minLength: 1 }),
+  }),
+
+  reconcileNodeResponse: t.Object({
+    workspaceId: t.String(),
+    nodeId: t.String(),
+    remoteWorkspaceId: t.String(),
+    discovered: t.Number(),
+    updated: t.Number(),
+    removed: t.Number(),
+  }),
 }

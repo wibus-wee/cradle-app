@@ -83,7 +83,12 @@ the peer's send window. A separate 16 MiB connection-wide cap bounds the sum
 of all streams' in-flight data, so concurrent transfers cannot multiply the
 per-stream maximum without limit. FabricSession serves ready streams round-robin,
 and relayd backpressures a saturated peer queue instead of disconnecting it;
-control frames retain reserved capacity and priority.
+control frames retain reserved capacity and priority. A local stream close is
+deferred until every byte already accepted from the local socket has been framed;
+later acknowledgements release credit and resume that drain. `stream_close`
+shares the stream's ordered data lane, and relayd preserves same-stream arrival
+order even for older clients that label close as control. Unrelated control
+traffic can still bypass bulk data on other streams.
 
 ## Performance checkpoints and benchmark
 

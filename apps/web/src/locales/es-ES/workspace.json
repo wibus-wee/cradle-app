@@ -276,6 +276,7 @@
   "workspace.dialog.relinkDescription": "Elige la ubicación actual de {{name}}.",
   "workspace.dialog.relinkTitle": "Volver a enlazar Workspace",
   "workspace.dialog.addWorkspaceChooseLocal": "Choose folder",
+  "workspace.dialog.addWorkspaceDescription": "Elige una carpeta de proyecto en este dispositivo o explora otro dispositivo de tu Fabric.",
   "workspace.dialog.addWorkspaceLocalDescription": "Local workspaces use this machine as host and keep your files where they are.",
   "workspace.dialog.addWorkspaceLocalHost": "This Mac",
   "workspace.dialog.addWorkspaceLocalTitle": "Choose a local project folder",

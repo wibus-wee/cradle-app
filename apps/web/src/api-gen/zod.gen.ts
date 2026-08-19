@@ -1394,6 +1394,10 @@ export const zPatchSessionsByIdPath = z.object({
     id: z.string().min(1)
 });
 
+export const zPostSessionsNodeProjectionsReconcileBody = z.object({
+    workspaceId: z.string().min(1)
+});
+
 export const zPostSessionsByIdArchiveBody = z.object({
     archived: z.boolean()
 });
@@ -1628,6 +1632,10 @@ export const zPostWorksBody = z.object({
         }).nullish()
     }).optional(),
     agentId: z.string().min(1).optional()
+});
+
+export const zPostWorksNodeProjectionsReconcileBody = z.object({
+    workspaceId: z.string().min(1)
 });
 
 export const zGetWorksByIdPath = z.object({

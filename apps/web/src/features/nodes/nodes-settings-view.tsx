@@ -144,7 +144,7 @@ export function NodesSettingsView({
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-              <Button type="button" variant="outline" size="sm" onClick={onLinkDevice}>
+              <Button type="button" variant="outline" size="sm" onClick={onLinkDevice} data-testid="nodes-link-device">
                 <LinkIcon className="size-3.5" aria-hidden />
                 {t('action.viewRequest')}
               </Button>
@@ -185,7 +185,7 @@ export function NodesSettingsView({
                 )}
               </div>
             </div>
-            <Button type="button" onClick={onLinkDevice}>
+            <Button type="button" onClick={onLinkDevice} data-testid="nodes-link-device">
               <LinkIcon className="size-4" aria-hidden />
               {t('action.linkDevice')}
             </Button>
@@ -199,7 +199,7 @@ export function NodesSettingsView({
             label={t('settings.network.title')}
             description={t('settings.network.description')}
             action={(
-              <Button type="button" size="sm" onClick={onLinkDevice}>
+              <Button type="button" size="sm" onClick={onLinkDevice} data-testid="nodes-link-device">
                 <LinkIcon className="size-3.5" aria-hidden />
                 {t('action.linkDevice')}
               </Button>
@@ -362,7 +362,10 @@ function PendingRequestRow({
   const requestedAt = new Date(request.requestedAt).toLocaleString()
 
   return (
-    <div className="flex flex-col gap-3 border-b border-border/60 py-3 last:border-b-0 sm:flex-row sm:items-center">
+    <div
+      className="flex flex-col gap-3 border-b border-border/60 py-3 last:border-b-0 sm:flex-row sm:items-center"
+      data-testid={`node-pending-request-${request.requestId}`}
+    >
       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-300">
         <ApprovalIcon className="size-4" aria-hidden />
       </span>
@@ -395,6 +398,7 @@ function PendingRequestRow({
           className="h-10"
           disabled={actionsDisabled}
           onClick={() => onApprove(request.requestId)}
+          data-testid={`node-pending-approve-${request.requestId}`}
         >
           {action === 'approve' ? <Spinner className="size-3.5" /> : <CheckIcon className="size-3.5" aria-hidden />}
           {t('action.approve')}

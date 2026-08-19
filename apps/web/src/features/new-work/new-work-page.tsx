@@ -14,7 +14,7 @@ import type { ChatContextPart } from '~/features/chat/context/chat-context-parts
 import { useComposerState } from '~/features/composer-toolbar'
 import { useGitBranches } from '~/features/git/shared/use-git'
 import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
-import { isWorkEligibleWorkspace } from '~/features/workspace/types'
+import { isLocalWorkspace, isWorkEligibleWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { apiErrorMessage } from '~/lib/api-error'
@@ -57,12 +57,19 @@ export function NewWorkPage() {
   })
   const [error, setError] = useState<unknown>(null)
   const selectedWorkspace = localWorkspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? null
-  const { data: branches, isLoading: branchesLoading } = useGitBranches(selectedWorkspace?.id)
+  const nodeId = selectedWorkspace && !isLocalWorkspace(selectedWorkspace)
+    ? selectedWorkspace.locator.nodeId
+    : null
+  const selectedLocalWorkspaceId = selectedWorkspace && isLocalWorkspace(selectedWorkspace)
+    ? selectedWorkspace.id
+    : null
+  const { data: branches, isLoading: branchesLoading } = useGitBranches(selectedLocalWorkspaceId)
   const [selectedBaseBranch, setSelectedBaseBranch] = useState<string | null>(null)
   const composerState = useComposerState({
     context: 'new-chat',
     workspaceId: selectedWorkspace?.id ?? null,
-    enableAgents: true,
+    nodeId,
+    enableAgents: !nodeId,
   })
 
   useEffect(() => {
@@ -193,7 +200,7 @@ export function NewWorkPage() {
         onSelectWorkspace={setSelectedWorkspaceId}
         onAddWorkspace={() => void addFromPicker()}
       />
-      {selectedWorkspace
+      {selectedWorkspace && isLocalWorkspace(selectedWorkspace)
         ? (
             <NewWorkBaseBranchControlView
               currentBranch={selectedWorkspace.gitIdentity?.branch ?? null}

@@ -359,7 +359,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `session-group` | 7 | Generated Cradle CLI module. | `cradle man session-group` |
 | `skill` | 10 | Manage skills and skill sources. | `cradle man skill` |
 | `usage` | 14 | Inspect usage and cost data. | `cradle man usage` |
-| `work` | 7 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
+| `work` | 8 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
 | `workflow-rule` | 4 | Manage workflow rules. | `cradle man workflow-rule` |
 | `workspace` | 51 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
 

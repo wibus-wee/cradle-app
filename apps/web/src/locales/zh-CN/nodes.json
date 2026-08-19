@@ -131,6 +131,7 @@
   "toast.rejectFailed": "无法拒绝这条申请",
   "workspace.add": "添加",
   "workspace.addFromDevice": "从其他设备添加",
+  "workspace.addFromDeviceDescription": "浏览 Fabric 中已连接设备上的工作区。",
   "workspace.added": "已添加",
   "workspace.empty": "这台设备上还没有工作区。",
   "workspace.loading": "正在加载工作区…",

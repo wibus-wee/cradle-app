@@ -6,7 +6,11 @@ import { WorktreeModel } from '../worktree/model'
 import * as Worktree from '../worktree/service'
 import { sessionArchiveChunks } from './export-archive'
 import { SessionModel } from './model'
-import { isNodeProjectedSession, syncNodeSessionTitle } from './node-projection'
+import {
+  isNodeProjectedSession,
+  reconcileNodeSessionsForWorkspace,
+  syncNodeSessionTitle,
+} from './node-projection'
 import * as Session from './service'
 
 export const session = new Elysia({
@@ -56,6 +60,13 @@ export const session = new Elysia({
     },
     body: SessionModel.createBody,
     response: { 200: SessionModel.session },
+  })
+  .post('/node-projections/reconcile', async ({ body }) => {
+    return await reconcileNodeSessionsForWorkspace(body.workspaceId)
+  }, {
+    detail: { summary: 'Reconcile sessions from a mounted Fabric Node workspace' },
+    body: SessionModel.reconcileNodeBody,
+    response: { 200: SessionModel.reconcileNodeResponse },
   })
   .patch(
     '/:id',

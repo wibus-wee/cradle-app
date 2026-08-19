@@ -23,12 +23,16 @@ export type E2ESimulator = {
 
 /**
  * Start a loopback model-api-simulator for E2E.
- * `probes-only` autoRespond: count_tokens / models may synthesise; unmatched
- * conversation creates fail so unexpected Claude/Codex turns surface as bugs.
+ * Defaults to `probes-only`: count_tokens / models may synthesise, while
+ * unmatched conversation creates fail. Dedicated topologies may opt into full
+ * auto-response when background title turns share a simulator with strictly
+ * matched user turns.
  */
-export async function startE2ESimulator(): Promise<E2ESimulator> {
+export async function startE2ESimulator(options: {
+  autoRespond?: boolean | 'probes-only'
+} = {}): Promise<E2ESimulator> {
   const simulator: ModelApiSimulator = await startModelApiSimulator({
-    autoRespond: 'probes-only',
+    autoRespond: options.autoRespond ?? 'probes-only',
     strictRequestValidation: false,
   })
 

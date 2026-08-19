@@ -29,6 +29,7 @@ export const chronicleRunningStatusFixture: ChronicleStatus = {
   available: true,
   running: true,
   pid: 4312,
+  runtimeError: null,
   lastCaptureAt: 1_784_806_920,
   lastSummaryAt: 1_784_806_700,
   lastErrorAt: null,

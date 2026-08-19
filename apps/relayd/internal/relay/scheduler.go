@@ -13,8 +13,9 @@ var (
 )
 
 type queuedEnvelope struct {
-	data []byte
-	size int64
+	data           []byte
+	size           int64
+	usesDataBudget bool
 }
 
 // peerScheduler reserves queue capacity for control traffic and serves bulk
@@ -76,14 +77,23 @@ func (s *peerScheduler) enqueueLocked(item queuedEnvelope, priority, streamID st
 	if s.queuedBytes+item.size > s.maxBytes || s.queuedCount >= s.maxCount {
 		return ErrSlowConsumer
 	}
-	if priority == PriorityControl {
+	// A control frame for a stream must not overtake data already queued for
+	// that stream. Older Fabric clients classify stream_close as control, so
+	// preserving arrival order here is required for HTTP response integrity.
+	// It still consumes the reserved control budget while waiting in the
+	// stream lane.
+	_, streamHasQueuedData := s.dataByStream[streamID]
+	if priority == PriorityControl && (!streamHasQueuedData || streamID == "") {
 		s.control = append(s.control, item)
 	} else {
 		// Data must leave space for at least one maximum-sized control frame.
 		// Without this separate budget, a bulk sender can fill the shared queue
 		// and force an ACK, close, or peer notification to be rejected.
-		if s.queuedDataBytes+item.size > s.maxDataBytes || s.queuedDataCount >= s.maxDataCount {
-			return ErrSlowConsumer
+		if priority != PriorityControl {
+			if s.queuedDataBytes+item.size > s.maxDataBytes || s.queuedDataCount >= s.maxDataCount {
+				return ErrSlowConsumer
+			}
+			item.usesDataBudget = true
 		}
 		if streamID == "" {
 			streamID = "_unclassified"
@@ -92,8 +102,10 @@ func (s *peerScheduler) enqueueLocked(item queuedEnvelope, priority, streamID st
 			s.streamOrder = append(s.streamOrder, streamID)
 		}
 		s.dataByStream[streamID] = append(s.dataByStream[streamID], item)
-		s.queuedDataBytes += item.size
-		s.queuedDataCount++
+		if item.usesDataBudget {
+			s.queuedDataBytes += item.size
+			s.queuedDataCount++
+		}
 	}
 	s.queuedBytes += item.size
 	s.queuedCount++
@@ -147,8 +159,10 @@ func (s *peerScheduler) next(ctx context.Context) (queuedEnvelope, error) {
 			}
 			s.queuedBytes -= item.size
 			s.queuedCount--
-			s.queuedDataBytes -= item.size
-			s.queuedDataCount--
+			if item.usesDataBudget {
+				s.queuedDataBytes -= item.size
+				s.queuedDataCount--
+			}
 			s.mu.Unlock()
 			s.signalSpace()
 			return item, nil

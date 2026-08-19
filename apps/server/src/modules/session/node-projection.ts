@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
 import { nodeSessionLinks, sessions } from '@cradle/db'
-import { eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
@@ -24,6 +24,7 @@ export interface NodeSessionLinkView {
   nodeId: string
   remoteSessionId: string
   remoteWorkspaceId: string
+  projectionKind: 'controller-created' | 'discovered'
   createdAt: number
   updatedAt: number
 }
@@ -46,6 +47,7 @@ export function getNodeSessionLink(localSessionId: string): NodeSessionLinkView 
     nodeId: row.nodeId,
     remoteSessionId: row.remoteSessionId,
     remoteWorkspaceId: row.remoteWorkspaceId,
+    projectionKind: row.projectionKind,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -140,6 +142,78 @@ interface NodeSessionCreateResponse {
   id: string
 }
 
+export interface ExistingNodeSessionProjectionInput {
+  localSessionId?: string
+  workspaceId: string
+  nodeId: string
+  remoteWorkspaceId: string
+  sessionGroupId?: string | null
+  remoteSession: {
+    id: string
+    title: string | null
+    origin: string
+    providerTargetId: string | null
+    modelId: string | null
+    thinkingEffort: ChatThinkingEffort | null
+    runtimeKind: string
+    linkedIssueId?: string | null
+    archivedAt: number | null
+    createdAt: number
+    updatedAt: number
+  }
+  projectionKind: NodeSessionLinkView['projectionKind']
+}
+
+/** Attach a controller projection to a Session that already exists on a Node. */
+export function attachExistingNodeSessionProjection(
+  input: ExistingNodeSessionProjectionInput,
+): { localSessionId: string } {
+  const existing = db()
+    .select({ localSessionId: nodeSessionLinks.localSessionId })
+    .from(nodeSessionLinks)
+    .where(and(
+      eq(nodeSessionLinks.nodeId, input.nodeId),
+      eq(nodeSessionLinks.remoteSessionId, input.remoteSession.id),
+    ))
+    .get()
+  if (existing) {
+    return existing
+  }
+
+  const localSessionId = input.localSessionId ?? randomUUID()
+  const remote = input.remoteSession
+  db().transaction((tx) => {
+    tx.insert(sessions)
+      .values({
+        id: localSessionId,
+        workspaceId: input.workspaceId,
+        title: remote.title ?? 'Untitled',
+        origin: remote.origin,
+        providerTargetId: null,
+        runtimeKind: remote.runtimeKind,
+        agentId: null,
+        configJson: projectionConfigJson(remote),
+        linkedIssueId: remote.linkedIssueId ?? null,
+        sessionGroupId: input.sessionGroupId ?? null,
+        archivedAt: remote.archivedAt,
+        createdAt: remote.createdAt,
+        updatedAt: remote.updatedAt,
+      })
+      .run()
+
+    tx.insert(nodeSessionLinks)
+      .values({
+        localSessionId,
+        nodeId: input.nodeId,
+        remoteSessionId: remote.id,
+        remoteWorkspaceId: input.remoteWorkspaceId,
+        projectionKind: input.projectionKind,
+      })
+      .run()
+  })
+  return { localSessionId }
+}
+
 export async function createNodeProjectedSession(input: {
   id?: string
   workspaceId: string
@@ -197,37 +271,27 @@ export async function createNodeProjectedSession(input: {
         })
   }
 
-  const localConfigJson = JSON.stringify({
-    ...(input.modelId ? { requestedModelId: input.modelId } : {}),
-    ...(input.providerTargetId ? { requestedProviderTargetId: input.providerTargetId } : {}),
-    ...(input.thinkingEffort ? { requestedThinkingEffort: input.thinkingEffort } : {}),
-  })
-
   try {
-    db().transaction((tx) => {
-      tx.insert(sessions)
-        .values({
-          id: localSessionId,
-          workspaceId: input.workspaceId,
-          title: input.title,
-          origin: input.origin ?? 'manual',
-          providerTargetId: null,
-          runtimeKind: input.runtimeKind ?? 'standard',
-          agentId: null,
-          configJson: localConfigJson,
-          linkedIssueId: input.linkedIssueId ?? null,
-          sessionGroupId: input.sessionGroupId ?? null,
-        })
-        .run()
-
-      tx.insert(nodeSessionLinks)
-        .values({
-          localSessionId,
-          nodeId: locator.nodeId,
-          remoteSessionId: remoteSession.id,
-          remoteWorkspaceId,
-        })
-        .run()
+    attachExistingNodeSessionProjection({
+      localSessionId,
+      workspaceId: input.workspaceId,
+      nodeId: locator.nodeId,
+      remoteWorkspaceId,
+      sessionGroupId: input.sessionGroupId ?? null,
+      remoteSession: {
+        id: remoteSession.id,
+        title: input.title,
+        origin: input.origin ?? 'manual',
+        providerTargetId: input.providerTargetId ?? null,
+        modelId: input.modelId ?? null,
+        thinkingEffort: input.thinkingEffort ?? null,
+        runtimeKind: input.runtimeKind ?? 'standard',
+        linkedIssueId: input.linkedIssueId ?? null,
+        archivedAt: null,
+        createdAt: currentUnixSeconds(),
+        updatedAt: currentUnixSeconds(),
+      },
+      projectionKind: 'controller-created',
     })
   }
   catch (error) {
@@ -253,6 +317,10 @@ export async function removeNodeProjectedSession(localSessionId: string): Promis
     return
   }
 
+  if (link.projectionKind === 'discovered') {
+    return
+  }
+
   const baseUrl = (await getFabricNodeLinkManager().ensure(link.nodeId)).localBaseUrl
   const response = await upstreamFetchByBaseUrl(
     baseUrl,
@@ -271,6 +339,174 @@ export async function removeNodeProjectedSession(localSessionId: string): Promis
         status: response.status,
       },
     })
+  }
+}
+
+interface RemoteSessionSummary {
+  id: string
+  workspaceId: string | null
+  title: string | null
+  origin: string
+  providerTargetId: string | null
+  modelId: string | null
+  thinkingEffort: ChatThinkingEffort | null
+  runtimeKind: string
+  archivedAt: number | null
+  createdAt: number
+  updatedAt: number
+}
+
+interface RemoteSessionPage {
+  items: RemoteSessionSummary[]
+  nextCursor: string | null
+}
+
+export interface ReconcileNodeSessionsResult {
+  workspaceId: string
+  nodeId: string
+  remoteWorkspaceId: string
+  discovered: number
+  updated: number
+  removed: number
+}
+
+function projectionConfigJson(remote: Pick<
+  RemoteSessionSummary,
+  'modelId' | 'providerTargetId' | 'thinkingEffort'
+>): string {
+  return JSON.stringify({
+    ...(remote.modelId ? { requestedModelId: remote.modelId } : {}),
+    ...(remote.providerTargetId ? { requestedProviderTargetId: remote.providerTargetId } : {}),
+    ...(remote.thinkingEffort ? { requestedThinkingEffort: remote.thinkingEffort } : {}),
+  })
+}
+
+/** Reconcile one mounted Node workspace with its authoritative remote sessions. */
+export async function reconcileNodeSessionsForWorkspace(
+  workspaceId: string,
+): Promise<ReconcileNodeSessionsResult> {
+  const locator = readNodeWorkspaceLocator(workspaceId)
+  if (!locator) {
+    throw new AppError({
+      code: 'node_workspace_required',
+      status: 409,
+      message: 'Session reconciliation requires a workspace mounted from a Fabric Node.',
+      details: { workspaceId },
+    })
+  }
+
+  const remoteWorkspaceId = await resolveRemoteWorkspaceIdForLocator(locator)
+  const baseUrl = (await getFabricNodeLinkManager().ensure(locator.nodeId)).localBaseUrl
+  const remoteSessionsById = new Map<string, RemoteSessionSummary>()
+  for (const archived of [false, true]) {
+    let cursor: string | null = null
+    do {
+      const query = new URLSearchParams({
+        workspaceId: remoteWorkspaceId,
+        archived: String(archived),
+        limit: '200',
+      })
+      if (cursor) {
+        query.set('cursor', cursor)
+      }
+      const page = await upstreamJsonByBaseUrl<RemoteSessionPage>(
+        baseUrl,
+        `/sessions/?${query.toString()}`,
+      )
+      for (const remote of page.items) {
+        remoteSessionsById.set(remote.id, remote)
+      }
+      cursor = page.nextCursor
+    } while (cursor)
+  }
+
+  let discovered = 0
+  let updated = 0
+  for (const remote of remoteSessionsById.values()) {
+    const existing = db()
+      .select({
+        localSessionId: nodeSessionLinks.localSessionId,
+        title: sessions.title,
+        updatedAt: sessions.updatedAt,
+      })
+      .from(nodeSessionLinks)
+      .innerJoin(sessions, eq(sessions.id, nodeSessionLinks.localSessionId))
+      .where(and(
+        eq(nodeSessionLinks.nodeId, locator.nodeId),
+        eq(nodeSessionLinks.remoteSessionId, remote.id),
+      ))
+      .get()
+
+    if (existing) {
+      const title = remote.title ?? existing.title
+      if (existing.title !== title || existing.updatedAt < remote.updatedAt) {
+        db().update(sessions).set({
+          title,
+          origin: remote.origin,
+          runtimeKind: remote.runtimeKind,
+          configJson: projectionConfigJson(remote),
+          archivedAt: remote.archivedAt,
+          updatedAt: remote.updatedAt,
+        }).where(eq(sessions.id, existing.localSessionId)).run()
+        updated += 1
+      }
+      continue
+    }
+
+    const now = currentUnixSeconds()
+    const localSessionId = randomUUID()
+    db().transaction((tx) => {
+      tx.insert(sessions).values({
+        id: localSessionId,
+        workspaceId,
+        title: remote.title ?? 'Untitled',
+        origin: remote.origin,
+        providerTargetId: null,
+        runtimeKind: remote.runtimeKind,
+        agentId: null,
+        configJson: projectionConfigJson(remote),
+        archivedAt: remote.archivedAt,
+        createdAt: remote.createdAt,
+        updatedAt: remote.updatedAt,
+      }).run()
+      tx.insert(nodeSessionLinks).values({
+        localSessionId,
+        nodeId: locator.nodeId,
+        remoteSessionId: remote.id,
+        remoteWorkspaceId,
+        projectionKind: 'discovered',
+        createdAt: now,
+        updatedAt: now,
+      }).run()
+    })
+    discovered += 1
+  }
+
+  const staleLocalSessionIds = db()
+    .select({
+      localSessionId: nodeSessionLinks.localSessionId,
+      remoteSessionId: nodeSessionLinks.remoteSessionId,
+    })
+    .from(nodeSessionLinks)
+    .where(and(
+      eq(nodeSessionLinks.nodeId, locator.nodeId),
+      eq(nodeSessionLinks.remoteWorkspaceId, remoteWorkspaceId),
+    ))
+    .all()
+    .filter(link => !remoteSessionsById.has(link.remoteSessionId))
+    .map(link => link.localSessionId)
+
+  if (staleLocalSessionIds.length > 0) {
+    db().delete(sessions).where(inArray(sessions.id, staleLocalSessionIds)).run()
+  }
+
+  return {
+    workspaceId,
+    nodeId: locator.nodeId,
+    remoteWorkspaceId,
+    discovered,
+    updated,
+    removed: staleLocalSessionIds.length,
   }
 }
 

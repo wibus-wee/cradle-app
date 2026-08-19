@@ -7252,6 +7252,31 @@ export type PatchSessionsByIdResponses = {
 
 export type PatchSessionsByIdResponse = PatchSessionsByIdResponses[keyof PatchSessionsByIdResponses];
 
+export type PostSessionsNodeProjectionsReconcileData = {
+    body: {
+        workspaceId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/sessions/node-projections/reconcile';
+};
+
+export type PostSessionsNodeProjectionsReconcileResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        workspaceId: string;
+        nodeId: string;
+        remoteWorkspaceId: string;
+        discovered: number;
+        updated: number;
+        removed: number;
+    };
+};
+
+export type PostSessionsNodeProjectionsReconcileResponse = PostSessionsNodeProjectionsReconcileResponses[keyof PostSessionsNodeProjectionsReconcileResponses];
+
 export type PostSessionsByIdArchiveData = {
     body: {
         archived: boolean;
@@ -8480,6 +8505,31 @@ export type PostWorksResponses = {
 };
 
 export type PostWorksResponse = PostWorksResponses[keyof PostWorksResponses];
+
+export type PostWorksNodeProjectionsReconcileData = {
+    body: {
+        workspaceId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/works/node-projections/reconcile';
+};
+
+export type PostWorksNodeProjectionsReconcileResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        workspaceId: string;
+        nodeId: string;
+        remoteWorkspaceId: string;
+        discovered: number;
+        updated: number;
+        removed: number;
+    };
+};
+
+export type PostWorksNodeProjectionsReconcileResponse = PostWorksNodeProjectionsReconcileResponses[keyof PostWorksNodeProjectionsReconcileResponses];
 
 export type GetWorksByIdData = {
     body?: never;
@@ -22963,6 +23013,7 @@ export type GetChronicleStatusResponses = {
         available: boolean;
         running: boolean;
         pid: number | null;
+        runtimeError: string | null;
         lastCaptureAt: number | null;
         lastSummaryAt: number | null;
         lastErrorAt: number | null;

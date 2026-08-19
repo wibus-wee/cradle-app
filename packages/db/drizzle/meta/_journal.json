@@ -435,6 +435,20 @@
       "when": 1786943287380,
       "tag": "0061_workspace_locator_node_id",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "6",
+      "when": 1787064430108,
+      "tag": "0062_fabric_session_projection_ownership",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "6",
+      "when": 1787101200000,
+      "tag": "0063_fabric_work_projection_ownership",
+      "breakpoints": true
     }
   ]
 }

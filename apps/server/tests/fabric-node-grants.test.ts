@@ -245,7 +245,6 @@ describe('fabric node directory routes', () => {
     expect(state.approvedRequestBodies[0]?.controllerCertificate).toMatchObject({
       subjectKind: 'controller',
       subjectId: 'node-pending',
-      nodeId: 'node-pending',
       scopes: ['admin', 'approve', 'control', 'view'],
     })
 

@@ -320,6 +320,8 @@ export default {
   'workspace.dialog.relinkDescription': 'Choose the current location for {{name}}.',
   'workspace.dialog.relinkTitle': 'Relink Workspace',
   'workspace.dialog.addWorkspaceTitle': 'Add workspace',
+  'workspace.dialog.addWorkspaceDescription':
+    'Choose a project folder on this device, or browse another device on your Fabric.',
   'workspace.dialog.addWorkspaceLocalHost': 'This Mac',
   'workspace.dialog.addWorkspaceLocalTitle': 'Choose a local project folder',
   'workspace.dialog.addWorkspaceLocalDescription':

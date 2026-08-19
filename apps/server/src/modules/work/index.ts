@@ -11,13 +11,23 @@ export const work = new Elysia({
   prefix: '/works',
   detail: { tags: ['work'] },
 })
-  .get('', ({ query }) => Work.list(query), {
+  .get('', async ({ query }) => await Work.listFresh(query), {
     detail: {
       'summary': 'List Work containers',
       'x-cradle-cli': { command: ['work', 'list'] },
     },
     query: WorkModel.listQuery,
     response: { 200: WorkModel.page },
+  })
+  .post('/node-projections/reconcile', async ({ body }) => {
+    return await Work.reconcileNodeWorksForWorkspace(body.workspaceId)
+  }, {
+    detail: {
+      'summary': 'Reconcile Works from a mounted Fabric Node workspace',
+      'x-cradle-cli': { command: ['work', 'reconcile-node-projections'] },
+    },
+    body: WorkModel.reconcileNodeBody,
+    response: { 200: WorkModel.reconcileNodeResponse },
   })
   .get('/:id', async ({ params }) => {
     const detail = await Work.get(params.id)
@@ -35,7 +45,7 @@ export const work = new Elysia({
   })
   .post('', async ({ body }) => await Work.create(body), {
     detail: {
-      'summary': 'Create local isolated Work',
+      'summary': 'Create isolated Work on the workspace authority',
       'x-cradle-cli': {
         command: ['work', 'create'],
         defaultWorkspaceId: true,
@@ -61,7 +71,7 @@ export const work = new Elysia({
     ...body,
   }), {
     detail: {
-      'summary': 'Prepare a local Work handoff without publishing it',
+      'summary': 'Prepare a Work handoff without publishing it',
       'x-cradle-cli': { command: ['work', 'prepare'] },
     },
     params: WorkModel.idParams,

@@ -108,7 +108,27 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
       writeJson(response, url.searchParams.get('path') === '/missing/project' ? null : workspace)
       return
     }
-    if (url.pathname === '/sessions' && request.method === 'POST') {
+    if ((url.pathname === '/sessions' || url.pathname === '/sessions/') && request.method === 'GET') {
+      const workspaceId = url.searchParams.get('workspaceId')
+      const items = [...state.sessions.entries()]
+        .filter(([, session]) => !workspaceId || session.workspaceId === workspaceId)
+        .map(([id, session], index) => ({
+          id,
+          workspaceId: session.workspaceId,
+          title: session.title,
+          origin: 'manual',
+          providerTargetId: session.providerTargetId ?? null,
+          modelId: session.modelId ?? null,
+          thinkingEffort: session.thinkingEffort ?? null,
+          runtimeKind: session.runtimeKind ?? 'standard',
+          archivedAt: null,
+          createdAt: 100 + index,
+          updatedAt: 200 + index,
+        }))
+      writeJson(response, { items, nextCursor: null })
+      return
+    }
+    if ((url.pathname === '/sessions' || url.pathname === '/sessions/') && request.method === 'POST') {
       readJsonBody(request).then((body) => {
         const payload = body as {
           workspaceId?: string
@@ -290,6 +310,7 @@ describe('node session projection', () => {
         nodeId: 'node-projection',
         remoteSessionId: 'remote-session-1',
         remoteWorkspaceId: 'remote-workspace-1',
+        projectionKind: 'controller-created',
       }))
       expect(fakeRemote.state.sessions.get('remote-session-1')).toEqual({
         workspaceId: 'remote-workspace-1',
@@ -474,6 +495,72 @@ describe('node session projection', () => {
       }))
       expect(deleteRes.status).toBe(502)
       expect(db().select().from(sessions).where(eq(sessions.id, localSessionId)).get()).toBeDefined()
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
+  it('discovers remote sessions idempotently and only unlinks discovered projections', async () => {
+    const dataDir = makeTempDir('cradle-remote-session-reconcile-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    let app: ElysiaApp | undefined
+
+    try {
+      fakeRemote = await startFakeRemoteCradleServer()
+      fakeRemote.state.sessions.set('remote-existing-session', {
+        workspaceId: 'remote-workspace-1',
+        title: 'Created on the other controller',
+        providerTargetId: 'remote-provider-1',
+        modelId: 'remote-model-1',
+        thinkingEffort: 'medium',
+        runtimeKind: 'standard',
+        runtimeSettings: {},
+      })
+      app = await createAppWithDataDir(dataDir)
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-reconcile')
+
+      const reconcileRequest = () => app!.handle(new Request('http://localhost/sessions/node-projections/reconcile', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId }),
+      }))
+      const firstRes = await reconcileRequest()
+      expect(firstRes.status).toBe(200)
+      expect(await firstRes.json()).toEqual(expect.objectContaining({
+        workspaceId,
+        nodeId: 'node-reconcile',
+        remoteWorkspaceId: 'remote-workspace-1',
+        discovered: 1,
+      }))
+
+      const link = db().select().from(nodeSessionLinks).where(eq(nodeSessionLinks.remoteSessionId, 'remote-existing-session')).get()
+      expect(link).toEqual(expect.objectContaining({ projectionKind: 'discovered' }))
+
+      const secondRes = await reconcileRequest()
+      expect(secondRes.status).toBe(200)
+      expect(await secondRes.json()).toEqual(expect.objectContaining({ discovered: 0, updated: 0, removed: 0 }))
+
+      const deleteRes = await app.handle(new Request(`http://localhost/sessions/${link!.localSessionId}`, {
+        method: 'DELETE',
+      }))
+      expect(deleteRes.status).toBe(200)
+      expect(fakeRemote.state.deletedSessionIds).not.toContain('remote-existing-session')
+      expect(fakeRemote.state.sessions.has('remote-existing-session')).toBe(true)
+      expect(db().select().from(sessions).where(eq(sessions.id, link!.localSessionId)).get()).toBeUndefined()
+
+      const rediscoverRes = await reconcileRequest()
+      expect(rediscoverRes.status).toBe(200)
+      expect(await rediscoverRes.json()).toEqual(expect.objectContaining({ discovered: 1, removed: 0 }))
+      const rediscoveredLink = db().select().from(nodeSessionLinks).where(eq(nodeSessionLinks.remoteSessionId, 'remote-existing-session')).get()
+      expect(rediscoveredLink).toBeDefined()
+
+      fakeRemote.state.sessions.delete('remote-existing-session')
+      const removeRes = await reconcileRequest()
+      expect(removeRes.status).toBe(200)
+      expect(await removeRes.json()).toEqual(expect.objectContaining({ discovered: 0, removed: 1 }))
+      expect(db().select().from(sessions).where(eq(sessions.id, rediscoveredLink!.localSessionId)).get()).toBeUndefined()
     }
     finally {
       rmSync(dataDir, { recursive: true, force: true })

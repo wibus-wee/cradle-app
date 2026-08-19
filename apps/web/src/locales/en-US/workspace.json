@@ -193,6 +193,7 @@
   "workspace.dialog.addProject": "Add project",
   "workspace.dialog.addProjectDescription": "Select a project directory to import into Cradle",
   "workspace.dialog.addWorkspaceChooseLocal": "Choose folder",
+  "workspace.dialog.addWorkspaceDescription": "Choose a project folder on this device, or browse another device on your Fabric.",
   "workspace.dialog.addWorkspaceLocalDescription": "Local workspaces use this machine as host and keep your files where they are.",
   "workspace.dialog.addWorkspaceLocalHost": "This Mac",
   "workspace.dialog.addWorkspaceLocalTitle": "Choose a local project folder",

@@ -89,6 +89,19 @@ export const WorkModel = {
     limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200 })),
   }),
 
+  reconcileNodeBody: t.Object({
+    workspaceId: t.String({ minLength: 1 }),
+  }),
+
+  reconcileNodeResponse: t.Object({
+    workspaceId: t.String(),
+    nodeId: t.String(),
+    remoteWorkspaceId: t.String(),
+    discovered: t.Number(),
+    updated: t.Number(),
+    removed: t.Number(),
+  }),
+
   createBody: t.Object({
     workspaceId: t.String({ minLength: 1 }),
     title: t.String({ minLength: 1 }),

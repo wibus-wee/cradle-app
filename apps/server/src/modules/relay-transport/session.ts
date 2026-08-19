@@ -119,6 +119,9 @@ interface StreamFlowState {
   appliedBytes: number
   /** Last cumulative value we advertised to the peer via stream_ack. */
   ackedToPeerBytes: number
+  /** Local transport ended; send close after all accepted data is framed. */
+  closeRequested: boolean
+  closeReason?: string
   closed: boolean
 }
 
@@ -133,6 +136,7 @@ function createStreamFlowState(creditBytes: number): StreamFlowState {
     receivedBytes: 0,
     appliedBytes: 0,
     ackedToPeerBytes: 0,
+    closeRequested: false,
     closed: false,
   }
 }
@@ -461,7 +465,7 @@ export class FabricSession {
    */
   writeStreamData(streamId: string, data: Uint8Array): void {
     const flow = this.streams.get(streamId)
-    if (!flow || flow.closed || !this.isReady) {
+    if (!flow || flow.closed || flow.closeRequested || !this.isReady) {
       return
     }
     flow.pendingData.push(data)
@@ -534,7 +538,7 @@ export class FabricSession {
   /** Close a stream (either side). */
   closeStream(streamId: string, reason?: string): void {
     const flow = this.streams.get(streamId)
-    if (!flow || flow.closed) {
+    if (!flow || flow.closed || flow.closeRequested) {
       return
     }
     // Flush any unacked receive progress so the peer can release remaining credit.
@@ -542,6 +546,16 @@ export class FabricSession {
       flow.appliedBytes = flow.receivedBytes
     }
     this.maybeSendReceiveAck(streamId, flow, true)
+    flow.closeRequested = true
+    flow.closeReason = reason
+    this.flushOutboundStreams()
+    this.finishLocalCloseIfReady(streamId, flow)
+  }
+
+  private finishLocalCloseIfReady(streamId: string, flow: StreamFlowState): void {
+    if (flow.closed || !flow.closeRequested || flow.pendingData.length > 0) {
+      return
+    }
     flow.closed = true
     this.connectionInFlightBytes = Math.max(
       0,
@@ -550,7 +564,7 @@ export class FabricSession {
     this.sendEncryptedFrame({
       kind: INNER_FRAME_KIND.streamClose,
       streamId,
-      ...(reason ? { reason } : {}),
+      ...(flow.closeReason ? { reason: flow.closeReason } : {}),
     })
     this.streams.delete(streamId)
   }
@@ -660,6 +674,9 @@ export class FabricSession {
             break
           }
         }
+      }
+      for (const [streamId, flow] of streams) {
+        this.finishLocalCloseIfReady(streamId, flow)
       }
     }
     finally {

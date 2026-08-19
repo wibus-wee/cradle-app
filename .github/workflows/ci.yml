@@ -129,6 +129,19 @@ jobs:
           path: apps/server/coverage/
           retention-days: 7
 
+  relayd-tests:
+    name: Relayd Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/relayd/go.mod
+          cache-dependency-path: apps/relayd/go.sum
+      - name: Run relayd Go tests
+        working-directory: apps/relayd
+        run: go test ./...
+
   chronicle-macos:
     name: Chronicle macOS
     runs-on: macos-latest

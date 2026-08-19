@@ -5,6 +5,7 @@ import { register as registerWorkCreate } from '../work/create'
 import { register as registerWorkGet } from '../work/get'
 import { register as registerWorkList } from '../work/list'
 import { register as registerWorkPrepare } from '../work/prepare'
+import { register as registerWorkReconcileNodeProjections } from '../work/reconcile-node-projections'
 import { register as registerWorkRenameBranch } from '../work/rename-branch'
 import { register as registerWorkSubmit } from '../work/submit'
 
@@ -14,6 +15,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerWorkGet(program)
   registerWorkList(program)
   registerWorkPrepare(program)
+  registerWorkReconcileNodeProjections(program)
   registerWorkRenameBranch(program)
   registerWorkSubmit(program)
 }

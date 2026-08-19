@@ -3,7 +3,16 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { sessionAwaits, sessions, works, workspaces, workThreads, worktrees } from '@cradle/db'
+import {
+  nodeSessionLinks,
+  nodeWorkLinks,
+  sessionAwaits,
+  sessions,
+  works,
+  workspaces,
+  workThreads,
+  worktrees,
+} from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -13,9 +22,12 @@ import { db } from '../../infra'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
+import * as NodeSession from '../session/node-projection'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
+import { serializeWorkspaceLocator } from '../workspace/workspace-locator'
 import * as Worktree from '../worktree/service'
+import * as NodeWork from './node-projection'
 import * as Work from './service'
 
 const WORKSPACE_ID = 'work-service-workspace'
@@ -87,12 +99,89 @@ function mockHealthyDetailReads() {
 afterEach(() => {
   vi.restoreAllMocks()
   db().delete(sessionAwaits).run()
+  db().delete(nodeWorkLinks).run()
   db().delete(workThreads).run()
   db().delete(works).run()
+  db().delete(nodeSessionLinks).run()
   db().delete(sessions).run()
   db().delete(worktrees).run()
   db().delete(workspaces).run()
 })
+
+function remoteWorkDetail(overrides: Partial<NodeWork.RemoteWorkDetail['work']> = {}): NodeWork.RemoteWorkDetail {
+  return {
+    work: {
+      id: 'remote-work-1',
+      title: 'Node-owned Work',
+      objective: 'Create and verify the Node-owned worktree.',
+      linkedIssueId: null,
+      handoffTitle: null,
+      handoffSummary: null,
+      handoffTestPlan: null,
+      preparedAt: null,
+      lastSubmittedAt: null,
+      closedAt: null,
+      archivedAt: null,
+      createdAt: 10,
+      updatedAt: 10,
+      ...overrides,
+    },
+    primaryThread: {
+      id: 'remote-session-1',
+      execution: { kind: 'local' },
+      parentSessionId: null,
+      sideContextSource: null,
+      workspaceId: 'remote-workspace-1',
+      title: 'Node-owned Work',
+      titleSource: 'initial',
+      origin: 'work',
+      providerTargetId: null,
+      agentId: null,
+      modelId: null,
+      thinkingEffort: null,
+      linkedIssueId: null,
+      sessionGroupId: null,
+      runtimeKind: 'standard',
+      configJson: '{}',
+      status: 'idle',
+      pinned: 0,
+      archivedAt: null,
+      lastReadAt: null,
+      ptyStartedAt: null,
+      createdAt: 10,
+      updatedAt: 10,
+      latestUserMessageAt: 10,
+      latestAssistantMessageAt: null,
+      unread: false,
+      isIsolated: true,
+      worktreeId: 'remote-worktree-1',
+      worktreeBranch: 'cradle/wt/node-owned-work',
+      worktreePath: '/remote/worktrees/node-owned-work',
+      worktreeHealth: 'ok',
+      pendingWorktreeId: null,
+      isolationBoundaryRequired: false,
+    },
+    execution: {
+      isIsolated: true,
+      worktreeId: 'remote-worktree-1',
+      worktreeBranch: 'cradle/wt/node-owned-work',
+      worktreePath: '/remote/worktrees/node-owned-work',
+      worktreeHealth: 'ok',
+      pendingWorktreeId: null,
+      isolationBoundaryRequired: false,
+    },
+    readiness: {
+      isolated: true,
+      clean: true,
+      branch: 'cradle/wt/node-owned-work',
+      baseRef: 'main',
+      commitsAhead: 0,
+      changedFiles: 0,
+    },
+    pullRequest: null,
+    activity: 'running',
+  }
+}
 
 function mockSessionAwaitRegister(viewerOwnsPersonalRepository = false) {
   vi.spyOn(PullRequest, 'isViewerPersonalRepositoryOwner').mockResolvedValue(viewerOwnsPersonalRepository)
@@ -153,6 +242,178 @@ describe('deriveActivity', () => {
       awaiting: false,
       waitingForInteraction: false,
     })).toBe('idle')
+  })
+})
+
+describe('fabric Node Work projection', () => {
+  function seedNodeWorkspace(): void {
+    db().insert(workspaces).values({
+      id: WORKSPACE_ID,
+      name: 'MacBook Workspace',
+      locatorJson: serializeWorkspaceLocator({
+        nodeId: 'macbook-node',
+        path: '/Users/test/project',
+        sourceWorkspaceId: 'remote-workspace-1',
+      }),
+      identifier: 'MBW',
+    }).run()
+  }
+
+  it('keeps worktree authority on the Node and projects the primary Session locally', async () => {
+    seedNodeWorkspace()
+    const remote = remoteWorkDetail()
+    vi.spyOn(NodeWork, 'resolveNodeWorkAuthority').mockResolvedValue({
+      nodeId: 'macbook-node',
+      remoteWorkspaceId: 'remote-workspace-1',
+      baseUrl: 'http://127.0.0.1:29999',
+    })
+    const createRemote = vi.spyOn(NodeWork, 'createRemoteWork').mockResolvedValue(remote)
+
+    const detail = await Work.create({
+      workspaceId: WORKSPACE_ID,
+      title: 'Node-owned Work',
+      goal: 'Create and verify the Node-owned worktree.',
+      runtimeKind: 'standard',
+    })
+
+    expect(createRemote).toHaveBeenCalledWith(
+      expect.objectContaining({ remoteWorkspaceId: 'remote-workspace-1' }),
+      expect.not.objectContaining({ workspaceId: WORKSPACE_ID }),
+    )
+    expect(detail.work.id).not.toBe(remote.work.id)
+    expect(detail.primaryThread.id).not.toBe(remote.primaryThread.id)
+    expect(detail.primaryThread.execution).toEqual({
+      kind: 'node',
+      nodeId: 'macbook-node',
+      remoteSessionId: 'remote-session-1',
+    })
+    expect(detail.execution).toEqual(remote.execution)
+    expect(db().select().from(worktrees).all()).toHaveLength(0)
+    expect(db().select().from(nodeWorkLinks).all()).toEqual([
+      expect.objectContaining({
+        localWorkId: detail.work.id,
+        nodeId: 'macbook-node',
+        remoteWorkId: 'remote-work-1',
+      }),
+    ])
+    expect(db().select().from(nodeSessionLinks).all()).toEqual([
+      expect.objectContaining({
+        localSessionId: detail.primaryThread.id,
+        nodeId: 'macbook-node',
+        remoteSessionId: 'remote-session-1',
+      }),
+    ])
+  })
+
+  it('routes Work lifecycle mutations to the Node authority', async () => {
+    seedNodeWorkspace()
+    const remote = remoteWorkDetail()
+    vi.spyOn(NodeWork, 'resolveNodeWorkAuthority').mockResolvedValue({
+      nodeId: 'macbook-node',
+      remoteWorkspaceId: 'remote-workspace-1',
+      baseUrl: 'http://127.0.0.1:29999',
+    })
+    vi.spyOn(NodeWork, 'createRemoteWork').mockResolvedValue(remote)
+    const detail = await Work.create({
+      workspaceId: WORKSPACE_ID,
+      title: 'Node-owned Work',
+      goal: 'Create and verify the Node-owned worktree.',
+    })
+    const mutateRemote = vi.spyOn(NodeWork, 'mutateRemoteWork')
+      .mockImplementation(async (_link, action) => remoteWorkDetail({
+        handoffTitle: action === 'prepare' ? 'Prepared Work' : null,
+        archivedAt: action === 'archive' ? 20 : null,
+        updatedAt: 20,
+      }))
+
+    await Work.prepare({
+      id: detail.work.id,
+      title: 'Prepared Work',
+      summary: 'Prepared remotely.',
+      testPlan: 'Run the remote checks.',
+    })
+    await Work.renameBranch({ id: detail.work.id, branch: 'cradle/wt/renamed' })
+    await Work.submit({ id: detail.work.id })
+    const archived = await Work.setArchived({ id: detail.work.id, archived: true })
+
+    expect(mutateRemote.mock.calls.map(call => call[1])).toEqual([
+      'prepare',
+      'branch',
+      'submit',
+      'archive',
+    ])
+    expect(archived.work.archivedAt).toBe(20)
+    expect(db().select({ archivedAt: works.archivedAt }).from(works).get()?.archivedAt).toBe(20)
+  })
+
+  it('discovers, refreshes, and removes Node-owned Work projections', async () => {
+    seedNodeWorkspace()
+    const authority = {
+      nodeId: 'macbook-node',
+      remoteWorkspaceId: 'remote-workspace-1',
+      baseUrl: 'http://127.0.0.1:29999',
+    }
+    vi.spyOn(NodeWork, 'resolveNodeWorkAuthority').mockResolvedValue(authority)
+    vi.spyOn(NodeSession, 'reconcileNodeSessionsForWorkspace').mockImplementation(async () => {
+      if (db().select().from(nodeSessionLinks).get()) {
+        return { workspaceId: WORKSPACE_ID, ...authority, discovered: 0, updated: 0, removed: 0 }
+      }
+      db().insert(sessions).values({
+        id: SESSION_ID,
+        workspaceId: WORKSPACE_ID,
+        title: 'Node-owned Work',
+        origin: 'work',
+      }).run()
+      db().insert(nodeSessionLinks).values({
+        localSessionId: SESSION_ID,
+        nodeId: authority.nodeId,
+        remoteSessionId: 'remote-session-1',
+        remoteWorkspaceId: authority.remoteWorkspaceId,
+        projectionKind: 'discovered',
+      }).run()
+      return { workspaceId: WORKSPACE_ID, ...authority, discovered: 1, updated: 0, removed: 0 }
+    })
+    let remote = remoteWorkDetail().work
+    vi.spyOn(NodeWork, 'listRemoteWorks').mockImplementation(async (_authority, input) => ({
+      items: input.archived
+        ? []
+        : [{
+            ...remote,
+            workspaceId: authority.remoteWorkspaceId,
+            primarySessionId: 'remote-session-1',
+            activity: 'idle',
+            pullRequest: null,
+          }],
+      nextCursor: null,
+    }))
+
+    const discovered = await Work.reconcileNodeWorksForWorkspace(WORKSPACE_ID)
+    const localWorkId = db().select().from(nodeWorkLinks).get()?.localWorkId
+    expect(discovered).toMatchObject({ discovered: 1, updated: 0, removed: 0 })
+    expect(localWorkId).toBeTruthy()
+    expect(Work.list({ workspaceId: WORKSPACE_ID }).items[0]).toMatchObject({
+      id: localWorkId,
+      title: 'Node-owned Work',
+      primarySessionId: SESSION_ID,
+    })
+
+    db().delete(sessions).where(eq(sessions.id, SESSION_ID)).run()
+    const rebound = await Work.reconcileNodeWorksForWorkspace(WORKSPACE_ID)
+    expect(rebound).toMatchObject({ discovered: 0, updated: 1, removed: 0 })
+    expect(Work.list({ workspaceId: WORKSPACE_ID }).items[0]).toMatchObject({
+      id: localWorkId,
+      primarySessionId: SESSION_ID,
+    })
+
+    remote = { ...remote, title: 'Renamed on MacBook', updatedAt: 20 }
+    const refreshed = await Work.reconcileNodeWorksForWorkspace(WORKSPACE_ID)
+    expect(refreshed).toMatchObject({ discovered: 0, updated: 1, removed: 0 })
+    expect(db().select().from(works).get()?.title).toBe('Renamed on MacBook')
+
+    vi.mocked(NodeWork.listRemoteWorks).mockResolvedValue({ items: [], nextCursor: null })
+    const removed = await Work.reconcileNodeWorksForWorkspace(WORKSPACE_ID)
+    expect(removed).toMatchObject({ discovered: 0, updated: 0, removed: 1 })
+    expect(db().select().from(works).all()).toHaveLength(0)
   })
 })
 
@@ -234,6 +495,7 @@ describe('work delivery control', () => {
       execFileSync('git', ['init'], { cwd: repositoryPath })
       execFileSync('git', ['config', 'user.email', 'work-test@example.com'], { cwd: repositoryPath })
       execFileSync('git', ['config', 'user.name', 'Work Test'], { cwd: repositoryPath })
+      execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: repositoryPath })
       writeFileSync(join(repositoryPath, 'README.md'), '# Work test\n', 'utf8')
       execFileSync('git', ['add', 'README.md'], { cwd: repositoryPath })
       execFileSync('git', ['commit', '-m', 'Initial commit'], { cwd: repositoryPath })

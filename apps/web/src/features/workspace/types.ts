@@ -21,8 +21,7 @@ export function isMultiFolderWorkspace(
 export function isWorkEligibleWorkspace(
   workspace: Pick<Workspace, 'locator' | 'availability' | 'multiFolder'>,
 ): boolean {
-  return isLocalWorkspace(workspace)
-    && workspace.availability === 'available'
+  return workspace.availability !== 'missing'
     && !workspace.multiFolder
 }
 

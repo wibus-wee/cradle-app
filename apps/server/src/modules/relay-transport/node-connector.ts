@@ -5,6 +5,7 @@ import WebSocket from 'ws'
 
 import { AppError } from '../../errors/app-error'
 import { CRADLE_RELAY_TOKEN_HEADER } from '../../http/auth'
+import { getLogger } from '../../logging/logger'
 import type { MembershipCertificate } from '../fabric/protocol'
 import { assertFabricCertificate, fabricAuthHeaders, fabricHeadersRecord } from '../fabric/protocol'
 import { completeNodeEnrollment, getFabricMembership, hasPendingNodeEnrollment, requireFabricMembershipSecretRefs } from '../fabric/service'
@@ -27,6 +28,7 @@ export class FabricNodeConnector {
   private enrollmentTimer: NodeJS.Timeout | null = null
   private readonly sessions = new Map<string, FabricSession>()
   private readonly streams = new Map<string, Map<string, ActiveStream>>()
+  private readonly logger = getLogger().child({ module: 'fabric-node-connector' })
 
   constructor(private readonly localServerHost: string, private readonly localServerPort: number) {}
 
@@ -57,12 +59,41 @@ export class FabricNodeConnector {
     const url = new URL('/v1/ws/nodes', `${membership.relayUrl}/`); url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
     const ws = new WebSocket(url, { headers: fabricHeadersRecord(headers) })
     this.ws = ws
+    ws.once('open', () => {
+      this.logger.info('Fabric Node connected to relay', {
+        fabricId: membership.fabricId,
+        nodeId: membership.localNodeId,
+      })
+    })
+    ws.once('unexpected-response', (_request, response) => {
+      this.logger.warn('Fabric Node relay upgrade was rejected', {
+        fabricId: membership.fabricId,
+        nodeId: membership.localNodeId,
+        status: response.statusCode,
+      })
+    })
     ws.on('message', (data) => {
       try { this.handleEnvelope(relayWebSocketDataView(data), membership.nodeCertificate, readSecret(secretRefs.encryptionKeySecretId), membership.fabricId) }
       catch { ws.close(1008, 'Invalid Fabric frame') }
     })
     const reconnect = () => { if (!this.stopped && this.ws === ws) { this.ws = null; this.reconnectTimer = setTimeout(() => void this.connect(), 1_000); this.reconnectTimer.unref?.() } }
-    ws.once('close', reconnect); ws.once('error', reconnect)
+    ws.once('close', (code, reason) => {
+      this.logger.warn('Fabric Node relay connection closed', {
+        fabricId: membership.fabricId,
+        nodeId: membership.localNodeId,
+        code,
+        reason: reason.toString(),
+      })
+      reconnect()
+    })
+    ws.once('error', (error) => {
+      this.logger.warn('Fabric Node relay connection failed', {
+        fabricId: membership.fabricId,
+        nodeId: membership.localNodeId,
+        error: error.message,
+      })
+      reconnect()
+    })
   }
 
   private handleEnvelope(bytes: Uint8Array, nodeCertificate: MembershipCertificate, encryptionPrivateKey: string, fabricId: string): void {

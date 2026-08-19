@@ -259,6 +259,11 @@ const config = {
       filter: ['**/*'],
     },
     {
+      from: 'resources/chronicle',
+      to: 'chronicle',
+      filter: ['**/*'],
+    },
+    {
       from: '../../packages/db/drizzle',
       to: 'drizzle',
       filter: [

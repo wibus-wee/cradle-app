@@ -2,8 +2,8 @@ import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 
 import type { Work } from '@cradle/db'
-import { sessions, works, workThreads } from '@cradle/db'
-import { and, desc, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
+import { nodeSessionLinks, nodeWorkLinks, sessions, works, workThreads } from '@cradle/db'
+import { and, desc, eq, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
@@ -16,11 +16,13 @@ import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
+import * as NodeSession from '../session/node-projection'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
 import type { SessionAwaitSource } from '../session-await/types'
 import * as Workspace from '../workspace/service'
 import * as Worktree from '../worktree/service'
+import * as NodeWork from './node-projection'
 
 export type WorkActivity = 'idle' | 'running' | 'waiting' | 'blocked'
 export const WORK_LIST_DEFAULT_LIMIT = 100
@@ -41,6 +43,15 @@ export interface WorkListInput {
   archived?: boolean
   cursor?: string
   limit?: number
+}
+
+export interface ReconcileNodeWorksResult {
+  workspaceId: string
+  nodeId: string
+  remoteWorkspaceId: string
+  discovered: number
+  updated: number
+  removed: number
 }
 
 interface WorkListCursor {
@@ -175,7 +186,7 @@ function readActivity(session: Session.SessionView): WorkActivity {
     || hasPendingRuntimeToolApproval(session.id)
   return deriveActivity({
     sessionStatus: session.status,
-    worktreeHealth: session.worktreeHealth,
+    worktreeHealth: session.execution.kind === 'node' ? 'ok' : session.worktreeHealth,
     awaiting: awaitSummary.awaiting,
     waitingForInteraction,
   })
@@ -324,10 +335,171 @@ export function list(input: WorkListInput = {}): WorkPage {
   }
 }
 
+export async function listFresh(input: WorkListInput = {}): Promise<WorkPage> {
+  if (input.workspaceId) {
+    const authority = await NodeWork.resolveNodeWorkAuthority(input.workspaceId)
+    if (authority) {
+      await reconcileNodeWorksForWorkspace(input.workspaceId, authority)
+    }
+  }
+  return list(input)
+}
+
+/** Rebuild the controller's Work projections from one mounted Node authority. */
+export async function reconcileNodeWorksForWorkspace(
+  workspaceId: string,
+  resolvedAuthority?: { nodeId: string, remoteWorkspaceId: string, baseUrl: string },
+): Promise<ReconcileNodeWorksResult> {
+  const authority = resolvedAuthority ?? await NodeWork.resolveNodeWorkAuthority(workspaceId)
+  if (!authority) {
+    throw new AppError({
+      code: 'node_workspace_required',
+      status: 409,
+      message: 'Work reconciliation requires a workspace mounted from a Fabric Node.',
+      details: { workspaceId },
+    })
+  }
+
+  await NodeSession.reconcileNodeSessionsForWorkspace(workspaceId)
+  const remoteWorksById = new Map<string, WorkSummary>()
+  for (const archived of [false, true]) {
+    let cursor: string | undefined
+    do {
+      const page = await NodeWork.listRemoteWorks(authority, {
+        archived,
+        cursor,
+        limit: WORK_LIST_MAX_LIMIT,
+      })
+      for (const remote of page.items) {
+        remoteWorksById.set(remote.id, remote)
+      }
+      cursor = page.nextCursor ?? undefined
+    } while (cursor)
+  }
+
+  let discovered = 0
+  let updated = 0
+  for (const remote of remoteWorksById.values()) {
+    const localSession = db()
+      .select({ id: nodeSessionLinks.localSessionId })
+      .from(nodeSessionLinks)
+      .where(and(
+        eq(nodeSessionLinks.nodeId, authority.nodeId),
+        eq(nodeSessionLinks.remoteSessionId, remote.primarySessionId),
+      ))
+      .get()
+    if (!localSession) {
+      throw new AppError({
+        code: 'node_work_primary_session_missing',
+        status: 502,
+        message: 'Remote Work primary Session was not projected during reconciliation.',
+        details: {
+          nodeId: authority.nodeId,
+          remoteWorkId: remote.id,
+          remoteSessionId: remote.primarySessionId,
+        },
+      })
+    }
+    const existing = db()
+      .select({ localWorkId: nodeWorkLinks.localWorkId, updatedAt: works.updatedAt })
+      .from(nodeWorkLinks)
+      .innerJoin(works, eq(works.id, nodeWorkLinks.localWorkId))
+      .where(and(
+        eq(nodeWorkLinks.nodeId, authority.nodeId),
+        eq(nodeWorkLinks.remoteWorkId, remote.id),
+      ))
+      .get()
+    const projectedValues = {
+      title: remote.title,
+      objective: remote.objective,
+      handoffTitle: remote.handoffTitle,
+      handoffSummary: remote.handoffSummary,
+      handoffTestPlan: remote.handoffTestPlan,
+      preparedAt: remote.preparedAt,
+      lastSubmittedAt: remote.lastSubmittedAt,
+      closedAt: remote.closedAt,
+      archivedAt: remote.archivedAt,
+      createdAt: remote.createdAt,
+      updatedAt: remote.updatedAt,
+    }
+    if (existing) {
+      const primarySessionId = getPrimarySessionId(existing.localWorkId)
+      if (existing.updatedAt < remote.updatedAt || primarySessionId !== localSession.id) {
+        db().transaction((tx) => {
+          tx.update(works).set(projectedValues).where(eq(works.id, existing.localWorkId)).run()
+          if (primarySessionId !== localSession.id) {
+            tx.delete(workThreads).where(and(
+              eq(workThreads.workId, existing.localWorkId),
+              eq(workThreads.role, 'primary'),
+            )).run()
+            tx.insert(workThreads).values({
+              workId: existing.localWorkId,
+              sessionId: localSession.id,
+              role: 'primary',
+              createdAt: remote.createdAt,
+            }).run()
+          }
+        })
+        updated += 1
+      }
+      continue
+    }
+
+    const localWorkId = randomUUID()
+    db().transaction((tx) => {
+      tx.insert(works).values({
+        id: localWorkId,
+        ...projectedValues,
+        linkedIssueId: null,
+      }).run()
+      tx.insert(workThreads).values({
+        workId: localWorkId,
+        sessionId: localSession.id,
+        role: 'primary',
+        createdAt: remote.createdAt,
+      }).run()
+      tx.insert(nodeWorkLinks).values({
+        localWorkId,
+        nodeId: authority.nodeId,
+        remoteWorkId: remote.id,
+        remoteWorkspaceId: authority.remoteWorkspaceId,
+      }).run()
+    })
+    discovered += 1
+  }
+
+  const staleLocalWorkIds = db()
+    .select({ localWorkId: nodeWorkLinks.localWorkId, remoteWorkId: nodeWorkLinks.remoteWorkId })
+    .from(nodeWorkLinks)
+    .where(and(
+      eq(nodeWorkLinks.nodeId, authority.nodeId),
+      eq(nodeWorkLinks.remoteWorkspaceId, authority.remoteWorkspaceId),
+    ))
+    .all()
+    .filter(link => !remoteWorksById.has(link.remoteWorkId))
+    .map(link => link.localWorkId)
+  if (staleLocalWorkIds.length > 0) {
+    db().delete(works).where(inArray(works.id, staleLocalWorkIds)).run()
+  }
+
+  return {
+    workspaceId,
+    nodeId: authority.nodeId,
+    remoteWorkspaceId: authority.remoteWorkspaceId,
+    discovered,
+    updated,
+    removed: staleLocalWorkIds.length,
+  }
+}
+
 export async function get(id: string): Promise<WorkDetail | null> {
   const work = getWorkRow(id)
   if (!work) {
     return null
+  }
+  const nodeLink = NodeWork.getNodeWorkLink(id)
+  if (nodeLink) {
+    return await projectRemoteDetail(id, await NodeWork.readRemoteWork(nodeLink))
   }
   const primaryThread = requirePrimaryThread(work.id)
   const [execution, readiness, pullRequest] = await Promise.all([
@@ -342,6 +514,65 @@ export async function get(id: string): Promise<WorkDetail | null> {
     readiness,
     pullRequest,
     activity: readActivity({ ...primaryThread, ...execution }),
+  }
+}
+
+async function projectRemoteDetail(
+  localWorkId: string,
+  remote: NodeWork.RemoteWorkDetail,
+): Promise<WorkDetail> {
+  const link = NodeWork.getNodeWorkLink(localWorkId)
+  if (!link) {
+    throw new AppError({
+      code: 'node_work_link_not_found',
+      status: 404,
+      message: 'Node Work link was not found for this local projection.',
+      details: { workId: localWorkId },
+    })
+  }
+  const localSessionId = getPrimarySessionId(localWorkId)
+  if (!localSessionId) {
+    throw new AppError({
+      code: 'work_primary_thread_missing',
+      status: 500,
+      message: 'Work primary Session is missing',
+      details: { workId: localWorkId },
+    })
+  }
+
+  db().transaction((tx) => {
+    tx.update(works).set({
+      title: remote.work.title,
+      objective: remote.work.objective,
+      handoffTitle: remote.work.handoffTitle,
+      handoffSummary: remote.work.handoffSummary,
+      handoffTestPlan: remote.work.handoffTestPlan,
+      preparedAt: remote.work.preparedAt,
+      lastSubmittedAt: remote.work.lastSubmittedAt,
+      closedAt: remote.work.closedAt,
+      archivedAt: remote.work.archivedAt,
+      updatedAt: remote.work.updatedAt,
+    }).where(eq(works.id, localWorkId)).run()
+    tx.update(sessions).set({
+      title: remote.primaryThread.title ?? remote.work.title,
+      archivedAt: remote.primaryThread.archivedAt,
+      updatedAt: remote.primaryThread.updatedAt,
+    }).where(eq(sessions.id, localSessionId)).run()
+  })
+
+  const localThread = requirePrimaryThread(localWorkId)
+  return {
+    work: { ...remote.work, id: localWorkId },
+    primaryThread: {
+      ...remote.primaryThread,
+      id: localSessionId,
+      workspaceId: localThread.workspaceId,
+      execution: localThread.execution,
+    },
+    execution: remote.execution,
+    readiness: remote.readiness,
+    pullRequest: remote.pullRequest,
+    activity: remote.activity,
   }
 }
 
@@ -386,6 +617,10 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
       message: 'Work requires a single-folder local Git workspace. Multi-folder workspaces are for Agent context only.',
       details: { workspaceId: input.workspaceId },
     })
+  }
+  const nodeAuthority = await NodeWork.resolveNodeWorkAuthority(input.workspaceId)
+  if (nodeAuthority) {
+    return await createNodeWork(input, nodeAuthority)
   }
   // An explicit branch never copies uncommitted local files into the managed
   // worktree, so a dirty source checkout is safe. Current HEAD still requires
@@ -502,8 +737,80 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
   }
 }
 
+async function createNodeWork(
+  input: CreateWorkInput,
+  authority: { nodeId: string, remoteWorkspaceId: string, baseUrl: string },
+): Promise<WorkDetail> {
+  const {
+    workspaceId: _workspaceId,
+    linkedIssueId: _linkedIssueId,
+    ...remoteInput
+  } = input
+  const remote = await NodeWork.createRemoteWork(authority, remoteInput)
+  const localWorkId = randomUUID()
+  let localSessionId: string | null = null
+
+  try {
+    localSessionId = NodeSession.attachExistingNodeSessionProjection({
+      workspaceId: input.workspaceId,
+      nodeId: authority.nodeId,
+      remoteWorkspaceId: authority.remoteWorkspaceId,
+      remoteSession: remote.primaryThread,
+      projectionKind: 'controller-created',
+    }).localSessionId
+
+    db().transaction((tx) => {
+      tx.insert(works).values({
+        ...remote.work,
+        id: localWorkId,
+        linkedIssueId: input.linkedIssueId ?? null,
+      }).run()
+      tx.insert(workThreads).values({
+        workId: localWorkId,
+        sessionId: localSessionId!,
+        role: 'primary',
+        createdAt: remote.work.createdAt,
+      }).run()
+      tx.insert(nodeWorkLinks).values({
+        localWorkId,
+        nodeId: authority.nodeId,
+        remoteWorkId: remote.work.id,
+        remoteWorkspaceId: authority.remoteWorkspaceId,
+      }).run()
+    })
+    return await projectRemoteDetail(localWorkId, remote)
+  }
+  catch (error) {
+    if (localSessionId) {
+      db().delete(sessions).where(eq(sessions.id, localSessionId)).run()
+    }
+    try {
+      await NodeWork.mutateRemoteWork({
+        localWorkId,
+        nodeId: authority.nodeId,
+        remoteWorkId: remote.work.id,
+        remoteWorkspaceId: authority.remoteWorkspaceId,
+        createdAt: remote.work.createdAt,
+        updatedAt: remote.work.updatedAt,
+      }, 'archive', { archived: true })
+    }
+    catch {
+      // The remote Work remains authoritative and can be reconciled later.
+    }
+    throw error
+  }
+}
+
 export async function setArchived(input: { id: string, archived: boolean }): Promise<WorkDetail> {
   const work = requireWork(input.id)
+  const nodeLink = NodeWork.getNodeWorkLink(work.id)
+  if (nodeLink) {
+    return await projectRemoteDetail(work.id, await NodeWork.mutateRemoteWork(
+      nodeLink,
+      'archive',
+      { archived: input.archived },
+    ))
+  }
   const primaryThread = requirePrimaryThread(work.id)
   await Session.setArchived({ id: primaryThread.id, archived: input.archived })
   if (!input.archived) {
@@ -548,6 +855,14 @@ export async function prepare(input: {
   testPlan: string
 }): Promise<WorkDetail> {
   const work = requireWork(input.id)
+  const nodeLink = NodeWork.getNodeWorkLink(work.id)
+  if (nodeLink) {
+    return await projectRemoteDetail(work.id, await NodeWork.mutateRemoteWork(
+      nodeLink,
+      'prepare',
+      { title: input.title, summary: input.summary, testPlan: input.testPlan },
+    ))
+  }
   const primaryThread = requirePrimaryThread(work.id)
   const readiness = await PullRequest.inspectPullRequestReadiness(primaryThread.id)
   assertReadyForDelivery(readiness)
@@ -678,6 +993,14 @@ export async function renameBranch(input: {
   branch: string
 }): Promise<WorkDetail> {
   const work = requireWork(input.id)
+  const nodeLink = NodeWork.getNodeWorkLink(work.id)
+  if (nodeLink) {
+    return await projectRemoteDetail(work.id, await NodeWork.mutateRemoteWork(
+      nodeLink,
+      'branch',
+      { branch: input.branch },
+    ))
+  }
   const primaryThread = requirePrimaryThread(work.id)
 
   // Any stored pull request (even closed/merged) pins the old head ref —
@@ -724,6 +1047,15 @@ export async function submit(input: {
   base?: string
 }): Promise<WorkDetail> {
   const work = requireWork(input.id)
+  const nodeLink = NodeWork.getNodeWorkLink(work.id)
+  if (nodeLink) {
+    const { id: _id, ...body } = input
+    return await projectRemoteDetail(work.id, await NodeWork.mutateRemoteWork(
+      nodeLink,
+      'submit',
+      body,
+    ))
+  }
   const primaryThread = requirePrimaryThread(work.id)
   const readiness = await PullRequest.inspectPullRequestReadiness(primaryThread.id)
   assertReadyForDelivery(readiness)

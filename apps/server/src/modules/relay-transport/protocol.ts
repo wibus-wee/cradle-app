@@ -436,7 +436,9 @@ function decodeStreamStringFrame(
 }
 
 export function relayPriorityForInnerFrame(frame: InnerFrame): RelayPriority {
-  return frame.kind === INNER_FRAME_KIND.streamData ? 'data' : 'control'
+  return frame.kind === INNER_FRAME_KIND.streamData || frame.kind === INNER_FRAME_KIND.streamClose
+    ? 'data'
+    : 'control'
 }
 
 /** Benchmark-only reference size; Fabric never accepts or emits this format. */

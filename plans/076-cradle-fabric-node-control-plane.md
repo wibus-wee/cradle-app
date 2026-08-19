@@ -380,4 +380,13 @@ Revision note (2026-08-16): recorded the v3 Node/link transport seam, certificat
 
 ## Outcomes & Retrospective
 
-Not started. At completion, record the number of Nodes/controllers exercised, the relay restart/revocation evidence, the migration export result, any observed latency or memory change, and any design change made while executing the plan.
+Automated two-Node acceptance was added on 2026-08-19 as
+`CRADLE-FABRIC-001`. It starts one relayd and two Cradle Servers with independent
+SQLite databases, drives enrollment and bidirectional Workspace mounting through
+two browser contexts, executes Chat on each selected authority, reconciles
+conversations created directly on either Node, restarts relayd, and restarts the
+target Server. The journey is owned by the dedicated PR E2E job.
+
+The physical two-host Work/tool-approval smoke, live grant revocation under
+load, and migration-export evidence remain separate acceptance items. The
+automated Chat journey does not claim those outcomes.

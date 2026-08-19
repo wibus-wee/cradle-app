@@ -204,8 +204,6 @@ export class SessionSyncEngine {
 
     const terminalRunRefresh = deriveRuntimeTerminalRunRefresh({
       runtimeStatus: input.runtimeStatus,
-      snapshotMessageIds: input.snapshotMessageIds,
-      storeMessageIds: input.storeMessageIds,
       previousRefreshRunId: this.latestTerminalRunRefreshId,
     })
     this.latestTerminalRunRefreshId = terminalRunRefresh.nextRefreshRunId

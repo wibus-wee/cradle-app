@@ -95,6 +95,10 @@ function notifyFabricMembershipChanged(): void {
   }
 }
 
+function localNodeDisplayName(input?: string): string {
+  return input?.trim() || process.env.CRADLE_FABRIC_NODE_NAME?.trim() || hostname()
+}
+
 export interface CreateFabricInput {
   relayUrl: string
   displayName?: string
@@ -221,10 +225,9 @@ encryptionPubkey: encryption.publicKeyBase64,
   const controllerCertificate = signFabricCertificate(owner.privateKeyBase64, {
     fabricId: created.fabric.fabricId,
     subjectKind: 'controller',
-subjectId: nodeId,
+    subjectId: nodeId,
     identityPubkey: identity.publicKeyBase64,
 encryptionPubkey: encryption.publicKeyBase64,
-    nodeId,
     scopes: ['admin', 'approve', 'control', 'view'],
   })
   const deliverySecret = randomFabricSecret()
@@ -233,7 +236,7 @@ encryptionPubkey: encryption.publicKeyBase64,
 subjectId: nodeId,
 identityPrivateKeyBase64: identity.privateKeyBase64,
     encryptionPubkey: encryption.publicKeyBase64,
-displayName: input.displayName?.trim() || hostname(),
+displayName: localNodeDisplayName(input.displayName),
     platform: input.platform ?? platform(),
 version: input.version ?? 'cradle-server',
     capabilities: input.capabilities ?? ['chat', 'workspace', 'terminal'],
@@ -280,7 +283,7 @@ export async function createNodeInvitation(input: CreateFabricInput & { fabricId
 subjectId: nodeId,
 identityPrivateKeyBase64: identity.privateKeyBase64,
     encryptionPubkey: encryption.publicKeyBase64,
-displayName: input.displayName?.trim() || hostname(),
+displayName: localNodeDisplayName(input.displayName),
     platform: input.platform ?? platform(),
 version: input.version ?? 'cradle-server',
     capabilities: input.capabilities ?? ['chat', 'workspace', 'terminal'],
@@ -425,7 +428,6 @@ scopes: ['admin'],
     subjectId: request.subjectId,
     identityPubkey: request.identityPubkey,
     encryptionPubkey: request.encryptionPubkey,
-    nodeId: request.subjectId,
     scopes: ['admin', 'approve', 'control', 'view'],
   })
   const directory = new FabricDirectoryClient(membership.relayUrl)

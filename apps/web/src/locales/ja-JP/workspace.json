@@ -276,6 +276,7 @@
   "workspace.dialog.relinkDescription": "{{name}} の現在の場所を選択してください。",
   "workspace.dialog.relinkTitle": "Workspace を再リンク",
   "workspace.dialog.addWorkspaceChooseLocal": "Choose folder",
+  "workspace.dialog.addWorkspaceDescription": "このデバイスのプロジェクトフォルダーを選ぶか、Fabric 上の他のデバイスを参照します。",
   "workspace.dialog.addWorkspaceLocalDescription": "Local workspaces use this machine as host and keep your files where they are.",
   "workspace.dialog.addWorkspaceLocalHost": "This Mac",
   "workspace.dialog.addWorkspaceLocalTitle": "Choose a local project folder",

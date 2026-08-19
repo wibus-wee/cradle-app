@@ -1,6 +1,13 @@
 # Session Module
 
 Session owns CRUD, pin toggle, soft archive/restore, markdown export, and session-owned lifecycle hooks. Chat transcript hydration is owned by Chat Runtime through `GET /chat/sessions/:sessionId/messages`; this module no longer exposes raw message-list HTTP routes.
+
+| Area | Owner | Responsibility |
+| --- | --- | --- |
+| Session state | [`service.ts`](./service.ts) | Owns CRUD, archive lifecycle, titles, origin, read state, and execution projections returned by list/get. |
+| HTTP contract | [`index.ts`](./index.ts), [`model.ts`](./model.ts) | Defines Session routes, pagination, mutation schemas, and generated-client response shapes. |
+| Fabric projection | [`node-projection.ts`](./node-projection.ts) | Maps a controller-local Session id to an authoritative Session on another Node and reconciles mounted Workspace sessions. |
+| Chat traffic | [`linked-session-proxy.ts`](../chat-runtime/http/linked-session-proxy.ts) | Rewrites linked Session paths and forwards all Session-scoped Chat Runtime traffic to the target Node. |
 Session owns the default provider target and requested execution preferences for a chat. Patch updates may change `providerTargetId`, the session-requested `modelId`, and `thinkingEffort`; model, thinking-effort, runtime settings, and session-scoped Claude Agent model aliases are stored in `sessions.configJson` and Chat Runtime passes them into Provider Runtime when a run starts. Backend session bindings remain Provider Runtime Directory state for durable/resumable runtime bindings, with read-only fallback for older rows.
 Session list/get responses expose the session-requested model id as `modelId`, falling back to backend session bindings when no session preference exists, a read-only `status` projection from chat-runtime-owned run rows and Codex active-goal snapshots so navigation surfaces can show active or errored sessions without opening them, `latestUserMessageAt` so session list timestamps use the same semantic clock as list ordering instead of mutable session metadata updates, and server-owned read-state projection through `lastReadAt`, `latestAssistantMessageAt`, and `unread`. Historical run rows do not keep a session in `streaming`; Chat Runtime owns cleanup of orphaned persisted streaming rows.
 Session exposes user title edits through `PATCH /sessions/:id`, but title persistence is projected from Chat Runtime `TitleChanged` events. Provider adapters never write Session rows directly.
@@ -21,7 +28,22 @@ Creating a projection:
 2. `POST` the Node session through the Fabric link manager and its local encrypted tunnel endpoint.
 3. Insert the local `sessions` row and `node_session_links` mapping `{ nodeId, remoteSessionId, remoteWorkspaceId }`.
 
-Deleting a local projection (`DELETE /sessions/:id`) **cascades** to `DELETE` the remote session upstream first. If upstream delete fails, the local projection and link remain and the API returns an error — no silent orphan cleanup.
+Mounted Workspace reconciliation reads both active and archived Session pages
+from the authoritative Node. It creates missing projections, updates remote
+metadata, and removes local projections whose authority no longer exists. A
+failed page read aborts before removal, so a disconnected Node cannot be
+mistaken for an empty Workspace.
+
+`node_session_links.projectionKind` preserves deletion ownership:
+
+| Kind | Created when | Local delete behavior |
+| --- | --- | --- |
+| `controller-created` | This controller created the authoritative Session through a mounted Workspace. | Delete the remote Session first; keep the local row if upstream deletion fails. |
+| `discovered` | Reconciliation found a Session created from another controller or directly on the target Node. | Remove only the local projection. If the authority still exists, later reconciliation may discover it again. |
+
+Reconciliation removes either kind when the complete authoritative active and
+archived listings prove the remote Session no longer exists. It never copies
+messages or provider credentials between databases.
 
 Linked chat traffic for **all** `/chat/sessions/:sessionId/*` paths is intercepted by
 `linkedChatSessionProxyPlugin` (mounted in `app.ts`) and forwarded through

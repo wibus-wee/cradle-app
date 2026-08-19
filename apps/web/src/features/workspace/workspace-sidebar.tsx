@@ -63,7 +63,12 @@ import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import { PreviewCardProvider } from './preview-card/preview-card-provider'
 import type { WorkspaceSession } from './use-session'
-import { sessionsQueryKey, updateSessionReadState, useAllSessions } from './use-session'
+import {
+  sessionsQueryKey,
+  updateSessionReadState,
+  useAllSessions,
+  useNodeSessionReconciliation,
+} from './use-session'
 import type { WorkspaceSessionGroup } from './use-session-group'
 import {
   useAddSessionGroupMembers,
@@ -1359,6 +1364,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
   const githubFeaturesDisabled = githubReady && !githubConnected
   const queryClient = useQueryClient()
   const { workspaces, ready: workspacesReady } = useWorkspaces()
+  useNodeSessionReconciliation(workspaces)
   const showArchived = useWorkspaceSidebarUiStore(state => state.showArchived)
   const { sessions: activeSessions } = useAllSessions()
   const { sessions: archivedSessions } = useAllSessions(showArchived ? true : undefined)
