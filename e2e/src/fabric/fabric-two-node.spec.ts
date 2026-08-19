@@ -283,6 +283,7 @@ async function mountRemoteWorkspace(input: {
   await input.page.locator(`[data-testid="node-pick-${input.targetNodeId}"]`).click()
   const picker = input.page.locator('[data-testid="node-workspace-picker"]')
   await expect(picker).toBeVisible()
+  await expect(picker.locator('[data-testid="node-workspace-empty"]')).toHaveCount(0)
   const row = picker.locator('[data-testid^="node-workspace-"]').filter({
     hasText: input.remoteWorkspace.name,
   }).first()

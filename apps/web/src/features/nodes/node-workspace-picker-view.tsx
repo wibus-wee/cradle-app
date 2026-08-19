@@ -3,7 +3,9 @@ import {
   DownLine as ChevronDownIcon,
   Folder2Line as FolderIcon,
   LoadingLine,
+  LockLine as LockIcon,
   Refresh1Line as RefreshIcon,
+  WarningLine as WarningIcon,
 } from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 
@@ -17,14 +19,14 @@ import { cn } from '~/lib/cn'
 
 import type { NodeWorkspaceEntry, NodeWorkspaceTarget } from './node-grouping'
 
+export type NodeWorkspacePickerState = 'connecting' | 'offline' | 'access-denied' | 'error' | 'ready'
+
 export interface NodeWorkspacePickerViewProps {
   /** Merged logical Workspace entries for the selected Node. */
   entries: NodeWorkspaceEntry[]
-  loading: boolean
-  /** True when the selected Node is offline (browse blocked). */
-  selectedNodeOffline: boolean
+  state: NodeWorkspacePickerState
   addingTargetKey: string | null
-  onReconnect: () => void
+  onRetry: () => void
   onAddWorkspace: (entry: NodeWorkspaceEntry, target: NodeWorkspaceTarget) => void
 }
 
@@ -118,85 +120,113 @@ function AddTargetControl({
 
 export function NodeWorkspacePickerView({
   entries,
-  loading,
-  selectedNodeOffline,
+  state,
   addingTargetKey,
-  onReconnect,
+  onRetry,
   onAddWorkspace,
 }: NodeWorkspacePickerViewProps) {
   const { t } = useTranslation('nodes')
 
+  if (state !== 'ready') {
+    const status = {
+      'access-denied': {
+        icon: <LockIcon className="size-5" aria-hidden />,
+        title: t('workspace.accessRequired'),
+        hint: t('workspace.accessRequiredHint'),
+        testId: 'node-workspace-access-denied',
+      },
+      connecting: {
+        icon: <LoadingLine className="size-5 animate-spin" aria-hidden />,
+        title: t('workspace.connecting'),
+        hint: null,
+        testId: 'node-workspace-connecting',
+      },
+      error: {
+        icon: <WarningIcon className="size-5" aria-hidden />,
+        title: t('workspace.connectionFailed'),
+        hint: t('workspace.connectionFailedHint'),
+        testId: 'node-workspace-connection-error',
+      },
+      offline: {
+        icon: <ComputerIcon className="size-5" aria-hidden />,
+        title: t('workspace.offline'),
+        hint: t('workspace.offlineHint'),
+        testId: 'node-workspace-offline',
+      },
+    }[state]
+    const canRetry = state === 'error' || state === 'offline'
+
+    return (
+      <div
+        className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 py-8 text-center"
+        data-testid={status.testId}
+      >
+        <span className="flex size-11 items-center justify-center rounded-lg bg-accent text-muted-foreground">
+          {status.icon}
+        </span>
+        <p className="text-[12px] font-medium">{status.title}</p>
+        {status.hint && (
+          <p className="max-w-72 text-pretty text-[12px] leading-relaxed text-muted-foreground">
+            {status.hint}
+          </p>
+        )}
+        {canRetry && (
+          <button
+            type="button"
+            className={cn(
+              'mt-1 flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium',
+              'transition-[background-color,transform] duration-120',
+              EASE,
+              'hover:bg-accent active:scale-[0.96]',
+            )}
+            onClick={onRetry}
+          >
+            <RefreshIcon className="size-3.5" aria-hidden />
+            {state === 'offline' ? t('action.reconnect') : t('action.retry')}
+          </button>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-w-0 flex-col" data-testid="node-workspace-picker">
-      {selectedNodeOffline
-        ? (
-            <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
-              <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-muted-foreground">
-                <ComputerIcon className="size-5" aria-hidden />
-              </span>
-              <p className="text-pretty text-[12px] leading-relaxed text-muted-foreground">
-                {t('workspace.offlineHint')}
-              </p>
-              <button
-                type="button"
-                className={cn(
-                  'flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium',
-                  'transition-[background-color,transform] duration-120',
-                  EASE,
-                  'hover:bg-accent active:scale-[0.96]',
-                )}
-                onClick={onReconnect}
-              >
-                <RefreshIcon className="size-3.5" aria-hidden />
-                {t('action.reconnect')}
-              </button>
-            </div>
-          )
-        : (
-            <div className="flex min-w-0 flex-col">
-              {loading && (
-                <div className="flex items-center gap-2 px-2 py-2 text-[12px] text-muted-foreground">
-                  <LoadingLine className="size-3.5 animate-spin" aria-hidden />
-                  {t('workspace.loading')}
+      <div className="flex min-w-0 flex-col">
+        {entries.length === 0 && (
+          <p className="px-2 py-2 text-[12px] text-muted-foreground" data-testid="node-workspace-empty">
+            {t('workspace.empty')}
+          </p>
+        )}
+        {entries.map((entry, index) => (
+          <div
+            key={entry.key}
+            className={cn(
+              'group flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2',
+              'motion-safe:animate-[node-row-in_180ms_cubic-bezier(0.23,1,0.32,1)_both]',
+              'transition-colors duration-120',
+              EASE,
+              'hover:bg-accent/50',
+            )}
+            style={{ animationDelay: `${index * 40}ms` }}
+            data-testid={`node-workspace-${entry.key}`}
+          >
+            <FolderIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-medium">{entry.name}</div>
+              {originTail(entry.originUrl) && (
+                <div className="truncate text-[11px] text-muted-foreground">
+                  {originTail(entry.originUrl)}
                 </div>
               )}
-              {!loading && entries.length === 0 && (
-                <p className="px-2 py-2 text-[12px] text-muted-foreground">
-                  {t('workspace.empty')}
-                </p>
-              )}
-              {!loading
-                && entries.map((entry, index) => (
-                  <div
-                    key={entry.key}
-                    className={cn(
-                      'group flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2',
-                      'motion-safe:animate-[node-row-in_180ms_cubic-bezier(0.23,1,0.32,1)_both]',
-                      'transition-colors duration-120',
-                      EASE,
-                      'hover:bg-accent/50',
-                    )}
-                    style={{ animationDelay: `${index * 40}ms` }}
-                    data-testid={`node-workspace-${entry.key}`}
-                  >
-                    <FolderIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-medium">{entry.name}</div>
-                      {originTail(entry.originUrl) && (
-                        <div className="truncate text-[11px] text-muted-foreground">
-                          {originTail(entry.originUrl)}
-                        </div>
-                      )}
-                    </div>
-                    <AddTargetControl
-                      entry={entry}
-                      addingTargetKey={addingTargetKey}
-                      onAddWorkspace={onAddWorkspace}
-                    />
-                  </div>
-                ))}
             </div>
-          )}
+            <AddTargetControl
+              entry={entry}
+              addingTargetKey={addingTargetKey}
+              onAddWorkspace={onAddWorkspace}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

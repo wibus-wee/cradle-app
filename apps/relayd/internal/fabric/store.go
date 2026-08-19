@@ -879,6 +879,119 @@ func (s *Store) migrate(ctx context.Context) error {
 	if err := s.ensureColumn(ctx, "join_requests", "rejected_at", "INTEGER"); err != nil {
 		return err
 	}
+	if err := s.repairPersonalDeviceGrants(ctx); err != nil {
+		return err
+	}
+	return nil
+}
+
+// repairPersonalDeviceGrants upgrades Fabrics created before personal devices
+// received full-mesh grants. Existing rows, including revoked grants, are
+// authoritative and are never recreated or widened.
+func (s *Store) repairPersonalDeviceGrants(ctx context.Context) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, `
+		SELECT p.fabric_id, p.subject_id, p.certificate_json
+		FROM principals p
+		JOIN nodes n ON n.fabric_id = p.fabric_id AND n.node_id = p.subject_id
+		WHERE p.subject_kind = 'controller'
+		UNION ALL
+		SELECT j.fabric_id, j.subject_id, j.controller_certificate_json
+		FROM join_requests j
+		JOIN nodes n ON n.fabric_id = j.fabric_id AND n.node_id = j.subject_id
+		WHERE j.controller_certificate_json IS NOT NULL AND j.approved_at IS NOT NULL
+	`)
+	if err != nil {
+		return fmt.Errorf("listing personal Fabric Controllers: %w", err)
+	}
+	controllers := map[string]membership.Certificate{}
+	for rows.Next() {
+		var fabricID, controllerID, certificateJSON string
+		if err := rows.Scan(&fabricID, &controllerID, &certificateJSON); err != nil {
+			rows.Close()
+			return err
+		}
+		var certificate membership.Certificate
+		if err := json.Unmarshal([]byte(certificateJSON), &certificate); err != nil {
+			rows.Close()
+			return fmt.Errorf("decoding personal Fabric Controller certificate: %w", err)
+		}
+		if certificate.FabricID != fabricID || certificate.SubjectID != controllerID || certificate.SubjectKind != membership.SubjectController || !membership.HasAnyScope(certificate.Scopes, membership.ScopeAdmin) {
+			continue
+		}
+		controllers[fabricID+"\x00"+controllerID] = certificate
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+
+	nodeRows, err := tx.QueryContext(ctx, `SELECT fabric_id, node_id FROM nodes ORDER BY fabric_id, node_id`)
+	if err != nil {
+		return fmt.Errorf("listing Fabric Nodes for grant repair: %w", err)
+	}
+	nodesByFabric := map[string][]string{}
+	for nodeRows.Next() {
+		var fabricID, nodeID string
+		if err := nodeRows.Scan(&fabricID, &nodeID); err != nil {
+			nodeRows.Close()
+			return err
+		}
+		nodesByFabric[fabricID] = append(nodesByFabric[fabricID], nodeID)
+	}
+	if err := nodeRows.Err(); err != nil {
+		nodeRows.Close()
+		return err
+	}
+	if err := nodeRows.Close(); err != nil {
+		return err
+	}
+
+	touchedFabrics := map[string]struct{}{}
+	createdAt := s.now().UTC().UnixMilli()
+	for _, certificate := range controllers {
+		for _, nodeID := range nodesByFabric[certificate.FabricID] {
+			var existing int
+			err := tx.QueryRowContext(ctx, `
+				SELECT 1 FROM node_grants
+				WHERE fabric_id = ? AND controller_id = ? AND node_id = ?
+				LIMIT 1
+			`, certificate.FabricID, certificate.SubjectID, nodeID).Scan(&existing)
+			if err == nil {
+				continue
+			}
+			if !errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("checking personal device grant: %w", err)
+			}
+			grantID, err := randomID("grant_")
+			if err != nil {
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO node_grants (grant_id, fabric_id, controller_id, node_id, scope, created_at)
+				VALUES (?, ?, ?, ?, 'admin', ?)
+			`, grantID, certificate.FabricID, certificate.SubjectID, nodeID, createdAt); err != nil {
+				return fmt.Errorf("repairing personal device grant: %w", err)
+			}
+			touchedFabrics[certificate.FabricID] = struct{}{}
+		}
+	}
+	for fabricID := range touchedFabrics {
+		if _, err := nextRevision(ctx, tx, fabricID); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 	return nil
 }
 

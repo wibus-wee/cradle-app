@@ -479,6 +479,7 @@ function DeviceSettingsRow({
 }) {
   const { t } = useTranslation('nodes')
   const online = node.status === 'online'
+  const canAccessWorkspaces = node.scopes?.some(scope => scope === 'admin' || scope === 'control') ?? false
   const lastSeen = node.lastSeenAt ? new Date(node.lastSeenAt).toLocaleString() : null
 
   return (
@@ -493,6 +494,9 @@ function DeviceSettingsRow({
           <Badge variant={online ? 'secondary' : 'outline'}>
             {online ? t('status.online') : t('status.offline')}
           </Badge>
+          {!isThisDevice && !canAccessWorkspaces && (
+            <Badge variant="outline">{t('status.noWorkspaceAccess')}</Badge>
+          )}
         </div>
         <p className="mt-1 text-[12px] text-muted-foreground">
           {node.platform}

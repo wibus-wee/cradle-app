@@ -222,7 +222,10 @@ function toNodeWorkspaceSummary(workspace: GetWorkspacesResponse[number]): NodeW
   }
 }
 
-/** Fetch a Node's workspace summaries on demand over its link. */
+/**
+ * Fetch a Node's workspace summaries on demand over its link. Consumers must
+ * distinguish query failure from a successful empty inventory.
+ */
 export function useNodeWorkspaces(node: FabricNode | null, enabled: boolean) {
   const nodeId = node?.nodeId ?? ''
   return useQuery({

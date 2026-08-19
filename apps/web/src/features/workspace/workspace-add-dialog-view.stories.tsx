@@ -101,10 +101,9 @@ export const WithRemoteDevices: Story = {
           ? (
               <NodeWorkspacePickerView
                 entries={selectedNode.status === 'online' ? fixtureEntries : []}
-                loading={false}
-                selectedNodeOffline={selectedNode.status === 'offline'}
+                state={selectedNode.status === 'offline' ? 'offline' : 'ready'}
                 addingTargetKey={null}
-                onReconnect={fn()}
+                onRetry={fn()}
                 onAddWorkspace={fn()}
               />
             )

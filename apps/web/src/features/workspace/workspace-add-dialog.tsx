@@ -6,6 +6,7 @@ import type {
 } from '~/features/nodes/node-grouping'
 import { mergeNodeWorkspaceInventories } from '~/features/nodes/node-grouping'
 import { NodeWorkspacePickerView } from '~/features/nodes/node-workspace-picker-view'
+import type { NodeWorkspacePickerState } from '~/features/nodes/node-workspace-picker-view'
 import { useConnectNode, useFabricMembership, useNodes, useNodeWorkspaces } from '~/features/nodes/use-nodes'
 import type { CreateWorkspaceInput } from '~/features/workspace/use-workspace'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
@@ -19,6 +20,28 @@ export interface WorkspaceAddDialogProps {
   onAddLocal: () => void
   /** Mount a workspace by locator (`nodeId` semantics). */
   onAddFromLocator: (input: CreateWorkspaceInput) => Promise<void>
+}
+
+function resolveNodeWorkspacePickerState(input: {
+  canControl: boolean
+  connecting: boolean
+  failed: boolean
+  offline: boolean
+  pending: boolean
+}): NodeWorkspacePickerState {
+  if (!input.canControl) {
+    return 'access-denied'
+  }
+  if (input.connecting) {
+    return 'connecting'
+  }
+  if (input.failed) {
+    return 'error'
+  }
+  if (input.offline) {
+    return 'offline'
+  }
+  return input.pending ? 'connecting' : 'ready'
 }
 
 export function WorkspaceAddDialog({
@@ -35,6 +58,7 @@ export function WorkspaceAddDialog({
   const localNodeId = membershipQuery.data?.localNodeId ?? null
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [addingTargetKey, setAddingTargetKey] = useState<string | null>(null)
+  const [connectionErrorNodeId, setConnectionErrorNodeId] = useState<string | null>(null)
   const connectNode = useConnectNode()
 
   const remoteNodes = useMemo(
@@ -45,6 +69,7 @@ export function WorkspaceAddDialog({
   useEffect(() => {
     if (!open) {
       setSelectedNodeId(null)
+      setConnectionErrorNodeId(null)
       return
     }
     if (selectedNodeId !== null && !remoteNodes.some(node => node.nodeId === selectedNodeId)) {
@@ -53,7 +78,18 @@ export function WorkspaceAddDialog({
   }, [open, remoteNodes, selectedNodeId])
 
   const selectedNode = remoteNodes.find(node => node.nodeId === selectedNodeId) ?? null
-  const nodeWorkspacesQuery = useNodeWorkspaces(selectedNode, open)
+  const selectedNodeCanControl = selectedNode?.scopes?.some(scope => scope === 'admin' || scope === 'control') ?? false
+  const nodeWorkspacesQuery = useNodeWorkspaces(selectedNode, open && selectedNodeCanControl)
+
+  useEffect(() => {
+    setConnectionErrorNodeId(null)
+  }, [selectedNodeId])
+
+  useEffect(() => {
+    if (nodeWorkspacesQuery.isSuccess) {
+      setConnectionErrorNodeId(null)
+    }
+  }, [nodeWorkspacesQuery.isSuccess])
 
   const addedLocators = useMemo(
     () => workspaces.map(workspace => ({
@@ -103,18 +139,35 @@ export function WorkspaceAddDialog({
     }
   }
 
+  const nodeWorkspacePickerState = resolveNodeWorkspacePickerState({
+    canControl: selectedNodeCanControl,
+    connecting: (connectNode.isPending && connectNode.variables.path.nodeId === selectedNode?.nodeId)
+      || nodeWorkspacesQuery.isFetching,
+    failed: connectionErrorNodeId === selectedNode?.nodeId || nodeWorkspacesQuery.isError,
+    offline: selectedNode?.status === 'offline',
+    pending: nodeWorkspacesQuery.isPending,
+  })
+
   const nodePane = selectedNode
     ? (
         <NodeWorkspacePickerView
           entries={entries}
-          loading={nodeWorkspacesQuery.isPending}
-          selectedNodeOffline={selectedNode.status === 'offline'}
+          state={nodeWorkspacePickerState}
           addingTargetKey={addingTargetKey}
-          onReconnect={() => {
-            void connectNode
-              .mutateAsync({ path: { nodeId: selectedNode.nodeId } })
-              .then(() => nodeWorkspacesQuery.refetch())
-              .catch(() => {})
+          onRetry={() => {
+            setConnectionErrorNodeId(null)
+            void (async () => {
+              try {
+                await connectNode.mutateAsync({ path: { nodeId: selectedNode.nodeId } })
+                const result = await nodeWorkspacesQuery.refetch()
+                if (result.isError) {
+                  setConnectionErrorNodeId(selectedNode.nodeId)
+                }
+              }
+              catch {
+                setConnectionErrorNodeId(selectedNode.nodeId)
+              }
+            })()
           }}
           onAddWorkspace={(entry, target) => void handleAddWorkspace(entry, target)}
         />

@@ -52,6 +52,11 @@ an existing membership reconnects automatically. A relay restart temporarily
 marks Nodes offline; the connector re-establishes presence and existing mounted
 Workspace routes become usable again without re-enrollment.
 
+Fabric membership, Node presence, grant authorization, and a live encrypted
+link are separate states. A Node can therefore be visible and online before an
+upstream Workspace request succeeds. User-facing callers must preserve upstream
+errors and only report an empty Workspace inventory after a successful response.
+
 The executable two-Node acceptance test is
 [`CRADLE-FABRIC-001`](../../../../../e2e/src/fabric/fabric-two-node.spec.ts).
 It runs relayd, two Cradle Servers with independent databases, and two browser

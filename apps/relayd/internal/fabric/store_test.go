@@ -101,6 +101,87 @@ func TestStoreRestartRetainsNodeAndResetsTransientPresence(t *testing.T) {
 	}
 }
 
+func TestStoreRestartRepairsMissingPersonalDeviceGrantsWithoutRestoringRevokedAccess(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	path := t.TempDir() + "/fabric.sqlite"
+	store, err := OpenStore(StoreConfig{Path: path, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerPublic, ownerPrivate := newKey(t)
+	fabricRecord, err := store.CreateFabric(t.Context(), "create-a", encodeKey(ownerPublic))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = enrollNode(t, store, ownerPrivate, fabricRecord, "node-a", "Studio", now)
+	_ = enrollNode(t, store, ownerPrivate, fabricRecord, "node-b", "MacBook", now)
+	_ = enrollNode(t, store, ownerPrivate, fabricRecord, "node-c", "Laptop", now)
+
+	var legacyControllerCertificate string
+	if err := store.db.QueryRowContext(t.Context(), `
+		SELECT controller_certificate_json FROM join_requests WHERE fabric_id = ? AND subject_id = ?
+	`, fabricRecord.ID, "node-a").Scan(&legacyControllerCertificate); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `
+		UPDATE principals SET subject_kind = 'controller', certificate_json = ?
+		WHERE fabric_id = ? AND subject_id = ?
+	`, legacyControllerCertificate, fabricRecord.ID, "node-a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `
+		UPDATE join_requests SET controller_certificate_json = NULL
+		WHERE fabric_id = ? AND subject_id = ?
+	`, fabricRecord.ID, "node-a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `
+		DELETE FROM node_grants WHERE fabric_id = ? AND controller_id = ? AND node_id = ?
+	`, fabricRecord.ID, "node-a", "node-b"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `
+		DELETE FROM node_grants WHERE fabric_id = ? AND controller_id = ? AND node_id = ?
+	`, fabricRecord.ID, "node-b", "node-c"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `
+		UPDATE node_grants SET revoked_at = ?
+		WHERE fabric_id = ? AND controller_id = ? AND node_id = ?
+	`, now.UnixMilli(), fabricRecord.ID, "node-b", "node-a"); err != nil {
+		t.Fatal(err)
+	}
+	before, err := store.GetFabric(t.Context(), fabricRecord.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err = OpenStore(StoreConfig{Path: path, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if granted, err := store.HasActiveGrant(t.Context(), fabricRecord.ID, "node-a", "node-b", membership.ScopeAdmin); err != nil || !granted {
+		t.Fatalf("repaired legacy owner grant = %v, error = %v", granted, err)
+	}
+	if granted, err := store.HasActiveGrant(t.Context(), fabricRecord.ID, "node-b", "node-c", membership.ScopeAdmin); err != nil || !granted {
+		t.Fatalf("repaired joined device grant = %v, error = %v", granted, err)
+	}
+	if granted, err := store.HasActiveGrant(t.Context(), fabricRecord.ID, "node-b", "node-a", membership.ScopeAdmin); err != nil || granted {
+		t.Fatalf("revoked personal device grant = %v, error = %v", granted, err)
+	}
+	after, err := store.GetFabric(t.Context(), fabricRecord.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Revision != before.Revision+1 {
+		t.Fatalf("repaired Fabric revision = %d, want %d", after.Revision, before.Revision+1)
+	}
+}
+
 func TestStoreListsAllFabricNodesForAdminWithoutExpandingGrants(t *testing.T) {
 	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 	store := newTestStore(t, &now)
