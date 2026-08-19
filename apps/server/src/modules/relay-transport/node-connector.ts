@@ -8,7 +8,7 @@ import { CRADLE_RELAY_TOKEN_HEADER } from '../../http/auth'
 import { getLogger } from '../../logging/logger'
 import type { MembershipCertificate } from '../fabric/protocol'
 import { assertFabricCertificate, fabricAuthHeaders, fabricHeadersRecord } from '../fabric/protocol'
-import { completeNodeEnrollment, getFabricMembership, hasPendingNodeEnrollment, requireFabricMembershipSecretRefs } from '../fabric/service'
+import { completeNodeEnrollment, getFabricMembership, hasPendingNodeEnrollment, registerLocalFabricController, requireFabricMembershipSecretRefs } from '../fabric/service'
 import { readSecret, upsertSecret } from '../secrets/service'
 import { decodeFabricEnvelope, encodeFabricEnvelope, toFabricSessionEnvelope } from './fabric-envelope'
 import { FabricSession } from './session'
@@ -34,7 +34,7 @@ export class FabricNodeConnector {
 
   start(): void {
     this.stopped = false
-    if (getFabricMembership()) { void readFabricNodeAuthToken(); void this.connect(); return }
+    if (getFabricMembership()) { void readFabricNodeAuthToken(); void this.connectAfterControllerRegistration(); return }
     if (hasPendingNodeEnrollment()) { void this.completeEnrollment() }
   }
 
@@ -48,6 +48,30 @@ export class FabricNodeConnector {
     }
  catch { /* Retry while the owner is deciding. */ }
     if (!this.stopped) { this.enrollmentTimer = setTimeout(() => void this.completeEnrollment(), 1_000); this.enrollmentTimer.unref?.() }
+  }
+
+  private async registerLocalController(): Promise<void> {
+    try {
+      if (await registerLocalFabricController()) {
+        const membership = getFabricMembership()
+        this.logger.info('Fabric owner Controller registered with relay', {
+          fabricId: membership?.fabricId,
+          nodeId: membership?.localNodeId,
+        })
+      }
+    }
+    catch (error) {
+      this.logger.warn('Fabric owner Controller registration failed', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  private async connectAfterControllerRegistration(): Promise<void> {
+    await this.registerLocalController()
+    if (!this.stopped) {
+      await this.connect()
+    }
   }
 
   private async connect(): Promise<void> {

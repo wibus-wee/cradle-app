@@ -493,6 +493,27 @@ export async function openNodeLink(nodeId: string): Promise<{ linkId: string, ex
   return link
 }
 
+/**
+ * Restore this owner's Controller record at the relay. This is idempotent and
+ * lets a relay recover membership records created before Node and Controller
+ * certificates were persisted independently.
+ */
+export async function registerLocalFabricController(): Promise<boolean> {
+  const membership = requireFabricMembership()
+  const secretRefs = requireFabricMembershipSecretRefs()
+  if (!secretRefs.ownerKeySecretId) {
+    return false
+  }
+  const path = `/v1/fabrics/${membership.fabricId}/controllers`
+  await new FabricDirectoryClient(membership.relayUrl).registerController(
+    membership.fabricId,
+    membership.controllerCertificate,
+    [],
+    ownerProofHeaders(readSecret(secretRefs.ownerKeySecretId), 'POST', path),
+  )
+  return true
+}
+
 export type FabricControllerMembershipView = FabricMembershipView & { controllerCertificate: MembershipCertificate }
 
 export function requireFabricMembership(): FabricControllerMembershipView {
