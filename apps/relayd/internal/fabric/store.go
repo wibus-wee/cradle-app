@@ -335,13 +335,24 @@ func (s *Store) ApproveJoinRequest(ctx context.Context, requestID string, nodeCe
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO principals (fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at)
 		VALUES (?, ?, 'node', ?, ?, ?, ?)
-		ON CONFLICT(fabric_id, subject_id) DO UPDATE SET
+		ON CONFLICT(fabric_id, subject_id, subject_kind) DO UPDATE SET
 			identity_pubkey = excluded.identity_pubkey,
 			encryption_pubkey = excluded.encryption_pubkey,
 			certificate_json = excluded.certificate_json
 	`, fabricID, subjectID, identityPubkey, encryptionPubkey, nodeCertificateJSON, now.UnixMilli())
 	if err != nil {
 		return NodeSummary{}, fmt.Errorf("persisting node principal: %w", err)
+	}
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO principals (fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at)
+		VALUES (?, ?, 'controller', ?, ?, ?, ?)
+		ON CONFLICT(fabric_id, subject_id, subject_kind) DO UPDATE SET
+			identity_pubkey = excluded.identity_pubkey,
+			encryption_pubkey = excluded.encryption_pubkey,
+			certificate_json = excluded.certificate_json
+	`, fabricID, subjectID, identityPubkey, encryptionPubkey, controllerCertificateJSON, now.UnixMilli())
+	if err != nil {
+		return NodeSummary{}, fmt.Errorf("persisting controller principal: %w", err)
 	}
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO nodes (node_id, fabric_id, identity_pubkey, encryption_pubkey, display_name, platform, version, capabilities_json, status, last_seen_at, revision, created_at, updated_at)
@@ -399,7 +410,7 @@ func (s *Store) RegisterController(ctx context.Context, certificate membership.C
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO principals (fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at)
 		VALUES (?, ?, 'controller', ?, ?, ?, ?)
-		ON CONFLICT(fabric_id, subject_id) DO UPDATE SET
+		ON CONFLICT(fabric_id, subject_id, subject_kind) DO UPDATE SET
 			identity_pubkey = excluded.identity_pubkey,
 			encryption_pubkey = excluded.encryption_pubkey,
 			certificate_json = excluded.certificate_json
@@ -503,7 +514,7 @@ func (s *Store) ControllerExists(ctx context.Context, fabricID, controllerID, id
 	var found int
 	err := s.db.QueryRowContext(ctx, `
 		SELECT 1 FROM principals
-		WHERE fabric_id = ? AND subject_id = ? AND identity_pubkey = ?
+		WHERE fabric_id = ? AND subject_id = ? AND subject_kind = 'controller' AND identity_pubkey = ?
 		LIMIT 1
 	`, fabricID, controllerID, identityPubkey).Scan(&found)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -810,7 +821,7 @@ func (s *Store) migrate(ctx context.Context) error {
 			encryption_pubkey TEXT NOT NULL,
 			certificate_json TEXT NOT NULL,
 			created_at INTEGER NOT NULL,
-			PRIMARY KEY(fabric_id, subject_id)
+			PRIMARY KEY(fabric_id, subject_id, subject_kind)
 		)`,
 		`CREATE TABLE IF NOT EXISTS nodes (
 			node_id TEXT PRIMARY KEY,
@@ -879,8 +890,108 @@ func (s *Store) migrate(ctx context.Context) error {
 	if err := s.ensureColumn(ctx, "join_requests", "rejected_at", "INTEGER"); err != nil {
 		return err
 	}
+	if err := s.migratePrincipalsPrimaryKey(ctx); err != nil {
+		return err
+	}
 	if err := s.repairPersonalDeviceGrants(ctx); err != nil {
 		return err
+	}
+	return nil
+}
+
+// migratePrincipalsPrimaryKey separates the Node and Controller certificates
+// for each personal device. The original schema keyed principals only by
+// Fabric and subject id, causing the Controller certificate to overwrite the
+// Node certificate when both identities shared a device id.
+func (s *Store) migratePrincipalsPrimaryKey(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx, `PRAGMA table_info(principals)`)
+	if err != nil {
+		return fmt.Errorf("reading principals schema: %w", err)
+	}
+	hasSubjectKindPrimaryKey := false
+	for rows.Next() {
+		var cid, notNull, primaryKey int
+		var name, kind string
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &kind, &notNull, &defaultValue, &primaryKey); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if name == "subject_kind" && primaryKey > 0 {
+			hasSubjectKindPrimaryKey = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		_ = rows.Close()
+		return err
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if hasSubjectKindPrimaryKey {
+		return nil
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `
+		CREATE TABLE principals_replacement (
+			fabric_id TEXT NOT NULL REFERENCES fabrics(fabric_id) ON DELETE CASCADE,
+			subject_id TEXT NOT NULL,
+			subject_kind TEXT NOT NULL CHECK(subject_kind IN ('node', 'controller')),
+			identity_pubkey TEXT NOT NULL,
+			encryption_pubkey TEXT NOT NULL,
+			certificate_json TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			PRIMARY KEY(fabric_id, subject_id, subject_kind)
+		)
+	`); err != nil {
+		return fmt.Errorf("creating replacement principals table: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO principals_replacement (fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at)
+		SELECT fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at
+		FROM principals
+	`); err != nil {
+		return fmt.Errorf("copying principals: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO principals_replacement (fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at)
+		SELECT j.fabric_id, j.subject_id, 'node', j.identity_pubkey, j.encryption_pubkey, j.certificate_json, j.created_at
+		FROM join_requests j
+		JOIN nodes n ON n.fabric_id = j.fabric_id AND n.node_id = j.subject_id
+		WHERE j.certificate_json IS NOT NULL AND j.approved_at IS NOT NULL
+		ON CONFLICT(fabric_id, subject_id, subject_kind) DO UPDATE SET
+			identity_pubkey = excluded.identity_pubkey,
+			encryption_pubkey = excluded.encryption_pubkey,
+			certificate_json = excluded.certificate_json
+	`); err != nil {
+		return fmt.Errorf("restoring node principals: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO principals_replacement (fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at)
+		SELECT j.fabric_id, j.subject_id, 'controller', j.identity_pubkey, j.encryption_pubkey, j.controller_certificate_json, j.created_at
+		FROM join_requests j
+		JOIN nodes n ON n.fabric_id = j.fabric_id AND n.node_id = j.subject_id
+		WHERE j.controller_certificate_json IS NOT NULL AND j.approved_at IS NOT NULL
+		ON CONFLICT(fabric_id, subject_id, subject_kind) DO UPDATE SET
+			identity_pubkey = excluded.identity_pubkey,
+			encryption_pubkey = excluded.encryption_pubkey,
+			certificate_json = excluded.certificate_json
+	`); err != nil {
+		return fmt.Errorf("restoring controller principals: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DROP TABLE principals`); err != nil {
+		return fmt.Errorf("dropping old principals table: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE principals_replacement RENAME TO principals`); err != nil {
+		return fmt.Errorf("renaming replacement principals table: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("migrating principals table: %w", err)
 	}
 	return nil
 }

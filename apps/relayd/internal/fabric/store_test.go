@@ -101,6 +101,68 @@ func TestStoreRestartRetainsNodeAndResetsTransientPresence(t *testing.T) {
 	}
 }
 
+func TestStoreMigratesLegacyPrincipalSchemaWithoutLosingNodeCertificate(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	path := t.TempDir() + "/fabric.sqlite"
+	store, err := OpenStore(StoreConfig{Path: path, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerPublic, ownerPrivate := newKey(t)
+	fabricRecord, err := store.CreateFabric(t.Context(), "create-a", encodeKey(ownerPublic))
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := enrollNode(t, store, ownerPrivate, fabricRecord, "node-a", "Studio", now)
+
+	if _, err := store.db.ExecContext(t.Context(), `
+		CREATE TABLE principals_legacy (
+			fabric_id TEXT NOT NULL REFERENCES fabrics(fabric_id) ON DELETE CASCADE,
+			subject_id TEXT NOT NULL,
+			subject_kind TEXT NOT NULL CHECK(subject_kind IN ('node', 'controller')),
+			identity_pubkey TEXT NOT NULL,
+			encryption_pubkey TEXT NOT NULL,
+			certificate_json TEXT NOT NULL,
+			created_at INTEGER NOT NULL,
+			PRIMARY KEY(fabric_id, subject_id)
+		)
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `
+		INSERT INTO principals_legacy
+		SELECT fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at
+		FROM principals WHERE subject_kind = 'controller'
+	`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `DROP TABLE principals`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `ALTER TABLE principals_legacy RENAME TO principals`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err = OpenStore(StoreConfig{Path: path, Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	certificate, err := store.GetNodeCertificate(t.Context(), fabricRecord.ID, node.NodeID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if certificate.SubjectKind != membership.SubjectNode || certificate.SubjectID != node.NodeID {
+		t.Fatalf("restored Node certificate = %#v", certificate)
+	}
+	if exists, err := store.ControllerExists(t.Context(), fabricRecord.ID, node.NodeID, certificate.IdentityPubkey); err != nil || !exists {
+		t.Fatalf("restored Controller principal = %v, error = %v", exists, err)
+	}
+}
+
 func TestStoreRestartRepairsMissingPersonalDeviceGrantsWithoutRestoringRevokedAccess(t *testing.T) {
 	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 	path := t.TempDir() + "/fabric.sqlite"
@@ -124,8 +186,14 @@ func TestStoreRestartRepairsMissingPersonalDeviceGrantsWithoutRestoringRevokedAc
 		t.Fatal(err)
 	}
 	if _, err := store.db.ExecContext(t.Context(), `
-		UPDATE principals SET subject_kind = 'controller', certificate_json = ?
-		WHERE fabric_id = ? AND subject_id = ?
+		DELETE FROM principals
+		WHERE fabric_id = ? AND subject_id = ? AND subject_kind = 'node'
+	`, fabricRecord.ID, "node-a"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.db.ExecContext(t.Context(), `
+		UPDATE principals SET certificate_json = ?
+		WHERE fabric_id = ? AND subject_id = ? AND subject_kind = 'controller'
 	`, legacyControllerCertificate, fabricRecord.ID, "node-a"); err != nil {
 		t.Fatal(err)
 	}
