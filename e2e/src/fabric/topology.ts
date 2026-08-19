@@ -131,6 +131,28 @@ async function buildRelayBinary(rootDir: string): Promise<string> {
   return binaryPath
 }
 
+async function runLoggedProcess(input: {
+  command: string
+  args: string[]
+  cwd: string
+  env: NodeJS.ProcessEnv
+  logPath: string
+  label: string
+}): Promise<void> {
+  await new Promise<void>((resolveProcess, reject) => {
+    const child = spawn(input.command, input.args, {
+      cwd: input.cwd,
+      env: input.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    captureLogs(child, input.logPath)
+    child.once('error', reject)
+    child.once('exit', (code, signal) => code === 0
+      ? resolveProcess()
+      : reject(new Error(`${input.label} failed (${signal ?? `exit ${code}`}), see ${input.logPath}.`)))
+  })
+}
+
 async function startNode(input: {
   rootDir: string
   relayUrl: string
@@ -216,13 +238,31 @@ relayDatabasePath,
     if (!existsSync(vite)) {
       throw new Error(`Vite executable is missing at ${vite}.`)
     }
-    webProcess = spawn(vite, ['--host', '127.0.0.1', '--port', String(webPort), '--strictPort'], {
+    const webEnv = {
+      ...process.env,
+      CRADLE_E2E: '1',
+      VITE_SERVER_URL: desktop.serverUrl,
+    }
+    const webDistDir = join(rootDir, 'web-dist')
+    await runLoggedProcess({
+      command: process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
+      args: ['--filter', '@cradle/plugin-sdk', 'build'],
+      cwd: ROOT,
+      env: webEnv,
+      logPath: webLogPath,
+      label: 'Plugin SDK build for Fabric E2E',
+    })
+    await runLoggedProcess({
+      command: vite,
+      args: ['build', '--outDir', webDistDir, '--emptyOutDir'],
       cwd: join(ROOT, 'apps', 'web'),
-      env: {
-        ...process.env,
-        CRADLE_E2E: '1',
-        VITE_SERVER_URL: desktop.serverUrl,
-      },
+      env: webEnv,
+      logPath: webLogPath,
+      label: 'Web build for Fabric E2E',
+    })
+    webProcess = spawn(vite, ['preview', '--outDir', webDistDir, '--host', '127.0.0.1', '--port', String(webPort), '--strictPort'], {
+      cwd: join(ROOT, 'apps', 'web'),
+      env: webEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     })
