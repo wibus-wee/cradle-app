@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
+import { useState } from 'react'
 import { fn } from 'storybook/test'
 
 import type { NodeWorkspaceEntry } from '~/features/nodes/node-grouping'
@@ -15,6 +16,9 @@ const meta = {
     creating: false,
     onOpenChange: fn(),
     onAddLocal: fn(),
+    nodes: [],
+    selectedNodeId: null,
+    onSelectNode: fn(),
   },
 } satisfies Meta<typeof WorkspaceAddDialogView>
 
@@ -84,19 +88,28 @@ const fixtureEntries: NodeWorkspaceEntry[] = [
 ]
 
 export const WithRemoteDevices: Story = {
-  args: {
-    nodePicker: (
-      <NodeWorkspacePickerView
+  render: function WithRemoteDevicesStory(args) {
+    const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
+    const selectedNode = fixtureNodes.find(node => node.nodeId === selectedNodeId) ?? null
+    return (
+      <WorkspaceAddDialogView
+        {...args}
         nodes={fixtureNodes}
-        selectedNodeId="node-macbook"
-        entries={fixtureEntries}
-        loading={false}
-        selectedNodeOffline={false}
-        addingTargetKey={null}
-        onSelectNode={fn()}
-        onReconnect={fn()}
-        onAddWorkspace={fn()}
+        selectedNodeId={selectedNodeId}
+        onSelectNode={setSelectedNodeId}
+        nodePane={selectedNode
+          ? (
+              <NodeWorkspacePickerView
+                entries={selectedNode.status === 'online' ? fixtureEntries : []}
+                loading={false}
+                selectedNodeOffline={selectedNode.status === 'offline'}
+                addingTargetKey={null}
+                onReconnect={fn()}
+                onAddWorkspace={fn()}
+              />
+            )
+          : null}
       />
-    ),
+    )
   },
 }

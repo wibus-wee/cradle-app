@@ -43,12 +43,12 @@ export function WorkspaceAddDialog({
   )
 
   useEffect(() => {
-    if (!open || (selectedNodeId !== null && remoteNodes.some(node => node.nodeId === selectedNodeId))) {
+    if (!open) {
+      setSelectedNodeId(null)
       return
     }
-    const initialNode = remoteNodes.find(node => node.status === 'online') ?? remoteNodes[0]
-    if (initialNode) {
-      setSelectedNodeId(initialNode.nodeId)
+    if (selectedNodeId !== null && !remoteNodes.some(node => node.nodeId === selectedNodeId)) {
+      setSelectedNodeId(null)
     }
   }, [open, remoteNodes, selectedNodeId])
 
@@ -103,19 +103,16 @@ export function WorkspaceAddDialog({
     }
   }
 
-  const nodePicker = remoteNodes.length > 0
+  const nodePane = selectedNode
     ? (
         <NodeWorkspacePickerView
-          nodes={remoteNodes}
-          selectedNodeId={selectedNodeId}
           entries={entries}
           loading={nodeWorkspacesQuery.isPending}
-          selectedNodeOffline={selectedNode?.status === 'offline'}
+          selectedNodeOffline={selectedNode.status === 'offline'}
           addingTargetKey={addingTargetKey}
-          onSelectNode={setSelectedNodeId}
-          onReconnect={(nodeId) => {
+          onReconnect={() => {
             void connectNode
-              .mutateAsync({ path: { nodeId } })
+              .mutateAsync({ path: { nodeId: selectedNode.nodeId } })
               .then(() => nodeWorkspacesQuery.refetch())
               .catch(() => {})
           }}
@@ -130,7 +127,10 @@ export function WorkspaceAddDialog({
       creating={creating}
       onOpenChange={onOpenChange}
       onAddLocal={onAddLocal}
-      nodePicker={nodePicker}
+      nodes={remoteNodes}
+      selectedNodeId={selectedNodeId}
+      onSelectNode={setSelectedNodeId}
+      nodePane={nodePane}
     />
   )
 }

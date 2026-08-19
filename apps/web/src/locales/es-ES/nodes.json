@@ -131,7 +131,6 @@
   "toast.rejectFailed": "No se pudo rechazar esta solicitud",
   "workspace.add": "Agregar",
   "workspace.addFromDevice": "Agregar desde otro dispositivo",
-  "workspace.addFromDeviceDescription": "Explora los workspaces de los dispositivos vinculados a tu Fabric.",
   "workspace.added": "Agregado",
   "workspace.empty": "Este dispositivo aún no tiene espacios de trabajo.",
   "workspace.loading": "Cargando espacios de trabajo…",

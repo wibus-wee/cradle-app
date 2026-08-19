@@ -13,25 +13,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { cn } from '~/lib/cn'
 
 import type { NodeWorkspaceEntry, NodeWorkspaceTarget } from './node-grouping'
-import type { FabricNode } from './types'
 
 export interface NodeWorkspacePickerViewProps {
-  /** Nodes that can be browsed (excluding the local device). */
-  nodes: FabricNode[]
-  /** Currently selected Node id, if any. */
-  selectedNodeId: string | null
-  /** Merged logical Workspace entries for the selected scope. */
+  /** Merged logical Workspace entries for the selected Node. */
   entries: NodeWorkspaceEntry[]
   loading: boolean
   /** True when the selected Node is offline (browse blocked). */
   selectedNodeOffline: boolean
   addingTargetKey: string | null
-  onSelectNode: (nodeId: string) => void
-  onReconnect: (nodeId: string) => void
+  onReconnect: () => void
   onAddWorkspace: (entry: NodeWorkspaceEntry, target: NodeWorkspaceTarget) => void
 }
 
@@ -124,13 +117,10 @@ function AddTargetControl({
 }
 
 export function NodeWorkspacePickerView({
-  nodes,
-  selectedNodeId,
   entries,
   loading,
   selectedNodeOffline,
   addingTargetKey,
-  onSelectNode,
   onReconnect,
   onAddWorkspace,
 }: NodeWorkspacePickerViewProps) {
@@ -138,115 +128,75 @@ export function NodeWorkspacePickerView({
 
   return (
     <div className="flex min-w-0 flex-col" data-testid="node-workspace-picker">
-      <div className="flex min-w-0 flex-col gap-2.5 px-1 pb-1 pt-1">
-        <div className="flex flex-wrap items-center gap-1">
-          {nodes.map((node) => {
-            const online = node.status === 'online'
-            const selected = selectedNodeId === node.nodeId
-            const chip = (
-              <button
-                key={node.nodeId}
-                type="button"
-                disabled={!online}
-                className={cn(
-                  'flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-[12px]',
-                  'transition-[background-color,border-color,color,transform] duration-150',
-                  EASE,
-                  'active:scale-[0.96]',
-                  selected
-                    ? 'border-foreground/25 bg-accent font-medium text-foreground'
-                    : 'border-border text-muted-foreground hover:border-foreground/20 hover:text-foreground',
-                  !online && 'cursor-not-allowed opacity-50',
-                )}
-                onClick={() => onSelectNode(node.nodeId)}
-                data-testid={`node-pick-${node.nodeId}`}
-              >
-                <span
-                  className={cn('size-1.5 rounded-full', online ? 'bg-green-500' : 'bg-muted-foreground/40')}
-                  aria-hidden
-                />
-                {node.displayName}
-              </button>
-            )
-            if (online) {
-              return chip
-            }
-            return (
-              <Tooltip key={node.nodeId}>
-                <TooltipTrigger render={chip} />
-                <TooltipContent>{t('workspace.offlineHint')}</TooltipContent>
-              </Tooltip>
-            )
-          })}
-        </div>
-
-        {selectedNodeId && selectedNodeOffline && (
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-[12px] text-muted-foreground">
-              {t('workspace.offlineHint')}
-            </span>
-            <button
-              type="button"
-              className={cn(
-                'flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium',
-                'transition-[background-color,transform] duration-120',
-                EASE,
-                'hover:bg-accent active:scale-[0.96]',
-              )}
-              onClick={() => onReconnect(selectedNodeId)}
-            >
-              <RefreshIcon className="size-3.5" aria-hidden />
-              {t('action.reconnect')}
-            </button>
-          </div>
-        )}
-
-        {selectedNodeId && !selectedNodeOffline && (
-          <div className="flex min-w-0 flex-col">
-            {loading && (
-              <div className="flex items-center gap-2 px-1 py-2 text-[12px] text-muted-foreground">
-                <LoadingLine className="size-3.5 animate-spin" aria-hidden />
-                {t('workspace.loading')}
-              </div>
-            )}
-            {!loading && entries.length === 0 && (
-              <p className="px-1 py-2 text-[12px] text-muted-foreground">
-                {t('workspace.empty')}
+      {selectedNodeOffline
+        ? (
+            <div className="flex h-full min-h-40 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+              <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-muted-foreground">
+                <ComputerIcon className="size-5" aria-hidden />
+              </span>
+              <p className="text-pretty text-[12px] leading-relaxed text-muted-foreground">
+                {t('workspace.offlineHint')}
               </p>
-            )}
-            {!loading
-              && entries.map((entry, index) => (
-                <div
-                  key={entry.key}
-                  className={cn(
-                    'group flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2',
-                    'motion-safe:animate-[node-row-in_180ms_cubic-bezier(0.23,1,0.32,1)_both]',
-                    'transition-colors duration-120',
-                    EASE,
-                    'hover:bg-accent/50',
-                  )}
-                  style={{ animationDelay: `${index * 40}ms` }}
-                  data-testid={`node-workspace-${entry.key}`}
-                >
-                  <FolderIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px] font-medium">{entry.name}</div>
-                    {originTail(entry.originUrl) && (
-                      <div className="truncate text-[11px] text-muted-foreground">
-                        {originTail(entry.originUrl)}
-                      </div>
-                    )}
-                  </div>
-                  <AddTargetControl
-                    entry={entry}
-                    addingTargetKey={addingTargetKey}
-                    onAddWorkspace={onAddWorkspace}
-                  />
+              <button
+                type="button"
+                className={cn(
+                  'flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium',
+                  'transition-[background-color,transform] duration-120',
+                  EASE,
+                  'hover:bg-accent active:scale-[0.96]',
+                )}
+                onClick={onReconnect}
+              >
+                <RefreshIcon className="size-3.5" aria-hidden />
+                {t('action.reconnect')}
+              </button>
+            </div>
+          )
+        : (
+            <div className="flex min-w-0 flex-col">
+              {loading && (
+                <div className="flex items-center gap-2 px-2 py-2 text-[12px] text-muted-foreground">
+                  <LoadingLine className="size-3.5 animate-spin" aria-hidden />
+                  {t('workspace.loading')}
                 </div>
-              ))}
-          </div>
-        )}
-      </div>
+              )}
+              {!loading && entries.length === 0 && (
+                <p className="px-2 py-2 text-[12px] text-muted-foreground">
+                  {t('workspace.empty')}
+                </p>
+              )}
+              {!loading
+                && entries.map((entry, index) => (
+                  <div
+                    key={entry.key}
+                    className={cn(
+                      'group flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2',
+                      'motion-safe:animate-[node-row-in_180ms_cubic-bezier(0.23,1,0.32,1)_both]',
+                      'transition-colors duration-120',
+                      EASE,
+                      'hover:bg-accent/50',
+                    )}
+                    style={{ animationDelay: `${index * 40}ms` }}
+                    data-testid={`node-workspace-${entry.key}`}
+                  >
+                    <FolderIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[13px] font-medium">{entry.name}</div>
+                      {originTail(entry.originUrl) && (
+                        <div className="truncate text-[11px] text-muted-foreground">
+                          {originTail(entry.originUrl)}
+                        </div>
+                      )}
+                    </div>
+                    <AddTargetControl
+                      entry={entry}
+                      addingTargetKey={addingTargetKey}
+                      onAddWorkspace={onAddWorkspace}
+                    />
+                  </div>
+                ))}
+            </div>
+          )}
     </div>
   )
 }

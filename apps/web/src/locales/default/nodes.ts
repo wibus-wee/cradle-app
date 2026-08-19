@@ -140,7 +140,6 @@ export default {
   'toast.rejectFailed': 'Couldn’t reject this request',
 
   'workspace.addFromDevice': 'Add from another device',
-  'workspace.addFromDeviceDescription': 'Browse workspaces on devices linked to your Fabric.',
   'workspace.pickDevice': 'Choose a device',
   'workspace.loading': 'Loading workspaces…',
   'workspace.empty': 'No workspaces on this device yet.',

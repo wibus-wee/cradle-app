@@ -247,9 +247,9 @@ async function mountRemoteWorkspace(input: {
   const addButton = input.page.locator('[data-testid="add-workspace-btn"]')
   await expect(addButton).toBeVisible()
   await addButton.click()
+  await input.page.locator(`[data-testid="node-pick-${input.targetNodeId}"]`).click()
   const picker = input.page.locator('[data-testid="node-workspace-picker"]')
   await expect(picker).toBeVisible()
-  await picker.locator(`[data-testid="node-pick-${input.targetNodeId}"]`).click()
   const row = picker.locator('[data-testid^="node-workspace-"]').filter({
     hasText: input.remoteWorkspace.name,
   }).first()

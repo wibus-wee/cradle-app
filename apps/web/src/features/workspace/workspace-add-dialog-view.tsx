@@ -1,13 +1,13 @@
 import {
-  ArrowRightLine as ArrowRightIcon,
   ComputerLine as ComputerIcon,
-  DownLine as ChevronDownIcon,
   FolderOpenLine as FolderOpenIcon,
+  LoadingLine,
 } from '@mingcute/react'
+import { m } from 'motion/react'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import type { FabricNode } from '~/features/nodes/types'
 import { cn } from '~/lib/cn'
 
 export interface WorkspaceAddDialogViewProps {
@@ -22,54 +23,63 @@ export interface WorkspaceAddDialogViewProps {
   creating: boolean
   onOpenChange: (open: boolean) => void
   onAddLocal: () => void
-  /** Node-dimension picker (merged cross-Node workspace view), when Nodes exist. */
-  nodePicker?: ReactNode
+  /** Remote Nodes listed in the source rail (excluding the local device). */
+  nodes?: FabricNode[]
+  /** Selected source: `null` is the local device, otherwise a Node id. */
+  selectedNodeId?: string | null
+  onSelectNode?: (nodeId: string | null) => void
+  /** Workspace list pane for the selected Node. */
+  nodePane?: ReactNode
 }
 
 const EASE = 'ease-[cubic-bezier(0.23,1,0.32,1)]'
-const ROW_IN = 'motion-safe:animate-[node-row-in_220ms_cubic-bezier(0.23,1,0.32,1)_both]'
+const PANE_IN = 'motion-safe:animate-[node-row-in_200ms_cubic-bezier(0.23,1,0.32,1)_both]'
+const PILL_SPRING = { type: 'spring', stiffness: 600, damping: 40 } as const
 
-function RowShell({
-  children,
-  className,
-  ...props
-}: React.ComponentProps<'button'>) {
+function SourceItem({
+  icon,
+  label,
+  selected,
+  trailing,
+  onClick,
+  testId,
+}: {
+  icon: ReactNode
+  label: string
+  selected: boolean
+  trailing?: ReactNode
+  onClick: () => void
+  testId: string
+}) {
   return (
     <button
       type="button"
+      onClick={onClick}
+      data-testid={testId}
+      title={label}
       className={cn(
-        'group flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left',
-        'transition-[background-color,transform] duration-150',
+        'relative flex h-9 w-full items-center rounded-lg px-2.5 text-[13px]',
+        'transition-colors duration-120',
         EASE,
-        'hover:bg-accent/60 active:scale-[0.99]',
-        'disabled:pointer-events-none disabled:opacity-50',
-        className,
+        selected
+          ? 'font-medium text-foreground'
+          : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
       )}
-      {...props}
     >
-      {children}
-    </button>
-  )
-}
-
-function RowIcon({ children }: { children: ReactNode }) {
-  return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent text-foreground">
-      {children}
-    </span>
-  )
-}
-
-function RowText({ title, description }: { title: string, description?: string }) {
-  return (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <span className="text-[13px] font-medium">{title}</span>
-      {description && (
-        <span className="text-pretty text-[12px] leading-snug text-muted-foreground">
-          {description}
-        </span>
+      {selected && (
+        <m.span
+          layoutId="workspace-add-source-pill"
+          className="absolute inset-0 rounded-lg bg-accent"
+          transition={PILL_SPRING}
+          aria-hidden
+        />
       )}
-    </span>
+      <span className="relative flex min-w-0 flex-1 items-center gap-2">
+        {icon}
+        <span className="truncate">{label}</span>
+      </span>
+      {trailing && <span className="relative shrink-0">{trailing}</span>}
+    </button>
   )
 }
 
@@ -78,16 +88,20 @@ export function WorkspaceAddDialogView({
   creating,
   onOpenChange,
   onAddLocal,
-  nodePicker,
+  nodes = [],
+  selectedNodeId = null,
+  onSelectNode,
+  nodePane,
 }: WorkspaceAddDialogViewProps) {
   const { t } = useTranslation('workspace')
   const { t: tNodes } = useTranslation('nodes')
-  const [remoteExpanded, setRemoteExpanded] = useState(true)
+  const hasRemote = nodes.length > 0
+  const showNodePane = hasRemote && selectedNodeId !== null && nodePane
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="px-6 pb-4 pt-5">
           <DialogTitle className="text-balance">
             {t('workspace.dialog.addWorkspaceTitle')}
           </DialogTitle>
@@ -96,76 +110,76 @@ export function WorkspaceAddDialogView({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex min-w-0 flex-col gap-1">
-          <RowShell
-            disabled={creating}
-            onClick={() => {
-              onOpenChange(false)
-              onAddLocal()
-            }}
-            className={ROW_IN}
-            style={{ animationDelay: '40ms' }}
-            data-testid="workspace-add-local"
-          >
-            <RowIcon>
-              <FolderOpenIcon className="size-4" aria-hidden />
-            </RowIcon>
-            <RowText
-              title={t('workspace.dialog.addWorkspaceLocalTitle')}
-              description={t('workspace.dialog.addWorkspaceLocalDescription')}
-            />
-            <ArrowRightIcon
-              className={cn(
-                'size-4 shrink-0 -translate-x-1 text-muted-foreground/40 opacity-0',
-                'transition-[opacity,transform] duration-150',
-                EASE,
-                'group-hover:translate-x-0 group-hover:text-muted-foreground group-hover:opacity-100',
-              )}
-              aria-hidden
-            />
-          </RowShell>
-
-          {nodePicker && (
-            <div
-              className={cn('flex min-w-0 flex-col', ROW_IN)}
-              style={{ animationDelay: '100ms' }}
-            >
-              <RowShell
-                onClick={() => setRemoteExpanded(value => !value)}
-                aria-expanded={remoteExpanded}
-                data-testid="workspace-add-remote-toggle"
-              >
-                <RowIcon>
-                  <ComputerIcon className="size-4" aria-hidden />
-                </RowIcon>
-                <RowText
-                  title={tNodes('workspace.addFromDevice')}
-                  description={tNodes('workspace.addFromDeviceDescription')}
-                />
-                <ChevronDownIcon
-                  className={cn(
-                    'size-4 shrink-0 text-muted-foreground/40',
-                    'transition-[color,transform] duration-200',
-                    EASE,
-                    'group-hover:text-muted-foreground',
-                    remoteExpanded && 'rotate-180',
+        <div className="flex h-[420px] min-h-0">
+          {hasRemote && (
+            <div className="flex w-56 shrink-0 flex-col gap-0.5 bg-muted/40 p-2.5">
+              <SourceItem
+                icon={<FolderOpenIcon className="size-4 shrink-0" aria-hidden />}
+                label={t('workspace.dialog.addWorkspaceLocalHost')}
+                selected={selectedNodeId === null}
+                onClick={() => onSelectNode?.(null)}
+                testId="workspace-add-source-local"
+              />
+              <p className="px-2 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground/70">
+                {tNodes('workspace.addFromDevice')}
+              </p>
+              {nodes.map(node => (
+                <SourceItem
+                  key={node.nodeId}
+                  icon={<ComputerIcon className="size-4 shrink-0" aria-hidden />}
+                  label={node.displayName}
+                  selected={selectedNodeId === node.nodeId}
+                  trailing={(
+                    <span
+                      className={cn(
+                        'block size-1.5 rounded-full',
+                        node.status === 'online' ? 'bg-green-500' : 'bg-muted-foreground/40',
+                      )}
+                      aria-hidden
+                    />
                   )}
-                  aria-hidden
+                  onClick={() => onSelectNode?.(node.nodeId)}
+                  testId={`node-pick-${node.nodeId}`}
                 />
-              </RowShell>
-              <div
-                className={cn(
-                  'grid transition-[grid-template-rows] duration-200',
-                  EASE,
-                  remoteExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
-                )}
-              >
-                <div className="min-h-0 overflow-hidden">
-                  <div className="px-1 pb-1 pt-0.5">{nodePicker}</div>
-                </div>
-              </div>
+              ))}
             </div>
           )}
+
+          <div className="min-w-0 flex-1 overflow-y-auto">
+            <div key={selectedNodeId ?? 'local'} className={cn('h-full', PANE_IN)}>
+              {showNodePane
+                ? <div className="p-2">{nodePane}</div>
+                : (
+                    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+                      <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-foreground">
+                        <FolderOpenIcon className="size-5" aria-hidden />
+                      </span>
+                      <div className="space-y-1">
+                        <p className="text-[13px] font-medium">
+                          {t('workspace.dialog.addWorkspaceLocalTitle')}
+                        </p>
+                        <p className="mx-auto max-w-60 text-pretty text-[12px] leading-relaxed text-muted-foreground">
+                          {t('workspace.dialog.addWorkspaceLocalDescription')}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={creating}
+                        onClick={() => {
+                          onOpenChange(false)
+                          onAddLocal()
+                        }}
+                        className={cn('transition-transform duration-120 active:scale-[0.97]', EASE)}
+                        data-testid="workspace-add-local"
+                      >
+                        {creating && <LoadingLine className="size-3.5 animate-spin" aria-hidden />}
+                        {t('workspace.dialog.addWorkspaceChooseLocal')}
+                      </Button>
+                    </div>
+                  )}
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
