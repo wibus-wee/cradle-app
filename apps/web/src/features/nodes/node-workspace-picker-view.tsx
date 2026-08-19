@@ -135,19 +135,19 @@ export function NodeWorkspacePickerView({
         hint: t('workspace.accessRequiredHint'),
         testId: 'node-workspace-access-denied',
       },
-      connecting: {
+      'connecting': {
         icon: <LoadingLine className="size-5 animate-spin" aria-hidden />,
         title: t('workspace.connecting'),
         hint: null,
         testId: 'node-workspace-connecting',
       },
-      error: {
+      'error': {
         icon: <WarningIcon className="size-5" aria-hidden />,
         title: t('workspace.connectionFailed'),
         hint: t('workspace.connectionFailedHint'),
         testId: 'node-workspace-connection-error',
       },
-      offline: {
+      'offline': {
         icon: <ComputerIcon className="size-5" aria-hidden />,
         title: t('workspace.offline'),
         hint: t('workspace.offlineHint'),

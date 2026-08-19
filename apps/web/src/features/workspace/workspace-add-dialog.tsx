@@ -5,8 +5,8 @@ import type {
   NodeWorkspaceTarget,
 } from '~/features/nodes/node-grouping'
 import { mergeNodeWorkspaceInventories } from '~/features/nodes/node-grouping'
-import { NodeWorkspacePickerView } from '~/features/nodes/node-workspace-picker-view'
 import type { NodeWorkspacePickerState } from '~/features/nodes/node-workspace-picker-view'
+import { NodeWorkspacePickerView } from '~/features/nodes/node-workspace-picker-view'
 import { useConnectNode, useFabricMembership, useNodes, useNodeWorkspaces } from '~/features/nodes/use-nodes'
 import type { CreateWorkspaceInput } from '~/features/workspace/use-workspace'
 import { useWorkspaces } from '~/features/workspace/use-workspace'
