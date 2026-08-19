@@ -483,7 +483,13 @@ export async function openNodeLink(nodeId: string): Promise<{ linkId: string, ex
   const membership = requireFabricMembership()
   const link = await new FabricDirectoryClient(membership.relayUrl).openLink(nodeId, controllerHeaders(membership, 'POST', `/v1/nodes/${nodeId}/links`))
   assertFabricCertificate(link.nodeCertificate, membership.ownerPubkey, membership.fabricId)
-  if (link.nodeCertificate.subjectKind !== 'node' || link.nodeCertificate.subjectId !== nodeId) { throw new AppError({ code: 'fabric_node_certificate_invalid', status: 502, message: 'Fabric relay returned a mismatched Node certificate.' }) }
+  if (link.nodeCertificate.subjectKind !== 'node' || link.nodeCertificate.subjectId !== nodeId) {
+    throw new AppError({
+      code: 'fabric_node_certificate_invalid',
+      status: 502,
+      message: `Fabric relay returned a certificate for ${link.nodeCertificate.subjectKind}/${link.nodeCertificate.subjectId}, expected node/${nodeId}.`,
+    })
+  }
   return link
 }
 
