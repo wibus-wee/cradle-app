@@ -75,11 +75,11 @@ export class FabricNodeConnector {
     ws.on('message', (data) => {
       try { this.handleEnvelope(relayWebSocketDataView(data), membership.nodeCertificate, readSecret(secretRefs.encryptionKeySecretId), membership.fabricId) }
       catch (error) {
-        this.logger.warn({
+        this.logger.warn('Fabric Node rejected inbound relay frame', {
           fabricId: membership.fabricId,
           nodeId: membership.localNodeId,
           error: error instanceof Error ? error.message : String(error),
-        }, 'Fabric Node rejected inbound relay frame')
+        })
         ws.close(1008, 'Invalid Fabric frame')
       }
     })
