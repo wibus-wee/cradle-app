@@ -74,7 +74,14 @@ export class FabricNodeConnector {
     })
     ws.on('message', (data) => {
       try { this.handleEnvelope(relayWebSocketDataView(data), membership.nodeCertificate, readSecret(secretRefs.encryptionKeySecretId), membership.fabricId) }
-      catch { ws.close(1008, 'Invalid Fabric frame') }
+      catch (error) {
+        this.logger.warn({
+          fabricId: membership.fabricId,
+          nodeId: membership.localNodeId,
+          error: error instanceof Error ? error.message : String(error),
+        }, 'Fabric Node rejected inbound relay frame')
+        ws.close(1008, 'Invalid Fabric frame')
+      }
     })
     const reconnect = () => { if (!this.stopped && this.ws === ws) { this.ws = null; this.reconnectTimer = setTimeout(() => void this.connect(), 1_000); this.reconnectTimer.unref?.() } }
     ws.once('close', (code, reason) => {
