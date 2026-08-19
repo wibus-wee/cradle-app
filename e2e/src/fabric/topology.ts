@@ -4,6 +4,8 @@ import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync }
 import { createServer } from 'node:net'
 import { join, resolve } from 'node:path'
 
+import { resolveManagedCodexAppServerPath } from '../support/codex-runtime'
+
 const ROOT = resolve(import.meta.dirname, '..', '..', '..')
 
 export interface FabricNodeProcess {
@@ -102,6 +104,15 @@ async function stopProcess(child: ChildProcess | null, timeoutMs = 5_000): Promi
   })
 }
 
+function removeTopologyData(rootDir: string): void {
+  rmSync(rootDir, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100,
+  })
+}
+
 async function buildRelayBinary(rootDir: string): Promise<string> {
   const binaryPath = join(rootDir, 'relayd')
   await new Promise<void>((resolveBuild, reject) => {
@@ -136,6 +147,7 @@ async function startNode(input: {
   const port = input.port ?? await reservePort()
   const serverUrl = `http://127.0.0.1:${port}`
   const nodeBinary = process.env.CRADLE_E2E_NODE ?? process.execPath
+  const codexAppServerPath = resolveManagedCodexAppServerPath(ROOT)
   const child = spawn(nodeBinary, ['--import', 'tsx', 'src/index.ts'], {
     cwd: join(ROOT, 'apps', 'server'),
     env: {
@@ -150,6 +162,7 @@ async function startNode(input: {
       CRADLE_RELAYD_PUBLIC_URL: input.relayUrl,
       CRADLE_RELAYD_ACCESS_MODE: 'network',
       CRADLE_FABRIC_NODE_NAME: input.name,
+      ...(codexAppServerPath ? { CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath } : {}),
       CRADLE_E2E: '1',
       NODE_ENV: 'production',
     },
@@ -265,15 +278,15 @@ relayDatabasePath,
         }
       },
       stop: async () => {
-      await Promise.all([
-        stopProcess(webProcess),
-        stopProcess(desktop?.process ?? null),
-        stopProcess(macbook?.process ?? null),
-      ])
-      await stopProcess(relayProcess)
-      if (!process.env.CRADLE_E2E_KEEP_DATA) {
-        rmSync(rootDir, { recursive: true, force: true })
-      }
+        await Promise.all([
+          stopProcess(webProcess),
+          stopProcess(desktop?.process ?? null),
+          stopProcess(macbook?.process ?? null),
+        ])
+        await stopProcess(relayProcess)
+        if (!process.env.CRADLE_E2E_KEEP_DATA) {
+          removeTopologyData(rootDir)
+        }
       },
     }
 
@@ -287,7 +300,7 @@ relayDatabasePath,
     ])
     await stopProcess(relayProcess)
     if (!process.env.CRADLE_E2E_KEEP_DATA) {
-      rmSync(rootDir, { recursive: true, force: true })
+      removeTopologyData(rootDir)
     }
     throw error
   }

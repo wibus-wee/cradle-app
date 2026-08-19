@@ -540,6 +540,11 @@ jobs:
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium
 
+      - name: Provision Codex app-server for Fabric E2E
+        env:
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+        run: pnpm --filter @cradle/desktop sync:codex-runtime
+
       - name: Run the real two-node Fabric journey
         run: pnpm e2e:fabric
 
