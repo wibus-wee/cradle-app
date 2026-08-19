@@ -1,16 +1,37 @@
 import { AppError } from '../../errors/app-error'
+import { createChildLogger } from '../../logging/logger'
 import type { FabricJoinRequest, FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
+
+const logger = createChildLogger({ module: 'fabric-directory-client' })
 
 export class FabricDirectoryClient {
   constructor(readonly relayUrl: string) {}
 
   async request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetch(new URL(path, `${this.relayUrl.replace(/\/+$/, '')}/`), {
-      ...init,
-      signal: init.signal ?? AbortSignal.timeout(15_000),
-    })
+    const url = new URL(path, `${this.relayUrl.replace(/\/+$/, '')}/`)
+    let response: Response
+    try {
+      response = await fetch(url, {
+        ...init,
+        signal: init.signal ?? AbortSignal.timeout(15_000),
+      })
+    }
+    catch (error) {
+      logger.warn('Fabric directory request failed', {
+        method: init.method ?? 'GET',
+        path: url.pathname,
+        error: error instanceof Error ? error.message : String(error),
+      })
+      throw error
+    }
     if (!response.ok) {
       const payload = await response.json().catch(() => null) as { error?: string } | null
+      logger.warn('Fabric directory request was rejected', {
+        method: init.method ?? 'GET',
+        path: url.pathname,
+        status: response.status,
+        error: payload?.error ?? `HTTP ${response.status}`,
+      })
       throw new AppError({
         code: response.status === 503 ? 'fabric_node_offline' : 'fabric_directory_request_failed',
         status: response.status === 503 ? 503 : 502,
