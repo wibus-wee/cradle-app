@@ -981,7 +981,10 @@ export function resolveDesktopChroniclePath(input: {
   const configuredPath = input.configuredPath ?? process.env[CHRONICLE_PATH_ENV]?.trim()
   if (configuredPath) {
     if (!existsSync(configuredPath)) {
-      throw new Error(`Configured Chronicle runtime is missing at ${configuredPath}`)
+      console.warn(
+        `[desktop] Chronicle runtime is unavailable at ${configuredPath}; skipping Chronicle startup.`,
+      )
+      return undefined
     }
     return configuredPath
   }
@@ -992,7 +995,10 @@ export function resolveDesktopChroniclePath(input: {
     const resourcesPath = input.resourcesPath ?? process.resourcesPath
     const bundledPath = join(resourcesPath, 'chronicle', `${platform}-${arch}`, executableName)
     if (!existsSync(bundledPath)) {
-      throw new Error(`Bundled Chronicle runtime is missing at ${bundledPath}`)
+      console.warn(
+        `[desktop] Chronicle runtime is unavailable at ${bundledPath}; skipping Chronicle startup.`,
+      )
+      return undefined
     }
     return bundledPath
   }
@@ -1021,9 +1027,11 @@ export function resolveDesktopChroniclePath(input: {
   ]
   const runtimePath = candidates.find(candidate => existsSync(candidate))
   if (!runtimePath) {
-    throw new Error(
-      'Chronicle development runtime is missing. Run `pnpm --filter @cradle/desktop build:chronicle`.',
+    console.warn(
+      '[desktop] Chronicle development runtime is unavailable; skipping Chronicle startup. '
+      + 'Run `pnpm --filter @cradle/desktop build:chronicle` to enable it.',
     )
+    return undefined
   }
   return runtimePath
 }

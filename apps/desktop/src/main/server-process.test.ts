@@ -330,15 +330,20 @@ describe('desktop Chronicle runtime path', () => {
     }
   })
 
-  it('rejects a missing configured macOS runtime and skips other platforms', async () => {
+  it('warns and skips a missing macOS runtime and skips other platforms', async () => {
     const { resolveDesktopChroniclePath } = await import('./server-process')
 
-    expect(() => resolveDesktopChroniclePath({
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    expect(resolveDesktopChroniclePath({
       isDev: true,
       moduleDir: '/tmp',
       platform: 'darwin',
       configuredPath: '/tmp/missing-cradle-chronicle',
-    })).toThrow('Configured Chronicle runtime is missing')
+    })).toBeUndefined()
+    expect(warn).toHaveBeenCalledWith(
+      '[desktop] Chronicle runtime is unavailable at /tmp/missing-cradle-chronicle; skipping Chronicle startup.',
+    )
     expect(resolveDesktopChroniclePath({
       isDev: false,
       moduleDir: '/tmp',
