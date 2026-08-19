@@ -15,4 +15,6 @@ Relayd never mints membership certificates or retains an owner key.
 
 Directory events are snapshot-first. A reconnect always receives the current
 authorized Node summary set before live events, so the implementation does not
-need a CRDT or replicated session history.
+need a CRDT or replicated session history. Durable grants define an admin
+Controller's Node access. A `nodeId` on a non-admin Controller certificate adds
+a narrower device boundary, but does not override an admin Controller's grants.

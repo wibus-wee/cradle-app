@@ -250,8 +250,9 @@ func (s *Server) registerController(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
+	nodeRestriction := controllerNodeRestriction(request.Certificate)
 	for _, grant := range request.Grants {
-		if request.Certificate.NodeID != "" && grant.NodeID != request.Certificate.NodeID || !membership.HasAnyScope(request.Certificate.Scopes, grant.Scope, membership.ScopeAdmin) {
+		if (nodeRestriction != "" && grant.NodeID != nodeRestriction) || !membership.HasAnyScope(request.Certificate.Scopes, grant.Scope, membership.ScopeAdmin) {
 			writeError(w, http.StatusForbidden, "controller certificate does not authorize this grant")
 			return
 		}
@@ -275,7 +276,7 @@ func (s *Server) listNodes(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "nodes": restrictNodes(nodes, controller.NodeID)})
+	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "nodes": restrictNodes(nodes, controllerNodeRestriction(controller))})
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
@@ -298,7 +299,8 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	if !writeSSE(w, "snapshot", map[string]any{"revision": revision, "nodes": restrictNodes(nodes, controller.NodeID)}) {
+	nodeRestriction := controllerNodeRestriction(controller)
+	if !writeSSE(w, "snapshot", map[string]any{"revision": revision, "nodes": restrictNodes(nodes, nodeRestriction)}) {
 		return
 	}
 	flusher.Flush()
@@ -310,7 +312,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			return
 		case update := <-updates:
 			if update.Node != nil {
-				if controller.NodeID != "" && update.Node.NodeID != controller.NodeID {
+				if nodeRestriction != "" && update.Node.NodeID != nodeRestriction {
 					continue
 				}
 				allowed, err := s.store.HasActiveGrant(r.Context(), fabricID, controller.SubjectID, update.Node.NodeID, membership.ScopeView, membership.ScopeControl, membership.ScopeApprove, membership.ScopeAdmin)
@@ -483,6 +485,15 @@ func (s *Server) controllerWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.links.HandleController(r.Context(), linkID, controller.SubjectID, ws)
+}
+
+// Admin controllers are scoped by durable grants. Earlier device certificates
+// carried a node ID, which must not hide other nodes subsequently granted to them.
+func controllerNodeRestriction(certificate membership.Certificate) string {
+	if membership.HasAnyScope(certificate.Scopes, membership.ScopeAdmin) {
+		return ""
+	}
+	return certificate.NodeID
 }
 
 func restrictNodes(nodes []fabric.NodeSummary, nodeID string) []fabric.NodeSummary {

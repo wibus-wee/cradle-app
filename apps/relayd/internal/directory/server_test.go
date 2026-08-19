@@ -126,6 +126,69 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 		t.Fatalf("join request result = %#v", approved)
 	}
 
+	nodeBPublic, nodeBPrivate := directoryKey(t)
+	nodeBJoin, err := membership.SignJoinRequest(nodeBPrivate, membership.JoinRequest{
+		RequestID:          "join-node-b",
+		FabricID:           created.Fabric.ID,
+		SubjectKind:        membership.SubjectNode,
+		SubjectID:          "node-b",
+		EncryptionPubkey:   "node-b-x25519",
+		DisplayName:        "Studio",
+		Platform:           "darwin",
+		Version:            "1.0.0",
+		Capabilities:       []string{"workspace", "terminal"},
+		DeliverySecretHash: directorySecretHash("node-b-delivery-secret"),
+		IssuedAt:           clock.Unix(),
+		ExpiresAt:          clock.Add(5 * time.Minute).Unix(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateJoinRequest(t.Context(), nodeBJoin); err != nil {
+		t.Fatal(err)
+	}
+	nodeBCertificate, err := membership.SignCertificate(ownerPrivate, membership.Certificate{
+		Version:          1,
+		FabricID:         created.Fabric.ID,
+		SubjectKind:      membership.SubjectNode,
+		SubjectID:        "node-b",
+		IdentityPubkey:   encodeDirectoryKey(nodeBPublic),
+		EncryptionPubkey: "node-b-x25519",
+		Scopes:           []membership.Scope{membership.ScopeControl},
+		IssuedAt:         clock.Unix(),
+		Nonce:            "node-b-certificate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodeBControllerCertificate, err := membership.SignCertificate(ownerPrivate, membership.Certificate{
+		Version:          1,
+		FabricID:         created.Fabric.ID,
+		SubjectKind:      membership.SubjectController,
+		SubjectID:        "node-b",
+		IdentityPubkey:   encodeDirectoryKey(nodeBPublic),
+		EncryptionPubkey: "node-b-x25519",
+		Scopes:           []membership.Scope{membership.ScopeAdmin},
+		IssuedAt:         clock.Unix(),
+		Nonce:            "node-b-controller-certificate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.ApproveJoinRequest(t.Context(), nodeBJoin.RequestID, nodeBCertificate, nodeBControllerCertificate); err != nil {
+		t.Fatal(err)
+	}
+
+	legacyControllerHeaders := directoryProofHeaders(t, nodePrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "legacy-controller-list-nodes")
+	legacyControllerHeaders.Set(certificateHeader, directoryHeaderJSON(t, joinedControllerCertificate))
+	var legacyControllerDiscovery struct {
+		Nodes []fabric.NodeSummary `json:"nodes"`
+	}
+	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", legacyControllerHeaders, http.StatusOK, &legacyControllerDiscovery)
+	if len(legacyControllerDiscovery.Nodes) != 2 {
+		t.Fatalf("legacy admin controller nodes = %#v", legacyControllerDiscovery.Nodes)
+	}
+
 	rejectedSecret := "rejected-delivery-secret"
 	rejectedJoin, err := membership.SignJoinRequest(nodePrivate, membership.JoinRequest{
 		RequestID:          "join-node-rejected",
@@ -202,7 +265,7 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 		Grants []fabric.Grant `json:"grants"`
 	}
 	getDirectoryJSON(t, httpServer.URL+"/v1/nodes/node-a/grants", grantListHeaders, http.StatusOK, &grantList)
-	if len(grantList.Grants) != 2 || !hasActiveGrant(grantList.Grants, "grant-node-a-view", membership.ScopeView) {
+	if len(grantList.Grants) != 3 || !hasActiveGrant(grantList.Grants, "grant-node-a-view", membership.ScopeView) {
 		t.Fatalf("node grants = %#v", grantList.Grants)
 	}
 	// Grant management is owner-only: a Controller proof must not list grants.
@@ -214,7 +277,7 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	deleteDirectory(t, httpServer.URL+"/v1/nodes/node-a/grants/grant-node-a-view", revokeHeaders, http.StatusNoContent)
 	grantListHeaders = directoryProofHeaders(t, ownerPrivate, http.MethodGet, "/v1/nodes/node-a/grants", clock, "list-grants-after-revoke")
 	getDirectoryJSON(t, httpServer.URL+"/v1/nodes/node-a/grants", grantListHeaders, http.StatusOK, &grantList)
-	if len(grantList.Grants) != 2 || !hasRevokedGrant(grantList.Grants, "grant-node-a-view") {
+	if len(grantList.Grants) != 3 || !hasRevokedGrant(grantList.Grants, "grant-node-a-view") {
 		t.Fatalf("node grants after revocation = %#v", grantList.Grants)
 	}
 	controllerHeaders = directoryProofHeaders(t, controllerPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "list-nodes-after-revoke")
@@ -226,6 +289,31 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 
 	if _, err := directory.MarkNodePresence(t.Context(), created.Fabric.ID, "node-a", fabric.NodeOnline); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestControllerNodeRestriction(t *testing.T) {
+	nodes := []fabric.NodeSummary{
+		{NodeID: "node-a"},
+		{NodeID: "node-b"},
+	}
+
+	legacyAdmin := membership.Certificate{
+		NodeID: "node-a",
+		Scopes: []membership.Scope{membership.ScopeAdmin},
+	}
+	adminNodes := restrictNodes(nodes, controllerNodeRestriction(legacyAdmin))
+	if len(adminNodes) != 2 {
+		t.Fatalf("legacy admin visible nodes = %#v", adminNodes)
+	}
+
+	boundController := membership.Certificate{
+		NodeID: "node-a",
+		Scopes: []membership.Scope{membership.ScopeView},
+	}
+	boundNodes := restrictNodes(nodes, controllerNodeRestriction(boundController))
+	if len(boundNodes) != 1 || boundNodes[0].NodeID != "node-a" {
+		t.Fatalf("node-bound controller visible nodes = %#v", boundNodes)
 	}
 }
 
