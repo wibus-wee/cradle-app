@@ -61,9 +61,10 @@ type registerControllerRequest struct {
 }
 
 type event struct {
-	Type     string              `json:"type"`
-	Revision int64               `json:"revision"`
-	Node     *fabric.NodeSummary `json:"node,omitempty"`
+	Type                    string              `json:"type"`
+	Revision                int64               `json:"revision"`
+	Node                    *fabric.NodeSummary `json:"node,omitempty"`
+	AuthorizedControllerIDs []string            `json:"-"`
 }
 
 func NewServer(cfg Config) (*Server, error) {
@@ -87,6 +88,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/nodes", s.listNodes)
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/events", s.events)
 	mux.HandleFunc("POST /v1/nodes/{nodeId}/links", s.openLink)
+	mux.HandleFunc("DELETE /v1/nodes/{nodeId}", s.removeNode)
 	mux.HandleFunc("GET /v1/nodes/{nodeId}/grants", s.listNodeGrants)
 	mux.HandleFunc("DELETE /v1/nodes/{nodeId}/grants/{grantId}", s.revokeGrant)
 	mux.HandleFunc("GET /v1/ws/nodes", s.nodeWebSocket)
@@ -271,7 +273,13 @@ func (s *Server) listNodes(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
-	nodes, revision, err := s.store.ListAuthorizedNodes(r.Context(), fabricID, controller.SubjectID)
+	var nodes []fabric.NodeSummary
+	var revision int64
+	if membership.HasAnyScope(controller.Scopes, membership.ScopeAdmin) {
+		nodes, revision, err = s.store.ListFabricNodes(r.Context(), fabricID, controller.SubjectID)
+	} else {
+		nodes, revision, err = s.store.ListAuthorizedNodes(r.Context(), fabricID, controller.SubjectID)
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -286,7 +294,14 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
-	nodes, revision, err := s.store.ListAuthorizedNodes(r.Context(), fabricID, controller.SubjectID)
+	admin := membership.HasAnyScope(controller.Scopes, membership.ScopeAdmin)
+	var nodes []fabric.NodeSummary
+	var revision int64
+	if admin {
+		nodes, revision, err = s.store.ListFabricNodes(r.Context(), fabricID, controller.SubjectID)
+	} else {
+		nodes, revision, err = s.store.ListAuthorizedNodes(r.Context(), fabricID, controller.SubjectID)
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -311,13 +326,26 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case update := <-updates:
-			if update.Node != nil {
+			if update.Node != nil && !admin {
 				if nodeRestriction != "" && update.Node.NodeID != nodeRestriction {
 					continue
 				}
-				allowed, err := s.store.HasActiveGrant(r.Context(), fabricID, controller.SubjectID, update.Node.NodeID, membership.ScopeView, membership.ScopeControl, membership.ScopeApprove, membership.ScopeAdmin)
-				if err != nil || !allowed {
-					continue
+				if update.Type == "node.removed" {
+					authorized := false
+					for _, controllerID := range update.AuthorizedControllerIDs {
+						if controllerID == controller.SubjectID {
+							authorized = true
+							break
+						}
+					}
+					if !authorized {
+						continue
+					}
+				} else {
+					allowed, err := s.store.HasActiveGrant(r.Context(), fabricID, controller.SubjectID, update.Node.NodeID, membership.ScopeView, membership.ScopeControl, membership.ScopeApprove, membership.ScopeAdmin)
+					if err != nil || !allowed {
+						continue
+					}
 				}
 			}
 			if !writeSSE(w, update.Type, update) {
@@ -326,6 +354,29 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 	}
+}
+
+func (s *Server) removeNode(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("nodeId")
+	record, err := s.store.GetFabricForNode(r.Context(), nodeID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if err := s.requireOwner(r, record); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	node, controllerIDs, err := s.store.RemoveNode(r.Context(), record.ID, nodeID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if s.links != nil {
+		s.links.RemoveNode(record.ID, nodeID)
+	}
+	s.broker.publish(record.ID, event{Type: "node.removed", Revision: node.Revision, Node: &node, AuthorizedControllerIDs: controllerIDs})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) listNodeGrants(w http.ResponseWriter, r *http.Request) {

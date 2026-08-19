@@ -69,6 +69,10 @@ export class FabricDirectoryClient {
   revokeNodeGrant(nodeId: string, grantId: string, headers: Headers) {
     return this.request<void>(`/v1/nodes/${encodeURIComponent(nodeId)}/grants/${encodeURIComponent(grantId)}`, { method: 'DELETE', headers })
   }
+
+  removeNode(nodeId: string, headers: Headers) {
+    return this.request<void>(`/v1/nodes/${encodeURIComponent(nodeId)}`, { method: 'DELETE', headers })
+  }
 }
 
 function jsonRequest(method: string, body: unknown, headers = new Headers()): RequestInit {

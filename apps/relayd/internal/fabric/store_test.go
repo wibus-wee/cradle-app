@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"testing"
 	"time"
 
@@ -97,6 +98,78 @@ func TestStoreRestartRetainsNodeAndResetsTransientPresence(t *testing.T) {
 	}
 	if restored.Status != NodeOffline {
 		t.Fatalf("status after restart = %q, want %q", restored.Status, NodeOffline)
+	}
+}
+
+func TestStoreListsAllFabricNodesForAdminWithoutExpandingGrants(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	store := newTestStore(t, &now)
+	ownerPublic, ownerPrivate := newKey(t)
+	fabricRecord, err := store.CreateFabric(t.Context(), "create-a", encodeKey(ownerPublic))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = enrollNode(t, store, ownerPrivate, fabricRecord, "node-a", "MacBook", now)
+	_ = enrollNode(t, store, ownerPrivate, fabricRecord, "node-b", "Studio", now)
+	adminPublic, _ := newKey(t)
+	adminCertificate, err := membership.SignCertificate(ownerPrivate, membership.Certificate{
+		Version: 1, FabricID: fabricRecord.ID, SubjectKind: membership.SubjectController,
+		SubjectID: "admin-without-grants", IdentityPubkey: encodeKey(adminPublic),
+		EncryptionPubkey: "admin-x25519", Scopes: []membership.Scope{membership.ScopeAdmin},
+		IssuedAt: now.Unix(), Nonce: "admin-without-grants",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.RegisterController(t.Context(), adminCertificate, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	nodes, _, err := store.ListFabricNodes(t.Context(), fabricRecord.ID, adminCertificate.SubjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 2 || len(nodes[0].Scopes) != 0 || len(nodes[1].Scopes) != 0 {
+		t.Fatalf("admin directory without grants = %#v", nodes)
+	}
+	if granted, err := store.HasActiveGrant(t.Context(), fabricRecord.ID, adminCertificate.SubjectID, "node-a", membership.ScopeAdmin); err != nil || granted {
+		t.Fatalf("admin discovery expanded grant = %v, error = %v", granted, err)
+	}
+}
+
+func TestStoreRemoveNodeDeletesIdentityAndBothSidesOfGrants(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	store := newTestStore(t, &now)
+	ownerPublic, ownerPrivate := newKey(t)
+	fabricRecord, err := store.CreateFabric(t.Context(), "create-a", encodeKey(ownerPublic))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = enrollNode(t, store, ownerPrivate, fabricRecord, "node-a", "MacBook", now)
+	_ = enrollNode(t, store, ownerPrivate, fabricRecord, "node-b", "Studio", now)
+
+	removed, controllerIDs, err := store.RemoveNode(t.Context(), fabricRecord.ID, "node-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if removed.NodeID != "node-b" || removed.Revision <= 0 || len(controllerIDs) != 2 {
+		t.Fatalf("removed Node = %#v, controllers = %#v", removed, controllerIDs)
+	}
+	if _, err := store.GetNode(t.Context(), fabricRecord.ID, "node-b"); !errors.Is(err, ErrFabricNotFound) {
+		t.Fatalf("removed Node lookup error = %v", err)
+	}
+	if _, err := store.GetNodeCertificate(t.Context(), fabricRecord.ID, "node-b"); !errors.Is(err, ErrFabricNotFound) {
+		t.Fatalf("removed Node certificate lookup error = %v", err)
+	}
+	if granted, err := store.HasActiveGrant(t.Context(), fabricRecord.ID, "node-b", "node-a", membership.ScopeAdmin); err != nil || granted {
+		t.Fatalf("removed Controller grant = %v, error = %v", granted, err)
+	}
+	nodes, _, err := store.ListFabricNodes(t.Context(), fabricRecord.ID, "node-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 1 || nodes[0].NodeID != "node-a" {
+		t.Fatalf("directory after removal = %#v", nodes)
 	}
 }
 

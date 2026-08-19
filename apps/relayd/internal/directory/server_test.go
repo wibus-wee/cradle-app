@@ -189,6 +189,29 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 		t.Fatalf("legacy admin controller nodes = %#v", legacyControllerDiscovery.Nodes)
 	}
 
+	adminPublic, adminPrivate := directoryKey(t)
+	adminWithoutGrants, err := membership.SignCertificate(ownerPrivate, membership.Certificate{
+		Version: 1, FabricID: created.Fabric.ID, SubjectKind: membership.SubjectController,
+		SubjectID: "admin-without-grants", IdentityPubkey: encodeDirectoryKey(adminPublic),
+		EncryptionPubkey: "admin-without-grants-x25519", Scopes: []membership.Scope{membership.ScopeAdmin},
+		IssuedAt: clock.Unix(), Nonce: "admin-without-grants-certificate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registerAdminPath := "/v1/fabrics/" + created.Fabric.ID + "/controllers"
+	registerAdminHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodPost, registerAdminPath, clock, "register-admin-without-grants")
+	postDirectoryJSON(t, httpServer.URL+registerAdminPath, registerControllerRequest{Certificate: adminWithoutGrants}, registerAdminHeaders, http.StatusNoContent, nil)
+	adminDirectoryHeaders := directoryProofHeaders(t, adminPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "admin-directory-without-grants")
+	adminDirectoryHeaders.Set(certificateHeader, directoryHeaderJSON(t, adminWithoutGrants))
+	var adminDirectory struct {
+		Nodes []fabric.NodeSummary `json:"nodes"`
+	}
+	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", adminDirectoryHeaders, http.StatusOK, &adminDirectory)
+	if len(adminDirectory.Nodes) != 2 || len(adminDirectory.Nodes[0].Scopes) != 0 || len(adminDirectory.Nodes[1].Scopes) != 0 {
+		t.Fatalf("authoritative admin directory = %#v", adminDirectory.Nodes)
+	}
+
 	rejectedSecret := "rejected-delivery-secret"
 	rejectedJoin, err := membership.SignJoinRequest(nodePrivate, membership.JoinRequest{
 		RequestID:          "join-node-rejected",
@@ -290,6 +313,19 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	if _, err := directory.MarkNodePresence(t.Context(), created.Fabric.ID, "node-a", fabric.NodeOnline); err != nil {
 		t.Fatal(err)
 	}
+
+	removePath := "/v1/nodes/node-b"
+	removeHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodDelete, removePath, clock, "remove-node-b")
+	deleteDirectory(t, httpServer.URL+removePath, removeHeaders, http.StatusNoContent)
+	adminDirectoryHeaders = directoryProofHeaders(t, adminPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "admin-directory-after-removal")
+	adminDirectoryHeaders.Set(certificateHeader, directoryHeaderJSON(t, adminWithoutGrants))
+	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", adminDirectoryHeaders, http.StatusOK, &adminDirectory)
+	if len(adminDirectory.Nodes) != 1 || adminDirectory.Nodes[0].NodeID != "node-a" {
+		t.Fatalf("admin directory after removal = %#v", adminDirectory.Nodes)
+	}
+	nodeBHeaders := directoryProofHeaders(t, nodeBPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "removed-node-controller")
+	nodeBHeaders.Set(certificateHeader, directoryHeaderJSON(t, nodeBControllerCertificate))
+	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", nodeBHeaders, http.StatusNotFound, nil)
 }
 
 func TestControllerNodeRestriction(t *testing.T) {

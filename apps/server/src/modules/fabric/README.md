@@ -22,15 +22,23 @@ certificates: a Node certificate for the persistent Node socket and a
 Controller certificate for directory and link operations.
 
 Controller certificates identify a device but do not restrict it to that
-device's Node. Relayd grants are the per-Node authorization boundary and filter
-directory visibility. The target Node validates the owner signature, Fabric,
-scope, and any optional Node restriction again before accepting encrypted
-payloads.
+device's Node. Admin Controllers share one authoritative device directory;
+each Node summary reports the calling Controller's actual grant scopes. Relayd
+grants remain the per-Node link authorization boundary. Non-admin Controllers
+discover only granted Nodes. The target Node validates the owner signature,
+Fabric, scope, and any optional Node restriction again before accepting
+encrypted payloads.
 
 Cancellation removes only the local pending membership and its Cradle-owned
 identity keys. Relayd retains the short-lived join request until expiry. A
 non-owner may leave locally; an owner cannot use that route because doing so
 would orphan Fabric administration.
+
+An owner can permanently remove any remote device with `DELETE
+/nodes/:nodeId`. Relayd removes its Node and Controller identity, removes every
+grant where it participates, and closes its live links. The route intentionally
+has no generated CLI command because device removal is a destructive UI flow
+with explicit confirmation.
 
 ## Routing and recovery
 
@@ -49,4 +57,7 @@ The executable two-Node acceptance test is
 It runs relayd, two Cradle Servers with independent databases, and two browser
 contexts; then verifies UI enrollment, bidirectional Workspace mounting and
 chat, cross-controller Session discovery, relay restart, and target-server
-restart. Run it with `pnpm e2e:fabric`.
+restart. It also re-enrolls one device to create a stale directory record,
+asserts both admins see the same three Node IDs, removes the stale device
+through the owner UI, and asserts both directories converge to the same two
+Node IDs. Run it with `pnpm e2e:fabric`.

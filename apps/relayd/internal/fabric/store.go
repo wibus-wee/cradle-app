@@ -461,6 +461,44 @@ func (s *Store) ListAuthorizedNodes(ctx context.Context, fabricID, controllerID 
 	return nodes, fabric.Revision, nil
 }
 
+// ListFabricNodes returns the authoritative device directory for an admin
+// Controller. Scopes still describe only that Controller's active grants, so
+// discovery does not expand its authorization to open a link.
+func (s *Store) ListFabricNodes(ctx context.Context, fabricID, controllerID string) ([]NodeSummary, int64, error) {
+	fabricRecord, err := s.GetFabric(ctx, fabricID)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT n.node_id, n.fabric_id, n.display_name, n.platform, n.version, n.capabilities_json, n.status, n.last_seen_at, n.revision,
+			COALESCE(GROUP_CONCAT(DISTINCT g.scope), '')
+		FROM nodes n
+		LEFT JOIN node_grants g ON g.fabric_id = n.fabric_id AND g.node_id = n.node_id
+			AND g.controller_id = ? AND g.revoked_at IS NULL
+			AND g.scope IN ('view', 'control', 'approve', 'admin')
+		WHERE n.fabric_id = ?
+		GROUP BY n.node_id
+		ORDER BY n.display_name COLLATE NOCASE, n.node_id
+	`, controllerID, fabricID)
+	if err != nil {
+		return nil, 0, fmt.Errorf("listing Fabric nodes: %w", err)
+	}
+	defer rows.Close()
+	nodes := []NodeSummary{}
+	for rows.Next() {
+		node, scopes, err := scanNodeWithScopes(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		node.Scopes = scopes
+		nodes = append(nodes, node)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	return nodes, fabricRecord.Revision, nil
+}
+
 func (s *Store) ControllerExists(ctx context.Context, fabricID, controllerID, identityPubkey string) (bool, error) {
 	var found int
 	err := s.db.QueryRowContext(ctx, `
@@ -566,6 +604,74 @@ func (s *Store) MarkAllOffline(ctx context.Context) error {
 		return fmt.Errorf("marking nodes offline: %w", err)
 	}
 	return nil
+}
+
+// RemoveNode permanently removes one enrolled device and every grant where it
+// is either the target Node or the Controller. Its signed certificates can no
+// longer authenticate because the corresponding principal and Node disappear
+// in the same transaction.
+func (s *Store) RemoveNode(ctx context.Context, fabricID, nodeID string) (NodeSummary, []string, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return NodeSummary{}, nil, err
+	}
+	defer tx.Rollback()
+	node, err := s.nodeInTx(ctx, tx, fabricID, nodeID)
+	if err != nil {
+		return NodeSummary{}, nil, err
+	}
+	controllerRows, err := tx.QueryContext(ctx, `
+		SELECT DISTINCT controller_id FROM node_grants
+		WHERE fabric_id = ? AND node_id = ? AND revoked_at IS NULL
+	`, fabricID, nodeID)
+	if err != nil {
+		return NodeSummary{}, nil, fmt.Errorf("listing removed Node Controllers: %w", err)
+	}
+	controllerIDs := []string{}
+	for controllerRows.Next() {
+		var controllerID string
+		if err := controllerRows.Scan(&controllerID); err != nil {
+			controllerRows.Close()
+			return NodeSummary{}, nil, err
+		}
+		controllerIDs = append(controllerIDs, controllerID)
+	}
+	if err := controllerRows.Close(); err != nil {
+		return NodeSummary{}, nil, err
+	}
+	if err := controllerRows.Err(); err != nil {
+		return NodeSummary{}, nil, err
+	}
+	revision, err := nextRevision(ctx, tx, fabricID)
+	if err != nil {
+		return NodeSummary{}, nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM node_grants
+		WHERE fabric_id = ? AND (node_id = ? OR controller_id = ?)
+	`, fabricID, nodeID, nodeID); err != nil {
+		return NodeSummary{}, nil, fmt.Errorf("removing Node grants: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM nodes WHERE fabric_id = ? AND node_id = ?`, fabricID, nodeID)
+	if err != nil {
+		return NodeSummary{}, nil, fmt.Errorf("removing Node: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return NodeSummary{}, nil, err
+	}
+	if affected != 1 {
+		return NodeSummary{}, nil, ErrFabricNotFound
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM principals WHERE fabric_id = ? AND subject_id = ?`, fabricID, nodeID); err != nil {
+		return NodeSummary{}, nil, fmt.Errorf("removing Node principal: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return NodeSummary{}, nil, err
+	}
+	node.Status = NodeOffline
+	node.Revision = revision
+	return node, controllerIDs, nil
 }
 
 // ListNodeGrants returns every grant recorded for a Node, including revoked
@@ -855,6 +961,9 @@ func scanNodeWithScopes(row rowScanner) (NodeSummary, []string, error) {
 	}
 	node.Status = NodeStatus(status)
 	node.LastSeenAt = time.UnixMilli(lastSeenAt).UTC()
+	if scopes == "" {
+		return node, []string{}, nil
+	}
 	return node, strings.Split(scopes, ","), nil
 }
 

@@ -21,6 +21,7 @@ import {
   usePendingFabricEnrollment,
   usePendingFabricNodeRequests,
   useRejectPendingFabricNodeRequest,
+  useRemoveNode,
   useRevokeNodeGrant,
 } from './use-nodes'
 
@@ -35,8 +36,8 @@ export function useNodesController() {
   const membershipQuery = useFabricMembership()
   const managedRelayQuery = useManagedRelay()
   const pendingEnrollmentQuery = usePendingFabricEnrollment()
-  const nodesQuery = useNodes()
   const membership = membershipQuery.data ?? null
+  const nodesQuery = useNodes(membership !== null)
   const managedRelay = managedRelayQuery.data ?? null
   const pendingEnrollment = pendingEnrollmentQuery.data ?? null
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
@@ -62,6 +63,7 @@ export function useNodesController() {
   const rejectPendingRequest = useRejectPendingFabricNodeRequest()
   const connectNode = useConnectNode()
   const revokeGrant = useRevokeNodeGrant()
+  const removeNode = useRemoveNode()
 
   const accessNode = accessNodeId
     ? (nodes.find(node => node.nodeId === accessNodeId) ?? null)
@@ -304,6 +306,26 @@ export function useNodesController() {
     [accessNodeId, revokeGrant, t],
   )
 
+  const handleRemoveNode = useCallback(
+    async (nodeId: string) => {
+      try {
+        await removeNode.mutateAsync({ path: { nodeId } })
+        if (accessNodeId === nodeId) {
+          setAccessNodeId(null)
+        }
+        toastManager.add({ type: 'success', title: t('toast.deviceRemoved') })
+      }
+      catch (error) {
+        toastManager.add({
+          type: 'error',
+          title: t('toast.deviceRemoveFailed'),
+          description: errorMessage(error),
+        })
+      }
+    },
+    [accessNodeId, removeNode, t],
+  )
+
   const handleConnectOpenChange = useCallback((open: boolean) => {
     setConnectOpen(open)
     if (!open) {
@@ -337,6 +359,7 @@ export function useNodesController() {
     accessNodeId,
     accessGrants,
     revokingGrantId,
+    removingNodeId: removeNode.isPending ? (removeNode.variables?.path.nodeId ?? null) : null,
     connectingNodeId: connectNode.isPending ? (connectNode.variables?.path.nodeId ?? null) : null,
     busy: managedRelayQuery.isLoading || createFabric.isPending || createInvitation.isPending || approveInvitation.isPending,
     setConnectOpen,
@@ -350,6 +373,7 @@ export function useNodesController() {
     handleApprovePendingRequest,
     handleRejectPendingRequest,
     handleRevokeGrant,
+    handleRemoveNode,
     handleConnectOpenChange,
   }
 }

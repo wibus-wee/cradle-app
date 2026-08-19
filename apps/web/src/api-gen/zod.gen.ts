@@ -594,6 +594,10 @@ export const zDeleteFabricNodeInvitationsRequestsByRequestIdPath = z.object({
     requestId: z.string().min(1).regex(/.*\S.*/)
 });
 
+export const zDeleteNodesByNodeIdPath = z.object({
+    nodeId: z.string().min(1).regex(/.*\S.*/)
+});
+
 export const zGetNodesByNodeIdPath = z.object({
     nodeId: z.string().min(1).regex(/.*\S.*/)
 });

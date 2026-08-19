@@ -14,7 +14,12 @@ relayd verifies both and atomically establishes the device's directory grants.
 Relayd never mints membership certificates or retains an owner key.
 
 Directory events are snapshot-first. A reconnect always receives the current
-authorized Node summary set before live events, so the implementation does not
-need a CRDT or replicated session history. Durable grants define an admin
-Controller's Node access. A `nodeId` on a non-admin Controller certificate adds
-a narrower device boundary, but does not override an admin Controller's grants.
+Node summary set before live events, so the implementation does not need a CRDT
+or replicated session history. Admin Controllers share the authoritative
+device directory; each summary carries only that Controller's active grant
+scopes, and links remain grant-gated. Non-admin Controllers discover only
+granted Nodes, with an optional certificate `nodeId` as a narrower boundary.
+
+Node removal is an owner-only lifecycle operation. It deletes the device's
+Node and Controller identity, removes all related grants, closes active links,
+and publishes a `node.removed` directory event.

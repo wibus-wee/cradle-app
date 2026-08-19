@@ -27,11 +27,13 @@ export function NodesSettings() {
         networkCode={controller.networkCode}
         canManageAccess={controller.membership?.role === 'owner'}
         reconnectingNodeId={controller.connectingNodeId}
+        removingNodeId={controller.removingNodeId}
         cancellingEnrollment={controller.cancellingEnrollment}
         leavingFabric={controller.leavingFabric}
         onLinkDevice={() => controller.setConnectOpen(true)}
         onReconnect={nodeId => void controller.handleReconnect(nodeId)}
         onManageAccess={controller.setAccessNodeId}
+        onRemoveNode={nodeId => void controller.handleRemoveNode(nodeId)}
         onRefreshMembership={controller.refreshMembership}
         onRefreshNodes={controller.refreshNodes}
         onRefreshPendingRequests={controller.refreshPendingRequests}

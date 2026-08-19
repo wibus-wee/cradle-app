@@ -468,6 +468,17 @@ export async function revokeNodeGrant(nodeId: string, grantId: string): Promise<
   await new FabricDirectoryClient(membership.relayUrl).revokeNodeGrant(nodeId, grantId, ownerProofHeaders(ownerPrivateKey, 'DELETE', path))
 }
 
+/** Permanently remove a remote device and all of its Node/Controller access. */
+export async function removeNode(nodeId: string): Promise<void> {
+  const membership = requireFabricMembership()
+  if (nodeId === membership.localNodeId) {
+    throw new AppError({ code: 'fabric_local_node_cannot_be_removed', status: 409, message: 'The Fabric owner cannot remove this device from itself.' })
+  }
+  const ownerPrivateKey = requireOwnerKey()
+  const path = `/v1/nodes/${nodeId}`
+  await new FabricDirectoryClient(membership.relayUrl).removeNode(nodeId, ownerProofHeaders(ownerPrivateKey, 'DELETE', path))
+}
+
 export async function openNodeLink(nodeId: string): Promise<{ linkId: string, expiresAt: string, nodeCertificate: MembershipCertificate }> {
   const membership = requireFabricMembership()
   const link = await new FabricDirectoryClient(membership.relayUrl).openLink(nodeId, controllerHeaders(membership, 'POST', `/v1/nodes/${nodeId}/links`))
@@ -496,7 +507,7 @@ function controllerHeaders(membership: FabricMembershipView, method: string, pat
 
 function requireOwnerKey(): string {
   const secretRefs = requireFabricMembershipSecretRefs()
-  if (!secretRefs.ownerKeySecretId) { throw new AppError({ code: 'fabric_owner_required', status: 403, message: 'Only the Fabric owner can approve Nodes.' }) }
+  if (!secretRefs.ownerKeySecretId) { throw new AppError({ code: 'fabric_owner_required', status: 403, message: 'Only the Fabric owner can manage devices.' }) }
   return readSecret(secretRefs.ownerKeySecretId)
 }
 

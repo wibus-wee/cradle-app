@@ -6,6 +6,7 @@ import {
   deleteFabricNodeInvitationsPendingMutation,
   deleteFabricNodeInvitationsRequestsByRequestIdMutation,
   deleteNodesByNodeIdGrantsByGrantIdMutation,
+  deleteNodesByNodeIdMutation,
   getFabricManagedRelayOptions,
   getFabricNodeInvitationsPendingOptions,
   getFabricNodeInvitationsPendingQueryKey,
@@ -57,8 +58,13 @@ export function usePendingFabricNodeRequests(enabled: boolean) {
 }
 
 /** Nodes visible in this Fabric (`GET /nodes`). */
-export function useNodes() {
-  return useQuery({ ...getNodesOptions(), staleTime: 15_000 })
+export function useNodes(enabled = true) {
+  return useQuery({
+    ...getNodesOptions(),
+    enabled,
+    staleTime: 3_000,
+    refetchInterval: enabled ? 3_000 : false,
+  })
 }
 
 /** Resolve a Node display name from the cached directory (no extra request). */
@@ -193,6 +199,15 @@ export function useRevokeNodeGrant() {
           queryKey: getNodesByNodeIdGrantsQueryKey({ path: { nodeId: variables.path.nodeId } }),
         }),
       ]),
+  })
+}
+
+/** Permanently remove a remote Node and its Controller identity (owner-only). */
+export function useRemoveNode() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...deleteNodesByNodeIdMutation(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getNodesQueryKey() }),
   })
 }
 

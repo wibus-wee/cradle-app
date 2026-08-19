@@ -191,6 +191,42 @@ func (h *FabricHub) RevokeControllerNode(fabricID, nodeID, controllerID string) 
 	}
 }
 
+// RemoveNode terminates the device's persistent socket and every live link in
+// which it participates as either the target Node or the Controller.
+func (h *FabricHub) RemoveNode(fabricID, nodeID string) {
+	h.mu.Lock()
+	removedNode := h.nodes[nodeKey(fabricID, nodeID)]
+	delete(h.nodes, nodeKey(fabricID, nodeID))
+	links := []*fabricLink{}
+	peerNodes := map[*fabricLink]*fabricNode{}
+	for linkID, link := range h.links {
+		if link.fabricID != fabricID || (link.nodeID != nodeID && link.controllerID != nodeID) {
+			continue
+		}
+		links = append(links, link)
+		if link.nodeID != nodeID {
+			peerNodes[link] = h.nodes[nodeKey(fabricID, link.nodeID)]
+		}
+		delete(h.links, linkID)
+	}
+	h.mu.Unlock()
+
+	for _, link := range links {
+		if link.expires != nil {
+			link.expires.Stop()
+		}
+		if link.controller != nil {
+			link.controller.close(websocket.StatusPolicyViolation, "fabric_node_removed")
+		}
+		if peer := peerNodes[link]; peer != nil {
+			h.enqueueControl(peer.conn, link, FabricKindPeerClosed, []byte("fabric_node_removed"))
+		}
+	}
+	if removedNode != nil {
+		removedNode.conn.close(websocket.StatusPolicyViolation, "fabric_node_removed")
+	}
+}
+
 func (h *FabricHub) newConn(ws *websocket.Conn) *fabricConn {
 	return &fabricConn{
 		ws:        ws,

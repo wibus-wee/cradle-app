@@ -170,6 +170,14 @@ async function addLocalWorkspace(page: Page, node: FabricNodeProcess, path: stri
   return workspace!
 }
 
+async function openNodeSettings(page: Page): Promise<void> {
+  await page.goto(topology.webUrl)
+  await page.locator('[data-testid="settings-btn"]').click()
+  await expect(page.locator('[data-testid="settings-sidebar"]')).toBeVisible()
+  await page.locator('[data-testid="settings-nav-nodes"]').click()
+  await expect(page.locator('[data-testid="nodes-settings"]')).toBeVisible()
+}
+
 function initializeGitWorkspace(path: string, markerName: string, markerContent: string): void {
   writeFileSync(join(path, markerName), markerContent)
   execFileSync('git', ['init'], { cwd: path })
@@ -184,15 +192,7 @@ async function pairNodesThroughUi(): Promise<{
   desktopMembership: FabricMembership
   macbookMembership: FabricMembership
 }> {
-  const openNodeSettings = async (page: Page) => {
-    await page.goto(topology.webUrl)
-    await page.locator('[data-testid="settings-btn"]').click()
-    await expect(page.locator('[data-testid="settings-sidebar"]')).toBeVisible()
-    await page.locator('[data-testid="settings-nav-nodes"]').click()
-  }
-
   await openNodeSettings(desktopPage)
-  await expect(desktopPage.locator('[data-testid="nodes-settings"]')).toBeVisible()
   await desktopPage.locator('[data-testid="nodes-link-device"]').click()
   await desktopPage.locator('[data-testid="connect-start"]').click()
   const networkCode = desktopPage.locator('[data-testid="connect-network-code"]')
@@ -203,7 +203,6 @@ async function pairNodesThroughUi(): Promise<{
   await expect(desktopPage.getByRole('dialog')).toBeHidden()
 
   await openNodeSettings(macbookPage)
-  await expect(macbookPage.locator('[data-testid="nodes-settings"]')).toBeVisible()
   await macbookPage.locator('[data-testid="nodes-link-device"]').click()
   await macbookPage.locator('[data-testid="connect-join"]').click()
   await macbookPage.locator('[data-testid="connect-network-code-input"]').fill(code!)
@@ -234,6 +233,40 @@ async function pairNodesThroughUi(): Promise<{
   }, { timeout: 45_000 }).toBe(true)
 
   return { desktopMembership: desktopMembership!, macbookMembership: macbookMembership! }
+}
+
+async function rejoinMacbookThroughUi(previousNodeId: string): Promise<FabricMembership> {
+  const leave = await fetch(`${topology.macbook.serverUrl}/fabric`, { method: 'DELETE' })
+  expect(leave.status).toBe(204)
+
+  await openNodeSettings(desktopPage)
+  await desktopPage.locator('[data-testid="nodes-link-device"]').click()
+  const networkCode = desktopPage.locator('[data-testid="connect-network-code"]')
+  await expect(networkCode).toBeVisible()
+  const code = (await networkCode.textContent())?.trim()
+  expect(code).toBeTruthy()
+  await desktopPage.keyboard.press('Escape')
+
+  await macbookPage.reload()
+  await openNodeSettings(macbookPage)
+  await macbookPage.locator('[data-testid="nodes-link-device"]').click()
+  await macbookPage.locator('[data-testid="connect-join"]').click()
+  await macbookPage.locator('[data-testid="connect-network-code-input"]').fill(code!)
+  await macbookPage.locator('[data-testid="connect-join-submit"]').click()
+  await expect(macbookPage.locator('[data-testid="connect-invite-code"]')).toBeVisible()
+
+  const pending = desktopPage.locator('[data-testid^="node-pending-request-"]')
+  await expect(pending).toBeVisible({ timeout: 45_000 })
+  await pending.locator('[data-testid^="node-pending-approve-"]').click()
+
+  let membership: FabricMembership | null = null
+  await expect.poll(async () => {
+    membership = await json<FabricMembership | null>(`${topology.macbook.serverUrl}/fabric`)
+    return membership && membership.localNodeId !== previousNodeId
+      ? membership.localNodeId
+      : null
+  }, { timeout: 45_000 }).not.toBeNull()
+  return membership!
 }
 
 async function mountRemoteWorkspace(input: {
@@ -680,6 +713,44 @@ test.describe('Fabric two-node user journey', () => {
         ).catch(() => null)
         return content?.content ?? null
       }, { timeout: 60_000 }).toBe('owned by MacBook\n')
+    })
+
+    await test.step('show the same directory after re-enrollment and remove the stale device', async () => {
+      const staleNodeId = macbookMembership.localNodeId
+      macbookMembership = await rejoinMacbookThroughUi(staleNodeId)
+
+      await expect.poll(async () => {
+        const [desktopNodes, macbookNodes] = await Promise.all([
+          json<Array<{ nodeId: string }>>(`${topology.desktop.serverUrl}/nodes`),
+          json<Array<{ nodeId: string }>>(`${topology.macbook.serverUrl}/nodes`),
+        ])
+        return [
+          desktopNodes.map(node => node.nodeId).sort(),
+          macbookNodes.map(node => node.nodeId).sort(),
+        ]
+      }, { timeout: 45_000 }).toEqual([
+        [desktopMembership.localNodeId, macbookMembership.localNodeId, staleNodeId].sort(),
+        [desktopMembership.localNodeId, macbookMembership.localNodeId, staleNodeId].sort(),
+      ])
+
+      await openNodeSettings(desktopPage)
+      await desktopPage.locator(`[data-testid="remove-device-${staleNodeId}"]`).click()
+      await expect(desktopPage.locator('[data-testid="remove-device-confirm"]')).toBeVisible()
+      await desktopPage.locator('[data-testid="remove-device-confirm"]').click()
+
+      await expect.poll(async () => {
+        const [desktopNodes, macbookNodes] = await Promise.all([
+          json<Array<{ nodeId: string }>>(`${topology.desktop.serverUrl}/nodes`),
+          json<Array<{ nodeId: string }>>(`${topology.macbook.serverUrl}/nodes`),
+        ])
+        return [
+          desktopNodes.map(node => node.nodeId).sort(),
+          macbookNodes.map(node => node.nodeId).sort(),
+        ]
+      }, { timeout: 45_000 }).toEqual([
+        [desktopMembership.localNodeId, macbookMembership.localNodeId].sort(),
+        [desktopMembership.localNodeId, macbookMembership.localNodeId].sort(),
+      ])
     })
   })
 })

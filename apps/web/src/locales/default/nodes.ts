@@ -14,6 +14,7 @@ export default {
   'action.viewRequest': 'View request',
   'action.cancelJoin': 'Cancel join',
   'action.leaveFabric': 'Leave Fabric',
+  'action.removeDevice': 'Remove device',
   'action.approve': 'Approve',
   'action.reject': 'Reject',
 
@@ -115,6 +116,11 @@ export default {
   'leave.keep': 'Stay connected',
   'leave.confirm': 'Leave Fabric',
 
+  'removeDevice.title': 'Remove {{name}}?',
+  'removeDevice.description': 'This permanently disconnects the device, removes its Fabric identity and access, and closes active links. It must be linked again before it can reconnect.',
+  'removeDevice.keep': 'Keep device',
+  'removeDevice.confirm': 'Remove device',
+
   'access.title': 'Who can use {{name}}',
   'access.description': 'Linked devices you approve can open this computer’s workspaces and sessions.',
   'access.empty': 'Only you.',
@@ -134,6 +140,8 @@ export default {
   'toast.relayUnavailable': 'The Fabric service is not ready',
   'toast.codeInvalid': 'This code doesn’t look right',
   'toast.removeFailed': 'Couldn’t remove access',
+  'toast.deviceRemoved': 'Device removed',
+  'toast.deviceRemoveFailed': 'Couldn’t remove device',
   'toast.cancelFailed': 'Couldn’t cancel the join request',
   'toast.leaveFailed': 'Couldn’t leave this Fabric',
   'toast.approveFailed': 'Couldn’t approve this device',

@@ -95,6 +95,87 @@ func TestFabricHubMultiplexesIndependentControllerLinks(t *testing.T) {
 	}
 }
 
+func TestFabricHubRemoveNodeClosesNodeAndBothLinkDirections(t *testing.T) {
+	hub := NewFabricHub(FabricHubConfig{
+		MaxFrameBytes: 1024, MaxQueuedEnvelopes: 8, MaxQueuedBytes: 4096,
+	})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/node/{nodeId}", func(w http.ResponseWriter, r *http.Request) {
+		ws, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		_ = hub.HandleNode(r.Context(), "fab-a", r.PathValue("nodeId"), ws)
+	})
+	mux.HandleFunc("/controller/{linkId}", func(w http.ResponseWriter, r *http.Request) {
+		ws, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		controllerID := "node-b"
+		if r.PathValue("linkId") == "from-node-a" {
+			controllerID = "node-a"
+		}
+		_ = hub.HandleController(r.Context(), r.PathValue("linkId"), controllerID, ws)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	nodeA, _, err := websocket.Dial(t.Context(), wsURL+"/node/node-a", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nodeA.Close(websocket.StatusNormalClosure, "done")
+	nodeB, _, err := websocket.Dial(t.Context(), wsURL+"/node/node-b", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nodeB.Close(websocket.StatusNormalClosure, "done")
+	for deadline := time.Now().Add(time.Second); ; time.Sleep(10 * time.Millisecond) {
+		err = hub.OpenLink("fab-a", "node-a", "to-node-a", "node-b")
+		if !errors.Is(err, ErrNodeNotConnected) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("node-a did not become available")
+		}
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	for deadline := time.Now().Add(time.Second); ; time.Sleep(10 * time.Millisecond) {
+		err = hub.OpenLink("fab-a", "node-b", "from-node-a", "node-a")
+		if !errors.Is(err, ErrNodeNotConnected) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("node-b did not become available")
+		}
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	toNodeA := dialFabricController(t, wsURL, "to-node-a")
+	defer toNodeA.Close(websocket.StatusNormalClosure, "done")
+	fromNodeA := dialFabricController(t, wsURL, "from-node-a")
+	defer fromNodeA.Close(websocket.StatusNormalClosure, "done")
+
+	hub.RemoveNode("fab-a", "node-a")
+	if _, _, err := nodeA.Read(context.Background()); websocket.CloseStatus(err) != websocket.StatusPolicyViolation {
+		t.Fatalf("removed Node close = %v", err)
+	}
+	if _, _, err := toNodeA.Read(context.Background()); websocket.CloseStatus(err) != websocket.StatusPolicyViolation {
+		t.Fatalf("targeting Controller close = %v", err)
+	}
+	if _, _, err := fromNodeA.Read(context.Background()); websocket.CloseStatus(err) != websocket.StatusPolicyViolation {
+		t.Fatalf("removed Controller close = %v", err)
+	}
+	closed := readFabricFrame(t, nodeB)
+	if closed.LinkID != "from-node-a" || closed.Kind != FabricKindPeerClosed {
+		t.Fatalf("remaining Node peer close = %#v", closed)
+	}
+}
+
 func dialFabricController(t *testing.T, baseURL, linkID string) *websocket.Conn {
 	t.Helper()
 	ws, _, err := websocket.Dial(t.Context(), baseURL+"/controller/"+linkID, nil)

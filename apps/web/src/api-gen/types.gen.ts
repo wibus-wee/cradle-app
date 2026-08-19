@@ -3153,6 +3153,22 @@ export type GetNodesResponses = {
 
 export type GetNodesResponse = GetNodesResponses[keyof GetNodesResponses];
 
+export type DeleteNodesByNodeIdData = {
+    body?: never;
+    path: {
+        nodeId: string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}';
+};
+
+export type DeleteNodesByNodeIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
 export type GetNodesByNodeIdData = {
     body?: never;
     path: {

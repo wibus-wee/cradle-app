@@ -4,6 +4,7 @@ import {
   CloseLine as RejectIcon,
   ComputerLine as ComputerIcon,
   CopyLine as CopyIcon,
+  Delete2Line as RemoveIcon,
   Link3Line as LinkIcon,
   Refresh1Line as RefreshIcon,
   SafeShieldLine as ApprovalIcon,
@@ -11,7 +12,7 @@ import {
   TimeLine as PendingIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Badge } from '~/components/ui/badge'
@@ -23,6 +24,7 @@ import { cn } from '~/lib/cn'
 
 import { CancelPendingEnrollmentDialog } from './cancel-pending-enrollment-dialog'
 import { LeaveFabricDialog } from './leave-fabric-dialog'
+import { RemoveDeviceDialog } from './remove-device-dialog'
 import type { FabricMembership, FabricNode, PendingFabricEnrollment, PendingFabricNodeRequest } from './types'
 
 export interface NodesSettingsViewProps {
@@ -42,11 +44,13 @@ export interface NodesSettingsViewProps {
   networkCode: string | null
   canManageAccess: boolean
   reconnectingNodeId: string | null
+  removingNodeId: string | null
   cancellingEnrollment: boolean
   leavingFabric: boolean
   onLinkDevice: () => void
   onReconnect: (nodeId: string) => void
   onManageAccess: (nodeId: string) => void
+  onRemoveNode: (nodeId: string) => void
   onRefreshMembership: () => void
   onRefreshNodes: () => void
   onRefreshPendingRequests: () => void
@@ -74,11 +78,13 @@ export function NodesSettingsView({
   networkCode,
   canManageAccess,
   reconnectingNodeId,
+  removingNodeId,
   cancellingEnrollment,
   leavingFabric,
   onLinkDevice,
   onReconnect,
   onManageAccess,
+  onRemoveNode,
   onRefreshMembership,
   onRefreshNodes,
   onRefreshPendingRequests,
@@ -91,6 +97,13 @@ export function NodesSettingsView({
   const { t } = useTranslation('nodes')
   const [cancelOpen, setCancelOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
+  const [removeNode, setRemoveNode] = useState<FabricNode | null>(null)
+
+  useEffect(() => {
+    if (removeNode && !nodes.some(node => node.nodeId === removeNode.nodeId)) {
+      setRemoveNode(null)
+    }
+  }, [nodes, removeNode])
 
   return (
     <SettingsPage
@@ -305,6 +318,7 @@ export function NodesSettingsView({
                     canManageAccess={canManageAccess}
                     onReconnect={onReconnect}
                     onManageAccess={onManageAccess}
+                    onRemove={setRemoveNode}
                   />
                 )))}
           </SettingsGroup>
@@ -327,6 +341,16 @@ export function NodesSettingsView({
           onLeaveFabric()
           setLeaveOpen(false)
         }}
+      />
+      <RemoveDeviceDialog
+        node={removeNode}
+        busy={removeNode !== null && removingNodeId === removeNode.nodeId}
+        onOpenChange={(open) => {
+          if (!open && removingNodeId === null) {
+            setRemoveNode(null)
+          }
+        }}
+        onConfirm={onRemoveNode}
       />
     </SettingsPage>
   )
@@ -443,6 +467,7 @@ function DeviceSettingsRow({
   canManageAccess,
   onReconnect,
   onManageAccess,
+  onRemove,
 }: {
   node: FabricNode
   isThisDevice: boolean
@@ -450,6 +475,7 @@ function DeviceSettingsRow({
   canManageAccess: boolean
   onReconnect: (nodeId: string) => void
   onManageAccess: (nodeId: string) => void
+  onRemove: (node: FabricNode) => void
 }) {
   const { t } = useTranslation('nodes')
   const online = node.status === 'online'
@@ -476,7 +502,7 @@ function DeviceSettingsRow({
           {!online && lastSeen ? ` · ${t('popover.lastSeen', { time: lastSeen })}` : ''}
         </p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         {!online && (
           <Button
             type="button"
@@ -493,6 +519,18 @@ function DeviceSettingsRow({
           <Button type="button" variant="ghost" size="sm" onClick={() => onManageAccess(node.nodeId)}>
             <SettingsIcon className="size-3.5" aria-hidden />
             {t('action.manageAccess')}
+          </Button>
+        )}
+        {canManageAccess && !isThisDevice && (
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={() => onRemove(node)}
+            data-testid={`remove-device-${node.nodeId}`}
+          >
+            <RemoveIcon className="size-3.5" aria-hidden />
+            {t('action.removeDevice')}
           </Button>
         )}
       </div>

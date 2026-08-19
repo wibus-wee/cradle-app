@@ -23,6 +23,7 @@ type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
 interface FakeDirectoryState {
   requests: string[]
   revokedGrants: string[]
+  removedNodes: string[]
   approvedRequestBodies: Array<{
     nodeCertificate: MembershipCertificate
     controllerCertificate: MembershipCertificate
@@ -121,6 +122,13 @@ function startFakeDirectory(state: FakeDirectoryState): Promise<{ baseUrl: strin
       response.end()
       return
     }
+    const removeNodeMatch = /^\/v1\/nodes\/(?<nodeId>[\w-]+)$/u.exec(url.pathname)
+    if (removeNodeMatch && request.method === 'DELETE') {
+      state.removedNodes.push(removeNodeMatch.groups!.nodeId!)
+      response.writeHead(204)
+      response.end()
+      return
+    }
     writeJson(404, { error: 'not found' })
   })
   return new Promise((resolve) => {
@@ -174,7 +182,7 @@ function seedFabricMembership(relayUrl: string): void {
 describe('fabric node directory routes', () => {
   let dataDir = ''
   let directory: { baseUrl: string, close: () => Promise<void> } | undefined
-  const state: FakeDirectoryState = { requests: [], revokedGrants: [], approvedRequestBodies: [], rejectedRequests: [] }
+  const state: FakeDirectoryState = { requests: [], revokedGrants: [], removedNodes: [], approvedRequestBodies: [], rejectedRequests: [] }
   const previousDataDir = process.env.CRADLE_DATA_DIR
   const previousCredentialSecret = process.env.CRADLE_CREDENTIAL_SECRET
 
@@ -203,6 +211,7 @@ describe('fabric node directory routes', () => {
     process.env.CRADLE_CREDENTIAL_SECRET = 'fabric-node-grants-test-secret'
     state.requests = []
     state.revokedGrants = []
+    state.removedNodes = []
     state.approvedRequestBodies = []
     state.rejectedRequests = []
     directory = await startFakeDirectory(state)
@@ -274,6 +283,22 @@ describe('fabric node directory routes', () => {
     const response = await server.handle(new Request('http://localhost/nodes/node-a/grants/grant-1', { method: 'DELETE' }))
     expect(response.status).toBe(204)
     expect(state.revokedGrants).toEqual(['grant-1'])
+  })
+
+  it('permanently removes a remote device through the owner proof', async () => {
+    const server = await setup()
+    const response = await server.handle(new Request('http://localhost/nodes/node-b', { method: 'DELETE' }))
+    expect(response.status).toBe(204)
+    expect(state.removedNodes).toEqual(['node-b'])
+    expect(state.requests).toContain('DELETE /v1/nodes/node-b')
+  })
+
+  it('does not let the owner remove its current local Node', async () => {
+    const server = await setup()
+    const response = await server.handle(new Request('http://localhost/nodes/node-local', { method: 'DELETE' }))
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'fabric_local_node_cannot_be_removed' })
+    expect(state.removedNodes).toEqual([])
   })
 
   it('grant routes require a Fabric membership', async () => {
