@@ -38,6 +38,7 @@ import { registerMessageBlobBackfillMaintenance } from './modules/chat-runtime/m
 import { registerMessageSteerSplitBackfillMaintenance } from './modules/chat-runtime/message-steer-split-backfill'
 import { runRegistry } from './modules/chat-runtime/run-registry'
 import { flushRunSnapshotWriteBehind } from './modules/chat-runtime/run-snapshot-journal'
+import { registerChatRuntimeSessionLifecycleHandlers } from './modules/chat-runtime/runtime'
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
 import { ClaudeUsageReconciliationScheduler } from './modules/chat-runtime-providers/claude-agent/usage-reconciliation-scheduler'
 import { readCodexChatgptAuthCredential } from './modules/chat-runtime-providers/codex/app-server/chatgpt-auth'
@@ -168,6 +169,7 @@ async function runBootstrapPhase<T>(
 }
 
 export async function createServerContractApp(options: CreateServerContractAppOptions = {}) {
+  registerChatRuntimeSessionLifecycleHandlers()
   configureProviderExtensionHost({
     findActiveRunId: (providerTargetId) => {
       const activeRun = runRegistry.listActiveRuns()
