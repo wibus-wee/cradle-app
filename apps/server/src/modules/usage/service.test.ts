@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../../infra'
 import type { CodexThreadUsageDiagnostics } from '../chat-runtime-providers/codex/app-server/account-diagnostics'
-import { getSessionUsage } from './service'
+import { getSessionUsageWithProviderBillingCheck } from './service'
 
 const previousDataDir = process.env.CRADLE_DATA_DIR
 let dataDir = ''
@@ -28,7 +28,7 @@ afterEach(() => {
   }
 })
 
-describe('getSessionUsage', () => {
+describe('getSessionUsageWithProviderBillingCheck', () => {
   it('returns Codex thread usage as a non-ledger billing check', async () => {
     db().insert(providerTargets).values({
       id: 'codex-target',
@@ -81,7 +81,7 @@ describe('getSessionUsage', () => {
       }],
     }))
 
-    const result = await getSessionUsage('session-1', readThreadUsage)
+    const result = await getSessionUsageWithProviderBillingCheck('session-1', readThreadUsage)
 
     expect(result).toMatchObject({
       totalTokens: 100,

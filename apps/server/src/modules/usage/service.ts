@@ -354,10 +354,7 @@ export interface SessionProviderBillingCheck {
   groups: CodexThreadUsageDiagnostics['groups']
 }
 
-export async function getSessionUsage(
-  sessionId: string,
-  readThreadUsage: typeof readCodexThreadUsage = readCodexThreadUsage,
-): Promise<{
+export interface SessionUsage {
   totalTokens: number
   promptTokens: number
   completionTokens: number
@@ -370,7 +367,9 @@ export async function getSessionUsage(
     turnCount: number
   }>
   providerBillingCheck: SessionProviderBillingCheck | null
-}> {
+}
+
+export function getSessionUsage(sessionId: string): SessionUsage {
   const row = db().get<{
     prompt_tokens: number
     completion_tokens: number
@@ -405,7 +404,7 @@ export async function getSessionUsage(
     ORDER BY total_tokens DESC, model_id ASC
   `)
 
-  const ledgerUsage = {
+  return {
     totalTokens: row?.total_tokens ?? 0,
     promptTokens: row?.prompt_tokens ?? 0,
     completionTokens: row?.completion_tokens ?? 0,
@@ -417,8 +416,15 @@ export async function getSessionUsage(
       totalTokens: model.total_tokens,
       turnCount: model.turn_count,
     })),
+    providerBillingCheck: null,
   }
+}
 
+export async function getSessionUsageWithProviderBillingCheck(
+  sessionId: string,
+  readThreadUsage: typeof readCodexThreadUsage = readCodexThreadUsage,
+): Promise<SessionUsage> {
+  const ledgerUsage = getSessionUsage(sessionId)
   return {
     ...ledgerUsage,
     providerBillingCheck: await readSessionProviderBillingCheck(
