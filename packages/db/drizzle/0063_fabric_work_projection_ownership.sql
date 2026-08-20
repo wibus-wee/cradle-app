@@ -9,9 +9,4 @@ CREATE TABLE `node_work_links` (
 );
 --> statement-breakpoint
 CREATE INDEX `node_work_links_node_id_idx` ON `node_work_links` (`node_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `node_work_links_node_remote_work_unique` ON `node_work_links` (`node_id`,`remote_work_id`);--> statement-breakpoint
-DROP TABLE `relay_host_enrollments`;--> statement-breakpoint
-DROP TABLE `relay_servers`;--> statement-breakpoint
-DROP TABLE `remote_hosts`;--> statement-breakpoint
-DROP TABLE `remote_session_links`;--> statement-breakpoint
-ALTER TABLE `node_session_links` ADD `projection_kind` text DEFAULT 'controller-created' NOT NULL;
+CREATE UNIQUE INDEX `node_work_links_node_remote_work_unique` ON `node_work_links` (`node_id`,`remote_work_id`);

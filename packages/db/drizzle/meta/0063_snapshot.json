@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f4757f79-a032-448c-97a6-b424dc35e29a",
-  "prevId": "d6ff8c7b-fbfc-4b32-8eb7-f239e1e46934",
+  "id": "a16fa6f2-8f15-4c34-a2bd-89c5cc06b17e",
+  "prevId": "feda1558-11e1-410a-89e7-a22abc967252",
   "tables": {
     "acp_agents": {
       "name": "acp_agents",
@@ -15699,6 +15699,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(unixepoch())"
+        },
+        "projection_kind": {
+          "name": "projection_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'controller-created'"
         }
       },
       "indexes": {
@@ -17392,6 +17400,90 @@
           "tableTo": "workspaces",
           "columnsFrom": [
             "source_workspace_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "node_work_links": {
+      "name": "node_work_links",
+      "columns": {
+        "local_work_id": {
+          "name": "local_work_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remote_work_id": {
+          "name": "remote_work_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remote_workspace_id": {
+          "name": "remote_workspace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "node_work_links_node_id_idx": {
+          "name": "node_work_links_node_id_idx",
+          "columns": [
+            "node_id"
+          ],
+          "isUnique": false
+        },
+        "node_work_links_node_remote_work_unique": {
+          "name": "node_work_links_node_remote_work_unique",
+          "columns": [
+            "node_id",
+            "remote_work_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "node_work_links_local_work_id_works_id_fk": {
+          "name": "node_work_links_local_work_id_works_id_fk",
+          "tableFrom": "node_work_links",
+          "tableTo": "works",
+          "columnsFrom": [
+            "local_work_id"
           ],
           "columnsTo": [
             "id"
