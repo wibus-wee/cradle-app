@@ -147,6 +147,11 @@ export const runtimeModelUiSlotStateSchema = t.Object({
   modelLabel: t.Union([t.String(), t.Null()]),
   modelProvider: t.Union([t.String(), t.Null()]),
   serviceTier: t.Union([t.String(), t.Null()]),
+  serviceTiers: t.Array(t.Object({
+    id: t.String(),
+    name: t.String(),
+    description: t.String(),
+  })),
   supportsImages: t.Union([t.Boolean(), t.Null()]),
   supportsWebSearch: t.Union([t.Boolean(), t.Null()]),
   supportsNamespaceTools: t.Union([t.Boolean(), t.Null()]),

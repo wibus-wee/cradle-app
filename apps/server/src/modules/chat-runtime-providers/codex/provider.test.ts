@@ -121,6 +121,9 @@ class FakeCodexAppServerClient {
               { reasoningEffort: 'medium', description: 'Medium' },
               { reasoningEffort: 'high', description: 'High' },
             ],
+            serviceTiers: [
+              { id: 'fast', name: 'Fast', description: 'Fast responses' },
+            ],
           },
         ],
         nextCursor: null,
@@ -2662,6 +2665,7 @@ describe('codexProvider app-server integration', () => {
         modelLabel: 'GPT-5 Codex',
         modelProvider: 'openai',
         serviceTier: 'priority',
+        serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Fast responses' }],
         supportsImages: true,
         supportsWebSearch: true,
         supportsNamespaceTools: true,
@@ -4365,6 +4369,7 @@ describe('codexProvider app-server integration', () => {
         runtimeSettings: {
           accessMode: 'approval-required',
           interactionMode: 'plan',
+          serviceTier: 'fast',
         },
       },
     })
@@ -4384,6 +4389,7 @@ describe('codexProvider app-server integration', () => {
       params: expect.objectContaining({
         approvalPolicy: 'untrusted',
         sandbox: 'read-only',
+        serviceTier: 'fast',
         config: expect.objectContaining({
           approval_policy: 'untrusted',
           sandbox_mode: 'read-only',
@@ -4395,6 +4401,7 @@ describe('codexProvider app-server integration', () => {
       params: expect.objectContaining({
         approvalPolicy: 'untrusted',
         sandboxPolicy: expect.objectContaining({ type: 'readOnly' }),
+        serviceTier: 'fast',
         collaborationMode: {
           mode: 'plan',
           settings: {
@@ -4412,6 +4419,7 @@ describe('codexProvider app-server integration', () => {
       settings: {
         accessMode: 'full-access',
         interactionMode: 'default',
+        serviceTier: 'fast',
       },
     })
 
@@ -4421,6 +4429,7 @@ describe('codexProvider app-server integration', () => {
         threadId: 'codex-thread-1',
         approvalPolicy: 'never',
         sandboxPolicy: { type: 'dangerFullAccess' },
+        serviceTier: 'fast',
         collaborationMode: {
           mode: 'default',
           settings: {

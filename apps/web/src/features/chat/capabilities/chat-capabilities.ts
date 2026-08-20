@@ -175,6 +175,7 @@ export interface ChatRuntimeModelUiSlotState {
   modelLabel: string | null
   modelProvider: string | null
   serviceTier: string | null
+  serviceTiers: Array<{ id: string, name: string, description: string }>
   supportsImages: boolean | null
   supportsWebSearch: boolean | null
   supportsNamespaceTools: boolean | null

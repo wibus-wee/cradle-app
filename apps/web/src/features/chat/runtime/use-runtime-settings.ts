@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { DEFAULT_CLAUDE_AGENT_ALIASES } from '~/features/agent-runtime/claude-agent-config'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 
+import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
 import type { RuntimeSettings } from '../commands/chat-response-command'
 import type {
   ChatRuntimeSettingsResponse,
@@ -84,6 +85,7 @@ export function useRuntimeSettings(sessionId: string | null, active = true): Cha
     onSuccess: (response) => {
       queryClient.setQueryData(runtimeSettingsQueryKey(response.sessionId), response)
       void queryClient.invalidateQueries({ queryKey: ['chat', 'runtime-session-status', response.sessionId] })
+      void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(response.sessionId) })
     },
   })
 

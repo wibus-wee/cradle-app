@@ -62,6 +62,7 @@ import type { ChatComposerSlashCommand } from './slash-commands/chat-slash-comma
 import {
   CRADLE_APPSHOT_SLASH_ACTION_ID,
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
 } from './slash-commands/chat-slash-commands'
 import { ThreadHandoffMenu } from './thread-handoff-menu'
@@ -590,6 +591,20 @@ export function ChatView({
       if (command.action.actionId === RUNTIME_USAGE_COMMAND_ACTION_ID) {
         setUsageSlotSessionId(sessionId)
         return { insertText: '' }
+      }
+      if (command.action.actionId === RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID) {
+        try {
+          await runtimeSettings.update({ serviceTier: 'fast' })
+          return { insertText: '' }
+        }
+        catch (error) {
+          toastManager.add({
+            type: 'error',
+            title: 'Fast mode update failed',
+            description: error instanceof Error ? error.message : 'Unknown runtime settings error.',
+          })
+          return
+        }
       }
       if (command.action.actionId !== CRADLE_APPSHOT_SLASH_ACTION_ID) {
         return

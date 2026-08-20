@@ -1,5 +1,6 @@
 import {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
 } from '@cradle/chat-runtime-contracts'
 
@@ -135,6 +136,7 @@ export function resolveSlashCommandPanelSection(
 export const CRADLE_APPSHOT_SLASH_ACTION_ID = 'capture-appshot'
 export {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
 }
 const TOKEN_COUNT_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })

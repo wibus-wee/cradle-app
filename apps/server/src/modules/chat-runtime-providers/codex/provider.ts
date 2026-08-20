@@ -1173,6 +1173,7 @@ export class CodexProvider implements ChatRuntime {
       ? readLiveSideForkThreadStart(input.runtimeSession, context.effectiveModel)
       : await startOrResumeThread(client, hostLease.resource, input.runtimeSession, {
           model: context.effectiveModel,
+          serviceTier: readCodexLikeRuntimeSettings(context.runtimeSettings).serviceTier,
           cwd: context.runtimeContext.cwd,
           runtimeWorkspaceRoots: context.runtimeContext.runtimeWorkspaceRoots,
           approvalPolicy: context.runtimeAccess?.approvalPolicy ?? context.config.approvalPolicy,
@@ -1323,6 +1324,7 @@ export class CodexProvider implements ChatRuntime {
     }
 
     const collaborationModeModel = context.effectiveModel ?? context.config.model
+    const { serviceTier } = readCodexLikeRuntimeSettings(context.runtimeSettings)
     const turnResponse = await client.request('turn/start', {
       threadId,
       input: context.userInput,
@@ -1343,6 +1345,7 @@ export class CodexProvider implements ChatRuntime {
           }
         : {}),
       model: context.effectiveModel,
+      ...(serviceTier ? { serviceTier } : {}),
       effort: context.requestedReasoningEffort,
     }) as TurnResponse
     turnId = turnResponse.turn?.id ?? turnResponse.turnId ?? null
@@ -1618,10 +1621,12 @@ export class CodexProvider implements ChatRuntime {
       additionalDirectories: config.additionalDirectories,
     })
     const collaborationModeModel = entry.modelId ?? snapshot.models.currentModelId ?? config.model
+    const { serviceTier } = readCodexLikeRuntimeSettings(input.settings)
     await entry.client.request('thread/settings/update', {
       threadId: entry.threadId,
       approvalPolicy: access.approvalPolicy,
       sandboxPolicy: access.sandboxPolicy,
+      ...(serviceTier ? { serviceTier } : {}),
       ...(collaborationModeModel
         ? {
             collaborationMode: buildCodexCollaborationMode(input.settings, {
