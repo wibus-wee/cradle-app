@@ -25,6 +25,27 @@ export type PostAuthWebsocketTicketResponses = {
 
 export type PostAuthWebsocketTicketResponse = PostAuthWebsocketTicketResponses[keyof PostAuthWebsocketTicketResponses];
 
+export type PostAuthResourceTicketData = {
+    body: {
+        path: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/auth/resource-ticket';
+};
+
+export type PostAuthResourceTicketResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ticket: string;
+        expiresAt: number;
+    };
+};
+
+export type PostAuthResourceTicketResponse = PostAuthResourceTicketResponses[keyof PostAuthResourceTicketResponses];
+
 export type PostAuthBrowserSessionData = {
     body?: never;
     path?: never;
@@ -326,6 +347,8 @@ export type GetPreferencesNetworkResponses = {
         customProxyUrl: string | null;
         inbound?: {
             serverAccessMode: 'local' | 'network';
+            relaySource: 'managed' | 'external';
+            relayUrl: string | null;
             managedRelayAccessMode: 'local' | 'network';
             managedRelayPublicUrl: string | null;
         };
@@ -341,6 +364,8 @@ export type PutPreferencesNetworkData = {
         customProxyUrl: string | null;
         inbound?: {
             serverAccessMode: 'local' | 'network';
+            relaySource: 'managed' | 'external';
+            relayUrl: string | null;
             managedRelayAccessMode: 'local' | 'network';
             managedRelayPublicUrl: string | null;
         };
@@ -461,7 +486,7 @@ export type GetWorkspacesResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -487,7 +512,7 @@ export type PostWorkspacesData = {
     body: {
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -513,7 +538,7 @@ export type PostWorkspacesErrors = {
         message: string;
         details: {
             locator: {
-                hostId: string;
+                nodeId: string;
                 path: string;
                 kind?: 'project' | 'managed-worktree';
                 sourceWorkspaceId?: string | null;
@@ -532,7 +557,7 @@ export type PostWorkspacesResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -572,7 +597,7 @@ export type PostWorkspacesFromDirectoryErrors = {
         message: string;
         details: {
             locator: {
-                hostId: string;
+                nodeId: string;
                 path: string;
                 kind?: 'project' | 'managed-worktree';
                 sourceWorkspaceId?: string | null;
@@ -591,7 +616,7 @@ export type PostWorkspacesFromDirectoryResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -668,7 +693,7 @@ export type PostWorkspacesMultiFolderErrors = {
         message: string;
         details: {
             locator: {
-                hostId: string;
+                nodeId: string;
                 path: string;
                 kind?: 'project' | 'managed-worktree';
                 sourceWorkspaceId?: string | null;
@@ -687,7 +712,7 @@ export type PostWorkspacesMultiFolderResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -727,7 +752,7 @@ export type PostWorkspacesMultiFolderFromConfigErrors = {
         message: string;
         details: {
             locator: {
-                hostId: string;
+                nodeId: string;
                 path: string;
                 kind?: 'project' | 'managed-worktree';
                 sourceWorkspaceId?: string | null;
@@ -746,7 +771,7 @@ export type PostWorkspacesMultiFolderFromConfigResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -772,7 +797,7 @@ export type GetWorkspacesResolveData = {
     body?: never;
     path?: never;
     query: {
-        hostId: string;
+        nodeId: string;
         path: string;
     };
     url: '/workspaces/resolve';
@@ -786,7 +811,7 @@ export type GetWorkspacesResolveResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -1145,7 +1170,7 @@ export type GetWorkspacesByWorkspaceIdResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -1187,7 +1212,7 @@ export type PatchWorkspacesByWorkspaceIdResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -1228,7 +1253,7 @@ export type PatchWorkspacesByWorkspaceIdLocationResponses = {
         id: string;
         name: string;
         locator: {
-            hostId: string;
+            nodeId: string;
             path: string;
             kind?: 'project' | 'managed-worktree';
             sourceWorkspaceId?: string | null;
@@ -1311,6 +1336,24 @@ export type PostWorkspacesByWorkspaceIdMigrateResponses = {
 };
 
 export type PostWorkspacesByWorkspaceIdMigrateResponse = PostWorkspacesByWorkspaceIdMigrateResponses[keyof PostWorkspacesByWorkspaceIdMigrateResponses];
+
+export type GetCodeActivitySessionsBySessionIdEventsData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/code-activity/sessions/{sessionId}/events';
+};
+
+export type GetCodeActivitySessionsBySessionIdEventsResponses = {
+    /**
+     * Server-sent Code Activity source events.
+     */
+    200: string;
+};
+
+export type GetCodeActivitySessionsBySessionIdEventsResponse = GetCodeActivitySessionsBySessionIdEventsResponses[keyof GetCodeActivitySessionsBySessionIdEventsResponses];
 
 export type GetFilesystemBrowseData = {
     body?: never;
@@ -2176,6 +2219,7 @@ export type GetProviderTargetsResponses = {
         sourceKey: string | null;
         externalRecordId: string | null;
         sourceFingerprint: string | null;
+        effectiveProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
         createdAt: number;
         updatedAt: number;
     }>;
@@ -2239,6 +2283,7 @@ export type PutProviderTargetsByProviderTargetIdResponses = {
         sourceKey: string | null;
         externalRecordId: string | null;
         sourceFingerprint: string | null;
+        effectiveProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
         createdAt: number;
         updatedAt: number;
     };
@@ -2717,760 +2762,568 @@ export type PostProviderTargetsByProviderTargetIdTestResponses = {
 
 export type PostProviderTargetsByProviderTargetIdTestResponse = PostProviderTargetsByProviderTargetIdTestResponses[keyof PostProviderTargetsByProviderTargetIdTestResponses];
 
-export type GetRelayServersData = {
+export type GetProviderTargetsByProviderTargetIdExtensionsData = {
     body?: never;
-    path?: never;
+    path: {
+        providerTargetId: string;
+    };
     query?: never;
-    url: '/relay-servers';
+    url: '/provider-targets/{providerTargetId}/extensions/';
 };
 
-export type GetRelayServersResponses = {
+export type GetProviderTargetsByProviderTargetIdExtensionsResponses = {
     /**
      * Response for status 200
      */
     200: Array<{
         id: string;
-        displayName: string;
-        relayUrl: string;
-        enabled: boolean;
-        isDefault: boolean;
-        createdAt: number;
+        providerTargetId: string;
+        extensionOwner: string;
+        extensionId: string;
+        extensionKey: string;
+        label: string;
+        description: string | null;
+        applicable: boolean;
+        unavailableReason: string | null;
+        desiredEnabled: boolean;
+        status: 'disabled' | 'enabling' | 'enabled' | 'disabling' | 'suspended' | 'error';
+        credentialStrategy: 'borrowed-static' | 'exclusive-refreshable' | null;
+        credentialOwner: 'host' | 'extension';
+        providerKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        addedProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        lastError: string | null;
         updatedAt: number;
     }>;
 };
 
-export type GetRelayServersResponse = GetRelayServersResponses[keyof GetRelayServersResponses];
+export type GetProviderTargetsByProviderTargetIdExtensionsResponse = GetProviderTargetsByProviderTargetIdExtensionsResponses[keyof GetProviderTargetsByProviderTargetIdExtensionsResponses];
 
-export type PostRelayServersData = {
+export type PutProviderTargetsByProviderTargetIdExtensionsData = {
     body: {
-        id?: string;
-        displayName: string;
-        relayUrl: string;
-        enabled?: boolean;
-        isDefault?: boolean;
+        owner: string;
+        id: string;
+        enabled: boolean;
     };
-    path?: never;
+    path: {
+        providerTargetId: string;
+    };
     query?: never;
-    url: '/relay-servers';
+    url: '/provider-targets/{providerTargetId}/extensions/';
 };
 
-export type PostRelayServersResponses = {
+export type PutProviderTargetsByProviderTargetIdExtensionsResponses = {
     /**
      * Response for status 200
      */
     200: {
         id: string;
-        displayName: string;
-        relayUrl: string;
-        enabled: boolean;
-        isDefault: boolean;
-        createdAt: number;
+        providerTargetId: string;
+        extensionOwner: string;
+        extensionId: string;
+        extensionKey: string;
+        label: string;
+        description: string | null;
+        applicable: boolean;
+        unavailableReason: string | null;
+        desiredEnabled: boolean;
+        status: 'disabled' | 'enabling' | 'enabled' | 'disabling' | 'suspended' | 'error';
+        credentialStrategy: 'borrowed-static' | 'exclusive-refreshable' | null;
+        credentialOwner: 'host' | 'extension';
+        providerKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        addedProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        lastError: string | null;
         updatedAt: number;
     };
 };
 
-export type PostRelayServersResponse = PostRelayServersResponses[keyof PostRelayServersResponses];
+export type PutProviderTargetsByProviderTargetIdExtensionsResponse = PutProviderTargetsByProviderTargetIdExtensionsResponses[keyof PutProviderTargetsByProviderTargetIdExtensionsResponses];
 
-export type DeleteRelayServersByRelayServerIdData = {
+export type DeleteFabricData = {
     body?: never;
-    path: {
-        relayServerId: string;
-    };
+    path?: never;
     query?: never;
-    url: '/relay-servers/{relayServerId}';
+    url: '/fabric';
 };
 
-export type DeleteRelayServersByRelayServerIdResponses = {
+export type DeleteFabricResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
+export type GetFabricData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric';
+};
+
+export type GetFabricResponses = {
     /**
      * Response for status 200
      */
     200: {
-        ok: boolean;
-    };
+        fabricId: string;
+        relayUrl: string;
+        localNodeId: string;
+        role: string;
+        ownerPubkey: string;
+        nodeCertificate: unknown;
+        controllerCertificate?: unknown;
+        createdAt: number;
+        updatedAt: number;
+    } | null;
 };
 
-export type DeleteRelayServersByRelayServerIdResponse = DeleteRelayServersByRelayServerIdResponses[keyof DeleteRelayServersByRelayServerIdResponses];
+export type GetFabricResponse = GetFabricResponses[keyof GetFabricResponses];
 
-export type PatchRelayServersByRelayServerIdData = {
+export type PostFabricData = {
     body: {
+        relayUrl: string;
         displayName?: string;
-        relayUrl?: string;
-        enabled?: boolean;
-        isDefault?: boolean;
+        platform?: string;
+        version?: string;
+        capabilities?: Array<string>;
     };
-    path: {
-        relayServerId: string;
-    };
+    path?: never;
     query?: never;
-    url: '/relay-servers/{relayServerId}';
+    url: '/fabric';
 };
 
-export type PatchRelayServersByRelayServerIdResponses = {
+export type PostFabricResponses = {
     /**
      * Response for status 200
      */
     200: {
-        id: string;
-        displayName: string;
+        fabricId: string;
         relayUrl: string;
-        enabled: boolean;
-        isDefault: boolean;
+        localNodeId: string;
+        role: string;
+        ownerPubkey: string;
+        nodeCertificate: unknown;
+        controllerCertificate?: unknown;
         createdAt: number;
         updatedAt: number;
     };
 };
 
-export type PatchRelayServersByRelayServerIdResponse = PatchRelayServersByRelayServerIdResponses[keyof PatchRelayServersByRelayServerIdResponses];
+export type PostFabricResponse = PostFabricResponses[keyof PostFabricResponses];
 
-export type GetRelayTransportHostEnrollmentsData = {
+export type GetFabricManagedRelayData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/relay-transport/host-enrollments';
+    url: '/fabric/managed-relay';
 };
 
-export type GetRelayTransportHostEnrollmentsResponses = {
+export type GetFabricManagedRelayResponses = {
     /**
      * Response for status 200
      */
-    200: Array<{
-        id: string;
-        displayName: string;
+    200: {
         relayUrl: string;
-        roomId: string;
-        hostPubkey: string;
-        hostKeyFingerprint: string;
-        pinnedControllerPubkey: string | null;
-        status: 'pending' | 'paired' | 'offline';
-        pairable: boolean;
-        lastError: string | null;
-        createdAt: number;
-        updatedAt: number;
-        live: {
-            connected: boolean;
-            controllerName: string | null;
-            lastReadyAt: number | null;
-            activeStreams: number;
-        } | null;
-    }>;
+        accessMode: 'local' | 'network' | 'external';
+    } | null;
 };
 
-export type GetRelayTransportHostEnrollmentsResponse = GetRelayTransportHostEnrollmentsResponses[keyof GetRelayTransportHostEnrollmentsResponses];
+export type GetFabricManagedRelayResponse = GetFabricManagedRelayResponses[keyof GetFabricManagedRelayResponses];
 
-export type PostRelayTransportHostEnrollmentsData = {
+export type PostFabricNodeInvitationsData = {
     body: {
-        id?: string;
-        displayName: string;
         relayUrl: string;
-    };
-    path?: never;
-    query?: never;
-    url: '/relay-transport/host-enrollments';
-};
-
-export type PostRelayTransportHostEnrollmentsResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        displayName: string;
-        relayUrl: string;
-        roomId: string;
-        hostPubkey: string;
-        hostKeyFingerprint: string;
-        pinnedControllerPubkey: string | null;
-        status: 'pending' | 'paired' | 'offline';
-        pairable: boolean;
-        lastError: string | null;
-        createdAt: number;
-        updatedAt: number;
-        live: {
-            connected: boolean;
-            controllerName: string | null;
-            lastReadyAt: number | null;
-            activeStreams: number;
-        } | null;
-        pairingString: string;
-        pairingCodeExpiresAt: string | null;
-    };
-};
-
-export type PostRelayTransportHostEnrollmentsResponse = PostRelayTransportHostEnrollmentsResponses[keyof PostRelayTransportHostEnrollmentsResponses];
-
-export type DeleteRelayTransportHostEnrollmentsByEnrollmentIdData = {
-    body?: never;
-    path: {
-        enrollmentId: string;
-    };
-    query?: never;
-    url: '/relay-transport/host-enrollments/{enrollmentId}';
-};
-
-export type DeleteRelayTransportHostEnrollmentsByEnrollmentIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteRelayTransportHostEnrollmentsByEnrollmentIdResponse = DeleteRelayTransportHostEnrollmentsByEnrollmentIdResponses[keyof DeleteRelayTransportHostEnrollmentsByEnrollmentIdResponses];
-
-export type GetRelayTransportHostEnrollmentsByEnrollmentIdData = {
-    body?: never;
-    path: {
-        enrollmentId: string;
-    };
-    query?: never;
-    url: '/relay-transport/host-enrollments/{enrollmentId}';
-};
-
-export type GetRelayTransportHostEnrollmentsByEnrollmentIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        displayName: string;
-        relayUrl: string;
-        roomId: string;
-        hostPubkey: string;
-        hostKeyFingerprint: string;
-        pinnedControllerPubkey: string | null;
-        status: 'pending' | 'paired' | 'offline';
-        pairable: boolean;
-        lastError: string | null;
-        createdAt: number;
-        updatedAt: number;
-        live: {
-            connected: boolean;
-            controllerName: string | null;
-            lastReadyAt: number | null;
-            activeStreams: number;
-        } | null;
-    };
-};
-
-export type GetRelayTransportHostEnrollmentsByEnrollmentIdResponse = GetRelayTransportHostEnrollmentsByEnrollmentIdResponses[keyof GetRelayTransportHostEnrollmentsByEnrollmentIdResponses];
-
-export type GetRelayTransportHostEnrollmentsByEnrollmentIdPairingStringData = {
-    body?: never;
-    path: {
-        enrollmentId: string;
-    };
-    query?: never;
-    url: '/relay-transport/host-enrollments/{enrollmentId}/pairing-string';
-};
-
-export type GetRelayTransportHostEnrollmentsByEnrollmentIdPairingStringResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        pairingString: string;
-        pairingCode: string;
-        hostKeyFingerprint: string;
-    };
-};
-
-export type GetRelayTransportHostEnrollmentsByEnrollmentIdPairingStringResponse = GetRelayTransportHostEnrollmentsByEnrollmentIdPairingStringResponses[keyof GetRelayTransportHostEnrollmentsByEnrollmentIdPairingStringResponses];
-
-export type GetRemoteHostsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/remote-hosts';
-};
-
-export type GetRemoteHostsResponses = {
-    /**
-     * Response for status 200
-     */
-    200: Array<{
-        id: string;
-        displayName: string;
-        enabled: boolean;
-        lastSeenAt: number | null;
-        connectionConfigJson: string;
-        capabilitiesJson: string;
-        createdAt: number;
-        updatedAt: number;
-        connectionState: 'idle' | 'warming' | 'connected' | 'offline';
-        lastError: string | null;
-    }>;
-};
-
-export type GetRemoteHostsResponse = GetRemoteHostsResponses[keyof GetRemoteHostsResponses];
-
-export type PostRemoteHostsData = {
-    body: {
-        id?: string;
-        displayName: string;
-        enabled?: boolean;
-        connectionConfig?: {
-            transport?: 'ssh' | 'direct-url' | 'relay';
-            baseUrl?: string;
-            ssh?: {
-                hostName: string;
-                user?: string | null;
-                port?: string | number | null;
-                auth?: 'default' | 'identityFile';
-                identityFilePath?: string | null;
-            };
-            sshExecutable?: string;
-            sshArgs?: Array<string>;
-            connectTimeoutMs?: string | number;
-            relay?: {
-                relayServerId?: string | null;
-                relayUrl?: string | null;
-                roomId?: string | null;
-                pinnedHostPubkey?: string | null;
-                controllerKeyRef?: string | null;
-            };
-        };
-        capabilities?: {
-            cradleServer?: {
-                enabled?: boolean;
-                remoteHost?: string;
-                remotePort?: string | number;
-            };
-        };
-    };
-    path?: never;
-    query?: never;
-    url: '/remote-hosts';
-};
-
-export type PostRemoteHostsResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        displayName: string;
-        enabled: boolean;
-        lastSeenAt: number | null;
-        connectionConfigJson: string;
-        capabilitiesJson: string;
-        createdAt: number;
-        updatedAt: number;
-        connectionState: 'idle' | 'warming' | 'connected' | 'offline';
-        lastError: string | null;
-    };
-};
-
-export type PostRemoteHostsResponse = PostRemoteHostsResponses[keyof PostRemoteHostsResponses];
-
-export type DeleteRemoteHostsByHostIdData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}';
-};
-
-export type DeleteRemoteHostsByHostIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteRemoteHostsByHostIdResponse = DeleteRemoteHostsByHostIdResponses[keyof DeleteRemoteHostsByHostIdResponses];
-
-export type PatchRemoteHostsByHostIdData = {
-    body: {
+        fabricId: string;
         displayName?: string;
-        enabled?: boolean;
-        connectionConfig?: {
-            transport?: 'ssh' | 'direct-url' | 'relay';
-            baseUrl?: string;
-            ssh?: {
-                hostName: string;
-                user?: string | null;
-                port?: string | number | null;
-                auth?: 'default' | 'identityFile';
-                identityFilePath?: string | null;
-            };
-            sshExecutable?: string;
-            sshArgs?: Array<string>;
-            connectTimeoutMs?: string | number;
-            relay?: {
-                relayServerId?: string | null;
-                relayUrl?: string | null;
-                roomId?: string | null;
-                pinnedHostPubkey?: string | null;
-                controllerKeyRef?: string | null;
-            };
-        };
-        capabilities?: {
-            cradleServer?: {
-                enabled?: boolean;
-                remoteHost?: string;
-                remotePort?: string | number;
-            };
-        };
+        platform?: string;
+        version?: string;
+        capabilities?: Array<string>;
     };
-    path: {
-        hostId: string;
-    };
+    path?: never;
     query?: never;
-    url: '/remote-hosts/{hostId}';
+    url: '/fabric/node-invitations';
 };
 
-export type PatchRemoteHostsByHostIdResponses = {
+export type PostFabricNodeInvitationsResponses = {
     /**
      * Response for status 200
      */
     200: {
-        id: string;
-        displayName: string;
-        enabled: boolean;
-        lastSeenAt: number | null;
-        connectionConfigJson: string;
-        capabilitiesJson: string;
+        version: number;
+        relayUrl: string;
+        fabricId: string;
+        requestId: string;
+        deliverySecret: string;
+        expiresAt: string;
+    };
+};
+
+export type PostFabricNodeInvitationsResponse = PostFabricNodeInvitationsResponses[keyof PostFabricNodeInvitationsResponses];
+
+export type DeleteFabricNodeInvitationsPendingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations/pending';
+};
+
+export type DeleteFabricNodeInvitationsPendingResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
+export type GetFabricNodeInvitationsPendingData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations/pending';
+};
+
+export type GetFabricNodeInvitationsPendingResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        version: number;
+        relayUrl: string;
+        fabricId: string;
+        requestId: string;
+        deliverySecret: string;
+        expiresAt: string | null;
+        createdAt: number;
+    } | null;
+};
+
+export type GetFabricNodeInvitationsPendingResponse = GetFabricNodeInvitationsPendingResponses[keyof GetFabricNodeInvitationsPendingResponses];
+
+export type PostFabricNodeInvitationsCompleteData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations/complete';
+};
+
+export type PostFabricNodeInvitationsCompleteResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        fabricId: string;
+        relayUrl: string;
+        localNodeId: string;
+        role: string;
+        ownerPubkey: string;
+        nodeCertificate: unknown;
+        controllerCertificate?: unknown;
         createdAt: number;
         updatedAt: number;
-        connectionState: 'idle' | 'warming' | 'connected' | 'offline';
-        lastError: string | null;
-    };
+    } | null;
 };
 
-export type PatchRemoteHostsByHostIdResponse = PatchRemoteHostsByHostIdResponses[keyof PatchRemoteHostsByHostIdResponses];
+export type PostFabricNodeInvitationsCompleteResponse = PostFabricNodeInvitationsCompleteResponses[keyof PostFabricNodeInvitationsCompleteResponses];
 
-export type PostRemoteHostsByHostIdCradleServerConnectData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/cradle-server/connect';
-};
-
-export type PostRemoteHostsByHostIdCradleServerConnectResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        hostId: string;
-        state: 'idle' | 'warming' | 'connected' | 'offline';
-        localBaseUrl: string | null;
-        lastError: string | null;
-        relayPerformance: {
-            connectionAttempts: Array<{
-                attempt: number;
-                startedAt: number;
-                websocketOpenedAt: number | null;
-                handshakeReadyAt: number | null;
-                failedAt: number | null;
-            }>;
-            localListenerReadyAt: number | null;
-            activeStreams: Array<{
-                streamId: string;
-                openedAt: number;
-                firstRequestByteAt: number | null;
-                firstResponseByteAt: number | null;
-                closedAt: number | null;
-            }>;
-            completedStreams: Array<{
-                streamId: string;
-                openedAt: number;
-                firstRequestByteAt: number | null;
-                firstResponseByteAt: number | null;
-                closedAt: number | null;
-            }>;
-        } | null;
-    };
-};
-
-export type PostRemoteHostsByHostIdCradleServerConnectResponse = PostRemoteHostsByHostIdCradleServerConnectResponses[keyof PostRemoteHostsByHostIdCradleServerConnectResponses];
-
-export type PostRemoteHostsByHostIdCradleServerDisconnectData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/cradle-server/disconnect';
-};
-
-export type PostRemoteHostsByHostIdCradleServerDisconnectResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type PostRemoteHostsByHostIdCradleServerDisconnectResponse = PostRemoteHostsByHostIdCradleServerDisconnectResponses[keyof PostRemoteHostsByHostIdCradleServerDisconnectResponses];
-
-export type GetRemoteHostsByHostIdCradleServerHealthData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/cradle-server/health';
-};
-
-export type GetRemoteHostsByHostIdCradleServerHealthResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        hostId: string;
-        state: 'idle' | 'warming' | 'connected' | 'offline';
-        localBaseUrl: string | null;
-        lastError: string | null;
-        relayPerformance: {
-            connectionAttempts: Array<{
-                attempt: number;
-                startedAt: number;
-                websocketOpenedAt: number | null;
-                handshakeReadyAt: number | null;
-                failedAt: number | null;
-            }>;
-            localListenerReadyAt: number | null;
-            activeStreams: Array<{
-                streamId: string;
-                openedAt: number;
-                firstRequestByteAt: number | null;
-                firstResponseByteAt: number | null;
-                closedAt: number | null;
-            }>;
-            completedStreams: Array<{
-                streamId: string;
-                openedAt: number;
-                firstRequestByteAt: number | null;
-                firstResponseByteAt: number | null;
-                closedAt: number | null;
-            }>;
-        } | null;
-        status: 'ok';
-        health: {
-            status: 'ok';
-            uptime: number;
-            memory: {
-                heapUsed: number;
-                heapTotal: number;
-                rss: number;
-                external: number;
-            };
-            cpu: {
-                percent: number | null;
-                userMicros: number;
-                systemMicros: number;
-                sampleMs: number | null;
-                usedMicros: number | null;
-                windowReady: boolean;
-            };
-            timestamp: number;
-        };
-    };
-};
-
-export type GetRemoteHostsByHostIdCradleServerHealthResponse = GetRemoteHostsByHostIdCradleServerHealthResponses[keyof GetRemoteHostsByHostIdCradleServerHealthResponses];
-
-export type PostRemoteHostsByHostIdCradleServerTestData = {
-    body?: never;
-    path: {
-        hostId: string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/cradle-server/test';
-};
-
-export type PostRemoteHostsByHostIdCradleServerTestResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        hostId: string;
-        state: 'idle' | 'warming' | 'connected' | 'offline';
-        localBaseUrl: string | null;
-        lastError: string | null;
-        relayPerformance: {
-            connectionAttempts: Array<{
-                attempt: number;
-                startedAt: number;
-                websocketOpenedAt: number | null;
-                handshakeReadyAt: number | null;
-                failedAt: number | null;
-            }>;
-            localListenerReadyAt: number | null;
-            activeStreams: Array<{
-                streamId: string;
-                openedAt: number;
-                firstRequestByteAt: number | null;
-                firstResponseByteAt: number | null;
-                closedAt: number | null;
-            }>;
-            completedStreams: Array<{
-                streamId: string;
-                openedAt: number;
-                firstRequestByteAt: number | null;
-                firstResponseByteAt: number | null;
-                closedAt: number | null;
-            }>;
-        } | null;
-        status: 'ok';
-        health: {
-            status: 'ok';
-            uptime: number;
-            memory: {
-                heapUsed: number;
-                heapTotal: number;
-                rss: number;
-                external: number;
-            };
-            cpu: {
-                percent: number | null;
-                userMicros: number;
-                systemMicros: number;
-                sampleMs: number | null;
-                usedMicros: number | null;
-                windowReady: boolean;
-            };
-            timestamp: number;
-        };
-    };
-};
-
-export type PostRemoteHostsByHostIdCradleServerTestResponse = PostRemoteHostsByHostIdCradleServerTestResponses[keyof PostRemoteHostsByHostIdCradleServerTestResponses];
-
-export type PostRemoteHostsByHostIdRelayClaimData = {
+export type PostFabricNodeInvitationsApproveData = {
     body: {
-        pairingString: string;
+        version: number;
+        relayUrl: string;
+        fabricId: string;
+        requestId: string;
+        deliverySecret: string;
+        expiresAt: string;
     };
-    path: {
-        hostId: string;
-    };
+    path?: never;
     query?: never;
-    url: '/remote-hosts/{hostId}/relay/claim';
+    url: '/fabric/node-invitations/approve';
 };
 
-export type PostRemoteHostsByHostIdRelayClaimResponses = {
+export type PostFabricNodeInvitationsApproveResponses = {
     /**
      * Response for status 200
      */
     200: {
-        hostId: string;
-        state: 'idle' | 'warming' | 'connected' | 'offline';
-        localBaseUrl: string | null;
-        lastError: string | null;
-        relayPerformance: {
-            connectionAttempts: Array<{
-                attempt: number;
-                startedAt: number;
-                websocketOpenedAt: number | null;
-                handshakeReadyAt: number | null;
-                failedAt: number | null;
-            }>;
-            localListenerReadyAt: number | null;
-            activeStreams: Array<{
-                streamId: string;
-                openedAt: number;
-                firstRequestByteAt: number | null;
-                firstResponseByteAt: number | null;
-                closedAt: number | null;
-            }>;
-            completedStreams: Array<{
-                streamId: string;
-                openedAt: number;
-                firstRequestByteAt: number | null;
-                firstResponseByteAt: number | null;
-                closedAt: number | null;
-            }>;
-        } | null;
+        nodeId: string;
+        fabricId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        status: 'online' | 'offline';
+        lastSeenAt: string;
+        revision: number;
+        scopes?: Array<'view' | 'control' | 'approve' | 'admin'>;
     };
 };
 
-export type PostRemoteHostsByHostIdRelayClaimResponse = PostRemoteHostsByHostIdRelayClaimResponses[keyof PostRemoteHostsByHostIdRelayClaimResponses];
+export type PostFabricNodeInvitationsApproveResponse = PostFabricNodeInvitationsApproveResponses[keyof PostFabricNodeInvitationsApproveResponses];
 
-export type AllRemoteHostsByHostIdUpstreamData = {
+export type GetFabricNodeInvitationsRequestsData = {
     body?: never;
-    path: {
-        hostId: string;
-        '*': string;
-    };
+    path?: never;
     query?: never;
-    url: '/remote-hosts/{hostId}/upstream/*';
+    url: '/fabric/node-invitations/requests';
 };
 
-export type AllRemoteHostsByHostIdUpstream2Data = {
-    body?: never;
-    path: {
-        hostId: string;
-        '*': string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/upstream/*';
+export type GetFabricNodeInvitationsRequestsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        requestId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        requestedAt: string;
+        expiresAt: string;
+    }>;
 };
 
-export type AllRemoteHostsByHostIdUpstream3Data = {
+export type GetFabricNodeInvitationsRequestsResponse = GetFabricNodeInvitationsRequestsResponses[keyof GetFabricNodeInvitationsRequestsResponses];
+
+export type PostFabricNodeInvitationsRequestsByRequestIdApproveData = {
     body?: never;
     path: {
-        hostId: string;
-        '*': string;
+        requestId: string;
     };
     query?: never;
-    url: '/remote-hosts/{hostId}/upstream/*';
+    url: '/fabric/node-invitations/requests/{requestId}/approve';
 };
 
-export type AllRemoteHostsByHostIdUpstream4Data = {
-    body?: never;
-    path: {
-        hostId: string;
-        '*': string;
+export type PostFabricNodeInvitationsRequestsByRequestIdApproveResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        nodeId: string;
+        fabricId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        status: 'online' | 'offline';
+        lastSeenAt: string;
+        revision: number;
+        scopes?: Array<'view' | 'control' | 'approve' | 'admin'>;
     };
-    query?: never;
-    url: '/remote-hosts/{hostId}/upstream/*';
 };
 
-export type AllRemoteHostsByHostIdUpstream5Data = {
+export type PostFabricNodeInvitationsRequestsByRequestIdApproveResponse = PostFabricNodeInvitationsRequestsByRequestIdApproveResponses[keyof PostFabricNodeInvitationsRequestsByRequestIdApproveResponses];
+
+export type DeleteFabricNodeInvitationsRequestsByRequestIdData = {
     body?: never;
     path: {
-        hostId: string;
-        '*': string;
+        requestId: string;
     };
     query?: never;
-    url: '/remote-hosts/{hostId}/upstream/*';
+    url: '/fabric/node-invitations/requests/{requestId}';
 };
 
-export type AllRemoteHostsByHostIdUpstream6Data = {
-    body?: never;
-    path: {
-        hostId: string;
-        '*': string;
-    };
-    query?: never;
-    url: '/remote-hosts/{hostId}/upstream/*';
+export type DeleteFabricNodeInvitationsRequestsByRequestIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
 };
 
-export type AllRemoteHostsByHostIdUpstream7Data = {
+export type GetNodesData = {
     body?: never;
-    path: {
-        hostId: string;
-        '*': string;
-    };
+    path?: never;
     query?: never;
-    url: '/remote-hosts/{hostId}/upstream/*';
+    url: '/nodes';
 };
 
-export type AllRemoteHostsByHostIdUpstream8Data = {
+export type GetNodesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        nodeId: string;
+        fabricId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        status: 'online' | 'offline';
+        lastSeenAt: string;
+        revision: number;
+        scopes?: Array<'view' | 'control' | 'approve' | 'admin'>;
+    }>;
+};
+
+export type GetNodesResponse = GetNodesResponses[keyof GetNodesResponses];
+
+export type GetNodesByNodeIdData = {
     body?: never;
     path: {
-        hostId: string;
+        nodeId: string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}';
+};
+
+export type GetNodesByNodeIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        nodeId: string;
+        fabricId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        status: 'online' | 'offline';
+        lastSeenAt: string;
+        revision: number;
+        scopes?: Array<'view' | 'control' | 'approve' | 'admin'>;
+    };
+};
+
+export type GetNodesByNodeIdResponse = GetNodesByNodeIdResponses[keyof GetNodesByNodeIdResponses];
+
+export type GetNodesByNodeIdGrantsData = {
+    body?: never;
+    path: {
+        nodeId: string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/grants';
+};
+
+export type GetNodesByNodeIdGrantsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        grantId: string;
+        fabricId: string;
+        controllerId: string;
+        nodeId: string;
+        scope: 'view' | 'control' | 'approve' | 'admin';
+        revokedAt?: string;
+    }>;
+};
+
+export type GetNodesByNodeIdGrantsResponse = GetNodesByNodeIdGrantsResponses[keyof GetNodesByNodeIdGrantsResponses];
+
+export type DeleteNodesByNodeIdGrantsByGrantIdData = {
+    body?: never;
+    path: {
+        nodeId: string;
+        grantId: string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/grants/{grantId}';
+};
+
+export type DeleteNodesByNodeIdGrantsByGrantIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
+export type PostNodesByNodeIdConnectData = {
+    body?: never;
+    path: {
+        nodeId: string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/connect';
+};
+
+export type PostNodesByNodeIdConnectResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        linkId: string;
+        expiresAt: string;
+        nodeCertificate: unknown;
+    };
+};
+
+export type PostNodesByNodeIdConnectResponse = PostNodesByNodeIdConnectResponses[keyof PostNodesByNodeIdConnectResponses];
+
+export type AllNodesByNodeIdUpstreamData = {
+    body?: never;
+    path: {
+        nodeId: string;
         '*': string;
     };
     query?: never;
-    url: '/remote-hosts/{hostId}/upstream/*';
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream2Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream3Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream4Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream5Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream6Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream7Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream8Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
 };
 
 export type GetExternalIssueSourcesData = {
@@ -7136,8 +6989,8 @@ export type GetSessionsResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -7225,8 +7078,8 @@ export type PostSessionsResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7300,8 +7153,8 @@ export type GetSessionsByIdResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7362,8 +7215,8 @@ export type PatchSessionsByIdResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7399,6 +7252,31 @@ export type PatchSessionsByIdResponses = {
 
 export type PatchSessionsByIdResponse = PatchSessionsByIdResponses[keyof PatchSessionsByIdResponses];
 
+export type PostSessionsNodeProjectionsReconcileData = {
+    body: {
+        workspaceId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/sessions/node-projections/reconcile';
+};
+
+export type PostSessionsNodeProjectionsReconcileResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        workspaceId: string;
+        nodeId: string;
+        remoteWorkspaceId: string;
+        discovered: number;
+        updated: number;
+        removed: number;
+    };
+};
+
+export type PostSessionsNodeProjectionsReconcileResponse = PostSessionsNodeProjectionsReconcileResponses[keyof PostSessionsNodeProjectionsReconcileResponses];
+
 export type PostSessionsByIdArchiveData = {
     body: {
         archived: boolean;
@@ -7419,8 +7297,8 @@ export type PostSessionsByIdArchiveResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7474,8 +7352,8 @@ export type PostSessionsByIdReadResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7529,8 +7407,8 @@ export type PostSessionsByIdUnreadResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -8232,8 +8110,8 @@ export type PostThreadHandoffsResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -8550,8 +8428,8 @@ export type PostWorksResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -8628,6 +8506,31 @@ export type PostWorksResponses = {
 
 export type PostWorksResponse = PostWorksResponses[keyof PostWorksResponses];
 
+export type PostWorksNodeProjectionsReconcileData = {
+    body: {
+        workspaceId: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/works/node-projections/reconcile';
+};
+
+export type PostWorksNodeProjectionsReconcileResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        workspaceId: string;
+        nodeId: string;
+        remoteWorkspaceId: string;
+        discovered: number;
+        updated: number;
+        removed: number;
+    };
+};
+
+export type PostWorksNodeProjectionsReconcileResponse = PostWorksNodeProjectionsReconcileResponses[keyof PostWorksNodeProjectionsReconcileResponses];
+
 export type GetWorksByIdData = {
     body?: never;
     path: {
@@ -8662,8 +8565,8 @@ export type GetWorksByIdResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -8776,8 +8679,8 @@ export type PostWorksByIdArchiveResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -8892,8 +8795,8 @@ export type PostWorksByIdPrepareResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -9009,8 +8912,8 @@ export type PostWorksByIdSubmitResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -9123,8 +9026,8 @@ export type PostWorksByIdBranchResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -9601,6 +9504,26 @@ export type GetPullRequestsReviewingResponses = {
 
 export type GetPullRequestsReviewingResponse = GetPullRequestsReviewingResponses[keyof GetPullRequestsReviewingResponses];
 
+export type PostPullRequestsRefreshData = {
+    body: {
+        login: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/pull-requests/refresh';
+};
+
+export type PostPullRequestsRefreshResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        refreshed: boolean;
+    };
+};
+
+export type PostPullRequestsRefreshResponse = PostPullRequestsRefreshResponses[keyof PostPullRequestsRefreshResponses];
+
 export type GetPullRequestsByOwnerByRepoAssignableUsersData = {
     body?: never;
     path: {
@@ -9729,6 +9652,112 @@ export type GetPullRequestsByOwnerByRepoByNumberDetailResponses = {
 };
 
 export type GetPullRequestsByOwnerByRepoByNumberDetailResponse = GetPullRequestsByOwnerByRepoByNumberDetailResponses[keyof GetPullRequestsByOwnerByRepoByNumberDetailResponses];
+
+export type PostPullRequestsByOwnerByRepoByNumberRefreshData = {
+    body: {
+        force?: boolean;
+    };
+    path: {
+        owner: string;
+        repo: string;
+        number: string;
+    };
+    query?: never;
+    url: '/pull-requests/{owner}/{repo}/{number}/refresh';
+};
+
+export type PostPullRequestsByOwnerByRepoByNumberRefreshResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions: number;
+            deletions: number;
+            body: string | null;
+            changedFiles: number;
+            commits: number;
+            comments: number;
+            reviewComments: number;
+            mergeable: boolean | null;
+            mergeableState: string;
+            createdAtIso: string;
+            updatedAtIso: string;
+            closedAtIso: string | null;
+            mergedAtIso: string | null;
+            reviewers: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            assignees: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            labels: Array<{
+                name: string;
+                color: string;
+            }>;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+            checks: Array<{
+                id: string;
+                name: string;
+                status: 'queued' | 'in_progress' | 'completed';
+                conclusion: string | null;
+                url: string | null;
+            }>;
+            allowedMergeMethods: Array<'merge' | 'squash' | 'rebase'>;
+            mergeBlockers: Array<string>;
+            canMerge: boolean;
+        };
+        timeline: Array<{
+            id: string;
+            kind: 'comment' | 'review';
+            author: {
+                login: string;
+                avatarUrl: string | null;
+                url: string | null;
+            } | null;
+            body: string | null;
+            state: string | null;
+            createdAt: string;
+            url: string | null;
+        }>;
+        files: Array<{
+            sha: string;
+            filename: string;
+            previousFilename: string | null;
+            status: string;
+            additions: number;
+            deletions: number;
+            changes: number;
+            patch: string | null;
+            blobUrl: string;
+            rawUrl: string;
+        }>;
+    };
+};
+
+export type PostPullRequestsByOwnerByRepoByNumberRefreshResponse = PostPullRequestsByOwnerByRepoByNumberRefreshResponses[keyof PostPullRequestsByOwnerByRepoByNumberRefreshResponses];
 
 export type GetPullRequestsByOwnerByRepoByNumberFingerprintData = {
     body?: never;
@@ -11352,8 +11381,8 @@ export type GetIssuesByIdSessionsResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -12264,6 +12293,7 @@ export type GetPluginsResponses = {
             trusted: boolean;
             reason: string | null;
             checksum: string | null;
+            grantedPermissions: Array<string>;
         };
         activation: {
             enabled: boolean;
@@ -12406,6 +12436,7 @@ export type GetPluginsSourcesResponses = {
                 trusted: boolean;
                 reason: string | null;
                 checksum: string | null;
+                grantedPermissions: Array<string>;
             };
             activation: {
                 enabled: boolean;
@@ -12527,6 +12558,7 @@ export type PostPluginsSourcesResponses = {
                     trusted: boolean;
                     reason: string | null;
                     checksum: string | null;
+                    grantedPermissions: Array<string>;
                 };
                 activation: {
                     enabled: boolean;
@@ -12613,6 +12645,7 @@ export type PostPluginsSourcesResponses = {
                 trusted: boolean;
                 reason: string | null;
                 checksum: string | null;
+                grantedPermissions: Array<string>;
             };
             activation: {
                 enabled: boolean;
@@ -12976,6 +13009,7 @@ export type GetPluginsSourcesByIdResponses = {
                 trusted: boolean;
                 reason: string | null;
                 checksum: string | null;
+                grantedPermissions: Array<string>;
             };
             activation: {
                 enabled: boolean;
@@ -13092,6 +13126,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
                     trusted: boolean;
                     reason: string | null;
                     checksum: string | null;
+                    grantedPermissions: Array<string>;
                 };
                 activation: {
                     enabled: boolean;
@@ -13178,6 +13213,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
                 trusted: boolean;
                 reason: string | null;
                 checksum: string | null;
+                grantedPermissions: Array<string>;
             };
             activation: {
                 enabled: boolean;
@@ -13366,6 +13402,7 @@ export type GetPluginsByRouteSegmentResponses = {
             trusted: boolean;
             reason: string | null;
             checksum: string | null;
+            grantedPermissions: Array<string>;
         };
         activation: {
             enabled: boolean;
@@ -13471,6 +13508,7 @@ export type PatchPluginsByRouteSegmentEnabledResponses = {
             trusted: boolean;
             reason: string | null;
             checksum: string | null;
+            grantedPermissions: Array<string>;
         };
         activation: {
             enabled: boolean;
@@ -21263,8 +21301,8 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -22732,6 +22770,7 @@ export type GetChronicleConfigResponses = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -22760,6 +22799,7 @@ export type PutChronicleConfigData = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -22792,6 +22832,7 @@ export type PutChronicleConfigResponses = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -22972,6 +23013,7 @@ export type GetChronicleStatusResponses = {
         available: boolean;
         running: boolean;
         pid: number | null;
+        runtimeError: string | null;
         lastCaptureAt: number | null;
         lastSummaryAt: number | null;
         lastErrorAt: number | null;
@@ -23007,6 +23049,7 @@ export type GetChronicleStatusResponses = {
         activityPipelineIntervalMs: number;
         activityPipelineBatchSize: number;
         audioCaptureEnabled: boolean;
+        audioCaptureMode: 'meeting' | 'continuous';
         audioRuntimeStatus: 'disabled' | 'armed' | 'unavailable';
         closedEyesDiscardEnabled: boolean;
         closedEyesMode: 'auto' | 'always-record' | 'always-pause';
@@ -23461,7 +23504,10 @@ export type GetChronicleAudioTranscriptsResponses = {
             segmentIndex: number;
             startMs: number;
             endMs: number | null;
+            speakerProfileId: string | null;
             speakerLabel: string | null;
+            speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+            speakerMatchConfidence: number | null;
             text: string;
             confidence: number | null;
             language: string | null;
@@ -23488,6 +23534,9 @@ export type PostChronicleAudioTranscriptsData = {
             startMs: number;
             endMs?: number | null;
             speakerLabel?: string | null;
+            speakerCandidateKey?: string | null;
+            speakerEmbedding?: Array<number> | null;
+            speakerEmbeddingModelId?: string | null;
             text: string;
             confidence?: number | null;
             language?: string | null;
@@ -23529,7 +23578,10 @@ export type PostChronicleAudioTranscriptsResponses = {
             segmentIndex: number;
             startMs: number;
             endMs: number | null;
+            speakerProfileId: string | null;
             speakerLabel: string | null;
+            speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+            speakerMatchConfidence: number | null;
             text: string;
             confidence: number | null;
             language: string | null;
@@ -23556,9 +23608,10 @@ export type GetChronicleSpeakerProfilesResponses = {
         displayName: string;
         normalizedLabel: string;
         aliases: Array<string>;
-        embedding: Array<number> | null;
+        hasVoiceprint: boolean;
         embeddingDimensions: number | null;
         embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
         sampleCount: number;
         lastSeenAt: string | null;
         lastSeenAtUnix: number | null;
@@ -23603,9 +23656,10 @@ export type PostChronicleSpeakerProfilesResponses = {
         displayName: string;
         normalizedLabel: string;
         aliases: Array<string>;
-        embedding: Array<number> | null;
+        hasVoiceprint: boolean;
         embeddingDimensions: number | null;
         embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
         sampleCount: number;
         lastSeenAt: string | null;
         lastSeenAtUnix: number | null;
@@ -23622,6 +23676,140 @@ export type PostChronicleSpeakerProfilesResponses = {
 };
 
 export type PostChronicleSpeakerProfilesResponse = PostChronicleSpeakerProfilesResponses[keyof PostChronicleSpeakerProfilesResponses];
+
+export type DeleteChronicleSpeakerProfilesByProfileIdData = {
+    body?: never;
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}';
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdResponse = DeleteChronicleSpeakerProfilesByProfileIdResponses[keyof DeleteChronicleSpeakerProfilesByProfileIdResponses];
+
+export type PatchChronicleSpeakerProfilesByProfileIdData = {
+    body: {
+        displayName: string;
+    };
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}';
+};
+
+export type PatchChronicleSpeakerProfilesByProfileIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        displayName: string;
+        normalizedLabel: string;
+        aliases: Array<string>;
+        hasVoiceprint: boolean;
+        embeddingDimensions: number | null;
+        embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
+        sampleCount: number;
+        lastSeenAt: string | null;
+        lastSeenAtUnix: number | null;
+        sourceTranscriptId: string | null;
+        sourceSegmentId: string | null;
+        metadata: {
+            [key: string]: unknown;
+        };
+        createdAt: string;
+        createdAtUnix: number;
+        updatedAt: string;
+        updatedAtUnix: number;
+    };
+};
+
+export type PatchChronicleSpeakerProfilesByProfileIdResponse = PatchChronicleSpeakerProfilesByProfileIdResponses[keyof PatchChronicleSpeakerProfilesByProfileIdResponses];
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintData = {
+    body?: never;
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}/voiceprint';
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        displayName: string;
+        normalizedLabel: string;
+        aliases: Array<string>;
+        hasVoiceprint: boolean;
+        embeddingDimensions: number | null;
+        embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
+        sampleCount: number;
+        lastSeenAt: string | null;
+        lastSeenAtUnix: number | null;
+        sourceTranscriptId: string | null;
+        sourceSegmentId: string | null;
+        metadata: {
+            [key: string]: unknown;
+        };
+        createdAt: string;
+        createdAtUnix: number;
+        updatedAt: string;
+        updatedAtUnix: number;
+    };
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponse = DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses[keyof DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses];
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerData = {
+    body: {
+        speakerProfileId: string | null;
+    };
+    path: {
+        segmentId: string;
+    };
+    query?: never;
+    url: '/chronicle/audio-segments/{segmentId}/speaker';
+};
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        segmentIndex: number;
+        startMs: number;
+        endMs: number | null;
+        speakerProfileId: string | null;
+        speakerLabel: string | null;
+        speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+        speakerMatchConfidence: number | null;
+        text: string;
+        confidence: number | null;
+        language: string | null;
+    };
+};
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerResponse = PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses[keyof PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses];
 
 export type GetChronicleAudioRawSegmentsData = {
     body?: never;
@@ -24520,6 +24708,7 @@ export type GetChronicleActivityMonitorStatusResponses = {
             activityPipelineIntervalMs: number;
             activityPipelineBatchSize: number;
             audioCaptureEnabled: boolean;
+            audioCaptureMode: 'meeting' | 'continuous';
             audioSource: 'microphone' | 'system' | 'mixed';
             closedEyesDiscardEnabled: boolean;
             closedEyesMode: 'auto' | 'always-record' | 'always-pause';

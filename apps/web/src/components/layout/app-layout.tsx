@@ -134,60 +134,66 @@ function installBrowserUseBridge({
   const requestBrowserTab = (payload: unknown) => {
     useBrowserPanelStore.getState().requestTab(parseBrowserTabRequest(payload), undefined, ownerId)
   }
-  const createBrowserTab = async (url?: string) => {
+  const createBrowserTab = async (targetOwnerId: string, url?: string) => {
     const bridge = window.cradle?.browser
     if (!bridge) {
-      return useBrowserPanelStore.getState().createTab(url, undefined, ownerId)
+      return useBrowserPanelStore.getState().createTab(url, undefined, targetOwnerId)
     }
-    const currentState = await bridge.getState({ threadId: resolvedOwnerId })
+    const currentState = await bridge.getState({ threadId: targetOwnerId })
     const nextState = currentState.open
       ? await bridge.newTab({
-          threadId: resolvedOwnerId,
+          threadId: targetOwnerId,
           url: url ?? 'about:blank',
           activate: true,
         })
-      : await bridge.open({ threadId: resolvedOwnerId, initialUrl: url ?? 'about:blank' })
+      : await bridge.open({ threadId: targetOwnerId, initialUrl: url ?? 'about:blank' })
     useBrowserPanelStore.getState().upsertOwnerState(nextState)
-    openBrowserPanel()
+    if (targetOwnerId === resolvedOwnerId) {
+      openBrowserPanel()
+    }
     return nextState.activeTabId ?? nextState.tabs.at(-1)?.id ?? ''
   }
-  const activateBrowserTab = async (tabId: string) => {
+  const activateBrowserTab = async (targetOwnerId: string, tabId: string) => {
     const bridge = window.cradle?.browser
     if (!bridge) {
       return false
     }
     try {
-      const nextState = await bridge.selectTab({ threadId: resolvedOwnerId, tabId })
+      const nextState = await bridge.selectTab({ threadId: targetOwnerId, tabId })
       useBrowserPanelStore.getState().upsertOwnerState(nextState)
-      openBrowserPanel()
+      if (targetOwnerId === resolvedOwnerId) {
+        openBrowserPanel()
+      }
       return true
     }
  catch {
       return false
     }
   }
-  const getActiveBrowserTab = async () => {
+  const getActiveBrowserTab = async (targetOwnerId: string) => {
     const bridge = window.cradle?.browser
     if (!bridge) {
       const state = useBrowserPanelStore.getState()
-      const ownerState = state.owners[resolvedOwnerId]
+      const ownerState = state.owners[targetOwnerId]
       return ownerState?.activeTabId ?? undefined
     }
-    const state = await bridge.getState({ threadId: resolvedOwnerId })
+    const state = await bridge.getState({ threadId: targetOwnerId })
     useBrowserPanelStore.getState().upsertOwnerState(state)
     return state.activeTabId ?? undefined
   }
-  const hideBrowserPanel = async (tabId?: string) => {
+  const hideBrowserPanel = async (targetOwnerId: string, tabId?: string) => {
     const bridge = window.cradle?.browser
     if (tabId && bridge) {
-      const state = await bridge.getState({ threadId: resolvedOwnerId })
+      const state = await bridge.getState({ threadId: targetOwnerId })
       if (!state.tabs.some(tab => tab.id === tabId)) {
         return false
       }
     }
-    closeBrowserPanel()
+    if (targetOwnerId === resolvedOwnerId) {
+      closeBrowserPanel()
+    }
     if (bridge) {
-      await bridge.hide({ threadId: resolvedOwnerId })
+      await bridge.hide({ threadId: targetOwnerId })
     }
     return true
   }

@@ -46,7 +46,7 @@ export const workspace = new Elysia({
     name: trimValue(body.name),
     locator: {
       ...body.locator,
-      hostId: trimValue(body.locator.hostId),
+      nodeId: trimValue(body.locator.nodeId),
       path: trimValue(body.locator.path),
     },
     gitIdentity: body.gitIdentity,
@@ -110,7 +110,7 @@ export const workspace = new Elysia({
     response: { 200: WorkspaceModel.record, 409: WorkspaceModel.locatorExistsError },
   })
   .get('/resolve', ({ query }) => nullableJsonResponse(Workspace.resolveByLocator({
-    hostId: trimValue(query.hostId),
+    nodeId: trimValue(query.nodeId),
     path: trimValue(query.path),
   })), {
     detail: {

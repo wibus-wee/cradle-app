@@ -111,15 +111,15 @@ function useNewChatPageOwner(
 
   const selectedWorkspace = workspaces.find(w => w.id === selectedProjectWorkspaceId) ?? null
   const selectedWorkspaceLocalPath = getLocalWorkspacePath(selectedWorkspace)
-  const remoteHostId = selectedWorkspace && !isLocalWorkspace(selectedWorkspace)
-    ? selectedWorkspace.locator.hostId
+  const nodeId = selectedWorkspace && !isLocalWorkspace(selectedWorkspace)
+    ? selectedWorkspace.locator.nodeId
     : null
   const composerState = useComposerState({
     context: 'new-chat',
     workspaceId: selectedProjectWorkspaceId,
-    remoteHostId,
-    // Remote hosts own their provider catalog; local Agents are not executable there.
-    enableAgents: !remoteHostId,
+    nodeId,
+    // Remote Nodes own their provider catalog; local Agents are not executable there.
+    enableAgents: !nodeId,
   })
   const { loading: sessionsLoading } = useWorkspaceSessions(selectedProjectWorkspaceId)
   const sessionsReady = selectedProjectWorkspaceId === null || !sessionsLoading
@@ -417,7 +417,7 @@ function useNewChatPageOwner(
     selectedWorkspace,
     selectedProjectWorkspaceId,
     selectedWorkspaceLocalPath,
-    remoteHostId,
+    nodeId,
     setDraft,
     promptInputCollapsed,
     addFromPicker,
@@ -474,7 +474,7 @@ function NewChatComposerCard({
     <DraftChatComposerWithState
       composerState={owner.composerState}
       workspaceId={selectedWorkspace?.id ?? null}
-      remoteHostId={owner.remoteHostId}
+      nodeId={owner.nodeId}
       active={active}
       contextBar={workspaceSelector}
       onSendIsolated={handleSendIsolated}

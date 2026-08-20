@@ -224,8 +224,9 @@ export type CodexMcpServerConfig
 export function buildCodexMcpServersConfig(
   cradleMcpEnvironment?: Record<string, string>,
 ): Record<string, CodexMcpServerConfig> {
+  const chatSessionId = cradleMcpEnvironment?.CRADLE_CHAT_SESSION_ID
   return Object.fromEntries(
-    Object.entries(getRegisteredMcpServers()).map(([name, config]) => [
+    Object.entries(getRegisteredMcpServers(chatSessionId ? { chatSessionId } : undefined)).map(([name, config]) => [
       name,
       projectCodexMcpServer(
         name,
@@ -260,16 +261,21 @@ export function bindCodexCradleMcpInvocation(
       return value ? [[name, value]] : []
     }),
   )
-  return {
+  const mcpServers = buildCodexMcpServersConfig(invocationEnvironment)
+  const nextConfig: NonNullable<ThreadForkParams['config']> = {
     ...config,
     shell_environment_policy: {
       inherit: 'all',
       set: invocationEnvironment,
     },
-    ...(config.mcp_servers
-      ? { mcp_servers: buildCodexMcpServersConfig(invocationEnvironment) }
-      : {}),
   }
+  if (Object.keys(mcpServers).length > 0) {
+    nextConfig.mcp_servers = mcpServers
+  }
+  else {
+    delete nextConfig.mcp_servers
+  }
+  return nextConfig
 }
 
 export function buildCodexMcpServersEnvironment(): Record<string, string> {

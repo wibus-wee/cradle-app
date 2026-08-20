@@ -50,7 +50,7 @@ import {
 import { listPluginSources, readPluginSource } from './source-registry'
 import { createPluginStaticServer, rewritePluginWebBundleImports } from './static-server'
 import { grantPluginTrust } from './trust-grants'
-import { evaluatePluginSourceTrust, isExternalLocalCodeSource, readRelayHostExposure } from './trust-policy'
+import { evaluatePluginSourceTrust, isExternalLocalCodeSource, readFabricNodeExposure } from './trust-policy'
 import {
   executePluginUninstall,
   hasPluginUninstallHandler,
@@ -170,7 +170,7 @@ async function getPluginDiscoverySources(defaultPluginsDir: string): Promise<Plu
 
 async function discoverPackagesFromSources(
   sources: PluginDiscoverySource[],
-  options: { relayHostExposed: boolean },
+  options: { fabricNodeExposed: boolean },
 ): Promise<PackageWithSource[]> {
   const packages: PackageWithSource[] = []
   for (const source of sources) {
@@ -188,7 +188,7 @@ async function discoverPackagesFromSources(
         trustedSource = await evaluatePluginSourceTrust({
           pluginName,
           source: baseSource,
-          relayHostExposed: options.relayHostExposed,
+          fabricNodeExposed: options.fabricNodeExposed,
         })
       }
       catch (error) {
@@ -509,7 +509,7 @@ export async function activateServerPlugins(
   const pluginsDir = process.env.CRADLE_PLUGINS_DIR
     ?? resolve(thisDir, '../../../../plugins')
   const packages = await discoverPackagesFromSources(await getPluginDiscoverySources(pluginsDir), {
-    relayHostExposed: readRelayHostExposure(),
+    fabricNodeExposed: readFabricNodeExposure(),
   })
   resetPluginRuntimeRegistry()
   resetPluginRouteRegistry()
@@ -647,7 +647,7 @@ export async function discoverAndActivateSource(
     kind: 'externalLocal',
     persistedSourceId: source.id,
   }], {
-    relayHostExposed: readRelayHostExposure(),
+    fabricNodeExposed: readFabricNodeExposure(),
   })
   const manifests = await registerDiscoveredPackages(packages)
   await prepareAndActivateManifests(manifests)

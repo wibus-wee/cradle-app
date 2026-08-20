@@ -12,6 +12,7 @@ const StdioMcpServerConfigSchema = z.object({
   command: z.string().trim().min(1),
   args: z.array(z.string()),
   env: z.record(z.string(), z.string()).default({}),
+  scope: z.enum(['global', 'chat-session']).default('global'),
   when: z.function().optional(),
 })
 
@@ -20,6 +21,7 @@ const StreamableHttpMcpServerConfigSchema = z.object({
   name: McpServerNameSchema,
   url: z.string().trim().url(),
   headers: z.record(z.string(), z.string()).default({}),
+  scope: z.enum(['global', 'chat-session']).default('global'),
   when: z.function().optional(),
 })
 
@@ -47,6 +49,10 @@ export interface RegisteredStreamableHttpMcpServer {
 }
 
 export type RegisteredMcpServer = RegisteredStdioMcpServer | RegisteredStreamableHttpMcpServer
+
+export interface McpInvocationContext {
+  chatSessionId: string
+}
 
 const registry = new Map<string, RegisteredMcpServerConfig>()
 const customRegistry = new Map<string, RegisteredMcpServerConfig>()
@@ -117,40 +123,60 @@ export function clearCustomMcpServers(): void {
   customRegistry.clear()
 }
 
-export function getRegisteredMcpServers(): Record<string, RegisteredMcpServer> {
+export function getRegisteredMcpServers(context?: McpInvocationContext): Record<string, RegisteredMcpServer> {
   return Object.fromEntries(
-    [...registry, ...customRegistry].map(([name, config]) => [name, projectRuntimeConfig(config)]),
+    [...registry, ...customRegistry].flatMap(([name, config]) => {
+      if (config.scope === 'chat-session' && !context) {
+        return []
+      }
+      return [[name, projectRuntimeConfig(config, context)]]
+    }),
   )
 }
 
-export function getRegisteredStdioMcpServers(): Record<string, RegisteredStdioMcpServer> {
+export function getRegisteredStdioMcpServers(context?: McpInvocationContext): Record<string, RegisteredStdioMcpServer> {
   return Object.fromEntries(
     [...registry, ...customRegistry]
       .filter((entry): entry is [string, RegisteredStdioMcpServerConfig] => entry[1].transport === 'stdio')
-      .map(([name, config]) => [name, projectStdioRuntimeConfig(config)]),
+      .flatMap(([name, config]) => {
+        if (config.scope === 'chat-session' && !context) {
+          return []
+        }
+        return [[name, projectStdioRuntimeConfig(config, context)]]
+      }),
   )
 }
 
-function projectRuntimeConfig(config: RegisteredMcpServerConfig): RegisteredMcpServer {
+function projectRuntimeConfig(
+  config: RegisteredMcpServerConfig,
+  context?: McpInvocationContext,
+): RegisteredMcpServer {
   if (config.transport === 'stdio') {
-    return projectStdioRuntimeConfig(config)
+    return projectStdioRuntimeConfig(config, context)
   }
 
   return {
     transport: 'streamable-http',
     name: config.name,
     url: config.url,
-    headers: config.headers,
+    headers: config.scope === 'chat-session' && context
+      ? { ...config.headers, 'x-cradle-chat-session-id': context.chatSessionId }
+      : config.headers,
   }
 }
 
-function projectStdioRuntimeConfig(config: RegisteredStdioMcpServerConfig): RegisteredStdioMcpServer {
+function projectStdioRuntimeConfig(
+  config: RegisteredStdioMcpServerConfig,
+  context?: McpInvocationContext,
+): RegisteredStdioMcpServer {
   return {
     transport: 'stdio',
     name: config.name,
     command: config.command,
     args: config.args,
-    env: config.env,
+    env: config.scope === 'chat-session' && context
+      ? { ...config.env, CRADLE_CHAT_SESSION_ID: context.chatSessionId }
+      : config.env,
   }
 }
 
@@ -161,6 +187,7 @@ function projectCapabilityMetadata(config: RegisteredMcpServerConfig): Record<st
       command: config.command,
       args: config.args,
       hasEnv: Object.keys(config.env).length > 0,
+      scope: config.scope,
     }
   }
 
@@ -170,5 +197,6 @@ function projectCapabilityMetadata(config: RegisteredMcpServerConfig): Record<st
     urlOrigin: url.origin,
     urlPathname: url.pathname,
     hasHeaders: Object.keys(config.headers).length > 0,
+    scope: config.scope,
   }
 }

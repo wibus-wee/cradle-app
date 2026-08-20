@@ -25,7 +25,7 @@ import {
 } from '~/components/ui/dialog'
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { Spinner } from '~/components/ui/spinner'
-import { fetchRemoteUpstreamJson } from '~/features/remote-hosts/upstream-fetch'
+import { fetchNodeUpstreamJson } from '~/features/nodes/upstream-fetch'
 import { cn } from '~/lib/cn'
 
 const LAST_PATH_KEY = 'directory-browser-last-path'
@@ -62,22 +62,22 @@ interface DirectoryBrowserDialogProps {
   description?: string
   /**
    * When set, browse the connected remote Cradle Server filesystem via
-   * `/remote-hosts/:hostId/upstream/filesystem/*` instead of the local server.
+   * `/nodes/:nodeId/upstream/filesystem/*` instead of the local server.
    */
-  hostId?: string | null
+  nodeId?: string | null
 }
 
-function lastPathStorageKey(hostId: string | null | undefined): string {
-  return hostId ? `${LAST_PATH_KEY}:remote:${hostId}` : LAST_PATH_KEY
+function lastPathStorageKey(nodeId: string | null | undefined): string {
+  return nodeId ? `${LAST_PATH_KEY}:remote:${nodeId}` : LAST_PATH_KEY
 }
 
 async function browseFilesystem(
-  hostId: string | null | undefined,
+  nodeId: string | null | undefined,
   path: string | undefined,
 ): Promise<FilesystemBrowseResult> {
-  if (hostId) {
+  if (nodeId) {
     const query = path ? `?path=${encodeURIComponent(path)}` : ''
-    const data = await fetchRemoteUpstreamJson<unknown>(hostId, `/filesystem/browse${query}`)
+    const data = await fetchNodeUpstreamJson<unknown>(nodeId, `/filesystem/browse${query}`)
     return FilesystemBrowseResultSchema.parse(data)
   }
   const result = await getFilesystemBrowse({
@@ -87,10 +87,10 @@ async function browseFilesystem(
 }
 
 async function listFilesystemFavorites(
-  hostId: string | null | undefined,
+  nodeId: string | null | undefined,
 ): Promise<FilesystemFavoriteEntry[]> {
-  if (hostId) {
-    const data = await fetchRemoteUpstreamJson<unknown>(hostId, '/filesystem/favorites')
+  if (nodeId) {
+    const data = await fetchNodeUpstreamJson<unknown>(nodeId, '/filesystem/favorites')
     return FilesystemFavoriteEntryListSchema.parse(data)
   }
   const result = await getFilesystemFavorites()
@@ -103,16 +103,16 @@ export function DirectoryBrowserDialog({
   onSelect,
   title,
   description,
-  hostId = null,
+  nodeId = null,
 }: DirectoryBrowserDialogProps) {
   const { t } = useTranslation('filesystem')
   const resolvedTitle = title ?? t('directory.title')
-  const pathKey = lastPathStorageKey(hostId)
+  const pathKey = lastPathStorageKey(nodeId)
   const [currentPath, setCurrentPath] = useState<string | undefined>(() => {
     return localStorage.getItem(pathKey) ?? undefined
   })
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null)
-  const hostKey = hostId ?? 'local'
+  const hostKey = nodeId ?? 'local'
   const lastHostKeyRef = useRef(hostKey)
 
   // Only re-seed the path when the dialog opens for a different host, or first open.
@@ -131,7 +131,7 @@ export function DirectoryBrowserDialog({
 
   const { data: favoritesData } = useQuery<FilesystemFavoriteEntry[]>({
     queryKey: ['filesystem-favorites', hostKey],
-    queryFn: () => listFilesystemFavorites(hostId),
+    queryFn: () => listFilesystemFavorites(nodeId),
     enabled: open,
     staleTime: 60_000,
   })
@@ -144,7 +144,7 @@ export function DirectoryBrowserDialog({
     error,
   } = useQuery<FilesystemBrowseResult>({
     queryKey: ['filesystem-browse', hostKey, currentPath ?? ''],
-    queryFn: () => browseFilesystem(hostId, currentPath),
+    queryFn: () => browseFilesystem(nodeId, currentPath),
     enabled: open,
     staleTime: 30_000,
     // Keep the previous directory visible while the next one loads — critical for
@@ -247,7 +247,7 @@ export function DirectoryBrowserDialog({
 
           <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
             <PathBar
-              hostId={hostId}
+              nodeId={nodeId}
               currentPath={currentDirectory ?? currentPath ?? ''}
               fetching={isFetching && !showInitialSpinner}
               onNavigate={navigateTo}
@@ -342,13 +342,13 @@ export function DirectoryBrowserDialog({
 }
 
 function PathBar({
-  hostId,
+  nodeId,
   currentPath,
   fetching,
   onNavigate,
   onGoUp,
 }: {
-  hostId: string | null | undefined
+  nodeId: string | null | undefined
   currentPath: string
   fetching: boolean
   onNavigate: (path: string) => void
@@ -374,8 +374,8 @@ function PathBar({
   const prefix = lastSlash >= 0 ? debouncedEditValue.slice(lastSlash + 1).toLowerCase() : ''
 
   const { data: suggestionsData } = useQuery<FilesystemBrowseResult>({
-    queryKey: ['filesystem-browse', hostId ?? 'local', parentDir ?? ''],
-    queryFn: () => browseFilesystem(hostId, parentDir),
+    queryKey: ['filesystem-browse', nodeId ?? 'local', parentDir ?? ''],
+    queryFn: () => browseFilesystem(nodeId, parentDir),
     enabled: editing && !!parentDir,
     staleTime: 30_000,
     placeholderData: keepPreviousData,

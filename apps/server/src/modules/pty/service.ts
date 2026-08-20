@@ -559,7 +559,7 @@ function resolveShellCwd(cwd: string): string {
 
 function getShellAllowedRoots(): ResolvedRootBoundary[] {
   const workspaceRoots = Workspace.list()
-    .filter(workspace => workspace.locator.hostId === 'local')
+    .filter(workspace => workspace.locator.nodeId === 'local')
     .map(workspace => workspace.locator.path)
   const worktreeRoots = db()
     .select({ path: worktrees.path })

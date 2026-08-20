@@ -1,100 +1,89 @@
 import type { ServerPluginContext } from '@cradle/plugin-sdk/server'
 import { z } from 'zod'
 
-export const DEFAULT_NOWLEDGE_API_URL = 'http://127.0.0.1:14242'
+export const DEFAULT_NOWLEDGE_MCP_URL = 'http://127.0.0.1:14242/mcp/'
 
 const CONFIG_STORAGE_KEY = 'config'
+const API_KEY_SECRET_KEY = 'api-key'
+
+const McpUrlSchema = z.url({ protocol: /^https?$/ })
 
 const StoredConfigSchema = z.object({
-  apiUrl: z.string().trim().optional(),
-  mcpUrl: z.string().trim().optional(),
-  spaceId: z.string().trim().optional(),
+  mcpUrl: McpUrlSchema.optional(),
   enabled: z.boolean().optional(),
-  recallEnabled: z.literal(false).optional(),
-  captureEnabled: z.literal(false).optional(),
 })
 
 const ConfigUpdateSchema = z.object({
-  apiUrl: z.string().trim().optional(),
-  mcpUrl: z.string().trim().nullable().optional(),
-  spaceId: z.string().trim().nullable().optional(),
+  mcpUrl: McpUrlSchema.optional(),
   enabled: z.boolean().optional(),
-  recallEnabled: z.literal(false).optional(),
-  captureEnabled: z.literal(false).optional(),
-}).passthrough()
+  apiKey: z.union([z.string().trim().min(1), z.null()]).optional(),
+}).strict()
 
-export interface NowledgePluginConfig {
-  apiUrl: string
-  mcpUrl?: string
-  spaceId?: string
+export type NowledgeApiKeySource = 'plugin' | 'environment' | 'none'
+
+export interface PublicNowledgePluginConfig {
+  mcpUrl: string
   enabled: boolean
-  recallEnabled: false
-  captureEnabled: false
+  hasApiKey: boolean
+  apiKeySource: NowledgeApiKeySource
 }
 
-export interface NowledgeResolvedConfig extends NowledgePluginConfig {
+export interface NowledgeResolvedConfig extends PublicNowledgePluginConfig {
   apiKey?: string
-  hasApiKey: boolean
-}
-
-export interface PublicNowledgePluginConfig extends NowledgePluginConfig {
-  hasApiKey: boolean
-}
-
-export function projectPublicConfig(config: NowledgeResolvedConfig): PublicNowledgePluginConfig {
-  const { apiKey: _apiKey, ...publicConfig } = config
-  return publicConfig
 }
 
 export async function readNowledgePluginConfig(ctx: ServerPluginContext): Promise<NowledgeResolvedConfig> {
   const stored = await readStoredConfig(ctx)
-  const sharedApiUrl = readSharedValue(ctx, 'NMEM_API_URL')
-  const envApiUrl = process.env.NMEM_API_URL
-  const sharedMcpUrl = readSharedValue(ctx, 'NMEM_MCP_URL')
-  const envMcpUrl = process.env.NMEM_MCP_URL
-  const apiKey = readSharedValue(ctx, 'NMEM_API_KEY') ?? process.env.NMEM_API_KEY
-  const apiUrl = normalizeApiUrl(stored.apiUrl ?? sharedApiUrl ?? envApiUrl ?? DEFAULT_NOWLEDGE_API_URL)
-  const mcpUrl = normalizeOptionalUrl(stored.mcpUrl ?? sharedMcpUrl ?? envMcpUrl) ?? deriveMcpUrl(apiUrl)
-  const spaceId = normalizeOptionalString(stored.spaceId)
+  const pluginApiKey = normalizeOptionalString(ctx.secrets.get(API_KEY_SECRET_KEY) ?? undefined)
+  const environmentApiKey = readSharedValue(ctx, 'NMEM_API_KEY')
+    ?? normalizeOptionalString(process.env.NMEM_API_KEY)
+  const apiKey = pluginApiKey ?? environmentApiKey
+  const mcpUrl = stored.mcpUrl
+    ?? readSharedValue(ctx, 'NMEM_MCP_URL')
+    ?? normalizeOptionalString(process.env.NMEM_MCP_URL)
+    ?? DEFAULT_NOWLEDGE_MCP_URL
 
   return {
-    apiUrl,
-    ...(mcpUrl ? { mcpUrl } : {}),
-    ...(spaceId ? { spaceId } : {}),
+    mcpUrl: McpUrlSchema.parse(mcpUrl),
     enabled: stored.enabled ?? true,
-    recallEnabled: false,
-    captureEnabled: false,
-    ...(apiKey ? { apiKey } : {}),
     hasApiKey: Boolean(apiKey),
+    apiKeySource: pluginApiKey ? 'plugin' : environmentApiKey ? 'environment' : 'none',
+    ...(apiKey ? { apiKey } : {}),
   }
 }
 
 export async function writeNowledgePluginConfig(
   ctx: ServerPluginContext,
   input: unknown,
-): Promise<NowledgePluginConfig> {
+): Promise<PublicNowledgePluginConfig> {
   const update = ConfigUpdateSchema.parse(input)
   const current = await readStoredConfig(ctx)
   const nextStored = StoredConfigSchema.parse({
     ...current,
-    ...(update.apiUrl !== undefined ? { apiUrl: normalizeApiUrl(update.apiUrl) } : {}),
-    ...(update.mcpUrl !== undefined ? { mcpUrl: normalizeNullableUrl(update.mcpUrl) } : {}),
-    ...(update.spaceId !== undefined ? { spaceId: normalizeNullableString(update.spaceId) } : {}),
+    ...(update.mcpUrl !== undefined ? { mcpUrl: update.mcpUrl } : {}),
     ...(update.enabled !== undefined ? { enabled: update.enabled } : {}),
-    recallEnabled: false,
-    captureEnabled: false,
   })
 
   await ctx.storage.set(CONFIG_STORAGE_KEY, JSON.stringify(nextStored))
 
-  return {
-    apiUrl: normalizeApiUrl(nextStored.apiUrl ?? DEFAULT_NOWLEDGE_API_URL),
-    mcpUrl: normalizeOptionalUrl(nextStored.mcpUrl) ?? deriveMcpUrl(normalizeApiUrl(nextStored.apiUrl ?? DEFAULT_NOWLEDGE_API_URL)),
-    ...(normalizeOptionalString(nextStored.spaceId) ? { spaceId: normalizeOptionalString(nextStored.spaceId) } : {}),
-    enabled: nextStored.enabled ?? true,
-    recallEnabled: false,
-    captureEnabled: false,
+  if (update.apiKey === null) {
+    ctx.secrets.delete(API_KEY_SECRET_KEY)
   }
+  else if (update.apiKey !== undefined) {
+    ctx.secrets.set(API_KEY_SECRET_KEY, update.apiKey)
+  }
+
+  return projectPublicConfig(await readNowledgePluginConfig(ctx))
+}
+
+export async function clearNowledgePluginConfig(ctx: ServerPluginContext): Promise<void> {
+  ctx.secrets.delete(API_KEY_SECRET_KEY)
+  await ctx.storage.delete(CONFIG_STORAGE_KEY)
+}
+
+export function projectPublicConfig(config: NowledgeResolvedConfig): PublicNowledgePluginConfig {
+  const { apiKey: _apiKey, ...publicConfig } = config
+  return publicConfig
 }
 
 async function readStoredConfig(ctx: ServerPluginContext): Promise<z.infer<typeof StoredConfigSchema>> {
@@ -113,40 +102,6 @@ async function readStoredConfig(ctx: ServerPluginContext): Promise<z.infer<typeo
 
 function readSharedValue(ctx: ServerPluginContext, key: string): string | undefined {
   return normalizeOptionalString(ctx.sharedConfig.get(key))
-}
-
-function normalizeApiUrl(value: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    return DEFAULT_NOWLEDGE_API_URL
-  }
-  return trimmed.replace(/\/+$/, '')
-}
-
-function normalizeNullableUrl(value: string | null | undefined): string | undefined {
-  if (value === null) {
-    return undefined
-  }
-  return normalizeOptionalUrl(value)
-}
-
-function normalizeOptionalUrl(value: string | undefined): string | undefined {
-  const trimmed = normalizeOptionalString(value)
-  if (!trimmed) {
-    return undefined
-  }
-  return trimmed.replace(/\/+$/, '')
-}
-
-function deriveMcpUrl(apiUrl: string): string {
-  return `${apiUrl.replace(/\/+$/, '')}/mcp`
-}
-
-function normalizeNullableString(value: string | null | undefined): string | undefined {
-  if (value === null) {
-    return undefined
-  }
-  return normalizeOptionalString(value)
 }
 
 function normalizeOptionalString(value: string | undefined): string | undefined {

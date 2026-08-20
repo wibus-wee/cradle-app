@@ -9,7 +9,7 @@ const spec = {
     "server",
     "resources"
   ],
-  "description": "Get one active pooled opencode host process resource sample",
+  "description": "Get active pooled opencode host process resource samples",
   "flags": [],
   "method": "get",
   "path": "/opencode/server/resources"

@@ -88,6 +88,7 @@ browser_get_text → selector: ".target-section"
 - **Real events**: Click and type use CDP Input domain — they trigger all event listeners, work with CSP, and behave identically to human interaction
 - **Accessibility tree**: `browser_dom_snapshot` returns semantic nodes with `role`, `name`, `value`, `description` — great for understanding page structure without needing screenshots
 - **Tab management**: `browser_tabs_new` returns a tab ID. Pass that `tabId` to follow-up commands when working across multiple pages.
+- **Session isolation**: Every tool call is bound by Cradle to the chat session that launched the MCP server. Tabs from other sessions are neither listed nor addressable.
 - **Timeouts**: `browser_wait_for_selector` defaults to 5000ms. Increase for slow-loading pages.
 
 ## Limitations

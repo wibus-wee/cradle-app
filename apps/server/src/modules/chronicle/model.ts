@@ -1341,6 +1341,7 @@ export const ChronicleModel = {
     available: t.Boolean(),
     running: t.Boolean(),
     pid: t.Nullable(t.Number()),
+    runtimeError: t.Nullable(t.String()),
     lastCaptureAt: t.Nullable(t.Number()),
     lastSummaryAt: t.Nullable(t.Number()),
     lastErrorAt: t.Nullable(t.Number()),

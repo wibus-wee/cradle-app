@@ -27,7 +27,7 @@ const WorkspaceRecordSchema = z.object({
   id: z.string(),
   name: z.string(),
   locator: z.object({
-    hostId: z.string(),
+    nodeId: z.string(),
     path: z.string(),
   }).passthrough(),
 }).passthrough()
@@ -135,7 +135,7 @@ async function resolveExistingWorkspace(
     const resolved = await context.request({
       method: 'get',
       path: {},
-      query: { hostId: 'local', path },
+      query: { nodeId: 'local', path },
       template: '/workspaces/resolve',
     })
     if (resolved == null) {

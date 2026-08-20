@@ -11,7 +11,7 @@ export const workspaceFixtures = {
     id: 'workspace-cradle',
     name: 'Cradle',
     locator: {
-      hostId: 'local',
+      nodeId: 'local',
       path: '/Users/demo/cradle',
       kind: 'project',
     },
@@ -32,7 +32,7 @@ export const workspaceFixtures = {
     id: 'workspace-missing',
     name: 'Archived client project',
     locator: {
-      hostId: 'local',
+      nodeId: 'local',
       path: '/Users/demo/archived-client',
       kind: 'project',
     },
@@ -53,7 +53,7 @@ export const workspaceFixtures = {
     id: 'workspace-remote',
     name: 'Remote release environment',
     locator: {
-      hostId: 'remote-host-staging',
+      nodeId: 'remote-host-staging',
       path: '/srv/cradle-release',
       kind: 'project',
     },

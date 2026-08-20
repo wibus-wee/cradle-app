@@ -43,6 +43,7 @@ export interface ChronicleStatus {
   available: boolean
   running: boolean
   pid: number | null
+  runtimeError: string | null
   lastCaptureAt: number | null
   lastSummaryAt: number | null
   lastErrorAt: number | null
@@ -844,6 +845,7 @@ const ChronicleStatusSchema = z.object({
   available: z.boolean(),
   running: z.boolean(),
   pid: z.number().finite().nullable(),
+  runtimeError: z.string().nullable().optional().default(null),
   lastCaptureAt: z.number().finite().nullable(),
   lastSummaryAt: z.number().finite().nullable(),
   lastErrorAt: z.number().finite().nullable(),

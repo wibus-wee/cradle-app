@@ -180,13 +180,14 @@ export function ChronicleStatusPanelView({
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <TriangleAlertIcon className="size-3.5 shrink-0" />
-          <span className="truncate">
-            {status?.lastExitCode === null || status?.lastExitCode === undefined
+          <span className="truncate" title={status?.runtimeError ?? undefined}>
+            {status?.runtimeError
+              ?? (status?.lastExitCode === null || status?.lastExitCode === undefined
               ? t('status.noExitRecord')
               : t('status.lastExit', {
                   code: status.lastExitCode,
                   time: formatChronicleDateTime(t, status.lastExitAt),
-                })}
+                }))}
           </span>
         </div>
       </div>

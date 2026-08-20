@@ -256,7 +256,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       db().insert(workspaces).values({
         id: 'workspace-sdk',
         name: 'Workspace SDK',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
 
@@ -343,7 +343,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       db().insert(workspaces).values({
         id: 'workspace-agent-settings',
         name: 'Workspace Agent Settings',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
 
@@ -491,7 +491,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       db().insert(workspaces).values({
         id: 'workspace-session-matrix-settings',
         name: 'Workspace Session Matrix Settings',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
 
@@ -633,7 +633,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       db().insert(workspaces).values({
         id: 'workspace-tool',
         name: 'Workspace Tool',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
 
@@ -777,7 +777,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       db().insert(workspaces).values({
         id: 'workspace-subagent',
         name: 'Workspace Subagent',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
 
@@ -904,7 +904,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       db().insert(workspaces).values({
         id: 'workspace-subagent-late-task',
         name: 'Workspace Subagent Late Task',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
 
@@ -1080,7 +1080,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       db().insert(workspaces).values({
         id: 'workspace-subagent-split',
         name: 'Workspace Subagent Split',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
 
@@ -1213,7 +1213,7 @@ describe('sdk-backed providers in unified chat runtime', () => {
       db().insert(workspaces).values({
         id: 'workspace-tool-err',
         name: 'Workspace Tool Err',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
 

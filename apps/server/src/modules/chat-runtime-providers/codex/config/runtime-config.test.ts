@@ -64,7 +64,7 @@ describe('buildCodexConfig MCP projection', () => {
     })
   })
 
-  it('binds the active invocation only to the built-in Cradle MCP server', () => {
+  it('binds the active invocation to session-scoped MCP servers', () => {
     addHostMcpServer({
       transport: 'stdio',
       name: AGENT_TOOLS_MCP_SERVER_NAME,
@@ -78,6 +78,7 @@ describe('buildCodexConfig MCP projection', () => {
       command: 'node',
       args: ['/plugins/browser-use/dist/mcp-server.mjs'],
       env: { BROWSER_BACKEND_SOCKET: '/tmp/cradle-browser.sock' },
+      scope: 'chat-session',
     })
 
     const config = bindCodexCradleMcpInvocation(
@@ -112,7 +113,10 @@ describe('buildCodexConfig MCP projection', () => {
       'browser-use': {
         command: 'node',
         args: ['/plugins/browser-use/dist/mcp-server.mjs'],
-        env: { BROWSER_BACKEND_SOCKET: '/tmp/cradle-browser.sock' },
+        env: {
+          BROWSER_BACKEND_SOCKET: '/tmp/cradle-browser.sock',
+          CRADLE_CHAT_SESSION_ID: 'session-1',
+        },
       },
     })
   })

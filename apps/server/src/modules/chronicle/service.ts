@@ -1432,6 +1432,7 @@ export interface ChronicleStatus {
   available: boolean
   running: boolean
   pid: number | null
+  runtimeError: string | null
   lastCaptureAt: number | null
   lastSummaryAt: number | null
   lastErrorAt: number | null
@@ -2476,9 +2477,10 @@ export async function getStatus(): Promise<ChronicleStatus> {
   const dreamRunCount = db().get<{ count: number }>(sql`SELECT COUNT(*) AS count FROM chronicle_dream_runs`)?.count ?? 0
 
   return {
-    available: runtimeEnabled && !!config.profileId,
+    available: runtimeEnabled && !!config.profileId && daemonInfo.available,
     running: runtimeEnabled && daemonInfo.running,
     pid: daemonInfo.pid,
+    runtimeError: daemonInfo.runtimeError,
     lastCaptureAt: latestSnapshot?.capturedAt ?? null,
     lastSummaryAt: latestMemory?.createdAt ?? null,
     lastErrorAt: latestError?.createdAt ?? null,

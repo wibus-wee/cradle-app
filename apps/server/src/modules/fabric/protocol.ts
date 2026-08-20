@@ -42,6 +42,35 @@ export interface NodeSummary {
   status: 'online' | 'offline'
   lastSeenAt: string
   revision: number
+  /** This Controller's active grant scopes over the Node (directory listings only). */
+  scopes?: FabricScope[]
+}
+
+/** One Controller grant over a Node, as recorded by the relayd directory. */
+export interface FabricNodeGrant {
+  grantId: string
+  fabricId: string
+  controllerId: string
+  nodeId: string
+  scope: FabricScope
+  revokedAt?: string
+}
+
+export interface FabricJoinRequest {
+  requestId: string
+  fabricId: string
+  subjectKind: 'node'
+  subjectId: string
+  identityPubkey: string
+  encryptionPubkey: string
+  displayName: string
+  platform: string
+  version: string
+  capabilities: string[]
+  deliverySecretHash: string
+  issuedAt: number
+  expiresAt: number
+  signature: string
 }
 
 export interface FabricKeyPair {
@@ -129,7 +158,7 @@ export function signFabricJoinRequest(input: {
   version: string
   capabilities: string[]
   deliverySecret: string
-}): Record<string, unknown> {
+}): FabricJoinRequest {
   const request = {
     requestId: `join_${randomUUID()}`,
     fabricId: input.fabricId,

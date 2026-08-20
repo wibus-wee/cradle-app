@@ -37,3 +37,14 @@ The active suite contains 44 scenarios: 13 `@P0` smoke journeys and 31 `@P1` dee
 - `@CRADLE-*`: stable scenario identity used by reports and focused runs.
 
 Feature prose describes observable user behavior. Provider scripts, exact request matching, temporary repositories, and other deterministic setup belong in support helpers rather than in Gherkin.
+
+## Dedicated process suites
+
+| Suite | Stable IDs | Journey boundary | Command |
+| --- | --- | --- | --- |
+| [`fabric-two-node.spec.ts`](../fabric/fabric-two-node.spec.ts) | `CRADLE-FABRIC-001` | Real relayd, two independent Cradle Server databases, UI pairing, bidirectional Workspace, Chat, Node-owned Work/worktree routing, remote tool approval and continuation in both directions, cross-controller Session discovery, and reconnect recovery | `pnpm e2e:fabric` |
+
+Fabric uses a dedicated Playwright configuration because its acceptance
+boundary requires three long-lived backend processes and two browser contexts.
+It runs as a separate PR job rather than changing the Cucumber scenario count
+or priority tags above.

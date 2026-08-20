@@ -1458,7 +1458,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-active-capabilities',
           name: 'Workspace Codex Active Capabilities',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -1551,7 +1551,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-rollback',
           name: 'Workspace Codex Rollback',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -1676,7 +1676,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-provider-thread-delete',
           name: 'Workspace Provider Thread Delete',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -1762,7 +1762,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-quick-question',
           name: 'Workspace Codex Quick Question',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -1836,7 +1836,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-quick-question-error',
           name: 'Workspace Codex Quick Question Error',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -1903,7 +1903,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-title-generation-error',
           name: 'Workspace Codex Title Generation Error',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2022,7 +2022,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-app-server-stream',
           name: 'Workspace Codex App Server Stream',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2096,7 +2096,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-app-server-stream-delete',
           name: 'Workspace Codex App Server Stream Delete',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2174,7 +2174,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-app-server-invoke-delete',
           name: 'Workspace Codex App Server Invoke Delete',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2262,7 +2262,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-skill',
           name: 'Workspace Codex Skill',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2359,7 +2359,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-plugin-mention',
           name: 'Workspace Codex Plugin Mention',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2445,7 +2445,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-side',
           name: 'Workspace Codex Side',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2592,7 +2592,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-fallback-side',
           name: 'Workspace Fallback Side',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2768,7 +2768,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-live-side',
           name: 'Workspace Codex Live Side',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2862,7 +2862,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-side-expired',
           name: 'Workspace Codex Side Expired',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -2955,7 +2955,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-side-close',
           name: 'Workspace Codex Side Close',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3070,7 +3070,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-incompatible',
           name: 'Workspace Chat Incompatible',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3177,7 +3177,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat',
           name: 'Workspace Chat',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3273,7 +3273,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-runtime-settings-failure',
           name: 'Workspace Runtime Settings Failure',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3442,7 +3442,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-claude-matrix-settings',
           name: 'Workspace Claude Matrix Settings',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3586,7 +3586,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-pending-runtime-settings',
           name: 'Workspace Pending Runtime Settings',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3701,7 +3701,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-pending-provider-target-delete',
           name: 'Workspace Pending Provider Target Delete',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3788,7 +3788,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-concurrent-start',
           name: 'Workspace Concurrent Start',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3869,7 +3869,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-live-steer-snapshot',
           name: 'Workspace Live Steer Snapshot',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -3992,7 +3992,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-live-steer-thinking-effort',
           name: 'Workspace Live Steer Thinking Effort',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -4080,7 +4080,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-historical-queue-runtime-settings',
           name: 'Workspace Historical Queue Runtime Settings',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -4214,7 +4214,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-thinking',
           name: 'Workspace Chat Thinking',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -4283,7 +4283,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-provider-deleted',
           name: 'Workspace Chat Provider Deleted',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -4454,7 +4454,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-bounded-history',
           name: 'Workspace Chat Bounded History',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -4588,7 +4588,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-repair-snapshot',
           name: 'Workspace Chat Repair Snapshot',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -4681,7 +4681,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-switch',
           name: 'Workspace Chat Switch',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -4827,7 +4827,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-session-model',
           name: 'Workspace Chat Session Model',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -4935,14 +4935,14 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-memory',
           name: 'Workspace Chat Memory',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .onConflictDoUpdate({
           target: workspaces.id,
           set: {
             name: 'Workspace Chat Memory',
             path: workspaceRoot,
-            locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+            locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
           },
         })
         .run()
@@ -5055,7 +5055,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-stream',
           name: 'Workspace Chat Stream',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -5149,7 +5149,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-protocol-normalization',
           name: 'Workspace Chat Protocol Normalization',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -5217,7 +5217,7 @@ describe('chat runtime capability', () => {
         .values({
           id: 'workspace-chat-provider-synthetic-turn',
           name: 'Workspace Chat Provider Synthetic Turn',
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
           path: workspaceRoot,
         })
         .run()
@@ -5327,7 +5327,7 @@ describe('chat runtime capability', () => {
         .values({
           id: 'workspace-chat-main-synthetic-turn',
           name: 'Workspace Chat Main Synthetic Turn',
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
           path: workspaceRoot,
         })
         .run()
@@ -5465,7 +5465,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-replay',
           name: 'Workspace Chat Replay',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -5562,7 +5562,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-active-snapshot',
           name: 'Workspace Chat Active Snapshot',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -5709,7 +5709,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat',
           name: 'Workspace Chat',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -5806,7 +5806,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-orphan',
           name: 'Workspace Chat Orphan',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
       db()
@@ -6119,7 +6119,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-stale-active-run',
           name: 'Workspace Stale Active Run',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -6343,7 +6343,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-queue-update',
           name: 'Workspace Queue Update',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
       await createProfileAndSession(app, 'workspace-queue-update', {
@@ -6508,7 +6508,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-queue',
           name: 'Workspace Chat Queue',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -6664,7 +6664,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-invalid-snapshot',
           name: 'Workspace Chat Invalid Snapshot',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -6749,7 +6749,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-message-metadata',
           name: 'Workspace Chat Message Metadata',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
       db()
@@ -6863,7 +6863,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-coalesced-replay',
           name: 'Workspace Chat Coalesced Replay',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -6979,7 +6979,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-segmented-replay',
           name: 'Workspace Chat Segmented Replay',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -7087,7 +7087,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-concurrent-replay',
           name: 'Workspace Chat Concurrent Replay',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -7192,7 +7192,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-chat-compact-snapshot',
           name: 'Workspace Chat Compact Snapshot',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -7266,7 +7266,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-bang-command',
           name: 'Workspace Codex Bang Command',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -7373,7 +7373,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-goal-auto',
           name: 'Workspace Codex Goal Auto',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -7504,7 +7504,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-goal-status-wake',
           name: 'Workspace Codex Goal Status Wake',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -7685,7 +7685,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-goal-disabled-target',
           name: 'Workspace Codex Goal Disabled Target',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 
@@ -7796,7 +7796,7 @@ describe('chat runtime capability', () => {
           id: 'workspace-codex-goal-stale-binding',
           name: 'Workspace Codex Goal Stale Binding',
           path: workspaceRoot,
-          locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+          locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         })
         .run()
 

@@ -13,8 +13,8 @@ import {
   resolveRuntimeOwnedChatProfileId,
 } from './chat-selection'
 
-export function resolveComposerCatalogSource(remoteHostId: string | null | undefined): 'local' | 'remote-host' {
-  return remoteHostId ? 'remote-host' : 'local'
+export function resolveComposerCatalogSource(nodeId: string | null | undefined): 'local' | 'node' {
+  return nodeId ? 'node' : 'local'
 }
 
 export function readComposerThinkingEffort(value: string | null | undefined): ThinkingEffort {

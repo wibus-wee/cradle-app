@@ -79,10 +79,10 @@ export function WorkspaceDetailPageContainer({
   const composer = (
     <DraftChatComposer
       workspaceId={workspaceId}
-      remoteHostId={
+      nodeId={
         isLocalWorkspace(owner.workspace)
           ? null
-          : owner.workspace.locator.hostId
+          : owner.workspace.locator.nodeId
       }
       active={isActive}
       onSend={owner.handleDraftComposerSend}

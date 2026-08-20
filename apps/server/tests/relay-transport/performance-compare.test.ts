@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 
 import { decodeRelayChunk, encodeRelayChunk } from '../../src/modules/relay-transport/compression'
-import { RelayCipher } from '../../src/modules/relay-transport/crypto'
+import { FabricSessionCipher } from '../../src/modules/relay-transport/crypto'
 import {
+  decodeFabricSessionEnvelope,
   decodeInnerFrame,
-  decodeRelayEnvelope,
+  encodeFabricSessionEnvelope,
   encodeInnerFrame,
-  encodeRelayEnvelope,
-  legacyV1WireBytesForStreamData,
-  RELAY_ENVELOPE_KIND,
+  FABRIC_SESSION_ENVELOPE_KIND,
+  FABRIC_SESSION_PROTOCOL_VERSION,
+  referenceJsonWireBytesForStreamData,
   RELAY_MAX_STREAM_CHUNK_BYTES,
-  RELAY_PROTOCOL_VERSION,
 } from '../../src/modules/relay-transport/protocol'
 
 interface BenchmarkRow {
@@ -60,7 +60,7 @@ function makePayload(length: number, profile: CodecSample['profile']): Uint8Arra
 }
 
 function baselineV2Wire(payload: Uint8Array): { wireBytes: number, frames: number } {
-  const roomBytes = Buffer.byteLength('room_benchmark')
+  const linkBytes = Buffer.byteLength('fabric-benchmark-link')
   const streamBytes = Buffer.byteLength('benchmark')
   let wireBytes = 0
   let frames = 0
@@ -68,14 +68,14 @@ function baselineV2Wire(payload: Uint8Array): { wireBytes: number, frames: numbe
     const chunkBytes = Math.min(RELAY_MAX_STREAM_CHUNK_BYTES, payload.byteLength - offset)
     // V2: outer header + room + outer stream id + encrypted(inner header +
     // inner stream id + data). XChaCha added nonce(24) + tag(16).
-    wireBytes += 16 + roomBytes + streamBytes + 7 + streamBytes + chunkBytes + 40
+    wireBytes += 16 + linkBytes + streamBytes + 7 + streamBytes + chunkBytes + 40
     frames++
   }
   return { wireBytes, frames }
 }
 
 function encodeOptimizedV2Payload(payload: Uint8Array): { wireBytes: number, frames: number } {
-  const cipher = new RelayCipher(new Uint8Array(32).fill(7))
+  const cipher = new FabricSessionCipher(new Uint8Array(32).fill(7))
   let wireBytes = 0
   let frames = 0
   for (let offset = 0; offset < payload.byteLength; offset += RELAY_MAX_STREAM_CHUNK_BYTES) {
@@ -90,16 +90,16 @@ function encodeOptimizedV2Payload(payload: Uint8Array): { wireBytes: number, fra
         ? { compression: 'zstd' as const, uncompressedBytes: compressed.uncompressedBytes }
         : {}),
     }
-    const encoded = encodeRelayEnvelope({
-      version: RELAY_PROTOCOL_VERSION,
-      roomId: 'room_benchmark',
+    const encoded = encodeFabricSessionEnvelope({
+      version: FABRIC_SESSION_PROTOCOL_VERSION,
+      linkId: 'fabric-benchmark-link',
       seq: frames,
-      kind: RELAY_ENVELOPE_KIND.dataFrame,
+      kind: FABRIC_SESSION_ENVELOPE_KIND.dataFrame,
       priority: 'data',
       streamId: frame.streamId,
       payload: cipher.encrypt(encodeInnerFrame(frame)),
     })
-    const decoded = decodeRelayEnvelope(encoded)
+    const decoded = decodeFabricSessionEnvelope(encoded)
     const decodedFrame = decodeInnerFrame(cipher.decrypt(decoded.payload))
     expect(decodedFrame).toMatchObject({ kind: 'stream_data', streamId: frame.streamId, seq: offset })
     if (decodedFrame.kind === 'stream_data') {
@@ -122,7 +122,7 @@ function measureCodec(profile: CodecSample['profile'], payloadBytes: number): Co
   return {
     profile,
     payloadBytes,
-    v1WireBytes: legacyV1WireBytesForStreamData(payload),
+    v1WireBytes: referenceJsonWireBytesForStreamData(payload),
     baselineV2WireBytes: baselineV2.wireBytes,
     optimizedV2WireBytes: optimizedV2.wireBytes,
     v1Frames: 1,
@@ -185,7 +185,7 @@ function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void
     kind: 'relay-v2-performance-benchmark',
     run: {
       id: 'relay-v1-v2-baseline-optimized-compare',
-      protocol: { v1: 1, baselineV2: RELAY_PROTOCOL_VERSION, optimizedV2: RELAY_PROTOCOL_VERSION },
+      protocol: { v1: 1, baselineV2: FABRIC_SESSION_PROTOCOL_VERSION, optimizedV2: FABRIC_SESSION_PROTOCOL_VERSION },
       measurementBoundary: 'same-process codec and scheduler model',
       payloadPatterns: ['compressible JSON-like stream', 'deterministic incompressible stream'],
       loss: 'none',

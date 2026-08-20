@@ -51,7 +51,8 @@ type createJoinRequestResponse struct {
 }
 
 type approveJoinRequest struct {
-	Certificate membership.Certificate `json:"certificate"`
+	NodeCertificate       membership.Certificate `json:"nodeCertificate"`
+	ControllerCertificate membership.Certificate `json:"controllerCertificate"`
 }
 
 type registerControllerRequest struct {
@@ -60,9 +61,10 @@ type registerControllerRequest struct {
 }
 
 type event struct {
-	Type     string              `json:"type"`
-	Revision int64               `json:"revision"`
-	Node     *fabric.NodeSummary `json:"node,omitempty"`
+	Type                    string              `json:"type"`
+	Revision                int64               `json:"revision"`
+	Node                    *fabric.NodeSummary `json:"node,omitempty"`
+	AuthorizedControllerIDs []string            `json:"-"`
 }
 
 func NewServer(cfg Config) (*Server, error) {
@@ -80,10 +82,14 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/join-requests", s.createJoinRequest)
 	mux.HandleFunc("GET /v1/join-requests/{requestId}", s.readJoinRequest)
 	mux.HandleFunc("POST /v1/join-requests/{requestId}/approve", s.approveJoinRequest)
+	mux.HandleFunc("GET /v1/fabrics/{fabricId}/join-requests", s.listJoinRequests)
+	mux.HandleFunc("DELETE /v1/fabrics/{fabricId}/join-requests/{requestId}", s.rejectJoinRequest)
 	mux.HandleFunc("POST /v1/fabrics/{fabricId}/controllers", s.registerController)
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/nodes", s.listNodes)
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/events", s.events)
 	mux.HandleFunc("POST /v1/nodes/{nodeId}/links", s.openLink)
+	mux.HandleFunc("DELETE /v1/nodes/{nodeId}", s.removeNode)
+	mux.HandleFunc("GET /v1/nodes/{nodeId}/grants", s.listNodeGrants)
 	mux.HandleFunc("DELETE /v1/nodes/{nodeId}/grants/{grantId}", s.revokeGrant)
 	mux.HandleFunc("GET /v1/ws/nodes", s.nodeWebSocket)
 	mux.HandleFunc("GET /v1/ws/controllers/{linkId}", s.controllerWebSocket)
@@ -133,16 +139,58 @@ func (s *Server) readJoinRequest(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "pending", "request": result.Request})
 		return
 	}
+	if errors.Is(err, fabric.ErrJoinRequestRejected) {
+		writeJSON(w, http.StatusOK, map[string]any{"status": "rejected", "request": result.Request, "rejectedAt": result.RejectedAt})
+		return
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"status":      "approved",
-		"request":     result.Request,
-		"certificate": result.Certificate,
-		"approvedAt":  result.ApprovedAt,
+		"status":                "approved",
+		"request":               result.Request,
+		"nodeCertificate":       result.NodeCertificate,
+		"controllerCertificate": result.ControllerCertificate,
+		"approvedAt":            result.ApprovedAt,
 	})
+}
+
+func (s *Server) listJoinRequests(w http.ResponseWriter, r *http.Request) {
+	fabricID := r.PathValue("fabricId")
+	record, err := s.store.GetFabric(r.Context(), fabricID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if err := s.requireOwner(r, record); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	requests, err := s.store.ListPendingJoinRequests(r.Context(), fabricID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"requests": requests})
+}
+
+func (s *Server) rejectJoinRequest(w http.ResponseWriter, r *http.Request) {
+	fabricID := r.PathValue("fabricId")
+	record, err := s.store.GetFabric(r.Context(), fabricID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if err := s.requireOwner(r, record); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	if err := s.store.RejectJoinRequest(r.Context(), fabricID, r.PathValue("requestId")); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) approveJoinRequest(w http.ResponseWriter, r *http.Request) {
@@ -151,7 +199,7 @@ func (s *Server) approveJoinRequest(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	fabricRecord, err := s.store.GetFabric(r.Context(), request.Certificate.FabricID)
+	fabricRecord, err := s.store.GetFabric(r.Context(), request.NodeCertificate.FabricID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -160,11 +208,19 @@ func (s *Server) approveJoinRequest(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
-	if err := s.validator.VerifyCertificate(request.Certificate, fabricRecord.OwnerPublicKey, fabricRecord.ID); err != nil {
+	if err := s.validator.VerifyCertificate(request.NodeCertificate, fabricRecord.OwnerPublicKey, fabricRecord.ID); err != nil {
 		writeMembershipError(w, err)
 		return
 	}
-	node, err := s.store.ApproveJoinRequest(r.Context(), requestID, request.Certificate)
+	if err := s.validator.VerifyCertificate(request.ControllerCertificate, fabricRecord.OwnerPublicKey, fabricRecord.ID); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	if request.ControllerCertificate.SubjectKind != membership.SubjectController || !membership.HasAnyScope(request.ControllerCertificate.Scopes, membership.ScopeAdmin) {
+		writeError(w, http.StatusBadRequest, "admin Controller certificate is required")
+		return
+	}
+	node, err := s.store.ApproveJoinRequest(r.Context(), requestID, request.NodeCertificate, request.ControllerCertificate)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -196,8 +252,9 @@ func (s *Server) registerController(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
+	nodeRestriction := controllerNodeRestriction(request.Certificate)
 	for _, grant := range request.Grants {
-		if request.Certificate.NodeID != "" && grant.NodeID != request.Certificate.NodeID || !membership.HasAnyScope(request.Certificate.Scopes, grant.Scope, membership.ScopeAdmin) {
+		if (nodeRestriction != "" && grant.NodeID != nodeRestriction) || !membership.HasAnyScope(request.Certificate.Scopes, grant.Scope, membership.ScopeAdmin) {
 			writeError(w, http.StatusForbidden, "controller certificate does not authorize this grant")
 			return
 		}
@@ -216,12 +273,18 @@ func (s *Server) listNodes(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
-	nodes, revision, err := s.store.ListAuthorizedNodes(r.Context(), fabricID, controller.SubjectID)
+	var nodes []fabric.NodeSummary
+	var revision int64
+	if membership.HasAnyScope(controller.Scopes, membership.ScopeAdmin) {
+		nodes, revision, err = s.store.ListFabricNodes(r.Context(), fabricID, controller.SubjectID)
+	} else {
+		nodes, revision, err = s.store.ListAuthorizedNodes(r.Context(), fabricID, controller.SubjectID)
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "nodes": restrictNodes(nodes, controller.NodeID)})
+	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "nodes": restrictNodes(nodes, controllerNodeRestriction(controller))})
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +294,14 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
-	nodes, revision, err := s.store.ListAuthorizedNodes(r.Context(), fabricID, controller.SubjectID)
+	admin := membership.HasAnyScope(controller.Scopes, membership.ScopeAdmin)
+	var nodes []fabric.NodeSummary
+	var revision int64
+	if admin {
+		nodes, revision, err = s.store.ListFabricNodes(r.Context(), fabricID, controller.SubjectID)
+	} else {
+		nodes, revision, err = s.store.ListAuthorizedNodes(r.Context(), fabricID, controller.SubjectID)
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -244,7 +314,8 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	if !writeSSE(w, "snapshot", map[string]any{"revision": revision, "nodes": restrictNodes(nodes, controller.NodeID)}) {
+	nodeRestriction := controllerNodeRestriction(controller)
+	if !writeSSE(w, "snapshot", map[string]any{"revision": revision, "nodes": restrictNodes(nodes, nodeRestriction)}) {
 		return
 	}
 	flusher.Flush()
@@ -255,13 +326,26 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case update := <-updates:
-			if update.Node != nil {
-				if controller.NodeID != "" && update.Node.NodeID != controller.NodeID {
+			if update.Node != nil && !admin {
+				if nodeRestriction != "" && update.Node.NodeID != nodeRestriction {
 					continue
 				}
-				allowed, err := s.store.HasActiveGrant(r.Context(), fabricID, controller.SubjectID, update.Node.NodeID, membership.ScopeView, membership.ScopeControl, membership.ScopeAdmin)
-				if err != nil || !allowed {
-					continue
+				if update.Type == "node.removed" {
+					authorized := false
+					for _, controllerID := range update.AuthorizedControllerIDs {
+						if controllerID == controller.SubjectID {
+							authorized = true
+							break
+						}
+					}
+					if !authorized {
+						continue
+					}
+				} else {
+					allowed, err := s.store.HasActiveGrant(r.Context(), fabricID, controller.SubjectID, update.Node.NodeID, membership.ScopeView, membership.ScopeControl, membership.ScopeApprove, membership.ScopeAdmin)
+					if err != nil || !allowed {
+						continue
+					}
 				}
 			}
 			if !writeSSE(w, update.Type, update) {
@@ -270,6 +354,48 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 	}
+}
+
+func (s *Server) removeNode(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("nodeId")
+	record, err := s.store.GetFabricForNode(r.Context(), nodeID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if err := s.requireOwner(r, record); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	node, controllerIDs, err := s.store.RemoveNode(r.Context(), record.ID, nodeID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if s.links != nil {
+		s.links.RemoveNode(record.ID, nodeID)
+	}
+	s.broker.publish(record.ID, event{Type: "node.removed", Revision: node.Revision, Node: &node, AuthorizedControllerIDs: controllerIDs})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) listNodeGrants(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("nodeId")
+	record, err := s.store.GetFabricForNode(r.Context(), nodeID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if err := s.requireOwner(r, record); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	grants, err := s.store.ListNodeGrants(r.Context(), record.ID, nodeID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"grants": grants})
 }
 
 func (s *Server) revokeGrant(w http.ResponseWriter, r *http.Request) {
@@ -412,6 +538,15 @@ func (s *Server) controllerWebSocket(w http.ResponseWriter, r *http.Request) {
 	_ = s.links.HandleController(r.Context(), linkID, controller.SubjectID, ws)
 }
 
+// Admin controllers are scoped by durable grants. Earlier device certificates
+// carried a node ID, which must not hide other nodes subsequently granted to them.
+func controllerNodeRestriction(certificate membership.Certificate) string {
+	if membership.HasAnyScope(certificate.Scopes, membership.ScopeAdmin) {
+		return ""
+	}
+	return certificate.NodeID
+}
+
 func restrictNodes(nodes []fabric.NodeSummary, nodeID string) []fabric.NodeSummary {
 	if nodeID == "" {
 		return nodes
@@ -514,6 +649,8 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, "not found")
 	case errors.Is(err, fabric.ErrJoinRequestPending):
 		writeError(w, http.StatusConflict, "join request is pending")
+	case errors.Is(err, fabric.ErrJoinRequestRejected):
+		writeError(w, http.StatusConflict, "join request was rejected")
 	case errors.Is(err, fabric.ErrJoinRequestExpired):
 		writeError(w, http.StatusGone, "join request expired")
 	case errors.Is(err, fabric.ErrAccessDenied):

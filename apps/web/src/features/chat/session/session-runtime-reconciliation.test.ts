@@ -87,7 +87,7 @@ describe('session runtime reconciliation', () => {
     })
   })
 
-  it('requests a snapshot once for a terminal latest run missing from both snapshot and store', () => {
+  it('requests a snapshot once for each terminal latest run', () => {
     const status = runtimeStatus({
       latestRun: runtimeRun({
         runId: 'run-complete',
@@ -98,8 +98,6 @@ describe('session runtime reconciliation', () => {
 
     expect(deriveRuntimeTerminalRunRefresh({
       runtimeStatus: status,
-      snapshotMessageIds: new Set(),
-      storeMessageIds: new Set(),
       previousRefreshRunId: null,
     })).toEqual({
       requestSnapshotRefresh: true,
@@ -108,12 +106,28 @@ describe('session runtime reconciliation', () => {
 
     expect(deriveRuntimeTerminalRunRefresh({
       runtimeStatus: status,
-      snapshotMessageIds: new Set(),
-      storeMessageIds: new Set(),
       previousRefreshRunId: 'run-complete',
     })).toEqual({
       requestSnapshotRefresh: false,
       nextRefreshRunId: 'run-complete',
+    })
+  })
+
+  it('refreshes a terminal run even when its streaming message already exists locally', () => {
+    const status = runtimeStatus({
+      latestRun: runtimeRun({
+        runId: 'run-stale-message',
+        messageId: 'assistant-already-present',
+        status: 'complete',
+      }),
+    })
+
+    expect(deriveRuntimeTerminalRunRefresh({
+      runtimeStatus: status,
+      previousRefreshRunId: null,
+    })).toEqual({
+      requestSnapshotRefresh: true,
+      nextRefreshRunId: 'run-stale-message',
     })
   })
 
@@ -131,8 +145,6 @@ describe('session runtime reconciliation', () => {
 
     expect(deriveRuntimeTerminalRunRefresh({
       runtimeStatus: runtimeStatus({ activeRun, latestRun }),
-      snapshotMessageIds: new Set(),
-      storeMessageIds: new Set(),
       previousRefreshRunId: null,
     })).toEqual({
       requestSnapshotRefresh: false,

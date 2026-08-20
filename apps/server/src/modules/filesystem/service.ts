@@ -113,7 +113,7 @@ async function getBrowseAllowedRoots(): Promise<ResolvedRootBoundary[]> {
   const candidates = [
     homedir(),
     ...Workspace.list()
-      .filter(workspace => workspace.locator.hostId === 'local')
+      .filter(workspace => workspace.locator.nodeId === 'local')
       .map(workspace => workspace.locator.path),
   ]
 

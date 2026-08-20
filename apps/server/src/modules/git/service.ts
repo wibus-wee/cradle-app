@@ -149,7 +149,7 @@ function getWorkspacePath(workspaceId: string): string {
       details: { workspaceId },
     })
   }
-  if (workspace.locator.hostId !== 'local') {
+  if (workspace.locator.nodeId !== 'local') {
     throw new AppError({
       code: 'workspace_local_path_required',
       status: 409,

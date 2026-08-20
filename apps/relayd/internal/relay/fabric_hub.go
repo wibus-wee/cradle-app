@@ -16,12 +16,19 @@ var (
 	ErrNodeConnected    = errors.New("relay: node already connected")
 )
 
+// FabricHubConfig bounds the opaque envelope queues of one FabricHub.
+type FabricHubConfig struct {
+	MaxFrameBytes      int64
+	MaxQueuedEnvelopes int
+	MaxQueuedBytes     int64
+}
+
 // FabricHub replaces one permanent room with a durable Node socket and many
 // short-lived Controller links. It receives authorization decisions from the
 // directory; it never evaluates certificates itself.
 type FabricHub struct {
 	mu    sync.RWMutex
-	cfg   HubConfig
+	cfg   FabricHubConfig
 	nodes map[string]*fabricNode
 	links map[string]*fabricLink
 }
@@ -56,7 +63,7 @@ type fabricConn struct {
 	writeMu   sync.Mutex
 }
 
-func NewFabricHub(cfg HubConfig) *FabricHub {
+func NewFabricHub(cfg FabricHubConfig) *FabricHub {
 	return &FabricHub{cfg: cfg, nodes: map[string]*fabricNode{}, links: map[string]*fabricLink{}}
 }
 
@@ -181,6 +188,42 @@ func (h *FabricHub) RevokeControllerNode(fabricID, nodeID, controllerID string) 
 	h.mu.RUnlock()
 	for _, linkID := range linkIDs {
 		_ = h.RevokeLink(linkID)
+	}
+}
+
+// RemoveNode terminates the device's persistent socket and every live link in
+// which it participates as either the target Node or the Controller.
+func (h *FabricHub) RemoveNode(fabricID, nodeID string) {
+	h.mu.Lock()
+	removedNode := h.nodes[nodeKey(fabricID, nodeID)]
+	delete(h.nodes, nodeKey(fabricID, nodeID))
+	links := []*fabricLink{}
+	peerNodes := map[*fabricLink]*fabricNode{}
+	for linkID, link := range h.links {
+		if link.fabricID != fabricID || (link.nodeID != nodeID && link.controllerID != nodeID) {
+			continue
+		}
+		links = append(links, link)
+		if link.nodeID != nodeID {
+			peerNodes[link] = h.nodes[nodeKey(fabricID, link.nodeID)]
+		}
+		delete(h.links, linkID)
+	}
+	h.mu.Unlock()
+
+	for _, link := range links {
+		if link.expires != nil {
+			link.expires.Stop()
+		}
+		if link.controller != nil {
+			link.controller.close(websocket.StatusPolicyViolation, "fabric_node_removed")
+		}
+		if peer := peerNodes[link]; peer != nil {
+			h.enqueueControl(peer.conn, link, FabricKindPeerClosed, []byte("fabric_node_removed"))
+		}
+	}
+	if removedNode != nil {
+		removedNode.conn.close(websocket.StatusPolicyViolation, "fabric_node_removed")
 	}
 }
 

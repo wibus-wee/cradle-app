@@ -19,6 +19,8 @@ SQL 文件负责重放数据库结构，`meta/` 负责 journal 与 snapshot，�
 - **0042_sudden_pepper_potts.sql**: Terminalizes inherited streaming Chat Runtime rows as `response.interrupted` before installing the one-streaming-run-per-session partial unique index; startup recovery appends missing terminal facts without deleting event history.
 - **0053_drop_diff_review_guides_and_commit_plans.sql**: Drops Diff Review guide + commit-plan tables; those flows moved to Chat prompt intents / transcript directives.
 - **0054_provider_targets_provider_id.sql**: Nullable `provider_id` on `provider_targets` for explicit Provider identity (never inferred from endpoint URL).
+- **0062_fabric_session_projection_ownership.sql**: Records whether a Fabric Session projection created its remote authority or discovered an existing remote Session, so local deletion follows the correct ownership rule.
+- **0063_fabric_work_projection_ownership.sql**: Maps controller-local Work projections to their authoritative Fabric Node Work and workspace IDs; worktree lifecycle remains Node-owned.
 - **meta/**: Drizzle journal 与 schema snapshot，用于 tooling 和 migration 顺序管理；该目录必须保持 JSON-only，否则 `drizzle-kit generate` 会解析失败
 
 ## Regenerate Before Release Boundary

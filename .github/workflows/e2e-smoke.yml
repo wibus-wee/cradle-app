@@ -44,6 +44,7 @@ jobs:
               - 'apps/web/**'
               - 'apps/server/**'
               - 'apps/desktop/**'
+              - 'apps/relayd/**'
               - '.github/workflows/e2e-smoke.yml'
               - '.github/actions/setup/**'
 
@@ -460,3 +461,53 @@ jobs:
       - name: Propagate failure
         if: steps.e2e.outcome == 'failure'
         run: exit 1
+
+  fabric-two-node:
+    name: Fabric two-node E2E
+    runs-on: ubuntu-latest
+    needs: gate
+    if: ${{ needs.gate.result == 'success' }}
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout Cradle source
+        uses: actions/checkout@v4
+        with:
+          repository: wibus-wee/cradle-app
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: ./.github/actions/setup
+        with:
+          node-version: 22
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/relayd/go.mod
+          cache-dependency-path: apps/relayd/go.sum
+
+      - name: Build plugin SDK and workspace plugins
+        run: pnpm --filter @cradle/plugin-sdk build && pnpm --filter "./plugins/*" build
+
+      - name: Install Chromium
+        timeout-minutes: 15
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Provision Codex app-server for Fabric E2E
+        env:
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
+        run: pnpm --filter @cradle/desktop sync:codex-runtime
+
+      - name: Run the real two-node Fabric journey
+        run: pnpm e2e:fabric
+
+      - name: Upload Fabric E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fabric-two-node-artifacts-${{ github.run_id }}
+          path: |
+            e2e/artifacts/fabric-report/**
+            e2e/artifacts/fabric-results/**
+          if-no-files-found: warn
+          retention-days: 14

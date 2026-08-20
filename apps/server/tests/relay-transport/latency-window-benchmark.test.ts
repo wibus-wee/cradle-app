@@ -1,12 +1,25 @@
 import { describe, expect, it } from 'vitest'
 
-import { generateRelayKeyPair } from '../../src/modules/relay-transport/crypto'
-import { decodeRelayEnvelope } from '../../src/modules/relay-transport/protocol'
-import { RelaySession } from '../../src/modules/relay-transport/session'
+import { generateFabricSessionKeyPair } from '../../src/modules/relay-transport/crypto'
+import {
+  decodeFabricSessionEnvelope,
+  encodeFabricSessionEnvelope,
+  FABRIC_SESSION_PROTOCOL_VERSION,
+} from '../../src/modules/relay-transport/protocol'
+import type { FabricSessionOutboundEnvelope } from '../../src/modules/relay-transport/session'
+import { FabricSession } from '../../src/modules/relay-transport/session'
 
 const TRANSFER_BYTES = 8 * 1024 * 1024
 const INITIAL_CREDIT_BYTES = 512 * 1024
 const ADAPTIVE_MAX_CREDIT_BYTES = 8 * 1024 * 1024
+
+function encodeFabricFrame(frame: FabricSessionOutboundEnvelope): Uint8Array {
+  return encodeFabricSessionEnvelope({
+    version: FABRIC_SESSION_PROTOCOL_VERSION,
+    linkId: 'virtual-rtt-link',
+    ...frame,
+  })
+}
 
 interface VirtualTransferResult {
   rttMs: number
@@ -26,7 +39,7 @@ interface ScheduledEnvelope {
 
 /**
  * Test-only, deterministic one-way-delay wire. It delivers real encrypted
- * RelaySession envelopes in virtual timestamp order without using wall-clock
+ * FabricSession envelopes in virtual timestamp order without using wall-clock
  * sleeps or claiming to emulate WebSocket, relayd, packet loss, or the WAN.
  */
 class VirtualDelayedWire {
@@ -69,8 +82,8 @@ function runVirtualTransfer(
   rttMs: number,
   mode: VirtualTransferResult['mode'],
 ): VirtualTransferResult {
-  const hostKeys = generateRelayKeyPair()
-  const controllerKeys = generateRelayKeyPair()
+  const hostKeys = generateFabricSessionKeyPair()
+  const controllerKeys = generateFabricSessionKeyPair()
   const wire = new VirtualDelayedWire(rttMs / 2)
   const payload = new Uint8Array(TRANSFER_BYTES).fill(7)
   const maxStreamCreditBytes = mode === 'fixed-512KiB'
@@ -87,14 +100,16 @@ function runVirtualTransfer(
     throw new Error('Host delivery was used before session setup.')
   }
 
-  const host = new RelaySession(
-    'host',
+  const host = new FabricSession(
+    'node',
     hostKeys.privateKeyBase64,
     {
-      roomId: 'virtual_rtt_benchmark',
-      pairingCode: 'VIRTUAL-RTT',
+      fabricId: 'fabric-benchmark',
+      linkId: 'virtual-rtt-link',
+      expectedPeerPubkey: controllerKeys.publicKeyBase64,
       ourPublicKeyBase64: hostKeys.publicKeyBase64,
       maxStreamCreditBytes,
+      encodeOutboundEnvelope: encodeFabricFrame,
     },
     {
       send: data => wire.send(deliverToController, data),
@@ -105,7 +120,7 @@ function runVirtualTransfer(
         receivedBytes += data.byteLength
         // This models a local target that has accepted the bytes immediately.
         // The ACK still crosses the virtual delayed wire through the real
-        // RelaySession encryption, framing, and cumulative-ack code paths.
+        // FabricSession encryption, framing, and cumulative-ack code paths.
         host.reportStreamDataConsumed(streamId, data.byteLength)
       },
       onError: (error) => {
@@ -113,14 +128,16 @@ function runVirtualTransfer(
       },
     },
   )
-  const controller = new RelaySession(
+  const controller = new FabricSession(
     'controller',
     controllerKeys.privateKeyBase64,
     {
-      roomId: 'virtual_rtt_benchmark',
-      pairingCode: 'VIRTUAL-RTT',
+      fabricId: 'fabric-benchmark',
+      linkId: 'virtual-rtt-link',
+      expectedPeerPubkey: hostKeys.publicKeyBase64,
       ourPublicKeyBase64: controllerKeys.publicKeyBase64,
       maxStreamCreditBytes,
+      encodeOutboundEnvelope: encodeFabricFrame,
     },
     {
       send: data => wire.send(deliverToHost, data),
@@ -135,8 +152,8 @@ function runVirtualTransfer(
       },
     },
   )
-  deliverToController = envelope => controller.handleEnvelope(decodeRelayEnvelope(envelope))
-  deliverToHost = envelope => host.handleEnvelope(decodeRelayEnvelope(envelope))
+  deliverToController = envelope => controller.handleEnvelope(decodeFabricSessionEnvelope(envelope))
+  deliverToHost = envelope => host.handleEnvelope(decodeFabricSessionEnvelope(envelope))
 
   host.start()
   controller.start()
@@ -168,7 +185,7 @@ function printVirtualResults(results: VirtualTransferResult[]): void {
   const markdown = [
     '# Relay session virtual-time RTT matrix',
     '',
-    'This is a deterministic RelaySession simulation: real handshake, binary codec, adaptive AEAD frames, ACKs, pause/resume, and credit state; it is not a real relayd, WebSocket, Tailscale, or WAN measurement.',
+    'This is a deterministic FabricSession simulation: real handshake, binary codec, adaptive AEAD frames, ACKs, pause/resume, and credit state; it is not a real relayd, WebSocket, Tailscale, or WAN measurement.',
     '',
     '| RTT | V2 fixed 512 KiB completion / useful rate / pause-resume | V2 adaptive 8 MiB completion / useful rate / pause-resume | Adaptive improvement |',
     '| ---: | --- | --- | ---: |',
@@ -187,7 +204,7 @@ function printVirtualResults(results: VirtualTransferResult[]): void {
       initialCreditBytes: INITIAL_CREDIT_BYTES,
       fixedMaxCreditBytes: INITIAL_CREDIT_BYTES,
       adaptiveMaxCreditBytes: ADAPTIVE_MAX_CREDIT_BYTES,
-      transport: 'virtual-time RelaySession wire',
+      transport: 'virtual-time FabricSession wire',
     },
     rows,
   }))

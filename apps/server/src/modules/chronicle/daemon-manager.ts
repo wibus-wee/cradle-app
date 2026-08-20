@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { delimiter, join, resolve } from 'node:path'
 
 import { z } from 'zod'
 
@@ -17,6 +17,7 @@ let lastExitAt: number | null = null
 let currentOptions: ChronicleDaemonOptions | null = null
 let pendingRestartOptions: ChronicleDaemonOptions | null = null
 let embeddingWorker: SupervisedChronicleInferenceWorker | null = null
+let lastRuntimeError: string | null = null
 
 export interface ChronicleDaemonOptions {
   storageRoot: string
@@ -44,13 +45,21 @@ const ChronicleDaemonOptionsSchema = z.object({
   privacySensitiveUrlPatterns: z.array(z.string()).default([]),
 })
 
-const EmbeddingBatchOptionsSchema = z.object({
-  timeoutMs: z.number().finite().positive().default(120_000),
-}).prefault({})
+const EmbeddingBatchOptionsSchema = z
+  .object({
+    timeoutMs: z.number().finite().positive().default(120_000),
+  })
+  .prefault({})
+
+const ManagedProcessErrorMessageSchema = z.object({
+  type: z.literal('error'),
+  message: z.string().min(1),
+})
 
 const PROCESS_RESOURCE_FIELD_SEPARATOR_PATTERN = /\s+/
 
-const ProcessResourcesTextSchema = z.string()
+const ProcessResourcesTextSchema = z
+  .string()
   .trim()
   .transform((value) => {
     const [rssRaw, cpuRaw] = value.split(PROCESS_RESOURCE_FIELD_SEPARATOR_PATTERN)
@@ -59,10 +68,12 @@ const ProcessResourcesTextSchema = z.string()
       cpuPercent: Number.parseFloat(cpuRaw),
     }
   })
-  .pipe(z.object({
-    rssMB: z.number().finite().nonnegative(),
-    cpuPercent: z.number().finite().nonnegative(),
-  }))
+  .pipe(
+    z.object({
+      rssMB: z.number().finite().nonnegative(),
+      cpuPercent: z.number().finite().nonnegative(),
+    }),
+  )
 
 function getModelResourcesRoot(): string {
   const config = getServerConfig()
@@ -90,7 +101,7 @@ export function createDaemonArgs(rawOptions: ChronicleDaemonOptions): string[] {
       String(options.audioRmsThreshold),
     )
   }
-  else {
+ else {
     args.push('--no-audio-capture')
   }
   for (const bundleId of options.privacySensitiveAppBundleIds) {
@@ -105,17 +116,41 @@ export function createDaemonArgs(rawOptions: ChronicleDaemonOptions): string[] {
   return args
 }
 
-function findChronicleBinary(): string {
+export function findChronicleBinary(): string {
+  const configuredPath = process.env.CRADLE_CHRONICLE_PATH?.trim()
+  if (configuredPath) {
+    const binary = resolve(configuredPath)
+    if (!existsSync(binary)) {
+      throw new Error(`Configured Chronicle runtime is missing at ${binary}`)
+    }
+    return binary
+  }
+
   const candidates = [
     join(process.cwd(), '..', '..', 'chronicle', 'target', 'release', 'cradle-chronicle'),
     join(process.cwd(), '..', '..', 'chronicle', 'target', 'debug', 'cradle-chronicle'),
-    join((process as { resourcesPath?: string }).resourcesPath ?? '', 'chronicle', 'cradle-chronicle'),
+    join(
+      (process as { resourcesPath?: string }).resourcesPath ?? '',
+      'chronicle',
+      'cradle-chronicle',
+    ),
   ]
 
   for (const candidate of candidates) {
-    if (existsSync(candidate)) { return candidate }
+    if (existsSync(candidate)) {
+      return candidate
+    }
   }
-  return 'cradle-chronicle'
+
+  for (const directory of process.env.PATH?.split(delimiter).filter(Boolean) ?? []) {
+    const candidate = resolve(directory, 'cradle-chronicle')
+    if (existsSync(candidate)) {
+      return candidate
+    }
+  }
+  throw new Error(
+    'Chronicle runtime is missing. Build it with `pnpm --filter @cradle/desktop build:chronicle`.',
+  )
 }
 
 export async function runEmbeddingBatch(
@@ -188,7 +223,7 @@ function findOrtDylibInTree(root: string, depth: number): string | null {
   try {
     entries = readdirSync(root)
   }
-  catch {
+ catch {
     return null
   }
 
@@ -199,7 +234,7 @@ function findOrtDylibInTree(root: string, depth: number): string | null {
       const stats = statSync(path)
       isDirectory = stats.isDirectory()
     }
-    catch {
+ catch {
       continue
     }
 
@@ -230,7 +265,17 @@ function getRunningDaemonOptions(): ChronicleDaemonOptions {
 export function getDaemonInfo() {
   const running = isRunning()
   const options = running ? getRunningDaemonOptions() : null
+  let available = true
+  let availabilityError: string | null = null
+  try {
+    findChronicleBinary()
+  }
+ catch (error) {
+    available = false
+    availabilityError = error instanceof Error ? error.message : String(error)
+  }
   return {
+    available,
     running,
     pid: chronicleProcess?.pid ?? null,
     lastExitCode,
@@ -239,6 +284,7 @@ export function getDaemonInfo() {
     audioCaptureMode: options ? options.audioCaptureMode : 'meeting',
     audioSource: options ? options.audioSource : 'microphone',
     restartPending: pendingRestartOptions !== null,
+    runtimeError: lastRuntimeError ?? availabilityError,
   }
 }
 
@@ -263,19 +309,21 @@ export function getDaemonResources(): {
       cpuPercent: Math.round(resources.cpuPercent * 100) / 100,
     }
   }
-  catch {
+ catch {
     return { running: true, pid, rssMB: null, cpuPercent: null }
   }
 }
 
 export function startDaemon(options: ChronicleDaemonOptions): boolean {
-  if (isRunning()) { return true }
-
-  const binary = findChronicleBinary()
-  const cradleUrl = process.env.CRADLE_URL ?? buildServerUrl()
-  const args = createDaemonArgs(options)
+  if (isRunning()) {
+    return true
+  }
 
   try {
+    const binary = findChronicleBinary()
+    const cradleUrl = process.env.CRADLE_URL ?? buildServerUrl()
+    const args = createDaemonArgs(options)
+    lastRuntimeError = null
     chronicleProcess = spawnManagedProcess({
       kind: 'spawn',
       command: binary,
@@ -302,6 +350,13 @@ export function startDaemon(options: ChronicleDaemonOptions): boolean {
       }
     })
 
+    chronicleProcess.on('message', (message) => {
+      const result = ManagedProcessErrorMessageSchema.safeParse(message)
+      if (result.success) {
+        lastRuntimeError = result.data.message
+      }
+    })
+
     chronicleProcess.on('error', (err) => {
       console.error('[chronicle-daemon] spawn error:', err.message)
       chronicleProcess = null
@@ -315,7 +370,8 @@ export function startDaemon(options: ChronicleDaemonOptions): boolean {
     currentOptions = options
     return true
   }
-  catch (err) {
+ catch (err) {
+    lastRuntimeError = err instanceof Error ? err.message : String(err)
     console.error('[chronicle-daemon] failed to spawn:', err)
     return false
   }
@@ -337,15 +393,14 @@ export function stopDaemon(): Promise<void> {
 
 async function stopCurrentDaemon(): Promise<void> {
   const child = chronicleProcess
-  if (!child) { return }
+  if (!child) {
+    return
+  }
   await child.stop('SIGTERM')
 }
 
 export async function cleanup(): Promise<void> {
-  await Promise.all([
-    stopDaemon(),
-    resetEmbeddingWorker(),
-  ])
+  await Promise.all([stopDaemon(), resetEmbeddingWorker()])
 }
 
 export async function resetEmbeddingWorker(): Promise<void> {
@@ -360,8 +415,7 @@ function readManagedProcessPid(child: ManagedChildProcess): number | null {
 
 function buildServerUrl(): string {
   const config = getServerConfig()
-  const host = config.host.includes(':') && !config.host.startsWith('[')
-    ? `[${config.host}]`
-    : config.host
+  const host
+    = config.host.includes(':') && !config.host.startsWith('[') ? `[${config.host}]` : config.host
   return `http://${host}:${config.port}`
 }

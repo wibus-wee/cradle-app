@@ -6,7 +6,7 @@ export const projectsFixture: ProjectsViewProps = {
       workspace: {
         id: 'workspace-1',
         name: 'Cradle',
-        locator: { hostId: 'local', path: '/Users/demo/dev/cradle', kind: 'project' },
+        locator: { nodeId: 'local', path: '/Users/demo/dev/cradle', kind: 'project' },
         gitIdentity: { branch: 'main', originUrl: 'git@github.com:example/cradle.git' },
         identifier: 'cradle',
         multiFolder: false,

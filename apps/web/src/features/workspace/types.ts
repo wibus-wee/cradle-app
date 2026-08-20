@@ -2,14 +2,14 @@ import type { GetWorkspacesResponse } from '~/api-gen/types.gen'
 
 export type Workspace = GetWorkspacesResponse[number]
 
-export const LOCAL_WORKSPACE_HOST_ID = 'local'
+export const LOCAL_WORKSPACE_NODE_ID = 'local'
 
 export function getWorkspaceLocatorPath(workspace: Pick<Workspace, 'locator'>): string {
   return workspace.locator.path
 }
 
 export function isLocalWorkspace(workspace: Pick<Workspace, 'locator'>): boolean {
-  return workspace.locator.hostId === LOCAL_WORKSPACE_HOST_ID
+  return workspace.locator.nodeId === LOCAL_WORKSPACE_NODE_ID
 }
 
 export function isMultiFolderWorkspace(
@@ -21,8 +21,7 @@ export function isMultiFolderWorkspace(
 export function isWorkEligibleWorkspace(
   workspace: Pick<Workspace, 'locator' | 'availability' | 'multiFolder'>,
 ): boolean {
-  return isLocalWorkspace(workspace)
-    && workspace.availability === 'available'
+  return workspace.availability !== 'missing'
     && !workspace.multiFolder
 }
 
@@ -35,5 +34,5 @@ export function getLocalWorkspacePath(workspace: Pick<Workspace, 'locator' | 'av
 export function getWorkspaceLocationLabel(workspace: Pick<Workspace, 'locator'>): string {
   return isLocalWorkspace(workspace)
     ? workspace.locator.path
-    : `${workspace.locator.hostId}:${workspace.locator.path}`
+    : `${workspace.locator.nodeId}:${workspace.locator.path}`
 }

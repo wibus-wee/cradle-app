@@ -82,6 +82,16 @@ const spec = {
       "type": "boolean"
     },
     {
+      "name": "audioCaptureMode",
+      "required": false,
+      "target": "body.audioCaptureMode",
+      "type": "string",
+      "values": [
+        "meeting",
+        "continuous"
+      ]
+    },
+    {
       "name": "audioSource",
       "required": false,
       "target": "body.audioSource",

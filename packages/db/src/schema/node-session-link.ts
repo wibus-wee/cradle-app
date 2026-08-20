@@ -3,8 +3,10 @@ import { index, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sessions } from './chat'
 import { timestamps } from './shared'
 
-/** A controller-local projection of a session whose only execution authority
- * is the selected Fabric Node. */
+/**
+ * A controller-local projection of a session whose only execution authority
+ * is the selected Fabric Node.
+ */
 export const nodeSessionLinks = sqliteTable(
   'node_session_links',
   {
@@ -14,6 +16,9 @@ export const nodeSessionLinks = sqliteTable(
     nodeId: text('node_id').notNull(),
     remoteSessionId: text('remote_session_id').notNull(),
     remoteWorkspaceId: text('remote_workspace_id').notNull(),
+    projectionKind: text('projection_kind', {
+      enum: ['controller-created', 'discovered'],
+    }).notNull().default('controller-created'),
     ...timestamps(),
   },
   table => ({

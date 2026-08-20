@@ -228,7 +228,21 @@ export function resolveWorktreeAbsolutePath(repoRoot: string, relativePath: stri
 }
 
 export async function resolveGitRepoRoot(workspacePath: string): Promise<string> {
-  const root = (await runGitCommand(workspacePath, ['rev-parse', '--show-toplevel'])).trim()
+  let root: string
+  try {
+    root = (await runGitCommand(workspacePath, ['rev-parse', '--show-toplevel'])).trim()
+  }
+  catch (error) {
+    throw new AppError({
+      code: 'git_repository_unavailable',
+      status: 409,
+      message: 'Git repository root could not be resolved',
+      details: {
+        workspacePath,
+        reason: error instanceof Error ? error.message : String(error),
+      },
+    })
+  }
   if (!root) {
     throw new AppError({
       code: 'git_repository_unavailable',

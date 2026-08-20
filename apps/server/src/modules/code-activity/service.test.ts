@@ -32,7 +32,7 @@ describe('code activity service', () => {
     vi.mocked(Workspace.get).mockReturnValue({
       id: 'workspace-1',
       name: 'Cradle',
-      locator: { hostId: 'local', path: '/source/cradle' },
+      locator: { nodeId: 'local', path: '/source/cradle' },
       gitIdentity: {},
       identifier: 'CRA',
       availability: 'available',

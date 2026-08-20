@@ -1,5 +1,3 @@
-import { timingSafeEqual } from 'node:crypto'
-
 import { x25519 } from '@noble/curves/ed25519'
 
 import { AppError } from '../../errors/app-error'
@@ -8,92 +6,85 @@ import {
   encodeRelayChunk,
   RELAY_MIN_COMPRESSION_INPUT_BYTES,
 } from './compression'
-import type { RelayCryptoRole, RelayDerivedKeys } from './crypto'
+import type { FabricSessionKeys, FabricSessionRole as FabricCryptoRole } from './crypto'
 import {
-  computeRelayConfirm,
-  computeRelaySharedSecret,
-  deriveRelayKeys,
-  RelayCipher,
-  relayPublicKeyFingerprint,
+  computeFabricSharedSecret,
+  deriveFabricSessionKeys,
+  fabricPublicKeyFingerprint,
+  FabricSessionCipher,
 } from './crypto'
-import type { InnerFrame, RelayEnvelope, RelayEnvelopeKind, RelayPriority } from './protocol'
+import type { FabricSessionEnvelope, FabricSessionEnvelopeKind, InnerFrame, RelayPriority } from './protocol'
 import {
   decodeInnerFrame,
   decodeRelayErrorPayload,
   decodeRelayPeerClosedPayload,
   encodeInnerFrame,
-  encodeRelayEnvelope,
+  FABRIC_SESSION_ENVELOPE_KIND,
+  FABRIC_SESSION_PROTOCOL_VERSION,
   INNER_FRAME_KIND,
   RELAY_CONNECTION_MAX_CREDIT_BYTES,
-  RELAY_ENVELOPE_KIND,
   RELAY_MAX_STREAM_CHUNK_BYTES,
-  RELAY_PROTOCOL_VERSION,
   RELAY_STREAM_MAX_CREDIT_BYTES,
   RELAY_STREAM_MIN_CREDIT_BYTES,
   relayPriorityForInnerFrame,
 } from './protocol'
 
 /**
- * RelaySession — the protocol state machine shared by the controller and host
+ * FabricSession — the protocol state machine shared by the controller and node
  * transports. It owns:
  *
- * 1. The `hello` / `hello_confirm` handshake (ECDH → key derivation → pinning).
+ * 1. The Fabric certificate-bound `hello` handshake (ECDH → key derivation).
  * 2. Size-adaptive XChaCha20-Poly1305/AES-256-GCM encryption of inner frames.
- * 3. Stream multiplexing over the single relayd room.
+ * 3. Stream multiplexing over one Fabric link.
  * 4. Credit-based flow control so a fast sender can't overrun the relayd queue
  *    (64 frames / 4 MiB) or the peer.
  *
  * The session is transport-agnostic: it emits outbound bytes via `send` and
- * inbound stream events via callbacks. The controller-transport / host-connector
- * wires it to a WebSocket (to relayd) and to local TCP sockets.
+ * inbound stream events via callbacks. The controller-transport / node-connector
+ * wire it to a WebSocket (to relayd) and to local TCP sockets.
  */
 
-export type RelaySessionRole = RelayCryptoRole
+export type FabricSessionRole = FabricCryptoRole
 
-export interface RelaySessionOptions {
-  /** The relayd room id this session operates in. Stamped on every outbound envelope. */
-  roomId: string
-  /** Pairing code. Required for first pairing; omitted on reconnect. */
-  pairingCode?: string
-  /** Pinned peer public key (base64). Present on reconnect; null on first pairing. */
-  pinnedPeerPubkey?: string
+export interface FabricSessionOptions {
+  /** Fabric identity that scopes key derivation for this link. */
+  fabricId: string
+  /** Fabric link identity that scopes routing and key derivation. */
+  linkId: string
+  /** Public encryption key from the peer's Fabric membership certificate. */
+  expectedPeerPubkey: string
   /** Our public key (base64). Derived from the private key if not supplied. */
   ourPublicKeyBase64?: string
-  /** Whether this side sends `hello` on start() (controller) or waits (host). Defaults to role === 'controller'. */
+  /** Whether this side sends `hello` on start() (controller) or waits (node). Defaults to role === 'controller'. */
   initiateHello?: boolean
-  /** Optional human-readable label sent in our `hello` so the peer can show who we are. */
-  ourName?: string
-  /** Optional Ed25519 relay assertion public key sent in our `hello`. */
-  ourSigningPubkey?: string
   /** Initial per-stream in-flight byte allowance. Defaults to 512 KiB. */
   initialStreamCreditBytes?: number
   /** Hard per-stream byte allowance. Defaults to 8 MiB. */
   maxStreamCreditBytes?: number
   /** Hard aggregate byte allowance across all streams. Defaults to 16 MiB. */
   maxConnectionCreditBytes?: number
-  /** Disable Zstandard and bulk AES together for controlled V2 before/after benchmarks. */
+  /** Disable Zstandard and bulk AES for controlled codec benchmarks. */
   optimizedCodecEnabled?: boolean
-  /** Override v2 room-envelope encoding. Fabric v3 supplies Fabric/Node/link
-   * routing outside the encrypted session while retaining this tested inner
-   * encryption and stream flow-control implementation. */
-  encodeOutboundEnvelope?: (frame: RelayOutboundEnvelope) => Uint8Array
+  /**
+   * Fabric v3 envelope encoding. Routing is owned by Fabric and is never
+   * projected into this session state machine.
+   */
+  encodeOutboundEnvelope: (frame: FabricSessionOutboundEnvelope) => Uint8Array
 }
 
-export interface RelayOutboundEnvelope {
+export interface FabricSessionOutboundEnvelope {
   seq: number
-  kind: RelayEnvelopeKind
+  kind: FabricSessionEnvelopeKind
   priority: RelayPriority
   streamId?: string
   payload: Uint8Array
 }
 
-export interface RelaySessionCallbacks {
+export interface FabricSessionCallbacks {
   /** Write one encoded binary envelope to relayd. */
   send: (data: Uint8Array) => void
   onReady?: () => void
   onPeerPubkey?: (peerPubkey: string, fingerprint: string) => void
-  /** Fires with the peer's reported label (from its `hello.name`) once known. */
-  onPeerInfo?: (info: { name?: string, signingPubkey?: string }) => void
   onStreamOpen?: (streamId: string) => void
   onStreamData?: (streamId: string, data: Uint8Array) => void
   onStreamAck?: (streamId: string, ackedBytes: number) => void
@@ -128,6 +119,9 @@ interface StreamFlowState {
   appliedBytes: number
   /** Last cumulative value we advertised to the peer via stream_ack. */
   ackedToPeerBytes: number
+  /** Local transport ended; send close after all accepted data is framed. */
+  closeRequested: boolean
+  closeReason?: string
   closed: boolean
 }
 
@@ -142,6 +136,7 @@ function createStreamFlowState(creditBytes: number): StreamFlowState {
     receivedBytes: 0,
     appliedBytes: 0,
     ackedToPeerBytes: 0,
+    closeRequested: false,
     closed: false,
   }
 }
@@ -164,74 +159,60 @@ function streamIdForFrame(frame: InnerFrame): string | undefined {
 
 const ACK_INTERVAL_BYTES = 256 * 1024
 
-export class RelaySession {
-  readonly role: RelaySessionRole
-  private readonly roomId: string
+export class FabricSession {
+  readonly role: FabricSessionRole
+  private readonly fabricId: string
+  private readonly linkId: string
   private readonly ourPrivateKeyBase64: string
   private readonly ourPublicKeyBase64: string
-  private readonly pairingCode: string | undefined
-  private readonly pinnedPeerPubkey: string | undefined
-  private readonly cb: RelaySessionCallbacks
+  private readonly expectedPeerPubkey: string
+  private readonly cb: FabricSessionCallbacks
   private readonly initiateHello: boolean
-  private readonly ourName: string | undefined
-  private readonly ourSigningPubkey: string | undefined
 
   private state: SessionState = 'idle'
   private peerPubkey: string | null = null
-  private keys: RelayDerivedKeys | null = null
-  private sendCipher: RelayCipher | null = null
-  private receiveCipher: RelayCipher | null = null
+  private keys: FabricSessionKeys | null = null
+  private sendCipher: FabricSessionCipher | null = null
+  private receiveCipher: FabricSessionCipher | null = null
   private outboundSeq = 0
   private readonly streams = new Map<string, StreamFlowState>()
   /** Set when we've sent our hello, awaiting peer hello. */
   private helloSent = false
-  /** Set when we've sent hello_confirm (first pairing). */
-  private confirmSent = false
-  /** Set when we've verified the peer's hello_confirm (first pairing). */
-  private confirmVerified = false
-  private readonly isReconnect: boolean
   private readonly initialStreamCreditBytes: number
   private readonly maxStreamCreditBytes: number
   private readonly maxConnectionCreditBytes: number
   private readonly optimizedCodecEnabled: boolean
-  private readonly encodeOutboundEnvelope: (frame: RelayOutboundEnvelope) => Uint8Array
+  private readonly encodeOutboundEnvelope: (frame: FabricSessionOutboundEnvelope) => Uint8Array
   private connectionInFlightBytes = 0
   private flushCursor = 0
   private flushingOutbound = false
 
   constructor(
-    role: RelaySessionRole,
+    role: FabricSessionRole,
     ourPrivateKeyBase64: string,
-    options: RelaySessionOptions,
-    callbacks: RelaySessionCallbacks,
+    options: FabricSessionOptions,
+    callbacks: FabricSessionCallbacks,
   ) {
     this.role = role
-    this.roomId = options.roomId
+    this.fabricId = options.fabricId
+    this.linkId = options.linkId
     this.ourPrivateKeyBase64 = ourPrivateKeyBase64
-    this.pairingCode = options.pairingCode
-    this.pinnedPeerPubkey = options.pinnedPeerPubkey
+    this.expectedPeerPubkey = options.expectedPeerPubkey
     this.cb = callbacks
     this.ourPublicKeyBase64
       = options.ourPublicKeyBase64 ?? publicKeyFromPrivateKey(ourPrivateKeyBase64)
-    this.isReconnect = Boolean(options.pinnedPeerPubkey)
-    // The controller initiates the hello exchange; the host waits for it. This
-    // matches the relay model where the host is always-on and the controller
-    // connects later — if the host sent hello first, relayd would close it
+    // The controller initiates the hello exchange; the node waits for it. This
+    // matches the Fabric model where the node is always-on and the controller
+    // connects later — if the node sent hello first, relayd would close it
     // (TryAgainLater) because no controller peer is connected yet.
     this.initiateHello = options.initiateHello ?? role === 'controller'
-    this.ourName = options.ourName
-    this.ourSigningPubkey = options.ourSigningPubkey
     this.initialStreamCreditBytes
       = options.initialStreamCreditBytes ?? RELAY_STREAM_MIN_CREDIT_BYTES
     this.maxStreamCreditBytes = options.maxStreamCreditBytes ?? RELAY_STREAM_MAX_CREDIT_BYTES
     this.maxConnectionCreditBytes
       = options.maxConnectionCreditBytes ?? RELAY_CONNECTION_MAX_CREDIT_BYTES
     this.optimizedCodecEnabled = options.optimizedCodecEnabled ?? true
-    this.encodeOutboundEnvelope = options.encodeOutboundEnvelope ?? (frame => encodeRelayEnvelope({
-      version: RELAY_PROTOCOL_VERSION,
-      roomId: this.roomId,
-      ...frame,
-    }))
+    this.encodeOutboundEnvelope = options.encodeOutboundEnvelope
     if (
       !Number.isSafeInteger(this.initialStreamCreditBytes)
       || !Number.isSafeInteger(this.maxStreamCreditBytes)
@@ -258,7 +239,7 @@ export class RelaySession {
 
   /**
    * Begin the handshake. The controller sends its `hello` immediately; the
-   *  host waits and sends its hello reactively when the controller's arrives.
+   *  node waits and sends its hello reactively when the controller's arrives.
    */
   start(): void {
     if (this.helloSent || this.state === 'closed') {
@@ -270,15 +251,15 @@ export class RelaySession {
     if (this.initiateHello) {
       this.sendHello()
     }
-    // else: host waits for the controller's hello, then sends ours in handleHello.
+    // else: node waits for the controller's hello, then sends ours in handleHello.
   }
 
   /** Process a raw envelope received from relayd. */
-  handleEnvelope(env: RelayEnvelope): void {
+  handleEnvelope(env: FabricSessionEnvelope): void {
     if (this.state === 'closed') {
       return
     }
-    if (env.version !== RELAY_PROTOCOL_VERSION) {
+    if (env.version !== FABRIC_SESSION_PROTOCOL_VERSION || env.linkId !== this.linkId) {
       this.fail(
         new AppError({
           code: 'relay_protocol_version',
@@ -289,13 +270,13 @@ export class RelaySession {
       return
     }
     switch (env.kind) {
-      case RELAY_ENVELOPE_KIND.dataFrame:
+      case FABRIC_SESSION_ENVELOPE_KIND.dataFrame:
         this.handleDataFrame(env)
         break
-      case RELAY_ENVELOPE_KIND.peerClosed:
+      case FABRIC_SESSION_ENVELOPE_KIND.peerClosed:
         this.handlePeerClosed(env)
         break
-      case RELAY_ENVELOPE_KIND.relayError:
+      case FABRIC_SESSION_ENVELOPE_KIND.relayError:
         this.handleRelayError(env)
         break
       default:
@@ -317,28 +298,25 @@ export class RelaySession {
     }
     const frame = {
       kind: INNER_FRAME_KIND.hello,
-      version: RELAY_PROTOCOL_VERSION,
+      version: FABRIC_SESSION_PROTOCOL_VERSION,
       pubkey: this.ourPublicKeyBase64,
-      ...(this.pinnedPeerPubkey ? { pinnedPubkey: this.pinnedPeerPubkey } : {}),
-      ...(this.ourName ? { name: this.ourName } : {}),
-      ...(this.ourSigningPubkey ? { signingPubkey: this.ourSigningPubkey } : {}),
     }
     // Set helloSent BEFORE sendPlainEnvelope: sendPlainEnvelope is delivered
-    // synchronously by the test transport, which can re-enter handleHello →
-    // sendHello before this call returns. Without this guard the host would
+    // synchronously by the Fabric transport, which can re-enter handleHello →
+    // sendHello before this call returns. Without this guard the node would
     // send a second, plaintext hello after keys are derived.
     this.helloSent = true
     this.sendPlainEnvelope(frame)
-    this.maybeSendConfirm()
+    this.maybeMarkReady()
   }
 
-  private handleDataFrame(env: RelayEnvelope): void {
+  private handleDataFrame(env: FabricSessionEnvelope): void {
     let frame: InnerFrame
     try {
       if (this.keys === null) {
         // Pre-key: only plaintext handshake frames are accepted.
         frame = this.parsePlainFrame(env.payload)
-        if (frame.kind !== INNER_FRAME_KIND.hello && frame.kind !== INNER_FRAME_KIND.helloConfirm) {
+        if (frame.kind !== INNER_FRAME_KIND.hello) {
           this.fail(
             new AppError({
               code: 'relay_handshake_unexpected_frame',
@@ -370,9 +348,6 @@ export class RelaySession {
       case INNER_FRAME_KIND.hello:
         this.handleHello(frame)
         break
-      case INNER_FRAME_KIND.helloConfirm:
-        this.handleHelloConfirm(frame)
-        break
       case INNER_FRAME_KIND.streamOpen:
         this.handleStreamOpen(frame.streamId)
         break
@@ -400,9 +375,6 @@ export class RelaySession {
     kind: 'hello'
     version: number
     pubkey: string
-    pinnedPubkey?: string
-    name?: string
-    signingPubkey?: string
   }): void {
     if (this.peerPubkey !== null) {
       this.fail(
@@ -414,26 +386,12 @@ export class RelaySession {
       )
       return
     }
-    // Reconnect: the peer's pubkey must match the pinned value.
-    if (this.isReconnect) {
-      if (!this.pinnedPeerPubkey || frame.pubkey !== this.pinnedPeerPubkey) {
-        this.fail(
-          new AppError({
-            code: 'relay_handshake_pubkey_mismatch',
-            status: 400,
-            message: 'Peer public key does not match the pinned value.',
-          }),
-        )
-        return
-      }
-    }
-    // The peer's pinnedPubkey (if any) must match ours too.
-    if (frame.pinnedPubkey && frame.pinnedPubkey !== this.ourPublicKeyBase64) {
+    if (frame.pubkey !== this.expectedPeerPubkey) {
       this.fail(
         new AppError({
           code: 'relay_handshake_pubkey_mismatch',
           status: 400,
-          message: 'Peer expected a different local public key.',
+          message: 'Peer public key does not match its Fabric membership certificate.',
         }),
       )
       return
@@ -441,123 +399,35 @@ export class RelaySession {
 
     this.peerPubkey = frame.pubkey
     this.cb.onPeerPubkey?.(frame.pubkey, peerFingerprint(frame.pubkey))
-    if (frame.name || frame.signingPubkey) {
-      this.cb.onPeerInfo?.({
-        ...(frame.name ? { name: frame.name } : {}),
-        ...(frame.signingPubkey ? { signingPubkey: frame.signingPubkey } : {}),
-      })
-    }
     this.deriveKeys()
 
-    // Host (reactive): send our hello now that the controller has spoken, so
+    // Node (reactive): send our hello now that the controller has spoken, so
     // the controller can learn our pubkey and complete the handshake.
     if (!this.helloSent) {
       this.sendHello()
     }
 
-    if (this.isReconnect) {
-      // Pinning verified → ready immediately, no confirm exchange needed.
-      this.markReady()
-    }
- else {
-      // First pairing: try to send hello_confirm now (only fires once we have
-      // both sent our own hello and learned the peer's pubkey).
-      this.maybeSendConfirm()
-    }
+    this.maybeMarkReady()
   }
 
   private deriveKeys(): void {
     if (!this.peerPubkey) {
       throw new Error('deriveKeys called before peer pubkey known')
     }
-    const sharedSecret = computeRelaySharedSecret(this.ourPrivateKeyBase64, this.peerPubkey)
-    this.keys = deriveRelayKeys(sharedSecret, this.pairingCode ?? '')
-    this.sendCipher = new RelayCipher(
-      this.role === 'host' ? this.keys.hostSendKey : this.keys.controllerSendKey,
+    const sharedSecret = computeFabricSharedSecret(this.ourPrivateKeyBase64, this.peerPubkey)
+    this.keys = deriveFabricSessionKeys(sharedSecret, { fabricId: this.fabricId, linkId: this.linkId })
+    this.sendCipher = new FabricSessionCipher(
+      this.role === 'node' ? this.keys.nodeSendKey : this.keys.controllerSendKey,
       this.optimizedCodecEnabled,
     )
-    this.receiveCipher = new RelayCipher(
-      this.role === 'host' ? this.keys.controllerSendKey : this.keys.hostSendKey,
+    this.receiveCipher = new FabricSessionCipher(
+      this.role === 'node' ? this.keys.controllerSendKey : this.keys.nodeSendKey,
       this.optimizedCodecEnabled,
     )
-  }
-
-  /**
-   * Build the canonical pairing `confirm` value. The transcript is role-tagged
-   * (controller pubkey, then host pubkey), so both peers compute the identical
-   * value regardless of which role they hold.
-   */
-  private buildConfirm(sharedSecret: Uint8Array): string {
-    if (!this.keys || !this.peerPubkey) {
-      throw new Error('buildConfirm called before keys derived')
-    }
-    const controllerPub = this.role === 'controller' ? this.ourPublicKeyBase64 : this.peerPubkey
-    const hostPub = this.role === 'host' ? this.ourPublicKeyBase64 : this.peerPubkey
-    return computeRelayConfirm({
-      confirmKey: this.keys.confirmKey,
-      controllerPublicKeyBase64: controllerPub,
-      hostPublicKeyBase64: hostPub,
-      sharedSecret,
-    })
-  }
-
-  /**
-   * Send `hello_confirm` once we have both sent our own `hello` and received
-   * the peer's `hello` (so we know the peer's pubkey and can build the
-   * canonical transcript). This ordering guarantee ensures the peer can always
-   * verify our confirm, regardless of which side calls start() first.
-   */
-  private maybeSendConfirm(): void {
-    if (this.isReconnect || this.confirmSent || !this.helloSent || !this.peerPubkey || !this.keys) {
-      return
-    }
-    this.sendHelloConfirm()
-  }
-
-  private sendHelloConfirm(): void {
-    if (!this.keys || !this.peerPubkey) {
-      return
-    }
-    const sharedSecret = computeRelaySharedSecret(this.ourPrivateKeyBase64, this.peerPubkey)
-    const confirm = this.buildConfirm(sharedSecret)
-    // hello_confirm is sent AFTER both hellos are exchanged, so both peers have
-    // derived keys — encrypt it like every other post-handshake frame.
-    this.sendEncryptedFrame({ kind: INNER_FRAME_KIND.helloConfirm, confirm })
-    this.confirmSent = true
-    this.maybeMarkReady()
-  }
-
-  private handleHelloConfirm(frame: { kind: 'hello_confirm', confirm: string }): void {
-    if (this.isReconnect || !this.keys || !this.peerPubkey) {
-      this.fail(
-        new AppError({
-          code: 'relay_handshake_unexpected_confirm',
-          status: 400,
-          message: 'Unexpected hello_confirm frame.',
-        }),
-      )
-      return
-    }
-    const sharedSecret = computeRelaySharedSecret(this.ourPrivateKeyBase64, this.peerPubkey)
-    const expected = this.buildConfirm(sharedSecret)
-    if (!confirmEquals(frame.confirm, expected)) {
-      this.fail(
-        new AppError({
-          code: 'relay_handshake_confirm_mismatch',
-          status: 400,
-          message: 'Pairing confirmation failed. Check the pairing code.',
-        }),
-      )
-      return
-    }
-    this.confirmVerified = true
-    this.maybeMarkReady()
   }
 
   private maybeMarkReady(): void {
-    // Ready once we have both sent and verified the confirm (first pairing),
-    // i.e. both directions of the proof are complete.
-    if (this.confirmSent && this.confirmVerified) {
+    if (this.helloSent && this.peerPubkey !== null && this.keys !== null) {
       this.markReady()
     }
   }
@@ -595,7 +465,7 @@ export class RelaySession {
    */
   writeStreamData(streamId: string, data: Uint8Array): void {
     const flow = this.streams.get(streamId)
-    if (!flow || flow.closed || !this.isReady) {
+    if (!flow || flow.closed || flow.closeRequested || !this.isReady) {
       return
     }
     flow.pendingData.push(data)
@@ -668,7 +538,7 @@ export class RelaySession {
   /** Close a stream (either side). */
   closeStream(streamId: string, reason?: string): void {
     const flow = this.streams.get(streamId)
-    if (!flow || flow.closed) {
+    if (!flow || flow.closed || flow.closeRequested) {
       return
     }
     // Flush any unacked receive progress so the peer can release remaining credit.
@@ -676,6 +546,16 @@ export class RelaySession {
       flow.appliedBytes = flow.receivedBytes
     }
     this.maybeSendReceiveAck(streamId, flow, true)
+    flow.closeRequested = true
+    flow.closeReason = reason
+    this.flushOutboundStreams()
+    this.finishLocalCloseIfReady(streamId, flow)
+  }
+
+  private finishLocalCloseIfReady(streamId: string, flow: StreamFlowState): void {
+    if (flow.closed || !flow.closeRequested || flow.pendingData.length > 0) {
+      return
+    }
     flow.closed = true
     this.connectionInFlightBytes = Math.max(
       0,
@@ -684,7 +564,7 @@ export class RelaySession {
     this.sendEncryptedFrame({
       kind: INNER_FRAME_KIND.streamClose,
       streamId,
-      ...(reason ? { reason } : {}),
+      ...(flow.closeReason ? { reason: flow.closeReason } : {}),
     })
     this.streams.delete(streamId)
   }
@@ -795,6 +675,9 @@ export class RelaySession {
           }
         }
       }
+      for (const [streamId, flow] of streams) {
+        this.finishLocalCloseIfReady(streamId, flow)
+      }
     }
     finally {
       this.flushingOutbound = false
@@ -864,7 +747,7 @@ export class RelaySession {
     }
   }
 
-  private handlePeerClosed(env: RelayEnvelope): void {
+  private handlePeerClosed(env: FabricSessionEnvelope): void {
     try {
       this.cb.onPeerClosed?.(decodeRelayPeerClosedPayload(env.payload).reason)
     }
@@ -873,7 +756,7 @@ export class RelaySession {
     }
   }
 
-  private handleRelayError(env: RelayEnvelope): void {
+  private handleRelayError(env: FabricSessionEnvelope): void {
     let message = 'relay error'
     try {
       message = decodeRelayErrorPayload(env.payload).error ?? message
@@ -894,9 +777,9 @@ export class RelaySession {
 
   private sendPlainEnvelope(frame: InnerFrame): void {
     const streamId = streamIdForFrame(frame)
-    const env: RelayOutboundEnvelope = {
+    const env: FabricSessionOutboundEnvelope = {
       seq: this.outboundSeq++,
-      kind: RELAY_ENVELOPE_KIND.dataFrame,
+      kind: FABRIC_SESSION_ENVELOPE_KIND.dataFrame,
       priority: relayPriorityForInnerFrame(frame),
       ...(streamId ? { streamId } : {}),
       payload: encodeInnerFrame(frame),
@@ -913,9 +796,9 @@ export class RelaySession {
       })
     }
     const streamId = streamIdForFrame(frame)
-    const env: RelayOutboundEnvelope = {
+    const env: FabricSessionOutboundEnvelope = {
       seq: this.outboundSeq++,
-      kind: RELAY_ENVELOPE_KIND.dataFrame,
+      kind: FABRIC_SESSION_ENVELOPE_KIND.dataFrame,
       priority: relayPriorityForInnerFrame(frame),
       ...(streamId ? { streamId } : {}),
       payload: this.sendCipher.encrypt(encodeInnerFrame(frame)),
@@ -967,17 +850,5 @@ function publicKeyFromPrivateKey(privateKeyBase64: string): string {
 }
 
 function peerFingerprint(publicKeyBase64: string): string {
-  return relayPublicKeyFingerprint(publicKeyBase64)
-}
-
-/** Constant-time compare of base64-encoded confirm digests (or any equal-length secrets). */
-function confirmEquals(actual: string, expected: string): boolean {
-  const a = Buffer.from(actual)
-  const b = Buffer.from(expected)
-  if (a.length !== b.length) {
-    // Still run a dummy compare so length leaks are the only timing channel.
-    timingSafeEqual(b, b)
-    return false
-  }
-  return timingSafeEqual(a, b)
+  return fabricPublicKeyFingerprint(publicKeyBase64)
 }

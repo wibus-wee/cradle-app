@@ -40,7 +40,7 @@ function resolveWorkspacePath(workspaceId?: string | null): string | undefined {
       details: { workspaceId },
     })
   }
-  if (workspace.locator.hostId !== 'local') {
+  if (workspace.locator.nodeId !== 'local') {
     throw new AppError({
       code: 'skills_local_workspace_required',
       status: 409,

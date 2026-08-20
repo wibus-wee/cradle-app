@@ -4,7 +4,7 @@ const nonBlankString = t.String({ minLength: 1, pattern: '.*\\S.*' })
 const nullableString = t.Union([t.String(), t.Null()])
 
 const workspaceLocator = t.Object({
-  hostId: nonBlankString,
+  nodeId: nonBlankString,
   path: nonBlankString,
   kind: t.Optional(t.Union([t.Literal('project'), t.Literal('managed-worktree')])),
   sourceWorkspaceId: t.Optional(nullableString),
@@ -122,7 +122,7 @@ export const WorkspaceModel = {
   }, { additionalProperties: false }),
 
   resolveQuery: t.Object({
-    hostId: nonBlankString,
+    nodeId: nonBlankString,
     path: nonBlankString,
   }, { additionalProperties: false }),
 

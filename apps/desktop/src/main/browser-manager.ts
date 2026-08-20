@@ -335,7 +335,7 @@ const LOCAL_SERVER_CANDIDATE_PORTS = [
 const BROWSER_ANNOTATION_RUNTIME_COMMAND_CHANNEL = 'desktop:browser-annotation-runtime-command'
 
 type BrowserStateListener = (state: ThreadBrowserState) => void
-type BrowserWebContentsListener = (webContents: WebContents, tabId: string) => void
+type BrowserWebContentsListener = (webContents: WebContents, ownerId: string, tabId: string) => void
 type BrowserPromptRequestListener = (request: BrowserPromptRequest) => void
 type BrowserAnnotationRuntimeEventListener = (event: BrowserAnnotationRuntimeEvent) => void
 
@@ -1341,7 +1341,7 @@ export class DesktopBrowserManager {
       this.configureRuntimeWebContents(runtime)
       this.runtimes.set(key, runtime)
       for (const listener of this.webContentsListeners) {
-        listener(runtime.webContents, tab.id)
+        listener(runtime.webContents, runtime.threadId, tab.id)
       }
     }
 
@@ -2252,7 +2252,7 @@ export class DesktopBrowserManager {
     }
     this.configureRuntimeWebContents(runtime)
     for (const listener of this.webContentsListeners) {
-      listener(runtime.webContents, tabId)
+      listener(runtime.webContents, threadId, tabId)
     }
     return runtime
   }

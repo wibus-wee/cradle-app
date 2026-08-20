@@ -352,28 +352,28 @@ describe('elysia migration skeleton', () => {
       const created = await createResponse.json() as {
         id: string
         name: string
-        locator: { hostId: string, path: string }
+        locator: { nodeId: string, path: string }
         createdAt: number
         updatedAt: number
       }
       expect(created.name).toBe(basename(workspaceRoot))
-      expect(created.locator).toEqual({ hostId: 'local', path: workspaceRoot })
+      expect(created.locator).toEqual({ nodeId: 'local', path: workspaceRoot })
       expect(created.createdAt).toBeTypeOf('number')
       expect(created.updatedAt).toBeTypeOf('number')
 
       const explicitResponse = await app.handle(new Request('http://localhost/workspaces', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'Manual Workspace', locator: { hostId: 'local', path: explicitWorkspaceRoot } }),
+        body: JSON.stringify({ name: 'Manual Workspace', locator: { nodeId: 'local', path: explicitWorkspaceRoot } }),
       }))
       expect(explicitResponse.status).toBe(200)
       const explicit = await explicitResponse.json() as {
         id: string
         name: string
-        locator: { hostId: string, path: string }
+        locator: { nodeId: string, path: string }
       }
       expect(explicit.name).toBe('Manual Workspace')
-      expect(explicit.locator).toEqual({ hostId: 'local', path: explicitWorkspaceRoot })
+      expect(explicit.locator).toEqual({ nodeId: 'local', path: explicitWorkspaceRoot })
 
       const listResponse = await app.handle(new Request('http://localhost/workspaces'))
       expect(listResponse.status).toBe(200)
@@ -391,11 +391,11 @@ describe('elysia migration skeleton', () => {
       expect(missingGet.status).toBe(200)
       expect(await missingGet.json()).toBeNull()
 
-      const resolveResponse = await app.handle(new Request(`http://localhost/workspaces/resolve?hostId=local&path=${encodeURIComponent(workspaceRoot)}`))
+      const resolveResponse = await app.handle(new Request(`http://localhost/workspaces/resolve?nodeId=local&path=${encodeURIComponent(workspaceRoot)}`))
       expect(resolveResponse.status).toBe(200)
       expect(await resolveResponse.json()).toEqual(expect.objectContaining({ id: created.id }))
 
-      const missingResolve = await app.handle(new Request(`http://localhost/workspaces/resolve?hostId=local&path=${encodeURIComponent('/missing/workspace')}`))
+      const missingResolve = await app.handle(new Request(`http://localhost/workspaces/resolve?nodeId=local&path=${encodeURIComponent('/missing/workspace')}`))
       expect(missingResolve.status).toBe(200)
       expect(await missingResolve.json()).toBeNull()
 
@@ -418,13 +418,13 @@ describe('elysia migration skeleton', () => {
       const duplicateResponse = await app.handle(new Request('http://localhost/workspaces', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'Dup', locator: { hostId: 'local', path: explicitWorkspaceRoot } }),
+        body: JSON.stringify({ name: 'Dup', locator: { nodeId: 'local', path: explicitWorkspaceRoot } }),
       }))
       expect(duplicateResponse.status).toBe(409)
       expect(await duplicateResponse.json()).toEqual({
         code: 'workspace_locator_exists',
         message: 'Workspace locator already exists',
-        details: { locator: { hostId: 'local', path: explicitWorkspaceRoot } },
+        details: { locator: { nodeId: 'local', path: explicitWorkspaceRoot } },
       })
 
       const deleteCreated = await app.handle(new Request(`http://localhost/workspaces/${created.id}`, {

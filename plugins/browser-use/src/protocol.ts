@@ -12,6 +12,7 @@ import { z } from 'zod'
 export interface NavigateCommand {
   type: 'navigate'
   id: string
+  ownerId: string
   url: string
   tabId?: string
 }
@@ -19,6 +20,7 @@ export interface NavigateCommand {
 export interface ScreenshotCommand {
   type: 'screenshot'
   id: string
+  ownerId: string
   tabId?: string
   fullPage?: boolean
 }
@@ -26,6 +28,7 @@ export interface ScreenshotCommand {
 export interface ClickCommand {
   type: 'click'
   id: string
+  ownerId: string
   tabId?: string
   selector: string
 }
@@ -33,6 +36,7 @@ export interface ClickCommand {
 export interface TypeCommand {
   type: 'type'
   id: string
+  ownerId: string
   tabId?: string
   selector: string
   text: string
@@ -41,6 +45,7 @@ export interface TypeCommand {
 export interface GetTextCommand {
   type: 'get_text'
   id: string
+  ownerId: string
   tabId?: string
   selector?: string
 }
@@ -48,35 +53,41 @@ export interface GetTextCommand {
 export interface TabsListCommand {
   type: 'tabs_list'
   id: string
+  ownerId: string
 }
 
 export interface TabsNewCommand {
   type: 'tabs_new'
   id: string
+  ownerId: string
   url?: string
 }
 
 export interface TabsCloseCommand {
   type: 'tabs_close'
   id: string
+  ownerId: string
   tabId: string
 }
 
 export interface TabsGoOffScreenCommand {
   type: 'tabs_go_off_screen'
   id: string
+  ownerId: string
   tabId?: string
 }
 
 export interface TabsBringToFrontCommand {
   type: 'tabs_bring_to_front'
   id: string
+  ownerId: string
   tabId?: string
 }
 
 export interface EvalCommand {
   type: 'eval'
   id: string
+  ownerId: string
   tabId?: string
   expression: string
 }
@@ -84,6 +95,7 @@ export interface EvalCommand {
 export interface ScrollCommand {
   type: 'scroll'
   id: string
+  ownerId: string
   tabId?: string
   selector?: string
   direction: 'up' | 'down' | 'left' | 'right'
@@ -93,6 +105,7 @@ export interface ScrollCommand {
 export interface HoverCommand {
   type: 'hover'
   id: string
+  ownerId: string
   tabId?: string
   selector: string
 }
@@ -100,12 +113,14 @@ export interface HoverCommand {
 export interface DomSnapshotCommand {
   type: 'dom_snapshot'
   id: string
+  ownerId: string
   tabId?: string
 }
 
 export interface WaitForSelectorCommand {
   type: 'wait_for_selector'
   id: string
+  ownerId: string
   tabId?: string
   selector: string
   timeout?: number
@@ -114,6 +129,7 @@ export interface WaitForSelectorCommand {
 export interface KeyboardCommand {
   type: 'keyboard'
   id: string
+  ownerId: string
   tabId?: string
   key: string
   modifiers?: string[]
@@ -179,29 +195,30 @@ export type WaitForSelectorResult = { found: true }
 export type KeyboardResult = { success: true }
 
 const BrowserCommandSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('navigate'), id: z.string(), url: z.string(), tabId: z.string().optional() }),
-  z.object({ type: z.literal('screenshot'), id: z.string(), tabId: z.string().optional(), fullPage: z.boolean().optional() }),
-  z.object({ type: z.literal('click'), id: z.string(), tabId: z.string().optional(), selector: z.string() }),
-  z.object({ type: z.literal('type'), id: z.string(), tabId: z.string().optional(), selector: z.string(), text: z.string() }),
-  z.object({ type: z.literal('get_text'), id: z.string(), tabId: z.string().optional(), selector: z.string().optional() }),
-  z.object({ type: z.literal('tabs_list'), id: z.string() }),
-  z.object({ type: z.literal('tabs_new'), id: z.string(), url: z.string().optional() }),
-  z.object({ type: z.literal('tabs_close'), id: z.string(), tabId: z.string() }),
-  z.object({ type: z.literal('tabs_go_off_screen'), id: z.string(), tabId: z.string().optional() }),
-  z.object({ type: z.literal('tabs_bring_to_front'), id: z.string(), tabId: z.string().optional() }),
-  z.object({ type: z.literal('eval'), id: z.string(), tabId: z.string().optional(), expression: z.string() }),
+  z.object({ type: z.literal('navigate'), id: z.string(), ownerId: z.string(), url: z.string(), tabId: z.string().optional() }),
+  z.object({ type: z.literal('screenshot'), id: z.string(), ownerId: z.string(), tabId: z.string().optional(), fullPage: z.boolean().optional() }),
+  z.object({ type: z.literal('click'), id: z.string(), ownerId: z.string(), tabId: z.string().optional(), selector: z.string() }),
+  z.object({ type: z.literal('type'), id: z.string(), ownerId: z.string(), tabId: z.string().optional(), selector: z.string(), text: z.string() }),
+  z.object({ type: z.literal('get_text'), id: z.string(), ownerId: z.string(), tabId: z.string().optional(), selector: z.string().optional() }),
+  z.object({ type: z.literal('tabs_list'), id: z.string(), ownerId: z.string() }),
+  z.object({ type: z.literal('tabs_new'), id: z.string(), ownerId: z.string(), url: z.string().optional() }),
+  z.object({ type: z.literal('tabs_close'), id: z.string(), ownerId: z.string(), tabId: z.string() }),
+  z.object({ type: z.literal('tabs_go_off_screen'), id: z.string(), ownerId: z.string(), tabId: z.string().optional() }),
+  z.object({ type: z.literal('tabs_bring_to_front'), id: z.string(), ownerId: z.string(), tabId: z.string().optional() }),
+  z.object({ type: z.literal('eval'), id: z.string(), ownerId: z.string(), tabId: z.string().optional(), expression: z.string() }),
   z.object({
     type: z.literal('scroll'),
     id: z.string(),
+    ownerId: z.string(),
     tabId: z.string().optional(),
     selector: z.string().optional(),
     direction: z.enum(['up', 'down', 'left', 'right']),
     amount: z.number().optional(),
   }),
-  z.object({ type: z.literal('hover'), id: z.string(), tabId: z.string().optional(), selector: z.string() }),
-  z.object({ type: z.literal('dom_snapshot'), id: z.string(), tabId: z.string().optional() }),
-  z.object({ type: z.literal('wait_for_selector'), id: z.string(), tabId: z.string().optional(), selector: z.string(), timeout: z.number().optional() }),
-  z.object({ type: z.literal('keyboard'), id: z.string(), tabId: z.string().optional(), key: z.string(), modifiers: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('hover'), id: z.string(), ownerId: z.string(), tabId: z.string().optional(), selector: z.string() }),
+  z.object({ type: z.literal('dom_snapshot'), id: z.string(), ownerId: z.string(), tabId: z.string().optional() }),
+  z.object({ type: z.literal('wait_for_selector'), id: z.string(), ownerId: z.string(), tabId: z.string().optional(), selector: z.string(), timeout: z.number().optional() }),
+  z.object({ type: z.literal('keyboard'), id: z.string(), ownerId: z.string(), tabId: z.string().optional(), key: z.string(), modifiers: z.array(z.string()).optional() }),
 ])
 
 const BrowserResponseSchema = z.union([

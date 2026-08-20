@@ -2,7 +2,18 @@ package relay
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
+)
+
+const (
+	PriorityControl = "control"
+	PriorityData    = "data"
+)
+
+var (
+	ErrInvalidEnvelope = errors.New("relay: invalid envelope")
+	ErrFrameTooLarge   = errors.New("relay: frame too large")
 )
 
 const (
@@ -124,6 +135,28 @@ func (env FabricEnvelope) Validate(maxBytes int64) error {
 		return ErrFrameTooLarge
 	}
 	return nil
+}
+
+func priorityCode(priority string) (byte, bool) {
+	switch priority {
+	case PriorityControl:
+		return 1, true
+	case PriorityData:
+		return 2, true
+	default:
+		return 0, false
+	}
+}
+
+func priorityFromCode(code byte) (string, bool) {
+	switch code {
+	case 1:
+		return PriorityControl, true
+	case 2:
+		return PriorityData, true
+	default:
+		return "", false
+	}
 }
 
 func fabricKindCode(kind string) (byte, bool) {

@@ -1,10 +1,38 @@
 // Tests Chronicle daemon launch argument construction.
 
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import { createDaemonArgs } from '../src/modules/chronicle/daemon-manager'
+import { createDaemonArgs, findChronicleBinary } from '../src/modules/chronicle/daemon-manager'
 
 describe('chronicle daemon manager', () => {
+  it('uses the Desktop-provided Chronicle runtime path', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cradle-chronicle-binary-'))
+    const binary = join(root, 'cradle-chronicle')
+    const previousPath = process.env.CRADLE_CHRONICLE_PATH
+
+    try {
+      writeFileSync(binary, '')
+      process.env.CRADLE_CHRONICLE_PATH = binary
+      expect(findChronicleBinary()).toBe(binary)
+
+      process.env.CRADLE_CHRONICLE_PATH = join(root, 'missing')
+      expect(() => findChronicleBinary()).toThrow('Configured Chronicle runtime is missing')
+    }
+    finally {
+      if (previousPath === undefined) {
+        delete process.env.CRADLE_CHRONICLE_PATH
+      }
+      else {
+        process.env.CRADLE_CHRONICLE_PATH = previousPath
+      }
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('passes an explicit negative audio flag when microphone capture is disabled', () => {
     const args = createDaemonArgs({
       storageRoot: '/tmp/cradle-chronicle',

@@ -19,7 +19,7 @@ import {
   writeCustomServerUrl,
 } from '~/lib/server-endpoint-preferences'
 
-import { InboundAccessSettingsGroup, ProxySettingsGroup } from './network-settings'
+import { ProxySettingsGroup, ServerAccessSettingsGroup } from './network-settings'
 import { SettingsGroup, SettingsPage } from './settings-container'
 import { SettingsRow } from './settings-row'
 
@@ -185,7 +185,7 @@ export function ServerEndpointSettings() {
         </SettingsRow>
       </SettingsGroup>
 
-      <InboundAccessSettingsGroup />
+      <ServerAccessSettingsGroup />
 
       <ProxySettingsGroup />
 

@@ -15,7 +15,7 @@ const spec = {
     "work",
     "prepare"
   ],
-  "description": "Prepare a local Work handoff without publishing it",
+  "description": "Prepare a Work handoff without publishing it",
   "flags": [
     {
       "name": "title",

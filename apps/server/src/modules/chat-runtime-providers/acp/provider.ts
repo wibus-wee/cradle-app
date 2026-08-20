@@ -79,8 +79,8 @@ export class AcpChatProvider implements ChatRuntime {
     const connectionKey = await this.ensureConnected(profile.id, profile.configJson)
     const draftSessionId = readAcpDraftSessionId(profile.configJson)
     const response = draftSessionId
-      ? await this.resumeDraftSession(connectionKey, draftSessionId, input.workspacePath)
-      : await this.deps.runtime.newSession(connectionKey, input.workspacePath)
+      ? await this.resumeDraftSession(connectionKey, draftSessionId, input.workspacePath, input.chatSessionId)
+      : await this.deps.runtime.newSession(connectionKey, input.workspacePath, input.chatSessionId)
 
     await this.applyRequestedModel(connectionKey, response.sessionId, input.modelId)
 
@@ -113,7 +113,12 @@ export class AcpChatProvider implements ChatRuntime {
 
     if (this.deps.runtime.supportsResumeSession(connectionKey)) {
       try {
-        const response = await this.deps.runtime.resumeSession(connectionKey, storedSessionId, input.workspacePath)
+        const response = await this.deps.runtime.resumeSession(
+          connectionKey,
+          storedSessionId,
+          input.workspacePath,
+          input.runtimeSession.chatSessionId,
+        )
         await this.applyRequestedModel(connectionKey, storedSessionId, input.modelId)
         return {
           ...input.runtimeSession,
@@ -130,7 +135,12 @@ export class AcpChatProvider implements ChatRuntime {
 
     if (this.deps.runtime.supportsLoadSession(connectionKey)) {
       try {
-        const response = await this.deps.runtime.loadSession(connectionKey, storedSessionId, input.workspacePath)
+        const response = await this.deps.runtime.loadSession(
+          connectionKey,
+          storedSessionId,
+          input.workspacePath,
+          input.runtimeSession.chatSessionId,
+        )
         await this.applyRequestedModel(connectionKey, storedSessionId, input.modelId)
         return {
           ...input.runtimeSession,
@@ -200,7 +210,12 @@ export class AcpChatProvider implements ChatRuntime {
     return connectionKey
   }
 
-  private async resumeDraftSession(connectionKey: string, sessionId: string, workspacePath: string): Promise<{
+  private async resumeDraftSession(
+    connectionKey: string,
+    sessionId: string,
+    workspacePath: string,
+    chatSessionId: string,
+  ): Promise<{
     sessionId: string
     modes: SessionModeState | null
     configOptions: SessionConfigOption[]
@@ -210,14 +225,14 @@ export class AcpChatProvider implements ChatRuntime {
       return { sessionId, ...state }
     }
     if (this.deps.runtime.supportsResumeSession(connectionKey)) {
-      const response = await this.deps.runtime.resumeSession(connectionKey, sessionId, workspacePath)
+      const response = await this.deps.runtime.resumeSession(connectionKey, sessionId, workspacePath, chatSessionId)
       return { sessionId, modes: response.modes, configOptions: response.configOptions }
     }
     if (this.deps.runtime.supportsLoadSession(connectionKey)) {
-      const response = await this.deps.runtime.loadSession(connectionKey, sessionId, workspacePath)
+      const response = await this.deps.runtime.loadSession(connectionKey, sessionId, workspacePath, chatSessionId)
       return { sessionId, modes: response.modes, configOptions: response.configOptions }
     }
-    return await this.deps.runtime.newSession(connectionKey, workspacePath)
+    return await this.deps.runtime.newSession(connectionKey, workspacePath, chatSessionId)
   }
 
   private async applyRequestedModel(connectionKey: string, sessionId: string, modelId: string | null | undefined): Promise<void> {

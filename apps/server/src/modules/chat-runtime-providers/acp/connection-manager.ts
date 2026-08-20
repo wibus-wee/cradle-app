@@ -60,8 +60,10 @@ export interface AcpPermissionResponse {
 
 export type AcpPermissionHandler = (request: AcpPermissionRequest) => Promise<AcpPermissionResponse>
 
-export function listRegisteredAcpMcpServers(): McpServer[] {
-  return Object.entries(getRegisteredStdioMcpServers()).map(([name, config]) => ({
+export function listRegisteredAcpMcpServers(chatSessionId?: string): McpServer[] {
+  return Object.entries(getRegisteredStdioMcpServers(
+    chatSessionId ? { chatSessionId } : undefined,
+  )).map(([name, config]) => ({
     name,
     command: config.command,
     args: config.args,
@@ -182,11 +184,11 @@ export class AcpConnectionManager {
     return promise
   }
 
-  async newSession(agentId: string, cwd: string): Promise<NewSessionResponse & AcpSessionState> {
+  async newSession(agentId: string, cwd: string, chatSessionId?: string): Promise<NewSessionResponse & AcpSessionState> {
     const conn = this.getConnection(agentId)
     const response = await conn.agent.request(methods.agent.session.new, {
       cwd,
-      mcpServers: listRegisteredAcpMcpServers(),
+      mcpServers: listRegisteredAcpMcpServers(chatSessionId),
     })
     const sessionState = readAcpSessionState(response)
     this.cacheSessionState(conn, response.sessionId, sessionState)
@@ -201,7 +203,7 @@ export class AcpConnectionManager {
     return !!this.getConnection(agentId).initResult?.agentCapabilities?.sessionCapabilities?.resume
   }
 
-  async loadSession(agentId: string, sessionId: string, cwd: string): Promise<LoadSessionResponse & AcpSessionState> {
+  async loadSession(agentId: string, sessionId: string, cwd: string, chatSessionId?: string): Promise<LoadSessionResponse & AcpSessionState> {
     const conn = this.getConnection(agentId)
     if (!this.supportsLoadSession(agentId)) {
       throw new Error(`Agent ${agentId} does not support session/load`)
@@ -212,7 +214,7 @@ export class AcpConnectionManager {
       const response = await conn.agent.request(methods.agent.session.load, {
         sessionId,
         cwd,
-        mcpServers: listRegisteredAcpMcpServers(),
+        mcpServers: listRegisteredAcpMcpServers(chatSessionId),
       })
       const sessionState = readAcpSessionState(response)
       this.cacheSessionState(conn, sessionId, sessionState)
@@ -223,7 +225,7 @@ export class AcpConnectionManager {
     }
   }
 
-  async resumeSession(agentId: string, sessionId: string, cwd: string): Promise<ResumeSessionResponse & AcpSessionState> {
+  async resumeSession(agentId: string, sessionId: string, cwd: string, chatSessionId?: string): Promise<ResumeSessionResponse & AcpSessionState> {
     const conn = this.getConnection(agentId)
     if (!this.supportsResumeSession(agentId)) {
       throw new Error(`Agent ${agentId} does not support session/resume`)
@@ -232,7 +234,7 @@ export class AcpConnectionManager {
     const response = await conn.agent.request(methods.agent.session.resume, {
       sessionId,
       cwd,
-      mcpServers: listRegisteredAcpMcpServers(),
+      mcpServers: listRegisteredAcpMcpServers(chatSessionId),
     })
     const sessionState = readAcpSessionState(response)
     this.cacheSessionState(conn, sessionId, sessionState)

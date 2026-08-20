@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
 
 import {
@@ -7,15 +7,18 @@ import {
   getSessionsOptions,
   getSessionsQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
+import { postSessionsNodeProjectionsReconcile } from '~/api-gen/sdk.gen'
 import type { GetSessionsByIdResponse, GetSessionsData, GetSessionsResponse } from '~/api-gen/types.gen'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import type { SessionExecution } from '~/features/chat/session/session-execution'
 import { readSessionExecution } from '~/features/chat/session/session-execution'
+import type { Workspace } from '~/features/workspace/types'
 import { queryRefreshPolicy } from '~/lib/query-refresh-policy'
 
 let unreadSessionIdsSnapshot: string[] = []
 
 export const SESSION_LIST_REFRESH_INTERVAL_MS = 5_000
+const NODE_SESSION_RECONCILE_INTERVAL_MS = 15_000
 const SESSION_LIST_PAGE_LIMIT = 200
 
 export function readUnreadSessionIdsSnapshot(): string[] {
@@ -58,7 +61,7 @@ export interface WorkspaceSession {
   isIsolated: boolean
   worktreeId: string | null
   worktreeBranch: string | null
-  /** Local vs remote-host execution affinity from session projection. */
+  /** Local vs Fabric Node execution affinity from session projection. */
   execution: SessionExecution
 }
 
@@ -366,6 +369,59 @@ export function useAllSessions(archived?: boolean) {
   }, [archived, sessions])
 
   return { sessions, loading }
+}
+
+/** Keep mounted Node workspaces aware of sessions created by another controller. */
+export function useNodeSessionReconciliation(workspaces: readonly Workspace[]): void {
+  const queryClient = useQueryClient()
+  const remoteWorkspaceIds = useMemo(
+    () => workspaces
+      .filter(workspace => workspace.locator.nodeId !== 'local')
+      .map(workspace => workspace.id)
+      .sort(),
+    [workspaces],
+  )
+  const remoteWorkspaceKey = remoteWorkspaceIds.join('\0')
+
+  useEffect(() => {
+    if (!remoteWorkspaceKey) {
+      return
+    }
+    let disposed = false
+    let running = false
+    const reconcile = async () => {
+      if (running || disposed) {
+        return
+      }
+      running = true
+      try {
+        const results = await Promise.allSettled(remoteWorkspaceIds.map(async (workspaceId) => {
+          const { data } = await postSessionsNodeProjectionsReconcile({
+            body: { workspaceId },
+            throwOnError: true,
+          })
+          return data
+        }))
+        if (!disposed && results.some(result =>
+          result.status === 'fulfilled'
+          && (result.value.discovered > 0 || result.value.updated > 0 || result.value.removed > 0))) {
+          await queryClient.invalidateQueries({
+            predicate: query => isSessionsQueryKey(query.queryKey),
+          })
+        }
+      }
+      finally {
+        running = false
+      }
+    }
+
+    void reconcile()
+    const timer = window.setInterval(() => void reconcile(), NODE_SESSION_RECONCILE_INTERVAL_MS)
+    return () => {
+      disposed = true
+      window.clearInterval(timer)
+    }
+  }, [queryClient, remoteWorkspaceIds, remoteWorkspaceKey])
 }
 
 export function useWorkspaceSessions(workspaceId: string | null, archived?: boolean) {
