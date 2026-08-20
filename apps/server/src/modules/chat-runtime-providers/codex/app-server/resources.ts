@@ -1,10 +1,10 @@
-import type { ProviderRuntimeHostSnapshot } from '../../../provider-runtime/host-manager'
-import { providerRuntimeHostManager } from '../../../provider-runtime/host-manager'
-import type { RuntimeProcessResource } from '../../../provider-runtime/process-resources'
+import type { RuntimeProcessResource } from '../../../../infra/process-resources'
 import {
   emptyRuntimeProcessResources,
   readProcessResourceUsage,
-} from '../../../provider-runtime/process-resources'
+} from '../../../../infra/process-resources'
+import type { ProviderRuntimeHostSnapshot } from '../../../provider-runtime/host-manager'
+import { providerRuntimeHostManager } from '../../../provider-runtime/host-manager'
 import type { CodexAppServerHostResource } from '../types'
 
 function isCodexAppServerHostResource(resource: unknown): resource is CodexAppServerHostResource {

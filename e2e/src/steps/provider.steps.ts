@@ -1,10 +1,15 @@
 import { Given, Then, When } from '@cucumber/cucumber'
 import { expect } from '@playwright/test'
 
+import {
+  configureProviderDisableGatedSimulator,
+  expectProviderDisableGatesCanceled,
+} from '../support/helpers/provider-scenario'
 import { anthropicScenario, anthropicTextExchange } from '../support/scenarios/anthropic'
 import type { CradleWorld } from '../support/world'
 
 const TIMEOUT = 15_000
+const PROVIDER_SESSION_ALIASES_KEY = 'provider.session-aliases'
 
 const KIND_TO_PRESET: Record<string, string> = {
   'Anthropic': 'anthropic',
@@ -100,6 +105,11 @@ Then('Provider 列表中应显示名为{string}的 profile', async function (thi
   await expect(row).toBeVisible({ timeout: TIMEOUT })
 })
 
+Then('Provider 列表中不应显示名为{string}的 profile', async function (this: CradleWorld, name: string) {
+  const row = this.page.locator('[data-testid^="agent-profile-row-"]').filter({ hasText: name })
+  await expect(row).toHaveCount(0, { timeout: TIMEOUT })
+})
+
 When('我为 UI 创建的 Provider 准备真实 Claude 回复', async function (this: CradleWorld) {
   const simulator = await this.ensureSimulator()
   simulator.reset()
@@ -131,6 +141,41 @@ When('我禁用当前 Provider', async function (this: CradleWorld) {
   await expect(toggle).toBeVisible({ timeout: TIMEOUT })
   await toggle.click()
   await expect(this.page.locator('[data-testid="provider-detail-panel"]')).toContainText('Off', { timeout: TIMEOUT })
+})
+
+When('我删除当前 Provider', async function (this: CradleWorld) {
+  const removeButton = this.page.locator('[aria-label="Remove provider"]')
+  await expect(removeButton).toBeVisible({ timeout: TIMEOUT })
+  await removeButton.click()
+
+  const dialog = this.page.getByRole('alertdialog')
+  await expect(dialog).toBeVisible({ timeout: TIMEOUT })
+  await dialog.getByRole('button', { name: 'Remove', exact: true }).click()
+  await expect(dialog).toBeHidden({ timeout: TIMEOUT })
+})
+
+Given('我已为 Provider 禁用准备两个门控 Claude 运行', async function (this: CradleWorld) {
+  await configureProviderDisableGatedSimulator(this)
+})
+
+When('我记住当前 Provider 会话为{string}', async function (this: CradleWorld, alias: string) {
+  const aliases = this.maybeRecall<Record<string, string>>(PROVIDER_SESSION_ALIASES_KEY) ?? {}
+  this.remember(PROVIDER_SESSION_ALIASES_KEY, {
+    ...aliases,
+    [alias]: await this.chat.sessionId(),
+  })
+})
+
+Then('两个 Provider 慢速响应均应已取消', function (this: CradleWorld) {
+  expectProviderDisableGatesCanceled(this)
+})
+
+When('我打开已记住的 Provider 会话{string}', async function (this: CradleWorld, alias: string) {
+  const sessionId = this.maybeRecall<Record<string, string>>(PROVIDER_SESSION_ALIASES_KEY)?.[alias]
+  if (!sessionId) {
+    throw new Error(`Missing remembered Provider session alias: ${alias}`)
+  }
+  await this.chat.openSession(sessionId)
 })
 
 Then('新建聊天中不应提供名为{string}的 Provider', async function (this: CradleWorld, name: string) {

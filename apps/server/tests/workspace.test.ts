@@ -156,12 +156,12 @@ describe('workspace capability', () => {
       const deleteRes = await app.handle(new Request(`http://localhost/workspaces/${created.id}`, { method: 'DELETE' }))
       expect(deleteRes.status).toBe(200)
       const deleteBody = await deleteRes.json()
-      expect(deleteBody).toEqual({ ok: true })
+      expect(deleteBody).toEqual({ ok: true, removedSessionIds: [], removedWorkIds: [] })
 
       const deleteExplicit = await app.handle(new Request(`http://localhost/workspaces/${explicit.id}`, { method: 'DELETE' }))
       expect(deleteExplicit.status).toBe(200)
       const deleteExplicitBody = await deleteExplicit.json()
-      expect(deleteExplicitBody).toEqual({ ok: true })
+      expect(deleteExplicitBody).toEqual({ ok: true, removedSessionIds: [], removedWorkIds: [] })
 
       const afterList = await (await app.handle(new Request('http://localhost/workspaces'))).json()
       expect(afterList).toEqual([])

@@ -58,6 +58,7 @@ import {
   openSettingsSection,
   openUsage,
   openWorkspaceDetail,
+  removeWorkspaceOwnedSurfaces,
 } from '~/navigation/navigation-commands'
 import { chatSelectors, useChatStore } from '~/store/chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
@@ -1494,9 +1495,23 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
       if (!authorized) {
         return
       }
-      remove({ path: { workspaceId: id } })
+      try {
+        const result = await remove({ path: { workspaceId: id } })
+        removeWorkspaceOwnedSurfaces({
+          workspaceId: id,
+          removedSessionIds: result.removedSessionIds,
+          removedWorkIds: result.removedWorkIds,
+        })
+      }
+      catch (error) {
+        toastManager.add({
+          type: 'error',
+          title: t('workspace.toast.removeFailed'),
+          description: formatToastError(error),
+        })
+      }
     },
-    [localAuthForDangerousActions, remove, workspaces],
+    [localAuthForDangerousActions, remove, t, workspaces],
   )
 
   const handleToggleWorkspacePin = useCallback(

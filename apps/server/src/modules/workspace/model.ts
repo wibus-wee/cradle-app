@@ -221,6 +221,8 @@ export const WorkspaceModel = {
 
   deleteResponse: t.Object({
     ok: t.Literal(true),
+    removedSessionIds: t.Array(t.String()),
+    removedWorkIds: t.Array(t.String()),
   }),
 
   locatorExistsError: t.Object({

@@ -84,4 +84,31 @@ describe('surface store persistence', () => {
 
     expect(state.surfaces.some(surface => surface.id === 'work:work-1')).toBe(true)
   })
+
+  it('preserves New Chat workspace and session-group context', () => {
+    const state = readPersistedSurfaceState({
+      surfaces: [{
+        id: 'new-chat',
+        kind: 'new-chat',
+        title: 'New Chat',
+        route: {
+          to: '/chat/new',
+          search: {
+            workspaceId: 'workspace-1',
+            sessionGroupId: 'group-1',
+          },
+        },
+        order: 1,
+        closable: true,
+      }],
+    })
+
+    expect(state.surfaces.find(surface => surface.id === 'new-chat')?.route).toEqual({
+      to: '/chat/new',
+      search: {
+        workspaceId: 'workspace-1',
+        sessionGroupId: 'group-1',
+      },
+    })
+  })
 })

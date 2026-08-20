@@ -18,8 +18,11 @@ import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { clearProviderTargetFromSessionQueuesInTransaction } from '../chat-runtime/es/commands'
+import {
+  cancelProviderTargetSessionQueuesInTransaction,
+} from '../chat-runtime/es/commands'
 import { publishSessionTailEvents } from '../chat-runtime/es/event-tail'
+import * as ChatRuntime from '../chat-runtime/runtime'
 import {
   CODEX_BEDROCK_API_KEY_SECRET_KIND,
   CODEX_CHATGPT_AUTH_SECRET_KIND,
@@ -503,6 +506,7 @@ export async function upsertManualProviderTarget(
   assertChatgptCredentialProviderInvariant(input)
 
   const nextEnabled = input.enabled ?? existing?.enabled ?? true
+  const disabling = existing?.enabled === true && !nextEnabled
   const connectionConfigJson = normalizeManualConnectionConfig(input)
   const enabledModelsJson = providerKindChanged ? '[]' : (existing?.enabledModelsJson ?? '[]')
   const nextProviderId = input.providerId !== undefined
@@ -521,11 +525,11 @@ export async function upsertManualProviderTarget(
       details: { providerTargetId: id },
     })
   }
-  if (existing?.enabled && !nextEnabled) {
+  if (disabling) {
     await suspendProviderExtensionsForTarget(id)
   }
   const d = db()
-  d.transaction((tx) => {
+  const queueEvents = d.transaction((tx) => {
     tx.insert(providerTargets)
       .values({
         id,
@@ -578,7 +582,18 @@ export async function upsertManualProviderTarget(
     if (!nextEnabled) {
       disableAgentsForProviderTargetInDb(id, tx)
     }
+    return disabling
+      ? cancelProviderTargetSessionQueuesInTransaction(tx, {
+          providerTargetId: id,
+          updatedAt: now,
+        })
+      : []
   })
+  publishSessionTailEvents(queueEvents)
+  if (disabling) {
+    await ChatRuntime.cancelProviderTargetSessions(id)
+    releaseLiveProviderRuntimeSessionsForProviderTarget(id)
+  }
   if (providerKindChanged) {
     releaseLiveProviderRuntimeSessionsForProviderTarget(id)
   }
@@ -607,13 +622,14 @@ export function updateProviderTargetIcon(
   return getProviderTarget(target.id)!
 }
 
-export function updateProviderTargetEnabled(
+export async function updateProviderTargetEnabled(
   providerTargetId: string,
   enabled: boolean,
-): ProviderTargetRow {
+): Promise<ProviderTargetRow> {
   const target = resolveProviderTarget(providerTargetId)
+  const disabling = target.enabled && !enabled
   const d = db()
-  d.transaction((tx) => {
+  const queueEvents = d.transaction((tx) => {
     tx.update(providerTargets)
       .set({ enabled, updatedAt: nowUnix() })
       .where(eq(providerTargets.id, target.id))
@@ -621,7 +637,18 @@ export function updateProviderTargetEnabled(
     if (!enabled) {
       disableAgentsForProviderTargetInDb(target.id, tx)
     }
+    return disabling
+      ? cancelProviderTargetSessionQueuesInTransaction(tx, {
+          providerTargetId: target.id,
+          updatedAt: nowUnix(),
+        })
+      : []
   })
+  publishSessionTailEvents(queueEvents)
+  if (disabling) {
+    await ChatRuntime.cancelProviderTargetSessions(target.id)
+    releaseLiveProviderRuntimeSessionsForProviderTarget(target.id)
+  }
   return getProviderTarget(target.id)!
 }
 
@@ -629,6 +656,20 @@ export async function removeProviderTarget(providerTargetId: string): Promise<vo
   const target = resolveProviderTarget(providerTargetId)
   await prepareProviderTargetExtensionDeletion(target.id)
   const d = db()
+  const cancellationEvents = d.transaction((tx) => {
+    const now = nowUnix()
+    tx.update(providerTargets)
+      .set({ enabled: false, updatedAt: now })
+      .where(eq(providerTargets.id, target.id))
+      .run()
+    return cancelProviderTargetSessionQueuesInTransaction(tx, {
+      providerTargetId: target.id,
+      updatedAt: now,
+    })
+  })
+  publishSessionTailEvents(cancellationEvents)
+  await ChatRuntime.cancelProviderTargetSessions(target.id)
+
   const storedSessionEvents = d.transaction((tx) => {
     const now = nowUnix()
     const ownedAgentIds = tx
@@ -658,10 +699,6 @@ export async function removeProviderTarget(providerTargetId: string): Promise<vo
       .set({ providerTargetId: null })
       .where(eq(usageLogs.providerTargetId, target.id))
       .run()
-    const queueEvents = clearProviderTargetFromSessionQueuesInTransaction(tx, {
-      providerTargetId: target.id,
-      updatedAt: now,
-    })
     tx.delete(providerTargetModelCache).where(eq(providerTargetModelCache.providerTargetId, target.id)).run()
     tx.delete(agentSessions).where(eq(agentSessions.providerTargetId, target.id)).run()
     if (ownedAgentIds.length > 0) {
@@ -675,7 +712,7 @@ export async function removeProviderTarget(providerTargetId: string): Promise<vo
         .run()
     }
     tx.delete(providerTargets).where(eq(providerTargets.id, target.id)).run()
-    return queueEvents
+    return []
   })
   publishSessionTailEvents(storedSessionEvents)
   releaseLiveProviderRuntimeSessionsForProviderTarget(target.id)

@@ -468,6 +468,62 @@ export function clearProviderTargetFromSessionQueuesInTransaction(
   return storedEvents
 }
 
+export function cancelProviderTargetSessionQueuesInTransaction(
+  tx: ChatRuntimeTx,
+  input: {
+    providerTargetId: string
+    updatedAt: number
+  },
+): StoredChatSessionEvent[] {
+  const rows = tx
+    .select({
+      id: chatSessionQueueItems.id,
+      sessionId: chatSessionQueueItems.sessionId,
+    })
+    .from(chatSessionQueueItems)
+    .where(
+      and(
+        eq(chatSessionQueueItems.providerTargetId, input.providerTargetId),
+        inArray(chatSessionQueueItems.status, ['pending', 'running']),
+        isNull(chatSessionQueueItems.startedRunId),
+      ),
+    )
+    .all()
+  if (rows.length === 0) {
+    return []
+  }
+
+  const rowsBySessionId = new Map<string, typeof rows>()
+  for (const row of rows) {
+    const sessionRows = rowsBySessionId.get(row.sessionId)
+    if (sessionRows) {
+      sessionRows.push(row)
+    }
+    else {
+      rowsBySessionId.set(row.sessionId, [row])
+    }
+  }
+
+  const storedEvents: StoredChatSessionEvent[] = []
+  for (const [sessionId, sessionRows] of rowsBySessionId) {
+    storedEvents.push(
+      ...appendDecidedSessionEvents(
+        tx,
+        sessionId,
+        sessionRows.map((row): ChatSessionEvent => ({
+          type: 'QueueItemCancelled',
+          payload: {
+            queueItemId: row.id,
+            sessionId,
+            updatedAt: input.updatedAt,
+          },
+        })),
+      ),
+    )
+  }
+  return storedEvents
+}
+
 export async function failSessionQueueItem(
   sessionId: string,
   queueItemId: string,

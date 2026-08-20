@@ -142,5 +142,16 @@ export const FabricModel = {
     ),
     t.Null(),
   ]),
+  managedRelayResources: t.Object(
+    {
+      source: t.Union([t.Literal('managed'), t.Literal('external'), t.Literal('unavailable')]),
+      running: t.Boolean(),
+      pid: t.Nullable(t.Number()),
+      rssMB: t.Nullable(t.Number()),
+      cpuPercent: t.Nullable(t.Number()),
+      descendantCount: t.Nullable(t.Number()),
+    },
+    { additionalProperties: false },
+  ),
   nodeSummary,
 } as const

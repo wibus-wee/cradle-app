@@ -68,6 +68,20 @@ export async function cancelSession(
   await abortRun(runId, deps)
 }
 
+export async function cancelProviderTargetSessions(
+  providerTargetId: string,
+  deps: ActiveRunLifecycleDeps,
+): Promise<void> {
+  const sessionIds = new Set(
+    runRegistry.listActiveRuns()
+      .filter(run => run.providerTargetId === providerTargetId)
+      .map(run => run.sessionId),
+  )
+  for (const sessionId of sessionIds) {
+    await cancelSession(sessionId, deps)
+  }
+}
+
 export async function abortAllRuns(deps: ActiveRunLifecycleDeps): Promise<void> {
   const runIds = runRegistry.listActiveRunIds()
   for (const runId of runIds) {

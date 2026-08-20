@@ -4,6 +4,7 @@ import { useResolvedThemeMode } from '~/store/theme'
 
 import { UsageDashboardView } from './usage-dashboard-view'
 import type { UsageRangeKey } from './usage-time-range'
+import { useFleetUsage } from './use-fleet-usage'
 import { useUsageOverview } from './use-usage-overview'
 
 export function UsageDashboard() {
@@ -12,6 +13,10 @@ export function UsageDashboard() {
   const [range, setRange] = useState<UsageRangeKey>('30d')
   const usage = useUsageOverview(range)
   const themeMode = useResolvedThemeMode()
+  const fleet = useFleetUsage(
+    { daily: usage.daily, dailyByModel: usage.dailyByModel, dailyCost: usage.dailyCost },
+    usage.usageReady,
+  )
 
   return (
     <UsageDashboardView
@@ -25,6 +30,7 @@ export function UsageDashboard() {
       tools={usage.tools}
       costEfficiency={usage.costEfficiency}
       performance={usage.performance}
+      fleet={fleet}
       usageReady={usage.usageReady}
       range={range}
       onRangeChange={setRange}

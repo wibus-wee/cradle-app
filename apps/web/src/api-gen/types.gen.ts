@@ -1148,6 +1148,8 @@ export type DeleteWorkspacesByWorkspaceIdResponses = {
      */
     200: {
         ok: boolean;
+        removedSessionIds: Array<string>;
+        removedWorkIds: Array<string>;
     };
 };
 
@@ -2928,6 +2930,29 @@ export type GetFabricManagedRelayResponses = {
 };
 
 export type GetFabricManagedRelayResponse = GetFabricManagedRelayResponses[keyof GetFabricManagedRelayResponses];
+
+export type GetFabricManagedRelayResourcesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/managed-relay/resources';
+};
+
+export type GetFabricManagedRelayResourcesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: 'managed' | 'external' | 'unavailable';
+        running: boolean;
+        pid: number | null;
+        rssMB: number | null;
+        cpuPercent: number | null;
+        descendantCount: number | null;
+    };
+};
+
+export type GetFabricManagedRelayResourcesResponse = GetFabricManagedRelayResourcesResponses[keyof GetFabricManagedRelayResourcesResponses];
 
 export type PostFabricNodeInvitationsData = {
     body: {

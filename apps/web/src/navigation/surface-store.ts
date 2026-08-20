@@ -55,7 +55,11 @@ const surfaceRouteSchema = z.discriminatedUnion('to', [
   }),
   z.object({
     to: z.literal('/chat/new'),
-    search: z.object({ issueId: optionalStringSchema }).optional(),
+    search: z.object({
+      issueId: optionalStringSchema,
+      workspaceId: optionalStringSchema,
+      sessionGroupId: optionalStringSchema,
+    }).optional(),
   }),
   z.object({
     to: z.literal('/chat/$sessionId'),

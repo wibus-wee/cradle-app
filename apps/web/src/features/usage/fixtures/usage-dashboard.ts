@@ -1,4 +1,5 @@
 import type { UsageDashboardViewProps } from '../usage-dashboard-view'
+import { LOCAL_DEVICE_KEY } from '../usage-fleet'
 import type {
   CostSummary,
   DailyCost,
@@ -291,6 +292,70 @@ const toolDaily = daily.flatMap((entry, dayIndex) => {
   }))
 })
 
+// Fleet fixture: this device plus two reachable remote nodes (scaled copies of
+// the local series so shares differ per device) and one offline node.
+function scaledDaily(scale: number, phase: number): DailyUsage[] {
+  return daily.map((entry, index) => ({
+    ...entry,
+    totalTokens: Math.round(entry.totalTokens * scale * (1 + ((index + phase) % 5) * 0.08)),
+    count: Math.round(entry.count * scale),
+  }))
+}
+
+function scaledDailyByModel(scale: number, phase: number): DailyUsageByModel[] {
+  return dailyByModel.map((entry, index) => ({
+    ...entry,
+    totalTokens: Math.round(entry.totalTokens * scale * (1 + ((index + phase) % 5) * 0.08)),
+    count: Math.max(1, Math.round(entry.count * scale)),
+  }))
+}
+
+function scaledDailyCost(scale: number, phase: number): DailyCost[] {
+  return dailyCost.map((entry, index) => ({
+    ...entry,
+    costUsd: entry.costUsd * scale * (1 + ((index + phase) % 5) * 0.08),
+  }))
+}
+
+const fleet: UsageDashboardViewProps['fleet'] = {
+  devices: [
+    {
+      key: LOCAL_DEVICE_KEY,
+      label: '本机',
+      platform: null,
+      isLocal: true,
+      status: 'online',
+      daily,
+      dailyByModel,
+      dailyCost,
+    },
+    {
+      key: 'node-macbook',
+      label: 'MacBook Pro',
+      platform: 'darwin',
+      isLocal: false,
+      status: 'online',
+      daily: scaledDaily(0.35, 1),
+      dailyByModel: scaledDailyByModel(0.35, 1),
+      dailyCost: scaledDailyCost(0.35, 1),
+    },
+    {
+      key: 'node-devbox',
+      label: 'Dev Box',
+      platform: 'linux',
+      isLocal: false,
+      status: 'online',
+      daily: scaledDaily(0.18, 3),
+      dailyByModel: scaledDailyByModel(0.18, 3),
+      dailyCost: scaledDailyCost(0.18, 3),
+    },
+  ],
+  unavailable: [
+    { key: 'node-nas', label: 'Home NAS', platform: 'linux', status: 'offline' },
+  ],
+  isLoading: false,
+}
+
 export const populatedUsageDashboardFixture: UsageDashboardViewProps = {
   daily,
   dailyByModel,
@@ -346,6 +411,7 @@ export const populatedUsageDashboardFixture: UsageDashboardViewProps = {
     avgCostPerRun: entry.count > 0 ? dailyCost.filter(c => c.date === entry.date).reduce((sum, c) => sum + c.costUsd, 0) / entry.count : 0,
   })),
   performance: runtimePerformance,
+  fleet,
   usageReady: true,
   range: '30d',
   onRangeChange: () => {},
@@ -393,6 +459,7 @@ export const emptyUsageDashboardFixture: UsageDashboardViewProps = {
     byModel: [],
     daily: [],
   },
+  fleet: null,
   usageReady: true,
   range: '30d',
   onRangeChange: () => {},

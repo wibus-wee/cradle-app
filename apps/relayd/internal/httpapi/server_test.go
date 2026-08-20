@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +26,30 @@ func TestHealth(t *testing.T) {
 	}
 	if rec.Body.String() != "ok" {
 		t.Fatalf("body = %q, expected ok", rec.Body.String())
+	}
+}
+
+func TestMetricsExposeRuntimeAndRelayCollectors(t *testing.T) {
+	server := newTestServer(t)
+	health := httptest.NewRecorder()
+	server.Handler().ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, expected 200", rec.Code)
+	}
+	for _, metricName := range []string{
+		"go_goroutines",
+		"process_resident_memory_bytes",
+		"cradle_relayd_build_info",
+		"cradle_relayd_http_requests_total",
+		"cradle_relayd_queue_bytes",
+	} {
+		if !strings.Contains(rec.Body.String(), metricName) {
+			t.Errorf("metrics response does not contain %q", metricName)
+		}
 	}
 }
 

@@ -16,10 +16,10 @@ import { createOpencodeClient as createOpencodeV2Client } from '@opencode-ai/sdk
 
 import type { ManagedChildProcess, ManagedSpawnOptions } from '../../../infra/managed-process'
 import { spawnManagedProcess } from '../../../infra/managed-process'
+import type { RuntimeProcessResources } from '../../../infra/process-resources'
 import { createChildLogger } from '../../../logging/logger'
 import type { RuntimeLiveResourceLease } from '../../chat-runtime/runtime-provider-types'
 import type { RuntimeKind } from '../../provider-contracts/types'
-import type { RuntimeProcessResources } from '../../provider-runtime/process-resources'
 import { resolveOpencodeExecutable } from './runtime-installation'
 
 const logger = createChildLogger({ module: 'chat-runtime.opencode-server' })

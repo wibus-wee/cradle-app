@@ -4381,7 +4381,7 @@ describe('chat runtime capability', () => {
         items: [
           expect.objectContaining({
             id: 'queue-provider-deleted',
-            providerTargetId: null,
+            status: 'cancelled',
             text: 'Queued before provider deletion.',
           }),
         ],

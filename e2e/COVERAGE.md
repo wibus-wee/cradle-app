@@ -51,11 +51,16 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Issue × isolated delegation × Work × worktree × linked Chat | `CRADLE-ISSUE-AGENT-003` | The Issue-owned action creates a Work-owned isolated execution without losing linkage |
 | Issue × active isolated Work × reload × undelegate × abort | `CRADLE-ISSUE-AGENT-004` | Cancellation stops runtime work while retaining the Work and worktree as explicit audit state |
 | Work × Git × worktree × file mutation × Session | `CRADLE-WORK-001` | Isolated execution uses a managed worktree and persistent primary thread |
+| Work × provider failure × reload × retry × worktree × Session | `CRADLE-WORK-002` | A failed initial run retains exactly one isolated Work primary thread; reload and retry recover in that same session and mutate its worktree |
+| Work × stop × reload × retry × worktree × Session | `CRADLE-WORK-003` | Stopping an active initial run returns the Work UI to idle without duplicating its isolated primary thread; reload and retry recover in that same session and mutate its worktree |
+| Workspace removal × Work primary Session × live PTY × managed worktree × reload | `CRADLE-WS-004` | Destructive Workspace removal explicitly releases Session-owned runtime/PTY resources, removes Work and managed checkout state, and leaves no stale server or filesystem projection |
+| Workspace removal × active Work run × runtime cancellation × delayed provider response × reload | `CRADLE-WS-005` | Destructive Workspace removal cancels the active Work run before Session disposal, so a delayed provider response cannot recreate deleted state |
 | Git branch × external file changes × diff refresh | `CRADLE-GIT-001`, `002`, `CRADLE-DIFF-001` | Repository projections refresh from real Git/filesystem state |
 | Await pending × external event × Agent continuation | `CRADLE-AWAIT-001` | Durable pending work resumes from an external signal |
 | Multiple PTYs × active-session input routing | `CRADLE-PTY-002` | Input reaches only the selected terminal session |
 | Completed Agent run × usage aggregation × reload | `CRADLE-USAGE-001` | Runtime usage is counted once and persists |
 | Provider profile × Agent selection × disable | `CRADLE-PROVIDER-001` | A UI-created provider can run and later become unavailable |
+| Provider disable/delete × two active sessions × queued continuation × runtime cancellation | `CRADLE-PROVIDER-002`, `003` | Disabling or deleting a UI-created provider cancels every in-flight run and prevents a queued continuation in another session from executing |
 | Fabric pairing × two databases × bidirectional Workspace/Chat/Work × Node-owned worktrees × remote tool approval × Session discovery × relay/server restart | `CRADLE-FABRIC-001` | Two real Nodes enroll through the UI, create Work and managed worktrees on the selected authority in both directions, continue each Work conversation, approve a remote Claude Agent tool request from each controller, discover conversations created by the other controller, and recover mounted routing without re-pairing |
 
 ## Web Feature Namespace Disposition
@@ -82,9 +87,6 @@ The backlog below is ordered by semantic fan-out and state-corruption risk, not 
 
 | Priority | Proposed journey | State fusion and owning namespaces |
 | --- | --- | --- |
-| P0 | Stop/fail Work, reload, retry, and verify exactly one active primary thread | Work × Session × runtime × worktree × recovery |
-| P0 | Disable/delete a provider while one run is active and another session is queued | profiles × provider target × active Run × queue × recovery |
-| P0 | Remove/rename workspace while Sessions, PTYs, and Work reference it | workspace × session × PTY × Work × destructive confirmation |
 | P0 | Application process restart with active stream and queued continuation | desktop lifecycle × persisted Run × queue × rehydration |
 | P1 | Await timeout/cancel/restart plus late external resolution | Await × terminal state × idempotent external event |
 | P1 | Automation run success/failure/cancel with linked Session and notification | automation × background job/activity × session |

@@ -1,12 +1,12 @@
 import type { ManagedChildProcess } from '../../../infra/managed-process'
-import type { ProviderRuntimeHostSnapshot } from '../../provider-runtime/host-manager'
-import { providerRuntimeHostManager } from '../../provider-runtime/host-manager'
-import type { RuntimeProcessResource } from '../../provider-runtime/process-resources'
+import type { RuntimeProcessResource } from '../../../infra/process-resources'
 import {
   emptyRuntimeProcessResources,
   readManagedProcessPid,
   readProcessResourceUsage,
-} from '../../provider-runtime/process-resources'
+} from '../../../infra/process-resources'
+import type { ProviderRuntimeHostSnapshot } from '../../provider-runtime/host-manager'
+import { providerRuntimeHostManager } from '../../provider-runtime/host-manager'
 import type { KimiWebHostResource } from './web-host'
 
 export interface KimiServerResources extends RuntimeProcessResource {

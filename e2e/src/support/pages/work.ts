@@ -61,8 +61,14 @@ export class WorkPage {
   private async findWork(
     predicate: (work: WorkSummary) => boolean,
   ): Promise<WorkSummary | null> {
+    const works = await this.listWorks()
+    return works.find(predicate) ?? null
+  }
+
+  private async listWorks(): Promise<WorkSummary[]> {
     let cursor: string | null = null
     const seenCursors = new Set<string>()
+    const works: WorkSummary[] = []
 
     for (;;) {
       const serverUrl = this.owner.params.serverUrl.replace(/\/$/, '')
@@ -74,18 +80,15 @@ export class WorkPage {
 
       const response = await fetch(url)
       if (!response.ok) {
-        return null
+        return []
       }
 
       const page = await response.json() as WorkListPage
-      const match = page.items.find(predicate)
-      if (match) {
-        return match
-      }
+      works.push(...page.items)
 
       const nextCursor = page.nextCursor
       if (!nextCursor || seenCursors.has(nextCursor)) {
-        return null
+        return works
       }
       seenCursors.add(nextCursor)
       cursor = nextCursor
@@ -190,6 +193,35 @@ export class WorkPage {
     await item.locator('button').first().click()
     await expect(this.page).toHaveURL(new RegExp(`/work/${workId}$`), { timeout: TIMEOUT })
     await expect(this.page.locator('[data-testid="work-state-badge"]')).toBeVisible({ timeout: TIMEOUT })
+  }
+
+  async expectSinglePersistedPrimarySession(
+    goal: string,
+    sessionId: string,
+    expectedFile?: { name: string, content: string },
+  ): Promise<void> {
+    await expect.poll(async () => {
+      const matches = (await this.listWorks()).filter(work => work.objective === goal)
+      return matches.map(work => work.primarySessionId)
+    }, { timeout: TIMEOUT }).toEqual([sessionId])
+
+    const work = await this.findWork(candidate =>
+      candidate.objective === goal && candidate.primarySessionId === sessionId)
+    if (!work) {
+      throw new Error(`Work for session ${sessionId} was not persisted`)
+    }
+    const response = await fetch(`${this.owner.params.serverUrl}/works/${work.id}`)
+    expect(response.ok).toBe(true)
+    const detail = await response.json() as WorkDetail
+    expect(detail.execution).toMatchObject({
+      isIsolated: true,
+      worktreeHealth: 'ok',
+    })
+    expect(detail.execution.worktreePath).not.toBeNull()
+    if (expectedFile) {
+      expect(readFileSync(join(detail.execution.worktreePath!, expectedFile.name), 'utf8'))
+        .toBe(expectedFile.content)
+    }
   }
 
   async expectIssueDelegationWork(input: {

@@ -185,6 +185,9 @@ describe('fabric node directory routes', () => {
   const state: FakeDirectoryState = { requests: [], revokedGrants: [], removedNodes: [], approvedRequestBodies: [], rejectedRequests: [] }
   const previousDataDir = process.env.CRADLE_DATA_DIR
   const previousCredentialSecret = process.env.CRADLE_CREDENTIAL_SECRET
+  const previousRelaydAccessMode = process.env.CRADLE_RELAYD_ACCESS_MODE
+  const previousRelaydPid = process.env.CRADLE_RELAYD_PID
+  const previousRelaydPublicUrl = process.env.CRADLE_RELAYD_PUBLIC_URL
 
   afterEach(async () => {
     shutdownInfra()
@@ -203,6 +206,9 @@ describe('fabric node directory routes', () => {
     else {
       process.env.CRADLE_CREDENTIAL_SECRET = previousCredentialSecret
     }
+    restoreEnv('CRADLE_RELAYD_ACCESS_MODE', previousRelaydAccessMode)
+    restoreEnv('CRADLE_RELAYD_PID', previousRelaydPid)
+    restoreEnv('CRADLE_RELAYD_PUBLIC_URL', previousRelaydPublicUrl)
   })
 
   async function setup(): Promise<ElysiaApp> {
@@ -345,4 +351,59 @@ describe('fabric node directory routes', () => {
       accessMode: 'external',
     })
   })
+
+  it('does not include an external Relay in local process resources', async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'cradle-fabric-grants-'))
+    process.env.CRADLE_DATA_DIR = dataDir
+    process.env.CRADLE_RELAYD_ACCESS_MODE = 'external'
+    process.env.CRADLE_RELAYD_PID = String(process.pid)
+    const server = await createServerApp()
+    const response = await server.handle(new Request('http://localhost/fabric/managed-relay/resources'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      source: 'external',
+      running: false,
+      pid: null,
+      rssMB: null,
+      cpuPercent: null,
+      descendantCount: null,
+    })
+  })
+
+  it('reports the managed Relay process tree resources', async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'cradle-fabric-grants-'))
+    process.env.CRADLE_DATA_DIR = dataDir
+    process.env.CRADLE_RELAYD_ACCESS_MODE = 'network'
+    process.env.CRADLE_RELAYD_PID = String(process.pid)
+    const server = await createServerApp()
+    const response = await server.handle(new Request('http://localhost/fabric/managed-relay/resources'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      source: 'managed',
+      running: true,
+      pid: process.pid,
+      rssMB: expect.any(Number),
+      cpuPercent: expect.any(Number),
+      descendantCount: expect.any(Number),
+    })
+  })
+
+  it('reports unavailable resources when Desktop did not provide a managed Relay PID', async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'cradle-fabric-grants-'))
+    process.env.CRADLE_DATA_DIR = dataDir
+    process.env.CRADLE_RELAYD_ACCESS_MODE = 'local'
+    delete process.env.CRADLE_RELAYD_PID
+    const server = await createServerApp()
+    const response = await server.handle(new Request('http://localhost/fabric/managed-relay/resources'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ source: 'unavailable', running: false, pid: null })
+  })
 })
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name]
+    return
+  }
+  process.env[name] = value
+}

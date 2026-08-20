@@ -10,7 +10,7 @@ bytes travel only through authenticated encrypted Node links.
 | Signed protocol | [`protocol.ts`](./protocol.ts), [`directory-client.ts`](./directory-client.ts) | Signs membership documents and calls the versioned relayd directory API. |
 | Controller links | [`node-link-manager.ts`](../relay-transport/node-link-manager.ts) | Opens one demand-driven encrypted tunnel to a selected Node and reuses it for upstream traffic. |
 | Node connection | [`node-connector.ts`](../relay-transport/node-connector.ts) | Maintains the local Node's authenticated WebSocket and reconnects after relay or server interruption. |
-| Local HTTP surface | [`index.ts`](./index.ts) | Exposes enrollment and Node routes, then proxies HTTP/SSE traffic through a resolved Node link. |
+| Local HTTP surface | [`index.ts`](./index.ts) | Exposes enrollment, managed Relay resource, and Node routes, then proxies HTTP/SSE traffic through a resolved Node link. |
 | Relay authority | [`apps/relayd`](../../../../relayd) | Persists Fabrics, Nodes, grants, and join requests; publishes presence and routes opaque envelopes. |
 
 ## Enrollment and authorization
@@ -51,6 +51,12 @@ Membership changes start the Node connector without a server restart. At boot,
 an existing membership reconnects automatically. A relay restart temporarily
 marks Nodes offline; the connector re-establishes presence and existing mounted
 Workspace routes become usable again without re-enrollment.
+
+Desktop passes the managed relayd process ID to the Server at launch.
+`GET /fabric/managed-relay/resources` samples that local process tree for the
+development resource panel, including the child executable started by `go run`.
+External Relays are reported as external and are never included in this host's
+memory or CPU totals.
 
 Fabric membership, Node presence, grant authorization, and a live encrypted
 link are separate states. A Node can therefore be visible and online before an

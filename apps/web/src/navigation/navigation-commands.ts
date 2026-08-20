@@ -1,4 +1,5 @@
-import { closeFocusedSplitPane } from '~/features/split-view/split-commands'
+import { closeFocusedSplitPane, closeSplitPaneById } from '~/features/split-view/split-commands'
+import { readSplitWorkspace, useSplitWorkspaceStore } from '~/features/split-view/store/split-workspace-store'
 import { getI18n } from '~/i18n/instance'
 import { router } from '~/router'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
@@ -8,7 +9,7 @@ import {
   clearRouteSurfaceSyncSuppressionForSurface,
   suppressRouteSurfaceSync,
 } from './route-surface-sync-key'
-import type { AppSurface, SurfaceDraft } from './surface-identity'
+import type { AppSurface, SurfaceDraft, SurfaceRoute } from './surface-identity'
 import {
   chatSurfaceId,
   createHomeSurfaceDraft,
@@ -51,6 +52,78 @@ function openSurface(surface: SurfaceDraft, options: { replace?: boolean } = {})
 
 export function openHome(options: { replace?: boolean } = {}): void {
   openSurface(createHomeSurfaceDraft(), options)
+}
+
+function routeBelongsToRemovedWorkspace(
+  route: SurfaceRoute,
+  input: { workspaceId: string, removedSessionIds: ReadonlySet<string>, removedWorkIds: ReadonlySet<string> },
+): boolean {
+  switch (route.to) {
+    case '/workspaces/$workspaceId':
+    case '/workspaces/$workspaceId/diffs':
+      return route.params.workspaceId === input.workspaceId
+    case '/work/new':
+      return route.search?.workspaceId === input.workspaceId
+    case '/chat/new':
+      return route.search?.workspaceId === input.workspaceId
+    case '/chat/$sessionId':
+      return input.removedSessionIds.has(route.params.sessionId)
+    case '/work/$workId':
+      return input.removedWorkIds.has(route.params.workId)
+    case '/pull-requests':
+      return route.search?.workId !== undefined && input.removedWorkIds.has(route.search.workId)
+    default:
+      return false
+  }
+}
+
+/**
+ * A workspace delete invalidates more than the visible route: chat and Work
+ * tabs, split panes, and their persisted layouts may all point at resources
+ * the server just removed. Prune those projections from the owning stores
+ * using the server's deletion result rather than a partial sidebar snapshot.
+ */
+export function removeWorkspaceOwnedSurfaces(input: {
+  workspaceId: string
+  removedSessionIds: readonly string[]
+  removedWorkIds: readonly string[]
+}): void {
+  const resourceIds = {
+    workspaceId: input.workspaceId,
+    removedSessionIds: new Set(input.removedSessionIds),
+    removedWorkIds: new Set(input.removedWorkIds),
+  }
+  const activeSurfaceId = readActiveSurfaceId()
+  const activeSplitWorkspace = activeSurfaceId ? readSplitWorkspace(activeSurfaceId) : undefined
+  const focusedPane = activeSplitWorkspace?.panes[activeSplitWorkspace.focusedPaneId]
+  const focusedPaneWasRemoved = focusedPane
+    ? routeBelongsToRemovedWorkspace(focusedPane.route, resourceIds)
+    : false
+
+  const surfaceStore = useSurfaceStore.getState()
+  const removedSurfaceIds = surfaceStore.surfaces
+    .filter(surface => routeBelongsToRemovedWorkspace(surface.route, resourceIds))
+    .map(surface => surface.id)
+  const activeSurfaceWasRemoved = activeSurfaceId !== null && removedSurfaceIds.includes(activeSurfaceId)
+
+  for (const surfaceId of removedSurfaceIds) {
+    surfaceStore.closeSurface(surfaceId)
+  }
+
+  for (const [surfaceId, workspace] of Object.entries(useSplitWorkspaceStore.getState().workspaces)) {
+    for (const pane of Object.values(workspace.panes)) {
+      if (pane.id === workspace.primaryPaneId || !routeBelongsToRemovedWorkspace(pane.route, resourceIds)) {
+        continue
+      }
+      if (!closeSplitPaneById(surfaceId, pane.id)) {
+        useSplitWorkspaceStore.getState().forgetPane(surfaceId, pane.id)
+      }
+    }
+  }
+
+  if (activeSurfaceWasRemoved || focusedPaneWasRemoved) {
+    openHome({ replace: true })
+  }
 }
 
 export function openNewChat(options: {
