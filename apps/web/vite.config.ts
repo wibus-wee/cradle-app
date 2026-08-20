@@ -15,6 +15,7 @@ import packageJson from './package.json' with { type: 'json' }
 const ASSET_MODULE_RE = /\.(?:avif|gif|ico|jpe?g|png|svg|webp)(?:\?|$)/
 const PRECACHE_ASSET_RE = /\.(?:css|js|woff2)$/
 const enableViteDevtools = process.env.CRADLE_VITE_DEVTOOLS === '1'
+const enableViteDevSourcemaps = process.env.CRADLE_VITE_DEV_SOURCEMAPS === '1'
 const isE2E = process.env.CRADLE_E2E === '1'
 const lobeIconsPackageRoot = dirname(fileURLToPath(import.meta.resolve('@lobehub/icons-static-png/package.json')))
 
@@ -114,6 +115,15 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
     alias: {
       '~': resolve(__dirname, 'src'),
+    },
+  },
+  environments: {
+    client: {
+      dev: {
+        // Large optimized dependencies can carry multi-megabyte inline maps.
+        // Keep them opt-in in desktop dev; production builds are unaffected.
+        sourcemap: { js: enableViteDevSourcemaps },
+      },
     },
   },
   server: {
