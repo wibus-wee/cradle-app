@@ -1,8 +1,9 @@
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import type { ElectronApplication, Page } from '@playwright/test'
 
-const ROOT = resolve(__dirname, '..', '..', '..')
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 const DESKTOP_PATH = resolve(ROOT, 'apps', 'desktop')
 
 let app: ElectronApplication | null = null
