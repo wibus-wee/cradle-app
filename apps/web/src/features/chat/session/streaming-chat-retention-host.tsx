@@ -1,15 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
 import { shallow } from 'zustand/shallow'
 
-import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { useActiveSurface } from '~/navigation/active-surface'
 import { chatSessionIdForSurface } from '~/navigation/surface-identity'
 import { useChatStore } from '~/store/chat'
 
-import type { ChatSessionFrameDescriptor } from './chat-session-frame-host'
-import { ChatSessionFrameHost } from './chat-session-frame-host'
-import { getSessionNodeId } from './session-execution'
-import { readSessionThinkingEffort } from './session-thinking-effort'
+import { ChatSessionSyncBoundary } from './chat-session-sync-boundary'
 import { readRetainableStreamingSessionIds } from './streaming-session-retention'
 
 function useStreamingSessionIds(): string[] {
@@ -21,24 +16,7 @@ function useActiveChatSessionId(): string | null {
 }
 
 function RetainedStreamingChatSession({ sessionId }: { sessionId: string }) {
-  const { data: session } = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId } }),
-    enabled: !!sessionId,
-    staleTime: 60_000,
-  })
-
-  const descriptor: ChatSessionFrameDescriptor = {
-    sessionId,
-    sessionProviderTargetId: session?.providerTargetId ?? null,
-    sessionModelId: session?.modelId ?? null,
-    sessionThinkingEffort: readSessionThinkingEffort(session?.thinkingEffort),
-    runtimeKind: session?.runtimeKind,
-    workspaceId: session?.workspaceId ?? null,
-    agentId: session?.agentId ?? null,
-    nodeId: getSessionNodeId(session),
-  }
-
-  return <ChatSessionFrameHost activeSession={descriptor} active={false} />
+  return <ChatSessionSyncBoundary sessionId={sessionId} active />
 }
 
 export function StreamingChatRetentionHost() {
