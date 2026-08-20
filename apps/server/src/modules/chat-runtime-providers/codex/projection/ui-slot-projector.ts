@@ -355,17 +355,6 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
     anyNotifications: ['thread/compacted'],
   },
   {
-    id: 'codex:feedback',
-    name: 'feedback',
-    label: 'Feedback',
-    description: 'Send feedback about this chat.',
-    argumentHint: '',
-    iconKey: 'feedback',
-    commandText: '/feedback ',
-    surfaces: ['slashCommand'],
-    requiredMethods: ['feedback/upload'],
-  },
-  {
     id: 'codex:goal',
     name: 'goal',
     label: 'Goal',
@@ -457,20 +446,6 @@ export function projectCodexUiSlots(manifest: CodexAppServerCapabilityManifest):
       surfaces: surfaces ?? ['runtimePanel'],
     }),
   )
-}
-
-/**
- * Applies host-local config requirements that gate presentation slots.
- * `feedback.enabled === false` removes `/feedback`; null/undefined leaves the slot.
- */
-export function applyCodexConfigRequirementSlotGates(
-  slots: RuntimeUiSlot[],
-  requirements: CodexConfigRequirementsReadResponse['requirements'] | null | undefined,
-): RuntimeUiSlot[] {
-  if (requirements?.feedback?.enabled === false) {
-    return slots.filter(slot => slot.id !== 'codex:feedback')
-  }
-  return slots
 }
 
 function supportsSlot(
