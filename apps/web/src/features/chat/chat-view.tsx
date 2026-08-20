@@ -638,7 +638,7 @@ export function ChatView({
         })
       }
     },
-    [appshotRuntime, composerRuntime.supportsAttachments, sessionId],
+    [appshotRuntime, composerRuntime.supportsAttachments, runtimeSettings, sessionId],
   )
 
   const startCodexNativeReview = useCallback(
