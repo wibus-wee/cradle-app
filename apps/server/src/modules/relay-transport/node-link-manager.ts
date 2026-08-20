@@ -1,3 +1,5 @@
+import { AppError } from '../../errors/app-error'
+import { getLogger } from '../../logging/logger'
 import { fabricAuthHeaders } from '../fabric/protocol'
 import { openNodeLink, requireFabricMembership, requireFabricMembershipSecretRefs } from '../fabric/service'
 import { readSecret } from '../secrets/service'
@@ -13,6 +15,7 @@ import { startRelayControllerTransport } from './controller-transport'
 export class FabricNodeLinkManager {
   private readonly handles = new Map<string, RelayControllerTransportHandle>()
   private readonly opening = new Map<string, Promise<RelayControllerTransportHandle>>()
+  private readonly logger = getLogger().child({ module: 'fabric-node-link-manager' })
 
   async ensure(nodeId: string): Promise<RelayControllerTransportHandle> {
     const existing = this.handles.get(nodeId)
@@ -35,20 +38,29 @@ export class FabricNodeLinkManager {
   private async open(nodeId: string): Promise<RelayControllerTransportHandle> {
     const membership = requireFabricMembership()
     const secretRefs = requireFabricMembershipSecretRefs()
-    const link = await openNodeLink(nodeId)
-    const headers = fabricAuthHeaders(membership.controllerCertificate, readSecret(secretRefs.identityKeySecretId), 'GET', `/v1/ws/controllers/${link.linkId}`)
-    const handle = await startRelayControllerTransport({
-      hostId: nodeId,
-relayUrl: membership.relayUrl,
-roomId: link.linkId,
-      controllerPrivateKeyBase64: readSecret(secretRefs.encryptionKeySecretId),
-      controllerPublicKeyBase64: membership.controllerCertificate.encryptionPubkey,
-      pinnedHostPubkey: link.nodeCertificate.encryptionPubkey,
-      fabric: { fabricId: membership.fabricId, nodeId, linkId: link.linkId, headers },
-    })
-    this.handles.set(nodeId, handle)
-    handle.onExit(() => { if (this.handles.get(nodeId) === handle) { this.handles.delete(nodeId) } })
-    return handle
+    try {
+      const link = await openNodeLink(nodeId)
+      const headers = fabricAuthHeaders(membership.controllerCertificate, readSecret(secretRefs.identityKeySecretId), 'GET', `/v1/ws/controllers/${link.linkId}`)
+      const handle = await startRelayControllerTransport({
+        relayUrl: membership.relayUrl,
+        controllerPrivateKeyBase64: readSecret(secretRefs.encryptionKeySecretId),
+        controllerPublicKeyBase64: membership.controllerCertificate.encryptionPubkey,
+        nodePublicKeyBase64: link.nodeCertificate.encryptionPubkey,
+        fabric: { fabricId: membership.fabricId, nodeId, linkId: link.linkId, headers },
+      })
+      this.handles.set(nodeId, handle)
+      handle.onExit(() => { if (this.handles.get(nodeId) === handle) { this.handles.delete(nodeId) } })
+      return handle
+    }
+    catch (error) {
+      this.logger.warn('Fabric Node link could not be opened', {
+        fabricId: membership.fabricId,
+        nodeId,
+        error: error instanceof Error ? error.message : String(error),
+        code: error instanceof AppError ? error.code : undefined,
+      })
+      throw error
+    }
   }
 }
 

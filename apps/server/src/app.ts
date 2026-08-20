@@ -25,6 +25,7 @@ import { backgroundJob } from './modules/background-job'
 import * as BackgroundJobPoller from './modules/background-job/poller'
 import { blobStore } from './modules/blob-store'
 import { registerBlobStoreMaintenance } from './modules/blob-store/gc'
+import { chatArtifacts } from './modules/chat-artifacts'
 import { chatRuntime } from './modules/chat-runtime'
 import { getRuntimeRegistry } from './modules/chat-runtime/chat-runtime-provider-registry'
 import * as ComposerDrafts from './modules/chat-runtime/composer-drafts'
@@ -54,7 +55,12 @@ import { DownloadCenterService } from './modules/download-center/service'
 import { externalIssueSources } from './modules/external-issue-sources'
 import { externalProviderSources } from './modules/external-provider-sources'
 import { externalSessionImport } from './modules/external-session-import'
-import { createFabricNodeRoutes, fabric, registerFabricWebSocketRoutes } from './modules/fabric'
+import {
+  createFabricNodeRoutes,
+  fabric,
+  registerFabricMembershipChangedListener,
+  registerFabricWebSocketRoutes,
+} from './modules/fabric'
 import { filesystem } from './modules/filesystem'
 import { git } from './modules/git'
 import { githubAuth } from './modules/github-auth'
@@ -86,13 +92,9 @@ import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
 import { pullRequest, pullRequestFeed } from './modules/pull-request'
 import { recall } from './modules/recall'
-import { relayServers } from './modules/relay-servers'
-import { relayTransport } from './modules/relay-transport'
 import { assertRelayCompressionRuntimeSupport } from './modules/relay-transport/compression'
 import { FabricNodeConnector, listActiveFabricNodeAuthTokens } from './modules/relay-transport/node-connector'
 import { getFabricNodeLinkManager } from './modules/relay-transport/node-link-manager'
-import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
-import { registerRemoteHostWebSocketRoutes, remoteHosts } from './modules/remote-hosts'
 import { search } from './modules/search'
 import { secrets } from './modules/secrets'
 import { session } from './modules/session'
@@ -229,7 +231,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(createRequestIdPlugin())
   app.use(createAuthPlugin({
     ...loadServerAuthConfig(),
-    listRelayAuthTokens: () => [...listActiveRelayAuthTokens(), ...listActiveFabricNodeAuthTokens()],
+    listRelayAuthTokens: () => [...listActiveFabricNodeAuthTokens()],
   }))
   if (includeRuntimeHttpPlugins) {
     const [{ createRequestLoggerPlugin }, { createErrorHandler }] = await Promise.all([
@@ -249,9 +251,6 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(profiles)
   app.use(providerTargets)
   app.use(providerExtensions)
-  app.use(relayServers)
-  app.use(relayTransport)
-  app.use(remoteHosts)
   app.use(fabric)
   app.use(createFabricNodeRoutes(getFabricNodeLinkManager()))
   app.use(externalIssueSources)
@@ -267,6 +266,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(automation)
   app.use(assets)
   app.use(blobStore)
+  app.use(chatArtifacts)
   app.use(backgroundActivity)
   app.use(backgroundJob)
   app.use(session)
@@ -308,8 +308,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(agentInteractionRuntime)
   app.use(desktop)
   app.use(downloadCenter.routes)
-  registerRemoteHostWebSocketRoutes(app)
-  registerFabricWebSocketRoutes(app)
+  registerFabricWebSocketRoutes(app, getFabricNodeLinkManager())
   registerPtyRoutes(app)
   registerSyncGatewayRoutes(app)
   app.use(observability)
@@ -344,7 +343,6 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     managedResourceService,
     opencodeRuntimeInstallationService,
     serverConfig,
-    hostConnector,
     runtime,
   ] = await runBootstrapPhase(bootstrapReporter, 'service-initialization', async () => {
     await downloadCenterService.boot()
@@ -360,10 +358,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       { activateServerPlugins, deactivateAllPlugins },
       conversationBridgeSupervisor,
       { destroyWorkspaceFileIndexes },
-      localRelaydSupervisor,
       { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
-      { initHostConnectorService, getHostConnectorService },
-      { shutdownRemoteHostConnections, startEnabledRelayRemoteHostConnections },
       { shutdownImageOcr },
       { CodexUsageReconciliationScheduler },
       { registerRunSnapshotMaintenance },
@@ -380,10 +375,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       import('./plugins/loader'),
       import('./modules/conversation-bridge/runtime-supervisor'),
       import('./modules/workspace/files'),
-      import('./modules/relay-servers/local-relayd-supervisor'),
       import('./modules/chat-runtime-providers/opencode/runtime-context'),
-      import('./modules/relay-transport/host-connector'),
-      import('./modules/remote-hosts/service'),
       import('./modules/image-ocr/service'),
       import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
       import('./modules/chat-runtime/run-snapshot-maintenance'),
@@ -444,16 +436,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     })
     registerAgentToolsMcpServer()
     const serverConfig = getServerConfig()
-    const hostConnector = initHostConnectorService({
-      localServerHost: '127.0.0.1',
-      localServerPort: serverConfig.port,
-    })
     return [
       app,
       managedResourceService,
       opencodeRuntimeInstallationService,
       serverConfig,
-      hostConnector,
       {
         abortAllRuns,
         flushAllActiveRunSnapshots,
@@ -468,11 +455,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
         deactivateAllPlugins,
         conversationBridgeSupervisor,
         destroyWorkspaceFileIndexes,
-        localRelaydSupervisor,
         stopOpencodeServer,
-        getHostConnectorService,
-        shutdownRemoteHostConnections,
-        startEnabledRelayRemoteHostConnections,
         shutdownImageOcr,
         CodexUsageReconciliationScheduler,
         hydrateCustomMcpServers,
@@ -494,11 +477,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     deactivateAllPlugins,
     conversationBridgeSupervisor,
     destroyWorkspaceFileIndexes,
-    localRelaydSupervisor,
     stopOpencodeServer,
-    getHostConnectorService,
-    shutdownRemoteHostConnections,
-    startEnabledRelayRemoteHostConnections,
     shutdownImageOcr,
     CodexUsageReconciliationScheduler,
     hydrateCustomMcpServers,
@@ -518,6 +497,9 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
 
   const runtimeResources = new RuntimeResourceRegistry()
   const fabricNodeConnector = new FabricNodeConnector('127.0.0.1', serverConfig.port)
+  const unregisterFabricMembershipChangedListener = startBackgroundTasks
+    ? registerFabricMembershipChangedListener(() => fabricNodeConnector.start())
+    : undefined
   const claudeUsageReconciliation = new ClaudeUsageReconciliationScheduler()
   const codexUsageReconciliation = new CodexUsageReconciliationScheduler()
   runtimeResources.register({
@@ -589,25 +571,17 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   })
   runtimeResources.register({ name: 'opencode-server', phase: 'stop', stop: stopOpencodeServer })
   runtimeResources.register({
-    name: 'local-relayd',
-    phase: 'stop',
-    stop: () => localRelaydSupervisor.stopManagedLocalRelayd(),
-  })
-  runtimeResources.register({
     name: 'background-job-poller',
     phase: 'cancel',
     stop: () => BackgroundJobPoller.stop(),
   })
   runtimeResources.register({
-    name: 'relay-host-connector',
+    name: 'fabric-node-connector',
     phase: 'cancel',
-    stop: () => getHostConnectorService()?.stopAll(),
-  })
-  runtimeResources.register({ name: 'fabric-node-connector', phase: 'cancel', stop: () => fabricNodeConnector.stop() })
-  runtimeResources.register({
-    name: 'remote-host-connections',
-    phase: 'cancel',
-    stop: shutdownRemoteHostConnections,
+    stop: () => {
+      unregisterFabricMembershipChangedListener?.()
+      fabricNodeConnector.stop()
+    },
   })
   runtimeResources.register({
     name: 'chronicle-scheduler',
@@ -666,18 +640,6 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     void conversationBridgeSupervisor.startEnabledConversationBridgeConnections().catch((error) => {
       console.error('[conversation-bridge] start enabled connections failed:', error)
     })
-    void localRelaydSupervisor.startManagedLocalRelayd().catch((error) => {
-      console.error('[relay-servers] managed relayd warm-start failed:', error)
-    })
-    void startEnabledRelayRemoteHostConnections()
-    // Start the always-on relay host-connector for any existing enrollments.
-    // Each enrollment maintains its own /ws/host connection with backoff.
-    try {
-      hostConnector.startAll()
-    }
- catch (error) {
-      console.error('[relay-host-connector] startAll failed:', error)
-    }
     fabricNodeConnector.start()
   }
 

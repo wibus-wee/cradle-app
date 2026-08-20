@@ -18,6 +18,20 @@ export interface ActiveRun {
   messageId: string
   /** Unix seconds when the run row was created; used for the terminal durationMs stamp. */
   startedAtSeconds: number
+  /** Server wall-clock time when admission for this user request began. */
+  admissionRequestedAtMs?: number
+  /** Canonical Run Snapshot start time. */
+  runStartedAtMs?: number
+  /** First non-terminal runtime event. */
+  firstResponseAtMs?: number
+  /** First text, reasoning, or tool-input token delta. */
+  firstTokenAtMs?: number
+  /** Whether reasoning/tool execution has occurred in this turn. */
+  hasExecutionActivity?: boolean
+  /** First text start after the latest execution activity. */
+  finalResponseStartedAtMs?: number
+  /** Authoritative wall-clock terminal time, assigned only after the terminal fact is durable. */
+  terminalAtMs?: number
   providerTargetKind: 'manual' | 'external' | null
   providerTargetId: string | null
   runtime: ChatRuntime

@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",
+    "@cradle/artifact": "workspace:*",
     "@cradle/chat-runtime-contracts": "workspace:*",
     "@cradle/download-center": "workspace:*",
     "@cradle/plugin-sdk": "workspace:*",
@@ -119,6 +120,7 @@
     "react-i18next": "^17.0.8",
     "react-icons": "^5.6.0",
     "shiki": "^3.4.2",
+    "sucrase": "^3.35.1",
     "tailwind-merge": "^3.3.0",
     "vaul": "^1.1.2",
     "web-vitals": "^5.2.0",

@@ -38,7 +38,7 @@ import { runWorktreeSetupHooks } from './worktree-setup'
 import {
   grantWorktreeSetupHookTrust,
   hasWorktreeSetupHookTrust,
-  isRelayHostExposed,
+  isFabricNodeExposed,
 } from './worktree-setup-trust'
 
 const BRANCH_PREFIX = 'cradle/wt/'
@@ -474,7 +474,7 @@ async function recreateWorktreeCheckout(worktree: Worktree, workspacePath: strin
 
   await runWorktreeSetupHooks(workspacePath, checkoutPath, {
     trusted: hasWorktreeSetupHookTrust(worktree.sourceWorkspaceId),
-    relayExposed: isRelayHostExposed(),
+    fabricNodeExposed: isFabricNodeExposed(),
   })
   return checkoutPath
 }
@@ -593,7 +593,7 @@ export async function createWorktree(input: {
     }
     await runWorktreeSetupHooks(workspacePath, absolutePath, {
       trusted: hasWorktreeSetupHookTrust(input.sourceWorkspaceId),
-      relayExposed: isRelayHostExposed(),
+      fabricNodeExposed: isFabricNodeExposed(),
     })
 
     const timestamp = now()

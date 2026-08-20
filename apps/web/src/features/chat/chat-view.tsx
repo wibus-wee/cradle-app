@@ -13,8 +13,8 @@ import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
-import { RemoteHostConnectionNotice } from '~/features/remote-hosts/remote-host-connection-notice'
-import { useRemoteHostConnection } from '~/features/remote-hosts/use-remote-host-connection'
+import { nodeAccessDisablesInteraction, useNodeAccess } from '~/features/nodes/node-access'
+import { SessionNodeBadge } from '~/features/nodes/session-node-badge'
 import { IsolationBoundaryDialog } from '~/features/session/isolation-boundary-dialog'
 import { IsolationMissingDialog } from '~/features/session/isolation-missing-dialog'
 import {
@@ -95,18 +95,17 @@ export function ChatView({
   runtimeKind: _runtimeKind,
   workspaceId,
   workspacePath = null,
-  remoteHostId = null,
+  nodeId = null,
   messageTextTransform,
   prepareSend,
   compactInset = false,
 }: ChatViewProps) {
   const queryClient = useQueryClient()
   const { t } = useTranslation('chat')
+  const { t: tNodes } = useTranslation('nodes')
   const threadHandoffsEnabled = useFeatureFlag('threadHandoffs')
   const surfaceActive = useSurfaceActive()
   const chatActive = active && surfaceActive
-  const remoteConnection = useRemoteHostConnection(remoteHostId)
-  const remoteConnectionBlocked = remoteConnection.isBlocking
   const {
     displayRows,
     messageCount,
@@ -125,6 +124,17 @@ export function ChatView({
     reorderQueueItems,
     updateQueueItem,
   } = useChatSession(sessionId, chatActive)
+  const nodeAccess = useNodeAccess(nodeId)
+  const nodeInteractionLocked = nodeId !== null && nodeAccessDisablesInteraction(nodeAccess)
+  const guardedRespondToToolApproval = useCallback(
+    (response: Parameters<typeof respondToToolApproval>[0]) => {
+      if (nodeInteractionLocked) {
+        return Promise.resolve()
+      }
+      return respondToToolApproval(response)
+    },
+    [nodeInteractionLocked, respondToToolApproval],
+  )
   const sessionMetaQuery = useQuery({
     ...getSessionsByIdOptions({ path: { id: sessionId ?? '' } }),
     enabled: chatActive && !!sessionId,
@@ -160,21 +170,14 @@ export function ChatView({
     sessionId,
     isStreaming,
     canStop,
-    isReady: isReady && !remoteConnectionBlocked,
+    isReady,
     workspaceId,
-    remoteHostId,
+    nodeId,
     composerModel,
     sendOverridesRef,
     sendMessage,
     stop,
   })
-  const gatedComposerRuntime = useMemo(
-    () => ({
-      ...composerRuntime,
-      disabled: composerRuntime.disabled || remoteConnectionBlocked,
-    }),
-    [composerRuntime, remoteConnectionBlocked],
-  )
   const scrollRuntime = useChatScrollRuntime({
     active: chatActive,
     sessionId,
@@ -255,8 +258,8 @@ export function ChatView({
     ],
   )
   const navigableComposerRuntime = useMemo<ChatComposerRuntime>(
-    () => gatedComposerRuntime,
-    [gatedComposerRuntime],
+    () => composerRuntime,
+    [composerRuntime],
   )
   const preparedBaseComposerRuntime = useMemo<ChatComposerRuntime>(() => {
     return {
@@ -309,6 +312,14 @@ export function ChatView({
       },
     }
   }, [preparedBaseComposerRuntime, rollback, sessionId, setPendingRollbackTarget, t])
+  // View-only Nodes: the composer and approval controls render disabled.
+  const effectiveComposerRuntime = useMemo<ChatComposerRuntime>(
+    () =>
+      nodeInteractionLocked
+        ? { ...preparedComposerRuntime, disabled: true }
+        : preparedComposerRuntime,
+    [nodeInteractionLocked, preparedComposerRuntime],
+  )
   const composerSend = preparedBaseComposerRuntime.send
 
   useEffect(() => {
@@ -704,6 +715,7 @@ export function ChatView({
   const headerActions = useMemo(
     () => (
       <div className="flex items-center gap-0.5">
+        <SessionNodeBadge nodeId={nodeId} />
         {threadHandoffsEnabled && sessionId && (
           <ThreadHandoffMenu
             sessionId={sessionId}
@@ -716,6 +728,7 @@ export function ChatView({
       </div>
     ),
     [
+      nodeId,
       sessionId,
       sessionMetaQuery.data?.providerTargetId,
       sessionMetaQuery.data?.runtimeKind,
@@ -772,7 +785,7 @@ export function ChatView({
         onVirtualScroll={scrollRuntime.handleVirtualScroll}
         onScrollToMessageIndex={scrollRuntime.scrollToMessageIndex}
         onScrollToOffset={scrollRuntime.scrollToOffset}
-        onToolApprovalResponse={respondToToolApproval}
+        onToolApprovalResponse={guardedRespondToToolApproval}
         editPreviousMessageId={editPreviousMessageId}
         editPreviousAction={editPreviousAction}
         messageTextTransform={messageTextTransform}
@@ -793,13 +806,14 @@ export function ChatView({
           : null}
         composerStack={(
           <>
-            {remoteConnectionBlocked
-? (
-              <div className="mb-2">
-                <RemoteHostConnectionNotice gate={remoteConnection.gate} />
-              </div>
-            )
-: null}
+            {nodeInteractionLocked && (
+              <p
+                className="px-3 py-1.5 text-[12px] text-muted-foreground"
+                data-testid="session-view-only-notice"
+              >
+                {tNodes('session.viewOnly')}
+              </p>
+            )}
             <ChatComposerSection
               sessionId={sessionId}
               workspacePath={workspacePath}
@@ -810,7 +824,7 @@ export function ChatView({
               onReorderQueueItems={queueItemIds => void reorderQueueItems(queueItemIds)}
               onUpdateQueueItem={(queueItemId, body) => updateQueueItem(queueItemId, body)}
               onSlashCommandAction={handleSlashCommandAction}
-              composerRuntime={preparedComposerRuntime}
+              composerRuntime={effectiveComposerRuntime}
               appshotRuntime={appshotRuntime}
               placeholder={placeholder}
               availableFiles={availableFiles}
@@ -824,8 +838,7 @@ export function ChatView({
                 disabled:
                   !isReady
                   || !runtimeSettings.loaded
-                  || runtimeSettings.loading
-                  || remoteConnectionBlocked,
+                  || runtimeSettings.loading,
                 onChange: updateRuntimeSettings,
               }}
               contextBar={effectiveComposerContextBar}

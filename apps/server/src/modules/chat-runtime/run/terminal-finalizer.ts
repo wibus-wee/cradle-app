@@ -1,6 +1,5 @@
 import type { UIMessageChunk } from 'ai'
 
-import { currentUnixSeconds } from '../../../helpers/time'
 import { evaluateIsolationBoundary } from '../../worktree/service'
 import {
   commitPreparedSessionEventsWithProjection,
@@ -75,6 +74,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
     if (fence.status !== 'streaming') {
       if (fence.status !== 'missing') {
         activeRun.terminalStatus = fence.status
+        activeRun.terminalAtMs = fence.finishedAt === null ? undefined : fence.finishedAt * 1000
       }
       return {
         durableTerminal: fence.status !== 'missing',
@@ -96,6 +96,7 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
       errorText,
       bindingId,
     )
+    activeRun.terminalAtMs = snapshotResult.terminalAtMs
     activeRun.terminalStatus = status
     if (profile) {
       profile.finalMessageJsonBytes = snapshotResult?.messageJsonBytes ?? null
@@ -138,13 +139,33 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
     status: TerminalChatMessageStatus,
     errorText: string | null,
     bindingId?: string | null,
-  ): Promise<{ messageJsonBytes: number }> {
-    const now = currentUnixSeconds()
+  ): Promise<{ messageJsonBytes: number, terminalAtMs: number }> {
+    const terminalAtMs = Date.now()
+    const now = Math.floor(terminalAtMs / 1000)
+    const runStartedAtMs = activeRun.runStartedAtMs ?? activeRun.startedAtSeconds * 1000
+    const totalMs = Math.max(0, terminalAtMs - runStartedAtMs)
     const annotated = annotateRunResultMessage(
       normalizeMessageSnapshot(activeRun.finalMessage),
       {
         runId: activeRun.runId,
-        durationMs: Math.max(0, (now - activeRun.startedAtSeconds) * 1000),
+        durationMs: totalMs,
+        timings: {
+          acceptMs: activeRun.admissionRequestedAtMs === undefined
+            ? null
+            : Math.max(0, runStartedAtMs - activeRun.admissionRequestedAtMs),
+          ttfbMs: activeRun.firstResponseAtMs === undefined
+            ? null
+            : Math.max(0, activeRun.firstResponseAtMs - runStartedAtMs),
+          ttftMs: activeRun.firstTokenAtMs === undefined
+            ? null
+            : Math.max(0, activeRun.firstTokenAtMs - runStartedAtMs),
+          workedMs:
+            activeRun.firstTokenAtMs === undefined
+            || activeRun.finalResponseStartedAtMs === undefined
+              ? null
+              : Math.max(0, activeRun.finalResponseStartedAtMs - activeRun.firstTokenAtMs),
+          totalMs,
+        },
       },
     )
     return await commitPreparedSessionEventsWithProjection(
@@ -156,7 +177,10 @@ export function createTerminalRunFinalizer(deps: TerminalRunFinalizerDeps) {
           d: tx,
         })
         return {
-          result: { messageJsonBytes: Buffer.byteLength(durable.messageJson) },
+          result: {
+            messageJsonBytes: Buffer.byteLength(durable.messageJson),
+            terminalAtMs,
+          },
           events: [
             {
               type: 'AssistantMessageCompleted',

@@ -4,36 +4,44 @@ import { getChatRunsByRunIdSnapshotOptions } from '~/api-gen/@tanstack/react-que
 import { chatSelectors } from '~/store/chat'
 
 import { useChatRenderStore } from '../../rendering/chat-render-store'
+import type { RunTimingMetrics } from '../../rendering/run-debug-timings'
 import { readLocalRunTimings, readRunSnapshotTimings } from '../../rendering/run-debug-timings'
 import { RunDebugCaptionView } from '../views/run-debug-caption-view'
 
 export interface RunDebugCaptionByIdProps {
   messageId: string
+  persistedRunId?: string | null
+  persistedTimings?: RunTimingMetrics | null
 }
 
-/** Store-backed run timing caption for assistant message bubbles. */
-export function RunDebugCaptionById({ messageId }: RunDebugCaptionByIdProps) {
+/** Persistent run timing caption for live and restored assistant message bubbles. */
+export function RunDebugCaptionById({
+  messageId,
+  persistedRunId,
+  persistedTimings,
+}: RunDebugCaptionByIdProps) {
   const meta = useChatRenderStore(chatSelectors.runDisplayMeta(messageId), (a, b) => a === b)
+  const runId = meta?.runId ?? persistedRunId ?? null
   const { data: runSnapshot } = useQuery({
-    ...getChatRunsByRunIdSnapshotOptions({ path: { runId: meta?.runId ?? '' } }),
-    enabled: Boolean(meta?.runId),
+    ...getChatRunsByRunIdSnapshotOptions({ path: { runId: runId ?? '' } }),
+    enabled: Boolean(runId),
     refetchInterval: query => query.state.data?.status === 'running' ? 1000 : false,
   })
 
-  if (!meta) {
+  if (!meta && !runId) {
     return null
   }
 
-  const localTimings = readLocalRunTimings(meta)
+  const localTimings = meta ? readLocalRunTimings(meta) : null
   const snapshotTimings = runSnapshot ? readRunSnapshotTimings(runSnapshot) : null
 
   return (
     <RunDebugCaptionView
-      runId={meta.runId}
-      acceptMs={localTimings.acceptMs}
-      ttfbMs={snapshotTimings ? snapshotTimings.ttfbMs : localTimings.ttfbMs}
-      ttftMs={snapshotTimings ? snapshotTimings.ttftMs : localTimings.ttftMs}
-      totalMs={snapshotTimings?.totalMs ?? localTimings.totalMs}
+      runId={runId ?? ''}
+      acceptMs={snapshotTimings?.acceptMs ?? persistedTimings?.acceptMs ?? localTimings?.acceptMs ?? null}
+      ttfbMs={snapshotTimings?.ttfbMs ?? persistedTimings?.ttfbMs ?? localTimings?.ttfbMs ?? null}
+      ttftMs={snapshotTimings?.ttftMs ?? persistedTimings?.ttftMs ?? localTimings?.ttftMs ?? null}
+      totalMs={snapshotTimings?.totalMs ?? persistedTimings?.totalMs ?? localTimings?.totalMs ?? null}
     />
   )
 }

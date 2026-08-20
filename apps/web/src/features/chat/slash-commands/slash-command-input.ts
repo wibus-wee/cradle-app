@@ -1,8 +1,5 @@
-import type { FuzzyRankField } from '~/lib/fuzzy-rank'
-import { rankFuzzyItems } from '~/lib/fuzzy-rank'
-
 import type { ChatComposerSlashCommand } from './chat-slash-commands'
-import { getSlashCommandSourceLabel, resolveSlashCommandPanelSection } from './chat-slash-commands'
+import { resolveSlashCommandPanelSection } from './chat-slash-commands'
 
 export const RE_SIMPLE_SLASH_COMMAND = /^[ \t]*\/[^/\s]*$/
 export const CHAT_SLASH_COMMAND_LISTBOX_ID = 'chat-slash-command-listbox'
@@ -73,26 +70,10 @@ export function getVisibleSlashCommands(commands: ChatComposerSlashCommand[], ha
   return commands.filter(command => command.action.kind !== 'uiAction' || hasUiActionHandler)
 }
 
-export function formatSlashCommandSearchText(command: ChatComposerSlashCommand): string {
-  return [
-    command.name,
-    command.label,
-    ...(command.aliases ?? []),
-    command.description,
-    command.argumentHint,
-    getSlashCommandSourceLabel(command),
-  ].join(' ')
-}
-
-function getSlashCommandRankFields(command: ChatComposerSlashCommand): FuzzyRankField[] {
-  return [
-    { value: command.name, role: 'primary' },
-    { value: command.label, role: 'primary' },
-    ...(command.aliases ?? []).map(alias => ({ value: alias, role: 'primary' as const })),
-    { value: command.description, role: 'secondary' },
-    { value: command.argumentHint, role: 'secondary' },
-    { value: getSlashCommandSourceLabel(command), role: 'secondary' },
-  ]
+function matchesSlashCommandPrefix(command: ChatComposerSlashCommand, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase()
+  return [command.name, command.label, ...(command.aliases ?? [])]
+    .some(value => value?.trim().toLowerCase().startsWith(normalizedQuery))
 }
 
 export type SlashCommandPanelSectionId = 'commands' | 'runtime'
@@ -154,13 +135,8 @@ export function getSlashCommandPanelItems(commands: ChatComposerSlashCommand[], 
   if (!query) {
     return partitionSlashCommandPanelItems(commands).slice(0, MAX_SLASH_COMMAND_RESULTS)
   }
-  return partitionSlashCommandPanelItems(
-    rankFuzzyItems(commands, query, {
-      fields: getSlashCommandRankFields,
-      searchText: formatSlashCommandSearchText,
-      limit: MAX_SLASH_COMMAND_RESULTS,
-    }).map(result => result.item),
-  )
+  return partitionSlashCommandPanelItems(commands.filter(command => matchesSlashCommandPrefix(command, query)))
+    .slice(0, MAX_SLASH_COMMAND_RESULTS)
 }
 
 export function readSlashTriggerState(inputValue: string, cursor: number, commands: ChatComposerSlashCommand[], selectedCommand: ChatComposerSlashCommand | null): SlashTriggerState | null {

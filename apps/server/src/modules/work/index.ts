@@ -1,4 +1,4 @@
-import { Elysia } from 'elysia'
+import { Elysia, t } from 'elysia'
 
 import { AppError } from '../../errors/app-error'
 import { registerWorkHarnessContextSource } from './agent-context'
@@ -11,13 +11,30 @@ export const work = new Elysia({
   prefix: '/works',
   detail: { tags: ['work'] },
 })
-  .get('', ({ query }) => Work.list(query), {
+  .get('', async ({ query }) => await Work.listFresh(query), {
     detail: {
       'summary': 'List Work containers',
       'x-cradle-cli': { command: ['work', 'list'] },
     },
     query: WorkModel.listQuery,
     response: { 200: WorkModel.page },
+  })
+  .post('/node-projections/reconcile', async ({ body }) => {
+    return await Work.reconcileNodeWorksForWorkspace(body.workspaceId)
+  }, {
+    detail: {
+      'summary': 'Reconcile Works from a mounted Fabric Node workspace',
+      'x-cradle-cli': { command: ['work', 'reconcile-node-projections'] },
+    },
+    body: WorkModel.reconcileNodeBody,
+    response: { 200: WorkModel.reconcileNodeResponse },
+  })
+  .get('/attention', () => Work.listAttention(), {
+    detail: {
+      'summary': 'List actionable Work attention items',
+      'x-cradle-cli': { command: ['work', 'attention'] },
+    },
+    response: { 200: t.Array(WorkModel.attentionItem) },
   })
   .get('/:id', async ({ params }) => {
     const detail = await Work.get(params.id)
@@ -35,7 +52,7 @@ export const work = new Elysia({
   })
   .post('', async ({ body }) => await Work.create(body), {
     detail: {
-      'summary': 'Create local isolated Work',
+      'summary': 'Create isolated Work on the workspace authority',
       'x-cradle-cli': {
         command: ['work', 'create'],
         defaultWorkspaceId: true,
@@ -56,12 +73,20 @@ export const work = new Elysia({
     body: WorkModel.archiveBody,
     response: { 200: WorkModel.detail },
   })
+  .post('/:id/redetect', async ({ params }) => await Work.redetect(params.id), {
+    detail: {
+      'summary': 'Redetect Work state from authoritative owner facts',
+      'x-cradle-cli': { command: ['work', 'redetect'] },
+    },
+    params: WorkModel.idParams,
+    response: { 200: WorkModel.detail },
+  })
   .post('/:id/prepare', async ({ params, body }) => await Work.prepare({
     id: params.id,
     ...body,
   }), {
     detail: {
-      'summary': 'Prepare a local Work handoff without publishing it',
+      'summary': 'Prepare a Work handoff without publishing it',
       'x-cradle-cli': { command: ['work', 'prepare'] },
     },
     params: WorkModel.idParams,

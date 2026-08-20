@@ -80,7 +80,7 @@ interface UseChatComposerRuntimeOptions {
   canStop: boolean
   isReady: boolean
   workspaceId?: string | null
-  remoteHostId?: string | null
+  nodeId?: string | null
   composerModel?: ModelDescriptor | null
   sendOverridesRef?: React.MutableRefObject<ChatComposerSendOverrides>
   sendMessage: (
@@ -138,7 +138,7 @@ export function useChatComposerRuntime({
   canStop,
   isReady,
   workspaceId,
-  remoteHostId = null,
+  nodeId = null,
   composerModel,
   sendOverridesRef,
   sendMessage,
@@ -181,7 +181,7 @@ export function useChatComposerRuntime({
   }, [sessionBinding?.providerTargetId])
   const { models: providerSessionModels } = useProviderTargetModels(boundProviderTarget, {
     workspaceId,
-    hostId: remoteHostId,
+    nodeId,
   })
   const sessionModels = providerSessionModels
   const hasRuntimeCodeReviewSlot = useMemo(() => {

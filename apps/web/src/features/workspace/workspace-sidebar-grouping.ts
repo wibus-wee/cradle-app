@@ -1,4 +1,4 @@
-import type { RemoteHostRecord } from '~/features/remote-hosts/use-remote-host-connection'
+import type { GetNodesResponse } from '~/api-gen/types.gen'
 import type { WorkSummary } from '~/features/work/use-work'
 
 import type { Workspace } from './types'
@@ -15,12 +15,19 @@ import type {
   WorkspaceSidebarSessionOrdering,
 } from './workspace-sidebar-ui-store'
 
+export type FabricNodeSummary = GetNodesResponse[number]
+
 export interface SidebarSessionEntry {
   session: WorkspaceSession
   workspace: Workspace
 }
 
-export type SidebarUpdatedBucket = 'today' | 'yesterday' | 'previous7Days' | 'earlier'
+export type SidebarUpdatedBucket
+  = | 'lastHour'
+    | 'earlierToday'
+    | 'yesterday'
+    | 'previous7Days'
+    | 'earlier'
 export type SidebarStatusBucket = 'streaming' | 'needsYou' | 'error' | 'unread' | 'idle'
 
 export type SidebarSectionLabelKey
@@ -32,7 +39,7 @@ export interface SidebarSessionSection {
   key: string
   /** i18n key in the `workspace` namespace for built-in buckets. */
   labelKey?: SidebarSectionLabelKey
-  /** Pre-resolved label for dynamic buckets (remote host names). */
+  /** Pre-resolved label for dynamic buckets (Node names). */
   label?: string
   entries: SidebarSessionEntry[]
 }
@@ -40,7 +47,8 @@ export interface SidebarSessionSection {
 export type SidebarFlatGrouping = Exclude<WorkspaceSidebarGrouping, 'workspace'>
 
 const UPDATED_BUCKET_ORDER: readonly SidebarUpdatedBucket[] = [
-  'today',
+  'lastHour',
+  'earlierToday',
   'yesterday',
   'previous7Days',
   'earlier',
@@ -62,11 +70,12 @@ function startOfLocalDay(timestamp: number): number {
   return date.getTime()
 }
 
-/** Buckets by local calendar day distance from `now`. */
-export function classifyUpdatedBucket(activityAt: number, now: number): SidebarUpdatedBucket {
-  const dayDistance = Math.round((startOfLocalDay(now) - startOfLocalDay(activityAt)) / DAY_MS)
+/** Buckets a Unix-seconds activity timestamp by local calendar day distance from `now`. */
+export function classifyUpdatedBucket(activityAtSeconds: number, now: number): SidebarUpdatedBucket {
+  const activityAtMs = activityAtSeconds * 1000
+  const dayDistance = Math.round((startOfLocalDay(now) - startOfLocalDay(activityAtMs)) / DAY_MS)
   if (dayDistance <= 0) {
-    return 'today'
+    return now - activityAtMs < 60 * 60 * 1000 ? 'lastHour' : 'earlierToday'
   }
   if (dayDistance === 1) {
     return 'yesterday'
@@ -146,7 +155,7 @@ export interface GroupSidebarSessionsInput {
   locallyStreamingSessionIds: ReadonlySet<string>
   locallyErroredSessionIds: ReadonlySet<string>
   attentionBySessionId: ReadonlyMap<string, WorkspaceSidebarSessionAttention>
-  remoteHosts: readonly RemoteHostRecord[]
+  nodes: readonly FabricNodeSummary[]
   /** Injectable clock for tests; defaults to `Date.now()`. */
   now?: number
 }
@@ -210,22 +219,22 @@ export function groupSidebarSessions(input: GroupSidebarSessionsInput): SidebarS
       })
     }
     case 'environment': {
-      const hostNameById = new Map(input.remoteHosts.map(host => [host.id, host.displayName]))
+      const nodeNameById = new Map(input.nodes.map(node => [node.nodeId, node.displayName]))
       const localEntries: SidebarSessionEntry[] = []
-      const entriesByHostId = new Map<string, SidebarSessionEntry[]>()
+      const entriesByNodeId = new Map<string, SidebarSessionEntry[]>()
       for (const entry of input.entries) {
         if (classifyWorkspaceSidebarEnvironment(entry.session) === 'local') {
           localEntries.push(entry)
           continue
         }
         const execution = entry.session.execution
-        const hostId = execution.kind === 'remote-host' ? execution.hostId : ''
-        const hostEntries = entriesByHostId.get(hostId)
-        if (hostEntries) {
-          hostEntries.push(entry)
+        const nodeId = execution.kind === 'node' ? execution.nodeId : ''
+        const nodeEntries = entriesByNodeId.get(nodeId)
+        if (nodeEntries) {
+          nodeEntries.push(entry)
         }
         else {
-          entriesByHostId.set(hostId, [entry])
+          entriesByNodeId.set(nodeId, [entry])
         }
       }
 
@@ -237,13 +246,13 @@ export function groupSidebarSessions(input: GroupSidebarSessionsInput): SidebarS
           entries: sortEntries(localEntries),
         })
       }
-      const hostIds = [...entriesByHostId.keys()].toSorted((left, right) =>
-        (hostNameById.get(left) ?? left).localeCompare(hostNameById.get(right) ?? right))
-      for (const hostId of hostIds) {
+      const nodeIds = [...entriesByNodeId.keys()].toSorted((left, right) =>
+        (nodeNameById.get(left) ?? left).localeCompare(nodeNameById.get(right) ?? right))
+      for (const nodeId of nodeIds) {
         sections.push({
-          key: `environment:host:${hostId}`,
-          label: hostNameById.get(hostId) ?? hostId,
-          entries: sortEntries(entriesByHostId.get(hostId) ?? []),
+          key: `environment:node:${nodeId}`,
+          label: nodeNameById.get(nodeId) ?? nodeId,
+          entries: sortEntries(entriesByNodeId.get(nodeId) ?? []),
         })
       }
       return sections

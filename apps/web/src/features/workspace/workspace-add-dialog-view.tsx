@@ -1,177 +1,184 @@
 import {
+  ComputerLine as ComputerIcon,
   FolderOpenLine as FolderOpenIcon,
   LoadingLine,
-  NewFolderLine as FolderPlusIcon,
-  TransferVerticalLine as RemoteHostIcon,
 } from '@mingcute/react'
+import { m } from 'motion/react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import type { GetRemoteHostsResponse } from '~/api-gen/types.gen'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import type { FabricNode } from '~/features/nodes/types'
 import { cn } from '~/lib/cn'
-
-type RemoteHost = GetRemoteHostsResponse[number]
 
 export interface WorkspaceAddDialogViewProps {
   open: boolean
   creating: boolean
-  remoteHosts: readonly RemoteHost[]
-  remoteHostsLoading: boolean
-  remoteHostsError: string | null
-  selectedHostId: string
-  remoteContent: ReactNode
   onOpenChange: (open: boolean) => void
-  onSelectHost: (hostId: string) => void
   onAddLocal: () => void
+  /** Remote Nodes listed in the source rail (excluding the local device). */
+  nodes?: FabricNode[]
+  /** Selected source: `null` is the local device, otherwise a Node id. */
+  selectedNodeId?: string | null
+  onSelectNode?: (nodeId: string | null) => void
+  /** Workspace list pane for the selected Node. */
+  nodePane?: ReactNode
+}
+
+const EASE = 'ease-[cubic-bezier(0.23,1,0.32,1)]'
+const PANE_IN = 'motion-safe:animate-[node-row-in_200ms_cubic-bezier(0.23,1,0.32,1)_both]'
+const PILL_SPRING = { type: 'spring', stiffness: 600, damping: 40 } as const
+
+function SourceItem({
+  icon,
+  label,
+  selected,
+  trailing,
+  onClick,
+  testId,
+}: {
+  icon: ReactNode
+  label: string
+  selected: boolean
+  trailing?: ReactNode
+  onClick: () => void
+  testId: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testId}
+      title={label}
+      className={cn(
+        'relative flex h-9 w-full items-center rounded-lg px-2.5 text-[13px]',
+        'transition-colors duration-120',
+        EASE,
+        selected
+          ? 'font-medium text-foreground'
+          : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+      )}
+    >
+      {selected && (
+        <m.span
+          layoutId="workspace-add-source-pill"
+          className="absolute inset-0 rounded-lg bg-accent"
+          transition={PILL_SPRING}
+          aria-hidden
+        />
+      )}
+      <span className="relative flex min-w-0 flex-1 items-center gap-2">
+        {icon}
+        <span className="truncate">{label}</span>
+      </span>
+      {trailing && <span className="relative shrink-0">{trailing}</span>}
+    </button>
+  )
 }
 
 export function WorkspaceAddDialogView({
   open,
   creating,
-  remoteHosts,
-  remoteHostsLoading,
-  remoteHostsError,
-  selectedHostId,
-  remoteContent,
   onOpenChange,
-  onSelectHost,
   onAddLocal,
+  nodes = [],
+  selectedNodeId = null,
+  onSelectNode,
+  nodePane,
 }: WorkspaceAddDialogViewProps) {
-  const { t } = useTranslation(['workspace', 'settings'])
-  const selectedRemoteHost = remoteHosts.find(
-    host => host.id === selectedHostId,
-  ) ?? null
+  const { t } = useTranslation('workspace')
+  const { t: tNodes } = useTranslation('nodes')
+  const hasRemote = nodes.length > 0
+  const showNodePane = hasRemote && selectedNodeId !== null && nodePane
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(92vh,46rem)] overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="px-5 pt-5">
-          <DialogTitle>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogHeader className="px-6 pb-4 pt-5">
+          <DialogTitle className="text-balance">
             {t('workspace.dialog.addWorkspaceTitle')}
           </DialogTitle>
+          <DialogDescription>
+            {t('workspace.dialog.addWorkspaceDescription')}
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid min-h-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(18rem,1fr)] overflow-y-auto border-t border-border/60 sm:min-h-96 sm:grid-cols-[12rem_minmax(0,1fr)] sm:grid-rows-1 sm:overflow-hidden">
-          <div className="min-w-0 border-b border-border/60 bg-muted/20 p-2 sm:overflow-y-auto sm:border-b-0 sm:border-r">
-            <button
-              type="button"
-              onClick={() => onSelectHost('local')}
-              className={cn(
-                'flex w-full min-w-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] transition-colors',
-                selectedHostId === 'local'
-                  ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-              )}
-            >
-              <FolderOpenIcon className="size-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">
-                {t('workspace.dialog.addWorkspaceLocalHost')}
-              </span>
-            </button>
-            <div className="mt-2 border-t border-border/60 pt-2">
-              <p className="px-2.5 pb-1 text-[10px] font-medium uppercase text-muted-foreground/60">
-                {t('settings:remoteHosts.page.title')}
-              </p>
-              {remoteHostsLoading
-                ? (
-                    <div className="flex items-center gap-2 px-2.5 py-2 text-[11px] text-muted-foreground">
-                      <LoadingLine className="size-3 animate-spin" />
-                      {t('settings:remoteHosts.loading')}
-                    </div>
-                  )
-                : remoteHostsError
-                  ? (
-                      <p className="break-words px-2.5 py-2 text-[11px] text-destructive">
-                        {remoteHostsError}
-                      </p>
-                    )
-                  : remoteHosts.length === 0
-                    ? (
-                        <p className="px-2.5 py-2 text-[11px] text-muted-foreground">
-                          {t('workspace.dialog.addWorkspaceNoRemoteHosts')}
-                        </p>
-                      )
-                    : null}
-              {!remoteHostsLoading && !remoteHostsError
-                ? (
-                    <div className="grid grid-flow-col auto-cols-[minmax(8rem,1fr)] gap-1 overflow-x-auto sm:block sm:space-y-1 sm:overflow-visible">
-                      {remoteHosts.map((host) => {
-                        const connected
-                          = host.connectionState === 'connected'
-                        return (
-                          <button
-                            key={host.id}
-                            type="button"
-                            disabled={!connected}
-                            onClick={() => onSelectHost(host.id)}
-                            className={cn(
-                              'flex w-full min-w-0 items-center gap-2 rounded-md px-2.5 py-2 text-left text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                              selectedHostId === host.id
-                                ? 'bg-accent text-foreground'
-                                : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
-                            )}
-                          >
-                            <RemoteHostIcon className="size-3.5 shrink-0" />
-                            <span className="min-w-0 flex-1 truncate">
-                              {host.displayName}
-                            </span>
-                            <span
-                              className={cn(
-                                'size-1.5 shrink-0 rounded-full',
-                                connected
-                                  ? 'bg-emerald-500'
-                                  : 'bg-muted-foreground/40',
-                              )}
-                            />
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )
-                : null}
-            </div>
-          </div>
 
-          <div className="min-h-0 min-w-0 overflow-y-auto p-4">
-            {selectedHostId === 'local'
-              ? (
-                  <div className="flex h-full min-h-64 flex-col items-center justify-center gap-4 px-2 text-center sm:px-6">
-                    <div className="flex size-12 items-center justify-center rounded-xl bg-muted/60">
-                      <FolderOpenIcon
-                        className="size-6 text-muted-foreground/70"
-                        aria-hidden="true"
-                      />
+        <div className="flex h-[420px] min-h-0">
+          {hasRemote && (
+            <div className="flex w-56 shrink-0 flex-col gap-0.5 bg-muted/40 p-2.5">
+              <SourceItem
+                icon={<FolderOpenIcon className="size-4 shrink-0" aria-hidden />}
+                label={t('workspace.dialog.addWorkspaceLocalHost')}
+                selected={selectedNodeId === null}
+                onClick={() => onSelectNode?.(null)}
+                testId="workspace-add-source-local"
+              />
+              <p className="px-2 pb-1 pt-2.5 text-[11px] font-medium text-muted-foreground/70">
+                {tNodes('workspace.addFromDevice')}
+              </p>
+              {nodes.map(node => (
+                <SourceItem
+                  key={node.nodeId}
+                  icon={<ComputerIcon className="size-4 shrink-0" aria-hidden />}
+                  label={node.displayName}
+                  selected={selectedNodeId === node.nodeId}
+                  trailing={(
+                    <span
+                      className={cn(
+                        'block size-1.5 rounded-full',
+                        node.status === 'online' ? 'bg-green-500' : 'bg-muted-foreground/40',
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  onClick={() => onSelectNode?.(node.nodeId)}
+                  testId={`node-pick-${node.nodeId}`}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1 overflow-y-auto">
+            <div key={selectedNodeId ?? 'local'} className={cn('h-full', PANE_IN)}>
+              {showNodePane
+                ? <div className="p-2">{nodePane}</div>
+                : (
+                    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+                      <span className="flex size-11 items-center justify-center rounded-xl bg-accent text-foreground">
+                        <FolderOpenIcon className="size-5" aria-hidden />
+                      </span>
+                      <div className="space-y-1">
+                        <p className="text-[13px] font-medium">
+                          {t('workspace.dialog.addWorkspaceLocalTitle')}
+                        </p>
+                        <p className="mx-auto max-w-60 text-pretty text-[12px] leading-relaxed text-muted-foreground">
+                          {t('workspace.dialog.addWorkspaceLocalDescription')}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={creating}
+                        onClick={() => {
+                          onOpenChange(false)
+                          onAddLocal()
+                        }}
+                        className={cn('transition-transform duration-120 active:scale-[0.97]', EASE)}
+                        data-testid="workspace-add-local"
+                      >
+                        {creating && <LoadingLine className="size-3.5 animate-spin" aria-hidden />}
+                        {t('workspace.dialog.addWorkspaceChooseLocal')}
+                      </Button>
                     </div>
-                    <div className="space-y-1.5">
-                      <h3 className="text-sm font-medium">
-                        {t('workspace.dialog.addWorkspaceLocalTitle')}
-                      </h3>
-                      <p className="mx-auto max-w-xs text-[12px] leading-relaxed text-muted-foreground">
-                        {t('workspace.dialog.addWorkspaceLocalDescription')}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      disabled={creating}
-                      onClick={() => {
-                        onOpenChange(false)
-                        onAddLocal()
-                      }}
-                    >
-                      <FolderPlusIcon className="size-3.5" />
-                      {t('workspace.dialog.addWorkspaceChooseLocal')}
-                    </Button>
-                  </div>
-                )
-              : selectedRemoteHost
-                ? remoteContent
-                : null}
+                  )}
+            </div>
           </div>
         </div>
       </DialogContent>

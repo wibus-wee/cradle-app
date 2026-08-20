@@ -116,7 +116,7 @@ describe('runOpenCommand', () => {
       .mockResolvedValueOnce({
         id: 'workspace-1',
         name: 'proj',
-        locator: { hostId: 'local', path: dir },
+        locator: { nodeId: 'local', path: dir },
       })
     const openDeepLink = vi.fn().mockResolvedValue(undefined)
 
@@ -158,7 +158,7 @@ describe('runOpenCommand', () => {
       .mockResolvedValueOnce({
         id: 'workspace-2',
         name: 'proj',
-        locator: { hostId: 'local', path: dir },
+        locator: { nodeId: 'local', path: dir },
       })
     const openDeepLink = vi.fn()
 
@@ -213,7 +213,7 @@ describe('runOpenCommand', () => {
       .mockResolvedValueOnce({
         id: 'workspace-existing',
         name: 'proj',
-        locator: { hostId: 'local', path: dir },
+        locator: { nodeId: 'local', path: dir },
       })
     const openDeepLink = vi.fn().mockResolvedValue(undefined)
 
@@ -227,7 +227,7 @@ describe('runOpenCommand', () => {
     expect(request).toHaveBeenNthCalledWith(3, {
       method: 'get',
       path: {},
-      query: { hostId: 'local', path: dir },
+      query: { nodeId: 'local', path: dir },
       template: '/workspaces/resolve',
     })
     expect(result).toMatchObject({
@@ -252,7 +252,7 @@ describe('registerOpenCommand', () => {
       .mockResolvedValueOnce({
         id: 'workspace-3',
         name: 'proj',
-        locator: { hostId: 'local', path: dir },
+        locator: { nodeId: 'local', path: dir },
       })
     const program = createProgram({ serverUrl: 'http://localhost:21423', request })
     registerOpenCommand(program)

@@ -1,0 +1,5 @@
+{
+  "name": "@cradle/e2e",
+  "private": true,
+  "type": "module"
+}

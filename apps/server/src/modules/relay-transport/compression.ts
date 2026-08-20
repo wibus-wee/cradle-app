@@ -77,7 +77,8 @@ function bufferView(bytes: Uint8Array): Buffer {
 
 /**
  * Compress one independently decodable stream chunk before encryption. Level 1
- * keeps compression below the cost of the old pure-JS cipher on 64 KiB chunks.
+ * keeps compression below the fixed overhead of the current Fabric Session
+ * cipher on 64 KiB chunks.
  * Incompressible and tiny chunks stay raw so compression never expands the wire.
  */
 export function encodeRelayChunk(

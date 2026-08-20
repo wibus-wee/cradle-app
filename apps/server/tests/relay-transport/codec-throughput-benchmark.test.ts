@@ -7,7 +7,7 @@ import {
   encodeRelayChunk,
   RELAY_MIN_COMPRESSION_INPUT_BYTES,
 } from '../../src/modules/relay-transport/compression'
-import { RelayCipher } from '../../src/modules/relay-transport/crypto'
+import { FabricSessionCipher } from '../../src/modules/relay-transport/crypto'
 import { decodeInnerFrame, encodeInnerFrame } from '../../src/modules/relay-transport/protocol'
 
 type PayloadProfile = 'compressible' | 'incompressible'
@@ -24,8 +24,8 @@ interface CodecResult {
 }
 
 const KEY = new Uint8Array(32).fill(7)
-const BASELINE_CIPHER = new RelayCipher(KEY, false)
-const OPTIMIZED_CIPHER = new RelayCipher(KEY)
+const BASELINE_CIPHER = new FabricSessionCipher(KEY, false)
+const OPTIMIZED_CIPHER = new FabricSessionCipher(KEY)
 
 function payloadFor(profile: PayloadProfile, length: number): Uint8Array {
   if (profile === 'compressible') {

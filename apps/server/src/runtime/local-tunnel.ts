@@ -1,7 +1,7 @@
 import net from 'node:net'
 
 export interface LocalTunnelHandle {
-  readonly hostId: string
+  readonly nodeId: string
   readonly localPort: number
   readonly localBaseUrl: string
   readonly pid: number | null

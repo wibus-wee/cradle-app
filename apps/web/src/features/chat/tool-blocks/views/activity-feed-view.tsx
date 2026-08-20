@@ -29,6 +29,7 @@ import {
   readFeedRowLabel,
 } from '../lib/activity-feed-model'
 import { hasHeroContent } from '../lib/tool-hero-content'
+import type { ArtifactOpenInput } from './artifact-preview-view'
 import type { PlanDocumentOpenInput } from './plan-document-preview-view'
 import {
   FileDiffExecutionDetails,
@@ -47,6 +48,7 @@ export interface ActivityFeedViewProps {
   blobSessionId?: string | null
   onOpenWorkspaceDiff?: (path: string) => void
   onOpenPlanDocument?: (input: PlanDocumentOpenInput) => void
+  onOpenArtifact?: (input: ArtifactOpenInput) => void
 }
 
 const REASONING_STREAMDOWN_OPTIONS = {
@@ -201,6 +203,7 @@ export function ActivityFeedView({
   blobSessionId,
   onOpenWorkspaceDiff,
   onOpenPlanDocument,
+  onOpenArtifact,
 }: ActivityFeedViewProps) {
   const [listExpanded, setListExpanded] = useState(false)
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(() => new Set())
@@ -270,6 +273,7 @@ export function ActivityFeedView({
                     errorText={part.errorText}
                     toolCallId={part.toolCallId}
                     onOpenPlanDocument={onOpenPlanDocument}
+                    onOpenArtifact={onOpenArtifact}
                     blobSessionId={blobSessionId}
                   />
                 )
@@ -299,6 +303,7 @@ export function ActivityFeedView({
                 errorText={part.errorText}
                 toolCallId={part.toolCallId}
                 onOpenPlanDocument={onOpenPlanDocument}
+                onOpenArtifact={onOpenArtifact}
                 blobSessionId={blobSessionId}
               />
             )}

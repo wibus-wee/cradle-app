@@ -8,7 +8,7 @@ const spec = {
     "work",
     "create"
   ],
-  "description": "Create local isolated Work",
+  "description": "Create isolated Work on the workspace authority",
   "flags": [
     {
       "description": "Defaults to the workspace for your current directory, then CRADLE_WORKSPACE_ID.",

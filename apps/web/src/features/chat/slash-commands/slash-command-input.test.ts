@@ -59,3 +59,49 @@ describe('slash command panel grouping', () => {
     ])
   })
 })
+
+describe('slash command search', () => {
+  const commands = [
+    command({
+      id: 'runtime:terminal',
+      name: 'terminal',
+      label: 'Terminal',
+      source: 'runtime',
+      aliases: ['shell'],
+      description: 'Show command and process activity.',
+      iconKey: 'terminal',
+    }),
+    command({
+      id: 'runtime:compact',
+      name: 'compact',
+      label: 'Compact',
+      source: 'runtime',
+      description: 'Compact this conversation context.',
+      iconKey: 'compact',
+    }),
+    command({
+      id: 'cradle:commit',
+      name: 'commit',
+      label: 'Commit',
+      source: 'cradle',
+      description: 'Propose a clean commit sequence',
+      iconKey: 'commit',
+    }),
+  ]
+
+  it('only returns the exact command for a complete command name', () => {
+    expect(getSlashCommandPanelItems(commands, 'commit').map(item => item.name)).toEqual(['commit'])
+  })
+
+  it('returns commands that share a command-name prefix', () => {
+    expect(getSlashCommandPanelItems(commands, 'com').map(item => item.name)).toEqual(['compact', 'commit'])
+  })
+
+  it('matches command aliases by prefix', () => {
+    expect(getSlashCommandPanelItems(commands, 'shell').map(item => item.name)).toEqual(['terminal'])
+  })
+
+  it('does not search descriptions', () => {
+    expect(getSlashCommandPanelItems(commands, 'conversation')).toEqual([])
+  })
+})

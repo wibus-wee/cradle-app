@@ -72,6 +72,7 @@ async function writeDesktopPluginPackage(options: DesktopPluginPackageOptions = 
 
 interface CapturedWebviewShape {
   tabId: string
+  ownerId: string
   url: string
   title: string
   hasRawDebugger: boolean
@@ -252,9 +253,10 @@ describe('desktop plugin loader lifecycle', () => {
     tempPluginsDir = await writeDesktopPluginPackage({
       desktopSource: [
         'export function activate(ctx) {',
-        '  ctx.webviews.onCreated((webview, tabId) => {',
+        '  ctx.webviews.onCreated((webview, tabId, ownerId) => {',
         '    globalThis.__desktopWebviewShape = {',
         '      tabId,',
+        '      ownerId,',
         '      url: webview.getUrl(),',
         '      title: webview.getTitle(),',
         '      hasRawDebugger: "debugger" in webview,',
@@ -290,10 +292,11 @@ describe('desktop plugin loader lifecycle', () => {
         on: vi.fn(),
         removeListener: vi.fn(),
       },
-    } as unknown as Electron.WebContents, 'renderer-tab-1')
+    } as unknown as Electron.WebContents, 'chat:session-a', 'renderer-tab-1')
 
     expect(readCapturedWebviewShape()).toEqual({
       tabId: 'renderer-tab-1',
+      ownerId: 'chat:session-a',
       url: 'https://example.test/',
       title: 'Example',
       hasRawDebugger: false,
@@ -313,7 +316,7 @@ describe('desktop plugin loader lifecycle', () => {
     tempPluginsDir = await writeDesktopPluginPackage({
       desktopSource: [
         'export async function activate(ctx) {',
-        '  globalThis.__browserTabRequestResult = await ctx.browserTabs.request("https://example.test/")',
+        '  globalThis.__browserTabRequestResult = await ctx.browserTabs.request("chat:session-a", "https://example.test/")',
         '}',
       ],
     })
@@ -325,7 +328,7 @@ describe('desktop plugin loader lifecycle', () => {
     await activateDesktopPlugins()
 
     expect(tearoffWindow.webContents.executeJavaScript).toHaveBeenCalledWith(
-      'globalThis.__cradleBrowserUseCreateTab("https://example.test/")',
+      'globalThis.__cradleBrowserUseCreateTab("chat:session-a", "https://example.test/")',
       true,
     )
     expect(mainWindow.webContents.executeJavaScript).not.toHaveBeenCalled()

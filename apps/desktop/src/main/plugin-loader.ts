@@ -21,7 +21,7 @@ const pluginSharedConfig = new Map<string, string>()
 const activePlugins = new Map<string, { deactivate?: () => void | Promise<void>, subscriptions: Disposable[] }>()
 
 /** Webview creation listeners from plugins */
-const webviewListeners: Array<(webview: DesktopWebview, tabId: string) => void> = []
+const webviewListeners: Array<(webview: DesktopWebview, tabId: string, ownerId: string) => void> = []
 
 /** Governed desktop plugin projection */
 const desktopPluginDescriptors = new Map<string, PluginDescriptor>()
@@ -119,11 +119,11 @@ export function getPluginEnvVars(): Record<string, string> {
 }
 
 /** Notify all desktop plugins about a new webview */
-export function notifyWebviewCreated(wc: Electron.WebContents, tabId: string): void {
-  const webview = createDesktopWebviewFacade(wc, tabId)
+export function notifyWebviewCreated(wc: Electron.WebContents, ownerId: string, tabId: string): void {
+  const webview = createDesktopWebviewFacade(wc, ownerId, tabId)
   for (const listener of webviewListeners) {
     try {
-      listener(webview, tabId)
+      listener(webview, tabId, ownerId)
     }
  catch (err) {
       console.error('[plugin-loader] webview listener error:', err)
@@ -131,8 +131,9 @@ export function notifyWebviewCreated(wc: Electron.WebContents, tabId: string): v
   }
 }
 
-function createDesktopWebviewFacade(wc: Electron.WebContents, tabId: string): DesktopWebview {
+function createDesktopWebviewFacade(wc: Electron.WebContents, ownerId: string, tabId: string): DesktopWebview {
   return {
+    ownerId,
     tabId,
     isDestroyed: () => wc.isDestroyed(),
     navigate: async (url: string) => {
@@ -334,7 +335,7 @@ function createDesktopPluginContext(manifest: PluginManifest): DesktopPluginCont
     userDataPath: app.getPath('userData'),
     subscriptions,
     webviews: {
-      onCreated(handler: (webview: DesktopWebview, tabId: string) => void): Disposable {
+      onCreated(handler: (webview: DesktopWebview, tabId: string, ownerId: string) => void): Disposable {
         const listener = handler
         const capabilityId = createCapabilityId(manifest.name, 'desktop.webview-listener')
         if (descriptor) {
@@ -359,30 +360,30 @@ function createDesktopPluginContext(manifest: PluginManifest): DesktopPluginCont
       },
     },
     browserTabs: {
-      async request(url?: string): Promise<string | undefined> {
+      async request(ownerId: string, url?: string): Promise<string | undefined> {
         return executeBrowserTabBridge(
-          `globalThis.__cradleBrowserUseCreateTab(${JSON.stringify(url)})`,
+          `globalThis.__cradleBrowserUseCreateTab(${JSON.stringify(ownerId)}, ${JSON.stringify(url)})`,
           BrowserTabIdSchema,
           'creation',
         )
       },
-      async activate(tabId: string): Promise<boolean> {
+      async activate(ownerId: string, tabId: string): Promise<boolean> {
         return executeBrowserTabBridge(
-          `globalThis.__cradleBrowserUseActivateTab(${JSON.stringify(tabId)})`,
+          `globalThis.__cradleBrowserUseActivateTab(${JSON.stringify(ownerId)}, ${JSON.stringify(tabId)})`,
           BrowserTabActivationSchema,
           'activation',
         )
       },
-      async goOffScreen(tabId?: string): Promise<boolean> {
+      async goOffScreen(ownerId: string, tabId?: string): Promise<boolean> {
         return executeBrowserTabBridge(
-          `globalThis.__cradleBrowserUseGoOffScreen(${JSON.stringify(tabId)})`,
+          `globalThis.__cradleBrowserUseGoOffScreen(${JSON.stringify(ownerId)}, ${JSON.stringify(tabId)})`,
           BrowserTabActivationSchema,
           'hiding',
         )
       },
-      async getActive(): Promise<string | undefined> {
+      async getActive(ownerId: string): Promise<string | undefined> {
         return executeBrowserTabBridge(
-          'globalThis.__cradleBrowserUseGetActiveTab()',
+          `globalThis.__cradleBrowserUseGetActiveTab(${JSON.stringify(ownerId)})`,
           BrowserTabLookupSchema,
           'lookup',
         )

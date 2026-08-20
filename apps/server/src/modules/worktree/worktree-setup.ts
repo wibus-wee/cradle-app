@@ -11,7 +11,7 @@ interface WorktreesJson {
 
 export interface WorktreeSetupHookTrustDecision {
   trusted: boolean
-  relayExposed: boolean
+  fabricNodeExposed: boolean
 }
 
 function skippedHookWarning(commands: string[], reason: string): string {
@@ -44,7 +44,7 @@ export async function runWorktreeSetupHooks(
   const commands = config.setup?.[platformKey] ?? config.setup?.default ?? []
   const warnings: string[] = []
 
-  if (commands.length > 0 && trust.relayExposed) {
+  if (commands.length > 0 && trust.fabricNodeExposed) {
     return [skippedHookWarning(
       commands,
       'Worktree setup hooks were not executed because relay host enrollments expose this server.',

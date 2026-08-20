@@ -168,7 +168,7 @@ export function useAddWorkspace() {
     })
     try {
       const name = path.split('/').filter(Boolean).pop() ?? path
-      await createWorkspace.mutateAsync({ body: { name, locator: { hostId: 'local', path } } })
+      await createWorkspace.mutateAsync({ body: { name, locator: { nodeId: 'local', path } } })
       trackProductTaskFinished(analyticsTask, 'success')
       setRecognition(null)
     }
@@ -187,7 +187,7 @@ export function useAddWorkspace() {
 
   const createFromLocator = useCallback(async (input: CreateWorkspaceInput) => {
     setAdding(true)
-    const taskVariant = input.locator.hostId === 'local' ? 'local' : 'remote'
+    const taskVariant = input.locator.nodeId === 'local' ? 'local' : 'remote'
     const analyticsTask = trackProductTaskStarted({
       feature_domain: 'workspace',
       task_kind: 'workspace_add',

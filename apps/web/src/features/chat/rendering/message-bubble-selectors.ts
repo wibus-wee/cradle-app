@@ -29,6 +29,7 @@ import {
   isRuntimeUserInputToolPart,
   readRenderableToolPart,
 } from './chat-render-plan'
+import type { RunTimingMetrics } from './run-debug-timings'
 import type { RenderableToolPart } from './tool-ui-classifier'
 import { describeToolCallCached } from './tool-ui-classifier'
 
@@ -45,8 +46,10 @@ export interface MessageFrame {
   isGoalMessage: boolean
   bangCommand: BangCommandMetadata | null
   bangResult: BangResultMetadata | null
-  /** Durable run duration stamped by the server on terminal assistant messages. */
-  runDurationMs: number | null
+  /** Durable run identity stamped by the server on terminal assistant messages. */
+  runId: string | null
+  /** Compact durable timing projection retained with the terminal message. */
+  runTimings: RunTimingMetrics | null
   hasHiddenRuntimeUserInputTail: boolean
 }
 
@@ -174,6 +177,7 @@ export function readMessageFromState(
 
 export function readMessageFrame(message: UIMessage): MessageFrame {
   const continuationMetadata = readChatContinuationMetadata(message)
+  const runMetadata = message.role === 'assistant' ? readRunMetadata(message) : null
   return {
     id: message.id,
     role: message.role,
@@ -181,18 +185,38 @@ export function readMessageFrame(message: UIMessage): MessageFrame {
     isGoalMessage: isCodexGoalUserMessage(message),
     bangCommand: message.role === 'user' ? readBangCommandMetadata(message) : null,
     bangResult: message.role === 'user' ? readBangResultMetadata(message) : null,
-    runDurationMs: message.role === 'assistant' ? readRunDurationMs(message) : null,
+    runId: runMetadata?.runId ?? null,
+    runTimings: runMetadata?.timings ?? null,
     hasHiddenRuntimeUserInputTail: hasHiddenRuntimeUserInputTail(message),
   }
 }
 
-function readRunDurationMs(message: UIMessage): number | null {
+function readRunMetadata(message: UIMessage): {
+  runId: string | null
+  timings: RunTimingMetrics | null
+} {
   const metadata = readRecord((message as { metadata?: unknown }).metadata)
   const cradleMetadata = readRecord(metadata.cradle)
   const run = readRecord(cradleMetadata.run)
-  return typeof run.durationMs === 'number' && Number.isFinite(run.durationMs)
-    ? run.durationMs
-    : null
+  const timings = readRecord(run.timings)
+  const durationMs = readFiniteTiming(run.durationMs)
+  const hasTimingProjection = Object.keys(timings).length > 0
+  return {
+    runId: typeof run.runId === 'string' && run.runId.length > 0 ? run.runId : null,
+    timings: hasTimingProjection || durationMs !== null
+      ? {
+          acceptMs: readFiniteTiming(timings.acceptMs),
+          ttfbMs: readFiniteTiming(timings.ttfbMs),
+          ttftMs: readFiniteTiming(timings.ttftMs),
+          workedMs: readFiniteTiming(timings.workedMs),
+          totalMs: readFiniteTiming(timings.totalMs) ?? durationMs,
+        }
+      : null,
+  }
+}
+
+function readFiniteTiming(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : null
 }
 
 function hasHiddenRuntimeUserInputTail(message: UIMessage): boolean {

@@ -29,7 +29,7 @@ function makeTempDir(prefix: string): string {
 }
 
 function localWorkspaceLocatorJson(path: string): string {
-  return JSON.stringify({ hostId: 'local', path })
+  return JSON.stringify({ nodeId: 'local', path })
 }
 
 function readLocalWorkspacePath(locatorJson: string): string {

@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { pluginActivationPolicies, pluginSources, relayHostEnrollments } from '@cradle/db'
+import { fabricMembership, pluginActivationPolicies, pluginSources } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { Elysia } from 'elysia'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -190,8 +190,8 @@ describe('server plugin loader lifecycle', () => {
       .run()
     deletePluginTrustGrantsForPlugin('@acme/live-source')
     db()
-      .delete(relayHostEnrollments)
-      .where(eq(relayHostEnrollments.id, 'plugin-loader-relay-fixture'))
+      .delete(fabricMembership)
+      .where(eq(fabricMembership.fabricId, 'plugin-loader-fabric-fixture'))
       .run()
     delete process.env.CRADLE_PLUGINS_DIR
     delete process.env.CRADLE_PLUGINS_SOURCE_KIND
@@ -437,29 +437,26 @@ describe('server plugin loader lifecycle', () => {
     expect(getRegisteredMcpServers()).toHaveProperty('loader-cleanup')
   })
 
-  it('blocks external local plugins while relay host enrollments expose the server', async () => {
+  it('blocks external local plugins while the server is enrolled as a Fabric node', async () => {
     tempPluginsDir = await writePluginPackage()
     process.env.CRADLE_PLUGINS_DIR = tempPluginsDir
     process.env.CRADLE_PLUGINS_SOURCE_KIND = 'externalLocal'
     await grantLoaderCleanupPluginTrust(tempPluginsDir)
-    db().insert(relayHostEnrollments).values({
-      id: 'plugin-loader-relay-fixture',
-      displayName: 'Plugin Loader Relay Fixture',
+    db().insert(fabricMembership).values({
+      fabricId: 'plugin-loader-fabric-fixture',
       relayUrl: 'https://relay.example.test',
-      roomId: 'plugin-loader-relay-room',
-      hostPubkey: 'host-pubkey-plugin-loader-relay-fixture',
-      hostPrivateKeySecretId: 'relay-host-key:plugin-loader-relay-fixture',
-      pinnedControllerPubkey: 'controller-pubkey-plugin-loader-relay-fixture',
-      status: 'paired',
-      pairingCode: null,
-      lastError: null,
+      localNodeId: 'plugin-loader-node-fixture',
+      role: 'node',
+      identityKeySecretId: 'fabric-identity:plugin-loader-fabric-fixture',
+      encryptionKeySecretId: 'fabric-encryption:plugin-loader-fabric-fixture',
+      certificateJson: '{}',
     }).run()
 
     await activateServerPlugins(new Elysia())
 
     const descriptor = listPluginDescriptors().find(plugin => plugin.identity === '@cradle/loader-cleanup')
     expect(descriptor?.source.trusted).toBe(false)
-    expect(descriptor?.source.reason).toContain('relay host enrollments')
+    expect(descriptor?.source.reason).toContain('Fabric node')
     expect(descriptor?.layers.server.status).toBe('disabled')
     expect(getRegisteredMcpServers()).not.toHaveProperty('loader-cleanup')
   })

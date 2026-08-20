@@ -43,7 +43,8 @@
     "gen:cli": "pnpm --filter @cradle/cli gen:cli",
     "knip": "knip",
     "db:studio": "pnpm --filter @cradle/db studio",
-    "e2e:check": "node e2e/scripts/check-suite.mjs"
+    "e2e:check": "node e2e/scripts/check-suite.mjs",
+    "e2e:fabric": "node --import tsx node_modules/@playwright/test/cli.js test --config e2e/playwright.fabric.config.ts"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.2.1",

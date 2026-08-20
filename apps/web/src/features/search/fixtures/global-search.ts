@@ -83,7 +83,7 @@ const workspaceFixtures: PaletteData['workspaces'] = [
     id: 'workspace-cradle',
     name: 'Cradle App',
     locator: {
-      hostId: 'local',
+      nodeId: 'local',
       path: '/Users/demo/cradle-app',
       kind: 'project',
     },
@@ -93,7 +93,7 @@ const workspaceFixtures: PaletteData['workspaces'] = [
     id: 'workspace-docs',
     name: 'Product documentation',
     locator: {
-      hostId: 'local',
+      nodeId: 'local',
       path: '/Users/demo/product-documentation',
       kind: 'project',
     },

@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { AppHeaderView } from '~/components/layout/app-header-view'
 import { CHROME_COLLAPSED_SIDEBAR_WIDTH } from '~/components/layout/layout-responsive'
 import { useChatSessionLayoutRecord } from '~/components/layout/use-layout-query-records'
-import { SessionExecutionChrome } from '~/features/remote-hosts/session-execution-chrome'
 import { SessionIsolationChrome } from '~/features/session/session-isolation-chrome'
 import { SessionPullRequestChrome } from '~/features/session/session-pull-request-chrome'
 import { WorkHeaderChrome } from '~/features/work/work-header-chrome'
@@ -125,7 +124,6 @@ export function AppHeader({
               </div>
               {scopedSessionId && (
                 <>
-                  <SessionExecutionChrome sessionId={scopedSessionId} />
                   <SessionIsolationChrome
                     sessionId={scopedSessionId}
                     workspaceId={scopedSessionLayout?.workspaceId ?? null}

@@ -1,11 +1,11 @@
 import { z } from 'zod'
 
-export const LOCAL_WORKSPACE_HOST_ID = 'local' as const
+export const LOCAL_WORKSPACE_NODE_ID = 'local' as const
 
 const nonBlankString = z.string().trim().min(1)
 
 export const workspaceLocatorSchema = z.object({
-  hostId: nonBlankString,
+  nodeId: nonBlankString,
   path: nonBlankString,
   kind: z.enum(['project', 'managed-worktree']).optional(),
   sourceWorkspaceId: nonBlankString.nullable().optional(),
@@ -24,7 +24,7 @@ export type WorkspaceGitIdentity = z.infer<typeof workspaceGitIdentitySchema>
 export function normalizeWorkspaceLocator(input: WorkspaceLocator): WorkspaceLocator {
   const locator = workspaceLocatorSchema.parse(input)
   return {
-    hostId: locator.hostId,
+    nodeId: locator.nodeId,
     path: locator.path,
     ...(locator.kind ? { kind: locator.kind } : {}),
     ...(locator.sourceWorkspaceId !== undefined ? { sourceWorkspaceId: locator.sourceWorkspaceId } : {}),
@@ -58,9 +58,9 @@ export function readWorkspaceGitIdentityJson(json: string): WorkspaceGitIdentity
 }
 
 export function isLocalWorkspaceLocator(locator: WorkspaceLocator): boolean {
-  return locator.hostId === LOCAL_WORKSPACE_HOST_ID
+  return locator.nodeId === LOCAL_WORKSPACE_NODE_ID
 }
 
 export function localWorkspaceLocator(path: string): WorkspaceLocator {
-  return { hostId: LOCAL_WORKSPACE_HOST_ID, path }
+  return { nodeId: LOCAL_WORKSPACE_NODE_ID, path }
 }

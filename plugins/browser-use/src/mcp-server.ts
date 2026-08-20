@@ -57,7 +57,7 @@ class BrowserClient {
   private pending = new Map<string, { resolve: (r: BrowserResponse) => void, reject: (e: Error) => void }>()
   private endpoint: BrowserBackendEndpoint
 
-  constructor(endpoint: string) {
+  constructor(endpoint: string, private readonly ownerId: string) {
     this.endpoint = parseBackendEndpoint(endpoint)
   }
 
@@ -90,12 +90,12 @@ class BrowserClient {
     })
   }
 
-  async send(cmd: Omit<BrowserCommand, 'id'> & Record<string, unknown>): Promise<BrowserResponse> {
+  async send(cmd: Omit<BrowserCommand, 'id' | 'ownerId'> & Record<string, unknown>): Promise<BrowserResponse> {
     if (!this.socket) {
       await this.connect()
     }
     const id = randomUUID()
-    const fullCmd = { ...cmd, id } as BrowserCommand
+    const fullCmd = { ...cmd, id, ownerId: this.ownerId } as BrowserCommand
 
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
@@ -142,7 +142,14 @@ const server = new McpServer({
   version: '0.0.1',
 })
 
-const client = new BrowserClient(process.env.BROWSER_BACKEND_SOCKET ?? discoverSocketPath())
+const chatSessionId = process.env.CRADLE_CHAT_SESSION_ID?.trim()
+if (!chatSessionId) {
+  throw new Error('Browser Use MCP requires a Cradle chat session binding')
+}
+const client = new BrowserClient(
+  process.env.BROWSER_BACKEND_SOCKET ?? discoverSocketPath(),
+  `chat:${chatSessionId}`,
+)
 
 // Tool: browser_navigate
 server.registerTool(

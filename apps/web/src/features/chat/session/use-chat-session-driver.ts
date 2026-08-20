@@ -72,6 +72,7 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
   })
   const runtimeStatusQuery = useRuntimeSessionStatus(driverEnabled ? chatSessionId : null, driverEnabled, {
     refetchInterval: false,
+    refetchWhileActiveInterval: 1_000,
   })
   const snapshotRevision = snapshotRowsQuery.data?.pages[0]?.revision
   const snapshotNextCursor = snapshotRowsQuery.data?.pages.at(-1)?.nextCursor ?? null

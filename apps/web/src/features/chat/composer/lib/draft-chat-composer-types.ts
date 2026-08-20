@@ -37,7 +37,7 @@ export type DraftChatComposerSendHandler = (
 
 export interface DraftChatComposerProps {
   workspaceId: string | null
-  remoteHostId?: string | null
+  nodeId?: string | null
   active?: boolean
   contextBar?: ReactNode
   replaceText?: string

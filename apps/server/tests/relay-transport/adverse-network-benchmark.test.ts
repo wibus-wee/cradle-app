@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest'
 
-import { generateRelayKeyPair } from '../../src/modules/relay-transport/crypto'
-import { decodeRelayEnvelope } from '../../src/modules/relay-transport/protocol'
-import { RelaySession } from '../../src/modules/relay-transport/session'
+import { generateFabricSessionKeyPair } from '../../src/modules/relay-transport/crypto'
+import {
+  decodeFabricSessionEnvelope,
+  encodeFabricSessionEnvelope,
+  FABRIC_SESSION_PROTOCOL_VERSION,
+} from '../../src/modules/relay-transport/protocol'
+import type { FabricSessionOutboundEnvelope } from '../../src/modules/relay-transport/session'
+import { FabricSession } from '../../src/modules/relay-transport/session'
 
 const TRANSFER_BYTES = 2 * 1024 * 1024
+
+function encodeFabricFrame(frame: FabricSessionOutboundEnvelope): Uint8Array {
+  return encodeFabricSessionEnvelope({
+    version: FABRIC_SESSION_PROTOCOL_VERSION,
+    linkId: 'adverse-network-link',
+    ...frame,
+  })
+}
 
 interface LinkScenario {
   name: 'stable' | 'mobile' | 'constrained' | 'hostile'
@@ -126,8 +139,8 @@ function runTransfer(
   profile: NetworkResult['profile'],
   mode: NetworkResult['mode'],
 ): NetworkResult {
-  const hostKeys = generateRelayKeyPair()
-  const controllerKeys = generateRelayKeyPair()
+  const hostKeys = generateFabricSessionKeyPair()
+  const controllerKeys = generateFabricSessionKeyPair()
   const wire = new ShapedTcpWire(scenario)
   const payload = payloadFor(profile)
   let receivedBytes = 0
@@ -141,14 +154,16 @@ function runTransfer(
     throw new Error('Host delivery used before setup.')
   }
   const makeOptions = () => ({
-    roomId: 'adverse-network-benchmark',
-    pairingCode: 'ADVERSE-NETWORK',
+    fabricId: 'fabric-benchmark',
+    linkId: 'adverse-network-link',
     optimizedCodecEnabled: mode === 'V2 optimized',
     maxStreamCreditBytes: 8 * 1024 * 1024,
   })
-  const host = new RelaySession('host', hostKeys.privateKeyBase64, {
+  const host = new FabricSession('node', hostKeys.privateKeyBase64, {
     ...makeOptions(),
+    expectedPeerPubkey: controllerKeys.publicKeyBase64,
     ourPublicKeyBase64: hostKeys.publicKeyBase64,
+    encodeOutboundEnvelope: encodeFabricFrame,
   }, {
     send: data => wire.send('host-controller', deliverToController, data),
     onStreamOpen: () => { hostStreamOpened = true },
@@ -158,17 +173,19 @@ function runTransfer(
     },
     onError: (error) => { throw error },
   })
-  const controller = new RelaySession('controller', controllerKeys.privateKeyBase64, {
+  const controller = new FabricSession('controller', controllerKeys.privateKeyBase64, {
     ...makeOptions(),
+    expectedPeerPubkey: hostKeys.publicKeyBase64,
     ourPublicKeyBase64: controllerKeys.publicKeyBase64,
+    encodeOutboundEnvelope: encodeFabricFrame,
   }, {
     send: data => wire.send('controller-host', deliverToHost, data),
     onPauseStream: () => { pauses++ },
     onResumeStream: () => { resumes++ },
     onError: (error) => { throw error },
   })
-  deliverToController = data => controller.handleEnvelope(decodeRelayEnvelope(data))
-  deliverToHost = data => host.handleEnvelope(decodeRelayEnvelope(data))
+  deliverToController = data => controller.handleEnvelope(decodeFabricSessionEnvelope(data))
+  deliverToHost = data => host.handleEnvelope(decodeFabricSessionEnvelope(data))
   host.start()
   controller.start()
   wire.drainUntil(() => host.isReady && controller.isReady, 'handshake')

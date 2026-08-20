@@ -73,6 +73,10 @@ const pendingWebviewResolvers = new Map<string, Array<(tabId: string) => void>>(
 
 let desktopContext: DesktopPluginContext | null = null
 
+function webviewKey(ownerId: string, tabId: string): string {
+  return `${ownerId}\0${tabId}`
+}
+
 function disposeWebviewEntry(entry: WebviewEntry): void {
   for (const subscription of entry.subscriptions.splice(0).reverse()) {
     subscription.dispose()
@@ -112,7 +116,7 @@ async function activateRendererTab(entry: WebviewEntry): Promise<void> {
   if (!desktopContext) {
     return
   }
-  const activated = await desktopContext.browserTabs.activate(entry.webview.tabId)
+  const activated = await desktopContext.browserTabs.activate(entry.webview.ownerId, entry.webview.tabId)
   if (activated) {
     await new Promise(resolve => setTimeout(resolve, 50))
   }
@@ -130,14 +134,15 @@ function ensureDebugger(entry: WebviewEntry): void {
   }
 }
 
-async function getActiveWebview(): Promise<WebviewEntry | undefined> {
+async function getActiveWebview(ownerId: string): Promise<WebviewEntry | undefined> {
   if (desktopContext) {
-    const rendererTabId = await desktopContext.browserTabs.getActive()
+    const rendererTabId = await desktopContext.browserTabs.getActive(ownerId)
     if (rendererTabId) {
-      const activeEntry = webviewRegistry.get(rendererTabId)
+      const key = webviewKey(ownerId, rendererTabId)
+      const activeEntry = webviewRegistry.get(key)
       if (activeEntry) {
         if (activeEntry.webview.isDestroyed()) {
-          removeWebviewEntry(rendererTabId, activeEntry)
+          removeWebviewEntry(key, activeEntry)
         }
         else {
           return activeEntry
@@ -146,30 +151,32 @@ async function getActiveWebview(): Promise<WebviewEntry | undefined> {
     }
   }
 
-  const entries = [...webviewRegistry.entries()]
+  const entries = [...webviewRegistry.values()].filter(entry => entry.webview.ownerId === ownerId)
   if (entries.length === 0) {
     return undefined
   }
-  return entries.at(-1)![1]
+  return entries.at(-1)
 }
 
-async function getWebview(tabId?: string): Promise<WebviewEntry | undefined> {
+async function getWebview(ownerId: string, tabId?: string): Promise<WebviewEntry | undefined> {
   if (tabId) {
-    const entry = webviewRegistry.get(tabId)
+    const key = webviewKey(ownerId, tabId)
+    const entry = webviewRegistry.get(key)
     if (entry && !entry.webview.isDestroyed()) {
       return entry
     }
     if (entry) {
-      removeWebviewEntry(tabId, entry)
+      removeWebviewEntry(key, entry)
     }
     return undefined
   }
-  return getActiveWebview()
+  return getActiveWebview(ownerId)
 }
 
 function registerWebview(webview: DesktopWebview): string {
   const id = webview.tabId
-  const previousEntry = webviewRegistry.get(id)
+  const key = webviewKey(webview.ownerId, id)
+  const previousEntry = webviewRegistry.get(key)
   if (previousEntry) {
     disposeWebviewEntry(previousEntry)
   }
@@ -184,7 +191,7 @@ function registerWebview(webview: DesktopWebview): string {
   }
 
   const entry: WebviewEntry = { webview, attached, subscriptions: [] }
-  webviewRegistry.set(id, entry)
+  webviewRegistry.set(key, entry)
 
   entry.subscriptions.push(webview.cdp.onDetached((reason) => {
     console.warn(`[browser-use] Debugger detached from ${id}: ${reason}`)
@@ -192,12 +199,12 @@ function registerWebview(webview: DesktopWebview): string {
   }))
 
   entry.subscriptions.push(webview.onDestroyed(() => {
-    removeWebviewEntry(id, entry)
+    removeWebviewEntry(key, entry)
   }))
 
-  const resolvers = pendingWebviewResolvers.get(id)
+  const resolvers = pendingWebviewResolvers.get(key)
   if (resolvers) {
-    pendingWebviewResolvers.delete(id)
+    pendingWebviewResolvers.delete(key)
     for (const resolve of resolvers) {
       resolve(id)
     }
@@ -206,8 +213,9 @@ function registerWebview(webview: DesktopWebview): string {
   return id
 }
 
-function waitForRegisteredWebview(rendererTabId: string): Promise<string> {
-  if (webviewRegistry.has(rendererTabId)) {
+function waitForRegisteredWebview(ownerId: string, rendererTabId: string): Promise<string> {
+  const key = webviewKey(ownerId, rendererTabId)
+  if (webviewRegistry.has(key)) {
     return Promise.resolve(rendererTabId)
   }
 
@@ -220,42 +228,42 @@ function waitForRegisteredWebview(rendererTabId: string): Promise<string> {
       resolve(tabId)
     }
     timeout = setTimeout(() => {
-      const resolvers = pendingWebviewResolvers.get(rendererTabId)
+      const resolvers = pendingWebviewResolvers.get(key)
       if (resolvers) {
         const nextResolvers = resolvers.filter(candidate => candidate !== wrappedResolve)
         if (nextResolvers.length > 0) {
-          pendingWebviewResolvers.set(rendererTabId, nextResolvers)
+          pendingWebviewResolvers.set(key, nextResolvers)
         }
         else {
-          pendingWebviewResolvers.delete(rendererTabId)
+          pendingWebviewResolvers.delete(key)
         }
       }
       reject(new Error(`Timed out waiting for renderer browser tab ${rendererTabId}`))
     }, 5000)
 
-    const resolvers = pendingWebviewResolvers.get(rendererTabId) ?? []
-    pendingWebviewResolvers.set(rendererTabId, [...resolvers, wrappedResolve])
+    const resolvers = pendingWebviewResolvers.get(key) ?? []
+    pendingWebviewResolvers.set(key, [...resolvers, wrappedResolve])
   })
 }
 
-async function requestRendererBrowserTab(url?: string): Promise<string> {
+async function requestRendererBrowserTab(ownerId: string, url?: string): Promise<string> {
   if (!desktopContext) {
     throw new Error('Desktop plugin context is not available')
   }
 
-  const rendererTabId = await desktopContext.browserTabs.request(url)
+  const rendererTabId = await desktopContext.browserTabs.request(ownerId, url)
   if (!rendererTabId) {
     throw new Error('Renderer did not create a browser tab')
   }
 
-  return waitForRegisteredWebview(rendererTabId)
+  return waitForRegisteredWebview(ownerId, rendererTabId)
 }
 
 async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
   try {
     switch (cmd.type) {
       case 'navigate': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -274,7 +282,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'screenshot': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -284,7 +292,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'click': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -301,7 +309,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'type': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -321,7 +329,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'get_text': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -337,7 +345,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'scroll': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -358,7 +366,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'hover': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -380,7 +388,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'dom_snapshot': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -399,7 +407,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'wait_for_selector': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -428,7 +436,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'keyboard': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -455,20 +463,23 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
 
       case 'tabs_list': {
         const tabs: TabInfo[] = []
-        for (const [id, entry] of webviewRegistry) {
-          if (entry.webview.isDestroyed()) {
-            removeWebviewEntry(id, entry)
+        for (const [key, entry] of webviewRegistry) {
+          if (entry.webview.ownerId !== cmd.ownerId) {
             continue
           }
-          tabs.push({ id, url: entry.webview.getUrl(), title: entry.webview.getTitle() })
+          if (entry.webview.isDestroyed()) {
+            removeWebviewEntry(key, entry)
+            continue
+          }
+          tabs.push({ id: entry.webview.tabId, url: entry.webview.getUrl(), title: entry.webview.getTitle() })
         }
         const data: TabsListResult = { tabs }
         return { id: cmd.id, ok: true, data }
       }
 
       case 'tabs_new': {
-        const newTabId = await requestRendererBrowserTab(cmd.url)
-        const entry = await getWebview(newTabId)
+        const newTabId = await requestRendererBrowserTab(cmd.ownerId, cmd.url)
+        const entry = await getWebview(cmd.ownerId, newTabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'New browser tab was not registered' }
         }
@@ -483,14 +494,15 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'tabs_close': {
-        const entry = webviewRegistry.get(cmd.tabId)
+        const key = webviewKey(cmd.ownerId, cmd.tabId)
+        const entry = webviewRegistry.get(key)
         if (!entry || entry.webview.isDestroyed()) {
           if (entry) {
-            removeWebviewEntry(cmd.tabId, entry)
+            removeWebviewEntry(key, entry)
           }
           return { id: cmd.id, ok: false, error: `Tab ${cmd.tabId} not found` }
         }
-        removeWebviewEntry(cmd.tabId, entry)
+        removeWebviewEntry(key, entry)
         try {
           entry.webview.cdp.detach()
         }
@@ -501,14 +513,14 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'tabs_go_off_screen': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
         if (!desktopContext) {
           return { id: cmd.id, ok: false, error: 'Desktop plugin context is not available' }
         }
-        const hidden = await desktopContext.browserTabs.goOffScreen(entry.webview.tabId)
+        const hidden = await desktopContext.browserTabs.goOffScreen(cmd.ownerId, entry.webview.tabId)
         if (!hidden) {
           return { id: cmd.id, ok: false, error: 'Browser tab could not be moved off screen' }
         }
@@ -517,7 +529,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'tabs_bring_to_front': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }
@@ -527,7 +539,7 @@ async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
       }
 
       case 'eval': {
-        const entry = await getWebview(cmd.tabId)
+        const entry = await getWebview(cmd.ownerId, cmd.tabId)
         if (!entry) {
           return { id: cmd.id, ok: false, error: 'No webview available' }
         }

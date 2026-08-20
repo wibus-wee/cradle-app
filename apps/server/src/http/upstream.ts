@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { AppError } from '../errors/app-error'
 
 export interface RemoteWorkspaceLocator {
-  hostId: string
+  nodeId: string
   path: string
   kind?: 'project' | 'managed-worktree'
   sourceWorkspaceId?: string | null

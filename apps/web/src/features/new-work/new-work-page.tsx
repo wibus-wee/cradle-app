@@ -14,13 +14,14 @@ import type { ChatContextPart } from '~/features/chat/context/chat-context-parts
 import { useComposerState } from '~/features/composer-toolbar'
 import { useGitBranches } from '~/features/git/shared/use-git'
 import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
-import { isWorkEligibleWorkspace } from '~/features/workspace/types'
+import { isLocalWorkspace, isWorkEligibleWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { apiErrorMessage } from '~/lib/api-error'
 import { openWork, openWorkspaceDiffs } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 
+import { NewWorkAcceptanceCriteriaView } from './new-work-acceptance-criteria-view'
 import { NewWorkBaseBranchControlView } from './new-work-base-branch-control-view'
 import type { NewWorkFailureKind } from './new-work-error-view'
 import { NewWorkPageView } from './new-work-page-view'
@@ -57,12 +58,20 @@ export function NewWorkPage() {
   })
   const [error, setError] = useState<unknown>(null)
   const selectedWorkspace = localWorkspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? null
-  const { data: branches, isLoading: branchesLoading } = useGitBranches(selectedWorkspace?.id)
+  const nodeId = selectedWorkspace && !isLocalWorkspace(selectedWorkspace)
+    ? selectedWorkspace.locator.nodeId
+    : null
+  const selectedLocalWorkspaceId = selectedWorkspace && isLocalWorkspace(selectedWorkspace)
+    ? selectedWorkspace.id
+    : null
+  const { data: branches, isLoading: branchesLoading } = useGitBranches(selectedLocalWorkspaceId)
   const [selectedBaseBranch, setSelectedBaseBranch] = useState<string | null>(null)
+  const [acceptanceCriteriaText, setAcceptanceCriteriaText] = useState('')
   const composerState = useComposerState({
     context: 'new-chat',
     workspaceId: selectedWorkspace?.id ?? null,
-    enableAgents: true,
+    nodeId,
+    enableAgents: !nodeId,
   })
 
   useEffect(() => {
@@ -118,6 +127,10 @@ export function NewWorkPage() {
       workspaceId: selectedWorkspace.id,
       title,
       goal,
+      acceptanceCriteria: acceptanceCriteriaText
+        .split('\n')
+        .map(criterion => criterion.trim())
+        .filter(Boolean),
       linkedIssueId: search.issueId,
       runtimeKind: options.runtimeKind,
       runtimeSettings: options.runtimeSettings,
@@ -193,7 +206,7 @@ export function NewWorkPage() {
         onSelectWorkspace={setSelectedWorkspaceId}
         onAddWorkspace={() => void addFromPicker()}
       />
-      {selectedWorkspace
+      {selectedWorkspace && isLocalWorkspace(selectedWorkspace)
         ? (
             <NewWorkBaseBranchControlView
               currentBranch={selectedWorkspace.gitIdentity?.branch ?? null}
@@ -229,6 +242,12 @@ export function NewWorkPage() {
 
   return (
     <NewWorkPageView
+      acceptanceCriteria={(
+        <NewWorkAcceptanceCriteriaView
+          value={acceptanceCriteriaText}
+          onChange={setAcceptanceCriteriaText}
+        />
+      )}
       composer={composer}
       workspaceCount={localWorkspaces.length}
       loadingWorkspaces={loading}

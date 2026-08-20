@@ -1,8 +1,10 @@
 import { cn } from '~/lib/cn'
 
 import type { ToolPayload, ToolState, ToolUiDescriptor } from '../../rendering/tool-ui-classifier'
+import type { ArtifactOpenInput } from './artifact-preview-view'
 import type { PlanDocumentOpenInput } from './plan-document-preview-view'
 import { DiffSummary, RawValue, ToolPayloadTruncationNotice } from './tool-call-details'
+import { ArtifactSummaryView } from './tool-hero/artifact-summary-view'
 import { FileReadSummaryView } from './tool-hero/file-read-summary-view'
 import { McpSummaryView } from './tool-hero/mcp-summary-view'
 import { PlanImplementationSummaryView } from './tool-hero/plan-implementation-summary-view'
@@ -23,6 +25,7 @@ export interface ToolHeroViewProps {
   toolCallId: string
   blobSessionId?: string | null
   onOpenPlanDocument?: (input: PlanDocumentOpenInput) => void
+  onOpenArtifact?: (input: ArtifactOpenInput) => void
 }
 
 /** Props-only dispatcher for independently-renderable tool summary Views. */
@@ -35,6 +38,7 @@ export function ToolHeroView({
   toolCallId,
   blobSessionId,
   onOpenPlanDocument,
+  onOpenArtifact,
 }: ToolHeroViewProps) {
   const truncatedPayload = output.truncatedOriginalChars !== null
     ? output
@@ -67,6 +71,15 @@ export function ToolHeroView({
     case 'todo': return <TodoSummaryView input={input} output={output} />
     case 'plan-implementation': return <PlanImplementationSummaryView />
     case 'plan': return <PlanSummaryView input={input} output={output} toolCallId={toolCallId} onOpenPlanDocument={onOpenPlanDocument} />
+    case 'artifact': return (
+      <ArtifactSummaryView
+        input={input}
+        output={output}
+        toolCallId={toolCallId}
+        sessionId={blobSessionId}
+        onOpenArtifact={onOpenArtifact}
+      />
+    )
     case 'question': return <QuestionSummaryView output={output} />
     case 'mcp': return <McpSummaryView output={output} errorText={errorText} />
     default: {

@@ -16,6 +16,7 @@ export function activate(ctx: ServerPluginContext): void {
       command: 'node',
       args: [resolve(__dirname, 'mcp-server.mjs')],
       env: { BROWSER_BACKEND_SOCKET: socketPath },
+      scope: 'chat-session',
     })
   }
 

@@ -9,10 +9,11 @@ import { db, shutdownInfra } from '../../../infra'
 import type { ActiveRun } from '../run-registry'
 import { createRunChunkSequencer } from '../stream/run-chunk-sequencer'
 import { createFinalMessageProjectionState } from './final-message-projection'
+import type { RunWriteFence } from './run-write-fence'
 
 const { commitPreparedSessionEventsWithProjection, readRunWriteFence } = vi.hoisted(() => ({
   commitPreparedSessionEventsWithProjection: vi.fn(),
-  readRunWriteFence: vi.fn(() => ({ status: 'streaming' as const })),
+  readRunWriteFence: vi.fn<(runId: string) => RunWriteFence>(() => ({ status: 'streaming' })),
 }))
 
 vi.mock('../es/commands', async (importOriginal) => {
@@ -70,6 +71,7 @@ function activeRun(): ActiveRun {
 
 describe('terminal finalizer durability barrier', () => {
   afterEach(() => {
+    vi.restoreAllMocks()
     commitPreparedSessionEventsWithProjection.mockReset()
     readRunWriteFence.mockReset()
     readRunWriteFence.mockReturnValue({ status: 'streaming' as const })
@@ -92,7 +94,74 @@ describe('terminal finalizer durability barrier', () => {
       finalizer.persistTerminalChunk(run, { type: 'finish', finishReason: 'stop' }),
     ).rejects.toThrow('terminal write failed')
     expect(run.terminalStatus).toBeUndefined()
+    expect(run.terminalAtMs).toBeUndefined()
     expect(publishUIMessageChunk).not.toHaveBeenCalled()
+  })
+
+  it('publishes the durable terminal timestamp onto the active run', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(9_000)
+    let messageJson = ''
+    commitPreparedSessionEventsWithProjection.mockImplementationOnce(
+      async (_sessionId, prepare) => db().transaction((tx) => {
+        const prepared = prepare(tx)
+        const completed = prepared.events.find(event => event.type === 'AssistantMessageCompleted')
+        const payload = completed?.payload as { message?: { messageJson?: string } } | undefined
+        messageJson = payload?.message?.messageJson ?? ''
+        return prepared.result
+      }),
+    )
+    const run = activeRun()
+    run.runStartedAtMs = 1_000
+    run.admissionRequestedAtMs = 900
+    run.firstResponseAtMs = 1_300
+    run.firstTokenAtMs = 1_600
+    run.finalResponseStartedAtMs = 6_300
+    const finalizer = createTerminalRunFinalizer({
+      stream: {
+        publishRunStartChunk: vi.fn(),
+        flushPendingRunDelta: vi.fn(),
+        publishUIMessageChunk: vi.fn(),
+      },
+      error: vi.fn(),
+    })
+
+    await finalizer.persistTerminalChunk(run, { type: 'finish', finishReason: 'stop' })
+
+    expect(run.terminalAtMs).toBe(9_000)
+    expect(JSON.parse(messageJson).metadata.cradle.run).toEqual({
+      runId: 'run-1',
+      durationMs: 8_000,
+      timings: {
+        acceptMs: 100,
+        ttfbMs: 300,
+        ttftMs: 600,
+        workedMs: 4_700,
+        totalMs: 8_000,
+      },
+    })
+  })
+
+  it('restores the durable terminal timestamp from an existing terminal fence', async () => {
+    readRunWriteFence.mockReturnValueOnce({
+      status: 'complete' as const,
+      errorText: null,
+      finishedAt: 123,
+    })
+    const run = activeRun()
+    const finalizer = createTerminalRunFinalizer({
+      stream: {
+        publishRunStartChunk: vi.fn(),
+        flushPendingRunDelta: vi.fn(),
+        publishUIMessageChunk: vi.fn(),
+      },
+      error: vi.fn(),
+    })
+
+    await finalizer.persistTerminalChunk(run, { type: 'finish', finishReason: 'stop' })
+
+    expect(run.terminalStatus).toBe('complete')
+    expect(run.terminalAtMs).toBe(123_000)
+    expect(commitPreparedSessionEventsWithProjection).not.toHaveBeenCalled()
   })
 
   it('persists an assistant message with an inline image as cradle-blob:// without base64', async () => {

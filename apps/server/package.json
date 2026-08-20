@@ -36,7 +36,7 @@
     "benchmark:relay": "vitest run tests/relay-transport/performance-compare.test.ts --reporter=verbose",
     "benchmark:relay:codec": "CRADLE_RELAY_BENCHMARK=1 vitest run tests/relay-transport/codec-throughput-benchmark.test.ts --reporter=verbose --maxWorkers=1 --no-file-parallelism",
     "benchmark:relay:full": "pnpm run benchmark:relay && pnpm run benchmark:relay:runtime",
-    "benchmark:relay:runtime": "CRADLE_RELAY_BENCHMARK=1 vitest run tests/relay-transport/codec-throughput-benchmark.test.ts tests/relay-transport/adverse-network-benchmark.test.ts tests/relay-transport/e2e.test.ts tests/relay-transport/latency-window-benchmark.test.ts --reporter=verbose --maxWorkers=1 --no-file-parallelism"
+    "benchmark:relay:runtime": "CRADLE_RELAY_BENCHMARK=1 vitest run tests/relay-transport/codec-throughput-benchmark.test.ts tests/relay-transport/adverse-network-benchmark.test.ts tests/relay-transport/latency-window-benchmark.test.ts --reporter=verbose --maxWorkers=1 --no-file-parallelism"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.76",

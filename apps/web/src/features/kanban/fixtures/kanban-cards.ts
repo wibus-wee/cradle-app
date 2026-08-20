@@ -27,7 +27,7 @@ export const kanbanRuntimeData: KanbanCardRuntimeData = {
   workspaces: [{
     id: 'cradle',
     name: 'Cradle',
-    locator: { hostId: 'local', path: '/workspace/cradle' },
+    locator: { nodeId: 'local', path: '/workspace/cradle' },
     gitIdentity: { originUrl: 'https://github.com/wibus-wee/cradle-app', branch: 'main' },
     identifier: 'CRA',
     availability: 'available',

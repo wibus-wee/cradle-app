@@ -46,7 +46,7 @@ const TEST_DIFF_REVIEW_RUNTIME_CAPABILITIES = {
 function localWorkspaceRow(input: { id: string, name: string, path: string }) {
   return {
     ...input,
-    locatorJson: JSON.stringify({ hostId: 'local', path: input.path }),
+    locatorJson: JSON.stringify({ nodeId: 'local', path: input.path }),
   }
 }
 

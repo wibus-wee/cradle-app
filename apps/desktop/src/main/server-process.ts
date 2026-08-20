@@ -11,7 +11,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, networkInterfaces } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 
 import { app, dialog } from 'electron'
@@ -35,6 +35,8 @@ import {
 } from './plugin-paths'
 
 let serverProcess: ManagedChildProcess | null = null
+let managedRelayProcess: ManagedChildProcess | null = null
+let managedRelayUrl: string | null = null
 let restartCount = 0
 let locatedServerPid: number | null = null
 const MAX_RESTARTS = 3
@@ -47,11 +49,14 @@ const SHELL_PATH_MARKER_START = '__CRADLE_SHELL_PATH_START__'
 const SHELL_PATH_MARKER_END = '__CRADLE_SHELL_PATH_END__'
 const CREDENTIAL_SECRET_FILE = 'credential-secret'
 const CODEX_APP_SERVER_PATH_ENV = 'CRADLE_CODEX_APP_SERVER_PATH'
+const CHRONICLE_PATH_ENV = 'CRADLE_CHRONICLE_PATH'
+const RELAYD_PATH_ENV = 'CRADLE_RELAYD_PATH'
 const SAFE_STORAGE_PREFIX = 'v1-safe:'
 const PLAIN_STORAGE_PREFIX = 'v1-plain:'
 const KEYCHAIN_BACKUP_SUFFIX = '.keychain-backup'
 const CLI_SERVER_LOCATOR_FILE = 'cli/server.json'
 const NETWORK_PREFERENCES_FILE = 'preferences/network.json'
+const RELAYD_STARTUP_TIMEOUT_MS = 15_000
 const SERVER_EXIT_DIAGNOSTICS_FILE = 'server-process-exits.ndjson'
 export const SERVER_EXIT_DIAGNOSTICS_MAX_BYTES = 8 * 1024 * 1024
 export const SERVER_EXIT_DIAGNOSTICS_GENERATIONS = 3
@@ -112,6 +117,18 @@ const DesktopServerAccessModeSchema = z
       })
       .default({ serverAccessMode: 'local' }),
   })
+    .passthrough()
+const DesktopRelayAccessPreferencesSchema = z
+  .object({
+    inbound: z
+      .object({
+        relaySource: z.enum(['managed', 'external']).default('managed'),
+        relayUrl: z.string().trim().nullable().default(null),
+        managedRelayAccessMode: z.enum(['local', 'network']).default('network'),
+        managedRelayPublicUrl: z.string().trim().nullable().default(null),
+      })
+      .default({ relaySource: 'managed', relayUrl: null, managedRelayAccessMode: 'network', managedRelayPublicUrl: null }),
+  })
   .passthrough()
 let currentServerUrl = ''
 const recentServerOutputLines: string[] = []
@@ -167,6 +184,57 @@ export function readDesktopServerAccessMode(dataDir: string): DesktopServerAcces
   }
 }
 
+export type DesktopRelayAccessMode = 'local' | 'network' | 'external'
+
+export type DesktopRelaySource = 'managed' | 'external'
+
+export function readDesktopRelayAccessPreferences(dataDir: string): {
+  source: DesktopRelaySource
+  accessMode: DesktopRelayAccessMode
+  relayUrl: string | null
+  publicUrl: string | null
+} {
+  const preferencesPath = join(dataDir, NETWORK_PREFERENCES_FILE)
+  if (!existsSync(preferencesPath)) {
+    return { source: 'managed', accessMode: 'network', relayUrl: null, publicUrl: null }
+  }
+  try {
+    const parsed = DesktopRelayAccessPreferencesSchema.parse(JSON.parse(readFileSync(preferencesPath, 'utf8')))
+    return {
+      source: parsed.inbound.relaySource,
+      accessMode: parsed.inbound.relaySource === 'external' ? 'external' : parsed.inbound.managedRelayAccessMode,
+      relayUrl: parsed.inbound.relayUrl,
+      publicUrl: parsed.inbound.managedRelayPublicUrl,
+    }
+  }
+ catch {
+    return { source: 'managed', accessMode: 'network', relayUrl: null, publicUrl: null }
+  }
+}
+
+export function desktopRelayBindHostForAccessMode(accessMode: DesktopRelayAccessMode): string {
+  return accessMode === 'network' ? '0.0.0.0' : '127.0.0.1'
+}
+
+export function resolveDesktopRelayAdvertisedUrl(
+  port: number,
+  accessMode: DesktopRelayAccessMode,
+  configuredPublicUrl: string | null,
+): string {
+  if (configuredPublicUrl) {
+    const parsed = new URL(configuredPublicUrl)
+    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) {
+      throw new Error('Managed relay public URL must be an HTTP or HTTPS URL.')
+    }
+    return parsed.toString().replace(/\/$/, '')
+  }
+  if (accessMode === 'local') {
+    return `http://127.0.0.1:${port}`
+  }
+  const address = resolveDesktopLanAddress()
+  return `http://${address}:${port}`
+}
+
 /**
  * Start the Cradle server as a forked child process.
  * Returns the full URL the server is listening on.
@@ -191,6 +259,7 @@ export async function startServer(
   const port = await getPort({ port: [21423, 21424, 21425, 21426] })
   const host = desktopServerBindHostForAccessMode(readDesktopServerAccessMode(dataDir))
   currentServerUrl = `http://127.0.0.1:${port}`
+  const managedRelay = await startManagedRelay(dataDir)
   let bootstrapSnapshot = createDesktopServerBootstrapSnapshot()
   const bootstrapWatchdog: ServerBootstrapWatchdog = {
     globalTimeoutMs: SERVER_BOOTSTRAP_GLOBAL_TIMEOUT_MS,
@@ -198,17 +267,24 @@ export async function startServer(
     readSnapshot: () => bootstrapSnapshot,
   }
 
-  await spawnServer({
-    host,
-    port,
-    dataDir,
-    credentialSecret,
-    bootstrapWatchdog,
-    onBootstrapEvent: (event) => {
-      bootstrapSnapshot = applyServerBootstrapEvent(bootstrapSnapshot, event)
-      onBootstrapSnapshot?.(bootstrapSnapshot)
-    },
-  })
+  try {
+    await spawnServer({
+      host,
+      port,
+      dataDir,
+      credentialSecret,
+      managedRelay,
+      bootstrapWatchdog,
+      onBootstrapEvent: (event) => {
+        bootstrapSnapshot = applyServerBootstrapEvent(bootstrapSnapshot, event)
+        onBootstrapSnapshot?.(bootstrapSnapshot)
+      },
+    })
+  }
+ catch (error) {
+    await stopManagedRelay()
+    throw error
+  }
 
   await waitForServer(currentServerUrl, { bootstrapWatchdog })
   writeCliServerLocator({
@@ -267,15 +343,181 @@ function removeCliServerLocator(): void {
   }
 }
 
+interface ManagedRelayLaunch {
+  command: string
+  args: string[]
+  cwd?: string
+}
+
+async function startManagedRelay(dataDir: string): Promise<{
+  relayUrl: string | null
+  accessMode: DesktopRelayAccessMode
+}> {
+  if (managedRelayProcess && managedRelayUrl) {
+    return {
+      relayUrl: managedRelayUrl,
+      accessMode: process.env.CRADLE_RELAYD_ACCESS_MODE === 'local' ? 'local' : 'network',
+    }
+  }
+
+  const isDev = !!process.env.ELECTRON_RENDERER_URL
+  const access = readDesktopRelayAccessPreferences(dataDir)
+  if (access.source === 'external') {
+    return {
+      relayUrl: access.relayUrl ? normalizeDesktopRelayUrl(access.relayUrl) : null,
+      accessMode: 'external',
+    }
+  }
+  const port = await getPort({ port: [8787, 8788, 8789, 8790] })
+  const relayUrl = resolveDesktopRelayAdvertisedUrl(port, access.accessMode, access.publicUrl)
+  const localUrl = `http://127.0.0.1:${port}`
+  const relayDatabasePath = join(dataDir, 'relayd', 'fabric.sqlite3')
+  mkdirSync(dirname(relayDatabasePath), { recursive: true })
+
+  const launch = resolveDesktopRelayLaunch({ isDev, moduleDir: __dirname })
+  const relayEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    CRADLE_RELAYD_EXIT_ON_STDIN_CLOSE: 'true',
+    PATH: await resolveDesktopServerPath(process.env),
+  }
+  const child = spawnManagedProcess({
+    kind: 'spawn',
+    command: launch.command,
+    args: [
+      ...launch.args,
+      '-listen',
+      `${desktopRelayBindHostForAccessMode(access.accessMode)}:${port}`,
+      '-public-url',
+      relayUrl,
+      '-fabric-db',
+      relayDatabasePath,
+    ],
+    cwd: launch.cwd,
+    env: relayEnv,
+    stdin: 'pipe',
+    shutdownGraceMs: 5_000,
+  })
+  managedRelayProcess = child
+  managedRelayUrl = relayUrl
+  child.stdout?.on('data', chunk => console.warn(`[relayd] ${String(chunk).trimEnd()}`))
+  child.stderr?.on('data', chunk => console.error(`[relayd:error] ${String(chunk).trimEnd()}`))
+  child.on('error', error => console.error('[desktop] Managed relay process error:', error))
+  child.on('exit', (code, signal) => {
+    if (managedRelayProcess === child) {
+      managedRelayProcess = null
+      managedRelayUrl = null
+    }
+    if (code !== 0 && signal !== 'SIGTERM') {
+      console.error(`[desktop] Managed relay exited unexpectedly (code=${code}, signal=${signal})`)
+    }
+  })
+
+  try {
+    await waitForManagedRelay(localUrl, child)
+  }
+ catch (error) {
+    await stopManagedRelay()
+    throw error
+  }
+  console.warn(`[desktop] Managed relay started on ${relayUrl}`)
+  return { relayUrl, accessMode: access.accessMode }
+}
+
+async function waitForManagedRelay(url: string, child: ManagedChildProcess): Promise<void> {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < RELAYD_STARTUP_TIMEOUT_MS) {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(`Managed relay exited before becoming healthy (code=${child.exitCode}, signal=${child.signalCode})`)
+    }
+    try {
+      const response = await fetch(`${url}/healthz`)
+      if (response.ok) {
+        return
+      }
+    }
+   catch {
+      // relayd is still binding its listener
+    }
+    await new Promise(resolveWait => setTimeout(resolveWait, 100))
+  }
+  throw new Error(`Managed relay failed to start within ${RELAYD_STARTUP_TIMEOUT_MS}ms`)
+}
+
+async function stopManagedRelay(): Promise<void> {
+  const child = managedRelayProcess
+  managedRelayProcess = null
+  managedRelayUrl = null
+  if (!child) {
+    return
+  }
+  await child.stop('SIGTERM')
+}
+
+function resolveDesktopRelayLaunch(input: { isDev: boolean, moduleDir: string }): ManagedRelayLaunch {
+  const configuredPath = process.env[RELAYD_PATH_ENV]?.trim()
+  if (configuredPath) {
+    if (!existsSync(configuredPath)) {
+      throw new Error(`Configured relayd binary is missing at ${configuredPath}`)
+    }
+    return { command: configuredPath, args: [] }
+  }
+
+  const executableName = process.platform === 'win32' ? 'relayd.exe' : 'relayd'
+  const bundledPath = input.isDev
+    ? [
+        resolve(input.moduleDir, '../../resources/relayd', `${process.platform}-${process.arch}`, executableName),
+        resolve(process.cwd(), 'resources/relayd', `${process.platform}-${process.arch}`, executableName),
+        resolve(process.cwd(), 'apps/desktop/resources/relayd', `${process.platform}-${process.arch}`, executableName),
+      ].find(candidate => existsSync(candidate))
+    : join(process.resourcesPath, 'relayd', `${process.platform}-${process.arch}`, executableName)
+  if (bundledPath && existsSync(bundledPath)) {
+    return { command: bundledPath, args: [] }
+  }
+  if (!input.isDev) {
+    throw new Error(`Bundled relayd runtime is missing at ${bundledPath}`)
+  }
+
+  const relaydRoot = [
+    resolve(process.cwd(), '../relayd'),
+    resolve(process.cwd(), 'apps/relayd'),
+    resolve(input.moduleDir, '../../../relayd'),
+  ].find(candidate => existsSync(join(candidate, 'go.mod')))
+  if (!relaydRoot) {
+    throw new Error('Cannot find the relayd source tree for development fallback.')
+  }
+  return { command: 'go', args: ['run', './cmd/relayd'], cwd: relaydRoot }
+}
+
+function resolveDesktopLanAddress(): string {
+  for (const entries of Object.values(networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      const isIPv4 = entry.family === 'IPv4'
+      if (isIPv4 && !entry.internal && entry.address) {
+        return entry.address
+      }
+    }
+  }
+  return '127.0.0.1'
+}
+
+function normalizeDesktopRelayUrl(value: string): string {
+  const parsed = new URL(value)
+  if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) {
+    throw new Error('External Relay URL must be an HTTP or HTTPS URL.')
+  }
+  return parsed.toString().replace(/\/$/, '')
+}
+
 async function spawnServer(opts: {
   host: string
   port: number
   dataDir: string
   credentialSecret: string
+  managedRelay: { relayUrl: string | null, accessMode: DesktopRelayAccessMode }
   bootstrapWatchdog?: ServerBootstrapWatchdog
   onBootstrapEvent?: (event: ServerBootstrapEvent) => void
 }): Promise<void> {
-  const { host, port, dataDir, credentialSecret } = opts
+  const { host, port, dataDir, credentialSecret, managedRelay } = opts
 
   // In dev, use tsx to run the TS source directly
   // In production, run the compiled server entry
@@ -293,6 +535,7 @@ async function spawnServer(opts: {
     = configuredMigrationsDir || (isDev ? undefined : join(process.resourcesPath, 'drizzle'))
   const builtinSkillsDir = isDev ? undefined : join(process.resourcesPath, 'resources/skills')
   const codexAppServerPath = resolveDesktopCodexAppServerPath({ isDev, moduleDir: __dirname })
+  const chroniclePath = resolveDesktopChroniclePath({ isDev, moduleDir: __dirname })
   const installedPluginsDir = resolveDesktopInstalledPluginsDir(app.getPath('userData'))
   const externalPluginsDirs = [installedPluginsDir, process.env.CRADLE_EXTERNAL_PLUGINS_DIRS]
   const externalPluginsDirList
@@ -306,16 +549,22 @@ async function spawnServer(opts: {
     CRADLE_DATA_DIR: dataDir,
     CRADLE_VERSION: app.getVersion(),
     CRADLE_CREDENTIAL_SECRET: credentialSecret,
+    ...(managedRelay.relayUrl ? { CRADLE_RELAYD_PUBLIC_URL: managedRelay.relayUrl } : {}),
+    CRADLE_RELAYD_ACCESS_MODE: managedRelay.accessMode,
     CRADLE_DESKTOP_PID: String(process.pid),
     CRADLE_PLUGINS_DIR: pluginsDir,
     CRADLE_PLUGINS_SOURCE_KIND: pluginsSourceKind,
     CRADLE_EXTERNAL_PLUGINS_DIRS: externalPluginsDirList,
     CRADLE_MARKETPLACE_PLUGINS_DIR: installedPluginsDir,
     ...(codexAppServerPath ? { [CODEX_APP_SERVER_PATH_ENV]: codexAppServerPath } : {}),
+    ...(chroniclePath ? { [CHRONICLE_PATH_ENV]: chroniclePath } : {}),
     ...(migrationsDir ? { CRADLE_MIGRATIONS_DIR: migrationsDir } : {}),
     ...(builtinSkillsDir ? { CRADLE_BUILTIN_SKILLS_DIR: builtinSkillsDir } : {}),
     NODE_ENV: isDev ? 'development' : 'production',
     FORCE_COLOR: '1',
+  }
+  if (!managedRelay.relayUrl) {
+    delete serverEnv.CRADLE_RELAYD_PUBLIC_URL
   }
   serverEnv.PATH = await resolveDesktopServerPath(serverEnv)
   delete serverEnv.NO_COLOR
@@ -716,6 +965,77 @@ function getCodexAppServerExecutableName(): string {
   return process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server'
 }
 
+export function resolveDesktopChroniclePath(input: {
+  isDev: boolean
+  moduleDir: string
+  platform?: NodeJS.Platform
+  arch?: string
+  resourcesPath?: string
+  configuredPath?: string
+}): string | undefined {
+  const platform = input.platform ?? process.platform
+  if (platform !== 'darwin') {
+    return undefined
+  }
+
+  const configuredPath = input.configuredPath ?? process.env[CHRONICLE_PATH_ENV]?.trim()
+  if (configuredPath) {
+    if (!existsSync(configuredPath)) {
+      console.warn(
+        `[desktop] Chronicle runtime is unavailable at ${configuredPath}; skipping Chronicle startup.`,
+      )
+      return undefined
+    }
+    return configuredPath
+  }
+
+  const arch = input.arch ?? process.arch
+  const executableName = 'cradle-chronicle'
+  if (!input.isDev) {
+    const resourcesPath = input.resourcesPath ?? process.resourcesPath
+    const bundledPath = join(resourcesPath, 'chronicle', `${platform}-${arch}`, executableName)
+    if (!existsSync(bundledPath)) {
+      console.warn(
+        `[desktop] Chronicle runtime is unavailable at ${bundledPath}; skipping Chronicle startup.`,
+      )
+      return undefined
+    }
+    return bundledPath
+  }
+
+  const candidates = [
+    resolve(
+      input.moduleDir,
+      '../../resources/chronicle',
+      `${platform}-${arch}`,
+      executableName,
+    ),
+    resolve(
+      process.cwd(),
+      'resources/chronicle',
+      `${platform}-${arch}`,
+      executableName,
+    ),
+    resolve(
+      process.cwd(),
+      'apps/desktop/resources/chronicle',
+      `${platform}-${arch}`,
+      executableName,
+    ),
+    resolve(process.cwd(), '../../chronicle/target/release', executableName),
+    resolve(input.moduleDir, '../../../../chronicle/target/release', executableName),
+  ]
+  const runtimePath = candidates.find(candidate => existsSync(candidate))
+  if (!runtimePath) {
+    console.warn(
+      '[desktop] Chronicle development runtime is unavailable; skipping Chronicle startup. '
+      + 'Run `pnpm --filter @cradle/desktop build:chronicle` to enable it.',
+    )
+    return undefined
+  }
+  return runtimePath
+}
+
 function readDesktopCommandPathFallbackSegments(env: NodeJS.ProcessEnv): string[] {
   const home = env.HOME?.trim() || homedir()
   return [
@@ -806,6 +1126,7 @@ export async function stopServer(timeoutMs = 5_000): Promise<void> {
   const child = serverProcess
   if (!child) {
     await stopLocatedServer(timeoutMs)
+    await stopManagedRelay()
     return
   }
 
@@ -825,6 +1146,7 @@ export async function stopServer(timeoutMs = 5_000): Promise<void> {
       timer.unref()
     }),
   ])
+  await stopManagedRelay()
 }
 
 async function stopLocatedServer(timeoutMs: number): Promise<void> {

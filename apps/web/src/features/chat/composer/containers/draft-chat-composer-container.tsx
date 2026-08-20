@@ -15,8 +15,6 @@ import {
 } from '~/features/agent-runtime/use-runtime-catalog'
 import { ComposerToolbar, useComposerState } from '~/features/composer-toolbar'
 import type { ComposerStateResult } from '~/features/composer-toolbar/use-composer-state'
-import { RemoteHostConnectionNotice } from '~/features/remote-hosts/remote-host-connection-notice'
-import { useRemoteHostConnection } from '~/features/remote-hosts/use-remote-host-connection'
 import type { SkillInventoryEntry } from '~/features/skills/types'
 import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { cn } from '~/lib/cn'
@@ -104,9 +102,9 @@ export function DraftChatComposer(props: DraftChatComposerProps) {
   const composerState = useComposerState({
     context: 'new-chat',
     workspaceId: props.workspaceId,
-    remoteHostId: props.remoteHostId,
+    nodeId: props.nodeId,
     // Remote catalogs own providers; local Agents are not executable there.
-    enableAgents: !props.remoteHostId,
+    enableAgents: !props.nodeId,
   })
   return <DraftChatComposerContent {...props} composerState={composerState} />
 }
@@ -117,7 +115,6 @@ export function DraftChatComposerWithState(props: DraftChatComposerContentProps)
 
 function DraftChatComposerContent({
   workspaceId,
-  remoteHostId = null,
   active = true,
   contextBar,
   replaceText,
@@ -147,13 +144,7 @@ function DraftChatComposerContent({
   const placeholderHints = PLACEHOLDER_HINT_KEYS.map(key => t(key))
   const placeholder = useRotatingPlaceholder(placeholderHints, active)
 
-  const remoteConnection = useRemoteHostConnection(remoteHostId)
-  const remoteConnectionBlocked = remoteConnection.isBlocking
-
   const readinessNotice = (() => {
-    if (remoteConnectionBlocked) {
-      return null
-    }
     if (
       composerState.isLoadingAgents
       || composerState.isLoadingAcpAgents
@@ -291,12 +282,11 @@ function DraftChatComposerContent({
     cradleSlashCommands,
   )
   const sendDisabled
-    = remoteConnectionBlocked
-      || (selection.targetMode === 'agent'
-        ? !effectiveAgent || sending
-        : selection.targetMode === 'acp-agent'
-          ? !composerState.effectiveAcpAgent || sending
-          : !effectiveProfile || sending)
+    = selection.targetMode === 'agent'
+      ? !effectiveAgent || sending
+      : selection.targetMode === 'acp-agent'
+        ? !composerState.effectiveAcpAgent || sending
+        : !effectiveProfile || sending
 
   const toolbar = (
     <div className="flex min-w-0 items-center gap-2">
@@ -333,12 +323,11 @@ function DraftChatComposerContent({
     const trimmedText = text.trim()
     const hasDraft = trimmedText.length > 0 || files.length > 0 || contextParts.length > 0
     const canSubmit
-      = !remoteConnectionBlocked
-        && (selection.targetMode === 'agent'
-          ? !!effectiveAgent && (allowEmptySubmit || hasDraft) && !sending
-          : selection.targetMode === 'acp-agent'
-            ? !!composerState.effectiveAcpAgent && hasDraft && !sending
-            : !!effectiveProfile && hasDraft && !sending)
+      = selection.targetMode === 'agent'
+        ? !!effectiveAgent && (allowEmptySubmit || hasDraft) && !sending
+        : selection.targetMode === 'acp-agent'
+          ? !!composerState.effectiveAcpAgent && hasDraft && !sending
+          : !!effectiveProfile && hasDraft && !sending
 
     if (!canSubmit) {
       return false
@@ -565,19 +554,13 @@ function DraftChatComposerContent({
         }}
         />
       )}
-      notice={remoteConnectionBlocked
-        ? (
-            <div className="mt-2">
-              <RemoteHostConnectionNotice gate={remoteConnection.gate} />
-            </div>
-          )
-        : (
-            <DraftChatReadinessNoticeView
-              notice={readinessNotice}
-              onAction={openSettingsSection}
-              testIdPrefix={testIdPrefix}
-            />
-          )}
+      notice={(
+        <DraftChatReadinessNoticeView
+          notice={readinessNotice}
+          onAction={openSettingsSection}
+          testIdPrefix={testIdPrefix}
+        />
+      )}
     />
   )
 }

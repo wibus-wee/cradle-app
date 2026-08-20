@@ -1,205 +1,67 @@
-<p align="center">
-  <img src="../../.github/Cradle.png" alt="Cradle Icon" width="128" />
-  <img src="https://mem.nowledge.co/images/nowledge-mem-logo.webp" alt="Nowledge Icon" width="136" />
-  <h1 align="center"><b>Nowledge Mem for Cradle</b></h1>
-  <p align="center">
-    Official Cradle plugin for connecting agents to Nowledge Mem.
-    <br />
-    <br />
-  </p>
-</p>
+# Nowledge Mem for Cradle
 
+This first-party Cradle plugin registers Nowledge Mem as a streamable HTTP MCP server. Agent runtimes use the MCP tools exposed by Nowledge Mem directly; the plugin does not proxy memory, context, or thread operations through Cradle HTTP routes.
 
-Nowledge Mem gives agents access to persistent memories, saved threads, Working Memory, and context bundles. This plugin exposes those capabilities through Cradle's plugin system without moving memory ownership into Cradle.
+| Component | Entry point | Responsibility |
+| --- | --- | --- |
+| Server plugin | [`src/server.ts`](./src/server.ts) | Registers the MCP server, configuration routes, agent guidance, and uninstall cleanup. |
+| Configuration | [`src/config.ts`](./src/config.ts) | Resolves the MCP endpoint and API key while keeping secrets out of plugin storage and responses. |
+| Settings panel | [`src/web/tabs/config-tab-view.tsx`](./src/web/tabs/config-tab-view.tsx) | Edits the endpoint, encrypted API key, and enabled state through a fixture-friendly View. |
+| Agent guidance | [`SKILL.md`](./SKILL.md) | Teaches runtimes when to use Nowledge Mem MCP tools and which writes require explicit intent. |
 
-## What It Does
+## Runtime Flow
 
-- Reads Nowledge Working Memory.
-- Fetches Context Bundles with `source_app=cradle`.
-- Searches durable memories.
-- Creates explicit memories when requested.
-- Searches, reads, creates, and appends Nowledge threads.
-- Optionally registers Nowledge's streamable HTTP MCP endpoint when configured.
-- Registers a `cradle-plugin-nowledge-mem` skill so agents know how to use the plugin routes (invoke as `/cradle-plugin-nowledge-mem`).
-- Keeps API keys out of plugin storage and public config responses.
+On activation, the plugin reads its configuration and registers one `nowledge-mem` streamable HTTP MCP server with Cradle. Every registration includes `APP: Cradle`; remote API keys are added as an `Authorization: Bearer ...` header at runtime.
 
-## Current Scope
+Cradle then projects the registered MCP server into compatible agent runtimes. Connectivity is established when a runtime invokes a tool, so the settings panel reports registration state rather than claiming that the remote endpoint is reachable.
 
-This is the M0 integration plus the M1.1 direct MCP registration path. Memory use is still explicit and route-driven unless an agent runtime chooses to call the registered MCP tools.
+The only plugin HTTP surface is its Cradle-owned configuration channel:
 
-Supported today:
+```text
+GET /api/plugins/nowledge-mem/config
+PUT /api/plugins/nowledge-mem/config
+```
 
-- Guided read/search/write operations through Cradle plugin routes.
-- Optional default Nowledge space.
-- Optional Nowledge API key via environment or shared plugin config.
-- Optional streamable HTTP MCP registration via `NMEM_MCP_URL` or non-secret plugin config.
-- Focused tests against mocked Nowledge API responses.
-
-Not included yet:
-
-- Automatic pre-turn recall.
-- Automatic session capture.
-- Pre-compaction capture.
-- Provider-neutral tool exposure across runtimes.
-
-Those features need additional Cradle plugin host lifecycle support.
-
-## Installation
-
-This plugin is bundled as a first-party Cradle workspace plugin:
-
-    plugins/nowledge-mem
-
-Build it from the repository root:
-
-    pnpm --filter @cradle/nowledge-mem build
-
-The build writes:
-
-    dist/server.mjs
-    dist/SKILL.md
+These routes configure the adapter itself. They never proxy Nowledge Mem operations.
 
 ## Configuration
 
-By default, the plugin connects to:
+| Setting | Default | Storage and precedence |
+| --- | --- | --- |
+| MCP endpoint | `http://127.0.0.1:14242/mcp/` | Plugin storage, then `NMEM_MCP_URL` shared config or environment. |
+| API key | None | Encrypted plugin secret, then `NMEM_API_KEY` shared config or environment. |
+| Enabled | `true` | Plugin storage. When disabled, no MCP server is registered. |
 
-    http://127.0.0.1:14242
+The settings panel can store or replace the API key in Cradle's encrypted plugin secret store. Public configuration responses expose only `hasApiKey` and whether the active key comes from the plugin secret or environment. Removing a plugin-owned key reveals an environment-provided fallback when one exists.
 
-You can configure the Nowledge endpoint and credentials with environment variables:
+The endpoint must be an absolute `http://` or `https://` URL. Use the exact streamable HTTP MCP endpoint exposed by the target Nowledge Mem instance.
 
-    NMEM_API_URL=http://127.0.0.1:14242
-    NMEM_MCP_URL=http://127.0.0.1:14242/mcp
-    NMEM_API_KEY=...
+## Ownership And Uninstall
 
-The plugin also accepts non-secret configuration through `PUT /config`:
+Cradle owns the endpoint setting, enabled state, and encrypted API key used by this adapter. Nowledge Mem owns all memories, threads, spaces, graph data, and server-side credentials.
 
-- `apiUrl`
-- `mcpUrl`
-- `spaceId`
-- `enabled`
+Confirmed uninstall removes only the Cradle-owned plugin configuration and encrypted key. It does not modify the Nowledge Mem data directory or call Nowledge APIs.
 
-API keys are never written to plugin storage. `GET /config` only returns `hasApiKey`.
+## Agent Behavior
 
-When `mcpUrl` is configured and the plugin is enabled, activation registers a `nowledge-mem` streamable HTTP MCP server. If an API key is available, the runtime-only MCP config includes an `Authorization` header. That header is not written to plugin storage or returned by config routes.
+The bundled `cradle-plugin-nowledge-mem` skill guides agents toward the registered MCP tools. It distinguishes durable memories from full conversation threads and requires explicit user or workflow intent before memory writes, updates, or thread capture.
 
-## Web Panel
-
-The plugin ships its own settings surface registered as the `panel.config` web-panel contribution. It opens from the sidebar and reads/writes the same `/config` route; there is no separate UI storage path.
-
-The panel manages:
-
-- `apiUrl`
-- `mcpUrl`
-- `spaceId`
-- `enabled`
-
-It also surfaces a read-only `hasApiKey` badge. The API key itself is never displayed, edited, or persisted from the UI; it continues to flow through `NMEM_API_KEY` in the environment or shared plugin config. Saving the form issues a single `PUT /config` with the four non-secret fields.
-
-## HTTP Routes
-
-Cradle mounts the plugin under:
-
-    /api/plugins/nowledge-mem
-
-### Status And Config
-
-    GET /status
-    GET /config
-    PUT /config
-
-`GET /status` returns public plugin config and a Nowledge health probe. `PUT /config` updates non-secret settings only.
-
-### Context
-
-    GET /working-memory
-    GET /context-bundle
-
-`GET /context-bundle` always sends `source_app=cradle` upstream. It accepts optional query parameters:
-
-- `agent_id`
-- `host_agent_id`
-- `include_working_memory`
-- `space_id`
-
-### Memories
-
-    GET /memories/search?q=<query>&limit=5
-    POST /memories
-
-Memory search uses `q`, not `query`.
-
-`POST /memories` is an explicit write route. Use it only when the user or workflow asks to save durable information.
-
-### Threads
-
-    GET /threads/search?query=<query>&limit=5
-    GET /threads/:threadId
-    POST /threads
-    POST /threads/:threadId/append
-
-Thread search uses `query`, not `q`.
-
-`POST /threads` defaults `source` to `cradle` when omitted.
-
-## Skill
-
-The plugin registers `SKILL.md` as the `cradle-plugin-nowledge-mem` skill during activation.
-
-The skill teaches agents to:
-
-- start with `/status` when setup or connectivity is unclear;
-- use Working Memory for current briefing context;
-- use memory search for durable facts, preferences, decisions, and procedures;
-- use thread search when prior conversation provenance matters;
-- write memories and append threads only as explicit operations.
+The plugin does not provide automatic pre-turn recall, session capture, pre-compaction capture, or transcript export. Those behaviors require Cradle lifecycle integration beyond MCP registration.
 
 ## Development
 
-Run tests:
+Build the production entries and bundled skill:
 
-    pnpm --filter @cradle/nowledge-mem exec vitest run src/nowledge-client.test.ts src/server.test.ts
+```bash
+pnpm --filter @cradle/nowledge-mem build
+```
 
-Typecheck:
+Run the focused checks:
 
-    pnpm --filter @cradle/nowledge-mem exec tsc --noEmit
+```bash
+pnpm --filter @cradle/nowledge-mem typecheck
+pnpm --filter @cradle/nowledge-mem test
+pnpm exec eslint plugins/nowledge-mem/src plugins/nowledge-mem/vite.config.ts
+```
 
-Build:
-
-    pnpm --filter @cradle/nowledge-mem build
-
-Run host boundary checks:
-
-    pnpm --filter @cradle/server exec vitest run src/plugins/manifest-boundary.test.ts src/plugins/context.test.ts
-
-Lint the plugin:
-
-    pnpm exec eslint plugins/nowledge-mem/src/config.ts plugins/nowledge-mem/src/nowledge-client.ts plugins/nowledge-mem/src/server.ts plugins/nowledge-mem/src/nowledge-client.test.ts plugins/nowledge-mem/src/server.test.ts plugins/nowledge-mem/vite.config.ts
-
-## Ownership Model
-
-Nowledge owns:
-
-- memories
-- threads
-- spaces
-- graph data
-- remote credentials
-
-Cradle owns:
-
-- this plugin package
-- plugin route and skill registration
-- optional plugin-owned MCP registration
-- plugin-local non-secret configuration
-
-The plugin does not write into `~/.nowledge-mem`, Chronicle tables, `~/.agents/skills`, or any other external product namespace.
-
-## Roadmap
-
-The next milestone is host lifecycle support for native-feeling memory:
-
-- plugin-safe pre-turn context injection
-- after-assistant-final capture hooks
-- transcript export for plugins
-- provider-neutral tool exposure beyond runtimes that support streamable HTTP MCP directly
-- provider-neutral compaction lifecycle
+The build produces `dist/server.mjs`, `dist/web.mjs`, and `dist/SKILL.md`.

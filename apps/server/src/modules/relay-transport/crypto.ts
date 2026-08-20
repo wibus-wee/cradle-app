@@ -10,7 +10,7 @@ import { utf8ToBytes } from '@noble/hashes/utils.js'
 import { AppError } from '../../errors/app-error'
 
 /**
- * End-to-end crypto for the relay tunnel:
+ * End-to-end crypto for one Fabric Session:
  *
  * - X25519 ECDH (`@noble/curves`) for key agreement.
  * - HKDF-SHA512 (`@noble/hashes`) with a distinct `info` label per key.
@@ -20,10 +20,10 @@ import { AppError } from '../../errors/app-error'
  *   materially higher throughput. Fresh random nonces avoid counter state
  *   across reconnects.
  *
- * relayd never sees any of this: it forwards opaque `relay_data_frame` blobs.
+ * relayd never sees any of this: it forwards opaque Fabric envelope payloads.
  */
 
-const HKDF_INFO_PREFIX = 'cradle/relay/v2'
+const HKDF_INFO_PREFIX = 'cradle/fabric/session/v1'
 const KEY_BYTES = 32
 const XCHACHA_NONCE_BYTES = 24
 const AES_GCM_NONCE_BYTES = 12
@@ -32,18 +32,18 @@ const XCHACHA_ALGORITHM_BIT = 0x80
 const NATIVE_AES_MIN_PLAINTEXT_BYTES = 1024
 
 /** Roles for key derivation: each direction's key is tagged with the sender. */
-export type RelayCryptoRole = 'host' | 'controller'
+export type FabricSessionRole = 'node' | 'controller'
 
 export const RELAY_CRYPTO_ALG = 'xchacha20poly1305-small+aes-256-gcm-bulk'
 
-export interface RelayKeyPair {
+export interface FabricSessionKeyPair {
   /** X25519 private key (raw 32 bytes, base64). Safe to persist as a managed secret. */
   privateKeyBase64: string
   /** X25519 public key (raw 32 bytes, base64). Shared over the wire. */
   publicKeyBase64: string
 }
 
-export function generateRelayKeyPair(): RelayKeyPair {
+export function generateFabricSessionKeyPair(): FabricSessionKeyPair {
   const privateKey = x25519.utils.randomPrivateKey()
   const publicKey = x25519.scalarMultBase(privateKey)
   return {
@@ -74,7 +74,7 @@ export function publicKeyFromPrivate(privateKeyBase64: string): string {
  * Compute the X25519 shared secret from our private key and the peer's raw
  * public key (base64, 32 bytes). Returns 32 raw bytes.
  */
-export function computeRelaySharedSecret(
+export function computeFabricSharedSecret(
   ourPrivateKeyBase64: string,
   peerPublicKeyBase64: string,
 ): Uint8Array {
@@ -100,75 +100,49 @@ export function computeRelaySharedSecret(
 }
 
 /**
- * Derive traffic keys + pairing-confirm key from an ECDH secret. Each key is a
- * separate HKDF extract+expand with a distinct `info` label, so the keys are
- * cryptographically independent. The pairing code is the HKDF salt — both sides
- * must know it to derive identical keys, which is what the `confirm` HMAC in
- * the `hello` frame proves before keys are pinned.
+ * Derive independent directional traffic keys from the ECDH secret and the
+ * authenticated Fabric route. The route context prevents key reuse across
+ * Fabric links while the certificates bind the public keys to their peers.
  */
-export interface RelayDerivedKeys {
-  hostSendKey: Uint8Array
+export interface FabricSessionKeys {
+  nodeSendKey: Uint8Array
   controllerSendKey: Uint8Array
-  confirmKey: Uint8Array
 }
 
-function deriveKey(secret: Uint8Array, pairingCode: string, label: string): Uint8Array {
+export interface FabricSessionContext {
+  fabricId: string
+  linkId: string
+}
+
+function deriveKey(secret: Uint8Array, context: FabricSessionContext, label: string): Uint8Array {
   return hkdf(
     sha512,
     secret,
-    utf8ToBytes(pairingCode),
+    utf8ToBytes(`${context.fabricId}\u0000${context.linkId}`),
     utf8ToBytes(`${HKDF_INFO_PREFIX}/${label}`),
     KEY_BYTES,
   )
 }
 
-export function deriveRelayKeys(sharedSecret: Uint8Array, pairingCode: string): RelayDerivedKeys {
+export function deriveFabricSessionKeys(sharedSecret: Uint8Array, context: FabricSessionContext): FabricSessionKeys {
   return {
-    hostSendKey: deriveKey(sharedSecret, pairingCode, 'host-send'),
-    controllerSendKey: deriveKey(sharedSecret, pairingCode, 'controller-send'),
-    confirmKey: deriveKey(sharedSecret, pairingCode, 'confirm'),
+    nodeSendKey: deriveKey(sharedSecret, context, 'node-send'),
+    controllerSendKey: deriveKey(sharedSecret, context, 'controller-send'),
   }
 }
 
 /** Send key for a given role (the peer decrypts with the same key). */
-export function sendKeyForRole(keys: RelayDerivedKeys, role: RelayCryptoRole): Uint8Array {
-  return role === 'host' ? keys.hostSendKey : keys.controllerSendKey
+export function sendKeyForRole(keys: FabricSessionKeys, role: FabricSessionRole): Uint8Array {
+  return role === 'node' ? keys.nodeSendKey : keys.controllerSendKey
 }
 
 /** Receive key for a given role = the other role's send key. */
-export function receiveKeyForRole(keys: RelayDerivedKeys, role: RelayCryptoRole): Uint8Array {
-  return role === 'host' ? keys.controllerSendKey : keys.hostSendKey
-}
-
-/**
- * Compute the `confirm` value for a `hello_confirm` frame. The transcript is
- * role-tagged so both peers compute the identical value regardless of which
- * side they are:
- *   "controller" || controllerPub || "host" || hostPub || sharedSecret
- * A relay MITM that substitutes public keys during pairing breaks the ECDH
- * secret, and thus the confirmKey and confirm, so the honest peer rejects.
- */
-export function computeRelayConfirm(opts: {
-  confirmKey: Uint8Array
-  controllerPublicKeyBase64: string
-  hostPublicKeyBase64: string
-  sharedSecret: Uint8Array
-}): string {
-  const controllerPub = base64ToBytes(opts.controllerPublicKeyBase64)
-  const hostPub = base64ToBytes(opts.hostPublicKeyBase64)
-  const parts: Uint8Array[] = [
-    utf8ToBytes('controller'),
-    controllerPub,
-    utf8ToBytes('host'),
-    hostPub,
-    opts.sharedSecret,
-  ]
-  const transcript = concatBytes(...parts)
-  return bytesToBase64(hmac(sha512, opts.confirmKey, transcript))
+export function receiveKeyForRole(keys: FabricSessionKeys, role: FabricSessionRole): Uint8Array {
+  return role === 'node' ? keys.controllerSendKey : keys.nodeSendKey
 }
 
 /** Short hex fingerprint of a public key, for display and pinning checks. */
-export function relayPublicKeyFingerprint(publicKeyBase64: string): string {
+export function fabricPublicKeyFingerprint(publicKeyBase64: string): string {
   const raw = base64ToBytes(publicKeyBase64)
   // SHA-256 of the raw public key, hex, truncated for human display.
   const tag = hmac(sha512, utf8ToBytes('cradle-relay-fp'), raw)
@@ -179,7 +153,7 @@ export function relayPublicKeyFingerprint(publicKeyBase64: string): string {
  * Stateful encryptor for one direction of the tunnel. Each frame carries its
  * random nonce so reconnects can safely reuse the long-lived derived key.
  */
-export class RelayCipher {
+export class FabricSessionCipher {
   private readonly key: Uint8Array
   private readonly nativeBulkEnabled: boolean
 
@@ -195,7 +169,7 @@ export class RelayCipher {
     this.nativeBulkEnabled = nativeBulkEnabled
   }
 
-  /** Encrypt a frame with the latency- or throughput-optimized V2 AEAD. */
+  /** Encrypt a frame with the latency- or throughput-optimized Fabric AEAD. */
   encrypt(plaintext: Uint8Array): Uint8Array {
     if (plaintext.byteLength < NATIVE_AES_MIN_PLAINTEXT_BYTES || !this.nativeBulkEnabled) {
       const nonce = randomBytes(XCHACHA_NONCE_BYTES)

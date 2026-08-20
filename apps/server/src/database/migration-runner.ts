@@ -1,3 +1,5 @@
+import { dirname } from 'node:path'
+
 import { databaseMaintenanceTasks } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
@@ -7,6 +9,7 @@ import type { ServerBootstrapReporter } from '../bootstrap-lifecycle'
 import type { Logger } from '../logging/logger'
 import type { DatabaseConfig } from './database.config'
 import type { DbProvider } from './database.provider'
+import { runLegacyRemoteNetworkCleanup } from './legacy-remote-network-cleanup'
 
 const ErrorCauseCarrierSchema = z
   .object({
@@ -33,6 +36,10 @@ export class MigrationRunner {
     const { dbPath, migrationsDir } = this.config.getOptions()
 
     try {
+      // One-time legacy remote network cleanup (plan 076 M5). Must finish —
+      // including its export — before Drizzle runs the migration that drops
+      // the legacy tables; any failure aborts startup here.
+      runLegacyRemoteNetworkCleanup(db, dirname(dbPath), this.logger)
       // Always migrate — optional chaining on runSync would skip migrate when
       // bootstrapReporter is absent (export-openapi, early db() from services).
       const runMigrate = () => {

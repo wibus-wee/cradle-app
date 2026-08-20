@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  getRemoteHostId,
-  isRemoteHostExecution,
+  getSessionNodeId,
+  isNodeExecution,
   readSessionExecution,
 } from './session-execution'
 
@@ -10,20 +10,20 @@ describe('session-execution', () => {
   it('treats missing execution as local', () => {
     expect(readSessionExecution(null)).toEqual({ kind: 'local' })
     expect(readSessionExecution({})).toEqual({ kind: 'local' })
-    expect(isRemoteHostExecution({ execution: { kind: 'local' } })).toBe(false)
-    expect(getRemoteHostId({ execution: { kind: 'local' } })).toBeNull()
+    expect(isNodeExecution({ execution: { kind: 'local' } })).toBe(false)
+    expect(getSessionNodeId({ execution: { kind: 'local' } })).toBeNull()
   })
 
-  it('reads remote-host execution metadata', () => {
+  it('reads node execution metadata', () => {
     const session = {
       execution: {
-        kind: 'remote-host',
-        hostId: 'host-1',
+        kind: 'node',
+        nodeId: 'node-1',
         remoteSessionId: 'remote-session-1',
       },
     }
-    expect(isRemoteHostExecution(session)).toBe(true)
-    expect(getRemoteHostId(session)).toBe('host-1')
+    expect(isNodeExecution(session)).toBe(true)
+    expect(getSessionNodeId(session)).toBe('node-1')
     expect(readSessionExecution(session)).toEqual(session.execution)
   })
 })

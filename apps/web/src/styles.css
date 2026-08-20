@@ -13,6 +13,7 @@
 }
 
 @source "../../../plugins/system-info/src/**/*.tsx";
+@source "../../../packages/artifact/src/**/*.{ts,tsx}";
 @import "@fontsource-variable/geist";
 @import "@cradle/streamdown/styles";
 
@@ -106,6 +107,18 @@ body {
 
 *::-webkit-scrollbar {
   display: none;
+}
+
+/* Node list row entrance: subtle rise + fade, staggered via animation-delay */
+@keyframes node-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Dot grid shimmer sweep */

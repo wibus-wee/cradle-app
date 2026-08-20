@@ -70,7 +70,7 @@ const GlobalSearchWorkspaceListSchema = z
       id: z.string(),
       name: z.string(),
       locator: z.object({
-        hostId: z.string(),
+        nodeId: z.string(),
         path: z.string(),
         kind: z.enum(['project', 'managed-worktree']).optional(),
         sourceWorkspaceId: z.string().nullable().optional(),

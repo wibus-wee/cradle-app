@@ -307,6 +307,7 @@ export function activate(ctx: ServerPluginContext): void {
     command: 'node',
     args: [resolve(__dirname, 'mcp-server.mjs')],
     env: { MY_CONFIG: 'value' },
+    scope: 'chat-session',
     when: () => !!ctx.sharedConfig.get('MY_FEATURE_ENABLED'),
   })
 
@@ -333,6 +334,8 @@ export function activate(ctx: ServerPluginContext): void {
 
 Server registrations return `Disposable` handles and are also tracked in `ctx.subscriptions`. Use namespace APIs such as `ctx.routes.register`, `ctx.mcp.registerServer`, `ctx.skills.register`, `ctx.providers.externalSources.register`, `ctx.providers.extensions.register`, and `ctx.runtimes.register`. When `when` is asynchronous, await the result if later initialization depends on the MCP server being registered.
 
+Use `scope: 'chat-session'` when a tool acts on session-owned state. Cradle omits that MCP server from runtimes that cannot provide an immutable invocation binding. For stdio transports, the host injects `CRADLE_CHAT_SESSION_ID`; for HTTP transports, it injects `x-cradle-chat-session-id`. Plugins must read this host-owned context instead of accepting a session identifier from model-controlled tool arguments.
+
 **`McpServerConfig` fields:**
 
 | Field | Type | Description |
@@ -344,6 +347,7 @@ Server registrations return `Disposable` handles and are also tracked in `ctx.su
 | `env` | `Record<string, string>` | Stdio-only optional environment variables |
 | `url` | `string` | Streamable HTTP-only MCP endpoint URL |
 | `headers` | `Record<string, string>` | Streamable HTTP-only optional request headers; may contain secrets |
+| `scope` | `'global' \| 'chat-session'` | Defaults to `global`; session scope requires host-bound invocation context |
 | `when` | `() => boolean \| Promise<boolean>` | Optional predicate — skips registration if returns `false` |
 
 ### `ctx.skills.register(skill)` — Skill Registration
@@ -941,8 +945,8 @@ export function activate(ctx: DesktopPluginContext): void {
   ctx.sharedConfig.set('MY_SECRET', process.env.MY_API_KEY ?? '')
 
   // Listen for webview creation
-  ctx.webviews.onCreated((webview, tabId) => {
-    ctx.logger.info(`Webview created: ${tabId}`)
+  ctx.webviews.onCreated((webview, tabId, ownerId) => {
+    ctx.logger.info(`Webview created: ${ownerId}/${tabId}`)
     webview.cdp.attach('1.3')
     void webview.cdp.sendCommand('Runtime.enable')
   })
@@ -974,36 +978,37 @@ The value is passed as environment variable `CRADLE_PLUGIN_BROWSER_BACKEND_SOCKE
 Called whenever a new webview (tab) is created in the Electron renderer:
 
 ```ts
-ctx.webviews.onCreated((webview, tabId) => {
+ctx.webviews.onCreated((webview, tabId, ownerId) => {
   webview.cdp.attach('1.3')
   void webview.cdp.sendCommand('Runtime.enable')
-  ctx.logger.info(`${tabId}: ${webview.getUrl()}`)
+  ctx.logger.info(`${ownerId}/${tabId}: ${webview.getUrl()}`)
 })
 ```
 
-The handler receives the SDK-owned `DesktopWebview` facade instead of a direct Electron object. The facade exposes navigation, URL/title lookup, PNG capture, close, destroyed event subscription, and a CDP session. Returns a `Disposable` for cleanup.
+The handler receives the SDK-owned `DesktopWebview` facade instead of a direct Electron object. `webview.ownerId` identifies the browser-panel owner and must be retained alongside `tabId`; tab IDs alone are not an ownership boundary. The facade exposes navigation, URL/title lookup, PNG capture, close, destroyed event subscription, and a CDP session. Returns a `Disposable` for cleanup.
 
 ### Browser Panel Tab Bridge
 
-Desktop plugins can ask the active renderer to create, activate, or inspect Cradle's visible browser panel tabs. This is useful for plugins that own a browser automation backend and need to keep backend webview IDs mapped to renderer tab IDs.
+Desktop plugins can create, activate, hide, or inspect Cradle browser-panel tabs for an explicit owner. This is useful for plugins that own a browser automation backend and need to keep backend webview IDs mapped to browser owners and tab IDs.
 
 ```ts
-const rendererTabId = await ctx.browserTabs.request('https://example.com')
+const ownerId = 'chat:session-id'
+const rendererTabId = await ctx.browserTabs.request(ownerId, 'https://example.com')
 if (!rendererTabId) {
   throw new Error('Browser panel tab was not created')
 }
 
-const activated = await ctx.browserTabs.activate(rendererTabId)
-const hidden = await ctx.browserTabs.goOffScreen(rendererTabId)
-const activeTabId = await ctx.browserTabs.getActive()
+const activated = await ctx.browserTabs.activate(ownerId, rendererTabId)
+const hidden = await ctx.browserTabs.goOffScreen(ownerId, rendererTabId)
+const activeTabId = await ctx.browserTabs.getActive(ownerId)
 ```
 
 | Method | Description |
 |--------|-------------|
-| `browserTabs.request(url?)` | Creates a visible browser panel tab in the active renderer and returns its renderer tab ID. |
-| `browserTabs.activate(tabId)` | Opens the browser panel and activates an existing renderer tab. Returns `false` when the renderer does not know the tab. |
-| `browserTabs.goOffScreen(tabId?)` | Hides the browser panel without closing tabs. Returns `false` when a provided tab ID is unknown. |
-| `browserTabs.getActive()` | Returns the active renderer browser panel tab ID, if one is available. |
+| `browserTabs.request(ownerId, url?)` | Creates a browser panel tab for the owner and returns its renderer tab ID. |
+| `browserTabs.activate(ownerId, tabId)` | Activates an owner-scoped tab. Returns `false` when that owner does not contain the tab. |
+| `browserTabs.goOffScreen(ownerId, tabId?)` | Hides the owner's panel without closing tabs. Returns `false` when that owner does not contain a provided tab ID. |
+| `browserTabs.getActive(ownerId)` | Returns the owner's active browser panel tab ID, if one is available. |
 
 ### `ctx.userDataPath` — Electron User Data
 
@@ -1316,6 +1321,7 @@ interface StdioMcpServerConfig {
   command: string
   args: string[]
   env?: Record<string, string>
+  scope?: 'global' | 'chat-session'
   when?: () => boolean | Promise<boolean>
 }
 
@@ -1324,6 +1330,7 @@ interface StreamableHttpMcpServerConfig {
   name: string
   url: string
   headers?: Record<string, string>
+  scope?: 'global' | 'chat-session'
   when?: () => boolean | Promise<boolean>
 }
 
@@ -1448,10 +1455,11 @@ interface DesktopPluginContext {
 }
 
 interface DesktopPluginWebviewRegistry {
-  onCreated(handler: (webview: DesktopWebview, tabId: string) => void): Disposable
+  onCreated(handler: (webview: DesktopWebview, tabId: string, ownerId: string) => void): Disposable
 }
 
 interface DesktopWebview {
+  readonly ownerId: string
   readonly tabId: string
   isDestroyed(): boolean
   navigate(url: string): Promise<void>
@@ -1471,10 +1479,10 @@ interface DesktopWebviewCdpSession {
 }
 
 interface DesktopPluginBrowserTabBridge {
-  request(url?: string): Promise<string | undefined>
-  activate(tabId: string): Promise<boolean>
-  goOffScreen(tabId?: string): Promise<boolean>
-  getActive(): Promise<string | undefined>
+  request(ownerId: string, url?: string): Promise<string | undefined>
+  activate(ownerId: string, tabId: string): Promise<boolean>
+  goOffScreen(ownerId: string, tabId?: string): Promise<boolean>
+  getActive(ownerId: string): Promise<string | undefined>
 }
 
 interface DesktopPluginSharedConfigRegistry {
@@ -1898,6 +1906,7 @@ export function activate(ctx: ServerPluginContext): void {
       command: 'node',
       args: [resolve(__dirname, 'mcp-server.mjs')],
       env: { MY_TOOL_SOCKET: socketPath },
+      scope: 'chat-session',
     })
   }
 
