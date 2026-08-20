@@ -21,6 +21,7 @@ export type ClaudeAgentPermissionMode = typeof CLAUDE_AGENT_PERMISSION_MODES[num
 
 const CODEX_ACCESS_MODES = ['approval-required', 'full-access'] as const
 const CODEX_INTERACTION_MODES = ['default', 'plan'] as const
+const CODEX_SERVICE_TIERS = ['fast'] as const
 
 const CLAUDE_AGENT_SETTINGS_SCHEMA: RuntimeSettingsSchemaLike = {
   type: 'object',
@@ -135,6 +136,7 @@ const RUNTIME_SETTINGS_REGISTRY: Partial<Record<RuntimeKind, RuntimeSettingsRegi
     fields: [
       { key: 'accessMode', allowed: CODEX_ACCESS_MODES },
       { key: 'interactionMode', allowed: CODEX_INTERACTION_MODES },
+      { key: 'serviceTier', allowed: CODEX_SERVICE_TIERS },
     ],
   }),
   'kimi': createProductSettingsEntry({
@@ -222,10 +224,12 @@ export function readCodexLikeRuntimeSettings(
 ): {
   accessMode: 'approval-required' | 'full-access'
   interactionMode: 'default' | 'plan'
+  serviceTier: 'fast' | null
 } {
   const accessMode = settings?.accessMode === 'approval-required' ? 'approval-required' : 'full-access'
   const interactionMode = settings?.interactionMode === 'plan' ? 'plan' : 'default'
-  return { accessMode, interactionMode }
+  const serviceTier = settings?.serviceTier === 'fast' ? 'fast' : null
+  return { accessMode, interactionMode, serviceTier }
 }
 
 /** One-time read migration from pre-provider-native Cradle 2D settings. */

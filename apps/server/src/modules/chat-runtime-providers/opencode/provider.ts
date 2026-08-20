@@ -257,6 +257,7 @@ export class OpencodeProvider implements ChatRuntime {
         modelLabel: providerModel?.modelID ?? modelId,
         modelProvider: providerModel?.providerID ?? null,
         serviceTier: null,
+        serviceTiers: [],
         supportsImages: null,
         supportsWebSearch: null,
         supportsNamespaceTools: null,
