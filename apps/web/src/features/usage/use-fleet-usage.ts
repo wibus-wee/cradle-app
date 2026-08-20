@@ -1,4 +1,4 @@
-// Loads the full usage surface from every online Fabric node via the upstream
+// Loads the full usage surface from every remote online Fabric node via the upstream
 // proxy and merges it with this device's local data into a FleetUsage model.
 // Remote nodes expose the same Usage API (same server), so the generated
 // response types are reused directly. Range-scoped endpoints (summary / cost
@@ -20,8 +20,9 @@ import type {
   GetUsageSummaryResponse,
   GetUsageToolsResponse,
 } from '~/api-gen/types.gen'
+import type { FabricNode } from '~/features/nodes/types'
 import { fetchNodeUpstreamJson, nodeUpstreamQueryKey } from '~/features/nodes/upstream-fetch'
-import { useNodes } from '~/features/nodes/use-nodes'
+import { useFabricMembership, useNodes } from '~/features/nodes/use-nodes'
 
 import type { FleetDeviceUsage, FleetUsage } from './usage-fleet'
 import { LOCAL_DEVICE_KEY } from './usage-fleet'
@@ -42,6 +43,11 @@ interface RemoteUsageSeries {
   costSummary: GetUsageCostSummaryResponse
   tools: GetUsageToolsResponse
   performance: GetUsagePerformanceResponse
+}
+
+/** A Fabric directory includes this device; its usage is already supplied locally. */
+export function remoteFleetNodes(nodes: readonly FabricNode[], localNodeId: string | null | undefined): FabricNode[] {
+  return localNodeId ? nodes.filter(node => node.nodeId !== localNodeId) : []
 }
 
 async function fetchRemoteUsageSeries(nodeId: string, from: string, signal: AbortSignal): Promise<RemoteUsageSeries> {
@@ -67,9 +73,15 @@ async function fetchRemoteUsageSeries(nodeId: string, from: string, signal: Abor
  */
 export function useFleetUsage(local: LocalUsageSeries, range: UsageRangeKey, enabled: boolean): FleetUsage | null {
   const { t } = useTranslation('usage')
+  const membershipQuery = useFabricMembership(enabled)
   const nodesQuery = useNodes(enabled)
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
-  const onlineNodes = useMemo(() => nodes.filter(node => node.status === 'online'), [nodes])
+  const localNodeId = membershipQuery.data?.localNodeId
+  const remoteNodes = useMemo(
+    () => remoteFleetNodes(nodes, localNodeId),
+    [localNodeId, nodes],
+  )
+  const onlineNodes = useMemo(() => remoteNodes.filter(node => node.status === 'online'), [remoteNodes])
 
   // Same rangeFrom contract as useUsageOverview (bare YYYY-MM-DD date).
   const rangeFrom = useMemo(() => {
@@ -90,7 +102,7 @@ export function useFleetUsage(local: LocalUsageSeries, range: UsageRangeKey, ena
   })
 
   return useMemo(() => {
-    if (!enabled || nodes.length === 0) {
+    if (!enabled || !localNodeId || remoteNodes.length === 0) {
       return null
     }
 
@@ -107,7 +119,7 @@ export function useFleetUsage(local: LocalUsageSeries, range: UsageRangeKey, ena
     const unavailable: FleetUsage['unavailable'] = []
     let isLoading = false
 
-    nodes.forEach((node) => {
+    remoteNodes.forEach((node) => {
       if (node.status !== 'online') {
         unavailable.push({ key: node.nodeId, label: node.displayName, platform: node.platform, status: 'offline' })
         return
@@ -135,5 +147,5 @@ export function useFleetUsage(local: LocalUsageSeries, range: UsageRangeKey, ena
     })
 
     return { devices, unavailable, isLoading, merged: mergeFleetUsage(devices) }
-  }, [enabled, nodes, onlineNodes, remoteQueries, local, t])
+  }, [enabled, localNodeId, remoteNodes, onlineNodes, remoteQueries, local, t])
 }

@@ -33,8 +33,8 @@ import type { FabricNode, FabricNodeInvitation } from './types'
 import { nodeUpstreamQueryOptions } from './upstream-fetch'
 
 /** This device's Fabric membership, or `null` when unenrolled. */
-export function useFabricMembership() {
-  return useQuery({ ...getFabricOptions(), staleTime: 30_000 })
+export function useFabricMembership(enabled = true) {
+  return useQuery({ ...getFabricOptions(), enabled, staleTime: 30_000 })
 }
 
 /** Current Relay endpoint used when creating the first Fabric. */
