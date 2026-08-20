@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import { useResolvedThemeMode } from '~/store/theme'
 
@@ -13,23 +13,45 @@ export function UsageDashboard() {
   const [range, setRange] = useState<UsageRangeKey>('30d')
   const usage = useUsageOverview(range)
   const themeMode = useResolvedThemeMode()
-  const fleet = useFleetUsage(
-    { daily: usage.daily, dailyByModel: usage.dailyByModel, dailyCost: usage.dailyCost },
-    usage.usageReady,
-  )
+
+  const localSeries = useMemo(() => ({
+    daily: usage.daily,
+    dailyByModel: usage.dailyByModel,
+    dailyCost: usage.dailyCost,
+    hourly: usage.hourly,
+    costEfficiency: usage.costEfficiency,
+    summary: usage.summary,
+    costSummary: usage.costSummary,
+    tools: usage.tools,
+    performance: usage.performance,
+  }), [
+    usage.daily,
+    usage.dailyByModel,
+    usage.dailyCost,
+    usage.hourly,
+    usage.costEfficiency,
+    usage.summary,
+    usage.costSummary,
+    usage.tools,
+    usage.performance,
+  ])
+  const fleet = useFleetUsage(localSeries, range, usage.usageReady)
+  // With a Fabric fleet every surface shows fleet-wide merged data; without
+  // one the View receives this device's local data untouched.
+  const merged = fleet?.merged ?? null
 
   return (
     <UsageDashboardView
-      daily={usage.daily}
-      dailyByModel={usage.dailyByModel}
-      hourly={usage.hourly}
-      summary={usage.summary}
-      stats={usage.stats}
-      costSummary={usage.costSummary}
-      dailyCost={usage.dailyCost}
-      tools={usage.tools}
-      costEfficiency={usage.costEfficiency}
-      performance={usage.performance}
+      daily={merged?.daily ?? usage.daily}
+      dailyByModel={merged?.dailyByModel ?? usage.dailyByModel}
+      hourly={merged?.hourly ?? usage.hourly}
+      summary={merged?.summary ?? usage.summary}
+      stats={merged?.stats ?? usage.stats}
+      costSummary={merged?.costSummary ?? usage.costSummary}
+      dailyCost={merged?.dailyCost ?? usage.dailyCost}
+      tools={merged?.tools ?? usage.tools}
+      costEfficiency={merged?.costEfficiency ?? usage.costEfficiency}
+      performance={merged?.performance ?? usage.performance}
       fleet={fleet}
       usageReady={usage.usageReady}
       range={range}
