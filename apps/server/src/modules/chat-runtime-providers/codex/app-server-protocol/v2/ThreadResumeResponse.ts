@@ -45,16 +45,16 @@ multiAgentMode: MultiAgentMode,
  */
 initialTurnsPage: TurnsPage | null,
 /**
- * Opaque head cursor for hydrating paginated turns backwards.
+ * Opaque cursor for hydrating paginated turns backwards.
  *
  * Pass this as `cursor` to `thread/turns/list` with
- * `sortDirection: "desc"`. The first page includes the cursor's head turn.
+ * `sortDirection: "desc"`. The first page includes the turn identified by the cursor.
  */
 turnsBackwardsCursor: string | null,
 /**
- * Opaque head cursor for hydrating paginated items backwards.
+ * Opaque cursor for hydrating paginated items backwards.
  *
  * Pass this as `cursor` to `thread/items/list` with
- * `sortDirection: "desc"`. The first page includes the cursor's head item.
+ * `sortDirection: "desc"`. The first page includes the item identified by the cursor.
  */
 itemsBackwardsCursor: string | null, };

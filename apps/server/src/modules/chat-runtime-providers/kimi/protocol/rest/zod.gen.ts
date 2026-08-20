@@ -6,6 +6,14 @@ export const zGetBy__Path = z.object({
     '*': z.string()
 });
 
+export const zGetCapabilityPath = z.object({
+    capability_id: z.string().min(1)
+});
+
+export const zInstallCapabilityPath = z.object({
+    tail: z.string().min(1)
+});
+
 export const zGetCatalogProviderPath = z.object({
     catalog_id: z.string().min(1)
 });
@@ -27,6 +35,7 @@ export const zPostApiV1ConfigBody = z.object({
     providers: z.record(z.string(), z.unknown()).optional(),
     secondary_model: z.unknown().optional(),
     services: z.unknown().optional(),
+    subagent: z.unknown().optional(),
     telemetry: z.boolean().optional(),
     thinking: z.unknown().optional(),
     yolo: z.boolean().optional()
@@ -101,6 +110,14 @@ export const zGetApiV1OauthUsageQuery = z.object({
 
 export const zGetApiV1OauthUserinfoQuery = z.object({
     provider: z.string().min(1).optional()
+});
+
+export const zInstallPluginBody = z.object({
+    source: z.string().min(1)
+});
+
+export const zPluginActionPath = z.object({
+    tail: z.string().min(1)
 });
 
 export const zCreateProviderBody = z.object({
@@ -419,8 +436,17 @@ export const zDownloadFilePath = z.object({
     '*': z.string()
 });
 
+export const zDownloadFileQuery = z.object({
+    runtime_id: z.string().min(1).optional()
+});
+
 export const zGetApiV1SessionsBySessionIdGoalPath = z.object({
     session_id: z.string().min(1)
+});
+
+export const zGetApiV1SessionsBySessionIdMediaByFileIdPath = z.object({
+    session_id: z.string().min(1),
+    file_id: z.string().min(1)
 });
 
 export const zGetApiV1SessionsBySessionIdMessagesPath = z.object({
@@ -533,6 +559,10 @@ export const zSubmitPromptBody = z.object({
                 z.object({
                     file_id: z.string().min(1),
                     kind: z.enum(['file'])
+                }),
+                z.object({
+                    file_id: z.string().min(1),
+                    kind: z.enum(['session_media'])
                 })
             ]),
             type: z.enum(['image'])
@@ -552,6 +582,10 @@ export const zSubmitPromptBody = z.object({
                 z.object({
                     file_id: z.string().min(1),
                     kind: z.enum(['file'])
+                }),
+                z.object({
+                    file_id: z.string().min(1),
+                    kind: z.enum(['session_media'])
                 })
             ]),
             type: z.enum(['video'])
@@ -585,6 +619,11 @@ export const zSubmitPromptBody = z.object({
     ]).optional(),
     plan_mode: z.boolean().optional(),
     profile: z.string().min(1).optional(),
+    prompt_id: z.string().min(1).optional(),
+    skills: z.array(z.object({
+        args: z.string().optional(),
+        name: z.string().min(1)
+    })).min(1).optional(),
     swarm_mode: z.boolean().optional(),
     thinking: z.string().min(1).optional()
 });
@@ -651,12 +690,79 @@ export const zPostApiV1SessionsBySessionIdQuestionsByTailPath = z.object({
     tail: z.string().min(1)
 });
 
+export const zGetApiV1SessionsBySessionIdRuntimePath = z.object({
+    session_id: z.string().min(1)
+});
+
+export const zPostApiV1SessionsBySessionIdRuntimeBody = z.object({
+    runtime_id: z.string().min(1)
+});
+
+export const zPostApiV1SessionsBySessionIdRuntimePath = z.object({
+    session_id: z.string().min(1)
+});
+
 export const zListSkillsPath = z.object({
     session_id: z.string().min(1)
 });
 
 export const zActivateSkillBody = z.object({
-    args: z.string().optional()
+    args: z.string().optional(),
+    attachments: z.array(z.union([
+        z.object({
+            source: z.union([
+                z.object({
+                    id: z.string().min(1).optional(),
+                    kind: z.enum(['url']),
+                    url: z.string().min(1)
+                }),
+                z.object({
+                    data: z.string().min(1),
+                    kind: z.enum(['base64']),
+                    media_type: z.string().min(1)
+                }),
+                z.object({
+                    file_id: z.string().min(1),
+                    kind: z.enum(['file'])
+                }),
+                z.object({
+                    file_id: z.string().min(1),
+                    kind: z.enum(['session_media'])
+                })
+            ]),
+            type: z.enum(['image'])
+        }),
+        z.object({
+            source: z.union([
+                z.object({
+                    id: z.string().min(1).optional(),
+                    kind: z.enum(['url']),
+                    url: z.string().min(1)
+                }),
+                z.object({
+                    data: z.string().min(1),
+                    kind: z.enum(['base64']),
+                    media_type: z.string().min(1)
+                }),
+                z.object({
+                    file_id: z.string().min(1),
+                    kind: z.enum(['file'])
+                }),
+                z.object({
+                    file_id: z.string().min(1),
+                    kind: z.enum(['session_media'])
+                })
+            ]),
+            type: z.enum(['video'])
+        }),
+        z.object({
+            file_id: z.string().min(1),
+            media_type: z.string().min(1),
+            name: z.string(),
+            size: z.int().gte(0).lte(9007199254740991),
+            type: z.enum(['file'])
+        })
+    ])).optional()
 });
 
 export const zActivateSkillPath = z.object({
@@ -708,6 +814,7 @@ export const zPostApiV1SessionsBySessionIdTerminalsBody = z.object({
     cols: z.int().lte(9007199254740991).optional(),
     cwd: z.string().min(1).optional(),
     rows: z.int().lte(9007199254740991).optional(),
+    runtime_id: z.string().min(1).optional(),
     shell: z.string().min(1).optional()
 });
 
@@ -723,6 +830,19 @@ export const zCloseTerminalPath = z.object({
 export const zGetApiV1SessionsBySessionIdTerminalsByTerminalIdPath = z.object({
     session_id: z.string().min(1),
     terminal_id: z.string().min(1)
+});
+
+export const zPostApiV1SessionsBySessionIdTitleGenerateBody = z.object({
+    force: z.boolean().optional(),
+    source: z.enum([
+        'user_prompts',
+        'first_turn',
+        'digest'
+    ]).optional()
+});
+
+export const zPostApiV1SessionsBySessionIdTitleGeneratePath = z.object({
+    session_id: z.string().min(1)
 });
 
 export const zGetApiV1SessionsBySessionIdTranscriptPath = z.object({
@@ -776,6 +896,18 @@ export const zWorkspaceFsSearchBody = z.object({
     include_globs: z.array(z.string()).optional(),
     limit: z.int().gte(1).lte(200).optional().default(50),
     query: z.string(),
+    runtime_id: z.string().min(1).optional(),
+    workspace: z.string().min(1)
+});
+
+export const zWorkspaceFsSuggestBody = z.object({
+    exclude_globs: z.array(z.string()).optional(),
+    follow_gitignore: z.boolean().optional().default(true),
+    include_globs: z.array(z.string()).optional(),
+    limit: z.int().gte(1).lte(200).optional().default(50),
+    query: z.string(),
+    runtime_id: z.string().min(1).optional(),
+    show_hidden: z.boolean().optional().default(false),
     workspace: z.string().min(1)
 });
 
@@ -810,4 +942,52 @@ export const zPostApiV1WorkspacesByWorkspaceIdTrustPath = z.object({
 
 export const zPostApiV1WorkspacesByWorkspaceIdUntrustPath = z.object({
     workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
+});
+
+export const zGetApiV2SessionsQuery = z.object({
+    'workspace.id': z.union([
+        z.string().min(1),
+        z.array(z.string().min(1)).min(1)
+    ]).optional(),
+    'activity.status': z.union([
+        z.enum([
+            'running',
+            'approval',
+            'question',
+            'failed',
+            'idle'
+        ]),
+        z.array(z.enum([
+            'running',
+            'approval',
+            'question',
+            'failed',
+            'idle'
+        ])).min(1)
+    ]).optional(),
+    'meta.updated_after': z.int().gte(0).lte(9007199254740991).optional(),
+    'meta.updated_before': z.int().gte(0).lte(9007199254740991).optional(),
+    'meta.archived': z.enum([
+        'true',
+        'false',
+        'all'
+    ]).optional(),
+    sort: z.enum([
+        'meta.updated_at_desc',
+        'meta.updated_at_asc',
+        'meta.created_at_desc'
+    ]).optional(),
+    include: z.string().optional(),
+    fields: z.string().optional(),
+    page_size: z.int().gte(1).lte(10000).optional(),
+    page: z.int().gte(1).lte(9007199254740991).optional(),
+    page_token: z.string().min(1).optional()
+});
+
+export const zPostApiV2SessionsArchiveBody = z.object({
+    ids: z.array(z.string().min(1)).min(1)
+});
+
+export const zPostApiV2SessionsRestoreBody = z.object({
+    ids: z.array(z.string().min(1)).min(1)
 });

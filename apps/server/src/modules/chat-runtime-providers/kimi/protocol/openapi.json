@@ -5,7 +5,7 @@
   "info": {
     "description": "REST API for the Kimi Code local server. All JSON responses are wrapped in a uniform envelope `{ code, msg, data, request_id }`.",
     "title": "Kimi Code Server API",
-    "version": "0.31.1"
+    "version": "0.37.2"
   },
   "openapi": "3.0.3",
   "paths": {
@@ -124,6 +124,631 @@
         },
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "description": "List built-in capabilities with layered readiness status",
+        "operationId": "listCapabilities",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "enum": [
+                        0
+                      ],
+                      "type": "number"
+                    },
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "capabilities": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "description": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "install": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "error": {
+                                    "type": "string"
+                                  },
+                                  "note": {
+                                    "type": "string"
+                                  },
+                                  "percent": {
+                                    "maximum": 100,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  },
+                                  "running": {
+                                    "type": "boolean"
+                                  },
+                                  "step": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "running"
+                                ],
+                                "type": "object"
+                              },
+                              "pluginId": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "enum": [
+                                  "not_installed",
+                                  "partial",
+                                  "ready",
+                                  "unsupported"
+                                ],
+                                "type": "string"
+                              },
+                              "steps": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "detail": {
+                                      "type": "string"
+                                    },
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "optional": {
+                                      "type": "boolean"
+                                    },
+                                    "state": {
+                                      "enum": [
+                                        "ok",
+                                        "missing",
+                                        "failed"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "state"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "supported": {
+                                "type": "boolean"
+                              },
+                              "version": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "displayName",
+                              "description",
+                              "supported",
+                              "state",
+                              "steps",
+                              "install"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "capabilities"
+                      ],
+                      "type": "object"
+                    },
+                    "details": {},
+                    "msg": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "request_id"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/{capability_id}": {
+      "get": {
+        "description": "Get one capability readiness status",
+        "operationId": "getCapability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "capability_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "description": {
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "install": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "error": {
+                                  "type": "string"
+                                },
+                                "note": {
+                                  "type": "string"
+                                },
+                                "percent": {
+                                  "maximum": 100,
+                                  "minimum": 0,
+                                  "type": "number"
+                                },
+                                "running": {
+                                  "type": "boolean"
+                                },
+                                "step": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "running"
+                              ],
+                              "type": "object"
+                            },
+                            "pluginId": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "enum": [
+                                "not_installed",
+                                "partial",
+                                "ready",
+                                "unsupported"
+                              ],
+                              "type": "string"
+                            },
+                            "steps": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "detail": {
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "optional": {
+                                    "type": "boolean"
+                                  },
+                                  "state": {
+                                    "enum": [
+                                      "ok",
+                                      "missing",
+                                      "failed"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "state"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "supported": {
+                              "type": "boolean"
+                            },
+                            "version": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "displayName",
+                            "description",
+                            "supported",
+                            "state",
+                            "steps",
+                            "install"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40418
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "capabilities"
+        ]
+      }
+    },
+    "/api/v1/capabilities/{tail}": {
+      "post": {
+        "description": "Start an idempotent capability install (poll GET for progress)",
+        "operationId": "installCapability",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tail",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "description": {
+                              "type": "string"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "install": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "error": {
+                                  "type": "string"
+                                },
+                                "note": {
+                                  "type": "string"
+                                },
+                                "percent": {
+                                  "maximum": 100,
+                                  "minimum": 0,
+                                  "type": "number"
+                                },
+                                "running": {
+                                  "type": "boolean"
+                                },
+                                "step": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "running"
+                              ],
+                              "type": "object"
+                            },
+                            "pluginId": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "enum": [
+                                "not_installed",
+                                "partial",
+                                "ready",
+                                "unsupported"
+                              ],
+                              "type": "string"
+                            },
+                            "steps": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "detail": {
+                                    "type": "string"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "optional": {
+                                    "type": "boolean"
+                                  },
+                                  "state": {
+                                    "enum": [
+                                      "ok",
+                                      "missing",
+                                      "failed"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "state"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "supported": {
+                              "type": "boolean"
+                            },
+                            "version": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "displayName",
+                            "description",
+                            "supported",
+                            "state",
+                            "steps",
+                            "install"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40418
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40924
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40925
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "capabilities"
         ]
       }
     },
@@ -610,6 +1235,7 @@
                         },
                         "secondary_model": {},
                         "services": {},
+                        "subagent": {},
                         "telemetry": {
                           "type": "boolean"
                         },
@@ -711,6 +1337,7 @@
                   },
                   "secondary_model": {},
                   "services": {},
+                  "subagent": {},
                   "telemetry": {
                     "type": "boolean"
                   },
@@ -816,6 +1443,7 @@
                             },
                             "secondary_model": {},
                             "services": {},
+                            "subagent": {},
                             "telemetry": {
                               "type": "boolean"
                             },
@@ -2390,6 +3018,12 @@
                         "dangerous_bypass_auth": {
                           "type": "boolean"
                         },
+                        "experimental_flags": {
+                          "additionalProperties": {
+                            "type": "boolean"
+                          },
+                          "type": "object"
+                        },
                         "open_in_apps": {
                           "items": {
                             "enum": [
@@ -2411,7 +3045,10 @@
                           "minLength": 1,
                           "type": "string"
                         },
-                        "started_at": {}
+                        "started_at": {},
+                        "web_title": {
+                          "type": "string"
+                        }
                       },
                       "required": [
                         "server_version",
@@ -3561,6 +4198,662 @@
         },
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/plugins": {
+      "get": {
+        "description": "List installed plugins",
+        "operationId": "listPlugins",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "enum": [
+                        0
+                      ],
+                      "type": "number"
+                    },
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "plugins": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "commandCount": {
+                                "type": "number"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "enabledMcpServerCount": {
+                                "type": "number"
+                              },
+                              "github": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "installedSha": {
+                                    "type": "string"
+                                  },
+                                  "owner": {
+                                    "type": "string"
+                                  },
+                                  "ref": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "kind": {
+                                        "enum": [
+                                          "branch",
+                                          "tag",
+                                          "sha"
+                                        ],
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "value"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "repo": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "owner",
+                                  "repo",
+                                  "ref"
+                                ],
+                                "type": "object"
+                              },
+                              "hasErrors": {
+                                "type": "boolean"
+                              },
+                              "hookCount": {
+                                "type": "number"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "mcpServerCount": {
+                                "type": "number"
+                              },
+                              "originalSource": {
+                                "type": "string"
+                              },
+                              "skillCount": {
+                                "type": "number"
+                              },
+                              "source": {
+                                "enum": [
+                                  "local-path",
+                                  "zip-url",
+                                  "github"
+                                ],
+                                "type": "string"
+                              },
+                              "state": {
+                                "enum": [
+                                  "ok",
+                                  "error"
+                                ],
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "displayName",
+                              "enabled",
+                              "state",
+                              "skillCount",
+                              "mcpServerCount",
+                              "enabledMcpServerCount",
+                              "hookCount",
+                              "commandCount",
+                              "hasErrors",
+                              "source"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "plugins"
+                      ],
+                      "type": "object"
+                    },
+                    "details": {},
+                    "msg": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "request_id"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "plugins"
+        ]
+      },
+      "post": {
+        "description": "Install a plugin from a local path, zip URL, or GitHub repo",
+        "operationId": "installPlugin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "source": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "source"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "commandCount": {
+                              "type": "number"
+                            },
+                            "displayName": {
+                              "type": "string"
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "enabledMcpServerCount": {
+                              "type": "number"
+                            },
+                            "github": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "installedSha": {
+                                  "type": "string"
+                                },
+                                "owner": {
+                                  "type": "string"
+                                },
+                                "ref": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "kind": {
+                                      "enum": [
+                                        "branch",
+                                        "tag",
+                                        "sha"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "value"
+                                  ],
+                                  "type": "object"
+                                },
+                                "repo": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "owner",
+                                "repo",
+                                "ref"
+                              ],
+                              "type": "object"
+                            },
+                            "hasErrors": {
+                              "type": "boolean"
+                            },
+                            "hookCount": {
+                              "type": "number"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "mcpServerCount": {
+                              "type": "number"
+                            },
+                            "originalSource": {
+                              "type": "string"
+                            },
+                            "skillCount": {
+                              "type": "number"
+                            },
+                            "source": {
+                              "enum": [
+                                "local-path",
+                                "zip-url",
+                                "github"
+                              ],
+                              "type": "string"
+                            },
+                            "state": {
+                              "enum": [
+                                "ok",
+                                "error"
+                              ],
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "displayName",
+                            "enabled",
+                            "state",
+                            "skillCount",
+                            "mcpServerCount",
+                            "enabledMcpServerCount",
+                            "hookCount",
+                            "commandCount",
+                            "hasErrors",
+                            "source"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40409
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/{tail}": {
+      "post": {
+        "description": "Enable, disable, or remove an installed plugin",
+        "operationId": "pluginAction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tail",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "ok": {
+                              "enum": [
+                                true
+                              ],
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "ok"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40419
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/v1/plugins/marketplace": {
+      "get": {
+        "description": "List the plugin marketplace catalog merged with live install state",
+        "operationId": "listPluginMarketplace",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "enum": [
+                        0
+                      ],
+                      "type": "number"
+                    },
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "entries": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "capabilityId": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              },
+                              "homepage": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "installed": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "enabled": {
+                                    "type": "boolean"
+                                  },
+                                  "version": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "enabled"
+                                ],
+                                "type": "object"
+                              },
+                              "keywords": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "tier": {
+                                "enum": [
+                                  "official",
+                                  "curated",
+                                  "third-party"
+                                ],
+                                "type": "string"
+                              },
+                              "updateAvailable": {
+                                "type": "boolean"
+                              },
+                              "version": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "tier",
+                              "displayName",
+                              "source"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "entries"
+                      ],
+                      "type": "object"
+                    },
+                    "details": {},
+                    "msg": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data",
+                    "request_id"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "plugins"
         ]
       }
     },
@@ -5356,18 +6649,26 @@
                             },
                             "incomplete": {
                               "enum": [
-                                "candidate_cap"
+                                "candidate_cap",
+                                "postings_budget",
+                                "deadline"
                               ],
                               "type": "string"
                             },
                             "index_state": {
                               "additionalProperties": false,
                               "properties": {
+                                "degraded": {
+                                  "type": "string"
+                                },
                                 "documents": {
                                   "type": "number"
                                 },
                                 "indexed_sessions": {
                                   "type": "number"
+                                },
+                                "stale": {
+                                  "type": "boolean"
                                 },
                                 "state": {
                                   "enum": [
@@ -5701,6 +7002,7 @@
                                   "archived": {
                                     "type": "boolean"
                                   },
+                                  "archived_at": {},
                                   "busy": {
                                     "type": "boolean"
                                   },
@@ -6180,6 +7482,7 @@
                             "archived": {
                               "type": "boolean"
                             },
+                            "archived_at": {},
                             "busy": {
                               "type": "boolean"
                             },
@@ -6610,6 +7913,7 @@
                             "archived": {
                               "type": "boolean"
                             },
+                            "archived_at": {},
                             "busy": {
                               "type": "boolean"
                             },
@@ -9223,6 +10527,7 @@
                                   "archived": {
                                     "type": "boolean"
                                   },
+                                  "archived_at": {},
                                   "busy": {
                                     "type": "boolean"
                                   },
@@ -9651,6 +10956,7 @@
                             "archived": {
                               "type": "boolean"
                             },
+                            "archived_at": {},
                             "busy": {
                               "type": "boolean"
                             },
@@ -10100,6 +11406,15 @@
         "operationId": "downloadFile",
         "parameters": [
           {
+            "in": "query",
+            "name": "runtime_id",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
             "in": "path",
             "name": "session_id",
             "required": true,
@@ -10444,6 +11759,47 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/media/{file_id}": {
+      "get": {
+        "description": "Download session-canonical prompt media by file ID",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "file_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "files"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/messages": {
       "get": {
         "description": "List messages for a session",
@@ -10672,6 +12028,26 @@
                                                     "file_id"
                                                   ],
                                                   "type": "object"
+                                                },
+                                                {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "file_id": {
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    },
+                                                    "kind": {
+                                                      "enum": [
+                                                        "session_media"
+                                                      ],
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "kind",
+                                                    "file_id"
+                                                  ],
+                                                  "type": "object"
                                                 }
                                               ]
                                             },
@@ -10752,6 +12128,26 @@
                                                     "kind": {
                                                       "enum": [
                                                         "file"
+                                                      ],
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "kind",
+                                                    "file_id"
+                                                  ],
+                                                  "type": "object"
+                                                },
+                                                {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "file_id": {
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    },
+                                                    "kind": {
+                                                      "enum": [
+                                                        "session_media"
                                                       ],
                                                       "type": "string"
                                                     }
@@ -11186,6 +12582,26 @@
                                               "file_id"
                                             ],
                                             "type": "object"
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "file_id": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              },
+                                              "kind": {
+                                                "enum": [
+                                                  "session_media"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "file_id"
+                                            ],
+                                            "type": "object"
                                           }
                                         ]
                                       },
@@ -11266,6 +12682,26 @@
                                               "kind": {
                                                 "enum": [
                                                   "file"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "file_id"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "file_id": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              },
+                                              "kind": {
+                                                "enum": [
+                                                  "session_media"
                                                 ],
                                                 "type": "string"
                                               }
@@ -11626,6 +13062,7 @@
                             "archived": {
                               "type": "boolean"
                             },
+                            "archived_at": {},
                             "busy": {
                               "type": "boolean"
                             },
@@ -12159,6 +13596,7 @@
                             "archived": {
                               "type": "boolean"
                             },
+                            "archived_at": {},
                             "busy": {
                               "type": "boolean"
                             },
@@ -12650,6 +14088,26 @@
                                                   "file_id"
                                                 ],
                                                 "type": "object"
+                                              },
+                                              {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                  "file_id": {
+                                                    "minLength": 1,
+                                                    "type": "string"
+                                                  },
+                                                  "kind": {
+                                                    "enum": [
+                                                      "session_media"
+                                                    ],
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "file_id"
+                                                ],
+                                                "type": "object"
                                               }
                                             ]
                                           },
@@ -12730,6 +14188,26 @@
                                                   "kind": {
                                                     "enum": [
                                                       "file"
+                                                    ],
+                                                    "type": "string"
+                                                  }
+                                                },
+                                                "required": [
+                                                  "kind",
+                                                  "file_id"
+                                                ],
+                                                "type": "object"
+                                              },
+                                              {
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                  "file_id": {
+                                                    "minLength": 1,
+                                                    "type": "string"
+                                                  },
+                                                  "kind": {
+                                                    "enum": [
+                                                      "session_media"
                                                     ],
                                                     "type": "string"
                                                   }
@@ -12995,6 +14473,26 @@
                                                     "file_id"
                                                   ],
                                                   "type": "object"
+                                                },
+                                                {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "file_id": {
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    },
+                                                    "kind": {
+                                                      "enum": [
+                                                        "session_media"
+                                                      ],
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "kind",
+                                                    "file_id"
+                                                  ],
+                                                  "type": "object"
                                                 }
                                               ]
                                             },
@@ -13075,6 +14573,26 @@
                                                     "kind": {
                                                       "enum": [
                                                         "file"
+                                                      ],
+                                                      "type": "string"
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "kind",
+                                                    "file_id"
+                                                  ],
+                                                  "type": "object"
+                                                },
+                                                {
+                                                  "additionalProperties": false,
+                                                  "properties": {
+                                                    "file_id": {
+                                                      "minLength": 1,
+                                                      "type": "string"
+                                                    },
+                                                    "kind": {
+                                                      "enum": [
+                                                        "session_media"
                                                       ],
                                                       "type": "string"
                                                     }
@@ -13420,6 +14938,25 @@
                                     "file_id"
                                   ],
                                   "type": "object"
+                                },
+                                {
+                                  "properties": {
+                                    "file_id": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "session_media"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "file_id"
+                                  ],
+                                  "type": "object"
                                 }
                               ]
                             },
@@ -13496,6 +15033,25 @@
                                     "kind": {
                                       "enum": [
                                         "file"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "file_id"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "properties": {
+                                    "file_id": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "session_media"
                                       ],
                                       "type": "string"
                                     }
@@ -13623,6 +15179,29 @@
                   "profile": {
                     "minLength": 1,
                     "type": "string"
+                  },
+                  "prompt_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "skills": {
+                    "items": {
+                      "properties": {
+                        "args": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
                   },
                   "swarm_mode": {
                     "type": "boolean"
@@ -13806,6 +15385,26 @@
                                               "file_id"
                                             ],
                                             "type": "object"
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "file_id": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              },
+                                              "kind": {
+                                                "enum": [
+                                                  "session_media"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "file_id"
+                                            ],
+                                            "type": "object"
                                           }
                                         ]
                                       },
@@ -13886,6 +15485,26 @@
                                               "kind": {
                                                 "enum": [
                                                   "file"
+                                                ],
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "kind",
+                                              "file_id"
+                                            ],
+                                            "type": "object"
+                                          },
+                                          {
+                                            "additionalProperties": false,
+                                            "properties": {
+                                              "file_id": {
+                                                "minLength": 1,
+                                                "type": "string"
+                                              },
+                                              "kind": {
+                                                "enum": [
+                                                  "session_media"
                                                 ],
                                                 "type": "string"
                                               }
@@ -14268,6 +15887,38 @@
                       "properties": {
                         "code": {
                           "enum": [
+                            40415
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
                             40903
                           ],
                           "type": "number"
@@ -14286,6 +15937,70 @@
                             "aborted"
                           ],
                           "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40912
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40927
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
                         },
                         "details": {},
                         "msg": {
@@ -15288,6 +17003,329 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/runtime": {
+      "get": {
+        "description": "Get the main agent runtime binding",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "runtime_id": {
+                              "type": "string"
+                            },
+                            "workspace_id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "workspace_id",
+                            "runtime_id"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40401
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "sessions"
+        ]
+      },
+      "post": {
+        "description": "Switch the main agent runtime binding",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "runtime_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "runtime_id"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "runtime_id": {
+                              "type": "string"
+                            },
+                            "workspace_id": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "workspace_id",
+                            "runtime_id"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40401
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40420
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40926
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/skills": {
       "get": {
         "description": "List the skills available to a session",
@@ -15458,6 +17496,255 @@
                 "properties": {
                   "args": {
                     "type": "string"
+                  },
+                  "attachments": {
+                    "items": {
+                      "oneOf": [
+                        {
+                          "properties": {
+                            "source": {
+                              "oneOf": [
+                                {
+                                  "properties": {
+                                    "id": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "url"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "url"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "properties": {
+                                    "data": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "base64"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "media_type": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "media_type",
+                                    "data"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "properties": {
+                                    "file_id": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "file"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "file_id"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "properties": {
+                                    "file_id": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "session_media"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "file_id"
+                                  ],
+                                  "type": "object"
+                                }
+                              ]
+                            },
+                            "type": {
+                              "enum": [
+                                "image"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "source"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "source": {
+                              "oneOf": [
+                                {
+                                  "properties": {
+                                    "id": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "url"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "url"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "properties": {
+                                    "data": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "base64"
+                                      ],
+                                      "type": "string"
+                                    },
+                                    "media_type": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "media_type",
+                                    "data"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "properties": {
+                                    "file_id": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "file"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "file_id"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "properties": {
+                                    "file_id": {
+                                      "minLength": 1,
+                                      "type": "string"
+                                    },
+                                    "kind": {
+                                      "enum": [
+                                        "session_media"
+                                      ],
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "file_id"
+                                  ],
+                                  "type": "object"
+                                }
+                              ]
+                            },
+                            "type": {
+                              "enum": [
+                                "video"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "source"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "properties": {
+                            "file_id": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "media_type": {
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "size": {
+                              "maximum": 9007199254740991,
+                              "minimum": 0,
+                              "type": "integer"
+                            },
+                            "type": {
+                              "enum": [
+                                "file"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "file_id",
+                            "name",
+                            "media_type",
+                            "size"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    },
+                    "type": "array"
                   }
                 },
                 "type": "object"
@@ -15555,6 +17842,38 @@
                         "code": {
                           "enum": [
                             40401
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40407
                           ],
                           "type": "number"
                         },
@@ -15933,6 +18252,26 @@
                                                         "file_id"
                                                       ],
                                                       "type": "object"
+                                                    },
+                                                    {
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "file_id": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        },
+                                                        "kind": {
+                                                          "enum": [
+                                                            "session_media"
+                                                          ],
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "file_id"
+                                                      ],
+                                                      "type": "object"
                                                     }
                                                   ]
                                                 },
@@ -16013,6 +18352,26 @@
                                                         "kind": {
                                                           "enum": [
                                                             "file"
+                                                          ],
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "file_id"
+                                                      ],
+                                                      "type": "object"
+                                                    },
+                                                    {
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "file_id": {
+                                                          "minLength": 1,
+                                                          "type": "string"
+                                                        },
+                                                        "kind": {
+                                                          "enum": [
+                                                            "session_media"
                                                           ],
                                                           "type": "string"
                                                         }
@@ -16357,6 +18716,7 @@
                                 "archived": {
                                   "type": "boolean"
                                 },
+                                "archived_at": {},
                                 "busy": {
                                   "type": "boolean"
                                 },
@@ -16557,6 +18917,9 @@
                               "items": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "agent_id": {
+                                    "type": "string"
+                                  },
                                   "command": {
                                     "type": "string"
                                   },
@@ -16575,6 +18938,9 @@
                                       "bash",
                                       "tool"
                                     ],
+                                    "type": "string"
+                                  },
+                                  "model": {
                                     "type": "string"
                                   },
                                   "output_bytes": {
@@ -16625,6 +18991,9 @@
                                     "maximum": 9007199254740991,
                                     "minimum": 0,
                                     "type": "integer"
+                                  },
+                                  "thinking_effort": {
+                                    "type": "string"
                                   }
                                 },
                                 "required": [
@@ -16816,7 +19185,6 @@
                             "plan_mode",
                             "swarm_mode",
                             "context_tokens",
-                            "max_context_tokens",
                             "context_usage"
                           ],
                           "type": "object"
@@ -16982,6 +19350,9 @@
                               "items": {
                                 "additionalProperties": false,
                                 "properties": {
+                                  "agent_id": {
+                                    "type": "string"
+                                  },
                                   "command": {
                                     "type": "string"
                                   },
@@ -17002,12 +19373,18 @@
                                     ],
                                     "type": "string"
                                   },
+                                  "model": {
+                                    "type": "string"
+                                  },
                                   "output_bytes": {
                                     "maximum": 9007199254740991,
                                     "minimum": 0,
                                     "type": "integer"
                                   },
                                   "output_preview": {
+                                    "type": "string"
+                                  },
+                                  "parent_tool_call_id": {
                                     "type": "string"
                                   },
                                   "session_id": {
@@ -17022,6 +19399,12 @@
                                       "failed",
                                       "cancelled"
                                     ],
+                                    "type": "string"
+                                  },
+                                  "subagent_type": {
+                                    "type": "string"
+                                  },
+                                  "thinking_effort": {
                                     "type": "string"
                                   }
                                 },
@@ -17460,6 +19843,9 @@
                         "data": {
                           "additionalProperties": false,
                           "properties": {
+                            "agent_id": {
+                              "type": "string"
+                            },
                             "command": {
                               "type": "string"
                             },
@@ -17480,12 +19866,18 @@
                               ],
                               "type": "string"
                             },
+                            "model": {
+                              "type": "string"
+                            },
                             "output_bytes": {
                               "maximum": 9007199254740991,
                               "minimum": 0,
                               "type": "integer"
                             },
                             "output_preview": {
+                              "type": "string"
+                            },
+                            "parent_tool_call_id": {
                               "type": "string"
                             },
                             "session_id": {
@@ -17500,6 +19892,12 @@
                                 "failed",
                                 "cancelled"
                               ],
+                              "type": "string"
+                            },
+                            "subagent_type": {
+                              "type": "string"
+                            },
+                            "thinking_effort": {
                               "type": "string"
                             }
                           },
@@ -17895,6 +20293,10 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991,
                     "type": "integer"
+                  },
+                  "runtime_id": {
+                    "minLength": 1,
+                    "type": "string"
                   },
                   "shell": {
                     "minLength": 1,
@@ -18557,6 +20959,162 @@
         ]
       }
     },
+    "/api/v1/sessions/{session_id}/title/generate": {
+      "post": {
+        "description": "Generate the session title via the managed chat_title tool",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "force": {
+                    "type": "boolean"
+                  },
+                  "source": {
+                    "enum": [
+                      "user_prompts",
+                      "first_turn",
+                      "digest"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "title": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "title"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40401
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40923
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "sessions"
+        ]
+      }
+    },
     "/api/v1/sessions/{session_id}/transcript": {
       "get": {
         "description": "Turn-granular session transcript page: live sessions read the in-memory store (wire-records backfill awaited per requested agent), cold sessions rebuild the requested agent from the persisted wire records",
@@ -18717,6 +21275,25 @@
                                           "kind": {
                                             "enum": [
                                               "file"
+                                            ],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "fileId"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "fileId": {
+                                            "type": "string"
+                                          },
+                                          "kind": {
+                                            "enum": [
+                                              "session_media"
                                             ],
                                             "type": "string"
                                           }
@@ -20322,6 +22899,25 @@
                                                               "kind": {
                                                                 "enum": [
                                                                   "file"
+                                                                ],
+                                                                "type": "string"
+                                                              }
+                                                            },
+                                                            "required": [
+                                                              "kind",
+                                                              "fileId"
+                                                            ],
+                                                            "type": "object"
+                                                          },
+                                                          {
+                                                            "additionalProperties": false,
+                                                            "properties": {
+                                                              "fileId": {
+                                                                "type": "string"
+                                                              },
+                                                              "kind": {
+                                                                "enum": [
+                                                                  "session_media"
                                                                 ],
                                                                 "type": "string"
                                                               }
@@ -22697,6 +25293,25 @@
                                                         "fileId"
                                                       ],
                                                       "type": "object"
+                                                    },
+                                                    {
+                                                      "additionalProperties": false,
+                                                      "properties": {
+                                                        "fileId": {
+                                                          "type": "string"
+                                                        },
+                                                        "kind": {
+                                                          "enum": [
+                                                            "session_media"
+                                                          ],
+                                                          "type": "string"
+                                                        }
+                                                      },
+                                                      "required": [
+                                                        "kind",
+                                                        "fileId"
+                                                      ],
+                                                      "type": "object"
                                                     }
                                                   ]
                                                 }
@@ -23768,7 +26383,7 @@
     },
     "/api/v1/sessions/{session_id}/transcript/user-messages": {
       "get": {
-        "description": "All turn-opening inputs (\"user messages\") of a session, grouped per agent: every turn with a defined prompt (real user text, user-slash skill/plugin commands, cron prompts — distinguish via origin). agent_id optional: present reads one agent, absent reads every rostered agent. Live sessions answer from the in-memory store (history backfill awaited per agent), cold sessions rebuild from the persisted wire records. Unpaginated; attachment entities referenced by the messages ride along (metadata only)",
+        "description": "All turn-opening inputs (\"user messages\") of a session, grouped per agent: every turn with a defined prompt (real user text, user-slash skill/plugin commands, cron prompts — distinguish via origin), plus attachment-only prompts projected with an empty prompt string. agent_id optional: present reads one agent, absent reads every rostered agent. Live sessions answer from the in-memory store (history backfill awaited per agent), cold sessions rebuild from the persisted wire records. Unpaginated; attachment entities referenced by the messages ride along (metadata only)",
         "parameters": [
           {
             "in": "query",
@@ -23865,6 +26480,25 @@
                                                 "kind": {
                                                   "enum": [
                                                     "file"
+                                                  ],
+                                                  "type": "string"
+                                                }
+                                              },
+                                              "required": [
+                                                "kind",
+                                                "fileId"
+                                              ],
+                                              "type": "object"
+                                            },
+                                            {
+                                              "additionalProperties": false,
+                                              "properties": {
+                                                "fileId": {
+                                                  "type": "string"
+                                                },
+                                                "kind": {
+                                                  "enum": [
+                                                    "session_media"
                                                   ],
                                                   "type": "string"
                                                 }
@@ -24553,6 +27187,10 @@
                   "query": {
                     "type": "string"
                   },
+                  "runtime_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
                   "workspace": {
                     "minLength": 1,
                     "type": "string"
@@ -24744,6 +27382,245 @@
                         "code": {
                           "enum": [
                             41303
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "fs"
+        ]
+      }
+    },
+    "/api/v1/workspace/fs:suggest": {
+      "post": {
+        "description": "Suggest file and directory completion candidates in a workspace without a session. `workspace` accepts a registered workspace id or an absolute root (registered on the spot).",
+        "operationId": "workspaceFsSuggest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "exclude_globs": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "follow_gitignore": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "include_globs": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "limit": {
+                    "default": 50,
+                    "maximum": 200,
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "query": {
+                    "type": "string"
+                  },
+                  "runtime_id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "show_hidden": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "workspace": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "query",
+                  "workspace"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "items": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "enum": [
+                                      "file",
+                                      "directory",
+                                      "symlink"
+                                    ],
+                                    "type": "string"
+                                  },
+                                  "match_positions": {
+                                    "items": {
+                                      "maximum": 9007199254740991,
+                                      "minimum": 0,
+                                      "type": "integer"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "path": {
+                                    "type": "string"
+                                  },
+                                  "score": {
+                                    "maximum": 1,
+                                    "minimum": 0,
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "path",
+                                  "name",
+                                  "kind",
+                                  "score",
+                                  "match_positions"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "truncated": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "items",
+                            "truncated"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "message": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "nullable": true,
+                          "type": "array"
+                        },
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40410
                           ],
                           "type": "number"
                         },
@@ -25842,6 +28719,819 @@
         ]
       }
     },
+    "/api/v2/sessions": {
+      "get": {
+        "description": "List sessions with domain-grouped metadata (workspace / meta / activity; git via include=git). Paginate with the opaque page_token (binds the first page’s query conditions) or with the stateless 1-based page parameter; every page carries total. fields=id,archived trims each item to the lightweight ids projection (select-all-matching flows; page_size ceiling relaxed to 10000).",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace.id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "activity.status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "running",
+                    "approval",
+                    "question",
+                    "failed",
+                    "idle"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "items": {
+                    "enum": [
+                      "running",
+                      "approval",
+                      "question",
+                      "failed",
+                      "idle"
+                    ],
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "meta.updated_after",
+            "required": false,
+            "schema": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "meta.updated_before",
+            "required": false,
+            "schema": {
+              "maximum": 9007199254740991,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "meta.archived",
+            "required": false,
+            "schema": {
+              "enum": [
+                "true",
+                "false",
+                "all"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "enum": [
+                "meta.updated_at_desc",
+                "meta.updated_at_asc",
+                "meta.created_at_desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fields",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "maximum": 9007199254740991,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_token",
+            "required": false,
+            "schema": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "has_more": {
+                              "type": "boolean"
+                            },
+                            "items": {
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "activity": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "status": {
+                                            "enum": [
+                                              "running",
+                                              "approval",
+                                              "question",
+                                              "failed",
+                                              "idle"
+                                            ],
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "status"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "git": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "branch": {
+                                            "nullable": true,
+                                            "type": "string"
+                                          },
+                                          "pull_request": {
+                                            "additionalProperties": false,
+                                            "nullable": true,
+                                            "properties": {
+                                              "number": {
+                                                "maximum": 9007199254740991,
+                                                "minimum": -9007199254740991,
+                                                "type": "integer"
+                                              },
+                                              "state": {
+                                                "enum": [
+                                                  "open",
+                                                  "closed",
+                                                  "merged"
+                                                ],
+                                                "type": "string"
+                                              },
+                                              "url": {
+                                                "type": "string"
+                                              }
+                                            },
+                                            "required": [
+                                              "number",
+                                              "state",
+                                              "url"
+                                            ],
+                                            "type": "object"
+                                          }
+                                        },
+                                        "required": [
+                                          "branch",
+                                          "pull_request"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "meta": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "archived": {
+                                            "type": "boolean"
+                                          },
+                                          "archived_at": {
+                                            "maximum": 9007199254740991,
+                                            "minimum": -9007199254740991,
+                                            "nullable": true,
+                                            "type": "integer"
+                                          },
+                                          "created_at": {
+                                            "maximum": 9007199254740991,
+                                            "minimum": -9007199254740991,
+                                            "type": "integer"
+                                          },
+                                          "last_prompt": {
+                                            "nullable": true,
+                                            "type": "string"
+                                          },
+                                          "title": {
+                                            "nullable": true,
+                                            "type": "string"
+                                          },
+                                          "updated_at": {
+                                            "maximum": 9007199254740991,
+                                            "minimum": -9007199254740991,
+                                            "type": "integer"
+                                          }
+                                        },
+                                        "required": [
+                                          "title",
+                                          "last_prompt",
+                                          "created_at",
+                                          "updated_at",
+                                          "archived",
+                                          "archived_at"
+                                        ],
+                                        "type": "object"
+                                      },
+                                      "workspace": {
+                                        "additionalProperties": false,
+                                        "properties": {
+                                          "cwd": {
+                                            "nullable": true,
+                                            "type": "string"
+                                          },
+                                          "id": {
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "cwd"
+                                        ],
+                                        "type": "object"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "workspace",
+                                      "meta",
+                                      "activity"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "archived": {
+                                        "type": "boolean"
+                                      },
+                                      "id": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "archived"
+                                    ],
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              "type": "array"
+                            },
+                            "next_page_token": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "total": {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "items",
+                            "total",
+                            "has_more",
+                            "next_page_token"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "message": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "nullable": true,
+                          "type": "array"
+                        },
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40922
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "v2-sessions"
+        ]
+      }
+    },
+    "/api/v2/sessions:archive": {
+      "post": {
+        "description": "Batch-archive sessions by id ({ ids }, ≤5000 unique). Per-item results — a missing session folds into its own item; cold sessions are patched without materialization.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ids": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "ids"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "failed": {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer"
+                            },
+                            "results": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "error": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "code": {
+                                        "maximum": 9007199254740991,
+                                        "minimum": -9007199254740991,
+                                        "type": "integer"
+                                      },
+                                      "message": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "code",
+                                      "message"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "ok": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "ok"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "succeeded": {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "results",
+                            "succeeded",
+                            "failed"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "message": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "nullable": true,
+                          "type": "array"
+                        },
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "v2-sessions"
+        ]
+      }
+    },
+    "/api/v2/sessions:restore": {
+      "post": {
+        "description": "Batch-restore sessions by id ({ ids }, ≤5000 unique). Per-item results — a missing session folds into its own item; cold sessions are patched without materialization.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "ids": {
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "ids"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            0
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "failed": {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer"
+                            },
+                            "results": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "error": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "code": {
+                                        "maximum": 9007199254740991,
+                                        "minimum": -9007199254740991,
+                                        "type": "integer"
+                                      },
+                                      "message": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "code",
+                                      "message"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "ok": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "ok"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "succeeded": {
+                              "maximum": 9007199254740991,
+                              "minimum": -9007199254740991,
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "results",
+                            "succeeded",
+                            "failed"
+                          ],
+                          "type": "object"
+                        },
+                        "details": {},
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "enum": [
+                            40001
+                          ],
+                          "type": "number"
+                        },
+                        "data": {
+                          "enum": [
+                            null
+                          ],
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "details": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "message": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "path",
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "nullable": true,
+                          "type": "array"
+                        },
+                        "msg": {
+                          "type": "string"
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "msg",
+                        "data",
+                        "request_id"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "tags": [
+          "v2-sessions"
+        ]
+      }
+    },
     "/asyncapi.json": {
       "get": {
         "responses": {
@@ -25881,6 +29571,10 @@
     {
       "description": "Session lifecycle",
       "name": "sessions"
+    },
+    {
+      "description": "Domain-grouped session list query (API v2)",
+      "name": "v2-sessions"
     },
     {
       "description": "Workspace registry + folder picker",
