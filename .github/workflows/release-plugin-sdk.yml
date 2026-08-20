@@ -23,7 +23,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-plugin-sdk-${{ github.ref }}
+  # npm's dev dist-tag is shared across tags and manual runs; serialize all
+  # publishes so a slower run cannot overwrite a newer dist-tag update.
+  group: release-plugin-sdk-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -109,7 +111,8 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-          package-manager-cache: false
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

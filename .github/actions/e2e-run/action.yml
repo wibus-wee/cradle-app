@@ -1,0 +1,50 @@
+name: Run Cucumber E2E
+description: Run the CI Cucumber suite with durable logs and a real exit status
+
+inputs:
+  tags:
+    description: Cucumber tag expression
+    required: true
+  verbose:
+    description: Enable verbose E2E logging
+    required: false
+    default: '0'
+  log-sync:
+    description: Enable synchronized E2E logging
+    required: false
+    default: '0'
+  fail-on-zero-scenarios:
+    description: Fail when Cucumber executes no scenarios
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare Cucumber CI config
+      shell: bash
+      run: node e2e/scripts/prepare-ci-config.mjs
+
+    - name: Run Cucumber scenarios
+      shell: bash
+      env:
+        NODE_ENV: test
+        CRADLE_CREDENTIAL_SECRET: e2e-test-secret
+        CRADLE_E2E_VERBOSE: ${{ inputs.verbose }}
+        CRADLE_LOG_SYNC: ${{ inputs.log-sync }}
+        TAGS_FILTER: ${{ inputs.tags }}
+        FAIL_ON_ZERO_SCENARIOS: ${{ inputs.fail-on-zero-scenarios }}
+      run: |
+        set -o pipefail
+        mkdir -p e2e/artifacts
+        pnpm exec cucumber-js --config e2e/cucumber-ci.mjs \
+          --tags "$TAGS_FILTER" \
+          --format summary \
+          --format summary:e2e/artifacts/cucumber-summary.txt \
+          --format junit:e2e/artifacts/cucumber-junit.xml \
+          2>&1 | tee e2e/artifacts/cucumber-output.log
+
+        if [ "$FAIL_ON_ZERO_SCENARIOS" = 'true' ] && grep -q '^0 scenarios' e2e/artifacts/cucumber-summary.txt; then
+          echo '::error::Cucumber completed without executing any scenarios.'
+          exit 1
+        fi

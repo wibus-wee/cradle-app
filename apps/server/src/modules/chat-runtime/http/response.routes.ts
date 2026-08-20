@@ -22,6 +22,7 @@ export const chatRuntimeResponseRoutes = new Elysia({
     '/sessions/:sessionId/response',
     async ({ params, body, request }) => {
       const startedAtMs = performance.now()
+      const admissionRequestedAtMs = Date.now()
       const desktopUpstreamRequestId = request.headers.get(DESKTOP_UPSTREAM_REQUEST_ID_HEADER)?.trim() || null
       const desktopUpstreamMode = request.headers.get(DESKTOP_UPSTREAM_MODE_HEADER)?.trim() || null
       let accepted = false
@@ -48,6 +49,7 @@ export const chatRuntimeResponseRoutes = new Elysia({
         const runtime = await loadChatRuntime()
         const response = await runtime.streamResponse({
           sessionId: params.sessionId,
+          admissionRequestedAtMs,
           text: body.text ?? '',
           files: body.files,
           contextParts: body.contextParts,

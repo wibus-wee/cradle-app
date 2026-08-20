@@ -17,7 +17,7 @@ export interface MessageBubbleFrameViewProps {
   isStreaming: boolean
   content: ReactNode
   thinkingPlaceholder?: ReactNode
-  debugCaption?: ReactNode
+  runTelemetryCaption?: ReactNode
   actions?: ReactNode
 }
 
@@ -27,7 +27,7 @@ export function MessageBubbleFrameView({
   isStreaming,
   content,
   thinkingPlaceholder,
-  debugCaption,
+  runTelemetryCaption,
   actions,
 }: MessageBubbleFrameViewProps) {
   const isUser = frame.role === 'user'
@@ -74,7 +74,7 @@ export function MessageBubbleFrameView({
           {thinkingPlaceholder}
         </div>
 
-        {isAssistant && debugCaption}
+        {isAssistant && runTelemetryCaption}
         {actions}
       </div>
     </div>
