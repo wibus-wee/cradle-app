@@ -15,6 +15,8 @@ import {
   automationRuns,
   backendCapabilitySnapshots,
   backendRuns,
+  backendRunSnapshotEvents,
+  backendRunSnapshots,
   backendSessionBindings,
   backgroundJobs,
   downloadCenterTasks,
@@ -42,6 +44,7 @@ import { sql } from 'drizzle-orm'
 import { Elysia, t } from 'elysia'
 
 import { db, getServerConfig } from '../../infra'
+import { discardRunSnapshotWriteBehind } from '../chat-runtime/run-snapshot-journal'
 import { abortAllRuns } from '../chat-runtime/runtime'
 
 const TABLES_IN_DELETION_ORDER = [
@@ -61,6 +64,8 @@ const TABLES_IN_DELETION_ORDER = [
   kanbanBoards,
   messages,
   usageLogs,
+  backendRunSnapshotEvents,
+  backendRunSnapshots,
   workThreads,
   works,
   sessions,
@@ -117,6 +122,7 @@ export const testReset = new Elysia({
   '/',
   async () => {
     await abortAllRuns()
+    discardRunSnapshotWriteBehind()
     const d = db()
     d.run(sql`PRAGMA foreign_keys = OFF`)
     try {

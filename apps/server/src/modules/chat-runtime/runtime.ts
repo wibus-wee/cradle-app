@@ -288,9 +288,6 @@ function observeStaleActiveRunCompletion(activeRun: ActiveRun, fence: Parameters
   })
 }
 
-SessionService.onSessionArchived(releaseSideConversationsByParentSessionId)
-SessionService.onSessionCleanup(releaseSideConversationsByParentSessionId)
-
 function disposeRuntimeSessionResources(sessionId: string): void {
   const registry = getRuntimeRegistry()
   for (const item of registry.list()) {
@@ -303,8 +300,18 @@ function disposeRuntimeSessionResources(sessionId: string): void {
   }
 }
 
-SessionService.onSessionArchived(disposeRuntimeSessionResources)
-SessionService.onSessionCleanup(disposeRuntimeSessionResources)
+let sessionLifecycleHandlersRegistered = false
+
+export function registerChatRuntimeSessionLifecycleHandlers(): void {
+  if (sessionLifecycleHandlersRegistered) {
+    return
+  }
+  sessionLifecycleHandlersRegistered = true
+  SessionService.onSessionArchived(releaseSideConversationsByParentSessionId)
+  SessionService.onSessionCleanup(releaseSideConversationsByParentSessionId)
+  SessionService.onSessionArchived(disposeRuntimeSessionResources)
+  SessionService.onSessionCleanup(disposeRuntimeSessionResources)
+}
 
 function publishRunChunk(runId: string, chunk: UIMessageChunk): void {
   const activeRun = runRegistry.getActiveRun(runId)

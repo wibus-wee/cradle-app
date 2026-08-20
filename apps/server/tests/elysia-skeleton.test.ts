@@ -431,13 +431,21 @@ describe('elysia migration skeleton', () => {
         method: 'DELETE',
       }))
       expect(deleteCreated.status).toBe(200)
-      expect(await deleteCreated.json()).toEqual({ ok: true })
+      expect(await deleteCreated.json()).toEqual({
+        ok: true,
+        removedSessionIds: [],
+        removedWorkIds: [],
+      })
 
       const deleteExplicit = await app.handle(new Request(`http://localhost/workspaces/${explicit.id}`, {
         method: 'DELETE',
       }))
       expect(deleteExplicit.status).toBe(200)
-      expect(await deleteExplicit.json()).toEqual({ ok: true })
+      expect(await deleteExplicit.json()).toEqual({
+        ok: true,
+        removedSessionIds: [],
+        removedWorkIds: [],
+      })
 
       const finalList = await app.handle(new Request('http://localhost/workspaces'))
       expect(finalList.status).toBe(200)
