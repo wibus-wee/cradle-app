@@ -31,7 +31,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: release-desktop-${{ github.ref }}
+  # Dev and bleeding-edge channels update shared rolling releases/feed tags.
+  # Serialize all desktop publishes so different refs cannot race those assets.
+  group: release-desktop-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:

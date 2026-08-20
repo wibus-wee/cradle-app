@@ -15,7 +15,12 @@ import type { TerminalChatMessageStatus } from './stream-chunks'
  */
 export type RunWriteFence
   = | { status: 'streaming' }
-    | { status: TerminalChatMessageStatus, errorText: string | null }
+    | {
+      status: TerminalChatMessageStatus
+      errorText: string | null
+      /** Durable terminal fact time, in Unix seconds. */
+      finishedAt: number | null
+    }
     | { status: 'missing' }
 
 export function readRunWriteFence(runId: string): RunWriteFence {
@@ -26,5 +31,5 @@ export function readRunWriteFence(runId: string): RunWriteFence {
   if (run.status === 'streaming') {
     return { status: 'streaming' }
   }
-  return { status: run.status, errorText: run.errorText }
+  return { status: run.status, errorText: run.errorText, finishedAt: run.finishedAt }
 }

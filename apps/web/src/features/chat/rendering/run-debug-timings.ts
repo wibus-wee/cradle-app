@@ -5,6 +5,8 @@ export type RunTimingMetrics = {
   acceptMs: number | null
   ttfbMs: number | null
   ttftMs: number | null
+  /** First token until the final response starts; response streaming is excluded. */
+  workedMs: number | null
   totalMs: number | null
 }
 
@@ -32,17 +34,27 @@ export function readLocalRunTimings(meta: ChatRunDisplayMeta): RunTimingMetrics 
     acceptMs: meta.acceptedAtMs === null ? null : Math.max(0, meta.acceptedAtMs - meta.requestStartedAtMs),
     ttfbMs: meta.firstEventAtMs === null ? null : Math.max(0, meta.firstEventAtMs - meta.requestStartedAtMs),
     ttftMs: meta.firstContentAtMs === null ? null : Math.max(0, meta.firstContentAtMs - meta.requestStartedAtMs),
+    workedMs: null,
     totalMs: meta.completedAtMs === null ? null : Math.max(0, meta.completedAtMs - meta.requestStartedAtMs),
   }
 }
 
 export function readRunSnapshotTimings(snapshot: GetChatRunsByRunIdSnapshotResponse): RunTimingMetrics {
-  const firstResponseEvent = snapshot.events.find(isResponseSnapshotEvent)
-  const firstTokenDeltaEvent = snapshot.events.find(isTokenDeltaSnapshotEvent)
+  const events = [...snapshot.events].sort((left, right) => left.seq - right.seq)
+  const admissionEvent = events.find(event => event.phase === 'run_admission_requested')
+  const firstResponseEvent = events.find(isResponseSnapshotEvent)
+  const firstTokenDeltaEvent = events.find(isTokenDeltaSnapshotEvent)
+  const lastExecutionEventIndex = events.findLastIndex(isExecutionSnapshotEvent)
+  const finalResponseEvent = lastExecutionEventIndex === -1
+    ? null
+    : events.slice(lastExecutionEventIndex + 1).find(isTextStartSnapshotEvent) ?? null
   return {
-    acceptMs: null,
+    acceptMs: admissionEvent ? Math.max(0, snapshot.startedAt - admissionEvent.occurredAt) : null,
     ttfbMs: firstResponseEvent ? Math.max(0, firstResponseEvent.occurredAt - snapshot.startedAt) : null,
     ttftMs: firstTokenDeltaEvent ? Math.max(0, firstTokenDeltaEvent.occurredAt - snapshot.startedAt) : null,
+    workedMs: !snapshot.eventsTruncated && firstTokenDeltaEvent && finalResponseEvent
+      ? Math.max(0, finalResponseEvent.occurredAt - firstTokenDeltaEvent.occurredAt)
+      : null,
     totalMs: snapshot.completedAt == null ? null : Math.max(0, snapshot.completedAt - snapshot.startedAt),
   }
 }
@@ -57,4 +69,15 @@ function isResponseSnapshotEvent(event: RunSnapshotEvent): boolean {
 
 function isTokenDeltaSnapshotEvent(event: RunSnapshotEvent): boolean {
   return TOKEN_DELTA_SNAPSHOT_PHASES.has(event.phase)
+}
+
+function isExecutionSnapshotEvent(event: RunSnapshotEvent): boolean {
+  return event.phase.startsWith('model_reasoning_')
+    || event.phase.startsWith('tool_call_')
+    || Boolean(event.chunkType?.startsWith('reasoning-'))
+    || Boolean(event.chunkType?.startsWith('tool-'))
+}
+
+function isTextStartSnapshotEvent(event: RunSnapshotEvent): boolean {
+  return event.chunkType === 'text-start' || event.chunkType === 'text-delta'
 }

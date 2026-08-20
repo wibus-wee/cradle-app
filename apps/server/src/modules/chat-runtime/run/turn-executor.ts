@@ -101,6 +101,7 @@ export interface TurnExecutorDeps {
       }
       estimatedCostUsd?: number | null
       durationMs?: number | null
+      occurredAt?: number
       payload?: Record<string, unknown>
     },
   ) => void
@@ -179,21 +180,19 @@ export async function executeRun(
       // Run snapshots are forensic/diagnostic. Once the durable terminal fact exists,
       // snapshot failure must not suppress terminal notification or queue/goal handoff.
       bestEffortBookkeeping: async (terminalChunk) => {
-        if (!activeRun.cancelRequested) {
-          try {
-            deps.finalizeSnapshot(activeRun, terminalChunk, {
-              modelId: actualModelId,
-              diagnostics,
-              profile,
-            })
-          }
-          catch (error) {
-            deps.warn('failed to finalize run snapshot after durable terminal', {
-              error,
-              sessionId: activeRun.sessionId,
-              runId: activeRun.runId,
-            })
-          }
+        try {
+          deps.finalizeSnapshot(activeRun, terminalChunk, {
+            modelId: actualModelId,
+            diagnostics,
+            profile,
+          })
+        }
+        catch (error) {
+          deps.warn('failed to finalize run snapshot after durable terminal', {
+            error,
+            sessionId: activeRun.sessionId,
+            runId: activeRun.runId,
+          })
         }
         recordRunUsageAndFailure(
           activeRun,
@@ -354,12 +353,15 @@ async function pumpRuntimeStream(
         })
       }
       accumulateDiagnostics(diagnostics, chunk)
+      const chunkOccurredAtMs = Date.now()
+      trackRunTimingBoundary(activeRun, chunk, chunkOccurredAtMs)
       if (isTokenDeltaChunk(chunk) && !activeRun.firstTokenDeltaSnapshotRecorded) {
         activeRun.firstTokenDeltaSnapshotRecorded = true
         profile.firstTokenAtMs = performance.now()
         deps.recordSnapshotEvent(activeRun, {
           phase: 'model_first_token_delta',
           chunk,
+          occurredAt: chunkOccurredAtMs,
         })
       }
       if (chunk.type === 'text-delta' && !activeRun.firstTextDeltaSnapshotRecorded) {
@@ -367,12 +369,14 @@ async function pumpRuntimeStream(
         deps.recordSnapshotEvent(activeRun, {
           phase: 'model_text_first_delta',
           chunk,
+          occurredAt: chunkOccurredAtMs,
         })
       }
       if (shouldRecordHarnessSnapshotChunk(chunk)) {
         deps.recordSnapshotEvent(activeRun, {
           phase: readHarnessSnapshotPhase(chunk),
           chunk,
+          occurredAt: chunkOccurredAtMs,
         })
       }
       if (isTerminalUIMessageChunk(chunk)) {
@@ -646,6 +650,31 @@ function isTokenDeltaChunk(chunk: UIMessageChunk): boolean {
   return chunk.type === 'text-delta'
     || chunk.type === 'reasoning-delta'
     || chunk.type === 'tool-input-delta'
+}
+
+function trackRunTimingBoundary(
+  activeRun: ActiveRun,
+  chunk: UIMessageChunk,
+  occurredAtMs: number,
+): void {
+  if (!isTerminalUIMessageChunk(chunk)) {
+    activeRun.firstResponseAtMs ??= occurredAtMs
+  }
+  if (isTokenDeltaChunk(chunk)) {
+    activeRun.firstTokenAtMs ??= occurredAtMs
+  }
+  if (chunk.type.startsWith('reasoning-') || chunk.type.startsWith('tool-')) {
+    activeRun.hasExecutionActivity = true
+    activeRun.finalResponseStartedAtMs = undefined
+    return
+  }
+  if (
+    activeRun.hasExecutionActivity
+    && activeRun.finalResponseStartedAtMs === undefined
+    && (chunk.type === 'text-start' || chunk.type === 'text-delta')
+  ) {
+    activeRun.finalResponseStartedAtMs = occurredAtMs
+  }
 }
 
 function toAiGenerationOutcome(chunk: UIMessageChunk): 'success' | 'failed' | 'cancelled' {

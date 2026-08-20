@@ -6,14 +6,150 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect CI scope
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.push.outputs.code || steps.filter.outputs.code }}
+      mobile: ${{ steps.push.outputs.mobile || steps.filter.outputs.mobile }}
+      chronicle: ${{ steps.push.outputs.chronicle || steps.filter.outputs.chronicle }}
+      build_web: ${{ steps.push.outputs.build_web || steps.filter.outputs.build_web }}
+      build_server: ${{ steps.push.outputs.build_server || steps.filter.outputs.build_server }}
+      build_desktop: ${{ steps.push.outputs.build_desktop || steps.filter.outputs.build_desktop }}
+      build_targets: ${{ steps.matrix.outputs.build_targets }}
+    steps:
+      - name: Run the complete gate for pushes to main
+        id: push
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          echo 'code=true' >> "$GITHUB_OUTPUT"
+          echo 'mobile=true' >> "$GITHUB_OUTPUT"
+          echo 'chronicle=true' >> "$GITHUB_OUTPUT"
+          echo 'build_web=true' >> "$GITHUB_OUTPUT"
+          echo 'build_server=true' >> "$GITHUB_OUTPUT"
+          echo 'build_desktop=true' >> "$GITHUB_OUTPUT"
+
+      # pull_request path filtering uses the GitHub API and does not need a
+      # checkout. Documentation-only PRs can therefore avoid every expensive
+      # validation job while still leaving this scope check green.
+      - name: Detect changed areas for pull requests
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            code:
+              - '**/*.cjs'
+              - '**/*.js'
+              - '**/*.mjs'
+              - '**/*.ts'
+              - '**/*.tsx'
+              - '**/*.go'
+              - '**/*.rs'
+              - '**/*.html'
+              - '**/*.mdx'
+              - '**/*.proto'
+              - '**/*.graphql'
+              - '**/*.css'
+              - '**/*.scss'
+              - '**/*.sh'
+              - '**/*.sql'
+              - '**/*.toml'
+              - '**/*.patch'
+              - '**/*.json'
+              - '**/*.yaml'
+              - '**/*.yml'
+              - 'Dockerfile*'
+              - 'Makefile'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/**'
+            mobile:
+              - 'apps/mobile/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/actions/setup/**'
+              - '.github/workflows/ci.yml'
+            chronicle:
+              - 'chronicle/**'
+              - '.github/workflows/ci.yml'
+            build_web:
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'plugins/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/actions/setup/**'
+              - '.github/workflows/ci.yml'
+            build_server:
+              - 'apps/server/**'
+              - 'packages/**'
+              - 'plugins/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/actions/setup/**'
+              - '.github/workflows/ci.yml'
+            build_desktop:
+              - 'apps/desktop/**'
+              - 'apps/server/**'
+              - 'apps/relayd/**'
+              - 'packages/**'
+              - 'plugins/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - '.github/actions/setup/**'
+              - '.github/workflows/ci.yml'
+
+      - name: Resolve build matrix
+        id: matrix
+        shell: bash
+        env:
+          BUILD_WEB: ${{ steps.push.outputs.build_web || steps.filter.outputs.build_web }}
+          BUILD_SERVER: ${{ steps.push.outputs.build_server || steps.filter.outputs.build_server }}
+          BUILD_DESKTOP: ${{ steps.push.outputs.build_desktop || steps.filter.outputs.build_desktop }}
+        run: |
+          targets=()
+          if [ "$BUILD_WEB" = 'true' ]; then targets+=(web); fi
+          if [ "$BUILD_SERVER" = 'true' ]; then targets+=(server); fi
+          if [ "$BUILD_DESKTOP" = 'true' ]; then targets+=(desktop); fi
+
+          # Keep the matrix non-empty for an unusual code/config path that is
+          # not covered by a target-specific filter. The complete build is
+          # the safe fallback; ordinary web-only/server-only PRs stay narrow.
+          if [ "${#targets[@]}" -eq 0 ]; then
+            targets=(web server desktop)
+          fi
+
+          targets_json='['
+          separator=''
+          for target in "${targets[@]}"; do
+            targets_json+="${separator}\"${target}\""
+            separator=','
+          done
+          targets_json+=']'
+          echo "build_targets=$targets_json" >> "$GITHUB_OUTPUT"
+
   shared-artifacts:
     name: Shared build artifacts
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -30,7 +166,10 @@ jobs:
   # ─── Lint ─────────────────────────────────────────────────────────────────
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -40,8 +179,10 @@ jobs:
   # ─── Typecheck ────────────────────────────────────────────────────────────
   typecheck:
     name: Typecheck (${{ matrix.target }})
+    needs: [changes, shared-artifacts]
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    needs: [shared-artifacts]
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -67,7 +208,10 @@ jobs:
   # ─── Mobile (Expo / React Native merge gate) ───────────────────────────────
   mobile:
     name: Mobile
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       EXPO_NO_TELEMETRY: 1
     steps:
@@ -86,7 +230,9 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    needs: [shared-artifacts]
+    needs: [changes, shared-artifacts]
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
@@ -108,7 +254,9 @@ jobs:
   server-tests:
     name: Server Tests
     runs-on: ubuntu-latest
-    needs: [shared-artifacts]
+    needs: [changes, shared-artifacts]
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 35
     env:
       CRADLE_CREDENTIAL_SECRET: ci-test-secret
       NODE_ENV: test
@@ -144,7 +292,10 @@ jobs:
 
   chronicle-macos:
     name: Chronicle macOS
+    needs: changes
+    if: needs.changes.outputs.chronicle == 'true'
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -158,11 +309,15 @@ jobs:
   build:
     name: Build (${{ matrix.target }})
     runs-on: ubuntu-latest
-    needs: [shared-artifacts, typecheck]
+    # Builds and typechecks are independent consumers of the shared artifact.
+    # Let them start together instead of waiting for the slowest typecheck.
+    needs: [changes, shared-artifacts]
+    if: needs.changes.outputs.code == 'true'
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        target: [web, server, desktop]
+        target: ${{ fromJSON(needs.changes.outputs.build_targets) }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup

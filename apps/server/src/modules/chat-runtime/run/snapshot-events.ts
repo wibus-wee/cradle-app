@@ -27,6 +27,7 @@ export interface SnapshotEventRun {
   snapshotEventIdByCoalesceKey: Map<string, SnapshotCoalesceEntry>
   runSnapshotTruncatedEventId?: string | null
   runSnapshotDroppedEventCount: number
+  terminalAtMs?: number
 }
 
 export interface RuntimeProfileSummaryInput {
@@ -103,6 +104,7 @@ export function recordActiveRunSnapshotEvent(
     }
     estimatedCostUsd?: number | null
     durationMs?: number | null
+    occurredAt?: number
     payload?: Record<string, unknown>
     truncatePayload: (value: unknown) => unknown
   },
@@ -150,6 +152,7 @@ export function recordActiveRunSnapshotEvent(
     totalTokens: input.usage?.totalTokens,
     estimatedCostUsd: input.estimatedCostUsd,
     durationMs: input.durationMs,
+    occurredAt: input.occurredAt,
     payload: coalesceKey ? { ...payload, coalescedCount: 1 } : payload,
   })
   if (!event) {
@@ -252,6 +255,7 @@ export function finalizeActiveRunSnapshot(
   finalizeRunSnapshot({
     snapshotId: activeRun.runSnapshotId,
     status,
+    completedAt: activeRun.terminalAtMs,
     completionReason: readSnapshotCompletionReason(finalChunk),
     errorText: finalChunk.type === 'error' ? finalChunk.errorText : null,
     modelId: input.modelId,
