@@ -6,6 +6,10 @@ Then('我应该看到工作区列表为空', async function (this: CradleWorld) 
   await this.workspacePage.expectListEmpty()
 })
 
+Then('已删除工作区当前页面应回到首页', async function (this: CradleWorld) {
+  await this.workspacePage.expectHomeRoute()
+})
+
 Then('我应该看到"添加工作区"按钮', async function (this: CradleWorld) {
   await this.workspacePage.expectAddWorkspaceButtonVisible()
 })

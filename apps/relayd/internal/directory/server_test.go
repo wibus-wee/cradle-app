@@ -16,6 +16,32 @@ import (
 	"github.com/cradle/relayd/internal/membership"
 )
 
+type recordingDirectoryMetrics struct {
+	subscriberDelta int
+}
+
+func (m *recordingDirectoryMetrics) DirectorySubscriberDelta(delta int) {
+	m.subscriberDelta += delta
+}
+
+func (*recordingDirectoryMetrics) DirectoryEvent(string) {}
+
+func TestBrokerCancelIsIdempotent(t *testing.T) {
+	metrics := &recordingDirectoryMetrics{}
+	broker := newBroker(metrics)
+	_, cancel := broker.subscribe("fabric-a")
+
+	cancel()
+	cancel()
+
+	if metrics.subscriberDelta != 0 {
+		t.Fatalf("subscriber delta = %d, want 0", metrics.subscriberDelta)
+	}
+	if len(broker.subscribers) != 0 {
+		t.Fatalf("subscribers = %#v, want empty", broker.subscribers)
+	}
+}
+
 func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
 	clock := now

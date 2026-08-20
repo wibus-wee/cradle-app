@@ -21,6 +21,13 @@ export const Populated: Story = {
   args: populatedUsageDashboardFixture,
 }
 
+export const SingleDevice: Story = {
+  args: {
+    ...populatedUsageDashboardFixture,
+    fleet: null,
+  },
+}
+
 export const Empty: Story = {
   args: emptyUsageDashboardFixture,
 }

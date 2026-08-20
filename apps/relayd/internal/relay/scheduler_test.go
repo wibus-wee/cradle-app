@@ -6,7 +6,7 @@ import (
 )
 
 func TestPeerSchedulerPreservesSameStreamOrderAcrossPriorities(t *testing.T) {
-	scheduler := newPeerScheduler(16, 16*1024, 1024)
+	scheduler := newPeerScheduler(16, 16*1024, 1024, noopMetrics{})
 	data := queuedEnvelope{data: []byte("response data"), size: 13}
 	closeFrame := queuedEnvelope{data: []byte("stream close"), size: 12}
 
@@ -34,7 +34,7 @@ func TestPeerSchedulerPreservesSameStreamOrderAcrossPriorities(t *testing.T) {
 }
 
 func TestPeerSchedulerStillPrioritizesUnrelatedControl(t *testing.T) {
-	scheduler := newPeerScheduler(16, 16*1024, 1024)
+	scheduler := newPeerScheduler(16, 16*1024, 1024, noopMetrics{})
 	data := queuedEnvelope{data: []byte("stream-a data"), size: 13}
 	control := queuedEnvelope{data: []byte("stream-b ack"), size: 12}
 

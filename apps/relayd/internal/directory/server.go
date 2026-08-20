@@ -39,7 +39,18 @@ type Config struct {
 	Store     *fabric.Store
 	Validator *membership.Validator
 	Links     *relay.FabricHub
+	Metrics   Metrics
 }
+
+type Metrics interface {
+	DirectorySubscriberDelta(delta int)
+	DirectoryEvent(outcome string)
+}
+
+type noopMetrics struct{}
+
+func (noopMetrics) DirectorySubscriberDelta(int) {}
+func (noopMetrics) DirectoryEvent(string)        {}
 
 type createFabricResponse struct {
 	Fabric fabric.Fabric `json:"fabric"`
@@ -74,7 +85,13 @@ func NewServer(cfg Config) (*Server, error) {
 	if cfg.Validator == nil {
 		return nil, errors.New("directory: membership validator is required")
 	}
-	return &Server{store: cfg.Store, validator: cfg.Validator, broker: newBroker(), links: cfg.Links}, nil
+	if cfg.Metrics == nil {
+		cfg.Metrics = noopMetrics{}
+	}
+	return &Server{
+		store: cfg.Store, validator: cfg.Validator, broker: newBroker(cfg.Metrics),
+		links: cfg.Links,
+	}, nil
 }
 
 func (s *Server) Register(mux *http.ServeMux) {
@@ -707,37 +724,46 @@ func writeSSE(w http.ResponseWriter, eventName string, value any) bool {
 type broker struct {
 	mu          sync.Mutex
 	subscribers map[string]map[chan event]struct{}
+	metrics     Metrics
 }
 
-func newBroker() *broker {
-	return &broker{subscribers: map[string]map[chan event]struct{}{}}
+func newBroker(metrics Metrics) *broker {
+	return &broker{subscribers: map[string]map[chan event]struct{}{}, metrics: metrics}
 }
 
 func (b *broker) subscribe(fabricID string) (<-chan event, func()) {
 	updates := make(chan event, 16)
+	var cancelOnce sync.Once
 	b.mu.Lock()
 	if b.subscribers[fabricID] == nil {
 		b.subscribers[fabricID] = map[chan event]struct{}{}
 	}
 	b.subscribers[fabricID][updates] = struct{}{}
 	b.mu.Unlock()
+	b.metrics.DirectorySubscriberDelta(1)
 	return updates, func() {
-		b.mu.Lock()
-		defer b.mu.Unlock()
-		delete(b.subscribers[fabricID], updates)
-		if len(b.subscribers[fabricID]) == 0 {
-			delete(b.subscribers, fabricID)
-		}
+		cancelOnce.Do(func() {
+			b.mu.Lock()
+			delete(b.subscribers[fabricID], updates)
+			if len(b.subscribers[fabricID]) == 0 {
+				delete(b.subscribers, fabricID)
+			}
+			b.mu.Unlock()
+			b.metrics.DirectorySubscriberDelta(-1)
+		})
 	}
 }
 
 func (b *broker) publish(fabricID string, update event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.metrics.DirectoryEvent("published")
 	for subscriber := range b.subscribers[fabricID] {
 		select {
 		case subscriber <- update:
+			b.metrics.DirectoryEvent("delivered")
 		default:
+			b.metrics.DirectoryEvent("dropped")
 			// Subscribers always receive a snapshot on reconnection. Dropping an
 			// overfull live update is preferable to unbounded relay control-plane
 			// memory and cannot expose another Node's state.

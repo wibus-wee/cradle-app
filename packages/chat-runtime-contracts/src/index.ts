@@ -189,6 +189,7 @@ export interface RuntimeSlashCommand {
 
 export const RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID = 'cradle.runtime.codeReview'
 export const RUNTIME_USAGE_COMMAND_ACTION_ID = 'cradle.runtime.usage'
+export const RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID = 'cradle.runtime.fastServiceTier'
 
 /**
  * Cradle-owned canonical tool-call vocabulary. Every chat-runtime provider must
@@ -414,6 +415,7 @@ export interface RuntimeModelUiSlotState {
   modelLabel: string | null
   modelProvider: string | null
   serviceTier: string | null
+  serviceTiers: Array<{ id: string, name: string, description: string }>
   supportsImages: boolean | null
   supportsWebSearch: boolean | null
   supportsNamespaceTools: boolean | null

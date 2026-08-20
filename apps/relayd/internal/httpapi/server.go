@@ -18,14 +18,14 @@ import (
 type ServerConfig struct {
 	Config    config.Config
 	Directory *directory.Server
-	Metrics   *metrics.Counters
+	Metrics   *metrics.Metrics
 	Logger    *slog.Logger
 }
 
 type Server struct {
 	cfg       config.Config
 	directory *directory.Server
-	metrics   *metrics.Counters
+	metrics   *metrics.Metrics
 	logger    *slog.Logger
 	mux       *http.ServeMux
 }
@@ -35,7 +35,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		return nil, errors.New("httpapi: directory is required")
 	}
 	if cfg.Metrics == nil {
-		cfg.Metrics = metrics.New()
+		cfg.Metrics = metrics.New("dev")
 	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
@@ -52,7 +52,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.mux
+	return s.metrics.InstrumentHTTP(s.mux)
 }
 
 func (s *Server) routes() {

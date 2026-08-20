@@ -41,6 +41,7 @@ import type { ActiveRunLifecycleDeps } from './lifecycle/cancel'
 import {
   abortAllRuns as abortAllRunsFromLifecycle,
   abortRun as abortRunFromLifecycle,
+  cancelProviderTargetSessions as cancelProviderTargetSessionsFromLifecycle,
   cancelSession as cancelSessionFromLifecycle,
   completeTerminalPersistedActiveRunForSession as completeTerminalPersistedActiveRunForSessionFromLifecycle,
 } from './lifecycle/cancel'
@@ -287,9 +288,6 @@ function observeStaleActiveRunCompletion(activeRun: ActiveRun, fence: Parameters
   })
 }
 
-SessionService.onSessionArchived(releaseSideConversationsByParentSessionId)
-SessionService.onSessionCleanup(releaseSideConversationsByParentSessionId)
-
 function disposeRuntimeSessionResources(sessionId: string): void {
   const registry = getRuntimeRegistry()
   for (const item of registry.list()) {
@@ -302,8 +300,18 @@ function disposeRuntimeSessionResources(sessionId: string): void {
   }
 }
 
-SessionService.onSessionArchived(disposeRuntimeSessionResources)
-SessionService.onSessionCleanup(disposeRuntimeSessionResources)
+let sessionLifecycleHandlersRegistered = false
+
+export function registerChatRuntimeSessionLifecycleHandlers(): void {
+  if (sessionLifecycleHandlersRegistered) {
+    return
+  }
+  sessionLifecycleHandlersRegistered = true
+  SessionService.onSessionArchived(releaseSideConversationsByParentSessionId)
+  SessionService.onSessionCleanup(releaseSideConversationsByParentSessionId)
+  SessionService.onSessionArchived(disposeRuntimeSessionResources)
+  SessionService.onSessionCleanup(disposeRuntimeSessionResources)
+}
 
 function publishRunChunk(runId: string, chunk: UIMessageChunk): void {
   const activeRun = runRegistry.getActiveRun(runId)
@@ -575,6 +583,10 @@ export async function abortRun(runId: string): Promise<void> {
  */
 export async function cancelSession(sessionId: string): Promise<void> {
   return cancelSessionFromLifecycle(sessionId, activeRunLifecycleDeps)
+}
+
+export async function cancelProviderTargetSessions(providerTargetId: string): Promise<void> {
+  return cancelProviderTargetSessionsFromLifecycle(providerTargetId, activeRunLifecycleDeps)
 }
 
 export async function abortAllRuns(): Promise<void> {

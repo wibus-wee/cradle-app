@@ -352,11 +352,13 @@ interface ManagedRelayLaunch {
 async function startManagedRelay(dataDir: string): Promise<{
   relayUrl: string | null
   accessMode: DesktopRelayAccessMode
+  pid: number | null
 }> {
   if (managedRelayProcess && managedRelayUrl) {
     return {
       relayUrl: managedRelayUrl,
       accessMode: process.env.CRADLE_RELAYD_ACCESS_MODE === 'local' ? 'local' : 'network',
+      pid: managedRelayProcess.targetPid ?? managedRelayProcess.pid ?? null,
     }
   }
 
@@ -366,6 +368,7 @@ async function startManagedRelay(dataDir: string): Promise<{
     return {
       relayUrl: access.relayUrl ? normalizeDesktopRelayUrl(access.relayUrl) : null,
       accessMode: 'external',
+      pid: null,
     }
   }
   const port = await getPort({ port: [8787, 8788, 8789, 8790] })
@@ -420,7 +423,11 @@ async function startManagedRelay(dataDir: string): Promise<{
     throw error
   }
   console.warn(`[desktop] Managed relay started on ${relayUrl}`)
-  return { relayUrl, accessMode: access.accessMode }
+  return {
+    relayUrl,
+    accessMode: access.accessMode,
+    pid: child.targetPid ?? child.pid ?? null,
+  }
 }
 
 async function waitForManagedRelay(url: string, child: ManagedChildProcess): Promise<void> {
@@ -513,7 +520,7 @@ async function spawnServer(opts: {
   port: number
   dataDir: string
   credentialSecret: string
-  managedRelay: { relayUrl: string | null, accessMode: DesktopRelayAccessMode }
+  managedRelay: { relayUrl: string | null, accessMode: DesktopRelayAccessMode, pid: number | null }
   bootstrapWatchdog?: ServerBootstrapWatchdog
   onBootstrapEvent?: (event: ServerBootstrapEvent) => void
 }): Promise<void> {
@@ -551,6 +558,7 @@ async function spawnServer(opts: {
     CRADLE_CREDENTIAL_SECRET: credentialSecret,
     ...(managedRelay.relayUrl ? { CRADLE_RELAYD_PUBLIC_URL: managedRelay.relayUrl } : {}),
     CRADLE_RELAYD_ACCESS_MODE: managedRelay.accessMode,
+    ...(managedRelay.pid ? { CRADLE_RELAYD_PID: String(managedRelay.pid) } : {}),
     CRADLE_DESKTOP_PID: String(process.pid),
     CRADLE_PLUGINS_DIR: pluginsDir,
     CRADLE_PLUGINS_SOURCE_KIND: pluginsSourceKind,

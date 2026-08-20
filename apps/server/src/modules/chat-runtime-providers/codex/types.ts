@@ -384,6 +384,7 @@ export interface CodexModelListResponse {
     model?: string
     displayName?: string
     supportedReasoningEfforts?: Array<{ reasoningEffort?: string, description?: string }>
+    serviceTiers?: Array<{ id: string, name: string, description: string }>
     defaultReasoningEffort?: string
     hidden?: boolean
   }>

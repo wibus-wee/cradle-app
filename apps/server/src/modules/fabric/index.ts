@@ -21,6 +21,10 @@ export const fabric = new Elysia({ prefix: '/fabric', detail: { tags: ['fabric']
     detail: { summary: 'Read the current Desktop Fabric relay endpoint' },
     response: { 200: FabricModel.managedRelay },
   })
+  .get('/managed-relay/resources', () => Fabric.getManagedRelayResources(), {
+    detail: { summary: 'Read the Desktop-managed Relay process resource usage' },
+    response: { 200: FabricModel.managedRelayResources },
+  })
   .post('', ({ body }) => Fabric.createFabric(body), { detail: { summary: 'Create a Cradle Fabric and enroll this Node' }, body: FabricModel.createBody, response: { 200: FabricModel.membership } })
   .delete('', ({ set }) => {
     Fabric.leaveFabric()

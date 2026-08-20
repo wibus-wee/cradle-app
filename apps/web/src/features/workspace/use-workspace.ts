@@ -4,8 +4,13 @@ import { useTranslation } from 'react-i18next'
 
 import {
   deleteWorkspacesByWorkspaceIdMutation,
+  getSessionsByIdQueryKey,
+  getSessionsByIdWorkQueryKey,
+  getSessionsQueryKey,
+  getWorksByIdQueryKey,
   getWorkspacesOptions,
   getWorkspacesQueryKey,
+  getWorksQueryKey,
   patchWorkspacesByWorkspaceIdMutation,
   postWorkspacesFromDirectoryMutation,
   postWorkspacesInspectDirectoryMutation,
@@ -224,9 +229,22 @@ export function useAddWorkspace() {
 export function useDeleteWorkspace() {
   const queryClient = useQueryClient()
 
-  const { mutate: remove } = useMutation({
+  const { mutateAsync: remove } = useMutation({
     ...deleteWorkspacesByWorkspaceIdMutation(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
+    onSuccess: async (result) => {
+      for (const sessionId of result.removedSessionIds) {
+        queryClient.removeQueries({ queryKey: getSessionsByIdQueryKey({ path: { id: sessionId } }) })
+        queryClient.removeQueries({ queryKey: getSessionsByIdWorkQueryKey({ path: { id: sessionId } }) })
+      }
+      for (const workId of result.removedWorkIds) {
+        queryClient.removeQueries({ queryKey: getWorksByIdQueryKey({ path: { id: workId } }) })
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
+      ])
+    },
   })
 
   return { remove }

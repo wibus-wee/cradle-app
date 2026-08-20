@@ -65,11 +65,12 @@ func run() error {
 		return fmt.Errorf("opening Fabric directory: %w", err)
 	}
 	defer fabricStore.Close()
-	counterSet := metrics.New()
+	metricSet := metrics.New(relaydVersion)
 	fabricHub := relay.NewFabricHub(relay.FabricHubConfig{
 		MaxFrameBytes:      cfg.MaxFrameBytes,
 		MaxQueuedEnvelopes: cfg.MaxQueuedEnvelopes,
 		MaxQueuedBytes:     cfg.MaxQueuedBytes,
+		Metrics:            metricSet,
 	})
 	// The directory is the only component allowed to create Fabric links; the
 	// hub only routes already-authorized opaque v3 envelopes.
@@ -77,6 +78,7 @@ func run() error {
 		Store:     fabricStore,
 		Validator: membership.NewValidator(time.Now, cfg.AssertionMaxSkew),
 		Links:     fabricHub,
+		Metrics:   metricSet,
 	})
 	if err != nil {
 		return fmt.Errorf("creating Fabric transport directory: %w", err)
@@ -84,7 +86,7 @@ func run() error {
 	api, err := httpapi.NewServer(httpapi.ServerConfig{
 		Config:    cfg,
 		Directory: fabricDirectory,
-		Metrics:   counterSet,
+		Metrics:   metricSet,
 		Logger:    logger,
 	})
 	if err != nil {

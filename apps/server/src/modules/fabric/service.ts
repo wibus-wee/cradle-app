@@ -8,6 +8,7 @@ import { asc, eq } from 'drizzle-orm'
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
+import { readProcessTreeResourceUsage } from '../../infra/process-resources'
 import { readSecret, removeSecret, upsertSecret } from '../secrets/service'
 import { FabricDirectoryClient } from './directory-client'
 import type { FabricJoinRequest, FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
@@ -125,6 +126,51 @@ export function getManagedRelay(): { relayUrl: string, accessMode: 'local' | 'ne
     ? 'external'
     : process.env.CRADLE_RELAYD_ACCESS_MODE === 'network' ? 'network' : 'local'
   return { relayUrl, accessMode }
+}
+
+export interface ManagedRelayResources {
+  source: 'managed' | 'external' | 'unavailable'
+  running: boolean
+  pid: number | null
+  rssMB: number | null
+  cpuPercent: number | null
+  descendantCount: number | null
+}
+
+/** Read the local process tree only; an external Relay is not part of this host's resource total. */
+export function getManagedRelayResources(): ManagedRelayResources {
+  if (process.env.CRADLE_RELAYD_ACCESS_MODE === 'external') {
+    return {
+      source: 'external',
+      running: false,
+      pid: null,
+      rssMB: null,
+      cpuPercent: null,
+      descendantCount: null,
+    }
+  }
+
+  const pid = Number.parseInt(process.env.CRADLE_RELAYD_PID ?? '', 10)
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return {
+      source: 'unavailable',
+      running: false,
+      pid: null,
+      rssMB: null,
+      cpuPercent: null,
+      descendantCount: null,
+    }
+  }
+
+  const usage = readProcessTreeResourceUsage(pid)
+  return {
+    source: 'managed',
+    running: usage !== null,
+    pid,
+    rssMB: usage?.rssMB ?? null,
+    cpuPercent: usage?.cpuPercent ?? null,
+    descendantCount: usage?.descendantCount ?? null,
+  }
 }
 
 export function hasPendingNodeEnrollment(): boolean {

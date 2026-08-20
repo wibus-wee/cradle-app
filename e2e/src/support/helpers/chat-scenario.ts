@@ -24,6 +24,12 @@ export const QUEUED_RESPONSE = '持久化队列跟进已完成'
 const QUEUED_PROMPT = '这是需要持久化的跟进'
 export const EDITED_QUEUE_PROMPT = '已编辑的队列跟进'
 export const EDITED_QUEUE_RESPONSE = '已编辑的队列跟进已完成'
+export const WORK_FAILURE_RECOVERY_RESPONSE = 'Work 失败后的重试已完成'
+export const WORK_FAILURE_RECOVERY_FILE_NAME = 'e2e-work-recovery.txt'
+export const WORK_FAILURE_RECOVERY_FILE_CONTENT = 'created after the initial Work provider failure\n'
+export const WORK_STOP_RECOVERY_RESPONSE = 'Work 停止后的重试已完成'
+export const WORK_STOP_RECOVERY_FILE_NAME = 'e2e-work-stop-recovery.txt'
+export const WORK_STOP_RECOVERY_FILE_CONTENT = 'created after the initial Work was stopped\n'
 const SLOW_GATE = 'e2e-slow-stream'
 export const CHAT_STATUS_TIMEOUT = 30_000
 const SESSION_ALIASES_KEY = 'chat.session-aliases'
@@ -242,6 +248,89 @@ export async function configureWorkWriteToolLoopSimulator(world: CradleWorld): P
   ]))
 }
 
+export async function configureWorkFailureRecoverySimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure Claude Agent Work failure recovery simulator')
+  await world.configureClaudeAgentChat({ mode: 'text' })
+  requireSimulator(world).reset()
+  const excludeTitle = 'You are naming a Claude Agent task session'
+  const toolUseId = 'toolu_e2e_work_recovery_write'
+  world.enqueue(anthropicScenario([
+    anthropicHttpErrorExchange({
+      label: 'work-initial-provider-failure',
+      message: 'E2E Work initial provider failure',
+      bodyTextIncludes: '首次 Work 请求触发 provider 错误',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicToolUseExchange({
+      label: 'work-recovery-write-file',
+      toolUseId,
+      toolName: 'Write',
+      toolInput: {
+        file_path: WORK_FAILURE_RECOVERY_FILE_NAME,
+        content: WORK_FAILURE_RECOVERY_FILE_CONTENT,
+      },
+      bodyTextIncludes: '请在隔离 Work 中完成失败后的恢复验证',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicTextExchange({
+      label: 'work-recovery-final',
+      text: WORK_FAILURE_RECOVERY_RESPONSE,
+      bodyTextIncludes: toolUseId,
+      bodyTextExcludes: excludeTitle,
+    }),
+  ]))
+}
+
+export async function configureStoppableWorkRecoverySimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure stoppable Claude Agent Work recovery simulator')
+  await world.configureClaudeAgentChat({ mode: 'text' })
+  requireSimulator(world).reset()
+  const excludeTitle = 'You are naming a Claude Agent task session'
+  const toolUseId = 'toolu_e2e_work_stop_recovery_write'
+  world.enqueue(anthropicScenario([
+    anthropicTextExchange({
+      label: 'work-slow-before-stop',
+      text: SLOW_RESPONSE,
+      gateAfterStart: SLOW_GATE,
+      bodyTextIncludes: '请启动可停止的 Work',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicToolUseExchange({
+      label: 'work-stop-recovery-write-file',
+      toolUseId,
+      toolName: 'Write',
+      toolInput: {
+        file_path: WORK_STOP_RECOVERY_FILE_NAME,
+        content: WORK_STOP_RECOVERY_FILE_CONTENT,
+      },
+      bodyTextIncludes: '请在停止后恢复隔离 Work',
+      bodyTextExcludes: excludeTitle,
+    }),
+    anthropicTextExchange({
+      label: 'work-stop-recovery-final',
+      text: WORK_STOP_RECOVERY_RESPONSE,
+      bodyTextIncludes: toolUseId,
+      bodyTextExcludes: excludeTitle,
+    }),
+  ]))
+}
+
+export async function configureActiveWorkWorkspaceRemovalSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure active Work workspace removal simulator')
+  await world.configureClaudeAgentChat({ mode: 'text', text: SLOW_RESPONSE })
+  requireSimulator(world).reset()
+  world.enqueue(anthropicScenario([
+    anthropicTextExchange({
+      label: 'active-work-before-workspace-removal',
+      text: SLOW_RESPONSE,
+      gateAfterStart: SLOW_GATE,
+      bodyTextIncludes: '删除运行中的 Work 工作区',
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
+    }),
+  ]))
+  world.remember('simulator.slow-gate', SLOW_GATE)
+}
+
 export async function configureFileContextSimulator(world: CradleWorld): Promise<void> {
   console.warn('[step] configure Claude Agent file-context simulator')
   await world.configureClaudeAgentChat({ mode: 'text' })
@@ -330,6 +419,16 @@ export async function releaseSlowStreamGate(world: CradleWorld): Promise<void> {
   }
   await simulator.waitForGate(gate)
   simulator.release(gate)
+}
+
+export async function waitForSlowStreamGate(world: CradleWorld): Promise<void> {
+  await requireSimulator(world).waitForGate(world.recall<string>('simulator.slow-gate'))
+}
+
+export function expectSlowStreamGateCanceled(world: CradleWorld): void {
+  const simulator = requireSimulator(world)
+  const gate = world.recall<string>('simulator.slow-gate')
+  expect(() => simulator.release(gate)).toThrow(`Unknown or already settled gate "${gate}"`)
 }
 
 export function clearPendingScriptedReplies(world: CradleWorld): void {

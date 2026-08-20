@@ -197,23 +197,24 @@ class KimiProvider implements ChatRuntime {
     try {
       const status = await lease.resource.http.request(getApiV1SessionsBySessionIdStatus({
         client: lease.resource.http.client,
-path: { session_id: providerSessionId },
+        path: { session_id: providerSessionId },
       }))
       if (!status || !('context_tokens' in status)) { return null }
+      const maxTokens = status.max_context_tokens ?? null
       return {
         runtimeKind: this.runtimeKind,
-providerSessionId,
-source: 'kimi.session.status',
-model: status.model ?? null,
+        providerSessionId,
+        source: 'kimi.session.status',
+        model: status.model ?? null,
         totalTokens: status.context_tokens,
-maxTokens: status.max_context_tokens,
-rawMaxTokens: status.max_context_tokens,
-        percentage: status.max_context_tokens ? status.context_usage : null,
+        maxTokens,
+        rawMaxTokens: maxTokens,
+        percentage: maxTokens ? status.context_usage : null,
         sections: [],
-messageBreakdown: null,
-apiUsage: null,
-raw: status,
-updatedAt: Date.now(),
+        messageBreakdown: null,
+        apiUsage: null,
+        raw: status,
+        updatedAt: Date.now(),
       }
     }
     finally { lease.release() }
@@ -253,7 +254,7 @@ updatedAt: Date.now(),
       }
       if (status && 'busy' in status) {
         states.push({ kind: 'status', slotId: 'kimi:status', threadId: providerSessionId, status: status.busy ? 'active' : 'idle', activeFlags: [], updatedAt })
-        states.push({ kind: 'model', slotId: 'kimi:model', threadId: providerSessionId, modelId: status.model ?? null, modelLabel: status.model ?? null, modelProvider: null, serviceTier: null, supportsImages: null, supportsWebSearch: null, supportsNamespaceTools: null, updatedAt })
+        states.push({ kind: 'model', slotId: 'kimi:model', threadId: providerSessionId, modelId: status.model ?? null, modelLabel: status.model ?? null, modelProvider: null, serviceTier: null, serviceTiers: [], supportsImages: null, supportsWebSearch: null, supportsNamespaceTools: null, updatedAt })
         states.push({ kind: 'config', slotId: 'kimi:config', threadId: providerSessionId, modelId: status.model ?? null, approvalPolicy: status.permission, sandboxMode: null, allowedApprovalPolicyCount: null, allowedSandboxModeCount: null, featureRequirementCount: null, webSearchModeCount: null, updatedAt })
         if (status.plan_mode) {
           states.push({

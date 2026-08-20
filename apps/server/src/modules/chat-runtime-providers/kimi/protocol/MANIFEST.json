@@ -1,18 +1,18 @@
 {
-  "asyncapiSha256": "816fc4942f55a4d1426e71ed787c112d2f376ae4cba043a033932f142db9d8ef",
+  "asyncapiSha256": "7198ac0d36a66da0f69e21864333889debd5419fc2e18e3f160c5a5159783e80",
   "asyncapiVersion": "3.1.0",
   "bindings": "typescript",
   "command": "pnpm --filter @cradle/server generate:kimi-web-protocol",
-  "generatedDate": "2026-07-31",
+  "generatedDate": "2026-08-20",
   "notes": [
     "The running Kimi CLI is the protocol source of truth.",
     "Loopback port values are normalized to {port} before snapshots are committed.",
     "The temporary KIMI_CODE_HOME and its bearer token are never committed or logged."
   ],
-  "openapiSha256": "c0883fcfa36fd78f25ece3f106bd6af3896749b679c14ab34c668f0aece47490",
+  "openapiSha256": "095c58697001102ed5e7af9ce2bd528a4ebebdb281fe7c1433a14e361c97d6df",
   "openapiVersion": "3.0.3",
   "owner": "apps/server/src/modules/chat-runtime-providers/kimi",
   "protocol": "kimi-web",
   "restGenerator": "@hey-api/openapi-ts",
-  "runtimeVersion": "0.31.1"
+  "runtimeVersion": "0.37.2"
 }

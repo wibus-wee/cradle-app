@@ -11,3 +11,11 @@ scrape_configs:
       - targets: ['host.docker.internal:9464']
         labels:
           service: cradle-server
+
+  - job_name: cradle-relayd
+    metrics_path: /metrics
+    static_configs:
+      # Desktop's managed Relay uses port 8787 when it is available.
+      - targets: ['host.docker.internal:8787']
+        labels:
+          service: cradle-relayd

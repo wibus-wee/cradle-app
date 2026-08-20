@@ -154,6 +154,17 @@ export function flushRunSnapshotWriteBehind(): void {
   }
 }
 
+/**
+ * Discard server-local write-behind state before the test reset capability
+ * removes its owning database rows.
+ */
+export function discardRunSnapshotWriteBehind(): void {
+  for (const journal of journals.values()) {
+    cancelTimer(journal)
+  }
+  journals.clear()
+}
+
 export function releaseRunSnapshotContext(database: SnapshotDatabase, snapshotId: string): void {
   const journal = journals.get(database)
   if (!journal) {

@@ -1,6 +1,7 @@
 import type { RuntimeApprovalsUiSlotState, RuntimeBackgroundTerminal, RuntimeCompactUiSlotState, RuntimeConfigUiSlotState, RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimeDiffUiSlotState, RuntimeFilesystemUiSlotState, RuntimeMcpUiSlotState, RuntimeModelUiSlotState, RuntimePlanUiSlotState, RuntimePluginUiSlotState, RuntimeReasoningUiSlotState, RuntimeSearchUiSlotState, RuntimeSkillsUiSlotItem, RuntimeSkillsUiSlotState, RuntimeStatusUiSlotState, RuntimeTerminalUiSlotState, RuntimeToolActivityStatus, RuntimeToolActivityUiSlotState, RuntimeUiSlot, RuntimeUiSlotState, RuntimeUsageUiSlotState } from '../../../chat-runtime/runtime-provider-types'
 import {
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
 } from '../../../chat-runtime/runtime-provider-types'
 import type { CodexAppServerCapabilityManifest } from '../app-server/capabilities'
@@ -354,17 +355,6 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
     anyNotifications: ['thread/compacted'],
   },
   {
-    id: 'codex:feedback',
-    name: 'feedback',
-    label: 'Feedback',
-    description: 'Send feedback about this chat.',
-    argumentHint: '',
-    iconKey: 'feedback',
-    commandText: '/feedback ',
-    surfaces: ['slashCommand'],
-    requiredMethods: ['feedback/upload'],
-  },
-  {
     id: 'codex:goal',
     name: 'goal',
     label: 'Goal',
@@ -388,6 +378,22 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
     commandText: '/reasoning ',
     surfaces: ['toolbarPicker', 'runtimePanel'],
     requiredMethods: ['thread/settings/update'],
+  },
+  {
+    id: 'codex:fast',
+    name: 'fast',
+    label: 'Fast',
+    description: 'Use the model fast service tier.',
+    argumentHint: '',
+    iconKey: 'reasoning',
+    commandText: '/fast ',
+    commandAction: {
+      kind: 'uiAction',
+      actionId: RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID,
+    },
+    requiresSession: true,
+    surfaces: ['slashCommand'],
+    requiredMethods: ['model/list', 'thread/settings/update'],
   },
   {
     id: 'codex:model',
@@ -440,20 +446,6 @@ export function projectCodexUiSlots(manifest: CodexAppServerCapabilityManifest):
       surfaces: surfaces ?? ['runtimePanel'],
     }),
   )
-}
-
-/**
- * Applies host-local config requirements that gate presentation slots.
- * `feedback.enabled === false` removes `/feedback`; null/undefined leaves the slot.
- */
-export function applyCodexConfigRequirementSlotGates(
-  slots: RuntimeUiSlot[],
-  requirements: CodexConfigRequirementsReadResponse['requirements'] | null | undefined,
-): RuntimeUiSlot[] {
-  if (requirements?.feedback?.enabled === false) {
-    return slots.filter(slot => slot.id !== 'codex:feedback')
-  }
-  return slots
 }
 
 function supportsSlot(
@@ -631,6 +623,11 @@ function projectCodexModelState(
     modelLabel: modelInfo?.displayName ?? modelInfo?.model ?? modelId,
     modelProvider: model?.modelProvider ?? configResponse?.config?.model_provider ?? null,
     serviceTier: model?.serviceTier ?? configResponse?.config?.service_tier ?? null,
+    serviceTiers: (modelInfo?.serviceTiers ?? []).map(tier => ({
+      id: tier.id,
+      name: tier.name,
+      description: tier.description,
+    })),
     supportsImages:
       typeof providerCapabilities?.imageGeneration === 'boolean'
         ? providerCapabilities.imageGeneration

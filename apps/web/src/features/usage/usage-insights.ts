@@ -5,9 +5,64 @@ import type { TFunction } from 'i18next'
 
 import { buildDenseDailySeries, lastDateKeys, weekdayIndexFromDateKey } from './usage-date'
 import { categoryColor } from './usage-palette'
-import type { DailyCost, DailyToolUsage, DailyUsage, DailyUsageByModel } from './use-usage-overview'
+import type { DailyCost, DailyToolUsage, DailyUsage, DailyUsageByModel, UsageStats } from './use-usage-overview'
 
 export { weekdayLabel } from './usage-date'
+
+/**
+ * Recomputes the UsageStats shape from a daily series client-side. Mirrors
+ * the server's streak semantics (streak stays alive when the last active day
+ * is today or yesterday; only 1-day gaps extend it). Used to derive
+ * fleet-wide stats from merged per-device series, where the server's
+ * single-device stats no longer apply.
+ */
+export function usageStatsFromDaily(daily: DailyUsage[]): UsageStats {
+  const dates = [...new Set(daily.filter(entry => entry.totalTokens > 0).map(entry => entry.date))].sort()
+  const totalTokens = sum(daily.map(entry => entry.totalTokens))
+  const activeDays = dates.length
+
+  let currentStreak = 0
+  let longestStreak = 0
+  if (dates.length > 0) {
+    const todayKey = lastDateKeys(1)[0]
+    const dayMs = 86_400_000
+    const daysSinceLast = Math.floor((new Date(todayKey).getTime() - new Date(dates.at(-1)!).getTime()) / dayMs)
+    if (daysSinceLast <= 1) {
+      currentStreak = 1
+      for (let index = dates.length - 2; index >= 0; index--) {
+        const gap = Math.floor((new Date(dates[index + 1]).getTime() - new Date(dates[index]).getTime()) / dayMs)
+        if (gap === 1) { currentStreak++ }
+ else { break }
+      }
+    }
+    let streak = 1
+    longestStreak = 1
+    for (let index = 1; index < dates.length; index++) {
+      const gap = Math.floor((new Date(dates[index]).getTime() - new Date(dates[index - 1]).getTime()) / dayMs)
+      if (gap === 1) {
+        streak++
+        if (streak > longestStreak) { longestStreak = streak }
+      }
+      else {
+        streak = 1
+      }
+    }
+  }
+
+  const peak = daily.reduce<DailyUsage | null>(
+    (best, entry) => (entry.totalTokens > (best?.totalTokens ?? 0) ? entry : best),
+    null,
+  )
+
+  return {
+    currentStreak,
+    longestStreak,
+    activeDays,
+    avgDailyTokens: activeDays > 0 ? Math.round(totalTokens / activeDays) : 0,
+    peakDay: peak ? { date: peak.date, totalTokens: peak.totalTokens } : null,
+    todayTokens: daily.find(entry => entry.date === lastDateKeys(1)[0])?.totalTokens ?? 0,
+  }
+}
 
 export interface PeriodComparison {
   currentTotal: number
@@ -357,6 +412,93 @@ export function denseToolStackSeries(
   })
 
   return { series, models: tools }
+}
+
+/**
+ * Generic dense-stack pivot shared by the fleet (per-device) stack helpers:
+ * ranks buckets by total volume across ALL history for stable stack position,
+ * collapses everything past `limit` into OTHER_MODEL_KEY.
+ */
+function pivotDenseStack(
+  rows: Array<{ date: string, key: string, value: number }>,
+  days: number,
+  limit: number,
+): ModelStackSeries {
+  const totalsByKey = new Map<string, number>()
+  for (const row of rows) {
+    totalsByKey.set(row.key, (totalsByKey.get(row.key) ?? 0) + row.value)
+  }
+  const ranked = [...totalsByKey.entries()].sort((a, b) => b[1] - a[1]).map(([key]) => key)
+  const top = ranked.slice(0, limit)
+  const topSet = new Set(top)
+  const buckets = ranked.length > limit ? [...top, OTHER_MODEL_KEY] : [...top]
+
+  const byDate = new Map<string, Map<string, number>>()
+  for (const row of rows) {
+    const key = topSet.has(row.key) ? row.key : OTHER_MODEL_KEY
+    const bucket = byDate.get(row.date) ?? new Map<string, number>()
+    bucket.set(key, (bucket.get(key) ?? 0) + row.value)
+    byDate.set(row.date, bucket)
+  }
+
+  const series: ModelStackDatum[] = lastDateKeys(days).map((date) => {
+    const bucket = byDate.get(date)
+    const datum: ModelStackDatum = { date }
+    for (const key of buckets) {
+      datum[key] = bucket?.get(key) ?? 0
+    }
+    return datum
+  })
+
+  return { series, models: buckets }
+}
+
+/** Minimal per-device series shape the fleet stack helpers need. */
+export interface FleetStackDevice {
+  key: string
+  daily: DailyUsage[]
+  dailyByModel: DailyUsageByModel[]
+  dailyCost: DailyCost[]
+}
+
+/**
+ * Pivots fleet-wide daily rows into one stacked-bar datum per calendar day
+ * keyed by device — the trend chart's "by device" token view. Device count is
+ * small by nature, so no top-N bucketing (limit = Infinity).
+ */
+export function denseFleetTokenStackSeries(devices: FleetStackDevice[], days: number): ModelStackSeries {
+  return pivotDenseStack(
+    devices.flatMap(device => device.daily.map(row => ({ date: row.date, key: device.key, value: row.totalTokens }))),
+    days,
+    Infinity,
+  )
+}
+
+/** Cost twin of denseFleetTokenStackSeries — sums each device's daily costUsd. */
+export function denseFleetCostStackSeries(devices: FleetStackDevice[], days: number): ModelStackSeries {
+  return pivotDenseStack(
+    devices.flatMap(device => device.dailyCost.map(row => ({ date: row.date, key: device.key, value: row.costUsd }))),
+    days,
+    Infinity,
+  )
+}
+
+/** Combined device × model token stack ("which models on which device"), keyed `${deviceKey}::${modelId}` with top-N bucketing. */
+export function denseFleetModelTokenStackSeries(devices: FleetStackDevice[], days: number, limit = 6): ModelStackSeries {
+  return pivotDenseStack(
+    devices.flatMap(device => device.dailyByModel.map(row => ({ date: row.date, key: `${device.key}::${row.modelId}`, value: row.totalTokens }))),
+    days,
+    limit,
+  )
+}
+
+/** Cost twin of denseFleetModelTokenStackSeries, stacking costUsd per device × model. */
+export function denseFleetModelCostStackSeries(devices: FleetStackDevice[], days: number, limit = 6): ModelStackSeries {
+  return pivotDenseStack(
+    devices.flatMap(device => device.dailyCost.map(row => ({ date: row.date, key: `${device.key}::${row.modelId}`, value: row.costUsd }))),
+    days,
+    limit,
+  )
 }
 
 /** Groups the daily-by-model series by weekday, for the "which model" line in the by-weekday pattern chart tooltip. */

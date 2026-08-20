@@ -1,3 +1,4 @@
+import { summarizeRuntimeProcessResources } from '../../infra/process-resources'
 import {
   updateChatRuntimeMetrics,
   updateChronicleMetrics,
@@ -19,7 +20,6 @@ import { getOpencodeServerResources } from '../chat-runtime-providers/opencode/r
 import { getDaemonResources } from '../chronicle/daemon-manager'
 import * as Health from '../health/service'
 import { providerRuntimeHostManager } from '../provider-runtime/host-manager'
-import { summarizeRuntimeProcessResources } from '../provider-runtime/process-resources'
 import * as Pty from '../pty/service'
 import type { DesktopRuntimeSample } from './service'
 import { getDesktopRuntimeSamples, getQueueHealth } from './service'

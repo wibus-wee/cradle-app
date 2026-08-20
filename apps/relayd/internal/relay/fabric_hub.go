@@ -21,6 +21,7 @@ type FabricHubConfig struct {
 	MaxFrameBytes      int64
 	MaxQueuedEnvelopes int
 	MaxQueuedBytes     int64
+	Metrics            Metrics
 }
 
 // FabricHub replaces one permanent room with a durable Node socket and many
@@ -64,6 +65,9 @@ type fabricConn struct {
 }
 
 func NewFabricHub(cfg FabricHubConfig) *FabricHub {
+	if cfg.Metrics == nil {
+		cfg.Metrics = noopMetrics{}
+	}
 	return &FabricHub{cfg: cfg, nodes: map[string]*fabricNode{}, links: map[string]*fabricLink{}}
 }
 
@@ -86,9 +90,10 @@ func (h *FabricHub) OpenLink(fabricID, nodeID, linkID, controllerID string, cert
 		return ErrNodeNotConnected
 	}
 	link := &fabricLink{fabricID: fabricID, nodeID: nodeID, linkID: linkID, controllerID: controllerID}
-	link.expires = time.AfterFunc(15*time.Minute, func() { _ = h.RevokeLink(linkID) })
+	link.expires = time.AfterFunc(15*time.Minute, func() { _ = h.revokeLink(linkID, "expired") })
 	h.links[linkID] = link
 	h.mu.Unlock()
+	h.cfg.Metrics.LinkOpened()
 	if len(certificates) > 0 && len(certificates[0]) > 0 {
 		h.enqueueControl(node.conn, link, FabricKindLinkOpen, certificates[0])
 	}
@@ -106,13 +111,19 @@ func (h *FabricHub) HandleNode(ctx context.Context, fabricID, nodeID string, ws 
 	}
 	h.nodes[key] = &fabricNode{fabricID: fabricID, nodeID: nodeID, conn: conn}
 	h.mu.Unlock()
+	h.cfg.Metrics.ConnectionOpened("node")
+	defer h.cfg.Metrics.ConnectionClosed("node")
 	defer h.dropNode(fabricID, nodeID, conn)
-	return h.serve(ctx, conn, func(data []byte, env FabricEnvelope) error {
+	err := h.serve(ctx, conn, func(data []byte, env FabricEnvelope) error {
 		if env.FabricID != fabricID || env.NodeID != nodeID {
 			return ErrInvalidEnvelope
 		}
 		return h.forwardFromNode(ctx, conn, data, env)
 	})
+	if err != nil {
+		h.cfg.Metrics.ConnectionError("node", classifyConnectionError(err))
+	}
+	return err
 }
 
 func (h *FabricHub) HandleController(ctx context.Context, linkID, controllerID string, ws *websocket.Conn) error {
@@ -136,16 +147,26 @@ func (h *FabricHub) HandleController(ctx context.Context, linkID, controllerID s
 	}
 	link.controller = conn
 	h.mu.Unlock()
+	h.cfg.Metrics.ConnectionOpened("controller")
+	defer h.cfg.Metrics.ConnectionClosed("controller")
 	defer h.dropController(linkID, conn)
-	return h.serve(ctx, conn, func(data []byte, env FabricEnvelope) error {
+	err := h.serve(ctx, conn, func(data []byte, env FabricEnvelope) error {
 		if env.LinkID != linkID || env.FabricID != link.fabricID || env.NodeID != link.nodeID {
 			return ErrInvalidEnvelope
 		}
 		return h.forwardFromController(ctx, conn, data, env)
 	})
+	if err != nil {
+		h.cfg.Metrics.ConnectionError("controller", classifyConnectionError(err))
+	}
+	return err
 }
 
 func (h *FabricHub) RevokeLink(linkID string) error {
+	return h.revokeLink(linkID, "revoked")
+}
+
+func (h *FabricHub) revokeLink(linkID, reason string) error {
 	h.mu.Lock()
 	link := h.links[linkID]
 	if link == nil {
@@ -155,6 +176,7 @@ func (h *FabricHub) RevokeLink(linkID string) error {
 	delete(h.links, linkID)
 	node := h.nodes[nodeKey(link.fabricID, link.nodeID)]
 	h.mu.Unlock()
+	h.cfg.Metrics.LinkClosed(reason)
 	if link.expires != nil {
 		link.expires.Stop()
 	}
@@ -210,6 +232,9 @@ func (h *FabricHub) RemoveNode(fabricID, nodeID string) {
 		delete(h.links, linkID)
 	}
 	h.mu.Unlock()
+	for range links {
+		h.cfg.Metrics.LinkClosed("node_removed")
+	}
 
 	for _, link := range links {
 		if link.expires != nil {
@@ -230,7 +255,7 @@ func (h *FabricHub) RemoveNode(fabricID, nodeID string) {
 func (h *FabricHub) newConn(ws *websocket.Conn) *fabricConn {
 	return &fabricConn{
 		ws:        ws,
-		scheduler: newPeerScheduler(h.cfg.MaxQueuedEnvelopes, h.cfg.MaxQueuedBytes, h.cfg.MaxFrameBytes),
+		scheduler: newPeerScheduler(h.cfg.MaxQueuedEnvelopes, h.cfg.MaxQueuedBytes, h.cfg.MaxFrameBytes, h.cfg.Metrics),
 		done:      make(chan struct{}),
 	}
 }
@@ -268,8 +293,10 @@ func (h *FabricHub) writeLoop(ctx context.Context, conn *fabricConn) {
 			return
 		}
 		writeCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		startedAt := time.Now()
 		err = conn.write(writeCtx, item.data)
 		cancel()
+		h.cfg.Metrics.ObserveWrite(time.Since(startedAt), err)
 		if err != nil {
 			conn.close(websocket.StatusPolicyViolation, err.Error())
 			return
@@ -286,7 +313,11 @@ func (h *FabricHub) forwardFromNode(ctx context.Context, from *fabricConn, data 
 	}
 	peer := link.controller
 	h.mu.RUnlock()
-	return peer.enqueue(ctx, data, env.Priority, env.StreamID)
+	if err := peer.enqueue(ctx, data, env.Priority, env.StreamID); err != nil {
+		return err
+	}
+	h.cfg.Metrics.FrameForwarded("node_to_controller", env.Priority, len(data))
+	return nil
 }
 
 func (h *FabricHub) forwardFromController(ctx context.Context, from *fabricConn, data []byte, env FabricEnvelope) error {
@@ -299,7 +330,11 @@ func (h *FabricHub) forwardFromController(ctx context.Context, from *fabricConn,
 	}
 	peer := node.conn
 	h.mu.RUnlock()
-	return peer.enqueue(ctx, data, env.Priority, env.StreamID)
+	if err := peer.enqueue(ctx, data, env.Priority, env.StreamID); err != nil {
+		return err
+	}
+	h.cfg.Metrics.FrameForwarded("controller_to_node", env.Priority, len(data))
+	return nil
 }
 
 func (h *FabricHub) dropNode(fabricID, nodeID string, conn *fabricConn) {
@@ -321,6 +356,9 @@ func (h *FabricHub) dropNode(fabricID, nodeID string, conn *fabricConn) {
 		delete(h.links, linkID)
 	}
 	h.mu.Unlock()
+	for range links {
+		h.cfg.Metrics.LinkClosed("node_disconnected")
+	}
 	for _, link := range links {
 		if link.expires != nil {
 			link.expires.Stop()
@@ -363,6 +401,7 @@ func (conn *fabricConn) write(ctx context.Context, data []byte) error {
 func (conn *fabricConn) close(status websocket.StatusCode, reason string) {
 	conn.closeOnce.Do(func() {
 		_ = conn.ws.Close(status, reason)
+		conn.scheduler.close()
 		close(conn.done)
 	})
 }

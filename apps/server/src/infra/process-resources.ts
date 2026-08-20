@@ -1,10 +1,14 @@
 import { execFileSync } from 'node:child_process'
 
-import type { ManagedChildProcess } from '../../infra/managed-process'
+import type { ManagedChildProcess } from './managed-process'
 
 export interface ProcessResources {
   rssMB: number
   cpuPercent: number
+}
+
+export interface ProcessTreeResources extends ProcessResources {
+  descendantCount: number
 }
 
 export interface RuntimeProcessResources {
@@ -44,6 +48,13 @@ export function summarizeRuntimeProcessResources(
 
 const PROCESS_RESOURCE_FIELD_SEPARATOR_PATTERN = /\s+/
 
+interface ProcessTableRow {
+  pid: number
+  ppid: number
+  rssKB: number
+  cpuPercent: number
+}
+
 export function readManagedProcessPid(proc: ManagedChildProcess): number | null {
   return proc.targetPid ?? proc.pid ?? null
 }
@@ -68,6 +79,68 @@ export function readProcessResourceUsage(pid: number): ProcessResources | null {
   catch {
     return null
   }
+}
+
+export function readProcessTreeResourceUsage(pid: number): ProcessTreeResources | null {
+  try {
+    const output = execFileSync('ps', ['-axo', 'pid=,ppid=,rss=,pcpu='], {
+      encoding: 'utf8',
+      timeout: 1000,
+    })
+    const rows = output
+      .split('\n')
+      .map(parseProcessTableRow)
+      .filter((row): row is ProcessTableRow => row !== null)
+    const root = rows.find(row => row.pid === pid)
+    if (!root) {
+      return null
+    }
+
+    const tree = [root]
+    const pendingPids = [pid]
+    while (pendingPids.length > 0) {
+      const parentPid = pendingPids.shift()
+      if (parentPid === undefined) {
+        break
+      }
+      for (const row of rows) {
+        if (row.ppid !== parentPid) {
+          continue
+        }
+        tree.push(row)
+        pendingPids.push(row.pid)
+      }
+    }
+
+    const rssMB = tree.reduce((total, row) => total + row.rssKB, 0) / 1024
+    const cpuPercent = tree.reduce((total, row) => total + row.cpuPercent, 0)
+    return {
+      rssMB: Math.round(rssMB * 100) / 100,
+      cpuPercent: Math.round(cpuPercent * 100) / 100,
+      descendantCount: tree.length - 1,
+    }
+  }
+  catch {
+    return null
+  }
+}
+
+function parseProcessTableRow(rawLine: string): ProcessTableRow | null {
+  const [pidRaw, ppidRaw, rssRaw, cpuRaw] = rawLine.trim().split(PROCESS_RESOURCE_FIELD_SEPARATOR_PATTERN)
+  const pid = Number.parseInt(pidRaw ?? '', 10)
+  const ppid = Number.parseInt(ppidRaw ?? '', 10)
+  const rssKB = Number.parseInt(rssRaw ?? '', 10)
+  const cpuPercent = Number.parseFloat(cpuRaw ?? '')
+  if (
+    !Number.isInteger(pid)
+    || !Number.isInteger(ppid)
+    || !Number.isInteger(rssKB)
+    || !Number.isFinite(cpuPercent)
+    || cpuPercent < 0
+  ) {
+    return null
+  }
+  return { pid, ppid, rssKB, cpuPercent }
 }
 
 export function emptyRuntimeProcessResources(): RuntimeProcessResources {

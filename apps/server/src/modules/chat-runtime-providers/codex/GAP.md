@@ -18,7 +18,7 @@ Protocol baseline for this note: Codex CLI / app-server **0.146.0** (PR #106 pro
 | `SkillInterface.iconSmallUrl` / `iconLargeUrl` | **Projected** | Skills UI slot `items[]` carries `iconUrl` / `brandColor` / `displayName`. |
 | `commandExecution.pluginId` / `scriptPath` | **Projected** | Tool input args include plugin provenance for command executions. |
 | `BrowserUseRequirements.disableAutoReview` | Follow up | Cradle already owns Browser Use bridge policy; avoid dual auto-review owners. |
-| `FeedbackRequirements.enabled` | **Projected** | `getPresentation` omits `codex:feedback` when `feedback.enabled === false`. |
+| `FeedbackRequirements.enabled` + `feedback/upload` | Leave native | Cradle has no feedback submission UI or explicit log-consent flow, so it does not expose `/feedback`. |
 | `externalAgentConfig/import/recordHistory` + detect limits | Leave native / Follow up | Only worth projecting if Cradle owns a Codex import UX. |
 | `codexResponseHandoffChannelPrefixes` | Leave native | No Cradle realtime/voice product owner yet. |
 | `AppToolSummary.isEnabled` / `disabledReason` / `isReadOnly` | Follow up | Needs `app/read` depth beyond current `app/list` counts. |
@@ -49,7 +49,7 @@ Capability scan (~140 client methods; ~half unused outside generated protocol):
 
 ### Already projected (do not re-open without cause)
 
-- Sleep items, rawResponse usage + cache-write, goals, compact, approvals/elicitation, background terminals list/terminate, collaboration modes, skills/plugin counts, feedback upload method capability, shell / steer / interrupt, provider-thread fork.
+- Sleep items, rawResponse usage + cache-write, goals, compact, approvals/elicitation, background terminals list/terminate, collaboration modes, skills/plugin counts, shell / steer / interrupt, provider-thread fork.
 
 ## IRON LAW note
 

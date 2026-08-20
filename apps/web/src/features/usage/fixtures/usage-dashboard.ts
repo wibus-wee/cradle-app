@@ -1,12 +1,17 @@
 import type { UsageDashboardViewProps } from '../usage-dashboard-view'
+import type { FleetDeviceUsage } from '../usage-fleet'
+import { LOCAL_DEVICE_KEY } from '../usage-fleet'
+import { mergeFleetUsage } from '../usage-fleet-merge'
 import type {
+  CostEfficiency,
   CostSummary,
   DailyCost,
   DailyUsage,
   DailyUsageByModel,
   HourlyUsage,
   RuntimePerformanceOverview,
-  UsageStats,
+  ToolUsageBreakdown,
+  ToolUsageEntry,
   UsageSummary,
 } from '../use-usage-overview'
 
@@ -187,18 +192,6 @@ const costSummary: CostSummary = {
   })),
 }
 
-const activeDays = daily.filter(entry => entry.totalTokens > 0)
-const peakDay = activeDays.reduce((peak, entry) => entry.totalTokens > peak.totalTokens ? entry : peak)
-
-const stats: UsageStats = {
-  currentStreak: 11,
-  longestStreak: 27,
-  activeDays: activeDays.length,
-  avgDailyTokens: Math.round(totalTokens / activeDays.length),
-  peakDay: { date: peakDay.date, totalTokens: peakDay.totalTokens },
-  todayTokens: daily.at(-1)?.totalTokens ?? 0,
-}
-
 const performanceDaily: RuntimePerformanceOverview['daily'] = daily
   .slice(-30)
   .flatMap((entry, index) => {
@@ -291,61 +284,240 @@ const toolDaily = daily.flatMap((entry, dayIndex) => {
   }))
 })
 
-export const populatedUsageDashboardFixture: UsageDashboardViewProps = {
-  daily,
-  dailyByModel,
-  hourly,
-  summary,
-  stats,
-  costSummary,
-  dailyCost,
-  tools: {
-    summary: {
-      ...toolTotals,
-      successRatePct: (toolTotals.successCount / (toolTotals.successCount + toolTotals.failureCount)) * 100,
-      uniqueToolCount: toolOverall.length,
-      medianDurationMs: 820,
-    },
-    daily: toolDaily,
-    dailyByRuntime: toolDaily.flatMap(row => [
-      { date: row.date, runtimeKind: 'opencode', toolName: row.toolName, count: Math.ceil(row.count * 0.6) },
-      { date: row.date, runtimeKind: 'codex', toolName: row.toolName, count: Math.floor(row.count * 0.4) },
-    ]),
-    dailyByModel: toolDaily.flatMap(row => [
-      { date: row.date, modelId: 'gpt-5.2', toolName: row.toolName, count: Math.ceil(row.count * 0.55) },
-      { date: row.date, modelId: 'claude-opus-4.6', toolName: row.toolName, count: Math.floor(row.count * 0.45) },
-    ]),
-    overall: toolOverall,
-    byRuntime: [
-      { runtimeKind: 'opencode', tools: [
-        { toolName: 'Read', count: 800, successCount: 793, failureCount: 5, deniedCount: 0, interruptedCount: 2, medianDurationMs: 40 },
-        { toolName: 'Edit', count: 600, successCount: 593, failureCount: 5, deniedCount: 0, interruptedCount: 2, medianDurationMs: 110 },
-      ]},
-      { runtimeKind: 'codex', tools: [
-        { toolName: 'Read', count: 440, successCount: 435, failureCount: 3, deniedCount: 2, interruptedCount: 0, medianDurationMs: 55 },
-        { toolName: 'Edit', count: 290, successCount: 285, failureCount: 5, deniedCount: 0, interruptedCount: 0, medianDurationMs: 135 },
-      ]},
-    ],
-    byModel: [
-      { modelId: 'gpt-5.2', tools: [
-        { toolName: 'Read', count: 600, successCount: 594, failureCount: 5, deniedCount: 0, interruptedCount: 1, medianDurationMs: 42 },
-        { toolName: 'Edit', count: 420, successCount: 414, failureCount: 5, deniedCount: 0, interruptedCount: 1, medianDurationMs: 115 },
-      ]},
-      { modelId: 'claude-opus-4.6', tools: [
-        { toolName: 'Read', count: 420, successCount: 417, failureCount: 2, deniedCount: 0, interruptedCount: 1, medianDurationMs: 48 },
-        { toolName: 'Edit', count: 310, successCount: 307, failureCount: 2, deniedCount: 0, interruptedCount: 1, medianDurationMs: 125 },
-      ]},
-    ],
+const tools: ToolUsageBreakdown = {
+  summary: {
+    ...toolTotals,
+    successRatePct: (toolTotals.successCount / (toolTotals.successCount + toolTotals.failureCount)) * 100,
+    uniqueToolCount: toolOverall.length,
+    medianDurationMs: 820,
   },
-  costEfficiency: daily.slice(-30).map(entry => ({
-    date: entry.date,
-    totalTokens: entry.totalTokens,
-    runCount: entry.count,
-    avgTokensPerRun: entry.count > 0 ? Math.round(entry.totalTokens / entry.count) : 0,
-    totalCostUsd: dailyCost.filter(c => c.date === entry.date).reduce((sum, c) => sum + c.costUsd, 0),
-    avgCostPerRun: entry.count > 0 ? dailyCost.filter(c => c.date === entry.date).reduce((sum, c) => sum + c.costUsd, 0) / entry.count : 0,
-  })),
-  performance: runtimePerformance,
+  daily: toolDaily,
+  dailyByRuntime: toolDaily.flatMap(row => [
+    { date: row.date, runtimeKind: 'opencode', toolName: row.toolName, count: Math.ceil(row.count * 0.6) },
+    { date: row.date, runtimeKind: 'codex', toolName: row.toolName, count: Math.floor(row.count * 0.4) },
+  ]),
+  dailyByModel: toolDaily.flatMap(row => [
+    { date: row.date, modelId: 'gpt-5.2', toolName: row.toolName, count: Math.ceil(row.count * 0.55) },
+    { date: row.date, modelId: 'claude-opus-4.6', toolName: row.toolName, count: Math.floor(row.count * 0.45) },
+  ]),
+  overall: toolOverall,
+  byRuntime: [
+    { runtimeKind: 'opencode', tools: [
+      { toolName: 'Read', count: 800, successCount: 793, failureCount: 5, deniedCount: 0, interruptedCount: 2, medianDurationMs: 40 },
+      { toolName: 'Edit', count: 600, successCount: 593, failureCount: 5, deniedCount: 0, interruptedCount: 2, medianDurationMs: 110 },
+    ]},
+    { runtimeKind: 'codex', tools: [
+      { toolName: 'Read', count: 440, successCount: 435, failureCount: 3, deniedCount: 2, interruptedCount: 0, medianDurationMs: 55 },
+      { toolName: 'Edit', count: 290, successCount: 285, failureCount: 5, deniedCount: 0, interruptedCount: 0, medianDurationMs: 135 },
+    ]},
+  ],
+  byModel: [
+    { modelId: 'gpt-5.2', tools: [
+      { toolName: 'Read', count: 600, successCount: 594, failureCount: 5, deniedCount: 0, interruptedCount: 1, medianDurationMs: 42 },
+      { toolName: 'Edit', count: 420, successCount: 414, failureCount: 5, deniedCount: 0, interruptedCount: 1, medianDurationMs: 115 },
+    ]},
+    { modelId: 'claude-opus-4.6', tools: [
+      { toolName: 'Read', count: 420, successCount: 417, failureCount: 2, deniedCount: 0, interruptedCount: 1, medianDurationMs: 48 },
+      { toolName: 'Edit', count: 310, successCount: 307, failureCount: 2, deniedCount: 0, interruptedCount: 1, medianDurationMs: 125 },
+    ]},
+  ],
+}
+
+const costEfficiency: CostEfficiency[] = daily.slice(-30).map(entry => ({
+  date: entry.date,
+  totalTokens: entry.totalTokens,
+  runCount: entry.count,
+  avgTokensPerRun: entry.count > 0 ? Math.round(entry.totalTokens / entry.count) : 0,
+  totalCostUsd: dailyCost.filter(c => c.date === entry.date).reduce((sum, c) => sum + c.costUsd, 0),
+  avgCostPerRun: entry.count > 0 ? dailyCost.filter(c => c.date === entry.date).reduce((sum, c) => sum + c.costUsd, 0) / entry.count : 0,
+}))
+
+// Fleet fixture: this device plus two reachable remote nodes (scaled copies of
+// the local series so shares differ per device) and one offline node.
+function scaledDaily(scale: number, phase: number): DailyUsage[] {
+  return daily.map((entry, index) => ({
+    ...entry,
+    totalTokens: Math.round(entry.totalTokens * scale * (1 + ((index + phase) % 5) * 0.08)),
+    count: Math.round(entry.count * scale),
+  }))
+}
+
+function scaledDailyByModel(scale: number, phase: number): DailyUsageByModel[] {
+  return dailyByModel.map((entry, index) => ({
+    ...entry,
+    totalTokens: Math.round(entry.totalTokens * scale * (1 + ((index + phase) % 5) * 0.08)),
+    count: Math.max(1, Math.round(entry.count * scale)),
+  }))
+}
+
+function scaledDailyCost(scale: number, phase: number): DailyCost[] {
+  return dailyCost.map((entry, index) => ({
+    ...entry,
+    costUsd: entry.costUsd * scale * (1 + ((index + phase) % 5) * 0.08),
+  }))
+}
+
+function scaledHourly(scale: number): HourlyUsage[] {
+  return hourly.map(entry => ({
+    ...entry,
+    promptTokens: Math.round(entry.promptTokens * scale),
+    completionTokens: Math.round(entry.completionTokens * scale),
+    totalTokens: Math.round(entry.totalTokens * scale),
+    count: Math.max(1, Math.round(entry.count * scale)),
+  }))
+}
+
+function scaledSummary(scale: number): UsageSummary {
+  const scaleRows = <Row extends { totalTokens: number, count: number }>(rows: Row[]): Row[] =>
+    rows.map(row => ({ ...row, totalTokens: Math.round(row.totalTokens * scale), count: Math.max(1, Math.round(row.count * scale)) }))
+  return {
+    totalPromptTokens: Math.round(summary.totalPromptTokens * scale),
+    totalCompletionTokens: Math.round(summary.totalCompletionTokens * scale),
+    totalTokens: Math.round(summary.totalTokens * scale),
+    totalTurns: Math.round(summary.totalTurns * scale),
+    byModel: scaleRows(summary.byModel),
+    byAgent: scaleRows(summary.byAgent),
+    byProviderTarget: scaleRows(summary.byProviderTarget),
+  }
+}
+
+function scaledCostSummary(scale: number): CostSummary {
+  const scaleCostRows = <Row extends { totalTokens: number, count: number, costUsd: number }>(rows: Row[]): Row[] =>
+    rows.map(row => ({ ...row, totalTokens: Math.round(row.totalTokens * scale), count: Math.max(1, Math.round(row.count * scale)), costUsd: row.costUsd * scale }))
+  return {
+    ...costSummary,
+    totalCostUsd: costSummary.totalCostUsd * scale,
+    totalPromptTokens: Math.round(costSummary.totalPromptTokens * scale),
+    totalUncachedInputTokens: Math.round(costSummary.totalUncachedInputTokens * scale),
+    totalCachedInputTokens: Math.round(costSummary.totalCachedInputTokens * scale),
+    totalCacheWriteInputTokens: Math.round(costSummary.totalCacheWriteInputTokens * scale),
+    totalCompletionTokens: Math.round(costSummary.totalCompletionTokens * scale),
+    totalTokens: Math.round(costSummary.totalTokens * scale),
+    uncachedInputCostUsd: costSummary.uncachedInputCostUsd * scale,
+    cacheReadCostUsd: costSummary.cacheReadCostUsd * scale,
+    cacheWriteCostUsd: costSummary.cacheWriteCostUsd * scale,
+    outputCostUsd: costSummary.outputCostUsd * scale,
+    byModel: scaleCostRows(costSummary.byModel),
+    byAgent: scaleCostRows(costSummary.byAgent),
+    byProviderTarget: scaleCostRows(costSummary.byProviderTarget),
+  }
+}
+
+function scaledTools(scale: number): ToolUsageBreakdown {
+  const scaleOutcomes = <Row extends { successCount: number, failureCount: number, deniedCount: number, interruptedCount: number }>(row: Row): Row => ({
+    ...row,
+    successCount: Math.max(1, Math.round(row.successCount * scale)),
+    failureCount: Math.round(row.failureCount * scale),
+    deniedCount: Math.round(row.deniedCount * scale),
+    interruptedCount: Math.round(row.interruptedCount * scale),
+  })
+  const scaleTool = (row: ToolUsageEntry): ToolUsageEntry => ({
+    ...scaleOutcomes(row),
+    count: Math.max(1, Math.round(row.count * scale)),
+  })
+  return {
+    summary: { ...scaleOutcomes(tools.summary), totalCalls: Math.max(1, Math.round(tools.summary.totalCalls * scale)) },
+    overall: tools.overall.map(scaleTool),
+    byRuntime: tools.byRuntime.map(group => ({ ...group, tools: group.tools.map(scaleTool) })),
+    byModel: tools.byModel.map(group => ({ ...group, tools: group.tools.map(scaleTool) })),
+    daily: tools.daily.map(row => ({ ...row, count: Math.max(1, Math.round(row.count * scale)) })),
+    dailyByRuntime: tools.dailyByRuntime.map(row => ({ ...row, count: Math.max(1, Math.round(row.count * scale)) })),
+    dailyByModel: tools.dailyByModel.map(row => ({ ...row, count: Math.max(1, Math.round(row.count * scale)) })),
+  }
+}
+
+function scaledCostEfficiency(scale: number): CostEfficiency[] {
+  return costEfficiency.map(entry => ({
+    ...entry,
+    totalTokens: Math.round(entry.totalTokens * scale),
+    runCount: Math.max(1, Math.round(entry.runCount * scale)),
+    totalCostUsd: entry.totalCostUsd * scale,
+    avgCostPerRun: entry.avgCostPerRun,
+    avgTokensPerRun: entry.avgTokensPerRun,
+  }))
+}
+
+function scaledPerformance(scale: number): RuntimePerformanceOverview {
+  const scaleSample = <Row extends { sampleCount: number, firstTokenSampleCount: number }>(row: Row): Row => ({
+    ...row,
+    sampleCount: Math.max(1, Math.round(row.sampleCount * scale)),
+    firstTokenSampleCount: Math.max(1, Math.round(row.firstTokenSampleCount * scale)),
+  })
+  return {
+    ...runtimePerformance,
+    summary: scaleSample(runtimePerformance.summary),
+    byRuntime: runtimePerformance.byRuntime.map(scaleSample),
+    byProviderTarget: runtimePerformance.byProviderTarget.map(scaleSample),
+    byModel: runtimePerformance.byModel.map(scaleSample),
+    daily: runtimePerformance.daily.map(scaleSample),
+  }
+}
+
+function remoteDevice(key: string, label: string, platform: string, scale: number, phase: number): FleetDeviceUsage {
+  return {
+    key,
+    label,
+    platform,
+    isLocal: false,
+    status: 'online',
+    daily: scaledDaily(scale, phase),
+    dailyByModel: scaledDailyByModel(scale, phase),
+    dailyCost: scaledDailyCost(scale, phase),
+    hourly: scaledHourly(scale),
+    costEfficiency: scaledCostEfficiency(scale),
+    summary: scaledSummary(scale),
+    costSummary: scaledCostSummary(scale),
+    tools: scaledTools(scale),
+    performance: scaledPerformance(scale),
+  }
+}
+
+const fleetDevices: FleetDeviceUsage[] = [
+  {
+    key: LOCAL_DEVICE_KEY,
+    label: '本机',
+    platform: null,
+    isLocal: true,
+    status: 'online',
+    daily,
+    dailyByModel,
+    dailyCost,
+    hourly,
+    costEfficiency,
+    summary,
+    costSummary,
+    tools,
+    performance: runtimePerformance,
+  },
+  remoteDevice('node-macbook', 'MacBook Pro', 'darwin', 0.35, 1),
+  remoteDevice('node-devbox', 'Dev Box', 'linux', 0.18, 3),
+]
+
+const fleetMerged = mergeFleetUsage(fleetDevices)
+
+const fleet: UsageDashboardViewProps['fleet'] = {
+  devices: fleetDevices,
+  unavailable: [
+    { key: 'node-nas', label: 'Home NAS', platform: 'linux', status: 'offline' },
+  ],
+  isLoading: false,
+  merged: fleetMerged,
+}
+
+// The View receives what the container would send in production: with a
+// Fabric fleet every surface gets the merged fleet-wide series.
+export const populatedUsageDashboardFixture: UsageDashboardViewProps = {
+  daily: fleetMerged.daily,
+  dailyByModel: fleetMerged.dailyByModel,
+  hourly: fleetMerged.hourly,
+  summary: fleetMerged.summary,
+  stats: fleetMerged.stats,
+  costSummary: fleetMerged.costSummary,
+  dailyCost: fleetMerged.dailyCost,
+  tools: fleetMerged.tools,
+  costEfficiency: fleetMerged.costEfficiency,
+  performance: fleetMerged.performance,
+  fleet,
   usageReady: true,
   range: '30d',
   onRangeChange: () => {},
@@ -393,6 +565,7 @@ export const emptyUsageDashboardFixture: UsageDashboardViewProps = {
     byModel: [],
     daily: [],
   },
+  fleet: null,
   usageReady: true,
   range: '30d',
   onRangeChange: () => {},

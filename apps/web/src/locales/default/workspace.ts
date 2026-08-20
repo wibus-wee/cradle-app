@@ -121,6 +121,7 @@ export default {
   'sessionGroup.toast.deleteFailed': 'Session group could not be deleted',
   'sessionGroup.toast.removeMemberFailed': 'Session could not be removed from the group',
   'sessionGroup.toast.renameFailed': 'Session group could not be renamed',
+  'workspace.toast.removeFailed': 'Workspace could not be removed',
   'sidebar.action.addMultiWorkspace': 'Create multi-folder workspace',
   'sidebar.action.addProject': 'Add project',
   'sidebar.action.collapseAll': 'Collapse all',
