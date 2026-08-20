@@ -276,7 +276,9 @@ describe('executeRun cancel/finalize race (turn-executor)', () => {
       expect(deps.completeActiveTurn).toHaveBeenCalledTimes(1)
       const [, outcome] = (deps.completeActiveTurn as ReturnType<typeof vi.fn>).mock.calls[0]
       expect(outcome.terminalChunk).toEqual({ type: 'abort', reason: 'user' })
-      expect(deps.finalizeSnapshot).not.toHaveBeenCalled()
+      expect(deps.finalizeSnapshot).toHaveBeenCalledTimes(1)
+      const [, snapshotChunk] = (deps.finalizeSnapshot as ReturnType<typeof vi.fn>).mock.calls[0]
+      expect(snapshotChunk).toEqual({ type: 'abort', reason: 'user' })
     })
   })
 

@@ -212,6 +212,7 @@ const activeTurnCompletionController = createActiveTurnCompletionController({
       return null
     }
     activeRun.terminalStatus = fence.status
+    activeRun.terminalAtMs = fence.finishedAt === null ? undefined : fence.finishedAt * 1000
     return {
       durableTerminal: true,
       notificationChunk: terminalChunkForFence(fence),
@@ -513,6 +514,7 @@ export async function createRun(input: CreateRunInput) {
  */
 export async function streamResponse(input: {
   sessionId: string
+  admissionRequestedAtMs?: number
   text?: string
   files?: FileUIPart[]
   contextParts?: ChatContextPart[]

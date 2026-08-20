@@ -24,6 +24,10 @@ permissions:
   contents: read
   issues: write
 
+concurrency:
+  group: e2e-daily
+  cancel-in-progress: true
+
 jobs:
   e2e:
     name: Daily E2E (@P0 or @P1)
@@ -43,74 +47,17 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate E2E suite contract
-        run: pnpm e2e:check
+      - name: Setup E2E runtime
+        uses: ./.github/actions/e2e-setup
 
-      # The server imports @cradle/plugin-sdk from dist/ and discovers plugin
-      # runtime entries from each plugin's dist/ directory.
-      - name: Build plugin SDK
-        run: pnpm --filter @cradle/plugin-sdk build
-
-      - name: Build workspace plugins
-        run: pnpm --filter "./plugins/*" build
-
-      # ── Install Playwright ────────────────────────────────────────────────
-      - name: Install Playwright browsers
-        timeout-minutes: 15
-        run: pnpm exec playwright install --with-deps chromium-headless-shell
-
-      - name: Provision Codex app-server for E2E
-        run: pnpm --filter @cradle/desktop sync:codex-runtime
-
-      - name: Prepare Cucumber CI config
-        run: |
-          node <<'NODE'
-          const { writeFileSync } = require('fs')
-
-          writeFileSync('e2e/cucumber-ci.mjs', [
-            "import baseConfig from './cucumber.mjs'",
-            '',
-            'export default {',
-            '  ...baseConfig,',
-            '  format: [],',
-            '  formatOptions: {',
-            '    ...baseConfig.formatOptions,',
-            '    printAttachments: false,',
-            '  },',
-            '}',
-            '',
-          ].join('\n'))
-          NODE
-
-      # ── Run E2E (server auto-starts via BeforeAll hook) ───────────────────
       - name: Run E2E tests
         id: e2e
-        # continue-on-error so artifact upload and issue creation always run
         continue-on-error: true
-        env:
-          NODE_ENV: test
-          CRADLE_CREDENTIAL_SECRET: e2e-test-secret
-          CRADLE_E2E_VERBOSE: "1"
-          CRADLE_LOG_SYNC: "1"
-        run: |
-          # Preserve the real Cucumber exit status when tee-ing the log.
-          set -o pipefail
-          mkdir -p e2e/artifacts
-          # Daily gate: full active priority suite (@P0 or @P1). Override via workflow_dispatch.
-          TAGS="${{ github.event.inputs.tags || '@P0 or @P1' }}"
-          CMD=(pnpm exec cucumber-js --config e2e/cucumber-ci.mjs
-            --format summary
-            --format summary:e2e/artifacts/cucumber-summary.txt
-            --format junit:e2e/artifacts/cucumber-junit.xml
-            --tags "$TAGS")
-          "${CMD[@]}" 2>&1 | tee e2e/artifacts/cucumber-output.log
-
-          # A bootstrap failure in a Cucumber worker can otherwise produce a
-          # misleading successful run with zero executed scenarios.
-          if grep -q '^0 scenarios' e2e/artifacts/cucumber-summary.txt; then
-            echo "::error::Cucumber completed without executing any scenarios."
-            exit 1
-          fi
+        uses: ./.github/actions/e2e-run
+        with:
+          tags: ${{ github.event.inputs.tags || '@P0 or @P1' }}
+          log-sync: '1'
+          fail-on-zero-scenarios: 'true'
 
       - name: Summarize E2E result
         if: always()
