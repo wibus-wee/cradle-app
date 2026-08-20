@@ -9,10 +9,11 @@ import { db, shutdownInfra } from '../../../infra'
 import type { ActiveRun } from '../run-registry'
 import { createRunChunkSequencer } from '../stream/run-chunk-sequencer'
 import { createFinalMessageProjectionState } from './final-message-projection'
+import type { RunWriteFence } from './run-write-fence'
 
 const { commitPreparedSessionEventsWithProjection, readRunWriteFence } = vi.hoisted(() => ({
   commitPreparedSessionEventsWithProjection: vi.fn(),
-  readRunWriteFence: vi.fn(() => ({ status: 'streaming' as const })),
+  readRunWriteFence: vi.fn<(runId: string) => RunWriteFence>(() => ({ status: 'streaming' })),
 }))
 
 vi.mock('../es/commands', async (importOriginal) => {
@@ -104,8 +105,8 @@ describe('terminal finalizer durability barrier', () => {
       async (_sessionId, prepare) => {
         const prepared = prepare({} as never)
         const completed = prepared.events.find(event => event.type === 'AssistantMessageCompleted')
-        messageJson = (completed?.payload as { message?: { messageJson?: string } })
-          .message?.messageJson ?? ''
+        const payload = completed?.payload as { message?: { messageJson?: string } } | undefined
+        messageJson = payload?.message?.messageJson ?? ''
         return prepared.result
       },
     )
