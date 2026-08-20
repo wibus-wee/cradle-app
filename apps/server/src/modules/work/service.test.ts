@@ -114,7 +114,6 @@ function remoteWorkDetail(overrides: Partial<NodeWork.RemoteWorkDetail['work']> 
       id: 'remote-work-1',
       title: 'Node-owned Work',
       objective: 'Create and verify the Node-owned worktree.',
-      acceptanceCriteria: [],
       linkedIssueId: null,
       handoffTitle: null,
       handoffSummary: null,
@@ -181,21 +180,6 @@ function remoteWorkDetail(overrides: Partial<NodeWork.RemoteWorkDetail['work']> 
     },
     pullRequest: null,
     activity: 'running',
-    state: 'running',
-    stateSinceAt: 10,
-    stateExplanation: {
-      trigger: 'runtime.active',
-      evidence: 'The remote Agent Run is active.',
-      authority: 'runtime_integration',
-      responsible: 'agent',
-      nextAction: 'Let the Agent Run continue.',
-      observedAt: 10,
-    },
-    recovery: {
-      level: 'live',
-      evidence: 'The remote runtime owns an active run.',
-      lastHeartbeatAt: 10,
-    },
   }
 }
 
@@ -542,10 +526,6 @@ describe('work delivery control', () => {
         workspaceId: WORKSPACE_ID,
         title: 'Create managed Work',
         goal: 'Create an isolated local Work container.',
-        acceptanceCriteria: [
-          'The Work uses a managed checkout.',
-          'The primary Session survives a reload.',
-        ],
         runtimeKind: 'opencode',
       })
 
@@ -553,10 +533,6 @@ describe('work delivery control', () => {
       expect(detail.execution.isIsolated).toBe(true)
       expect(detail.execution.worktreeHealth).toBe('ok')
       expect(detail.readiness.commitsAhead).toBe(0)
-      expect(detail.work.acceptanceCriteria).toEqual([
-        'The Work uses a managed checkout.',
-        'The primary Session survives a reload.',
-      ])
       expect(detail.initialRun?.runId).toBe('initial-work-run')
       expect(createRun).toHaveBeenCalledWith({
         sessionId: detail.primaryThread.id,

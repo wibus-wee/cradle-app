@@ -24,12 +24,10 @@ const meta = {
   args: {
     collapsed: false,
     pullRequestsActive: false,
-    attentionActive: false,
     githubFeaturesDisabled: false,
     disabledLabel: 'Disabled',
     onNewWork: fn(),
     onNewChat: fn(),
-    onAttention: fn(),
     onSearch: fn(),
     onDiff: fn(),
     onPullRequests: fn(),

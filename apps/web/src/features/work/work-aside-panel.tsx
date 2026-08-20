@@ -79,8 +79,6 @@ export function WorkAsidePanel({ workId }: { workId: string }) {
       labels={{
         objective: t('aside.objective'),
         objectiveEmpty: t('aside.objective.empty'),
-        acceptanceCriteria: t('aside.acceptanceCriteria'),
-        acceptanceCriteriaEmpty: t('aside.acceptanceCriteria.empty'),
         execution: t('aside.execution'),
         executionUnhealthy: t('aside.execution.unhealthy'),
         tryAgain: t('new.tryAgain'),

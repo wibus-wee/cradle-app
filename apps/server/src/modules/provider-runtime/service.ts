@@ -12,7 +12,6 @@ import {
   clearProviderTargetFromProviderRuntimeBindings,
   deleteProviderRuntimeBinding,
   isResumableProviderRuntimeBinding,
-  listProviderRuntimeBindingsByChatSessionIds,
   listProviderRuntimeBindingsByProviderSession,
   readProviderRuntimeBinding,
   readReusableProviderRuntimeBinding,
@@ -108,12 +107,6 @@ export function listDurableProviderRuntimeBindingsByProviderSession(input: {
   runtimeKind?: RuntimeKind
 }): BackendSessionBinding[] {
   return listProviderRuntimeBindingsByProviderSession(input)
-}
-
-export function listDurableProviderRuntimeBindingsByChatSessionIds(
-  chatSessionIds: readonly string[],
-): BackendSessionBinding[] {
-  return listProviderRuntimeBindingsByChatSessionIds(chatSessionIds)
 }
 
 export function unlinkProviderTargetFromDurableProviderRuntimeBindings(input: {

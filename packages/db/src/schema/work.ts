@@ -9,7 +9,6 @@ export const works = sqliteTable('works', {
   id: textPk(),
   title: text('title').notNull(),
   objective: text('objective').notNull(),
-  acceptanceCriteriaJson: text('acceptance_criteria_json').notNull().default('[]'),
   linkedIssueId: text('linked_issue_id')
     .references(() => issues.id, { onDelete: 'set null' }),
   handoffTitle: text('handoff_title'),

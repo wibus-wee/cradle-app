@@ -16,39 +16,6 @@ import type { WorkDetail } from './use-work'
 import { useSubmitWork, useWorkDetail } from './use-work'
 import { WorkHeaderChromeView } from './work-header-chrome-view'
 
-const workStateTranslationKey = {
-  draft: 'state.draft',
-  queued: 'state.queued',
-  preparing: 'state.preparing',
-  running: 'state.running',
-  awaiting_human: 'state.awaitingHuman',
-  awaiting_dependency: 'state.awaitingDependency',
-  verifying: 'state.verifying',
-  ready_for_review: 'state.readyForReview',
-  merging: 'state.merging',
-  done: 'state.done',
-  failed: 'state.failed',
-  cancelled: 'state.cancelled',
-  archived: 'state.archived',
-  unknown: 'state.unknown',
-} as const
-
-const recoveryTranslationKey = {
-  live: 'recovery.live',
-  resumable: 'recovery.resumable',
-  restorable: 'recovery.restorable',
-  reproducible: 'recovery.reproducible',
-  unknown: 'recovery.unknown',
-} as const
-
-const authorityTranslationKey = {
-  official_hook: 'authority.officialHook',
-  runtime_integration: 'authority.runtimeIntegration',
-  terminal_recognizer: 'authority.terminalRecognizer',
-  user_override: 'authority.userOverride',
-  derived: 'authority.derived',
-} as const
-
 // Work's delivery chrome lives in the always-visible app header, reusing the
 // same PR-pill + Mark Ready pattern as a normal session's pull request chrome.
 // The only Work-specific addition is the "publish" step (Create/Update Draft
@@ -174,14 +141,6 @@ export function WorkHeaderChrome({ workId }: { workId: string }) {
 
   return (
     <WorkHeaderChromeView
-      stateLabel={t(workStateTranslationKey[detail.state])}
-      stateEvidence={detail.stateExplanation.evidence}
-      stateAuthorityLabel={t('state.authority', {
-        authority: t(authorityTranslationKey[detail.stateExplanation.authority]),
-      })}
-      nextAction={detail.stateExplanation.nextAction}
-      recoveryLabel={t(recoveryTranslationKey[detail.recovery.level])}
-      recoveryEvidence={detail.recovery.evidence}
       pullRequest={pr}
       pullRequestStatusLabel={prStatusLabel}
       showPublish={showPublish}

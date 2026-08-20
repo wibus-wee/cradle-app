@@ -1,4 +1,4 @@
-import { Elysia, t } from 'elysia'
+import { Elysia } from 'elysia'
 
 import { AppError } from '../../errors/app-error'
 import { registerWorkHarnessContextSource } from './agent-context'
@@ -28,13 +28,6 @@ export const work = new Elysia({
     },
     body: WorkModel.reconcileNodeBody,
     response: { 200: WorkModel.reconcileNodeResponse },
-  })
-  .get('/attention', () => Work.listAttention(), {
-    detail: {
-      'summary': 'List actionable Work attention items',
-      'x-cradle-cli': { command: ['work', 'attention'] },
-    },
-    response: { 200: t.Array(WorkModel.attentionItem) },
   })
   .get('/:id', async ({ params }) => {
     const detail = await Work.get(params.id)
@@ -71,14 +64,6 @@ export const work = new Elysia({
     },
     params: WorkModel.idParams,
     body: WorkModel.archiveBody,
-    response: { 200: WorkModel.detail },
-  })
-  .post('/:id/redetect', async ({ params }) => await Work.redetect(params.id), {
-    detail: {
-      'summary': 'Redetect Work state from authoritative owner facts',
-      'x-cradle-cli': { command: ['work', 'redetect'] },
-    },
-    params: WorkModel.idParams,
     response: { 200: WorkModel.detail },
   })
   .post('/:id/prepare', async ({ params, body }) => await Work.prepare({

@@ -6,7 +6,6 @@ import { NewWorkErrorView } from './new-work-error-view'
 
 export interface NewWorkPageViewProps {
   composer: ReactNode
-  acceptanceCriteria: ReactNode
   workspaceCount: number
   loadingWorkspaces: boolean
   failureKind: NewWorkFailureKind | null
@@ -18,7 +17,6 @@ export interface NewWorkPageViewProps {
 
 export function NewWorkPageView({
   composer,
-  acceptanceCriteria,
   workspaceCount,
   loadingWorkspaces,
   failureKind,
@@ -45,7 +43,6 @@ export function NewWorkPageView({
             </p>
           </div>
 
-          {acceptanceCriteria}
           {composer}
 
           {!loadingWorkspaces && workspaceCount === 0

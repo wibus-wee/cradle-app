@@ -46,7 +46,6 @@ export default {
   'fileTree.toast.revealFailedExplorer': 'File could not be revealed in Explorer',
   'fileTree.toast.renameFailed': 'File could not be renamed',
   'nav.automation': 'Automations',
-  'nav.needsMe': 'Needs me',
   'nav.diffs': 'Diffs',
   'nav.newChat': 'New chat',
   'nav.newWork': 'New Work',

@@ -19,12 +19,6 @@ const meta = {
     ),
   ],
   args: {
-    stateLabel: 'Ready for review',
-    stateEvidence: 'The Agent prepared a newer handoff than the last submitted pull request.',
-    stateAuthorityLabel: 'Source: agent runtime integration',
-    nextAction: 'Review the committed diff and publish or update the Draft pull request.',
-    recoveryLabel: 'Resumable',
-    recoveryEvidence: 'The provider runtime has a durable session binding that supports resume.',
     pullRequest: null,
     pullRequestStatusLabel: null,
     showPublish: true,

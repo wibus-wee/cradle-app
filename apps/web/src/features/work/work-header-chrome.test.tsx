@@ -2,8 +2,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { TooltipProvider } from '~/components/ui/tooltip'
-
 import { WorkHeaderChrome } from './work-header-chrome'
 
 const mocks = vi.hoisted(() => ({
@@ -37,7 +35,6 @@ function createWorkDetail(options: { submitted?: boolean } = {}) {
       id: 'work-1',
       title: 'Fix retries',
       objective: 'Make retries deterministic.',
-      acceptanceCriteria: ['Retries are deterministic.'],
       linkedIssueId: null,
       handoffTitle: 'Fix retries',
       handoffSummary: null,
@@ -84,32 +81,7 @@ function createWorkDetail(options: { submitted?: boolean } = {}) {
         }
       : null,
     activity: 'idle',
-    state: 'ready_for_review',
-    stateSinceAt: 20,
-    stateExplanation: {
-      trigger: 'delivery.prepared',
-      evidence: 'The Agent prepared a newer handoff than the last submitted pull request.',
-      authority: 'runtime_integration',
-      responsible: 'user',
-      nextAction: 'Review the committed diff.',
-      observedAt: 20,
-    },
-    recovery: {
-      level: 'resumable',
-      evidence: 'The provider runtime can resume this Session.',
-      lastHeartbeatAt: 20,
-    },
   }
-}
-
-function renderWorkHeader() {
-  render(
-    <QueryClientProvider client={new QueryClient()}>
-      <TooltipProvider>
-        <WorkHeaderChrome workId="work-1" />
-      </TooltipProvider>
-    </QueryClientProvider>,
-  )
 }
 
 describe('work header chrome delivery actions', () => {
@@ -126,7 +98,11 @@ describe('work header chrome delivery actions', () => {
   afterEach(cleanup)
 
   it('submits only after the user clicks Create Draft PR', () => {
-    renderWorkHeader()
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WorkHeaderChrome workId="work-1" />
+      </QueryClientProvider>,
+    )
 
     expect(mocks.submit).not.toHaveBeenCalled()
     fireEvent.click(screen.getByTestId('work-submit'))
@@ -137,16 +113,13 @@ describe('work header chrome delivery actions', () => {
     })
   })
 
-  it('shows explainable state and recovery promises for every Work', () => {
-    renderWorkHeader()
-
-    expect(screen.getByTestId('work-state-badge').textContent).toContain('state.readyForReview')
-    expect(screen.getByTestId('work-recovery-badge').textContent).toContain('recovery.resumable')
-  })
-
   it('marks the submitted draft ready and reports success', async () => {
     mocks.getWorkDetail.mockReturnValue(createWorkDetail({ submitted: true }))
-    renderWorkHeader()
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <WorkHeaderChrome workId="work-1" />
+      </QueryClientProvider>,
+    )
 
     fireEvent.click(screen.getByTestId('work-mark-ready'))
 

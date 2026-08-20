@@ -2,7 +2,6 @@ import {
   CalendarTimeAddLine as AutomationIcon,
   ChartBar2Line as UsageIcon,
   Chat1Line as NewChatIcon,
-  DotCircleLine as AttentionIcon,
   FileNewLine as DiffIcon,
   GitPullRequestLine as WorkIcon,
   SearchLine as SearchIcon,
@@ -17,12 +16,10 @@ import { WorkspaceSidebarNavItemView } from './workspace-sidebar-nav-item-view'
 export interface WorkspaceSidebarNavigationViewProps {
   collapsed: boolean
   pullRequestsActive: boolean
-  attentionActive: boolean
   githubFeaturesDisabled?: boolean
   disabledLabel?: string
   onNewWork: () => void
   onNewChat: () => void
-  onAttention: () => void
   onSearch: () => void
   onDiff: () => void
   onPullRequests: () => void
@@ -34,12 +31,10 @@ export interface WorkspaceSidebarNavigationViewProps {
 export function WorkspaceSidebarNavigationView({
   collapsed,
   pullRequestsActive,
-  attentionActive,
   githubFeaturesDisabled = false,
   disabledLabel,
   onNewWork,
   onNewChat,
-  onAttention,
   onSearch,
   onDiff,
   onPullRequests,
@@ -67,14 +62,6 @@ export function WorkspaceSidebarNavigationView({
           collapsed={collapsed}
           onClick={onNewChat}
           dataTestId="nav-new-chat"
-        />
-        <WorkspaceSidebarNavItemView
-          icon={<AttentionIcon className="size-3.5" />}
-          label={t('nav.needsMe')}
-          collapsed={collapsed}
-          active={attentionActive}
-          onClick={onAttention}
-          dataTestId="nav-needs-me"
         />
         <WorkspaceSidebarNavItemView
           icon={<SearchIcon className="size-3.5" />}

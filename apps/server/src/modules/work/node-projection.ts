@@ -1,3 +1,4 @@
+import type { Work } from '@cradle/db'
 import { nodeWorkLinks } from '@cradle/db'
 import { eq } from 'drizzle-orm'
 
@@ -11,8 +12,7 @@ import type { SessionView } from '../session/service'
 import * as Workspace from '../workspace/service'
 import { isLocalWorkspaceLocator } from '../workspace/workspace-locator'
 import type { SessionIsolationView } from '../worktree/service'
-import type { WorkDeliveryState, WorkRecovery, WorkStateExplanation } from './projection'
-import type { WorkPage, WorkView } from './service'
+import type { WorkPage } from './service'
 
 export interface NodeWorkLinkView {
   localWorkId: string
@@ -24,16 +24,12 @@ export interface NodeWorkLinkView {
 }
 
 export interface RemoteWorkDetail {
-  work: WorkView
+  work: Work
   primaryThread: SessionView
   execution: SessionIsolationView
   readiness: PullRequestReadiness
   pullRequest: SessionPullRequestView | null
   activity: 'idle' | 'running' | 'waiting' | 'blocked'
-  state: WorkDeliveryState
-  stateSinceAt: number
-  stateExplanation: WorkStateExplanation
-  recovery: WorkRecovery
 }
 
 export function getNodeWorkLink(localWorkId: string): NodeWorkLinkView | null {

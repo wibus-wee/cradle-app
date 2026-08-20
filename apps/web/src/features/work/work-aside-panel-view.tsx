@@ -1,7 +1,6 @@
 import {
   AlertLine as AlertCircleIcon,
   BoxLine as BoxIcon,
-  CheckCircleLine as CriteriaIcon,
   ClipboardLine as ClipboardIcon,
   GitBranchLine as GitBranchIcon,
   GitCommitLine as GitCommitIcon,
@@ -20,8 +19,6 @@ import { WorkAsideSectionHeader } from './work-aside-section-header'
 interface WorkAsidePanelLabels {
   objective: string
   objectiveEmpty: string
-  acceptanceCriteria: string
-  acceptanceCriteriaEmpty: string
   execution: string
   executionUnhealthy: string
   tryAgain: string
@@ -79,22 +76,6 @@ export function WorkAsidePanelView({
           >
             {detail.work.objective || labels.objectiveEmpty}
           </p>
-        </section>
-
-        <section className="space-y-1">
-          <WorkAsideSectionHeader icon={CriteriaIcon} label={labels.acceptanceCriteria} />
-          {detail.work.acceptanceCriteria.length > 0
-            ? (
-                <ul className="mt-1.5 space-y-1.5 text-[12px] leading-5 text-foreground/85">
-                  {detail.work.acceptanceCriteria.map(criterion => (
-                    <li key={criterion} className="flex gap-2">
-                      <span className="mt-2 size-1 shrink-0 rounded-full bg-muted-foreground/60" aria-hidden="true" />
-                      <span>{criterion}</span>
-                    </li>
-                  ))}
-                </ul>
-              )
-            : <p className="mt-1.5 text-[12px] leading-5 text-muted-foreground/60">{labels.acceptanceCriteriaEmpty}</p>}
         </section>
 
         <section className="space-y-2">
