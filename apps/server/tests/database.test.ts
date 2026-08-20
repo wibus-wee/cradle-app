@@ -156,7 +156,7 @@ describe('database module', () => {
       `).run()
 
       const runMigration = sqlite.transaction(() => {
-        for (const name of ['0013_host_scoped_workspaces.sql', '0062_workspace_locator_node_id.sql']) {
+        for (const name of ['0013_host_scoped_workspaces.sql', '0061_workspace_locator_node_id.sql']) {
           for (const statement of readMigrationStatements(name)) {
             sqlite.exec(statement)
           }
