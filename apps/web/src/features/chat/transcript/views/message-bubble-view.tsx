@@ -115,7 +115,7 @@ export interface MessageBubbleViewProps {
   presentation?: 'thread' | 'export'
   onToolApprovalResponse?: (response: { messageId: string, approvalId: string, approved: boolean }) => void
   onCopy?: (text: string) => void | Promise<void>
-  debugCaption?: ReactNode
+  runTelemetryCaption?: ReactNode
 }
 
 function useTextStreamIdle(enabled: boolean, textLength: number): boolean {
@@ -142,7 +142,7 @@ export function MessageBubbleView({
   presentation = 'thread',
   onToolApprovalResponse,
   onCopy,
-  debugCaption,
+  runTelemetryCaption,
 }: MessageBubbleViewProps) {
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
@@ -251,7 +251,7 @@ export function MessageBubbleView({
           {content}
           {showThinkingPlaceholder && <ThinkingPlaceholder />}
         </div>
-        {isAssistant && debugCaption}
+        {isAssistant && runTelemetryCaption}
         {!isExportPresentation && !isStreaming && plainText.length > 0 && onCopy && <MessageBubbleActionsView hasPlainText isUser={isUser} onCopy={() => onCopy(plainText)} />}
       </div>
     </div>

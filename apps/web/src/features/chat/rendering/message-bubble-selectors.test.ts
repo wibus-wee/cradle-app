@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { appendPastedTextsToPrompt, createComposerPastedText } from '../pasted-text/pasted-text'
 import {
   readMessageDisplayText,
+  readMessageFrame,
   readUserDisplayText,
   readUserTextDisplay,
 } from './message-bubble-selectors'
@@ -37,5 +38,62 @@ describe('pasted-text message display projection', () => {
     expect(readMessageDisplayText(userMessage(serialized))).toBe(
       'Finish the review\n\nsupporting context',
     )
+  })
+})
+
+describe('assistant run metadata projection', () => {
+  it('restores the durable run identity and timing projection', () => {
+    const message: UIMessage = {
+      id: 'assistant-1',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Done' }],
+      metadata: {
+        cradle: {
+          run: {
+            runId: 'run-1',
+            durationMs: 42_000,
+            timings: {
+              acceptMs: 100,
+              ttfbMs: 300,
+              ttftMs: 500,
+              workedMs: 40_000,
+              totalMs: 42_000,
+            },
+          },
+        },
+      },
+    }
+
+    expect(readMessageFrame(message)).toMatchObject({
+      runId: 'run-1',
+      runTimings: {
+        acceptMs: 100,
+        ttfbMs: 300,
+        ttftMs: 500,
+        workedMs: 40_000,
+        totalMs: 42_000,
+      },
+    })
+  })
+
+  it('keeps legacy total time out of the Worked projection', () => {
+    const message: UIMessage = {
+      id: 'assistant-legacy',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Done' }],
+      metadata: {
+        cradle: {
+          run: { runId: 'run-legacy', durationMs: 42_000 },
+        },
+      },
+    }
+
+    expect(readMessageFrame(message).runTimings).toEqual({
+      acceptMs: null,
+      ttfbMs: null,
+      ttftMs: null,
+      workedMs: null,
+      totalMs: 42_000,
+    })
   })
 })

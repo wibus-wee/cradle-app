@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 
-import { getChatSessionsBySessionIdRunSnapshotsOptions } from '~/api-gen/@tanstack/react-query.gen'
+import { getChatRunsByRunIdSnapshotOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { chatSelectors } from '~/store/chat'
 
 import { BangCommandBlock, BangCommandPromptBlock } from '../../rendering/blocks/bang-command-block'
@@ -17,7 +17,7 @@ import type {
   MessageTextTransform,
 } from '../../rendering/message-bubble-selectors'
 import { readActiveStreamingSegmentKey } from '../../rendering/message-bubble-selectors'
-import { readLocalRunTimings } from '../../rendering/run-debug-timings'
+import { readRunSnapshotTimings } from '../../rendering/run-debug-timings'
 import { describeToolCall } from '../../rendering/tool-ui-classifier'
 import type { MessageBubbleByIdProps, MessageToolApprovalHandler } from '../lib/message-bubble-types'
 import { MessageBubbleFrameView } from '../views/message-bubble-frame-view'
@@ -58,20 +58,18 @@ export function MessageBubbleSegmentsContainer({
   const executionPhaseSplit = isStreaming
     ? null
     : splitSegmentExecutionPhase(segments, { describeToolKind: part => describeToolCall(part).kind })
-  const runMeta = useChatRenderStore(chatSelectors.runDisplayMeta(frame.id), (a, b) => a === b)
-  const localRunTotalMs = runMeta ? readLocalRunTimings(runMeta).totalMs : null
-  // History restores have no session-local run meta; fall back to the durable
-  // duration stamped on the message, then to per-session run snapshots.
-  const { data: runSnapshotPage } = useQuery({
-    ...getChatSessionsBySessionIdRunSnapshotsOptions({ path: { sessionId } }),
-    enabled: isAssistant && !isStreaming && localRunTotalMs === null && frame.runDurationMs === null,
+  const liveRunMeta = useChatRenderStore(chatSelectors.runDisplayMeta(frame.id), (a, b) => a === b)
+  const effectiveRunId = liveRunMeta?.runId ?? frame.runId
+  const { data: runSnapshot } = useQuery({
+    ...getChatRunsByRunIdSnapshotOptions({ path: { runId: effectiveRunId ?? '' } }),
+    enabled: isAssistant && !isStreaming && Boolean(effectiveRunId),
+    refetchInterval: query => query.state.data?.status === 'running' ? 1000 : false,
     staleTime: 60_000,
   })
-  const restoredRunTotalMs = (() => {
-    const snapshot = runSnapshotPage?.snapshots.find(candidate => candidate.messageId === frame.id)
-    return snapshot?.completedAt != null ? Math.max(0, snapshot.completedAt - snapshot.startedAt) : null
-  })()
-  const runTotalMs = localRunTotalMs ?? frame.runDurationMs ?? restoredRunTotalMs
+  const snapshotTimings = runSnapshot ? readRunSnapshotTimings(runSnapshot) : null
+  // Never substitute legacy total duration for Worked: old messages retain
+  // Done, while new compact projections preserve the correct execution bound.
+  const workedMs = snapshotTimings?.workedMs ?? frame.runTimings?.workedMs ?? null
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState(0)
   const imageAttachmentBySegmentKey = new Map(imageAttachments.map(attachment => [attachment.segmentKey, attachment.part]))
@@ -133,7 +131,7 @@ export function MessageBubbleSegmentsContainer({
         ? renderSegmentsWithImageGrid(segments)
         : (
             <>
-              <ExecutionPhaseFold durationMs={runTotalMs}>{executionPhaseSplit.executionItems.map(renderSegment)}</ExecutionPhaseFold>
+              <ExecutionPhaseFold durationMs={workedMs}>{executionPhaseSplit.executionItems.map(renderSegment)}</ExecutionPhaseFold>
               {renderSegmentsWithImageGrid(executionPhaseSplit.finalItems)}
             </>
           )
@@ -145,7 +143,7 @@ export function MessageBubbleSegmentsContainer({
         isStreaming={isStreaming}
         content={content}
         thinkingPlaceholder={<MessageBubbleThinkingPlaceholderById sessionId={sessionId} messageId={frame.id} isAssistant={isAssistant} isStreaming={isStreaming} segments={segments} textTransform={textTransform} suppressPlaceholder={frame.hasHiddenRuntimeUserInputTail} />}
-        debugCaption={isAssistant ? <RunDebugCaptionById messageId={frame.id} /> : undefined}
+        runTelemetryCaption={isAssistant ? <RunDebugCaptionById messageId={frame.id} persistedRunId={frame.runId} persistedTimings={frame.runTimings} /> : undefined}
         actions={!isStreaming ? <MessageBubbleActionsById sessionId={sessionId} messageId={frame.id} isUser={isUser} editAction={isUser ? editAction : undefined} textTransform={textTransform} /> : undefined}
       />
       {lightboxImages.length > 0 && <ImageLightbox images={lightboxImages} sessionId={sessionId} initialIndex={lightboxIndex} open={lightboxOpen} onOpenChange={setLightboxOpen} />}

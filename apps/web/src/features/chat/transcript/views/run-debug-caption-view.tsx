@@ -18,7 +18,7 @@ export interface RunDebugCaptionViewProps {
   totalMs: number | null
 }
 
-/** Props-only run timing caption for assistant bubbles and Storybook fixtures. */
+/** Props-only persistent run timing caption for assistant bubbles and Storybook fixtures. */
 export function RunDebugCaptionView({
   runId,
   acceptMs,
