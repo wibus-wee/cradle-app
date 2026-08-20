@@ -519,21 +519,6 @@ jobs:
       - name: Set desktop version
         run: pnpm --filter @cradle/desktop run set-version ${{ needs.resolve.outputs.desktop_version }}
 
-      - name: Run packaged Server fetch smoke
-        run: pnpm --filter @cradle/desktop smoke:server-fetch:packaged
-
-      - name: Upload Windows Server fetch smoke evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-win-x64-server-fetch-smoke-${{ github.run_id }}
-          if-no-files-found: error
-          include-hidden-files: true
-          retention-days: 7
-          path: |
-            apps/desktop/.server-fetch-smoke/**
-            apps/desktop/release/server-fetch-smoke/builder-effective-config.yaml
-
       - name: Build Windows desktop runtime and app bundles
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

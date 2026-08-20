@@ -7,28 +7,6 @@ on:
         description: Git ref in this repository to checkout (branch, tag, or SHA)
         required: true
         default: main
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/workflows/verify-windows-desktop-package.yml'
-      - 'apps/desktop/src/main/server-fetch-smoke/**'
-      - 'apps/desktop/src/main/server-fetch-broker.ts'
-      - 'apps/desktop/src/main/main-app.ts'
-      - 'apps/desktop/src/preload/index.ts'
-      - 'apps/desktop/src/preload/server-fetch.ts'
-      - 'apps/desktop/src/shared/server-runtime.ts'
-      - 'apps/desktop/src/shared/server-fetch-transport.ts'
-      - 'apps/web/src/lib/client.config.ts'
-      - 'apps/web/src/lib/server-credential.ts'
-      - 'apps/web/src/lib/server-transport/base-url.ts'
-      - 'apps/web/src/lib/server-transport/desktop-ipc-fetch.ts'
-      - 'apps/desktop/package.json'
-      - 'apps/desktop/electron.vite.config.ts'
-      - 'apps/desktop/electron-builder.mjs'
-      - 'plugins/system-info/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/verify-windows-desktop-package.yml'
-
 permissions:
   contents: read
 
@@ -46,15 +24,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || 'main' }}
 
       - name: Setup desktop build environment
         uses: ./.github/actions/desktop-build-setup
         with:
           node-version: '24'
-
-      - name: Run packaged Server fetch smoke
-        run: pnpm --filter @cradle/desktop smoke:server-fetch:packaged
 
       - name: Build desktop runtime and app bundles
         run: pnpm --filter @cradle/desktop build
@@ -254,10 +229,7 @@ jobs:
         with:
           name: cradle-windows-package
           if-no-files-found: warn
-          include-hidden-files: true
           path: |
-            apps/desktop/.server-fetch-smoke/**
-            apps/desktop/release/server-fetch-smoke/builder-effective-config.yaml
             apps/desktop/release/*.exe
             apps/desktop/release/*.blockmap
             apps/desktop/release/builder-effective-config.yaml

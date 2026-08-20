@@ -16,8 +16,11 @@ data
 !.env.example
 chronicle/target/
 apps/desktop/release
-apps/desktop/.m0-results
 apps/desktop/resources/chronicle/**
+apps/desktop/resources/codex/**
+apps/desktop/resources/codex/**
+apps/desktop/resources/codex/**
+apps/desktop/resources/codex/**
 apps/desktop/resources/codex/**
 apps/desktop/resources/relayd/**/relayd
 apps/desktop/resources/relayd/**/relayd.exe

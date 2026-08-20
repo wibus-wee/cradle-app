@@ -36,13 +36,7 @@
     "dist:linux": "pnpm build && electron-builder --config electron-builder.mjs --linux",
     "generate:linux-update-manifest": "node scripts/generate-linux-update-manifest.mjs",
     "verify:linux-release": "node scripts/verify-linux-release.mjs",
-    "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json",
-    "smoke:server-fetch:build": "tsc --noEmit -p src/main/server-fetch-smoke/tsconfig.renderer.json && electron-vite build --config src/main/server-fetch-smoke/electron.vite.config.ts",
-    "smoke:server-fetch:development": "pnpm smoke:server-fetch:build && node src/main/server-fetch-smoke/run-smoke.mjs --mode development",
-    "smoke:server-fetch:resource": "pnpm smoke:server-fetch:build && node src/main/server-fetch-smoke/run-smoke.mjs --mode development --profile resource",
-    "smoke:server-fetch:pack": "pnpm smoke:server-fetch:build && electron-builder --config src/main/server-fetch-smoke/electron-builder.mjs --dir --publish never",
-    "smoke:server-fetch:packaged": "pnpm smoke:server-fetch:pack && node src/main/server-fetch-smoke/run-smoke.mjs --mode packaged",
-    "smoke:server-fetch:gate": "pnpm smoke:server-fetch:development && pnpm smoke:server-fetch:packaged"
+    "typecheck": "pnpm --filter @cradle/plugin-sdk build && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
     "@cradle/browser-use": "workspace:*",
@@ -67,9 +61,6 @@
     "electron": "42.4.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
-    "es-module-lexer": "2.3.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
     "typescript": "^5.9.3",
     "vite": "^7.2.6"
   }

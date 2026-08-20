@@ -13,7 +13,7 @@ The ordinary Server HTTP listener remains the single API contract for the CLI, a
 ## Progress
 
 - [x] (2026-08-12 16:22Z) Read Plan 063, the root repository instructions, the installed `execplan` instructions, current source, package/build workflows, and the existing Web transport scaffold.
-- [x] (2026-08-12 16:22Z) Completed three independent exploration nodes and stored their self-contained handoffs under `docs/multi-work/desktop-server-transport/`: packaged M0, Desktop Main/lifecycle, and Web/auth/ratchet.
+- [x] (2026-08-12 16:22Z) Completed independent exploration of packaged M0, Desktop Main/lifecycle, and Web/auth/ratchet concerns.
 - [x] (2026-08-12 16:22Z) Reconciled the exploration findings into this ExecPlan and fixed the implementation DAG and architecture decisions below.
 - [x] (2026-08-12 16:27Z) Captured the fresh local pre-edit baseline available in the partial dependency install: Desktop direct TypeScript check passed and the focused Web transport suite passed 9/9; Web direct TypeScript check failed at the pre-existing `plugin-host.ts` descriptor nullable-description mismatch before any M0 or production edit.
 - [x] (2026-08-12 17:24Z) Implemented Node A's isolated fixture, exact result validator, bounded process-tree runner, direct undici dependency, package commands, and Linux/Windows/release CI gates. The first two independent reviews failed the evidence validator and two generations of timeout cleanup; both defects and the authority/privilege ratchets were fixed, and Review C passed code readiness after a repeated parent-exits/descendant-ignores adversarial probe.
@@ -168,7 +168,7 @@ Node F adds the AST boundary ratchet, exact manifest, unit fixtures, and affecte
 
 Node G extends the packaged launcher into the targeted twenty-Tearoff smoke. It opens unique sessions/Tearoffs, keeps more than six distinct streams active, performs representative JSON/multipart/binary/image/PDF/plugin traffic, opens one ticketed PTY WebSocket, cancels/cleans half, restarts the owned Server, proves generation fencing/no mutation replay/existing cursor recovery, and finally closes everything. Main redacted diagnostics and OS socket sampling independently prove zero renderer HTTP(S) sockets to the owned Server port and zero leaked active proxy operations.
 
-Each node receives the ExecPlan and related files directly, writes a self-contained `docs/multi-work/desktop-server-transport/20260813-...-{Implementation|Review|Fix}X.md` handoff, and is independently reviewed. Failed reviews receive a bounded Fix node and re-review. Architectural failures return an escalation instead of a patch-around. Main owns cross-node merges, ExecPlan updates, and final reporting.
+Each node receives the ExecPlan and related files directly and is independently reviewed. Failed reviews receive a bounded correction and re-review. Architectural failures return an escalation instead of a patch-around. Main owns cross-node merges, ExecPlan updates, and final reporting.
 
 ## Concrete Steps
 
@@ -250,14 +250,6 @@ Shutdown first fences restart, stops producers/timers, invalidates transport, re
 If M0 or a packaged smoke fails, preserve its JSON/log/measurements, leave production routing unchanged or revert only the failed in-progress slice using explicit path edits, and stop. If a review exposes architecture drift, return an escalation; do not add HTTP fallback, buffering, `bypassCSP`, BrowserPanel access, ticket weakening, or private framing.
 
 ## Artifacts and Notes
-
-Exploration handoffs:
-
-    docs/multi-work/desktop-server-transport/20260813-m0-packaged-gate-ExplorationA.md
-    docs/multi-work/desktop-server-transport/20260813-desktop-main-transport-ExplorationB.md
-    docs/multi-work/desktop-server-transport/20260813-web-auth-ratchet-ExplorationC.md
-
-These files are intentionally separate from this ExecPlan and are ignored by the repository's `/docs` rule. They remain workflow handoffs, not the source of truth required to execute this self-contained plan.
 
 The implementation baseline is Plan 063's `d40f895e`. The branch contains the replan plus the committed, fixture-only M0 gate, Linux launch-policy, and evidence-preservation slices; the production-routing boundary remains unchanged. The worktree's untracked `apps/server/src/http/websocket-ticket.ts` is unrelated and must remain unstaged. Use explicit `git add <paths>` only; never `git add -A`.
 

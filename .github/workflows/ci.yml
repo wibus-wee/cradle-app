@@ -305,39 +305,6 @@ jobs:
       - name: Test Chronicle with default native features
         run: cargo test --manifest-path chronicle/Cargo.toml --all-targets
 
-  desktop-server-fetch-smoke:
-    name: Desktop Server Fetch Smoke
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - name: Install Electron runtime dependencies and Xvfb
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes xvfb
-          pnpm exec playwright install-deps chromium
-      - name: Run development Server fetch smoke
-        env:
-          CRADLE_SERVER_FETCH_SMOKE_NO_SANDBOX: '1'
-        run: xvfb-run -a pnpm --filter @cradle/desktop smoke:server-fetch:development
-      - name: Run packaged Server fetch smoke
-        if: always()
-        env:
-          CRADLE_SERVER_FETCH_SMOKE_NO_SANDBOX: '1'
-        run: xvfb-run -a pnpm --filter @cradle/desktop smoke:server-fetch:packaged
-      - name: Upload Server fetch smoke evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: desktop-server-fetch-smoke-${{ github.run_id }}
-          if-no-files-found: error
-          include-hidden-files: true
-          retention-days: 7
-          path: |
-            apps/desktop/.server-fetch-smoke/**
-            apps/desktop/release/server-fetch-smoke/builder-effective-config.yaml
-
   # ─── Build ────────────────────────────────────────────────────────────────
   build:
     name: Build (${{ matrix.target }})

@@ -4,7 +4,6 @@ import { createSimulatorApp, createSimulatorRuntime } from './server'
 
 export * from './anthropic'
 export * from './contract'
-export * from './conversation-load-pattern'
 export * from './core/auto-respond-policy'
 export * from './core/scenario-runtime'
 export * from './openai'

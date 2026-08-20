@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: gate
     if: ${{ needs.gate.result == 'success' }}
-    timeout-minutes: 75
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Cradle source
