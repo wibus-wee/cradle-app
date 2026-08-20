@@ -165,6 +165,18 @@ export const browserPanelTabFixtures = [
     favicon: null,
   },
   {
+    kind: 'artifact',
+    id: 'artifact',
+    sessionId: 'session-current',
+    artifactId: 'review-board',
+    toolCallId: 'tool-artifact',
+    title: 'Review board',
+    source: `import { Artifact, Header } from 'cradle/artifact'\n\nexport default function ReviewBoard() {\n  return (\n    <Artifact>\n      <Header eyebrow="PR" title="Review board" summary="Fixture" />\n    </Artifact>\n  )\n}\n`,
+    revision: 1,
+    loading: false,
+    favicon: null,
+  },
+  {
     kind: 'plan-refine',
     id: 'plan-refine',
     sessionId: 'session-current',

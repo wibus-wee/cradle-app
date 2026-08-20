@@ -10,6 +10,12 @@ import { PullRequestTabLinkView } from '~/features/pull-requests/pull-request-ta
 import type { SessionPullRequest } from '~/features/session/api/pull-request'
 
 interface WorkHeaderChromeViewProps {
+  stateLabel: string
+  stateEvidence: string
+  stateAuthorityLabel: string
+  nextAction: string
+  recoveryLabel: string
+  recoveryEvidence: string
   pullRequest: SessionPullRequest | null
   pullRequestStatusLabel: string | null
   showPublish: boolean
@@ -26,6 +32,12 @@ interface WorkHeaderChromeViewProps {
 }
 
 export function WorkHeaderChromeView({
+  stateLabel,
+  stateEvidence,
+  stateAuthorityLabel,
+  nextAction,
+  recoveryLabel,
+  recoveryEvidence,
   pullRequest,
   pullRequestStatusLabel,
   showPublish,
@@ -45,10 +57,6 @@ export function WorkHeaderChromeView({
     && pullRequest.state === 'open'
     && !pullRequest.merged
 
-  if (!showPublish && !pullRequest) {
-    return null
-  }
-
   const submitButton = (
     <Button
       type="button"
@@ -64,6 +72,39 @@ export function WorkHeaderChromeView({
 
   return (
     <div className="flex min-w-0 items-center gap-1.5" data-testid="work-header-chrome">
+      <Tooltip>
+        <TooltipTrigger
+          render={(
+            <span
+              className="inline-flex h-6 items-center gap-1 rounded-md border border-border/60 bg-fill/35 px-1.5 text-[11px] font-medium text-foreground/90"
+              data-testid="work-state-badge"
+            >
+              <span className="size-1.5 rounded-full bg-current opacity-60" aria-hidden="true" />
+              {stateLabel}
+            </span>
+          )}
+        />
+        <TooltipContent side="bottom" className="max-w-80 space-y-1">
+          <p>{stateEvidence}</p>
+          <p className="text-muted-foreground">{stateAuthorityLabel}</p>
+          <p>{nextAction}</p>
+        </TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger
+          render={(
+            <span
+              className="inline-flex h-6 items-center rounded-md border border-border/60 px-1.5 text-[11px] text-muted-foreground"
+              data-testid="work-recovery-badge"
+            >
+              {recoveryLabel}
+            </span>
+          )}
+        />
+        <TooltipContent side="bottom" className="max-w-72">
+          {recoveryEvidence}
+        </TooltipContent>
+      </Tooltip>
       {showPublish && (
         blockedReason
           ? (

@@ -1,4 +1,5 @@
 import type { CradleToolKind } from '../../../chat-runtime/runtime-provider-types'
+import { isCradleWriteArtifactToolName } from '../../tools/artifact-tool'
 import type { BuiltinToolCallInputPayload, BuiltinToolCallResultPayload } from '../../tools/tool-call-payload'
 import {
   createBuiltinToolCallInputPayload,
@@ -145,6 +146,9 @@ const CODEX_TOOL_KINDS: Record<string, CradleToolKind> = {
 }
 
 export function classifyCodexToolKind(apiName: string, itemType?: string): CradleToolKind {
+  if (isCradleWriteArtifactToolName(apiName)) {
+    return 'artifact'
+  }
   if (itemType === 'mcpToolCall') {
     return 'mcp'
   }

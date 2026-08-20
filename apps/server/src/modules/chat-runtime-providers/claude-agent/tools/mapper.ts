@@ -1,4 +1,5 @@
 import type { CradleToolKind } from '../../../chat-runtime/runtime-provider-types'
+import { isCradleWriteArtifactToolName } from '../../tools/artifact-tool'
 import type { BuiltinToolCallInputPayload, BuiltinToolCallResultPayload } from '../../tools/tool-call-payload'
 import {
   createBuiltinToolCallInputPayload,
@@ -96,6 +97,9 @@ export function classifyClaudeCodeToolKind(apiName: string): CradleToolKind {
   }
   if (apiName === CLAUDE_PLAN_IMPLEMENTATION_TOOL_NAME) {
     return 'plan-implementation'
+  }
+  if (isCradleWriteArtifactToolName(apiName)) {
+    return 'artifact'
   }
   if (CLAUDE_AGENT_MCP_TOOL_NAME_PATTERN.test(apiName)) {
     return 'mcp'

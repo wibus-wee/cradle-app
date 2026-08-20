@@ -48,6 +48,7 @@ import {
 import { useLayoutStore } from '~/store/layout'
 
 import { releaseSideConversation } from '../chat/commands/chat-response-command'
+import { ArtifactViewer } from './artifact/artifact-viewer'
 import type { BrowserAnnotationAdjustmentApplyDetail } from './browser-annotation-adjustment-panel'
 import { BROWSER_ANNOTATION_ADJUSTMENT_APPLY_EVENT } from './browser-annotation-adjustment-panel'
 import {
@@ -2669,6 +2670,17 @@ export function BrowserPanel({
 
         {activePanelTab?.kind === 'plan-document' && (
           <PlanDocumentViewer title={activePanelTab.title} text={activePanelTab.text} />
+        )}
+
+        {activePanelTab?.kind === 'artifact' && (
+          <ArtifactViewer
+            sessionId={activePanelTab.sessionId}
+            artifactId={activePanelTab.artifactId}
+            title={activePanelTab.title}
+            source={activePanelTab.source}
+            revision={activePanelTab.revision}
+            refreshFromServer
+          />
         )}
 
         {activePanelTab?.kind === 'plan-refine' && (

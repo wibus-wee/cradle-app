@@ -6773,6 +6773,88 @@ export type GetBlobsByIdResponses = {
 
 export type GetBlobsByIdResponse = GetBlobsByIdResponses[keyof GetBlobsByIdResponses];
 
+export type PostChatArtifactsData = {
+    body: {
+        chatSessionId: string;
+        artifactId?: string;
+        title: string;
+        source: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/chat-artifacts';
+};
+
+export type PostChatArtifactsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        title: string;
+        source: string;
+        revision: number;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostChatArtifactsResponse = PostChatArtifactsResponses[keyof PostChatArtifactsResponses];
+
+export type GetChatArtifactsBySessionIdData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat-artifacts/{sessionId}';
+};
+
+export type GetChatArtifactsBySessionIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        sessionId: string;
+        title: string;
+        source: string;
+        revision: number;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+};
+
+export type GetChatArtifactsBySessionIdResponse = GetChatArtifactsBySessionIdResponses[keyof GetChatArtifactsBySessionIdResponses];
+
+export type GetChatArtifactsBySessionIdByArtifactIdData = {
+    body?: never;
+    path: {
+        sessionId: string;
+        artifactId: string;
+    };
+    query?: never;
+    url: '/chat-artifacts/{sessionId}/{artifactId}';
+};
+
+export type GetChatArtifactsBySessionIdByArtifactIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        title: string;
+        source: string;
+        revision: number;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type GetChatArtifactsBySessionIdByArtifactIdResponse = GetChatArtifactsBySessionIdByArtifactIdResponses[keyof GetChatArtifactsBySessionIdByArtifactIdResponses];
+
 export type GetBackgroundActivitiesData = {
     body?: never;
     path?: never;
@@ -8339,6 +8421,7 @@ export type GetWorksResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8374,6 +8457,21 @@ export type GetWorksResponses = {
                 additions?: number;
                 deletions?: number;
             } | null;
+            state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+            stateSinceAt: number;
+            stateExplanation: {
+                trigger: string;
+                evidence: string;
+                authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+                responsible: 'user' | 'agent' | 'dependency' | 'system';
+                nextAction: string;
+                observedAt: number;
+            };
+            recovery: {
+                level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+                evidence: string;
+                lastHeartbeatAt: number | null;
+            };
         }>;
         nextCursor: string | null;
     };
@@ -8387,6 +8485,7 @@ export type PostWorksData = {
         title: string;
         goal?: string;
         objective?: string;
+        acceptanceCriteria?: Array<string>;
         linkedIssueId?: string;
         baseBranch?: string;
         providerTargetId?: string;
@@ -8428,6 +8527,7 @@ export type PostWorksResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8517,6 +8617,21 @@ export type PostWorksResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -8547,6 +8662,44 @@ export type PostWorksNodeProjectionsReconcileResponses = {
 
 export type PostWorksNodeProjectionsReconcileResponse = PostWorksNodeProjectionsReconcileResponses[keyof PostWorksNodeProjectionsReconcileResponses];
 
+export type GetWorksAttentionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/works/attention';
+};
+
+export type GetWorksAttentionResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        category: 'approve_or_answer' | 'handle_failure' | 'review_work' | 'merge_or_archive';
+        risk: 'low' | 'medium' | 'high';
+        workId: string;
+        workTitle: string;
+        workspaceId: string;
+        sessionId: string;
+        runtimeKind: string;
+        providerTargetId: string | null;
+        agentId: string | null;
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        waitingSeconds: number;
+        reason: string;
+        authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+        nextAction: string;
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
+    }>;
+};
+
+export type GetWorksAttentionResponse = GetWorksAttentionResponses[keyof GetWorksAttentionResponses];
+
 export type GetWorksByIdData = {
     body?: never;
     path: {
@@ -8565,6 +8718,7 @@ export type GetWorksByIdResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8654,6 +8808,21 @@ export type GetWorksByIdResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -8679,6 +8848,7 @@ export type PostWorksByIdArchiveResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8768,10 +8938,153 @@ export type PostWorksByIdArchiveResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
 export type PostWorksByIdArchiveResponse = PostWorksByIdArchiveResponses[keyof PostWorksByIdArchiveResponses];
+
+export type PostWorksByIdRedetectData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/works/{id}/redetect';
+};
+
+export type PostWorksByIdRedetectResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        work: {
+            id: string;
+            title: string;
+            objective: string;
+            acceptanceCriteria: Array<string>;
+            linkedIssueId: string | null;
+            handoffTitle: string | null;
+            handoffSummary: string | null;
+            handoffTestPlan: string | null;
+            preparedAt: number | null;
+            lastSubmittedAt: number | null;
+            closedAt: number | null;
+            archivedAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+        };
+        primaryThread: {
+            id: string;
+            execution: {
+                kind: 'local';
+            } | {
+                kind: 'node';
+                nodeId: string;
+                remoteSessionId: string;
+            };
+            parentSessionId: string | null;
+            sideContextSource: 'provider-native' | 'cradle-context' | null;
+            workspaceId: string | null;
+            title: string | null;
+            origin: string;
+            providerTargetId: string | null;
+            agentId: string | null;
+            modelId: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
+            linkedIssueId: string | null;
+            sessionGroupId: string | null;
+            runtimeKind: string;
+            status: 'idle' | 'streaming' | 'error';
+            pinned: number;
+            archivedAt: number | null;
+            lastReadAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+            latestUserMessageAt: number | null;
+            latestAssistantMessageAt: number | null;
+            unread: boolean;
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        };
+        execution: {
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        };
+        readiness: {
+            isolated: boolean;
+            clean: boolean;
+            branch: string | null;
+            baseRef: string | null;
+            commitsAhead: number;
+            changedFiles: number;
+        };
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
+        } | null;
+        activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
+    };
+};
+
+export type PostWorksByIdRedetectResponse = PostWorksByIdRedetectResponses[keyof PostWorksByIdRedetectResponses];
 
 export type PostWorksByIdPrepareData = {
     body: {
@@ -8795,6 +9108,7 @@ export type PostWorksByIdPrepareResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8884,6 +9198,21 @@ export type PostWorksByIdPrepareResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -8912,6 +9241,7 @@ export type PostWorksByIdSubmitResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -9001,6 +9331,21 @@ export type PostWorksByIdSubmitResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -9026,6 +9371,7 @@ export type PostWorksByIdBranchResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -9115,6 +9461,21 @@ export type PostWorksByIdBranchResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -9138,6 +9499,7 @@ export type GetSessionsByIdWorkResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -9173,6 +9535,21 @@ export type GetSessionsByIdWorkResponses = {
                 additions?: number;
                 deletions?: number;
             } | null;
+            state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+            stateSinceAt: number;
+            stateExplanation: {
+                trigger: string;
+                evidence: string;
+                authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+                responsible: 'user' | 'agent' | 'dependency' | 'system';
+                nextAction: string;
+                observedAt: number;
+            };
+            recovery: {
+                level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+                evidence: string;
+                lastHeartbeatAt: number | null;
+            };
         } | null;
     };
 };

@@ -3,6 +3,7 @@ import { useCallback } from 'react'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
 import type { ToolCallBlockProps } from '../lib/tool-call-block-types'
+import type { ArtifactOpenInput } from '../views/artifact-preview-view'
 import type { PlanDocumentOpenInput } from '../views/plan-document-preview-view'
 import type { ToolCallBlockViewProps } from '../views/tool-call-block-view'
 import { ToolCallBlockView } from '../views/tool-call-block-view'
@@ -17,6 +18,7 @@ type SubagentOutputOpen = Parameters<
   NonNullable<ToolCallBlockViewProps['onOpenSubagentOutput']>
 >[0]
 type PlanDocumentOpen = PlanDocumentOpenInput
+type ArtifactOpen = ArtifactOpenInput
 
 /** Runtime adapter that connects the props-only tool surface to browser-panel state. */
 export function ToolCallBlock({
@@ -30,6 +32,7 @@ export function ToolCallBlock({
   const updateWorkflowTab = useBrowserPanelStore(s => s.updateWorkflowTab)
   const requestScrollToFilePath = useBrowserPanelStore(s => s.requestScrollToFilePath)
   const openPlanDocumentTab = useBrowserPanelStore(s => s.openPlanDocumentTab)
+  const openArtifactTab = useBrowserPanelStore(s => s.openArtifactTab)
 
   const handleOpenWorkspaceDiff = useCallback((path: string) => {
     if (!workspaceDiffTarget) {
@@ -78,6 +81,17 @@ export function ToolCallBlock({
     openPlanDocumentTab(input)
   }, [openPlanDocumentTab])
 
+  const handleOpenArtifact = useCallback((input: ArtifactOpen) => {
+    openArtifactTab({
+      sessionId: input.sessionId,
+      artifactId: input.artifactId,
+      toolCallId: input.toolCallId,
+      title: input.title,
+      source: input.source ?? '',
+      revision: input.revision,
+    })
+  }, [openArtifactTab])
+
   return (
     <ToolCallBlockView
       {...viewProps}
@@ -87,6 +101,7 @@ export function ToolCallBlock({
       onOpenWorkflowSurface={handleOpenWorkflowSurface}
       onWorkflowSurfaceChange={handleWorkflowSurfaceChange}
       onOpenPlanDocument={handleOpenPlanDocument}
+      onOpenArtifact={handleOpenArtifact}
     />
   )
 }

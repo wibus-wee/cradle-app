@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "d6ff8c7b-fbfc-4b32-8eb7-f239e1e46934",
+  "id": "ee5a840a-dd00-4073-822b-146ff265c00a",
   "prevId": "d83632d6-7ca0-4aee-ba43-7578e3a50aca",
   "tables": {
     "acp_agents": {
@@ -12661,6 +12661,88 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "fabric_membership": {
+      "name": "fabric_membership",
+      "columns": {
+        "fabric_id": {
+          "name": "fabric_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "relay_url": {
+          "name": "relay_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "local_node_id": {
+          "name": "local_node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_key_secret_id": {
+          "name": "owner_key_secret_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "identity_key_secret_id": {
+          "name": "identity_key_secret_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "encryption_key_secret_id": {
+          "name": "encryption_key_secret_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "certificate_json": {
+          "name": "certificate_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "agent_credentials": {
       "name": "agent_credentials",
       "columns": {
@@ -13756,6 +13838,90 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "node_session_links": {
+      "name": "node_session_links",
+      "columns": {
+        "local_session_id": {
+          "name": "local_session_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remote_session_id": {
+          "name": "remote_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "remote_workspace_id": {
+          "name": "remote_workspace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "node_session_links_node_id_idx": {
+          "name": "node_session_links_node_id_idx",
+          "columns": [
+            "node_id"
+          ],
+          "isUnique": false
+        },
+        "node_session_links_node_remote_session_unique": {
+          "name": "node_session_links_node_remote_session_unique",
+          "columns": [
+            "node_id",
+            "remote_session_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "node_session_links_local_session_id_sessions_id_fk": {
+          "name": "node_session_links_local_session_id_sessions_id_fk",
+          "tableFrom": "node_session_links",
+          "tableTo": "sessions",
+          "columnsFrom": [
+            "local_session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -15571,13 +15737,20 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "fabric_membership": {
-      "name": "fabric_membership",
+    "relay_host_enrollments": {
+      "name": "relay_host_enrollments",
       "columns": {
-        "fabric_id": {
-          "name": "fabric_id",
+        "id": {
+          "name": "id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
@@ -15588,46 +15761,54 @@
           "notNull": true,
           "autoincrement": false
         },
-        "local_node_id": {
-          "name": "local_node_id",
+        "room_id": {
+          "name": "room_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "role": {
-          "name": "role",
+        "host_pubkey": {
+          "name": "host_pubkey",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "owner_key_secret_id": {
-          "name": "owner_key_secret_id",
+        "host_private_key_secret_id": {
+          "name": "host_private_key_secret_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "pinned_controller_pubkey": {
+          "name": "pinned_controller_pubkey",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "identity_key_secret_id": {
-          "name": "identity_key_secret_id",
+        "status": {
+          "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
+        },
+        "pairing_code": {
+          "name": "pairing_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
-        "encryption_key_secret_id": {
-          "name": "encryption_key_secret_id",
+        "last_error": {
+          "name": "last_error",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "certificate_json": {
-          "name": "certificate_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "created_at": {
@@ -15647,14 +15828,186 @@
           "default": "(unixepoch())"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "relay_host_enrollments_status_idx": {
+          "name": "relay_host_enrollments_status_idx",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        },
+        "relay_host_enrollments_room_idx": {
+          "name": "relay_host_enrollments_room_idx",
+          "columns": [
+            "room_id"
+          ],
+          "isUnique": false
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "node_session_links": {
-      "name": "node_session_links",
+    "relay_servers": {
+      "name": "relay_servers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "relay_url": {
+          "name": "relay_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "relay_servers_default_idx": {
+          "name": "relay_servers_default_idx",
+          "columns": [
+            "is_default"
+          ],
+          "isUnique": false
+        },
+        "relay_servers_enabled_idx": {
+          "name": "relay_servers_enabled_idx",
+          "columns": [
+            "enabled"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "remote_hosts": {
+      "name": "remote_hosts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "connection_config_json": {
+          "name": "connection_config_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "capabilities_json": {
+          "name": "capabilities_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "last_seen_at": {
+          "name": "last_seen_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "remote_hosts_enabled_idx": {
+          "name": "remote_hosts_enabled_idx",
+          "columns": [
+            "enabled"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "remote_session_links": {
+      "name": "remote_session_links",
       "columns": {
         "local_session_id": {
           "name": "local_session_id",
@@ -15663,8 +16016,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "node_id": {
-          "name": "node_id",
+        "host_id": {
+          "name": "host_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
@@ -15702,29 +16055,42 @@
         }
       },
       "indexes": {
-        "node_session_links_node_id_idx": {
-          "name": "node_session_links_node_id_idx",
+        "remote_session_links_host_id_idx": {
+          "name": "remote_session_links_host_id_idx",
           "columns": [
-            "node_id"
+            "host_id"
           ],
           "isUnique": false
         },
-        "node_session_links_node_remote_session_unique": {
-          "name": "node_session_links_node_remote_session_unique",
+        "remote_session_links_host_remote_session_unique": {
+          "name": "remote_session_links_host_remote_session_unique",
           "columns": [
-            "node_id",
+            "host_id",
             "remote_session_id"
           ],
           "isUnique": true
         }
       },
       "foreignKeys": {
-        "node_session_links_local_session_id_sessions_id_fk": {
-          "name": "node_session_links_local_session_id_sessions_id_fk",
-          "tableFrom": "node_session_links",
+        "remote_session_links_local_session_id_sessions_id_fk": {
+          "name": "remote_session_links_local_session_id_sessions_id_fk",
+          "tableFrom": "remote_session_links",
           "tableTo": "sessions",
           "columnsFrom": [
             "local_session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "remote_session_links_host_id_remote_hosts_id_fk": {
+          "name": "remote_session_links_host_id_remote_hosts_id_fk",
+          "tableFrom": "remote_session_links",
+          "tableTo": "remote_hosts",
+          "columnsFrom": [
+            "host_id"
           ],
           "columnsTo": [
             "id"
@@ -17147,6 +17513,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "acceptance_criteria_json": {
+          "name": "acceptance_criteria_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'[]'"
         },
         "linked_issue_id": {
           "name": "linked_issue_id",

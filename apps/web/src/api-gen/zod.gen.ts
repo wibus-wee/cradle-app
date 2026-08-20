@@ -1283,6 +1283,22 @@ export const zGetBlobsByIdPath = z.object({
     id: z.string().min(1)
 });
 
+export const zPostChatArtifactsBody = z.object({
+    chatSessionId: z.string().min(1),
+    artifactId: z.string().min(1).optional(),
+    title: z.string().min(1).max(200),
+    source: z.string().min(1)
+});
+
+export const zGetChatArtifactsBySessionIdPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatArtifactsBySessionIdByArtifactIdPath = z.object({
+    sessionId: z.string().min(1),
+    artifactId: z.string().min(1)
+});
+
 export const zPostBackgroundActivitiesByOwnerNamespaceByKeyRunPath = z.object({
     ownerNamespace: z.string().min(1),
     key: z.string().min(1)
@@ -1603,6 +1619,7 @@ export const zPostWorksBody = z.object({
     title: z.string().min(1),
     goal: z.string().min(1).optional(),
     objective: z.string().min(1).optional(),
+    acceptanceCriteria: z.array(z.string().min(1)).max(50).optional(),
     linkedIssueId: z.string().min(1).optional(),
     baseBranch: z.string().min(1).optional(),
     providerTargetId: z.string().min(1).optional(),
@@ -1651,6 +1668,10 @@ export const zPostWorksByIdArchiveBody = z.object({
 });
 
 export const zPostWorksByIdArchivePath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostWorksByIdRedetectPath = z.object({
     id: z.string().min(1)
 });
 

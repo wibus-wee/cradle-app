@@ -7,7 +7,7 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
 | Web feature namespaces | 20 | 10 | 15 | 1 |
-| Server module namespaces | 30 | 15 | 19 | 6 |
+| Server module namespaces | 30 | 15 | 20 | 6 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
 
@@ -73,7 +73,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | --- | --- | --- |
 | Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
 | Indirect | `background-activity`, `code-activity`, `desktop`, `mcp-servers`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `skills`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources`, `plugins` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
-| User-visible gap | `acp`, `assets`, `automation`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `external-session-import`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-environment`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
+| User-visible gap | `acp`, `assets`, `automation`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `external-session-import`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-environment`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
 | Service/infra contract | `background-job`, `blob-store`, `health`, `maintenance`, `observability`, `test-reset` | Prefer focused service/contract verification; `test-reset` is harness-only |
 
 ## Prioritized Missing Journeys

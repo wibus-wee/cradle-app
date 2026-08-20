@@ -55,6 +55,7 @@ function createWorkDetail() {
       id: 'work-1',
       title: 'Fix retries',
       objective: 'Make retries deterministic.',
+      acceptanceCriteria: ['Retries produce the same result after reload.'],
       linkedIssueId: null,
       handoffTitle: 'Fix retries',
       handoffSummary: 'Implemented deterministic retries.',
@@ -85,6 +86,21 @@ function createWorkDetail() {
     },
     pullRequest: null,
     activity: 'idle',
+    state: 'ready_for_review',
+    stateSinceAt: 20,
+    stateExplanation: {
+      trigger: 'delivery.prepared',
+      evidence: 'The Agent prepared a handoff.',
+      authority: 'runtime_integration',
+      responsible: 'user',
+      nextAction: 'Review the Work.',
+      observedAt: 20,
+    },
+    recovery: {
+      level: 'reproducible',
+      evidence: 'A healthy managed worktree is available.',
+      lastHeartbeatAt: 20,
+    },
   }
 }
 
