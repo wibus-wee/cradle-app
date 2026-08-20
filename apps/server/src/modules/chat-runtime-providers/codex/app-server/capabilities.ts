@@ -145,6 +145,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'account/logout', paramsType: null, category: 'account', operation: 'logout', interaction: 'request' },
   { method: 'account/rateLimits/read', paramsType: null, category: 'account', operation: 'rateLimits/read', interaction: 'request' },
   { method: 'account/rateLimitResetCredit/consume', paramsType: 'ConsumeAccountRateLimitResetCreditParams', category: 'account', operation: 'rateLimitResetCredit/consume', interaction: 'request' },
+  { method: 'account/usage/read', paramsType: 'GetAccountTokenUsageParams', category: 'account', operation: 'usage/read', interaction: 'request' },
   { method: 'account/workspaceMessages/read', paramsType: null, category: 'account', operation: 'workspaceMessages/read', interaction: 'request' },
   { method: 'account/sendAddCreditsNudgeEmail', paramsType: 'SendAddCreditsNudgeEmailParams', category: 'account', operation: 'sendAddCreditsNudgeEmail', interaction: 'request' },
   { method: 'feedback/upload', paramsType: 'FeedbackUploadParams', category: 'feedback', operation: 'upload', interaction: 'request' },

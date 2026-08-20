@@ -102,8 +102,13 @@ export function readCodexAppServerMethodCapability(method: string): CodexAppServ
 function readRequestMethods(fileName) {
   const source = readFileSync(join(protocolRoot, fileName), 'utf8')
   return Array.from(
-    source.matchAll(/\{\s*"method": "([^"]+)",\s*id: RequestId,\s*params: ([^,]+),\s*\}/g),
-    match => ({ method: match[1], paramsType: match[2].trim() }),
+    source.matchAll(/\{\s*"method": "([^"]+)",\s*id: RequestId,\s*params(\?)?: ([^,]+),\s*\}/g),
+    match => ({
+      method: match[1],
+      paramsType: match[2] === '?'
+        ? match[3].replace(/\s*\|\s*undefined$/, '').trim()
+        : match[3].trim(),
+    }),
   )
 }
 
