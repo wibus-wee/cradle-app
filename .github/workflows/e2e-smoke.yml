@@ -1,9 +1,11 @@
-name: E2E Smoke (PR)
+name: E2E PR Suite
 
-# Runs @P0 against the PR head when:
+# Runs against the PR head when:
 # The checkout below intentionally follows the PR head SHA after main is merged.
-# - critical paths change (e2e / simulator / web / server / Codex sync / this workflow), OR
-# - the `e2e` label is present (force / keep running on later pushes)
+# - critical paths change (default @P0 smoke), OR
+# - the `e2e` label is present (force @P0 smoke), OR
+# - the `e2e-full` label is present (force @P0 + @P1 full suite)
+# The `e2e-full` label also keeps the full suite enabled on later pushes.
 # Always provisions Codex app-server so @CRADLE-CODEX-* can pass on clean runners.
 
 on:
@@ -49,7 +51,7 @@ jobs:
               - '.github/actions/setup/**'
 
   gate:
-    name: Check smoke gate
+    name: Check E2E gate
     runs-on: ubuntu-latest
     needs: changes
     if: >
@@ -57,17 +59,19 @@ jobs:
       needs.changes.result == 'success' && (
         needs.changes.outputs.critical == 'true' ||
         contains(github.event.pull_request.labels.*.name, 'e2e') ||
-        github.event.label.name == 'e2e'
+        github.event.label.name == 'e2e' ||
+        contains(github.event.pull_request.labels.*.name, 'e2e-full') ||
+        github.event.label.name == 'e2e-full'
       )
     steps:
-      - run: echo "E2E smoke gate open (critical paths and/or e2e label) — running @P0 on PR head"
+      - run: echo "E2E gate open — @P0 smoke by default, @P0 or @P1 full suite when the e2e-full label is present"
 
   e2e-smoke:
-    name: E2E Smoke (P0)
+    name: E2E PR suite (@P0 or @P1 when e2e-full)
     runs-on: ubuntu-latest
     needs: gate
     if: ${{ needs.gate.result == 'success' }}
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout Cradle source
@@ -82,6 +86,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Validate E2E suite contract
+        run: pnpm e2e:check
+
       - name: Build plugin SDK
         run: pnpm --filter @cradle/plugin-sdk build
 
@@ -93,6 +100,8 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium-headless-shell
 
       - name: Provision Codex app-server for E2E
+        env:
+          GITHUB_TOKEN: ${{ secrets.PRIVATE_REPO_PAT }}
         run: pnpm --filter @cradle/desktop sync:codex-runtime
 
       - name: Prepare Cucumber CI config
@@ -115,28 +124,29 @@ jobs:
           ].join('\n'))
           NODE
 
-      - name: Run P0 smoke scenarios
+      - name: Run selected E2E scenarios
         id: smoke
         continue-on-error: true
         env:
           NODE_ENV: test
           CRADLE_CREDENTIAL_SECRET: e2e-test-secret
           CRADLE_E2E_VERBOSE: '1'
+          TAGS_FILTER: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') && '@P0 or @P1' || '@P0' }}
         run: |
           mkdir -p e2e/artifacts
           pnpm exec cucumber-js --config e2e/cucumber-ci.mjs \
-            --tags "@P0" \
+            --tags "$TAGS_FILTER" \
             --format summary \
             --format summary:e2e/artifacts/cucumber-summary.txt \
             --format junit:e2e/artifacts/cucumber-junit.xml \
             2>&1 | tee e2e/artifacts/cucumber-output.log
 
-      - name: Summarize E2E smoke result
+      - name: Summarize E2E result
         if: always()
         env:
           E2E_OUTCOME: ${{ steps.smoke.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TAGS_FILTER: '@P0'
+          TAGS_FILTER: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') && '@P0 or @P1' || '@P0' }}
         run: |
           node <<'NODE'
           const fs = require('fs')
@@ -388,7 +398,7 @@ jobs:
             : ''
 
           const markdown = [
-            '## E2E Smoke Result',
+            '## E2E Result',
             '',
             `| Field | Value |`,
             `|-------|-------|`,
@@ -426,7 +436,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-smoke-artifacts-${{ github.run_id }}
+          name: e2e-${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') && 'full' || 'smoke' }}-artifacts-${{ github.run_id }}
           path: |
             e2e/artifacts/ARTIFACTS.md
             e2e/artifacts/failure-index.json
@@ -448,12 +458,16 @@ jobs:
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SUITE_NAME: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') && 'Full E2E' || 'E2E Smoke' }}
+          ARTIFACT_NAME: e2e-${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') && 'full' || 'smoke' }}-artifacts-${{ github.run_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { readJson, formatFailureArtifactsSection } = require('./e2e/scripts/format-failure-issue.cjs')
             const runUrl = process.env.RUN_URL
             const runId = process.env.RUN_ID
+            const suiteName = process.env.SUITE_NAME
+            const artifactName = process.env.ARTIFACT_NAME
             const summary = readJson('e2e/artifacts/e2e-summary.json', {
               markdown: '_(no E2E summary was generated)_',
               resultLine: 'no parsed scenario data',
@@ -461,13 +475,13 @@ jobs:
             })
             const failureIndex = readJson('e2e/artifacts/failure-index.json', [])
 
-            const body = `## ❌ E2E Smoke Failed
+            const body = `## ❌ ${suiteName} Failed
 
             ${summary.markdown}
 
             **Result:** \`${summary.resultLine}\`
 
-            ### Evidence (download artifact \`e2e-smoke-artifacts-${runId}\`)
+            ### Evidence (download artifact \`${artifactName}\`)
 
             See root \`ARTIFACTS.md\` in the zip. Per failure:
 

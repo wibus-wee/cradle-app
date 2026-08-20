@@ -161,7 +161,7 @@ describe('work delivery control', () => {
     seedWork()
     mockHealthyDetailReads()
 
-    const [summary] = await Work.list({ workspaceId: WORKSPACE_ID })
+    const [summary] = Work.list({ workspaceId: WORKSPACE_ID }).items
     const detail = await Work.get(WORK_ID)
 
     expect(summary?.title).toBe('Primary Work Session')
@@ -170,20 +170,62 @@ describe('work delivery control', () => {
       .toBe('Implement Work')
   })
 
-  it('detects the live pull request state when listing Work', async () => {
+  it('uses cached pull request state without a list-time GitHub read', async () => {
     seedWork()
     const { pullRequest } = mockHealthyDetailReads()
-    pullRequest.mockResolvedValue({
-      ...OPEN_PULL_REQUEST,
-      isDraft: false,
-      state: 'closed',
-      merged: true,
+    db().update(sessions).set({
+      configJson: JSON.stringify({ github: { pullRequest: OPEN_PULL_REQUEST } }),
+    }).where(eq(sessions.id, SESSION_ID)).run()
+
+    const [summary] = Work.list({ workspaceId: WORKSPACE_ID }).items
+
+    expect(pullRequest).not.toHaveBeenCalled()
+    expect(summary?.pullRequest).toMatchObject({ state: 'open', merged: false })
+  })
+
+  it('returns stable bounded cursor pages', () => {
+    db().insert(workspaces).values({
+      id: WORKSPACE_ID,
+      name: 'Work Service Workspace',
+      locatorJson: localWorkspaceLocatorJson('/tmp/work-service'),
+      identifier: 'WSW',
+    }).run()
+    const count = 205
+    db().insert(sessions).values(Array.from({ length: count }, (_, index) => ({
+      id: `paged-work-session-${String(index).padStart(3, '0')}`,
+      workspaceId: WORKSPACE_ID,
+      title: `Paged Work ${index}`,
+    }))).run()
+    db().insert(works).values(Array.from({ length: count }, (_, index) => ({
+      id: `paged-work-${String(index).padStart(3, '0')}`,
+      title: `Paged Work ${index}`,
+      objective: 'Exercise cursor pagination',
+      createdAt: 1_000 - index,
+      updatedAt: 1_000 - index,
+    }))).run()
+    db().insert(workThreads).values(Array.from({ length: count }, (_, index) => ({
+      workId: `paged-work-${String(index).padStart(3, '0')}`,
+      sessionId: `paged-work-session-${String(index).padStart(3, '0')}`,
+      role: 'primary' as const,
+    }))).run()
+
+    const first = Work.list({ workspaceId: WORKSPACE_ID, limit: 100 })
+    const second = Work.list({
+      workspaceId: WORKSPACE_ID,
+      limit: 100,
+      cursor: first.nextCursor ?? undefined,
+    })
+    const third = Work.list({
+      workspaceId: WORKSPACE_ID,
+      limit: 100,
+      cursor: second.nextCursor ?? undefined,
     })
 
-    const [summary] = await Work.list({ workspaceId: WORKSPACE_ID })
-
-    expect(pullRequest).toHaveBeenCalledWith(SESSION_ID)
-    expect(summary?.pullRequest).toMatchObject({ state: 'closed', merged: true })
+    expect(first.items).toHaveLength(100)
+    expect(second.items).toHaveLength(100)
+    expect(third.items).toHaveLength(5)
+    expect(third.nextCursor).toBeNull()
+    expect(new Set([...first.items, ...second.items, ...third.items].map(row => row.id)).size).toBe(count)
   })
 
   it('creates a primary Session in a healthy managed Worktree from a clean repository', async () => {

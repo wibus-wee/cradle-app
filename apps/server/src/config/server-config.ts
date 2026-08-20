@@ -30,19 +30,12 @@ const serverEnvSchema = z.object({
   CRADLE_DB_PATH: OptionalEnvStringSchema,
   CRADLE_MIGRATIONS_DIR: OptionalEnvStringSchema,
   CRADLE_LOG_FILE: OptionalEnvStringSchema,
-  CRADLE_AUTH_TOKEN: OptionalEnvStringSchema,
   CRADLE_AUTH_REQUIRED: z.enum(['true', 'false']).optional(),
 }).transform((env) => {
   const dbPath = env.CRADLE_DB_PATH || (env.CRADLE_DATA_DIR ? join(env.CRADLE_DATA_DIR, 'cradle.db') : undefined)
 
   if (!dbPath) {
     throw new Error('CRADLE_DATA_DIR or CRADLE_DB_PATH is required')
-  }
-
-  const authToken = env.CRADLE_AUTH_TOKEN ?? null
-  const authRequired = env.CRADLE_AUTH_TOKEN !== undefined || env.CRADLE_AUTH_REQUIRED === 'true'
-  if (!isLoopbackBindHost(env.CRADLE_HOST) && (!authRequired || !authToken)) {
-    throw new Error('CRADLE_AUTH_TOKEN is required when CRADLE_HOST is not loopback')
   }
 
   return {
@@ -53,17 +46,14 @@ const serverEnvSchema = z.object({
     dbPath,
     migrationsDir: env.CRADLE_MIGRATIONS_DIR || getMigrationsPath(),
     logFile: env.CRADLE_LOG_FILE || (env.CRADLE_DATA_DIR ? join(env.CRADLE_DATA_DIR, 'server.log') : undefined),
-    authToken,
-    authRequired,
+    authRequired: env.CRADLE_AUTH_REQUIRED === 'true',
   }
 })
 
 const serverAuthEnvSchema = z.object({
-  CRADLE_AUTH_TOKEN: OptionalEnvStringSchema,
   CRADLE_AUTH_REQUIRED: z.enum(['true', 'false']).optional(),
 }).transform(env => ({
-  authToken: env.CRADLE_AUTH_TOKEN ?? null,
-  authRequired: env.CRADLE_AUTH_TOKEN !== undefined || env.CRADLE_AUTH_REQUIRED === 'true',
+  authRequired: env.CRADLE_AUTH_REQUIRED === 'true',
 }))
 
 export type LogLevel = (typeof logLevels)[number]
@@ -76,11 +66,10 @@ export interface ServerConfigValues {
   dbPath: string
   migrationsDir: string
   logFile?: string
-  authToken: string | null
   authRequired: boolean
 }
 
-export type ServerAuthConfigValues = Pick<ServerConfigValues, 'authRequired' | 'authToken'>
+export type ServerAuthConfigValues = Pick<ServerConfigValues, 'authRequired'>
 
 export function loadServerAuthConfig(env: NodeJS.ProcessEnv = process.env): ServerAuthConfigValues {
   return serverAuthEnvSchema.parse(env)

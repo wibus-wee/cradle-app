@@ -1,5 +1,5 @@
 import type { ChildProcess } from 'node:child_process'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import type { Server } from 'node:http'
 import { createServer } from 'node:http'
@@ -10,9 +10,18 @@ import { join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import WebSocket from 'ws'
 
+import {
+  fabricAuthHeaders,
+  generateFabricEncryptionKeyPair,
+  generateFabricSigningKeyPair,
+  ownerProofHeaders,
+  signFabricCertificate,
+  signFabricCreateRequest,
+  signFabricJoinRequest,
+} from '../../src/modules/fabric/protocol'
 import type { SignedRelayAssertion } from '../../src/modules/relay-servers/relay-signature-service'
 import {
   createRelayRoomId,
@@ -31,23 +40,41 @@ import {
   generateRelayKeyPair,
   relayPublicKeyFingerprint,
 } from '../../src/modules/relay-transport/crypto'
+import {
+  decodeFabricEnvelope,
+  encodeFabricEnvelope,
+  toRelaySessionEnvelope,
+} from '../../src/modules/relay-transport/fabric-envelope'
 import { decodeRelayEnvelope } from '../../src/modules/relay-transport/protocol'
 import { RelaySession } from '../../src/modules/relay-transport/session'
+import { relayWebSocketDataView } from '../../src/modules/relay-transport/websocket-data'
 
 /**
  * End-to-end relay transport test: spawns a REAL relayd subprocess and drives
  * the full controller<->host tunnel through it — pairing, E2E handshake,
  * stream multiplexing, an HTTP request round-trip, and a pinned-pubkey
  * reconnect. This is the only test that exercises the WebSocket wiring against
- * the actual relay.
+ * the actual relay. Run it explicitly with `CRADLE_RELAY_E2E=1`; the default
+ * server suite must not depend on a Go toolchain or network module downloads.
  */
 
 const moduleDir = fileURLToPath(new URL('.', import.meta.url))
 const relaydSourceDir = resolveRelaydSourceDir()
+const runRealRelayE2E = process.env.CRADLE_RELAY_E2E === '1'
+const goAvailable = (() => {
+  try {
+    execFileSync('go', ['version'], { stdio: 'ignore' })
+    return true
+  }
+ catch {
+    return false
+  }
+})()
 
 interface RelaydHandle {
   relayUrl: string
   child: ChildProcess
+  getOutput: () => string
 }
 
 function resolveRelaydSourceDir(): string | null {
@@ -95,11 +122,30 @@ async function spawnRelayd(): Promise<RelaydHandle> {
     detached: process.platform !== 'win32',
     stdio: ['pipe', 'pipe', 'pipe'],
   })
-  child.stdout?.on('data', () => {})
-  child.stderr?.on('data', () => {})
+  let output = ''
+  const captureOutput = (data: Buffer) => {
+    output = `${output}${data.toString()}`.slice(-24_000)
+  }
+  child.stdout?.on('data', captureOutput)
+  let spawnError: Error | undefined
+  child.stderr?.on('data', captureOutput)
+  child.once('error', (error) => {
+    spawnError = error
+  })
 
-  await waitForReady(relayUrl)
-  return { relayUrl, child }
+  try {
+    await waitForReady(relayUrl, child, () => output, () => spawnError)
+  }
+ catch (error) {
+    await stopRelayd(child)
+    const message = error instanceof Error ? error.message : String(error)
+    const details = output.trim()
+    throw new Error(
+      `relayd failed to start: ${message}${details ? `\n${details}` : ''}`,
+      { cause: error },
+    )
+  }
+  return { relayUrl, child, getOutput: () => output }
 }
 
 function allocatePort(): Promise<number> {
@@ -119,10 +165,24 @@ function allocatePort(): Promise<number> {
   })
 }
 
-async function waitForReady(relayUrl: string): Promise<void> {
-  const deadline = Date.now() + 30_000 // `go run` compiles on first launch
+async function waitForReady(
+  relayUrl: string,
+  child: ChildProcess,
+  getOutput: () => string,
+  getSpawnError: () => Error | undefined,
+): Promise<void> {
+  const deadline = Date.now() + 120_000 // `go run` may download and compile on first launch
   let lastError: unknown
   while (Date.now() < deadline) {
+    const childError = getSpawnError()
+    if (childError) {
+      throw childError
+    }
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(
+        `relayd exited before readiness${getOutput().trim() ? `: ${getOutput().trim()}` : ''}`,
+      )
+    }
     try {
       const response = await fetch(new URL('/readyz', `${relayUrl}/`), {
         signal: AbortSignal.timeout(500),
@@ -137,13 +197,12 @@ async function waitForReady(relayUrl: string): Promise<void> {
     }
     await new Promise(r => setTimeout(r, 200))
   }
-  throw lastError instanceof Error ? lastError : new Error('relayd did not become ready')
+  const timeoutMessage = lastError instanceof Error ? lastError.message : 'relayd did not become ready'
+  const details = getOutput().trim()
+  throw new Error(`${timeoutMessage}${details ? `: ${details}` : ''}`)
 }
 
 async function stopRelayd(child: ChildProcess): Promise<void> {
-  if (child.exitCode !== null || child.signalCode !== null) {
-    return
-  }
   closeRelaydOwnerPipe(child)
   await new Promise<void>((resolveDone) => {
     let resolved = false
@@ -158,12 +217,10 @@ async function stopRelayd(child: ChildProcess): Promise<void> {
       resolveDone()
     }
     timeout = setTimeout(() => {
-      if (child.exitCode === null && child.signalCode === null) {
-        const signaled = signalRelayd(child, 'SIGKILL')
-        if (!signaled) {
-          resolveOnce()
-        }
-      }
+      // `go run` can exit while its compiled child still owns the process
+      // group and stdio pipes. Kill the group even when the parent is gone.
+      signalRelayd(child, 'SIGKILL')
+      resolveOnce()
     }, 3_000)
     timeout.unref()
     child.once('exit', resolveOnce)
@@ -316,8 +373,94 @@ async function startHostBridge(opts: {
       streams.clear()
       ws.removeAllListeners()
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close()
+        ws.terminate()
       }
+    },
+  }
+}
+
+interface FabricNodeBridge {
+  stop: () => Promise<void>
+  getWebSocketState: () => string
+}
+
+async function startFabricNodeBridge(opts: {
+  relayUrl: string
+  fabricId: string
+  nodeId: string
+  nodeCertificate: Parameters<typeof fabricAuthHeaders>[0]
+  identityPrivateKeyBase64: string
+  encryptionPrivateKeyBase64: string
+  targetHost: string
+  targetPort: number
+}): Promise<FabricNodeBridge> {
+  const sessions = new Map<string, RelaySession>()
+  const sockets = new Map<string, Socket>()
+  const sessionErrors: string[] = []
+  const socketErrors: string[] = []
+  const headers = fabricAuthHeaders(opts.nodeCertificate, opts.identityPrivateKeyBase64, 'GET', '/v1/ws/nodes')
+  const ws = new WebSocket(toWsUrl(opts.relayUrl, '/v1/ws/nodes'), { headers: Object.fromEntries(headers.entries()) })
+  let webSocketError = ''
+  let webSocketClose = ''
+  ws.on('error', (error) => { webSocketError = error.message })
+  ws.on('close', (code, reason) => { webSocketClose = `code=${code} reason=${reason.toString()}` })
+
+  ws.on('message', (data: WebSocket.RawData) => {
+    const envelope = decodeFabricEnvelope(relayWebSocketDataView(data))
+    if (envelope.fabricId !== opts.fabricId || envelope.nodeId !== opts.nodeId) {
+      throw new Error('Fabric node bridge received a route for another Node')
+    }
+    if (envelope.kind === 'link_open') {
+      const controller = JSON.parse(new TextDecoder().decode(envelope.payload)) as Parameters<typeof signFabricCertificate>[1]
+      const session = new RelaySession('host', opts.encryptionPrivateKeyBase64, {
+        roomId: envelope.linkId,
+        ourPublicKeyBase64: opts.nodeCertificate.encryptionPubkey,
+        pairingCode: opts.fabricId,
+        encodeOutboundEnvelope: frame => encodeFabricEnvelope({ fabricId: opts.fabricId, nodeId: opts.nodeId, linkId: envelope.linkId }, frame),
+      }, {
+        send: (dataToSend) => { if (ws.readyState === WebSocket.OPEN) { ws.send(dataToSend) } },
+        onStreamOpen: (streamId) => {
+          const socket = connect({ host: opts.targetHost, port: opts.targetPort })
+          sockets.set(streamId, socket)
+          socket.on('data', chunk => session.writeStreamData(streamId, new Uint8Array(chunk)))
+          socket.on('close', () => { session.closeStream(streamId, 'target closed'); sockets.delete(streamId) })
+          socket.on('error', (error) => { socketErrors.push(`stream=${streamId} ${error.message}`); session.closeStream(streamId, 'target error'); sockets.delete(streamId) })
+        },
+        onStreamData: (streamId, dataToSend) => {
+          const socket = sockets.get(streamId)
+          if (!socket) { return }
+          const chunk = Buffer.from(dataToSend)
+          socket.write(chunk, (error) => {
+ if (error) { socket.destroy() }
+ else { session.reportStreamDataConsumed(streamId, chunk.byteLength) }
+})
+        },
+        onStreamClose: (streamId) => { sockets.get(streamId)?.destroy(); sockets.delete(streamId) },
+        onError: (error) => { sessionErrors.push(error.message) },
+      })
+      if (controller.subjectKind !== 'controller') { throw new Error('Fabric link did not deliver a controller certificate') }
+      sessions.set(envelope.linkId, session)
+      session.start()
+      return
+    }
+    const session = sessions.get(envelope.linkId)
+    if (!session) { throw new Error(`Fabric link ${envelope.linkId} is not open`) }
+    session.handleEnvelope(toRelaySessionEnvelope(envelope))
+  })
+
+  await new Promise<void>((resolveOpen, rejectOpen) => {
+    ws.once('open', () => resolveOpen())
+    ws.once('error', rejectOpen)
+  })
+  return {
+    getWebSocketState: () => [...sessionErrors, ...socketErrors, webSocketError, webSocketClose].filter(Boolean).join('; ') || `readyState=${ws.readyState}`,
+    stop: async () => {
+      for (const session of sessions.values()) { session.close() }
+      for (const socket of sockets.values()) { socket.destroy() }
+      sessions.clear()
+      sockets.clear()
+      ws.removeAllListeners()
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) { ws.terminate() }
     },
   }
 }
@@ -363,8 +506,9 @@ async function callPairingClaim(
   return (await response.json()) as { roomId: string }
 }
 
-function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, requests: string[] }> {
+function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, requests: string[], sockets: Set<Socket> }> {
   const requests: string[] = []
+  const sockets = new Set<Socket>()
   const server = createServer((req, res) => {
     if (req.url?.startsWith('/hang/')) {
       req.resume()
@@ -380,31 +524,57 @@ function startFakeHostServer(): Promise<{ baseUrl: string, server: Server, reque
       res.end(JSON.stringify({ ok: true, echo: body, path: req.url }))
     })
   })
+  server.on('connection', (socket) => {
+    sockets.add(socket)
+    socket.once('close', () => sockets.delete(socket))
+  })
   return new Promise((resolve, reject) => {
     server.once('error', reject)
     server.listen(0, '127.0.0.1', () => {
       const address = server.address() as AddressInfo
-      resolve({ baseUrl: `http://127.0.0.1:${address.port}`, server, requests })
+      resolve({ baseUrl: `http://127.0.0.1:${address.port}`, server, requests, sockets })
     })
   })
 }
 
-describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
-  let relayd: RelaydHandle
-  let fakeHost: { baseUrl: string, server: Server, requests: string[] }
-  let dataDir: string
+describe.skipIf(!runRealRelayE2E || !relaydSourceDir || !goAvailable)('relay transport e2e (real relayd)', () => {
+  let relayd!: RelaydHandle
+  let fakeHost!: { baseUrl: string, server: Server, requests: string[] }
+  let dataDir!: string
+  const activeTransports = new Set<Awaited<ReturnType<typeof startRelayControllerTransport>>>()
+  const activeBridges = new Set<{ stop: () => Promise<void> }>()
 
   beforeAll(async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'cradle-relay-e2e-'))
     process.env.CRADLE_DATA_DIR = dataDir
     relayd = await spawnRelayd()
     fakeHost = await startFakeHostServer()
-  }, 60_000)
+  }, 180_000)
+
+  afterEach(async () => {
+    for (const transport of activeTransports) {
+      await transport.close()
+      activeTransports.delete(transport)
+    }
+    for (const bridge of activeBridges) {
+      await bridge.stop()
+      activeBridges.delete(bridge)
+    }
+  })
 
   afterAll(async () => {
-    await stopRelayd(relayd.child)
-    await new Promise<void>(resolve => fakeHost.server.close(() => resolve()))
-    rmSync(dataDir, { recursive: true, force: true })
+    if (relayd) {
+      await stopRelayd(relayd.child)
+    }
+    if (fakeHost) {
+      for (const socket of fakeHost.sockets) {
+        socket.destroy()
+      }
+      await new Promise<void>(resolve => fakeHost.server.close(() => resolve()))
+    }
+    if (dataDir) {
+      rmSync(dataDir, { recursive: true, force: true })
+    }
   })
 
   it('pairs, tunnels an HTTP request end-to-end, and reconnects with pinned pubkeys', async () => {
@@ -443,6 +613,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
       targetHost: '127.0.0.1',
       targetPort: fakeHostPort,
     })
+    activeBridges.add(hostBridge)
 
     // ── Controller: claim the pairing ──
     const claimAssertion = signRelayAssertion(controllerSigningKeys.privateKeyBase64, {
@@ -470,6 +641,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
       pairingCode,
       readyTimeoutMs: 15_000,
     })
+    activeTransports.add(handle)
 
     expect(handle.hostPublicKeyBase64).toBe(hostKeys.publicKeyBase64)
     expect(relayPublicKeyFingerprint(handle.hostPublicKeyBase64!)).toBe(hostFingerprint)
@@ -615,7 +787,9 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     }
 
     await handle.close()
+    activeTransports.delete(handle)
     await hostBridge.stop()
+    activeBridges.delete(hostBridge)
 
     // ── Reconnect with pinned pubkeys (no pairing code) ──
     // Re-create the room (host-session) and reconnect both sides.
@@ -647,6 +821,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
       targetHost: '127.0.0.1',
       targetPort: fakeHostPort,
     })
+    activeBridges.add(hostBridgeReconnect)
 
     const controllerWs2 = signRelayAssertion(controllerSigningKeys.privateKeyBase64, {
       role: 'controller',
@@ -663,6 +838,7 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
       pinnedHostPubkey: hostKeys.publicKeyBase64,
       readyTimeoutMs: 15_000,
     })
+    activeTransports.add(handle2)
 
     const response2 = await fetch(`${handle2.localBaseUrl}/again`, { method: 'GET' })
     expect(response2.status).toBe(200)
@@ -671,8 +847,185 @@ describe.skipIf(!relaydSourceDir)('relay transport e2e (real relayd)', () => {
     expect(json2.path).toBe('/again')
 
     await handle2.close()
+    activeTransports.delete(handle2)
     await hostBridgeReconnect.stop()
+    activeBridges.delete(hostBridgeReconnect)
   }, 120_000)
+
+  it('enrolls a Node, discovers it, and tunnels through real Fabric relayd', async () => {
+    // Keep the Fabric scenario independent from the legacy room scenario. A
+    // fresh port also prevents undici from reusing an idle HTTP socket that
+    // the previous relayd instance already closed.
+    await stopRelayd(relayd.child)
+    relayd = await spawnRelayd()
+
+    const owner = generateFabricSigningKeyPair()
+    const nodeIdentity = generateFabricSigningKeyPair()
+    const nodeEncryption = generateFabricEncryptionKeyPair()
+    const controllerIdentity = generateFabricSigningKeyPair()
+    const controllerEncryption = generateFabricEncryptionKeyPair()
+    const nodeId = 'node-fabric-e2e'
+    const controllerId = 'controller-fabric-e2e'
+
+    const fabricResponse = await fetch(new URL('/v1/fabrics', `${relayd.relayUrl}/`), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(signFabricCreateRequest(owner.privateKeyBase64)),
+    })
+    expect(fabricResponse.status).toBe(201)
+    const fabric = (await fabricResponse.json()) as { fabric: { fabricId: string } }
+    const fabricId = fabric.fabric.fabricId
+
+    const deliverySecret = 'fabric-e2e-delivery-secret'
+    const joinRequest = signFabricJoinRequest({
+      fabricId,
+      subjectId: nodeId,
+      identityPrivateKeyBase64: nodeIdentity.privateKeyBase64,
+      encryptionPubkey: nodeEncryption.publicKeyBase64,
+      displayName: 'Fabric E2E Node',
+      platform: 'test',
+      version: 'e2e',
+      capabilities: ['workspace'],
+      deliverySecret,
+    })
+    const joinResponse = await fetch(new URL('/v1/join-requests', `${relayd.relayUrl}/`), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(joinRequest),
+    })
+    expect(joinResponse.status).toBe(201)
+    const join = (await joinResponse.json()) as { requestId: string }
+
+    const nodeCertificate = signFabricCertificate(owner.privateKeyBase64, {
+      fabricId,
+      subjectKind: 'node',
+      subjectId: nodeId,
+      identityPubkey: nodeIdentity.publicKeyBase64,
+      encryptionPubkey: nodeEncryption.publicKeyBase64,
+      scopes: ['admin'],
+    })
+    const approvePath = `/v1/join-requests/${join.requestId}/approve`
+    const approveHeaders = ownerProofHeaders(owner.privateKeyBase64, 'POST', approvePath)
+    approveHeaders.set('content-type', 'application/json')
+    const approveResponse = await fetch(new URL(approvePath, `${relayd.relayUrl}/`), {
+      method: 'POST',
+      headers: approveHeaders,
+      body: JSON.stringify({ certificate: nodeCertificate }),
+    })
+    expect(approveResponse.status).toBe(200)
+
+    const controllerCertificate = signFabricCertificate(owner.privateKeyBase64, {
+      fabricId,
+      subjectKind: 'controller',
+      subjectId: controllerId,
+      identityPubkey: controllerIdentity.publicKeyBase64,
+      encryptionPubkey: controllerEncryption.publicKeyBase64,
+      scopes: ['control', 'view'],
+    })
+    const controllerPath = `/v1/fabrics/${fabricId}/controllers`
+    const controllerHeaders = ownerProofHeaders(owner.privateKeyBase64, 'POST', controllerPath)
+    controllerHeaders.set('content-type', 'application/json')
+    const controllerResponse = await fetch(new URL(controllerPath, `${relayd.relayUrl}/`), {
+      method: 'POST',
+      headers: controllerHeaders,
+      body: JSON.stringify({
+        certificate: controllerCertificate,
+        grants: [{ grantId: 'grant-fabric-e2e', fabricId, controllerId, nodeId, scope: 'control' }],
+      }),
+    })
+    expect(controllerResponse.status).toBe(204)
+
+    const fakeHostPort = Number(new URL(fakeHost.baseUrl).port)
+    let nodeBridge: FabricNodeBridge | undefined
+    let fabricStage = 'starting node bridge'
+    let controllerExit = ''
+    let controllerTransport: Awaited<ReturnType<typeof startRelayControllerTransport>> | undefined
+    try {
+      nodeBridge = await startFabricNodeBridge({
+        relayUrl: relayd.relayUrl,
+        fabricId,
+        nodeId,
+        nodeCertificate,
+        identityPrivateKeyBase64: nodeIdentity.privateKeyBase64,
+        encryptionPrivateKeyBase64: nodeEncryption.privateKeyBase64,
+        targetHost: '127.0.0.1',
+        targetPort: fakeHostPort,
+      })
+      activeBridges.add(nodeBridge)
+
+      fabricStage = 'discovering node'
+      const listPath = `/v1/fabrics/${fabricId}/nodes`
+      let discovered: { nodes: Array<{ nodeId: string, status: string }> } | null = null
+      let lastListError = ''
+      const deadline = Date.now() + 10_000
+      while (Date.now() < deadline) {
+        try {
+          const listHeaders = fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', listPath)
+          listHeaders.set('connection', 'close')
+          const response = await fetch(new URL(listPath, `${relayd.relayUrl}/`), { headers: listHeaders })
+          if (response.ok) {
+            const candidate = (await response.json()) as { nodes: Array<{ nodeId: string, status: string }> }
+            if (candidate.nodes.some(node => node.nodeId === nodeId && node.status === 'online')) {
+              discovered = candidate
+              break
+            }
+          }
+        }
+        catch (error) {
+          lastListError = error instanceof Error ? error.message : String(error)
+        }
+        await new Promise(resolveWait => setTimeout(resolveWait, 100))
+      }
+      if (!discovered && lastListError) {
+        throw new Error(`Fabric Node discovery did not become ready: ${lastListError}`)
+      }
+      expect(discovered?.nodes).toEqual(expect.arrayContaining([expect.objectContaining({ nodeId, status: 'online' })]))
+
+      fabricStage = 'opening node link'
+      const openPath = `/v1/nodes/${nodeId}/links`
+      const openHeaders = fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'POST', openPath)
+      openHeaders.set('connection', 'close')
+      const openResponse = await fetch(new URL(openPath, `${relayd.relayUrl}/`), { method: 'POST', headers: openHeaders })
+      expect(openResponse.status).toBe(201)
+      const link = (await openResponse.json()) as { linkId: string, nodeCertificate: typeof nodeCertificate }
+
+      fabricStage = 'starting controller transport'
+      controllerTransport = await startRelayControllerTransport({
+        hostId: nodeId,
+        relayUrl: relayd.relayUrl,
+        roomId: link.linkId,
+        controllerPrivateKeyBase64: controllerEncryption.privateKeyBase64,
+        controllerPublicKeyBase64: controllerEncryption.publicKeyBase64,
+        pinnedHostPubkey: link.nodeCertificate.encryptionPubkey,
+        fabric: { fabricId, nodeId, linkId: link.linkId, headers: fabricAuthHeaders(controllerCertificate, controllerIdentity.privateKeyBase64, 'GET', `/v1/ws/controllers/${link.linkId}`) },
+      })
+      activeTransports.add(controllerTransport)
+      controllerTransport.onExit((exit) => { controllerExit = `code=${exit.code} signal=${exit.signal}` })
+      try {
+        fabricStage = 'round-tripping tunneled HTTP'
+        const response = await fetch(`${controllerTransport.localBaseUrl}/fabric-e2e`, { method: 'GET' })
+        expect(response.status).toBe(200)
+        expect(((await response.json()) as { ok: boolean, path: string }).path).toBe('/fabric-e2e')
+      }
+      finally {
+        await controllerTransport.close()
+        activeTransports.delete(controllerTransport)
+      }
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      const relaydState = relayd.child.exitCode === null
+        ? 'relayd is still running'
+        : `relayd exited with code ${relayd.child.exitCode}`
+      throw new Error(`${message}; stage=${fabricStage}; ${relaydState}; node websocket ${nodeBridge?.getWebSocketState() ?? 'not connected'}; controller ${controllerExit || 'still connected'}; streams ${JSON.stringify(controllerTransport?.getPerformanceSnapshot() ?? null)}; fake host requests ${JSON.stringify(fakeHost.requests)}\n${relayd.getOutput().trim()}`, { cause: error })
+    }
+    finally {
+      await nodeBridge?.stop()
+      if (nodeBridge) {
+        activeBridges.delete(nodeBridge)
+      }
+    }
+  }, 60_000)
 })
 
 function latestRelayStream(snapshot: RelayControllerPerformanceSnapshot): RelayStreamCheckpoint | undefined {
@@ -768,7 +1121,7 @@ async function startHostBridgePinned(opts: {
       streams.clear()
       ws.removeAllListeners()
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-        ws.close()
+        ws.terminate()
       }
     },
   }

@@ -5,8 +5,6 @@ import { fileURLToPath } from 'node:url'
 import type { BrowserWindow } from 'electron'
 import { app, ipcMain, Menu, nativeImage, Tray } from 'electron'
 
-import { getDesktopServerAuthHeaders } from './server-process'
-
 const localModuleDir = dirname(fileURLToPath(import.meta.url))
 
 export type TrayActionId
@@ -334,7 +332,7 @@ export class TrayManager {
   }
 
   private async readDesktopJson<T>(path: string): Promise<T> {
-    const response = await fetch(new URL(path, this.options.serverUrl), { headers: getDesktopServerAuthHeaders() })
+    const response = await fetch(new URL(path, this.options.serverUrl))
     if (!response.ok) {
       throw new Error(`Desktop projection request failed: ${response.status}`)
     }

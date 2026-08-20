@@ -10,3 +10,15 @@ export function runtimeSupportsProviderKind(
   const runtime = runtimes?.find(item => item.runtimeKind === runtimeKind)
   return runtime?.providerKinds.includes(providerKind) ?? false
 }
+
+export function runtimeSupportsAnyProviderKind(
+  runtimeKind: RuntimeKind,
+  providerKinds: ProviderKind[] | undefined,
+  runtimes?: RuntimeCatalogItem[],
+): boolean {
+  if (!providerKinds) {
+    return false
+  }
+  const runtime = runtimes?.find(item => item.runtimeKind === runtimeKind)
+  return runtime?.providerKinds.some(providerKind => providerKinds.includes(providerKind)) ?? false
+}

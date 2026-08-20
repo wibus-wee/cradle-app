@@ -397,8 +397,36 @@
     {
       "idx": 56,
       "version": "6",
-      "when": 1786554752780,
-      "tag": "0056_lame_black_bolt",
+      "when": 1786588364345,
+      "tag": "0056_thread_search_fts",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "6",
+      "when": 1786590000000,
+      "tag": "0057_chronicle_embedding_candidates",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "6",
+      "when": 1786601689506,
+      "tag": "0058_parallel_karma",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "6",
+      "when": 1786866422998,
+      "tag": "0059_medical_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "6",
+      "when": 1787186572935,
+      "tag": "0060_same_ezekiel_stane",
       "breakpoints": true
     }
   ]

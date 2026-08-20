@@ -2,12 +2,10 @@
 // and predefined feature tips. A mini version of the What's New dialog:
 // seeded mesh-gradient hero on top, description and actions below. The card
 // stays until dismissed. One card at a time — announcements win over tips.
-import { StaticRender } from '@cradle/streamdown'
 import { BulbLine as BulbIcon, CloseLine as XIcon, SparklesLine as SparklesIcon } from '@mingcute/react'
-import { MeshGradient } from '@paper-design/shaders-react'
 import { useRouter } from '@tanstack/react-router'
 import { AnimatePresence, m } from 'motion/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
@@ -26,6 +24,10 @@ import {
 } from './whats-new-store'
 
 const APPEAR_DELAY_MS = 2500
+const loadMeshGradient = () => import('@paper-design/shaders-react').then(module => ({ default: module.MeshGradient }))
+const loadStaticRender = () => import('@cradle/streamdown').then(module => ({ default: module.StaticRender }))
+const MeshGradient = lazy(loadMeshGradient)
+const StaticRender = lazy(loadStaticRender)
 
 // Same spring family as the sidebar pane drill-in (blur + rise + fade).
 const ENTER_SPRING = { type: 'spring', stiffness: 500, damping: 35, mass: 0.8 } as const
@@ -93,6 +95,8 @@ export function WhatsNewPopup() {
     if (!item || dialogOpen) { return }
     if (shownForRef.current === item.key) { return }
     shownForRef.current = item.key
+    void loadMeshGradient().catch(() => {})
+    void loadStaticRender().catch(() => {})
     const timeoutId = window.setTimeout(setVisible, APPEAR_DELAY_MS, true)
     return () => window.clearTimeout(timeoutId)
   }, [item, dialogOpen])
@@ -139,19 +143,21 @@ export function WhatsNewPopup() {
           <div className="relative overflow-hidden rounded-xl bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10">
             {/* Seeded mesh-gradient hero — mini version of the dialog header */}
             <div className="relative h-46 overflow-hidden select-none">
-              <MeshGradient
-                colors={look.colors}
-                distortion={look.distortion}
-                swirl={look.swirl}
-                scale={look.scale}
-                rotation={look.rotation}
-                offsetX={look.offsetX}
-                offsetY={look.offsetY}
-                grainOverlay={0.15}
-                speed={0.35}
-                style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-                aria-hidden="true"
-              />
+              <Suspense fallback={<div className="absolute inset-0 bg-muted" />}>
+                <MeshGradient
+                  colors={look.colors}
+                  distortion={look.distortion}
+                  swirl={look.swirl}
+                  scale={look.scale}
+                  rotation={look.rotation}
+                  offsetX={look.offsetX}
+                  offsetY={look.offsetY}
+                  grainOverlay={0.15}
+                  speed={0.35}
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+                  aria-hidden="true"
+                />
+              </Suspense>
               <div
                 className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent"
                 aria-hidden="true"
@@ -188,11 +194,13 @@ export function WhatsNewPopup() {
 
             <div className="flex flex-col gap-2.5 p-3.5">
               <div className={cn('min-h-12', POPUP_MARKDOWN_CLASSES)}>
-                <StaticRender
-                  content={item.kind === 'announcement'
-                    ? resolveLocalizedText(item.entry.summary)
-                    : resolveLocalizedText(item.tip.body)}
-                />
+                <Suspense fallback={null}>
+                  <StaticRender
+                    content={item.kind === 'announcement'
+                      ? resolveLocalizedText(item.entry.summary)
+                      : resolveLocalizedText(item.tip.body)}
+                  />
+                </Suspense>
               </div>
               <div className="flex justify-end gap-1.5">
                 <Button type="button" variant="ghost" size="sm" onClick={dismiss}>

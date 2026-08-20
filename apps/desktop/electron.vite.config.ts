@@ -111,12 +111,20 @@ export default defineConfig({
         autoCodeSplitting: true,
       }),
       viteReact({
+        exclude: /[/\\](?:node_modules|api-gen)[/\\]/,
         babel: {
           plugins: ['babel-plugin-react-compiler'],
         },
       }),
       pluginImportMap(),
     ],
+    optimizeDeps: {
+      esbuildOptions: {
+        // Chrome eagerly loads optimizer maps into the renderer; maps for large
+        // dependencies can retain hundreds of megabytes in Electron dev mode.
+        sourcemap: false,
+      },
+    },
     resolve: {
       alias: {
         '~': resolve(webRoot, 'src'),

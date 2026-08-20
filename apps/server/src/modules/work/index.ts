@@ -17,7 +17,7 @@ export const work = new Elysia({
       'x-cradle-cli': { command: ['work', 'list'] },
     },
     query: WorkModel.listQuery,
-    response: { 200: t.Array(WorkModel.summary) },
+    response: { 200: WorkModel.page },
   })
   .get('/attention', () => Work.listAttention(), {
     detail: {

@@ -32,7 +32,6 @@ export function registerAgentToolsMcpServer(): void {
     args: resolveMcpEntryArgs(),
     env: {
       CRADLE_SERVER_URL: `http://127.0.0.1:${config.port}`,
-      ...(config.authToken ? { CRADLE_AUTH_TOKEN: config.authToken } : {}),
     },
   })
 }

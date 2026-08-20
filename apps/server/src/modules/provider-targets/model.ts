@@ -120,6 +120,7 @@ export const ProviderTargetsModel = {
     sourceKey: nullableString,
     externalRecordId: nullableString,
     sourceFingerprint: nullableString,
+    effectiveProviderKinds: t.Array(providerKind),
     createdAt: t.Number(),
     updatedAt: t.Number(),
   }),

@@ -1,17 +1,23 @@
+import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 
 import type { Work } from '@cradle/db'
-import { works, workThreads } from '@cradle/db'
-import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm'
+import { sessions, works, workThreads } from '@cradle/db'
+import { and, desc, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { createChildLogger } from '../../logging/logger'
-import { hasPendingRuntimeToolApproval } from '../chat-runtime/pending-tool-approval'
+import {
+  hasPendingRuntimeToolApproval,
+  listSessionIdsWithPendingRuntimeToolApproval,
+} from '../chat-runtime/pending-tool-approval'
 import { listPendingRuntimeUserInputSummaries } from '../chat-runtime/pending-user-input'
 import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
 import * as ChatRuntime from '../chat-runtime/runtime'
-import { readDurableProviderRuntimeBinding } from '../provider-runtime/service'
+import {
+  listDurableProviderRuntimeBindingsByChatSessionIds,
+  readDurableProviderRuntimeBinding,
+} from '../provider-runtime/service'
 import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
 import * as Session from '../session/service'
@@ -24,9 +30,9 @@ import {
   deriveWorkProjection,
 } from './projection'
 
-const logger = createChildLogger({ module: 'work' })
-
 export type WorkActivity = 'idle' | 'running' | 'waiting' | 'blocked'
+export const WORK_LIST_DEFAULT_LIMIT = 100
+export const WORK_LIST_MAX_LIMIT = 200
 export type WorkView = Omit<Work, 'acceptanceCriteriaJson'> & {
   acceptanceCriteria: string[]
 }
@@ -39,6 +45,23 @@ export type WorkSummary = WorkView & {
   stateSinceAt: number
   stateExplanation: WorkStateExplanation
   recovery: WorkRecovery
+}
+export interface WorkPage {
+  items: WorkSummary[]
+  nextCursor: string | null
+}
+export interface WorkListInput {
+  workspaceId?: string
+  linkedIssueId?: string
+  archived?: boolean
+  cursor?: string
+  limit?: number
+}
+
+interface WorkListCursor {
+  updatedAt: number
+  createdAt: number
+  id: string
 }
 export interface WorkDetail {
   work: WorkView
@@ -143,11 +166,6 @@ function requirePrimaryThread(workId: string): Session.SessionView {
   return session
 }
 
-function readPrimaryThread(workId: string): Session.SessionView | null {
-  const sessionId = getPrimarySessionId(workId)
-  return sessionId ? Session.get(sessionId) : null
-}
-
 async function archiveWorkForPrimarySession(sessionId: string): Promise<void> {
   const membership = db()
     .select({ workId: workThreads.workId })
@@ -214,17 +232,25 @@ export function deriveActivity(input: {
 }
 
 interface WorkSignals {
-  awaitSummary: ReturnType<typeof SessionAwait.getSessionSummary>
-  pendingUserInputs: ReturnType<typeof listPendingRuntimeUserInputSummaries>
+  awaiting: boolean
+  awaitPrimarySource: string | null
+  awaitReason: string | null
+  pendingUserInput: ReturnType<typeof listPendingRuntimeUserInputSummaries>[number] | null
+  hasPendingUserInput: boolean
   pendingToolApproval: boolean
   hasActiveRun: boolean
   hasDurableProviderBinding: boolean
 }
 
 function readWorkSignals(session: Session.SessionView): WorkSignals {
+  const awaitSummary = SessionAwait.getSessionSummary(session.id)
+  const pendingUserInput = listPendingRuntimeUserInputSummaries({ sessionId: session.id })[0] ?? null
   return {
-    awaitSummary: SessionAwait.getSessionSummary(session.id),
-    pendingUserInputs: listPendingRuntimeUserInputSummaries({ sessionId: session.id }),
+    awaiting: awaitSummary.awaiting,
+    awaitPrimarySource: awaitSummary.primarySource,
+    awaitReason: awaitSummary.reason,
+    pendingUserInput,
+    hasPendingUserInput: pendingUserInput !== null,
     pendingToolApproval: hasPendingRuntimeToolApproval(session.id),
     hasActiveRun: ChatRuntime.getActiveSessionRun(session.id) !== null,
     hasDurableProviderBinding: readDurableProviderRuntimeBinding(session.id) !== undefined,
@@ -238,8 +264,8 @@ function readActivity(
   return deriveActivity({
     sessionStatus: session.status,
     worktreeHealth: session.worktreeHealth,
-    awaiting: signals.awaitSummary.awaiting,
-    waitingForInteraction: signals.pendingUserInputs.length > 0 || signals.pendingToolApproval,
+    awaiting: signals.awaiting,
+    waitingForInteraction: signals.hasPendingUserInput || signals.pendingToolApproval,
   })
 }
 
@@ -250,16 +276,21 @@ function projectWorkState(input: {
   signals?: WorkSignals
 }): WorkProjection {
   const signals = input.signals ?? readWorkSignals(input.primaryThread)
-  const firstPendingInput = signals.pendingUserInputs[0]
-  const pendingHumanEvidence = firstPendingInput
-    ? firstPendingInput.firstQuestion
+  const firstPendingInput = signals.pendingUserInput
+  let pendingHumanEvidence: string | null = null
+  if (firstPendingInput) {
+    pendingHumanEvidence = firstPendingInput.firstQuestion
       ? `The Agent asked: ${firstPendingInput.firstQuestion}`
       : `The Agent requested ${firstPendingInput.providerMethod} input.`
-    : signals.pendingToolApproval
-      ? 'The Agent requested approval for a tool call.'
-      : null
-  const pendingDependencyEvidence = signals.awaitSummary.awaiting
-    ? [signals.awaitSummary.primarySource, signals.awaitSummary.reason].filter(Boolean).join(': ')
+  }
+  else if (signals.pendingToolApproval) {
+    pendingHumanEvidence = 'The Agent requested approval for a tool call.'
+  }
+  else if (signals.hasPendingUserInput) {
+    pendingHumanEvidence = 'The Agent requested user input.'
+  }
+  const pendingDependencyEvidence = signals.awaiting
+    ? [signals.awaitPrimarySource, signals.awaitReason].filter(Boolean).join(': ') || 'The Agent is waiting for a dependency.'
     : null
 
   return deriveWorkProjection({
@@ -274,10 +305,10 @@ function projectWorkState(input: {
     hasPersistedSession: true,
     hasDurableProviderBinding: signals.hasDurableProviderBinding,
     hasActiveRun: signals.hasActiveRun,
-    pendingHumanInteraction: signals.pendingUserInputs.length > 0 || signals.pendingToolApproval,
+    pendingHumanInteraction: signals.hasPendingUserInput || signals.pendingToolApproval,
     pendingHumanSinceAt: firstPendingInput?.createdAt ?? null,
     pendingHumanEvidence,
-    pendingDependency: signals.awaitSummary.awaiting,
+    pendingDependency: signals.awaiting,
     pendingDependencySinceAt: null,
     pendingDependencyEvidence,
     preparedAt: input.work.preparedAt,
@@ -314,41 +345,154 @@ function toSummary(
   }
 }
 
-async function toLiveSummary(work: Work, primaryThread: Session.SessionView): Promise<WorkSummary> {
-  const pullRequest = await PullRequest.getPullRequest(primaryThread.id)
-  return toSummary(work, primaryThread, pullRequest)
+function encodeWorkListCursor(cursor: WorkListCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString('base64url')
 }
 
-export async function list(input: {
-  workspaceId?: string
-  linkedIssueId?: string
-  archived?: boolean
-} = {}): Promise<WorkSummary[]> {
+function decodeWorkListCursor(cursor: string): WorkListCursor {
+  try {
+    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as WorkListCursor
+    if (
+      !Number.isFinite(value.updatedAt)
+      || !Number.isFinite(value.createdAt)
+      || typeof value.id !== 'string'
+      || value.id.length === 0
+    ) {
+      throw new Error('invalid cursor fields')
+    }
+    return value
+  }
+  catch {
+    throw new AppError({
+      code: 'invalid_work_cursor',
+      status: 400,
+      message: 'Work cursor is invalid',
+    })
+  }
+}
+
+function toListSummary(input: {
+  work: Work
+  primaryThread: Session.SessionView
+  awaitingSessionIds: ReadonlySet<string>
+  pendingUserInputSessionIds: ReadonlySet<string>
+  pendingToolApprovalSessionIds: ReadonlySet<string>
+  activeSessionIds: ReadonlySet<string>
+  durableBindingSessionIds: ReadonlySet<string>
+}): WorkSummary {
+  const { work, primaryThread } = input
+  if (!primaryThread.workspaceId) {
+    throw new AppError({
+      code: 'work_workspace_missing',
+      status: 500,
+      message: 'Work primary Session has no workspace',
+      details: { workId: work.id, sessionId: primaryThread.id },
+    })
+  }
+  const signals: WorkSignals = {
+    awaiting: input.awaitingSessionIds.has(primaryThread.id),
+    awaitPrimarySource: null,
+    awaitReason: null,
+    pendingUserInput: null,
+    hasPendingUserInput: input.pendingUserInputSessionIds.has(primaryThread.id),
+    pendingToolApproval: input.pendingToolApprovalSessionIds.has(primaryThread.id),
+    hasActiveRun: input.activeSessionIds.has(primaryThread.id),
+    hasDurableProviderBinding: input.durableBindingSessionIds.has(primaryThread.id),
+  }
+  const pullRequest = PullRequest.readBoundPullRequest(primaryThread.configJson)
+  const projection = projectWorkState({ work, primaryThread, pullRequest, signals })
+  return {
+    ...projectWorkView(work, primaryThread),
+    workspaceId: primaryThread.workspaceId,
+    primarySessionId: primaryThread.id,
+    activity: deriveActivity({
+      sessionStatus: primaryThread.status,
+      worktreeHealth: primaryThread.worktreeHealth,
+      awaiting: signals.awaiting,
+      waitingForInteraction: signals.hasPendingUserInput || signals.pendingToolApproval,
+    }),
+    pullRequest,
+    state: projection.state,
+    stateSinceAt: projection.stateSinceAt,
+    stateExplanation: projection.explanation,
+    recovery: projection.recovery,
+  }
+}
+
+export function list(input: WorkListInput = {}): WorkPage {
+  const limit = Math.min(Math.max(input.limit ?? WORK_LIST_DEFAULT_LIMIT, 1), WORK_LIST_MAX_LIMIT)
+  const cursor = input.cursor ? decodeWorkListCursor(input.cursor) : null
   const predicates = [
+    eq(workThreads.role, 'primary'),
+    input.workspaceId ? eq(sessions.workspaceId, input.workspaceId) : undefined,
     input.linkedIssueId ? eq(works.linkedIssueId, input.linkedIssueId) : undefined,
     input.archived ? isNotNull(works.archivedAt) : isNull(works.archivedAt),
+    cursor
+      ? or(
+          lt(works.updatedAt, cursor.updatedAt),
+          and(eq(works.updatedAt, cursor.updatedAt), lt(works.createdAt, cursor.createdAt)),
+          and(
+            eq(works.updatedAt, cursor.updatedAt),
+            eq(works.createdAt, cursor.createdAt),
+            lt(works.id, cursor.id),
+          ),
+        )
+      : undefined,
   ].filter(predicate => predicate !== undefined)
-  const where = predicates.length > 0 ? and(...predicates) : undefined
-  const query = db().select().from(works).orderBy(desc(works.updatedAt), desc(works.createdAt))
-  const rows = where ? query.where(where).all() : query.all()
-
-  // List must stay available even when a Work row is orphaned (primary Session
-  // deleted/missing). Throwing on one bad row blanked the whole sidebar Work
-  // decoration map and hid every origin=work Session.
-  const visibleWorks = rows.flatMap((work) => {
-    const primaryThread = readPrimaryThread(work.id)
-    if (!primaryThread) {
-      logger.warn('skipping Work with missing primary Session during list', {
-        workId: work.id,
-      })
-      return []
-    }
-    if (input.workspaceId && primaryThread.workspaceId !== input.workspaceId) {
-      return []
-    }
-    return [{ work, primaryThread }]
+  const rows = db()
+    .select({ work: works, primaryThread: sessions })
+    .from(works)
+    .innerJoin(workThreads, eq(workThreads.workId, works.id))
+    .innerJoin(sessions, eq(sessions.id, workThreads.sessionId))
+    .where(and(...predicates))
+    .orderBy(desc(works.updatedAt), desc(works.createdAt), desc(works.id))
+    .limit(limit + 1)
+    .all()
+  const hasNextPage = rows.length > limit
+  const pageRows = hasNextPage ? rows.slice(0, limit) : rows
+  const primaryThreads = Session.projectSessionRows(pageRows.map(row => row.primaryThread))
+  const primaryThreadById = new Map(primaryThreads.map(thread => [thread.id, thread]))
+  const sessionIds = primaryThreads.map(thread => thread.id)
+  const awaitingSessionIds = SessionAwait.listAwaitingSessionIds(sessionIds)
+  const sessionIdSet = new Set(sessionIds)
+  const pendingUserInputSessionIds = new Set(
+    listPendingRuntimeUserInputSummaries()
+      .map(summary => summary.sessionId)
+      .filter(sessionId => sessionIdSet.has(sessionId)),
+  )
+  const pendingToolApprovalSessionIds = listSessionIdsWithPendingRuntimeToolApproval()
+  const activeSessionIds = new Set(
+    ChatRuntime.listActiveRunSummaries().map(run => run.sessionId),
+  )
+  const durableBindingSessionIds = new Set(
+    listDurableProviderRuntimeBindingsByChatSessionIds(sessionIds)
+      .map(binding => binding.chatSessionId),
+  )
+  const items = pageRows.flatMap(({ work, primaryThread }) => {
+    const projectedThread = primaryThreadById.get(primaryThread.id)
+    return projectedThread
+      ? [toListSummary({
+          work,
+          primaryThread: projectedThread,
+          awaitingSessionIds,
+          pendingUserInputSessionIds,
+          pendingToolApprovalSessionIds,
+          activeSessionIds,
+          durableBindingSessionIds,
+        })]
+      : []
   })
-  return Promise.all(visibleWorks.map(({ work, primaryThread }) => toLiveSummary(work, primaryThread)))
+  const last = pageRows.at(-1)?.work
+  return {
+    items,
+    nextCursor: hasNextPage && last
+      ? encodeWorkListCursor({
+          updatedAt: last.updatedAt,
+          createdAt: last.createdAt,
+          id: last.id,
+        })
+      : null,
+  }
 }
 
 export async function get(id: string): Promise<WorkDetail | null> {
@@ -415,7 +559,7 @@ const attentionRiskRank: Record<WorkAttentionRisk, number> = {
 
 export async function listAttention(): Promise<WorkAttentionItem[]> {
   const observedAt = now()
-  const summaries = await list()
+  const summaries = list().items
   return summaries
     .flatMap((summary): WorkAttentionItem[] => {
       const attention = attentionCategoryForState(summary.state)

@@ -20,6 +20,7 @@
   "history.loadingEarlier": "Cargando mensajes anteriores…",
   "minimap.assistantReply": "Respuesta del asistente",
   "minimap.userMessage": "Mensaje de usuario",
+  "messageSelection.quote": "Citar selección",
   "pastedText.chars_many": "{{count}} caracteres",
   "pastedText.chars_one": "{{count}} carácter",
   "pastedText.chars_other": "{{count}} caracteres",

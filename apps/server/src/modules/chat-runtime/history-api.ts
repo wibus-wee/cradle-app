@@ -4,8 +4,8 @@ import { and, desc, eq, lt, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { reduceChatSessionEventHeaders } from './es/aggregate'
-import { readSessionEventHeaders } from './es/event-store'
+import { projectChatMessageForClient } from './client-message-projection'
+import { readCurrentSessionEventVersion } from './es/event-store'
 import { messagePayloadJoinCondition } from './message-payload-store'
 import type { ChatMessageStatus } from './run/stream-chunks'
 import { assertStoredSession } from './runtime-session-context'
@@ -139,7 +139,7 @@ async function getMessagePage(
   revision: number
 }> {
   assertStoredSession(sessionId)
-  const headerState = reduceChatSessionEventHeaders(readSessionEventHeaders(sessionId))
+  const revision = readCurrentSessionEventVersion(db(), sessionId)
   const limit = Math.min(Math.max(Math.floor(input.limit ?? 100), 1), 200)
   const beforeRowId = decodeMessageCursor(input.cursor ?? null)
 
@@ -176,11 +176,11 @@ async function getMessagePage(
 
   return {
     nextCursor,
-    revision: headerState.version,
+    revision,
     rows: rows.map(row => ({
       messageId: row.messageId,
       role: row.role as 'user' | 'assistant',
-      status: headerState.messageStatusById.get(row.messageId) ?? row.status as ChatMessageStatus,
+      status: row.status as ChatMessageStatus,
       errorText: row.errorText ?? undefined,
       preview: row.preview.slice(0, CHAT_HISTORY_PREVIEW_MAX_CHARS),
       previewTruncated: row.preview.length > CHAT_HISTORY_PREVIEW_MAX_CHARS,
@@ -200,7 +200,7 @@ export async function getMessageSnapshot(
   sessionId: string,
   input: ChatMessagePageInput = {},
 ): Promise<ChatMessageSnapshot> {
-  const page = await getMessagePage(sessionId, input)
+  const page = await getMessagePage(sessionId, input, projectChatMessageForClient)
   return {
     revision: page.revision,
     rows: page.rows,
@@ -267,7 +267,7 @@ export function getMessageDetail(sessionId: string, messageId: string): ChatMess
     { id: row.message.id, messageJson: row.payload.messageJson },
     role,
   )
-  return { message }
+  return { message: projectChatMessageForClient(message) }
 }
 
 function encodeMessageCursor(beforeRowId: number): string {

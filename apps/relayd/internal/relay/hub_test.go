@@ -229,6 +229,26 @@ func TestPeerSchedulerReservesCapacityForControlAndPrunesDrainedStreams(t *testi
 	}
 }
 
+func TestPeerSchedulerClearsDequeuedDataSlot(t *testing.T) {
+	scheduler := newPeerScheduler(8, 8192, 1024)
+	if err := scheduler.enqueue(queuedEnvelope{data: []byte("first"), size: 5}, PriorityData, "bulk"); err != nil {
+		t.Fatalf("enqueue first: %v", err)
+	}
+	if err := scheduler.enqueue(queuedEnvelope{data: []byte("second"), size: 6}, PriorityData, "bulk"); err != nil {
+		t.Fatalf("enqueue second: %v", err)
+	}
+	backing := scheduler.dataByStream["bulk"]
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := scheduler.next(ctx); err != nil {
+		t.Fatalf("next data: %v", err)
+	}
+	if backing[0].data != nil || backing[0].size != 0 {
+		t.Fatalf("dequeued backing slot retained envelope: %#v", backing[0])
+	}
+}
+
 func TestPeerSchedulerBackpressuresAndResumesDataInsteadOfDroppingPeer(t *testing.T) {
 	scheduler := newPeerScheduler(4, 4096, 1024)
 	for index := range 3 {

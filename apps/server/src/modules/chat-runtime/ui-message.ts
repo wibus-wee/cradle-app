@@ -11,6 +11,7 @@ import { isToolUIPart } from 'ai'
 import { AppError } from '../../errors/app-error'
 import { readObjectRecord } from '../../helpers/json-record'
 import { readBlobBytes } from '../blob-store/service'
+import { projectChatMessageForClient } from './client-message-projection'
 import type { ChatContextPart } from './context-parts'
 import { isChatContextPart, readChatContextPart, toOrderedUserMessageParts } from './context-parts'
 
@@ -197,8 +198,9 @@ export function parseStoredMessageSnapshot(raw: string): UIMessage {
  * the ordinary history response.
  */
 export function projectChatMessageDisplay<TMessage extends UIMessage>(message: TMessage): TMessage {
+  const clientMessage = projectChatMessageForClient(message)
   let changed = false
-  const parts = message.parts.map((part) => {
+  const parts = clientMessage.parts.map((part) => {
     if (!isToolUIPart(part)) {
       return part
     }
@@ -219,7 +221,7 @@ export function projectChatMessageDisplay<TMessage extends UIMessage>(message: T
     return compactPart as UIMessage['parts'][number]
   })
 
-  return (changed ? { ...message, parts } : message) as TMessage
+  return (changed ? { ...clientMessage, parts } : clientMessage) as TMessage
 }
 
 export function normalizeMessageSnapshot(message: UIMessage): UIMessage {

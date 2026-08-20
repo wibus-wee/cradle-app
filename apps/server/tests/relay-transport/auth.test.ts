@@ -28,7 +28,6 @@ async function createAuthenticatedApp(dataDir: string) {
   process.env.CRADLE_DATA_DIR = dataDir
   process.env.CRADLE_CREDENTIAL_SECRET = 'relay-auth-test-secret'
   process.env.CRADLE_AUTH_REQUIRED = 'true'
-  delete process.env.CRADLE_AUTH_TOKEN
   return await createServerContractApp({ includeRuntimeHttpPlugins: true })
 }
 
@@ -59,7 +58,6 @@ describe('relay transport auth boundary', () => {
     const previousDataDir = process.env.CRADLE_DATA_DIR
     const previousSecret = process.env.CRADLE_CREDENTIAL_SECRET
     const previousAuthRequired = process.env.CRADLE_AUTH_REQUIRED
-    const previousAuthToken = process.env.CRADLE_AUTH_TOKEN
 
     try {
       const app = await createAuthenticatedApp(dataDir)
@@ -89,7 +87,6 @@ describe('relay transport auth boundary', () => {
       restoreEnv('CRADLE_DATA_DIR', previousDataDir)
       restoreEnv('CRADLE_CREDENTIAL_SECRET', previousSecret)
       restoreEnv('CRADLE_AUTH_REQUIRED', previousAuthRequired)
-      restoreEnv('CRADLE_AUTH_TOKEN', previousAuthToken)
     }
   })
 

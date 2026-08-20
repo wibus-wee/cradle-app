@@ -7,18 +7,26 @@ import { messages, sessionEvents, sessions } from '@cradle/db'
 import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm'
 
 import { db } from '../../../infra'
-import { readMessagePayload } from '../message-payload-store'
+import { readMessagePayloads } from '../message-payload-store'
 import { parseStoredMessageSnapshot } from '../ui-message'
 import { publishChatRunActivities } from './activity-tail'
-import type { MessageRecordedFact, StoredChatSessionEvent } from './events'
+import type {
+  ChatSessionEventRow,
+  ChatSessionHeaderEvent,
+  MessageRecordedFact,
+  StoredChatSessionEvent,
+} from './events'
 import {
   isLegacyAssistantMessageSnapshottedRow,
+  parseChatSessionEventHeader,
   parseStoredChatSessionEvent,
 } from './events'
 
 const encoder = new TextEncoder()
 const DEFAULT_TAIL_LIMIT = 500
 const KEEPALIVE_INTERVAL_MS = 15000
+const TAIL_STREAM_MAX_EVENTS = 128
+const TAIL_STREAM_MAX_BYTES = 1024 * 1024
 
 type ChatTailSubscriber = (event: ChatSessionTailEvent) => void
 type ChatGlobalTailSubscriber = (event: PublishedSessionTailEvent) => void
@@ -49,7 +57,17 @@ export interface ChatGlobalSessionsTailQuery {
   limit?: number
 }
 
-export function toChatSessionTailEvent(event: StoredChatSessionEvent): ChatSessionTailEvent {
+interface TailMessageStructure {
+  parentMessageId: string | null
+  parentToolCallId: string | null
+  taskId: string | null
+  depth: number
+}
+
+export function toChatSessionTailEvent(
+  event: StoredChatSessionEvent,
+  messageStructuresById?: ReadonlyMap<string, TailMessageStructure>,
+): ChatSessionTailEvent {
   return {
     scope: 'session',
     sessionId: event.aggregateId,
@@ -57,7 +75,7 @@ export function toChatSessionTailEvent(event: StoredChatSessionEvent): ChatSessi
     version: event.version,
     type: event.type,
     occurredAt: event.occurredAt,
-    payload: readTailPayload(event),
+    payload: readTailPayload(event, messageStructuresById),
   }
 }
 
@@ -100,12 +118,14 @@ function readSessionTailReplay(input: ChatSessionTailQuery): ChatTailReplay<Chat
     }
   }
 
-  const events = rows
-    .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
-    .map(row => toChatSessionTailEvent(parseStoredChatSessionEvent(
-      row,
-      payloadId => readMessagePayload(db(), payloadId),
-    )))
+  const eventRows = rows.filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
+  const headers = eventRows.map(parseChatSessionEventHeader)
+  const payloads = readMessagePayloads(db(), headers.flatMap(readHeaderMessagePayloadIds))
+  const messageStructures = readTailMessageStructures(headers.flatMap(readCompletedMessageIds))
+  const events = eventRows.map(row => toChatSessionTailEvent(
+    parseStoredChatSessionEvent(row, payloadId => payloads.get(payloadId)),
+    messageStructures,
+  ))
   return {
     events,
     cursor: events.at(-1)?.version ?? input.afterVersion,
@@ -168,10 +188,7 @@ function readGlobalSessionTailReplay(
 
   const events: ChatGlobalSessionTailEvent[] = rows
     .filter(row => !isLegacyAssistantMessageSnapshottedRow(row))
-    .map(row => toGlobalTailEvent(toChatSessionTailEvent(parseStoredChatSessionEvent(
-      row,
-      payloadId => readMessagePayload(db(), payloadId),
-    ))))
+    .map(toGlobalTailEventFromRow)
   return {
     events,
     cursor: events.at(-1)?.sequenceId ?? input.afterSequenceId,
@@ -180,18 +197,25 @@ function readGlobalSessionTailReplay(
 }
 
 export function publishSessionTailEvents(events: StoredChatSessionEvent[]): void {
-  const tailEvents = events.map(stored => toChatSessionTailEvent(stored))
-  const workspaceIdsBySessionId = readWorkspaceIdsBySessionId(tailEvents)
-  for (const event of tailEvents) {
-    const subscribers = sessionSubscribers.get(event.sessionId)
+  const workspaceIdsBySessionId = readWorkspaceIdsBySessionId(events)
+  const messageStructures = sessionSubscribers.size > 0
+    ? readTailMessageStructures(events.flatMap(event =>
+        event.type === 'AssistantMessageCompleted' ? [event.payload.message.id] : []))
+    : new Map<string, TailMessageStructure>()
+  for (const stored of events) {
+    const subscribers = sessionSubscribers.get(stored.aggregateId)
     if (subscribers) {
+      const event = toChatSessionTailEvent(stored, messageStructures)
       for (const subscriber of subscribers) {
         subscriber(event)
       }
     }
-    const workspaceId = workspaceIdsBySessionId.get(event.sessionId) ?? null
-    for (const subscriber of globalSubscribers) {
-      subscriber({ event, workspaceId })
+    if (globalSubscribers.size > 0) {
+      const event = toHeaderOnlySessionTailEventFromStored(stored)
+      const workspaceId = workspaceIdsBySessionId.get(event.sessionId) ?? null
+      for (const subscriber of globalSubscribers) {
+        subscriber({ event, workspaceId })
+      }
     }
   }
   publishChatRunActivities(events)
@@ -267,8 +291,8 @@ function subscribeGlobalSessionTail(
   }
 }
 
-function readWorkspaceIdsBySessionId(events: ChatSessionTailEvent[]): Map<string, string | null> {
-  const sessionIds = [...new Set(events.map(event => event.sessionId))]
+function readWorkspaceIdsBySessionId(events: StoredChatSessionEvent[]): Map<string, string | null> {
+  const sessionIds = [...new Set(events.map(event => event.aggregateId))]
   if (sessionIds.length === 0 || globalSubscribers.size === 0) {
     return new Map()
   }
@@ -284,6 +308,27 @@ function readWorkspaceIdsBySessionId(events: ChatSessionTailEvent[]): Map<string
   return new Map(rows.map(row => [row.id, row.workspaceId]))
 }
 
+function readTailMessageStructures(
+  messageIds: readonly string[],
+): Map<string, TailMessageStructure> {
+  const uniqueMessageIds = [...new Set(messageIds)]
+  if (uniqueMessageIds.length === 0) {
+    return new Map()
+  }
+  const rows = db()
+    .select({
+      id: messages.id,
+      parentMessageId: messages.parentMessageId,
+      parentToolCallId: messages.parentToolCallId,
+      taskId: messages.taskId,
+      depth: messages.depth,
+    })
+    .from(messages)
+    .where(inArray(messages.id, uniqueMessageIds))
+    .all()
+  return new Map(rows.map(row => [row.id, row]))
+}
+
 export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalSessionTailEvent>(input: {
   replay: ChatTailReplay<TEvent>
   subscribe: (subscriber: (event: TEvent) => void) => () => void
@@ -292,53 +337,166 @@ export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalS
   let unsubscribe = () => {}
   let keepAlive: ReturnType<typeof setInterval> | null = null
   let closed = false
-  const close = () => {
-    if (closed) {
+  let accepting = true
+  let terminalAfterDrain = false
+  const pending: Uint8Array[] = []
+  let pendingBytes = 0
+  let controllerRef: ReadableStreamDefaultController<Uint8Array> | null = null
+
+  const stopProducer = () => {
+    if (!accepting) {
       return
     }
-    closed = true
+    accepting = false
     unsubscribe()
+    unsubscribe = () => {}
     if (keepAlive) {
       clearInterval(keepAlive)
       keepAlive = null
     }
   }
+  const close = () => {
+    if (closed) {
+      return
+    }
+    closed = true
+    stopProducer()
+    pending.length = 0
+    pendingBytes = 0
+  }
+  const drain = (
+    controller: ReadableStreamDefaultController<Uint8Array>,
+    pullRequested = false,
+  ) => {
+    if (closed) {
+      return
+    }
+    while (
+      pending.length > 0
+      && (pullRequested || (controller.desiredSize ?? 0) > 0)
+    ) {
+      const chunk = pending.shift()!
+      pendingBytes -= chunk.byteLength
+      controller.enqueue(chunk)
+      pullRequested = false
+    }
+    if (!closed && terminalAfterDrain && pending.length === 0) {
+      closed = true
+      controller.close()
+    }
+  }
+
+  const replaceWithSnapshotRequired = (event: TEvent) => {
+    stopProducer()
+    pending.length = 0
+    pendingBytes = 0
+    const snapshotRequired = createTailSnapshotRequiredEvent(event) as TEvent
+    const chunk = encodeTailEvent(snapshotRequired)
+    pending.push(chunk)
+    pendingBytes = chunk.byteLength
+    terminalAfterDrain = true
+    if (controllerRef) {
+      drain(controllerRef)
+    }
+  }
+
+  const enqueueEvent = (event: TEvent) => {
+    if (!accepting || closed) {
+      return
+    }
+    const chunk = encodeTailEvent(event)
+    if (
+      pending.length + 1 > TAIL_STREAM_MAX_EVENTS
+      || pendingBytes + chunk.byteLength > TAIL_STREAM_MAX_BYTES
+    ) {
+      replaceWithSnapshotRequired(event)
+      return
+    }
+    pending.push(chunk)
+    pendingBytes += chunk.byteLength
+    if (controllerRef) {
+      drain(controllerRef)
+    }
+  }
+
+  const enqueueReplay = (replay: ChatTailReplay<TEvent>): boolean => {
+    for (const event of replay.events) {
+      enqueueEvent(event)
+      if (!accepting) {
+        const latest = replay.events.at(-1)
+        if (latest && latest !== event) {
+          replaceWithSnapshotRequired(latest)
+        }
+        return false
+      }
+    }
+    if (replay.snapshotRequired) {
+      stopProducer()
+      const chunk = encodeTailEvent(replay.snapshotRequired)
+      pending.push(chunk)
+      pendingBytes += chunk.byteLength
+      terminalAfterDrain = true
+      return false
+    }
+    return true
+  }
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      const send = (event: TEvent) => {
-        if (closed) {
-          return
-        }
-        controller.enqueue(encodeTailEvent(event))
+      controllerRef = controller
+      if (!enqueueReplay(input.replay)) {
+        drain(controller)
+        return
       }
-      for (const event of input.replay.events) {
-        send(event)
-      }
-      if (input.replay.snapshotRequired) {
-        send(input.replay.snapshotRequired)
-      }
-      unsubscribe = input.subscribe(send)
+      unsubscribe = input.subscribe(enqueueEvent)
       const catchup = input.readCatchupReplay(input.replay.cursor)
-      for (const event of catchup.events) {
-        send(event)
-      }
-      if (catchup.snapshotRequired) {
-        send(catchup.snapshotRequired)
+      if (!enqueueReplay(catchup)) {
+        drain(controller)
+        return
       }
       keepAlive = setInterval(() => {
-        try {
-          controller.enqueue(encoder.encode(': keepalive\n\n'))
+        if (closed || !accepting || pending.length > 0) {
+          return
         }
- catch {
+        const chunk = encoder.encode(': keepalive\n\n')
+        if (pendingBytes + chunk.byteLength > TAIL_STREAM_MAX_BYTES) {
           close()
+          return
         }
+        pending.push(chunk)
+        pendingBytes += chunk.byteLength
+        drain(controller)
       }, KEEPALIVE_INTERVAL_MS)
+      drain(controller)
+    },
+    pull(controller) {
+      drain(controller, true)
     },
     cancel() {
       close()
     },
-  })
+  }, { highWaterMark: 0 })
+}
+
+export function readTailStreamBufferLimits(): { maxEvents: number, maxBytes: number } {
+  return {
+    maxEvents: TAIL_STREAM_MAX_EVENTS,
+    maxBytes: TAIL_STREAM_MAX_BYTES,
+  }
+}
+
+function createTailSnapshotRequiredEvent(
+  event: ChatSessionTailEvent | ChatGlobalSessionTailEvent,
+): ChatSessionTailEvent | ChatGlobalSessionTailEvent {
+  const cursor = {
+    sessionId: event.sessionId,
+    sequenceId: event.sequenceId,
+    version: event.version,
+    occurredAt: event.occurredAt,
+  }
+  return event.scope === 'session'
+    ? toChatTailSnapshotRequiredEvent({ scope: 'session', ...cursor })
+    : toChatTailSnapshotRequiredEvent({ scope: 'sessions', ...cursor })
 }
 
 function readLatestSessionTailCursor(sessionId: string): {
@@ -465,18 +623,20 @@ function toCompletedTailMessageSnapshot(payload: {
   messageJson: string
   status: ChatSessionTailMessageSnapshot['status']
   errorText: string | null
-}): ChatSessionTailMessageSnapshot | null {
+}, messageStructuresById?: ReadonlyMap<string, TailMessageStructure>): ChatSessionTailMessageSnapshot | null {
   try {
-    const structural = db()
-      .select({
-        parentMessageId: messages.parentMessageId,
-        parentToolCallId: messages.parentToolCallId,
-        taskId: messages.taskId,
-        depth: messages.depth,
-      })
-      .from(messages)
-      .where(eq(messages.id, payload.id))
-      .get()
+    const structural = messageStructuresById
+      ? messageStructuresById.get(payload.id)
+      : db()
+          .select({
+            parentMessageId: messages.parentMessageId,
+            parentToolCallId: messages.parentToolCallId,
+            taskId: messages.taskId,
+            depth: messages.depth,
+          })
+          .from(messages)
+          .where(eq(messages.id, payload.id))
+          .get()
     if (!structural) {
       return null
     }
@@ -516,6 +676,111 @@ function stripTailMessageSnapshots(payload: ChatSessionTailEvent['payload']): Ch
   return payload
 }
 
+function readHeaderMessagePayloadIds(event: ChatSessionHeaderEvent): string[] {
+  switch (event.type) {
+    case 'UserMessageAppended':
+    case 'MessageImported':
+    case 'SteerApplied':
+      return [event.payload.message.payloadId]
+    case 'RunStarted':
+      return event.payload.assistantMessage ? [event.payload.assistantMessage.payloadId] : []
+    case 'AssistantMessageCompleted':
+      return [event.payload.message.payloadId]
+    default:
+      return []
+  }
+}
+
+function readCompletedMessageIds(event: ChatSessionHeaderEvent): string[] {
+  return event.type === 'AssistantMessageCompleted' ? [event.payload.message.id] : []
+}
+
+function toHeaderOnlySessionTailEventFromStored(
+  event: StoredChatSessionEvent,
+): ChatSessionTailEvent {
+  return {
+    scope: 'session',
+    sessionId: event.aggregateId,
+    sequenceId: event.sequenceId,
+    version: event.version,
+    type: event.type,
+    occurredAt: event.occurredAt,
+    payload: readHeaderOnlyTailPayload(event),
+  }
+}
+
+function toGlobalTailEventFromStored(event: StoredChatSessionEvent): ChatGlobalSessionTailEvent {
+  return {
+    ...toHeaderOnlySessionTailEventFromStored(event),
+    scope: 'sessions',
+  }
+}
+
+function toGlobalTailEventFromRow(row: ChatSessionEventRow): ChatGlobalSessionTailEvent {
+  const header = parseChatSessionEventHeader(row)
+  const base = {
+    scope: 'sessions' as const,
+    sessionId: row.aggregateId,
+    sequenceId: row.sequenceId,
+    version: row.version,
+    type: header.type,
+    occurredAt: row.occurredAt,
+  }
+  switch (header.type) {
+    case 'UserMessageAppended':
+    case 'MessageImported':
+    case 'SteerApplied':
+      return { ...base, payload: { messageId: header.payload.message.id } }
+    case 'RunStarted': {
+      const storedPayload = JSON.parse(row.payload) as { runtimeSettings?: Record<string, unknown> }
+      return {
+        ...base,
+        payload: {
+          runId: header.payload.run.id,
+          assistantMessageId: header.payload.assistantMessage?.id ?? header.payload.run.messageId ?? null,
+          queueItemId: header.payload.queueItemId,
+          ...(storedPayload.runtimeSettings ? { runtimeSettings: storedPayload.runtimeSettings } : {}),
+        },
+      } as ChatGlobalSessionTailEvent
+    }
+    case 'AssistantMessageCompleted':
+      return {
+        ...base,
+        payload: {
+          messageId: header.payload.message.id,
+          status: header.payload.message.status,
+        },
+      }
+    default:
+      return toGlobalTailEventFromStored(parseStoredChatSessionEvent(row))
+  }
+}
+
+function readHeaderOnlyTailPayload(
+  event: StoredChatSessionEvent,
+): ChatSessionTailEvent['payload'] {
+  switch (event.type) {
+    case 'UserMessageAppended':
+    case 'MessageImported':
+    case 'SteerApplied':
+      return { messageId: event.payload.message.id }
+    case 'RunStarted':
+      return {
+        runId: event.payload.run.id,
+        assistantMessageId: event.payload.assistantMessage?.id ?? event.payload.run.messageId ?? null,
+        queueItemId: event.payload.queueItemId ?? null,
+        ...(event.payload.runtimeSettings ? { runtimeSettings: event.payload.runtimeSettings } : {}),
+      }
+    case 'AssistantMessageCompleted':
+      return {
+        messageId: event.payload.message.id,
+        status: event.payload.message.status,
+      }
+    default:
+      return stripTailMessageSnapshots(readTailPayload(event))
+  }
+}
+
 function toGlobalTailEvent(event: ChatSessionTailEvent): ChatGlobalSessionTailEvent {
   return {
     ...event,
@@ -530,7 +795,10 @@ function encodeTailEvent(event: ChatSessionTailEvent | ChatGlobalSessionTailEven
   )
 }
 
-function readTailPayload(event: StoredChatSessionEvent): ChatSessionTailEvent['payload'] {
+function readTailPayload(
+  event: StoredChatSessionEvent,
+  messageStructuresById?: ReadonlyMap<string, TailMessageStructure>,
+): ChatSessionTailEvent['payload'] {
   switch (event.type) {
     case 'UserMessageAppended':
     case 'MessageImported':
@@ -554,7 +822,7 @@ function readTailPayload(event: StoredChatSessionEvent): ChatSessionTailEvent['p
       }
     }
     case 'AssistantMessageCompleted': {
-      const snapshot = toCompletedTailMessageSnapshot(event.payload.message)
+      const snapshot = toCompletedTailMessageSnapshot(event.payload.message, messageStructuresById)
       return {
         messageId: event.payload.message.id,
         status: event.payload.message.status,

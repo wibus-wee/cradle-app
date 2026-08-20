@@ -5,7 +5,6 @@ import * as ReactDOMClient from 'react-dom/client'
 import { AppErrorBoundary } from '~/components/common/app-error-boundary'
 import { resolveInitialLocale } from '~/i18n/browser-locale'
 import { I18nProvider } from '~/i18n/client'
-import { bootstrapBrowserAuthSession } from '~/lib/server-credential'
 import { waitForServer } from '~/lib/server-readiness'
 
 const queryClient = new QueryClient({
@@ -31,13 +30,11 @@ function showBootstrapError(error: unknown): void {
 }
 
 async function startTearoffApp(): Promise<void> {
-  const [App, serverUrl] = await Promise.all([
+  const [App] = await Promise.all([
     applicationPromise,
     waitForServer(),
     stylesheetPromise,
   ])
-  const authPromise = bootstrapBrowserAuthSession(serverUrl)
-
   ReactDOMClient.createRoot(document.getElementById('app')!).render(
     <React.StrictMode>
       <AppErrorBoundary>
@@ -49,10 +46,6 @@ async function startTearoffApp(): Promise<void> {
       </AppErrorBoundary>
     </React.StrictMode>,
   )
-
-  void authPromise.catch((error) => {
-    console.error('[bootstrap] post-render authentication failed:', error)
-  })
 }
 
 void startTearoffApp().catch(showBootstrapError)

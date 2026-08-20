@@ -544,6 +544,20 @@ export const zPostProviderTargetsByProviderTargetIdTestPath = z.object({
     providerTargetId: z.string().min(1)
 });
 
+export const zGetProviderTargetsByProviderTargetIdExtensionsPath = z.object({
+    providerTargetId: z.string().min(1)
+});
+
+export const zPutProviderTargetsByProviderTargetIdExtensionsBody = z.object({
+    owner: z.string().min(1),
+    id: z.string().min(1),
+    enabled: z.boolean()
+});
+
+export const zPutProviderTargetsByProviderTargetIdExtensionsPath = z.object({
+    providerTargetId: z.string().min(1)
+});
+
 export const zPostRelayServersBody = z.object({
     id: z.string().min(1).regex(/.*\S.*/).optional(),
     displayName: z.string().min(1).regex(/.*\S.*/),
@@ -747,6 +761,76 @@ export const zAllRemoteHostsByHostIdUpstream7Path = z.object({
 
 export const zAllRemoteHostsByHostIdUpstream8Path = z.object({
     hostId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zPostFabricBody = z.object({
+    relayUrl: z.string().min(1).regex(/.*\S.*/),
+    displayName: z.string().min(1).regex(/.*\S.*/).optional(),
+    platform: z.string().min(1).regex(/.*\S.*/).optional(),
+    version: z.string().min(1).regex(/.*\S.*/).optional(),
+    capabilities: z.array(z.string().min(1).regex(/.*\S.*/)).optional()
+});
+
+export const zPostFabricNodeInvitationsBody = z.object({
+    relayUrl: z.string().min(1).regex(/.*\S.*/),
+    fabricId: z.string().min(1).regex(/.*\S.*/),
+    displayName: z.string().min(1).regex(/.*\S.*/).optional(),
+    platform: z.string().min(1).regex(/.*\S.*/).optional(),
+    version: z.string().min(1).regex(/.*\S.*/).optional(),
+    capabilities: z.array(z.string().min(1).regex(/.*\S.*/)).optional()
+});
+
+export const zPostFabricNodeInvitationsApproveBody = z.object({
+    version: z.number(),
+    relayUrl: z.string(),
+    fabricId: z.string(),
+    requestId: z.string(),
+    deliverySecret: z.string(),
+    expiresAt: z.string()
+});
+
+export const zPostNodesByNodeIdConnectPath = z.object({
+    nodeId: z.string().min(1).regex(/.*\S.*/)
+});
+
+export const zAllNodesByNodeIdUpstreamPath = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream2Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream3Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream4Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream5Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream6Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream7Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream8Path = z.object({
+    nodeId: z.string().min(1),
     '*': z.string()
 });
 
@@ -1412,7 +1496,12 @@ export const zGetSessionsQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     origin: z.string().min(1).optional(),
     sessionGroupId: z.string().min(1).optional(),
-    archived: z.boolean().optional()
+    archived: z.boolean().optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.union([
+        z.string(),
+        z.number().gte(1).lte(200)
+    ]).optional()
 });
 
 export const zPostSessionsBody = z.object({
@@ -1676,7 +1765,12 @@ export const zPostSessionsByIdTurnCheckpointsByCheckpointIdRewindPath = z.object
 export const zGetWorksQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     linkedIssueId: z.string().min(1).optional(),
-    archived: z.boolean().optional()
+    archived: z.boolean().optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.union([
+        z.string(),
+        z.number().gte(1).lte(200)
+    ]).optional()
 });
 
 export const zPostWorksBody = z.object({
@@ -2366,11 +2460,11 @@ export const zGetSearchThreadsQuery = z.object({
     origin: z.string().min(1).optional(),
     limit: z.union([
         z.string(),
-        z.number().gte(1)
+        z.number().gte(1).lte(100)
     ]).optional(),
     snippetsPerHit: z.union([
         z.string(),
-        z.number().gte(1)
+        z.number().gte(1).lte(10)
     ]).optional()
 });
 

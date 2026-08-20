@@ -12,6 +12,8 @@ import { fixMacOSFrameworkSymlinks } from '../apps/desktop/scripts/fix-macos-fra
 const REPO_ROOT = resolve(import.meta.dirname, '..')
 const DEFAULT_ICON = resolve(REPO_ROOT, '.github', 'Cradle.png')
 const DEFAULT_COMMAND = resolve(import.meta.dirname, 'Install Cradle.command')
+const DEFAULT_INSTRUCTIONS = resolve(import.meta.dirname, 'Install Instructions.txt')
+const DEFAULT_BACKGROUND = resolve(import.meta.dirname, 'assets', 'dmg-background.png')
 const DEFAULT_OUTPUT = resolve(import.meta.dirname, 'dist', 'Cradle-Installer.dmg')
 const VOLUME_NAME = 'Install Cradle'
 
@@ -135,6 +137,12 @@ function stageCommand(stageDir) {
   return dest
 }
 
+function stageInstructions(stageDir) {
+  const dest = resolve(stageDir, 'Install Instructions.txt')
+  cpSync(DEFAULT_INSTRUCTIONS, dest)
+  return dest
+}
+
 function applyCommandIcon(commandPath, iconPath) {
   if (!iconPath || !existsSync(iconPath)) { return }
   const script = `
@@ -147,34 +155,6 @@ function applyCommandIcon(commandPath, iconPath) {
     }
   `
   execFileSync('/usr/bin/osascript', ['-l', 'JavaScript', '-e', script, iconPath, commandPath], { stdio: 'ignore' })
-}
-
-function hideExtension(dmgPath) {
-  const mountDir = mkdtempSync(resolve(tmpdir(), 'dmg-mount-'))
-  try {
-    execFileSync('/usr/bin/hdiutil', ['attach', dmgPath, '-nobrowse', '-readwrite', '-mountpoint', mountDir, '-quiet'], { stdio: 'ignore' })
-    const commandFile = resolve(mountDir, 'Install Cradle.command')
-    if (existsSync(commandFile)) {
-      try {
-        execFileSync('/usr/bin/SetFile', ['-a', 'E', commandFile], { stdio: 'ignore' })
-      }
- catch {
-        // SetFile may not be available; extension will still show
-      }
-    }
-  }
- finally {
-    try {
-      execFileSync('/usr/bin/hdiutil', ['detach', mountDir, '-quiet'], { stdio: 'ignore' })
-    }
- catch {
-      // Force-detach if the normal detach fails (e.g. a background process still holds a handle)
-      try { execFileSync('/usr/bin/hdiutil', ['detach', mountDir, '-force', '-quiet'], { stdio: 'ignore' }) }
- catch {}
-    }
-    try { rmSync(mountDir, { recursive: true, force: true }) }
- catch {}
-  }
 }
 
 async function buildDmg(spec, outputPath) {
@@ -201,6 +181,7 @@ async function main() {
 
     console.log('Staging installer command...')
     const commandPath = stageCommand(stageDir)
+    const instructionsPath = stageInstructions(stageDir)
     applyCommandIcon(commandPath, args.icon)
 
     const iconStaged = args.icon && existsSync(args.icon) ? resolve(stageDir, 'volume.icns') : null
@@ -210,51 +191,23 @@ async function main() {
 
     console.log('Building DMG with appdmg...')
     const outputAbs = resolve(REPO_ROOT, args.output)
-    const rwDmg = resolve(stageDir, 'rw.dmg')
+    rmSync(outputAbs, { force: true })
     await buildDmg({
       'title': VOLUME_NAME,
       ...(iconStaged ? { icon: iconStaged } : {}),
-      'background-color': '#1c1c1c',
+      'background': DEFAULT_BACKGROUND,
       'icon-size': 80,
-      'format': 'UDRW',
+      'format': 'UDZO',
       'window': {
         size: { width: 660, height: 400 },
       },
       'contents': [
         { x: 80, y: 320, type: 'file', path: payloadDir, name: '.payload' },
         { x: 330, y: 200, type: 'file', path: commandPath, name: 'Install Cradle' },
+        { x: 530, y: 200, type: 'file', path: instructionsPath, name: 'Install Instructions.txt' },
       ],
       'basepath': stageDir,
-    }, rwDmg)
-
-    console.log('Hiding .command extension in DMG...')
-    hideExtension(rwDmg)
-
-    console.log('Compressing DMG...')
-    // Flush filesystem buffers so the rw image is fully written before convert
-    try { execFileSync('/bin/sync', { stdio: 'ignore' }) }
- catch {}
-
-    // hdiutil convert can transiently fail on CI runners when a prior detach
-    // hasn't fully released the image.  Retry up to 3 times with a short delay.
-    let convertErr
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        execFileSync('/usr/bin/hdiutil', ['convert', rwDmg, '-format', 'UDZO', '-o', outputAbs], { stdio: 'pipe' })
-        convertErr = null
-        break
-      }
- catch (err) {
-        convertErr = err
-        const stderr = err.stderr?.toString?.() ?? ''
-        console.error(`hdiutil convert attempt ${attempt} failed${stderr ? `: ${stderr.trim()}` : ''}`)
-        if (attempt < 3) {
-          // Wait before retrying — gives APFS time to release the image
-          execFileSync('/bin/sleep', ['2'])
-        }
-      }
-    }
-    if (convertErr) { throw convertErr }
+    }, outputAbs)
 
     console.log(`Wrote ${outputAbs}`)
   }

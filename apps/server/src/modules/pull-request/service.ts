@@ -455,6 +455,14 @@ export function getBoundPullRequest(sessionId: string): SessionPullRequestView |
   return stored ? toView(stored) : null
 }
 
+/** Decode the cached PR projection from an already-loaded Session row. */
+export function readBoundPullRequest(
+  configJson: string | null | undefined,
+): SessionPullRequestView | null {
+  const stored = readStoredPullRequest(configJson)
+  return stored ? toView(stored) : null
+}
+
 export async function getPullRequest(sessionId: string): Promise<SessionPullRequestView | null> {
   const session = requireSession(sessionId)
   const stored = readStoredPullRequest(session.configJson)

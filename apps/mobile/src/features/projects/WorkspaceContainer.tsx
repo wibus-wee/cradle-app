@@ -14,6 +14,7 @@ import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
+import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 
 import { WorkspaceView } from './WorkspaceView'
 
@@ -30,12 +31,12 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
         cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
         cradleRequest<GetSessionsResponse>(
           connection!,
-          `/sessions/?workspaceId=${encodeURIComponent(workspaceId)}&archived=false`,
+          `/sessions/?workspaceId=${encodeURIComponent(workspaceId)}&archived=false&limit=200`,
           { signal },
         ),
         cradleRequest<GetWorksResponse>(
           connection!,
-          `/works?workspaceId=${encodeURIComponent(workspaceId)}&archived=false`,
+          `/works?workspaceId=${encodeURIComponent(workspaceId)}&archived=false&limit=200`,
           { signal },
         ),
         cradleRequest<GetWorkspacesByWorkspaceIdFilesChildrenResponse>(
@@ -50,8 +51,8 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
       }
       return {
         workspace,
-        sessions,
-        works,
+        sessions: sessions.items,
+        works: works.items,
         files,
         workspaces: workspaces.filter(
           candidate =>
@@ -59,12 +60,8 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
         ),
       }
     },
-    refetchInterval: data =>
-      data.state.data?.sessions.some(session => session.status === 'streaming')
-      || data.state.data?.works.some(work => work.activity === 'running')
-        ? 5_000
-        : false,
   })
+  useSessionSummaryEvents(connection, isRouteActive, () => { void query.refetch() })
 
   const refresh = async () => {
     setIsRefreshing(true)

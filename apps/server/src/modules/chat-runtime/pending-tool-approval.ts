@@ -34,6 +34,12 @@ export function hasPendingRuntimeToolApproval(
   return false
 }
 
+export function listSessionIdsWithPendingRuntimeToolApproval(): Set<string> {
+  return new Set(
+    Array.from(pendingToolApprovalById.values(), pending => pending.request.sessionId),
+  )
+}
+
 export async function requestRuntimeToolApproval(
   input: RuntimeToolApprovalRequest,
 ): Promise<RuntimeToolApprovalResolution> {

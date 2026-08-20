@@ -1,21 +1,10 @@
 import {
   getRendererServerUrl,
   getServerNetworkUrl,
-  isCradleServerLocalUrl,
   isCustomSchemeProxyMode,
   isSameServerEndpoint,
   rebaseToServerBase,
 } from './server-transport/base-url'
-
-let browserServerToken: string | null = null
-
-export function setBrowserServerToken(token: string | null): void {
-  browserServerToken = token?.trim() || null
-}
-
-export function readServerToken(): string | null {
-  return window.cradle?.env?.serverAuthToken?.trim() || browserServerToken
-}
 
 /**
  * Fetch hook for Cradle Server traffic.
@@ -71,25 +60,7 @@ export async function cradleFetch(input: RequestInfo | URL, init: RequestInit = 
     })
   }
 
-  const token = readServerToken()
-  if (token && !headers.has('authorization')) {
-    headers.set('authorization', `Bearer ${token}`)
-  }
   return await fetch(resolvedInput, { ...init, credentials: 'include', headers })
-}
-
-export async function bootstrapBrowserAuthSession(serverUrl: string): Promise<void> {
-  // Custom-scheme proxy mode: Main owns credentials / session cookie bootstrap.
-  if (isCustomSchemeProxyMode() || isCradleServerLocalUrl(serverUrl)) {
-    return
-  }
-  if (!readServerToken()) {
-    return
-  }
-  const response = await cradleFetch(new URL('/auth/browser-session', serverUrl), { method: 'POST' })
-  if (!response.ok) {
-    throw new Error(`Failed to bootstrap browser authentication: HTTP ${response.status}`)
-  }
 }
 
 function isAlreadyOnBase(inputUrl: URL, serverBase: string): boolean {

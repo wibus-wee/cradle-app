@@ -1,7 +1,5 @@
 import type { WebContents } from 'electron'
 
-import { getDesktopServerAuthHeaders } from './server-process'
-
 export const DESKTOP_CHAT_EVENT_TAIL_EVENT_CHANNEL = 'chat-event-tail:event'
 export const DESKTOP_CHAT_EVENT_TAIL_CLOSED_CHANNEL = 'chat-event-tail:closed'
 export const DESKTOP_CHAT_EVENT_TAIL_ERROR_CHANNEL = 'chat-event-tail:error'
@@ -55,6 +53,12 @@ export interface DesktopChatEventTailDiagnostics {
     replayEventCount: number
     startedAtMs: number
   }>
+}
+
+export interface DesktopChatGlobalEventListener {
+  onEvent: (event: unknown) => void
+  onClosed?: () => void
+  onError?: (message: string) => void
 }
 
 export const DESKTOP_CHAT_EVENT_TAIL_REPLAY_MAX_EVENTS = 512
@@ -169,6 +173,43 @@ export class ChatEventTailBroker {
     }
   }
 
+  subscribeGlobalSessionEventsListener(
+    request: DesktopChatSubscribeGlobalSessionEventsRequest,
+    listener: DesktopChatGlobalEventListener,
+  ): () => void {
+    const afterSequenceId = Math.max(0, request.afterSequenceId ?? 0)
+    const workspaceId = request.workspaceId?.trim() || null
+    const entry = this.readOrCreateGlobalEntry(workspaceId, afterSequenceId)
+    const tailId = this.createTailId(`sessions-internal-${workspaceId ?? 'all'}`)
+    const sink: ChatEventTailSink = {
+      isDestroyed: () => false,
+      send: (channel, payload) => {
+        if (channel === DESKTOP_CHAT_EVENT_TAIL_EVENT_CHANNEL) {
+          listener.onEvent((payload as DesktopChatEventTailEvent).event)
+        }
+        else if (channel === DESKTOP_CHAT_EVENT_TAIL_CLOSED_CHANNEL) {
+          listener.onClosed?.()
+        }
+        else if (channel === DESKTOP_CHAT_EVENT_TAIL_ERROR_CHANNEL) {
+          listener.onError?.((payload as DesktopChatEventTailErrorEvent).message)
+        }
+      },
+    }
+    entry.subscribers.set(tailId, {
+      tailId,
+      sink,
+      webContents: null,
+      afterVersion: 0,
+      afterSequenceId,
+    })
+    this.replayEventsToSubscriber(entry, entry.subscribers.get(tailId)!)
+
+    return () => {
+      this.removeSubscriber(entry, tailId)
+      this.abortEntryIfUnobserved(entry)
+    }
+  }
+
   abortTail(webContents: WebContents, request: DesktopChatEventTailAbortRequest): void {
     const located = this.findSubscriber(request.tailId)
     if (!located || located.subscriber.webContents !== webContents) {
@@ -275,7 +316,6 @@ export class ChatEventTailBroker {
 
     try {
       const response = await this.fetchFn(url, {
-        headers: getDesktopServerAuthHeaders(),
         method: 'GET',
         signal: entry.controller.signal,
       })

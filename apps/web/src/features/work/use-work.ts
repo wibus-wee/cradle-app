@@ -22,7 +22,7 @@ import type {
 } from '~/api-gen/types.gen'
 
 export type WorkDetail = GetWorksByIdResponse
-export type WorkSummary = GetWorksResponse[number]
+export type WorkSummary = GetWorksResponse['items'][number]
 export type WorkAttentionItem = GetWorksAttentionResponse[number]
 export type SessionWorkResolution = GetSessionsByIdWorkResponse
 
@@ -50,13 +50,15 @@ export function useWorks(options?: {
   return useQuery({
     ...getWorksOptions({
       query: {
+        limit: 200,
         ...(workspaceId ? { workspaceId } : {}),
         ...(archived === undefined ? {} : { archived }),
       },
     }),
+    select: response => response.items,
     enabled: options?.enabled ?? true,
     staleTime: 5_000,
-    refetchInterval: query => hasOpenWorkPullRequest(query.state.data)
+    refetchInterval: query => hasOpenWorkPullRequest(query.state.data?.items)
       ? WORK_PULL_REQUEST_REFRESH_INTERVAL_MS
       : false,
     refetchIntervalInBackground: true,

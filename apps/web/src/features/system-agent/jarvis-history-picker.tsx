@@ -46,7 +46,7 @@ function formatHistoryTime(
   return t('history.time.months', { count: Math.floor(days / 30) })
 }
 
-function isJarvisHistorySession(session: GetSessionsResponse[number]): boolean {
+function isJarvisHistorySession(session: GetSessionsResponse['items'][number]): boolean {
   return session.runtimeKind === 'jar-core'
     && session.workspaceId === null
     && session.parentSessionId === null
@@ -71,14 +71,14 @@ export function JarvisHistoryPicker({
     isError,
     isPending,
   } = useQuery({
-    ...getSessionsOptions(),
+    ...getSessionsOptions({ query: { limit: 30 } }),
     enabled: open,
-    select: sessions => sessions
+    select: page => page.items
       .filter(isJarvisHistorySession)
       .slice(0, MAX_HISTORY_SESSIONS),
   })
 
-  const handleSelectSession = (session: GetSessionsResponse[number]) => {
+  const handleSelectSession = (session: GetSessionsResponse['items'][number]) => {
     addSession({
       id: session.id,
       title: session.title?.trim() || 'Jarvis',

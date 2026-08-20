@@ -25,14 +25,13 @@ const sessionExecutionSchema = t.Union([
     kind: t.Literal('local'),
   }),
   t.Object({
-    kind: t.Literal('remote-host'),
-    hostId: t.String(),
+    kind: t.Literal('node'),
+    nodeId: t.String(),
     remoteSessionId: t.String(),
   }),
 ])
 
-export const SessionModel = {
-  session: t.Object({
+const session = t.Object({
     id: t.String(),
     execution: sessionExecutionSchema,
     parentSessionId: nullableString,
@@ -63,6 +62,14 @@ export const SessionModel = {
     worktreeHealth: t.Nullable(WorktreeModel.worktreeHealth),
     pendingWorktreeId: t.Nullable(t.String()),
     isolationBoundaryRequired: t.Boolean(),
+})
+
+export const SessionModel = {
+  session,
+
+  page: t.Object({
+    items: t.Array(session),
+    nextCursor: t.Nullable(t.String()),
   }),
 
   isolationView: t.Object({
@@ -127,6 +134,8 @@ export const SessionModel = {
     origin: t.Optional(t.String({ minLength: 1 })),
     sessionGroupId: t.Optional(t.String({ minLength: 1 })),
     archived: t.Optional(t.Boolean()),
+    cursor: t.Optional(t.String({ minLength: 1 })),
+    limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200 })),
   }),
 
   updateBody: t.Object({

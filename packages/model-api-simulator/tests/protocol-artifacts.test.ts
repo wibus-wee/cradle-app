@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 
-import { describe, expect, it } from 'vitest'
+import Ajv2020 from 'ajv/dist/2020.js'
+import { describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
 
 import anthropicManifest from '../protocol/anthropic/MANIFEST.json'
@@ -99,6 +100,21 @@ describe('protocol profile and operation registry', () => {
       'not-an-email',
       'format-check',
     )).toThrow('format')
+  })
+
+  it('compiles a dynamic OpenAI schema once per schema identity', () => {
+    const schemas = new JsonSchemaRegistry()
+    const compile = vi.spyOn(Ajv2020.prototype, 'compile')
+    const schema = { type: 'object', required: ['id'], properties: { id: { type: 'string' } } }
+
+    try {
+      schemas.validateOpenAiSchema(schema, { id: 'one' }, 'dynamic-response')
+      schemas.validateOpenAiSchema(schema, { id: 'two' }, 'dynamic-response')
+      expect(compile).toHaveBeenCalledTimes(1)
+    }
+    finally {
+      compile.mockRestore()
+    }
   })
 
   it('rejects excluded branch identities structurally and contains no substring heuristic', async () => {

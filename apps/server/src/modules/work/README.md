@@ -36,8 +36,10 @@ Provider Runtime, and Await read models.
   persisted Sessions, and healthy isolated worktrees keep their original
   ownership; Work only composes their evidence.
 - Listing Work detects the current state of each bound pull request through the
-  Pull Request owner, so sidebar summaries reflect GitHub merges without
-  opening the individual Work surface.
+  Pull Request owner's cached Session projection and never calls GitHub. Explicit
+  Work/PR detail and reconciliation paths refresh remote state.
+- Work lists return `{ items, nextCursor }`, default to 100 rows, cap `limit`
+  at 200, and batch primary Session/activity projections for the page.
 - Preparing a handoff saves metadata locally. When an open Draft PR already exists, prepare also pushes the branch and updates the PR automatically.
 - The builtin `cradle` MCP server exposes `manage_pull_request` as the required
   Agent-facing closed-loop finalization tool; the tool delegates to this module's

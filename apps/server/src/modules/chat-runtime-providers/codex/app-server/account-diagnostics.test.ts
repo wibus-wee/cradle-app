@@ -381,6 +381,8 @@ function createResolvedProviderTarget(input: {
     customModelsJson: '[]',
     iconSlug: null,
     sourceMetadata: null,
+    extensionBinding: null,
+    effectiveModelId: null,
   }
 }
 

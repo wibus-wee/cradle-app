@@ -1,6 +1,6 @@
 //! CLI entry point for Cradle Chronicle.
 
-use std::io::{Read, Write};
+use std::io::{BufRead, Read, Write};
 use std::process::{Command, ExitCode, Output, Stdio};
 use std::thread;
 use std::thread::JoinHandle;
@@ -48,6 +48,9 @@ fn run() -> Result<String, ChronicleError> {
     }
     if internal_embed_texts_requested() {
         return run_embedding_batch();
+    }
+    if embedding_worker_requested() {
+        return run_embedding_worker();
     }
     if internal_redact_pii_requested() {
         return run_pii_redaction();
@@ -113,6 +116,10 @@ fn embed_texts_requested() -> bool {
 
 fn internal_embed_texts_requested() -> bool {
     std::env::args().any(|arg| arg == "--internal-embed-texts")
+}
+
+fn embedding_worker_requested() -> bool {
+    std::env::args().any(|arg| arg == "--embedding-worker")
 }
 
 fn redact_pii_requested() -> bool {
@@ -514,6 +521,136 @@ fn run_embedding_batch() -> Result<String, ChronicleError> {
     serde_json::to_string(&response).map_err(|error| {
         ChronicleError::Process(format!("failed to serialize embedding response: {error}"))
     })
+}
+
+fn run_embedding_worker() -> Result<String, ChronicleError> {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct WorkerRequest {
+        id: String,
+        texts: Vec<String>,
+    }
+
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct EmbeddingResult {
+        model_id: &'static str,
+        model_version: &'static str,
+        dimensions: usize,
+        embeddings: Vec<Vec<f32>>,
+    }
+
+    #[derive(serde::Serialize)]
+    struct WorkerError {
+        message: String,
+    }
+
+    #[derive(serde::Serialize)]
+    #[serde(untagged)]
+    enum WorkerResponse {
+        Success {
+            id: String,
+            ok: bool,
+            result: EmbeddingResult,
+        },
+        Failure {
+            id: String,
+            ok: bool,
+            error: WorkerError,
+        },
+    }
+
+    const MAX_TEXTS: usize = 64;
+    const MAX_LINE_BYTES: usize = 4 * 1024 * 1024;
+
+    let runtime = cradle_chronicle::onnx::OnnxRuntime::new_local_only();
+    let stdin = std::io::stdin();
+    let mut stdout = std::io::stdout().lock();
+    for line in stdin.lock().lines() {
+        let line = line.map_err(|error| {
+            ChronicleError::Process(format!("failed to read embedding worker request: {error}"))
+        })?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let request_id = serde_json::from_str::<serde_json::Value>(&line)
+            .ok()
+            .and_then(|value| value.get("id").and_then(|id| id.as_str()).map(str::to_owned))
+            .unwrap_or_default();
+        let response = if line.len() > MAX_LINE_BYTES {
+            WorkerResponse::Failure {
+                id: request_id,
+                ok: false,
+                error: WorkerError {
+                    message: format!("embedding worker request exceeds {MAX_LINE_BYTES} bytes"),
+                },
+            }
+        } else {
+            match serde_json::from_str::<WorkerRequest>(&line) {
+                Ok(request)
+                    if !request.texts.is_empty()
+                        && request.texts.len() <= MAX_TEXTS
+                        && request.texts.iter().all(|text| !text.trim().is_empty()) =>
+                {
+                    let result = runtime.embedding().and_then(|model| {
+                        let embeddings = model.borrow_mut().embed_batch(
+                            &request.texts.iter().map(String::as_str).collect::<Vec<_>>(),
+                        )?;
+                        let dimensions = model.borrow().dim();
+                        Ok(EmbeddingResult {
+                            model_id: "all-MiniLM-L6-v2",
+                            model_version: "onnx-minilm-l6-v2",
+                            dimensions,
+                            embeddings,
+                        })
+                    });
+                    match result {
+                        Ok(result) => WorkerResponse::Success {
+                            id: request.id,
+                            ok: true,
+                            result,
+                        },
+                        Err(error) => WorkerResponse::Failure {
+                            id: request.id,
+                            ok: false,
+                            error: WorkerError {
+                                message: error.to_string(),
+                            },
+                        },
+                    }
+                }
+                Ok(request) => WorkerResponse::Failure {
+                    id: request.id,
+                    ok: false,
+                    error: WorkerError {
+                        message: format!(
+                            "embedding worker requests require 1-{MAX_TEXTS} non-empty texts"
+                        ),
+                    },
+                },
+                Err(error) => WorkerResponse::Failure {
+                    id: request_id,
+                    ok: false,
+                    error: WorkerError {
+                        message: format!("invalid embedding worker request: {error}"),
+                    },
+                },
+            }
+        };
+        serde_json::to_writer(&mut stdout, &response).map_err(|error| {
+            ChronicleError::Process(format!(
+                "failed to serialize embedding worker response: {error}"
+            ))
+        })?;
+        stdout.write_all(b"\n").map_err(|error| {
+            ChronicleError::Process(format!("failed to write embedding worker response: {error}"))
+        })?;
+        stdout.flush().map_err(|error| {
+            ChronicleError::Process(format!("failed to flush embedding worker response: {error}"))
+        })?;
+    }
+    Ok(String::new())
 }
 
 fn run_pii_redaction() -> Result<String, ChronicleError> {

@@ -1,6 +1,9 @@
 import type { BackendRunSnapshotEvent } from '@cradle/db'
-import { backendRunSnapshotEvents } from '@cradle/db'
-import { eq } from 'drizzle-orm'
+import {
+  backendRunSnapshotEvents,
+  backendRunSnapshots,
+} from '@cradle/db'
+import { eq, inArray } from 'drizzle-orm'
 
 import type { db } from '../../infra'
 import { registerBeforeDatabaseShutdown } from '../../infra'
@@ -34,6 +37,14 @@ interface SnapshotFlushContext {
 interface SnapshotFlushOptions<Result> {
   compactSuccessfulPayloads?: (result: Result | undefined) => boolean
   finalSnapshot?: boolean
+}
+
+interface PreparedSnapshotEventInserts {
+  events: BackendRunSnapshotEvent[]
+  dropped: Array<{
+    event: BackendRunSnapshotEvent
+    reason: 'snapshot-missing'
+  }>
 }
 
 const logger = createChildLogger({ module: 'chat-runtime.run-snapshot-journal' })
@@ -148,10 +159,18 @@ export function releaseRunSnapshotContext(database: SnapshotDatabase, snapshotId
   if (!journal) {
     return
   }
+  for (const [eventId, event] of journal.pendingInserts) {
+    if (event.snapshotId === snapshotId) {
+      journal.pendingInserts.delete(eventId)
+      journal.pendingUpdates.delete(eventId)
+      journal.eventById.delete(eventId)
+    }
+  }
   journal.workspaceBySnapshotId.delete(snapshotId)
   journal.persistedSnapshotIds.delete(snapshotId)
   for (const [eventId, event] of journal.eventById) {
     if (event.snapshotId === snapshotId) {
+      journal.pendingUpdates.delete(eventId)
       journal.eventById.delete(eventId)
     }
   }
@@ -207,14 +226,19 @@ function flushJournal<Result>(
     .filter(([eventId]) =>
       snapshotId === undefined || journal.eventById.get(eventId)?.snapshotId === snapshotId)
   let result: Result | undefined
+  let droppedEvents: PreparedSnapshotEventInserts['dropped'] = []
+  let persistedInserts: BackendRunSnapshotEvent[] = []
   journal.database.transaction((tx) => {
     result = withinTransaction?.(tx, {
       hadPreviouslyPersistedEvents: snapshotId !== undefined
         && journal.persistedSnapshotIds.has(snapshotId),
     })
-    const persistedInserts = options.compactSuccessfulPayloads?.(result)
+    const compactedInserts = options.compactSuccessfulPayloads?.(result)
       ? inserts.map(compactSuccessfulSnapshotEvent)
       : inserts
+    const prepared = prepareSnapshotEventInserts(tx, compactedInserts)
+    droppedEvents = prepared.dropped
+    persistedInserts = prepared.events
     for (let offset = 0; offset < persistedInserts.length; offset += INSERT_BATCH_SIZE) {
       tx.insert(backendRunSnapshotEvents)
         .values(persistedInserts.slice(offset, offset + INSERT_BATCH_SIZE))
@@ -226,7 +250,12 @@ function flushJournal<Result>(
         .where(eq(backendRunSnapshotEvents.id, eventId))
         .run()
     }
-    for (const event of inserts) {
+    const persistedEventById = new Map(persistedInserts.map(event => [event.id, event]))
+    for (const insert of inserts) {
+      const event = persistedEventById.get(insert.id)
+      if (!event) {
+        continue
+      }
       projectChatRuntimeRunSnapshotEventReadModels(tx, {
         sourceEvent: event,
         workspaceId: journal.workspaceBySnapshotId.get(event.snapshotId) ?? null,
@@ -242,14 +271,31 @@ function flushJournal<Result>(
       }
     }
   })
+  for (const dropped of droppedEvents) {
+    logger.warn('dropping run snapshot event with missing snapshot parent', {
+      eventId: dropped.event.id,
+      snapshotId: dropped.event.snapshotId,
+      chatSessionId: dropped.event.chatSessionId,
+      runId: dropped.event.runId,
+      reason: dropped.reason,
+    })
+  }
   for (const event of inserts) {
     journal.pendingInserts.delete(event.id)
+    const persistedEvent = persistedInserts.find(candidate => candidate.id === event.id)
+    if (persistedEvent) {
+      journal.eventById.set(event.id, persistedEvent)
+    }
+    else {
+      journal.eventById.delete(event.id)
+      journal.pendingUpdates.delete(event.id)
+    }
   }
   for (const [eventId] of updates) {
     journal.pendingUpdates.delete(eventId)
   }
   if (!options.finalSnapshot) {
-    for (const event of inserts) {
+    for (const event of persistedInserts) {
       journal.persistedSnapshotIds.add(event.snapshotId)
     }
   }
@@ -258,6 +304,47 @@ function flushJournal<Result>(
   }
   removeJournalIfIdle(journal)
   return result
+}
+
+function prepareSnapshotEventInserts(
+  tx: SnapshotTransaction,
+  events: BackendRunSnapshotEvent[],
+): PreparedSnapshotEventInserts {
+  if (events.length === 0) {
+    return { events: [], dropped: [] }
+  }
+
+  const snapshotParents = new Map(
+    tx
+      .select({
+        id: backendRunSnapshots.id,
+        chatSessionId: backendRunSnapshots.chatSessionId,
+        runId: backendRunSnapshots.runId,
+      })
+      .from(backendRunSnapshots)
+      .where(inArray(backendRunSnapshots.id, events.map(event => event.snapshotId)))
+      .all()
+      .map(row => [row.id, row] as const),
+  )
+
+  const persisted: BackendRunSnapshotEvent[] = []
+  const dropped: PreparedSnapshotEventInserts['dropped'] = []
+  for (const event of events) {
+    const parent = snapshotParents.get(event.snapshotId)
+    if (!parent) {
+      dropped.push({ event, reason: 'snapshot-missing' })
+      continue
+    }
+    persisted.push({
+      ...event,
+      // These relationships are nullable in the schema. The snapshot parent
+      // is the canonical owner of both values, and SQLite sets them to NULL
+      // when the session or run is deleted before this event is flushed.
+      chatSessionId: parent.chatSessionId,
+      runId: parent.runId,
+    })
+  }
+  return { events: persisted, dropped }
 }
 
 function removeJournalIfIdle(journal: SnapshotJournal): void {

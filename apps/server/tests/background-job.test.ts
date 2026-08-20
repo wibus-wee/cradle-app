@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { shutdownInfra } from '../src/infra'
 import {
@@ -53,6 +53,43 @@ function restoreTestInfra(previous: TestInfraEnv): void {
 }
 
 describe('background jobs', () => {
+  it('skips writes for unchanged normalized source observations', async () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'cradle-background-job-'))
+    const previousEnv = configureIsolatedTestInfra(dataDir)
+    const sourceKind = 'background-job-stable-source'
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000)
+    registerSourceAdapter({
+      sourceKind,
+      async read() {
+        return { status: 'running', progress: { a: 1, b: 2 } }
+      },
+    })
+
+    try {
+      const created = BackgroundJob.enqueue({
+        ownerNamespace: 'background-job-stable-owner',
+        ownerResourceType: 'fixture',
+        ownerResourceId: 'fixture-stable',
+        kind: 'stable-observation',
+        sourceKind,
+        status: 'running',
+        progress: { b: 2, a: 1 },
+      })
+      now.mockReturnValue(2_000_000)
+
+      const reconciled = await BackgroundJob.reconcileOne(created.id)
+
+      expect(reconciled.updatedAt).toBe(created.updatedAt)
+      expect(reconciled.progress).toEqual({ a: 1, b: 2 })
+    }
+    finally {
+      now.mockRestore()
+      unregisterSourceAdapter(sourceKind)
+      restoreTestInfra(previousEnv)
+      rmSync(dataDir, { recursive: true, force: true })
+    }
+  })
+
   it('reconciles durable source state and retries incomplete owner projection', async () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'cradle-background-job-'))
     const previousEnv = configureIsolatedTestInfra(dataDir)

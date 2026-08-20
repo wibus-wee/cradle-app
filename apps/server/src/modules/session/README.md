@@ -6,27 +6,27 @@ Session list/get responses expose the session-requested model id as `modelId`, f
 Session exposes user title edits through `PATCH /sessions/:id`, but title persistence is projected from Chat Runtime `TitleChanged` events. Provider adapters never write Session rows directly.
 Session origin is owned by this module as coarse source metadata for list and search filtering. Ordinary sessions default to `manual`; workflow-owned callers may set broad origins such as `automation`, `cradle-review`, or `cradle-issue`. Detailed lifecycle records stay in the owning workflow namespace, for example diff-review guide or agent-fix rows that link back by session id and run id.
 Side chat parentage is stored on Session rows through `parentSessionId` and `sideContextSource`, but side chat creation semantics are owned by Chat Runtime. Session only persists the relationship and exposes it to list/get responses so renderers can navigate and future lifecycle policies can reason about side children without writing into provider namespaces.
-Session lists default to active rows (`archivedAt` is null) sorted by latest user message time, falling back to session creation time before a user turn exists. Pass `archived=true` to list archived rows without deleting session-owned messages, usage, or runtime binding history. Archiving runs pre-archive lifecycle hooks before the archive fact is persisted, then emits archive hooks so runtime owners can release live resources while preserving persisted session history. Pre-archive hooks may reject archival when their owned cleanup cannot complete; Work uses this to remove its managed checkout before its primary Session is archived.
+Session lists return `{ items, nextCursor }`, default to 100 active rows, and cap `limit` at 200. The opaque cursor preserves the latest-user-message ordering (falling back to session creation time before a user turn exists). Requested model, latest run status, message activity, Worktree isolation, and remote execution are projected with page-bounded set reads instead of per-Session database lookups. Listing never starts remote title synchronization; point reads may still request that best-effort refresh. Pass `archived=true` to list archived rows without deleting session-owned messages, usage, or runtime binding history. Archiving runs pre-archive lifecycle hooks before the archive fact is persisted, then emits archive hooks so runtime owners can release live resources while preserving persisted session history. Pre-archive hooks may reject archival when their owned cleanup cannot complete; Work uses this to remove its managed checkout before its primary Session is archived.
 
-## Remote session projection
+## Node session projection
 
-Sessions created on a workspace mounted from a remote Cradle Server host are **local projections** linked to the authoritative remote session through `remote_session_links`. List/get responses expose `execution.kind`:
+Sessions created on a workspace mounted from a Fabric Node are **local projections** linked to the authoritative Node session through `node_session_links`. List/get responses expose `execution.kind`:
 
 - `local` — chat runs on this Cradle Server through Chat Runtime.
-- `remote-host` — chat runs on the linked remote host; local Chat Runtime hard-rejects these sessions with `chat_session_executes_on_remote_host` (HTTP 409).
+- `node` — chat runs on the linked Node; local Chat Runtime hard-rejects these sessions with `chat_session_executes_on_fabric_node` (HTTP 409).
 
 Creating a projection:
 
 1. Resolve the remote workspace id from `locator.sourceWorkspaceId` or upstream workspace list + path match.
-2. `POST` the remote session through the plan 032 upstream gateway (`ensureRemoteHostConnected` + `upstreamJsonByBaseUrl`).
-3. Insert the local `sessions` row and `remote_session_links` mapping `{ hostId, remoteSessionId, remoteWorkspaceId }`.
+2. `POST` the Node session through the Fabric link manager and its local encrypted tunnel endpoint.
+3. Insert the local `sessions` row and `node_session_links` mapping `{ nodeId, remoteSessionId, remoteWorkspaceId }`.
 
 Deleting a local projection (`DELETE /sessions/:id`) **cascades** to `DELETE` the remote session upstream first. If upstream delete fails, the local projection and link remain and the API returns an error — no silent orphan cleanup.
 
 Linked chat traffic for **all** `/chat/sessions/:sessionId/*` paths is intercepted by
 `linkedChatSessionProxyPlugin` (mounted in `app.ts`) and forwarded through
-`/remote-hosts/:hostId/upstream/*` with `remoteSessionId` substituted. Non-session chat
-routes (composer drafts, global catalogs) stay local. See `session/remote-projection.ts`
+`/nodes/:nodeId/upstream/*` with `remoteSessionId` substituted. Non-session chat
+routes (composer drafts, global catalogs) stay local. See `session/node-projection.ts`
 and Chat Runtime `http/linked-session-proxy.ts`.
 
 Provider targets for remote projections are owned by the remote server. The web

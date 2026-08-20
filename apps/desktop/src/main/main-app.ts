@@ -81,12 +81,7 @@ import {
   syncAllDesktopLayerSources,
 } from './plugin-source-sync'
 import { QuitGuard } from './quit-guard'
-import {
-  getDesktopServerAuthHeaders,
-  getDesktopServerAuthToken,
-  startServer,
-  stopServer,
-} from './server-process'
+import { startServer, stopServer } from './server-process'
 import { TrayManager } from './tray-manager'
 import { DesktopUpdateManager } from './update-manager'
 import { WindowManager } from './window-manager'
@@ -216,14 +211,13 @@ async function createMainWindow(): Promise<BrowserWindow> {
     backgroundColor: windowControlsOverlay.color,
     titleBarOverlay: isMacOS ? true : windowControlsOverlay,
     ...(isMacOS && { trafficLightPosition: resolveTrafficLightPosition(windowControlsSafeArea) }),
-    webPreferences: {
+      webPreferences: {
       preload: resolveDesktopPreloadPath(__dirname),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       webviewTag: true,
       additionalArguments: [
-        `--server-auth-token=${getDesktopServerAuthToken()}`,
         `--browser-panel-preload-url=${resolveDesktopBrowserPanelPreloadUrl(__dirname)}`,
       ],
     },
@@ -598,9 +592,7 @@ async function applyAppshotHotkeyPreference(
 
 async function syncDesktopPreferencesFromServer(serverUrl: string): Promise<void> {
   try {
-    const response = await fetch(new URL('/preferences/desktop', serverUrl), {
-      headers: getDesktopServerAuthHeaders(),
-    })
+    const response = await fetch(new URL('/preferences/desktop', serverUrl))
     if (!response.ok) {
       await applyAppshotHotkeyPreference(true)
       updateManager?.configurePreferences({
@@ -667,6 +659,7 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
   notificationCenterManager = new NotificationCenterManager({
     serverUrl,
     chatStreamBroker,
+    chatEventTailBroker,
     getMainWindow: () => mainWindow,
   })
   notificationCenterManager.start()

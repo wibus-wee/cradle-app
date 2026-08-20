@@ -4,6 +4,7 @@ import type { UIMessageChunk } from 'ai'
 import { readPositiveIntegerEnv } from '../../../helpers/env'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
+import { projectChatChunkForClient } from '../client-message-projection'
 import { externalizeMessageBlobs } from '../message-blob-externalization'
 import { toDurableMessagePayload } from '../message-durable-payload'
 import {
@@ -238,9 +239,18 @@ export function createActiveRunStreamController(
     chunk: UIMessageChunk,
     terminal: boolean,
   ): void {
-    const publishedChunk = !terminal && chunk.type === 'file'
+    const durableChunk = !terminal && chunk.type === 'file'
       ? externalizeLiveFileChunk(activeRun, chunk)
       : chunk
+
+    if (!terminal && durableChunk.type !== 'file') {
+      projectFinalMessageChunk(activeRun, chunk)
+    }
+
+    const publishedChunk = projectChatChunkForClient(durableChunk)
+    if (!publishedChunk) {
+      return
+    }
 
     if (publishedChunk.type === 'start') {
       activeRun.startChunkPublished = true
@@ -263,11 +273,6 @@ export function createActiveRunStreamController(
       })
     }
 
-    if (!terminal) {
-      if (publishedChunk.type !== 'file') {
-        projectFinalMessageChunk(activeRun, publishedChunk)
-      }
-    }
     activeRun.runChunkSequencer.publish(publishedChunk, terminal)
     runSubscribers.publish(activeRun.runId, publishedChunk, terminal)
   }

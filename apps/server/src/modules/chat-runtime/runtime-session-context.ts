@@ -23,7 +23,7 @@ import {
   resolveProviderRuntimeSession,
 } from '../provider-runtime/service'
 import { getProviderTarget, resolveProviderTargetForRuntime } from '../provider-targets/service'
-import { getRemoteSessionLink } from '../session/remote-projection'
+import { getNodeSessionLink } from '../session/node-projection'
 import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'
 import { assertIsolationExecutionReady, resolveSessionExecutionRoot } from '../worktree/service'
@@ -55,6 +55,7 @@ export interface SessionRunContext {
   workspacePath: string
   profile: RuntimeProviderTargetProfile | null
   providerTarget: { id: string, kind: 'manual' | 'external' } | null
+  effectiveModelId: string | null
 }
 
 export type ProviderBoundSessionRunContext = SessionRunContext & {
@@ -82,14 +83,14 @@ export function assertProviderBoundRunContext(
 
 export function getSessionRunContext(
   sessionId: string,
-  input: { providerTargetId?: string } = {},
+  input: { providerTargetId?: string, modelId?: string | null } = {},
 ): SessionRunContext | null {
   const session = db().select().from(sessions).where(eq(sessions.id, sessionId)).get()
   if (!session) {
     return null
   }
-  const remoteLink = getRemoteSessionLink(sessionId)
-  if (remoteLink) {
+  const nodeLink = getNodeSessionLink(sessionId)
+  if (nodeLink) {
     return null
   }
   assertIsolationExecutionReady(session)
@@ -118,6 +119,7 @@ export function getSessionRunContext(
       workspacePath: workspacePath ?? '',
       profile: null,
       providerTarget: null,
+      effectiveModelId: null,
     }
   }
   const runtime = getRuntimeRegistry().get(runtimeKind)
@@ -146,6 +148,7 @@ export function getSessionRunContext(
         workspacePath: workspacePath ?? '',
         profile: null,
         providerTarget: null,
+        effectiveModelId: null,
       }
     }
     if (runtime?.metadata.providerBinding === 'none') {
@@ -158,12 +161,13 @@ export function getSessionRunContext(
         workspacePath: workspacePath ?? '',
         profile,
         providerTarget: null,
+        effectiveModelId: null,
       }
     }
     return null
   }
 
-  const resolvedTarget = resolveProviderTargetForRuntime(providerTarget, runtimeKind)
+  const resolvedTarget = resolveProviderTargetForRuntime(providerTarget, runtimeKind, input.modelId)
   const profileConfig = parseJsonObject(resolvedTarget.configJson)
   const targetModelRegistryConfig = {
     modelRegistryMappings: ModelRegistry.listMappingEntries(),
@@ -191,6 +195,7 @@ export function getSessionRunContext(
     workspacePath: workspacePath ?? '',
     profile: effectiveProfile,
     providerTarget: resolvedTarget.target,
+    effectiveModelId: resolvedTarget.effectiveModelId,
   }
 }
 
@@ -292,7 +297,7 @@ export async function resolveExistingRuntimeSessionForContext(input: {
     profile: input.context.profile,
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
-    modelId: input.modelId,
+    modelId: input.context.effectiveModelId ?? input.modelId,
   })
   return resolution
     ? {
@@ -321,7 +326,7 @@ export async function resolveRuntimeSessionForContext(input: {
     profile: input.context.profile,
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
-    modelId: input.modelId,
+    modelId: input.context.effectiveModelId ?? input.modelId,
   })
   try {
     validateResolvedRuntimeSessionContext({
@@ -349,7 +354,7 @@ export async function resolveRuntimeSessionForContext(input: {
   }
   return {
     runtimeSession: resolution.runtimeSession,
-    requestedModelId: resolution.requestedModelId,
+    requestedModelId: input.modelId ?? resolution.requestedModelId,
   }
 }
 
@@ -452,16 +457,16 @@ export function readSessionRequestedThinkingEffort(input: {
 }
 
 export function assertRunnableSession(sessionId: string): SessionRunContext {
-  const remoteLink = getRemoteSessionLink(sessionId)
-  if (remoteLink) {
+  const nodeLink = getNodeSessionLink(sessionId)
+  if (nodeLink) {
     throw new AppError({
-      code: 'chat_session_executes_on_remote_host',
+      code: 'chat_session_executes_on_fabric_node',
       status: 409,
-      message: 'This session executes on a remote Cradle Server; use the remote-host upstream APIs.',
+      message: 'This session executes on a Fabric Node; use the Node upstream APIs.',
       details: {
         sessionId,
-        hostId: remoteLink.hostId,
-        remoteSessionId: remoteLink.remoteSessionId,
+        nodeId: nodeLink.nodeId,
+        remoteSessionId: nodeLink.remoteSessionId,
       },
     })
   }

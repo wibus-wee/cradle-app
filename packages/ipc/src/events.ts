@@ -69,24 +69,72 @@ export interface SerializeValueOptions {
 }
 
 const DEFAULT_MAX_LENGTH = 16_384
+const MAX_PREVIEW_DEPTH = 5
+const MAX_PREVIEW_ENTRIES = 50
+const MAX_PREVIEW_NODES = 250
+const MAX_PREVIEW_STRING_LENGTH = 2_048
 
-const ValueSummarySchema = z.union([
-  z.null().transform(() => 'null'),
-  z.undefined().transform(() => 'undefined'),
-  z.array(z.unknown()).transform(value => `Array(${value.length})`),
-  z.instanceof(Error).transform(value => `${value.name}: ${value.message}`),
-  z.string().transform(value => value.length > 80 ? `${value.slice(0, 80)}…` : value),
-  z.unknown().transform((value) => {
-    const boxed = new Object(value)
-    if (boxed === value) {
-      const name = boxed.constructor?.name
-      return name && name !== 'Object'
-        ? name
-        : `Object(${Object.keys(boxed).length})`
+interface PreviewState {
+  nodes: number
+  readonly seen: WeakSet<object>
+}
+
+function boundedPreview(value: unknown, state: PreviewState, depth = 0): unknown {
+  if (typeof value === 'string') {
+    return value.length > MAX_PREVIEW_STRING_LENGTH
+      ? `${value.slice(0, MAX_PREVIEW_STRING_LENGTH)}…`
+      : value
+  }
+  if (value == null || typeof value !== 'object') {
+    return value
+  }
+  if (value instanceof Error) {
+    return {
+      name: boundedPreview(value.name, state, depth + 1),
+      message: boundedPreview(value.message, state, depth + 1),
+      stack: boundedPreview(value.stack, state, depth + 1),
     }
-    return String(value)
-  }),
-])
+  }
+  if (value instanceof Date) {
+    return value
+  }
+  if (ArrayBuffer.isView(value)) {
+    return { type: value.constructor.name, byteLength: value.byteLength }
+  }
+  if (state.seen.has(value)) {
+    return '[Circular]'
+  }
+  if (depth >= MAX_PREVIEW_DEPTH || state.nodes >= MAX_PREVIEW_NODES) {
+    return `[${value.constructor?.name ?? 'Object'}]`
+  }
+  state.seen.add(value)
+  state.nodes++
+
+  if (Array.isArray(value)) {
+    const preview = value
+      .slice(0, MAX_PREVIEW_ENTRIES)
+      .map(item => boundedPreview(item, state, depth + 1))
+    if (value.length > MAX_PREVIEW_ENTRIES) {
+      preview.push(`… ${value.length - MAX_PREVIEW_ENTRIES} more items`)
+    }
+    return preview
+  }
+
+  const preview: Record<string, unknown> = {}
+  let count = 0
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) {
+      continue
+    }
+    if (count >= MAX_PREVIEW_ENTRIES) {
+      preview['…'] = 'more properties'
+      break
+    }
+    preview[key] = boundedPreview((value as Record<string, unknown>)[key], state, depth + 1)
+    count++
+  }
+  return preview
+}
 
 function createUuid(): string {
   return globalThis.crypto.randomUUID()
@@ -136,7 +184,7 @@ export function serializePayload(
   let json = ''
 
   try {
-    json = superjson.stringify(value)
+    json = superjson.stringify(boundedPreview(value, { nodes: 0, seen: new WeakSet() }))
   }
  catch (error) {
     json = superjson.stringify({
@@ -147,7 +195,13 @@ export function serializePayload(
 
   const truncated = json.length > maxLength
   const preview = truncated ? `${json.slice(0, maxLength)}…` : json
-  const summary = summarizeValue(value)
+  let summary: string
+  try {
+    summary = summarizeValue(value)
+  }
+  catch {
+    summary = 'Unserializable value'
+  }
 
   return {
     json: preview,
@@ -176,7 +230,26 @@ export function createObservedEvent(input: Omit<IpcObservedEvent, 'id'>): IpcObs
 }
 
 export function summarizeValue(value: unknown): string {
-  return ValueSummarySchema.parse(value)
+  if (value === null) { return 'null' }
+  if (value === undefined) { return 'undefined' }
+  if (Array.isArray(value)) { return `Array(${value.length})` }
+  if (value instanceof Error) {
+    const summary = `${value.name}: ${value.message}`
+    return summary.length > 80 ? `${summary.slice(0, 80)}…` : summary
+  }
+  if (typeof value === 'string') { return value.length > 80 ? `${value.slice(0, 80)}…` : value }
+  if (typeof value !== 'object') { return String(value) }
+
+  const name = value.constructor?.name
+  if (name && name !== 'Object') { return name }
+
+  let count = 0
+  for (const key in value) {
+    if (!Object.hasOwn(value, key)) { continue }
+    count++
+    if (count > MAX_PREVIEW_ENTRIES) { return `Object(${MAX_PREVIEW_ENTRIES}+)` }
+  }
+  return `Object(${count})`
 }
 
 export function markSpanSuccess(): void {

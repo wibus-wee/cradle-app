@@ -41,7 +41,7 @@ import { openGithubRequiredDialog } from '~/features/settings/github-required-di
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
 import { useGithubAppConnected } from '~/features/settings/use-github-app-connected'
 import type { WorkSummary } from '~/features/work/use-work'
-import { useWorks, useWorkspaceWorks } from '~/features/work/use-work'
+import { useWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import type { Workspace } from '~/features/workspace/types'
 import { getLocalWorkspacePath, getWorkspaceLocationLabel, isLocalWorkspace } from '~/features/workspace/types'
@@ -271,18 +271,11 @@ const WorkspaceGroup = memo(
       ),
       shallow,
     )
-    const { data: workspaceWorks = [] } = useWorkspaceWorks(workspace.id)
-    const resolvedWorkByPrimarySessionId = useMemo(() => {
-      if (workByPrimarySessionId.size > 0) {
-        return workByPrimarySessionId
-      }
-      return new Map(workspaceWorks.map(work => [work.primarySessionId, work]))
-    }, [workByPrimarySessionId, workspaceWorks])
     const filteredSessions = useMemo(() => {
       return sessions.filter(session =>
         sessionMatchesListFilters(
           session,
-          resolvedWorkByPrimarySessionId.get(session.id) ?? null,
+          workByPrimarySessionId.get(session.id) ?? null,
           listFilters,
           locallyStreamingSessionIds,
           locallyErroredSessionIds,
@@ -292,10 +285,15 @@ const WorkspaceGroup = memo(
       listFilters,
       locallyErroredSessionIds,
       locallyStreamingSessionIds,
-      resolvedWorkByPrimarySessionId,
+      workByPrimarySessionId,
       sessionAttentionBySessionId,
       sessions,
     ])
+    const resolvedWorkByPrimarySessionId = workByPrimarySessionId
+    const workspaceWorks = useMemo(
+      () => [...workByPrimarySessionId.values()].filter(work => work.workspaceId === workspace.id),
+      [workByPrimarySessionId, workspace.id],
+    )
     const { mutateAsync: renameWorkspace } = useMutation({
       ...patchWorkspacesByWorkspaceIdMutation(),
       onSuccess: () => {

@@ -89,10 +89,6 @@ export async function requestJson(input: RequestInput): Promise<unknown> {
   if (input.body !== undefined) {
     headers['content-type'] = 'application/json'
   }
-  const authToken = process.env.CRADLE_AUTH_TOKEN?.trim()
-  if (authToken) {
-    headers['x-cradle-token'] = authToken
-  }
   const chatSessionId = process.env.CRADLE_CHAT_SESSION_ID?.trim()
   assertIssueMutationRuntimeContext(input, chatSessionId || undefined)
   if (chatSessionId) {

@@ -14,11 +14,18 @@ This file applies to everything under `e2e/`.
 ```bash
 # Prefer Node >= 22.15 for zstd (e.g. nvm use 22.22.2)
 pnpm --filter @cradle/plugin-sdk build
+pnpm --filter "./plugins/*" build
+pnpm e2e:check
 # Optional: provision native Codex app-server for Codex essence scenarios
 pnpm --filter @cradle/desktop sync:codex-runtime
+pnpm exec playwright install chromium-headless-shell
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0 or @P1"
 ```
+
+`CRADLE_E2E_NODE` may point the managed server at a repository-compatible Node
+binary. `CRADLE_E2E_BROWSER_PATH` may point local runs at an existing Chromium
+executable; CI installs the Playwright-pinned browser instead.
 
 ## CI gate
 
@@ -26,6 +33,10 @@ pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0 or @P1"
   (`e2e/**`, `packages/model-api-simulator/**`, `apps/web/**`, `apps/server/**`, …)
   **or** when the `e2e` label is present (force / keep running).
 - Always checks out the **PR head**, provisions Codex via `sync:codex-runtime`.
+- Both workflows run `pnpm e2e:check` before expensive builds and browser setup.
+- PR full E2E: add the `e2e-full` label to a PR. The existing PR workflow then
+  runs the exact PR head with `@P0 or @P1`; while the label remains, later pushes
+  continue to run the full suite. Failures are commented on the PR with artifacts.
 - Daily (`e2e-daily.yml`) defaults to **`@P0 or @P1`** (full active priority suite).
   Failures open a GitHub Issue labeled `daily-e2e-failure` assigned to `wibus-wee`.
 - Tag model:
@@ -78,5 +89,6 @@ Daily/smoke CI uploads all of the above and links them from the failure Issue / 
 
 ## Scenario Scope
 
-- `P0`: smoke — core chat, Claude approval, Codex one-shot, workspace/kanban entry
+- `P0`: smoke — onboarding, core chat/queue recovery, Claude approval, Codex rollback,
+  Work isolation, and Issue delegation/rerun/cancellation
 - `P1`: recovery, settings, agent identity, tabs, session lifecycle, search/git/terminal, side paths

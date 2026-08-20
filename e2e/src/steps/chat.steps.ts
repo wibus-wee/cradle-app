@@ -12,8 +12,10 @@ import {
   configureCodexQuickQuestionSimulator,
   configureCodexRollbackSimulator,
   configureDefaultAiReply,
+  configureDurableQueueClaudeAgentSimulator,
   configureFailingClaudeAgentSimulator,
   configureFileContextSimulator,
+  configureManagedQueueClaudeAgentSimulator,
   configureMultiTurnClaudeAgentSimulator,
   configureReadToolLoopSimulator,
   configureSlowGatedClaudeAgentSimulator,
@@ -33,6 +35,7 @@ import {
   fillChatComposerWithNextReply,
   navigateToNewChatWithSimulator,
   openToolCall,
+  QUEUED_RESPONSE,
   recallSessionAlias,
   releaseSlowStreamGate,
   renameRememberedSession,
@@ -68,6 +71,14 @@ Given('我已配置停止后可恢复的慢速 Claude Agent Simulator', async fu
   await configureStoppableClaudeAgentSimulator(this)
 })
 
+Given('我已配置可持久化队列的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureDurableQueueClaudeAgentSimulator(this)
+})
+
+Given('我已配置可管理队列的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureManagedQueueClaudeAgentSimulator(this)
+})
+
 Given('我已配置会失败的 Claude Agent Simulator', async function (this: CradleWorld) {
   await configureFailingClaudeAgentSimulator(this)
 })
@@ -96,8 +107,9 @@ When('我在新建聊天中提及文件{string}并输入{string}', async functio
   const editor = this.newChat.textBox()
   await editor.click()
   await editor.fill(`@${path}`)
-  await expect(this.page.getByText(path, { exact: true }).last()).toBeVisible({ timeout: 15_000 })
-  await this.page.keyboard.press('Enter')
+  const mentionOption = this.newChat.entry().getByRole('button', { name: path, exact: true }).last()
+  await expect(mentionOption).toBeVisible({ timeout: 15_000 })
+  await mentionOption.click()
   await expect(editor.locator(`[data-file-mention-path="${path}"]`)).toBeVisible({ timeout: 10_000 })
   await editor.pressSequentially(` ${prompt}`)
 })
@@ -259,13 +271,36 @@ Then('聊天中不应出现错误提示', async function (this: CradleWorld) {
 })
 
 Then('跟进消息{string}应显示在聊天队列中', async function (this: CradleWorld, text: string) {
-  const queueList = this.page.locator('[data-testid="chat-queue-list"]')
-  await expect(queueList).toBeVisible({ timeout: 10_000 })
-  await expect(queueList.locator('[data-testid="chat-queue-item"]').filter({ hasText: text })).toBeVisible({ timeout: 10_000 })
+  await this.chat.expectQueued(text)
+})
+
+Then('持久化队列跟进应完成', async function (this: CradleWorld) {
+  await this.chat.expectAssistantContains(QUEUED_RESPONSE, CHAT_STATUS_TIMEOUT)
 })
 
 Then('聊天队列中不应显示跟进消息{string}', async function (this: CradleWorld, text: string) {
-  await expect(this.page.locator('[data-testid="chat-queue-item"]').filter({ hasText: text })).toHaveCount(0, { timeout: CHAT_STATUS_TIMEOUT })
+  await this.chat.expectNotQueued(text)
+})
+
+When('我将跟进消息{string}加入聊天队列', async function (this: CradleWorld, text: string) {
+  await this.chat.fillAndSend(text)
+  await this.chat.expectQueued(text)
+})
+
+When('我将队列跟进消息{string}编辑为{string}', async function (this: CradleWorld, currentText: string, nextText: string) {
+  await this.chat.editQueuedMessage(currentText, nextText)
+})
+
+When('我将队列跟进消息{string}上移', async function (this: CradleWorld, text: string) {
+  await this.chat.moveQueuedMessageUp(text)
+})
+
+When('我取消队列跟进消息{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.cancelQueuedMessage(text)
+})
+
+Then('聊天队列顺序应为:', async function (this: CradleWorld, table: DataTable) {
+  await this.chat.expectQueueOrder(table.raw().flat())
 })
 
 Then('聊天流应处于进行中', async function (this: CradleWorld) {

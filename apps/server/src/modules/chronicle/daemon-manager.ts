@@ -1,4 +1,4 @@
-import { execSync, spawnSync } from 'node:child_process'
+import { execSync } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -8,12 +8,15 @@ import { z } from 'zod'
 import { getServerConfig } from '../../infra'
 import type { ManagedChildProcess } from '../../infra/managed-process'
 import { spawnManagedProcess } from '../../infra/managed-process'
+import type { ChronicleEmbeddingBatch } from './inference-worker'
+import { SupervisedChronicleInferenceWorker } from './inference-worker'
 
 let chronicleProcess: ManagedChildProcess | null = null
 let lastExitCode: number | null = null
 let lastExitAt: number | null = null
 let currentOptions: ChronicleDaemonOptions | null = null
 let pendingRestartOptions: ChronicleDaemonOptions | null = null
+let embeddingWorker: SupervisedChronicleInferenceWorker | null = null
 
 export interface ChronicleDaemonOptions {
   storageRoot: string
@@ -115,51 +118,23 @@ function findChronicleBinary(): string {
   return 'cradle-chronicle'
 }
 
-export interface ChronicleEmbeddingBatch {
-  modelId: string
-  modelVersion: string
-  dimensions: number
-  embeddings: number[][]
-}
-
-const ChronicleEmbeddingBatchJsonSchema = z.string()
-  .transform(raw => JSON.parse(raw))
-  .pipe(z.object({
-    modelId: z.string(),
-    modelVersion: z.string(),
-    dimensions: z.number(),
-    embeddings: z.array(z.array(z.number())),
-  }))
-
-export function runEmbeddingBatch(
-  texts: string[],
+export async function runEmbeddingBatch(
+  texts: readonly string[],
   modelsRoot: string,
-  options: { timeoutMs?: number } = {},
-): ChronicleEmbeddingBatch {
-  const binary = findChronicleBinary()
-  const input = JSON.stringify({ texts })
+  options: { signal?: AbortSignal, timeoutMs?: number } = {},
+): Promise<ChronicleEmbeddingBatch> {
   const embeddingOptions = EmbeddingBatchOptionsSchema.parse(options)
-  const result = spawnSync(binary, ['--embed-texts'], {
-    input,
-    encoding: 'utf8',
-    env: buildChronicleEnv({
-      CRADLE_MODELS_DIR: modelsRoot,
-      CRADLE_CHRONICLE_LOCAL_DIAGNOSTIC_TIMEOUT_MS: String(embeddingOptions.timeoutMs),
-    }),
-    timeout: embeddingOptions.timeoutMs + 1_000,
-    maxBuffer: 64 * 1024 * 1024,
+  if (!embeddingWorker) {
+    embeddingWorker = new SupervisedChronicleInferenceWorker({
+      command: findChronicleBinary(),
+      args: ['--embedding-worker'],
+      env: buildChronicleEnv({ CRADLE_MODELS_DIR: modelsRoot }),
+    })
+  }
+  return embeddingWorker.embed(texts, {
+    signal: options.signal,
+    timeoutMs: embeddingOptions.timeoutMs,
   })
-  if (result.error) {
-    throw result.error
-  }
-  if (result.status !== 0) {
-    throw new Error(result.stderr.trim() || `cradle-chronicle embedding exited with ${result.status}`)
-  }
-  const parsed = ChronicleEmbeddingBatchJsonSchema.parse(result.stdout) satisfies ChronicleEmbeddingBatch
-  if (parsed.embeddings.length !== texts.length) {
-    throw new Error('cradle-chronicle embedding response has an invalid embedding count')
-  }
-  return parsed
 }
 
 function buildChronicleEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
@@ -367,7 +342,16 @@ async function stopCurrentDaemon(): Promise<void> {
 }
 
 export async function cleanup(): Promise<void> {
-  await stopDaemon()
+  await Promise.all([
+    stopDaemon(),
+    resetEmbeddingWorker(),
+  ])
+}
+
+export async function resetEmbeddingWorker(): Promise<void> {
+  const worker = embeddingWorker
+  embeddingWorker = null
+  await worker?.stop()
 }
 
 function readManagedProcessPid(child: ManagedChildProcess): number | null {

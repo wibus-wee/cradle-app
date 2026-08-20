@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "268446c0-4a9b-4de0-8123-ac1b64164c4d",
+  "id": "5ae2aec9-eff2-49d2-99f4-aac7a78d0452",
   "prevId": "23476902-1010-4ac1-af21-2174b080e289",
   "tables": {
     "acp_agents": {
@@ -17032,14 +17032,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "acceptance_criteria_json": {
-          "name": "acceptance_criteria_json",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
         },
         "linked_issue_id": {
           "name": "linked_issue_id",

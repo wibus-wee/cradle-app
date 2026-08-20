@@ -8,7 +8,6 @@ import * as ReactDOMClient from 'react-dom/client'
 import { AppErrorBoundary } from './components/common/app-error-boundary'
 import { resolveInitialLocale } from './i18n/browser-locale'
 import { I18nProvider } from './i18n/client'
-import { bootstrapBrowserAuthSession } from './lib/server-credential'
 import { waitForServer } from './lib/server-readiness'
 
 // Expose shared React modules for plugin runtime
@@ -51,13 +50,11 @@ function showBootstrapError(error: unknown): void {
 }
 
 async function startApp(): Promise<void> {
-  const [RootApplication, serverUrl] = await Promise.all([
+  const [RootApplication] = await Promise.all([
     applicationPromise,
     waitForServer(),
     stylesheetPromise,
   ])
-  const authPromise = bootstrapBrowserAuthSession(serverUrl)
-
   ReactDOMClient.createRoot(document.getElementById('app')!).render(
     <React.StrictMode>
       <AppErrorBoundary>
@@ -81,7 +78,6 @@ async function startApp(): Promise<void> {
         perfMonitor.initPerfMonitor()
         reactDiagnostics.initializeReactDiagnostics()
         rendererDiagnostics.installRendererDiagnostics()
-        await authPromise
         await pluginHost.loadWebPlugins()
         await pluginHost.startPluginDevSessionWatcher()
       })

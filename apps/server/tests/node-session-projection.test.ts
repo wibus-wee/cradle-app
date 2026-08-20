@@ -5,14 +5,27 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { remoteSessionLinks, sessions } from '@cradle/db'
+import { nodeSessionLinks, sessions } from '@cradle/db'
 import { eq } from 'drizzle-orm'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { db, shutdownInfra } from '../src/infra'
 import { assertRunnableSession } from '../src/modules/chat-runtime/runtime-session-context'
-import { getRemoteSessionLink } from '../src/modules/session/remote-projection'
+import { getNodeSessionLink } from '../src/modules/session/node-projection'
+
+const fabricNodeLinkTestState = vi.hoisted(() => ({ baseUrl: null as string | null }))
+
+vi.mock('../src/modules/relay-transport/node-link-manager', () => ({
+  getFabricNodeLinkManager: () => ({
+    ensure: async () => {
+      if (!fabricNodeLinkTestState.baseUrl) {
+        throw new Error('fake Fabric Node link has not been configured')
+      }
+      return { localBaseUrl: fabricNodeLinkTestState.baseUrl }
+    },
+  }),
+}))
 
 type ElysiaApp = Awaited<ReturnType<typeof createServerApp>>
 
@@ -91,6 +104,10 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
       writeJson(response, [workspace])
       return
     }
+    if (url.pathname === '/workspaces/resolve') {
+      writeJson(response, url.searchParams.get('path') === '/missing/project' ? null : workspace)
+      return
+    }
     if (url.pathname === '/sessions' && request.method === 'POST') {
       readJsonBody(request).then((body) => {
         const payload = body as {
@@ -166,8 +183,10 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
     })
   })
   const address = server.address() as AddressInfo
+  const baseUrl = `http://127.0.0.1:${address.port}`
+  fabricNodeLinkTestState.baseUrl = baseUrl
   return {
-    baseUrl: `http://127.0.0.1:${address.port}`,
+    baseUrl,
     state,
     close: () => closeServer(server),
   }
@@ -206,29 +225,6 @@ function closeServer(server: Server): Promise<void> {
   })
 }
 
-async function createDirectUrlHost(app: ElysiaApp, hostId: string, baseUrl: string): Promise<void> {
-  const createRes = await app.handle(new Request('http://localhost/remote-hosts', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      id: hostId,
-      displayName: hostId,
-      connectionConfig: {
-        transport: 'direct-url',
-        baseUrl,
-      },
-    }),
-  }))
-  expect(createRes.status).toBe(200)
-}
-
-async function connectHost(app: ElysiaApp, hostId: string): Promise<void> {
-  const connectRes = await app.handle(new Request(`http://localhost/remote-hosts/${hostId}/cradle-server/connect`, {
-    method: 'POST',
-  }))
-  expect(connectRes.status).toBe(200)
-}
-
 async function createRemoteMountedWorkspace(app: ElysiaApp, hostId: string, path = '/remote/project'): Promise<string> {
   const createWorkspaceRes = await app.handle(new Request('http://localhost/workspaces', {
     method: 'POST',
@@ -247,12 +243,13 @@ async function createRemoteMountedWorkspace(app: ElysiaApp, hostId: string, path
   return workspace.id
 }
 
-describe('remote session projection', () => {
+describe('node session projection', () => {
   let fakeRemote: FakeRemoteCradleServer | null = null
 
   afterEach(async () => {
     await fakeRemote?.close()
     fakeRemote = null
+    fabricNodeLinkTestState.baseUrl = null
     shutdownInfra()
   })
 
@@ -264,9 +261,7 @@ describe('remote session projection', () => {
     try {
       fakeRemote = await startFakeRemoteCradleServer()
       app = await createAppWithDataDir(dataDir)
-      await createDirectUrlHost(app, 'remote-host-projection', fakeRemote.baseUrl)
-      await connectHost(app, 'remote-host-projection')
-      const workspaceId = await createRemoteMountedWorkspace(app, 'remote-host-projection')
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-projection')
 
       const createRes = await app.handle(new Request('http://localhost/sessions', {
         method: 'POST',
@@ -284,15 +279,15 @@ describe('remote session projection', () => {
       expect(createRes.status).toBe(200)
       const session = await createRes.json() as { id: string, execution: { kind: string, remoteSessionId?: string } }
       expect(session.execution).toEqual({
-        kind: 'remote-host',
-        hostId: 'remote-host-projection',
+        kind: 'node',
+        nodeId: 'node-projection',
         remoteSessionId: 'remote-session-1',
       })
       expect(session.id).not.toBe('remote-session-1')
 
-      const link = getRemoteSessionLink(session.id)
+      const link = getNodeSessionLink(session.id)
       expect(link).toEqual(expect.objectContaining({
-        hostId: 'remote-host-projection',
+        nodeId: 'node-projection',
         remoteSessionId: 'remote-session-1',
         remoteWorkspaceId: 'remote-workspace-1',
       }))
@@ -321,9 +316,7 @@ describe('remote session projection', () => {
     try {
       fakeRemote = await startFakeRemoteCradleServer()
       app = await createAppWithDataDir(dataDir)
-      await createDirectUrlHost(app, 'remote-host-reject', fakeRemote.baseUrl)
-      await connectHost(app, 'remote-host-reject')
-      const workspaceId = await createRemoteMountedWorkspace(app, 'remote-host-reject')
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-reject')
 
       const createRes = await app.handle(new Request('http://localhost/sessions', {
         method: 'POST',
@@ -333,7 +326,7 @@ describe('remote session projection', () => {
       const session = await createRes.json() as { id: string }
 
       expect(() => assertRunnableSession(session.id)).toThrowError(expect.objectContaining({
-        code: 'chat_session_executes_on_remote_host',
+        code: 'chat_session_executes_on_fabric_node',
       }))
     }
     finally {
@@ -350,9 +343,7 @@ describe('remote session projection', () => {
     try {
       fakeRemote = await startFakeRemoteCradleServer()
       app = await createAppWithDataDir(dataDir)
-      await createDirectUrlHost(app, 'remote-host-chat', fakeRemote.baseUrl)
-      await connectHost(app, 'remote-host-chat')
-      const workspaceId = await createRemoteMountedWorkspace(app, 'remote-host-chat')
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-chat')
 
       const createRes = await app.handle(new Request('http://localhost/sessions', {
         method: 'POST',
@@ -384,9 +375,7 @@ describe('remote session projection', () => {
     try {
       fakeRemote = await startFakeRemoteCradleServer()
       app = await createAppWithDataDir(dataDir)
-      await createDirectUrlHost(app, 'remote-host-passthrough', fakeRemote.baseUrl)
-      await connectHost(app, 'remote-host-passthrough')
-      const workspaceId = await createRemoteMountedWorkspace(app, 'remote-host-passthrough')
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-passthrough')
 
       const createRes = await app.handle(new Request('http://localhost/sessions', {
         method: 'POST',
@@ -431,9 +420,7 @@ describe('remote session projection', () => {
     try {
       fakeRemote = await startFakeRemoteCradleServer()
       app = await createAppWithDataDir(dataDir)
-      await createDirectUrlHost(app, 'remote-host-delete', fakeRemote.baseUrl)
-      await connectHost(app, 'remote-host-delete')
-      const workspaceId = await createRemoteMountedWorkspace(app, 'remote-host-delete')
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-delete')
 
       const createRes = await app.handle(new Request('http://localhost/sessions', {
         method: 'POST',
@@ -448,7 +435,7 @@ describe('remote session projection', () => {
       expect(deleteRes.status).toBe(200)
       expect(fakeRemote.state.deletedSessionIds).toContain('remote-session-1')
       expect(db().select().from(sessions).where(eq(sessions.id, session.id)).get()).toBeUndefined()
-      expect(db().select().from(remoteSessionLinks).where(eq(remoteSessionLinks.localSessionId, session.id)).get()).toBeUndefined()
+      expect(db().select().from(nodeSessionLinks).where(eq(nodeSessionLinks.localSessionId, session.id)).get()).toBeUndefined()
     }
     finally {
       rmSync(dataDir, { recursive: true, force: true })
@@ -464,9 +451,7 @@ describe('remote session projection', () => {
     try {
       fakeRemote = await startFakeRemoteCradleServer()
       app = await createAppWithDataDir(dataDir)
-      await createDirectUrlHost(app, 'remote-host-delete-fail', fakeRemote.baseUrl)
-      await connectHost(app, 'remote-host-delete-fail')
-      const workspaceId = await createRemoteMountedWorkspace(app, 'remote-host-delete-fail')
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-delete-fail')
 
       const localSessionId = 'local-projection-delete-fail'
       db().insert(sessions).values({
@@ -477,9 +462,9 @@ describe('remote session projection', () => {
         runtimeKind: 'standard',
         configJson: '{}',
       }).run()
-      db().insert(remoteSessionLinks).values({
+      db().insert(nodeSessionLinks).values({
         localSessionId,
-        hostId: 'remote-host-delete-fail',
+        nodeId: 'node-delete-fail',
         remoteSessionId: 'remote-session-fail-delete',
         remoteWorkspaceId: 'remote-workspace-1',
       }).run()
@@ -504,9 +489,7 @@ describe('remote session projection', () => {
     try {
       fakeRemote = await startFakeRemoteCradleServer()
       app = await createAppWithDataDir(dataDir)
-      await createDirectUrlHost(app, 'remote-host-unresolved', fakeRemote.baseUrl)
-      await connectHost(app, 'remote-host-unresolved')
-      const workspaceId = await createRemoteMountedWorkspace(app, 'remote-host-unresolved', '/missing/project')
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-unresolved', '/missing/project')
 
       const beforeCount = db().select().from(sessions).all().length
       const createRes = await app.handle(new Request('http://localhost/sessions', {

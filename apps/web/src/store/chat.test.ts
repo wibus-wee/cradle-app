@@ -356,6 +356,26 @@ describe('chat store messages', () => {
     expect(chatSelectors.isVisibleStreamingMessage('session-1', 'assistant-1')(useChatStore.getState())).toBe(false)
   })
 
+  it('marks matching run display metadata terminal after its stream lease is gone', () => {
+    useChatStore.getState().setMessages('session-1', [{
+      id: 'assistant-1',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'Done' }],
+    }])
+    useChatStore.getState().beginRunDisplayMeta('assistant-1', 100)
+    useChatStore.getState().setRunDisplayId('assistant-1', 'run-a')
+
+    expect(useChatStore.getState().streamLeaseMap.has('assistant-1')).toBe(false)
+    expect(chatSelectors.runDisplayMeta('assistant-1')(useChatStore.getState())?.completedAtMs).toBeNull()
+
+    expect(releaseSessionStreamingStateForTerminalRun('session-1', runtimeRun({
+      runId: 'run-a',
+      messageId: 'assistant-1',
+      status: 'complete',
+    }))).toBe(true)
+    expect(chatSelectors.runDisplayMeta('assistant-1')(useChatStore.getState())?.completedAtMs).not.toBeNull()
+  })
+
   it('does not synthesize accept timing when a run id is reconciled', () => {
     useChatStore.getState().setRunDisplayId('assistant-1', 'run-a')
 

@@ -32,6 +32,7 @@ import {
 } from '../provider-contracts/claude-agent-config'
 import { CodexAuthModeSchema, readTrustedUniversalConfig } from '../provider-contracts/provider-base'
 import {
+  listProviderKindsForRuntime,
   listRuntimeOwnedProviderTargets,
   projectRuntimeOwnedProviderTarget,
   readRuntimeOwnedProviderTargetOwner,
@@ -41,6 +42,15 @@ import {
   runtimeSupportsProviderKind,
 } from '../provider-contracts/runtime-compatibility'
 import type { ModelCapabilities, ProviderKind, RuntimeKind } from '../provider-contracts/types'
+import {
+  ensureProviderExtensionRuntimeRouteReady,
+  isProviderTargetCredentialLeased,
+  prepareProviderTargetExtensionDeletion,
+  readEffectiveProviderKinds,
+  readProviderExtensionRuntimeRoute,
+  reconcileProviderExtensionsForTarget,
+  suspendProviderExtensionsForTarget,
+} from '../provider-extensions/service'
 import {
   releaseLiveProviderRuntimeSessionsForProviderTarget,
   unlinkProviderTargetFromDurableProviderRuntimeBindings,
@@ -92,6 +102,12 @@ export interface ResolvedProviderTarget {
     externalRecordId: string
     app: string
   } | null
+  extensionBinding: {
+    id: string
+    owner: string
+    extensionId: string
+  } | null
+  effectiveModelId: string | null
 }
 
 export interface ProviderTargetModelSettings {
@@ -257,6 +273,8 @@ function toResolvedProviderTarget(row: ProviderTargetRow): ResolvedProviderTarge
     customModelsJson: row.customModelsJson,
     iconSlug: row.iconSlug ?? null,
     sourceMetadata,
+    extensionBinding: null,
+    effectiveModelId: null,
   }
 }
 
@@ -289,10 +307,16 @@ export function listStoredProviderTargets(): ProviderTargetRow[] {
   return db().select().from(providerTargets).all()
 }
 
-export async function listProviderTargets(input: ListProviderTargetsInput = {}): Promise<ProviderTargetRow[]> {
+export async function listProviderTargets(input: ListProviderTargetsInput = {}): Promise<Array<ProviderTargetRow & {
+  effectiveProviderKinds: ProviderKind[]
+}>> {
   const rows = listStoredProviderTargets()
+  const projectedRows = rows.map(row => ({
+    ...row,
+    effectiveProviderKinds: readEffectiveProviderKinds(row.id, row.providerKind),
+  }))
   if (!input.runtimeKind) {
-    return rows
+    return projectedRows
   }
   const runtimeKind = input.runtimeKind
   const workspacePath = input.workspaceId ? Workspace.getLocalWorkspacePath(input.workspaceId) ?? undefined : undefined
@@ -303,14 +327,16 @@ export async function listProviderTargets(input: ListProviderTargetsInput = {}):
   })
   const providerBinding = readRuntimeProviderBinding(runtimeKind)
   if (providerBinding === 'runtime-owned') {
-    return runtimeOwnedTargets
+    return runtimeOwnedTargets.map(row => ({ ...row, effectiveProviderKinds: [row.providerKind] }))
   }
   if (providerBinding === 'none') {
     return []
   }
   return [
-    ...rows.filter(row => runtimeSupportsProviderKind(runtimeKind, row.providerKind)),
-    ...runtimeOwnedTargets,
+    ...projectedRows.filter(row => row.effectiveProviderKinds.some(
+      kind => runtimeSupportsProviderKind(runtimeKind, kind),
+    )),
+    ...runtimeOwnedTargets.map(row => ({ ...row, effectiveProviderKinds: [row.providerKind] })),
   ]
 }
 
@@ -364,17 +390,104 @@ function projectUniversalProviderTargetForRuntime(
 export function resolveProviderTargetForRuntime(
   input: ProviderTarget | string,
   runtimeKind: RuntimeKind,
+  publicModelId?: string | null,
 ): ResolvedProviderTarget {
   const target = resolveProviderTarget(input)
-  if (target.providerKind !== 'universal') {
+  const acceptedProviderKinds = [...listProviderKindsForRuntime(runtimeKind)]
+  const exclusiveRoute = readProviderExtensionRuntimeRoute({
+    providerTargetId: target.id,
+    acceptedProviderKinds,
+    publicModelId,
+    exclusiveOnly: true,
+  })
+  if (exclusiveRoute) {
+    return projectProviderExtensionRoute(target, exclusiveRoute)
+  }
+  if (isProviderTargetCredentialLeased(target.id)) {
+    throw new AppError({
+      code: 'provider_extension_not_ready',
+      status: 409,
+      message: 'The Provider credential is leased to an unavailable extension route',
+      details: { providerTargetId: target.id, runtimeKind },
+    })
+  }
+  if (target.providerKind === 'universal') {
+    const projected = projectUniversalProviderTargetForRuntime(target, runtimeKind)
+    if (runtimeSupportsProviderKind(runtimeKind, projected.providerKind)) {
+      return projected
+    }
+  }
+  if (runtimeSupportsProviderKind(runtimeKind, target.providerKind)) {
     return target
   }
-  return projectUniversalProviderTargetForRuntime(target, runtimeKind)
+  const borrowedRoute = readProviderExtensionRuntimeRoute({
+    providerTargetId: target.id,
+    acceptedProviderKinds,
+    publicModelId,
+  })
+  return borrowedRoute ? projectProviderExtensionRoute(target, borrowedRoute) : target
 }
 
-export function upsertManualProviderTarget(
+function projectProviderExtensionRoute(
+  target: ResolvedProviderTarget,
+  route: NonNullable<ReturnType<typeof readProviderExtensionRuntimeRoute>>,
+): ResolvedProviderTarget {
+  return {
+    ...target,
+    providerKind: route.providerKind,
+    configJson: JSON.stringify({
+      ...JsonObjectTextSchema.parse(target.configJson),
+      ...JsonObjectTextSchema.parse(route.configJson),
+    }),
+    credentialRef: route.credentialRef,
+    extensionBinding: {
+      id: route.bindingId,
+      owner: route.extensionOwner,
+      extensionId: route.extensionId,
+    },
+    effectiveModelId: route.effectiveModelId,
+  }
+}
+
+export async function ensureProviderTargetReadyForRuntime(
+  input: ProviderTarget | string,
+  runtimeKind: RuntimeKind,
+): Promise<void> {
+  const target = resolveProviderTarget(input)
+  const acceptedProviderKinds = [...listProviderKindsForRuntime(runtimeKind)]
+  const exclusive = readProviderExtensionRuntimeRoute({
+    providerTargetId: target.id,
+    acceptedProviderKinds,
+    exclusiveOnly: true,
+  })
+  if (exclusive) {
+    await ensureProviderExtensionRuntimeRouteReady({
+      providerTargetId: target.id,
+      acceptedProviderKinds,
+      exclusiveOnly: true,
+    })
+    return
+  }
+  if (isProviderTargetCredentialLeased(target.id)) {
+    throw new AppError({
+      code: 'provider_extension_not_ready',
+      status: 409,
+      message: 'The Provider credential is leased to an unavailable extension route',
+      details: { providerTargetId: target.id, runtimeKind },
+    })
+  }
+  if (runtimeSupportsProviderKind(runtimeKind, target.providerKind)) {
+    return
+  }
+  await ensureProviderExtensionRuntimeRouteReady({
+    providerTargetId: target.id,
+    acceptedProviderKinds,
+  })
+}
+
+export async function upsertManualProviderTarget(
   input: UpsertManualProviderTargetInput,
-): ProviderTargetRow {
+): Promise<ProviderTargetRow & { effectiveProviderKinds: ProviderKind[] }> {
   const id = input.id?.trim() || randomUUID()
   const now = nowUnix()
   const existing = getProviderTarget(id)
@@ -395,6 +508,22 @@ export function upsertManualProviderTarget(
   const nextProviderId = input.providerId !== undefined
     ? (input.providerId?.trim() || null)
     : (existing?.providerId ?? null)
+  const mutatesLeasedCredential = !!existing && (
+    existing.providerKind !== input.providerKind
+    || existing.connectionConfigJson !== connectionConfigJson
+    || existing.credentialRef !== (input.credentialRef ?? null)
+  )
+  if (mutatesLeasedCredential && isProviderTargetCredentialLeased(id)) {
+    throw new AppError({
+      code: 'provider_extension_credential_leased',
+      status: 409,
+      message: 'Disable the Provider extension before changing this Provider credential or connection',
+      details: { providerTargetId: id },
+    })
+  }
+  if (existing?.enabled && !nextEnabled) {
+    await suspendProviderExtensionsForTarget(id)
+  }
   const d = db()
   d.transaction((tx) => {
     tx.insert(providerTargets)
@@ -454,7 +583,15 @@ export function upsertManualProviderTarget(
     releaseLiveProviderRuntimeSessionsForProviderTarget(id)
   }
 
-  return getProviderTarget(id)!
+  if (nextEnabled && existing) {
+    await reconcileProviderExtensionsForTarget(id)
+  }
+
+  const target = getProviderTarget(id)!
+  return {
+    ...target,
+    effectiveProviderKinds: readEffectiveProviderKinds(target.id, target.providerKind),
+  }
 }
 
 export function updateProviderTargetIcon(
@@ -488,8 +625,9 @@ export function updateProviderTargetEnabled(
   return getProviderTarget(target.id)!
 }
 
-export function removeProviderTarget(providerTargetId: string): void {
+export async function removeProviderTarget(providerTargetId: string): Promise<void> {
   const target = resolveProviderTarget(providerTargetId)
+  await prepareProviderTargetExtensionDeletion(target.id)
   const d = db()
   const storedSessionEvents = d.transaction((tx) => {
     const now = nowUnix()

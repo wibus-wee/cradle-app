@@ -323,11 +323,11 @@ function useIssueSearch(query: string, enabled: boolean) {
 
 function useRecentConversations(enabled: boolean): RecentConversation[] {
   const { data } = useQuery({
-    ...getSessionsOptions({}),
+    ...getSessionsOptions({ query: { limit: 5 } }),
     enabled,
     staleTime: 30_000,
-    select: (sessions: Array<{ id: string, title: string | null, updatedAt: number }>): RecentConversation[] =>
-      [...sessions]
+    select: (page): RecentConversation[] =>
+      [...page.items]
         .sort((a, b) => b.updatedAt - a.updatedAt)
         .slice(0, 5)
         .map(session => ({ id: session.id, title: session.title })),

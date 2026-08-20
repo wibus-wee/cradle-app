@@ -5,9 +5,12 @@ import WebSocket from 'ws'
 import { AppError } from '../../errors/app-error'
 import type { LocalTunnelHandle } from '../../runtime/local-tunnel'
 import { allocateLocalPort } from '../../runtime/local-tunnel'
+import { fabricHeadersRecord } from '../fabric/protocol'
 import type { SignedRelayAssertion } from '../relay-servers/relay-signature-service'
 import { relayAssertionHeaders } from '../relay-servers/relay-signature-service'
 import { generateRelayKeyPair, publicKeyFromPrivate } from './crypto'
+import type { FabricEnvelopeRoute } from './fabric-envelope'
+import { decodeFabricEnvelope, encodeFabricEnvelope, toRelaySessionEnvelope } from './fabric-envelope'
 import type { RelayEnvelope } from './protocol'
 import { decodeRelayEnvelope } from './protocol'
 import { RelaySession } from './session'
@@ -34,7 +37,7 @@ export interface RelayControllerTransportOptions {
   relayUrl: string
   roomId: string
   /** Signed assertion for relayd /ws/controller. */
-  wsAssertion: SignedRelayAssertion
+  wsAssertion?: SignedRelayAssertion
   /** Controller private key (base64). If omitted, a fresh keypair is generated. */
   controllerPrivateKeyBase64?: string
   controllerPublicKeyBase64?: string
@@ -45,6 +48,11 @@ export interface RelayControllerTransportOptions {
   /** Optional label sent in `hello` so the host can show who paired with it. */
   controllerName?: string
   readyTimeoutMs?: number
+  /**
+   * Fabric v3 route and authenticated WebSocket headers. When present, this
+   * transport uses the durable Node/link relay endpoint instead of a room.
+   */
+  fabric?: FabricEnvelopeRoute & { headers: Headers }
 }
 
 export interface RelayControllerTransportHandle extends LocalTunnelHandle {
@@ -113,6 +121,7 @@ export async function startRelayControllerTransport(
 
 class ControllerTransport {
   private readonly streams = new Map<string, ActiveStream>()
+  private readonly localSockets = new Set<net.Socket>()
   private readonly exitListeners = new Set<
     (exit: { code: number | null, signal: NodeJS.Signals | null }) => void
   >()
@@ -164,7 +173,7 @@ class ControllerTransport {
 
   private connectAndHandshake(remainingMs: number): Promise<void> {
     const checkpoint = this.startConnectionAttempt()
-    const wsUrl = toWebSocketUrl(this.options.relayUrl, '/ws/controller')
+    const wsUrl = toWebSocketUrl(this.options.relayUrl, this.options.fabric ? `/v1/ws/controllers/${encodeURIComponent(this.options.fabric.linkId)}` : '/ws/controller')
     return new Promise<void>((resolve, reject) => {
       let settled = false
       const timeout = setTimeout(
@@ -196,7 +205,8 @@ class ControllerTransport {
 
       let ws: WebSocket
       try {
-        ws = new WebSocket(wsUrl, { headers: relayAssertionHeaders(this.options.wsAssertion) })
+        if (!this.options.fabric && !this.options.wsAssertion) { throw new AppError({ code: 'relay_assertion_required', status: 500, message: 'Room transport requires a relay assertion.' }) }
+        ws = new WebSocket(wsUrl, { headers: this.options.fabric ? fabricHeadersRecord(this.options.fabric.headers) : relayAssertionHeaders(this.options.wsAssertion!) })
       }
  catch (error) {
         finish(error instanceof Error ? error : new Error(String(error)))
@@ -210,12 +220,13 @@ class ControllerTransport {
         {
           roomId: this.options.roomId,
           ourPublicKeyBase64: this.keypair.publicKeyBase64,
-          ...(this.options.pairingCode ? { pairingCode: this.options.pairingCode } : {}),
+          ...((this.options.pairingCode || this.options.fabric) ? { pairingCode: this.options.fabric?.fabricId ?? this.options.pairingCode } : {}),
           ...(this.options.pinnedHostPubkey
             ? { pinnedPeerPubkey: this.options.pinnedHostPubkey }
             : {}),
           ...(this.options.controllerName ? { ourName: this.options.controllerName } : {}),
-          ourSigningPubkey: this.options.wsAssertion.assertion.pubkey,
+          ...(this.options.wsAssertion ? { ourSigningPubkey: this.options.wsAssertion.assertion.pubkey } : {}),
+          ...(this.options.fabric ? { encodeOutboundEnvelope: frame => encodeFabricEnvelope(this.options.fabric!, frame) } : {}),
         },
         {
           send: (data) => {
@@ -252,9 +263,13 @@ class ControllerTransport {
       })
       ws.on('message', (data: WebSocket.RawData) => {
         try {
-          session.handleEnvelope(
-            decodeRelayEnvelope(relayWebSocketDataView(data)) as RelayEnvelope,
-          )
+          const raw = relayWebSocketDataView(data)
+          if (this.options.fabric) {
+            const envelope = decodeFabricEnvelope(raw)
+            if (envelope.fabricId !== this.options.fabric.fabricId || envelope.nodeId !== this.options.fabric.nodeId || envelope.linkId !== this.options.fabric.linkId) { throw new AppError({ code: 'fabric_protocol_route_mismatch', status: 400, message: 'Fabric relay route mismatch.' }) }
+            session.handleEnvelope(toRelaySessionEnvelope(envelope))
+          }
+          else { session.handleEnvelope(decodeRelayEnvelope(raw) as RelayEnvelope) }
         }
  catch (error) {
           finish(error instanceof Error ? error : new Error(String(error)))
@@ -274,6 +289,8 @@ class ControllerTransport {
 
   private startLocalServer(): Promise<void> {
     const server = net.createServer((socket) => {
+      this.localSockets.add(socket)
+      socket.once('close', () => this.localSockets.delete(socket))
       this.handleLocalConnection(socket)
     })
     this.server = server
@@ -384,17 +401,21 @@ class ControllerTransport {
       closeRelayWebSocket(this.ws)
       this.ws = null
     }
-    if (this.server) {
-      await new Promise<void>((resolve) => {
-        this.server?.close(() => resolve())
-      })
-      this.server = null
-    }
     for (const { socket } of this.streams.values()) {
+      socket.destroy()
+    }
+    for (const socket of this.localSockets) {
       socket.destroy()
     }
     for (const streamId of [...this.streams.keys()]) {
       this.completeStream(streamId)
+    }
+    if (this.server) {
+      const server = this.server
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve())
+      })
+      this.server = null
     }
   }
 
