@@ -3590,6 +3590,281 @@ export type AllRemoteHostsByHostIdUpstream8Data = {
     url: '/remote-hosts/{hostId}/upstream/*';
 };
 
+export type GetFabricData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric';
+};
+
+export type GetFabricResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        fabricId: string;
+        relayUrl: string;
+        localNodeId: string;
+        role: string;
+        ownerPubkey: string;
+        nodeCertificate: unknown;
+        controllerCertificate?: unknown;
+        createdAt: number;
+        updatedAt: number;
+    } | null;
+};
+
+export type GetFabricResponse = GetFabricResponses[keyof GetFabricResponses];
+
+export type PostFabricData = {
+    body: {
+        relayUrl: string;
+        displayName?: string;
+        platform?: string;
+        version?: string;
+        capabilities?: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/fabric';
+};
+
+export type PostFabricResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        fabricId: string;
+        relayUrl: string;
+        localNodeId: string;
+        role: string;
+        ownerPubkey: string;
+        nodeCertificate: unknown;
+        controllerCertificate?: unknown;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostFabricResponse = PostFabricResponses[keyof PostFabricResponses];
+
+export type PostFabricNodeInvitationsData = {
+    body: {
+        relayUrl: string;
+        fabricId: string;
+        displayName?: string;
+        platform?: string;
+        version?: string;
+        capabilities?: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations';
+};
+
+export type PostFabricNodeInvitationsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        version: number;
+        relayUrl: string;
+        fabricId: string;
+        requestId: string;
+        deliverySecret: string;
+        expiresAt: string;
+    };
+};
+
+export type PostFabricNodeInvitationsResponse = PostFabricNodeInvitationsResponses[keyof PostFabricNodeInvitationsResponses];
+
+export type PostFabricNodeInvitationsCompleteData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations/complete';
+};
+
+export type PostFabricNodeInvitationsCompleteResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        fabricId: string;
+        relayUrl: string;
+        localNodeId: string;
+        role: string;
+        ownerPubkey: string;
+        nodeCertificate: unknown;
+        controllerCertificate?: unknown;
+        createdAt: number;
+        updatedAt: number;
+    } | null;
+};
+
+export type PostFabricNodeInvitationsCompleteResponse = PostFabricNodeInvitationsCompleteResponses[keyof PostFabricNodeInvitationsCompleteResponses];
+
+export type PostFabricNodeInvitationsApproveData = {
+    body: {
+        version: number;
+        relayUrl: string;
+        fabricId: string;
+        requestId: string;
+        deliverySecret: string;
+        expiresAt: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/fabric/node-invitations/approve';
+};
+
+export type PostFabricNodeInvitationsApproveResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        nodeId: string;
+        fabricId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        status: 'online' | 'offline';
+        lastSeenAt: string;
+        revision: number;
+    };
+};
+
+export type PostFabricNodeInvitationsApproveResponse = PostFabricNodeInvitationsApproveResponses[keyof PostFabricNodeInvitationsApproveResponses];
+
+export type GetNodesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/nodes';
+};
+
+export type GetNodesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        nodeId: string;
+        fabricId: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        status: 'online' | 'offline';
+        lastSeenAt: string;
+        revision: number;
+    }>;
+};
+
+export type GetNodesResponse = GetNodesResponses[keyof GetNodesResponses];
+
+export type PostNodesByNodeIdConnectData = {
+    body?: never;
+    path: {
+        nodeId: string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/connect';
+};
+
+export type PostNodesByNodeIdConnectResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        linkId: string;
+        expiresAt: string;
+        nodeCertificate: unknown;
+    };
+};
+
+export type PostNodesByNodeIdConnectResponse = PostNodesByNodeIdConnectResponses[keyof PostNodesByNodeIdConnectResponses];
+
+export type AllNodesByNodeIdUpstreamData = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream2Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream3Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream4Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream5Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream6Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream7Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
+export type AllNodesByNodeIdUpstream8Data = {
+    body?: never;
+    path: {
+        nodeId: string;
+        '*': string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}/upstream/*';
+};
+
 export type GetExternalIssueSourcesData = {
     body?: never;
     path?: never;
@@ -7253,8 +7528,8 @@ export type GetSessionsResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -7342,8 +7617,8 @@ export type PostSessionsResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7417,8 +7692,8 @@ export type GetSessionsByIdResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7479,8 +7754,8 @@ export type PatchSessionsByIdResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7536,8 +7811,8 @@ export type PostSessionsByIdArchiveResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7591,8 +7866,8 @@ export type PostSessionsByIdReadResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -7646,8 +7921,8 @@ export type PostSessionsByIdUnreadResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -8349,8 +8624,8 @@ export type PostThreadHandoffsResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -8562,6 +8837,7 @@ export type GetWorksResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8597,6 +8873,21 @@ export type GetWorksResponses = {
                 additions?: number;
                 deletions?: number;
             } | null;
+            state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+            stateSinceAt: number;
+            stateExplanation: {
+                trigger: string;
+                evidence: string;
+                authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+                responsible: 'user' | 'agent' | 'dependency' | 'system';
+                nextAction: string;
+                observedAt: number;
+            };
+            recovery: {
+                level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+                evidence: string;
+                lastHeartbeatAt: number | null;
+            };
         }>;
         nextCursor: string | null;
     };
@@ -8610,6 +8901,7 @@ export type PostWorksData = {
         title: string;
         goal?: string;
         objective?: string;
+        acceptanceCriteria?: Array<string>;
         linkedIssueId?: string;
         baseBranch?: string;
         providerTargetId?: string;
@@ -8651,6 +8943,7 @@ export type PostWorksResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8667,8 +8960,8 @@ export type PostWorksResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -8740,10 +9033,63 @@ export type PostWorksResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
 export type PostWorksResponse = PostWorksResponses[keyof PostWorksResponses];
+
+export type GetWorksAttentionData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/works/attention';
+};
+
+export type GetWorksAttentionResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        category: 'approve_or_answer' | 'handle_failure' | 'review_work' | 'merge_or_archive';
+        risk: 'low' | 'medium' | 'high';
+        workId: string;
+        workTitle: string;
+        workspaceId: string;
+        sessionId: string;
+        runtimeKind: string;
+        providerTargetId: string | null;
+        agentId: string | null;
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        waitingSeconds: number;
+        reason: string;
+        authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+        nextAction: string;
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
+    }>;
+};
+
+export type GetWorksAttentionResponse = GetWorksAttentionResponses[keyof GetWorksAttentionResponses];
 
 export type GetWorksByIdData = {
     body?: never;
@@ -8763,6 +9109,7 @@ export type GetWorksByIdResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8779,8 +9126,8 @@ export type GetWorksByIdResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -8852,6 +9199,21 @@ export type GetWorksByIdResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -8877,6 +9239,7 @@ export type PostWorksByIdArchiveResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -8893,8 +9256,8 @@ export type PostWorksByIdArchiveResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -8966,10 +9329,153 @@ export type PostWorksByIdArchiveResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
 export type PostWorksByIdArchiveResponse = PostWorksByIdArchiveResponses[keyof PostWorksByIdArchiveResponses];
+
+export type PostWorksByIdRedetectData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/works/{id}/redetect';
+};
+
+export type PostWorksByIdRedetectResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        work: {
+            id: string;
+            title: string;
+            objective: string;
+            acceptanceCriteria: Array<string>;
+            linkedIssueId: string | null;
+            handoffTitle: string | null;
+            handoffSummary: string | null;
+            handoffTestPlan: string | null;
+            preparedAt: number | null;
+            lastSubmittedAt: number | null;
+            closedAt: number | null;
+            archivedAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+        };
+        primaryThread: {
+            id: string;
+            execution: {
+                kind: 'local';
+            } | {
+                kind: 'node';
+                nodeId: string;
+                remoteSessionId: string;
+            };
+            parentSessionId: string | null;
+            sideContextSource: 'provider-native' | 'cradle-context' | null;
+            workspaceId: string | null;
+            title: string | null;
+            origin: string;
+            providerTargetId: string | null;
+            agentId: string | null;
+            modelId: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
+            linkedIssueId: string | null;
+            sessionGroupId: string | null;
+            runtimeKind: string;
+            status: 'idle' | 'streaming' | 'error';
+            pinned: number;
+            archivedAt: number | null;
+            lastReadAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+            latestUserMessageAt: number | null;
+            latestAssistantMessageAt: number | null;
+            unread: boolean;
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        };
+        execution: {
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        };
+        readiness: {
+            isolated: boolean;
+            clean: boolean;
+            branch: string | null;
+            baseRef: string | null;
+            commitsAhead: number;
+            changedFiles: number;
+        };
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author?: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions?: number;
+            deletions?: number;
+        } | null;
+        activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
+    };
+};
+
+export type PostWorksByIdRedetectResponse = PostWorksByIdRedetectResponses[keyof PostWorksByIdRedetectResponses];
 
 export type PostWorksByIdPrepareData = {
     body: {
@@ -8993,6 +9499,7 @@ export type PostWorksByIdPrepareResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -9009,8 +9516,8 @@ export type PostWorksByIdPrepareResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -9082,6 +9589,21 @@ export type PostWorksByIdPrepareResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -9110,6 +9632,7 @@ export type PostWorksByIdSubmitResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -9126,8 +9649,8 @@ export type PostWorksByIdSubmitResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -9199,6 +9722,21 @@ export type PostWorksByIdSubmitResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -9224,6 +9762,7 @@ export type PostWorksByIdBranchResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -9240,8 +9779,8 @@ export type PostWorksByIdBranchResponses = {
             execution: {
                 kind: 'local';
             } | {
-                kind: 'remote-host';
-                hostId: string;
+                kind: 'node';
+                nodeId: string;
                 remoteSessionId: string;
             };
             parentSessionId: string | null;
@@ -9313,6 +9852,21 @@ export type PostWorksByIdBranchResponses = {
             deletions?: number;
         } | null;
         activity: 'idle' | 'running' | 'waiting' | 'blocked';
+        state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+        stateSinceAt: number;
+        stateExplanation: {
+            trigger: string;
+            evidence: string;
+            authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+            responsible: 'user' | 'agent' | 'dependency' | 'system';
+            nextAction: string;
+            observedAt: number;
+        };
+        recovery: {
+            level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+            evidence: string;
+            lastHeartbeatAt: number | null;
+        };
     };
 };
 
@@ -9336,6 +9890,7 @@ export type GetSessionsByIdWorkResponses = {
             id: string;
             title: string;
             objective: string;
+            acceptanceCriteria: Array<string>;
             linkedIssueId: string | null;
             handoffTitle: string | null;
             handoffSummary: string | null;
@@ -9371,6 +9926,21 @@ export type GetSessionsByIdWorkResponses = {
                 additions?: number;
                 deletions?: number;
             } | null;
+            state: 'draft' | 'queued' | 'preparing' | 'running' | 'awaiting_human' | 'awaiting_dependency' | 'verifying' | 'ready_for_review' | 'merging' | 'done' | 'failed' | 'cancelled' | 'archived' | 'unknown';
+            stateSinceAt: number;
+            stateExplanation: {
+                trigger: string;
+                evidence: string;
+                authority: 'official_hook' | 'runtime_integration' | 'terminal_recognizer' | 'user_override' | 'derived';
+                responsible: 'user' | 'agent' | 'dependency' | 'system';
+                nextAction: string;
+                observedAt: number;
+            };
+            recovery: {
+                level: 'live' | 'resumable' | 'restorable' | 'reproducible' | 'unknown';
+                evidence: string;
+                lastHeartbeatAt: number | null;
+            };
         } | null;
     };
 };
@@ -11595,8 +12165,8 @@ export type GetIssuesByIdSessionsResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;
@@ -21515,8 +22085,8 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
         execution: {
             kind: 'local';
         } | {
-            kind: 'remote-host';
-            hostId: string;
+            kind: 'node';
+            nodeId: string;
             remoteSessionId: string;
         };
         parentSessionId: string | null;

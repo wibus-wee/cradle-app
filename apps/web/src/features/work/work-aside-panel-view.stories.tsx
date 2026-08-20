@@ -7,6 +7,8 @@ import { WorkAsidePanelView } from './work-aside-panel-view'
 const labels = {
   objective: 'Objective',
   objectiveEmpty: 'No objective provided.',
+  acceptanceCriteria: 'Acceptance criteria',
+  acceptanceCriteriaEmpty: 'No explicit acceptance criteria.',
   execution: 'Execution',
   executionUnhealthy: 'The managed worktree needs repair.',
   tryAgain: 'Try again',

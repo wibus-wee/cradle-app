@@ -5,6 +5,10 @@ export const workDetailFixture = {
     id: 'work-storybook',
     title: 'Extract Storybook rendering seams',
     objective: 'Move user-visible Work surfaces behind pure props interfaces while preserving runtime behavior.',
+    acceptanceCriteria: [
+      'Work surfaces render from typed props.',
+      'Runtime behavior remains unchanged.',
+    ],
     linkedIssueId: null,
     handoffTitle: 'Expand Storybook architecture',
     handoffSummary: 'Extracted Work delivery and execution surfaces from their query and mutation adapters.',
@@ -81,6 +85,21 @@ export const workDetailFixture = {
     updatedAt: 30,
   },
   activity: 'idle',
+  state: 'ready_for_review',
+  stateSinceAt: 30,
+  stateExplanation: {
+    trigger: 'delivery.prepared',
+    evidence: 'The Agent prepared a newer handoff than the last submitted pull request.',
+    authority: 'runtime_integration',
+    responsible: 'user',
+    nextAction: 'Review the committed diff and publish or update the Draft pull request.',
+    observedAt: 31,
+  },
+  recovery: {
+    level: 'resumable',
+    evidence: 'The provider runtime has a durable session binding that supports resume.',
+    lastHeartbeatAt: 30,
+  },
 } satisfies WorkDetail
 
 export const unhealthyWorkDetailFixture = {
@@ -101,4 +120,19 @@ export const unhealthyWorkDetailFixture = {
     changedFiles: 12,
   },
   pullRequest: null,
+  state: 'failed',
+  stateSinceAt: 30,
+  stateExplanation: {
+    trigger: 'worktree.unhealthy',
+    evidence: 'The managed worktree health is missing.',
+    authority: 'official_hook',
+    responsible: 'user',
+    nextAction: 'Redetect the checkout, then repair or recreate the Work isolation boundary.',
+    observedAt: 31,
+  },
+  recovery: {
+    level: 'restorable',
+    evidence: 'Cradle retains the primary Session and its persisted transcript.',
+    lastHeartbeatAt: 30,
+  },
 } satisfies WorkDetail

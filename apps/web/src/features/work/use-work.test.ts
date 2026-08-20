@@ -10,6 +10,7 @@ function createWork(pullRequest: WorkSummary['pullRequest']): WorkSummary {
     primarySessionId: 'session-1',
     title: 'Refresh pull request state',
     objective: 'Keep the sidebar current.',
+    acceptanceCriteria: [],
     linkedIssueId: null,
     handoffTitle: null,
     handoffSummary: null,
@@ -22,6 +23,21 @@ function createWork(pullRequest: WorkSummary['pullRequest']): WorkSummary {
     updatedAt: 1,
     activity: 'idle',
     pullRequest,
+    state: pullRequest ? 'ready_for_review' : 'unknown',
+    stateSinceAt: 1,
+    stateExplanation: {
+      trigger: pullRequest ? 'delivery.prepared' : 'state.unknown',
+      evidence: 'Fixture state evidence.',
+      authority: 'derived',
+      responsible: 'system',
+      nextAction: 'Inspect the Work.',
+      observedAt: 1,
+    },
+    recovery: {
+      level: 'reproducible',
+      evidence: 'A healthy managed worktree is available.',
+      lastHeartbeatAt: 1,
+    },
   }
 }
 

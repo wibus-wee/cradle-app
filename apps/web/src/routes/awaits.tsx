@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { lazy, Suspense } from 'react'
 
-const AwaitsOverview = lazy(() => import('~/features/session-await/awaits-overview').then(module => ({ default: module.AwaitsOverview })))
+const WorkAttention = lazy(() => import('~/features/work/work-attention').then(module => ({ default: module.WorkAttention })))
 
 export const Route = createFileRoute('/awaits')({
   component: AwaitsRoute,
@@ -10,7 +10,7 @@ export const Route = createFileRoute('/awaits')({
 function AwaitsRoute() {
   return (
     <Suspense fallback={null}>
-      <AwaitsOverview />
+      <WorkAttention />
     </Suspense>
   )
 }

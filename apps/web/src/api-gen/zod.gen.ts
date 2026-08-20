@@ -764,6 +764,76 @@ export const zAllRemoteHostsByHostIdUpstream8Path = z.object({
     '*': z.string()
 });
 
+export const zPostFabricBody = z.object({
+    relayUrl: z.string().min(1).regex(/.*\S.*/),
+    displayName: z.string().min(1).regex(/.*\S.*/).optional(),
+    platform: z.string().min(1).regex(/.*\S.*/).optional(),
+    version: z.string().min(1).regex(/.*\S.*/).optional(),
+    capabilities: z.array(z.string().min(1).regex(/.*\S.*/)).optional()
+});
+
+export const zPostFabricNodeInvitationsBody = z.object({
+    relayUrl: z.string().min(1).regex(/.*\S.*/),
+    fabricId: z.string().min(1).regex(/.*\S.*/),
+    displayName: z.string().min(1).regex(/.*\S.*/).optional(),
+    platform: z.string().min(1).regex(/.*\S.*/).optional(),
+    version: z.string().min(1).regex(/.*\S.*/).optional(),
+    capabilities: z.array(z.string().min(1).regex(/.*\S.*/)).optional()
+});
+
+export const zPostFabricNodeInvitationsApproveBody = z.object({
+    version: z.number(),
+    relayUrl: z.string(),
+    fabricId: z.string(),
+    requestId: z.string(),
+    deliverySecret: z.string(),
+    expiresAt: z.string()
+});
+
+export const zPostNodesByNodeIdConnectPath = z.object({
+    nodeId: z.string().min(1).regex(/.*\S.*/)
+});
+
+export const zAllNodesByNodeIdUpstreamPath = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream2Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream3Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream4Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream5Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream6Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream7Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
+export const zAllNodesByNodeIdUpstream8Path = z.object({
+    nodeId: z.string().min(1),
+    '*': z.string()
+});
+
 export const zGetExternalIssueSourcesBindingsQuery = z.object({
     workspaceId: z.string().optional(),
     sourceKey: z.string().optional()
@@ -1708,6 +1778,7 @@ export const zPostWorksBody = z.object({
     title: z.string().min(1),
     goal: z.string().min(1).optional(),
     objective: z.string().min(1).optional(),
+    acceptanceCriteria: z.array(z.string().min(1)).max(50).optional(),
     linkedIssueId: z.string().min(1).optional(),
     baseBranch: z.string().min(1).optional(),
     providerTargetId: z.string().min(1).optional(),
@@ -1752,6 +1823,10 @@ export const zPostWorksByIdArchiveBody = z.object({
 });
 
 export const zPostWorksByIdArchivePath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostWorksByIdRedetectPath = z.object({
     id: z.string().min(1)
 });
 
@@ -2385,11 +2460,11 @@ export const zGetSearchThreadsQuery = z.object({
     origin: z.string().min(1).optional(),
     limit: z.union([
         z.string(),
-        z.number().gte(1)
+        z.number().gte(1).lte(100)
     ]).optional(),
     snippetsPerHit: z.union([
         z.string(),
-        z.number().gte(1)
+        z.number().gte(1).lte(10)
     ]).optional()
 });
 

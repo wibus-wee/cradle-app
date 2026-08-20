@@ -50,6 +50,7 @@ import { authorizeDangerousAction, isElectron, nativeIpc } from '~/lib/electron'
 import { useIsActiveSurfaceId } from '~/navigation/active-surface'
 import {
   openAutomation,
+  openAwaits,
   openDiff,
   openNewChat,
   openNewWork,
@@ -1352,6 +1353,7 @@ WorkspaceSidebarBody.displayName = 'WorkspaceSidebarBody'
 export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boolean }) => {
   const { t } = useTranslation('workspace')
   const pullRequestsActive = useIsActiveSurfaceId('pull-requests')
+  const attentionActive = useIsActiveSurfaceId('awaits')
   const { connected: githubConnected, ready: githubReady } = useGithubAppConnected()
   const githubFeaturesDisabled = githubReady && !githubConnected
   const queryClient = useQueryClient()
@@ -1593,10 +1595,12 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
       <WorkspaceSidebarNavigationView
         collapsed={collapsed}
         pullRequestsActive={pullRequestsActive}
+        attentionActive={attentionActive}
         githubFeaturesDisabled={githubFeaturesDisabled}
         disabledLabel={t('nav.disabled')}
         onNewWork={handleNewWork}
         onNewChat={openNewChat}
+        onAttention={openAwaits}
         onSearch={openSearch}
         onDiff={openDiff}
         onPullRequests={handlePullRequests}

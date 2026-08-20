@@ -6,6 +6,7 @@ import type { ComposerProps } from '~/features/chat/composer/views/composer-view
 import { ComposerView } from '~/features/chat/composer/views/composer-view'
 
 import { newWorkWorkspaceFixtures } from './fixtures/new-work'
+import { NewWorkAcceptanceCriteriaView } from './new-work-acceptance-criteria-view'
 import { NewWorkBaseBranchControlView } from './new-work-base-branch-control-view'
 import type { NewWorkFailureKind } from './new-work-error-view'
 import { NewWorkPageView } from './new-work-page-view'
@@ -50,6 +51,9 @@ function NewWorkPageStoryScene({ state }: { state: NewWorkStoryState }) {
     state === 'other-branch-selected' ? 'origin/develop' : null,
   )
   const [failureDismissed, setFailureDismissed] = useState(false)
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState(
+    'Focused tests pass\nThe Work remains resumable after reload',
+  )
   const [activity, setActivity] = useState('Ready to create Work')
   const failureKind = failureDismissed ? null : failureForState(state)
   const workspaceSelector = (
@@ -131,6 +135,12 @@ function NewWorkPageStoryScene({ state }: { state: NewWorkStoryState }) {
   return (
     <main className="h-screen min-h-160 bg-muted/20 text-foreground">
       <NewWorkPageView
+        acceptanceCriteria={(
+          <NewWorkAcceptanceCriteriaView
+            value={acceptanceCriteria}
+            onChange={setAcceptanceCriteria}
+          />
+        )}
         composer={<ComposerView {...composerProps} />}
         workspaceCount={workspaces.length}
         loadingWorkspaces={state === 'loading-workspaces'}

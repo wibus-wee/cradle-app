@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { BackendSessionBinding } from '@cradle/db'
 import { backendSessionBindings } from '@cradle/db'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 
 import { currentUnixSeconds } from '../../helpers/time'
 import { db, registerBeforeDatabaseShutdown } from '../../infra'
@@ -77,6 +77,20 @@ export function listProviderRuntimeBindingsByProviderSession(input: {
           )
         : eq(backendSessionBindings.backendSessionId, input.providerSessionId),
     )
+    .all()
+    .filter(isResumableProviderRuntimeBinding)
+}
+
+export function listProviderRuntimeBindingsByChatSessionIds(
+  chatSessionIds: readonly string[],
+): BackendSessionBinding[] {
+  if (chatSessionIds.length === 0) {
+    return []
+  }
+  return db()
+    .select()
+    .from(backendSessionBindings)
+    .where(inArray(backendSessionBindings.chatSessionId, [...chatSessionIds]))
     .all()
     .filter(isResumableProviderRuntimeBinding)
 }

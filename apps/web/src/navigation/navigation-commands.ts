@@ -237,7 +237,7 @@ export function openAwaits(options: { replace?: boolean } = {}): void {
   openSurface({
     id: 'awaits',
     kind: 'awaits',
-    title: 'Awaits',
+    title: 'Needs me',
     route: { to: '/awaits' },
     closable: true,
   }, options)
