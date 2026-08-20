@@ -1,0 +1,33 @@
+import type { CSSProperties } from 'react'
+
+/** Bridge the host theme onto the Design System token vocabulary. */
+export const ARTIFACT_THEME_STYLE = {
+  '--color-surface': 'var(--card)',
+  '--color-surface-inset': 'var(--background)',
+  '--color-fill': 'var(--muted)',
+  '--color-border-content': 'var(--border)',
+  '--color-border-chrome': 'var(--sidebar-border)',
+  '--color-sidebar': 'var(--sidebar)',
+  '--color-sidebar-foreground': 'var(--sidebar-foreground)',
+  '--color-neutral-1': 'var(--card)',
+  '--color-neutral-8': 'var(--color-neutral-700)',
+  '--color-neutral-9': 'var(--foreground)',
+  '--text-primary': 'var(--foreground)',
+  '--text-secondary': 'var(--muted-foreground)',
+  '--color-accent': 'var(--color-blue-500)',
+  '--color-accent-session': 'var(--color-violet-500)',
+  '--color-accent-global': 'var(--color-cyan-500)',
+  '--color-accent-scope': 'var(--color-emerald-500)',
+  '--color-accent-agent': 'var(--color-rose-500)',
+  '--color-accent-legacy': 'var(--color-amber-500)',
+  '--color-accent-diff': 'var(--color-orange-500)',
+  '--color-accent-summary': 'var(--color-pink-500)',
+  '--color-success': 'var(--success)',
+  '--color-warning': 'var(--warning)',
+  '--color-error': 'var(--destructive)',
+  '--color-info': 'var(--info)',
+  '--duration-quick': '120ms',
+  '--ease-standard': 'cubic-bezier(0.22, 1, 0.36, 1)',
+  '--shadow-inset-ring': 'inset 0 0 0 1px var(--color-border-content)',
+  '--layout-content-max-wide': '896px',
+} as CSSProperties

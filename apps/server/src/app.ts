@@ -25,6 +25,7 @@ import { backgroundJob } from './modules/background-job'
 import * as BackgroundJobPoller from './modules/background-job/poller'
 import { blobStore } from './modules/blob-store'
 import { registerBlobStoreMaintenance } from './modules/blob-store/gc'
+import { chatArtifacts } from './modules/chat-artifacts'
 import { chatRuntime } from './modules/chat-runtime'
 import { getRuntimeRegistry } from './modules/chat-runtime/chat-runtime-provider-registry'
 import * as ComposerDrafts from './modules/chat-runtime/composer-drafts'
@@ -267,6 +268,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(automation)
   app.use(assets)
   app.use(blobStore)
+  app.use(chatArtifacts)
   app.use(backgroundActivity)
   app.use(backgroundJob)
   app.use(session)

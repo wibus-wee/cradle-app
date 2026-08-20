@@ -9,7 +9,9 @@
 - `runtime-registration.ts`: publishes the MCP process through the server MCP registry.
 - `mcp-entry.ts`: stdio MCP process entry bundled with the server runtime.
 - `tools/index.ts`: explicit inventory of builtin Agent tools.
-- `tools/work/submit.ts`: required closed-loop Work finalization tool; delegates to `POST /works/:id/submit` (push + create/update Draft PR).
+- `tools/work/manage-pull-request.ts`: required closed-loop Work delivery tool.
+- `tools/artifact/write-artifact.ts`: create/update session Artifacts (constrained JSX for the Browser Panel host).
+- `tools/recall/*`: Recall query/attune tools bound to the active chat session.
 
 ## Ownership
 

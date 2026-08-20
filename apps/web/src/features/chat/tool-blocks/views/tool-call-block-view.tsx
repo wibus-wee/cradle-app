@@ -34,6 +34,7 @@ import { describeToolCall, readToolInputPayload, readToolPayload } from '../../r
 import { hasWorkflowDetails, readWorkflowSurfaceSnapshot } from '../../rendering/workflow-surface'
 import type { ToolCallBlockProps } from '../lib/tool-call-block-types'
 import { hasHeroContent } from '../lib/tool-hero-content'
+import type { ArtifactOpenInput } from './artifact-preview-view'
 import type { PlanDocumentOpenInput } from './plan-document-preview-view'
 import {
   DetailSection,
@@ -385,6 +386,7 @@ export type ToolCallBlockViewProps = Omit<
     surface: WorkflowSurface
   }) => void
   onOpenPlanDocument?: (input: PlanDocumentOpenInput) => void
+  onOpenArtifact?: (input: ArtifactOpenInput) => void
 }
 
 /** Props-only tool surface. Browser-panel orchestration stays in ToolCallBlock. */
@@ -404,6 +406,7 @@ export function ToolCallBlockView({
   onOpenWorkflowSurface,
   onWorkflowSurfaceChange,
   onOpenPlanDocument,
+  onOpenArtifact,
   children,
   blobSessionId,
 }: ToolCallBlockViewProps) {
@@ -680,6 +683,7 @@ export function ToolCallBlockView({
                 errorText={errorText}
                 toolCallId={toolCallId}
                 onOpenPlanDocument={onOpenPlanDocument}
+                onOpenArtifact={onOpenArtifact}
                 blobSessionId={blobSessionId}
               />
             </div>

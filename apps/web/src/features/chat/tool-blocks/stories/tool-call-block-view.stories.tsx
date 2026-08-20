@@ -28,6 +28,7 @@ function ToolFixtureRow({
         onOpenSubagentOutput={input => onActivity(`subagent: ${input.agentName}`)}
         onOpenWorkflowSurface={input => onActivity(`workflow: ${input.title}`)}
         onOpenPlanDocument={input => onActivity(`plan: ${input.toolCallId}`)}
+        onOpenArtifact={input => onActivity(`artifact: ${input.artifactId}`)}
       />
     </div>
   )
