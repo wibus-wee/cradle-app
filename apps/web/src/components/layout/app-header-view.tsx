@@ -86,8 +86,8 @@ export function AppHeaderView({
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             {(sidebar.inSheet && !sidebar.sheetOpen) || (!sidebar.inSheet && sidebar.collapsed)
-              ? <PanelLeftOpenIcon aria-hidden="true" />
-              : <PanelLeftCloseIcon aria-hidden="true" />}
+              ? <PanelLeftOpenIcon className="size-3.5" aria-hidden="true" />
+              : <PanelLeftCloseIcon className="size-3.5" aria-hidden="true" />}
           </Button>
         </m.div>
       )}
@@ -115,7 +115,7 @@ export function AppHeaderView({
             title={browserPanel.label}
             data-testid="app-header-browser-toggle"
           >
-            <GlobeIcon aria-hidden="true" />
+            <GlobeIcon className="size-3.5" aria-hidden="true" />
           </Button>
         )}
         {bottomPanel && (
@@ -129,7 +129,7 @@ export function AppHeaderView({
             title={bottomPanel.label}
             data-testid="app-header-panel-toggle"
           >
-            <PanelBottomIcon aria-hidden="true" />
+            <PanelBottomIcon className="size-3.5" aria-hidden="true" />
           </Button>
         )}
         {aside && (
@@ -143,7 +143,7 @@ export function AppHeaderView({
             title={aside.label}
             data-testid="app-header-aside-toggle"
           >
-            <PanelRightIcon aria-hidden="true" />
+            <PanelRightIcon className="size-3.5" aria-hidden="true" />
           </Button>
         )}
         {windowControls.rightReservedWidth > 0 && (
