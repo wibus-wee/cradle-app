@@ -102,13 +102,13 @@ describe('terminal finalizer durability barrier', () => {
     vi.spyOn(Date, 'now').mockReturnValue(9_000)
     let messageJson = ''
     commitPreparedSessionEventsWithProjection.mockImplementationOnce(
-      async (_sessionId, prepare) => {
-        const prepared = prepare({} as never)
+      async (_sessionId, prepare) => db().transaction((tx) => {
+        const prepared = prepare(tx)
         const completed = prepared.events.find(event => event.type === 'AssistantMessageCompleted')
         const payload = completed?.payload as { message?: { messageJson?: string } } | undefined
         messageJson = payload?.message?.messageJson ?? ''
         return prepared.result
-      },
+      }),
     )
     const run = activeRun()
     run.runStartedAtMs = 1_000
