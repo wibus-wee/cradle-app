@@ -29,6 +29,17 @@ export interface AppendSessionEventInput {
   occurredAt?: number
 }
 
+export interface AppendSessionEventsInput {
+  aggregateId: string
+  events: ChatSessionEvent[]
+  expectedVersion?: number
+  /** Version read earlier inside the same caller-owned transaction. */
+  knownCurrentVersion?: number
+  occurredAt?: number
+}
+
+const SESSION_EVENT_INSERT_BATCH_SIZE = 100
+
 export function readCurrentSessionEventVersion(
   d: Pick<ChatRuntimeWriteDb, 'select'>,
   aggregateId: string,
@@ -54,32 +65,64 @@ export function appendSessionEvent(
   d: Pick<ChatRuntimeWriteDb, 'select' | 'insert' | 'update'>,
   input: AppendSessionEventInput,
 ): StoredChatSessionEvent {
-  const currentVersion = readCurrentSessionEventVersion(d, input.aggregateId)
+  return appendSessionEvents(d, {
+    aggregateId: input.aggregateId,
+    events: [input.event],
+    expectedVersion: input.expectedVersion,
+    occurredAt: input.occurredAt,
+  })[0]!
+}
+
+/**
+ * Allocate versions once and append a command's facts in bounded multi-row
+ * inserts. Callers own the surrounding transaction so a later chunk failure
+ * rolls back the entire logical append.
+ */
+export function appendSessionEvents(
+  d: Pick<ChatRuntimeWriteDb, 'select' | 'insert' | 'update'>,
+  input: AppendSessionEventsInput,
+): StoredChatSessionEvent[] {
+  if (input.events.length === 0) {
+    return []
+  }
+  const currentVersion = input.knownCurrentVersion
+    ?? readCurrentSessionEventVersion(d, input.aggregateId)
   if (input.expectedVersion !== undefined && currentVersion !== input.expectedVersion) {
     throwConcurrencyConflict(input.aggregateId, input.expectedVersion, currentVersion)
   }
 
-  const version = currentVersion + 1
-  persistEventMessagePayloads(d, input.event)
-  let row
+  for (const event of input.events) {
+    persistEventMessagePayloads(d, event)
+  }
+  const occurredAt = input.occurredAt ?? currentUnixSeconds()
+  const rows = input.events.map((event, index) => ({
+    aggregateId: input.aggregateId,
+    aggregateType: CHAT_SESSION_AGGREGATE_TYPE,
+    version: currentVersion + index + 1,
+    eventType: event.type,
+    payload: serializeChatSessionEventPayload(event),
+    occurredAt,
+  }))
+  const storedRows: Array<typeof sessionEvents.$inferSelect> = []
   try {
-    row = d
-      .insert(sessionEvents)
-      .values({
-        aggregateId: input.aggregateId,
-        aggregateType: CHAT_SESSION_AGGREGATE_TYPE,
-        version,
-        eventType: input.event.type,
-        payload: serializeChatSessionEventPayload(input.event),
-        occurredAt: input.occurredAt ?? currentUnixSeconds(),
-      })
-      .returning()
-      .get()
+    for (let offset = 0; offset < rows.length; offset += SESSION_EVENT_INSERT_BATCH_SIZE) {
+      storedRows.push(...d
+        .insert(sessionEvents)
+        .values(rows.slice(offset, offset + SESSION_EVENT_INSERT_BATCH_SIZE))
+        .returning()
+        .all())
+    }
   }
- catch {
-    throwConcurrencyConflict(input.aggregateId, input.expectedVersion ?? currentVersion, currentVersion)
+  catch {
+    const actualVersion = readCurrentSessionEventVersion(d, input.aggregateId)
+    throwConcurrencyConflict(
+      input.aggregateId,
+      input.expectedVersion ?? currentVersion,
+      actualVersion,
+    )
   }
-  return parseStoredChatSessionEvent(row, payloadId => readMessagePayload(d, payloadId))
+  return storedRows.map(row =>
+    parseStoredChatSessionEvent(row, payloadId => readMessagePayload(d, payloadId)))
 }
 
 export function readSessionEvents(

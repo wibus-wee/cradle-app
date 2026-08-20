@@ -1,9 +1,3 @@
-/**
- * Output: opencode runtime identity and static capabilities.
- * Input: no runtime data.
- * Position: opencode provider package metadata owner.
- */
-
 import type {
   ChatRuntimeCapabilities,
   ChatRuntimeMetadata,

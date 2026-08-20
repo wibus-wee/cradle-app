@@ -9,6 +9,7 @@ import type { AppError } from '../../errors/app-error'
 import { db, initializeDatabase, shutdownInfra } from '../../infra'
 import { resetGitHubAuthProviderForTests, setGitHubAuthProvider } from '../../lib/github/auth-provider'
 import { hasGitHubToken, resetGitHubTokenCache, resolveGitHubToken } from '../../lib/github-api-token'
+import { resetCredentialLifecycleForTests } from '../provider-auth/credential-lifecycle'
 import { resetCredentialKeyringForTests } from '../secrets/service'
 import {
   cancelGitHubDeviceLogin,
@@ -35,6 +36,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setGitHubAuthFetchForTests(null)
+  resetCredentialLifecycleForTests()
   resetGitHubAuthProviderForTests()
   resetGitHubTokenCache()
   vi.useRealTimers()
@@ -74,6 +76,7 @@ describe('gitHub App Device Flow', () => {
   })
 
   it('persists an encrypted connection, rotates it before expiry, and redacts status', async () => {
+    vi.useFakeTimers()
     const responses = [
       { device_code: 'device-secret', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 1 },
       { access_token: 'access-token-one', refresh_token: 'refresh-token-one', expires_in: 1, refresh_token_expires_in: 3600 },
@@ -84,7 +87,7 @@ describe('gitHub App Device Flow', () => {
     setGitHubAuthFetchForTests(async () => jsonResponse(responses.shift() ?? {}))
 
     const start = await startGitHubDeviceLogin()
-    await new Promise(resolve => setTimeout(resolve, 0))
+    await vi.advanceTimersByTimeAsync(0)
     expect(getGitHubDeviceLogin(start.loginId).state).toBe('completed')
 
     const connection = await getGitHubAppConnection()
@@ -118,6 +121,77 @@ describe('gitHub App Device Flow', () => {
     process.env.GH_TOKEN = 'legacy-token'
     await expect(resolveGitHubAppIdentity()).rejects.toMatchObject({ code: 'github_app_connection_expired', status: 401 } satisfies Partial<AppError>)
     await expect(resolveGitHubToken()).rejects.toMatchObject({ code: 'github_app_connection_expired', status: 401 } satisfies Partial<AppError>)
+  })
+
+  it('refreshes an expired access token when reading connection status', async () => {
+    vi.useFakeTimers()
+    const responses = [
+      { device_code: 'device-secret', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 1 },
+      { access_token: 'access-token-one', refresh_token: 'refresh-token-one', expires_in: 1, refresh_token_expires_in: 3600 },
+      { login: 'octocat' },
+      { access_token: 'access-token-two', refresh_token: 'refresh-token-two', expires_in: 3600, refresh_token_expires_in: 7200 },
+    ]
+    let refreshRequests = 0
+    setGitHubAuthFetchForTests(async (input, init) => {
+      if (`${input}`.includes('/access_token') && String(init?.body).includes('grant_type=refresh_token')) {
+        refreshRequests += 1
+      }
+      return jsonResponse(responses.shift() ?? {})
+    })
+
+    await startGitHubDeviceLogin()
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(1_000)
+
+    const connection = await getGitHubAppConnection()
+    expect(connection).toMatchObject({ state: 'connected', viewer: { login: 'octocat' } })
+    expect(refreshRequests).toBe(1)
+  })
+
+  it('shares one refresh across concurrent GitHub callers', async () => {
+    vi.useFakeTimers()
+    let refreshRequests = 0
+    let releaseRefresh!: () => void
+    const refreshGate = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    let notifyRefreshStarted!: () => void
+    const refreshStarted = new Promise<void>((resolve) => {
+      notifyRefreshStarted = resolve
+    })
+    setGitHubAuthFetchForTests(async (input, init) => {
+      if (`${input}`.includes('/device/code')) {
+        return jsonResponse({ device_code: 'device-secret', user_code: 'ABCD-EFGH', verification_uri: 'https://github.com/login/device', expires_in: 900, interval: 1 })
+      }
+      if (`${input}`.includes('/access_token')) {
+        const body = String(init?.body)
+        if (body.includes('grant_type=refresh_token')) {
+          refreshRequests += 1
+          notifyRefreshStarted()
+          await refreshGate
+          return jsonResponse({ access_token: 'access-token-two', refresh_token: 'refresh-token-two', expires_in: 3600, refresh_token_expires_in: 7200 })
+        }
+        return jsonResponse({ access_token: 'access-token-one', refresh_token: 'refresh-token-one', expires_in: 1, refresh_token_expires_in: 3600 })
+      }
+      return jsonResponse({ login: 'octocat' })
+    })
+
+    const start = await startGitHubDeviceLogin()
+    await vi.advanceTimersByTimeAsync(0)
+    await vi.advanceTimersByTimeAsync(1_000)
+
+    const first = resolveGitHubAppIdentity()
+    await refreshStarted
+    const second = resolveGitHubAppIdentity()
+    releaseRefresh()
+
+    const identities = await Promise.all([first, second])
+    expect(refreshRequests).toBe(1)
+    expect(identities).toEqual([
+      expect.objectContaining({ accessToken: 'access-token-two' }),
+      expect.objectContaining({ accessToken: 'access-token-two' }),
+    ])
+    expect(getGitHubDeviceLogin(start.loginId).state).toBe('completed')
   })
 
   it('waits through pending and slow-down responses before completing', async () => {

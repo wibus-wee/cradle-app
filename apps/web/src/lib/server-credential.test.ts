@@ -32,7 +32,6 @@ describe('cradleFetch credential injection', () => {
     window.cradle = {
       env: {
         isElectron: true,
-        serverAuthToken: 'secret-token',
         serverUrl: 'http://127.0.0.1:21423',
       },
     } as unknown as typeof window.cradle
@@ -51,14 +50,13 @@ describe('cradleFetch credential injection', () => {
     expect(init?.credentials).toBe('omit')
   })
 
-  it('attaches Bearer for browser/attached HTTP Server requests', async () => {
+  it('does not attach a bearer token for browser/attached HTTP Server requests', async () => {
     applyDesktopServerReadyEndpoint({
       serverUrl: 'http://127.0.0.1:21423',
     })
     window.cradle = {
       env: {
         isElectron: true,
-        serverAuthToken: 'secret-token',
         serverUrl: 'http://127.0.0.1:21423',
       },
     } as unknown as typeof window.cradle
@@ -70,7 +68,7 @@ describe('cradleFetch credential injection', () => {
 
     const [, init] = fetchMock.mock.calls[0]!
     const headers = new Headers(init?.headers)
-    expect(headers.get('authorization')).toBe('Bearer secret-token')
+    expect(headers.has('authorization')).toBe(false)
     expect(init?.credentials).toBe('include')
   })
 

@@ -185,6 +185,18 @@ describe('sdk-backed providers in unified chat runtime', () => {
         type: 'stream_event',
         session_id: 'claude-session-1',
         event: {
+          type: 'message_start',
+          message: {
+            id: 'msg_1',
+            model: 'claude-sonnet-4-20250514',
+            usage: { input_tokens: 9, output_tokens: 1 },
+          },
+        },
+      },
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-1',
+        event: {
           type: 'content_block_start',
           index: 0,
           content_block: { type: 'thinking' },
@@ -206,6 +218,14 @@ describe('sdk-backed providers in unified chat runtime', () => {
           id: 'msg_1',
           model: 'claude-sonnet-4-20250514',
           content: [{ type: 'text', text: 'Claude says hi' }],
+          usage: { input_tokens: 9, output_tokens: 1 },
+        },
+      },
+      {
+        type: 'stream_event',
+        session_id: 'claude-session-1',
+        event: {
+          type: 'message_delta',
           usage: { input_tokens: 9, output_tokens: 4 },
         },
       },

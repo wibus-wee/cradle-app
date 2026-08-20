@@ -636,7 +636,7 @@ describe('gitHub session-await sources', () => {
     })
   })
 
-  it('keeps the await pending when branch-protection lookup is temporarily unavailable', async () => {
+  it('completes the await when branch-protection lookup is unavailable without bypass rules', async () => {
     installGitHubFetch({
       '/repos/acme/app/pulls/42': {
         number: 42,
@@ -675,8 +675,9 @@ describe('gitHub session-await sources', () => {
 
     expect(result).toEqual({
       awaitId: 'await-1',
-      matched: false,
-      transientError: 'GitHub branch protection API unavailable',
+      matched: true,
+      resumeText: 'GitHub checks passed. All 1 checks/statuses succeeded.',
+      resumePayloadJson: expect.stringContaining('"allSuccess":true'),
     })
   })
 

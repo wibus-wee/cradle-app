@@ -58,12 +58,12 @@ const AppSidebarContent = memo(({
         </div>
       )}
       <div
-        className="relative flex flex-col flex-1 overflow-hidden"
+        className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         <m.div
           className={cn(
-            'absolute inset-0 flex flex-col overflow-hidden',
+            'absolute inset-0 flex min-h-0 flex-col overflow-hidden',
             isSettings ? 'pointer-events-auto' : 'pointer-events-none',
           )}
           data-testid="settings-sidebar-pane"
@@ -84,7 +84,7 @@ const AppSidebarContent = memo(({
         </m.div>
         <m.div
           className={cn(
-            'absolute inset-0 flex flex-col overflow-hidden',
+            'absolute inset-0 flex min-h-0 flex-col overflow-hidden',
             isSettings ? 'pointer-events-none' : 'pointer-events-auto',
           )}
           data-testid="workspace-sidebar-pane"
@@ -173,7 +173,7 @@ export function AppSidebar() {
   return (
     <>
       <m.aside
-        className="flex flex-col shrink-0 bg-sidebar text-sidebar-foreground overflow-hidden"
+        className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-sidebar text-sidebar-foreground"
         animate={{ width: currentWidth }}
         transition={dragWidth === null ? SIDEBAR_SPRING : INSTANT}
         style={{ width: currentWidth }}

@@ -36,10 +36,8 @@ interface ChatScrollDisplayRow {
 interface UseChatScrollRuntimeOptions {
   active: boolean
   sessionId: string | null
-  /** Virtualized transcript rows (display order). Prefer expanded steer rows. */
-  displayRows?: ChatScrollDisplayRow[]
-  /** @deprecated Prefer displayRows — kept for callers that only have canonical ids. */
-  messageIds?: string[]
+  /** Virtualized transcript rows in display order, including expanded steer rows. */
+  displayRows: ChatScrollDisplayRow[]
   status: string
 }
 
@@ -75,12 +73,11 @@ export function useChatScrollRuntime({
   active,
   sessionId,
   displayRows,
-  messageIds: legacyMessageIds,
   status,
 }: UseChatScrollRuntimeOptions): ChatScrollRuntime {
   const messageIds = useMemo(
-    () => displayRows?.map(row => row.messageId) ?? legacyMessageIds ?? [],
-    [displayRows, legacyMessageIds],
+    () => displayRows.map(row => row.messageId),
+    [displayRows],
   )
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)

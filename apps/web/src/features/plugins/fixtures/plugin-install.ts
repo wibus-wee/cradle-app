@@ -99,6 +99,7 @@ export const installedPluginFixture = {
     trusted: true,
     reason: 'Installed from a reviewed source.',
     checksum: 'fixture-checksum',
+    grantedPermissions: [],
   },
   activation: {
     enabled: true,

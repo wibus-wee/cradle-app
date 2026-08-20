@@ -20,6 +20,7 @@
   "history.loadingEarlier": "正在加载更早的消息…",
   "minimap.assistantReply": "助手回复",
   "minimap.userMessage": "用户消息",
+  "messageSelection.quote": "引用选中内容",
   "pastedText.chars_many": "{{count}} 个字符",
   "pastedText.chars_one": "{{count}} 个字符",
   "pastedText.chars_other": "{{count}} 个字符",

@@ -1,7 +1,10 @@
 import type { WorkSummary } from '~/features/work/use-work'
 
 import type { WorkspaceSession } from './use-session'
-import { isWorkspaceSessionRunning } from './workspace-session-status'
+import {
+  hasUnreadWorkspaceSessionError,
+  isWorkspaceSessionRunning,
+} from './workspace-session-status'
 import type {
   WorkspaceSidebarEnvironmentFilter,
   WorkspaceSidebarListFilters,
@@ -66,7 +69,7 @@ function matchesStatusFilters(
       case 'streaming':
         return isWorkspaceSessionRunning(session, locallyStreamingSessionIds)
       case 'error':
-        return session.status === 'error' || locallyErroredSessionIds.has(session.id)
+        return hasUnreadWorkspaceSessionError(session, locallyErroredSessionIds)
       case 'needsYou':
         return attentionBySessionId.has(session.id)
           || work?.activity === 'waiting'

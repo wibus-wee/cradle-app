@@ -25,6 +25,27 @@ export type PostAuthWebsocketTicketResponses = {
 
 export type PostAuthWebsocketTicketResponse = PostAuthWebsocketTicketResponses[keyof PostAuthWebsocketTicketResponses];
 
+export type PostAuthResourceTicketData = {
+    body: {
+        path: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/auth/resource-ticket';
+};
+
+export type PostAuthResourceTicketResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ticket: string;
+        expiresAt: number;
+    };
+};
+
+export type PostAuthResourceTicketResponse = PostAuthResourceTicketResponses[keyof PostAuthResourceTicketResponses];
+
 export type PostAuthBrowserSessionData = {
     body?: never;
     path?: never;
@@ -1312,6 +1333,24 @@ export type PostWorkspacesByWorkspaceIdMigrateResponses = {
 
 export type PostWorkspacesByWorkspaceIdMigrateResponse = PostWorkspacesByWorkspaceIdMigrateResponses[keyof PostWorkspacesByWorkspaceIdMigrateResponses];
 
+export type GetCodeActivitySessionsBySessionIdEventsData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/code-activity/sessions/{sessionId}/events';
+};
+
+export type GetCodeActivitySessionsBySessionIdEventsResponses = {
+    /**
+     * Server-sent Code Activity source events.
+     */
+    200: string;
+};
+
+export type GetCodeActivitySessionsBySessionIdEventsResponse = GetCodeActivitySessionsBySessionIdEventsResponses[keyof GetCodeActivitySessionsBySessionIdEventsResponses];
+
 export type GetFilesystemBrowseData = {
     body?: never;
     path?: never;
@@ -2176,6 +2215,7 @@ export type GetProviderTargetsResponses = {
         sourceKey: string | null;
         externalRecordId: string | null;
         sourceFingerprint: string | null;
+        effectiveProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
         createdAt: number;
         updatedAt: number;
     }>;
@@ -2239,6 +2279,7 @@ export type PutProviderTargetsByProviderTargetIdResponses = {
         sourceKey: string | null;
         externalRecordId: string | null;
         sourceFingerprint: string | null;
+        effectiveProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
         createdAt: number;
         updatedAt: number;
     };
@@ -2437,33 +2478,6 @@ export type GetProviderTargetsByProviderTargetIdCodexAccountDiagnosticsResponses
             email: string | null;
             planType: string | null;
             requiresOpenaiAuth: boolean | null;
-        } | null;
-        rateLimits: {
-            limitId: string | null;
-            limitName: string | null;
-            primary: {
-                usedPercent: number;
-                windowDurationMins: number | null;
-                resetsAt: number | null;
-            } | null;
-            secondary: {
-                usedPercent: number;
-                windowDurationMins: number | null;
-                resetsAt: number | null;
-            } | null;
-            credits: {
-                hasCredits: boolean;
-                unlimited: boolean;
-                balance: string | null;
-            } | null;
-            individualLimit: {
-                limit: string;
-                used: string;
-                remainingPercent: number;
-                resetsAt: number;
-            } | null;
-            planType: string | null;
-            rateLimitReachedType: string | null;
         } | null;
         rateLimitsByLimitId: {
             [key: string]: {
@@ -2743,6 +2757,82 @@ export type PostProviderTargetsByProviderTargetIdTestResponses = {
 };
 
 export type PostProviderTargetsByProviderTargetIdTestResponse = PostProviderTargetsByProviderTargetIdTestResponses[keyof PostProviderTargetsByProviderTargetIdTestResponses];
+
+export type GetProviderTargetsByProviderTargetIdExtensionsData = {
+    body?: never;
+    path: {
+        providerTargetId: string;
+    };
+    query?: never;
+    url: '/provider-targets/{providerTargetId}/extensions/';
+};
+
+export type GetProviderTargetsByProviderTargetIdExtensionsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        providerTargetId: string;
+        extensionOwner: string;
+        extensionId: string;
+        extensionKey: string;
+        label: string;
+        description: string | null;
+        applicable: boolean;
+        unavailableReason: string | null;
+        desiredEnabled: boolean;
+        status: 'disabled' | 'enabling' | 'enabled' | 'disabling' | 'suspended' | 'error';
+        credentialStrategy: 'borrowed-static' | 'exclusive-refreshable' | null;
+        credentialOwner: 'host' | 'extension';
+        providerKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        addedProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        lastError: string | null;
+        updatedAt: number;
+    }>;
+};
+
+export type GetProviderTargetsByProviderTargetIdExtensionsResponse = GetProviderTargetsByProviderTargetIdExtensionsResponses[keyof GetProviderTargetsByProviderTargetIdExtensionsResponses];
+
+export type PutProviderTargetsByProviderTargetIdExtensionsData = {
+    body: {
+        owner: string;
+        id: string;
+        enabled: boolean;
+    };
+    path: {
+        providerTargetId: string;
+    };
+    query?: never;
+    url: '/provider-targets/{providerTargetId}/extensions/';
+};
+
+export type PutProviderTargetsByProviderTargetIdExtensionsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        providerTargetId: string;
+        extensionOwner: string;
+        extensionId: string;
+        extensionKey: string;
+        label: string;
+        description: string | null;
+        applicable: boolean;
+        unavailableReason: string | null;
+        desiredEnabled: boolean;
+        status: 'disabled' | 'enabling' | 'enabled' | 'disabling' | 'suspended' | 'error';
+        credentialStrategy: 'borrowed-static' | 'exclusive-refreshable' | null;
+        credentialOwner: 'host' | 'extension';
+        providerKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        addedProviderKinds: Array<'openai-compatible' | 'anthropic' | 'universal'>;
+        lastError: string | null;
+        updatedAt: number;
+    };
+};
+
+export type PutProviderTargetsByProviderTargetIdExtensionsResponse = PutProviderTargetsByProviderTargetIdExtensionsResponses[keyof PutProviderTargetsByProviderTargetIdExtensionsResponses];
 
 export type GetRelayServersData = {
     body?: never;
@@ -7147,6 +7237,8 @@ export type GetSessionsData = {
         origin?: string;
         sessionGroupId?: string;
         archived?: boolean;
+        cursor?: string;
+        limit?: string | number;
     };
     url: '/sessions/';
 };
@@ -7155,44 +7247,47 @@ export type GetSessionsResponses = {
     /**
      * Response for status 200
      */
-    200: Array<{
-        id: string;
-        execution: {
-            kind: 'local';
-        } | {
-            kind: 'remote-host';
-            hostId: string;
-            remoteSessionId: string;
-        };
-        parentSessionId: string | null;
-        sideContextSource: 'provider-native' | 'cradle-context' | null;
-        workspaceId: string | null;
-        title: string | null;
-        origin: string;
-        providerTargetId: string | null;
-        agentId: string | null;
-        modelId: string | null;
-        thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
-        linkedIssueId: string | null;
-        sessionGroupId: string | null;
-        runtimeKind: string;
-        status: 'idle' | 'streaming' | 'error';
-        pinned: number;
-        archivedAt: number | null;
-        lastReadAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-        latestUserMessageAt: number | null;
-        latestAssistantMessageAt: number | null;
-        unread: boolean;
-        isIsolated: boolean;
-        worktreeId: string | null;
-        worktreeBranch: string | null;
-        worktreePath: string | null;
-        worktreeHealth: 'ok' | 'missing' | 'stale' | null;
-        pendingWorktreeId: string | null;
-        isolationBoundaryRequired: boolean;
-    }>;
+    200: {
+        items: Array<{
+            id: string;
+            execution: {
+                kind: 'local';
+            } | {
+                kind: 'remote-host';
+                hostId: string;
+                remoteSessionId: string;
+            };
+            parentSessionId: string | null;
+            sideContextSource: 'provider-native' | 'cradle-context' | null;
+            workspaceId: string | null;
+            title: string | null;
+            origin: string;
+            providerTargetId: string | null;
+            agentId: string | null;
+            modelId: string | null;
+            thinkingEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
+            linkedIssueId: string | null;
+            sessionGroupId: string | null;
+            runtimeKind: string;
+            status: 'idle' | 'streaming' | 'error';
+            pinned: number;
+            archivedAt: number | null;
+            lastReadAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+            latestUserMessageAt: number | null;
+            latestAssistantMessageAt: number | null;
+            unread: boolean;
+            isIsolated: boolean;
+            worktreeId: string | null;
+            worktreeBranch: string | null;
+            worktreePath: string | null;
+            worktreeHealth: 'ok' | 'missing' | 'stale' | null;
+            pendingWorktreeId: string | null;
+            isolationBoundaryRequired: boolean;
+        }>;
+        nextCursor: string | null;
+    };
 };
 
 export type GetSessionsResponse = GetSessionsResponses[keyof GetSessionsResponses];
@@ -8452,6 +8547,8 @@ export type GetWorksData = {
         workspaceId?: string;
         linkedIssueId?: string;
         archived?: boolean;
+        cursor?: string;
+        limit?: string | number;
     };
     url: '/works';
 };
@@ -8460,46 +8557,49 @@ export type GetWorksResponses = {
     /**
      * Response for status 200
      */
-    200: Array<{
-        id: string;
-        title: string;
-        objective: string;
-        linkedIssueId: string | null;
-        handoffTitle: string | null;
-        handoffSummary: string | null;
-        handoffTestPlan: string | null;
-        preparedAt: number | null;
-        lastSubmittedAt: number | null;
-        closedAt: number | null;
-        archivedAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-        workspaceId: string;
-        primarySessionId: string;
-        activity: 'idle' | 'running' | 'waiting' | 'blocked';
-        pullRequest: {
-            owner: string;
-            repo: string;
-            number: number;
-            url: string;
+    200: {
+        items: Array<{
+            id: string;
             title: string;
-            isDraft: boolean;
-            state: 'open' | 'closed';
-            merged: boolean;
-            headRef: string;
-            baseRef: string;
-            headSha: string | null;
+            objective: string;
+            linkedIssueId: string | null;
+            handoffTitle: string | null;
+            handoffSummary: string | null;
+            handoffTestPlan: string | null;
+            preparedAt: number | null;
+            lastSubmittedAt: number | null;
+            closedAt: number | null;
+            archivedAt: number | null;
             createdAt: number;
             updatedAt: number;
-            author?: {
-                login: string;
-                avatarUrl: string;
+            workspaceId: string;
+            primarySessionId: string;
+            activity: 'idle' | 'running' | 'waiting' | 'blocked';
+            pullRequest: {
+                owner: string;
+                repo: string;
+                number: number;
                 url: string;
+                title: string;
+                isDraft: boolean;
+                state: 'open' | 'closed';
+                merged: boolean;
+                headRef: string;
+                baseRef: string;
+                headSha: string | null;
+                createdAt: number;
+                updatedAt: number;
+                author?: {
+                    login: string;
+                    avatarUrl: string;
+                    url: string;
+                } | null;
+                additions?: number;
+                deletions?: number;
             } | null;
-            additions?: number;
-            deletions?: number;
-        } | null;
-    }>;
+        }>;
+        nextCursor: string | null;
+    };
 };
 
 export type GetWorksResponse = GetWorksResponses[keyof GetWorksResponses];
@@ -8511,7 +8611,7 @@ export type PostWorksData = {
         goal?: string;
         objective?: string;
         linkedIssueId?: string;
-        baseStrategy?: 'source-head' | 'remote-default';
+        baseBranch?: string;
         providerTargetId?: string;
         modelId?: string | null;
         thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
@@ -9618,6 +9718,26 @@ export type GetPullRequestsReviewingResponses = {
 
 export type GetPullRequestsReviewingResponse = GetPullRequestsReviewingResponses[keyof GetPullRequestsReviewingResponses];
 
+export type PostPullRequestsRefreshData = {
+    body: {
+        login: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/pull-requests/refresh';
+};
+
+export type PostPullRequestsRefreshResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        refreshed: boolean;
+    };
+};
+
+export type PostPullRequestsRefreshResponse = PostPullRequestsRefreshResponses[keyof PostPullRequestsRefreshResponses];
+
 export type GetPullRequestsByOwnerByRepoAssignableUsersData = {
     body?: never;
     path: {
@@ -9746,6 +9866,112 @@ export type GetPullRequestsByOwnerByRepoByNumberDetailResponses = {
 };
 
 export type GetPullRequestsByOwnerByRepoByNumberDetailResponse = GetPullRequestsByOwnerByRepoByNumberDetailResponses[keyof GetPullRequestsByOwnerByRepoByNumberDetailResponses];
+
+export type PostPullRequestsByOwnerByRepoByNumberRefreshData = {
+    body: {
+        force?: boolean;
+    };
+    path: {
+        owner: string;
+        repo: string;
+        number: string;
+    };
+    query?: never;
+    url: '/pull-requests/{owner}/{repo}/{number}/refresh';
+};
+
+export type PostPullRequestsByOwnerByRepoByNumberRefreshResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        pullRequest: {
+            owner: string;
+            repo: string;
+            number: number;
+            url: string;
+            title: string;
+            isDraft: boolean;
+            state: 'open' | 'closed';
+            merged: boolean;
+            headRef: string;
+            baseRef: string;
+            headSha: string | null;
+            createdAt: number;
+            updatedAt: number;
+            author: {
+                login: string;
+                avatarUrl: string;
+                url: string;
+            } | null;
+            additions: number;
+            deletions: number;
+            body: string | null;
+            changedFiles: number;
+            commits: number;
+            comments: number;
+            reviewComments: number;
+            mergeable: boolean | null;
+            mergeableState: string;
+            createdAtIso: string;
+            updatedAtIso: string;
+            closedAtIso: string | null;
+            mergedAtIso: string | null;
+            reviewers: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            assignees: Array<{
+                login: string;
+                avatarUrl: string;
+                url: string;
+            }>;
+            labels: Array<{
+                name: string;
+                color: string;
+            }>;
+            checksState: 'success' | 'failure' | 'pending' | 'neutral';
+            checks: Array<{
+                id: string;
+                name: string;
+                status: 'queued' | 'in_progress' | 'completed';
+                conclusion: string | null;
+                url: string | null;
+            }>;
+            allowedMergeMethods: Array<'merge' | 'squash' | 'rebase'>;
+            mergeBlockers: Array<string>;
+            canMerge: boolean;
+        };
+        timeline: Array<{
+            id: string;
+            kind: 'comment' | 'review';
+            author: {
+                login: string;
+                avatarUrl: string | null;
+                url: string | null;
+            } | null;
+            body: string | null;
+            state: string | null;
+            createdAt: string;
+            url: string | null;
+        }>;
+        files: Array<{
+            sha: string;
+            filename: string;
+            previousFilename: string | null;
+            status: string;
+            additions: number;
+            deletions: number;
+            changes: number;
+            patch: string | null;
+            blobUrl: string;
+            rawUrl: string;
+        }>;
+    };
+};
+
+export type PostPullRequestsByOwnerByRepoByNumberRefreshResponse = PostPullRequestsByOwnerByRepoByNumberRefreshResponses[keyof PostPullRequestsByOwnerByRepoByNumberRefreshResponses];
 
 export type GetPullRequestsByOwnerByRepoByNumberFingerprintData = {
     body?: never;
@@ -12281,6 +12507,7 @@ export type GetPluginsResponses = {
             trusted: boolean;
             reason: string | null;
             checksum: string | null;
+            grantedPermissions: Array<string>;
         };
         activation: {
             enabled: boolean;
@@ -12423,6 +12650,7 @@ export type GetPluginsSourcesResponses = {
                 trusted: boolean;
                 reason: string | null;
                 checksum: string | null;
+                grantedPermissions: Array<string>;
             };
             activation: {
                 enabled: boolean;
@@ -12544,6 +12772,7 @@ export type PostPluginsSourcesResponses = {
                     trusted: boolean;
                     reason: string | null;
                     checksum: string | null;
+                    grantedPermissions: Array<string>;
                 };
                 activation: {
                     enabled: boolean;
@@ -12630,6 +12859,7 @@ export type PostPluginsSourcesResponses = {
                 trusted: boolean;
                 reason: string | null;
                 checksum: string | null;
+                grantedPermissions: Array<string>;
             };
             activation: {
                 enabled: boolean;
@@ -12993,6 +13223,7 @@ export type GetPluginsSourcesByIdResponses = {
                 trusted: boolean;
                 reason: string | null;
                 checksum: string | null;
+                grantedPermissions: Array<string>;
             };
             activation: {
                 enabled: boolean;
@@ -13109,6 +13340,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
                     trusted: boolean;
                     reason: string | null;
                     checksum: string | null;
+                    grantedPermissions: Array<string>;
                 };
                 activation: {
                     enabled: boolean;
@@ -13195,6 +13427,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
                 trusted: boolean;
                 reason: string | null;
                 checksum: string | null;
+                grantedPermissions: Array<string>;
             };
             activation: {
                 enabled: boolean;
@@ -13383,6 +13616,7 @@ export type GetPluginsByRouteSegmentResponses = {
             trusted: boolean;
             reason: string | null;
             checksum: string | null;
+            grantedPermissions: Array<string>;
         };
         activation: {
             enabled: boolean;
@@ -13488,6 +13722,7 @@ export type PatchPluginsByRouteSegmentEnabledResponses = {
             trusted: boolean;
             reason: string | null;
             checksum: string | null;
+            grantedPermissions: Array<string>;
         };
         activation: {
             enabled: boolean;
@@ -21626,6 +21861,59 @@ export type PostChatSessionsBySessionIdBangCommandResponses = {
 
 export type PostChatSessionsBySessionIdBangCommandResponse = PostChatSessionsBySessionIdBangCommandResponses[keyof PostChatSessionsBySessionIdBangCommandResponses];
 
+export type PostChatSessionsBySessionIdBangTranscriptData = {
+    body: {
+        transcript: string;
+        command?: string;
+        durationMs?: number;
+        exitCode?: number | null;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/bang-transcript';
+};
+
+export type PostChatSessionsBySessionIdBangTranscriptResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        command: string;
+        stdout: string;
+        stderr: string;
+        exitCode: number | null;
+        durationMs: number;
+        timedOut: boolean;
+        truncated: boolean;
+        userMessageId: string;
+        resultMessageId: string;
+        userMessage: {
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        };
+        resultMessage: {
+            id: string;
+            role: 'system' | 'user' | 'assistant';
+            parts: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+            metadata?: unknown;
+            [key: string]: unknown;
+        };
+    };
+};
+
+export type PostChatSessionsBySessionIdBangTranscriptResponse = PostChatSessionsBySessionIdBangTranscriptResponses[keyof PostChatSessionsBySessionIdBangTranscriptResponses];
+
 export type PostChatSessionsBySessionIdObservationsData = {
     body: {
         text: string;
@@ -21870,6 +22158,52 @@ export type GetChatSessionsBySessionIdMessagesResponses = {
 };
 
 export type GetChatSessionsBySessionIdMessagesResponse = GetChatSessionsBySessionIdMessagesResponses[keyof GetChatSessionsBySessionIdMessagesResponses];
+
+export type GetChatSessionsBySessionIdMessagePreviewsData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: {
+        cursor?: string;
+        limit?: number;
+    };
+    url: '/chat/sessions/{sessionId}/message-previews';
+};
+
+export type GetChatSessionsBySessionIdMessagePreviewsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        revision: number;
+        rows: Array<{
+            messageId: string;
+            role: 'user' | 'assistant';
+            status: 'streaming' | 'complete' | 'aborted' | 'failed';
+            errorText?: string;
+            preview: string;
+            previewTruncated: boolean;
+            parentMessageId: string | null;
+            parentToolCallId: string | null;
+            taskId: string | null;
+            depth: number;
+            message: {
+                id: string;
+                role: 'system' | 'user' | 'assistant';
+                parts: Array<{
+                    type: string;
+                    [key: string]: unknown;
+                }>;
+                metadata?: unknown;
+                [key: string]: unknown;
+            };
+        }>;
+        nextCursor: string | null;
+    };
+};
+
+export type GetChatSessionsBySessionIdMessagePreviewsResponse = GetChatSessionsBySessionIdMessagePreviewsResponses[keyof GetChatSessionsBySessionIdMessagePreviewsResponses];
 
 export type GetChatSessionsBySessionIdMessagesByMessageIdData = {
     body?: never;
@@ -22650,6 +22984,7 @@ export type GetChronicleConfigResponses = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -22678,6 +23013,7 @@ export type PutChronicleConfigData = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -22710,6 +23046,7 @@ export type PutChronicleConfigResponses = {
         dreamSchedulerIntervalMs?: number;
         dreamSchedulerApplyMerge?: boolean;
         audioCaptureEnabled: boolean;
+        audioCaptureMode?: 'meeting' | 'continuous';
         audioSource?: 'microphone' | 'system' | 'mixed';
         audioSegmentMs: number;
         audioSegmentIntervalMs: number;
@@ -22925,6 +23262,7 @@ export type GetChronicleStatusResponses = {
         activityPipelineIntervalMs: number;
         activityPipelineBatchSize: number;
         audioCaptureEnabled: boolean;
+        audioCaptureMode: 'meeting' | 'continuous';
         audioRuntimeStatus: 'disabled' | 'armed' | 'unavailable';
         closedEyesDiscardEnabled: boolean;
         closedEyesMode: 'auto' | 'always-record' | 'always-pause';
@@ -23379,7 +23717,10 @@ export type GetChronicleAudioTranscriptsResponses = {
             segmentIndex: number;
             startMs: number;
             endMs: number | null;
+            speakerProfileId: string | null;
             speakerLabel: string | null;
+            speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+            speakerMatchConfidence: number | null;
             text: string;
             confidence: number | null;
             language: string | null;
@@ -23406,6 +23747,9 @@ export type PostChronicleAudioTranscriptsData = {
             startMs: number;
             endMs?: number | null;
             speakerLabel?: string | null;
+            speakerCandidateKey?: string | null;
+            speakerEmbedding?: Array<number> | null;
+            speakerEmbeddingModelId?: string | null;
             text: string;
             confidence?: number | null;
             language?: string | null;
@@ -23447,7 +23791,10 @@ export type PostChronicleAudioTranscriptsResponses = {
             segmentIndex: number;
             startMs: number;
             endMs: number | null;
+            speakerProfileId: string | null;
             speakerLabel: string | null;
+            speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+            speakerMatchConfidence: number | null;
             text: string;
             confidence: number | null;
             language: string | null;
@@ -23474,9 +23821,10 @@ export type GetChronicleSpeakerProfilesResponses = {
         displayName: string;
         normalizedLabel: string;
         aliases: Array<string>;
-        embedding: Array<number> | null;
+        hasVoiceprint: boolean;
         embeddingDimensions: number | null;
         embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
         sampleCount: number;
         lastSeenAt: string | null;
         lastSeenAtUnix: number | null;
@@ -23521,9 +23869,10 @@ export type PostChronicleSpeakerProfilesResponses = {
         displayName: string;
         normalizedLabel: string;
         aliases: Array<string>;
-        embedding: Array<number> | null;
+        hasVoiceprint: boolean;
         embeddingDimensions: number | null;
         embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
         sampleCount: number;
         lastSeenAt: string | null;
         lastSeenAtUnix: number | null;
@@ -23540,6 +23889,140 @@ export type PostChronicleSpeakerProfilesResponses = {
 };
 
 export type PostChronicleSpeakerProfilesResponse = PostChronicleSpeakerProfilesResponses[keyof PostChronicleSpeakerProfilesResponses];
+
+export type DeleteChronicleSpeakerProfilesByProfileIdData = {
+    body?: never;
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}';
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdResponse = DeleteChronicleSpeakerProfilesByProfileIdResponses[keyof DeleteChronicleSpeakerProfilesByProfileIdResponses];
+
+export type PatchChronicleSpeakerProfilesByProfileIdData = {
+    body: {
+        displayName: string;
+    };
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}';
+};
+
+export type PatchChronicleSpeakerProfilesByProfileIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        displayName: string;
+        normalizedLabel: string;
+        aliases: Array<string>;
+        hasVoiceprint: boolean;
+        embeddingDimensions: number | null;
+        embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
+        sampleCount: number;
+        lastSeenAt: string | null;
+        lastSeenAtUnix: number | null;
+        sourceTranscriptId: string | null;
+        sourceSegmentId: string | null;
+        metadata: {
+            [key: string]: unknown;
+        };
+        createdAt: string;
+        createdAtUnix: number;
+        updatedAt: string;
+        updatedAtUnix: number;
+    };
+};
+
+export type PatchChronicleSpeakerProfilesByProfileIdResponse = PatchChronicleSpeakerProfilesByProfileIdResponses[keyof PatchChronicleSpeakerProfilesByProfileIdResponses];
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintData = {
+    body?: never;
+    path: {
+        profileId: string;
+    };
+    query?: never;
+    url: '/chronicle/speaker-profiles/{profileId}/voiceprint';
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        workspaceId: string | null;
+        displayName: string;
+        normalizedLabel: string;
+        aliases: Array<string>;
+        hasVoiceprint: boolean;
+        embeddingDimensions: number | null;
+        embeddingModelId: string | null;
+        identitySource: 'automatic' | 'user';
+        sampleCount: number;
+        lastSeenAt: string | null;
+        lastSeenAtUnix: number | null;
+        sourceTranscriptId: string | null;
+        sourceSegmentId: string | null;
+        metadata: {
+            [key: string]: unknown;
+        };
+        createdAt: string;
+        createdAtUnix: number;
+        updatedAt: string;
+        updatedAtUnix: number;
+    };
+};
+
+export type DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponse = DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses[keyof DeleteChronicleSpeakerProfilesByProfileIdVoiceprintResponses];
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerData = {
+    body: {
+        speakerProfileId: string | null;
+    };
+    path: {
+        segmentId: string;
+    };
+    query?: never;
+    url: '/chronicle/audio-segments/{segmentId}/speaker';
+};
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        segmentIndex: number;
+        startMs: number;
+        endMs: number | null;
+        speakerProfileId: string | null;
+        speakerLabel: string | null;
+        speakerAssignmentSource: 'automatic' | 'user' | 'unassigned';
+        speakerMatchConfidence: number | null;
+        text: string;
+        confidence: number | null;
+        language: string | null;
+    };
+};
+
+export type PatchChronicleAudioSegmentsBySegmentIdSpeakerResponse = PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses[keyof PatchChronicleAudioSegmentsBySegmentIdSpeakerResponses];
 
 export type GetChronicleAudioRawSegmentsData = {
     body?: never;
@@ -24438,6 +24921,7 @@ export type GetChronicleActivityMonitorStatusResponses = {
             activityPipelineIntervalMs: number;
             activityPipelineBatchSize: number;
             audioCaptureEnabled: boolean;
+            audioCaptureMode: 'meeting' | 'continuous';
             audioSource: 'microphone' | 'system' | 'mixed';
             closedEyesDiscardEnabled: boolean;
             closedEyesMode: 'auto' | 'always-record' | 'always-pause';
@@ -25603,7 +26087,8 @@ export type GetOpencodeServerResourcesResponses = {
     /**
      * Response for status 200
      */
-    200: {
+    200: Array<{
+        hostId: string;
         running: boolean;
         pid: number | null;
         url: string | null;
@@ -25611,7 +26096,7 @@ export type GetOpencodeServerResourcesResponses = {
         uptimeSeconds: number | null;
         rssMB: number | null;
         cpuPercent: number | null;
-    };
+    }>;
 };
 
 export type GetOpencodeServerResourcesResponse = GetOpencodeServerResourcesResponses[keyof GetOpencodeServerResourcesResponses];
@@ -25627,13 +26112,16 @@ export type GetKimiServerResourcesResponses = {
     /**
      * Response for status 200
      */
-    200: {
+    200: Array<{
+        hostId: string;
+        providerTargetId: string;
+        scopeId: string;
         running: boolean;
         pid: number | null;
         rssMB: number | null;
         cpuPercent: number | null;
         url: string | null;
-    };
+    }>;
 };
 
 export type GetKimiServerResourcesResponse = GetKimiServerResourcesResponses[keyof GetKimiServerResourcesResponses];
@@ -25649,12 +26137,15 @@ export type GetCodexAppServerResourcesResponses = {
     /**
      * Response for status 200
      */
-    200: {
+    200: Array<{
+        hostId: string;
+        providerTargetId: string;
+        scopeId: string;
         running: boolean;
         pid: number | null;
         rssMB: number | null;
         cpuPercent: number | null;
-    };
+    }>;
 };
 
 export type GetCodexAppServerResourcesResponse = GetCodexAppServerResourcesResponses[keyof GetCodexAppServerResourcesResponses];

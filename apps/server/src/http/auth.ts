@@ -6,25 +6,29 @@ import { loadServerAuthConfig } from '../config/server-config'
 import { AppError } from '../errors/app-error'
 import { issueBrowserAuthSession, verifyBrowserAuthSession } from './browser-auth-session'
 import { OPENAPI_DOCS_PATH, OPENAPI_JSON_ALIAS_PATH, OPENAPI_JSON_PATH } from './openapi'
-import { consumeWebSocketTicket, issueWebSocketTicket } from './websocket-ticket'
+import { consumeSingleUseTicket, hasSingleUseTicket, issueSingleUseTicket } from './single-use-ticket'
 
-export const CRADLE_TOKEN_HEADER = 'x-cradle-token'
 export const CRADLE_RELAY_TOKEN_HEADER = 'x-cradle-relay-token'
 
 interface AuthConfig {
   authRequired: boolean
-  authToken: string | null
   listRelayAuthTokens?: () => string[]
 }
 
 interface VerifyRequestTokenOptions {
-  token?: string | null
   config?: AuthConfig
 }
 
+interface VerifyWebSocketRequestTokenOptions {
+  config?: AuthConfig
+  audience?: string
+  consume?: boolean
+}
+
+const consumedWebSocketTicketRequests = new WeakMap<Request, string>()
+
 function readAuthConfig(): AuthConfig {
-  const { authRequired, authToken } = loadServerAuthConfig()
-  return { authRequired, authToken }
+  return loadServerAuthConfig()
 }
 
 function hashToken(token: string): Buffer {
@@ -35,33 +39,14 @@ function tokenMatches(actual: string, expected: string): boolean {
   return timingSafeEqual(hashToken(actual), hashToken(expected))
 }
 
-function readBearerToken(authorization: string | null): string | null {
-  if (!authorization) {
-    return null
-  }
-
-  const [scheme, ...parts] = authorization.trim().split(/\s+/)
-  if (scheme?.toLowerCase() !== 'bearer' || parts.length !== 1) {
-    return null
-  }
-
-  return parts[0] || null
-}
-
-function readPresentedToken(headers: Headers, options: VerifyRequestTokenOptions): string | null {
-  return readBearerToken(headers.get('authorization'))
-    ?? headers.get(CRADLE_TOKEN_HEADER)?.trim()
-    ?? headers.get(CRADLE_RELAY_TOKEN_HEADER)?.trim()
-    ?? options.token?.trim()
-    ?? null
-}
-
 function isPublicAuthPath(method: string, pathname: string): boolean {
-  if ((method === 'GET' || method === 'HEAD') && pathname === '/health') {
-    return true
+  if (method !== 'GET' && method !== 'HEAD') {
+    return false
   }
 
-  return pathname === OPENAPI_JSON_PATH
+  return pathname === '/health'
+    || pathname.startsWith('/api/plugins/-/deps/')
+    || pathname === OPENAPI_JSON_PATH
     || pathname === OPENAPI_JSON_ALIAS_PATH
     || pathname === OPENAPI_DOCS_PATH
     || pathname.startsWith(`${OPENAPI_DOCS_PATH}/`)
@@ -84,22 +69,14 @@ export function verifyRequestToken(
     return true
   }
 
-  const presentedToken = readPresentedToken(headers, options)
-  if (!presentedToken) {
-    return verifyBrowserAuthSession(headers)
-  }
-
-  if (config.authToken && tokenMatches(presentedToken, config.authToken)) {
-    return true
-  }
-
-  return readRelayAuthTokens(config).some(token => tokenMatches(presentedToken, token))
-    || verifyBrowserAuthSession(headers)
+  const relayToken = headers.get(CRADLE_RELAY_TOKEN_HEADER)?.trim()
+  return verifyBrowserAuthSession(headers)
+    || Boolean(relayToken && readRelayAuthTokens(config).some(token => tokenMatches(relayToken, token)))
 }
 
 export function verifyWebSocketRequestToken(
   request: Request,
-  options: Pick<VerifyRequestTokenOptions, 'config'> & { audience?: string } = {},
+  options: VerifyWebSocketRequestTokenOptions = {},
 ): boolean {
   const url = new URL(request.url)
   const config = options.config ?? readAuthConfig()
@@ -107,7 +84,27 @@ export function verifyWebSocketRequestToken(
     return true
   }
   const ticket = url.searchParams.get('ticket')
-  return Boolean(ticket && consumeWebSocketTicket(ticket, options.audience ?? url.pathname))
+  if (!ticket) {
+    return false
+  }
+  const audience = options.audience ?? url.pathname
+  if (options.consume === false) {
+    return hasSingleUseTicket(ticket, audience)
+  }
+
+  if (consumedWebSocketTicketRequests.get(request) === audience) {
+    return true
+  }
+
+  if (!consumeSingleUseTicket(ticket, audience)) {
+    return false
+  }
+
+  // @elysiajs/node 1.4 invokes a WebSocket route's beforeHandle twice for the
+  // same upgrade Request. Keep consumption idempotent within that request while
+  // preserving single use across separate upgrade requests.
+  consumedWebSocketTicketRequests.set(request, audience)
+  return true
 }
 
 export function createAuthPlugin(config: AuthConfig = readAuthConfig()) {
@@ -123,8 +120,28 @@ export function createAuthPlugin(config: AuthConfig = readAuthConfig()) {
       if (
         request.method === 'GET'
         && eventTicket
-        && consumeWebSocketTicket(eventTicket, `sse:${pathname}`)
+        && consumeSingleUseTicket(eventTicket, `sse:${pathname}`)
       ) {
+        return undefined
+      }
+
+      const resourceTicket = url.searchParams.get('resourceTicket')
+      if (
+        request.method === 'GET'
+        && resourceTicket
+        && consumeSingleUseTicket(resourceTicket, `resource:${pathname}`)
+      ) {
+        return undefined
+      }
+
+      if (
+        request.method === 'GET'
+        && request.headers.get('upgrade')?.toLowerCase() === 'websocket'
+        && verifyWebSocketRequestToken(request, { config, audience: pathname, consume: false })
+      ) {
+        // Native browser WebSocket upgrades cannot send Authorization headers.
+        // Leave ticket consumption to the matched WebSocket route so this global
+        // hook does not consume the single-use ticket before route validation.
         return undefined
       }
 
@@ -134,9 +151,24 @@ export function createAuthPlugin(config: AuthConfig = readAuthConfig()) {
 
       return undefined
     })
-    .post('/auth/websocket-ticket', ({ body }) => issueWebSocketTicket(body.audience), {
+    .post('/auth/websocket-ticket', ({ body }) => issueSingleUseTicket(body.audience), {
       detail: { summary: 'Issue a single-use WebSocket authentication ticket', tags: ['auth'] },
       body: t.Object({ audience: t.String({ minLength: 1, maxLength: 256 }) }),
+      response: {
+        200: t.Object({
+          ticket: t.String(),
+          expiresAt: t.Number(),
+        }),
+      },
+    })
+    .post('/auth/resource-ticket', ({ body }) => issueSingleUseTicket(`resource:${body.path}`), {
+      detail: {
+        summary: 'Issue a single-use browser resource authentication ticket',
+        tags: ['auth'],
+      },
+      body: t.Object({
+        path: t.String({ minLength: 1, maxLength: 512, pattern: '^/[^?#]*$' }),
+      }),
       response: {
         200: t.Object({
           ticket: t.String(),

@@ -79,6 +79,7 @@ export interface PluginSourceView {
   trusted: boolean
   reason: string | null
   checksum: string | null
+  grantedPermissions: string[]
 }
 
 export interface PluginCapabilityView {
@@ -373,6 +374,7 @@ export function toPluginDescriptorView(descriptor: PluginDescriptor): PluginDesc
       trusted: descriptor.source.trusted,
       reason: descriptor.source.reason ?? null,
       checksum: descriptor.source.checksum ?? null,
+      grantedPermissions: descriptor.source.grantedPermissions ?? [],
     },
     activation: toActivationView(descriptor.activation),
     layers: {

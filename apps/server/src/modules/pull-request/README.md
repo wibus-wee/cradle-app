@@ -9,7 +9,7 @@ Owns session-bound GitHub pull request lifecycle for isolated agent work:
 5. Project live GitHub PR summary, review/comment timeline, checks, and changed files
 6. Own the **PR console** mutates (comment, whole-PR review, merge, assignees,
    reviewers, ready/draft) and the cheap fingerprint probe used for cache-aware
-   detail refresh
+   detail refresh, including an explicit user-initiated cache bypass
 
 The module consumes the shared asynchronous GitHub API client. GitHub Auth owns
 the selected user credential and its lifecycle, so comments, reviews, and pull
@@ -68,7 +68,9 @@ settings + PR mergeability + checks.
 | `GET` | `/pull-requests/viewer` | `pull-request viewer` | Authenticated GitHub identity the `authored`/`reviewing` feeds below are scoped to |
 | `GET` | `/pull-requests/authored?login&after` | `pull-request authored` | One cursor page of PRs authored by `login`, most recently updated first (GraphQL search, not session-bound) |
 | `GET` | `/pull-requests/reviewing?login&after` | `pull-request reviewing` | Combined cursor page of PRs requested from or previously reviewed by `login`, most recently updated first |
+| `POST` | `/pull-requests/refresh` | `pull-request refresh` | Force-refresh the authored and reviewing feed heads from GitHub |
 | `GET` | `/pull-requests/:owner/:repo/:number/detail` | `pull-request detail` | Same detail projection as the session route, addressed directly by ref instead of by session |
+| `POST` | `/pull-requests/:owner/:repo/:number/refresh` | `pull-request detail refresh` | Synchronously revalidate the full detail projection; force mode is the default, while `force=false` preserves rate-budget fallback for fingerprint probes |
 | `GET` | `/pull-requests/:owner/:repo/:number/fingerprint` | `pull-request fingerprint` | Cheap PR version for cache-aware refresh |
 | `POST` | `/pull-requests/:owner/:repo/:number/fingerprint/probe` | `pull-request fingerprint probe` | Visible-tab probe; returns `changed` vs optional previous fingerprint |
 | `POST` | `/pull-requests/:owner/:repo/:number/comment` | `pull-request comment` | Post an issue comment |

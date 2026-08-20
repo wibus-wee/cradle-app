@@ -1,9 +1,3 @@
-/**
- * Output: Claude Agent runtime identity, static capabilities, and presentation projection.
- * Input: Claude Agent SDK slash command metadata.
- * Position: Claude Agent provider package metadata owner.
- */
-
 import type { SlashCommand } from '@anthropic-ai/claude-agent-sdk'
 
 import type {
@@ -126,18 +120,6 @@ const CLAUDE_AGENT_TOOL_ACTIVITY_SLOT: RuntimeUiSlot = {
   surfaces: ['runtimePanel'],
 }
 
-const CLAUDE_AGENT_ALERTS_SLOT: RuntimeUiSlot = {
-  id: 'claude-agent:alerts',
-  name: 'alerts',
-  label: 'Alerts',
-  description: 'Show recent Claude permission denials and runtime warnings.',
-  argumentHint: '',
-  aliases: ['warnings'],
-  iconKey: 'alert',
-  commandText: '/alerts ',
-  surfaces: ['runtimePanel'],
-}
-
 const CLAUDE_AGENT_USAGE_SLOT: RuntimeUiSlot = {
   id: 'claude-agent:usage',
   name: 'usage',
@@ -168,7 +150,6 @@ export function projectClaudeAgentPresentation(
       CLAUDE_AGENT_USER_INPUT_SLOT,
       CLAUDE_AGENT_CREW_SLOT,
       CLAUDE_AGENT_TOOL_ACTIVITY_SLOT,
-      CLAUDE_AGENT_ALERTS_SLOT,
       CLAUDE_AGENT_USAGE_SLOT,
     ],
     skills: [],

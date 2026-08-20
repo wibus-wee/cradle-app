@@ -80,6 +80,7 @@ describe('plugin management API', () => {
     expect(plugins).toContainEqual(expect.objectContaining({
       identity: '@cradle/plugin-api',
       activation: expect.objectContaining({ enabled: true }),
+      source: expect.objectContaining({ grantedPermissions: [] }),
     }))
 
     const getResponse = await app.handle(new Request('http://localhost/plugins/api'))

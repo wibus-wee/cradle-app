@@ -28,7 +28,7 @@ export function instrumentClaudeWorkflowScript(script: string): InstrumentedClau
     sourceType: 'module',
     allowAwaitOutsideFunction: true,
     allowReturnOutsideFunction: true,
-  }) as unknown as SyntaxNode
+  })
   const insertions: Insertion[] = []
   const branchIds = new Set<string>()
   let insertionOrder = 0

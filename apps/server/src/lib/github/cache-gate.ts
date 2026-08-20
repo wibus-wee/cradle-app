@@ -128,10 +128,11 @@ export async function cachedFetch<T>(options: {
   cacheKey: string
   ttlS?: number
   etag?: boolean
+  mode?: GitHubReadMode
   swr?: boolean
   fetcher: (etag: string | null) => Promise<CachedFetchResult<T>>
 }): Promise<T | null> {
-  return cachedGitHubRead({ ...options, mode: 'read' })
+  return cachedGitHubRead(options)
 }
 
 export async function octokitRestGet<T>(input: {

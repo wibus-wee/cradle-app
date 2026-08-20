@@ -10,8 +10,7 @@ import { chatSelectors, useChatStore } from '~/store/chat'
 
 import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
 import { readBangCommand } from '../commands/bang-command'
-import { annotateBangCommandMessage, annotateBangResultMessage } from '../commands/bang-command-metadata'
-import { cancelChatResponse, createSideChat, enqueueChatSessionQueueItem, executeBangCommand, resolvePlanImplementationApproval, steerChatSessionTurn, submitRuntimeToolApproval, submitRuntimeUserInput } from '../commands/chat-response-command'
+import { cancelChatResponse, createSideChat, enqueueChatSessionQueueItem, resolvePlanImplementationApproval, steerChatSessionTurn, submitRuntimeToolApproval, submitRuntimeUserInput } from '../commands/chat-response-command'
 import { rollbackLastTurn as rollbackLastTurnCommand } from '../commands/rollback-last-turn-command'
 import type { RuntimeSessionStatus } from '../commands/runtime-session-status-command'
 import { runtimeSettingsQueryKey, updateSessionRuntimeSettings } from '../commands/runtime-settings-command'
@@ -20,13 +19,13 @@ import { setCodexThreadGoal } from '../runtime/codex-app-server-bridge'
 import { runtimeSessionStatusQueryKey, runtimeSessionStatusQueryOptions } from '../runtime/use-runtime-session-status'
 import { startChatResponseStream } from '../transport/chat-stream-transport'
 import { ChatStreamingHandler } from '../transport/chat-streaming-handler'
+import { executeOptimisticBangCommand } from './optimistic-bang-command'
 import { buildOptimisticUserMessage, readGoalCommandObjective } from './optimistic-chat-turn'
 import type { UserMessageDraft } from './read-user-message-draft'
 import { readUserMessageDraft } from './read-user-message-draft'
 import type { ChatSessionRuntimeControls } from './use-chat-session-runtime-controls'
 import type { RuntimeUserInputSubmitInput, SendMessageOptions, SendMessageResult, ToolApprovalResponseInput } from './use-chat-session-types'
 import {
-  BANG_COMMAND_DRIVER_PREFIX,
   CODEX_PLAN_IMPLEMENTATION_PROMPT_PREFIX,
   isMatchingApprovalPart,
   isMatchingToolPart,
@@ -148,83 +147,16 @@ export function useChatActions(input: UseChatActionsInput) {
     }
 
     if (bangCommand) {
-      const controller = new AbortController()
-      const driverMessageId = `${BANG_COMMAND_DRIVER_PREFIX}-${Date.now()}`
-      const store = useChatStore.getState()
-      store.appendMessage(chatSessionId, annotateBangCommandMessage(
-        {
-          id: driverMessageId,
-          role: 'user',
-          parts: [{ type: 'text', text: `!${bangCommand}` }],
-        },
-        bangCommand,
-      ))
-      if (!isBusy) {
-        store.startGeneration(chatSessionId, driverMessageId, controller)
-      }
       updateSessionInSessionLists(queryClient, { id: chatSessionId }, { promote: true })
-
-      try {
-        const result = await executeBangCommand({
-          sessionId: chatSessionId,
-          command: bangCommand,
-          signal: controller.signal,
-        })
-        useChatStore.getState().removeMessage(chatSessionId, driverMessageId)
-        const latestMessages = useChatStore.getState().messagesMap.get(chatSessionId) ?? []
-        const userMessage = annotateBangCommandMessage(result.userMessage, result.command)
-        const resultMessage = annotateBangResultMessage(result.resultMessage, {
-          command: result.command,
-          stdout: result.stdout,
-          stderr: result.stderr,
-          exitCode: result.exitCode,
-          durationMs: result.durationMs,
-          timedOut: result.timedOut,
-          truncated: result.truncated,
-        })
-        if (latestMessages.some(message => message.id === userMessage.id)) {
-          useChatStore.getState().updateMessage(chatSessionId, userMessage.id, current => annotateBangCommandMessage(current, result.command))
-        }
-        else {
-          useChatStore.getState().appendMessage(chatSessionId, userMessage)
-        }
-        if (latestMessages.some(message => message.id === resultMessage.id)) {
-          useChatStore.getState().updateMessage(chatSessionId, resultMessage.id, current => annotateBangResultMessage(current, {
-            command: result.command,
-            stdout: result.stdout,
-            stderr: result.stderr,
-            exitCode: result.exitCode,
-            durationMs: result.durationMs,
-            timedOut: result.timedOut,
-            truncated: result.truncated,
-          }))
-        }
-        else {
-          useChatStore.getState().appendMessage(chatSessionId, resultMessage)
-        }
-        useChatStore.getState().finishGeneration(driverMessageId)
-        scheduleSnapshotRefresh(0)
-        refreshSessionLists()
-      }
-      catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          if (!isBusy) {
-            useChatStore.getState().finishGeneration(driverMessageId)
-          }
-        }
-        else {
-          const errorMessage = err instanceof Error ? err.message : 'Bang command failed'
-          if (isBusy) {
-            useChatStore.getState().updateMessage(chatSessionId, driverMessageId, message => ({
-              ...message,
-              parts: [{ type: 'text', text: `!${bangCommand}\n\n${errorMessage}` }],
-            }))
-          }
-          else {
-            useChatStore.getState().failGeneration(driverMessageId, errorMessage)
-          }
-        }
-      }
+      await executeOptimisticBangCommand({
+        sessionId: chatSessionId,
+        command: bangCommand,
+        runtimeBusy: isBusy,
+        onSuccess: () => {
+          scheduleSnapshotRefresh(0)
+          refreshSessionLists()
+        },
+      })
       return
     }
 

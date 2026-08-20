@@ -50,9 +50,10 @@ function resolveRunnerPath(): string {
 
 export function spawnManagedProcess(options: ManagedProcessOptions): ManagedChildProcess {
   let targetPid: number | null = null
-  const child = fork(resolveRunnerPath(), [JSON.stringify(normalizeOptions(options))], {
-    execPath: options.kind === 'fork' && resolveRunnerPath().endsWith('.ts') ? options.execPath : undefined,
-    execArgv: process.execArgv,
+  const runnerPath = resolveRunnerPath()
+  const child = fork(runnerPath, [JSON.stringify(normalizeOptions(options))], {
+    execPath: options.kind === 'fork' && runnerPath.endsWith('.ts') ? options.execPath : undefined,
+    execArgv: runnerPath.endsWith('.ts') ? ['--import', 'tsx'] : process.execArgv,
     stdio: [
       options.kind === 'spawn' && options.stdin === 'pipe' ? 'pipe' : 'ignore',
       'pipe',

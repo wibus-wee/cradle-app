@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createPtyChannel } from './pty-channel'
 import type { PtyErrorEvent, PtySnapshotEvent } from './pty-protocol'
 
-vi.mock('~/lib/electron', () => ({
+vi.mock('~/lib/authenticated-server-url', () => ({
   getAuthenticatedServerWebSocketUrl: async (_socketPath: string, query?: { fromSeq?: number }) => {
     const url = new URL('ws://127.0.0.1/pty')
     if (typeof query?.fromSeq === 'number') {
@@ -167,6 +167,54 @@ describe('createPtyChannel', () => {
 
     expect(FakeWebSocket.instances[1]?.url).toBe('ws://127.0.0.1/pty?fromSeq=5')
 
+    channel.close()
+  })
+
+  it('coalesces concurrent connection attempts', async () => {
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
+    const channel = createPtyChannel({
+      socketPath: '/pty/session-1',
+      onSnapshot: vi.fn(),
+      onOutput: vi.fn(),
+      onExit: vi.fn(),
+    })
+
+    await Promise.all([channel.connect(), channel.connect(), channel.connect()])
+
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    channel.close()
+  })
+
+  it('ignores stale socket events after a newer connection replaces it', async () => {
+    vi.useFakeTimers()
+    globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket
+    const channel = createPtyChannel({
+      socketPath: '/pty/session-1',
+      reconnectDelayMs: 250,
+      onSnapshot: vi.fn(),
+      onOutput: vi.fn(),
+      onExit: vi.fn(),
+    })
+
+    await channel.connect()
+    const firstSocket = FakeWebSocket.instances[0]!
+    firstSocket.open()
+    firstSocket.close()
+    vi.advanceTimersByTime(250)
+    await Promise.resolve()
+
+    const secondSocket = FakeWebSocket.instances[1]!
+    secondSocket.open()
+    firstSocket.emitMessage(JSON.stringify({
+      type: 'snapshot',
+      seq: 1,
+      buffer: 'stale',
+      running: true,
+    }))
+    firstSocket.close()
+
+    expect(channel.getLastSeq()).toBeNull()
+    expect(FakeWebSocket.instances).toHaveLength(2)
     channel.close()
   })
 })

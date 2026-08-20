@@ -1,8 +1,4 @@
 /**
- * Output: cwd-scoped OpenCode SDK server resources.
- * Input: OpenCode binary path and workspace directory.
- * Position: OpenCode provider package runtime process owner.
- *
  * Each managed `opencode serve` process inherits the user's native OpenCode
  * config, auth, and project scope. Hosts are pooled by binary path and cwd so
  * sessions in the same workspace can share a process without crossing project
@@ -23,6 +19,7 @@ import { spawnManagedProcess } from '../../../infra/managed-process'
 import { createChildLogger } from '../../../logging/logger'
 import type { RuntimeLiveResourceLease } from '../../chat-runtime/runtime-provider-types'
 import type { RuntimeKind } from '../../provider-contracts/types'
+import type { RuntimeProcessResources } from '../../provider-runtime/process-resources'
 import { resolveOpencodeExecutable } from './runtime-installation'
 
 const logger = createChildLogger({ module: 'chat-runtime.opencode-server' })
@@ -74,7 +71,8 @@ export interface OpencodeRuntimePoolOptions {
   }) => Promise<OpencodeManagedHost>
 }
 
-interface OpencodeServerResources {
+export interface OpencodeServerResources extends RuntimeProcessResources {
+  hostId: string
   running: boolean
   pid: number | null
   url: string | null
@@ -137,23 +135,26 @@ export class OpencodeRuntimePool {
     return this.createLease(entry, resource)
   }
 
-  getResources(): OpencodeServerResources {
-    const host = Array.from(this.entries.values(), entry => entry.host).find(candidate => candidate !== null)
-    const pid = host ? readManagedProcessPid(host.process) : null
-    if (!host || !pid) {
-      return emptyOpencodeServerResources()
-    }
+  getResources(): OpencodeServerResources[] {
+    return Array.from(this.entries.values()).flatMap((entry) => {
+      const host = entry.host
+      const pid = host ? readManagedProcessPid(host.process) : null
+      if (!host || !pid) {
+        return []
+      }
 
-    const usage = readProcessResourceUsage(pid)
-    return {
-      running: true,
-      pid,
-      url: host.url,
-      startedAt: host.startedAt,
-      uptimeSeconds: Math.max(0, Math.floor((Date.now() - host.startedAt) / 1000)),
-      rssMB: usage?.rssMB ?? null,
-      cpuPercent: usage?.cpuPercent ?? null,
-    }
+      const usage = readProcessResourceUsage(pid)
+      return [{
+        hostId: entry.key,
+        running: true,
+        pid,
+        url: host.url,
+        startedAt: host.startedAt,
+        uptimeSeconds: Math.max(0, Math.floor((Date.now() - host.startedAt) / 1000)),
+        rssMB: usage?.rssMB ?? null,
+        cpuPercent: usage?.cpuPercent ?? null,
+      }]
+    })
   }
 
   async shutdown(): Promise<void> {
@@ -349,8 +350,8 @@ export async function prepareOpencodeManagedPathForRemoval(binaryPath: string): 
   return await opencodeRuntimePool.preparePathForRemoval(binaryPath)
 }
 
-/** Return the first live cwd-scoped host for the existing resource panel shape. */
-export function getOpencodeServerResources(): OpencodeServerResources {
+/** Return every live cwd-scoped host for the resource panel. */
+export function getOpencodeServerResources(): OpencodeServerResources[] {
   return opencodeRuntimePool.getResources()
 }
 
@@ -539,18 +540,6 @@ function readProcessResourceUsage(pid: number): { rssMB: number, cpuPercent: num
   }
   catch {
     return null
-  }
-}
-
-function emptyOpencodeServerResources(): OpencodeServerResources {
-  return {
-    running: false,
-    pid: null,
-    url: null,
-    startedAt: null,
-    uptimeSeconds: null,
-    rssMB: null,
-    cpuPercent: null,
   }
 }
 

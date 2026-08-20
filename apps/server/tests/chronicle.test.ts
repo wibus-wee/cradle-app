@@ -19,6 +19,7 @@ import {
   chronicleKnowledgeVersions,
   chronicleMemories,
   chronicleMemoryChunks,
+  chronicleMemoryEmbeddingBuckets,
   chronicleMemoryEmbeddings,
   chronicleMemoryKeywords,
   chronicleMessages,
@@ -1083,6 +1084,13 @@ describe('chronicle module', () => {
       expect(embeddingRows).toHaveLength(1)
       expect(embeddingRows[0].modelId).toBe('chronicle-lexical')
       expect(embeddingRows[0].dimensions).toBe(64)
+      const candidateBuckets = db()
+        .select()
+        .from(chronicleMemoryEmbeddingBuckets)
+        .where(eq(chronicleMemoryEmbeddingBuckets.embeddingId, embeddingRows[0].id))
+        .all()
+      expect(candidateBuckets.length).toBeGreaterThan(0)
+      expect(candidateBuckets.length).toBeLessThanOrEqual(16)
       const indexedChunk = db().select().from(chronicleMemoryChunks).where(eq(chronicleMemoryChunks.memoryId, indexedMemory!.id)).get()
       expect(indexedChunk?.embeddingStatus).toBe('missing')
       expect(indexedChunk?.embeddingModelId).toBeNull()
@@ -1095,6 +1103,15 @@ describe('chronicle module', () => {
         })
         expect(response.status).toBe(200)
       }
+
+      // An unindexed corrupt vector must remain invisible to request-time reranking;
+      // search selects candidates from ANN/keyword indexes instead of scanning it.
+      db().run(sql`DELETE FROM chronicle_memory_embedding_buckets WHERE memory_id = (
+        SELECT id FROM chronicle_memories WHERE source_id = 'memory-noise-24'
+      )`)
+      db().run(sql`UPDATE chronicle_memory_embeddings SET vector_json = 'malformed' WHERE memory_id = (
+        SELECT id FROM chronicle_memories WHERE source_id = 'memory-noise-24'
+      )`)
 
       const searchResponse = await requestJson(app, '/chronicle/memories/search?q=TargetAlpha&limit=5')
       expect(searchResponse.status).toBe(200)
@@ -1217,18 +1234,21 @@ describe('chronicle module', () => {
       expect(fallbackChunk?.embeddingStatus).toBe('missing')
       expect(fallbackChunk?.embeddingModelId).toBeNull()
       expect(runEmbeddingBatchMock).toHaveBeenCalledWith(
-        ['chronicle embedding health probe'],
+        ['TargetAlpha'],
         join(dataDir, 'chronicle', 'models'),
-        { timeoutMs: 5_000 },
       )
       const speakerResource = resources.find(resource => resource.category === 'speaker')
-      expect(speakerResource?.displayName).toBe('Speaker Embedding Extractor')
-      expect(speakerResource?.metadata.function).toBe('speaker-embedding-extractor')
+      expect(speakerResource?.displayName).toBe('Speaker Diarization')
+      expect(speakerResource?.metadata.function).toBe('pyannote-segmentation-plus-campplus')
       expect(speakerResource?.metadata.manifest?.files).toEqual([
         expect.objectContaining({
           path: 'speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
           sha256: 'aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2',
           sizeBytes: 28_281_164,
+        }),
+        expect.objectContaining({
+          path: 'speaker/pyannote-segmentation-3.0.onnx',
+          sha256: '220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079',
         }),
       ])
 
@@ -1326,7 +1346,7 @@ describe('chronicle module', () => {
         body: JSON.stringify({
           sourceId: 'meeting-source-1',
           title: 'Chronicle Planning Meeting',
-          source: 'asr',
+          source: 'manual',
           status: 'completed',
           startedAt: '2026-05-21T10:30:00Z',
           endedAt: '2026-05-21T10:45:00Z',
@@ -1355,7 +1375,7 @@ describe('chronicle module', () => {
           metadata: { source: 'test' },
         }),
       })
-      expect(transcriptResponse.status).toBe(200)
+      expect(transcriptResponse.status, await transcriptResponse.clone().text()).toBe(200)
       const transcriptBody = await transcriptResponse.json() as {
         id: string
         memoryId: string | null
@@ -1390,7 +1410,7 @@ describe('chronicle module', () => {
         body: JSON.stringify({
           sourceId: 'meeting-source-1',
           title: 'Chronicle Planning Meeting Updated',
-          source: 'asr',
+          source: 'manual',
           status: 'completed',
           startedAt: '2026-05-21T10:30:00Z',
           endedAt: '2026-05-21T10:40:00Z',
@@ -1428,7 +1448,7 @@ describe('chronicle module', () => {
         .from(chronicleSpeakerProfiles)
         .where(eq(chronicleSpeakerProfiles.normalizedLabel, 'ada'))
         .get()
-      expect(updatedAdaProfile?.sampleCount).toBe(2)
+      expect(updatedAdaProfile?.sampleCount).toBe(1)
       const manualSpeakerProfileResponse = await requestJson(app, '/chronicle/speaker-profiles', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -1444,8 +1464,10 @@ describe('chronicle module', () => {
       })
       expect(manualSpeakerProfileResponse.status).toBe(200)
       const manualSpeakerProfile = await manualSpeakerProfileResponse.json() as {
+        id: string
         displayName: string
         aliases: string[]
+        hasVoiceprint: boolean
         embeddingDimensions: number | null
         embeddingModelId: string | null
         sampleCount: number
@@ -1454,7 +1476,9 @@ describe('chronicle module', () => {
       expect(manualSpeakerProfile.aliases).toContain('Ada Lovelace')
       expect(manualSpeakerProfile.embeddingDimensions).toBe(3)
       expect(manualSpeakerProfile.embeddingModelId).toBe('test-speaker-extractor')
-      expect(manualSpeakerProfile.sampleCount).toBe(5)
+      expect(manualSpeakerProfile.sampleCount).toBe(4)
+      expect(manualSpeakerProfile.hasVoiceprint).toBe(true)
+      expect('embedding' in manualSpeakerProfile).toBe(false)
       const transcriptActivitySegment = db()
         .select()
         .from(chronicleActivitySegments)
@@ -1485,6 +1509,174 @@ describe('chronicle module', () => {
       expect(staleTranscriptSearchResponse.status).toBe(200)
       const staleTranscriptSearchResults = await staleTranscriptSearchResponse.json() as Array<{ content: string }>
       expect(staleTranscriptSearchResults.every(result => !result.content.includes('AudioTargetAlpha'))).toBe(true)
+
+      const automaticMatchResponse = await requestJson(app, '/chronicle/audio-transcripts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sourceId: 'meeting-speaker-match',
+          title: 'Cross-session speaker match',
+          source: 'asr',
+          status: 'completed',
+          startedAt: '2026-05-21T10:46:00Z',
+          segments: [{
+            startMs: 0,
+            endMs: 1000,
+            speakerLabel: 'candidate-0',
+            speakerCandidateKey: 'candidate-0',
+            speakerEmbedding: [0.1, 0.2, 0.3],
+            speakerEmbeddingModelId: 'test-speaker-extractor',
+            text: 'VoiceMatchTarget should resolve to the saved Ada voiceprint.',
+          }],
+        }),
+      })
+      expect(automaticMatchResponse.status).toBe(200)
+      const automaticMatch = await automaticMatchResponse.json() as {
+        segments: Array<{
+          id: string
+          speakerProfileId: string | null
+          speakerLabel: string | null
+          speakerAssignmentSource: string
+          speakerMatchConfidence: number | null
+          text: string
+        }>
+      }
+      expect(automaticMatch.segments[0]).toMatchObject({
+        speakerProfileId: manualSpeakerProfile.id,
+        speakerLabel: 'Ada',
+        speakerAssignmentSource: 'automatic',
+      })
+      expect(automaticMatch.segments[0].speakerMatchConfidence).toBeGreaterThan(0.99)
+
+      const competingProfileResponse = await requestJson(app, '/chronicle/speaker-profiles', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          displayName: 'Eve',
+          embedding: [0.1001, 0.1999, 0.3],
+          embeddingModelId: 'test-speaker-extractor',
+          sampleCount: 1,
+          metadata: { source: 'ambiguity-test' },
+        }),
+      })
+      expect(competingProfileResponse.status).toBe(200)
+
+      const ambiguousMatchResponse = await requestJson(app, '/chronicle/audio-transcripts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sourceId: 'meeting-speaker-ambiguous',
+          title: 'Ambiguous speaker match',
+          source: 'asr',
+          status: 'completed',
+          startedAt: '2026-05-21T10:47:00Z',
+          segments: [
+            {
+              startMs: 0,
+              endMs: 1000,
+              speakerLabel: 'candidate-0',
+              speakerCandidateKey: 'candidate-0',
+              speakerEmbedding: [0.1, 0.2, 0.3],
+              speakerEmbeddingModelId: 'test-speaker-extractor',
+              text: 'AmbiguousVoiceTarget must remain intact when the identity is unknown.',
+            },
+            {
+              startMs: 1100,
+              endMs: 1800,
+              speakerLabel: 'Speaker 1',
+              text: 'An ASR-local label without a voiceprint must never become a global identity.',
+            },
+          ],
+        }),
+      })
+      expect(ambiguousMatchResponse.status).toBe(200)
+      const ambiguousMatch = await ambiguousMatchResponse.json() as {
+        segments: Array<{
+          id: string
+          speakerProfileId: string | null
+          speakerLabel: string | null
+          speakerAssignmentSource: string
+          speakerMatchConfidence: number | null
+          text: string
+        }>
+      }
+      expect(ambiguousMatch.segments[0]).toMatchObject({
+        speakerProfileId: null,
+        speakerLabel: 'Unknown',
+        speakerAssignmentSource: 'unassigned',
+      })
+      expect(ambiguousMatch.segments[0].speakerMatchConfidence).toBeGreaterThan(0.99)
+      expect(ambiguousMatch.segments[1]).toMatchObject({
+        speakerProfileId: null,
+        speakerLabel: 'Unknown',
+        speakerAssignmentSource: 'unassigned',
+      })
+
+      const renamedProfileResponse = await requestJson(app, `/chronicle/speaker-profiles/${manualSpeakerProfile.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ displayName: 'Ada Byron' }),
+      })
+      expect(renamedProfileResponse.status).toBe(200)
+      expect(await renamedProfileResponse.json()).toMatchObject({
+        id: manualSpeakerProfile.id,
+        displayName: 'Ada Byron',
+        identitySource: 'user',
+      })
+
+      const correctedSegmentResponse = await requestJson(app, `/chronicle/audio-segments/${ambiguousMatch.segments[0].id}/speaker`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ speakerProfileId: manualSpeakerProfile.id }),
+      })
+      expect(correctedSegmentResponse.status).toBe(200)
+      expect(await correctedSegmentResponse.json()).toMatchObject({
+        speakerProfileId: manualSpeakerProfile.id,
+        speakerLabel: 'Ada Byron',
+        speakerAssignmentSource: 'user',
+      })
+
+      const unassignedSegmentResponse = await requestJson(app, `/chronicle/audio-segments/${ambiguousMatch.segments[0].id}/speaker`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ speakerProfileId: null }),
+      })
+      expect(unassignedSegmentResponse.status).toBe(200)
+      expect(await unassignedSegmentResponse.json()).toMatchObject({
+        speakerProfileId: null,
+        speakerLabel: 'Unknown',
+        speakerAssignmentSource: 'unassigned',
+      })
+
+      const deleteVoiceprintResponse = await requestJson(app, `/chronicle/speaker-profiles/${manualSpeakerProfile.id}/voiceprint`, {
+        method: 'DELETE',
+      })
+      expect(deleteVoiceprintResponse.status).toBe(200)
+      const profileWithoutVoiceprint = await deleteVoiceprintResponse.json() as Record<string, unknown>
+      expect(profileWithoutVoiceprint).toMatchObject({
+        id: manualSpeakerProfile.id,
+        hasVoiceprint: false,
+        embeddingDimensions: null,
+        embeddingModelId: null,
+      })
+      expect('embedding' in profileWithoutVoiceprint).toBe(false)
+
+      const deleteProfileResponse = await requestJson(app, `/chronicle/speaker-profiles/${manualSpeakerProfile.id}`, {
+        method: 'DELETE',
+      })
+      expect(deleteProfileResponse.status).toBe(200)
+      expect(await deleteProfileResponse.json()).toEqual({ ok: true })
+      const preservedMatchSegment = db()
+        .select()
+        .from(chronicleAudioSegments)
+        .where(eq(chronicleAudioSegments.id, automaticMatch.segments[0].id))
+        .get()
+      expect(preservedMatchSegment).toMatchObject({
+        speakerProfileId: null,
+        speakerLabel: 'Unknown',
+        speakerAssignmentSource: 'unassigned',
+        text: 'VoiceMatchTarget should resolve to the saved Ada voiceprint.',
+      })
 
       const invalidTimestampResponse = await requestJson(app, '/chronicle/audio-transcripts', {
         method: 'POST',
@@ -2372,8 +2564,8 @@ describe('chronicle module', () => {
       expect(status.lastAccessibilitySnapshotAt).toBe(1779357660)
       expect(status.totalAccessibilityEvents).toBe(1)
       expect(status.lastAccessibilityEventAt).toBe(1779357601)
-      expect(status.totalAudioTranscripts).toBe(1)
-      expect(status.lastAudioTranscriptAt).toBe(1779359400)
+      expect(status.totalAudioTranscripts).toBe(3)
+      expect(status.lastAudioTranscriptAt).toBe(1779360420)
       expect(status.totalAudioRawSegments).toBe(1)
       expect(status.lastAudioRawSegmentAt).toBe(1779360660)
       expect(status.totalActivitySegments).toBeGreaterThanOrEqual(4)

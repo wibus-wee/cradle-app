@@ -1,9 +1,3 @@
-/**
- * Output: System Agent runtime filesystem roots.
- * Input: Cradle server data-dir configuration.
- * Position: System Agent provider package runtime context owner.
- */
-
 import path from 'node:path'
 
 import { getServerConfig } from '../../../infra'

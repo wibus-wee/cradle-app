@@ -3,6 +3,8 @@
 - **rebuild-sparkle.mjs**: Rebuilds `electron-sparkle-updater` against the local Electron ABI on macOS (no-op elsewhere). Wired into `postinstall` / `build`.
 - **run-update-smoke.mjs**: Serves a local Sparkle appcast + zip feed and optionally launches a packaged `.app` with `CRADLE_DESKTOP_SPARKLE_APPCAST_URL` for manual Desktop settings smoke. `--build-version` controls Sparkle's numeric comparison version independently from the human-readable `--version`.
 - **set-version.mjs**: Writes the desktop package version before release packaging.
+- **generate-linux-update-manifest.mjs**: Creates `latest-linux.yml` from the packaged Linux artifacts when the release pipeline uses `electron-builder --publish never`.
+- **verify-linux-release.mjs**: Verifies the Linux updater manifest and artifact SHA-512 digests.
 - **build-mac-bridge.mjs**: Builds the Swift Mac Bridge binary for packaging.
 - **fix-macos-framework-symlinks.mjs**: Rewrites absolute Electron framework symlinks after pack.
 - **sync-codex-runtime.mjs**: Copies Codex runtime assets into packaged resources.

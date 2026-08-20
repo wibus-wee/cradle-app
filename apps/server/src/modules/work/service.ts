@@ -1,13 +1,16 @@
+import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 
 import type { Work } from '@cradle/db'
-import { works, workThreads } from '@cradle/db'
-import { and, desc, eq, isNotNull, isNull } from 'drizzle-orm'
+import { sessions, works, workThreads } from '@cradle/db'
+import { and, desc, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { createChildLogger } from '../../logging/logger'
-import { hasPendingRuntimeToolApproval } from '../chat-runtime/pending-tool-approval'
+import {
+  hasPendingRuntimeToolApproval,
+  listSessionIdsWithPendingRuntimeToolApproval,
+} from '../chat-runtime/pending-tool-approval'
 import { listPendingRuntimeUserInputSummaries } from '../chat-runtime/pending-user-input'
 import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
 import * as ChatRuntime from '../chat-runtime/runtime'
@@ -19,14 +22,31 @@ import type { SessionAwaitSource } from '../session-await/types'
 import * as Workspace from '../workspace/service'
 import * as Worktree from '../worktree/service'
 
-const logger = createChildLogger({ module: 'work' })
-
 export type WorkActivity = 'idle' | 'running' | 'waiting' | 'blocked'
+export const WORK_LIST_DEFAULT_LIMIT = 100
+export const WORK_LIST_MAX_LIMIT = 200
 export type WorkSummary = Work & {
   workspaceId: string
   primarySessionId: string
   activity: WorkActivity
   pullRequest: PullRequest.SessionPullRequestView | null
+}
+export interface WorkPage {
+  items: WorkSummary[]
+  nextCursor: string | null
+}
+export interface WorkListInput {
+  workspaceId?: string
+  linkedIssueId?: string
+  archived?: boolean
+  cursor?: string
+  limit?: number
+}
+
+interface WorkListCursor {
+  updatedAt: number
+  createdAt: number
+  id: string
 }
 export interface WorkDetail {
   work: Work
@@ -39,7 +59,6 @@ export interface WorkDetail {
 }
 
 type SessionCreateInput = Parameters<typeof Session.create>[0]
-export type WorkBaseStrategy = Worktree.WorkBaseStrategy
 export type CreateWorkInput = Omit<
   SessionCreateInput,
   'id' | 'workspaceId' | 'title' | 'origin' | 'linkedIssueId' | 'sessionGroupId' | 'worktreeId'
@@ -50,11 +69,10 @@ export type CreateWorkInput = Omit<
   objective?: string
   linkedIssueId?: string | null
   /**
-   * Isolation base selection. Defaults to `source-head` (clean local HEAD).
-   * Pass `remote-default` to start from origin's default branch tip even when
-   * the source checkout has uncommitted changes.
+   * Exact local or remote branch ref to use as the isolation base.
+   * When omitted, the current workspace HEAD is used.
    */
-  baseStrategy?: WorkBaseStrategy
+  baseBranch?: string
 }
 
 function now(): number {
@@ -100,11 +118,6 @@ function requirePrimaryThread(workId: string): Session.SessionView {
   return session
 }
 
-function readPrimaryThread(workId: string): Session.SessionView | null {
-  const sessionId = getPrimarySessionId(workId)
-  return sessionId ? Session.get(sessionId) : null
-}
-
 async function archiveWorkForPrimarySession(sessionId: string): Promise<void> {
   const membership = db()
     .select({ workId: workThreads.workId })
@@ -130,7 +143,10 @@ async function archiveWorkForPrimarySession(sessionId: string): Promise<void> {
 
 Session.onSessionArchiving(archiveWorkForPrimarySession)
 
-function projectConversationTitle(work: Work, primaryThread: Session.SessionView): Work {
+function projectConversationTitle(
+  work: Work,
+  primaryThread: Pick<Session.SessionView, 'title'>,
+): Work {
   const title = primaryThread.title?.trim()
   return title && title !== work.title ? { ...work, title } : work
 }
@@ -183,44 +199,129 @@ function toSummary(work: Work, primaryThread: Session.SessionView): WorkSummary 
   }
 }
 
-async function toLiveSummary(work: Work, primaryThread: Session.SessionView): Promise<WorkSummary> {
-  const summary = toSummary(work, primaryThread)
-  return {
-    ...summary,
-    pullRequest: await PullRequest.getPullRequest(primaryThread.id),
+function encodeWorkListCursor(cursor: WorkListCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString('base64url')
+}
+
+function decodeWorkListCursor(cursor: string): WorkListCursor {
+  try {
+    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as WorkListCursor
+    if (
+      !Number.isFinite(value.updatedAt)
+      || !Number.isFinite(value.createdAt)
+      || typeof value.id !== 'string'
+      || value.id.length === 0
+    ) {
+      throw new Error('invalid cursor fields')
+    }
+    return value
+  }
+  catch {
+    throw new AppError({
+      code: 'invalid_work_cursor',
+      status: 400,
+      message: 'Work cursor is invalid',
+    })
   }
 }
 
-export async function list(input: {
-  workspaceId?: string
-  linkedIssueId?: string
-  archived?: boolean
-} = {}): Promise<WorkSummary[]> {
+function toListSummary(input: {
+  work: Work
+  primaryThread: Session.SessionView
+  awaitingSessionIds: ReadonlySet<string>
+  pendingUserInputSessionIds: ReadonlySet<string>
+  pendingToolApprovalSessionIds: ReadonlySet<string>
+}): WorkSummary {
+  const { work, primaryThread } = input
+  if (!primaryThread.workspaceId) {
+    throw new AppError({
+      code: 'work_workspace_missing',
+      status: 500,
+      message: 'Work primary Session has no workspace',
+      details: { workId: work.id, sessionId: primaryThread.id },
+    })
+  }
+  return {
+    ...projectConversationTitle(work, primaryThread),
+    workspaceId: primaryThread.workspaceId,
+    primarySessionId: primaryThread.id,
+    activity: deriveActivity({
+      sessionStatus: primaryThread.status,
+      worktreeHealth: primaryThread.worktreeHealth,
+      awaiting: input.awaitingSessionIds.has(primaryThread.id),
+      waitingForInteraction:
+        input.pendingUserInputSessionIds.has(primaryThread.id)
+        || input.pendingToolApprovalSessionIds.has(primaryThread.id),
+    }),
+    pullRequest: PullRequest.readBoundPullRequest(primaryThread.configJson),
+  }
+}
+
+export function list(input: WorkListInput = {}): WorkPage {
+  const limit = Math.min(Math.max(input.limit ?? WORK_LIST_DEFAULT_LIMIT, 1), WORK_LIST_MAX_LIMIT)
+  const cursor = input.cursor ? decodeWorkListCursor(input.cursor) : null
   const predicates = [
+    eq(workThreads.role, 'primary'),
+    input.workspaceId ? eq(sessions.workspaceId, input.workspaceId) : undefined,
     input.linkedIssueId ? eq(works.linkedIssueId, input.linkedIssueId) : undefined,
     input.archived ? isNotNull(works.archivedAt) : isNull(works.archivedAt),
+    cursor
+      ? or(
+          lt(works.updatedAt, cursor.updatedAt),
+          and(eq(works.updatedAt, cursor.updatedAt), lt(works.createdAt, cursor.createdAt)),
+          and(
+            eq(works.updatedAt, cursor.updatedAt),
+            eq(works.createdAt, cursor.createdAt),
+            lt(works.id, cursor.id),
+          ),
+        )
+      : undefined,
   ].filter(predicate => predicate !== undefined)
-  const where = predicates.length > 0 ? and(...predicates) : undefined
-  const query = db().select().from(works).orderBy(desc(works.updatedAt), desc(works.createdAt))
-  const rows = where ? query.where(where).all() : query.all()
-
-  // List must stay available even when a Work row is orphaned (primary Session
-  // deleted/missing). Throwing on one bad row blanked the whole sidebar Work
-  // decoration map and hid every origin=work Session.
-  const visibleWorks = rows.flatMap((work) => {
-    const primaryThread = readPrimaryThread(work.id)
-    if (!primaryThread) {
-      logger.warn('skipping Work with missing primary Session during list', {
-        workId: work.id,
-      })
-      return []
-    }
-    if (input.workspaceId && primaryThread.workspaceId !== input.workspaceId) {
-      return []
-    }
-    return [{ work, primaryThread }]
+  const rows = db()
+    .select({ work: works, primaryThread: sessions })
+    .from(works)
+    .innerJoin(workThreads, eq(workThreads.workId, works.id))
+    .innerJoin(sessions, eq(sessions.id, workThreads.sessionId))
+    .where(and(...predicates))
+    .orderBy(desc(works.updatedAt), desc(works.createdAt), desc(works.id))
+    .limit(limit + 1)
+    .all()
+  const hasNextPage = rows.length > limit
+  const pageRows = hasNextPage ? rows.slice(0, limit) : rows
+  const primaryThreads = Session.projectSessionRows(pageRows.map(row => row.primaryThread))
+  const primaryThreadById = new Map(primaryThreads.map(thread => [thread.id, thread]))
+  const sessionIds = primaryThreads.map(thread => thread.id)
+  const awaitingSessionIds = SessionAwait.listAwaitingSessionIds(sessionIds)
+  const sessionIdSet = new Set(sessionIds)
+  const pendingUserInputSessionIds = new Set(
+    listPendingRuntimeUserInputSummaries()
+      .map(summary => summary.sessionId)
+      .filter(sessionId => sessionIdSet.has(sessionId)),
+  )
+  const pendingToolApprovalSessionIds = listSessionIdsWithPendingRuntimeToolApproval()
+  const items = pageRows.flatMap(({ work, primaryThread }) => {
+    const projectedThread = primaryThreadById.get(primaryThread.id)
+    return projectedThread
+      ? [toListSummary({
+          work,
+          primaryThread: projectedThread,
+          awaitingSessionIds,
+          pendingUserInputSessionIds,
+          pendingToolApprovalSessionIds,
+        })]
+      : []
   })
-  return Promise.all(visibleWorks.map(({ work, primaryThread }) => toLiveSummary(work, primaryThread)))
+  const last = pageRows.at(-1)?.work
+  return {
+    items,
+    nextCursor: hasNextPage && last
+      ? encodeWorkListCursor({
+          updatedAt: last.updatedAt,
+          createdAt: last.createdAt,
+          id: last.id,
+        })
+      : null,
+  }
 }
 
 export async function get(id: string): Promise<WorkDetail | null> {
@@ -268,7 +369,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
     })
   }
 
-  const baseStrategy: WorkBaseStrategy = input.baseStrategy ?? 'source-head'
+  const baseBranch = input.baseBranch?.trim() || null
   const sourceWorkspace = Workspace.get(input.workspaceId)
   if (!sourceWorkspace) {
     throw new AppError({
@@ -286,10 +387,10 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
       details: { workspaceId: input.workspaceId },
     })
   }
-  // Remote-default isolation never copies uncommitted local files into the
-  // managed worktree, so a dirty source checkout is safe. Source-head still
-  // requires a clean tree so Work does not silently drop or mix WIP.
-  if (baseStrategy === 'source-head') {
+  // An explicit branch never copies uncommitted local files into the managed
+  // worktree, so a dirty source checkout is safe. Current HEAD still requires
+  // a clean tree so Work does not silently drop or mix WIP.
+  if (!baseBranch) {
     await Worktree.assertWorkspaceCleanForManagedIsolation(input.workspaceId)
   }
 
@@ -300,7 +401,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
 
   try {
     const {
-      baseStrategy: _baseStrategy,
+      baseBranch: _baseBranch,
       title: _title,
       goal: _goal,
       objective: _objective,
@@ -321,7 +422,7 @@ export async function create(input: CreateWorkInput): Promise<WorkDetail> {
       sourceWorkspaceId: input.workspaceId,
       sessionId,
       slug: title,
-      baseStrategy,
+      baseBranch: baseBranch ?? undefined,
     })
     worktreeId = worktree.id
     await Worktree.bindSessionWorktree({ sessionId, worktreeId, pending: false })

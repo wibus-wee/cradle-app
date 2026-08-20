@@ -216,27 +216,22 @@ export function WorkspaceSessionItemView({
           )
         : (
             <>
-              <div
+              <button
+                type="button"
+                onClick={onOpen}
+                onDoubleClick={canOpenInNewWindow
+                  ? openNewWindow
+                  : undefined}
+                onFocus={onPrefetch}
+                onPointerDown={onPrepareOpen}
+                data-testid={`session-open-${session.id}`}
                 className={cn(
-                  'flex min-w-0 items-center',
-                  workspace ? 'w-full' : 'flex-1',
+                  'relative z-10 flex w-full min-w-0 flex-1 flex-col items-stretch overflow-hidden rounded-lg text-sidebar-foreground/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring',
+                  dimmed
+                  && 'opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100',
                 )}
               >
-                <button
-                  type="button"
-                  onClick={onOpen}
-                  onDoubleClick={canOpenInNewWindow
-                    ? openNewWindow
-                    : undefined}
-                  onFocus={onPrefetch}
-                  onPointerDown={onPrepareOpen}
-                  data-testid={`session-open-${session.id}`}
-                  className={cn(
-                    'relative z-10 flex min-w-0 flex-1 items-center gap-2 overflow-hidden px-2.5 py-1.5 text-sidebar-foreground/80',
-                    dimmed
-                    && 'opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100',
-                  )}
-                >
+                <span className="flex w-full min-w-0 items-center gap-2 px-2.5 py-1.5 pr-8">
                 {work
                   ? (
                       <span
@@ -371,31 +366,31 @@ export function WorkspaceSessionItemView({
                         {relativeTime}
                       </span>
                     )}
-                </button>
-                <div className="group/menu relative z-10 mr-0.5 size-6 shrink-0">
-                  <button
-                    type="button"
-                    className="absolute inset-0 grid place-items-center rounded-md text-muted-foreground/50 opacity-0 hover:bg-accent/80 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100"
-                    onClick={openButtonMenu}
-                    aria-haspopup="menu"
-                    aria-label={t('session.aria.menu')}
-                    data-testid={`session-menu-trigger-${session.id}`}
-                  >
-                    <MoreHorizontalIcon className="size-3" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-              {workspace
-                ? (
-                    <div
+                </span>
+                {workspace
+                  ? (
+                    <span
                       className="flex min-w-0 items-center gap-1.5 px-2.5 pb-1.5 pl-8 text-[11px] text-muted-foreground"
                       data-testid={`session-workspace-${session.id}`}
                     >
                       <FolderIcon className="size-3 shrink-0" aria-hidden="true" />
                       <span className="min-w-0 truncate">{workspace.name}</span>
-                    </div>
-                  )
-                : null}
+                    </span>
+                    )
+                  : null}
+              </button>
+              <div className="group/menu absolute right-0.5 top-0.5 z-20 size-6">
+                <button
+                  type="button"
+                  className="absolute inset-0 grid place-items-center rounded-md text-muted-foreground/50 opacity-0 hover:bg-accent/80 hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100"
+                  onClick={openButtonMenu}
+                  aria-haspopup="menu"
+                  aria-label={t('session.aria.menu')}
+                  data-testid={`session-menu-trigger-${session.id}`}
+                >
+                  <MoreHorizontalIcon className="size-3" aria-hidden="true" />
+                </button>
+              </div>
             </>
           )}
     </div>

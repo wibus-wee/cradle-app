@@ -349,19 +349,17 @@ jobs:
         run: |
           set -euo pipefail
           app_path="release/mac-${RELEASE_ARCH}/Cradle.app"
-          # Include version in the zip name so Sparkle fix-appcast can rewrite enclosures.
+          # Sparkle's archive identity is the packaged app, so publish exactly one
+          # archive per build and keep the monotonically versioned name it records.
           zip_path="release/Cradle-${DESKTOP_VERSION}-mac-${RELEASE_ARCH}.zip"
-          legacy_zip_path="release/Cradle-mac-${RELEASE_ARCH}.zip"
 
           if [ ! -d "$app_path" ]; then
             echo "Packaged app is missing: $app_path" >&2
             exit 1
           fi
 
-          rm -f "$zip_path" "$legacy_zip_path"
+          rm -f "$zip_path"
           /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
-          # Keep a stable alias name for download pages / landing CTA.
-          cp "$zip_path" "$legacy_zip_path"
           /usr/bin/du -h "$zip_path"
 
       - name: Prepare Sparkle archive directory
@@ -385,13 +383,38 @@ jobs:
             exit 1
           fi
 
-          # Official action treats every *.zip present before it runs as "this release".
-          # Only put the versioned zip here — never the stable Cradle-mac-*.zip alias,
-          # and never prior-release bases (the action fetches those itself).
+          # Official action treats every *.zip present before it runs as an update
+          # archive. Only put the canonical versioned zip here; the action fetches
+          # prior-release bases itself.
           rm -rf "$archive_dir"
           mkdir -p "$archive_dir"
           cp "release/${zip_name}" "$archive_dir/"
           ls -la "$archive_dir"
+
+      - name: Remove legacy Sparkle aliases from delta bases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SPARKLE_TAG_PREFIX: ${{ needs.resolve.outputs.sparkle_tag_prefix }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Older releases contain both the canonical versioned archive and the
+          # old Cradle-mac-arm64.zip alias. The Sparkle action downloads every
+          # *.zip from its delta-base releases, so remove the duplicate before it
+          # scans the directory. This is a one-time migration for existing feeds;
+          # new releases no longer publish the alias.
+          previous_tags="$(gh release list --repo "$GH_REPO" --exclude-drafts --limit 20 --json tagName \
+            -q "[.[] | select(.tagName | startswith(\"$SPARKLE_TAG_PREFIX\"))][0:2][].tagName" 2>/dev/null || true)"
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            if gh release view "$tag" --repo "$GH_REPO" --json assets \
+              --jq '.assets[].name' | /usr/bin/grep -Fxq 'Cradle-mac-arm64.zip'; then
+              echo "Removing legacy Sparkle alias from $tag"
+              gh release delete-asset "$tag" Cradle-mac-arm64.zip --repo "$GH_REPO" --yes
+            fi
+          done <<< "$previous_tags"
 
       - name: Generate Sparkle appcast + deltas
         uses: Innei/electron-sparkle-updater/action@v1
@@ -597,13 +620,21 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: pnpm --filter @cradle/desktop build
 
-      - name: Package Linux AppImage and deb
+      - name: Package Linux AppImage, deb, and rpm
         working-directory: apps/desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CRADLE_DESKTOP_UPDATE_URL: ${{ needs.resolve.outputs.update_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm exec electron-builder --config electron-builder.mjs --linux AppImage deb --x64 --publish never
+        run: pnpm exec electron-builder --config electron-builder.mjs --linux AppImage deb rpm --x64 --publish never
+
+      - name: Generate Linux updater metadata
+        working-directory: apps/desktop
+        run: pnpm generate:linux-update-manifest
+
+      - name: Verify Linux release artifacts and updater metadata
+        working-directory: apps/desktop
+        run: pnpm verify:linux-release
 
       - name: Upload artifacts
         uses: ./.github/actions/desktop-upload-artifacts
@@ -659,7 +690,7 @@ jobs:
           mkdir -p release-assets
 
           shopt -s globstar nullglob
-          for file in artifacts/**/*.{dmg,zip,exe,blockmap,yml,xml,AppImage,deb,delta}; do
+          for file in artifacts/**/*.{dmg,zip,exe,blockmap,yml,xml,AppImage,deb,rpm,delta}; do
             basename="$(basename "$file")"
             if [[ "$basename" == "builder-debug.yml" ]]; then
               continue
@@ -723,10 +754,12 @@ jobs:
             const exe = assets.find(f => f.endsWith('.exe'))
             const appImage = assets.find(f => f.endsWith('.AppImage'))
             const deb = assets.find(f => f.endsWith('.deb'))
+            const rpm = assets.find(f => f.endsWith('.rpm'))
             if (dmg) downloadLinks.push(`[macOS (arm64)](${releaseDownloadUrl}/${encodeURIComponent(dmg)})`)
             if (exe) downloadLinks.push(`[Windows (x64)](${releaseDownloadUrl}/${encodeURIComponent(exe)})`)
             if (appImage) downloadLinks.push(`[Linux AppImage (x64)](${releaseDownloadUrl}/${encodeURIComponent(appImage)})`)
             if (deb) downloadLinks.push(`[Linux deb (x64)](${releaseDownloadUrl}/${encodeURIComponent(deb)})`)
+            if (rpm) downloadLinks.push(`[Linux rpm (x64)](${releaseDownloadUrl}/${encodeURIComponent(rpm)})`)
 
             return template
               .replace(/\{\{title\}\}/g, title)
@@ -742,7 +775,7 @@ jobs:
               if (entry.isDirectory()) {
                 walk(entryPath, files)
               }
-              else if (entry.isFile() && entry.name.endsWith('.yml')) {
+              else if (entry.isFile() && /^latest(?:-[^.]+)?\.yml$/.test(entry.name)) {
                 files.push(entryPath)
               }
             }
@@ -903,8 +936,11 @@ jobs:
             if [ -f release-assets/latest.yml ]; then
               cp release-assets/latest.yml feed-assets/
             fi
+            if [ -f release-assets/latest-linux.yml ]; then
+              cp release-assets/latest-linux.yml feed-assets/
+            fi
             # Versioned mac zips for the feed channel.
-            find release-assets -maxdepth 1 -type f \( -name 'Cradle-*-mac-*.zip' -o -name 'Cradle-mac-*.zip' -o -name '*.delta' \) -exec cp {} feed-assets/ \;
+            find release-assets -maxdepth 1 -type f \( -name 'Cradle-*-mac-*.zip' -o -name '*.delta' \) -exec cp {} feed-assets/ \;
             find feed-assets -maxdepth 1 -type f -print | sort
           fi
 

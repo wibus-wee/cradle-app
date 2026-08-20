@@ -1,6 +1,6 @@
 import type { FileUIPart } from 'ai'
 import { convertFileListToFileUIParts } from 'ai'
-import type { ChangeEvent, ClipboardEvent, RefObject } from 'react'
+import type { ChangeEvent, RefObject } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { ModelDescriptor } from '~/features/agent-runtime/types'
@@ -14,7 +14,7 @@ export interface ComposerAttachmentController {
   supportsAttachments: boolean
   clearAttachments: () => void
   handleFilesSelected: (event: ChangeEvent<HTMLInputElement>) => Promise<void>
-  handlePaste: (event: ClipboardEvent<HTMLElement>) => void
+  handlePaste: (event: ClipboardEvent) => void
   pickFiles: () => void
   removeAttachment: (index: number) => void
   replaceAttachments: (fileParts: FileUIPart[]) => void
@@ -160,8 +160,12 @@ export function useComposerAttachments({
   )
 
   const handlePaste = useCallback(
-    (event: ClipboardEvent<HTMLElement>) => {
+    (event: ClipboardEvent) => {
       if (!supportsAttachments) {
+        return
+      }
+
+      if (!event.clipboardData) {
         return
       }
 

@@ -39,14 +39,14 @@ const FALLBACK_PRICING: Record<string, ModelPricing> = {
   'deepseek-chat': { input: 0.27, output: 1.10 },
   'deepseek-reasoner': { input: 0.55, output: 2.19 },
 }
+const FALLBACK_PRICING_KEYS = Object.keys(FALLBACK_PRICING).sort((a, b) => b.length - a.length)
 
 function findFallbackPricing(modelId: string): ModelPricing | null {
   if (FALLBACK_PRICING[modelId]) {
     return FALLBACK_PRICING[modelId]!
   }
   // Longest prefix match
-  const sortedKeys = Object.keys(FALLBACK_PRICING).sort((a, b) => b.length - a.length)
-  for (const key of sortedKeys) {
+  for (const key of FALLBACK_PRICING_KEYS) {
     if (modelId.startsWith(key)) {
       return FALLBACK_PRICING[key]!
     }

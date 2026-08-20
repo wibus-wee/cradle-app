@@ -136,7 +136,7 @@ fn mix_mono_sources(
     samples
 }
 
-fn resample_linear(samples: &[f32], source_rate: u32, target_rate: u32) -> Vec<f32> {
+pub(crate) fn resample_linear(samples: &[f32], source_rate: u32, target_rate: u32) -> Vec<f32> {
     if samples.is_empty() || source_rate == target_rate || source_rate == 0 || target_rate == 0 {
         return samples.to_vec();
     }

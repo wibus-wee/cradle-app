@@ -1,20 +1,28 @@
 import type { FSWatcher } from 'node:fs'
-import { watch } from 'node:fs'
+import { statSync, watch } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
 
 import { invalidateWorkspaceFileList } from './files'
 
-export interface WorkspaceFileChangeEvent {
-  type: 'directory-changed'
-  workspaceId: string
-  path: string
-  reason: 'direct' | 'ancestor'
-  timestamp: number
-}
+export type WorkspaceFileChangeEvent
+  = | {
+    type: 'directory-changed'
+    workspaceId: string
+    path: string
+    reason: 'direct' | 'ancestor'
+    timestamp: number
+  }
+  | {
+    type: 'file-changed'
+    workspaceId: string
+    path: string
+    timestamp: number
+  }
 
 type WorkspaceFileChangeListener = (event: WorkspaceFileChangeEvent) => void
 
 interface WorkspaceWatchRecord {
+  key: string
   listeners: Set<WorkspaceFileChangeListener>
   refCount: number
   watcher: FSWatcher
@@ -23,7 +31,10 @@ interface WorkspaceWatchRecord {
 }
 
 const watchRecords = new Map<string, WorkspaceWatchRecord>()
-const pendingEventsByKey = new Map<string, WorkspaceFileChangeEvent>()
+const pendingEventsByKey = new Map<string, {
+  event: WorkspaceFileChangeEvent
+  record: WorkspaceWatchRecord
+}>()
 let flushTimer: NodeJS.Timeout | null = null
 
 export function subscribeWorkspaceFileChanges(input: {
@@ -43,23 +54,28 @@ export function subscribeWorkspaceFileChanges(input: {
       return
     }
     record.watcher.close()
-    watchRecords.delete(input.workspaceId)
+    watchRecords.delete(record.key)
   }
 }
 
 function getOrCreateWatchRecord(workspaceId: string, workspacePath: string): WorkspaceWatchRecord {
-  const existing = watchRecords.get(workspaceId)
-  if (existing && existing.workspacePath === workspacePath) {
+  const key = `${workspaceId}\0${workspacePath}`
+  const existing = watchRecords.get(key)
+  if (existing) {
     return existing
   }
-  existing?.watcher.close()
 
   const record: WorkspaceWatchRecord = {
+    key,
     listeners: new Set(),
     refCount: 0,
     watcher: watch(workspacePath, { recursive: true }, (_eventType, filename) => {
       invalidateWorkspaceFileList(workspacePath)
-      queueDirectoryChanged(record, readChangedDirectoryPath(workspacePath, filename), 'direct')
+      const changedPath = readChangedRelativePath(workspacePath, filename)
+      queueDirectoryChanged(record, readChangedDirectoryPath(changedPath), 'direct')
+      if (changedPath && isExistingFile(workspacePath, changedPath)) {
+        queueFileChanged(record, changedPath)
+      }
     }),
     workspaceId,
     workspacePath,
@@ -67,27 +83,54 @@ function getOrCreateWatchRecord(workspaceId: string, workspacePath: string): Wor
   record.watcher.on('error', () => {
     queueDirectoryChanged(record, '', 'direct')
   })
-  watchRecords.set(workspaceId, record)
+  watchRecords.set(key, record)
   return record
 }
 
-function readChangedDirectoryPath(workspacePath: string, filename: string | Buffer | null): string {
+function readChangedRelativePath(
+  workspacePath: string,
+  filename: string | Buffer | null,
+): string | null {
   if (!filename) {
-    return ''
+    return null
   }
   const normalizedRelativePath = normalizeRelativePath(filename.toString())
   if (normalizedRelativePath.length === 0) {
-    return ''
+    return null
   }
   const absolutePath = resolve(workspacePath, normalizedRelativePath)
-  const parent = dirname(absolutePath)
-  if (parent === workspacePath) {
-    return ''
+  const resolvedRelativePath = relative(workspacePath, absolutePath)
+  if (
+    resolvedRelativePath === '..'
+    || resolvedRelativePath.startsWith(`..${sep}`)
+  ) {
+    return null
   }
-  return normalizeRelativePath(relative(workspacePath, parent))
+  return normalizeRelativePath(resolvedRelativePath)
 }
 
-function queueDirectoryChanged(record: WorkspaceWatchRecord, path: string, reason: WorkspaceFileChangeEvent['reason']): void {
+function readChangedDirectoryPath(changedPath: string | null): string {
+  if (!changedPath) {
+    return ''
+  }
+  const parent = dirname(changedPath)
+  return parent === '.' ? '' : normalizeRelativePath(parent)
+}
+
+function isExistingFile(workspacePath: string, changedPath: string): boolean {
+  try {
+    return statSync(resolve(workspacePath, changedPath)).isFile()
+  }
+  catch {
+    return false
+  }
+}
+
+function queueDirectoryChanged(
+  record: WorkspaceWatchRecord,
+  path: string,
+  reason: 'direct' | 'ancestor',
+): void {
   const event = {
     type: 'directory-changed',
     workspaceId: record.workspaceId,
@@ -95,7 +138,7 @@ function queueDirectoryChanged(record: WorkspaceWatchRecord, path: string, reaso
     reason,
     timestamp: Date.now(),
   } satisfies WorkspaceFileChangeEvent
-  pendingEventsByKey.set(`${record.workspaceId}\0${path}`, event)
+  pendingEventsByKey.set(`directory\0${record.key}\0${path}`, { event, record })
   const parentPath = readParentDirectoryPath(path)
   if (parentPath !== path) {
     queueDirectoryChanged(record, parentPath, 'ancestor')
@@ -106,13 +149,26 @@ function queueDirectoryChanged(record: WorkspaceWatchRecord, path: string, reaso
   flushTimer = setTimeout(flushWorkspaceFileChangeEvents, 100)
 }
 
+function queueFileChanged(record: WorkspaceWatchRecord, path: string): void {
+  const event = {
+    type: 'file-changed',
+    workspaceId: record.workspaceId,
+    path,
+    timestamp: Date.now(),
+  } satisfies WorkspaceFileChangeEvent
+  pendingEventsByKey.set(`file\0${record.key}\0${path}`, { event, record })
+  if (flushTimer) {
+    return
+  }
+  flushTimer = setTimeout(flushWorkspaceFileChangeEvents, 100)
+}
+
 function flushWorkspaceFileChangeEvents(): void {
   flushTimer = null
-  const events = [...pendingEventsByKey.values()]
+  const pendingEvents = [...pendingEventsByKey.values()]
   pendingEventsByKey.clear()
-  for (const event of events) {
-    const record = watchRecords.get(event.workspaceId)
-    if (!record) {
+  for (const { event, record } of pendingEvents) {
+    if (watchRecords.get(record.key) !== record) {
       continue
     }
     for (const listener of record.listeners) {

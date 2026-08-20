@@ -22,7 +22,7 @@ export const uiMessageSchema = t.Object(
   { additionalProperties: true },
 )
 
-export const chatMessageRowSchema = t.Object({
+const chatMessageRowFields = {
   messageId: t.String(),
   role: t.Union([t.Literal('user'), t.Literal('assistant')]),
   status: t.Union([
@@ -39,7 +39,14 @@ export const chatMessageRowSchema = t.Object({
   taskId: t.Union([t.String(), t.Null()]),
   depth: t.Number(),
   message: uiMessageSchema,
-})
+}
+
+export const chatMessageRowSchema = t.Object(chatMessageRowFields)
+
+// The row shape is intentionally shared with the full history response. The
+// contract distinction is semantic: preview messages omit inline tool
+// payloads, while the existing history route remains lossless for compatibility.
+export const chatMessagePreviewRowSchema = t.Object(chatMessageRowFields)
 
 export const chatMessageDetailSchema = t.Object({
   message: uiMessageSchema,

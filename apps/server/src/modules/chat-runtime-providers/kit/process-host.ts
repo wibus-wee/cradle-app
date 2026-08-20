@@ -15,6 +15,7 @@ export type ProviderProcessHostLease<Resource = undefined> = ProviderRuntimeLeas
 export interface AcquireProviderProcessHostResourceInput<Resource> extends ProviderProcessHostKey {
   ttlMs?: number
   pinned?: boolean
+  retainOnRelease?: boolean
   resourceFingerprint?: string
   createResource: ProviderRuntimeResourceFactory<Resource>
   disposeResource: ProviderRuntimeResourceDisposer<Resource>
@@ -26,8 +27,8 @@ export async function acquireProviderProcessHostResource<Resource>(
   return await providerRuntimeHostManager.acquireResource(input)
 }
 
-export function invalidateProviderProcessHostResource(hostId: string): Promise<void> {
-  return providerRuntimeHostManager.invalidateResource(hostId)
+export function invalidateProviderProcessHostResource(hostId: string, expectedResource?: unknown): Promise<void> {
+  return providerRuntimeHostManager.invalidateResource(hostId, expectedResource)
 }
 
 export function listProviderProcessHosts(): ProviderProcessHostSnapshot[] {

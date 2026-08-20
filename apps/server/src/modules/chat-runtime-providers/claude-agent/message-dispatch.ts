@@ -127,10 +127,11 @@ export class ClaudeAgentMessageDispatch {
         result.sessionId,
       )
     }
-    await this.providerThreadTurns.emitClaudeAssistantUsageEvent(
+    await this.providerThreadTurns.emitClaudeLiveUsageEvent(
       entry,
       message,
       turn?.effectiveModel,
+      entry.mapperState.usageProjection,
     )
     for (const plan of result.capturedPlans) {
       writeClaudeAgentCapturedPlan(entry.runtimeSession, plan)

@@ -6,6 +6,10 @@ export const zPostAuthWebsocketTicketBody = z.object({
     audience: z.string().min(1).max(256)
 });
 
+export const zPostAuthResourceTicketBody = z.object({
+    path: z.string().min(1).max(512).regex(/^\/[^?#]*$/)
+});
+
 export const zPutPreferencesAppBody = z.object({
     featureFlags: z.object({
         multiWorkspacePoc: z.boolean().default(false),
@@ -115,7 +119,7 @@ export const zPostWorkspacesMultiFolderBody = z.object({
     folders: z.array(z.object({
         name: z.string().min(1).regex(/.*\S.*/),
         path: z.string().min(1).regex(/.*\S.*/)
-    })).min(1)
+    })).min(2)
 });
 
 export const zPostWorkspacesMultiFolderFromConfigBody = z.object({
@@ -261,6 +265,10 @@ export const zPostWorkspacesByWorkspaceIdMigrateBody = z.object({
 
 export const zPostWorkspacesByWorkspaceIdMigratePath = z.object({
     workspaceId: z.string().min(1)
+});
+
+export const zGetCodeActivitySessionsBySessionIdEventsPath = z.object({
+    sessionId: z.string().min(1)
 });
 
 export const zGetFilesystemBrowseQuery = z.object({
@@ -533,6 +541,20 @@ export const zPostProviderTargetsByProviderTargetIdTestBody = z.object({
 });
 
 export const zPostProviderTargetsByProviderTargetIdTestPath = z.object({
+    providerTargetId: z.string().min(1)
+});
+
+export const zGetProviderTargetsByProviderTargetIdExtensionsPath = z.object({
+    providerTargetId: z.string().min(1)
+});
+
+export const zPutProviderTargetsByProviderTargetIdExtensionsBody = z.object({
+    owner: z.string().min(1),
+    id: z.string().min(1),
+    enabled: z.boolean()
+});
+
+export const zPutProviderTargetsByProviderTargetIdExtensionsPath = z.object({
     providerTargetId: z.string().min(1)
 });
 
@@ -1404,7 +1426,12 @@ export const zGetSessionsQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     origin: z.string().min(1).optional(),
     sessionGroupId: z.string().min(1).optional(),
-    archived: z.boolean().optional()
+    archived: z.boolean().optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.union([
+        z.string(),
+        z.number().gte(1).lte(200)
+    ]).optional()
 });
 
 export const zPostSessionsBody = z.object({
@@ -1668,7 +1695,12 @@ export const zPostSessionsByIdTurnCheckpointsByCheckpointIdRewindPath = z.object
 export const zGetWorksQuery = z.object({
     workspaceId: z.string().min(1).optional(),
     linkedIssueId: z.string().min(1).optional(),
-    archived: z.boolean().optional()
+    archived: z.boolean().optional(),
+    cursor: z.string().min(1).optional(),
+    limit: z.union([
+        z.string(),
+        z.number().gte(1).lte(200)
+    ]).optional()
 });
 
 export const zPostWorksBody = z.object({
@@ -1677,7 +1709,7 @@ export const zPostWorksBody = z.object({
     goal: z.string().min(1).optional(),
     objective: z.string().min(1).optional(),
     linkedIssueId: z.string().min(1).optional(),
-    baseStrategy: z.enum(['source-head', 'remote-default']).optional(),
+    baseBranch: z.string().min(1).optional(),
     providerTargetId: z.string().min(1).optional(),
     modelId: z.string().min(1).nullish(),
     thinkingEffort: z.enum([
@@ -1788,12 +1820,26 @@ export const zGetPullRequestsReviewingQuery = z.object({
     after: z.string().optional()
 });
 
+export const zPostPullRequestsRefreshBody = z.object({
+    login: z.string().min(1)
+});
+
 export const zGetPullRequestsByOwnerByRepoAssignableUsersPath = z.object({
     owner: z.string().min(1),
     repo: z.string().min(1)
 });
 
 export const zGetPullRequestsByOwnerByRepoByNumberDetailPath = z.object({
+    owner: z.string().min(1),
+    repo: z.string().min(1),
+    number: z.string().min(1)
+});
+
+export const zPostPullRequestsByOwnerByRepoByNumberRefreshBody = z.object({
+    force: z.boolean().optional()
+});
+
+export const zPostPullRequestsByOwnerByRepoByNumberRefreshPath = z.object({
     owner: z.string().min(1),
     repo: z.string().min(1),
     number: z.string().min(1)
@@ -3855,6 +3901,17 @@ export const zPostChatSessionsBySessionIdBangCommandPath = z.object({
     sessionId: z.string().min(1)
 });
 
+export const zPostChatSessionsBySessionIdBangTranscriptBody = z.object({
+    transcript: z.string(),
+    command: z.string().min(1).optional(),
+    durationMs: z.number().gte(0).optional(),
+    exitCode: z.number().nullish()
+});
+
+export const zPostChatSessionsBySessionIdBangTranscriptPath = z.object({
+    sessionId: z.string().min(1)
+});
+
 export const zPostChatSessionsBySessionIdObservationsBody = z.object({
     text: z.string().min(1),
     entity: z.string().optional(),
@@ -3926,6 +3983,15 @@ export const zGetChatSessionsBySessionIdMessagesPath = z.object({
 });
 
 export const zGetChatSessionsBySessionIdMessagesQuery = z.object({
+    cursor: z.string().min(1).optional(),
+    limit: z.number().gte(1).lte(200).optional()
+});
+
+export const zGetChatSessionsBySessionIdMessagePreviewsPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdMessagePreviewsQuery = z.object({
     cursor: z.string().min(1).optional(),
     limit: z.number().gte(1).lte(200).optional()
 });
@@ -4047,6 +4113,7 @@ export const zPutChronicleConfigBody = z.object({
     dreamSchedulerIntervalMs: z.number().optional().default(86400000),
     dreamSchedulerApplyMerge: z.boolean().optional().default(false),
     audioCaptureEnabled: z.boolean(),
+    audioCaptureMode: z.enum(['meeting', 'continuous']).optional(),
     audioSource: z.enum([
         'microphone',
         'system',
@@ -4254,6 +4321,9 @@ export const zPostChronicleAudioTranscriptsBody = z.object({
         startMs: z.number().gte(0),
         endMs: z.number().gte(0).nullish(),
         speakerLabel: z.string().nullish(),
+        speakerCandidateKey: z.string().nullish(),
+        speakerEmbedding: z.array(z.number()).max(4096).nullish(),
+        speakerEmbeddingModelId: z.string().nullish(),
         text: z.string().min(1),
         confidence: z.number().gte(0).lte(1).nullish(),
         language: z.string().nullish(),
@@ -4270,6 +4340,30 @@ export const zPostChronicleSpeakerProfilesBody = z.object({
     sampleCount: z.number().gte(0).optional(),
     lastSeenAt: z.string().nullish(),
     metadata: z.record(z.string(), z.unknown()).optional()
+});
+
+export const zDeleteChronicleSpeakerProfilesByProfileIdPath = z.object({
+    profileId: z.string().min(1)
+});
+
+export const zPatchChronicleSpeakerProfilesByProfileIdBody = z.object({
+    displayName: z.string().min(1)
+});
+
+export const zPatchChronicleSpeakerProfilesByProfileIdPath = z.object({
+    profileId: z.string().min(1)
+});
+
+export const zDeleteChronicleSpeakerProfilesByProfileIdVoiceprintPath = z.object({
+    profileId: z.string().min(1)
+});
+
+export const zPatchChronicleAudioSegmentsBySegmentIdSpeakerBody = z.object({
+    speakerProfileId: z.string().nullable()
+});
+
+export const zPatchChronicleAudioSegmentsBySegmentIdSpeakerPath = z.object({
+    segmentId: z.string().min(1)
 });
 
 export const zGetChronicleAudioRawSegmentsQuery = z.object({

@@ -62,6 +62,8 @@
   "page.loadMore": "加载更多",
   "page.loadingMore": "加载中…",
   "page.searchPlaceholder": "搜索 Pull request",
+  "page.refresh": "从 GitHub 刷新 Pull request",
+  "page.refreshError": "无法刷新 Pull request",
   "page.title": "Pull request",
   "status.closed": "已关闭",
   "status.draft": "Draft",

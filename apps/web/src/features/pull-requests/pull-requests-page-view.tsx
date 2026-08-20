@@ -1,5 +1,6 @@
 import {
   GitPullRequestLine as PullRequestIcon,
+  Refresh1Line as RefreshIcon,
   Search2Line as SearchIcon,
 } from '@mingcute/react'
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
@@ -14,6 +15,7 @@ import {
   EmptyTitle,
 } from '~/components/ui/empty'
 import { Input } from '~/components/ui/input'
+import { cn } from '~/lib/cn'
 
 import type { PullRequestViewer } from './api/pull-requests'
 import type { PullRequestErrorKind } from './pull-request-error'
@@ -40,6 +42,8 @@ export interface PullRequestsPageViewProps {
   errorKind: PullRequestErrorKind | null
   retrying?: boolean
   onRetry?: () => void
+  refreshing?: boolean
+  onRefresh: () => void
   authoredFeed: PullRequestFeedPage
   reviewingFeed: PullRequestFeedPage
   selectedRef?: string
@@ -55,6 +59,8 @@ export function PullRequestsPageView({
   errorKind,
   retrying = false,
   onRetry,
+  refreshing = false,
+  onRefresh,
   authoredFeed,
   reviewingFeed,
   selectedRef,
@@ -173,29 +179,43 @@ export function PullRequestsPageView({
             : null}
         </div>
 
-        <div className="relative shrink-0">
-          <SearchIcon
-            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            ref={searchInputRef}
-            value={search}
-            onChange={event => setSearch(event.target.value)}
-            placeholder={t('page.searchPlaceholder')}
-            className="h-8 w-56 rounded-lg border-border/60 bg-muted/30 pl-8 pr-10 text-[12px] shadow-none"
-            aria-label={t('page.searchPlaceholder')}
-          />
-          {!search
-            ? (
-                <kbd
-                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted-foreground/60"
-                  aria-hidden="true"
-                >
-                  ⌘K
-                </kbd>
-              )
-            : null}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={onRefresh}
+            disabled={refreshing || !viewer}
+            aria-label={t('page.refresh')}
+            title={t('page.refresh')}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <RefreshIcon className={cn('size-3.5', refreshing && 'animate-spin')} aria-hidden />
+          </Button>
+          <div className="relative">
+            <SearchIcon
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              ref={searchInputRef}
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+              placeholder={t('page.searchPlaceholder')}
+              className="h-8 w-56 rounded-lg border-border/60 bg-muted/30 pl-8 pr-10 text-[12px] shadow-none"
+              aria-label={t('page.searchPlaceholder')}
+            />
+            {!search
+              ? (
+                  <kbd
+                    className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted-foreground/60"
+                    aria-hidden="true"
+                  >
+                    ⌘K
+                  </kbd>
+                )
+              : null}
+          </div>
         </div>
       </header>
 

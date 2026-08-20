@@ -3,6 +3,7 @@ import type {
   RuntimeHarnessFragment,
   RuntimeSession,
 } from '../runtime-provider-types'
+import { replaceRuntimeSessionProviderCheckpoint } from '../runtime-session-checkpoint'
 
 interface HarnessProjectionSnapshot {
   providerSessionId: string | null
@@ -76,8 +77,8 @@ function writeHarnessProjectionSnapshot(
   harness: HarnessProjectionSnapshot,
 ): void {
   const snapshot = readProviderStateSnapshot(runtimeSession.providerStateSnapshot)
-  runtimeSession.providerStateSnapshot = JSON.stringify({
+  replaceRuntimeSessionProviderCheckpoint(runtimeSession, JSON.stringify({
     ...snapshot,
     harness,
-  })
+  }))
 }

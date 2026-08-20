@@ -1,16 +1,45 @@
 <!-- Once this directory changes, update this README.md -->
 
-# E2E/Support
+# E2E Support Architecture
 
-这里存放端到端测试共享的 world、hooks 与辅助服务，用来隔离环境并稳定启动 Electron 应用。
-Support 层负责测试生命周期与共享状态，不承载具体业务断言。
-当应用启动成本、测试状态隔离或全局前后置逻辑变化时，应同步更新这里。
+Support code owns deterministic infrastructure and interaction mechanics; it does not own user-journey intent.
 
-## Files
+| Area | Owner |
+| --- | --- |
+| `hooks.ts` | Scenario launch, Playwright tracing, screenshots/video, console capture, and simulator request ledger |
+| `world.ts` | Cucumber World, browser/context/page, temporary workspaces, scenario memory, and runtime configuration |
+| `server-lifecycle.ts` | Managed server and production web preview without `CRADLE_MOCK_LLM_URL` |
+| `model-api-simulator.ts` | `@cradle/model-api-simulator` in `probes-only` auto-response mode |
+| `providers.ts` | Provider/profile/Agent prerequisites and workspace prerequisite |
+| `scenarios/` | Strict OpenAI Responses and Anthropic Messages exchanges |
+| `helpers/chat-scenario.ts` | Cross-turn Chat scripts, gates, queue timing, approvals, and tool loops |
+| `helpers/issue-agent-scenario.ts` | Issue delegation, rerun, and cancellation scripts |
+| `pages/` | Stable selectors and reusable UI mechanics |
+| `database.ts` | Explicit fixture-only database support; never the proof of a user-visible outcome |
+| `world-utils.ts` | Artifact paths and scenario-safe names |
 
-- **hooks.ts**: 全局 hooks，负责 scenario 级启动、trace/screenshot 落盘、失败附件与清理；artifact 采集失败时仍会进入 world cleanup
-- **database.ts**: 只读 SQLite 查询 helper，把跨场景的持久化断言统一收口到共享 support 层
-- **mock-llm-server.ts**: 本地 OpenAI-compatible mock server，支持成功/失败模式、按请求顺序返回不同回复、reasoning / tool-call 流、Codex app-server 可解析的 Responses stream events / usage、请求日志，以及带 socket 兜底销毁的幂等停止
-- **server-lifecycle.ts**: managed E2E server / web dev server lifecycle, using isolated `CRADLE_DATA_DIR` and `HOME` so test reset never touches the real user profile; resolves the vendored Codex app-server entrypoint for managed runs; startup failure paths also tear down any spawned process group
-- **world.ts**: 自定义 Cucumber world，维护隔离的 `userData`、`HOME`、scenario 状态、mock provider 生命周期（含多轮回复、reasoning、tool-call 配置），Mock Provider 配置后刷新页面以同步 renderer 查询缓存，并保留带参数的 `mainProcess` 断言辅助方法
-- **world-utils.ts**: scenario slug、artifact 路径与隐藏窗口 E2E 启动环境的纯工具函数
+## Page Objects
+
+| File | Surface |
+| --- | --- |
+| `pages/await.ts` | Await creation and resolution |
+| `pages/chat.ts` | New Chat, Chat, approval, messages, sessions, and queue |
+| `pages/diff.ts` | Diff review |
+| `pages/first-run.ts` | Onboarding |
+| `pages/git.ts` | Branch controls |
+| `pages/kanban.ts` | Board, Issue detail, activity, and delegation |
+| `pages/search.ts` | Global search |
+| `pages/settings.ts` | Settings shell and appearance |
+| `pages/terminal.ts` | Bottom panel and PTY sessions |
+| `pages/usage.ts` | Usage dashboard |
+| `pages/work.ts` | New Work and managed Work verification |
+| `pages/workspace.ts` | Workspace list, Directory Browser, and overview |
+
+## Runtime Rules
+
+- Claude scenarios launch the real Claude Agent SDK; Codex scenarios launch the real Codex app-server.
+- Only upstream model HTTP is simulated. Unmatched conversation requests fail; probe endpoints such as token counting may auto-respond.
+- Agent-scoped provider sessions use Agent Home as their runtime `cwd`. Tests that mutate an isolated Work must target the provider-owned `CRADLE_WORKSPACE_PATH` instead of assuming relative paths resolve inside the worktree.
+- Title-generation and primary-turn requests share provider infrastructure. Match primary turns by semantic body content and enqueue follow-up replies at the action boundary when background title work can interleave.
+- `CRADLE_E2E_NODE` selects the Node binary used by managed child processes.
+- `CRADLE_E2E_BROWSER_PATH` may point Playwright at an already-installed Chromium executable.

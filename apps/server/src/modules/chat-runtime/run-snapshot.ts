@@ -5,7 +5,6 @@ import type {
   BackendRunSnapshot,
   BackendRunSnapshotEvent,
   NewBackendRunSnapshot,
-  NewBackendRunSnapshotEvent,
 } from '@cradle/db'
 import { backendRunSnapshotEvents, backendRunSnapshots } from '@cradle/db'
 import type { SQL } from 'drizzle-orm'
@@ -18,6 +17,21 @@ import { createChildLogger } from '../../logging/logger'
 import { OBSERVABILITY_CODES } from '../observability/contract'
 import * as Observability from '../observability/service'
 import { projectChatRuntimeRunSnapshotEventReadModels } from './read-model-projectors'
+import {
+  COMPACTED_SUCCESS_PAYLOAD_PREFIX,
+  compactSuccessfulPayload,
+  isCompactedSuccessPayload,
+} from './run-snapshot-compaction'
+import {
+  enqueueRunSnapshotEvent,
+  flushRunSnapshotJournalForSnapshot,
+  flushRunSnapshotWriteBehind,
+  registerRunSnapshotContext,
+  releaseRunSnapshotContext,
+  updateQueuedRunSnapshotEvent,
+} from './run-snapshot-journal'
+
+export { COMPACTED_SUCCESS_PAYLOAD_SCHEMA } from './run-snapshot-compaction'
 
 const logger = createChildLogger({ module: 'chat-runtime.run-snapshot' })
 
@@ -144,8 +158,6 @@ const DEFAULT_SNAPSHOT_EVENTS_READ_LIMIT = 2_000
 const DEFAULT_SNAPSHOT_EVENTS_MAX = 2_000
 const DEFAULT_RETENTION_BATCH_SIZE = 250
 const DEFAULT_COMPACTION_SNAPSHOT_BATCH_SIZE = 25
-export const COMPACTED_SUCCESS_PAYLOAD_SCHEMA = 'cradle.run-snapshot-success-metadata.v1'
-const COMPACTED_SUCCESS_PAYLOAD_PREFIX = `{"schema":"${COMPACTED_SUCCESS_PAYLOAD_SCHEMA}"`
 
 /**
  * Hard cap on how many event rows a single run snapshot may accumulate.
@@ -194,8 +206,10 @@ export function startRunSnapshot(input: StartRunSnapshotInput): ChatRunSnapshot 
 
   try {
     pruneExpiredRunSnapshots()
-    db().insert(backendRunSnapshots).values(row).run()
-    return toChatRunSnapshot(row as BackendRunSnapshot, [])
+    const d = db()
+    d.insert(backendRunSnapshots).values(row).run()
+    registerRunSnapshotContext(d, id, input.workspaceId ?? null)
+    return toChatRunSnapshot(row as BackendRunSnapshot, [], 0)
   }
  catch (error) {
     logger.error('failed to start run snapshot', { input, error })
@@ -206,7 +220,7 @@ export function startRunSnapshot(input: StartRunSnapshotInput): ChatRunSnapshot 
 export function appendRunSnapshotEvent(
   input: AppendRunSnapshotEventInput,
 ): ChatRunSnapshotEvent | null {
-  const row: NewBackendRunSnapshotEvent = {
+  const row: BackendRunSnapshotEvent = {
     id: randomUUID(),
     snapshotId: input.snapshotId,
     chatSessionId: input.chatSessionId,
@@ -228,9 +242,8 @@ export function appendRunSnapshotEvent(
 
   try {
     const d = db()
-    d.insert(backendRunSnapshotEvents).values(row).run()
-    projectChatRuntimeRunSnapshotEventReadModels(d, { sourceEventId: row.id })
-    return toChatRunSnapshotEvent(row as BackendRunSnapshotEvent)
+    enqueueRunSnapshotEvent(d, row)
+    return toChatRunSnapshotEvent(row)
   }
  catch (error) {
     logger.error('failed to append run snapshot event', { input, error })
@@ -247,17 +260,37 @@ export function appendRunSnapshotEvent(
 export function updateRunSnapshotEventPayload(input: UpdateRunSnapshotEventPayloadInput): void {
   try {
     const d = db()
+    const update = {
+      payloadJson: stringifySnapshotRecord(input.payload),
+      occurredAt: input.occurredAt ?? Date.now(),
+      durationMs: input.durationMs ?? null,
+    }
+    if (updateQueuedRunSnapshotEvent(d, input.eventId, update)) {
+      return
+    }
     const result = d
       .update(backendRunSnapshotEvents)
-      .set({
-        payloadJson: stringifySnapshotRecord(input.payload),
-        occurredAt: input.occurredAt ?? Date.now(),
-        durationMs: input.durationMs ?? null,
-      })
+      .set(update)
       .where(eq(backendRunSnapshotEvents.id, input.eventId))
       .run()
     if (result.changes > 0) {
-      projectChatRuntimeRunSnapshotEventReadModels(d, { sourceEventId: input.eventId })
+      const event = d
+        .select()
+        .from(backendRunSnapshotEvents)
+        .where(eq(backendRunSnapshotEvents.id, input.eventId))
+        .get()
+      const snapshot = event
+        ? d.select({ workspaceId: backendRunSnapshots.workspaceId })
+            .from(backendRunSnapshots)
+            .where(eq(backendRunSnapshots.id, event.snapshotId))
+            .get()
+        : null
+      if (event) {
+        projectChatRuntimeRunSnapshotEventReadModels(d, {
+          sourceEvent: event,
+          workspaceId: snapshot?.workspaceId ?? null,
+        })
+      }
     }
   }
  catch (error) {
@@ -284,30 +317,35 @@ export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
 
   try {
     const d = db()
-    const { previous, changes } = d.transaction((tx) => {
+    const { previous, changes } = flushRunSnapshotJournalForSnapshot(d, input.snapshotId, (tx, context) => {
       const previous = tx
         .select()
         .from(backendRunSnapshots)
         .where(eq(backendRunSnapshots.id, input.snapshotId))
         .get()
-      const result = tx
-        .update(backendRunSnapshots)
-        .set(values)
-        .where(
-          and(
-            eq(backendRunSnapshots.id, input.snapshotId),
-            eq(backendRunSnapshots.status, 'running'),
-          ),
-        )
-        .run()
+      const result = previous && previous.status !== 'running' && previous.status !== input.status
+        ? { changes: 0 }
+        : tx
+            .update(backendRunSnapshots)
+            .set(values)
+            .where(eq(backendRunSnapshots.id, input.snapshotId))
+            .run()
 
-      if (result.changes > 0 && input.status === 'complete') {
+      if (
+        result.changes > 0
+        && input.status === 'complete'
+        && context.hadPreviouslyPersistedEvents
+      ) {
         compactSuccessfulRunSnapshotEventPayloads(tx, input.snapshotId)
       }
 
       return { previous, changes: result.changes }
-    })
-    if (changes === 0 && previous && previous.status !== 'running') {
+    }, {
+      compactSuccessfulPayloads: result => input.status === 'complete' && (result?.changes ?? 0) > 0,
+      finalSnapshot: true,
+    })!
+    releaseRunSnapshotContext(d, input.snapshotId)
+    if (changes === 0 && previous && previous.status !== 'running' && previous.status !== input.status) {
       Observability.record({
         source: 'chat-engine',
         code: OBSERVABILITY_CODES.chatLateRunFinalizationIgnored,
@@ -332,6 +370,7 @@ export function finalizeRunSnapshot(input: FinalizeRunSnapshotInput): void {
 }
 
 export function getRunSnapshots(filter: RunSnapshotFilter = {}): ChatRunSnapshot[] {
+  flushRunSnapshotWriteBehind()
   const conditions: SQL[] = []
   if (filter.chatSessionId) {
     conditions.push(eq(backendRunSnapshots.chatSessionId, filter.chatSessionId))
@@ -368,6 +407,7 @@ export function getRunSnapshots(filter: RunSnapshotFilter = {}): ChatRunSnapshot
 }
 
 export function getRunSnapshot(runId: string): ChatRunSnapshot | null {
+  flushRunSnapshotWriteBehind()
   const row = db()
     .select()
     .from(backendRunSnapshots)
@@ -409,8 +449,9 @@ function countSnapshotEvents(snapshotId: string): number {
 function toChatRunSnapshot(
   row: BackendRunSnapshot,
   events: BackendRunSnapshotEvent[],
+  knownEventCount?: number,
 ): ChatRunSnapshot {
-  const eventCount = countSnapshotEvents(row.id)
+  const eventCount = knownEventCount ?? countSnapshotEvents(row.id)
   return {
     id: row.id,
     schemaVersion: row.schemaVersion,
@@ -480,6 +521,7 @@ interface RunSnapshotMaintenanceResult {
 }
 
 export function maintainRunSnapshots(now = Date.now()): RunSnapshotMaintenanceResult {
+  flushRunSnapshotWriteBehind()
   const d = db()
   return d.transaction((tx) => {
     const completedSnapshotIds = tx
@@ -565,24 +607,6 @@ function compactSuccessfulRunSnapshotEventPayloads(
     compacted += 1
   }
   return compacted
-}
-
-function compactSuccessfulPayload(payloadJson: string): string {
-  const parsed = SnapshotRecordSchema.safeParse(payloadJson)
-  const coalescedCount
-    = parsed.success && typeof parsed.data.coalescedCount === 'number'
-      ? parsed.data.coalescedCount
-      : undefined
-  return JSON.stringify({
-    schema: COMPACTED_SUCCESS_PAYLOAD_SCHEMA,
-    originalLength: payloadJson.length,
-    ...(coalescedCount !== undefined ? { coalescedCount } : {}),
-  })
-}
-
-function isCompactedSuccessPayload(payloadJson: string): boolean {
-  const parsed = SnapshotRecordSchema.safeParse(payloadJson)
-  return parsed.success && parsed.data.schema === COMPACTED_SUCCESS_PAYLOAD_SCHEMA
 }
 
 function readExpiredRunSnapshotIds(d: RunSnapshotMaintenanceDb, now: number): string[] {

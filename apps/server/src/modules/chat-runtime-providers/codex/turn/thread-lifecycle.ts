@@ -1,9 +1,3 @@
-/**
- * Output: Codex app-server thread lifecycle and history hydration helpers.
- * Input: runtime sessions, app-server clients, transcript snapshots, and native Codex history snapshots.
- * Position: Codex provider package owner for opening, restoring, and hydrating app-server threads.
- */
-
 import type { UIMessage } from 'ai'
 
 import type {
@@ -14,24 +8,17 @@ import type { CodexConfig } from '../../../provider-contracts/provider-base'
 import { isCodexAppServerUnknownMethodError } from '../app-server/client'
 import type { ThreadForkParams } from '../app-server-protocol/v2/ThreadForkParams'
 import type { ThreadInjectItemsParams } from '../app-server-protocol/v2/ThreadInjectItemsParams'
-import type { ThreadTurnsListResponse } from '../app-server-protocol/v2/ThreadTurnsListResponse'
-import type { Turn } from '../app-server-protocol/v2/Turn'
-import type { CodexNativeHistorySnapshot } from '../projection/state-projector'
-import {
-  readCodexProviderSnapshot,
-  writeCodexNativeHistorySnapshot,
-} from '../projection/state-projector'
+import { readCodexProviderSnapshot } from '../projection/state-projector'
 import { codexRequestError, formatUnknownError } from '../provider-errors'
 import type {
   CodexAppServerClientLike,
+  CodexAppServerHostResource,
   CodexThreadStatus,
   ThreadResponse,
 } from '../types'
-import { projectCodexNativeTurnsToCodexItems } from './native-history-projector'
 import { readCodexThreadDisplayTitle } from './stream-diagnostics'
 import { projectCradleTranscriptToCodexItems } from './transcript-projector'
 
-const CODEX_THREAD_TURNS_LIST_LIMIT = 100
 const CODEX_SIDE_BOUNDARY_PROMPT = [
   'You are in a Cradle side conversation.',
   '',
@@ -72,21 +59,47 @@ export async function requestCodexAppServerWithTimeout<T>(
 }
 
 export async function syncCodexSkillExtraRoots(
-  client: CodexAppServerClientLike,
+  resource: CodexAppServerHostResource,
   extraRoots: string[],
 ): Promise<void> {
-  if (extraRoots.length === 0) {
+  const previousSize = resource.skillExtraRoots.size
+  for (const root of extraRoots) {
+    resource.skillExtraRoots.add(root)
+  }
+  if (resource.skillExtraRootsUnsupported) {
     return
   }
-  try {
-    await client.request('skills/extraRoots/set', { extraRoots })
+  if (resource.skillExtraRoots.size === previousSize) {
+    await resource.skillExtraRootsSync
+    return
   }
-  catch (error) {
-    if (isCodexAppServerUnknownMethodError(error, 'skills/extraRoots/set')) {
+
+  const roots = [...resource.skillExtraRoots].sort()
+  const previousSync = resource.skillExtraRootsSync ?? Promise.resolve()
+  const sync = previousSync.then(async () => {
+    if (resource.skillExtraRootsUnsupported) {
       return
     }
-    throw codexRequestError('skills/extraRoots/set', formatUnknownError(error))
-  }
+    try {
+      await resource.client.request('skills/extraRoots/set', { extraRoots: roots })
+    }
+    catch (error) {
+      if (isCodexAppServerUnknownMethodError(error, 'skills/extraRoots/set')) {
+        resource.skillExtraRootsUnsupported = true
+        return
+      }
+      throw codexRequestError('skills/extraRoots/set', formatUnknownError(error))
+    }
+  })
+  resource.skillExtraRootsSync = sync
+  await sync
+}
+
+export function markCodexThreadLoaded(
+  resource: CodexAppServerHostResource,
+  threadId: string,
+): void {
+  resource.loadedThreadIds.add(threadId)
 }
 
 export function isLiveCodexSideFork(runtimeSession: RuntimeSession): boolean {
@@ -119,6 +132,7 @@ export function readLiveSideForkThreadStart(
 
 export async function startOrResumeThread(
   client: CodexAppServerClientLike,
+  resource: CodexAppServerHostResource,
   runtimeSession: RuntimeSession,
   params: {
     model?: string | null
@@ -144,11 +158,37 @@ export async function startOrResumeThread(
   const requestParams = runtimeSession.providerSessionId
     ? { ...baseParams, threadId: runtimeSession.providerSessionId, excludeTurns: true }
     : { ...baseParams, experimentalRawEvents: true }
+  if (runtimeSession.providerSessionId && resource.loadedThreadIds.has(runtimeSession.providerSessionId)) {
+    return readLiveSideForkThreadStart(runtimeSession, params.model)
+  }
+
   let response: ThreadResponse
   try {
-    response = params.requestTimeoutMs
-      ? await requestCodexAppServerWithTimeout<ThreadResponse>(client, method, requestParams, params.requestTimeoutMs)
-      : await client.request(method, requestParams) as ThreadResponse
+    const existingThreadId = runtimeSession.providerSessionId
+    if (existingThreadId) {
+      const existingBind = resource.threadBindPromises.get(existingThreadId)
+      if (existingBind) {
+        response = await existingBind
+      }
+      else {
+        const bind = params.requestTimeoutMs
+          ? requestCodexAppServerWithTimeout<ThreadResponse>(client, method, requestParams, params.requestTimeoutMs)
+          : client.request(method, requestParams) as Promise<ThreadResponse>
+        resource.threadBindPromises.set(existingThreadId, bind)
+        try {
+          response = await bind
+          resource.loadedThreadIds.add(existingThreadId)
+        }
+        finally {
+          resource.threadBindPromises.delete(existingThreadId)
+        }
+      }
+    }
+    else {
+      response = params.requestTimeoutMs
+        ? await requestCodexAppServerWithTimeout<ThreadResponse>(client, method, requestParams, params.requestTimeoutMs)
+        : await client.request(method, requestParams) as ThreadResponse
+    }
   }
   catch (error) {
     throw codexRequestError(method, formatUnknownError(error))
@@ -157,6 +197,7 @@ export async function startOrResumeThread(
   if (!threadId) {
     throw codexRequestError('startOrResumeCodexThread', 'Codex app-server did not return a thread id')
   }
+  resource.loadedThreadIds.add(threadId)
   return {
     threadId,
     title: readCodexThreadDisplayTitle(response.thread),
@@ -225,93 +266,4 @@ export async function injectCodexSideBoundary(
     }],
   }
   await client.request('thread/inject_items', params)
-}
-
-export async function injectCodexNativeHistory(
-  client: CodexAppServerClientLike,
-  threadId: string,
-  nativeHistory: CodexNativeHistorySnapshot | undefined,
-): Promise<void> {
-  if (!nativeHistory?.turns.length) {
-    return
-  }
-
-  const items = projectCodexNativeTurnsToCodexItems(nativeHistory.turns)
-  if (items.length === 0) {
-    return
-  }
-
-  const params: ThreadInjectItemsParams = {
-    threadId,
-    items: items as ThreadInjectItemsParams['items'],
-  }
-  await client.request('thread/inject_items', params)
-}
-
-export async function hydrateCodexNativeHistory(
-  client: CodexAppServerClientLike,
-  runtimeSession: RuntimeSession,
-  threadId: string,
-): Promise<void> {
-  try {
-    const turns = await listFullCodexTurns(client, threadId)
-    writeCodexNativeHistorySnapshot(runtimeSession, {
-      threadId,
-      itemsView: 'full',
-      fetchedAt: Date.now(),
-      complete: true,
-      turns,
-      turnCount: turns.length,
-      itemCount: countCodexTurnItems(turns),
-      nextCursor: null,
-      error: null,
-    })
-  }
-  catch (error) {
-    writeCodexNativeHistorySnapshot(runtimeSession, {
-      threadId,
-      itemsView: 'full',
-      fetchedAt: Date.now(),
-      complete: false,
-      turns: [],
-      turnCount: 0,
-      itemCount: 0,
-      nextCursor: null,
-      error: error instanceof Error ? error.message : String(error),
-    })
-  }
-}
-
-async function listFullCodexTurns(
-  client: CodexAppServerClientLike,
-  threadId: string,
-): Promise<Turn[]> {
-  const turns: Turn[] = []
-  let cursor: string | null = null
-  const seenCursors = new Set<string>()
-  do {
-    const response = await client.request('thread/turns/list', {
-      threadId,
-      cursor,
-      limit: CODEX_THREAD_TURNS_LIST_LIMIT,
-      sortDirection: 'asc',
-      itemsView: 'full',
-    }) as ThreadTurnsListResponse
-    turns.push(...(Array.isArray(response.data) ? response.data : []))
-    const nextCursor = typeof response.nextCursor === 'string' && response.nextCursor.length > 0
-      ? response.nextCursor
-      : null
-    if (nextCursor && seenCursors.has(nextCursor)) {
-      throw codexRequestError('hydrateCodexNativeHistory', `Codex thread/turns/list returned a repeated cursor: ${nextCursor}`)
-    }
-    if (nextCursor) {
-      seenCursors.add(nextCursor)
-    }
-    cursor = nextCursor
-  } while (cursor)
-  return turns
-}
-
-function countCodexTurnItems(turns: Turn[]): number {
-  return turns.reduce((count, turn) => count + turn.items.length, 0)
 }

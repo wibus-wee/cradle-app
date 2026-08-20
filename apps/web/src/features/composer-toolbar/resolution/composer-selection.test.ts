@@ -16,6 +16,8 @@ function profile(overrides: Partial<ProviderModelOption> & { id: string }): Prov
     id: overrides.id,
     name: overrides.name ?? overrides.id,
     providerKind: overrides.providerKind ?? 'openai-compatible',
+    effectiveProviderKinds: overrides.effectiveProviderKinds
+      ?? [overrides.providerKind ?? 'openai-compatible'],
     enabled: overrides.enabled ?? true,
     iconSlug: overrides.iconSlug ?? null,
     sourceKey: overrides.sourceKey,

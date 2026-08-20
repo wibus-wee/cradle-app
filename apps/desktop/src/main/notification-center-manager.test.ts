@@ -46,7 +46,82 @@ function createJsonResponse(value: unknown): Response {
   })
 }
 
+function createEventTailBroker() {
+  return {
+    subscribeGlobalSessionEventsListener: vi.fn(() => vi.fn()),
+  }
+}
+
 describe('notificationCenterManager', () => {
+  it('refreshes from durable global events instead of idle polling', async () => {
+    const listeners: Array<{ onEvent: (event: unknown) => void }> = []
+    const eventTailBroker = {
+      subscribeGlobalSessionEventsListener: vi.fn((_request, nextListener) => {
+        listeners.push(nextListener)
+        return vi.fn()
+      }),
+    }
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).includes('/chat/runs/completed')
+        ? createJsonResponse({ runs: [] })
+        : createJsonResponse([]))
+    const manager = new NotificationCenterManager({
+      serverUrl: 'http://127.0.0.1:21423',
+      chatStreamBroker: { startResponseDetached: vi.fn() } as never,
+      chatEventTailBroker: eventTailBroker as never,
+      fetchFn: fetchFn as typeof fetch,
+    })
+
+    manager.start()
+    await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2))
+    fetchFn.mockClear()
+
+    listeners[0]?.onEvent({ type: 'TitleChanged', sequenceId: 1 })
+    await new Promise(resolve => setTimeout(resolve, 75))
+    expect(fetchFn).not.toHaveBeenCalled()
+
+    listeners[0]?.onEvent({ type: 'RunCompleted', sequenceId: 2 })
+    await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2))
+    manager.stop()
+  })
+
+  it('does not lose an event refresh while the initial read is still in flight', async () => {
+    const listeners: Array<{ onEvent: (event: unknown) => void }> = []
+    const eventTailBroker = {
+      subscribeGlobalSessionEventsListener: vi.fn((_request, nextListener) => {
+        listeners.push(nextListener)
+        return vi.fn()
+      }),
+    }
+    let releaseInitialRead: (() => void) | undefined
+    const initialRead = new Promise<void>((resolve) => {
+      releaseInitialRead = resolve
+    })
+    const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+      if (fetchFn.mock.calls.length === 1) {
+        await initialRead
+      }
+      return String(input).includes('/chat/runs/completed')
+        ? createJsonResponse({ runs: [] })
+        : createJsonResponse([])
+    })
+    const manager = new NotificationCenterManager({
+      serverUrl: 'http://127.0.0.1:21423',
+      chatStreamBroker: { startResponseDetached: vi.fn() } as never,
+      chatEventTailBroker: eventTailBroker as never,
+      fetchFn: fetchFn as typeof fetch,
+    })
+
+    manager.start()
+    await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1))
+    listeners[0]?.onEvent({ type: 'RunCompleted', sequenceId: 1 })
+    await new Promise(resolve => setTimeout(resolve, 75))
+    releaseInitialRead?.()
+
+    await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(4))
+    manager.stop()
+  })
+
   it('shows a native reply notification for completed chat runs', async () => {
     const notifications: FakeNotification[] = []
     const broker = { startResponseDetached: vi.fn() }
@@ -65,6 +140,7 @@ describe('notificationCenterManager', () => {
     const manager = new NotificationCenterManager({
       serverUrl: 'http://127.0.0.1:21423',
       chatStreamBroker: broker as never,
+      chatEventTailBroker: createEventTailBroker() as never,
       fetchFn: fetchFn as typeof fetch,
       createNotification: (options) => {
         const notification = new FakeNotification(options)
@@ -79,7 +155,6 @@ describe('notificationCenterManager', () => {
 
     expect(fetchFn).toHaveBeenCalledWith(
       new URL('http://127.0.0.1:21423/chat/runs/completed?since=0&limit=50'),
-      { headers: {} },
     )
     expect(notifications).toHaveLength(1)
     expect(notifications[0]?.options).toMatchObject({
@@ -119,6 +194,7 @@ describe('notificationCenterManager', () => {
     const manager = new NotificationCenterManager({
       serverUrl: 'http://127.0.0.1:21423',
       chatStreamBroker: broker as never,
+      chatEventTailBroker: createEventTailBroker() as never,
       fetchFn: fetchFn as typeof fetch,
       createNotification: (options) => {
         const notification = new FakeNotification(options)
@@ -180,6 +256,7 @@ describe('notificationCenterManager', () => {
     const manager = new NotificationCenterManager({
       serverUrl: 'http://127.0.0.1:21423',
       chatStreamBroker: broker as never,
+      chatEventTailBroker: createEventTailBroker() as never,
       fetchFn: fetchFn as typeof fetch,
       createNotification: (options) => {
         const notification = new FakeNotification(options)
@@ -194,7 +271,6 @@ describe('notificationCenterManager', () => {
 
     expect(fetchFn).toHaveBeenCalledWith(
       new URL('http://127.0.0.1:21423/desktop/user-input-requests'),
-      { headers: {} },
     )
     expect(notifications).toHaveLength(1)
     expect(notifications[0]?.options).toMatchObject({
@@ -240,6 +316,7 @@ describe('notificationCenterManager', () => {
     const manager = new NotificationCenterManager({
       serverUrl: 'http://127.0.0.1:21423',
       chatStreamBroker: broker as never,
+      chatEventTailBroker: createEventTailBroker() as never,
       fetchFn: fetchFn as typeof fetch,
       createNotification: (options) => {
         const notification = new FakeNotification(options)
@@ -284,6 +361,7 @@ describe('notificationCenterManager', () => {
     const manager = new NotificationCenterManager({
       serverUrl: 'http://127.0.0.1:21423',
       chatStreamBroker: broker as never,
+      chatEventTailBroker: createEventTailBroker() as never,
       fetchFn: fetchFn as typeof fetch,
       createNotification: (options) => {
         const notification = new FakeNotification(options)

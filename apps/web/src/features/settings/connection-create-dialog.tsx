@@ -6,6 +6,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
+  deleteSecretsById,
   getSecrets,
   postConversationBridgeConnections,
   postSecrets,
@@ -152,7 +153,6 @@ export function CreateConnectionDialog({
 
   const [botToken, setBotToken] = useSecretField('create')
   const [appToken, setAppToken] = useSecretField('create')
-  const [signingSecret, setSigningSecret] = useSecretField('create')
   const [logLevel, setLogLevel] = useState<'debug' | 'info' | 'warn' | 'error'>('info')
 
   const selectedAdapter = useMemo(() => adapters.find(a => a.id === selectedAdapterId), [adapters, selectedAdapterId])
@@ -164,15 +164,21 @@ export function CreateConnectionDialog({
     setEnabled(true)
     setBotToken({ mode: 'create', selectedId: '', newValue: '', newLabel: '' })
     setAppToken({ mode: 'create', selectedId: '', newValue: '', newLabel: '' })
-    setSigningSecret({ mode: 'create', selectedId: '', newValue: '', newLabel: '' })
     setLogLevel('info')
   }
 
-  const resolveSecretId = async (field: SecretFieldState, kind: 'slack-bot-token' | 'slack-app-token' | 'slack-signing-secret'): Promise<string | null> => {
+  const resolveSecretId = async (
+    field: SecretFieldState,
+    kind: 'slack-bot-token' | 'slack-app-token' | 'slack-signing-secret',
+    createdSecretIds: string[],
+  ): Promise<string | null> => {
     if (field.mode === 'select') { return field.selectedId || null }
     if (!field.newValue || !field.newLabel) { return null }
     const { data, error } = await postSecrets({ body: { kind, label: field.newLabel, secret: field.newValue } })
     if (error) { throw new Error(String(error)) }
+    if (data?.id) {
+      createdSecretIds.push(data.id)
+    }
     return data?.id ?? null
   }
 
@@ -180,29 +186,34 @@ export function CreateConnectionDialog({
     mutationFn: async () => {
       if (!selectedAdapter) { throw new Error('No adapter selected') }
 
+      const createdSecretIds: string[] = []
       const secretRefs: Record<string, string> = {}
-      if (isSlack) {
-        const botId = await resolveSecretId(botToken, 'slack-bot-token')
-        const appId = await resolveSecretId(appToken, 'slack-app-token')
-        const signingId = await resolveSecretId(signingSecret, 'slack-signing-secret')
-        if (botId) { secretRefs.botToken = botId }
-        if (appId) { secretRefs.appToken = appId }
-        if (signingId) { secretRefs.signingSecret = signingId }
-      }
+      try {
+        if (isSlack) {
+          const botId = await resolveSecretId(botToken, 'slack-bot-token', createdSecretIds)
+          const appId = await resolveSecretId(appToken, 'slack-app-token', createdSecretIds)
+          if (botId) { secretRefs.botToken = botId }
+          if (appId) { secretRefs.appToken = appId }
+        }
 
-      const { data, error } = await postConversationBridgeConnections({
-        body: {
-          platform: selectedAdapter.platform,
-          adapterOwner: selectedAdapter.owner,
-          adapterId: selectedAdapter.id,
-          displayName,
-          enabled,
-          secretRefs: Object.keys(secretRefs).length > 0 ? secretRefs : undefined,
-          config: isSlack ? { logLevel } : undefined,
-        },
-      })
-      if (error) { throw new Error(String(error)) }
-      return data
+        const { data, error } = await postConversationBridgeConnections({
+          body: {
+            platform: selectedAdapter.platform,
+            adapterOwner: selectedAdapter.owner,
+            adapterId: selectedAdapter.id,
+            displayName,
+            enabled,
+            secretRefs: Object.keys(secretRefs).length > 0 ? secretRefs : undefined,
+            config: isSlack ? { logLevel } : undefined,
+          },
+        })
+        if (error) { throw new Error(String(error)) }
+        return data
+      }
+      catch (error) {
+        await Promise.allSettled(createdSecretIds.map(id => deleteSecretsById({ path: { id } })))
+        throw error
+      }
     },
     onSuccess: () => {
       toastManager.add({ type: 'success', title: t('integrations.connection.toast.created') })
@@ -219,7 +230,6 @@ export function CreateConnectionDialog({
   const isSlackFormValid
     = ((botToken.mode === 'create' && botToken.newValue && botToken.newLabel) || (botToken.mode === 'select' && botToken.selectedId))
       && ((appToken.mode === 'create' && appToken.newValue && appToken.newLabel) || (appToken.mode === 'select' && appToken.selectedId))
-      && ((signingSecret.mode === 'create' && signingSecret.newValue && signingSecret.newLabel) || (signingSecret.mode === 'select' && signingSecret.selectedId))
 
   const isFormValid = Boolean(selectedAdapter && displayName && (isSlack ? isSlackFormValid : true))
 
@@ -297,15 +307,6 @@ export function CreateConnectionDialog({
                   description={t('integrations.slack.appTokenDescription')}
                   secrets={secrets}
                   secretKind="slack-app-token"
-                />
-                <SecretFieldEditor
-                  field={signingSecret}
-                  set={setSigningSecret}
-                  label={t('integrations.slack.signingSecret')}
-                  placeholder={t('integrations.slack.signingSecretPlaceholder')}
-                  description={t('integrations.slack.signingSecretDescription')}
-                  secrets={secrets}
-                  secretKind="slack-signing-secret"
                 />
                 <div className="space-y-2">
                   <Label htmlFor="logLevel" className="text-xs">{t('integrations.slack.logLevel')}</Label>

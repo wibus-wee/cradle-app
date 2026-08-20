@@ -66,10 +66,20 @@ function isPermissionEnforcedSource(sourceKind: PluginSourceKind): boolean {
 }
 
 function isDeclaredCapabilityInLayer(
-  declaredLayer: PluginLayer | undefined,
+  declaredLayer: PluginLayer | null | undefined,
   runtimeLayer: PluginLayer,
 ): boolean {
-  return declaredLayer === undefined || declaredLayer === runtimeLayer
+  return declaredLayer == null || declaredLayer === runtimeLayer
+}
+
+interface PluginRuntimePolicyDescriptor {
+  source: { kind: PluginSourceKind }
+  declaredCapabilities: Array<{
+    id: string
+    localId: string
+    type: string
+    layer?: PluginLayer | null
+  }>
 }
 
 export function evaluatePluginPermissionPolicy(
@@ -107,7 +117,7 @@ export function evaluatePluginPermissionPolicy(
 }
 
 export function evaluatePluginRuntimeCapabilityPolicy(
-  descriptor: PluginDescriptor,
+  descriptor: PluginRuntimePolicyDescriptor,
   registration: PluginRuntimeCapabilityRegistration,
 ): PluginRuntimeCapabilityDecision {
   const parsedRegistration = RuntimeCapabilityRegistrationSchema.parse(registration)

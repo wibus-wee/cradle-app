@@ -3,7 +3,6 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 import { getChatSessionsBySessionIdRunSnapshotsOptions } from '~/api-gen/@tanstack/react-query.gen'
-import { resolveBlobContentUrl } from '~/features/assets/blob-url'
 import { chatSelectors } from '~/store/chat'
 
 import { BangCommandBlock, BangCommandPromptBlock } from '../../rendering/blocks/bang-command-block'
@@ -80,7 +79,7 @@ export function MessageBubbleSegmentsContainer({
   const lightboxImages = imageSegments.map(({ segment }) => {
     const part = imageAttachmentBySegmentKey.get(segment.key)
     return {
-      url: part ? resolveBlobContentUrl(part.url, sessionId) : '',
+      url: part?.url ?? '',
       alt: part?.filename ?? part?.mediaType ?? 'Image',
     }
   })
@@ -149,7 +148,7 @@ export function MessageBubbleSegmentsContainer({
         debugCaption={isAssistant ? <RunDebugCaptionById messageId={frame.id} /> : undefined}
         actions={!isStreaming ? <MessageBubbleActionsById sessionId={sessionId} messageId={frame.id} isUser={isUser} editAction={isUser ? editAction : undefined} textTransform={textTransform} /> : undefined}
       />
-      {lightboxImages.length > 0 && <ImageLightbox images={lightboxImages} initialIndex={lightboxIndex} open={lightboxOpen} onOpenChange={setLightboxOpen} />}
+      {lightboxImages.length > 0 && <ImageLightbox images={lightboxImages} sessionId={sessionId} initialIndex={lightboxIndex} open={lightboxOpen} onOpenChange={setLightboxOpen} />}
     </>
   )
 }

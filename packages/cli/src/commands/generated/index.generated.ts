@@ -1,755 +1,100 @@
 import type { Command } from 'commander'
 
-import { register as registerAcpAgentCancelInstall } from './acp/agent/cancel-install'
-import { register as registerAcpAgentCreate } from './acp/agent/create'
-import { register as registerAcpAgentGet } from './acp/agent/get'
-import { register as registerAcpAgentInstall } from './acp/agent/install'
-import { register as registerAcpAgentInstallPath } from './acp/agent/install-path'
-import { register as registerAcpAgentLaunchConfig } from './acp/agent/launch-config'
-import { register as registerAcpAgentList } from './acp/agent/list'
-import { register as registerAcpAgentUninstall } from './acp/agent/uninstall'
-import { register as registerAcpAudit } from './acp/audit'
-import { register as registerAcpRegistryDistributionTypes } from './acp/registry/distribution-types'
-import { register as registerAcpRegistryList } from './acp/registry/list'
-import { register as registerAgentCreate } from './agent/create'
-import { register as registerAgentDelete } from './agent/delete'
-import { register as registerAgentGet } from './agent/get'
-import { register as registerAgentList } from './agent/list'
-import { register as registerAgentUpdate } from './agent/update'
-import { register as registerAutomationArtifactGet } from './automation/artifact/get'
-import { register as registerAutomationArtifactList } from './automation/artifact/list'
-import { register as registerAutomationArtifacts } from './automation/artifacts'
-import { register as registerAutomationCreate } from './automation/create'
-import { register as registerAutomationDelete } from './automation/delete'
-import { register as registerAutomationDisable } from './automation/disable'
-import { register as registerAutomationEnable } from './automation/enable'
-import { register as registerAutomationGet } from './automation/get'
-import { register as registerAutomationList } from './automation/list'
-import { register as registerAutomationRun } from './automation/run'
-import { register as registerAutomationRunGet } from './automation/run/get'
-import { register as registerAutomationRunStop } from './automation/run/stop'
-import { register as registerAutomationRunTriage } from './automation/run/triage'
-import { register as registerAutomationRuns } from './automation/runs'
-import { register as registerAutomationTriageList } from './automation/triage/list'
-import { register as registerAutomationUpdate } from './automation/update'
-import { register as registerBackgroundActivityList } from './background-activity/list'
-import { register as registerBackgroundActivityRun } from './background-activity/run'
-import { register as registerBackgroundJobCancel } from './background-job/cancel'
-import { register as registerBackgroundJobGet } from './background-job/get'
-import { register as registerBackgroundJobList } from './background-job/list'
-import { register as registerBoardCreate } from './board/create'
-import { register as registerBoardDelete } from './board/delete'
-import { register as registerBoardList } from './board/list'
-import { register as registerBoardUpdate } from './board/update'
-import { register as registerChatCancel } from './chat/cancel'
-import { register as registerChatHandoffCreate } from './chat/handoff/create'
-import { register as registerChatHandoffGet } from './chat/handoff/get'
-import { register as registerChatMessages } from './chat/messages'
-import { register as registerChatQueue } from './chat/queue'
-import { register as registerChatQueueAdd } from './chat/queue/add'
-import { register as registerChatQueueCancel } from './chat/queue/cancel'
-import { register as registerChatQueueReorder } from './chat/queue/reorder'
-import { register as registerChatQueueUpdate } from './chat/queue/update'
-import { register as registerChatRuntimeSettingsGet } from './chat/runtime-settings/get'
-import { register as registerChatRuntimeSettingsSet } from './chat/runtime-settings/set'
-import { register as registerChatSessionCheckpointList } from './chat/session/checkpoint/list'
-import { register as registerChatSessionCheckpointRestore } from './chat/session/checkpoint/restore'
-import { register as registerChatSessionCheckpointRewind } from './chat/session/checkpoint/rewind'
-import { register as registerChatSessionEnvironment } from './chat/session/environment'
-import { register as registerChatSessionRollbackLastTurn } from './chat/session/rollback-last-turn'
-import { register as registerChatSnapshotRun } from './chat/snapshot/run'
-import { register as registerChatSnapshotSession } from './chat/snapshot/session'
-import { register as registerChatTraceRun } from './chat/trace/run'
-import { register as registerChatTraceSession } from './chat/trace/session'
-import { register as registerChronicleAccessibilityEventsList } from './chronicle/accessibility-events/list'
-import { register as registerChronicleAccessibilitySnapshotsList } from './chronicle/accessibility-snapshots/list'
-import { register as registerChronicleActivityMonitorStatus } from './chronicle/activity-monitor/status'
-import { register as registerChronicleActivityPipelineTick } from './chronicle/activity-pipeline/tick'
-import { register as registerChronicleActivitySegmentsCrystallize } from './chronicle/activity-segments/crystallize'
-import { register as registerChronicleActivitySegmentsGet } from './chronicle/activity-segments/get'
-import { register as registerChronicleActivitySegmentsList } from './chronicle/activity-segments/list'
-import { register as registerChronicleActivitySegmentsSummarize } from './chronicle/activity-segments/summarize'
-import { register as registerChronicleActivitySegmentsTriage } from './chronicle/activity-segments/triage'
-import { register as registerChronicleActivitySessionsGet } from './chronicle/activity-sessions/get'
-import { register as registerChronicleActivitySessionsList } from './chronicle/activity-sessions/list'
-import { register as registerChronicleActivitySessionsSnapshots } from './chronicle/activity-sessions/snapshots'
-import { register as registerChronicleActivitySnapshotsGet } from './chronicle/activity-snapshots/get'
-import { register as registerChronicleActivitySnapshotsOcr } from './chronicle/activity-snapshots/ocr'
-import { register as registerChronicleActivityStorageStats } from './chronicle/activity-storage/stats'
-import { register as registerChronicleAudioRawSegmentsList } from './chronicle/audio-raw-segments/list'
-import { register as registerChronicleAudioRawSegmentsProcessingResult } from './chronicle/audio-raw-segments/processing-result'
-import { register as registerChronicleAudioTranscriptsList } from './chronicle/audio-transcripts/list'
-import { register as registerChronicleConfigGet } from './chronicle/config/get'
-import { register as registerChronicleConfigSet } from './chronicle/config/set'
-import { register as registerChronicleDaemonResources } from './chronicle/daemon/resources'
-import { register as registerChronicleDreamRunsList } from './chronicle/dream-runs/list'
-import { register as registerChronicleDreamRunsStart } from './chronicle/dream-runs/start'
-import { register as registerChronicleEventsList } from './chronicle/events/list'
-import { register as registerChronicleKnowledgeCardsCreate } from './chronicle/knowledge-cards/create'
-import { register as registerChronicleKnowledgeCardsDelete } from './chronicle/knowledge-cards/delete'
-import { register as registerChronicleKnowledgeCardsFiles } from './chronicle/knowledge-cards/files'
-import { register as registerChronicleKnowledgeCardsGet } from './chronicle/knowledge-cards/get'
-import { register as registerChronicleKnowledgeCardsList } from './chronicle/knowledge-cards/list'
-import { register as registerChronicleKnowledgeCardsRestoreVersion } from './chronicle/knowledge-cards/restore-version'
-import { register as registerChronicleKnowledgeCardsUpdate } from './chronicle/knowledge-cards/update'
-import { register as registerChronicleKnowledgeCardsVersions } from './chronicle/knowledge-cards/versions'
-import { register as registerChronicleMemoriesDelete } from './chronicle/memories/delete'
-import { register as registerChronicleMemoriesGet } from './chronicle/memories/get'
-import { register as registerChronicleMemoriesList } from './chronicle/memories/list'
-import { register as registerChronicleMemoriesSearch } from './chronicle/memories/search'
-import { register as registerChronicleMemoriesUpdate } from './chronicle/memories/update'
-import { register as registerChronicleMemoryStatus } from './chronicle/memory/status'
-import { register as registerChronicleMessageSourcesCreate } from './chronicle/message-sources/create'
-import { register as registerChronicleMessageSourcesList } from './chronicle/message-sources/list'
-import { register as registerChronicleMessageSourcesSync } from './chronicle/message-sources/sync'
-import { register as registerChronicleMessageSourcesUpdate } from './chronicle/message-sources/update'
-import { register as registerChronicleMessagesList } from './chronicle/messages/list'
-import { register as registerChronicleModelResourcesInstall } from './chronicle/model-resources/install'
-import { register as registerChronicleModelResourcesInstallAll } from './chronicle/model-resources/install-all'
-import { register as registerChronicleModelResourcesList } from './chronicle/model-resources/list'
-import { register as registerChronicleModelResourcesReconcile } from './chronicle/model-resources/reconcile'
-import { register as registerChronicleModelResourcesVerify } from './chronicle/model-resources/verify'
-import { register as registerChroniclePipelineRunsList } from './chronicle/pipeline-runs/list'
-import { register as registerChroniclePrivacyBreadcrumbs } from './chronicle/privacy/breadcrumbs'
-import { register as registerChroniclePrivacyExport } from './chronicle/privacy/export'
-import { register as registerChroniclePrivacyRedact } from './chronicle/privacy/redact'
-import { register as registerChronicleSpeakerProfilesList } from './chronicle/speaker-profiles/list'
-import { register as registerChronicleSpeakerProfilesUpsert } from './chronicle/speaker-profiles/upsert'
-import { register as registerChronicleStatus } from './chronicle/status'
-import { register as registerChronicleTimeline } from './chronicle/timeline'
-import { register as registerCodexAppServerResources } from './codex/app-server/resources'
-import { register as registerDownloadCenterCancel } from './download-center/cancel'
-import { register as registerDownloadCenterGet } from './download-center/get'
-import { register as registerDownloadCenterList } from './download-center/list'
-import { register as registerExternalIssueSourceBind } from './external-issue-source/bind'
-import { register as registerExternalIssueSourceBindingDelete } from './external-issue-source/binding/delete'
-import { register as registerExternalIssueSourceBindingList } from './external-issue-source/binding/list'
-import { register as registerExternalIssueSourceBindingUpdate } from './external-issue-source/binding/update'
-import { register as registerExternalIssueSourceItemList } from './external-issue-source/item/list'
-import { register as registerExternalIssueSourceItemMove } from './external-issue-source/item/move'
-import { register as registerExternalIssueSourceList } from './external-issue-source/list'
-import { register as registerExternalIssueSourceRefresh } from './external-issue-source/refresh'
-import { register as registerExternalIssueSourceRefreshSource } from './external-issue-source/refresh-source'
-import { register as registerExternalSessionImportImport } from './external-session-import/import'
-import { register as registerExternalSessionImportList } from './external-session-import/list'
-import { register as registerExternalSessionImportScan } from './external-session-import/scan'
-import { register as registerExternalSessionImportScanGet } from './external-session-import/scan/get'
-import { register as registerExternalSessionImportSync } from './external-session-import/sync'
-import { register as registerHealth } from './health'
-import { register as registerIssueActivityList } from './issue/activity/list'
-import { register as registerIssueCommentAdd } from './issue/comment/add'
-import { register as registerIssueCommentDelete } from './issue/comment/delete'
-import { register as registerIssueCommentList } from './issue/comment/list'
-import { register as registerIssueContextRefAdd } from './issue/context-ref/add'
-import { register as registerIssueContextRefRemove } from './issue/context-ref/remove'
-import { register as registerIssueCreate } from './issue/create'
-import { register as registerIssueDelegate } from './issue/delegate'
-import { register as registerIssueDelegation } from './issue/delegation'
-import { register as registerIssueDelete } from './issue/delete'
-import { register as registerIssueFieldChangeList } from './issue/field-change/list'
-import { register as registerIssueGet } from './issue/get'
-import { register as registerIssueList } from './issue/list'
-import { register as registerIssueMilestoneCreate } from './issue/milestone/create'
-import { register as registerIssueMilestoneDelete } from './issue/milestone/delete'
-import { register as registerIssueMilestoneList } from './issue/milestone/list'
-import { register as registerIssueMilestoneUpdate } from './issue/milestone/update'
-import { register as registerIssueMove } from './issue/move'
-import { register as registerIssueRelationCreate } from './issue/relation/create'
-import { register as registerIssueRelationDelete } from './issue/relation/delete'
-import { register as registerIssueRelationList } from './issue/relation/list'
-import { register as registerIssueReorder } from './issue/reorder'
-import { register as registerIssueSearch } from './issue/search'
-import { register as registerIssueSessions } from './issue/sessions'
-import { register as registerIssueStatusCreate } from './issue/status/create'
-import { register as registerIssueStatusDelete } from './issue/status/delete'
-import { register as registerIssueStatusList } from './issue/status/list'
-import { register as registerIssueStatusReorder } from './issue/status/reorder'
-import { register as registerIssueStatusUpdate } from './issue/status/update'
-import { register as registerIssueUndelegate } from './issue/undelegate'
-import { register as registerIssueUpdate } from './issue/update'
-import { register as registerIssueAgentSessionActivities } from './issue-agent-session/activities'
-import { register as registerIssueAgentSessionRerun } from './issue-agent-session/rerun'
-import { register as registerIssueAgentSessionStop } from './issue-agent-session/stop'
-import { register as registerKimiServerResources } from './kimi/server/resources'
-import { register as registerLinkPreviewGet } from './link-preview/get'
-import { register as registerManagedResourcesGet } from './managed-resources/get'
-import { register as registerManagedResourcesInstall } from './managed-resources/install'
-import { register as registerManagedResourcesList } from './managed-resources/list'
-import { register as registerManagedResourcesUninstall } from './managed-resources/uninstall'
-import { register as registerManagedResourcesUpdate } from './managed-resources/update'
-import { register as registerMcpServerDelete } from './mcp-server/delete'
-import { register as registerMcpServerList } from './mcp-server/list'
-import { register as registerMcpServerSetEnabled } from './mcp-server/set-enabled'
-import { register as registerObservabilityErrorPatterns } from './observability/error-patterns'
-import { register as registerObservabilityEvents } from './observability/events'
-import { register as registerObservabilityExport } from './observability/export'
-import { register as registerObservabilityIncidents } from './observability/incidents'
-import { register as registerObservabilityRuntimeSnapshot } from './observability/runtime-snapshot'
-import { register as registerOpencodeServerResources } from './opencode/server/resources'
-import { register as registerPluginGet } from './plugin/get'
-import { register as registerPluginList } from './plugin/list'
-import { register as registerPluginMarketplaceList } from './plugin/marketplace/list'
-import { register as registerPluginMarketplaceRefresh } from './plugin/marketplace/refresh'
-import { register as registerPluginSetEnabled } from './plugin/set-enabled'
-import { register as registerPluginSourceAdd } from './plugin/source/add'
-import { register as registerPluginSourceGet } from './plugin/source/get'
-import { register as registerPluginSourceList } from './plugin/source/list'
-import { register as registerPluginSourceRefresh } from './plugin/source/refresh'
-import { register as registerPluginSourceRemove } from './plugin/source/remove'
-import { register as registerPluginSourceUninstallPlan } from './plugin/source/uninstall-plan'
-import { register as registerPreferencesAppGet } from './preferences/app/get'
-import { register as registerPreferencesAppSet } from './preferences/app/set'
-import { register as registerPreferencesChatGet } from './preferences/chat/get'
-import { register as registerPreferencesChatSet } from './preferences/chat/set'
-import { register as registerPreferencesCodexGet } from './preferences/codex/get'
-import { register as registerPreferencesCodexSet } from './preferences/codex/set'
-import { register as registerPreferencesDesktopGet } from './preferences/desktop/get'
-import { register as registerPreferencesDesktopSet } from './preferences/desktop/set'
-import { register as registerPreferencesJarvisGet } from './preferences/jarvis/get'
-import { register as registerPreferencesJarvisSet } from './preferences/jarvis/set'
-import { register as registerPreferencesKeybindingsGet } from './preferences/keybindings/get'
-import { register as registerProfileCustomModels } from './profile/custom-models'
-import { register as registerProfileDelete } from './profile/delete'
-import { register as registerProfileGet } from './profile/get'
-import { register as registerProfileList } from './profile/list'
-import { register as registerProfileSet } from './profile/set'
-import { register as registerProviderDelete } from './provider/delete'
-import { register as registerProviderList } from './provider/list'
-import { register as registerProviderModels } from './provider/models'
-import { register as registerProviderPresets } from './provider/presets'
-import { register as registerProviderScanLocal } from './provider/scan-local'
-import { register as registerProviderSet } from './provider/set'
-import { register as registerProviderTest } from './provider/test'
-import { register as registerPullRequestAssignableUsers } from './pull-request/assignable-users'
-import { register as registerPullRequestAssignees } from './pull-request/assignees'
-import { register as registerPullRequestAuthored } from './pull-request/authored'
-import { register as registerPullRequestComment } from './pull-request/comment'
-import { register as registerPullRequestDetail } from './pull-request/detail'
-import { register as registerPullRequestDraft } from './pull-request/draft'
-import { register as registerPullRequestFingerprint } from './pull-request/fingerprint'
-import { register as registerPullRequestFingerprintProbe } from './pull-request/fingerprint/probe'
-import { register as registerPullRequestMerge } from './pull-request/merge'
-import { register as registerPullRequestReady } from './pull-request/ready'
-import { register as registerPullRequestReview } from './pull-request/review'
-import { register as registerPullRequestReviewers } from './pull-request/reviewers'
-import { register as registerPullRequestReviewing } from './pull-request/reviewing'
-import { register as registerPullRequestViewer } from './pull-request/viewer'
-import { register as registerRelayServerCreate } from './relay-server/create'
-import { register as registerRelayServerDelete } from './relay-server/delete'
-import { register as registerRelayServerList } from './relay-server/list'
-import { register as registerRelayServerUpdate } from './relay-server/update'
-import { register as registerRelayTransportHostEnrollmentCreate } from './relay-transport/host-enrollment/create'
-import { register as registerRelayTransportHostEnrollmentDelete } from './relay-transport/host-enrollment/delete'
-import { register as registerRelayTransportHostEnrollmentGet } from './relay-transport/host-enrollment/get'
-import { register as registerRelayTransportHostEnrollmentList } from './relay-transport/host-enrollment/list'
-import { register as registerRelayTransportHostEnrollmentPairingString } from './relay-transport/host-enrollment/pairing-string'
-import { register as registerRemoteHostCradleServerConnect } from './remote-host/cradle-server/connect'
-import { register as registerRemoteHostCradleServerDisconnect } from './remote-host/cradle-server/disconnect'
-import { register as registerRemoteHostCradleServerHealth } from './remote-host/cradle-server/health'
-import { register as registerRemoteHostCreate } from './remote-host/create'
-import { register as registerRemoteHostDelete } from './remote-host/delete'
-import { register as registerRemoteHostList } from './remote-host/list'
-import { register as registerRemoteHostRelayClaim } from './remote-host/relay/claim'
-import { register as registerRemoteHostUpdate } from './remote-host/update'
-import { register as registerSearchChronicle } from './search/chronicle'
-import { register as registerSearchThreads } from './search/threads'
-import { register as registerSecretDelete } from './secret/delete'
-import { register as registerSecretList } from './secret/list'
-import { register as registerSessionArchive } from './session/archive'
-import { register as registerSessionAwaitCancel } from './session/await-cancel'
-import { register as registerSessionAwaitCreate } from './session/await-create'
-import { register as registerSessionAwaitGet } from './session/await-get'
-import { register as registerSessionAwaitList } from './session/await-list'
-import { register as registerSessionAwaitRetryDelivery } from './session/await-retry-delivery'
-import { register as registerSessionAwaitSummary } from './session/await-summary'
-import { register as registerSessionAwaitTrigger } from './session/await-trigger'
-import { register as registerSessionCreate } from './session/create'
-import { register as registerSessionDelete } from './session/delete'
-import { register as registerSessionExportMarkdown } from './session/export/markdown'
-import { register as registerSessionExportZip } from './session/export/zip'
-import { register as registerSessionGet } from './session/get'
-import { register as registerSessionIsolationActivate } from './session/isolation/activate'
-import { register as registerSessionIsolationCancel } from './session/isolation/cancel'
-import { register as registerSessionIsolationLeave } from './session/isolation/leave'
-import { register as registerSessionIsolationRepair } from './session/isolation/repair'
-import { register as registerSessionIsolationStart } from './session/isolation/start'
-import { register as registerSessionLinkedIssueGet } from './session/linked-issue/get'
-import { register as registerSessionLinkedIssueLink } from './session/linked-issue/link'
-import { register as registerSessionLinkedIssueUnlink } from './session/linked-issue/unlink'
-import { register as registerSessionList } from './session/list'
-import { register as registerSessionPullRequestCreate } from './session/pull-request/create'
-import { register as registerSessionPullRequestDetail } from './session/pull-request/detail'
-import { register as registerSessionPullRequestGet } from './session/pull-request/get'
-import { register as registerSessionPullRequestReady } from './session/pull-request/ready'
-import { register as registerSessionUpdate } from './session/update'
-import { register as registerSessionGroupAddMember } from './session-group/add-member'
-import { register as registerSessionGroupCreate } from './session-group/create'
-import { register as registerSessionGroupDelete } from './session-group/delete'
-import { register as registerSessionGroupGet } from './session-group/get'
-import { register as registerSessionGroupList } from './session-group/list'
-import { register as registerSessionGroupRemoveMember } from './session-group/remove-member'
-import { register as registerSessionGroupUpdate } from './session-group/update'
-import { register as registerSkillCreate } from './skill/create'
-import { register as registerSkillDocumentDelete } from './skill/document/delete'
-import { register as registerSkillDocumentGet } from './skill/document/get'
-import { register as registerSkillDocumentUpdate } from './skill/document/update'
-import { register as registerSkillExport } from './skill/export'
-import { register as registerSkillImport } from './skill/import'
-import { register as registerSkillList } from './skill/list'
-import { register as registerSkillSourceCancelFetch } from './skill/source/cancel-fetch'
-import { register as registerSkillSourceFetch } from './skill/source/fetch'
-import { register as registerSkillSourceImport } from './skill/source/import'
-import { register as registerUsageCostDaily } from './usage/cost/daily'
-import { register as registerUsageCostSessions } from './usage/cost/sessions'
-import { register as registerUsageCostSummary } from './usage/cost/summary'
-import { register as registerUsageCostEfficiency } from './usage/cost-efficiency'
-import { register as registerUsageDaily } from './usage/daily'
-import { register as registerUsageDailyByModel } from './usage/daily-by-model'
-import { register as registerUsagePatternsHourly } from './usage/patterns/hourly'
-import { register as registerUsagePerformance } from './usage/performance'
-import { register as registerUsageReconcileClaude } from './usage/reconcile/claude'
-import { register as registerUsageSession } from './usage/session'
-import { register as registerUsageSessionsRecent } from './usage/sessions/recent'
-import { register as registerUsageStats } from './usage/stats'
-import { register as registerUsageSummary } from './usage/summary'
-import { register as registerUsageTools } from './usage/tools'
-import { register as registerWorkArchive } from './work/archive'
-import { register as registerWorkCreate } from './work/create'
-import { register as registerWorkGet } from './work/get'
-import { register as registerWorkList } from './work/list'
-import { register as registerWorkPrepare } from './work/prepare'
-import { register as registerWorkRenameBranch } from './work/rename-branch'
-import { register as registerWorkSubmit } from './work/submit'
-import { register as registerWorkflowRuleDelete } from './workflow-rule/delete'
-import { register as registerWorkflowRuleGet } from './workflow-rule/get'
-import { register as registerWorkflowRuleList } from './workflow-rule/list'
-import { register as registerWorkflowRuleSave } from './workflow-rule/save'
-import { register as registerWorkspaceCreate } from './workspace/create'
-import { register as registerWorkspaceDelete } from './workspace/delete'
-import { register as registerWorkspaceDiffsAgentFixArtifact } from './workspace/diffs/agent-fix/artifact'
-import { register as registerWorkspaceDiffsAgentFixCancel } from './workspace/diffs/agent-fix/cancel'
-import { register as registerWorkspaceDiffsAgentFixCreate } from './workspace/diffs/agent-fix/create'
-import { register as registerWorkspaceDiffsAgentFixDelete } from './workspace/diffs/agent-fix/delete'
-import { register as registerWorkspaceDiffsAgentFixRerun } from './workspace/diffs/agent-fix/rerun'
-import { register as registerWorkspaceDiffsAgentFixStart } from './workspace/diffs/agent-fix/start'
-import { register as registerWorkspaceDiffsBranchCompare } from './workspace/diffs/branch-compare'
-import { register as registerWorkspaceDiffsClose } from './workspace/diffs/close'
-import { register as registerWorkspaceDiffsCommit } from './workspace/diffs/commit'
-import { register as registerWorkspaceDiffsFileViewed } from './workspace/diffs/file/viewed'
-import { register as registerWorkspaceDiffsGet } from './workspace/diffs/get'
-import { register as registerWorkspaceDiffsGithubPullRequest } from './workspace/diffs/github-pull-request'
-import { register as registerWorkspaceDiffsList } from './workspace/diffs/list'
-import { register as registerWorkspaceDiffsLocalWorkingTree } from './workspace/diffs/local-working-tree'
-import { register as registerWorkspaceDiffsMerge } from './workspace/diffs/merge'
-import { register as registerWorkspaceDiffsPreferencesSet } from './workspace/diffs/preferences/set'
-import { register as registerWorkspaceDiffsReadiness } from './workspace/diffs/readiness'
-import { register as registerWorkspaceDiffsRefresh } from './workspace/diffs/refresh'
-import { register as registerWorkspaceDiffsSubmit } from './workspace/diffs/submit'
-import { register as registerWorkspaceDiffsThreadComment } from './workspace/diffs/thread/comment'
-import { register as registerWorkspaceDiffsThreadCreate } from './workspace/diffs/thread/create'
-import { register as registerWorkspaceDiffsThreadResolve } from './workspace/diffs/thread/resolve'
-import { register as registerWorkspaceFileCreate } from './workspace/file/create'
-import { register as registerWorkspaceFileRead } from './workspace/file/read'
-import { register as registerWorkspaceFileRename } from './workspace/file/rename'
-import { register as registerWorkspaceFileWrite } from './workspace/file/write'
-import { register as registerWorkspaceFiles } from './workspace/files'
-import { register as registerWorkspaceFolderCreate } from './workspace/folder/create'
-import { register as registerWorkspaceGet } from './workspace/get'
-import { register as registerWorkspaceGitBranchCreate } from './workspace/git/branch/create'
-import { register as registerWorkspaceGitBranches } from './workspace/git/branches'
-import { register as registerWorkspaceGitCheckout } from './workspace/git/checkout'
-import { register as registerWorkspaceGitDiff } from './workspace/git/diff'
-import { register as registerWorkspaceGitFetch } from './workspace/git/fetch'
-import { register as registerWorkspaceGitGraph } from './workspace/git/graph'
-import { register as registerWorkspaceGitRepositories } from './workspace/git/repositories'
-import { register as registerWorkspaceGitStatus } from './workspace/git/status'
-import { register as registerWorkspaceImport } from './workspace/import'
-import { register as registerWorkspaceInspect } from './workspace/inspect'
-import { register as registerWorkspaceList } from './workspace/list'
-import { register as registerWorkspaceMigrate } from './workspace/migrate'
-import { register as registerWorkspaceMultiFolderCreate } from './workspace/multi-folder/create'
-import { register as registerWorkspaceMultiFolderImport } from './workspace/multi-folder/import'
-import { register as registerWorkspaceRelink } from './workspace/relink'
-import { register as registerWorkspaceResolve } from './workspace/resolve'
-import { register as registerWorkspaceUpdate } from './workspace/update'
-import { register as registerWorkspaceWorktreeCleanup } from './workspace/worktree/cleanup'
-import { register as registerWorkspaceWorktreeCreate } from './workspace/worktree/create'
-import { register as registerWorkspaceWorktreeList } from './workspace/worktree/list'
+export const generatedCommandGroups = ["acp", "agent", "automation", "background-activity", "background-job", "board", "chat", "chronicle", "codex", "download-center", "external-issue-source", "external-session-import", "health", "issue", "issue-agent-session", "kimi", "link-preview", "managed-resources", "mcp-server", "observability", "opencode", "plugin", "preferences", "profile", "provider", "pull-request", "relay-server", "relay-transport", "remote-host", "search", "secret", "session", "session-group", "skill", "usage", "work", "workflow-rule", "workspace"] as const
 
-export function registerGeneratedCommands(program: Command): void {
-  registerAcpAgentCancelInstall(program)
-  registerAcpAgentCreate(program)
-  registerAcpAgentGet(program)
-  registerAcpAgentInstall(program)
-  registerAcpAgentInstallPath(program)
-  registerAcpAgentLaunchConfig(program)
-  registerAcpAgentList(program)
-  registerAcpAgentUninstall(program)
-  registerAcpAudit(program)
-  registerAcpRegistryDistributionTypes(program)
-  registerAcpRegistryList(program)
-  registerAgentCreate(program)
-  registerAgentDelete(program)
-  registerAgentGet(program)
-  registerAgentList(program)
-  registerAgentUpdate(program)
-  registerAutomationArtifactGet(program)
-  registerAutomationArtifactList(program)
-  registerAutomationArtifacts(program)
-  registerAutomationCreate(program)
-  registerAutomationDelete(program)
-  registerAutomationDisable(program)
-  registerAutomationEnable(program)
-  registerAutomationGet(program)
-  registerAutomationList(program)
-  registerAutomationRun(program)
-  registerAutomationRunGet(program)
-  registerAutomationRunStop(program)
-  registerAutomationRunTriage(program)
-  registerAutomationRuns(program)
-  registerAutomationTriageList(program)
-  registerAutomationUpdate(program)
-  registerBackgroundActivityList(program)
-  registerBackgroundActivityRun(program)
-  registerBackgroundJobCancel(program)
-  registerBackgroundJobGet(program)
-  registerBackgroundJobList(program)
-  registerBoardCreate(program)
-  registerBoardDelete(program)
-  registerBoardList(program)
-  registerBoardUpdate(program)
-  registerChatCancel(program)
-  registerChatHandoffCreate(program)
-  registerChatHandoffGet(program)
-  registerChatMessages(program)
-  registerChatQueue(program)
-  registerChatQueueAdd(program)
-  registerChatQueueCancel(program)
-  registerChatQueueReorder(program)
-  registerChatQueueUpdate(program)
-  registerChatRuntimeSettingsGet(program)
-  registerChatRuntimeSettingsSet(program)
-  registerChatSessionCheckpointList(program)
-  registerChatSessionCheckpointRestore(program)
-  registerChatSessionCheckpointRewind(program)
-  registerChatSessionEnvironment(program)
-  registerChatSessionRollbackLastTurn(program)
-  registerChatSnapshotRun(program)
-  registerChatSnapshotSession(program)
-  registerChatTraceRun(program)
-  registerChatTraceSession(program)
-  registerChronicleAccessibilityEventsList(program)
-  registerChronicleAccessibilitySnapshotsList(program)
-  registerChronicleActivityMonitorStatus(program)
-  registerChronicleActivityPipelineTick(program)
-  registerChronicleActivitySegmentsCrystallize(program)
-  registerChronicleActivitySegmentsGet(program)
-  registerChronicleActivitySegmentsList(program)
-  registerChronicleActivitySegmentsSummarize(program)
-  registerChronicleActivitySegmentsTriage(program)
-  registerChronicleActivitySessionsGet(program)
-  registerChronicleActivitySessionsList(program)
-  registerChronicleActivitySessionsSnapshots(program)
-  registerChronicleActivitySnapshotsGet(program)
-  registerChronicleActivitySnapshotsOcr(program)
-  registerChronicleActivityStorageStats(program)
-  registerChronicleAudioRawSegmentsList(program)
-  registerChronicleAudioRawSegmentsProcessingResult(program)
-  registerChronicleAudioTranscriptsList(program)
-  registerChronicleConfigGet(program)
-  registerChronicleConfigSet(program)
-  registerChronicleDaemonResources(program)
-  registerChronicleDreamRunsList(program)
-  registerChronicleDreamRunsStart(program)
-  registerChronicleEventsList(program)
-  registerChronicleKnowledgeCardsCreate(program)
-  registerChronicleKnowledgeCardsDelete(program)
-  registerChronicleKnowledgeCardsFiles(program)
-  registerChronicleKnowledgeCardsGet(program)
-  registerChronicleKnowledgeCardsList(program)
-  registerChronicleKnowledgeCardsRestoreVersion(program)
-  registerChronicleKnowledgeCardsUpdate(program)
-  registerChronicleKnowledgeCardsVersions(program)
-  registerChronicleMemoriesDelete(program)
-  registerChronicleMemoriesGet(program)
-  registerChronicleMemoriesList(program)
-  registerChronicleMemoriesSearch(program)
-  registerChronicleMemoriesUpdate(program)
-  registerChronicleMemoryStatus(program)
-  registerChronicleMessageSourcesCreate(program)
-  registerChronicleMessageSourcesList(program)
-  registerChronicleMessageSourcesSync(program)
-  registerChronicleMessageSourcesUpdate(program)
-  registerChronicleMessagesList(program)
-  registerChronicleModelResourcesInstall(program)
-  registerChronicleModelResourcesInstallAll(program)
-  registerChronicleModelResourcesList(program)
-  registerChronicleModelResourcesReconcile(program)
-  registerChronicleModelResourcesVerify(program)
-  registerChroniclePipelineRunsList(program)
-  registerChroniclePrivacyBreadcrumbs(program)
-  registerChroniclePrivacyExport(program)
-  registerChroniclePrivacyRedact(program)
-  registerChronicleSpeakerProfilesList(program)
-  registerChronicleSpeakerProfilesUpsert(program)
-  registerChronicleStatus(program)
-  registerChronicleTimeline(program)
-  registerCodexAppServerResources(program)
-  registerDownloadCenterCancel(program)
-  registerDownloadCenterGet(program)
-  registerDownloadCenterList(program)
-  registerExternalIssueSourceBind(program)
-  registerExternalIssueSourceBindingDelete(program)
-  registerExternalIssueSourceBindingList(program)
-  registerExternalIssueSourceBindingUpdate(program)
-  registerExternalIssueSourceItemList(program)
-  registerExternalIssueSourceItemMove(program)
-  registerExternalIssueSourceList(program)
-  registerExternalIssueSourceRefresh(program)
-  registerExternalIssueSourceRefreshSource(program)
-  registerExternalSessionImportImport(program)
-  registerExternalSessionImportList(program)
-  registerExternalSessionImportScan(program)
-  registerExternalSessionImportScanGet(program)
-  registerExternalSessionImportSync(program)
-  registerHealth(program)
-  registerIssueActivityList(program)
-  registerIssueCommentAdd(program)
-  registerIssueCommentDelete(program)
-  registerIssueCommentList(program)
-  registerIssueContextRefAdd(program)
-  registerIssueContextRefRemove(program)
-  registerIssueCreate(program)
-  registerIssueDelegate(program)
-  registerIssueDelegation(program)
-  registerIssueDelete(program)
-  registerIssueFieldChangeList(program)
-  registerIssueGet(program)
-  registerIssueList(program)
-  registerIssueMilestoneCreate(program)
-  registerIssueMilestoneDelete(program)
-  registerIssueMilestoneList(program)
-  registerIssueMilestoneUpdate(program)
-  registerIssueMove(program)
-  registerIssueRelationCreate(program)
-  registerIssueRelationDelete(program)
-  registerIssueRelationList(program)
-  registerIssueReorder(program)
-  registerIssueSearch(program)
-  registerIssueSessions(program)
-  registerIssueStatusCreate(program)
-  registerIssueStatusDelete(program)
-  registerIssueStatusList(program)
-  registerIssueStatusReorder(program)
-  registerIssueStatusUpdate(program)
-  registerIssueUndelegate(program)
-  registerIssueUpdate(program)
-  registerIssueAgentSessionActivities(program)
-  registerIssueAgentSessionRerun(program)
-  registerIssueAgentSessionStop(program)
-  registerKimiServerResources(program)
-  registerLinkPreviewGet(program)
-  registerManagedResourcesGet(program)
-  registerManagedResourcesInstall(program)
-  registerManagedResourcesList(program)
-  registerManagedResourcesUninstall(program)
-  registerManagedResourcesUpdate(program)
-  registerMcpServerDelete(program)
-  registerMcpServerList(program)
-  registerMcpServerSetEnabled(program)
-  registerObservabilityErrorPatterns(program)
-  registerObservabilityEvents(program)
-  registerObservabilityExport(program)
-  registerObservabilityIncidents(program)
-  registerObservabilityRuntimeSnapshot(program)
-  registerOpencodeServerResources(program)
-  registerPluginGet(program)
-  registerPluginList(program)
-  registerPluginMarketplaceList(program)
-  registerPluginMarketplaceRefresh(program)
-  registerPluginSetEnabled(program)
-  registerPluginSourceAdd(program)
-  registerPluginSourceGet(program)
-  registerPluginSourceList(program)
-  registerPluginSourceRefresh(program)
-  registerPluginSourceRemove(program)
-  registerPluginSourceUninstallPlan(program)
-  registerPreferencesAppGet(program)
-  registerPreferencesAppSet(program)
-  registerPreferencesChatGet(program)
-  registerPreferencesChatSet(program)
-  registerPreferencesCodexGet(program)
-  registerPreferencesCodexSet(program)
-  registerPreferencesDesktopGet(program)
-  registerPreferencesDesktopSet(program)
-  registerPreferencesJarvisGet(program)
-  registerPreferencesJarvisSet(program)
-  registerPreferencesKeybindingsGet(program)
-  registerProfileCustomModels(program)
-  registerProfileDelete(program)
-  registerProfileGet(program)
-  registerProfileList(program)
-  registerProfileSet(program)
-  registerProviderDelete(program)
-  registerProviderList(program)
-  registerProviderModels(program)
-  registerProviderPresets(program)
-  registerProviderScanLocal(program)
-  registerProviderSet(program)
-  registerProviderTest(program)
-  registerPullRequestAssignableUsers(program)
-  registerPullRequestAssignees(program)
-  registerPullRequestAuthored(program)
-  registerPullRequestComment(program)
-  registerPullRequestDetail(program)
-  registerPullRequestDraft(program)
-  registerPullRequestFingerprint(program)
-  registerPullRequestFingerprintProbe(program)
-  registerPullRequestMerge(program)
-  registerPullRequestReady(program)
-  registerPullRequestReview(program)
-  registerPullRequestReviewers(program)
-  registerPullRequestReviewing(program)
-  registerPullRequestViewer(program)
-  registerRelayServerCreate(program)
-  registerRelayServerDelete(program)
-  registerRelayServerList(program)
-  registerRelayServerUpdate(program)
-  registerRelayTransportHostEnrollmentCreate(program)
-  registerRelayTransportHostEnrollmentDelete(program)
-  registerRelayTransportHostEnrollmentGet(program)
-  registerRelayTransportHostEnrollmentList(program)
-  registerRelayTransportHostEnrollmentPairingString(program)
-  registerRemoteHostCradleServerConnect(program)
-  registerRemoteHostCradleServerDisconnect(program)
-  registerRemoteHostCradleServerHealth(program)
-  registerRemoteHostCreate(program)
-  registerRemoteHostDelete(program)
-  registerRemoteHostList(program)
-  registerRemoteHostRelayClaim(program)
-  registerRemoteHostUpdate(program)
-  registerSearchChronicle(program)
-  registerSearchThreads(program)
-  registerSecretDelete(program)
-  registerSecretList(program)
-  registerSessionArchive(program)
-  registerSessionAwaitCancel(program)
-  registerSessionAwaitCreate(program)
-  registerSessionAwaitGet(program)
-  registerSessionAwaitList(program)
-  registerSessionAwaitRetryDelivery(program)
-  registerSessionAwaitSummary(program)
-  registerSessionAwaitTrigger(program)
-  registerSessionCreate(program)
-  registerSessionDelete(program)
-  registerSessionExportMarkdown(program)
-  registerSessionExportZip(program)
-  registerSessionGet(program)
-  registerSessionIsolationActivate(program)
-  registerSessionIsolationCancel(program)
-  registerSessionIsolationLeave(program)
-  registerSessionIsolationRepair(program)
-  registerSessionIsolationStart(program)
-  registerSessionLinkedIssueGet(program)
-  registerSessionLinkedIssueLink(program)
-  registerSessionLinkedIssueUnlink(program)
-  registerSessionList(program)
-  registerSessionPullRequestCreate(program)
-  registerSessionPullRequestDetail(program)
-  registerSessionPullRequestGet(program)
-  registerSessionPullRequestReady(program)
-  registerSessionUpdate(program)
-  registerSessionGroupAddMember(program)
-  registerSessionGroupCreate(program)
-  registerSessionGroupDelete(program)
-  registerSessionGroupGet(program)
-  registerSessionGroupList(program)
-  registerSessionGroupRemoveMember(program)
-  registerSessionGroupUpdate(program)
-  registerSkillCreate(program)
-  registerSkillDocumentDelete(program)
-  registerSkillDocumentGet(program)
-  registerSkillDocumentUpdate(program)
-  registerSkillExport(program)
-  registerSkillImport(program)
-  registerSkillList(program)
-  registerSkillSourceCancelFetch(program)
-  registerSkillSourceFetch(program)
-  registerSkillSourceImport(program)
-  registerUsageCostDaily(program)
-  registerUsageCostSessions(program)
-  registerUsageCostSummary(program)
-  registerUsageCostEfficiency(program)
-  registerUsageDaily(program)
-  registerUsageDailyByModel(program)
-  registerUsagePatternsHourly(program)
-  registerUsagePerformance(program)
-  registerUsageReconcileClaude(program)
-  registerUsageSession(program)
-  registerUsageSessionsRecent(program)
-  registerUsageStats(program)
-  registerUsageSummary(program)
-  registerUsageTools(program)
-  registerWorkArchive(program)
-  registerWorkCreate(program)
-  registerWorkGet(program)
-  registerWorkList(program)
-  registerWorkPrepare(program)
-  registerWorkRenameBranch(program)
-  registerWorkSubmit(program)
-  registerWorkflowRuleDelete(program)
-  registerWorkflowRuleGet(program)
-  registerWorkflowRuleList(program)
-  registerWorkflowRuleSave(program)
-  registerWorkspaceCreate(program)
-  registerWorkspaceDelete(program)
-  registerWorkspaceDiffsAgentFixArtifact(program)
-  registerWorkspaceDiffsAgentFixCancel(program)
-  registerWorkspaceDiffsAgentFixCreate(program)
-  registerWorkspaceDiffsAgentFixDelete(program)
-  registerWorkspaceDiffsAgentFixRerun(program)
-  registerWorkspaceDiffsAgentFixStart(program)
-  registerWorkspaceDiffsBranchCompare(program)
-  registerWorkspaceDiffsClose(program)
-  registerWorkspaceDiffsCommit(program)
-  registerWorkspaceDiffsFileViewed(program)
-  registerWorkspaceDiffsGet(program)
-  registerWorkspaceDiffsGithubPullRequest(program)
-  registerWorkspaceDiffsList(program)
-  registerWorkspaceDiffsLocalWorkingTree(program)
-  registerWorkspaceDiffsMerge(program)
-  registerWorkspaceDiffsPreferencesSet(program)
-  registerWorkspaceDiffsReadiness(program)
-  registerWorkspaceDiffsRefresh(program)
-  registerWorkspaceDiffsSubmit(program)
-  registerWorkspaceDiffsThreadComment(program)
-  registerWorkspaceDiffsThreadCreate(program)
-  registerWorkspaceDiffsThreadResolve(program)
-  registerWorkspaceFileCreate(program)
-  registerWorkspaceFileRead(program)
-  registerWorkspaceFileRename(program)
-  registerWorkspaceFileWrite(program)
-  registerWorkspaceFiles(program)
-  registerWorkspaceFolderCreate(program)
-  registerWorkspaceGet(program)
-  registerWorkspaceGitBranchCreate(program)
-  registerWorkspaceGitBranches(program)
-  registerWorkspaceGitCheckout(program)
-  registerWorkspaceGitDiff(program)
-  registerWorkspaceGitFetch(program)
-  registerWorkspaceGitGraph(program)
-  registerWorkspaceGitRepositories(program)
-  registerWorkspaceGitStatus(program)
-  registerWorkspaceImport(program)
-  registerWorkspaceInspect(program)
-  registerWorkspaceList(program)
-  registerWorkspaceMigrate(program)
-  registerWorkspaceMultiFolderCreate(program)
-  registerWorkspaceMultiFolderImport(program)
-  registerWorkspaceRelink(program)
-  registerWorkspaceResolve(program)
-  registerWorkspaceUpdate(program)
-  registerWorkspaceWorktreeCleanup(program)
-  registerWorkspaceWorktreeCreate(program)
-  registerWorkspaceWorktreeList(program)
+const groupLoaders: Record<string, () => Promise<{ registerGeneratedCommands: (program: Command) => void }>> = {
+  "acp": () => import('./groups.generated/acp'),
+  "agent": () => import('./groups.generated/agent'),
+  "automation": () => import('./groups.generated/automation'),
+  "background-activity": () => import('./groups.generated/background-activity'),
+  "background-job": () => import('./groups.generated/background-job'),
+  "board": () => import('./groups.generated/board'),
+  "chat": () => import('./groups.generated/chat'),
+  "chronicle": () => import('./groups.generated/chronicle'),
+  "codex": () => import('./groups.generated/codex'),
+  "download-center": () => import('./groups.generated/download-center'),
+  "external-issue-source": () => import('./groups.generated/external-issue-source'),
+  "external-session-import": () => import('./groups.generated/external-session-import'),
+  "health": () => import('./groups.generated/health'),
+  "issue": () => import('./groups.generated/issue'),
+  "issue-agent-session": () => import('./groups.generated/issue-agent-session'),
+  "kimi": () => import('./groups.generated/kimi'),
+  "link-preview": () => import('./groups.generated/link-preview'),
+  "managed-resources": () => import('./groups.generated/managed-resources'),
+  "mcp-server": () => import('./groups.generated/mcp-server'),
+  "observability": () => import('./groups.generated/observability'),
+  "opencode": () => import('./groups.generated/opencode'),
+  "plugin": () => import('./groups.generated/plugin'),
+  "preferences": () => import('./groups.generated/preferences'),
+  "profile": () => import('./groups.generated/profile'),
+  "provider": () => import('./groups.generated/provider'),
+  "pull-request": () => import('./groups.generated/pull-request'),
+  "relay-server": () => import('./groups.generated/relay-server'),
+  "relay-transport": () => import('./groups.generated/relay-transport'),
+  "remote-host": () => import('./groups.generated/remote-host'),
+  "search": () => import('./groups.generated/search'),
+  "secret": () => import('./groups.generated/secret'),
+  "session": () => import('./groups.generated/session'),
+  "session-group": () => import('./groups.generated/session-group'),
+  "skill": () => import('./groups.generated/skill'),
+  "usage": () => import('./groups.generated/usage'),
+  "work": () => import('./groups.generated/work'),
+  "workflow-rule": () => import('./groups.generated/workflow-rule'),
+  "workspace": () => import('./groups.generated/workspace'),
+}
+
+const groupDescriptions: Record<string, string> = {
+  "acp": "Manage ACP agent installation and registry state.",
+  "agent": "Manage Cradle agent identities.",
+  "automation": "Manage scheduled automations, runs, and artifacts.",
+  "background-activity": "Manage background-activity commands.",
+  "background-job": "Manage background-job commands.",
+  "board": "Manage Kanban boards.",
+  "chat": "Control chat runtime commands.",
+  "chronicle": "Manage chronicle commands.",
+  "codex": "Manage codex commands.",
+  "download-center": "Manage download-center commands.",
+  "external-issue-source": "Manage external-issue-source commands.",
+  "external-session-import": "Manage external-session-import commands.",
+  "health": "Check server health.",
+  "issue": "Manage Kanban issues, comments, relations, delegation, and context refs.",
+  "issue-agent-session": "Inspect and control issue agent sessions.",
+  "kimi": "Manage kimi commands.",
+  "link-preview": "Manage link-preview commands.",
+  "managed-resources": "Manage managed-resources commands.",
+  "mcp-server": "Manage mcp-server commands.",
+  "observability": "Inspect local observability events, incidents, and exports.",
+  "opencode": "Manage opencode commands.",
+  "plugin": "Manage plugin commands.",
+  "preferences": "Read and update server preferences.",
+  "profile": "Manage agent profiles.",
+  "provider": "Inspect provider model availability.",
+  "pull-request": "Manage pull-request commands.",
+  "relay-server": "Manage relay-server commands.",
+  "relay-transport": "Manage relay-transport commands.",
+  "remote-host": "Manage remote-host commands.",
+  "search": "Search Cradle data.",
+  "secret": "Manage secret metadata.",
+  "session": "Manage chat sessions and session links.",
+  "session-group": "Manage session-group commands.",
+  "skill": "Manage skills and skill sources.",
+  "usage": "Inspect usage and cost data.",
+  "work": "Manage user-controlled local Work containers and Draft PR delivery.",
+  "workflow-rule": "Manage workflow rules.",
+  "workspace": "Manage workspaces, files, and git helpers.",
+}
+
+export async function registerGeneratedCommandGroup(program: Command, group: string | undefined): Promise<void> {
+  if (!group) { return }
+  const load = groupLoaders[group]
+  if (!load) { return }
+  const module = await load()
+  module.registerGeneratedCommands(program)
+}
+
+export function registerGeneratedCommandPlaceholders(program: Command, loadedGroup: string | undefined): void {
+  for (const group of generatedCommandGroups) {
+    if (group === loadedGroup || program.commands.some(command => command.name() === group)) { continue }
+    program.command(group).description(groupDescriptions[group] ?? `Manage ${group} commands.`)
+  }
 }

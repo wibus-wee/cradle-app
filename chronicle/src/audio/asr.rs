@@ -289,6 +289,21 @@ impl<'a> LocalTranscriptionPipeline<'a> {
         Self { runtime }
     }
 
+    pub fn contains_speech(&self, samples: &[f32], sample_rate: u32) -> ChronicleResult<bool> {
+        let resampled;
+        let samples = if sample_rate == 16_000 {
+            samples
+        } else {
+            resampled = resample_linear(samples, sample_rate, 16_000);
+            resampled.as_slice()
+        };
+        let vad_cell = self.runtime.vad()?;
+        Ok(!vad_cell
+            .borrow_mut()
+            .detect_speech(samples, 16_000)?
+            .is_empty())
+    }
+
     /// Process raw audio: local VAD → extract speech → local ASR → combine.
     pub fn process(
         &self,
@@ -305,19 +320,43 @@ impl<'a> LocalTranscriptionPipeline<'a> {
 
         // VAD
         let vad_cell = self.runtime.vad()?;
-        let mut segments = vad_cell.borrow_mut().detect_speech(samples, sample_rate)?;
-        if segments.is_empty() {
-            segments = super::vad::EnergyVad::new(super::vad::VadConfig {
-                energy_threshold: 0.001,
-                sample_rate,
-                ..super::vad::VadConfig::default()
-            })
-            .detect(samples);
-        }
+        let vad_segments = vad_cell.borrow_mut().detect_speech(samples, sample_rate)?;
 
-        if segments.is_empty() {
+        if vad_segments.is_empty() {
             return Ok(TranscriptionResult::empty());
         }
+
+        let diarization_turns = self
+            .runtime
+            .diarizer()
+            .ok()
+            .and_then(|diarizer| diarizer.borrow().process(samples, sample_rate).ok())
+            .unwrap_or_default();
+        let segments: Vec<(super::vad::SpeechSegment, Option<i32>)> =
+            if diarization_turns.is_empty() {
+                vad_segments
+                    .into_iter()
+                    .map(|segment| (segment, None))
+                    .collect()
+            } else {
+                diarization_turns
+                    .into_iter()
+                    .map(|turn| {
+                        let start_sample = turn.start_sample.min(samples.len());
+                        let end_sample = turn.end_sample.min(samples.len());
+                        (
+                            super::vad::SpeechSegment {
+                                start_sample,
+                                end_sample,
+                                start_ms: (start_sample as u64 * 1_000) / sample_rate as u64,
+                                end_ms: (end_sample as u64 * 1_000) / sample_rate as u64,
+                                energy: 0.0,
+                            },
+                            Some(turn.speaker),
+                        )
+                    })
+                    .collect()
+            };
 
         // ASR each speech segment
         let asr_cell = self.runtime.asr()?;
@@ -327,7 +366,7 @@ impl<'a> LocalTranscriptionPipeline<'a> {
         let mut total_confidence = 0.0;
         let mut successful_count = 0u32;
 
-        for seg in &segments {
+        for (seg, speaker_index) in &segments {
             let start = seg.start_sample;
             let end = seg.end_sample.min(samples.len());
             if start >= end {
@@ -342,6 +381,7 @@ impl<'a> LocalTranscriptionPipeline<'a> {
                         self.runtime,
                         audio_slice,
                         sample_rate,
+                        *speaker_index,
                     );
                     if !combined_text.is_empty() {
                         combined_text.push(' ');
@@ -374,7 +414,10 @@ impl<'a> LocalTranscriptionPipeline<'a> {
             0.0
         };
 
-        let duration_ms = segments.last().map(|s| s.end_ms).unwrap_or(0);
+        let duration_ms = segments
+            .last()
+            .map(|(segment, _)| segment.end_ms)
+            .unwrap_or(0);
 
         Ok(TranscriptionResult {
             text: combined_text,
@@ -436,6 +479,7 @@ impl<'a> LocalTranscriptionPipeline<'a> {
 }
 
 struct SpeakerCluster {
+    speaker_index: i32,
     label: String,
     centroid: Vec<f32>,
     embedding_model_id: String,
@@ -447,25 +491,14 @@ fn assign_speaker_label(
     runtime: &crate::onnx::OnnxRuntime,
     samples: &[f32],
     sample_rate: u32,
+    speaker_index: Option<i32>,
 ) -> Option<String> {
+    let speaker_index = speaker_index?;
     let speaker_cell = runtime.speaker().ok()?;
     let embedding = speaker_cell.borrow_mut().embed(samples, sample_rate).ok()?;
-    let best = clusters
+    if let Some(index) = clusters
         .iter()
-        .enumerate()
-        .map(|(index, cluster)| {
-            (
-                index,
-                cosine_similarity(&cluster.centroid, &embedding.vector),
-            )
-        })
-        .max_by(|left, right| {
-            left.1
-                .partial_cmp(&right.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-    if let Some((index, score)) = best
-        && score >= 0.72
+        .position(|cluster| cluster.speaker_index == speaker_index)
     {
         let cluster = &mut clusters[index];
         merge_centroid(
@@ -477,8 +510,9 @@ fn assign_speaker_label(
         return Some(cluster.label.clone());
     }
 
-    let label = format!("Speaker {}", clusters.len() + 1);
+    let label = format!("candidate-{speaker_index}");
     clusters.push(SpeakerCluster {
+        speaker_index,
         label: label.clone(),
         centroid: embedding.vector,
         embedding_model_id: embedding.model_id.to_string(),
@@ -508,13 +542,6 @@ fn normalize_centroid(vector: &mut [f32]) {
     for value in vector {
         *value = (*value as f64 / norm) as f32;
     }
-}
-
-fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
-    if left.len() != right.len() || left.is_empty() {
-        return 0.0;
-    }
-    left.iter().zip(right).map(|(a, b)| a * b).sum()
 }
 
 fn resample_linear(samples: &[f32], source_rate: u32, target_rate: u32) -> Vec<f32> {

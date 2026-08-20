@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 
 import type { Session, Worktree } from '@cradle/db'
 import { backendRuns, sessions, workspaces, worktrees } from '@cradle/db'
-import { and, desc, eq, isNotNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, or, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
@@ -21,6 +21,7 @@ import {
   pruneGitWorktrees,
   removeGitWorktree,
   renameLocalBranch,
+  resolveBaseRef,
   resolveGitRepoRoot,
   resolveRemoteDefaultBaseRef,
   stashAndPopAcrossCheckouts,
@@ -404,6 +405,35 @@ export function readSessionIsolation(session: Session): SessionIsolationView {
   return buildIsolationView(session, worktreeRecord, health)
 }
 
+/**
+ * Project list-time isolation state with one Worktree read for the whole page.
+ * Filesystem health checks remain bounded by the page size and are shared by
+ * Sessions that point at the same managed Worktree.
+ */
+export function readSessionIsolations(
+  sessionRows: readonly Session[],
+): Map<string, SessionIsolationView> {
+  const worktreeIds = [...new Set(
+    sessionRows.flatMap(session => session.worktreeId ? [session.worktreeId] : []),
+  )]
+  const records = worktreeIds.length === 0
+    ? []
+    : db().select().from(worktrees).where(inArray(worktrees.id, worktreeIds)).all()
+  const recordsById = new Map(records.map(record => [record.id, record]))
+  const healthById = new Map(
+    worktreeIds.map((worktreeId) => {
+      const record = recordsById.get(worktreeId) ?? null
+      return [worktreeId, assessWorktreeHealthSync(record)] as const
+    }),
+  )
+
+  return new Map(sessionRows.map((session) => {
+    const record = session.worktreeId ? recordsById.get(session.worktreeId) ?? null : null
+    const health = session.worktreeId ? healthById.get(session.worktreeId) ?? null : null
+    return [session.id, buildIsolationView(session, record, health)] as const
+  }))
+}
+
 export async function readSessionIsolationAsync(session: Session): Promise<SessionIsolationView> {
   const worktreeRecord = session.worktreeId ? getWorktreeRecord(session.worktreeId) : null
   if (!session.worktreeId || !worktreeRecord) {
@@ -520,11 +550,11 @@ export async function createWorktree(input: {
   slug: string
   confirmedSetupHooks?: boolean
   /**
-   * How to choose the commit the managed branch starts from.
-   * - `source-head` (default): current local HEAD. Requires a clean source when used by Work.
-   * - `remote-default`: remote-tracking default branch tip (e.g. origin/main). Safe with a dirty
-   *   source checkout because uncommitted local files never enter the new worktree.
+   * Exact local or remote branch ref to use as the commit the managed branch starts from.
+   * When omitted, the current local HEAD is used.
    */
+  baseBranch?: string
+  /** Internal automation-only compatibility until automation recipes expose a branch ref. */
   baseStrategy?: WorkBaseStrategy
 }): Promise<WorktreeView> {
   const workspacePath = Workspace.getLocalWorkspacePath(input.sourceWorkspaceId)
@@ -541,8 +571,9 @@ export async function createWorktree(input: {
   const name = buildWorktreeName(input.sessionId, input.slug)
   const branch = `${BRANCH_PREFIX}${name}`
   const absolutePath = resolveWorktreeCheckoutPath(input.sourceWorkspaceId, name)
-  const baseStrategy = input.baseStrategy ?? 'source-head'
-  const baseRef = baseStrategy === 'remote-default'
+  const baseRef = input.baseBranch
+    ? await resolveBaseRef(repoRoot, input.baseBranch)
+    : input.baseStrategy === 'remote-default'
     ? await resolveRemoteDefaultBaseRef(repoRoot)
     : await getHeadSha(repoRoot)
 

@@ -1,7 +1,3 @@
-// Input: window keydown events, ipc-devtool stores (selection / paused / clear), filtered traces
-// Output: useIpcKeyboard hook wiring arrow-key row navigation plus pause/clear/search shortcuts
-// Position: Called once from IpcDevtoolPage — owns the devtool window's global keybindings
-
 import { useEffect } from 'react'
 
 import { useIpcDevtoolStore, useIpcFilteredTraces } from './use-ipc-events'

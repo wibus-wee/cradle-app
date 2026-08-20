@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { getPullRequestsByOwnerByRepoByNumberDetailQueryKey } from '~/api-gen/@tanstack/react-query.gen'
 import {
   getPullRequestsByOwnerByRepoByNumberFingerprint,
   postPullRequestsByOwnerByRepoByNumberFingerprintProbe,
+  postPullRequestsByOwnerByRepoByNumberRefresh,
 } from '~/api-gen/sdk.gen'
 import type { PostPullRequestsByOwnerByRepoByNumberFingerprintProbeResponse } from '~/api-gen/types.gen'
 
@@ -26,25 +27,36 @@ export function usePullRequestFingerprintSync({
   enabled = true,
 }: UsePullRequestFingerprintSyncOptions) {
   const queryClient = useQueryClient()
-  const path = { owner, repo, number: String(number) }
+  const path = useMemo(
+    () => ({ owner, repo, number: String(number) }),
+    [number, owner, repo],
+  )
   const fingerprintRef = useRef<PullRequestFingerprint | null>(null)
   const inFlightRef = useRef(false)
   const visibleRef = useRef(
     typeof document === 'undefined' ? true : document.visibilityState === 'visible',
   )
 
-  const invalidateDetail = useCallback(() => {
-    void queryClient.invalidateQueries({
-      queryKey: getPullRequestsByOwnerByRepoByNumberDetailQueryKey({ path }),
+  const refreshDetail = useCallback(async () => {
+    const { data, error } = await postPullRequestsByOwnerByRepoByNumberRefresh({
+      path,
+      body: { force: false },
     })
-  }, [queryClient, owner, repo, number])
-
-  const applyProbeResult = useCallback((result: PostPullRequestsByOwnerByRepoByNumberFingerprintProbeResponse) => {
-    fingerprintRef.current = result.fingerprint
-    if (result.changed) {
-      invalidateDetail()
+    if (!error && data) {
+      queryClient.setQueryData(
+        getPullRequestsByOwnerByRepoByNumberDetailQueryKey({ path }),
+        data,
+      )
+      return true
     }
-  }, [invalidateDetail])
+    return false
+  }, [path, queryClient])
+
+  const applyProbeResult = useCallback(async (result: PostPullRequestsByOwnerByRepoByNumberFingerprintProbeResponse) => {
+    if (!result.changed || await refreshDetail()) {
+      fingerprintRef.current = result.fingerprint
+    }
+  }, [refreshDetail])
 
   const probe = useCallback(async () => {
     if (!enabled || inFlightRef.current) {
@@ -59,23 +71,26 @@ export function usePullRequestFingerprintSync({
       if (error || !data) {
         return
       }
-      applyProbeResult(data)
+      await applyProbeResult(data)
     }
     finally {
       inFlightRef.current = false
     }
-  }, [applyProbeResult, enabled, owner, repo, number])
+  }, [applyProbeResult, enabled, path])
 
   const resetFingerprint = useCallback(async () => {
     fingerprintRef.current = null
     if (!enabled) {
       return
     }
-    const { data, error } = await getPullRequestsByOwnerByRepoByNumberFingerprint({ path })
+    const { data, error } = await postPullRequestsByOwnerByRepoByNumberFingerprintProbe({
+      path,
+      body: { previous: null },
+    })
     if (!error && data) {
       fingerprintRef.current = data.fingerprint
     }
-  }, [enabled, owner, repo, number])
+  }, [enabled, path])
 
   useEffect(() => {
     if (!enabled) {
@@ -108,7 +123,7 @@ export function usePullRequestFingerprintSync({
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.clearInterval(intervalId)
     }
-  }, [enabled, probe, owner, repo, number])
+  }, [enabled, path, probe])
 
   return { resetFingerprint }
 }

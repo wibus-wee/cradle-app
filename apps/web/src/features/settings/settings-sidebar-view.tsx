@@ -32,6 +32,7 @@ export interface SettingsSidebarViewProps {
   clearSearchLabel: string
   noResultsLabel: string
   onSetSection: (section: string) => void
+  onSectionIntent?: (section: string) => void
   onClose: () => void
 }
 
@@ -45,6 +46,7 @@ export function SettingsSidebarView({
   clearSearchLabel,
   noResultsLabel,
   onSetSection,
+  onSectionIntent,
   onClose,
 }: SettingsSidebarViewProps) {
   const [query, setQuery] = useState('')
@@ -102,7 +104,7 @@ export function SettingsSidebarView({
         )}
       </div>
 
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2 pt-1">
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2 pt-1">
         {filteredSections.map(section => (
           <div key={section.id} className="flex flex-col gap-0.5">
             <span className="select-none px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground">
@@ -115,6 +117,9 @@ export function SettingsSidebarView({
                   key={item.id}
                   type="button"
                   onClick={() => (item.onActivate ? item.onActivate() : onSetSection(item.id))}
+                  onFocus={() => onSectionIntent?.(item.id)}
+                  onPointerDown={() => onSectionIntent?.(item.id)}
+                  onPointerEnter={() => onSectionIntent?.(item.id)}
                   data-testid={`settings-nav-${item.id}`}
                   className={cn(
                     'flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs',

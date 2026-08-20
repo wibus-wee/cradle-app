@@ -9,7 +9,7 @@ import { useChatStore } from '~/store/chat'
 
 import { chatMessageSnapshotQueryKey } from '../api/messages'
 import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
-import type { ChatResponseRequestBody, ChatRuntimeSettingsPatch } from '../commands/chat-response-command'
+import type { ChatResponseRequestBody, RuntimeSettingsPatch } from '../commands/chat-response-command'
 import { runtimeSessionStatusQueryKey } from '../commands/runtime-session-status-command'
 import { runtimeSettingsQueryKey } from '../commands/runtime-settings-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
@@ -35,7 +35,7 @@ interface StartOptimisticChatResponseInput {
     providerTargetId?: string
     modelId?: string | null
     thinkingEffort?: ChatResponseRequestBody['thinkingEffort']
-    runtimeSettings?: ChatRuntimeSettingsPatch
+    runtimeSettings?: RuntimeSettingsPatch
     reviewTarget?: ChatResponseRequestBody['reviewTarget']
   }
   supportsGoalCommand?: boolean

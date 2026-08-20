@@ -1,7 +1,7 @@
 import { FileLine as FileIcon, PicLine as ImageIcon } from '@mingcute/react'
 
 import { Button } from '~/components/ui/button'
-import { resolveBlobContentUrl } from '~/features/assets/blob-url'
+import { useProtectedBlobUrl } from '~/features/assets/use-protected-blob-url'
 import { cn } from '~/lib/cn'
 
 import { AppshotAttachmentCard } from '../../composer/appshot-attachment'
@@ -20,19 +20,19 @@ export function FileAttachmentView({ part, sessionId, onClick }: FileAttachmentV
   const label = part.filename ?? part.mediaType
   const isImage = part.mediaType.startsWith('image/')
   const appshotMetadata = readCradleAppshotMetadata(part)
-  const imageSrc = sessionId ? resolveBlobContentUrl(part.url, sessionId) : part.url
+  const imageSrc = useProtectedBlobUrl(isImage ? part.url : '', isImage ? sessionId : null)
   if (appshotMetadata) {
     return (
       <AppshotAttachmentCard
         variant="thread"
-        metadata={{ ...appshotMetadata, imageDataUrl: imageSrc }}
+        metadata={{ ...appshotMetadata, imageDataUrl: imageSrc ?? '' }}
       />
     )
   }
 
   const content = (
 <>
-{isImage && <img src={imageSrc} alt={label} className="h-auto max-h-48 w-full max-w-full object-cover" loading="lazy" data-testid="chat-file-attachment-image" />}
+{isImage && imageSrc && <img src={imageSrc} alt={label} className="h-auto max-h-48 w-full max-w-full object-cover" loading="lazy" data-testid="chat-file-attachment-image" />}
 <div className="flex min-w-0 items-center gap-2 px-2.5 py-2 text-xs">
 {isImage ? <ImageIcon className="size-3.5 shrink-0 !text-muted-foreground" aria-hidden="true" /> : <FileIcon className="size-3.5 shrink-0 !text-muted-foreground" aria-hidden="true" />}
 <div className="min-w-0 flex-1">

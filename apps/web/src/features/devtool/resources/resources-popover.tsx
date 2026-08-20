@@ -87,7 +87,8 @@ const ChronicleResourcesSchema = z.object({
   cpuPercent: z.number().nullable().default(null),
 })
 
-const OpencodeServerResourcesSchema = z.object({
+const OpencodeServerResourcesSchema = z.array(z.object({
+  hostId: z.string(),
   running: z.boolean(),
   pid: z.number().nullable(),
   url: z.string().nullable(),
@@ -95,22 +96,28 @@ const OpencodeServerResourcesSchema = z.object({
   uptimeSeconds: z.number().nullable(),
   rssMB: z.number().nullable(),
   cpuPercent: z.number().nullable().default(null),
-})
+}))
 
-const KimiServerResourcesSchema = z.object({
+const KimiServerResourcesSchema = z.array(z.object({
+  hostId: z.string(),
+  providerTargetId: z.string(),
+  scopeId: z.string(),
   running: z.boolean(),
   pid: z.number().nullable(),
   rssMB: z.number().nullable(),
   cpuPercent: z.number().nullable().default(null),
   url: z.string().nullable(),
-})
+}))
 
-const CodexAppServerResourcesSchema = z.object({
+const CodexAppServerResourcesSchema = z.array(z.object({
+  hostId: z.string(),
+  providerTargetId: z.string(),
+  scopeId: z.string(),
   running: z.boolean(),
   pid: z.number().nullable(),
   rssMB: z.number().nullable(),
   cpuPercent: z.number().nullable().default(null),
-})
+}))
 
 export interface ServerHealth {
   memory: {
@@ -165,6 +172,7 @@ interface ChronicleStatus {
 }
 
 interface OpencodeServerResources {
+  hostId: string
   running: boolean
   pid: number | null
   url: string | null
@@ -175,6 +183,9 @@ interface OpencodeServerResources {
 }
 
 interface KimiServerResources {
+  hostId: string
+  providerTargetId: string
+  scopeId: string
   running: boolean
   pid: number | null
   rssMB: number | null
@@ -183,6 +194,9 @@ interface KimiServerResources {
 }
 
 interface CodexAppServerResources {
+  hostId: string
+  providerTargetId: string
+  scopeId: string
   running: boolean
   pid: number | null
   rssMB: number | null
@@ -214,18 +228,18 @@ export interface ResourceSnapshot {
   chronicleRss: number
   chronicleCpuPercent: number | null
   opencodeRunning: boolean
-  opencodePid: number | null
   opencodeRss: number
   opencodeCpuPercent: number | null
   opencodeUptime: number
+  opencodeResources: OpencodeServerResources[]
   kimiRunning: boolean
-  kimiPid: number | null
   kimiRss: number
   kimiCpuPercent: number | null
+  kimiResources: KimiServerResources[]
   codexAppServerRunning: boolean
-  codexAppServerPid: number | null
   codexAppServerRss: number
   codexAppServerCpuPercent: number | null
+  codexAppServerResources: CodexAppServerResources[]
   terminals: PtyResourceItem[]
   timestamp: number
   updatedAtLabel: string
@@ -238,11 +252,11 @@ interface ResourceSnapshotInput {
   pty: PtyResources | null
   chronicle: ChronicleResources | null
   chronicleWarning: string | null
-  opencode: OpencodeServerResources | null
+  opencode: OpencodeServerResources[] | null
   opencodeWarning: string | null
-  kimi: KimiServerResources | null
+  kimi: KimiServerResources[] | null
   kimiWarning: string | null
-  codexAppServer: CodexAppServerResources | null
+  codexAppServer: CodexAppServerResources[] | null
   codexAppServerWarning: string | null
   timestamp: number
 }
@@ -327,19 +341,52 @@ function createResourceSnapshot({
     chroniclePid: chronicle?.pid ?? null,
     chronicleRss: chronicle?.rssMB ? mbToBytes(chronicle.rssMB) : 0,
     chronicleCpuPercent: chronicle?.cpuPercent ?? null,
-    opencodeRunning: opencode?.running ?? false,
-    opencodePid: opencode?.pid ?? null,
-    opencodeRss: opencode?.rssMB ? mbToBytes(opencode.rssMB) : 0,
-    opencodeCpuPercent: opencode?.cpuPercent ?? null,
-    opencodeUptime: opencode?.uptimeSeconds ?? 0,
-    kimiRunning: kimi?.running ?? false,
-    kimiPid: kimi?.pid ?? null,
-    kimiRss: kimi?.rssMB ? mbToBytes(kimi.rssMB) : 0,
-    kimiCpuPercent: kimi?.cpuPercent ?? null,
-    codexAppServerRunning: codexAppServer?.running ?? false,
-    codexAppServerPid: codexAppServer?.pid ?? null,
-    codexAppServerRss: codexAppServer?.rssMB ? mbToBytes(codexAppServer.rssMB) : 0,
-    codexAppServerCpuPercent: codexAppServer?.cpuPercent ?? null,
+    opencodeRunning: opencode?.some(resource => resource.running) ?? false,
+    opencodeRss: mbToBytes(opencode?.reduce(
+      (total, resource) => total + (resource.rssMB ?? 0),
+      0,
+    ) ?? 0),
+    opencodeCpuPercent: opencode
+      ? opencode.reduce<number | null>(
+          (total, resource) => resource.cpuPercent === null
+            ? total
+            : (total ?? 0) + resource.cpuPercent,
+          null,
+        )
+      : null,
+    opencodeUptime: opencode?.reduce(
+      (latest, resource) => Math.max(latest, resource.uptimeSeconds ?? 0),
+      0,
+    ) ?? 0,
+    opencodeResources: opencode ?? [],
+    kimiRunning: kimi?.some(resource => resource.running) ?? false,
+    kimiRss: mbToBytes(kimi?.reduce(
+      (total, resource) => total + (resource.rssMB ?? 0),
+      0,
+    ) ?? 0),
+    kimiCpuPercent: kimi
+      ? kimi.reduce<number | null>(
+          (total, resource) => resource.cpuPercent === null
+            ? total
+            : (total ?? 0) + resource.cpuPercent,
+          null,
+        )
+      : null,
+    kimiResources: kimi ?? [],
+    codexAppServerRunning: codexAppServer?.some(resource => resource.running) ?? false,
+    codexAppServerRss: mbToBytes(codexAppServer?.reduce(
+      (total, resource) => total + (resource.rssMB ?? 0),
+      0,
+    ) ?? 0),
+    codexAppServerCpuPercent: codexAppServer
+      ? codexAppServer.reduce<number | null>(
+          (total, resource) => resource.cpuPercent === null
+            ? total
+            : (total ?? 0) + resource.cpuPercent,
+          null,
+        )
+      : null,
+    codexAppServerResources: codexAppServer ?? [],
     terminals: pty?.terminals ?? [],
     timestamp,
     updatedAtLabel: formatTimestampLabel(timestamp),
@@ -446,6 +493,12 @@ function RuntimeSection({
   )
 }
 
+interface RuntimeProcessSample {
+  pid: number | null
+  rssMB: number | null
+  cpuPercent: number | null
+}
+
 function RuntimeProvider({
   label,
   value,
@@ -454,6 +507,7 @@ function RuntimeProvider({
   processLabel,
   rssMB,
   cpuPercent,
+  processes,
   isLast,
 }: {
   label: string
@@ -463,8 +517,13 @@ function RuntimeProvider({
   processLabel?: string
   rssMB?: number | null
   cpuPercent?: number | null
+  processes?: RuntimeProcessSample[]
   isLast?: boolean
 }) {
+  const processRows = processes ?? (running
+    ? [{ pid: pid ?? null, rssMB: rssMB ?? null, cpuPercent: cpuPercent ?? null }]
+    : [])
+
   return (
     <div className="relative">
       <SectionRow
@@ -472,16 +531,17 @@ function RuntimeProvider({
         value={value}
         dimLabel={false}
       />
-      {running && processLabel
-        ? (
+      {processRows.length > 0 && processLabel
+        ? processRows.map((process, index) => (
           <SectionRow
+            key={`${processLabel}-${process.pid ?? index}`}
             label={processLabel}
-            detail={pid ? `pid ${pid}` : undefined}
-            value={`${rssMB && rssMB > 0 ? formatMegabytes(rssMB, 1) : '—'} / ${formatCpuPercent(cpuPercent ?? null)}`}
+            detail={process.pid ? `pid ${process.pid}` : undefined}
+            value={`${process.rssMB && process.rssMB > 0 ? formatMegabytes(process.rssMB, 1) : '—'} / ${formatCpuPercent(process.cpuPercent ?? null)}`}
             dimLabel
-            branch={isLast ? 'last' : 'middle'}
+            branch={isLast && index === processRows.length - 1 ? 'last' : 'middle'}
           />
-        )
+        ))
         : (
           <SectionRow label="Not running" value="0 MB / 0%" dimLabel branch={isLast ? 'last' : 'middle'} />
         )}
@@ -521,30 +581,11 @@ const CHRONICLE_OFF_RESOURCES: ChronicleResources = {
   cpuPercent: null,
 }
 
-const OPENCODE_OFF_RESOURCES: OpencodeServerResources = {
-  running: false,
-  pid: null,
-  url: null,
-  startedAt: null,
-  uptimeSeconds: null,
-  rssMB: null,
-  cpuPercent: null,
-}
+const OPENCODE_OFF_RESOURCES: OpencodeServerResources[] = []
 
-const KIMI_OFF_RESOURCES: KimiServerResources = {
-  running: false,
-  pid: null,
-  rssMB: null,
-  cpuPercent: null,
-  url: null,
-}
+const KIMI_OFF_RESOURCES: KimiServerResources[] = []
 
-const CODEX_APP_SERVER_OFF_RESOURCES: CodexAppServerResources = {
-  running: false,
-  pid: null,
-  rssMB: null,
-  cpuPercent: null,
-}
+const CODEX_APP_SERVER_OFF_RESOURCES: CodexAppServerResources[] = []
 
 function parseServerHealth(data: unknown): ServerHealth {
   return ServerHealthSchema.parse(data)
@@ -562,15 +603,15 @@ function parseChronicleResources(data: unknown): ChronicleResources {
   return ChronicleResourcesSchema.parse(data)
 }
 
-function parseOpencodeServerResources(data: unknown): OpencodeServerResources {
+function parseOpencodeServerResources(data: unknown): OpencodeServerResources[] {
   return OpencodeServerResourcesSchema.parse(data)
 }
 
-function parseKimiServerResources(data: unknown): KimiServerResources {
+function parseKimiServerResources(data: unknown): KimiServerResources[] {
   return KimiServerResourcesSchema.parse(data)
 }
 
-function parseCodexAppServerResources(data: unknown): CodexAppServerResources {
+function parseCodexAppServerResources(data: unknown): CodexAppServerResources[] {
   return CodexAppServerResourcesSchema.parse(data)
 }
 
@@ -905,10 +946,24 @@ export function ResourcesPopover() {
         {snap && (
           <div className="px-3 pt-2 pb-1">
             <MemoryBar
-              used={snap.rendererHeapUsed + snap.serverRss + snap.cliTuiRss + snap.bottomPanelRss + snap.chronicleRss + snap.opencodeRss}
+              used={snap.rendererHeapUsed
+                + snap.serverRss
+                + snap.cliTuiRss
+                + snap.bottomPanelRss
+                + snap.chronicleRss
+                + snap.opencodeRss
+                + snap.kimiRss
+                + snap.codexAppServerRss}
               total={Math.max(
                 snap.rendererHeapLimit,
-                (snap.rendererHeapUsed + snap.serverRss + snap.cliTuiRss + snap.bottomPanelRss + snap.chronicleRss + snap.opencodeRss) * 2,
+                (snap.rendererHeapUsed
+                  + snap.serverRss
+                  + snap.cliTuiRss
+                  + snap.bottomPanelRss
+                  + snap.chronicleRss
+                  + snap.opencodeRss
+                  + snap.kimiRss
+                  + snap.codexAppServerRss) * 2,
               )}
             />
           </div>
@@ -1008,10 +1063,8 @@ export function ResourcesPopover() {
                   ? formatResourceUsage(bytesToMegabytes(snap.opencodeRss), snap.opencodeCpuPercent)
                   : 'Off'}
                 running={snap?.opencodeRunning ?? false}
-                pid={snap?.opencodePid}
                 processLabel="opencode-serve"
-                rssMB={snap?.opencodeRss ? bytesToMegabytes(snap.opencodeRss) : null}
-                cpuPercent={snap?.opencodeCpuPercent}
+                processes={snap?.opencodeResources}
                 isLast={false}
               />
 
@@ -1021,10 +1074,8 @@ export function ResourcesPopover() {
                   ? formatResourceUsage(bytesToMegabytes(snap.kimiRss), snap.kimiCpuPercent)
                   : 'Off'}
                 running={snap?.kimiRunning ?? false}
-                pid={snap?.kimiPid}
                 processLabel="kimi-server"
-                rssMB={snap?.kimiRss ? bytesToMegabytes(snap.kimiRss) : null}
-                cpuPercent={snap?.kimiCpuPercent}
+                processes={snap?.kimiResources}
                 isLast={false}
               />
 
@@ -1034,10 +1085,8 @@ export function ResourcesPopover() {
                   ? formatResourceUsage(bytesToMegabytes(snap.codexAppServerRss), snap.codexAppServerCpuPercent)
                   : 'Off'}
                 running={snap?.codexAppServerRunning ?? false}
-                pid={snap?.codexAppServerPid}
                 processLabel="codex-app-server"
-                rssMB={snap?.codexAppServerRss ? bytesToMegabytes(snap.codexAppServerRss) : null}
-                cpuPercent={snap?.codexAppServerCpuPercent}
+                processes={snap?.codexAppServerResources}
                 isLast={false}
               />
 

@@ -8,7 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       tags:
-        description: 'Cucumber tags filter (e.g. "@P0 or @P1"). Leave empty for full suite.'
+        description: 'Cucumber tags filter (default @P0 or @P1 = full active suite). Smoke subset: @P0.'
+        required: false
+        default: '@P0 or @P1'
+      source_ref:
+        description: Git ref from wibus-wee/cradle-app to test
         required: false
         default: ''
       ref:
@@ -22,25 +26,41 @@ permissions:
 
 jobs:
   e2e:
-    name: Full E2E Suite
+    name: Daily E2E (@P0 or @P1)
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
       # ── Checkout & Setup ──────────────────────────────────────────────────
-      - name: Checkout
+      - name: Checkout Cradle source
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref || 'main' }}
+          repository: wibus-wee/cradle-app
+          token: ${{ secrets.PRIVATE_REPO_PAT }}
+          ref: ${{ github.event.inputs.source_ref || github.event.inputs.ref || 'main' }}
 
       - uses: ./.github/actions/setup
         with:
           node-version: 22
 
+      - name: Validate E2E suite contract
+        run: pnpm e2e:check
+
+      # The server imports @cradle/plugin-sdk from dist/ and discovers plugin
+      # runtime entries from each plugin's dist/ directory.
+      - name: Build plugin SDK
+        run: pnpm --filter @cradle/plugin-sdk build
+
+      - name: Build workspace plugins
+        run: pnpm --filter "./plugins/*" build
+
       # ── Install Playwright ────────────────────────────────────────────────
       - name: Install Playwright browsers
         timeout-minutes: 15
         run: pnpm exec playwright install --with-deps chromium-headless-shell
+
+      - name: Provision Codex app-server for E2E
+        run: pnpm --filter @cradle/desktop sync:codex-runtime
 
       - name: Prepare Cucumber CI config
         run: |
@@ -70,24 +90,34 @@ jobs:
         env:
           NODE_ENV: test
           CRADLE_CREDENTIAL_SECRET: e2e-test-secret
+          CRADLE_E2E_VERBOSE: "1"
+          CRADLE_LOG_SYNC: "1"
         run: |
+          # Preserve the real Cucumber exit status when tee-ing the log.
+          set -o pipefail
           mkdir -p e2e/artifacts
-          TAGS="${{ github.event.inputs.tags || '' }}"
+          # Daily gate: full active priority suite (@P0 or @P1). Override via workflow_dispatch.
+          TAGS="${{ github.event.inputs.tags || '@P0 or @P1' }}"
           CMD=(pnpm exec cucumber-js --config e2e/cucumber-ci.mjs
             --format summary
             --format summary:e2e/artifacts/cucumber-summary.txt
-            --format junit:e2e/artifacts/cucumber-junit.xml)
-          if [ -n "$TAGS" ]; then
-            CMD+=(--tags "$TAGS")
-          fi
+            --format junit:e2e/artifacts/cucumber-junit.xml
+            --tags "$TAGS")
           "${CMD[@]}" 2>&1 | tee e2e/artifacts/cucumber-output.log
+
+          # A bootstrap failure in a Cucumber worker can otherwise produce a
+          # misleading successful run with zero executed scenarios.
+          if grep -q '^0 scenarios' e2e/artifacts/cucumber-summary.txt; then
+            echo "::error::Cucumber completed without executing any scenarios."
+            exit 1
+          fi
 
       - name: Summarize E2E result
         if: always()
         env:
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TAGS_FILTER: ${{ github.event.inputs.tags || '(full suite)' }}
+          TAGS_FILTER: ${{ github.event.inputs.tags || '@P0 or @P1' }}
         run: |
           node <<'NODE'
           const fs = require('fs')
@@ -386,14 +416,19 @@ jobs:
         with:
           name: e2e-artifacts-${{ github.run_id }}
           path: |
+            e2e/artifacts/ARTIFACTS.md
+            e2e/artifacts/failure-index.json
             e2e/artifacts/cucumber-summary.txt
             e2e/artifacts/cucumber-output.log
             e2e/artifacts/cucumber-junit.xml
             e2e/artifacts/e2e-summary.json
             e2e/artifacts/e2e-summary.md
             e2e/artifacts/scenarios/**/failure.png
+            e2e/artifacts/scenarios/**/failure.webm
+            e2e/artifacts/scenarios/**/trace.zip
             e2e/artifacts/scenarios/**/console.log
-          retention-days: 7
+          if-no-files-found: warn
+          retention-days: 14
 
       # ── Create GitHub Issue on Failure ────────────────────────────────────
       - name: Create failure issue
@@ -405,87 +440,40 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ARTIFACTS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BRANCH: ${{ github.ref_name }}
-          TAGS_FILTER: ${{ github.event.inputs.tags || '(full suite)' }}
+          TAGS_FILTER: ${{ github.event.inputs.tags || '@P0 or @P1' }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const fs = require('fs')
+            const { readJson, buildDailyFailureIssueBody } = require('./e2e/scripts/format-failure-issue.cjs')
 
             const runUrl = process.env.RUN_URL
             const artifactsUrl = process.env.ARTIFACTS_URL
             const branch = process.env.BRANCH
             const tagsFilter = process.env.TAGS_FILTER
             const today = new Date().toISOString().split('T')[0]
+            const runId = process.env.RUN_ID
 
-            const summaryPath = 'e2e/artifacts/e2e-summary.json'
-            const summary = fs.existsSync(summaryPath)
-              ? JSON.parse(fs.readFileSync(summaryPath, 'utf8'))
-              : {
-                  totalScenarios: 0,
-                  passedScenarios: 0,
-                  failedScenarios: [],
-                  nonPassedScenarios: [],
-                  resultLine: 'no parsed scenario data',
-                  markdown: '_No summary file was generated. Check the raw run logs._',
-                }
+            const summary = readJson('e2e/artifacts/e2e-summary.json', {
+              totalScenarios: 0,
+              passedScenarios: 0,
+              failedScenarios: [],
+              nonPassedScenarios: [],
+              resultLine: 'no parsed scenario data',
+              markdown: '_No summary file was generated. Check the raw run logs._',
+            })
+            const failureIndex = readJson('e2e/artifacts/failure-index.json', [])
 
-            // ── Build issue body ─────────────────────────────────────────
-            const failedList = summary.nonPassedScenarios.map(s =>
-              `- [ ] **${s.line ? `${s.feature}:${s.line}` : s.feature}** - ${s.name}\n  > Status: \`${s.status}\`\n  > Tags: \`${s.tags || 'none'}\`\n  > Error: ${s.error || '(no error message)'}`
-            ).join('\n')
+            const cleanBody = buildDailyFailureIssueBody({
+              today,
+              branch,
+              tagsFilter,
+              runId,
+              runUrl,
+              artifactsUrl,
+              summary,
+              failureIndex,
+            })
 
-            const agentPrompt = summary.nonPassedScenarios.map(s =>
-              `- ${s.name} (${s.line ? `${s.feature}:${s.line}` : s.feature}${s.tags ? ' ' + s.tags : ''})`
-            ).join('\n')
-
-            const body = `## Daily E2E Run Failed — ${today}
-
-            | Field | Value |
-            |-------|-------|
-            | Date | ${today} |
-            | Branch | \`${branch}\` |
-            | Tags filter | \`${tagsFilter}\` |
-            | Result | ❌ ${summary.resultLine} |
-            | Run | [View run #${process.env.RUN_ID}](${runUrl}) |
-
-            ## Failed Scenarios
-
-            ${summary.nonPassedScenarios.length > 0 ? failedList : summary.markdown}
-
-            ## Artifacts
-
-            > Summary, JUnit XML, raw console output, failure screenshots, console logs, and parsed summary are attached to the run.
-
-            - [📦 Download E2E artifacts](${artifactsUrl}/artifacts)
-            - [📋 View run logs](${runUrl})
-
-            ---
-
-            ## Agent Delegation Prompt
-
-            <details>
-            <summary>Copy this block and paste it to a developer agent</summary>
-
-            \`\`\`
-            The following Cucumber E2E scenarios failed in the Cradle daily CI run (${today}, branch: ${branch}):
-
-            ${agentPrompt || '(see run logs for details)'}
-
-            Run URL: ${runUrl}
-            Artifacts: ${artifactsUrl}/artifacts
-
-            Please investigate each failing scenario, identify the root cause (check screenshots/traces in artifacts), and provide a fix. Each test exercises a real user-facing workflow in the Cradle web app.
-
-            Repo context: Elysia server + React web app + TypeScript + Playwright/Cucumber E2E.
-            E2E command to reproduce: pnpm e2e:test
-            \`\`\`
-
-            </details>`
-
-            // Normalize indentation (template literals add leading spaces)
-            const cleanBody = body.split('\n').map(l => l.trimStart()).join('\n')
-
-            // ── Check for existing open issue to avoid duplicates ────────
             const existingIssues = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -496,12 +484,17 @@ jobs:
             const todayIssue = existingIssues.data.find(i => i.title.includes(today))
 
             if (todayIssue) {
-              // Append a new comment to the existing issue
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: todayIssue.number,
                 body: `### Re-run failed (${new Date().toISOString()})\n\n${cleanBody}`,
+              })
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: todayIssue.number,
+                assignees: ['wibus-wee'],
               })
               console.log(`Appended to existing issue #${todayIssue.number}`)
             } else {
@@ -511,6 +504,7 @@ jobs:
                 title: `❌ Daily E2E Failed — ${today}`,
                 body: cleanBody,
                 labels: ['daily-e2e-failure', 'bug'],
+                assignees: ['wibus-wee'],
               })
               console.log(`Created issue #${issue.number}: ${issue.html_url}`)
             }

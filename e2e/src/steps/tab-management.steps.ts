@@ -1,6 +1,7 @@
 import { Given, Then, When } from '@cucumber/cucumber'
 import { expect } from '@playwright/test'
 
+import { recallSessionAlias } from '../support/helpers/chat-scenario'
 import type { CradleWorld } from '../support/world'
 
 const TAB_BAR = '[data-testid="surface-bar"]'
@@ -374,4 +375,43 @@ Then('已关闭的标签页不应再次出现', async function (this: CradleWorl
 Then('左侧相邻标签页应处于活跃状态', async function (this: CradleWorld) {
   const expectedTab = this.recall<{ id: string, testId: string, title: string | null }>('expectedActiveTabAfterClose')
   await expect(this.page.locator(`[data-testid="${expectedTab.testId}"]`)).toHaveAttribute(TAB_ACTIVE_ATTR, 'true', { timeout: 10_000 })
+})
+
+Then('会话{string}与{string}都应有真实聊天标签', async function (this: CradleWorld, firstAlias: string, secondAlias: string) {
+  for (const alias of [firstAlias, secondAlias]) {
+    const session = recallSessionAlias(this, alias)
+    await expect(this.page.locator(`[data-testid="surface-pill-chat:${session.id}"]`)).toBeVisible({ timeout: 15_000 })
+  }
+})
+
+When('我切换到会话{string}的聊天标签', async function (this: CradleWorld, alias: string) {
+  const session = recallSessionAlias(this, alias)
+  const tab = this.page.locator(`[data-testid="surface-pill-chat:${session.id}"]`)
+  await tab.click()
+  await expect(tab).toHaveAttribute(TAB_ACTIVE_ATTR, 'true', { timeout: 10_000 })
+})
+
+Then('活跃标签应显示会话{string}的用户消息', async function (this: CradleWorld, alias: string) {
+  const session = recallSessionAlias(this, alias)
+  const frame = this.page.locator(`[data-chat-session-frame="${session.id}"][data-chat-session-visible="true"]`)
+  await expect(frame.locator('[data-testid="message-bubble-user"]')).toContainText(session.firstUserText, { timeout: 15_000 })
+})
+
+When('我关闭会话{string}的聊天标签', async function (this: CradleWorld, alias: string) {
+  const session = recallSessionAlias(this, alias)
+  const tab = this.page.locator(`[data-testid="surface-pill-chat:${session.id}"]`)
+  await tab.hover()
+  await tab.locator(`[data-testid="surface-close-chat:${session.id}"]`).click()
+  await expect(tab).toHaveCount(0, { timeout: 10_000 })
+})
+
+Then('刷新后会话{string}与{string}的标签和内容仍隔离', async function (this: CradleWorld, firstAlias: string, secondAlias: string) {
+  await this.page.reload({ waitUntil: 'domcontentloaded' })
+  for (const alias of [firstAlias, secondAlias]) {
+    const session = recallSessionAlias(this, alias)
+    await expect(this.page.locator(`[data-testid="surface-pill-chat:${session.id}"]`)).toBeVisible({ timeout: 15_000 })
+  }
+  const second = recallSessionAlias(this, secondAlias)
+  await expect(this.page.locator(`[data-chat-session-frame="${second.id}"][data-chat-session-visible="true"] [data-testid="message-bubble-user"]`))
+    .toContainText(second.firstUserText, { timeout: 15_000 })
 })

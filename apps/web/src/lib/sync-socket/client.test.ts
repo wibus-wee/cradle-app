@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('~/lib/electron', () => ({
+vi.mock('~/lib/authenticated-server-url', () => ({
   getAuthenticatedServerWebSocketUrl: async () => 'ws://127.0.0.1:4100/sync?ticket=test-ticket',
 }))
 

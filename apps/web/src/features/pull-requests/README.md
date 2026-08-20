@@ -29,13 +29,13 @@ models for this surface.
 ## Files
 
 - `pull-requests-page.tsx` - list Container: owns queries, prefetch, Browser
-  Panel navigation, and layout slots.
+  Panel navigation, explicit GitHub refresh, and layout slots.
 - `pull-requests-page-view.tsx` - fixture-driven list View: owns local role
   filtering, search, recency grouping, and loading/auth/empty presentation.
 - `pull-request-*-view.tsx` - focused props-only row, filter, recency,
   summary, timeline, check, people, and code-diff rendering modules.
 - `pull-request-detail-panel.tsx` - Browser Panel Container: owns detail
-  query/refetch and Work navigation for `owner/repo/number`.
+  query/force-refresh and Work navigation for `owner/repo/number`.
 - `pull-request-detail-panel-view.tsx` - fixture-driven detail View: owns
   local tabs and composes summary, timeline, and changed-file Views.
 - `fixtures/pull-requests.ts` - owner-typed deterministic list and detail
@@ -49,3 +49,8 @@ models for this surface.
 - `status-meta.ts` - shared status icon/color mapping (draft/ready/
   merged/closed) and the CI check-state dot color mapping, used by both the
   list and the detail panel.
+
+User refreshes call dedicated server refresh mutations that synchronously
+bypass GitHub cache freshness. Visible detail panels use the cheaper
+rate-budget-aware probe mode after a fingerprint change, then replace the
+detail query with the revalidated projection.

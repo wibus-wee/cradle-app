@@ -41,7 +41,7 @@ import { openGithubRequiredDialog } from '~/features/settings/github-required-di
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
 import { useGithubAppConnected } from '~/features/settings/use-github-app-connected'
 import type { WorkSummary } from '~/features/work/use-work'
-import { useWorks, useWorkspaceWorks } from '~/features/work/use-work'
+import { useWorks } from '~/features/work/use-work'
 import { MigrateWorkspaceDialog } from '~/features/workspace/migrate-workspace-dialog'
 import type { Workspace } from '~/features/workspace/types'
 import { getLocalWorkspacePath, getWorkspaceLocationLabel, isLocalWorkspace } from '~/features/workspace/types'
@@ -94,6 +94,7 @@ import { partitionWorkspaceSessions } from './workspace-session-group-partition'
 import { WorkspaceSessionGroupSection } from './workspace-session-groups'
 import type { WorkspaceSessionItemMenuRequest } from './workspace-session-item'
 import type { WorkspaceSessionAttentionKind } from './workspace-session-item-view'
+import { WorkspaceSessionListClock } from './workspace-session-list-clock'
 import type { WorkspaceRuntimeIconByKind } from './workspace-session-list-section'
 import { WorkspaceSessionListSection } from './workspace-session-list-section'
 import { isWorkspaceSessionRunning } from './workspace-session-status'
@@ -269,18 +270,11 @@ const WorkspaceGroup = memo(
       ),
       shallow,
     )
-    const { data: workspaceWorks = [] } = useWorkspaceWorks(workspace.id)
-    const resolvedWorkByPrimarySessionId = useMemo(() => {
-      if (workByPrimarySessionId.size > 0) {
-        return workByPrimarySessionId
-      }
-      return new Map(workspaceWorks.map(work => [work.primarySessionId, work]))
-    }, [workByPrimarySessionId, workspaceWorks])
     const filteredSessions = useMemo(() => {
       return sessions.filter(session =>
         sessionMatchesListFilters(
           session,
-          resolvedWorkByPrimarySessionId.get(session.id) ?? null,
+          workByPrimarySessionId.get(session.id) ?? null,
           listFilters,
           locallyStreamingSessionIds,
           locallyErroredSessionIds,
@@ -290,10 +284,15 @@ const WorkspaceGroup = memo(
       listFilters,
       locallyErroredSessionIds,
       locallyStreamingSessionIds,
-      resolvedWorkByPrimarySessionId,
+      workByPrimarySessionId,
       sessionAttentionBySessionId,
       sessions,
     ])
+    const resolvedWorkByPrimarySessionId = workByPrimarySessionId
+    const workspaceWorks = useMemo(
+      () => [...workByPrimarySessionId.values()].filter(work => work.workspaceId === workspace.id),
+      [workByPrimarySessionId, workspace.id],
+    )
     const { mutateAsync: renameWorkspace } = useMutation({
       ...patchWorkspacesByWorkspaceIdMutation(),
       onSuccess: () => {
@@ -1590,7 +1589,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
   }, [githubFeaturesDisabled])
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <WorkspaceSidebarNavigationView
         collapsed={collapsed}
         pullRequestsActive={pullRequestsActive}
@@ -1614,25 +1613,27 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
         viewportClassName="min-w-0 max-w-full overflow-x-hidden"
         contentClassName="min-w-0 max-w-full overflow-x-hidden"
       >
-        <div className={cn(collapsed ? 'hidden' : 'contents')}>
-          <WorkspaceSidebarBody
-            workspaces={workspaces}
-            workspacesReady={workspacesReady}
-            sessionsByWorkspaceId={sessionsByWorkspaceId}
-            workByPrimarySessionId={workByPrimarySessionId}
-            runtimeIconByKind={runtimeIconByKind}
-            adding={adding}
-            multiWorkspaceEnabled={multiWorkspaceEnabled}
-            multiFolderCreating={creatingMultiFolderWorkspace}
-            onAddFromPicker={() => setAddWorkspaceDialogOpen(true)}
-            onCreateMultiFolder={handleCreateMultiFolderWorkspace}
-            hasUnreadWorkspaceSessions={unreadWorkspaceSessions.length > 0}
-            markingAllSessionsRead={markingAllSessionsRead}
-            onMarkAllAsRead={handleMarkAllAsRead}
-            onDelete={handleDelete}
-            onTogglePin={handleToggleWorkspacePin}
-          />
-        </div>
+        <WorkspaceSessionListClock>
+          <div className={cn(collapsed ? 'hidden' : 'contents')}>
+            <WorkspaceSidebarBody
+              workspaces={workspaces}
+              workspacesReady={workspacesReady}
+              sessionsByWorkspaceId={sessionsByWorkspaceId}
+              workByPrimarySessionId={workByPrimarySessionId}
+              runtimeIconByKind={runtimeIconByKind}
+              adding={adding}
+              multiWorkspaceEnabled={multiWorkspaceEnabled}
+              multiFolderCreating={creatingMultiFolderWorkspace}
+              onAddFromPicker={() => setAddWorkspaceDialogOpen(true)}
+              onCreateMultiFolder={handleCreateMultiFolderWorkspace}
+              hasUnreadWorkspaceSessions={unreadWorkspaceSessions.length > 0}
+              markingAllSessionsRead={markingAllSessionsRead}
+              onMarkAllAsRead={handleMarkAllAsRead}
+              onDelete={handleDelete}
+              onTogglePin={handleToggleWorkspacePin}
+            />
+          </div>
+        </WorkspaceSessionListClock>
       </ScrollArea>
       <WorkspaceAddDialog
         open={addWorkspaceDialogOpen}

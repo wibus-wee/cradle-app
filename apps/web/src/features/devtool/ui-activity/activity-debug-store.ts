@@ -14,7 +14,6 @@ export interface ActivityDebugSnapshot {
   recentEvents: UiActivityEvent[]
   subscribers: {
     host: string[]
-    plugin: string[]
   }
   idleTimeoutMs: number
 }
@@ -33,7 +32,6 @@ function buildSnapshot(): ActivityDebugSnapshot {
     recentEvents: [...recentEvents],
     subscribers: {
       host: subscribers.host.filter(owner => owner !== DEBUG_OWNER),
-      plugin: subscribers.plugin,
     },
     idleTimeoutMs: IDLE_TIMEOUT_MS,
   }

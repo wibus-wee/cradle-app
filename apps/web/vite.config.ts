@@ -34,15 +34,7 @@ function getVendorChunk(id: string): string | undefined {
     : parts[0]
 
   if (packageName === 'react' || packageName === 'react-dom') { return 'vendor-react' }
-  if (packageName?.startsWith('@tanstack/')) { return 'vendor-tanstack' }
-  if (packageName?.startsWith('@tiptap/')) { return 'vendor-tiptap' }
-  if (packageName?.startsWith('@xterm/')) { return 'vendor-xterm' }
-  if (packageName === 'motion') { return 'vendor-motion' }
-  if (packageName === '@mingcute/react' || packageName === 'react-icons') { return 'vendor-icons' }
-  if (packageName?.startsWith('@base-ui/') || packageName === 'radix-ui' || packageName === 'vaul') { return 'vendor-ui' }
-  if (packageName?.startsWith('@cradle/')) { return packageName.replace('@cradle/', 'vendor-cradle-') }
-
-  return `vendor-${packageName?.replace('@', '').replace('/', '-')}`
+  return undefined
 }
 
 function createAssetPrecachePlugin(): Plugin {
@@ -108,6 +100,7 @@ export default defineConfig({
       autoCodeSplitting: true,
     }),
     viteReact({
+      exclude: /[/\\](?:node_modules|api-gen)[/\\]/,
       babel: {
         plugins: ['babel-plugin-react-compiler'],
       },

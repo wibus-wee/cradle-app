@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { delimiter, isAbsolute, join } from 'node:path'
-import type { Writable } from 'node:stream'
+import type { Readable, Writable } from 'node:stream'
 
 import { jsonrepair } from 'jsonrepair'
 
@@ -48,10 +48,13 @@ export interface CodexAppServerClientOptions {
   cliCompatibleIdentity?: boolean
   serverRequestHandler?: (request: CodexAppServerServerRequest) => Promise<unknown> | unknown
   exposeServerRequestsAsNotifications?: boolean
+  onTerminated?: (error: Error) => void
 }
 
 const CODEX_NATIVE_CLIENT_INFO_FALLBACK_VERSION = '0.0.0'
 const CODEX_APP_SERVER_PATH_ENV = 'CRADLE_CODEX_APP_SERVER_PATH'
+const MAX_EXIT_ERROR_DIAGNOSTICS = 3
+const MAX_STDERR_BUFFER_LENGTH = 64_000
 const codexNativeClientVersionByPath = new Map<string, Promise<string>>()
 
 export function buildCradleCodexAppServerEnv(input: {
@@ -73,6 +76,7 @@ export function buildCradleCodexAppServerEnv(input: {
 export class CodexAppServerClient {
   private readonly child: ManagedChildProcess
   private readonly childStdin: Writable
+  private readonly childStdout: Readable
   private readonly pendingRequests = new Map<RequestId, {
     resolve: (value: unknown) => void
     reject: (error: Error) => void
@@ -86,6 +90,7 @@ export class CodexAppServerClient {
   private readonly executablePath: string
   private readonly userAgentMode: CodexUserAgentMode
   private readonly cliCompatibleIdentity: boolean
+  private readonly onTerminated?: (error: Error) => void
   private nextRequestId = 1
   private closed = false
   private stderrText = ''
@@ -98,6 +103,7 @@ export class CodexAppServerClient {
   constructor(options: CodexAppServerClientOptions = {}) {
     this.serverRequestHandler = options.serverRequestHandler
     this.exposeServerRequestsAsNotifications = options.exposeServerRequestsAsNotifications ?? true
+    this.onTerminated = options.onTerminated
     const env = { ...process.env, ...options.env }
     const launch = resolveCodexAppServerLaunch({
       env,
@@ -146,8 +152,9 @@ export class CodexAppServerClient {
       throw new Error('Codex app-server process did not expose stdio pipes')
     }
     this.childStdin = childStdin
+    this.childStdout = childStdout
     childStderr.on('data', (chunk: Buffer) => {
-      this.stderrText += chunk.toString('utf8')
+      this.stderrText = `${this.stderrText}${chunk.toString('utf8')}`.slice(-MAX_STDERR_BUFFER_LENGTH)
     })
     childStdin.on('error', error => this.terminate(error))
     this.child.once('error', error => this.terminate(error))
@@ -203,6 +210,7 @@ export class CodexAppServerClient {
       : { jsonrpc: '2.0' as const, id, method, params }
     return new Promise((resolve, reject) => {
       this.pendingRequests.set(id, { resolve, reject })
+      this.childStdout.resume()
       this.writeMessage(payload).catch((error) => {
         this.pendingRequests.delete(id)
         reject(error)
@@ -236,6 +244,7 @@ export class CodexAppServerClient {
         resolve(message)
       }
       this.notificationWaiters.push(waiter)
+      this.childStdout.resume()
     })
   }
 
@@ -252,7 +261,8 @@ export class CodexAppServerClient {
       return new Error('Codex app-server exited')
     }
     const detail = signal ? `signal ${signal}` : `code ${code ?? 1}`
-    return new Error(`Codex app-server exited with ${detail}: ${this.stderrText}`)
+    const stderrSummary = summarizeCodexAppServerStderr(this.stderrText)
+    return new Error(`Codex app-server exited with ${detail}${stderrSummary ? `: ${stderrSummary}` : ''}`)
   }
 
   private terminate(error: Error): void {
@@ -261,6 +271,7 @@ export class CodexAppServerClient {
     }
     this.closed = true
     this.failAll(error)
+    this.onTerminated?.(error)
   }
 
   private handleLine(line: string): void {
@@ -313,6 +324,7 @@ export class CodexAppServerClient {
       else {
         pending.resolve(message.result)
       }
+      this.pauseStdoutWithoutDemand()
       return
     }
 
@@ -334,9 +346,11 @@ export class CodexAppServerClient {
     let response: CodexAppServerMessage
     try {
       if (this.exposeServerRequestsAsNotifications && isCodexAppServerInteractiveServerRequest(message.method)) {
+        const threadId = readServerRequestThreadId(message)
         this.pushNotification({
           method: 'serverRequest/pending',
           params: {
+            ...(threadId ? { threadId } : {}),
             id: message.id,
             method: message.method,
             params: message.params,
@@ -346,9 +360,11 @@ export class CodexAppServerClient {
       const result = await this.serverRequestHandler(message)
       response = { id: message.id, result }
       if (this.exposeServerRequestsAsNotifications) {
+        const threadId = readServerRequestThreadId(message)
         this.pushNotification({
           method: 'serverRequest/handled',
           params: {
+            ...(threadId ? { threadId } : {}),
             id: message.id,
             method: message.method,
             params: message.params,
@@ -374,9 +390,17 @@ export class CodexAppServerClient {
     const waiter = this.notificationWaiters.shift()
     if (waiter) {
       waiter(message)
+      this.pauseStdoutWithoutDemand()
       return
     }
     this.notificationQueue.push(message)
+    this.pauseStdoutWithoutDemand()
+  }
+
+  private pauseStdoutWithoutDemand(): void {
+    if (this.pendingRequests.size === 0 && this.notificationWaiters.length === 0) {
+      this.childStdout.pause()
+    }
   }
 
   private failAll(error: Error): void {
@@ -415,6 +439,49 @@ export class CodexAppServerClient {
       }
     })
   }
+}
+
+function readServerRequestThreadId(message: CodexAppServerServerRequest): string | null {
+  const params = message.params
+  if (!params || typeof params !== 'object' || !('threadId' in params)) {
+    return null
+  }
+  const threadId = (params as { threadId?: unknown }).threadId
+  return typeof threadId === 'string' ? threadId : null
+}
+
+/**
+ * Keep process failures actionable without copying the app-server's entire
+ * stderr buffer into the user-facing Error.message. The buffer often contains
+ * the same retry/transport failure hundreds of times, plus unrelated agent
+ * tool output from earlier in the process lifetime.
+ */
+export function summarizeCodexAppServerStderr(stderr: string): string | null {
+  const lines = stripAnsi(stderr)
+    .split(/\r?\n/)
+    .map(normalizeCodexAppServerStderrLine)
+    .filter((line): line is string => line !== null)
+
+  const candidates = lines.filter(line => /fatal|panic|error|failed|transport|websocket|handshake|http\s+\d{3}|server|startup/i.test(line))
+  const infrastructureCandidates = candidates.filter(line => /fatal|panic|transport|websocket|handshake|http\s+\d{3}|server|startup/i.test(line))
+  const selected = (infrastructureCandidates.length > 0 ? infrastructureCandidates : candidates)
+    .filter((line, index, all) => all.findIndex(candidate => candidate.toLowerCase() === line.toLowerCase()) === index)
+    .slice(0, MAX_EXIT_ERROR_DIAGNOSTICS)
+
+  return selected.length > 0 ? selected.join('; ') : null
+}
+
+function normalizeCodexAppServerStderrLine(line: string): string | null {
+  const normalized = line
+    .replace(/^\d{4}-\d{2}-\d{2}T\S+\s+(?:ERROR|WARN|WARNING|INFO|DEBUG|TRACE)\s+\S+:\s*/i, '')
+    .replace(/,?\s*url:\s*\S+/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return normalized.length > 0 ? normalized : null
+}
+
+function stripAnsi(value: string): string {
+  return value.replace(/\u001B\[[0-9;]*m/g, '')
 }
 
 export function readCradleCodexClientVersion(env: Record<string, string | undefined> = process.env): string {

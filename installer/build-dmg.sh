@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 COMMAND_SOURCE="$SCRIPT_DIR/Install Cradle.command"
+INSTRUCTIONS_SOURCE="$SCRIPT_DIR/Install Instructions.txt"
 APP_INPUT="${CRADLE_APP_PATH:-}"
 ICON_INPUT="${CRADLE_INSTALLER_ICON:-.github/Cradle.png}"
 ICON_ENABLED=1
@@ -224,10 +225,12 @@ main() {
 
   [[ -n "$APP_INPUT" ]] || fail "--app <path> is required, or set CRADLE_APP_PATH"
   [[ -f "$COMMAND_SOURCE" ]] || fail "missing installer command: $COMMAND_SOURCE"
+  [[ -f "$INSTRUCTIONS_SOURCE" ]] || fail "missing installer instructions: $INSTRUCTIONS_SOURCE"
 
   STAGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cradle-installer-dmg.XXXXXX")"
 
   /bin/cp "$COMMAND_SOURCE" "$STAGE_DIR/Install Cradle.command"
+  /bin/cp "$INSTRUCTIONS_SOURCE" "$STAGE_DIR/Install Instructions.txt"
   /bin/chmod 755 "$STAGE_DIR/Install Cradle.command"
   if [[ "$ICON_ENABLED" == "1" ]]; then
     apply_command_icon "$STAGE_DIR/Install Cradle.command" "$(resolve_path "$ICON_INPUT")"

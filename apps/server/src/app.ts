@@ -37,12 +37,15 @@ import { linkedChatSessionProxyPlugin } from './modules/chat-runtime/http/linked
 import { registerMessageBlobBackfillMaintenance } from './modules/chat-runtime/message-blob-backfill'
 import { registerMessageSteerSplitBackfillMaintenance } from './modules/chat-runtime/message-steer-split-backfill'
 import { runRegistry } from './modules/chat-runtime/run-registry'
+import { flushRunSnapshotWriteBehind } from './modules/chat-runtime/run-snapshot-journal'
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
 import { ClaudeUsageReconciliationScheduler } from './modules/chat-runtime-providers/claude-agent/usage-reconciliation-scheduler'
+import { readCodexChatgptAuthCredential } from './modules/chat-runtime-providers/codex/app-server/chatgpt-auth'
 import { createOpencodeManagedResourceAdapter } from './modules/chat-runtime-providers/opencode/managed-resource-adapter'
 import { OpencodeRuntimeInstallationService } from './modules/chat-runtime-providers/opencode/runtime-installation'
 import { createChronicleModule } from './modules/chronicle'
 import { createChronicleManagedResourceAdapter } from './modules/chronicle/managed-resource-adapter'
+import { codeActivity } from './modules/code-activity'
 import { codexAppServer } from './modules/codex-app-server'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
@@ -52,6 +55,7 @@ import { DownloadCenterService } from './modules/download-center/service'
 import { externalIssueSources } from './modules/external-issue-sources'
 import { externalProviderSources } from './modules/external-provider-sources'
 import { externalSessionImport } from './modules/external-session-import'
+import { createFabricNodeRoutes, fabric, registerFabricWebSocketRoutes } from './modules/fabric'
 import { filesystem } from './modules/filesystem'
 import { git } from './modules/git'
 import { githubAuth } from './modules/github-auth'
@@ -76,6 +80,9 @@ import { createPluginsModule } from './modules/plugins'
 import { preferences } from './modules/preferences'
 import { profiles } from './modules/profiles'
 import { providerPresets, providers } from './modules/provider-catalog'
+import { providerExtensions } from './modules/provider-extensions'
+import { configureProviderExtensionHost } from './modules/provider-extensions/host'
+import { releaseLiveProviderRuntimeSessionsForProviderTarget } from './modules/provider-runtime/service'
 import { providerTargets } from './modules/provider-targets'
 import { registerPtyRoutes } from './modules/pty'
 import { pullRequest, pullRequestFeed } from './modules/pull-request'
@@ -83,6 +90,8 @@ import { recall } from './modules/recall'
 import { relayServers } from './modules/relay-servers'
 import { relayTransport } from './modules/relay-transport'
 import { assertRelayCompressionRuntimeSupport } from './modules/relay-transport/compression'
+import { FabricNodeConnector, listActiveFabricNodeAuthTokens } from './modules/relay-transport/node-connector'
+import { getFabricNodeLinkManager } from './modules/relay-transport/node-link-manager'
 import { listActiveRelayAuthTokens } from './modules/relay-transport/relay-auth-token-service'
 import { registerRemoteHostWebSocketRoutes, remoteHosts } from './modules/remote-hosts'
 import { search } from './modules/search'
@@ -99,6 +108,7 @@ import { threadHandoff } from './modules/thread-handoff'
 import { turnCheckpoint } from './modules/turn-checkpoint'
 import * as TurnCheckpoint from './modules/turn-checkpoint/service'
 import { usage } from './modules/usage'
+import { flushUsageWriteBehind } from './modules/usage/write-behind'
 import { sessionWork, work } from './modules/work'
 import { workflowRules } from './modules/workflow-rules'
 import { workspace } from './modules/workspace'
@@ -157,6 +167,17 @@ async function runBootstrapPhase<T>(
 }
 
 export async function createServerContractApp(options: CreateServerContractAppOptions = {}) {
+  configureProviderExtensionHost({
+    findActiveRunId: (providerTargetId) => {
+      const activeRun = runRegistry.listActiveRuns()
+        .find(run => run.providerTargetId === providerTargetId)
+      return activeRun?.runId ?? null
+    },
+    releaseRuntimeSessions: releaseLiveProviderRuntimeSessionsForProviderTarget,
+    validateRefreshableCredential: (credentialRef, value) => Boolean(
+      readCodexChatgptAuthCredential(credentialRef, value),
+    ),
+  })
   setGitHubAuthProvider(GitHubAuth.resolveGitHubAppIdentity)
   registerTurnCheckpointHooks({
     captureStart: async (input) => {
@@ -207,12 +228,10 @@ export async function createServerContractApp(options: CreateServerContractAppOp
     }),
   )
   app.use(createRequestIdPlugin())
-  app.use(
-    createAuthPlugin({
-      ...loadServerAuthConfig(),
-      listRelayAuthTokens: listActiveRelayAuthTokens,
-    }),
-  )
+  app.use(createAuthPlugin({
+    ...loadServerAuthConfig(),
+    listRelayAuthTokens: () => [...listActiveRelayAuthTokens(), ...listActiveFabricNodeAuthTokens()],
+  }))
   if (includeRuntimeHttpPlugins) {
     const [{ createRequestLoggerPlugin }, { createErrorHandler }] = await Promise.all([
       import('./http/request-logger'),
@@ -225,13 +244,17 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(health)
   app.use(preferences)
   app.use(workspace)
+  app.use(codeActivity)
   app.use(filesystem)
   app.use(usage)
   app.use(profiles)
   app.use(providerTargets)
+  app.use(providerExtensions)
   app.use(relayServers)
   app.use(relayTransport)
   app.use(remoteHosts)
+  app.use(fabric)
+  app.use(createFabricNodeRoutes(getFabricNodeLinkManager()))
   app.use(externalIssueSources)
   app.use(githubAuth)
   app.use(externalProviderSources)
@@ -288,6 +311,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(desktop)
   app.use(downloadCenter.routes)
   registerRemoteHostWebSocketRoutes(app)
+  registerFabricWebSocketRoutes(app)
   registerPtyRoutes(app)
   registerSyncGatewayRoutes(app)
   app.use(observability)
@@ -376,6 +400,8 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       createChronicleManagedResourceAdapter(downloadCenterService),
       createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
     ])
+    chronicleService.startMemoryEmbeddingIndexer()
+    chronicleService.reconcileMemoryEmbeddingCandidateIndex()
     const app = await createServerContractApp({
       includeRuntimeHttpPlugins: true,
       downloadCenterService,
@@ -493,8 +519,19 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   })
 
   const runtimeResources = new RuntimeResourceRegistry()
+  const fabricNodeConnector = new FabricNodeConnector('127.0.0.1', serverConfig.port)
   const claudeUsageReconciliation = new ClaudeUsageReconciliationScheduler()
   const codexUsageReconciliation = new CodexUsageReconciliationScheduler()
+  runtimeResources.register({
+    name: 'run-snapshot-write-behind',
+    phase: 'drain',
+    stop: flushRunSnapshotWriteBehind,
+  })
+  runtimeResources.register({
+    name: 'usage-write-behind',
+    phase: 'drain',
+    stop: flushUsageWriteBehind,
+  })
   runtimeResources.register({
     name: 'download-center',
     phase: 'cancel',
@@ -568,6 +605,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     phase: 'cancel',
     stop: () => getHostConnectorService()?.stopAll(),
   })
+  runtimeResources.register({ name: 'fabric-node-connector', phase: 'cancel', stop: () => fabricNodeConnector.stop() })
   runtimeResources.register({
     name: 'remote-host-connections',
     phase: 'cancel',
@@ -582,6 +620,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     name: 'chronicle-slack-sync',
     phase: 'stop',
     stop: () => chronicleService.stopSlackBackgroundSync(),
+  })
+  runtimeResources.register({
+    name: 'chronicle-embedding-indexer',
+    phase: 'drain',
+    stop: () => chronicleService.stopMemoryEmbeddingIndexer(),
   })
   runtimeResources.register({ name: 'chronicle-daemon', phase: 'stop', stop: chronicleCleanup })
   runtimeResources.register({ name: 'trace-streams', phase: 'stop', stop: shutdownTraceStreams })
@@ -637,6 +680,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
  catch (error) {
       console.error('[relay-host-connector] startAll failed:', error)
     }
+    fabricNodeConnector.start()
   }
 
   return app

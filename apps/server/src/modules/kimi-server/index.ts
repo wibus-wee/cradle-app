@@ -10,12 +10,15 @@ export const kimiServer = new Elysia({ prefix: '/kimi' })
       'x-cradle-cli': { command: ['kimi', 'server', 'resources'] },
     },
     response: {
-      200: t.Object({
+      200: t.Array(t.Object({
+        hostId: t.String(),
+        providerTargetId: t.String(),
+        scopeId: t.String(),
         running: t.Boolean(),
         pid: t.Nullable(t.Number()),
         rssMB: t.Nullable(t.Number()),
         cpuPercent: t.Nullable(t.Number()),
         url: t.Nullable(t.String()),
-      }),
+      })),
     },
   })

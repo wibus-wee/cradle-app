@@ -10,6 +10,7 @@ import { db, shutdownInfra } from '../src/infra'
 import type { ModelRegistryMappingEntry, ModelsDevModel } from '../src/modules/model-registry/model-info-registry'
 import {
   enrichModelsWithRegistryData,
+  fetchModelsDevData,
   getCachedModelsDevCost,
   resolveModelEnrichment,
 } from '../src/modules/model-registry/model-info-registry'
@@ -427,6 +428,44 @@ describe('models.dev reasoning_options projection', () => {
 })
 
 // ── DB-backed tests ───────────────────────────────────────────────────────────
+
+describe('fetchModelsDevData concurrency', () => {
+  it('coalesces concurrent cache misses and forced refreshes into one request', async () => {
+    const dataDir = makeTempDir('cradle-data-model-refresh-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+    let requestCount = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = new Request(input).url
+      if (url !== MODELS_DEV_URL) {
+        throw new Error(`Unexpected fetch: ${url}`)
+      }
+      requestCount += 1
+      await new Promise(resolve => setTimeout(resolve, 5))
+      return new Response(JSON.stringify(makeModelsDevData({
+        'single-flight-model': { limit: { context: 32_768 } },
+      })), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+
+    try {
+      const requests: Array<ReturnType<typeof fetchModelsDevData>> = []
+      for (let index = 0; index < 64; index += 1) {
+        requests.push(fetchModelsDevData({ forceRefresh: true }))
+      }
+      const results = await Promise.all(requests)
+
+      expect(requestCount).toBe(1)
+      expect(results.every(result => result?.['test-provider']?.models['single-flight-model'])).toBe(true)
+    }
+    finally {
+      shutdownInfra()
+      if (previousDataDir !== undefined) { process.env.CRADLE_DATA_DIR = previousDataDir }
+      else { delete process.env.CRADLE_DATA_DIR }
+      rmSync(dataDir, { recursive: true, force: true })
+      vi.restoreAllMocks()
+    }
+  })
+})
 
 describe('getCachedModelsDevCost (DB-backed)', () => {
   it('returns cost from mapping.modelJson when present', async () => {

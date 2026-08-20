@@ -1,6 +1,7 @@
 import type { ManagedChildProcess } from '../../../infra/managed-process'
+import type { ProviderRuntimeHostSnapshot } from '../../provider-runtime/host-manager'
 import { providerRuntimeHostManager } from '../../provider-runtime/host-manager'
-import type { RuntimeProcessResources } from '../../provider-runtime/process-resources'
+import type { RuntimeProcessResource } from '../../provider-runtime/process-resources'
 import {
   emptyRuntimeProcessResources,
   readManagedProcessPid,
@@ -8,7 +9,7 @@ import {
 } from '../../provider-runtime/process-resources'
 import type { KimiWebHostResource } from './web-host'
 
-export interface KimiServerResources extends RuntimeProcessResources {
+export interface KimiServerResources extends RuntimeProcessResource {
   url: string | null
 }
 
@@ -21,22 +22,19 @@ function isKimiWebHostResource(resource: unknown): resource is KimiWebHostResour
   )
 }
 
-function emptyKimiServerResources(): KimiServerResources {
-  return {
-    ...emptyRuntimeProcessResources(),
-    url: null,
-  }
-}
-
-function readKimiHostResources(resource: KimiWebHostResource): KimiServerResources {
+function readKimiHostResources(
+  resource: KimiWebHostResource,
+  host: ProviderRuntimeHostSnapshot,
+): KimiServerResources {
   const proc: ManagedChildProcess = resource.process
   const pid = readManagedProcessPid(proc)
-  if (!pid) {
-    return emptyKimiServerResources()
-  }
-  const usage = readProcessResourceUsage(pid)
+  const usage = pid ? readProcessResourceUsage(pid) : null
   return {
-    running: true,
+    ...emptyRuntimeProcessResources(),
+    hostId: host.hostId,
+    providerTargetId: host.providerTargetId,
+    scopeId: host.scopeId,
+    running: pid !== null,
     pid,
     rssMB: usage?.rssMB ?? null,
     cpuPercent: usage?.cpuPercent ?? null,
@@ -44,11 +42,11 @@ function readKimiHostResources(resource: KimiWebHostResource): KimiServerResourc
   }
 }
 
-export function getKimiServerResources(): KimiServerResources {
-  return providerRuntimeHostManager.forEachResource('kimi', (resource) => {
+export function getKimiServerResources(): KimiServerResources[] {
+  return providerRuntimeHostManager.collectResources('kimi', (resource, host) => {
     if (isKimiWebHostResource(resource)) {
-      return readKimiHostResources(resource)
+      return readKimiHostResources(resource, host)
     }
     return undefined
-  }) ?? emptyKimiServerResources()
+  })
 }

@@ -33,8 +33,8 @@ export const profiles = new Elysia({
     params: ProfilesModel.idParams,
     response: { 200: ProfilesModel.agentProfile },
   })
-  .put('/:id', ({ params, body }) => {
-    return Profiles.upsertProfile({
+  .put('/:id', async ({ params, body }) => {
+    return await Profiles.upsertProfile({
       id: params.id,
       name: body.name,
       providerKind: body.providerKind,
@@ -55,8 +55,8 @@ export const profiles = new Elysia({
     body: ProfilesModel.upsertBody,
     response: { 200: ProfilesModel.agentProfile },
   })
-  .post('/:id/bind-provider', ({ params, body }) => {
-    return Profiles.bindProfileProvider(params.id, {
+  .post('/:id/bind-provider', async ({ params, body }) => {
+    return await Profiles.bindProfileProvider(params.id, {
       providerId: body.providerId,
       applyEndpointDefaults: body.applyEndpointDefaults,
     })
@@ -69,8 +69,8 @@ export const profiles = new Elysia({
     body: ProfilesModel.bindProviderBody,
     response: { 200: ProfilesModel.agentProfile },
   })
-  .delete('/:id', ({ params }) => {
-    Profiles.removeProfile(params.id)
+  .delete('/:id', async ({ params }) => {
+    await Profiles.removeProfile(params.id)
     return { ok: true as const }
   }, {
     detail: {

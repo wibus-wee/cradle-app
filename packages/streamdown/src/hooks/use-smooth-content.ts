@@ -27,6 +27,18 @@ const WAKE_TIMER_MS = 50
 
 type Phase = 'idle' | 'active' | 'settling'
 
+let graphemeSegmenter: Intl.Segmenter | null | undefined
+
+function getGraphemeSegmenter(): Intl.Segmenter | null {
+  if (graphemeSegmenter !== undefined) {
+    return graphemeSegmenter
+  }
+  graphemeSegmenter = typeof Intl !== 'undefined' && Intl.Segmenter
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : null
+  return graphemeSegmenter
+}
+
 export function useSmoothContent(
   content: string,
   streaming: boolean,
@@ -57,6 +69,8 @@ export function useSmoothContent(
     wakeTimerId: 0 as ReturnType<typeof setTimeout> | 0,
     // Debug tick counter
     tickCount: 0,
+    graphemeText: '',
+    graphemeSegments: null as ReturnType<Intl.Segmenter['segment']> | null,
   })
 
   const configRef = useRef(PRESETS[preset])
@@ -218,7 +232,8 @@ export function useSmoothContent(
       let newCursor = Math.min(s.cursor + chars, totalLen)
 
       // Grapheme cluster protection via Intl.Segmenter when available
-      if (newCursor < totalLen && typeof Intl !== 'undefined' && Intl.Segmenter) {
+      const segmenter = getGraphemeSegmenter()
+      if (newCursor < totalLen && segmenter) {
         const code = fullText.charCodeAt(newCursor - 1)
         // Check if we might be mid-grapheme (surrogate pair or combining sequence)
         if (code >= 0xD800 && code <= 0xDBFF) {
@@ -226,16 +241,16 @@ export function useSmoothContent(
           newCursor = Math.min(newCursor + 1, totalLen)
         }
  else if (newCursor > s.cursor) {
-          // Use Intl.Segmenter to snap to grapheme boundary
-          const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
-          const segments = segmenter.segment(fullText.slice(0, newCursor))
-          const iter = segments[Symbol.iterator]()
-          let last: Intl.SegmentData | undefined
-          for (const seg of iter) {
-            last = seg
+          // Reuse one lazy segmentation for every animation frame until the
+          // source content changes, and jump directly to the containing
+          // grapheme instead of iterating from the beginning of the response.
+          if (s.graphemeText !== fullText || !s.graphemeSegments) {
+            s.graphemeText = fullText
+            s.graphemeSegments = segmenter.segment(fullText)
           }
-          if (last) {
-            const boundaryEnd = last.index + last.segment.length
+          const containing = s.graphemeSegments.containing(newCursor - 1)
+          if (containing) {
+            const boundaryEnd = containing.index + containing.segment.length
             if (boundaryEnd <= totalLen) {
               newCursor = boundaryEnd
             }

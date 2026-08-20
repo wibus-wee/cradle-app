@@ -54,5 +54,8 @@ minimumReleaseAgeExclude:
   - '@arcships/light-ocr@0.3.0'
 overrides:
   '@cradle/cli': link:packages/cli
+  # Mobile pins React 19.2.3 for Expo; keep web/desktop on the same exact pair.
+  react: 19.2.3
+  react-dom: 19.2.3
 patchedDependencies:
   '@elysiajs/node@1.4.5': patches/@elysiajs__node@1.4.5.patch

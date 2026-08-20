@@ -70,6 +70,18 @@ describe('scenario controller', () => {
         },
       ],
     })
+    expect(controller.nextMatches('anthropic', {
+      method: 'POST',
+      path: '/v1/messages',
+      headers: { 'x-api-key': 'fake' },
+      body: { model: 'test' },
+    })).toBe(true)
+    expect(controller.nextMatches('anthropic', {
+      method: 'POST',
+      path: '/v1/messages/count_tokens',
+      headers: { 'x-api-key': 'fake' },
+      body: { model: 'test' },
+    })).toBe(false)
     const waiting = controller.waitForRequest({ method: 'POST', path: '/v1/messages' })
     controller.take('anthropic', {
       method: 'POST',
@@ -78,6 +90,12 @@ describe('scenario controller', () => {
       body: { model: 'test' },
     })
     await expect(waiting).resolves.toMatchObject({ index: 0 })
+    expect(controller.nextMatches('anthropic', {
+      method: 'POST',
+      path: '/v1/messages',
+      headers: { 'x-api-key': 'fake' },
+      body: { model: 'test' },
+    })).toBe(false)
     expect(controller.requests()).toHaveLength(1)
     expect(() => controller.assertExhausted()).not.toThrow()
   })

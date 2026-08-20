@@ -60,6 +60,7 @@ export interface StartRunInput {
   assistantMessage: UIMessage
   userMessage?: UIMessage
   queueItemId?: string | null
+  bindingId?: string | null
 }
 
 export function annotateContinuationMessage(
@@ -166,11 +167,13 @@ export async function insertCompletedUserMessage(
 }
 
 export async function startRun(input: StartRunInput): Promise<BackendRun> {
-  const binding = readDurableProviderRuntimeBinding(input.sessionId)
+  const bindingId = input.bindingId === undefined
+    ? readDurableProviderRuntimeBinding(input.sessionId)?.id ?? null
+    : input.bindingId
   const now = currentUnixSeconds()
   const run = {
     id: randomUUID(),
-    bindingId: binding?.id ?? null,
+    bindingId,
     chatSessionId: input.sessionId,
     messageId: input.messageId,
     origin: input.origin,

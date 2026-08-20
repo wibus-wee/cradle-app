@@ -63,6 +63,7 @@ export function NewWorkWorkspaceSelectorView({
             <MenuItem
               key={workspace.id}
               onClick={() => onSelectWorkspace(workspace.id)}
+              data-testid={`new-work-workspace-option-${workspace.id}`}
             >
               <FolderIcon className="size-3" />
               <span className="flex-1">{workspace.name}</span>

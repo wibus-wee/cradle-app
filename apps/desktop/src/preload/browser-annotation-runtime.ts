@@ -8,6 +8,7 @@ import {
 } from './browser-annotation-toolbar'
 import type { BrowserAnnotationAnchor, BrowserAnnotationDesignChange, BrowserAnnotationElement, BrowserAnnotationElementStyle, BrowserAnnotationLayoutComponentType, BrowserAnnotationLayoutHint, BrowserAnnotationMarkerClickBehavior, BrowserAnnotationMarkerColorId, BrowserAnnotationOutputDetail, BrowserAnnotationReactDetectionMode, BrowserAnnotationResizeHandle, BrowserAnnotationRuntimeAnnotation, BrowserAnnotationRuntimeCommand, BrowserAnnotationRuntimeEvent, BrowserAnnotationRuntimeNotification, BrowserAnnotationRuntimeSettings, BrowserAnnotationRuntimeStage, BrowserPanelPromptAttachment } from './browser-panel-contract'
 import {
+  BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES,
   BROWSER_ANNOTATION_RUNTIME_COMMAND_CHANNEL,
   BROWSER_ANNOTATION_RUNTIME_EVENT_CHANNEL,
 } from './browser-panel-contract'
@@ -153,9 +154,6 @@ const BROWSER_ANNOTATION_LAYOUT_COMPONENTS: ReadonlyArray<{
       { type: 'footer', label: 'Footer', ...DEFAULT_SIZES.footer },
       { type: 'modal', label: 'Modal', ...DEFAULT_SIZES.modal },
       { type: 'banner', label: 'Banner', ...DEFAULT_SIZES.banner },
-      { type: 'drawer', label: 'Drawer', ...DEFAULT_SIZES.drawer },
-      { type: 'popover', label: 'Popover', ...DEFAULT_SIZES.popover },
-      { type: 'divider', label: 'Divider', ...DEFAULT_SIZES.divider },
     ],
   },
   {
@@ -164,20 +162,9 @@ const BROWSER_ANNOTATION_LAYOUT_COMPONENTS: ReadonlyArray<{
       { type: 'card', label: 'Card', ...DEFAULT_SIZES.card },
       { type: 'text', label: 'Text', ...DEFAULT_SIZES.text },
       { type: 'image', label: 'Image', ...DEFAULT_SIZES.image },
-      { type: 'video', label: 'Video', ...DEFAULT_SIZES.video },
       { type: 'table', label: 'Table', ...DEFAULT_SIZES.table },
-      { type: 'grid', label: 'Grid', ...DEFAULT_SIZES.grid },
       { type: 'list', label: 'List', ...DEFAULT_SIZES.list },
-      { type: 'chart', label: 'Chart', ...DEFAULT_SIZES.chart },
-      { type: 'codeBlock', label: 'Code Block', ...DEFAULT_SIZES.codeBlock },
-      { type: 'map', label: 'Map', ...DEFAULT_SIZES.map },
-      { type: 'timeline', label: 'Timeline', ...DEFAULT_SIZES.timeline },
-      { type: 'calendar', label: 'Calendar', ...DEFAULT_SIZES.calendar },
-      { type: 'accordion', label: 'Accordion', ...DEFAULT_SIZES.accordion },
-      { type: 'carousel', label: 'Carousel', ...DEFAULT_SIZES.carousel },
-      { type: 'logo', label: 'Logo', ...DEFAULT_SIZES.logo },
-      { type: 'faq', label: 'FAQ', ...DEFAULT_SIZES.faq },
-      { type: 'gallery', label: 'Gallery', ...DEFAULT_SIZES.gallery },
+      { type: 'grid', label: 'Grid', ...DEFAULT_SIZES.grid },
     ],
   },
   {
@@ -190,47 +177,6 @@ const BROWSER_ANNOTATION_LAYOUT_COMPONENTS: ReadonlyArray<{
       { type: 'tabs', label: 'Tabs', ...DEFAULT_SIZES.tabs },
       { type: 'dropdown', label: 'Dropdown', ...DEFAULT_SIZES.dropdown },
       { type: 'toggle', label: 'Toggle', ...DEFAULT_SIZES.toggle },
-      { type: 'stepper', label: 'Stepper', ...DEFAULT_SIZES.stepper },
-      { type: 'rating', label: 'Rating', ...DEFAULT_SIZES.rating },
-      { type: 'fileUpload', label: 'File Upload', ...DEFAULT_SIZES.fileUpload },
-      { type: 'checkbox', label: 'Checkbox', ...DEFAULT_SIZES.checkbox },
-      { type: 'radio', label: 'Radio', ...DEFAULT_SIZES.radio },
-      { type: 'slider', label: 'Slider', ...DEFAULT_SIZES.slider },
-      { type: 'datePicker', label: 'Date Picker', ...DEFAULT_SIZES.datePicker },
-    ],
-  },
-  {
-    section: 'Elements',
-    items: [
-      { type: 'avatar', label: 'Avatar', ...DEFAULT_SIZES.avatar },
-      { type: 'badge', label: 'Badge', ...DEFAULT_SIZES.badge },
-      { type: 'tag', label: 'Tag', ...DEFAULT_SIZES.tag },
-      { type: 'breadcrumb', label: 'Breadcrumb', ...DEFAULT_SIZES.breadcrumb },
-      { type: 'pagination', label: 'Pagination', ...DEFAULT_SIZES.pagination },
-      { type: 'progress', label: 'Progress', ...DEFAULT_SIZES.progress },
-      { type: 'alert', label: 'Alert', ...DEFAULT_SIZES.alert },
-      { type: 'toast', label: 'Toast', ...DEFAULT_SIZES.toast },
-      { type: 'notification', label: 'Notification', ...DEFAULT_SIZES.notification },
-      { type: 'tooltip', label: 'Tooltip', ...DEFAULT_SIZES.tooltip },
-      { type: 'stat', label: 'Stat', ...DEFAULT_SIZES.stat },
-      { type: 'skeleton', label: 'Skeleton', ...DEFAULT_SIZES.skeleton },
-      { type: 'chip', label: 'Chip', ...DEFAULT_SIZES.chip },
-      { type: 'icon', label: 'Icon', ...DEFAULT_SIZES.icon },
-      { type: 'spinner', label: 'Spinner', ...DEFAULT_SIZES.spinner },
-    ],
-  },
-  {
-    section: 'Blocks',
-    items: [
-      { type: 'pricing', label: 'Pricing', ...DEFAULT_SIZES.pricing },
-      { type: 'testimonial', label: 'Testimonial', ...DEFAULT_SIZES.testimonial },
-      { type: 'cta', label: 'CTA', ...DEFAULT_SIZES.cta },
-      { type: 'productCard', label: 'Product Card', ...DEFAULT_SIZES.productCard },
-      { type: 'profile', label: 'Profile', ...DEFAULT_SIZES.profile },
-      { type: 'feature', label: 'Feature', ...DEFAULT_SIZES.feature },
-      { type: 'team', label: 'Team', ...DEFAULT_SIZES.team },
-      { type: 'login', label: 'Login', ...DEFAULT_SIZES.login },
-      { type: 'contact', label: 'Contact', ...DEFAULT_SIZES.contact },
     ],
   },
 ]
@@ -238,7 +184,7 @@ const BROWSER_ANNOTATION_LAYOUT_COMPONENTS: ReadonlyArray<{
 const BROWSER_ANNOTATION_DEFAULT_SETTINGS: BrowserAnnotationRuntimeSettings = {
   blockInteractions: true,
   clearOnCopySend: false,
-  markerClickBehavior: 'delete',
+  markerClickBehavior: 'edit',
   markerColorId: 'blue',
   outputDetail: 'detailed',
   reactDetectionEnabled: true,
@@ -250,16 +196,21 @@ const BROWSER_ANNOTATION_POPUP_STYLE_FIELDS: ReadonlyArray<{
   property: string
 }> = [
   { key: 'display', property: 'display' },
+  { key: 'position', property: 'position' },
   { key: 'color', property: 'color' },
   { key: 'backgroundColor', property: 'background-color' },
   { key: 'fontSize', property: 'font-size' },
   { key: 'fontWeight', property: 'font-weight' },
+  { key: 'fontFamily', property: 'font-family' },
+  { key: 'lineHeight', property: 'line-height' },
   { key: 'width', property: 'width' },
   { key: 'height', property: 'height' },
   { key: 'paddingTop', property: 'padding-top' },
   { key: 'paddingRight', property: 'padding-right' },
   { key: 'paddingBottom', property: 'padding-bottom' },
   { key: 'paddingLeft', property: 'padding-left' },
+  { key: 'borderRadius', property: 'border-radius' },
+  { key: 'boxShadow', property: 'box-shadow' },
 ]
 
 function browserAnnotationFreezeState(): BrowserAnnotationFreezeState {
@@ -391,6 +342,18 @@ class BrowserAnnotationRuntime {
   private wireframeMode = false
   private wireframeOpacity = 0.22
   private wireframePurpose = ''
+  private stableElementMetadata = new WeakMap<Element, { role: string, selector: string }>()
+  private readonly metadataObserver = new MutationObserver((records) => {
+    const pageChanged = records.some((record) => {
+      const target = record.target instanceof Element
+        ? record.target
+        : record.target.parentElement
+      return !target?.closest('#cradle-browser-comment-root')
+    })
+    if (pageChanged) {
+      this.stableElementMetadata = new WeakMap()
+    }
+  })
 
   constructor() {
     this.applySettings(this.loadSettings())
@@ -443,6 +406,9 @@ class BrowserAnnotationRuntime {
     this.selectionEnabled = true
     this.stage = 'selecting'
     this.mount()
+    if (document.body) {
+      this.metadataObserver.observe(document.body, { attributes: true, childList: true, subtree: true })
+    }
     this.emit({ type: 'ready', surfaceSize: this.surfaceSize(), elements: this.scanElements() })
   }
 
@@ -482,6 +448,8 @@ class BrowserAnnotationRuntime {
       this.noticeTimer = null
     }
     this.active = false
+    this.metadataObserver.disconnect()
+    this.stableElementMetadata = new WeakMap()
     this.selectionEnabled = true
     this.stage = 'selecting'
     this.clearDesign()
@@ -532,6 +500,7 @@ class BrowserAnnotationRuntime {
     root.id = 'cradle-browser-comment-root'
     root.setAttribute('data-cradle-browser-comment-root', 'true')
     this.applyRootSettings(root)
+    this.installOverlayEventIsolation(root)
 
     const style = document.createElement('style')
     style.textContent = `
@@ -542,7 +511,7 @@ class BrowserAnnotationRuntime {
         --cradle-browser-comment-red: #ff383c;
         position: fixed;
         inset: 0;
-        z-index: 2147483646;
+        z-index: 2147483647;
         pointer-events: none;
         color-scheme: light;
         font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -594,6 +563,7 @@ class BrowserAnnotationRuntime {
       #cradle-browser-comment-root [data-cradle-browser-comment-region],
       #cradle-browser-comment-root [data-cradle-browser-comment-selection-frame] {
         position: absolute;
+        z-index: 20;
         box-sizing: border-box;
         border: 2px solid var(--cradle-browser-comment-accent);
         border-radius: 4px;
@@ -620,6 +590,7 @@ class BrowserAnnotationRuntime {
       #cradle-browser-comment-root [data-cradle-browser-comment-highlight-label],
       #cradle-browser-comment-root [data-cradle-browser-comment-selection-label] {
         position: absolute;
+        z-index: 21;
         box-sizing: border-box;
         max-width: min(220px, calc(100vw - 16px));
         min-height: 22px;
@@ -672,11 +643,13 @@ class BrowserAnnotationRuntime {
       #cradle-browser-comment-root [data-cradle-browser-comment-marker-layer] {
         position: absolute;
         inset: 0;
+        z-index: 30;
         pointer-events: none;
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-placement-layer] {
         position: absolute;
         inset: 0;
+        z-index: 40;
         pointer-events: none;
       }
       #cradle-browser-comment-root[data-cradle-browser-layout-mode="true"] [data-cradle-browser-comment-placement-layer] {
@@ -783,7 +756,7 @@ class BrowserAnnotationRuntime {
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-layout-selection] {
         position: absolute;
-        z-index: 3;
+        z-index: 45;
         box-sizing: border-box;
         border: 1.5px solid var(--cradle-browser-comment-blue);
         border-radius: 6px;
@@ -846,7 +819,7 @@ class BrowserAnnotationRuntime {
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-notice] {
         position: fixed;
-        z-index: 11;
+        z-index: 90;
         max-width: min(280px, calc(100vw - 24px));
         padding: 8px 11px;
         border-radius: 12px;
@@ -877,10 +850,11 @@ class BrowserAnnotationRuntime {
         position: fixed;
         right: 20px;
         bottom: 72px;
-        z-index: 10;
+        z-index: 80;
         width: 292px;
         max-height: min(620px, calc(100vh - 96px));
         overflow: auto;
+        overscroll-behavior: contain;
         border-radius: 1rem;
         padding: 12px;
         color: #fff;
@@ -997,7 +971,7 @@ class BrowserAnnotationRuntime {
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-drag-preview] {
         position: fixed;
-        z-index: 12;
+        z-index: 95;
         box-sizing: border-box;
         display: flex;
         align-items: center;
@@ -1152,11 +1126,11 @@ class BrowserAnnotationRuntime {
       @keyframes cradle-browser-comment-toolbar-enter {
         from {
           opacity: 0;
-          transform: scale(0.5) rotate(90deg);
+          transform: translateY(8px) scale(0.92);
         }
         to {
           opacity: 1;
-          transform: scale(1) rotate(0deg);
+          transform: translateY(0) scale(1);
         }
       }
       @keyframes cradle-browser-comment-popup-enter {
@@ -1199,6 +1173,7 @@ class BrowserAnnotationRuntime {
       }
       #cradle-browser-comment-root [data-cradle-browser-comment-editor] {
         position: absolute;
+        z-index: 60;
         box-sizing: border-box;
         width: min(280px, calc(100vw - 24px));
         min-height: 112px;
@@ -1452,6 +1427,43 @@ class BrowserAnnotationRuntime {
     this.renderMarkers()
     this.renderPlacements()
     this.renderToolbar()
+  }
+
+  /**
+   * The overlay is injected into the page DOM, so without a boundary its
+   * interactions leak into the page: clicks bubble into page-level listeners
+   * (closing the page's own popovers) and pressing overlay buttons moves
+   * focus away from whatever the page had focused. Contain UI events at the
+   * overlay root and cancel the focus-moving mousedown default for
+   * everything except the overlay's own form fields.
+   */
+  private installOverlayEventIsolation(root: HTMLDivElement): void {
+    const containedEvents = [
+      'pointerdown',
+      'pointerup',
+      'mousedown',
+      'mouseup',
+      'click',
+      'dblclick',
+      'auxclick',
+      'contextmenu',
+      'keydown',
+      'keyup',
+      'keypress',
+    ] as const
+    for (const type of containedEvents) {
+      root.addEventListener(type, (event) => {
+        event.stopPropagation()
+      })
+    }
+    root.addEventListener('mousedown', (event) => {
+      const target = event.target
+      const keepsNativeFocus = target instanceof Element
+        && target.closest('textarea, input, select, [contenteditable="true"]')
+      if (!keepsNativeFocus) {
+        event.preventDefault()
+      }
+    })
   }
 
   private readonly onDocumentPointerDown = (event: PointerEvent): void => {
@@ -1976,10 +1988,12 @@ class BrowserAnnotationRuntime {
     actions.setAttribute('data-cradle-browser-comment-actions', 'true')
     const fileLabel = document.createElement('label')
     fileLabel.textContent = 'Attach'
+    fileLabel.tabIndex = -1
     const fileInput = document.createElement('input')
     fileInput.type = 'file'
     fileInput.accept = 'image/*'
     fileInput.multiple = true
+    fileInput.tabIndex = -1
     fileLabel.appendChild(fileInput)
     const fileCount = document.createElement('span')
     fileCount.setAttribute('data-cradle-browser-comment-file-count', 'true')
@@ -1988,14 +2002,17 @@ class BrowserAnnotationRuntime {
       : `${this.attachedImages.length} file${this.attachedImages.length === 1 ? '' : 's'}`
     const cancelButton = document.createElement('button')
     cancelButton.type = 'button'
+    cancelButton.tabIndex = -1
     cancelButton.textContent = 'Cancel'
     cancelButton.setAttribute('data-cradle-browser-comment-ghost', 'true')
     const saveButton = document.createElement('button')
     saveButton.type = 'button'
+    saveButton.tabIndex = -1
     saveButton.textContent = 'Save'
     saveButton.setAttribute('data-cradle-browser-comment-ghost', 'true')
     const sendButton = document.createElement('button')
     sendButton.type = 'button'
+    sendButton.tabIndex = -1
     sendButton.textContent = '↑'
     sendButton.title = 'Add to chat (Command L)'
     sendButton.setAttribute('data-primary', 'true')
@@ -2149,12 +2166,9 @@ class BrowserAnnotationRuntime {
     ]
     const toolbar = renderBrowserAnnotationToolbar({
       buttons,
-      count: totalCount,
-      expanded: true,
       entrance: !this.toolbarHasEntered,
       tooltipBelow: this.toolbarPosition !== null && this.toolbarPosition.y < 100,
       position: this.toolbarPosition,
-      onCollapsedClick: () => undefined,
       onPointerDown: (event, currentToolbar) => this.handleToolbarPointerDown(event, currentToolbar),
     })
     this.toolbarHasEntered = true
@@ -2546,6 +2560,7 @@ class BrowserAnnotationRuntime {
       }
       const marker = document.createElement('button')
       marker.type = 'button'
+      marker.tabIndex = -1
       marker.setAttribute('data-cradle-browser-comment-marker', 'true')
       marker.setAttribute('aria-label', `Browser annotation ${markerNumber}`)
       marker.style.left = `${point.x}px`
@@ -4184,10 +4199,48 @@ class BrowserAnnotationRuntime {
   }
 
   private scanElements(): BrowserAnnotationElement[] {
-    return Array.from(document.querySelectorAll('body *'))
-      .map((element, index) => this.readElement(element, index))
-      .filter(element => element !== null)
-      .slice(0, 250)
+    const body = document.body
+    if (!body) {
+      return []
+    }
+    const elements: BrowserAnnotationElement[] = []
+    const visited = new Set<Element>()
+    const collect = (element: Element) => {
+      if (visited.has(element) || !body.contains(element)) { return }
+      visited.add(element)
+      const scanned = this.readElement(element, elements.length)
+      if (scanned) { elements.push(scanned) }
+    }
+
+    // Sample viewport hit stacks first. Dense interactive surfaces generally
+    // satisfy the result budget here, avoiding a walk through off-screen DOM.
+    const columns = 6
+    const rows = 6
+    for (let row = 0; row < rows && elements.length < 250; row++) {
+      for (let column = 0; column < columns && elements.length < 250; column++) {
+        const x = ((column + 0.5) / columns) * window.innerWidth
+        const y = ((row + 0.5) / rows) * window.innerHeight
+        for (const element of document.elementsFromPoint(x, y)) {
+          collect(element)
+          if (elements.length >= 250) { break }
+        }
+      }
+    }
+
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (node) => {
+        const element = node as Element
+        return element.matches('#cradle-browser-comment-root, script, style, meta, link, noscript')
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT
+      },
+    })
+    let node = walker.nextNode()
+    while (node && elements.length < 250) {
+      collect(node as Element)
+      node = walker.nextNode()
+    }
+    return elements
   }
 
   private readElement(element: Element, index: number): BrowserAnnotationElement | null {
@@ -4195,7 +4248,6 @@ class BrowserAnnotationRuntime {
       return null
     }
     const rect = element.getBoundingClientRect()
-    const style = window.getComputedStyle(element)
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
     if (
@@ -4205,23 +4257,28 @@ class BrowserAnnotationRuntime {
       || rect.bottom < 0
       || rect.left > viewportWidth
       || rect.top > viewportHeight
-      || style.visibility === 'hidden'
-      || style.display === 'none'
-      || Number(style.opacity) === 0
     ) {
+      return null
+    }
+    const style = window.getComputedStyle(element)
+    if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) {
       return null
     }
 
     const attributes = this.attributesFor(element)
+    let stableMetadata = this.stableElementMetadata.get(element)
+    if (!stableMetadata) {
+      stableMetadata = { role: this.roleFor(element), selector: this.cssPath(element) }
+      this.stableElementMetadata.set(element, stableMetadata)
+    }
     const label = this.labelFor(element)
-    const role = this.roleFor(element)
     return {
       id: `element-${index}`,
       tagName: element.tagName,
       label,
       description: this.descriptionFor(attributes),
-      role,
-      selector: this.cssPath(element),
+      role: stableMetadata.role,
+      selector: stableMetadata.selector,
       attributes,
       pageUrl: window.location.href,
       nearbyText: this.nearbyTextFor(element),
@@ -4238,14 +4295,25 @@ class BrowserAnnotationRuntime {
         fontFamily: style.fontFamily,
         fontSize: style.fontSize,
         fontWeight: style.fontWeight,
+        fontStyle: style.fontStyle,
         lineHeight: style.lineHeight,
+        letterSpacing: style.letterSpacing,
+        textAlign: style.textAlign,
+        textTransform: style.textTransform,
+        textDecorationLine: style.textDecorationLine,
         borderRadius: style.borderRadius,
         borderColor: style.borderColor,
         borderWidth: style.borderWidth,
+        borderStyle: style.borderStyle,
+        boxShadow: style.boxShadow,
         display: style.display,
         alignItems: style.alignItems,
         justifyContent: style.justifyContent,
         flexDirection: style.flexDirection,
+        flexWrap: style.flexWrap,
+        overflow: style.overflow,
+        position: style.position,
+        zIndex: style.zIndex,
         width: style.width,
         height: style.height,
         marginTop: style.marginTop,
@@ -4276,33 +4344,9 @@ class BrowserAnnotationRuntime {
     this.designElement = element
     element.setAttribute('data-cradle-browser-design-group', 'active')
     this.designChange = designChange
-    const rows = [
-      this.cssDeclaration('color', designChange.color),
-      this.cssDeclaration('background-color', designChange.backgroundColor),
-      this.cssDeclaration('opacity', designChange.opacity),
-      this.cssDeclaration('font-family', designChange.fontFamily),
-      this.cssDeclaration('font-size', designChange.fontSize),
-      this.cssDeclaration('font-weight', designChange.fontWeight),
-      this.cssDeclaration('border-radius', designChange.borderRadius),
-      this.cssDeclaration('border-color', designChange.borderColor),
-      this.cssDeclaration('border-width', designChange.borderWidth),
-      this.cssDeclaration('display', designChange.display),
-      this.cssDeclaration('align-items', designChange.alignItems),
-      this.cssDeclaration('justify-content', designChange.justifyContent),
-      this.cssDeclaration('flex-direction', designChange.flexDirection),
-      this.cssDeclaration('width', designChange.width),
-      this.cssDeclaration('height', designChange.height),
-      this.cssDeclaration('margin-top', designChange.marginTop),
-      this.cssDeclaration('margin-right', designChange.marginRight),
-      this.cssDeclaration('margin-bottom', designChange.marginBottom),
-      this.cssDeclaration('margin-left', designChange.marginLeft),
-      this.cssDeclaration('padding-top', designChange.paddingTop),
-      this.cssDeclaration('padding-right', designChange.paddingRight),
-      this.cssDeclaration('padding-bottom', designChange.paddingBottom),
-      this.cssDeclaration('padding-left', designChange.paddingLeft),
-      this.cssDeclaration('row-gap', designChange.rowGap),
-      this.cssDeclaration('column-gap', designChange.columnGap),
-    ].filter(row => row !== null)
+    const rows = BROWSER_ANNOTATION_DESIGN_CSS_PROPERTIES
+      .map(({ key, property }) => this.cssDeclaration(property, designChange[key]))
+      .filter(row => row !== null)
 
     let style = document.getElementById('cradle-browser-design-draft-style')
     if (!style) {
@@ -4832,13 +4876,13 @@ class BrowserAnnotationRuntime {
     if (!fiberKey) {
       return null
     }
-    const value = (element as unknown as Record<string, unknown>)[fiberKey]
+    const value = Object.getOwnPropertyDescriptor(element, fiberKey)?.value
     if (!fiberKey.startsWith('__reactProps$')) {
       return value
     }
     const fallbackKey = keys.find(key =>
       key.startsWith('__reactFiber$') || key.startsWith('__reactInternalInstance$'))
-    return fallbackKey ? (element as unknown as Record<string, unknown>)[fallbackKey] : null
+    return fallbackKey ? Object.getOwnPropertyDescriptor(element, fallbackKey)?.value : null
   }
 
   private reactComponentName(type: unknown): string | null {

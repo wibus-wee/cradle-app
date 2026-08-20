@@ -5,16 +5,19 @@ import { getCodexAppServerResources } from '../chat-runtime-providers/codex/app-
 export const codexAppServer = new Elysia({ prefix: '/codex' })
   .get('/app-server/resources', () => getCodexAppServerResources(), {
     detail: {
-      'summary': 'Get the active codex app-server process resource sample',
+      'summary': 'Get active codex app-server process resource samples',
       'tags': ['codex'],
       'x-cradle-cli': { command: ['codex', 'app-server', 'resources'] },
     },
     response: {
-      200: t.Object({
+      200: t.Array(t.Object({
+        hostId: t.String(),
+        providerTargetId: t.String(),
+        scopeId: t.String(),
         running: t.Boolean(),
         pid: t.Nullable(t.Number()),
         rssMB: t.Nullable(t.Number()),
         cpuPercent: t.Nullable(t.Number()),
-      }),
+      })),
     },
   })

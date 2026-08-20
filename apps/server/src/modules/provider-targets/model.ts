@@ -120,6 +120,7 @@ export const ProviderTargetsModel = {
     sourceKey: nullableString,
     externalRecordId: nullableString,
     sourceFingerprint: nullableString,
+    effectiveProviderKinds: t.Array(providerKind),
     createdAt: t.Number(),
     updatedAt: t.Number(),
   }),
@@ -259,7 +260,6 @@ export const ProviderTargetsModel = {
       }, { additionalProperties: false }),
       t.Null(),
     ]),
-    rateLimits: t.Union([codexRateLimitSnapshotDiagnostics, t.Null()]),
     rateLimitsByLimitId: t.Union([
       t.Object({}, { additionalProperties: codexRateLimitSnapshotDiagnostics }),
       t.Null(),

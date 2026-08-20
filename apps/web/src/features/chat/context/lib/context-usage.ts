@@ -106,5 +106,5 @@ export function readContextUsageSectionLabel(section: ChatRuntimeContextUsageSec
 }
 
 function readCompactWindowUsage(compactState: ChatRuntimeCompactUiSlotState) {
-  return compactState.last.totalTokens > 0 ? compactState.last : compactState.total
+  return compactState.last
 }

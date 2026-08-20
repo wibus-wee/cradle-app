@@ -1,9 +1,3 @@
-/**
- * Output: Cradle-owned builtin tool payloads projected from opencode-native tool parts.
- * Input: opencode tool part state.
- * Position: opencode provider package tool envelope mapper.
- */
-
 import type { Permission, ToolPart } from '@opencode-ai/sdk'
 
 import type { CradleToolKind } from '../../../chat-runtime/runtime-provider-types'

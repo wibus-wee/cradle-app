@@ -468,6 +468,7 @@ export function DiffsIndexView({
               <button
                 type="button"
                 onClick={onOpenWorkingTree}
+                data-testid="diffs-open-working-tree"
                 className={cn(
                   'inline-flex h-7 items-center gap-1.5 rounded-[var(--rv-radius)] px-2.5',
                   'border border-[var(--rv-line)] text-[11.5px] font-medium text-[var(--rv-fg-muted)]',

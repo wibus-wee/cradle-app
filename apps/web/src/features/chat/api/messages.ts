@@ -30,6 +30,8 @@ export function chatMessageDetailQueryOptions(sessionId: string, messageId: stri
 }
 
 export function chatMessageHistoryInfiniteOptions(sessionId: string) {
+  // Desktop keeps the lossless route for interactive tool/approval blocks.
+  // Passive/mobile clients should use the compact message-previews route.
   return infiniteQueryOptions({
     queryKey: chatMessageSnapshotQueryKey(sessionId),
     initialPageParam: null as string | null,

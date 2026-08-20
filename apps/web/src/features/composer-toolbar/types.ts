@@ -22,8 +22,10 @@ export interface ProviderModelOption {
   kind?: ProviderTargetKind
   name: string
   providerKind: ProviderKind
+  effectiveProviderKinds: ProviderKind[]
   enabled: boolean
   iconSlug: string | null
+  enabledModelsJson?: string
   sourceKey?: string | null
   externalRecordId?: string | null
 }

@@ -42,7 +42,8 @@ import {
   createClaudeCodeToolResultPayload,
 } from '../tools/mapper'
 import type { ClaudeAgentProviderDeps } from '../types'
-import { projectClaudeAssistantUsageEvent } from '../usage-event-projector'
+import type { ClaudeLiveUsageProjectionState } from '../usage-event-projector'
+import { projectClaudeLiveUsageEvent } from '../usage-event-projector'
 
 export interface ClaudeAgentProviderThreadTurnsContext {
   activeQueries: Map<string, ActiveClaudeQuery>
@@ -78,7 +79,12 @@ export class ClaudeAgentProviderThreadTurns {
       message,
       providerThreadTurn.mapperState,
     )
-    await this.emitClaudeAssistantUsageEvent(entry, message, turn.effectiveModel)
+    await this.emitClaudeLiveUsageEvent(
+      entry,
+      message,
+      turn.effectiveModel,
+      providerThreadTurn.mapperState.usageProjection,
+    )
     for (const crewCall of result.capturedCrewCalls) {
       writeClaudeAgentCrewCall(entry.runtimeSession, mapCrewCallToSnapshot(crewCall))
       if (crewCall.workflow) {
@@ -465,20 +471,22 @@ export class ClaudeAgentProviderThreadTurns {
     })
   }
 
-  async emitClaudeAssistantUsageEvent(
+  async emitClaudeLiveUsageEvent(
     entry: ActiveClaudeQuery,
     message: SDKMessage,
     fallbackModelId: string | null | undefined,
+    state: ClaudeLiveUsageProjectionState,
   ): Promise<void> {
-    let event: ReturnType<typeof projectClaudeAssistantUsageEvent>
+    let event: ReturnType<typeof projectClaudeLiveUsageEvent>
     try {
-      event = projectClaudeAssistantUsageEvent({
+      event = projectClaudeLiveUsageEvent({
         message,
         fallbackModelId,
+        state,
       })
     }
     catch (error) {
-      this.deps.logger?.warn?.('Claude Agent ignored malformed assistant usage event', {
+      this.deps.logger?.warn?.('Claude Agent ignored malformed live usage event', {
         error,
         chatSessionId: entry.runtimeSession.chatSessionId,
       })
@@ -494,7 +502,7 @@ export class ClaudeAgentProviderThreadTurns {
 
     const providerSessionId = entry.runtimeSession.providerSessionId
     if (!providerSessionId) {
-      this.deps.logger?.warn?.('Claude Agent late assistant usage event arrived before provider session binding', {
+      this.deps.logger?.warn?.('Claude Agent late usage event arrived before provider session binding', {
         chatSessionId: entry.runtimeSession.chatSessionId,
         providerThreadId: event.providerThreadId,
         providerTurnId: event.providerTurnId,
@@ -512,7 +520,7 @@ export class ClaudeAgentProviderThreadTurns {
       })
     }
     catch (error) {
-      this.deps.logger?.warn?.('Claude Agent failed to persist late assistant usage event', {
+      this.deps.logger?.warn?.('Claude Agent failed to persist late usage event', {
         error,
         chatSessionId: entry.runtimeSession.chatSessionId,
         providerSessionId,

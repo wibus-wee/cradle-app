@@ -6,7 +6,7 @@
   "description": "MCP human-in-the-loop bridge: routes zhi tool calls to Slack threads",
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "build": "tsup",
+    "build": "tsdown",
     "start": "node dist/main.js",
     "start:mcp": "node dist/mcp-server.js",
     "typecheck": "tsc --noEmit",
@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsup": "^8.0.0",
+    "tsdown": "^0.22.14",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

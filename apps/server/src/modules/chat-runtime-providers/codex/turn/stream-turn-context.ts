@@ -19,6 +19,7 @@ import { buildCradleCodexAppServerEnv } from '../app-server/client'
 import type { ReasoningEffort } from '../app-server-protocol/ReasoningEffort'
 import type { ThreadForkParams } from '../app-server-protocol/v2/ThreadForkParams'
 import {
+  bindCodexCradleMcpInvocation,
   buildCodexAuthEnvironment,
   buildCodexConfig,
   codexConfigRequiresApiKey,
@@ -58,7 +59,6 @@ export interface CodexStreamTurnContext {
   codexConfig: NonNullable<ThreadForkParams['config']>
   codexEnv: Record<string, string>
   serverRequestHandler: NonNullable<CodexAppServerClientOptions['serverRequestHandler']>
-  shouldInjectReconstructedHistory: boolean
   isFreshProviderThread: boolean
   isLiveSideFork: boolean
 }
@@ -93,7 +93,7 @@ export function resolveCodexStreamTurnContext(
   }
 
   const snapshot = readWorkspaceProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
-  const workspacePath = snapshot.workspacePath ?? '.'
+  const workspacePath = snapshot.workspacePath ?? input.workspacePath ?? '.'
   const agentId = input.agentId ?? snapshot.agentId ?? null
   const runtimeContext = resolveCodexRuntimeContext(workspacePath, agentId)
   const runtimeSettings = input.providerOptions?.runtimeSettings
@@ -108,7 +108,7 @@ export function resolveCodexStreamTurnContext(
       })
     : null
   const skillExtraRoots = resolveCodexSkillExtraRoots(config, workspacePath, deps.resolveSkillPaths)
-  const codexConfig = buildCodexConfig(
+  const projectedCodexConfig = buildCodexConfig(
     config,
     workspacePath,
     deps.resolveSkillPaths,
@@ -116,8 +116,8 @@ export function resolveCodexStreamTurnContext(
     auth,
   )
   if (runtimeAccess) {
-    codexConfig.approval_policy = runtimeAccess.approvalPolicy
-    codexConfig.sandbox_mode = runtimeAccess.sandbox
+    projectedCodexConfig.approval_policy = runtimeAccess.approvalPolicy
+    projectedCodexConfig.sandbox_mode = runtimeAccess.sandbox
   }
   const codexEnv = {
     ...buildCradleCodexAppServerEnv({
@@ -129,6 +129,7 @@ export function resolveCodexStreamTurnContext(
     }),
     ...buildCodexAuthEnvironment(auth),
   }
+  const codexConfig = bindCodexCradleMcpInvocation(projectedCodexConfig, codexEnv)
 
   return {
     config,
@@ -150,7 +151,6 @@ export function resolveCodexStreamTurnContext(
     codexConfig,
     codexEnv,
     serverRequestHandler: deps.createServerRequestHandler(auth),
-    shouldInjectReconstructedHistory: !input.runtimeSession.providerSessionId,
     isFreshProviderThread: !input.runtimeSession.providerSessionId,
     isLiveSideFork: isLiveCodexSideFork(input.runtimeSession),
   }

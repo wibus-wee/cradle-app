@@ -19,7 +19,7 @@ import {
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { buildModelMessages, executeAiSdkTurn } from '../../chat-runtime-engine/ai-sdk-engine'
 import { createLanguageModel, detectApiFormat } from '../../chat-runtime-engine/providers'
-import { lookupContextWindow } from '../../model-registry/model-info-registry'
+import { getCachedContextWindow } from '../../model-registry/model-info-registry'
 import { readTrustedOpenAICompatibleConfig, readTrustedUniversalConfig } from '../../provider-contracts/provider-base'
 import { readProviderStateSnapshot } from '../kit/state-snapshot'
 import {
@@ -38,16 +38,6 @@ export class OpenAICompatibleProvider implements ChatRuntime {
   readonly capabilities = STANDARD_RUNTIME_CAPABILITIES
 
   private readonly activeTurns = new Map<string, AbortController>()
-  private _lastUsage: TokenUsage | null = null
-  private _lastStepUsages: RuntimeStepUsage[] = []
-
-  get lastUsage(): TokenUsage | null {
-    return this._lastUsage
-  }
-
-  get lastStepUsages(): RuntimeStepUsage[] {
-    return this._lastStepUsages
-  }
 
   constructor(private readonly deps: ProviderContext) {}
 
@@ -108,8 +98,8 @@ export class OpenAICompatibleProvider implements ChatRuntime {
     const abortController = new AbortController()
     const sessionId = runtimeSession.chatSessionId
     this.activeTurns.set(sessionId, abortController)
-    this._lastUsage = null
-    this._lastStepUsages = []
+    let turnUsage: TokenUsage | null = null
+    const turnStepUsages: RuntimeStepUsage[] = []
 
     try {
       const apiFormat = detectApiFormat(baseUrl)
@@ -128,7 +118,9 @@ export class OpenAICompatibleProvider implements ChatRuntime {
         maxMessages,
       )
 
-      const contextWindow = await lookupContextWindow(effectiveModel) ?? 128_000
+      // Catalog metadata is optional. Never put network or SQLite catalog I/O
+      // on the first-token path; startup warmup populates this in-memory cache.
+      const contextWindow = getCachedContextWindow(effectiveModel) ?? 128_000
 
       yield* executeAiSdkTurn({
         model,
@@ -141,8 +133,8 @@ export class OpenAICompatibleProvider implements ChatRuntime {
         maxSteps: 1, // single-turn for openai-compatible (no tool execution)
         abortSignal: abortController.signal,
         providerOptions,
-        onUsage: (usage) => { this._lastUsage = usage },
-        onStepFinish: (step) => { this._lastStepUsages.push(step) },
+        onUsage: (usage) => { turnUsage = usage },
+        onStepFinish: (step) => { turnStepUsages.push(step) },
         contextWindow,
         chatSessionId: runtimeSession.chatSessionId,
       })
@@ -154,7 +146,16 @@ export class OpenAICompatibleProvider implements ChatRuntime {
       throw error
     }
     finally {
-      this.releaseTurn(sessionId, abortController)
+      try {
+        input.reportTurnResult?.({
+          modelId: effectiveModel,
+          usage: turnUsage,
+          stepUsages: turnStepUsages,
+        })
+      }
+      finally {
+        this.releaseTurn(sessionId, abortController)
+      }
     }
   }
 

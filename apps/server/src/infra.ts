@@ -15,6 +15,7 @@ let _serverConfig: ServerConfig | undefined
 let _logger: Logger | undefined
 let _dbProvider: DbProvider | undefined
 let _infraEnv: InfraEnvSnapshot | undefined
+const beforeDatabaseShutdownHooks = new Set<() => void>()
 
 interface InfraEnvSnapshot {
   host?: string
@@ -24,7 +25,6 @@ interface InfraEnvSnapshot {
   dbPath?: string
   migrationsDir?: string
   logFile?: string
-  authToken?: string
   authRequired?: string
 }
 
@@ -37,7 +37,6 @@ function readInfraEnv(): InfraEnvSnapshot {
     dbPath: process.env.CRADLE_DB_PATH,
     migrationsDir: process.env.CRADLE_MIGRATIONS_DIR,
     logFile: process.env.CRADLE_LOG_FILE,
-    authToken: process.env.CRADLE_AUTH_TOKEN,
     authRequired: process.env.CRADLE_AUTH_REQUIRED,
   }
 }
@@ -51,16 +50,45 @@ function isSameInfraEnv(a: InfraEnvSnapshot, b: InfraEnvSnapshot): boolean {
     && a.dbPath === b.dbPath
     && a.migrationsDir === b.migrationsDir
     && a.logFile === b.logFile
-    && a.authToken === b.authToken
     && a.authRequired === b.authRequired
   )
 }
 
 function clearCachedInfra(): void {
-  _dbProvider?.onApplicationShutdown()
+  const provider = _dbProvider
+  const failures: Error[] = []
+  if (provider) {
+    for (const hook of beforeDatabaseShutdownHooks) {
+      try {
+        hook()
+      }
+      catch (error) {
+        failures.push(error instanceof Error ? error : new Error(String(error)))
+      }
+    }
+    try {
+      provider.onApplicationShutdown()
+    }
+    catch (error) {
+      failures.push(error instanceof Error ? error : new Error(String(error)))
+    }
+  }
   _dbProvider = undefined
   _serverConfig = undefined
   _logger = undefined
+  if (failures.length > 0) {
+    throw new AggregateError(failures, 'Failed to flush database-owned runtime state')
+  }
+}
+
+/**
+ * Register a synchronous durability hook that runs immediately before the
+ * current SQLite connection closes. Feature modules use this to drain
+ * write-behind journals without making infrastructure depend on them.
+ */
+export function registerBeforeDatabaseShutdown(hook: () => void): () => void {
+  beforeDatabaseShutdownHooks.add(hook)
+  return () => beforeDatabaseShutdownHooks.delete(hook)
 }
 
 function refreshInfraForEnv(): void {

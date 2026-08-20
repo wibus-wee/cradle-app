@@ -1,411 +1,194 @@
 import type { DataTable } from '@cucumber/cucumber'
 import { Given, Then, When } from '@cucumber/cucumber'
-import type { Locator } from '@playwright/test'
 import { expect } from '@playwright/test'
 
-import { MockLlmServer } from '../support/mock-llm-server'
 import {
-  expectPromptEditorToContain,
-  fillPromptEditor,
-  newChatSendButton,
-  newChatTextBox,
-  visibleNewChatEntry,
-  visibleProviderModelSelector,
-  visibleRuntimeSelector,
-  waitForNewChatReady,
-} from '../support/ui'
+  assertSimulatorExhausted,
+  CHAT_STATUS_TIMEOUT,
+  clearBrowserClipboard,
+  configureClaudeAgentProviderWithoutExchanges,
+  configureClaudeApprovalSimulator,
+  configureCodexMultiTurnSimulator,
+  configureCodexQuickQuestionSimulator,
+  configureCodexRollbackSimulator,
+  configureDefaultAiReply,
+  configureDurableQueueClaudeAgentSimulator,
+  configureFailingClaudeAgentSimulator,
+  configureFileContextSimulator,
+  configureManagedQueueClaudeAgentSimulator,
+  configureMultiTurnClaudeAgentSimulator,
+  configureReadToolLoopSimulator,
+  configureSlowGatedClaudeAgentSimulator,
+  configureStoppableClaudeAgentSimulator,
+  configureThinkingClaudeAgentSimulator,
+  createRememberedSession,
+  expectChatStreaming,
+  expectClipboardContainsMarkdownFragments,
+  expectCurrentSessionUnderSelectedWorkspace,
+  expectDefaultAiReply,
+  expectPromptContains,
+  expectSessionPinned,
+  expectSessionTitle,
+  expectSessionUnpinned,
+  expectSidebarSessionOrder,
+  expectToolCallContains,
+  fillChatComposerWithNextReply,
+  navigateToNewChatWithSimulator,
+  openToolCall,
+  QUEUED_RESPONSE,
+  recallSessionAlias,
+  releaseSlowStreamGate,
+  renameRememberedSession,
+  selectClaudeAgentSimulator,
+  selectCodexSimulator,
+  selectNewChatWorkspace,
+  SLOW_RESPONSE,
+} from '../support/helpers/chat-scenario'
 import type { CradleWorld } from '../support/world'
-
-const DEFAULT_RESPONSE = 'Hello from mock LLM! I am an AI assistant.'
-const SLOW_RESPONSE = Array.from({ length: 30 }).fill('Hello from mock LLM!').join(' ')
-const QUEUED_CONTINUATION_RESPONSES = [
-  Array.from({ length: 16 }).fill('Initial assistant reply: I am expanding the answer.').join(' '),
-  'Follow-up assistant reply: I will continue.',
-]
-const CONTEXT_RESPONSES = [
-  '第一轮助手回复：我记住了苹果。',
-  '第二轮助手回复：我记住了香蕉。',
-  '第三轮助手回复：你先让我记住苹果，又让我记住香蕉。',
-]
-const MARKDOWN_RESPONSE = 'Markdown 导出助手回复：请复制我。'
-const REASONING_TEXT = '第一步分析问题\n第二步形成答案'
-const CHAT_VIEW_TIMEOUT = 20_000
-const CHAT_STATUS_TIMEOUT = 30_000
-const SESSION_ALIASES_KEY = 'chat.session-aliases'
-const PREFERRED_RUNTIME_KEY = 'chat.preferred-runtime'
-const MOCK_CLAUDE_AGENT_RE = /Mock Claude Agent/i
-
-type SessionAlias = {
-  id: string
-  firstUserText: string
-}
-
-type PreferredChatRuntime = 'standard' | 'claude-agent'
-
-function recallSessionAliases(world: CradleWorld): Record<string, SessionAlias> {
-  return world.maybeRecall<Record<string, SessionAlias>>(SESSION_ALIASES_KEY) ?? {}
-}
-
-function rememberSessionAlias(world: CradleWorld, alias: string, session: SessionAlias): void {
-  const aliases = recallSessionAliases(world)
-  aliases[alias] = session
-  world.remember(SESSION_ALIASES_KEY, aliases)
-}
-
-function recallSessionAlias(world: CradleWorld, alias: string): SessionAlias {
-  const session = recallSessionAliases(world)[alias]
-
-  if (!session) {
-    throw new Error(`Missing remembered chat session alias: ${alias}`)
-  }
-
-  return session
-}
-
-async function getChatView(world: CradleWorld) {
-  const chatView = world.page.locator('[data-testid="chat-view"]').first()
-  await expect(chatView).toBeVisible({ timeout: CHAT_VIEW_TIMEOUT })
-  return chatView
-}
-
-async function waitForChatStatus(world: CradleWorld, status: string) {
-  const chatView = await getChatView(world)
-  await expect(chatView).toHaveAttribute('data-chat-status', status, { timeout: CHAT_STATUS_TIMEOUT })
-  return chatView
-}
-
-async function getCurrentChatSessionId(world: CradleWorld): Promise<string> {
-  const chatView = await getChatView(world)
-  const sessionId = await chatView.getAttribute('data-chat-session-id')
-  if (!sessionId) {
-    throw new Error('Expected active chat view to expose a chat session id')
-  }
-  return sessionId
-}
-
-function rememberSelectedNewChatWorkspace(world: CradleWorld, name: string): void {
-  world.remember('chat.selected-new-chat-workspace', name)
-}
-
-function recallSelectedNewChatWorkspace(world: CradleWorld): string {
-  return world.recall<string>('chat.selected-new-chat-workspace')
-}
-
-/** Get the visible new-chat page container to avoid strict mode violations with multiple tabs */
-function visibleNewChatPage(world: CradleWorld) {
-  return visibleNewChatEntry(world)
-}
-
-async function getLastAssistantBubble(world: CradleWorld) {
-  const locator = world.page.locator('[data-testid="message-bubble-assistant"]').last()
-  await expect(locator).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
-  return locator
-}
-
-async function navigateToNewChat(world: CradleWorld): Promise<void> {
-  console.warn('[step] navigate to new-chat page')
-  const navItem = world.page.locator('[data-testid="nav-new-chat"]')
-  await expect(navItem).toBeVisible({ timeout: 15_000 })
-  await navItem.click()
-  await waitForNewChatReady(world)
-  if (recallPreferredChatRuntime(world) === 'claude-agent') {
-    await selectRuntime(world, 'Claude Agent')
-    await selectProvider(world, MOCK_CLAUDE_AGENT_RE)
-    return
-  }
-
-  await selectRuntime(world, 'Standard')
-}
-
-function rememberPreferredChatRuntime(world: CradleWorld, runtime: PreferredChatRuntime): void {
-  world.remember(PREFERRED_RUNTIME_KEY, runtime)
-}
-
-function recallPreferredChatRuntime(world: CradleWorld): PreferredChatRuntime {
-  return world.maybeRecall<PreferredChatRuntime>(PREFERRED_RUNTIME_KEY) ?? 'standard'
-}
-
-async function selectRuntime(world: CradleWorld, label: string | RegExp): Promise<void> {
-  const selector = visibleRuntimeSelector(world)
-  await expect(selector).toBeVisible({ timeout: 10_000 })
-
-  const currentLabel = (await selector.textContent())?.trim() ?? ''
-  const expectedLabel = typeof label === 'string' ? new RegExp(label, 'i') : label
-  if (expectedLabel.test(currentLabel)) {
-    return
-  }
-
-  await selector.click()
-  const menu = world.page.locator('[role="menu"]').last()
-  await expect(menu).toBeVisible({ timeout: 10_000 })
-
-  const runtimeItem = menu.locator('[role="menuitem"]', { hasText: label }).first()
-  await expect(runtimeItem).toBeVisible({ timeout: 10_000 })
-  await runtimeItem.click()
-  await expect(selector).toContainText(expectedLabel, { timeout: 10_000 })
-}
-
-async function selectProvider(world: CradleWorld, label: string | RegExp): Promise<void> {
-  const selector = visibleProviderModelSelector(world)
-  await expect(selector).toBeVisible({ timeout: 10_000 })
-  await selector.click()
-
-  const menu = world.page.locator('[role="menu"]').last()
-  await expect(menu).toBeVisible({ timeout: 10_000 })
-
-  const providerItem = menu.locator('[role="menuitem"]', { hasText: label }).first()
-  await expect(providerItem).toBeVisible({ timeout: 10_000 })
-  await providerItem.click()
-  await world.page.keyboard.press('Escape')
-}
-
-function claudeAgentMockBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/v1\/?$/, '')
-}
-
-async function configureDefaultMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure default mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseText: DEFAULT_RESPONSE,
-    chunkDelay: 5,
-  })
-}
-
-async function configureSlowMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure slow mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseText: SLOW_RESPONSE,
-    chunkDelay: 120,
-  })
-}
-
-async function configureQueuedContinuationMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure queued continuation mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseTexts: QUEUED_CONTINUATION_RESPONSES,
-    chunkDelay: 80,
-  })
-}
-
-async function configureContextMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure multi-turn context mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseTexts: CONTEXT_RESPONSES,
-    chunkDelay: 5,
-  })
-}
-
-async function configureMarkdownExportMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure markdown export mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseText: MARKDOWN_RESPONSE,
-    chunkDelay: 5,
-  })
-}
-
-async function configureReasoningMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure reasoning mock LLM provider')
-  await world.configureMockLlmProvider({
-    responseText: DEFAULT_RESPONSE,
-    reasoningText: REASONING_TEXT,
-    chunkDelay: 5,
-  })
-}
-
-async function configureToolCallMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure tool-call mock LLM provider')
-  if (world.mockLlmServer) {
-    await world.mockLlmServer.stop()
-  }
-
-  const mockLlmServer = new MockLlmServer({ chunkDelay: 5, claudeAgentScenario: 'tool-call' })
-  world.mockLlmServer = mockLlmServer
-  world.mockLlmBaseUrl = await mockLlmServer.start()
-
-  const response = await fetch(`${world.params.serverUrl}/profiles/mock-claude-agent`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: 'Mock Claude Agent',
-      providerKind: 'anthropic',
-      enabled: true,
-      config: {
-        baseUrl: claudeAgentMockBaseUrl(world.mockLlmBaseUrl),
-        model: 'claude-sonnet-4-20250514',
-        permissionMode: 'default',
-        apiKey: 'sk-mock-test-key',
-      },
-      credentialRef: null,
-    }),
-  })
-  if (!response.ok) {
-    throw new Error(`Failed to configure claude-agent tool-call provider: ${response.status} ${await response.text()}`)
-  }
-
-  await world.ensureWorkspaceExists()
-  rememberPreferredChatRuntime(world, 'claude-agent')
-  await world.page?.reload({ waitUntil: 'domcontentloaded' })
-}
-
-async function configureFailingMockProvider(world: CradleWorld): Promise<void> {
-  console.warn('[step] configure failing mock LLM provider')
-  await world.configureMockLlmProvider({
-    failureMode: 'http-error',
-    errorStatusCode: 503,
-    errorMessage: 'Mock LLM forced failure',
-  })
-}
-
-async function waitForSessionSidebarItem(world: CradleWorld, sessionId: string): Promise<void> {
-  await expect(world.page.locator(`[data-testid="session-item-${sessionId}"]`)).toBeVisible({ timeout: 10_000 })
-}
-
-async function createRememberedSession(world: CradleWorld, alias: string, firstUserText: string): Promise<SessionAlias> {
-  await navigateToNewChat(world)
-
-  // Scope to the visible tab to avoid strict mode violations with multiple new-chat pages
-  const visibleNewChat = visibleNewChatPage(world)
-  const textarea = newChatTextBox(visibleNewChat)
-  await fillPromptEditor(textarea, firstUserText)
-
-  const button = newChatSendButton(visibleNewChat)
-  await expect(button).toBeEnabled({ timeout: 20_000 })
-  await button.click()
-
-  await waitForChatStatus(world, 'idle')
-  // Small delay to ensure distinct createdAt timestamps between sessions
-  await world.page.waitForTimeout(100)
-
-  const session = {
-    id: await getCurrentChatSessionId(world),
-    firstUserText,
-  }
-
-  rememberSessionAlias(world, alias, session)
-  await waitForSessionSidebarItem(world, session.id)
-  return session
-}
-
-async function openSessionMenu(world: CradleWorld, sessionId: string): Promise<void> {
-  const item = world.page.locator(`[data-testid="session-item-${sessionId}"]`)
-  await expect(item).toBeVisible({ timeout: 10_000 })
-  await item.hover()
-
-  const trigger = world.page.locator(`[data-testid="session-menu-trigger-${sessionId}"]`)
-  await expect(trigger).toBeVisible({ timeout: 10_000 })
-  await trigger.click()
-}
-
-async function clickSessionMenuAction(world: CradleWorld, sessionId: string, action: 'toggle-pin' | 'copy-markdown' | 'archive' | 'rename'): Promise<void> {
-  const locator = world.page.locator(`[data-testid="session-menu-${action}-${sessionId}"]`)
-  await expect(locator).toBeVisible({ timeout: 10_000 })
-  await locator.click()
-}
-
-async function getVisibleSessionOrder(world: CradleWorld): Promise<string[]> {
-  return world.page.locator('[data-testid^="session-item-"]').filter({ visible: true }).evaluateAll((elements) => {
-    return elements
-      .flatMap((element) => {
-        const value = element.getAttribute('data-testid')?.replace('session-item-', '')
-        return value ? [value] : []
-      })
-  })
-}
-
-async function readBrowserClipboardText(world: CradleWorld): Promise<string> {
-  return world.page.evaluate(() => navigator.clipboard.readText())
-}
-
-async function expandExecutionDetailsIfCollapsed(assistantBubble: Locator) {
-  const foldButton = assistantBubble.getByRole('button', { name: 'Show execution details' })
-  if (await foldButton.count() > 0) {
-    await foldButton.click()
-  }
-}
-
-async function getLastAssistantReasoningToggle(world: CradleWorld) {
-  const assistantBubble = await getLastAssistantBubble(world)
-  let toggle = assistantBubble.locator('[data-testid="chat-reasoning-toggle"]').last()
-  if (await toggle.count() === 0) {
-    await expandExecutionDetailsIfCollapsed(assistantBubble)
-    toggle = assistantBubble.locator('[data-testid="chat-reasoning-toggle"]').last()
-  }
-  await expect(toggle).toBeVisible({ timeout: 10_000 })
-  return toggle
-}
-
-async function getLastAssistantToolCallBlock(world: CradleWorld, toolName: string) {
-  const assistantBubble = await getLastAssistantBubble(world)
-  let block = world.page.locator(`[data-testid^="chat-tool-call-"][data-tool-name="${toolName}"]`).first()
-  if (await block.count() === 0) {
-    await expandExecutionDetailsIfCollapsed(assistantBubble)
-    block = world.page.locator(`[data-testid^="chat-tool-call-"][data-tool-name="${toolName}"]`).first()
-  }
-  await expect(block).toBeVisible({ timeout: 10_000 })
-  return block
-}
-
-async function clearBrowserClipboard(world: CradleWorld): Promise<void> {
-  await world.page.evaluate(() => navigator.clipboard.writeText(''))
-}
 
 Given('应用已启动', async function (this: CradleWorld) {
   console.warn('[step] assert app is launched')
   await this.page.waitForLoadState('domcontentloaded')
 })
 
-Given('我已配置 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureDefaultMockProvider(this)
+Given('我已配置 Claude Agent 多轮 Simulator', async function (this: CradleWorld) {
+  await configureMultiTurnClaudeAgentSimulator(this)
 })
 
-Given('我已配置会慢速流式返回的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureSlowMockProvider(this)
+Given('我已配置 Claude Agent Simulator', async function (this: CradleWorld) {
+  await this.configureClaudeAgentChat()
 })
 
-Given('我已配置用于跟进排队的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureQueuedContinuationMockProvider(this)
+Given('我已配置 Claude Agent Simulator Provider（不预置回复）', async function (this: CradleWorld) {
+  await configureClaudeAgentProviderWithoutExchanges(this)
 })
 
-Given('我已配置按轮次返回不同回复的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureContextMockProvider(this)
+Given('我已配置带门控的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureSlowGatedClaudeAgentSimulator(this)
 })
 
-Given('我已配置用于 Markdown 导出的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureMarkdownExportMockProvider(this)
+Given('我已配置停止后可恢复的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureStoppableClaudeAgentSimulator(this)
 })
 
-Given('我已配置会返回 Reasoning 的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureReasoningMockProvider(this)
+Given('我已配置可持久化队列的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureDurableQueueClaudeAgentSimulator(this)
 })
 
-Given('我已配置会返回 Tool Call 的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureToolCallMockProvider(this)
+Given('我已配置可管理队列的慢速 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureManagedQueueClaudeAgentSimulator(this)
 })
 
-Given('我已配置会失败的 Mock LLM Provider', async function (this: CradleWorld) {
-  await configureFailingMockProvider(this)
+Given('我已配置会失败的 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureFailingClaudeAgentSimulator(this)
+})
+
+Given('我已配置会返回 Thinking 的 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureThinkingClaudeAgentSimulator(this)
+})
+
+Given('我已配置 Claude Agent 审批 Simulator', async function (this: CradleWorld) {
+  await configureClaudeApprovalSimulator(this)
+})
+
+Given('我已配置 Codex Simulator', async function (this: CradleWorld) {
+  await configureDefaultAiReply(this)
+})
+
+Given('我已配置 Claude Agent Read 工具环 Simulator', async function (this: CradleWorld) {
+  await configureReadToolLoopSimulator(this)
+})
+
+Given('我已配置会校验文件上下文的 Claude Agent Simulator', async function (this: CradleWorld) {
+  await configureFileContextSimulator(this)
+})
+
+When('我在新建聊天中提及文件{string}并输入{string}', async function (this: CradleWorld, path: string, prompt: string) {
+  const editor = this.newChat.textBox()
+  await editor.click()
+  await editor.fill(`@${path}`)
+  const mentionOption = this.newChat.entry().getByRole('button', { name: path, exact: true }).last()
+  await expect(mentionOption).toBeVisible({ timeout: 15_000 })
+  await mentionOption.click()
+  await expect(editor.locator(`[data-file-mention-path="${path}"]`)).toBeVisible({ timeout: 10_000 })
+  await editor.pressSequentially(` ${prompt}`)
+})
+
+Then('Simulator 请求应包含文件内容{string}', function (this: CradleWorld, content: string) {
+  const requests = this.simulator?.requests() ?? []
+  expect(JSON.stringify(requests)).toContain(content)
+})
+
+Given('我已配置 Codex 多轮 Simulator', async function (this: CradleWorld) {
+  await configureCodexMultiTurnSimulator(this)
+})
+
+Given('我已配置 Codex Edit last message Simulator', async function (this: CradleWorld) {
+  await configureCodexRollbackSimulator(this)
+})
+
+When('我点击编辑上一条消息', async function (this: CradleWorld) {
+  await this.chat.editLastUserMessage()
+})
+
+Then('聊天输入框应恢复上一条消息{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectComposerContains(text)
+})
+
+Then('聊天中不应再出现用户消息{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectNoUserMessage(text)
+})
+
+Then('聊天中不应再出现 AI 消息{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectNoAssistantMessage(text)
+})
+
+Given('我已配置 Codex btw Simulator', async function (this: CradleWorld) {
+  await configureCodexQuickQuestionSimulator(this)
+})
+
+Given('我已导航到新建聊天并选中 Simulator', async function (this: CradleWorld) {
+  await navigateToNewChatWithSimulator(this)
+})
+
+When('我选择 Claude Agent 运行时与 Simulator Provider', async function (this: CradleWorld) {
+  await selectClaudeAgentSimulator(this)
+})
+
+When('我选择 Codex 运行时与 Simulator Provider', async function (this: CradleWorld) {
+  await selectCodexSimulator(this)
+})
+
+When('我释放慢速流门控', async function (this: CradleWorld) {
+  await releaseSlowStreamGate(this)
+})
+
+Then('聊天流应结束于空闲状态', async function (this: CradleWorld) {
+  await this.chat.waitStatus('idle')
+})
+
+Then('Simulator 脚本化交换应全部耗尽', async function (this: CradleWorld) {
+  assertSimulatorExhausted(this)
 })
 
 When('我点击"新建聊天"导航项', async function (this: CradleWorld) {
-  const navItem = this.page.locator('[data-testid="nav-new-chat"]')
-  await expect(navItem).toBeVisible({ timeout: 15_000 })
-  await navItem.click()
+  await this.newChat.openFromNav()
 })
 
 Given('我已导航到新建聊天页面', async function (this: CradleWorld) {
-  await navigateToNewChat(this)
+  await navigateToNewChatWithSimulator(this)
 })
 
 Then('我应该看到新建聊天页面', async function (this: CradleWorld) {
-  await expect(visibleNewChatPage(this)).toBeVisible({ timeout: 10_000 })
+  await expect(this.newChat.entry()).toBeVisible({ timeout: 10_000 })
 })
 
 Then('聊天输入框应可见', async function (this: CradleWorld) {
-  await expect(newChatTextBox(visibleNewChatPage(this))).toBeVisible({ timeout: 10_000 })
+  await expect(this.newChat.textBox()).toBeVisible({ timeout: 10_000 })
 })
 
 When('我在新建聊天输入框中输入{string}', async function (this: CradleWorld, text: string) {
-  await fillPromptEditor(newChatTextBox(visibleNewChatPage(this)), text)
+  await this.newChat.fill(text)
 })
 
 When('我点击新建聊天快速操作{string}', async function (this: CradleWorld, label: string) {
@@ -415,57 +198,31 @@ When('我点击新建聊天快速操作{string}', async function (this: CradleWo
 })
 
 When('我在新建聊天中选择第 {int} 个工作区', async function (this: CradleWorld, ordinal: number) {
-  const selector = visibleNewChatPage(this).locator('[data-testid="new-chat-workspace-selector"], [data-testid="home-workspace-selector"]').first()
-  await expect(selector).toBeVisible({ timeout: 10_000 })
-  await selector.click()
-
-  // Options may be in a portal (popover) outside the new-chat page DOM tree
-  const option = this.page.locator('[data-testid^="new-chat-workspace-option-"]').nth(ordinal - 1)
-  await expect(option).toBeVisible({ timeout: 10_000 })
-
-  const workspaceName = (await option.textContent())?.trim()
-  if (!workspaceName) {
-    throw new Error(`Workspace option ${ordinal} did not expose a visible name`)
-  }
-
-  await option.click()
-  await expect(selector).toContainText(workspaceName, { timeout: 10_000 })
-  rememberSelectedNewChatWorkspace(this, workspaceName)
+  await selectNewChatWorkspace(this, ordinal)
 })
 
 When('我点击发送按钮', async function (this: CradleWorld) {
-  const button = newChatSendButton(visibleNewChatPage(this))
-  await expect(button).toBeEnabled({ timeout: 10_000 })
-  await button.click()
+  await this.newChat.send()
 })
 
 Then('应该跳转到聊天视图', async function (this: CradleWorld) {
-  await getChatView(this)
+  await this.chat.waitVisible(20_000)
 })
 
 Then('我应该看到用户消息{string}', async function (this: CradleWorld, text: string) {
-  const userBubble = this.page.locator('[data-testid="message-bubble-user"]').filter({ hasText: text })
-  await expect(userBubble).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
+  await this.chat.expectUserMessage(text, CHAT_STATUS_TIMEOUT)
 })
 
 Then('新建聊天输入框应包含{string}', async function (this: CradleWorld, text: string) {
-  await expectPromptEditorToContain(newChatTextBox(visibleNewChatPage(this)), new RegExp(text))
+  await expectPromptContains(this, text)
 })
 
 Then('当前聊天会话应显示在选中的工作区下', async function (this: CradleWorld) {
-  const workspaceName = recallSelectedNewChatWorkspace(this)
-  const sessionId = await getCurrentChatSessionId(this)
-  const workspaceGroup = this.page.locator('[data-testid^="workspace-group-"]').filter({ hasText: workspaceName }).first()
-
-  await expect(workspaceGroup).toBeVisible({ timeout: 10_000 })
-  await expect(workspaceGroup.locator(`[data-testid="session-item-${sessionId}"]`)).toBeVisible({ timeout: 10_000 })
+  await expectCurrentSessionUnderSelectedWorkspace(this)
 })
 
 Then('我应该看到 AI 回复消息', async function (this: CradleWorld) {
-  await waitForChatStatus(this, 'idle')
-  const assistantBubble = await getLastAssistantBubble(this)
-  await expect(assistantBubble).toContainText('Hello from mock LLM!', { timeout: CHAT_STATUS_TIMEOUT })
-  await expect(this.page.locator('[data-testid="chat-error-banner"]')).toHaveCount(0)
+  await expectDefaultAiReply(this)
 })
 
 Given('我已在新建聊天页面发送了初始消息', async function (this: CradleWorld) {
@@ -478,16 +235,11 @@ When('我新建一个聊天会话并记住为{string}，首条消息为{string}'
 })
 
 When('我在聊天输入框中输入{string}', async function (this: CradleWorld, text: string) {
-  const chatView = await getChatView(this)
-  const textarea = chatView.locator('[data-testid="chat-composer-textarea"]')
-  await fillPromptEditor(textarea, text)
+  await fillChatComposerWithNextReply(this, text)
 })
 
 When('我点击聊天发送按钮', async function (this: CradleWorld) {
-  const chatView = await getChatView(this)
-  const button = chatView.locator('[data-testid="chat-send-btn"]')
-  await expect(button).toBeEnabled({ timeout: 10_000 })
-  await button.click()
+  await this.chat.sendFromComposer()
 })
 
 Then('侧栏应显示至少一个会话项', async function (this: CradleWorld) {
@@ -495,97 +247,126 @@ Then('侧栏应显示至少一个会话项', async function (this: CradleWorld) 
 })
 
 Then('侧栏应显示会话{string}', async function (this: CradleWorld, alias: string) {
-  await waitForSessionSidebarItem(this, recallSessionAlias(this, alias).id)
+  await this.chat.waitForSessionInSidebar(recallSessionAlias(this, alias).id)
 })
 
 Then('侧栏中不应显示会话{string}', async function (this: CradleWorld, alias: string) {
-  await expect(this.page.locator(`[data-testid="session-item-${recallSessionAlias(this, alias).id}"]`)).toHaveCount(0, { timeout: 10_000 })
+  await expect(this.chat.sessionItem(recallSessionAlias(this, alias).id)).toHaveCount(0, { timeout: 10_000 })
 })
 
 Then('侧栏会话顺序应为{string}在{string}之前', async function (this: CradleWorld, firstAlias: string, secondAlias: string) {
-  const firstSessionId = recallSessionAlias(this, firstAlias).id
-  const secondSessionId = recallSessionAlias(this, secondAlias).id
-
-  await expect.poll(async () => {
-    const order = await getVisibleSessionOrder(this)
-    const firstIndex = order.indexOf(firstSessionId)
-    const secondIndex = order.indexOf(secondSessionId)
-
-    return firstIndex >= 0 && secondIndex >= 0 && firstIndex < secondIndex
-  }, { timeout: 10_000 }).toBe(true)
+  await expectSidebarSessionOrder(this, firstAlias, secondAlias)
 })
 
 Then('最后一条 AI 消息应包含{string}', async function (this: CradleWorld, text: string) {
-  const assistantBubble = await getLastAssistantBubble(this)
-  await expect(assistantBubble).toContainText(text, { timeout: CHAT_STATUS_TIMEOUT })
+  await this.chat.expectAssistantContains(text, CHAT_STATUS_TIMEOUT)
+})
+
+Then('Composer 的 btw 结果应包含{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectQuickQuestionContains(text, CHAT_STATUS_TIMEOUT)
 })
 
 Then('聊天中不应出现错误提示', async function (this: CradleWorld) {
-  await expect(this.page.locator('[data-testid="chat-error-banner"]')).toHaveCount(0)
+  await this.chat.expectNoError()
 })
 
 Then('跟进消息{string}应显示在聊天队列中', async function (this: CradleWorld, text: string) {
-  const queueList = this.page.locator('[data-testid="chat-queue-list"]')
-  await expect(queueList).toBeVisible({ timeout: 10_000 })
-  await expect(queueList.locator('[data-testid="chat-queue-item"]').filter({ hasText: text })).toBeVisible({ timeout: 10_000 })
+  await this.chat.expectQueued(text)
+})
+
+Then('持久化队列跟进应完成', async function (this: CradleWorld) {
+  await this.chat.expectAssistantContains(QUEUED_RESPONSE, CHAT_STATUS_TIMEOUT)
 })
 
 Then('聊天队列中不应显示跟进消息{string}', async function (this: CradleWorld, text: string) {
-  const queueItem = this.page.locator('[data-testid="chat-queue-item"]').filter({ hasText: text })
-  await expect(queueItem).toHaveCount(0, { timeout: CHAT_STATUS_TIMEOUT })
+  await this.chat.expectNotQueued(text)
+})
+
+When('我将跟进消息{string}加入聊天队列', async function (this: CradleWorld, text: string) {
+  await this.chat.fillAndSend(text)
+  await this.chat.expectQueued(text)
+})
+
+When('我将队列跟进消息{string}编辑为{string}', async function (this: CradleWorld, currentText: string, nextText: string) {
+  await this.chat.editQueuedMessage(currentText, nextText)
+})
+
+When('我将队列跟进消息{string}上移', async function (this: CradleWorld, text: string) {
+  await this.chat.moveQueuedMessageUp(text)
+})
+
+When('我取消队列跟进消息{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.cancelQueuedMessage(text)
+})
+
+Then('聊天队列顺序应为:', async function (this: CradleWorld, table: DataTable) {
+  await this.chat.expectQueueOrder(table.raw().flat())
 })
 
 Then('聊天流应处于进行中', async function (this: CradleWorld) {
-  await waitForChatStatus(this, 'streaming')
-  await expect(this.page.locator('[data-testid="chat-stop-btn"]')).toBeVisible({ timeout: 10_000 })
-  // Wait for the assistant bubble to have some streamed content before proceeding.
-  // This prevents clicking stop before any text arrives from the LLM.
-  const assistantBubble = this.page.locator('[data-testid="message-bubble-assistant"]').last()
-  await expect(assistantBubble).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
+  await expectChatStreaming(this)
 })
 
 When('我点击停止生成按钮', async function (this: CradleWorld) {
-  const button = this.page.locator('[data-testid="chat-stop-btn"]')
-  await expect(button).toBeVisible({ timeout: 10_000 })
-  await button.click()
+  // Capture stop-path console thrash (ede_diagnostic / missing run stream) across
+  // the click and subsequent settlement assertions.
+  const watch = this.chat.beginStopPathConsoleWatch()
+  this.remember('chat.stop-path-console', watch)
+  await this.chat.stop()
 })
 
 Then('停止生成按钮应消失', async function (this: CradleWorld) {
-  await expect(this.page.locator('[data-testid="chat-stop-btn"]')).toHaveCount(0, { timeout: CHAT_STATUS_TIMEOUT })
+  await this.chat.expectStopGone(CHAT_STATUS_TIMEOUT)
+})
+
+Then('聊天中不应出现完整的慢速回复', async function (this: CradleWorld) {
+  // Abort must cut the gated stream before the scripted completion text lands.
+  await expect(this.page.locator('[data-testid="chat-view"]').first())
+    .not
+    .toContainText(SLOW_RESPONSE, { timeout: 5_000 })
+})
+
+Then('停止后聊天视图、侧栏会话与 Composer 状态应一致为空闲', async function (this: CradleWorld) {
+  await this.chat.expectStopSettledConsistent(CHAT_STATUS_TIMEOUT)
+})
+
+Then('停止后不应再刷 Claude stop-path 诊断错误', async function (this: CradleWorld) {
+  // Give a brief window for late Query fallout; a broken cancel floods these.
+  await this.page.waitForTimeout(1_500)
+  const watch = this.maybeRecall<{ stopPathErrors: string[], dispose: () => void }>('chat.stop-path-console')
+  if (!watch) {
+    throw new Error('Expected stop-path console watch from 我点击停止生成按钮')
+  }
+  watch.dispose()
+  await this.chat.expectNoStopPathConsoleErrors(watch.stopPathErrors)
 })
 
 When('我打开会话{string}的菜单', async function (this: CradleWorld, alias: string) {
-  await openSessionMenu(this, recallSessionAlias(this, alias).id)
+  await this.chat.openSessionMenu(recallSessionAlias(this, alias).id)
 })
 
 When('我点击会话{string}的置顶菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'toggle-pin')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'toggle-pin')
 })
 
 When('我点击会话{string}的取消置顶菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'toggle-pin')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'toggle-pin')
 })
 
 When('我点击会话{string}的删除菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'archive')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'archive')
 })
 
 When('我点击会话{string}的重命名菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'rename')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'rename')
 })
 
 When('我将会话{string}重命名为{string}', async function (this: CradleWorld, alias: string, nextTitle: string) {
-  const sessionId = recallSessionAlias(this, alias).id
-  const input = this.page.locator(`[data-testid="session-rename-input-${sessionId}"]`)
-
-  await expect(input).toBeVisible({ timeout: 10_000 })
-  await input.fill(nextTitle)
-  await input.press('Enter')
-  await expect(input).toHaveCount(0, { timeout: 10_000 })
+  await renameRememberedSession(this, alias, nextTitle)
 })
 
 When('我点击会话{string}的复制 Markdown 菜单项', async function (this: CradleWorld, alias: string) {
-  await clickSessionMenuAction(this, recallSessionAlias(this, alias).id, 'copy-markdown')
+  await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'copy-markdown')
 })
 
 When('我清空 Electron 剪贴板', async function (this: CradleWorld) {
@@ -599,86 +380,66 @@ Then('我应该看到至少一条 AI 消息', async function (this: CradleWorld)
 })
 
 Then('聊天错误提示应显示{string}', async function (this: CradleWorld, text: string) {
-  const errorBanner = this.page.locator('[data-testid="chat-error-banner"]')
-  await expect(errorBanner).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
-  await expect(errorBanner).toContainText(text, { timeout: CHAT_STATUS_TIMEOUT })
+  await this.chat.expectErrorContains(text, {
+    timeout: Math.max(CHAT_STATUS_TIMEOUT, 60_000),
+  })
 })
 
 When('我重新加载当前页面', async function (this: CradleWorld) {
   await this.page.reload()
   await this.page.waitForLoadState('domcontentloaded')
-  await getChatView(this)
+  await expect(this.page.locator('[data-testid="app-sidebar"]')).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
 })
 
 Then('会话{string}应显示为已置顶', async function (this: CradleWorld, alias: string) {
-  const sessionId = recallSessionAlias(this, alias).id
-  const item = this.page.locator(`[data-testid="session-item-${sessionId}"]`)
-
-  await expect(item).toHaveAttribute('data-session-pinned', 'true', { timeout: 10_000 })
-  await expect(this.page.locator(`[data-testid="session-pin-indicator-${sessionId}"]`)).toBeVisible({ timeout: 10_000 })
+  await expectSessionPinned(this, alias)
 })
 
 Then('会话{string}不应显示为已置顶', async function (this: CradleWorld, alias: string) {
-  const sessionId = recallSessionAlias(this, alias).id
-  const item = this.page.locator(`[data-testid="session-item-${sessionId}"]`)
-
-  await expect(item).toHaveAttribute('data-session-pinned', 'false', { timeout: 10_000 })
-  await expect(item.locator(`[data-testid="session-pin-indicator-${sessionId}"]`)).toHaveCount(0)
+  await expectSessionUnpinned(this, alias)
 })
 
 Then('侧栏中的会话{string}标题应为{string}', async function (this: CradleWorld, alias: string, expectedTitle: string) {
-  const sessionId = recallSessionAlias(this, alias).id
-  await expect(this.page.locator(`[data-testid="session-title-${sessionId}"]`)).toHaveText(expectedTitle, { timeout: 10_000 })
+  await expectSessionTitle(this, alias, expectedTitle)
 })
 
 Then('最后一条 AI 消息应显示 Reasoning 入口', async function (this: CradleWorld) {
-  await getLastAssistantReasoningToggle(this)
+  await this.chat.openReasoningEntry()
 })
 
 When('我展开最后一条 AI 消息的 Reasoning', async function (this: CradleWorld) {
-  const toggle = await getLastAssistantReasoningToggle(this)
-  await toggle.click()
+  await this.chat.openReasoningEntry()
 })
 
 Then('最后一条 AI 消息的 Reasoning 应包含{string}', async function (this: CradleWorld, text: string) {
-  const assistantBubble = await getLastAssistantBubble(this)
-  const content = assistantBubble.locator('[data-testid="chat-reasoning-content"]').last()
-  await expect(content).toBeVisible({ timeout: 10_000 })
-  await expect(content).toContainText(text, { timeout: 10_000 })
+  await this.chat.expectReasoningContains(text)
+})
+
+Then('最后一条 AI 消息应显示已展开的 Thought 条目', async function (this: CradleWorld) {
+  await this.chat.expectThoughtEntryVisible()
+})
+
+Then('聊天活动流应包含{string}', async function (this: CradleWorld, text: string) {
+  await this.chat.expectActivityContains(text, CHAT_STATUS_TIMEOUT)
 })
 
 Then('最后一条 AI 消息应显示名为{string}的 Tool Call', async function (this: CradleWorld, toolName: string) {
-  await waitForChatStatus(this, 'idle')
-  await getLastAssistantToolCallBlock(this, toolName)
+  await this.chat.waitStatus('idle')
+  await this.chat.toolCallBlock(toolName)
 })
 
 When('我展开最后一条 AI 消息中名为{string}的 Tool Call', async function (this: CradleWorld, toolName: string) {
-  const block = await getLastAssistantToolCallBlock(this, toolName)
-  const toggle = block.locator('[data-testid^="chat-tool-call-toggle-"]').first()
-  if (await toggle.count() > 0) {
-    await expect(toggle).toBeVisible({ timeout: 10_000 })
-    await toggle.click()
-    await expect(block.locator('[data-testid^="chat-tool-call-content-"]').first()).toBeVisible({ timeout: 10_000 })
-  }
+  await openToolCall(this, toolName)
 })
 
 Then('最后一条 AI 消息中名为{string}的 Tool Call 输入应包含{string}', async function (this: CradleWorld, toolName: string, text: string) {
-  const block = await getLastAssistantToolCallBlock(this, toolName)
-  await expect(block).toContainText(text, { timeout: 10_000 })
+  await expectToolCallContains(this, toolName, text)
 })
 
 Then('最后一条 AI 消息中名为{string}的 Tool Call 输出应包含{string}', async function (this: CradleWorld, toolName: string, text: string) {
-  const block = await getLastAssistantToolCallBlock(this, toolName)
-  await expect(block).toContainText(text, { timeout: 10_000 })
+  await expectToolCallContains(this, toolName, text)
 })
 
 Then('Electron 剪贴板中应包含以下 Markdown 片段:', async function (this: CradleWorld, table: DataTable) {
-  const fragments = table.raw().flat().map(fragment => fragment.trim()).filter(Boolean)
-
-  await expect.poll(async () => readBrowserClipboardText(this), { timeout: 10_000 }).not.toBe('')
-  const clipboardText = await readBrowserClipboardText(this)
-
-  for (const fragment of fragments) {
-    expect(clipboardText).toContain(fragment)
-  }
+  await expectClipboardContainsMarkdownFragments(this, table)
 })

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
 
 import type { LayoutSlots } from './layout-slots-context'
 import { useActiveLayoutSlots, useLayoutSlotsStore } from './layout-slots-context'
@@ -22,7 +22,7 @@ export function useLayoutSlotsCtx() {
 export function useRegisterLayoutSlots(id: string, slots: LayoutSlots) {
   const registerSlot = useLayoutSlotsStore(state => state.registerSlot)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     registerSlot(id, slots)
   }, [id, slots, registerSlot])
 }
@@ -31,7 +31,7 @@ export function useSyncLayoutSlotScope(activeSlotId?: string | null, validSlotId
   const setSlotScope = useLayoutSlotsStore(state => state.setSlotScope)
   const validSlotKey = validSlotIds?.join('\n') ?? null
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setSlotScope(activeSlotId, validSlotKey?.split('\n').filter(Boolean))
   }, [activeSlotId, setSlotScope, validSlotKey])
 }

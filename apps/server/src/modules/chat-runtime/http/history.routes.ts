@@ -1,7 +1,12 @@
 import { Elysia } from 'elysia'
 
 import { AppError } from '../../../errors/app-error'
-import { getMessageDetail, getMessageSnapshot, listCompletedRuns } from '../history-api'
+import {
+  getMessageDetail,
+  getMessagePreviewSnapshot,
+  getMessageSnapshot,
+  listCompletedRuns,
+} from '../history-api'
 import { ChatRuntimeModel } from '../model'
 import { getRunSnapshot, getRunSnapshots } from '../run-snapshot'
 import { listChatSessionTraceDtos, readChatRunTraceDto } from '../stream-trace'
@@ -28,6 +33,24 @@ export const chatRuntimeHistoryRoutes = new Elysia({
       params: ChatRuntimeModel.sessionIdParams,
       query: ChatRuntimeModel.chatMessagesQuery,
       response: { 200: ChatRuntimeModel.chatMessages },
+    },
+  )
+  // GET /chat/sessions/:sessionId/message-previews -> bounded display rows
+  .get(
+    '/sessions/:sessionId/message-previews',
+    async ({ params, query }): Promise<Response> => {
+      return Response.json(await getMessagePreviewSnapshot(params.sessionId, {
+        cursor: query.cursor ?? null,
+        limit: query.limit ?? null,
+      }))
+    },
+    {
+      detail: {
+        summary: 'Get compact chat message previews',
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      query: ChatRuntimeModel.chatMessagesQuery,
+      response: { 200: ChatRuntimeModel.chatMessagePreviews },
     },
   )
   // GET /chat/sessions/:sessionId/messages/:messageId -> one full message payload

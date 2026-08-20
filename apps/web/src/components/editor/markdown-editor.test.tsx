@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Editor } from '@tiptap/core'
 import Link from '@tiptap/extension-link'
 import StarterKit from '@tiptap/starter-kit'
+import type { MarkdownStorage } from 'tiptap-markdown'
 import { Markdown } from 'tiptap-markdown'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -65,8 +66,8 @@ describe('markdown editor', () => {
         },
       })
 
-      const storage = editor.storage as unknown as { markdown: { getMarkdown: () => string } }
-      const markdown = storage.markdown.getMarkdown()
+      const markdownStorage: MarkdownStorage = editor.storage.markdown
+      const markdown = markdownStorage.getMarkdown()
 
       expect(markdown).toContain('[[CRA-007] Smart mentions](cradle://mention/issue/issue-1?label=CRA-007&title=Smart+mentions&detail=Todo+%C2%B7+high&workspaceId=workspace-1)')
     }

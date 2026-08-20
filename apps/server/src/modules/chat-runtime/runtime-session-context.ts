@@ -6,6 +6,7 @@ import { AppError } from '../../errors/app-error'
 import { parseJsonObject } from '../../helpers/json-record'
 import { db } from '../../infra'
 import { createChildLogger } from '../../logging/logger'
+import { decodeCodexDurableCheckpoint } from '../chat-runtime-providers/codex/state/durable-checkpoint'
 import { readProviderStateSnapshot } from '../chat-runtime-providers/kit/state-snapshot'
 import * as ModelRegistry from '../model-registry/service'
 import {
@@ -22,7 +23,7 @@ import {
   resolveProviderRuntimeSession,
 } from '../provider-runtime/service'
 import { getProviderTarget, resolveProviderTargetForRuntime } from '../provider-targets/service'
-import { getRemoteSessionLink } from '../session/remote-projection'
+import { getNodeSessionLink } from '../session/node-projection'
 import * as SessionService from '../session/service'
 import * as Workspace from '../workspace/service'
 import { assertIsolationExecutionReady, resolveSessionExecutionRoot } from '../worktree/service'
@@ -36,14 +37,25 @@ import type {
   RuntimeProviderTargetProfile,
   RuntimeSession,
 } from './runtime-provider-types'
+import { readRuntimeSessionProviderCheckpointRevision } from './runtime-session-checkpoint'
 
 const runtimeSessionLogger = createChildLogger({ module: 'chat-runtime.runtime-session' })
+const bindingByRuntimeSession = new WeakMap<RuntimeSession, {
+  sessionId: string
+  providerTargetId: string | null
+  runtimeKind: RuntimeKind
+  providerSessionId: string | null
+  providerCheckpointRevision: number
+  requestedModelId: string | null
+  binding: BackendSessionBinding | undefined
+}>()
 
 export interface SessionRunContext {
   session: Session
   workspacePath: string
   profile: RuntimeProviderTargetProfile | null
   providerTarget: { id: string, kind: 'manual' | 'external' } | null
+  effectiveModelId: string | null
 }
 
 export type ProviderBoundSessionRunContext = SessionRunContext & {
@@ -71,14 +83,14 @@ export function assertProviderBoundRunContext(
 
 export function getSessionRunContext(
   sessionId: string,
-  input: { providerTargetId?: string } = {},
+  input: { providerTargetId?: string, modelId?: string | null } = {},
 ): SessionRunContext | null {
   const session = db().select().from(sessions).where(eq(sessions.id, sessionId)).get()
   if (!session) {
     return null
   }
-  const remoteLink = getRemoteSessionLink(sessionId)
-  if (remoteLink) {
+  const nodeLink = getNodeSessionLink(sessionId)
+  if (nodeLink) {
     return null
   }
   assertIsolationExecutionReady(session)
@@ -107,6 +119,7 @@ export function getSessionRunContext(
       workspacePath: workspacePath ?? '',
       profile: null,
       providerTarget: null,
+      effectiveModelId: null,
     }
   }
   const runtime = getRuntimeRegistry().get(runtimeKind)
@@ -135,6 +148,7 @@ export function getSessionRunContext(
         workspacePath: workspacePath ?? '',
         profile: null,
         providerTarget: null,
+        effectiveModelId: null,
       }
     }
     if (runtime?.metadata.providerBinding === 'none') {
@@ -147,12 +161,13 @@ export function getSessionRunContext(
         workspacePath: workspacePath ?? '',
         profile,
         providerTarget: null,
+        effectiveModelId: null,
       }
     }
     return null
   }
 
-  const resolvedTarget = resolveProviderTargetForRuntime(providerTarget, runtimeKind)
+  const resolvedTarget = resolveProviderTargetForRuntime(providerTarget, runtimeKind, input.modelId)
   const profileConfig = parseJsonObject(resolvedTarget.configJson)
   const targetModelRegistryConfig = {
     modelRegistryMappings: ModelRegistry.listMappingEntries(),
@@ -180,6 +195,7 @@ export function getSessionRunContext(
     workspacePath: workspacePath ?? '',
     profile: effectiveProfile,
     providerTarget: resolvedTarget.target,
+    effectiveModelId: resolvedTarget.effectiveModelId,
   }
 }
 
@@ -225,14 +241,42 @@ export function attachBinding(input: {
   runtimeSession: RuntimeSession
   requestedModelId: string | null
 }): BackendSessionBinding | undefined {
-  return persistProviderRuntimeResolution({
+  const cached = bindingByRuntimeSession.get(input.runtimeSession)
+  const providerCheckpointRevision = readRuntimeSessionProviderCheckpointRevision(input.runtimeSession)
+  if (
+    cached?.sessionId === input.sessionId
+    && cached.providerTargetId === input.providerTargetId
+    && cached.runtimeKind === input.runtimeKind
+    && cached.providerSessionId === input.runtimeSession.providerSessionId
+    && cached.providerCheckpointRevision === providerCheckpointRevision
+    && cached.requestedModelId === input.requestedModelId
+  ) {
+    return cached.binding
+  }
+  const durableRuntimeSession = input.runtimeKind === 'codex'
+    ? {
+        ...input.runtimeSession,
+        providerStateSnapshot: decodeCodexDurableCheckpoint(input.runtimeSession.providerStateSnapshot).serialized,
+      }
+    : input.runtimeSession
+  const binding = persistProviderRuntimeResolution({
     chatSessionId: input.sessionId,
     providerTargetId: input.providerTargetId,
     runtimeKind: input.runtimeKind,
-    runtimeSession: input.runtimeSession,
+    runtimeSession: durableRuntimeSession,
     requestedModelId: input.requestedModelId,
     durable: true,
   })
+  bindingByRuntimeSession.set(input.runtimeSession, {
+    sessionId: input.sessionId,
+    providerTargetId: input.providerTargetId,
+    runtimeKind: input.runtimeKind,
+    providerSessionId: input.runtimeSession.providerSessionId,
+    providerCheckpointRevision,
+    requestedModelId: input.requestedModelId,
+    binding,
+  })
+  return binding
 }
 
 export async function resolveExistingRuntimeSessionForContext(input: {
@@ -253,7 +297,7 @@ export async function resolveExistingRuntimeSessionForContext(input: {
     profile: input.context.profile,
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
-    modelId: input.modelId,
+    modelId: input.context.effectiveModelId ?? input.modelId,
   })
   return resolution
     ? {
@@ -282,7 +326,7 @@ export async function resolveRuntimeSessionForContext(input: {
     profile: input.context.profile,
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
-    modelId: input.modelId,
+    modelId: input.context.effectiveModelId ?? input.modelId,
   })
   try {
     validateResolvedRuntimeSessionContext({
@@ -310,7 +354,7 @@ export async function resolveRuntimeSessionForContext(input: {
   }
   return {
     runtimeSession: resolution.runtimeSession,
-    requestedModelId: resolution.requestedModelId,
+    requestedModelId: input.modelId ?? resolution.requestedModelId,
   }
 }
 
@@ -413,16 +457,16 @@ export function readSessionRequestedThinkingEffort(input: {
 }
 
 export function assertRunnableSession(sessionId: string): SessionRunContext {
-  const remoteLink = getRemoteSessionLink(sessionId)
-  if (remoteLink) {
+  const nodeLink = getNodeSessionLink(sessionId)
+  if (nodeLink) {
     throw new AppError({
-      code: 'chat_session_executes_on_remote_host',
+      code: 'chat_session_executes_on_fabric_node',
       status: 409,
-      message: 'This session executes on a remote Cradle Server; use the remote-host upstream APIs.',
+      message: 'This session executes on a Fabric Node; use the Node upstream APIs.',
       details: {
         sessionId,
-        hostId: remoteLink.hostId,
-        remoteSessionId: remoteLink.remoteSessionId,
+        nodeId: nodeLink.nodeId,
+        remoteSessionId: nodeLink.remoteSessionId,
       },
     })
   }

@@ -16,6 +16,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/cradle/relayd/internal/config"
+	"github.com/cradle/relayd/internal/directory"
 	"github.com/cradle/relayd/internal/metrics"
 	"github.com/cradle/relayd/internal/pairing"
 	"github.com/cradle/relayd/internal/relay"
@@ -31,6 +32,7 @@ type ServerConfig struct {
 	Validator token.Validator
 	Pairings  *pairing.Store
 	Hub       *relay.Hub
+	Directory *directory.Server
 	Metrics   *metrics.Counters
 	Logger    *slog.Logger
 }
@@ -40,6 +42,7 @@ type Server struct {
 	validator           token.Validator
 	pairings            *pairing.Store
 	hub                 *relay.Hub
+	directory           *directory.Server
 	metrics             *metrics.Counters
 	logger              *slog.Logger
 	mux                 *http.ServeMux
@@ -96,6 +99,7 @@ func NewServer(cfg ServerConfig) (*Server, error) {
 		validator:           cfg.Validator,
 		pairings:            cfg.Pairings,
 		hub:                 cfg.Hub,
+		directory:           cfg.Directory,
 		metrics:             cfg.Metrics,
 		logger:              cfg.Logger,
 		mux:                 http.NewServeMux(),
@@ -118,6 +122,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /rooms/host-session", s.startHostSession)
 	s.mux.HandleFunc("GET /ws/host", s.hostWebSocket)
 	s.mux.HandleFunc("GET /ws/controller", s.controllerWebSocket)
+	if s.directory != nil {
+		s.directory.Register(s.mux)
+	}
 	if s.cfg.MetricsEnabled {
 		s.mux.Handle("GET /metrics", s.metrics)
 	}

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 
 import { ChronicleAudioTranscriptCardView } from './chronicle-audio-transcript-card-view'
 import { chronicleAudioTranscriptFixtures } from './fixtures/chronicle-audio'
+import { chronicleSpeakerProfileFixtures } from './fixtures/chronicle-memory-knowledge'
 
 const meta = {
   title: 'App/Chronicle/Audio Transcript Card',
@@ -17,6 +18,9 @@ const meta = {
   ],
   args: {
     transcript: chronicleAudioTranscriptFixtures[0],
+    speakerProfiles: chronicleSpeakerProfileFixtures,
+    assigningSpeaker: false,
+    onAssignSpeaker: async () => {},
   },
 } satisfies Meta<typeof ChronicleAudioTranscriptCardView>
 

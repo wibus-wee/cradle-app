@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { initializeDatabase, shutdownInfra } from '../infra'
+import { setNetworkPreferences } from '../modules/preferences/service'
 import { resetGitHubAuthProviderForTests, setGitHubAuthProvider } from './github/auth-provider'
 import { cachedGitHubRead, clearGitHubReadInFlight } from './github/cache-gate'
 import {
@@ -12,6 +13,7 @@ import {
   fetchPullRequestDetail,
   fetchPullRequestFiles,
   fetchPullRequestReviewThreads,
+  invalidatePullRequestCaches,
   markPullRequestReady,
   mergePullRequest,
   replyToPullRequestReviewThread,
@@ -20,7 +22,7 @@ import {
   resolvePullRequestReviewThread,
   searchAuthoredPullRequests,
 } from './github-api'
-import { getCached } from './github-cache'
+import { getCached, setCache } from './github-cache'
 
 const originalGitHubToken = process.env.GH_TOKEN
 const originalDataDir = process.env.CRADLE_DATA_DIR
@@ -84,6 +86,43 @@ describe('gitHub App identity', () => {
     expect(getCached('github-app-test-read:identity:app-user-token')).toBeNull()
   })
 
+  it('bypasses a fresh cached read when force mode is explicit', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce({ data: { version: 1 }, status: 200 })
+      .mockResolvedValueOnce({ data: { version: 2 }, status: 200 })
+
+    await expect(cachedGitHubRead({
+      cacheKey: 'force-refresh-test',
+      etag: false,
+      fetcher,
+    })).resolves.toEqual({ version: 1 })
+    await expect(cachedGitHubRead({
+      cacheKey: 'force-refresh-test',
+      etag: false,
+      fetcher,
+    })).resolves.toEqual({ version: 1 })
+    await expect(cachedGitHubRead({
+      cacheKey: 'force-refresh-test',
+      etag: false,
+      mode: 'force',
+      fetcher,
+    })).resolves.toEqual({ version: 2 })
+
+    expect(fetcher).toHaveBeenCalledTimes(2)
+  })
+
+  it('invalidates both legacy and identity-scoped pull request cache entries', () => {
+    setCache('pr-detail:cradle/app:14', { title: 'legacy' })
+    setCache('pr-detail:cradle/app:14:identity:app-user-identity-v1', { title: 'scoped' })
+    setCache('pr-detail:cradle/app:140:identity:app-user-identity-v1', { title: 'other' })
+
+    invalidatePullRequestCaches('cradle', 'app', 14)
+
+    expect(getCached('pr-detail:cradle/app:14')).toBeNull()
+    expect(getCached('pr-detail:cradle/app:14:identity:app-user-identity-v1')).toBeNull()
+    expect(getCached('pr-detail:cradle/app:140:identity:app-user-identity-v1')).not.toBeNull()
+  })
+
   it('keeps head commit and check state in the authored pull request feed', async () => {
     setGitHubAuthProvider(async () => ({
       accessToken: 'app-user-token',
@@ -134,6 +173,30 @@ describe('gitHub App identity', () => {
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))
     expect(request.query).toContain('commits(last: 1)')
     expect(request.query).toContain('statusCheckRollup { state }')
+  })
+
+  it('routes GitHub API requests through the configured outbound proxy', async () => {
+    await setNetworkPreferences({
+      proxyEnabled: true,
+      proxyMode: 'custom',
+      customProxyUrl: 'http://127.0.0.1:7890',
+    })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: {
+        search: {
+          pageInfo: { hasNextPage: false, endCursor: null },
+          nodes: [],
+        },
+      },
+    }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await searchAuthoredPullRequests('wibus-wee')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.github.com/graphql',
+      expect.objectContaining({ dispatcher: expect.anything() }),
+    )
   })
 })
 

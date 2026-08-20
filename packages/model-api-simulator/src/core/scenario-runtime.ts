@@ -161,6 +161,34 @@ export class ScenarioController implements SimulatorController {
     return observed
   }
 
+  /**
+   * Peek whether the next enqueued exchange would accept this request.
+   * Used by autoRespond to absorb probe noise without consuming conversation turns.
+   */
+  nextMatches(
+    provider: SimulatorScenario['provider'],
+    request: Omit<ObservedRequest, 'index'>,
+  ): boolean {
+    const queued = this.#exchanges[0]
+    if (!queued || queued.provider !== provider) {
+      return false
+    }
+    const provisional: ObservedRequest = {
+      ...request,
+      query: request.query ?? {},
+      index: this.#requests.length,
+    }
+    if (matches(provisional, queued.exchange.request)) {
+      return false
+    }
+    for (const [name, expected] of Object.entries(queued.exchange.expectedHeaders ?? {})) {
+      if (provisional.headers[name.toLowerCase()] !== expected) {
+        return false
+      }
+    }
+    return true
+  }
+
   take(
     provider: SimulatorScenario['provider'],
     request: Omit<ObservedRequest, 'index'>,
@@ -300,6 +328,37 @@ function matches(request: ObservedRequest, match: RequestMatch): Mismatch | unde
     const actual = resolvePointer(request.body, pointer)
     const fieldMismatch = compareJson(actual, expected, `/body${pointer}`)
     if (fieldMismatch) { return fieldMismatch }
+  }
+  const includes = match.bodyTextIncludes === undefined
+    ? []
+    : Array.isArray(match.bodyTextIncludes)
+      ? match.bodyTextIncludes
+      : [match.bodyTextIncludes]
+  const excludes = match.bodyTextExcludes === undefined
+    ? []
+    : Array.isArray(match.bodyTextExcludes)
+      ? match.bodyTextExcludes
+      : [match.bodyTextExcludes]
+  if (includes.length > 0 || excludes.length > 0) {
+    const bodyText = request.body === undefined ? '' : JSON.stringify(request.body)
+    for (const needle of includes) {
+      if (!bodyText.includes(needle)) {
+        return {
+          path: '/bodyTextIncludes',
+          expected: needle,
+          actual: bodyText.length > 200 ? `${bodyText.slice(0, 200)}…` : bodyText,
+        }
+      }
+    }
+    for (const needle of excludes) {
+      if (bodyText.includes(needle)) {
+        return {
+          path: '/bodyTextExcludes',
+          expected: `not containing ${needle}`,
+          actual: `contains ${needle}`,
+        }
+      }
+    }
   }
   return undefined
 }

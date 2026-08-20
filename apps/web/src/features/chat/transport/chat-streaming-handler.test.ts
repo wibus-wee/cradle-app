@@ -16,7 +16,12 @@ import { useRendererChatStore } from '~/store/renderer-chat'
 import type { ChatStreamChunk } from './chat-stream-types'
 import { liveChatStreamChunk, replayChatStreamChunk } from './chat-stream-types'
 import { ChatStreamingHandler } from './chat-streaming-handler'
-import { buildUIMessageChunkStreamFromResponse, disposeChatRunBroadcast, onChatRunSettled } from './sse-chat-transport'
+import {
+  buildRawUIMessageChunkStreamFromResponse,
+  buildUIMessageChunkStreamFromResponse,
+  disposeChatRunBroadcast,
+  onChatRunSettled,
+} from './sse-chat-transport'
 
 const productAnalyticsMocks = vi.hoisted(() => ({
   trackProductTaskFinished: vi.fn(),
@@ -348,5 +353,34 @@ describe('chat streaming handler store boundary', () => {
     }
 
     expect(items.map(item => item.replay)).toEqual([true, true, false])
+  })
+
+  it('reuses the UIMessageChunk parser for stateless streams and consumes DONE as stream termination', async () => {
+    const encoder = new TextEncoder()
+    const response = new Response(encoder.encode([
+      ': cradle-stream-open\n\n',
+      'data: {"type":"text-start","id":"text-1"}\n\n',
+      'data: {"type":"text-delta","id":"text-1","delta":"Answer"}\n\n',
+      'data: {"type":"text-end","id":"text-1"}\n\n',
+      'data: {"type":"finish","finishReason":"stop"}\n\n',
+      'data: [DONE]\n\n',
+    ].join('')))
+
+    const reader = buildRawUIMessageChunkStreamFromResponse(response).getReader()
+    const chunks: UIMessageChunk[] = []
+    while (true) {
+      const result = await reader.read()
+      if (result.done) {
+        break
+      }
+      chunks.push(result.value)
+    }
+
+    expect(chunks).toEqual([
+      { type: 'text-start', id: 'text-1' },
+      { type: 'text-delta', id: 'text-1', delta: 'Answer' },
+      { type: 'text-end', id: 'text-1' },
+      { type: 'finish', finishReason: 'stop' },
+    ])
   })
 })

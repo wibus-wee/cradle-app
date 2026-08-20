@@ -9,6 +9,7 @@ import type { UIMessageChunk } from 'ai'
 
 import type { TokenUsage } from '../../chat-runtime/runtime-provider-types'
 import { providerChunk } from '../kit/chunk-mapper'
+import { mapOpencodeRetryPartToWarning } from './event-to-chunk-mapper'
 import { buildOpencodeToolInput, buildOpencodeToolOutput } from './tools/mapper'
 
 type OpencodeMessagePartDeltaEvent = {
@@ -429,7 +430,6 @@ export class OpencodeEventStreamProjector {
       case 'step-start':
       case 'step-finish':
       case 'agent':
-      case 'retry':
       case 'compaction':
       case 'subtask':
         return [{
@@ -439,6 +439,8 @@ export class OpencodeEventStreamProjector {
             part,
           },
         }]
+      case 'retry':
+        return [mapOpencodeRetryPartToWarning(part)]
     }
   }
 

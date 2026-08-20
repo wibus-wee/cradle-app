@@ -1,9 +1,3 @@
-/**
- * Output: AI SDK UIMessageChunk events projected from opencode message parts.
- * Input: opencode session.prompt response parts.
- * Position: opencode provider package event mapper between SDK-native parts and Chat Runtime chunks.
- */
-
 import type { AssistantMessage as OpencodeAssistantMessage, Part as OpencodePart } from '@opencode-ai/sdk'
 import type { UIMessageChunk } from 'ai'
 
@@ -68,7 +62,6 @@ function mapOpencodePartToChunks(part: OpencodePart): UIMessageChunk[] {
     case 'step-start':
     case 'step-finish':
     case 'agent':
-    case 'retry':
     case 'compaction':
     case 'subtask':
       return [{
@@ -78,7 +71,18 @@ function mapOpencodePartToChunks(part: OpencodePart): UIMessageChunk[] {
           part,
         },
       }]
+    case 'retry':
+      return [mapOpencodeRetryPartToWarning(part)]
   }
+}
+
+export function mapOpencodeRetryPartToWarning(
+  part: Extract<OpencodePart, { type: 'retry' }>,
+): UIMessageChunk {
+  return providerChunk.runtimeWarning({
+    message: `OpenCode is retrying (attempt ${part.attempt}).`,
+    additionalDetails: part.error.data.message,
+  })
 }
 
 function mapOpencodeToolPartToChunks(part: Extract<OpencodePart, { type: 'tool' }>): UIMessageChunk[] {

@@ -1,14 +1,9 @@
-/**
- * Output: Codex provider-private types shared by package modules.
- * Input: provider context, app-server client options/messages, and active turn bookkeeping.
- * Position: Codex provider package type boundary.
- */
-
 import type {
   ProviderContext,
-  RuntimeAlertSeverity,
   RuntimeApprovalStatus,
+  RuntimeBackgroundTerminal,
   RuntimeCompactUiSlotState,
+  RuntimeCrewUiSlotState,
   RuntimeGoalStatus,
   RuntimeMcpAuthStatus,
   RuntimeMcpServerStatus,
@@ -19,7 +14,6 @@ import type {
 import type { ProviderProcessHostLease } from '../kit/process-host'
 import type { CodexAppServerClientOptions, CodexAppServerMessage, CodexAppServerServerRequest } from './app-server/client'
 import type { ReasoningEffort } from './app-server-protocol/ReasoningEffort'
-import type { CodexNativeHistorySnapshot } from './projection/state-projector'
 
 export interface CodexProviderConfig {
   createAppServerClient?: (options: CodexAppServerClientOptions) => CodexAppServerClientLike
@@ -58,18 +52,50 @@ export interface CodexAppServerResourceRequestHandler {
 }
 
 export interface CodexAppServerNotificationSubscriber {
-  onMessage: (message: CodexAppServerMessage) => boolean
+  onMessage: (message: CodexAppServerMessage) => boolean | Promise<boolean>
   onClose: () => void
+  readThreadId?: () => string | null
 }
 
 export interface CodexAppServerHostResource {
   client: CodexAppServerClientLike
   serverRequestHandlers: Set<CodexAppServerResourceRequestHandler>
   notificationSubscribers: Set<CodexAppServerNotificationSubscriber>
+  notificationOwnershipWaiters: Set<() => void>
+  pendingThreadBinderCount: number
+  discardedNotificationCount: number
   notificationAbortController?: AbortController
   notificationPump?: Promise<void>
+  loadedThreadIds: Set<string>
+  threadBindPromises: Map<string, Promise<ThreadResponse>>
+  skillExtraRoots: Set<string>
+  skillExtraRootsSync?: Promise<void>
+  skillExtraRootsUnsupported?: boolean
+  uiSlotHostFacts?: Promise<CodexUiSlotHostFacts>
+  uiSlotThreadFacts: Map<string, Promise<CodexUiSlotThreadFacts>>
   initialized?: Promise<void>
   chatgptAuthenticated?: Promise<void>
+  disposing?: boolean
+  onTerminated?: (error: Error) => void
+}
+
+export interface CodexUiSlotHostFacts {
+  configResponse: CodexConfigReadResponse | null
+  providerCapabilities: CodexModelProviderCapabilitiesReadResponse | null
+  modelList: CodexModelListResponse | null
+  rateLimits: CodexRateLimitsResponse | null
+  configRequirements: CodexConfigRequirementsReadResponse | null
+  skills: CodexSkillsListResponse | null
+  plugins: CodexPluginListResponse | null
+  apps: CodexAppsListResponse | null
+  collaborationModes: CodexCollaborationModeListResponse | null
+}
+
+export interface CodexUiSlotThreadFacts {
+  goal: ThreadGoalGetResponse['goal'] | undefined
+  mcpStatus: CodexListMcpServerStatusResponse | null
+  backgroundTerminals: RuntimeBackgroundTerminal[]
+  crewState: RuntimeCrewUiSlotState | null
 }
 
 export interface ActiveCodexTurn {
@@ -487,18 +513,6 @@ export interface CodexApprovalsSnapshot {
   updatedAt: number
 }
 
-export interface CodexAlertSnapshot {
-  threadId: string | null
-  items: Array<{
-    id: string
-    severity: RuntimeAlertSeverity
-    message: string
-    source: string
-    updatedAt: number
-  }>
-  updatedAt: number
-}
-
 export interface CodexFilesystemSnapshot {
   threadId: string
   recentPaths: string[]
@@ -588,6 +602,14 @@ export interface CodexProviderSnapshot {
     [key: string]: unknown
   }
   codex?: {
+    durableVersion?: 1
+    contextUsage?: {
+      threadId: string
+      total: CodexTokenUsageBreakdown
+      last: CodexTokenUsageBreakdown
+      modelContextWindow: number | null
+      updatedAt: number
+    } | null
     compact?: CodexCompactSnapshot
     goal?: CodexGoalSnapshot | null
     sideConversation?: {
@@ -596,8 +618,6 @@ export interface CodexProviderSnapshot {
       parentThreadId: string | null
       updatedAt: number
     }
-    nativeHistory?: CodexNativeHistorySnapshot
-    previousNativeHistory?: CodexNativeHistorySnapshot
     model?: {
       threadId: string
       modelId: string | null
@@ -622,7 +642,6 @@ export interface CodexProviderSnapshot {
     diff?: CodexDiffSnapshot
     terminal?: CodexTerminalSnapshot
     approvals?: CodexApprovalsSnapshot
-    alert?: CodexAlertSnapshot
     filesystem?: CodexFilesystemSnapshot
     search?: CodexSearchSnapshot
     usage?: CodexUsageSnapshot

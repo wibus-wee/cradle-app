@@ -26,6 +26,7 @@ export interface ChronicleConfig {
   dreamSchedulerIntervalMs: number
   dreamSchedulerApplyMerge: boolean
   audioCaptureEnabled: boolean
+  audioCaptureMode: 'meeting' | 'continuous'
   audioSource?: 'microphone' | 'system' | 'mixed'
   audioSegmentMs: number
   audioSegmentIntervalMs: number
@@ -77,6 +78,7 @@ export interface ChronicleStatus {
   activityPipelineIntervalMs: number
   activityPipelineBatchSize: number
   audioCaptureEnabled: boolean
+  audioCaptureMode: 'meeting' | 'continuous'
   audioSource?: 'microphone' | 'system' | 'mixed'
   audioRuntimeStatus: 'disabled' | 'armed' | 'unavailable'
   configuredModel: string | null
@@ -177,7 +179,10 @@ export interface ChronicleAudioTranscriptSegment {
   segmentIndex: number
   startMs: number
   endMs: number | null
+  speakerProfileId: string | null
   speakerLabel: string | null
+  speakerAssignmentSource: 'automatic' | 'user' | 'unassigned'
+  speakerMatchConfidence: number | null
   text: string
   confidence: number | null
   language: string | null
@@ -231,9 +236,10 @@ export interface ChronicleSpeakerProfile {
   displayName: string
   normalizedLabel: string
   aliases: string[]
-  embedding: number[] | null
+  hasVoiceprint: boolean
   embeddingDimensions: number | null
   embeddingModelId: string | null
+  identitySource: 'automatic' | 'user'
   sampleCount: number
   lastSeenAt: string | null
   lastSeenAtUnix: number | null
@@ -594,7 +600,10 @@ const ChronicleAudioTranscriptSegmentSchema = z.object({
   segmentIndex: z.number().finite(),
   startMs: z.number().finite(),
   endMs: z.number().finite().nullable(),
+  speakerProfileId: z.string().nullable(),
   speakerLabel: z.string().nullable(),
+  speakerAssignmentSource: z.enum(['automatic', 'user', 'unassigned']),
+  speakerMatchConfidence: z.number().finite().nullable(),
   text: z.string(),
   confidence: z.number().finite().nullable(),
   language: z.string().nullable(),
@@ -652,9 +661,10 @@ const ChronicleSpeakerProfileSchema = z.object({
   displayName: z.string(),
   normalizedLabel: z.string(),
   aliases: z.array(z.string()),
-  embedding: z.array(z.number()).nullable(),
+  hasVoiceprint: z.boolean(),
   embeddingDimensions: z.number().finite().nullable(),
   embeddingModelId: z.string().nullable(),
+  identitySource: z.enum(['automatic', 'user']),
   sampleCount: z.number().finite(),
   lastSeenAt: z.string().nullable(),
   lastSeenAtUnix: z.number().finite().nullable(),
@@ -817,6 +827,7 @@ const ChronicleConfigSchema = z.object({
   dreamSchedulerIntervalMs: z.number().finite(),
   dreamSchedulerApplyMerge: z.boolean(),
   audioCaptureEnabled: z.boolean(),
+  audioCaptureMode: z.enum(['meeting', 'continuous']).default('meeting'),
   audioSource: z.enum(['microphone', 'system', 'mixed']).optional(),
   audioSegmentMs: z.number().finite(),
   audioSegmentIntervalMs: z.number().finite(),
@@ -868,6 +879,7 @@ const ChronicleStatusSchema = z.object({
   activityPipelineIntervalMs: z.number().finite(),
   activityPipelineBatchSize: z.number().finite(),
   audioCaptureEnabled: z.boolean(),
+  audioCaptureMode: z.enum(['meeting', 'continuous']).default('meeting'),
   audioSource: z.enum(['microphone', 'system', 'mixed']).optional(),
   audioRuntimeStatus: z.enum(['disabled', 'armed', 'unavailable']),
   configuredModel: z.string().nullable(),
@@ -1195,6 +1207,7 @@ export function useChronicleAccessibilityEvents(limit = 50) {
 }
 
 export function useChronicleAudioTranscripts(limit = 20) {
+  const queryClient = useQueryClient()
   const { data: transcripts = [], isLoading: loading, refetch } = useQuery({
     queryKey: [...CHRONICLE_AUDIO_TRANSCRIPTS_QUERY_KEY, limit],
     queryFn: async () => ChronicleAudioTranscriptsSchema.parse(await requestChronicleJson(
@@ -1203,7 +1216,20 @@ export function useChronicleAudioTranscripts(limit = 20) {
     refetchInterval: 10_000,
   })
 
-  return { transcripts, loading, refetch }
+  const { mutateAsync: assignSpeaker, isPending: assigningSpeaker } = useMutation({
+    mutationFn: async ({ segmentId, speakerProfileId }: { segmentId: string, speakerProfileId: string | null }) =>
+      ChronicleAudioTranscriptSegmentSchema.parse(await requestChronicleJson(
+        `/chronicle/audio-segments/${encodeURIComponent(segmentId)}/speaker`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ speakerProfileId }),
+        },
+      )),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: CHRONICLE_AUDIO_TRANSCRIPTS_QUERY_KEY }),
+  })
+
+  return { transcripts, loading, assigningSpeaker, assignSpeaker, refetch }
 }
 
 export function useChronicleAudioRawSegments(limit = 20) {
@@ -1219,6 +1245,7 @@ export function useChronicleAudioRawSegments(limit = 20) {
 }
 
 export function useChronicleSpeakerProfiles() {
+  const queryClient = useQueryClient()
   const { data: profiles = [], isLoading: loading, refetch } = useQuery({
     queryKey: CHRONICLE_SPEAKER_PROFILES_QUERY_KEY,
     queryFn: async () =>
@@ -1226,7 +1253,54 @@ export function useChronicleSpeakerProfiles() {
     refetchInterval: 10_000,
   })
 
-  return { profiles, loading, refetch }
+  const { mutateAsync: renameProfile, isPending: renaming } = useMutation({
+    mutationFn: async ({ profileId, displayName }: { profileId: string, displayName: string }) =>
+      ChronicleSpeakerProfileSchema.parse(await requestChronicleJson(
+        `/chronicle/speaker-profiles/${encodeURIComponent(profileId)}`,
+        {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ displayName }),
+        },
+      )),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CHRONICLE_SPEAKER_PROFILES_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: CHRONICLE_AUDIO_TRANSCRIPTS_QUERY_KEY }),
+      ])
+    },
+  })
+
+  const { mutateAsync: deleteVoiceprint, isPending: deletingVoiceprint } = useMutation({
+    mutationFn: async (profileId: string) => ChronicleSpeakerProfileSchema.parse(await requestChronicleJson(
+      `/chronicle/speaker-profiles/${encodeURIComponent(profileId)}/voiceprint`,
+      { method: 'DELETE' },
+    )),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: CHRONICLE_SPEAKER_PROFILES_QUERY_KEY }),
+  })
+
+  const { mutateAsync: deleteProfile, isPending: deletingProfile } = useMutation({
+    mutationFn: async (profileId: string) => requestChronicleJson(
+      `/chronicle/speaker-profiles/${encodeURIComponent(profileId)}`,
+      { method: 'DELETE' },
+    ),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: CHRONICLE_SPEAKER_PROFILES_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: CHRONICLE_AUDIO_TRANSCRIPTS_QUERY_KEY }),
+      ])
+    },
+  })
+
+  return {
+    profiles,
+    loading,
+    mutating: renaming || deletingVoiceprint || deletingProfile,
+    refetch,
+    renameProfile,
+    deleteVoiceprint,
+    deleteProfile,
+  }
 }
 
 export function useChronicleActivitySegments(limit = 20) {

@@ -1,4 +1,4 @@
-// Public API — same exports as before
+// Public chat-store API.
 export type { ChatDisplayRow, MessagePartsProjection } from './expand-messages-for-display'
 export { chatSelectors, createChatStore, getChatStoreTelemetrySnapshot, useChatStore } from './store'
 export type {

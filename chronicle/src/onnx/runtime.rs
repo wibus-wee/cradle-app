@@ -7,6 +7,7 @@ use crate::error::{ChronicleError, ChronicleResult};
 use crate::models::{ModelId, ModelManager};
 
 use super::asr::SenseVoiceAsr;
+use super::diarization::SpeakerDiarizer;
 use super::embedding::OnnxEmbeddingModel;
 use super::pii::GlinerPiiDetector;
 use super::speaker::SpeakerEmbeddingExtractor;
@@ -28,6 +29,7 @@ pub struct OnnxRuntime {
     embedding: OnceCell<RefCell<OnnxEmbeddingModel>>,
     pii: OnceCell<RefCell<GlinerPiiDetector>>,
     speaker: OnceCell<RefCell<SpeakerEmbeddingExtractor>>,
+    diarizer: OnceCell<RefCell<SpeakerDiarizer>>,
 }
 
 impl Default for OnnxRuntime {
@@ -45,6 +47,7 @@ impl OnnxRuntime {
             embedding: OnceCell::new(),
             pii: OnceCell::new(),
             speaker: OnceCell::new(),
+            diarizer: OnceCell::new(),
         }
     }
 
@@ -57,6 +60,7 @@ impl OnnxRuntime {
             embedding: OnceCell::new(),
             pii: OnceCell::new(),
             speaker: OnceCell::new(),
+            diarizer: OnceCell::new(),
         }
     }
 
@@ -115,6 +119,20 @@ impl OnnxRuntime {
         Ok(self.speaker.get_or_init(|| RefCell::new(instance)))
     }
 
+    pub fn diarizer(&self) -> ChronicleResult<&RefCell<SpeakerDiarizer>> {
+        if let Some(diarizer) = self.diarizer.get() {
+            return Ok(diarizer);
+        }
+        let segmentation_path = self
+            .model_manager
+            .ensure_model(ModelId::SpeakerSegmentation)?;
+        let embedding_path = self
+            .model_manager
+            .ensure_model(ModelId::SpeakerEmbeddingExtractor)?;
+        let instance = SpeakerDiarizer::new(&segmentation_path, &embedding_path)?;
+        Ok(self.diarizer.get_or_init(|| RefCell::new(instance)))
+    }
+
     /// Check which models are available (downloaded) on disk.
     pub fn available_models(&self) -> Vec<ModelId> {
         self.model_manager
@@ -132,6 +150,8 @@ impl OnnxRuntime {
         self.model_manager.ensure_model(ModelId::GlinerPii)?;
         self.model_manager
             .ensure_model(ModelId::SpeakerEmbeddingExtractor)?;
+        self.model_manager
+            .ensure_model(ModelId::SpeakerSegmentation)?;
         Ok(())
     }
 }

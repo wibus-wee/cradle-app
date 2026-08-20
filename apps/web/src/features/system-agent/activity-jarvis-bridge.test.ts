@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import { uiActivityBus } from '~/features/activity/activity-bus'
-import { formatObservationText } from '~/lib/web-activity-registry'
 
 import {
   clearRecentAmbientObservationTextsForTests,
+  formatObservationText,
   installJarvisActivityBridge,
   readRecentAmbientObservationTexts,
 } from './activity-jarvis-bridge'

@@ -158,9 +158,12 @@ export class ProviderRuntimeHostManager {
     }
   }
 
-  invalidateResource(hostId: string): Promise<void> {
+  invalidateResource(hostId: string, expectedResource?: unknown): Promise<void> {
     const entry = this.hosts.get(hostId)
     if (!entry) {
+      return Promise.resolve()
+    }
+    if (expectedResource !== undefined && entry.resource !== expectedResource) {
       return Promise.resolve()
     }
     return this.disposeHostResource(entry)
@@ -219,7 +222,15 @@ export class ProviderRuntimeHostManager {
     runtimeKind: RuntimeKind,
     callback: (resource: unknown, entry: ProviderRuntimeHostSnapshot) => T | undefined,
   ): T | undefined {
+    return this.collectResources(runtimeKind, callback)[0]
+  }
+
+  collectResources<T>(
+    runtimeKind: RuntimeKind,
+    callback: (resource: unknown, entry: ProviderRuntimeHostSnapshot) => T | undefined,
+  ): T[] {
     this.reapIdleHosts()
+    const results: T[] = []
     for (const entry of this.hosts.values()) {
       if (entry.runtimeKind !== runtimeKind || !entry.hasResource || entry.resource === undefined) {
         continue
@@ -237,10 +248,10 @@ export class ProviderRuntimeHostManager {
       }
       const result = callback(entry.resource, snapshot)
       if (result !== undefined) {
-        return result
+        results.push(result)
       }
     }
-    return undefined
+    return results
   }
 
   hasHost(hostId: string): boolean {

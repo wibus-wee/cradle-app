@@ -1,10 +1,10 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 import { AfterAll, BeforeAll } from '@cucumber/cucumber'
 
@@ -46,8 +46,30 @@ async function stopProcessGroup(proc: ChildProcess | null, timeoutMs: number): P
     proc.once('exit', finish)
     timeout = setTimeout(() => {
       killProcessGroup(proc, 'SIGKILL')
-      finish()
+      // Wait for the process exit event before deleting its SQLite/log files.
+      // A final guard keeps teardown bounded if the platform never reaps it.
+      timeout = setTimeout(finish, 1000)
     }, timeoutMs)
+  })
+}
+
+async function runProcess(command: string, args: string[], options: Parameters<typeof spawn>[2]): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, options)
+    let stderr = ''
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
+    child.once('error', reject)
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolve()
+        return
+      }
+
+      reject(new Error(`${command} ${args.join(' ')} failed (${signal ?? `exit ${code}`}):\n${stderr}`))
+    })
   })
 }
 
@@ -58,6 +80,7 @@ const CODEX_APP_SERVER_PACKAGE_PATH = '@openai/codex/bin/codex.js'
 interface E2EServerInstance {
   serverProcess: ChildProcess
   webProcess: ChildProcess | null
+  webDistDir: string | null
   dataDir: string
   serverUrl: string
   webUrl: string | null
@@ -73,6 +96,10 @@ export function getManagedServerUrl(): string | null {
 /** Exported so CradleWorld can override its webUrl. */
 export function getManagedWebUrl(): string | null {
   return instance?.webUrl ?? null
+}
+
+export function getManagedDataDir(): string | null {
+  return instance?.dataDir ?? null
 }
 
 async function waitForReady(url: string, label: string, timeoutMs = 30_000): Promise<void> {
@@ -115,7 +142,7 @@ async function reserveAvailablePort(): Promise<number> {
   })
 }
 
-function resolveManagedCodexAppServerPath(): string {
+function resolveManagedCodexAppServerPath(): string | null {
   const configuredPath = process.env[CODEX_APP_SERVER_PATH_ENV]?.trim()
   if (configuredPath) {
     return configuredPath
@@ -124,11 +151,27 @@ function resolveManagedCodexAppServerPath(): string {
   try {
     return createRequire(join(ROOT, 'package.json')).resolve(CODEX_APP_SERVER_PACKAGE_PATH)
   }
-  catch (error) {
-    throw new Error(`Unable to resolve ${CODEX_APP_SERVER_PACKAGE_PATH} for the managed E2E server`, {
-      cause: error,
-    })
+  catch {
+    // Fall through to the desktop-synced native binary when the npm package is absent.
   }
+
+  // Prefer the desktop `sync:codex-runtime` artifact (gitignored binaries under resources/codex).
+  const platformArch = `${process.platform}-${process.arch}`
+  const bundled = join(
+    ROOT,
+    'apps',
+    'desktop',
+    'resources',
+    'codex',
+    platformArch,
+    process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server',
+  )
+  if (existsSync(bundled)) {
+    return bundled
+  }
+
+  // Codex is optional for essence E2E paths that do not exercise the Codex runtime.
+  return null
 }
 
 /**
@@ -141,24 +184,48 @@ BeforeAll({ timeout: 120_000 }, async () => {
     return
   }
 
-  const dataDir = mkdtempSync(join(tmpdir(), 'cradle-e2e-data-'))
+  // Codex refuses CODEX_HOME beneath an OS temporary directory. Keep the
+  // per-run data in the checkout's ignored dependency cache instead.
+  const runtimeCacheDir = join(ROOT, 'node_modules', '.cache')
+  mkdirSync(runtimeCacheDir, { recursive: true })
+  const dataDir = mkdtempSync(join(runtimeCacheDir, 'cradle-e2e-data-'))
+  const serverHomeDir = join(dataDir, 'home')
+  mkdirSync(serverHomeDir, { recursive: true })
+  chmodSync(dataDir, 0o777)
+  chmodSync(serverHomeDir, 0o777)
   const serverPort = await reserveAvailablePort()
   const codexAppServerPath = resolveManagedCodexAppServerPath()
 
   let serverProcess: ChildProcess | null = null
   let webProcess: ChildProcess | null = null
+  let webDistDir: string | null = null
 
   try {
-    serverProcess = spawn(join(ROOT, 'apps', 'server', 'node_modules', '.bin', 'vite-node'), ['src/index.ts'], {
+    const nodeBinary = process.env.CRADLE_E2E_NODE
+      ?? (existsSync(join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node'))
+        ? join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node')
+        : process.execPath)
+    // Use tsx as a Node loader instead of its CLI. The CLI creates an IPC socket even
+    // for a one-shot process, which is blocked in hardened CI/sandbox environments.
+    serverProcess = spawn(nodeBinary, ['--import', 'tsx', 'src/index.ts'], {
       cwd: join(ROOT, 'apps', 'server'),
       env: {
         ...process.env,
+        PATH: `${dirname(nodeBinary)}:${process.env.PATH ?? ''}`,
+        HOME: serverHomeDir,
         CRADLE_DATA_DIR: dataDir,
+        // Keep ad-hoc chat workspaces inside the per-run writable sandbox. The
+        // production default (~/Documents/Cradle) may not exist or be writable
+        // on a clean CI runner.
+        CRADLE_AD_HOC_WORKSPACE_ROOT: join(dataDir, 'ad-hoc-workspaces'),
         CRADLE_PORT: String(serverPort),
         CRADLE_HOST: '127.0.0.1',
+        // Allow loopback model-api-simulator hosts for provider probe/warm during E2E.
+        CRADLE_ALLOW_PRIVATE_PROVIDER_HOSTS: '127.0.0.1,localhost,::1',
         CRADLE_CREDENTIAL_SECRET: 'e2e-test-secret',
-        CRADLE_MOCK_LLM_URL: 'http://127.0.0.1:1', // Placeholder — actual URL set per-profile config.baseUrl
-        CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath,
+        // Do NOT set CRADLE_MOCK_LLM_URL — E2E must use the real Claude Agent Provider
+        // talking to @cradle/model-api-simulator over Anthropic Messages.
+        ...(codexAppServerPath ? { CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath } : {}),
         CRADLE_E2E: '1',
         NODE_ENV: 'test',
       },
@@ -181,13 +248,44 @@ BeforeAll({ timeout: 120_000 }, async () => {
     await waitForReady(`${serverUrl}/health`, 'Managed E2E Server')
 
     console.log(`[e2e] Managed server started at ${serverUrl} (data: ${dataDir})`)
+    if (codexAppServerPath) {
+      console.log(`[e2e] Codex app-server: ${codexAppServerPath}`)
+    }
+    else {
+      console.warn('[e2e] Codex app-server not resolved — Codex scenarios will fail until sync:codex-runtime')
+    }
 
-    // Start a web dev server pointing to the managed API server
+    // Build and serve the production web bundle so E2E measures application startup,
+    // not Vite's on-demand module transformation on a cold runner.
     let webUrl: string | null = null
 
     if (!process.env.CRADLE_WEB_URL) {
       const webPort = await reserveAvailablePort()
-      webProcess = spawn(join(ROOT, 'apps', 'web', 'node_modules', '.bin', 'vite'), ['--port', String(webPort), '--strictPort'], {
+      const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+      const vite = join(ROOT, 'apps', 'web', 'node_modules', '.bin', process.platform === 'win32' ? 'vite.cmd' : 'vite')
+      webDistDir = mkdtempSync(join(tmpdir(), 'cradle-e2e-web-dist-'))
+
+      await runProcess(pnpm, ['--filter', '@cradle/plugin-sdk', 'build'], {
+        cwd: ROOT,
+        env: {
+          ...process.env,
+          CRADLE_E2E: '1',
+          VITE_SERVER_URL: serverUrl,
+        },
+        stdio: process.env.CRADLE_E2E_VERBOSE ? 'inherit' : ['ignore', 'ignore', 'pipe'],
+      })
+
+      await runProcess(vite, ['build', '--outDir', webDistDir, '--emptyOutDir'], {
+        cwd: join(ROOT, 'apps', 'web'),
+        env: {
+          ...process.env,
+          CRADLE_E2E: '1',
+          VITE_SERVER_URL: serverUrl,
+        },
+        stdio: process.env.CRADLE_E2E_VERBOSE ? 'inherit' : ['ignore', 'ignore', 'pipe'],
+      })
+
+      webProcess = spawn(vite, ['preview', '--outDir', webDistDir, '--host', '127.0.0.1', '--port', String(webPort), '--strictPort'], {
         cwd: join(ROOT, 'apps', 'web'),
         env: {
           ...process.env,
@@ -212,10 +310,10 @@ BeforeAll({ timeout: 120_000 }, async () => {
       webUrl = `http://localhost:${webPort}`
       await waitForReady(webUrl, 'Managed E2E Web', 30_000)
 
-      console.log(`[e2e] Managed web dev server started at ${webUrl}`)
+      console.log(`[e2e] Managed web production preview started at ${webUrl}`)
     }
 
-    instance = { serverProcess, webProcess, dataDir, serverUrl, webUrl }
+    instance = { serverProcess, webProcess, webDistDir, dataDir, serverUrl, webUrl }
   }
   catch (error) {
     await stopProcessGroup(webProcess, 3000)
@@ -224,6 +322,12 @@ BeforeAll({ timeout: 120_000 }, async () => {
       rmSync(dataDir, { recursive: true, force: true })
     }
     catch { /* best effort */ }
+    if (webDistDir) {
+      try {
+        rmSync(webDistDir, { recursive: true, force: true })
+      }
+      catch { /* best effort */ }
+    }
     throw error
   }
 })
@@ -233,7 +337,7 @@ AfterAll({ timeout: 15_000 }, async () => {
     return
   }
 
-  const { serverProcess, webProcess, dataDir } = instance
+  const { serverProcess, webProcess, webDistDir, dataDir } = instance
 
   await stopProcessGroup(webProcess, 3000)
   await stopProcessGroup(serverProcess, 5000)
@@ -242,6 +346,13 @@ AfterAll({ timeout: 15_000 }, async () => {
     rmSync(dataDir, { recursive: true, force: true })
   }
   catch { /* best effort */ }
+
+  if (webDistDir) {
+    try {
+      rmSync(webDistDir, { recursive: true, force: true })
+    }
+    catch { /* best effort */ }
+  }
 
   instance = null
 })

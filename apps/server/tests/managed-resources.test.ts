@@ -125,6 +125,6 @@ describe('managed resources HTTP contract', () => {
 
     const diagnosticResponse = await app.handle(new Request('http://localhost/opencode/server/resources'))
     expect(diagnosticResponse.status).toBe(200)
-    await expect(diagnosticResponse.json()).resolves.toMatchObject({ running: false })
+    await expect(diagnosticResponse.json()).resolves.toEqual([])
   })
 })

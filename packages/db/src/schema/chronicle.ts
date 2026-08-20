@@ -228,6 +228,26 @@ export const chronicleMemoryEmbeddings = sqliteTable('chronicle_memory_embedding
   byVectorHash: index('chronicle_memory_embeddings_vector_hash_idx').on(table.vectorHash),
 }))
 
+/** Rebuildable ANN bucket projection used to select bounded embedding candidates. */
+export const chronicleMemoryEmbeddingBuckets = sqliteTable('chronicle_memory_embedding_buckets', {
+  id: textPk(),
+  embeddingId: text('embedding_id')
+    .notNull()
+    .references(() => chronicleMemoryEmbeddings.id, { onDelete: 'cascade' }),
+  memoryId: text('memory_id')
+    .notNull()
+    .references(() => chronicleMemories.id, { onDelete: 'cascade' }),
+  modelId: text('model_id').notNull(),
+  modelVersion: text('model_version').notNull(),
+  bandIndex: int('band_index').notNull(),
+  bucketKey: text('bucket_key').notNull(),
+  createdAt: int('created_at').notNull(),
+}, table => ({
+  byEmbeddingBand: uniqueIndex('chronicle_memory_embedding_buckets_embedding_band_unique').on(table.embeddingId, table.bandIndex),
+  byCandidate: index('chronicle_memory_embedding_buckets_candidate_idx').on(table.modelId, table.modelVersion, table.bandIndex, table.bucketKey),
+  byMemory: index('chronicle_memory_embedding_buckets_memory_id_idx').on(table.memoryId),
+}))
+
 export const chronicleKnowledgeCards = sqliteTable('chronicle_knowledge_cards', {
   id: textPk(),
   workspaceId: text('workspace_id')
@@ -377,7 +397,12 @@ export const chronicleAudioSegments = sqliteTable('chronicle_audio_segments', {
   segmentIndex: int('segment_index').notNull(),
   startMs: int('start_ms').notNull(),
   endMs: int('end_ms'),
+  speakerProfileId: text('speaker_profile_id'),
   speakerLabel: text('speaker_label'),
+  speakerAssignmentSource: text('speaker_assignment_source', {
+    enum: ['automatic', 'user', 'unassigned'],
+  }).notNull().default('unassigned'),
+  speakerMatchConfidenceBps: int('speaker_match_confidence_bps'),
   text: text('text').notNull(),
   confidenceBps: int('confidence_bps'),
   language: text('language'),
@@ -386,6 +411,7 @@ export const chronicleAudioSegments = sqliteTable('chronicle_audio_segments', {
 }, table => ({
   byTranscriptSegment: uniqueIndex('chronicle_audio_segments_transcript_segment_unique').on(table.transcriptId, table.segmentIndex),
   byTranscript: index('chronicle_audio_segments_transcript_id_idx').on(table.transcriptId),
+  bySpeakerProfile: index('chronicle_audio_segments_speaker_profile_id_idx').on(table.speakerProfileId),
   bySpeaker: index('chronicle_audio_segments_speaker_label_idx').on(table.speakerLabel),
 }))
 
@@ -400,6 +426,9 @@ export const chronicleSpeakerProfiles = sqliteTable('chronicle_speaker_profiles'
   embeddingJson: text('embedding_json'),
   embeddingDimensions: int('embedding_dimensions'),
   embeddingModelId: text('embedding_model_id'),
+  identitySource: text('identity_source', {
+    enum: ['automatic', 'user'],
+  }).notNull().default('automatic'),
   sampleCount: int('sample_count').notNull().default(0),
   lastSeenAt: int('last_seen_at'),
   sourceTranscriptId: text('source_transcript_id')
@@ -680,6 +709,8 @@ export type ChronicleMemoryKeyword = typeof chronicleMemoryKeywords.$inferSelect
 export type NewChronicleMemoryKeyword = typeof chronicleMemoryKeywords.$inferInsert
 export type ChronicleMemoryEmbedding = typeof chronicleMemoryEmbeddings.$inferSelect
 export type NewChronicleMemoryEmbedding = typeof chronicleMemoryEmbeddings.$inferInsert
+export type ChronicleMemoryEmbeddingBucket = typeof chronicleMemoryEmbeddingBuckets.$inferSelect
+export type NewChronicleMemoryEmbeddingBucket = typeof chronicleMemoryEmbeddingBuckets.$inferInsert
 export type ChronicleKnowledgeCard = typeof chronicleKnowledgeCards.$inferSelect
 export type NewChronicleKnowledgeCard = typeof chronicleKnowledgeCards.$inferInsert
 export type ChronicleKnowledgeVersion = typeof chronicleKnowledgeVersions.$inferSelect

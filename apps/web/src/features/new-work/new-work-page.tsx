@@ -12,6 +12,7 @@ import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/co
 import { DraftChatComposerWithState } from '~/features/chat/composer/containers/draft-chat-composer-container'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { useComposerState } from '~/features/composer-toolbar'
+import { useGitBranches } from '~/features/git/shared/use-git'
 import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
 import { isWorkEligibleWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey } from '~/features/workspace/use-session'
@@ -20,24 +21,16 @@ import { apiErrorMessage } from '~/lib/api-error'
 import { openWork, openWorkspaceDiffs } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 
+import { NewWorkBaseBranchControlView } from './new-work-base-branch-control-view'
 import type { NewWorkFailureKind } from './new-work-error-view'
 import { NewWorkPageView } from './new-work-page-view'
 import { NewWorkWorkspaceSelectorView } from './new-work-workspace-selector-view'
-
-type WorkBaseStrategy = NonNullable<PostWorksData['body']['baseStrategy']>
 
 function isDirtySourceError(error: unknown): boolean {
   return !!error
     && typeof error === 'object'
     && 'code' in error
     && (error as { code?: unknown }).code === 'work_source_dirty'
-}
-
-function isRemoteBaseUnavailableError(error: unknown): boolean {
-  return !!error
-    && typeof error === 'object'
-    && 'code' in error
-    && (error as { code?: unknown }).code === 'work_remote_base_unavailable'
 }
 
 export function NewWorkPage() {
@@ -63,13 +56,9 @@ export function NewWorkPage() {
     }
   })
   const [error, setError] = useState<unknown>(null)
-  const [pendingObjective, setPendingObjective] = useState<{
-    text: string
-    files: FileUIPart[]
-    contextParts: ChatContextPart[]
-    options: DraftChatComposerSubmitOptions
-  } | null>(null)
   const selectedWorkspace = localWorkspaces.find(workspace => workspace.id === selectedWorkspaceId) ?? null
+  const { data: branches, isLoading: branchesLoading } = useGitBranches(selectedWorkspace?.id)
+  const [selectedBaseBranch, setSelectedBaseBranch] = useState<string | null>(null)
   const composerState = useComposerState({
     context: 'new-chat',
     workspaceId: selectedWorkspace?.id ?? null,
@@ -81,6 +70,10 @@ export function NewWorkPage() {
       setSelectedWorkspaceId(localWorkspaces[0]?.id ?? null)
     }
   }, [localWorkspaces, selectedWorkspaceId])
+
+  useEffect(() => {
+    setSelectedBaseBranch(null)
+  }, [selectedWorkspaceId])
 
   useEffect(() => {
     try {
@@ -102,7 +95,7 @@ export function NewWorkPage() {
     files: FileUIPart[],
     contextParts: ChatContextPart[],
     options: DraftChatComposerSubmitOptions,
-    baseStrategy?: WorkBaseStrategy,
+    baseBranch?: string | null,
   ) => {
     if (!selectedWorkspace) {
       setError(new Error(t('new.workspaceRequired')))
@@ -129,7 +122,7 @@ export function NewWorkPage() {
       runtimeKind: options.runtimeKind,
       runtimeSettings: options.runtimeSettings,
       thinkingEffort: options.thinkingEffort,
-      ...(baseStrategy ? { baseStrategy } : {}),
+      ...(baseBranch ? { baseBranch } : {}),
       ...(options.agentId
         ? { agentId: options.agentId }
         : {
@@ -155,15 +148,11 @@ export function NewWorkPage() {
     if (result.error || !result.data) {
       trackProductTaskFinished(analyticsTask, 'failed')
       setError(result.error ?? new Error(t('new.createFailed')))
-      if (isDirtySourceError(result.error) || isRemoteBaseUnavailableError(result.error)) {
-        setPendingObjective({ text, files, contextParts, options })
-      }
       return false
     }
 
     const detail = result.data
     trackProductTaskFinished(analyticsTask, 'success')
-    setPendingObjective(null)
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
       queryClient.invalidateQueries({ queryKey: sessionsQueryKey(selectedWorkspace.id) }),
@@ -181,55 +170,50 @@ export function NewWorkPage() {
     options: DraftChatComposerSubmitOptions,
   ) => {
     try {
-      return await createWork(text, files, contextParts, options)
+      return await createWork(text, files, contextParts, options, selectedBaseBranch)
     }
     catch (requestError) {
       setError(requestError)
-      if (isDirtySourceError(requestError) || isRemoteBaseUnavailableError(requestError)) {
-        setPendingObjective({ text, files, contextParts, options })
-      }
       return false
     }
   }
 
-  const handleStartFromRemoteDefault = async () => {
-    if (!pendingObjective) {
-      return
-    }
-    try {
-      await createWork(
-        pendingObjective.text,
-        pendingObjective.files,
-        pendingObjective.contextParts,
-        pendingObjective.options,
-        'remote-default',
-      )
-    }
-    catch (requestError) {
-      setError(requestError)
-      if (isDirtySourceError(requestError) || isRemoteBaseUnavailableError(requestError)) {
-        setPendingObjective(pendingObjective)
-      }
-    }
-  }
-
   const dirty = isDirtySourceError(error)
-  const remoteBaseUnavailable = isRemoteBaseUnavailableError(error)
   const failureKind: NewWorkFailureKind | null = error === null
     ? null
     : dirty
       ? 'dirty-source'
-      : remoteBaseUnavailable
-        ? 'remote-base-unavailable'
-        : 'generic'
+      : 'generic'
   const workspaceSelector = (
-    <NewWorkWorkspaceSelectorView
-      workspaces={localWorkspaces}
-      selectedWorkspaceId={selectedWorkspaceId}
-      adding={adding}
-      onSelectWorkspace={setSelectedWorkspaceId}
-      onAddWorkspace={() => void addFromPicker()}
-    />
+    <div className="flex min-w-0 items-center gap-1.5">
+      <NewWorkWorkspaceSelectorView
+        workspaces={localWorkspaces}
+        selectedWorkspaceId={selectedWorkspaceId}
+        adding={adding}
+        onSelectWorkspace={setSelectedWorkspaceId}
+        onAddWorkspace={() => void addFromPicker()}
+      />
+      {selectedWorkspace
+        ? (
+            <NewWorkBaseBranchControlView
+              currentBranch={selectedWorkspace.gitIdentity?.branch ?? null}
+              selectedBranch={selectedBaseBranch}
+              branches={[
+                ...(branches?.local ?? []).map(branch => ({
+                  name: branch.name,
+                  scope: 'local' as const,
+                })),
+                ...(branches?.remote ?? []).map(branch => ({
+                  name: branch.name,
+                  scope: 'remote' as const,
+                })),
+              ]}
+              loading={branchesLoading}
+              onSelectBranch={setSelectedBaseBranch}
+            />
+          )
+        : null}
+    </div>
   )
   const composer = (
     <DraftChatComposerWithState
@@ -251,16 +235,13 @@ export function NewWorkPage() {
       failureKind={failureKind}
       failureMessage={failureKind === 'generic' ? apiErrorMessage(error) : null}
       canOpenChanges={dirty && selectedWorkspace !== null}
-      canStartFromRemoteDefault={dirty && pendingObjective !== null}
       onOpenChanges={() => {
         if (selectedWorkspace) {
           openWorkspaceDiffs({ workspaceId: selectedWorkspace.id })
         }
       }}
-      onStartFromRemoteDefault={() => void handleStartFromRemoteDefault()}
       onDismissFailure={() => {
         setError(null)
-        setPendingObjective(null)
       }}
     />
   )

@@ -1,9 +1,3 @@
-/**
- * Output: AI SDK UIMessageChunk events projected from Codex app-server notifications.
- * Input: Codex app-server item lifecycle, delta, patch, and server request notifications.
- * Position: Codex provider package event mapper between app-server protocol and Chat Runtime chunks.
- */
-
 import type { UIMessageChunk } from 'ai'
 
 import type { BoundedTextCollector } from '../../bounded-text-collector'
@@ -22,7 +16,7 @@ import {
   readCodexToolError,
   readCodexToolName,
 } from '../tools/mapper'
-import { readRetryableCodexAppServerWarning } from './stream-diagnostics'
+import { readCodexAppServerRuntimeWarning } from './stream-diagnostics'
 
 export interface CodexAppServerMapperState {
   openReasoningItemIds: Set<string>
@@ -158,17 +152,22 @@ export function mapCodexAppServerNotificationToChunks(
     case 'serverRequest/handled':
       return mapHandledServerRequest(notification.params, state)
     case 'error':
-      return mapRetryableError(notification, state)
+    case 'warning':
+    case 'guardianWarning':
+    case 'configWarning':
+    case 'deprecationNotice':
+    case 'windows/worldWritableWarning':
+      return mapRuntimeWarning(notification, state)
     default:
       return []
   }
 }
 
-function mapRetryableError(
+function mapRuntimeWarning(
   notification: CodexAppServerNotification,
   state: CodexAppServerMapperState,
 ): UIMessageChunk[] {
-  const warning = readRetryableCodexAppServerWarning(notification)
+  const warning = readCodexAppServerRuntimeWarning(notification)
   if (!warning) {
     return []
   }
@@ -436,7 +435,7 @@ function mapRawResponseItemCompleted(rawParams: unknown, state: CodexAppServerMa
         responseItems: [{
           threadId: params.threadId,
           turnId: params.turnId,
-          item: params.item,
+          item: sanitizeRawResponseItem(params.item),
         }],
       },
     },
@@ -452,6 +451,16 @@ function mapRawResponseItemCompleted(rawParams: unknown, state: CodexAppServerMa
     }
   }
   return chunks
+}
+
+function sanitizeRawResponseItem(item: CodexResponseItem): CodexResponseItem {
+  if (item.type !== 'image_generation_call') {
+    return item
+  }
+
+  // The image is emitted as a separate file chunk. Keeping the base64 result
+  // in metadata duplicates megabytes in the message and every checkpoint.
+  return { ...item, result: '' }
 }
 
 function mapTurnModerationMetadata(rawParams: unknown): UIMessageChunk[] {

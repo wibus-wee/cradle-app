@@ -21,6 +21,7 @@ import {
   chronicleKnowledgeVersions,
   chronicleMemories,
   chronicleMemoryChunks,
+  chronicleMemoryEmbeddingBuckets,
   chronicleMemoryEmbeddings,
   chronicleMemoryKeywords,
   chronicleMessages,
@@ -33,7 +34,7 @@ import {
 import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
 import type { LanguageModel } from 'ai'
 import { generateText } from 'ai'
-import { count, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, count, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import formatDuration from 'format-duration'
 import sharp from 'sharp'
 import { z } from 'zod'
@@ -59,6 +60,7 @@ interface ChronicleConfig {
   dreamSchedulerIntervalMs: number
   dreamSchedulerApplyMerge: boolean
   audioCaptureEnabled: boolean
+  audioCaptureMode: 'meeting' | 'continuous'
   audioSource: 'microphone' | 'system' | 'mixed'
   audioSegmentMs: number
   audioSegmentIntervalMs: number
@@ -83,6 +85,7 @@ const defaultConfig: ChronicleConfig = {
   dreamSchedulerIntervalMs: 86_400_000,
   dreamSchedulerApplyMerge: false,
   audioCaptureEnabled: false,
+  audioCaptureMode: 'meeting',
   audioSource: 'microphone',
   audioSegmentMs: 5_000,
   audioSegmentIntervalMs: 60_000,
@@ -133,6 +136,7 @@ const ChronicleConfigSchema = z.object({
   dreamSchedulerIntervalMs: z.number().finite().positive().default(defaultConfig.dreamSchedulerIntervalMs),
   dreamSchedulerApplyMerge: z.boolean().default(defaultConfig.dreamSchedulerApplyMerge),
   audioCaptureEnabled: z.boolean().default(defaultConfig.audioCaptureEnabled),
+  audioCaptureMode: z.enum(['meeting', 'continuous']).default(defaultConfig.audioCaptureMode),
   audioSource: z.enum(['microphone', 'system', 'mixed']).default(defaultConfig.audioSource),
   audioSegmentMs: z.number().finite().positive().default(defaultConfig.audioSegmentMs),
   audioSegmentIntervalMs: z.number().finite().positive().default(defaultConfig.audioSegmentIntervalMs),
@@ -288,6 +292,7 @@ const SpeakerAliasesSchema = z.array(z.string())
 
 const SpeakerEmbeddingSchema = z.array(z.coerce.number().finite())
   .min(1, 'Speaker embedding must contain finite numeric values')
+  .max(4_096, 'Speaker embedding is too large')
   .nullable()
   .optional()
 
@@ -361,6 +366,9 @@ const AudioTranscriptSegmentInputSchema = z.object({
   startMs: z.number().finite().transform(value => Math.floor(value)),
   endMs: z.number().finite().nullable().optional().default(null).transform(value => value === null ? null : Math.floor(value)),
   speakerLabel: NullableStringSchema,
+  speakerCandidateKey: NullableStringSchema,
+  speakerEmbedding: SpeakerEmbeddingSchema,
+  speakerEmbeddingModelId: NullableStringSchema,
   text: z.string(),
   confidence: RatioBpsSchema.nullable().optional().default(null),
   language: NullableStringSchema,
@@ -430,6 +438,14 @@ const SpeakerProfileInputSchema = z.object({
   sampleCount: NonNegativeIntegerSchema.optional(),
   lastSeenAt: NullableStringSchema.transform(value => value === null ? null : UnixTimestampTextSchema.parse(value)),
   metadata: JsonRecordSchema,
+})
+
+const SpeakerProfilePatchInputSchema = z.object({
+  displayName: SpeakerDisplayNameSchema,
+})
+
+const AudioSegmentSpeakerPatchInputSchema = z.object({
+  speakerProfileId: NullableStringSchema,
 })
 
 const AccessibilitySnapshotReportInputSchema = z.object({
@@ -529,25 +545,23 @@ const ONNX_TEXT_EMBEDDING_MODEL_ID = 'all-MiniLM-L6-v2'
 const ONNX_TEXT_EMBEDDING_MODEL_VERSION = 'onnx-minilm-l6-v2'
 const MEMORY_SEMANTIC_SCORE_WEIGHT = 12
 const MEMORY_SEMANTIC_MIN_SCORE = 0.28
+const MEMORY_EMBEDDING_CANDIDATE_BUCKET_COUNT = 16
+const MEMORY_SEARCH_CANDIDATE_LIMIT = 256
+const MEMORY_EMBEDDING_ASYNC_BATCH_SIZE = 64
 const ACTIVITY_IDLE_BOUNDARY_SECONDS = 10 * 60
 const ACTIVITY_MAX_SEGMENT_SECONDS = 30 * 60
 // A fixed owner guard against local disk exhaustion. This is not a claimed source
 // size: manifest `sizeBytes`, when present, remains the precise validation.
 const MODEL_RESOURCE_DOWNLOAD_MAX_BYTES = 100 * 1024 ** 3
-const EMBEDDING_RUNTIME_HEALTH_TIMEOUT_MS = 5_000
-const EMBEDDING_RUNTIME_HEALTH_CACHE_MS = 60_000
 const DREAM_SCHEDULER_MIN_INTERVAL_MS = 3_600_000
 const DREAM_SCHEDULER_MAX_INTERVAL_MS = 7 * 86_400_000
 const ACTIVITY_SESSION_GAP_SECONDS = 6 * 60 * 60
 
-let embeddingRuntimeHealth: {
-  checkedAtMs: number
-  ok: boolean
-  error: string | null
-} | null = null
-
 type ChronicleDb = ReturnType<typeof db>
 type ChronicleTx = Parameters<Parameters<ChronicleDb['transaction']>[0]>[0]
+
+let memoryEmbeddingIndexerAccepting = true
+const pendingMemoryEmbeddingUpgrades = new Set<Promise<void>>()
 
 export type ModelResourceCategory = 'ocr' | 'audio-vad' | 'audio-asr' | 'speaker' | 'embedding' | 'pii'
 const ModelResourceCategorySchema = z.enum(['ocr', 'audio-vad', 'audio-asr', 'speaker', 'embedding', 'pii'])
@@ -1015,10 +1029,12 @@ const ChronicleSummarizeInputSchema = z.object({
 
 const SpeakerProfileUpsertInputSchema = z.object({
   workspaceId: z.string().nullable(),
+  stableKey: z.string().trim().min(1).optional(),
   displayName: SpeakerDisplayNameSchema,
   aliases: SpeakerAliasesSchema,
   embedding: SpeakerEmbeddingSchema,
   embeddingModelId: NullableStringSchema,
+  identitySource: z.enum(['automatic', 'user']).default('automatic'),
   sampleCount: z.number().finite().nonnegative().default(1).transform(value => Math.floor(value)),
   seenAt: z.number().finite().nullable().optional(),
   transcriptId: NullableStringSchema,
@@ -1199,21 +1215,32 @@ const rawBuiltInModelManifests = {
   },
   'speaker': {
     category: 'speaker',
-    displayName: 'Speaker Embedding Extractor',
-    version: '3dspeaker-campplus-zh-en-16k',
+    displayName: 'Speaker Diarization',
+    version: 'pyannote-segmentation-3.0-campplus-zh-en-16k',
     runtime: 'sherpa-onnx',
     required: false,
-    message: 'Sherpa speaker embedding extractor model for local speaker profiles and meeting speaker labeling.',
-    files: [{
-      path: 'speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
-      sourceUrl: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
-      sha256: 'aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2',
-      sizeBytes: 28_281_164,
-      required: true,
-    }],
+    message: 'Sherpa Pyannote segmentation and CAMPPlus embedding models for local meeting speaker labeling.',
+    files: [
+      {
+        path: 'speaker/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
+        sourceUrl: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx',
+        sha256: 'aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2',
+        sizeBytes: 28_281_164,
+        required: true,
+      },
+      {
+        path: 'speaker/pyannote-segmentation-3.0.onnx',
+        sourceUrl: 'https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx',
+        fallbackUrls: [
+          'https://hf-mirror.com/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx',
+        ],
+        sha256: '220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079',
+        required: true,
+      },
+    ],
     metadata: {
       requiredFor: ['speaker-labeling', 'meeting-transcription'],
-      function: 'speaker-embedding-extractor',
+      function: 'pyannote-segmentation-plus-campplus',
       sampleRate: 16_000,
       languages: ['zh', 'en'],
     },
@@ -1440,6 +1467,7 @@ export interface ChronicleStatus {
   activityPipelineIntervalMs: number
   activityPipelineBatchSize: number
   audioCaptureEnabled: boolean
+  audioCaptureMode: 'meeting' | 'continuous'
   audioSource: 'microphone' | 'system' | 'mixed'
   audioRuntimeStatus: 'disabled' | 'armed' | 'unavailable'
   closedEyesDiscardEnabled: boolean
@@ -1482,6 +1510,7 @@ export interface ActivityMonitorStatusEntry {
     activityPipelineIntervalMs: number
     activityPipelineBatchSize: number
     audioCaptureEnabled: boolean
+    audioCaptureMode: 'meeting' | 'continuous'
     audioSource: 'microphone' | 'system' | 'mixed'
     closedEyesDiscardEnabled: boolean
     closedEyesMode: 'auto' | 'always-record' | 'always-pause'
@@ -1856,6 +1885,9 @@ export interface AudioTranscriptSegmentInput {
   startMs: number
   endMs?: number | null
   speakerLabel?: string | null
+  speakerCandidateKey?: string | null
+  speakerEmbedding?: number[] | null
+  speakerEmbeddingModelId?: string | null
   text: string
   confidence?: number | null
   language?: string | null
@@ -1883,7 +1915,10 @@ export interface AudioTranscriptSegmentEntry {
   segmentIndex: number
   startMs: number
   endMs: number | null
+  speakerProfileId: string | null
   speakerLabel: string | null
+  speakerAssignmentSource: 'automatic' | 'user' | 'unassigned'
+  speakerMatchConfidence: number | null
   text: string
   confidence: number | null
   language: string | null
@@ -1914,9 +1949,10 @@ export interface SpeakerProfileEntry {
   displayName: string
   normalizedLabel: string
   aliases: string[]
-  embedding: number[] | null
+  hasVoiceprint: boolean
   embeddingDimensions: number | null
   embeddingModelId: string | null
+  identitySource: 'automatic' | 'user'
   sampleCount: number
   lastSeenAt: string | null
   lastSeenAtUnix: number | null
@@ -1937,6 +1973,14 @@ export interface SpeakerProfileInput {
   sampleCount?: number
   lastSeenAt?: string | null
   metadata?: Record<string, unknown>
+}
+
+export interface SpeakerProfilePatchInput {
+  displayName: string
+}
+
+export interface AudioSegmentSpeakerPatchInput {
+  speakerProfileId: string | null
 }
 
 export interface AudioRawSegmentReportInput {
@@ -2129,6 +2173,7 @@ function toDaemonOptions(config: ChronicleConfig): DaemonManager.ChronicleDaemon
   return {
     storageRoot: config.storageRoot,
     audioCaptureEnabled: config.audioCaptureEnabled,
+    audioCaptureMode: config.audioCaptureMode,
     audioSource: config.audioSource,
     audioSegmentMs: config.audioSegmentMs,
     audioSegmentIntervalMs: config.audioSegmentIntervalMs,
@@ -2142,6 +2187,7 @@ function toDaemonOptions(config: ChronicleConfig): DaemonManager.ChronicleDaemon
 function daemonLaunchConfigChanged(previous: ChronicleConfig, next: ChronicleConfig): boolean {
   return previous.storageRoot !== next.storageRoot
     || previous.audioCaptureEnabled !== next.audioCaptureEnabled
+    || previous.audioCaptureMode !== next.audioCaptureMode
     || previous.audioSource !== next.audioSource
     || previous.audioSegmentMs !== next.audioSegmentMs
     || previous.audioSegmentIntervalMs !== next.audioSegmentIntervalMs
@@ -2257,6 +2303,7 @@ export async function updateConfig(input: unknown): Promise<ChronicleConfig> {
     audioRmsThreshold: boundedNumber(config.audioRmsThreshold, 0, 1),
     storageRoot: resolve(config.storageRoot),
     audioSource: config.audioSource,
+    audioCaptureMode: config.audioCaptureMode,
   }
   await saveConfig(next)
   recordEvent({
@@ -2274,6 +2321,7 @@ export async function updateConfig(input: unknown): Promise<ChronicleConfig> {
       dreamSchedulerIntervalMs: next.dreamSchedulerIntervalMs,
       dreamSchedulerApplyMerge: next.dreamSchedulerApplyMerge,
       audioCaptureEnabled: next.audioCaptureEnabled,
+      audioCaptureMode: next.audioCaptureMode,
       audioSource: next.audioSource,
       audioSegmentMs: next.audioSegmentMs,
       audioSegmentIntervalMs: next.audioSegmentIntervalMs,
@@ -2466,6 +2514,7 @@ export async function getStatus(): Promise<ChronicleStatus> {
     activityPipelineIntervalMs: config.activityPipelineIntervalMs,
     activityPipelineBatchSize: config.activityPipelineBatchSize,
     audioCaptureEnabled: config.audioCaptureEnabled,
+    audioCaptureMode: config.audioCaptureMode,
     audioSource: config.audioSource,
     audioRuntimeStatus: runtimeAllowed ? getAudioRuntimeStatus(config, daemonInfo) : 'disabled',
     closedEyesDiscardEnabled: config.closedEyesDiscardEnabled,
@@ -2849,6 +2898,7 @@ export function updateMemory(memoryId: string, rawInput: ChronicleMemoryUpdateIn
     memoryId,
     attrs: { contentChanged: content !== existing.content },
   })
+  scheduleMemoryOnnxEmbeddingUpgrade(updated.id)
   return toMemoryEntry(updated)
 }
 
@@ -3177,7 +3227,7 @@ export function exportPrivacyRedacted(rawInput: {
   return { format, content, entityCount, sources }
 }
 
-export function searchMemories(query: string, limit = 20): MemoryEntry[] {
+export async function searchMemories(query: string, limit = 20): Promise<MemoryEntry[]> {
   reconcileMemorySearchIndex()
   const needle = query.trim()
   if (!needle) {
@@ -3188,25 +3238,69 @@ export function searchMemories(query: string, limit = 20): MemoryEntry[] {
     return []
   }
 
+  const keywordScore = sql<number>`sum(${chronicleMemoryKeywords.occurrences} * ${chronicleMemoryKeywords.weight} + 1)`
   const keywordRows = db()
-    .select()
+    .select({
+      memoryId: chronicleMemoryKeywords.memoryId,
+      keywordScore,
+    })
     .from(chronicleMemoryKeywords)
     .where(inArray(chronicleMemoryKeywords.term, terms))
+    .groupBy(chronicleMemoryKeywords.memoryId)
+    .orderBy(desc(keywordScore))
+    .limit(MEMORY_SEARCH_CANDIDATE_LIMIT)
     .all()
 
   const scoreByMemoryId = new Map<string, MemorySearchScore>()
   for (const row of keywordRows) {
-    const phraseBoost = terms.includes(row.term) ? 1 : 0
-    const current = scoreByMemoryId.get(row.memoryId) ?? { keywordScore: 0, semanticScore: 0 }
-    current.keywordScore += row.occurrences * row.weight + phraseBoost
-    scoreByMemoryId.set(row.memoryId, current)
+    scoreByMemoryId.set(row.memoryId, { keywordScore: row.keywordScore, semanticScore: 0 })
   }
 
-  const queryEmbedding = buildTextEmbeddingVector(needle)
-  const embeddingRows = db()
+  const queryEmbedding = await buildQueryTextEmbeddingVector(needle)
+  const buckets = buildEmbeddingCandidateBuckets(queryEmbedding.vector)
+  const bucketConditions = buckets.map(bucket => and(
+    eq(chronicleMemoryEmbeddingBuckets.bandIndex, bucket.bandIndex),
+    eq(chronicleMemoryEmbeddingBuckets.bucketKey, bucket.bucketKey),
+  ))
+  const embeddingCandidateIds = bucketConditions.length === 0
+    ? []
+    : db()
+        .select({
+          embeddingId: chronicleMemoryEmbeddingBuckets.embeddingId,
+          matches: count(),
+        })
+        .from(chronicleMemoryEmbeddingBuckets)
+        .where(and(
+          eq(chronicleMemoryEmbeddingBuckets.modelId, queryEmbedding.modelId),
+          eq(chronicleMemoryEmbeddingBuckets.modelVersion, queryEmbedding.modelVersion),
+          or(...bucketConditions),
+        ))
+        .groupBy(chronicleMemoryEmbeddingBuckets.embeddingId)
+        .orderBy(desc(count()))
+        .limit(MEMORY_SEARCH_CANDIDATE_LIMIT)
+        .all()
+        .map(row => row.embeddingId)
+  const keywordMemoryIds = keywordRows.map(row => row.memoryId)
+  const candidateConditions = [
+    ...(embeddingCandidateIds.length > 0
+      ? [inArray(chronicleMemoryEmbeddings.id, embeddingCandidateIds)]
+      : []),
+    ...(keywordMemoryIds.length > 0
+      ? [inArray(chronicleMemoryEmbeddings.memoryId, keywordMemoryIds)]
+      : []),
+  ]
+  const embeddingRows = candidateConditions.length === 0
+    ? []
+    : db()
     .select()
     .from(chronicleMemoryEmbeddings)
-    .where(sql`${chronicleMemoryEmbeddings.status} = 'ready' AND ${chronicleMemoryEmbeddings.modelId} = ${queryEmbedding.modelId} AND ${chronicleMemoryEmbeddings.modelVersion} = ${queryEmbedding.modelVersion}`)
+    .where(and(
+      eq(chronicleMemoryEmbeddings.status, 'ready'),
+      eq(chronicleMemoryEmbeddings.modelId, queryEmbedding.modelId),
+      eq(chronicleMemoryEmbeddings.modelVersion, queryEmbedding.modelVersion),
+      or(...candidateConditions),
+    ))
+    .limit(MEMORY_SEARCH_CANDIDATE_LIMIT)
     .all()
 
   for (const row of embeddingRows) {
@@ -3257,7 +3351,7 @@ export function searchMemories(query: string, limit = 20): MemoryEntry[] {
     .map(({ row, match }) => toMemoryEntry(row, match))
 }
 
-export function embedTexts(input: EmbeddingRequestInput): EmbeddingResponse {
+export async function embedTexts(input: EmbeddingRequestInput): Promise<EmbeddingResponse> {
   const texts = input.texts.map(text => text.trim()).filter(Boolean)
   if (texts.length === 0 || texts.length > 64) {
     throw new AppError({
@@ -3266,16 +3360,15 @@ export function embedTexts(input: EmbeddingRequestInput): EmbeddingResponse {
       message: 'Embedding request must include 1-64 non-empty texts',
     })
   }
-  const health = getOnnxEmbeddingRuntimeHealth()
-  if (!health.ok) {
+  if (!onnxEmbeddingResourceAvailable()) {
     throw new AppError({
       code: 'chronicle_embedding_model_unavailable',
       status: 503,
-      message: health.error ?? 'Chronicle ONNX embedding runtime is not available',
+      message: 'Chronicle ONNX embedding model is not installed',
     })
   }
   try {
-    const response = EmbeddingBatchSchema.parse(DaemonManager.runEmbeddingBatch(texts, getModelResourcesRoot()))
+    const response = EmbeddingBatchSchema.parse(await DaemonManager.runEmbeddingBatch(texts, getModelResourcesRoot()))
     if (response.embeddings.length !== texts.length) {
       throw new Error('embedding response has an invalid embedding count')
     }
@@ -3289,7 +3382,7 @@ export function embedTexts(input: EmbeddingRequestInput): EmbeddingResponse {
   catch (error) {
     throw new AppError({
       code: 'chronicle_embedding_failed',
-      status: 500,
+      status: 503,
       message: error instanceof Error ? error.message : String(error),
     })
   }
@@ -3364,7 +3457,7 @@ async function verifyModelResourceInternal(
   options: { recordEventOnSuccess?: boolean } = {},
 ): Promise<ModelResourceEntry> {
   if (category === 'embedding') {
-    clearEmbeddingRuntimeHealth()
+    resetEmbeddingRuntime()
   }
   const manifest = getModelResourceManifest(category)
   const current = getModelResourceRow(category)
@@ -3472,7 +3565,7 @@ async function installModelResourceInternal(
   downloadCenter?: ModelResourceDownloadCenter,
 ): Promise<ModelResourceEntry> {
   if (category === 'embedding') {
-    clearEmbeddingRuntimeHealth()
+    resetEmbeddingRuntime()
   }
   const input = ModelResourceInstallInputSchema.parse(rawInput)
   const manifest = getModelResourceManifest(category)
@@ -3592,7 +3685,7 @@ async function installModelResourceInternal(
 
 export async function removeModelResource(category: ModelResourceCategory): Promise<ModelResourceEntry> {
   if (category === 'embedding') {
-    clearEmbeddingRuntimeHealth()
+    resetEmbeddingRuntime()
   }
   const manifest = getModelResourceManifest(category)
   for (const file of manifest.files) {
@@ -3805,6 +3898,7 @@ export async function getActivityMonitorStatus(): Promise<ActivityMonitorStatusE
       activityPipelineIntervalMs: status.activityPipelineIntervalMs,
       activityPipelineBatchSize: status.activityPipelineBatchSize,
       audioCaptureEnabled: status.audioCaptureEnabled,
+      audioCaptureMode: status.audioCaptureMode,
       audioSource: status.audioSource,
       closedEyesDiscardEnabled: status.closedEyesDiscardEnabled,
       closedEyesMode: status.closedEyesMode,
@@ -6161,10 +6255,12 @@ function uniqueStrings(values: string[]): string[] {
 
 interface SpeakerProfileUpsertInput {
   workspaceId: string | null
+  stableKey?: string
   displayName: string
   aliases?: string[]
   embedding?: number[] | null
   embeddingModelId?: string | null
+  identitySource?: 'automatic' | 'user'
   sampleCount?: number
   seenAt?: number | null
   transcriptId?: string | null
@@ -6182,7 +6278,7 @@ function upsertSpeakerProfileFromLabel(
   const displayName = input.displayName
   const normalizedLabel = normalizeSpeakerDisplayName(displayName).toLocaleLowerCase()
   const workspaceId = input.workspaceId || null
-  const stableKey = buildSpeakerStableKey(workspaceId, normalizedLabel)
+  const stableKey = input.stableKey ?? buildSpeakerStableKey(workspaceId, normalizedLabel)
   const existing = d
     .select()
     .from(chronicleSpeakerProfiles)
@@ -6216,6 +6312,7 @@ function upsertSpeakerProfileFromLabel(
       ? null
       : input.embeddingModelId ?? existing?.embeddingModelId ?? 'speaker-embedding-extractor'
   const lastSeenAt = input.seenAt ?? (existing ? existing.lastSeenAt : null)
+  const identitySource = existing?.identitySource === 'user' ? 'user' : input.identitySource
 
   if (existing) {
     d.update(chronicleSpeakerProfiles).set({
@@ -6225,6 +6322,7 @@ function upsertSpeakerProfileFromLabel(
       embeddingJson,
       embeddingDimensions,
       embeddingModelId,
+      identitySource,
       sampleCount: nextSampleCount,
       lastSeenAt,
       sourceTranscriptId: input.transcriptId === null ? existing.sourceTranscriptId : input.transcriptId,
@@ -6246,6 +6344,7 @@ function upsertSpeakerProfileFromLabel(
     embeddingJson,
     embeddingDimensions,
     embeddingModelId,
+    identitySource,
     sampleCount: nextSampleCount,
     lastSeenAt,
     sourceTranscriptId: input.transcriptId,
@@ -6278,6 +6377,122 @@ function normalizeSpeakerAliases(values: string[]): string[] {
 
 function buildSpeakerStableKey(workspaceId: string | null, normalizedLabel: string): string {
   return `${workspaceId ?? 'global'}:${normalizedLabel}`
+}
+
+const SPEAKER_MATCH_MINIMUM = 0.78
+const SPEAKER_MATCH_AMBIGUITY_MARGIN = 0.05
+
+interface SpeakerAssignment {
+  profileId: string | null
+  label: string
+  source: 'automatic' | 'user' | 'unassigned'
+  confidenceBps: number | null
+}
+
+function speakerCosineSimilarity(left: number[], right: number[]): number | null {
+  if (left.length !== right.length || left.length === 0) {
+    return null
+  }
+  let dot = 0
+  let leftMagnitude = 0
+  let rightMagnitude = 0
+  for (let index = 0; index < left.length; index += 1) {
+    dot += left[index] * right[index]
+    leftMagnitude += left[index] * left[index]
+    rightMagnitude += right[index] * right[index]
+  }
+  if (leftMagnitude === 0 || rightMagnitude === 0) {
+    return null
+  }
+  return dot / Math.sqrt(leftMagnitude * rightMagnitude)
+}
+
+function mergeSpeakerEmbedding(existing: number[], sampleCount: number, incoming: number[]): number[] {
+  const denominator = Math.max(1, sampleCount) + 1
+  return existing.map((value, index) => ((value * Math.max(1, sampleCount)) + incoming[index]) / denominator)
+}
+
+function resolveSpeakerAssignment(
+  d: ChronicleDb | ChronicleTx,
+  input: {
+    workspaceId: string | null
+    transcriptSource: 'asr' | 'manual' | 'imported'
+    speakerLabel: string | null
+    embedding: number[] | null | undefined
+    embeddingModelId: string | null
+    seenAt: number
+    transcriptId: string
+    segmentId: string | null
+  },
+): SpeakerAssignment {
+  if (!input.embedding) {
+    if (input.speakerLabel && input.transcriptSource !== 'asr') {
+      const profile = upsertSpeakerProfileFromLabel(d, {
+        workspaceId: input.workspaceId,
+        displayName: input.speakerLabel,
+        identitySource: 'user',
+        seenAt: input.seenAt,
+        transcriptId: input.transcriptId,
+        segmentId: input.segmentId,
+      })
+      return { profileId: profile.id, label: profile.displayName, source: 'user', confidenceBps: null }
+    }
+    return { profileId: null, label: 'Unknown', source: 'unassigned', confidenceBps: null }
+  }
+
+  const embeddingModelId = input.embeddingModelId ?? 'speaker-embedding-extractor'
+  const candidates = d
+    .select()
+    .from(chronicleSpeakerProfiles)
+    .all()
+    .filter(profile => profile.workspaceId === input.workspaceId
+      && profile.embeddingModelId === embeddingModelId
+      && profile.embeddingDimensions === input.embedding!.length
+      && profile.embeddingJson !== null)
+    .map((profile) => {
+      const similarity = speakerCosineSimilarity(NumberListTextSchema.parse(profile.embeddingJson), input.embedding!)
+      return similarity === null ? null : { profile, similarity }
+    })
+    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null)
+    .sort((left, right) => right.similarity - left.similarity)
+
+  const best = candidates[0]
+  const runnerUp = candidates[1]
+  if (best && best.similarity >= SPEAKER_MATCH_MINIMUM) {
+    if (runnerUp && best.similarity - runnerUp.similarity < SPEAKER_MATCH_AMBIGUITY_MARGIN) {
+      return { profileId: null, label: 'Unknown', source: 'unassigned', confidenceBps: Math.round(best.similarity * 10_000) }
+    }
+    const existingEmbedding = NumberListTextSchema.parse(best.profile.embeddingJson)
+    const mergedEmbedding = mergeSpeakerEmbedding(existingEmbedding, best.profile.sampleCount, input.embedding)
+    d.update(chronicleSpeakerProfiles).set({
+      embeddingJson: JSON.stringify(mergedEmbedding),
+      sampleCount: best.profile.sampleCount + 1,
+      lastSeenAt: input.seenAt,
+      sourceTranscriptId: input.transcriptId,
+      sourceSegmentId: input.segmentId,
+      updatedAt: currentUnixSeconds(),
+    }).where(eq(chronicleSpeakerProfiles.id, best.profile.id)).run()
+    return {
+      profileId: best.profile.id,
+      label: best.profile.displayName,
+      source: 'automatic',
+      confidenceBps: Math.round(best.similarity * 10_000),
+    }
+  }
+
+  const profile = upsertSpeakerProfileFromLabel(d, {
+    workspaceId: input.workspaceId,
+    stableKey: `${input.workspaceId ?? 'global'}:voice:${randomUUID()}`,
+    displayName: 'Unknown',
+    embedding: input.embedding,
+    embeddingModelId,
+    identitySource: 'automatic',
+    sampleCount: 1,
+    seenAt: input.seenAt,
+    transcriptId: input.transcriptId,
+    segmentId: input.segmentId,
+  })
+  return { profileId: profile.id, label: profile.displayName, source: 'automatic', confidenceBps: null }
 }
 
 function normalizeActivityBoundary(value: string | null): string {
@@ -6477,6 +6692,27 @@ export function recordAudioTranscript(rawInput: AudioTranscriptReportInput): Aud
     .where(eq(chronicleAudioTranscripts.sourceId, input.sourceId))
     .get()
   const transcriptId = existing?.id ?? randomUUID()
+  const preservedUserAssignments = new Map<number, { profileId: string, displayName: string }>()
+  if (existing) {
+    const previousSegments = db()
+      .select()
+      .from(chronicleAudioSegments)
+      .where(eq(chronicleAudioSegments.transcriptId, transcriptId))
+      .all()
+    for (const segment of previousSegments) {
+      if (segment.speakerAssignmentSource !== 'user' || !segment.speakerProfileId) {
+        continue
+      }
+      const profile = db()
+        .select()
+        .from(chronicleSpeakerProfiles)
+        .where(eq(chronicleSpeakerProfiles.id, segment.speakerProfileId))
+        .get()
+      if (profile) {
+        preservedUserAssignments.set(segment.segmentIndex, { profileId: profile.id, displayName: profile.displayName })
+      }
+    }
+  }
   const transcriptText = buildAudioTranscriptMemoryContent({
     title: input.title,
     startedAt,
@@ -6528,16 +6764,43 @@ export function recordAudioTranscript(rawInput: AudioTranscriptReportInput): Aud
       }).run()
     }
 
+    const candidateAssignments = new Map<string, SpeakerAssignment>()
     for (const [segmentIndex, segment] of input.segments.entries()) {
       const segmentId = randomUUID()
-      const speakerLabel = segment.speakerLabel
+      const preservedAssignment = preservedUserAssignments.get(segmentIndex)
+      const cachedAssignment = segment.speakerCandidateKey
+        ? candidateAssignments.get(segment.speakerCandidateKey)
+        : undefined
+      const speakerAssignment: SpeakerAssignment = preservedAssignment
+        ? {
+            profileId: preservedAssignment.profileId,
+            label: preservedAssignment.displayName,
+            source: 'user',
+            confidenceBps: null,
+          }
+        : cachedAssignment ?? resolveSpeakerAssignment(tx, {
+            workspaceId: config.workspaceId || null,
+            transcriptSource: source,
+            speakerLabel: segment.speakerLabel,
+            embedding: segment.speakerEmbedding,
+            embeddingModelId: segment.speakerEmbeddingModelId,
+            seenAt: startedAt + Math.floor(segment.startMs / 1000),
+            transcriptId,
+            segmentId: null,
+          })
+      if (segment.speakerCandidateKey && !cachedAssignment) {
+        candidateAssignments.set(segment.speakerCandidateKey, speakerAssignment)
+      }
       tx.insert(chronicleAudioSegments).values({
         id: segmentId,
         transcriptId,
         segmentIndex,
         startMs: segment.startMs,
         endMs: segment.endMs,
-        speakerLabel,
+        speakerProfileId: speakerAssignment.profileId,
+        speakerLabel: speakerAssignment.label,
+        speakerAssignmentSource: speakerAssignment.source,
+        speakerMatchConfidenceBps: speakerAssignment.confidenceBps,
         text: segment.text,
         confidenceBps: segment.confidenceBps,
         language: segment.language ?? input.language,
@@ -6545,19 +6808,11 @@ export function recordAudioTranscript(rawInput: AudioTranscriptReportInput): Aud
         createdAt: now,
         updatedAt: now,
       }).run()
-      if (speakerLabel) {
-        upsertSpeakerProfileFromLabel(tx, {
-          workspaceId: config.workspaceId || null,
-          displayName: speakerLabel,
-          seenAt: startedAt + Math.floor(segment.startMs / 1000),
-          transcriptId,
-          segmentId,
-          metadata: {
-            source: 'audio-transcript',
-            transcriptSourceId: input.sourceId,
-            transcriptTitle: input.title,
-          },
-        })
+      if (speakerAssignment.profileId) {
+        tx.update(chronicleSpeakerProfiles).set({
+          sourceSegmentId: segmentId,
+          updatedAt: now,
+        }).where(eq(chronicleSpeakerProfiles.id, speakerAssignment.profileId)).run()
       }
     }
   })
@@ -6647,6 +6902,7 @@ export function upsertSpeakerProfile(rawInput: SpeakerProfileInput): SpeakerProf
     aliases,
     embedding,
     embeddingModelId: input.embeddingModelId,
+    identitySource: 'user',
     sampleCount,
     seenAt: lastSeenAt,
     metadata: {
@@ -6656,6 +6912,102 @@ export function upsertSpeakerProfile(rawInput: SpeakerProfileInput): SpeakerProf
     now,
   })
   return toSpeakerProfileEntry(row)
+}
+
+export function updateSpeakerProfile(profileId: string, rawInput: SpeakerProfilePatchInput): SpeakerProfileEntry {
+  const input = SpeakerProfilePatchInputSchema.parse(rawInput)
+  const row = db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()
+  if (!row) {
+    throw new AppError({ code: 'chronicle_speaker_profile_not_found', status: 404, message: 'Chronicle speaker profile not found' })
+  }
+  const now = currentUnixSeconds()
+  const aliases = normalizeSpeakerAliases([
+    ...StringListTextSchema.parse(row.aliasesJson),
+    row.displayName,
+    input.displayName,
+  ])
+  db().transaction((tx) => {
+    tx.update(chronicleSpeakerProfiles).set({
+      displayName: input.displayName,
+      normalizedLabel: input.displayName.toLocaleLowerCase(),
+      aliasesJson: JSON.stringify(aliases),
+      identitySource: 'user',
+      updatedAt: now,
+    }).where(eq(chronicleSpeakerProfiles.id, profileId)).run()
+    tx.update(chronicleAudioSegments).set({
+      speakerLabel: input.displayName,
+      updatedAt: now,
+    }).where(eq(chronicleAudioSegments.speakerProfileId, profileId)).run()
+  })
+  return toSpeakerProfileEntry(db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()!)
+}
+
+export function deleteSpeakerVoiceprint(profileId: string): SpeakerProfileEntry {
+  const row = db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()
+  if (!row) {
+    throw new AppError({ code: 'chronicle_speaker_profile_not_found', status: 404, message: 'Chronicle speaker profile not found' })
+  }
+  db().update(chronicleSpeakerProfiles).set({
+    embeddingJson: null,
+    embeddingDimensions: null,
+    embeddingModelId: null,
+    updatedAt: currentUnixSeconds(),
+  }).where(eq(chronicleSpeakerProfiles.id, profileId)).run()
+  return toSpeakerProfileEntry(db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()!)
+}
+
+export function deleteSpeakerProfile(profileId: string): { ok: true } {
+  const row = db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).get()
+  if (!row) {
+    throw new AppError({ code: 'chronicle_speaker_profile_not_found', status: 404, message: 'Chronicle speaker profile not found' })
+  }
+  const now = currentUnixSeconds()
+  db().transaction((tx) => {
+    tx.update(chronicleAudioSegments).set({
+      speakerProfileId: null,
+      speakerLabel: 'Unknown',
+      speakerAssignmentSource: 'unassigned',
+      speakerMatchConfidenceBps: null,
+      updatedAt: now,
+    }).where(eq(chronicleAudioSegments.speakerProfileId, profileId)).run()
+    tx.delete(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, profileId)).run()
+  })
+  return { ok: true }
+}
+
+export function updateAudioSegmentSpeaker(
+  segmentId: string,
+  rawInput: AudioSegmentSpeakerPatchInput,
+): AudioTranscriptSegmentEntry {
+  const input = AudioSegmentSpeakerPatchInputSchema.parse(rawInput)
+  const segment = db().select().from(chronicleAudioSegments).where(eq(chronicleAudioSegments.id, segmentId)).get()
+  if (!segment) {
+    throw new AppError({ code: 'chronicle_audio_segment_not_found', status: 404, message: 'Chronicle audio segment not found' })
+  }
+  const now = currentUnixSeconds()
+  if (input.speakerProfileId === null) {
+    db().update(chronicleAudioSegments).set({
+      speakerProfileId: null,
+      speakerLabel: 'Unknown',
+      speakerAssignmentSource: 'unassigned',
+      speakerMatchConfidenceBps: null,
+      updatedAt: now,
+    }).where(eq(chronicleAudioSegments.id, segmentId)).run()
+  }
+  else {
+    const profile = db().select().from(chronicleSpeakerProfiles).where(eq(chronicleSpeakerProfiles.id, input.speakerProfileId)).get()
+    if (!profile) {
+      throw new AppError({ code: 'chronicle_speaker_profile_not_found', status: 404, message: 'Chronicle speaker profile not found' })
+    }
+    db().update(chronicleAudioSegments).set({
+      speakerProfileId: profile.id,
+      speakerLabel: profile.displayName,
+      speakerAssignmentSource: 'user',
+      speakerMatchConfidenceBps: null,
+      updatedAt: now,
+    }).where(eq(chronicleAudioSegments.id, segmentId)).run()
+  }
+  return toAudioSegmentEntry(db().select().from(chronicleAudioSegments).where(eq(chronicleAudioSegments.id, segmentId)).get()!)
 }
 
 export async function syncSlackSource(
@@ -7197,6 +7549,7 @@ export function recordMemory(
         attrs: { sourceId: input.sourceId, duplicateOfSourceId: duplicate.sourceId, contentHash, removedMemoryId: existing.id },
       })
       assignMemoryToActivity(input, merged.id, createdAt, config.workspaceId || null, options)
+      scheduleMemoryOnnxEmbeddingUpgrade(merged.id)
       return merged
     }
 
@@ -7207,6 +7560,7 @@ export function recordMemory(
       return updated
     })
     assignMemoryToActivity(input, updated.id, createdAt, config.workspaceId || null, options)
+    scheduleMemoryOnnxEmbeddingUpgrade(updated.id)
     return updated
   }
 
@@ -7226,6 +7580,7 @@ export function recordMemory(
       attrs: { sourceId: input.sourceId, duplicateOfSourceId: duplicate.sourceId, contentHash },
     })
     assignMemoryToActivity(input, merged.id, createdAt, config.workspaceId || null, options)
+    scheduleMemoryOnnxEmbeddingUpgrade(merged.id)
     return merged
   }
 
@@ -7244,6 +7599,7 @@ export function recordMemory(
     attrs: { sourceId: input.sourceId, source: input.summaryKind },
   })
   assignMemoryToActivity(input, inserted.id, createdAt, config.workspaceId || null, options)
+  scheduleMemoryOnnxEmbeddingUpgrade(inserted.id)
   return inserted
 }
 
@@ -7822,7 +8178,10 @@ function toAudioSegmentEntry(row: typeof chronicleAudioSegments.$inferSelect): A
     segmentIndex: row.segmentIndex,
     startMs: row.startMs,
     endMs: row.endMs,
+    speakerProfileId: row.speakerProfileId,
     speakerLabel: row.speakerLabel,
+    speakerAssignmentSource: row.speakerAssignmentSource,
+    speakerMatchConfidence: row.speakerMatchConfidenceBps === null ? null : row.speakerMatchConfidenceBps / 10_000,
     text: row.text,
     confidence: row.confidenceBps === null ? null : row.confidenceBps / 10_000,
     language: row.language,
@@ -7830,16 +8189,16 @@ function toAudioSegmentEntry(row: typeof chronicleAudioSegments.$inferSelect): A
 }
 
 function toSpeakerProfileEntry(row: typeof chronicleSpeakerProfiles.$inferSelect): SpeakerProfileEntry {
-  const embedding = row.embeddingJson ? NumberListTextSchema.parse(row.embeddingJson) : null
   return {
     id: row.id,
     workspaceId: row.workspaceId,
     displayName: row.displayName,
     normalizedLabel: row.normalizedLabel,
     aliases: StringListTextSchema.parse(row.aliasesJson),
-    embedding,
+    hasVoiceprint: row.embeddingJson !== null,
     embeddingDimensions: row.embeddingDimensions,
     embeddingModelId: row.embeddingModelId,
+    identitySource: row.identitySource,
     sampleCount: row.sampleCount,
     lastSeenAt: row.lastSeenAt === null ? null : new Date(row.lastSeenAt * 1000).toISOString(),
     lastSeenAtUnix: row.lastSeenAt,
@@ -8734,8 +9093,9 @@ function insertMemoryEmbedding(
 ): void {
   const embedding = buildTextEmbeddingVector(content)
   const vectorJson = JSON.stringify(embedding.vector)
+  const embeddingId = randomUUID()
   tx.insert(chronicleMemoryEmbeddings).values({
-    id: randomUUID(),
+    id: embeddingId,
     memoryId,
     chunkId,
     modelId: embedding.modelId,
@@ -8751,6 +9111,14 @@ function insertMemoryEmbedding(
     createdAt: now,
     updatedAt: now,
   }).run()
+  insertEmbeddingCandidateBuckets(tx, {
+    embeddingId,
+    memoryId,
+    modelId: embedding.modelId,
+    modelVersion: embedding.modelVersion,
+    vector: embedding.vector,
+    createdAt: now,
+  })
 
   if (embedding.provider === 'onnx') {
     tx.update(chronicleMemoryChunks).set({
@@ -8759,6 +9127,190 @@ function insertMemoryEmbedding(
       updatedAt: now,
     }).where(eq(chronicleMemoryChunks.id, chunkId)).run()
   }
+}
+
+export function startMemoryEmbeddingIndexer(): void {
+  memoryEmbeddingIndexerAccepting = true
+}
+
+export async function stopMemoryEmbeddingIndexer(): Promise<void> {
+  memoryEmbeddingIndexerAccepting = false
+  await Promise.allSettled([...pendingMemoryEmbeddingUpgrades])
+}
+
+function scheduleMemoryOnnxEmbeddingUpgrade(memoryId: string): void {
+  if (!memoryEmbeddingIndexerAccepting || !onnxEmbeddingResourceAvailable()) {
+    return
+  }
+  const operation = upgradeMemoryOnnxEmbeddings(memoryId)
+    .catch((error) => {
+      recordEvent({
+        type: 'model-resource',
+        status: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        attrs: { category: 'embedding', runtime: 'local-onnx', phase: 'memory-index' },
+      })
+    })
+  pendingMemoryEmbeddingUpgrades.add(operation)
+  void operation.then(() => pendingMemoryEmbeddingUpgrades.delete(operation))
+}
+
+async function upgradeMemoryOnnxEmbeddings(memoryId: string): Promise<void> {
+  const chunks = db()
+    .select()
+    .from(chronicleMemoryChunks)
+    .where(eq(chronicleMemoryChunks.memoryId, memoryId))
+    .all()
+  for (let offset = 0; offset < chunks.length; offset += MEMORY_EMBEDDING_ASYNC_BATCH_SIZE) {
+    const batch = chunks.slice(offset, offset + MEMORY_EMBEDDING_ASYNC_BATCH_SIZE)
+    const response = EmbeddingBatchSchema.parse(await DaemonManager.runEmbeddingBatch(
+      batch.map(chunk => chunk.content),
+      getModelResourcesRoot(),
+    ))
+    if (response.embeddings.length !== batch.length) {
+      throw new Error('embedding response has an invalid embedding count')
+    }
+    const now = currentUnixSeconds()
+    db().transaction((tx) => {
+      for (const [index, chunk] of batch.entries()) {
+        const currentChunk = tx
+          .select()
+          .from(chronicleMemoryChunks)
+          .where(eq(chronicleMemoryChunks.id, chunk.id))
+          .get()
+        if (!currentChunk || currentChunk.contentHash !== chunk.contentHash) {
+          continue
+        }
+        tx.delete(chronicleMemoryEmbeddings).where(and(
+          eq(chronicleMemoryEmbeddings.chunkId, chunk.id),
+          eq(chronicleMemoryEmbeddings.modelId, response.modelId),
+          eq(chronicleMemoryEmbeddings.modelVersion, response.modelVersion),
+        )).run()
+        const vector = response.embeddings[index]!
+        const vectorJson = JSON.stringify(vector)
+        const embeddingId = randomUUID()
+        tx.insert(chronicleMemoryEmbeddings).values({
+          id: embeddingId,
+          memoryId,
+          chunkId: chunk.id,
+          modelId: response.modelId,
+          modelVersion: response.modelVersion,
+          dimensions: response.dimensions,
+          vectorJson,
+          vectorHash: hashText(vectorJson),
+          status: 'ready',
+          metadataJson: JSON.stringify({ provider: 'chronicle-onnx', runtime: 'local-onnx' }),
+          createdAt: now,
+          updatedAt: now,
+        }).run()
+        insertEmbeddingCandidateBuckets(tx, {
+          embeddingId,
+          memoryId,
+          modelId: response.modelId,
+          modelVersion: response.modelVersion,
+          vector,
+          createdAt: now,
+        })
+        tx.update(chronicleMemoryChunks).set({
+          embeddingStatus: 'ready',
+          embeddingModelId: response.modelId,
+          updatedAt: now,
+        }).where(eq(chronicleMemoryChunks.id, chunk.id)).run()
+      }
+    })
+  }
+}
+
+/**
+ * Rebuilds missing ANN bucket rows outside the request path. The projection is derived
+ * exclusively from Chronicle-owned canonical embedding rows and is safe to rerun.
+ */
+export function reconcileMemoryEmbeddingCandidateIndex(): number {
+  const indexedEmbeddingIds = new Set(db()
+    .select({ embeddingId: chronicleMemoryEmbeddingBuckets.embeddingId })
+    .from(chronicleMemoryEmbeddingBuckets)
+    .groupBy(chronicleMemoryEmbeddingBuckets.embeddingId)
+    .all()
+    .map(row => row.embeddingId))
+  const embeddings = db()
+    .select()
+    .from(chronicleMemoryEmbeddings)
+    .where(eq(chronicleMemoryEmbeddings.status, 'ready'))
+    .all()
+    .filter(row => !indexedEmbeddingIds.has(row.id))
+  if (embeddings.length === 0) {
+    return 0
+  }
+
+  db().transaction((tx) => {
+    for (const embedding of embeddings) {
+      const vector = NumberListTextSchema.parse(embedding.vectorJson)
+      if (vector.length !== embedding.dimensions) {
+        throw new AppError({
+          code: 'chronicle_memory_embedding_invalid',
+          status: 500,
+          message: 'Stored Chronicle memory embedding has invalid dimensions',
+          details: {
+            embeddingId: embedding.id,
+            expectedDimensions: embedding.dimensions,
+            actualDimensions: vector.length,
+          },
+        })
+      }
+      insertEmbeddingCandidateBuckets(tx, {
+        embeddingId: embedding.id,
+        memoryId: embedding.memoryId,
+        modelId: embedding.modelId,
+        modelVersion: embedding.modelVersion,
+        vector,
+        createdAt: embedding.createdAt,
+      })
+    }
+  })
+  return embeddings.length
+}
+
+function insertEmbeddingCandidateBuckets(
+  tx: ChronicleTx,
+  input: {
+    embeddingId: string
+    memoryId: string
+    modelId: string
+    modelVersion: string
+    vector: number[]
+    createdAt: number
+  },
+): void {
+  const buckets = buildEmbeddingCandidateBuckets(input.vector)
+  if (buckets.length === 0) {
+    return
+  }
+  tx.insert(chronicleMemoryEmbeddingBuckets).values(buckets.map(bucket => ({
+    id: randomUUID(),
+    embeddingId: input.embeddingId,
+    memoryId: input.memoryId,
+    modelId: input.modelId,
+    modelVersion: input.modelVersion,
+    bandIndex: bucket.bandIndex,
+    bucketKey: bucket.bucketKey,
+    createdAt: input.createdAt,
+  }))).run()
+}
+
+function buildEmbeddingCandidateBuckets(vector: number[]): Array<{ bandIndex: number, bucketKey: string }> {
+  if (vector.length === 0) {
+    return []
+  }
+  return vector
+    .map((value, dimensionIndex) => ({ value, dimensionIndex }))
+    .filter(entry => entry.value !== 0)
+    .sort((left, right) => Math.abs(right.value) - Math.abs(left.value)
+      || left.dimensionIndex - right.dimensionIndex)
+    .slice(0, MEMORY_EMBEDDING_CANDIDATE_BUCKET_COUNT)
+    .map(entry => ({
+      bandIndex: entry.dimensionIndex,
+      bucketKey: entry.value < 0 ? 'negative' : 'positive',
+    }))
 }
 
 function insertMemoryKeywords(
@@ -8830,15 +9382,34 @@ function buildCombinedMemorySearchScore(match: MemorySearchScore, phraseContaine
 }
 
 function currentTextEmbeddingVectorMode(): string {
-  return getOnnxEmbeddingRuntimeHealth().ok
-    ? `${ONNX_TEXT_EMBEDDING_MODEL_ID}/${ONNX_TEXT_EMBEDDING_MODEL_VERSION}`
-    : `${MEMORY_EMBEDDING_MODEL_ID}/${MEMORY_EMBEDDING_MODEL_VERSION}`
+  return `${MEMORY_EMBEDDING_MODEL_ID}/${MEMORY_EMBEDDING_MODEL_VERSION}`
 }
 
 function buildTextEmbeddingVector(text: string): TextEmbeddingVector {
-  if (getOnnxEmbeddingRuntimeHealth().ok) {
+  return {
+    vector: buildLexicalEmbeddingVector(text),
+    modelId: MEMORY_EMBEDDING_MODEL_ID,
+    modelVersion: MEMORY_EMBEDDING_MODEL_VERSION,
+    provider: 'lexical',
+  }
+}
+
+async function buildQueryTextEmbeddingVector(text: string): Promise<TextEmbeddingVector> {
+  const hasOnnxCandidates = db()
+    .select({ id: chronicleMemoryEmbeddingBuckets.id })
+    .from(chronicleMemoryEmbeddingBuckets)
+    .where(and(
+      eq(chronicleMemoryEmbeddingBuckets.modelId, ONNX_TEXT_EMBEDDING_MODEL_ID),
+      eq(chronicleMemoryEmbeddingBuckets.modelVersion, ONNX_TEXT_EMBEDDING_MODEL_VERSION),
+    ))
+    .limit(1)
+    .get()
+  if (hasOnnxCandidates && onnxEmbeddingResourceAvailable()) {
     try {
-      const response = EmbeddingBatchSchema.parse(DaemonManager.runEmbeddingBatch([text], getModelResourcesRoot()))
+      const response = EmbeddingBatchSchema.parse(await DaemonManager.runEmbeddingBatch(
+        [text],
+        getModelResourcesRoot(),
+      ))
       if (response.embeddings.length !== 1) {
         throw new Error('embedding response has an invalid embedding count')
       }
@@ -8858,13 +9429,7 @@ function buildTextEmbeddingVector(text: string): TextEmbeddingVector {
       })
     }
   }
-
-  return {
-    vector: buildLexicalEmbeddingVector(text),
-    modelId: MEMORY_EMBEDDING_MODEL_ID,
-    modelVersion: MEMORY_EMBEDDING_MODEL_VERSION,
-    provider: 'lexical',
-  }
+  return buildTextEmbeddingVector(text)
 }
 
 function onnxEmbeddingResourceAvailable(): boolean {
@@ -8874,60 +9439,15 @@ function onnxEmbeddingResourceAvailable(): boolean {
     .every(file => existsSync(getModelResourceAbsolutePath(file.path)))
 }
 
-function clearEmbeddingRuntimeHealth(): void {
-  embeddingRuntimeHealth = null
-}
-
-function getOnnxEmbeddingRuntimeHealth(): { ok: boolean, error: string | null } {
-  if (!onnxEmbeddingResourceAvailable()) {
-    return {
-      ok: false,
-      error: 'Chronicle ONNX embedding model is not installed',
-    }
-  }
-
-  const now = Date.now()
-  if (embeddingRuntimeHealth && now - embeddingRuntimeHealth.checkedAtMs < EMBEDDING_RUNTIME_HEALTH_CACHE_MS) {
-    return {
-      ok: embeddingRuntimeHealth.ok,
-      error: embeddingRuntimeHealth.error,
-    }
-  }
-
-  try {
-    const response = EmbeddingBatchSchema.parse(DaemonManager.runEmbeddingBatch(
-      ['chronicle embedding health probe'],
-      getModelResourcesRoot(),
-      { timeoutMs: EMBEDDING_RUNTIME_HEALTH_TIMEOUT_MS },
-    ))
-    if (response.embeddings.length !== 1) {
-      throw new Error('embedding response has an invalid embedding count')
-    }
-    embeddingRuntimeHealth = {
-      checkedAtMs: now,
-      ok: true,
-      error: null,
-    }
-  }
-  catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    embeddingRuntimeHealth = {
-      checkedAtMs: now,
-      ok: false,
-      error: errorMessage,
-    }
+function resetEmbeddingRuntime(): void {
+  void DaemonManager.resetEmbeddingWorker().catch((error) => {
     recordEvent({
       type: 'model-resource',
       status: 'error',
-      message: errorMessage,
-      attrs: { category: 'embedding', runtime: 'local-onnx', phase: 'health-check' },
+      message: error instanceof Error ? error.message : String(error),
+      attrs: { category: 'embedding', runtime: 'local-onnx', phase: 'worker-reset' },
     })
-  }
-
-  return {
-    ok: embeddingRuntimeHealth.ok,
-    error: embeddingRuntimeHealth.error,
-  }
+  })
 }
 
 function buildLexicalEmbeddingVector(text: string): number[] {

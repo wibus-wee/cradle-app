@@ -107,7 +107,7 @@ export function ContextUsageDetailPanel({
     queryFn: ({ signal }) => getChatRuntimeContextUsage(sessionId!, signal),
     enabled: Boolean(sessionId),
     staleTime: 5_000,
-    refetchInterval: compactState?.isCompactRelevant ? 5_000 : false,
+    refetchInterval: query => compactState?.isCompactRelevant && query.state.data?.usage !== null ? 5_000 : false,
     retry: false,
   })
   const usage = data?.usage ?? null
@@ -489,7 +489,7 @@ function readContextAggregate(
 }
 
 function readCompactWindowUsage(compactState: ChatRuntimeCompactUiSlotState) {
-  return compactState.last.totalTokens > 0 ? compactState.last : compactState.total
+  return compactState.last
 }
 
 function readContextSections(usage: ChatRuntimeContextUsage | null): ChatRuntimeContextUsageSection[] {

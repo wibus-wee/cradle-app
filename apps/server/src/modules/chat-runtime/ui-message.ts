@@ -6,10 +6,12 @@ import {
   readCradlePartPayloadRef,
 } from '@cradle/chat-runtime-contracts'
 import type { FileUIPart, UIMessage } from 'ai'
+import { isToolUIPart } from 'ai'
 
 import { AppError } from '../../errors/app-error'
 import { readObjectRecord } from '../../helpers/json-record'
 import { readBlobBytes } from '../blob-store/service'
+import { projectChatMessageForClient } from './client-message-projection'
 import type { ChatContextPart } from './context-parts'
 import { isChatContextPart, readChatContextPart, toOrderedUserMessageParts } from './context-parts'
 
@@ -186,6 +188,40 @@ async function resolveToolPartPayloads(
 
 export function parseStoredMessageSnapshot(raw: string): UIMessage {
   return normalizeMessageSnapshot(JSON.parse(raw) as UIMessage)
+}
+
+/**
+ * Projects a durable message for transcript lists. Tool lifecycle metadata is
+ * useful for rendering a compact card, but inline input/output values can be
+ * arbitrarily large. Blob references remain available so a detail request can
+ * still explain where the full payload lives without putting that payload in
+ * the ordinary history response.
+ */
+export function projectChatMessageDisplay<TMessage extends UIMessage>(message: TMessage): TMessage {
+  const clientMessage = projectChatMessageForClient(message)
+  let changed = false
+  const parts = clientMessage.parts.map((part) => {
+    if (!isToolUIPart(part)) {
+      return part
+    }
+
+    const { input, output, ...metadata } = part
+    const compactPart: Record<string, unknown> = { ...metadata }
+
+    if (isChatBlobPayloadRef(input)) {
+      compactPart.input = input
+    }
+    if (isChatBlobPayloadRef(output)) {
+      compactPart.output = output
+    }
+
+    if (input !== undefined || output !== undefined) {
+      changed = true
+    }
+    return compactPart as UIMessage['parts'][number]
+  })
+
+  return (changed ? { ...clientMessage, parts } : clientMessage) as TMessage
 }
 
 export function normalizeMessageSnapshot(message: UIMessage): UIMessage {

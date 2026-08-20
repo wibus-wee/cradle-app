@@ -34,6 +34,11 @@ export interface RecallToolEventProjectionInput {
   sourceEventId: string
 }
 
+export interface RecallToolEventRecordProjectionInput {
+  sourceEvent: typeof backendRunSnapshotEvents.$inferSelect
+  workspaceId: string | null
+}
+
 export interface RecallProjectionReconciliationResult {
   projectedMessages: number
   projectedRuns: number
@@ -144,51 +149,66 @@ export function projectRecallToolEvent(
     return
   }
 
+  projectRecallToolEventRecord(d, {
+    sourceEvent: row.event,
+    workspaceId: row.workspaceId,
+  })
+}
+
+export function projectRecallToolEventRecord(
+  d: RecallProjectionDb,
+  input: RecallToolEventRecordProjectionInput,
+): void {
+  const event = input.sourceEvent
+  if (!event.chatSessionId || !event.toolCallId) {
+    return
+  }
+
   d.insert(recallToolEvents)
     .values({
-      id: row.event.id,
-      runId: row.event.runId,
-      sessionId: row.event.chatSessionId,
-      workspaceId: row.workspaceId,
-      sourceEventId: row.event.id,
-      toolCallId: row.event.toolCallId,
-      toolName: row.event.toolName,
-      phase: row.event.phase,
-      isFailure: isFailureEvent(row.event.phase, row.event.payloadJson) ? 1 : 0,
+      id: event.id,
+      runId: event.runId,
+      sessionId: event.chatSessionId,
+      workspaceId: input.workspaceId,
+      sourceEventId: event.id,
+      toolCallId: event.toolCallId,
+      toolName: event.toolName,
+      phase: event.phase,
+      isFailure: isFailureEvent(event.phase, event.payloadJson) ? 1 : 0,
       summary: truncate(
-        `${row.event.toolName ?? row.event.chunkType ?? row.event.phase}: ${row.event.payloadJson}`,
+        `${event.toolName ?? event.chunkType ?? event.phase}: ${event.payloadJson}`,
       ),
-      occurredAt: row.event.occurredAt,
+      occurredAt: event.occurredAt,
     })
     .onConflictDoUpdate({
       target: recallToolEvents.sourceEventId,
       set: {
-        runId: row.event.runId,
-        toolCallId: row.event.toolCallId,
-        toolName: row.event.toolName,
-        phase: row.event.phase,
-        isFailure: isFailureEvent(row.event.phase, row.event.payloadJson) ? 1 : 0,
+        runId: event.runId,
+        toolCallId: event.toolCallId,
+        toolName: event.toolName,
+        phase: event.phase,
+        isFailure: isFailureEvent(event.phase, event.payloadJson) ? 1 : 0,
         summary: truncate(
-          `${row.event.toolName ?? row.event.chunkType ?? row.event.phase}: ${row.event.payloadJson}`,
+          `${event.toolName ?? event.chunkType ?? event.phase}: ${event.payloadJson}`,
         ),
-        occurredAt: row.event.occurredAt,
+        occurredAt: event.occurredAt,
       },
     })
     .run()
 
-  d.delete(recallFileTouches).where(eq(recallFileTouches.toolEventId, row.event.id)).run()
-  const paths = extractRecallFileTouchPaths(row.event)
+  d.delete(recallFileTouches).where(eq(recallFileTouches.toolEventId, event.id)).run()
+  const paths = extractRecallFileTouchPaths(event)
   if (paths.length === 0) {
     return
   }
   d.insert(recallFileTouches)
     .values(paths.map(path => ({
-      id: `${row.event.id}:${path}`,
-      toolEventId: row.event.id,
-      sessionId: row.event.chatSessionId!,
-      workspaceId: row.workspaceId,
+      id: `${event.id}:${path}`,
+      toolEventId: event.id,
+      sessionId: event.chatSessionId!,
+      workspaceId: input.workspaceId,
       path,
-      occurredAt: row.event.occurredAt,
+      occurredAt: event.occurredAt,
     })))
     .onConflictDoNothing()
     .run()

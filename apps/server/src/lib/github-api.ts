@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 
+import type { GitHubReadMode } from './github/cache-gate'
 import { cachedFetch, cachedGitHubRead, octokitRestGet } from './github/cache-gate'
 import type { CradleOctokitInstance } from './github/client'
 import {
@@ -80,7 +81,7 @@ async function restGetCached<T>(options: {
   path: string
   etag?: boolean
   swr?: boolean
-  mode?: 'read' | 'probe'
+  mode?: GitHubReadMode
 }): Promise<T | null> {
   return cachedGitHubRead({
     cacheKey: options.cacheKey,
@@ -386,6 +387,7 @@ export function fetchAuthenticatedUser() {
 export function searchAuthoredPullRequests(
   login: string,
   after: string | null = null,
+  mode: GitHubReadMode = 'read',
 ): Promise<{
   items: ReturnType<typeof mapSearchPullRequestNode>[]
   hasNextPage: boolean
@@ -395,6 +397,7 @@ export function searchAuthoredPullRequests(
     cacheKey: `search-authored:login:${login}:${after ?? 'first'}`,
     ttlS: 15,
     etag: false,
+    mode,
     swr: false,
     fetcher: async () => {
       const data = await searchPullRequestsPage(`is:pr author:${login}`, after)
@@ -406,6 +409,7 @@ export function searchAuthoredPullRequests(
 export function searchReviewingPullRequests(
   login: string,
   after: string | null = null,
+  mode: GitHubReadMode = 'read',
 ): Promise<{
   items: ReturnType<typeof mapSearchPullRequestNode>[]
   hasNextPage: boolean
@@ -416,6 +420,7 @@ export function searchReviewingPullRequests(
     cacheKey: `search-reviewing:v2:login:${login}:${after ?? 'first'}`,
     ttlS: 15,
     etag: false,
+    mode,
     swr: false,
     fetcher: async () => {
       const [requestedPage, reviewedPage] = await Promise.all([
@@ -467,10 +472,12 @@ export function fetchPullRequestDetail(
   owner: string,
   repo: string,
   pr: number,
+  mode: GitHubReadMode = 'read',
 ): Promise<PullRequestData | null> {
   return restGetCached<PullRequestData>({
     cacheKey: `pr-detail:${owner}/${repo}:${pr}`,
     ttlS: 30,
+    mode,
     route: 'GET /repos/{owner}/{repo}/pulls/{pull_number}',
     params: { owner, repo, pull_number: pr },
     path: `/repos/${owner}/${repo}/pulls/${pr}`,
@@ -481,11 +488,13 @@ export function fetchPullRequestComments(
   owner: string,
   repo: string,
   pr: number,
+  mode: GitHubReadMode = 'read',
 ): Promise<IssueCommentData[] | null> {
   return cachedFetch({
     cacheKey: `pr-comments:${owner}/${repo}:${pr}`,
     ttlS: 60,
     etag: false,
+    mode,
     fetcher: async () => {
       try {
         const octokit = await getOctokit()
@@ -510,11 +519,13 @@ export function fetchPullRequestFiles(
   owner: string,
   repo: string,
   pr: number,
+  mode: GitHubReadMode = 'read',
 ): Promise<PullRequestFileData[] | null> {
   return cachedFetch({
     cacheKey: `pr-files:${owner}/${repo}:${pr}`,
     ttlS: 60,
     etag: false,
+    mode,
     fetcher: async () => {
       try {
         const octokit = await getOctokit()
@@ -557,11 +568,13 @@ export async function fetchCheckRuns(
   owner: string,
   repo: string,
   ref: string,
+  mode: GitHubReadMode = 'read',
 ): Promise<{ total_count: number, check_runs: CheckRunData[] } | null> {
   return cachedFetch({
     cacheKey: `check-runs:${owner}/${repo}:${ref}`,
     ttlS: 30,
     etag: false,
+    mode,
     fetcher: async () => {
       try {
         const runs = await paginateRest<CheckRunData>(async (page) => {
@@ -714,10 +727,12 @@ export function fetchCombinedStatus(
   owner: string,
   repo: string,
   ref: string,
+  mode: GitHubReadMode = 'read',
 ): Promise<CombinedStatusData | null> {
   return restGetCached<CombinedStatusData>({
     cacheKey: `combined-status:${owner}/${repo}:${ref}`,
     ttlS: 30,
+    mode,
     route: 'GET /repos/{owner}/{repo}/commits/{ref}/status',
     params: { owner, repo, ref },
     path: `/repos/${owner}/${repo}/commits/${ref}/status`,
@@ -728,11 +743,13 @@ export function fetchPullRequestReviews(
   owner: string,
   repo: string,
   pr: number,
+  mode: GitHubReadMode = 'read',
 ): Promise<PullRequestReviewData[] | null> {
   return cachedFetch({
     cacheKey: `pr-reviews:${owner}/${repo}:${pr}`,
     ttlS: 60,
     etag: false,
+    mode,
     fetcher: async () => {
       try {
         const octokit = await getOctokit()
@@ -774,9 +791,6 @@ export async function fetchBranchProtection(
       }
       catch (error) {
         const mapped = toGitHubApiError(error, `/repos/${owner}/${repo}/branches/${branch}/protection`)
-        if (mapped.status === 304) {
-          return { data: null, etag: null, status: 304 }
-        }
         if (mapped.status === 404) {
           // Unprotected branch — treat as empty required checks, not a hard miss.
           return { data: null, etag: null, status: 404 }
@@ -799,6 +813,7 @@ export function invalidatePullRequestCaches(owner: string, repo: string, number:
     `pr-fingerprint-core:${ref}`,
   ]) {
     deleteCache(key)
+    deleteCachePrefix(`${key}:identity:`)
   }
   deleteCachePrefix(`pr-fingerprint-checks:${owner}/${repo}:`)
   invalidatePullRequestSearchCaches()
@@ -882,10 +897,12 @@ export function probePullRequestFingerprint(
 export function fetchRepoMergeSettings(
   owner: string,
   repo: string,
+  mode: GitHubReadMode = 'read',
 ) {
   return cachedFetch({
     cacheKey: `repo-merge-settings:${owner}/${repo}`,
     ttlS: 3600,
+    mode,
     fetcher: async (etag) => {
       const result = await octokitRestGet<Pick<
         RepoData,

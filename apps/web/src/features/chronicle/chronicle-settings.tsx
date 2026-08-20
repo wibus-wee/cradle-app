@@ -183,9 +183,21 @@ export function ChronicleSettings() {
   const { sources: messageSources, loading: messageSourcesLoading } = useChronicleMessageSources()
   const { snapshots: accessibilitySnapshots, loading: accessibilitySnapshotsLoading } = useChronicleAccessibilitySnapshots()
   const { events: accessibilityEvents, loading: accessibilityEventsLoading } = useChronicleAccessibilityEvents()
-  const { transcripts: audioTranscripts, loading: audioTranscriptsLoading } = useChronicleAudioTranscripts()
+  const {
+    transcripts: audioTranscripts,
+    loading: audioTranscriptsLoading,
+    assigningSpeaker,
+    assignSpeaker,
+  } = useChronicleAudioTranscripts()
   const { segments: audioRawSegments, loading: audioRawSegmentsLoading } = useChronicleAudioRawSegments()
-  const { profiles: speakerProfiles, loading: speakerProfilesLoading } = useChronicleSpeakerProfiles()
+  const {
+    profiles: speakerProfiles,
+    loading: speakerProfilesLoading,
+    mutating: speakerProfilesMutating,
+    renameProfile: renameSpeakerProfile,
+    deleteVoiceprint: deleteSpeakerVoiceprint,
+    deleteProfile: deleteSpeakerProfile,
+  } = useChronicleSpeakerProfiles()
   const { segments: activitySegments, loading: activitySegmentsLoading } = useChronicleActivitySegments()
   const { runs: pipelineRuns, loading: pipelineRunsLoading } = useChroniclePipelineRuns()
   const { cards: knowledgeCards, loading: knowledgeCardsLoading } = useChronicleKnowledgeCards()
@@ -488,6 +500,16 @@ export function ChronicleSettings() {
           <div className="flex items-center gap-2">
             <select
               className="h-8 max-w-40 rounded-md border border-border bg-background px-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              value={config?.audioCaptureMode ?? 'meeting'}
+              onChange={event => void updateConfig({ audioCaptureMode: event.target.value as ChronicleConfig['audioCaptureMode'] })}
+              disabled={saving || !config?.enabled || !config?.audioCaptureEnabled}
+              aria-label={t('control.audio.mode.label')}
+            >
+              <option value="meeting">{t('control.audio.mode.meeting')}</option>
+              <option value="continuous">{t('control.audio.mode.continuous')}</option>
+            </select>
+            <select
+              className="h-8 max-w-40 rounded-md border border-border bg-background px-2 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               value={config?.audioSource ?? 'microphone'}
               onChange={event => void updateConfig({ audioSource: event.target.value as ChronicleConfig['audioSource'] })}
               disabled={saving || !config?.enabled || !config?.audioCaptureEnabled}
@@ -600,7 +622,17 @@ export function ChronicleSettings() {
         <SettingsRow label={t('speakers.title')} description={t('speakers.description')} vertical>
           <ChronicleSpeakerProfileGridView
             loading={speakerProfilesLoading}
+            busy={speakerProfilesMutating}
             profiles={speakerProfiles}
+            onRename={async (profileId, displayName) => {
+              await renameSpeakerProfile({ profileId, displayName })
+            }}
+            onDeleteVoiceprint={async (profileId) => {
+              await deleteSpeakerVoiceprint(profileId)
+            }}
+            onDeleteProfile={async (profileId) => {
+              await deleteSpeakerProfile(profileId)
+            }}
           />
         </SettingsRow>
       </SettingsGroup>
@@ -674,6 +706,11 @@ export function ChronicleSettings() {
             <ChronicleAudioTranscriptListView
               loading={audioTranscriptsLoading}
               transcripts={audioTranscripts}
+              speakerProfiles={speakerProfiles}
+              assigningSpeaker={assigningSpeaker}
+              onAssignSpeaker={async (segmentId, speakerProfileId) => {
+                await assignSpeaker({ segmentId, speakerProfileId })
+              }}
             />
           </SettingsRow>
           <div className="border-t border-border/60" />

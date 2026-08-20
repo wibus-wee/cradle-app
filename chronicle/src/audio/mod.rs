@@ -1,6 +1,7 @@
 //! Local audio capture foundations for Chronicle runtime diagnostics.
 
 pub mod activity;
+pub mod admission;
 pub mod asr;
 pub mod capture;
 pub mod vad;
@@ -16,4 +17,6 @@ pub use capture::{
     capture_mixed_audio_samples, capture_system_audio_samples, record_microphone_diagnostics,
 };
 pub use vad::{EnergyVad, SpeechSegment, VadConfig};
-pub use wav::{AudioArtifactMetadata, WavArtifact, write_audio_segment_artifact};
+pub use wav::{
+    AudioArtifactMetadata, AudioSegmentArtifact, WavArtifact, write_audio_segment_artifact,
+};

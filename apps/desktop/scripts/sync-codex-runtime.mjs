@@ -44,6 +44,8 @@ const supportedTargets = new Map([
     executableName: 'codex',
     appServerAssetName: 'codex-app-server-aarch64-apple-darwin.tar.gz',
     appServerExecutableName: 'codex-app-server',
+    codeModeHostAssetName: 'codex-code-mode-host-aarch64-apple-darwin.tar.gz',
+    codeModeHostExecutableName: 'codex-code-mode-host',
   }],
   ['darwin-x64', {
     platform: 'darwin',
@@ -53,6 +55,8 @@ const supportedTargets = new Map([
     executableName: 'codex',
     appServerAssetName: 'codex-app-server-x86_64-apple-darwin.tar.gz',
     appServerExecutableName: 'codex-app-server',
+    codeModeHostAssetName: 'codex-code-mode-host-x86_64-apple-darwin.tar.gz',
+    codeModeHostExecutableName: 'codex-code-mode-host',
   }],
   ['linux-arm64', {
     platform: 'linux',
@@ -62,6 +66,8 @@ const supportedTargets = new Map([
     executableName: 'codex',
     appServerAssetName: 'codex-app-server-aarch64-unknown-linux-musl.tar.gz',
     appServerExecutableName: 'codex-app-server',
+    codeModeHostAssetName: 'codex-code-mode-host-aarch64-unknown-linux-musl.tar.gz',
+    codeModeHostExecutableName: 'codex-code-mode-host',
   }],
   ['linux-x64', {
     platform: 'linux',
@@ -71,6 +77,8 @@ const supportedTargets = new Map([
     executableName: 'codex',
     appServerAssetName: 'codex-app-server-x86_64-unknown-linux-musl.tar.gz',
     appServerExecutableName: 'codex-app-server',
+    codeModeHostAssetName: 'codex-code-mode-host-x86_64-unknown-linux-musl.tar.gz',
+    codeModeHostExecutableName: 'codex-code-mode-host',
   }],
   ['win32-arm64', {
     platform: 'win32',
@@ -80,6 +88,8 @@ const supportedTargets = new Map([
     executableName: 'codex.exe',
     appServerAssetName: 'codex-app-server-aarch64-pc-windows-msvc.exe.tar.gz',
     appServerExecutableName: 'codex-app-server.exe',
+    codeModeHostAssetName: 'codex-code-mode-host-aarch64-pc-windows-msvc.exe.tar.gz',
+    codeModeHostExecutableName: 'codex-code-mode-host.exe',
   }],
   ['win32-x64', {
     platform: 'win32',
@@ -89,6 +99,8 @@ const supportedTargets = new Map([
     executableName: 'codex.exe',
     appServerAssetName: 'codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz',
     appServerExecutableName: 'codex-app-server.exe',
+    codeModeHostAssetName: 'codex-code-mode-host-x86_64-pc-windows-msvc.exe.tar.gz',
+    codeModeHostExecutableName: 'codex-code-mode-host.exe',
   }],
 ])
 
@@ -130,15 +142,22 @@ export function getCodexAppServerRuntimePath(targetInput = {}) {
   return join(codexResourceRoot, `${target.platform}-${target.arch}`, target.appServerExecutableName)
 }
 
+export function getCodexCodeModeHostRuntimePath(targetInput = {}) {
+  const target = resolveCodexRuntimeTarget(targetInput)
+  return join(codexResourceRoot, `${target.platform}-${target.arch}`, target.codeModeHostExecutableName)
+}
+
 export async function ensureCodexRuntime(input = {}) {
   const target = resolveCodexRuntimeTarget(input)
   const releaseTag = input.releaseTag ?? defaultReleaseTag
   const release = await fetchCodexRelease(releaseTag)
   const asset = findReleaseAsset(release, target.assetName)
   const appServerAsset = findReleaseAsset(release, target.appServerAssetName)
+  const codeModeHostAsset = findReleaseAsset(release, target.codeModeHostAssetName)
   const outputDir = join(codexResourceRoot, `${target.platform}-${target.arch}`)
   const executablePath = join(outputDir, target.executableName)
   const appServerExecutablePath = join(outputDir, target.appServerExecutableName)
+  const codeModeHostExecutablePath = join(outputDir, target.codeModeHostExecutableName)
   const manifestPath = join(outputDir, 'codex-runtime.json')
   const existingManifest = await readRuntimeManifest(manifestPath)
   const runtimeIsCurrent = !input.force && await isExistingArtifactCurrent({
@@ -157,15 +176,25 @@ export async function ensureCodexRuntime(input = {}) {
     assetManifestKey: 'appServerAsset',
     target,
   })
+  const codeModeHostIsCurrent = !input.force && await isExistingArtifactCurrent({
+    executablePath: codeModeHostExecutablePath,
+    manifest: existingManifest,
+    release,
+    asset: codeModeHostAsset,
+    assetManifestKey: 'codeModeHostAsset',
+    target,
+  })
 
-  if (runtimeIsCurrent && appServerIsCurrent) {
+  if (runtimeIsCurrent && appServerIsCurrent && codeModeHostIsCurrent) {
     return {
       target,
       release,
       asset,
       appServerAsset,
+      codeModeHostAsset,
       executablePath,
       appServerExecutablePath,
+      codeModeHostExecutablePath,
       manifestPath,
       manifest: existingManifest,
     }
@@ -201,11 +230,25 @@ export async function ensureCodexRuntime(input = {}) {
             executablePath: appServerExecutablePath,
             target,
           }),
+      codeModeHostIsCurrent
+        ? Promise.resolve()
+        : downloadAndInstallExecutable({
+            asset: codeModeHostAsset,
+            tempDir: join(tempDir, 'code-mode-host'),
+            executableNames: [
+              target.codeModeHostExecutableName,
+              `codex-code-mode-host-${target.triple}`,
+              target.platform === 'win32' ? `codex-code-mode-host-${target.triple}.exe` : null,
+            ].filter(Boolean),
+            executablePath: codeModeHostExecutablePath,
+            target,
+          }),
     ])
 
-    const [binary, appServerBinary] = await Promise.all([
+    const [binary, appServerBinary, codeModeHostBinary] = await Promise.all([
       readBinaryMetadata(executablePath, target),
       readBinaryMetadata(appServerExecutablePath, target),
+      readBinaryMetadata(codeModeHostExecutablePath, target),
     ])
     const manifest = {
       kind: 'cradle.codex-runtime',
@@ -233,8 +276,15 @@ export async function ensureCodexRuntime(input = {}) {
         size: appServerAsset.size ?? null,
         digest: appServerAsset.digest ?? null,
       },
+      codeModeHostAsset: {
+        name: codeModeHostAsset.name,
+        url: codeModeHostAsset.browser_download_url,
+        size: codeModeHostAsset.size ?? null,
+        digest: codeModeHostAsset.digest ?? null,
+      },
       binary,
       appServerBinary,
+      codeModeHostBinary,
       updatedAt: new Date().toISOString(),
     }
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
@@ -243,8 +293,10 @@ export async function ensureCodexRuntime(input = {}) {
       release,
       asset,
       appServerAsset,
+      codeModeHostAsset,
       executablePath,
       appServerExecutablePath,
+      codeModeHostExecutablePath,
       manifestPath,
       manifest,
     }
@@ -279,13 +331,20 @@ export async function copyCodexRuntimeToPackagedResources(context, input = {}) {
   })
   const resourcesDir = resolvePackagedResourcesDir(context, platform)
   const destination = join(resourcesDir, runtime.target.appServerExecutableName)
+  const codeModeHostDestination = join(resourcesDir, runtime.target.codeModeHostExecutableName)
   await mkdir(resourcesDir, { recursive: true })
-  await copyFile(runtime.appServerExecutablePath, destination)
+  await Promise.all([
+    copyFile(runtime.appServerExecutablePath, destination),
+    copyFile(runtime.codeModeHostExecutablePath, codeModeHostDestination),
+  ])
   if (runtime.target.platform !== 'win32') {
-    await chmod(destination, 0o755)
+    await Promise.all([
+      chmod(destination, 0o755),
+      chmod(codeModeHostDestination, 0o755),
+    ])
   }
-  console.warn(`[desktop] Bundled Codex app-server ${runtime.manifest.release.tagName} ${platform}-${arch} at ${destination}`)
-  return { ...runtime, destination }
+  console.warn(`[desktop] Bundled Codex app-server and code-mode host ${runtime.manifest.release.tagName} ${platform}-${arch} at ${resourcesDir}`)
+  return { ...runtime, destination, codeModeHostDestination }
 }
 
 export function resolvePackagedResourcesDir(context, platform = normalizePlatform(context.electronPlatformName)) {
@@ -585,7 +644,7 @@ async function main() {
     })
     results.push(result)
     console.log(
-      `${result.manifest.release.tagName} ${result.target.platform}-${result.target.arch} -> ${result.executablePath}, ${result.appServerExecutablePath}`,
+      `${result.manifest.release.tagName} ${result.target.platform}-${result.target.arch} -> ${result.executablePath}, ${result.appServerExecutablePath}, ${result.codeModeHostExecutablePath}`,
     )
   }
   return results

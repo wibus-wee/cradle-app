@@ -26,7 +26,7 @@ import {
 } from './chatgpt-auth'
 import type { CodexAppServerClientOptions } from './client'
 import { buildCodexAppServerEnv } from './env'
-import { acquireCodexAppServerHostLease, codexProviderTargetDiagnosticsAppServerScopeId } from './host-lease'
+import { acquireCodexAppServerHostLease } from './host-lease'
 
 export interface CodexRateLimitWindowDiagnostics {
   usedPercent: number
@@ -68,7 +68,6 @@ export interface CodexAccountDiagnostics {
     planType: string | null
     requiresOpenaiAuth: boolean | null
   } | null
-  rateLimits: CodexRateLimitSnapshotDiagnostics | null
   rateLimitsByLimitId: Record<string, CodexRateLimitSnapshotDiagnostics> | null
   rateLimitResetCredits: {
     availableCount: string
@@ -190,49 +189,60 @@ export async function readCodexAccountDiagnostics(
       unavailableReason: resolved.unavailableReason,
       refreshedAt: null,
       account: null,
-      rateLimits: null,
       rateLimitsByLimitId: null,
       rateLimitResetCredits: null,
       tokenUsage: null,
     }
   }
 
-  const { target, config, auth } = resolved
-  const chatgptAuth = readCodexChatgptAuth(auth)!
-  const hostLease = await acquireDiagnosticsHostLease({
-    providerTargetId: target.id,
-    config,
-    auth,
-    deps,
-  })
-  const client = hostLease.resource.client
-
   try {
-    const [accountResponse, rateLimitsResponse, usageResponse] = await Promise.all([
-      client.request('account/read', { refreshToken: false }) as Promise<GetAccountResponse>,
-      client.request('account/rateLimits/read', {}) as Promise<GetAccountRateLimitsResponse>,
-      client.request('account/usage/read', {}) as Promise<GetAccountTokenUsageResponse>,
-    ])
-
-    return {
+    const { target, config, auth } = resolved
+    const chatgptAuth = readCodexChatgptAuth(auth)!
+    const hostLease = await acquireDiagnosticsHostLease({
       providerTargetId: target.id,
-      supported: true,
-      unavailableReason: null,
-      refreshedAt: Date.now(),
-      account: projectAccountDiagnostics(accountResponse, chatgptAuth, rateLimitsResponse.rateLimits),
-      rateLimits: projectRateLimitSnapshot(rateLimitsResponse.rateLimits),
-      rateLimitsByLimitId: projectRateLimitsByLimitId(rateLimitsResponse.rateLimitsByLimitId),
-      rateLimitResetCredits: rateLimitsResponse.rateLimitResetCredits
-        ? {
-            availableCount: formatCounter(rateLimitsResponse.rateLimitResetCredits.availableCount),
-            credits: rateLimitsResponse.rateLimitResetCredits.credits,
-          }
-        : null,
-      tokenUsage: projectTokenUsage(usageResponse),
+      config,
+      auth,
+      deps,
+    })
+    const client = hostLease.client
+
+    try {
+      const [accountResponse, rateLimitsResponse, usageResponse] = await Promise.all([
+        client.request('account/read', { refreshToken: false }) as Promise<GetAccountResponse>,
+        client.request('account/rateLimits/read', {}) as Promise<GetAccountRateLimitsResponse>,
+        client.request('account/usage/read', {}) as Promise<GetAccountTokenUsageResponse>,
+      ])
+
+      return {
+        providerTargetId: target.id,
+        supported: true,
+        unavailableReason: null,
+        refreshedAt: Date.now(),
+        account: projectAccountDiagnostics(accountResponse, chatgptAuth),
+        rateLimitsByLimitId: projectRateLimitsByLimitId(rateLimitsResponse.rateLimitsByLimitId),
+        rateLimitResetCredits: rateLimitsResponse.rateLimitResetCredits
+          ? {
+              availableCount: formatCounter(rateLimitsResponse.rateLimitResetCredits.availableCount),
+              credits: rateLimitsResponse.rateLimitResetCredits.credits,
+            }
+          : null,
+        tokenUsage: projectTokenUsage(usageResponse),
+      }
+    }
+    finally {
+      hostLease.release()
     }
   }
-  finally {
-    hostLease.release()
+  catch (error) {
+    if (error instanceof AppError) {
+      throw error
+    }
+    throw new AppError({
+      code: 'codex_account_diagnostics_read_failed',
+      status: 502,
+      message: error instanceof Error ? error.message : String(error),
+      details: { providerTargetId: input.providerTargetId },
+    })
   }
 }
 
@@ -256,7 +266,7 @@ export async function consumeCodexRateLimitResetCredit(
     auth: resolved.auth,
     deps,
   })
-  const client = hostLease.resource.client
+  const client = hostLease.client
 
   try {
     const params: ConsumeAccountRateLimitResetCreditParams = {
@@ -369,19 +379,17 @@ async function acquireDiagnosticsHostLease(input: {
 }) {
   const workspacePath = process.cwd()
   const runtimeContext = resolveCodexRuntimeContext(workspacePath, null)
-  const diagnosticsScopeId = codexProviderTargetDiagnosticsAppServerScopeId(input.providerTargetId)
   const chatgptAuth = readCodexChatgptAuth(input.auth)
 
   return await acquireCodexAppServerHostLease({
     runtimeKind: CODEX_RUNTIME_KIND,
     providerTargetId: input.providerTargetId,
-    scopeId: diagnosticsScopeId,
     chatgptAuth,
     options: {
       apiKey: readCodexApiKeyAuth(input.auth) ?? undefined,
       config: buildCodexConfig(input.config, workspacePath, () => [], input.config.model, input.auth),
       env: buildCodexAppServerEnv({
-        chatSessionId: diagnosticsScopeId,
+        chatSessionId: `provider-diagnostics:${input.providerTargetId}`,
         workspacePath,
         agentId: null,
         agentHome: runtimeContext.agentHome,
@@ -405,7 +413,6 @@ async function acquireDiagnosticsHostLease(input: {
 function projectAccountDiagnostics(
   response: GetAccountResponse,
   chatgptAuth: NonNullable<ReturnType<typeof readCodexChatgptAuth>>,
-  rateLimits: RateLimitSnapshot,
 ): NonNullable<CodexAccountDiagnostics['account']> {
   const account = response.account
   const chatgptAccount = account?.type === 'chatgpt' ? account : null
@@ -414,7 +421,7 @@ function projectAccountDiagnostics(
     authMode: 'chatgptAuthTokens',
     accountType: account?.type ?? null,
     email: chatgptAccount?.email ?? null,
-    planType: chatgptAccount?.planType ?? chatgptAuth.chatgptPlanType ?? rateLimits.planType,
+    planType: chatgptAccount?.planType ?? chatgptAuth.chatgptPlanType,
     requiresOpenaiAuth: response.requiresOpenaiAuth,
   }
 }

@@ -1,15 +1,27 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
+import { toastManager } from '~/components/ui/toast'
+import { apiErrorMessage } from '~/lib/api-error'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 
-import { pullRequestQueryOptions } from './api/pull-requests'
+import { pullRequestMutations, pullRequestQueryOptions } from './api/pull-requests'
 import { resolvePullRequestErrorKind } from './pull-request-error'
 import { PullRequestsPageView } from './pull-requests-page-view'
 import type { CradlePullRequest } from './use-pull-requests'
 import { useCradlePullRequests } from './use-pull-requests'
 
 const PULL_REQUEST_LAYOUT_SLOTS = { hasBrowserPanel: true } as const
+
+function isPullRequestFeedQuery(query: { queryKey: readonly unknown[] }): boolean {
+  const head = query.queryKey[0]
+  if (typeof head !== 'object' || head === null || !('_id' in head)) {
+    return false
+  }
+  const id = (head as { _id?: unknown })._id
+  return id === 'getPullRequestsAuthored' || id === 'getPullRequestsReviewing'
+}
 
 export interface PullRequestsPageProps {
   selectedRef?: string
@@ -20,10 +32,25 @@ export function PullRequestsPage({
   selectedRef,
   onSelectedRefChange,
 }: PullRequestsPageProps) {
+  const { t } = useTranslation('pull-requests')
   const queryClient = useQueryClient()
   const { entries, viewer, isPending, error, authored, reviewing } = useCradlePullRequests()
   const openPullRequestTab = useBrowserPanelStore(state => state.openPullRequestTab)
   const errorKind = error ? resolvePullRequestErrorKind(error) : null
+
+  const refreshMutation = useMutation({
+    ...pullRequestMutations.refreshFeeds(),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ predicate: isPullRequestFeedQuery })
+    },
+    onError: (refreshError) => {
+      toastManager.add({
+        type: 'error',
+        title: t('page.refreshError'),
+        description: apiErrorMessage(refreshError),
+      })
+    },
+  })
 
   useRegisterLayoutSlots('pull-requests', PULL_REQUEST_LAYOUT_SLOTS)
 
@@ -73,6 +100,12 @@ export function PullRequestsPage({
             })
           }
         : undefined}
+      refreshing={refreshMutation.isPending}
+      onRefresh={() => {
+        if (viewer) {
+          refreshMutation.mutate({ body: { login: viewer.login } })
+        }
+      }}
       authoredFeed={authored}
       reviewingFeed={reviewing}
       selectedRef={selectedRef}

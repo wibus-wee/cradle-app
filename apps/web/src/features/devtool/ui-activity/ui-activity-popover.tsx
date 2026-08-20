@@ -123,10 +123,10 @@ function InfoRow({ label, value, mono = true }: { label: string, value: string, 
   )
 }
 
-function SinkChip({ kind, name }: { kind: 'host' | 'plugin', name: string }) {
+function SinkChip({ name }: { name: string }) {
   return (
     <span className="inline-flex items-center gap-1 rounded-md bg-background px-2 py-1 ring-1 ring-border">
-      <span className="text-[9px] font-medium text-muted-foreground">{kind}</span>
+      <span className="text-[9px] font-medium text-muted-foreground">host</span>
       <span className="font-mono text-[10px] text-foreground">{name}</span>
     </span>
   )
@@ -212,7 +212,7 @@ export function UiActivityPopover() {
 
   const triggerType = segment?.entityType ?? debug.resolution.resolved?.entityType ?? null
   const triggerEntity = segment?.entity ?? debug.resolution.resolved?.entity ?? null
-  const sinkCount = debug.subscribers.host.length + debug.subscribers.plugin.length
+  const sinkCount = debug.subscribers.host.length
 
   const triggerLabel = triggerType && triggerEntity
     ? `${triggerType} · ${truncateEntity(triggerEntity, 14)}`
@@ -387,10 +387,7 @@ export function UiActivityPopover() {
               : (
                   <div className="flex flex-wrap gap-1.5 py-0.5">
                     {debug.subscribers.host.map(owner => (
-                      <SinkChip key={`host:${owner}`} kind="host" name={owner} />
-                    ))}
-                    {debug.subscribers.plugin.map(owner => (
-                      <SinkChip key={`plugin:${owner}`} kind="plugin" name={owner} />
+                      <SinkChip key={`host:${owner}`} name={owner} />
                     ))}
                   </div>
                 )}

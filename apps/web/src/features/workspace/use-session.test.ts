@@ -5,7 +5,7 @@ import type { GetSessionsResponse } from '~/api-gen/types.gen'
 
 import { sessionsQueryKey, updateSessionInSessionLists } from './use-session'
 
-type SessionRow = GetSessionsResponse[number]
+type SessionRow = GetSessionsResponse['items'][number]
 
 function createSessionRow(overrides: Partial<SessionRow> & Pick<SessionRow, 'id'>): SessionRow {
   const now = 1_700_000_000
@@ -59,28 +59,30 @@ describe('updateSessionInSessionLists', () => {
   it('preserves an existing session status when the patch omits status', () => {
     const queryClient = createQueryClient()
     const queryKey = sessionsQueryKey('workspace-1')
-    queryClient.setQueryData<GetSessionsResponse>(queryKey, [
-      createSessionRow({ id: 'session-1', status: 'idle' }),
-    ])
+    queryClient.setQueryData<GetSessionsResponse>(queryKey, {
+      items: [createSessionRow({ id: 'session-1', status: 'idle' })],
+      nextCursor: null,
+    })
 
     updateSessionInSessionLists(queryClient, {
       id: 'session-1',
       title: 'Renamed',
     })
 
-    expect(queryClient.getQueryData<GetSessionsResponse>(queryKey)).toEqual([
-      expect.objectContaining({
-        id: 'session-1',
-        title: 'Renamed',
-        status: 'idle',
-      }),
-    ])
+    expect(queryClient.getQueryData<GetSessionsResponse>(queryKey)).toEqual({
+      items: [expect.objectContaining({
+          id: 'session-1',
+          title: 'Renamed',
+          status: 'idle',
+        })],
+      nextCursor: null,
+    })
   })
 
   it('defaults inserted non-promoted sessions to idle', () => {
     const queryClient = createQueryClient()
     const queryKey = sessionsQueryKey('workspace-1')
-    queryClient.setQueryData<GetSessionsResponse>(queryKey, [])
+    queryClient.setQueryData<GetSessionsResponse>(queryKey, { items: [], nextCursor: null })
 
     updateSessionInSessionLists(queryClient, {
       id: 'session-2',
@@ -88,18 +90,19 @@ describe('updateSessionInSessionLists', () => {
       title: 'External session',
     })
 
-    expect(queryClient.getQueryData<GetSessionsResponse>(queryKey)).toEqual([
-      expect.objectContaining({
-        id: 'session-2',
-        status: 'idle',
-      }),
-    ])
+    expect(queryClient.getQueryData<GetSessionsResponse>(queryKey)).toEqual({
+      items: [expect.objectContaining({
+          id: 'session-2',
+          status: 'idle',
+        })],
+      nextCursor: null,
+    })
   })
 
   it('defaults inserted promoted sessions to streaming', () => {
     const queryClient = createQueryClient()
     const queryKey = sessionsQueryKey('workspace-1')
-    queryClient.setQueryData<GetSessionsResponse>(queryKey, [])
+    queryClient.setQueryData<GetSessionsResponse>(queryKey, { items: [], nextCursor: null })
 
     updateSessionInSessionLists(queryClient, {
       id: 'session-3',
@@ -107,11 +110,34 @@ describe('updateSessionInSessionLists', () => {
       title: 'Submitted session',
     }, { promote: true })
 
-    expect(queryClient.getQueryData<GetSessionsResponse>(queryKey)).toEqual([
-      expect.objectContaining({
-        id: 'session-3',
-        status: 'streaming',
-      }),
-    ])
+    expect(queryClient.getQueryData<GetSessionsResponse>(queryKey)).toEqual({
+      items: [expect.objectContaining({
+          id: 'session-3',
+          status: 'streaming',
+        })],
+      nextCursor: null,
+    })
+  })
+
+  it('keeps optimistic list pages bounded', () => {
+    const queryClient = createQueryClient()
+    const queryKey = sessionsQueryKey('workspace-1')
+    queryClient.setQueryData<GetSessionsResponse>(queryKey, {
+      items: Array.from({ length: 200 }, (_, index) => createSessionRow({
+        id: `session-${index}`,
+      })),
+      nextCursor: 'next-page',
+    })
+
+    updateSessionInSessionLists(queryClient, {
+      id: 'new-session',
+      workspaceId: 'workspace-1',
+      title: 'New session',
+    }, { promote: true })
+
+    const page = queryClient.getQueryData<GetSessionsResponse>(queryKey)
+    expect(page?.items).toHaveLength(200)
+    expect(page?.items[0]?.id).toBe('new-session')
+    expect(page?.items.some(session => session.id === 'session-199')).toBe(false)
   })
 })

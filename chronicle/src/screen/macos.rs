@@ -6,9 +6,9 @@ mod native {
     use std::collections::VecDeque;
     use std::ffi::{c_uchar, c_void};
     use std::ptr;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::mpsc::{self, Receiver, Sender, SyncSender, TryRecvError, TrySendError};
+    use std::sync::Arc;
     use std::thread;
     use std::time::Duration;
 
@@ -175,7 +175,7 @@ mod native {
             let mut frames = VecDeque::with_capacity(display_ids.len());
             for display_id in display_ids {
                 let cg_image = capture_display(*display_id)?;
-                let bytes = encode_cgimage_to_png(&cg_image)?;
+                let bytes = encode_cgimage_to_lossless_webp(&cg_image)?;
                 if bytes.is_empty() {
                     return Err(ChronicleError::Process(format!(
                         "macOS display capture produced empty image data for display {display_id}"
@@ -188,7 +188,7 @@ mod native {
                     frame_index,
                     captured_at,
                     bytes,
-                    frame_extension: "png".to_string(),
+                    frame_extension: "webp".to_string(),
                     observed_text,
                     accessibility: accessibility.clone(),
                     windows: windows.clone(),
@@ -727,7 +727,11 @@ mod native {
             }
             let string = CFString::wrap_under_create_rule(value as CFStringRef);
             let text = string.to_string();
-            if text.is_empty() { None } else { Some(text) }
+            if text.is_empty() {
+                None
+            } else {
+                Some(text)
+            }
         }
     }
 
@@ -836,72 +840,41 @@ mod native {
         })
     }
 
-    fn encode_cgimage_to_png(image: &CGImage) -> ChronicleResult<Vec<u8>> {
-        // Use ImageIO to write CGImage to PNG data in-memory.
-        #[link(name = "ImageIO", kind = "framework")]
-        unsafe extern "C" {
-            fn CGImageDestinationCreateWithData(
-                data: CFTypeRef,
-                type_: CFTypeRef,
-                count: usize,
-                options: CFTypeRef,
-            ) -> *mut c_void;
-            fn CGImageDestinationAddImage(
-                dest: *mut c_void,
-                image: *const c_void,
-                properties: CFTypeRef,
-            );
-            fn CGImageDestinationFinalize(dest: *mut c_void) -> bool;
+    fn encode_cgimage_to_lossless_webp(image: &CGImage) -> ChronicleResult<Vec<u8>> {
+        if image.bits_per_pixel() != 32 || image.bits_per_component() != 8 {
+            return Err(ChronicleError::Process(format!(
+                "unsupported macOS capture pixel layout: {} bits per pixel",
+                image.bits_per_pixel()
+            )));
         }
-
-        #[link(name = "CoreFoundation", kind = "framework")]
-        unsafe extern "C" {
-            fn CFDataCreateMutable(allocator: CFTypeRef, capacity: isize) -> CFTypeRef;
-            fn CFDataGetBytePtr(data: CFTypeRef) -> *const u8;
-            fn CFDataGetLength(data: CFTypeRef) -> isize;
+        let width = image.width();
+        let height = image.height();
+        let bytes_per_row = image.bytes_per_row();
+        let data = image.data();
+        let source = data.bytes();
+        let mut rgba = Vec::with_capacity(width * height * 4);
+        for row in 0..height {
+            let row_start = row * bytes_per_row;
+            let row_bytes = &source[row_start..row_start + width * 4];
+            for pixel in row_bytes.chunks_exact(4) {
+                rgba.extend_from_slice(&[pixel[2], pixel[1], pixel[0], pixel[3]]);
+            }
         }
-
-        unsafe {
-            let mutable_data = CFDataCreateMutable(ptr::null(), 0);
-            if mutable_data.is_null() {
-                return Err(ChronicleError::Process(
-                    "failed to create mutable data for PNG encoding".to_string(),
-                ));
-            }
-
-            let png_uti = CFString::new("public.png");
-            let dest = CGImageDestinationCreateWithData(
-                mutable_data,
-                png_uti.as_CFTypeRef(),
-                1,
-                ptr::null(),
-            );
-            if dest.is_null() {
-                CFRelease(mutable_data);
-                return Err(ChronicleError::Process(
-                    "failed to create CGImageDestination for PNG".to_string(),
-                ));
-            }
-
-            CGImageDestinationAddImage(dest, image.as_ptr() as *const c_void, ptr::null());
-
-            let success = CGImageDestinationFinalize(dest);
-            CFRelease(dest as CFTypeRef);
-
-            if !success {
-                CFRelease(mutable_data);
-                return Err(ChronicleError::Process(
-                    "CGImageDestinationFinalize failed".to_string(),
-                ));
-            }
-
-            let ptr = CFDataGetBytePtr(mutable_data);
-            let len = CFDataGetLength(mutable_data) as usize;
-            let bytes = std::slice::from_raw_parts(ptr, len).to_vec();
-            CFRelease(mutable_data);
-
-            Ok(bytes)
-        }
+        let mut config = webp::WebPConfig::new().map_err(|error| {
+            ChronicleError::Process(format!(
+                "failed to initialize lossless WebP encoder: {error:?}"
+            ))
+        })?;
+        config.lossless = 1;
+        config.method = 6;
+        config.quality = 100.0;
+        config.exact = 1;
+        webp::Encoder::from_rgba(&rgba, width as u32, height as u32)
+            .encode_advanced(&config)
+            .map(|encoded| encoded.as_ref().to_vec())
+            .map_err(|error| {
+                ChronicleError::Process(format!("lossless WebP encoding failed: {error:?}"))
+            })
     }
 
     // --- Window Enumeration via CoreGraphics ---
@@ -1206,8 +1179,8 @@ mod native {
 
 #[cfg(target_os = "macos")]
 pub use native::{
-    AxObserverNotification, AxObserverRuntime, MacosCaptureSource,
-    read_ax_observer_accessibility_capture,
+    read_ax_observer_accessibility_capture, AxObserverNotification, AxObserverRuntime,
+    MacosCaptureSource,
 };
 
 #[cfg(not(target_os = "macos"))]

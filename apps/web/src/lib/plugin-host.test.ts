@@ -1,6 +1,18 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { activateWebPluginModule, deactivateWebPlugin, isWebLayerLoadable } from './plugin-host'
+import { activateWebPluginModule, deactivateWebPlugin, isWebLayerLoadable, loadWebPlugins } from './plugin-host'
+
+const mocks = vi.hoisted(() => ({
+  getPlugins: vi.fn(),
+}))
+
+vi.mock('~/api-gen/sdk.gen', () => ({
+  getPlugins: mocks.getPlugins,
+}))
+
+vi.mock('./authenticated-server-url', () => ({
+  getAuthenticatedServerResourceUrl: vi.fn(),
+}))
 
 function createLayers(webStatus: 'discovered' | 'failed') {
   return {
@@ -26,6 +38,14 @@ function createLayers(webStatus: 'discovered' | 'failed') {
 }
 
 describe('plugin host web layer filtering', () => {
+  it('reads descriptors through the generated SDK', async () => {
+    mocks.getPlugins.mockResolvedValueOnce({ data: [] })
+
+    await loadWebPlugins()
+
+    expect(mocks.getPlugins).toHaveBeenCalledWith({ throwOnError: true })
+  })
+
   it('does not load failed web layers', () => {
     expect(isWebLayerLoadable({
       name: '@cradle/system-info',

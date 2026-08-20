@@ -1276,6 +1276,7 @@ export interface StreamTurnInput {
   onUsageEvent?: (event: RuntimeUsageEvent) => void | Promise<void>
   onProviderThreadEvent?: (event: ProviderThreadEvent) => void
   onProviderSyntheticTurnEvent?: (event: ProviderSyntheticTurnEvent) => void | Promise<void>
+  reportTurnResult?: (result: RuntimeTurnResult) => void
 }
 
 export interface RuntimeUsageEvent {
@@ -1534,6 +1535,13 @@ export interface RuntimeStepUsage {
   stepType: string
   modelId?: string
   usage: TokenUsage
+}
+
+/** Metrics produced by one concrete turn. Owned by the turn, never by a shared runtime. */
+export interface RuntimeTurnResult {
+  modelId?: string | null
+  usage?: TokenUsage | null
+  stepUsages?: RuntimeStepUsage[]
 }
 
 export interface ChatRuntime {

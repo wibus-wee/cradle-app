@@ -18,11 +18,14 @@ import { cn } from '~/lib/cn'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import type { ComposerDraft } from '~/store/composer-draft'
 
-import type { ChatRuntimeCompactUiSlotState } from '../../capabilities/chat-capabilities'
+import type {
+  ChatRuntimeCompactUiSlotState,
+  ChatRuntimeUsageUiSlotState,
+} from '../../capabilities/chat-capabilities'
 import { readBangCommand } from '../../commands/bang-command'
 import type {
-  ChatRuntimeSettings,
-  ChatRuntimeSettingsPatch,
+  RuntimeSettings,
+  RuntimeSettingsPatch,
 } from '../../commands/chat-response-command'
 import type { ChatContextPart } from '../../context/chat-context-parts'
 import type { MentionItem, MentionPickerItem, PluginMentionItem } from '../../mentions/mention-panel'
@@ -65,7 +68,11 @@ import { useComposerAttachments } from '../composer-attachment-state'
 import type { PendingAppshotAttachment } from '../composer-attachments'
 import { ComposerAttachmentInput, ComposerAttachmentList } from '../composer-attachments'
 import { composerReducer, INITIAL_COMPOSER_STATE } from '../composer-state'
-import type { ComposerSendHandler, ComposerSendResult } from '../composer-submit'
+import type {
+  ComposerSendHandler,
+  ComposerSendResult,
+  ComposerSubmitOutcome,
+} from '../composer-submit'
 import {
   isComposerSendPromise,
   readBangCommandDraft,
@@ -171,9 +178,9 @@ export interface ComposerExternalSignals {
 
 export interface ComposerRuntimeSettingsController {
   runtimeKind?: RuntimeKind | null
-  settings: ChatRuntimeSettings
+  settings: RuntimeSettings
   disabled?: boolean
-  onChange: (patch: ChatRuntimeSettingsPatch) => void
+  onChange: (patch: RuntimeSettingsPatch) => void
 }
 
 export interface ComposerViewOptions {
@@ -208,6 +215,7 @@ export interface ComposerViewOptions {
   sessionTokens?: number
   sessionContextWindow?: number | null
   compactState?: ChatRuntimeCompactUiSlotState | null
+  runtimeUsageState?: ChatRuntimeUsageUiSlotState | null
   /**
    * When provided, the composer persists its draft to per-surface localStorage
    * and restores it on remount. This prevents draft loss on tab switches.
@@ -348,6 +356,7 @@ export function ComposerView({
     sessionTokens,
     sessionContextWindow,
     compactState,
+    runtimeUsageState,
     promptHistory = [],
   } = view ?? {}
   const { textareaAriaLabel = 'Message', sendButtonAriaLabel } = accessibility ?? {}
@@ -368,6 +377,17 @@ export function ComposerView({
   const historyDraftRef = useRef<ComposerDraft | null>(null)
   const historyAppliedTextRef = useRef<string | null>(null)
   const actionTargetRef = useRef<HTMLDivElement>(null)
+  const handleSubmitResult = useCallback((outcome: ComposerSubmitOutcome) => {
+    if (!outcome.accepted && !outcome.restored) {
+      return
+    }
+
+    if (outcome.accepted || outcome.restored) {
+      setPastedTexts([])
+      historyIndexRef.current = null
+      historyDraftRef.current = null
+    }
+  }, [])
   const setActionTargetElement = useCallback(
     (element: HTMLDivElement | null) => {
       actionTargetRef.current = element
@@ -625,7 +645,7 @@ export function ComposerView({
         }
 
         dispatch({ type: 'slash/selected', inputValue: currentState.inputValue, command: null })
-        submitAndClearDraft({
+        const submissionStarted = submitAndClearDraft({
           appendFileParts: appendComposerFileParts,
           clearAttachments: clearComposerAttachments,
           contextParts: [],
@@ -634,7 +654,11 @@ export function ComposerView({
           promptEditor: promptEditorRef.current,
           submit,
           text: submitText,
+          onResult: handleSubmitResult,
         })
+        if (submissionStarted && surfaceId) {
+          clearSyncedDraft()
+        }
         requestAnimationFrame(() => promptEditorRef.current?.focus())
         return
       }
@@ -666,9 +690,12 @@ export function ComposerView({
       clearComposerAttachments,
       composerAttachments,
       disabled,
+      clearSyncedDraft,
+      handleSubmitResult,
       isSending,
       onSlashCommandAction,
       sendDisabled,
+      surfaceId,
       submit,
     ],
   )
@@ -726,7 +753,7 @@ export function ComposerView({
         }
       }
 
-      submitAndClearDraft({
+      const submissionStarted = submitAndClearDraft({
         appendFileParts: appendComposerFileParts,
         clearAttachments: clearComposerAttachments,
         contextParts,
@@ -736,14 +763,11 @@ export function ComposerView({
         promptEditor: promptEditorRef.current,
         submit: submitHandler,
         text,
+        onResult: handleSubmitResult,
       })
-      // Clear persisted draft on send
-      if (surfaceId) {
+      if (submissionStarted && surfaceId) {
         clearSyncedDraft()
       }
-      setPastedTexts([])
-      historyIndexRef.current = null
-      historyDraftRef.current = null
     },
     [
       allowEmptySend,
@@ -751,6 +775,7 @@ export function ComposerView({
       bangPty,
       bangPtyActive,
       clearComposerAttachments,
+      clearSyncedDraft,
       composerAttachments,
       disabled,
       inputCollapsed,
@@ -759,7 +784,7 @@ export function ComposerView({
       sendBlocked,
       sendDisabled,
       submit,
-      clearSyncedDraft,
+      handleSubmitResult,
       pastedTexts,
       surfaceId,
     ],
@@ -795,7 +820,7 @@ export function ComposerView({
 
   const handlePaste = useCallback(
     (event: ClipboardEvent) => {
-      handleAttachmentPaste(event as unknown as React.ClipboardEvent<HTMLElement>)
+      handleAttachmentPaste(event)
       if (event.defaultPrevented) {
         return
       }
@@ -1217,8 +1242,8 @@ export function ComposerView({
           </div>
 
           {!inputCollapsed && !bangPtyActive && pastedTexts.length > 0 && (
-            <div className={cn('px-3 py-2 pb-0', isUltraDecoration && 'relative')}>
-              <div className="flex gap-2">
+            <div className={cn('overflow-x-auto px-3 py-2 pb-0', isUltraDecoration && 'relative')}>
+              <div className="flex min-w-full w-max gap-2">
                 <AnimatePresence mode="popLayout" initial={false}>
                   {pastedTexts.map(pastedText => (
                     <ComposerPastedTextCard
@@ -1304,6 +1329,7 @@ export function ComposerView({
               sessionTokens={sessionTokens}
               sessionContextWindow={sessionContextWindow}
               compactState={compactState}
+              runtimeUsageState={runtimeUsageState}
               contextBar={contextBar}
               disabled={effectiveDisabled}
               sendVariants={sendVariantActions}

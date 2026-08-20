@@ -39,8 +39,8 @@ export const providerTargets = new Elysia({
   )
   .put(
     '/:providerTargetId',
-    ({ params, body }) => {
-      return ProviderTargets.upsertManualProviderTarget({
+    async ({ params, body }) => {
+      return await ProviderTargets.upsertManualProviderTarget({
         id: params.providerTargetId,
         displayName: body.displayName,
         providerKind: body.providerKind,
@@ -62,8 +62,8 @@ export const providerTargets = new Elysia({
   )
   .delete(
     '/:providerTargetId',
-    ({ params }) => {
-      ProviderTargets.removeProviderTarget(params.providerTargetId)
+    async ({ params }) => {
+      await ProviderTargets.removeProviderTarget(params.providerTargetId)
       return { ok: true as const }
     },
     {

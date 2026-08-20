@@ -1,9 +1,3 @@
-/**
- * Output: Codex runtime identity, static capabilities, and presentation projection.
- * Input: generated Codex app-server capability manifest.
- * Position: Codex provider package metadata owner.
- */
-
 import type {
   ChatRuntimeCapabilities,
   ChatRuntimeMetadata,

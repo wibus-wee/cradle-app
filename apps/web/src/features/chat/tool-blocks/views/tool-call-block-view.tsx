@@ -23,7 +23,7 @@ import { cn } from '~/lib/cn'
 import { EditFileBlock } from '../../rendering/blocks/edit-file-block'
 import { readBuiltinToolCallInputPayload } from '../../rendering/chat-tool-entities'
 import { readTerminalOutputSections } from '../../rendering/terminal-tool-details'
-import { STATUS_LABELS, TOOL_ICON_MAP } from '../../rendering/tool-block-constants'
+import { statusLabelForToolState, TOOL_ICON_MAP } from '../../rendering/tool-block-constants'
 import type {
   RenderableToolPart,
   ToolPayload,
@@ -120,11 +120,19 @@ function readSubagentPanelRole(
 // StatusIcon
 // ---------------------------------------------------------------------------
 
-function StatusIcon({ state, animated = true }: { state: ToolState, animated?: boolean }) {
-  if (isError(state)) {
+function StatusIcon({
+  state,
+  animated = true,
+  approval,
+}: {
+  state: ToolState
+  animated?: boolean
+  approval?: { approved?: boolean }
+}) {
+  if (isError(state) || (state === 'approval-responded' && approval?.approved === false)) {
     return <CircleAlertIcon className="size-3.5 !text-destructive" aria-hidden />
   }
-  if (state === 'output-available' || state === 'approval-responded') {
+  if (state === 'output-available' || (state === 'approval-responded' && approval?.approved !== false)) {
     return <CheckCircle2Icon className="size-3.5 !text-emerald-500" aria-hidden />
   }
   return (
@@ -613,13 +621,15 @@ export function ToolCallBlockView({
           <span
             className={cn(
               'flex shrink-0 items-center',
-              isError(state) ? 'text-destructive/70' : 'text-muted-foreground/40',
-              (state === 'output-available' || state === 'approval-responded')
+              (isError(state) || (state === 'approval-responded' && approval?.approved === false))
+                ? 'text-destructive/70'
+                : 'text-muted-foreground/40',
+              (state === 'output-available' || (state === 'approval-responded' && approval?.approved !== false))
               && 'text-emerald-500/80',
             )}
-            title={`${descriptor.displayName} · ${STATUS_LABELS[state]}`}
+            title={`${descriptor.displayName} · ${statusLabelForToolState(state, approval)}`}
           >
-            <StatusIcon state={state} animated={animated} />
+            <StatusIcon state={state} animated={animated} approval={approval} />
           </span>
         </div>
 
@@ -723,7 +733,7 @@ export function ToolCallBlockView({
               {descriptor.displayName}
 {' '}
 ·
-{STATUS_LABELS[state]}
+{statusLabelForToolState(state, approval)}
             </DialogDescription>
           </DialogHeader>
           <_ToolDetails
@@ -745,6 +755,9 @@ export function ToolCallBlockView({
     'data-testid': `chat-tool-call-${toolCallId}`,
     'data-tool-name': toolName,
     'data-tool-kind': descriptor.kind,
+    ...(approval?.approved === undefined
+      ? {}
+      : { 'data-approval-approved': approval.approved ? 'true' : 'false' }),
   }
 
   if (!animated) {

@@ -264,7 +264,7 @@ export function DiffStage({
   })
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden">
+    <div className="relative h-full min-h-0 flex-1 overflow-hidden">
       {visibleItems.length === 0
         ? (
             <div className="flex h-full items-center justify-center p-4 text-center">

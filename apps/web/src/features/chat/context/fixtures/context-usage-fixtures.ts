@@ -1,6 +1,7 @@
 import type {
   ChatRuntimeCompactUiSlotState,
   ChatRuntimeContextUsage,
+  ChatRuntimeUsageUiSlotState,
 } from '../../capabilities/chat-capabilities'
 
 export const contextUsageFixture: ChatRuntimeContextUsage = {
@@ -29,6 +30,24 @@ export const contextUsageNearLimitFixture: ChatRuntimeContextUsage = {
   ...contextUsageFixture,
   totalTokens: 121_120,
   percentage: 94.6,
+}
+
+export const runtimeUsageFixture: ChatRuntimeUsageUiSlotState = {
+  kind: 'usage',
+  slotId: 'codex-usage-fixture',
+  threadId: 'thread-context-fixture',
+  limitName: null,
+  usedPercent: 0,
+  primaryWindowDurationMins: 10_080,
+  primaryResetsAt: 1_786_406_400,
+  secondaryUsedPercent: 15,
+  secondaryWindowDurationMins: 300,
+  secondaryResetsAt: 1_785_837_200,
+  creditsBalance: null,
+  hasCredits: null,
+  rateLimitReachedType: null,
+  planType: 'pro',
+  updatedAt: 1_725_000_000,
 }
 
 export const compactContextUsageFixture: ChatRuntimeCompactUiSlotState = {

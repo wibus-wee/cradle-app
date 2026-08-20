@@ -42,6 +42,7 @@ function initGitRepository(dir: string): void {
 
   runGit(dir, ['config', 'user.name', 'Cradle E2E'])
   runGit(dir, ['config', 'user.email', 'cradle-e2e@example.com'])
+  runGit(dir, ['config', 'commit.gpgSign', 'false'])
 }
 
 function commitFile(dir: string, fileName: string, content: string, message: string): void {
@@ -64,6 +65,7 @@ function createGitWorkspaceFixture(world: CradleWorld): GitWorkspaceFixture {
   )
 
   initGitRepository(dir)
+  runGit(dir, ['add', 'AGENTS.md'])
   commitFile(dir, 'README.md', `# ${name}`, 'repo: initial commit')
   commitFile(dir, 'main.txt', 'main branch content', 'main: second commit')
 
@@ -93,65 +95,30 @@ function updateCurrentBranch(world: CradleWorld, branchName: string): void {
   world.remember(GIT_WORKSPACE_KEY, fixture)
 }
 
-async function addWorkspaceFromPicker(world: CradleWorld, fixture: GitWorkspaceFixture): Promise<void> {
-  const addWorkspaceButton = world.page.locator('[data-testid="add-workspace-btn"]')
-  await expect(addWorkspaceButton).toBeVisible({ timeout: 10_000 })
-  await addWorkspaceButton.click()
-
-  await world.selectDirectoryInBrowser(fixture.dir)
-
-  await expect(
-    world.page.locator('[data-testid^="workspace-open-"]').filter({ hasText: fixture.name }).first(),
-  ).toBeVisible({ timeout: 10_000 })
-}
-
-async function getGitPanelBranchControl(world: CradleWorld) {
-  // Wait for the git panel to finish loading git status
-  const gitPanel = world.page.locator('[data-testid="git-panel"]')
-  await expect(gitPanel).toBeVisible({ timeout: 15_000 })
-  await expect(gitPanel).toHaveAttribute('data-right-aside-git-ready', 'true', { timeout: 30_000 })
-  const locator = world.page.locator('[data-testid="git-panel-branch-trigger"]')
-  await expect(locator).toBeVisible({ timeout: 15_000 })
-  return locator
-}
-
-async function assertGitPanelBranch(world: CradleWorld, branchName: string): Promise<void> {
-  const control = await getGitPanelBranchControl(world)
-  await expect.poll(async () => control.getAttribute('data-branch-name'), { timeout: 10_000 }).toBe(branchName)
-  await expect(control).toContainText(branchName, { timeout: 10_000 })
-}
-
-async function openGitPanelBranchPicker(world: CradleWorld): Promise<void> {
-  const control = await getGitPanelBranchControl(world)
-  await control.click()
-  await expect(world.page.locator(GIT_BRANCH_PICKER)).toBeVisible({ timeout: 10_000 })
-}
-
 async function openRightAside(world: CradleWorld): Promise<void> {
-  const aside = world.page.locator('[data-testid="right-aside"]')
-  if (await aside.isVisible()) {
-    return
-  }
-
-  const toggle = world.page.locator('[data-testid="app-header-aside-toggle"]')
-  await expect(toggle).toBeVisible({ timeout: 10_000 })
-  await toggle.click()
-  await expect(aside).toBeVisible({ timeout: 10_000 })
+  await world.gitPage.openRightAside()
 }
 
 async function switchRightAsideToGit(world: CradleWorld): Promise<void> {
-  const tab = world.page.locator('[data-testid="right-aside-tab-git"]')
-  await expect(tab).toBeVisible({ timeout: 10_000 })
-  await tab.click()
-  await expect(tab).toHaveAttribute('data-active', 'true', { timeout: 10_000 })
-  await expect(world.page.locator('[data-testid="git-panel"]')).toBeVisible({ timeout: 10_000 })
+  await world.gitPage.switchToGitTab()
 }
 
 Given('我已添加了一个真实 Git 工作区', async function (this: CradleWorld) {
-  console.warn('[step] setup: add real git workspace')
+  console.warn('[step] setup: add real git workspace via API')
   const fixture = createGitWorkspaceFixture(this)
-  await addWorkspaceFromPicker(this, fixture)
+  const response = await fetch(`${this.params.serverUrl}/workspaces/from-directory`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: fixture.dir }),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to create git workspace: ${response.status} ${await response.text()}`)
+  }
   this.remember(GIT_WORKSPACE_KEY, fixture)
+  await this.page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(
+    this.page.locator('[data-testid^="workspace-open-"]').filter({ hasText: fixture.name }).first(),
+  ).toBeVisible({ timeout: 15_000 })
 })
 
 Given('我在新建聊天中选择 Git 工作区', async function (this: CradleWorld) {
@@ -169,35 +136,30 @@ Given('我在新建聊天中选择 Git 工作区', async function (this: CradleW
 
 Then('Chat Header 中应该显示当前 Git 分支', async function (this: CradleWorld) {
   const fixture = recallGitWorkspace(this)
-  await openRightAside(this)
-  await switchRightAsideToGit(this)
-  await assertGitPanelBranch(this, fixture.currentBranch)
+  await this.gitPage.openRightAside()
+  await this.gitPage.switchToGitTab()
+  await this.gitPage.expectBranch(fixture.currentBranch)
 })
 
 Then('Chat Header 中应该显示 Git 分支 {string}', async function (this: CradleWorld, branchName: string) {
-  await openRightAside(this)
-  await switchRightAsideToGit(this)
-  await assertGitPanelBranch(this, branchName)
+  await this.gitPage.openRightAside()
+  await this.gitPage.switchToGitTab()
+  await this.gitPage.expectBranch(branchName)
 })
 
 When('我打开 Chat Header 中的 Git 分支选择器', async function (this: CradleWorld) {
   console.warn('[step] open git branch picker from git panel')
-  await openRightAside(this)
-  await switchRightAsideToGit(this)
-  await openGitPanelBranchPicker(this)
+  await this.gitPage.openRightAside()
+  await this.gitPage.switchToGitTab()
+  await this.gitPage.openBranchPicker()
 })
 
 Then('我应该看到 Git 分支选择器', async function (this: CradleWorld) {
-  await expect(this.page.locator(GIT_BRANCH_PICKER)).toBeVisible({ timeout: 10_000 })
+  await expect(this.gitPage.picker()).toBeVisible({ timeout: 10_000 })
 })
 
 Then('Git 分支选择器中应该包含本地分支 {string}', async function (this: CradleWorld, branchName: string) {
-  const option = this.page
-    .locator('[data-testid="git-branch-option"][data-branch-scope="local"]')
-    .filter({ hasText: branchName })
-    .first()
-
-  await expect(option).toBeVisible({ timeout: 10_000 })
+  await this.gitPage.expectLocalBranchVisible(branchName)
 })
 
 When('我在分支选择器中开始创建新分支', async function (this: CradleWorld) {

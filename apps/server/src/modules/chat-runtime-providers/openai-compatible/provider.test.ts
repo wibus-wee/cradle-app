@@ -1,13 +1,19 @@
 import type { UIMessage, UIMessageChunk } from 'ai'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ProviderContext, RuntimeProviderTargetProfile, RuntimeSession } from '../../chat-runtime/runtime-provider-types'
+import type {
+  ProviderContext,
+  RuntimeProviderTargetProfile,
+  RuntimeSession,
+  RuntimeTurnResult,
+} from '../../chat-runtime/runtime-provider-types'
+import type { AiSdkEngineInput } from '../../chat-runtime-engine/ai-sdk-engine'
 import { assertValidProviderChunkSequence } from '../kit/testing/chunk-contract'
 import { OpenAICompatibleProvider } from './provider'
 
 const engineMocks = vi.hoisted(() => ({
   buildModelMessages: vi.fn(async () => [{ role: 'user', content: 'Hello standard' }]),
-  executeAiSdkTurn: vi.fn(async function* () {
+  executeAiSdkTurn: vi.fn(async function* (_input: AiSdkEngineInput) {
     yield { type: 'text-start', id: 'text-1' }
     yield { type: 'text-delta', id: 'text-1', delta: 'Standard answer' }
     yield { type: 'text-end', id: 'text-1' }
@@ -15,7 +21,7 @@ const engineMocks = vi.hoisted(() => ({
   }),
   createLanguageModel: vi.fn(() => ({ provider: 'mock-model' })),
   detectApiFormat: vi.fn(() => 'openai'),
-  lookupContextWindow: vi.fn(async () => 32_000),
+  getCachedContextWindow: vi.fn(() => 32_000),
 }))
 
 vi.mock('../../chat-runtime-engine/ai-sdk-engine', async (importOriginal) => {
@@ -40,13 +46,19 @@ vi.mock('../../model-registry/model-info-registry', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../model-registry/model-info-registry')>()
   return {
     ...actual,
-    lookupContextWindow: engineMocks.lookupContextWindow,
+    getCachedContextWindow: engineMocks.getCachedContextWindow,
   }
 })
 
 describe('openai compatible provider', () => {
   afterEach(() => {
     vi.clearAllMocks()
+    engineMocks.executeAiSdkTurn.mockImplementation(async function* (_input: AiSdkEngineInput) {
+      yield { type: 'text-start', id: 'text-1' }
+      yield { type: 'text-delta', id: 'text-1', delta: 'Standard answer' }
+      yield { type: 'text-end', id: 'text-1' }
+      yield { type: 'finish', finishReason: 'stop' }
+    })
   })
 
   it('streams AI SDK engine chunks as a valid provider chunk sequence', async () => {
@@ -82,6 +94,81 @@ describe('openai compatible provider', () => {
       chatSessionId: 'chat-session-1',
     }))
   })
+
+  it('keeps usage and step results isolated across concurrent turns', async () => {
+    const provider = new OpenAICompatibleProvider(createProviderContext())
+    let callIndex = 0
+    let releaseFirstTurn!: () => void
+    let markFirstUsageReported!: () => void
+    const firstTurnMayFinish = new Promise<void>((resolve) => { releaseFirstTurn = resolve })
+    const firstUsageReported = new Promise<void>((resolve) => { markFirstUsageReported = resolve })
+
+    engineMocks.executeAiSdkTurn.mockImplementation(async function* (input: AiSdkEngineInput) {
+      const turn = ++callIndex
+      const usage = {
+        promptTokens: turn,
+        completionTokens: turn * 10,
+        totalTokens: turn * 11,
+      }
+      input.onUsage?.(usage)
+      input.onStepFinish?.({
+        stepNumber: 0,
+        stepType: 'initial',
+        modelId: `model-${turn}`,
+        usage,
+      })
+      if (turn === 1) {
+        markFirstUsageReported()
+        await firstTurnMayFinish
+      }
+      else {
+        releaseFirstTurn()
+      }
+      yield { type: 'finish', finishReason: 'stop' }
+    })
+
+    const results: RuntimeTurnResult[] = []
+    const consume = async (turn: number): Promise<void> => {
+      for await (const _chunk of provider.streamTurn({
+        runId: `run-${turn}`,
+        runtimeSession: createRuntimeSession(`chat-session-${turn}`),
+        profile: createProfile(),
+        message: createUserMessage(`turn ${turn}`),
+        workspaceId: 'workspace-1',
+        workspacePath: '/tmp/workspace',
+        reportTurnResult: (result) => { results[turn - 1] = result },
+      })) {
+        // Consume the provider stream so the turn result is finalized.
+      }
+    }
+
+    const first = consume(1)
+    await firstUsageReported
+    await Promise.all([first, consume(2)])
+
+    expect(results).toEqual([
+      {
+        modelId: 'gpt-test',
+        usage: { promptTokens: 1, completionTokens: 10, totalTokens: 11 },
+        stepUsages: [{
+          stepNumber: 0,
+          stepType: 'initial',
+          modelId: 'model-1',
+          usage: { promptTokens: 1, completionTokens: 10, totalTokens: 11 },
+        }],
+      },
+      {
+        modelId: 'gpt-test',
+        usage: { promptTokens: 2, completionTokens: 20, totalTokens: 22 },
+        stepUsages: [{
+          stepNumber: 0,
+          stepType: 'initial',
+          modelId: 'model-2',
+          usage: { promptTokens: 2, completionTokens: 20, totalTokens: 22 },
+        }],
+      },
+    ])
+  })
 })
 
 function createProviderContext(): ProviderContext {
@@ -109,10 +196,10 @@ function createProfile(): RuntimeProviderTargetProfile {
   }
 }
 
-function createRuntimeSession(): RuntimeSession {
+function createRuntimeSession(chatSessionId = 'chat-session-1'): RuntimeSession {
   return {
     id: 'runtime-session-1',
-    chatSessionId: 'chat-session-1',
+    chatSessionId,
     providerTargetId: 'profile-standard',
     runtimeKind: 'standard',
     providerSessionId: null,

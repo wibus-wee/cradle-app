@@ -6,6 +6,7 @@ import type { ComposerProps } from '~/features/chat/composer/views/composer-view
 import { ComposerView } from '~/features/chat/composer/views/composer-view'
 
 import { newWorkWorkspaceFixtures } from './fixtures/new-work'
+import { NewWorkBaseBranchControlView } from './new-work-base-branch-control-view'
 import type { NewWorkFailureKind } from './new-work-error-view'
 import { NewWorkPageView } from './new-work-page-view'
 import { NewWorkWorkspaceSelectorView } from './new-work-workspace-selector-view'
@@ -14,6 +15,8 @@ type NewWorkStoryState
   = | 'ready'
     | 'adding-workspace'
     | 'workspace-menu-open'
+    | 'base-branch-picker-open'
+    | 'other-branch-selected'
     | 'loading-workspaces'
     | 'no-local-workspace'
     | 'dirty-source'
@@ -42,18 +45,44 @@ function NewWorkPageStoryScene({ state }: { state: NewWorkStoryState }) {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
     workspaces[0]?.id ?? null,
   )
+  const selectedWorkspace = workspaces.find(workspace => workspace.id === selectedWorkspaceId)
+  const [selectedBaseBranch, setSelectedBaseBranch] = useState<string | null>(
+    state === 'other-branch-selected' ? 'origin/develop' : null,
+  )
   const [failureDismissed, setFailureDismissed] = useState(false)
   const [activity, setActivity] = useState('Ready to create Work')
   const failureKind = failureDismissed ? null : failureForState(state)
   const workspaceSelector = (
-    <NewWorkWorkspaceSelectorView
-      workspaces={workspaces}
-      selectedWorkspaceId={selectedWorkspaceId}
-      adding={state === 'adding-workspace'}
-      defaultOpen={state === 'workspace-menu-open'}
-      onSelectWorkspace={setSelectedWorkspaceId}
-      onAddWorkspace={() => setActivity('Add project selected')}
-    />
+    <div className="flex min-w-0 items-center gap-1.5">
+      <NewWorkWorkspaceSelectorView
+        workspaces={workspaces}
+        selectedWorkspaceId={selectedWorkspaceId}
+        adding={state === 'adding-workspace'}
+        defaultOpen={state === 'workspace-menu-open'}
+        onSelectWorkspace={setSelectedWorkspaceId}
+        onAddWorkspace={() => setActivity('Add project selected')}
+      />
+      {workspaces.length > 0
+        ? (
+            <NewWorkBaseBranchControlView
+              currentBranch={selectedWorkspace?.gitIdentity?.branch ?? null}
+              selectedBranch={selectedBaseBranch}
+              defaultOpen={state === 'base-branch-picker-open'}
+              branches={[
+                { name: 'main', scope: 'local' },
+                { name: 'develop', scope: 'local' },
+                { name: 'origin/main', scope: 'remote' },
+                { name: 'origin/develop', scope: 'remote' },
+                { name: 'origin/release/next', scope: 'remote' },
+              ]}
+              onSelectBranch={(branch) => {
+                setSelectedBaseBranch(branch)
+                setActivity(branch ? `Base branch selected: ${branch}` : 'Current branch selected')
+              }}
+            />
+          )
+        : null}
+    </div>
   )
   const composerProps: ComposerProps = {
     send: {
@@ -112,9 +141,7 @@ function NewWorkPageStoryScene({ state }: { state: NewWorkStoryState }) {
             : null
         }
         canOpenChanges={failureKind === 'dirty-source'}
-        canStartFromRemoteDefault={failureKind === 'dirty-source'}
         onOpenChanges={() => setActivity('Open Changes selected')}
-        onStartFromRemoteDefault={() => setActivity('Remote default selected')}
         onDismissFailure={() => setFailureDismissed(true)}
       />
       <span className="sr-only" role="status">{activity}</span>
@@ -146,6 +173,14 @@ export const AddingWorkspace: Story = {
 
 export const WorkspaceMenuOpen: Story = {
   args: { state: 'workspace-menu-open' },
+}
+
+export const BaseBranchPickerOpen: Story = {
+  args: { state: 'base-branch-picker-open' },
+}
+
+export const OtherBranchSelected: Story = {
+  args: { state: 'other-branch-selected' },
 }
 
 export const LoadingWorkspaces: Story = {

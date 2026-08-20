@@ -141,7 +141,7 @@ async function ensureConnected(): Promise<void> {
 }
 
 async function openSocket(): Promise<void> {
-  const { getAuthenticatedServerWebSocketUrl } = await import('~/lib/electron')
+  const { getAuthenticatedServerWebSocketUrl } = await import('~/lib/authenticated-server-url')
   const url = await getAuthenticatedServerWebSocketUrl('/sync')
   const generation = ++socketGeneration
   const currentSocket = new WebSocket(url)

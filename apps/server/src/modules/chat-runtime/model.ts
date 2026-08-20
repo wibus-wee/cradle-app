@@ -3,6 +3,7 @@ import { t } from 'elysia'
 import { SessionModel } from '../session/model'
 import {
   chatMessageDetailSchema,
+  chatMessagePreviewRowSchema,
   chatMessageRowSchema,
   codexAppServerCapabilitySchema,
   codexAppServerServerMessageSchema,
@@ -494,6 +495,15 @@ export const ChatRuntimeModel = {
     {
       revision: t.Number({ minimum: 0 }),
       rows: t.Array(chatMessageRowSchema),
+      nextCursor: t.Union([t.String(), t.Null()]),
+    },
+    { additionalProperties: false },
+  ),
+
+  chatMessagePreviews: t.Object(
+    {
+      revision: t.Number({ minimum: 0 }),
+      rows: t.Array(chatMessagePreviewRowSchema),
       nextCursor: t.Union([t.String(), t.Null()]),
     },
     { additionalProperties: false },

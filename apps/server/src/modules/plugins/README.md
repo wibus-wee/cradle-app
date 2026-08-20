@@ -6,7 +6,7 @@ This module owns host activation APIs. Host activation means Cradle decides whet
 
 ## Routes
 
-- `GET /plugins` lists host plugin descriptors for management surfaces and generated CLI usage. Descriptors include activation state, layer state, source metadata, declared capabilities, runtime capabilities, warnings, and an `active` projection.
+- `GET /plugins` lists host plugin descriptors for management surfaces, the web plugin host, and generated SDK/CLI usage. Descriptors include activation state, layer state, source trust and granted permissions, declared capabilities, runtime capabilities, warnings, and an `active` projection.
 - `GET /plugins/:routeSegment` reads one host plugin descriptor by route segment. The route segment is the URL-safe identifier from the descriptor, not the package identity.
 - `PATCH /plugins/:routeSegment/enabled` updates Cradle's activation policy for one plugin and returns the updated descriptor. The request body is `{ enabled: boolean, reason?: string | null }`.
 - `GET /plugins/mentions` lists plugin mention candidates for the chat composer. It reads plugin descriptors and capabilities from Cradle's plugin registry; it does not read from or write to MCP registry state.

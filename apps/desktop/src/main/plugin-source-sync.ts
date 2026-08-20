@@ -7,7 +7,6 @@ import {
   deactivateOneDesktopPlugin,
   discoverAndActivateDesktopPluginSource,
 } from './plugin-loader'
-import { getDesktopServerAuthHeaders } from './server-process'
 
 const PLUGINS_SYNC_SOURCE_CHANNEL = 'desktop:plugins-sync-source'
 const PLUGINS_UNSYNC_SOURCE_CHANNEL = 'desktop:plugins-unsync-source'
@@ -57,7 +56,7 @@ function requireServerUrl(): string {
 }
 
 async function fetchJson<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-  const response = await fetch(new URL(path, requireServerUrl()), { headers: getDesktopServerAuthHeaders() })
+  const response = await fetch(new URL(path, requireServerUrl()))
   if (!response.ok) {
     throw new Error(`Plugin source sync request failed with status ${response.status}.`)
   }
@@ -142,7 +141,6 @@ export function startPluginDevSessionSync(): () => void {
 
   const consumeEvents = async (): Promise<void> => {
     const response = await fetch(new URL('/plugins/dev-sessions/events', requireServerUrl()), {
-      headers: getDesktopServerAuthHeaders(),
       signal: abortController.signal,
     })
     if (!response.ok || !response.body) {

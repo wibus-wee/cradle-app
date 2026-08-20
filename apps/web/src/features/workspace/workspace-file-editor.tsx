@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
+import { recordCodeActivityWrite } from '~/features/code-activity/code-activity-bus'
 import { cn } from '~/lib/cn'
 import { useThemeStore } from '~/store/theme'
 
@@ -174,6 +175,7 @@ export function WorkspaceFileEditor({ workspaceId, path }: { workspaceId: string
           path={`${workspaceId}/${path}`}
           loading={null}
           onChange={(value) => {
+            recordCodeActivityWrite(workspaceId, path)
             setEditorState(current => ({
               ...current,
               draft: value ?? '',

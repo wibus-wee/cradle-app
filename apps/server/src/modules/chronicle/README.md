@@ -8,7 +8,8 @@
 - `model.ts`: Elysia TypeBox schemas for Chronicle request and response contracts。
 - `service.ts`: DB-backed Chronicle service，读写 preferences、upsert snapshot/accessibility/memory/message/raw audio segment/audio transcript/speaker profile rows、把 snapshot/message/audio/transcript/memory evidence 归入 Chronicle-owned activity sessions/segments、运行 activity segment triage/summarization/crystallization、写入 knowledge cards/version/source links、记录 dream merge dry-run candidates、记录 pipeline runs、维护 Chronicle-owned memory chunk/keyword/embedding index 与 content-hash dedup foundation、管理 Chronicle-owned local model resource manifest/status、调用 configured profile 生成 summary、后台轮询同步 Slack channel history、校验 Slack Events API signatures、渲染 snapshot frame privacy mask projection、记录 Chronicle events，并把 opt-in background audio capture config、closed-eyes discard config 和 sensitive app/title/url privacy rules 投影到 daemon launch options；closed-eyes discard gate 目前在 snapshot ingest 边界临时禁用。
 - `agent-context.ts`: Chat runtime 的只读 Chronicle memory/knowledge context helper。它按当前用户 turn 做轻量 keyword retrieval，注入只读长期记忆 context，并在 prompt 边界 redacts 常见敏感值；它不 import `service.ts`，避免 Chronicle 与 chat-runtime 形成依赖环。
-- `daemon-manager.ts`: Rust `cradle-chronicle` evidence runtime process lifecycle、restart handoff、audio/privacy launch option tracking、local ONNX embedding worker invocation and memory/CPU resource usage tracking。
+- `daemon-manager.ts`: Rust `cradle-chronicle` evidence runtime process lifecycle、restart handoff、audio/privacy launch option tracking、supervised long-lived local ONNX embedding worker ownership and memory/CPU resource usage tracking。
+- `inference-worker.ts`: JSON-lines inference supervisor；复用一个 Rust ONNX runtime，以 request id 串行 multiplex，限制 input/pending queue，处理 abort/timeout/crash，并在下一次请求 lazy restart。
 
 ## Ownership Notes
 
@@ -18,7 +19,7 @@ CLI metadata is intentionally limited to Agent-facing read/query/list commands a
 
 Chronicle 的 canonical product state 是 Cradle DB，不是 artifact filename scan，也不是 Rust outbox。Artifact files 与 `outbox/events.ndjson` 是本地证据和恢复来源；Server ingest 会把 Rust 上报的 paths 转成 Chronicle storage root 相对路径，并决定这些 evidence 如何进入 activity、memory、knowledge 和 privacy projections。
 
-Memory search 由 Chronicle-owned `chronicle_memory_chunks`、`chronicle_memory_keywords` 和 `chronicle_memory_embeddings` 支撑。`recordMemory()` 会为新写入和更新后的 memory 重建 keyword index 与 text embedding，并用 canonicalized content hash 做跨 source duplicate merge。安装 `embedding` model resource 后，Server 会通过 Rust `cradle-chronicle --embed-texts` 调用本地 all-MiniLM-L6-v2 ONNX runtime；未安装或 runtime 失败时保留 `chronicle-lexical/v1` deterministic fallback，保证基础 search 不因模型缺失中断。
+Memory search 由 Chronicle-owned `chronicle_memory_chunks`、`chronicle_memory_keywords`、`chronicle_memory_embeddings` 和 rebuildable `chronicle_memory_embedding_buckets` ANN projection 支撑。`recordMemory()` 会同步写入 keyword/lexical baseline，再由 bounded asynchronous indexer 通过 long-lived Rust `cradle-chronicle --embedding-worker` 升级为 all-MiniLM-L6-v2 embedding；未安装或 runtime 失败时保留 `chronicle-lexical/v1` deterministic fallback。Search 先通过 indexed keyword/embedding buckets 选出至多 256 个 candidates，再只对 candidates 做 exact cosine rerank，不在 request path 解析完整 vector corpus。
 
 本地小模型资源属于 Chronicle namespace，默认位于 `~/.cradle/chronicle/models/`；在 isolated server data dir 下固定为 `CRADLE_DATA_DIR/chronicle/models/`，不跟随 capture `storageRoot` 写到其他 namespace。Provider profiles 只用于远程 summary generation 的 credentials/model selection，不拥有 OCR、VAD、ASR、speaker embedding extractor 或 text embedding 资源生命周期。Speaker profile/alias/embedding 记忆是 Chronicle 运行时数据，不是下载资源；`speaker` model resource 只表示 Sherpa speaker embedding extractor ONNX 文件。
 

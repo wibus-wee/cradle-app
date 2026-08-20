@@ -8,10 +8,12 @@ import {
   getChatSessionsBySessionIdQueue,
   patchChatSessionsBySessionIdQueueByQueueItemId,
   postChatSessionsBySessionIdBangCommand,
+  postChatSessionsBySessionIdBangTranscript,
   postChatSessionsBySessionIdCancel,
   postChatSessionsBySessionIdMessagesByMessageIdPlanImplementationApproval,
   postChatSessionsBySessionIdQueue,
   postChatSessionsBySessionIdQueueReorder,
+  postChatSessionsBySessionIdQuickQuestion,
   postChatSessionsBySessionIdSideChat,
   postChatSessionsBySessionIdSteer,
   postChatSessionsBySessionIdToolApprovalByRequestId,
@@ -34,8 +36,12 @@ export interface ChatResponseRequestBody {
   providerTargetId?: string
   modelId?: string | null
   thinkingEffort?: ChatThinkingEffort
-  runtimeSettings?: ChatRuntimeSettingsPatch
+  runtimeSettings?: RuntimeSettingsPatch
   reviewTarget?: RuntimeReviewTarget
+}
+
+export interface ChatQuickQuestionRequestBody {
+  question: string
 }
 
 export type ChatQueueMode = 'queue'
@@ -45,11 +51,6 @@ export type RuntimeSettings = Record<string, RuntimeSettingsValue>
 export type RuntimeSettingsPatchValue = RuntimeSettingsValue | null
 export type RuntimeSettingsPatch = Record<string, RuntimeSettingsPatchValue | undefined>
 export type RuntimeSettingsPayload = Record<string, RuntimeSettingsPatchValue>
-
-/** @deprecated Use RuntimeSettings — provider-native session settings. */
-export type ChatRuntimeSettings = RuntimeSettings
-/** @deprecated Use RuntimeSettingsPatch */
-export type ChatRuntimeSettingsPatch = RuntimeSettingsPatch
 
 export interface ChatQueueItem {
   id: string
@@ -62,7 +63,7 @@ export interface ChatQueueItem {
   providerTargetId: string | null
   modelId: string | null
   thinkingEffort: ChatThinkingEffort | null
-  runtimeSettings: ChatRuntimeSettings
+  runtimeSettings: RuntimeSettings
   position: number
   sourceRunId: string | null
   startedRunId: string | null
@@ -298,10 +299,48 @@ export async function startChatResponse(args: {
   body: ChatResponseRequestBody
   signal?: AbortSignal
 }): Promise<Response> {
-  return fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/response`, {
+  return requestChatRuntimeSse({
+    sessionId: args.sessionId,
+    route: 'response',
+    body: buildChatResponseRequestBody(args.body),
+    signal: args.signal,
+  })
+}
+
+export async function startQuickQuestion(args: {
+  sessionId: string
+  body: ChatQuickQuestionRequestBody
+  signal?: AbortSignal
+}) {
+  return postChatSessionsBySessionIdQuickQuestion({
+    path: { sessionId: args.sessionId },
+    body: args.body,
+    signal: args.signal,
+    // A quick question is a single ephemeral turn. Do not reconnect it as a
+    // new provider request after a transport failure.
+    sseMaxRetryAttempts: 1,
+    onSseError: (error) => {
+      if (args.signal?.aborted) {
+        return
+      }
+      throw error instanceof Error ? error : new Error(String(error))
+    },
+  })
+}
+
+type ChatRuntimeSseRoute = 'response' | 'quick-question'
+type ChatRuntimeSseRequestBody = ChatResponseRequestPayload | ChatQuickQuestionRequestBody
+
+async function requestChatRuntimeSse(args: {
+  sessionId: string
+  route: ChatRuntimeSseRoute
+  body: ChatRuntimeSseRequestBody
+  signal?: AbortSignal
+}): Promise<Response> {
+  return fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/${args.route}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(buildChatResponseRequestBody(args.body)),
+    body: JSON.stringify(args.body),
     signal: args.signal,
   })
 }
@@ -338,26 +377,17 @@ export async function persistBangTranscript(args: {
   exitCode?: number | null
   signal?: AbortSignal
 }): Promise<BangCommandResult> {
-  const response = await fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/bang-transcript`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  const result = await postChatSessionsBySessionIdBangTranscript({
+    path: { sessionId: args.sessionId },
+    body: {
       transcript: args.transcript,
       command: args.command,
       durationMs: args.durationMs,
       exitCode: args.exitCode,
-    }),
+    },
     signal: args.signal,
   })
-  if (!response.ok) {
-    const message = await response.text().catch(() => '')
-    throw new Error(message || `Failed to persist bang transcript (${response.status})`)
-  }
-  const payload = await response.json() as { data?: BangCommandResult } | BangCommandResult
-  if (payload && typeof payload === 'object' && 'data' in payload && payload.data) {
-    return payload.data
-  }
-  return payload as BangCommandResult
+  return readSdkData(result, 'Failed to persist bang transcript') as BangCommandResult
 }
 
 export async function createSideChat(args: {

@@ -25,8 +25,10 @@ function toProviderTargetOption(target: GetProviderTargetsResponse[number]): Pro
     kind: target.kind as ProviderTargetKind,
     name: target.displayName,
     providerKind: target.providerKind as ProviderKind,
+    effectiveProviderKinds: target.effectiveProviderKinds as ProviderKind[],
     enabled: target.enabled,
     iconSlug: nullableString(target.iconSlug),
+    enabledModelsJson: target.enabledModelsJson,
     sourceKey: nullableString(target.sourceKey),
     externalRecordId: nullableString(target.externalRecordId),
   }

@@ -6,6 +6,7 @@ import { simpleGit } from 'simple-git'
 import { AppError } from '../../errors/app-error'
 import { parseJsonObjectOrEmpty } from '../../helpers/json-record'
 import { db } from '../../infra'
+import type { GitHubReadMode } from '../../lib/github/cache-gate'
 import {
   createPullRequest as createGitHubPullRequest,
   fetchAuthenticatedUser,
@@ -454,6 +455,14 @@ export function getBoundPullRequest(sessionId: string): SessionPullRequestView |
   return stored ? toView(stored) : null
 }
 
+/** Decode the cached PR projection from an already-loaded Session row. */
+export function readBoundPullRequest(
+  configJson: string | null | undefined,
+): SessionPullRequestView | null {
+  const stored = readStoredPullRequest(configJson)
+  return stored ? toView(stored) : null
+}
+
 export async function getPullRequest(sessionId: string): Promise<SessionPullRequestView | null> {
   const session = requireSession(sessionId)
   const stored = readStoredPullRequest(session.configJson)
@@ -536,9 +545,10 @@ export async function fetchPullRequestDetailByRef(
   owner: string,
   repo: string,
   number: number,
+  mode: GitHubReadMode = 'read',
 ): Promise<SessionPullRequestDetail> {
   try {
-    return await fetchPullRequestDetailByRefImpl(owner, repo, number)
+    return await fetchPullRequestDetailByRefImpl(owner, repo, number, mode)
   }
   catch (error) {
     mapGitHubError(error, 'Failed to fetch GitHub pull request details.')
@@ -549,13 +559,14 @@ async function fetchPullRequestDetailByRefImpl(
   owner: string,
   repo: string,
   number: number,
+  mode: GitHubReadMode,
 ): Promise<SessionPullRequestDetail> {
   const [live, comments, reviews, files, mergeSettings] = await Promise.all([
-    fetchPullRequestDetail(owner, repo, number),
-    fetchPullRequestComments(owner, repo, number),
-    fetchPullRequestReviews(owner, repo, number),
-    fetchPullRequestFiles(owner, repo, number),
-    fetchRepoMergeSettings(owner, repo),
+    fetchPullRequestDetail(owner, repo, number, mode),
+    fetchPullRequestComments(owner, repo, number, mode),
+    fetchPullRequestReviews(owner, repo, number, mode),
+    fetchPullRequestFiles(owner, repo, number, mode),
+    fetchRepoMergeSettings(owner, repo, mode),
   ])
   if (!live) {
     throw new AppError({
@@ -566,8 +577,8 @@ async function fetchPullRequestDetailByRefImpl(
     })
   }
   const [checkRuns, combinedStatus] = await Promise.all([
-    fetchCheckRuns(owner, repo, live.head.sha),
-    fetchCombinedStatus(owner, repo, live.head.sha),
+    fetchCheckRuns(owner, repo, live.head.sha, mode),
+    fetchCombinedStatus(owner, repo, live.head.sha, mode),
   ])
 
   const checks: SessionPullRequestDetail['pullRequest']['checks'] = [
@@ -805,6 +816,19 @@ export async function listAuthoredPullRequests(login: string, after?: string): P
   }
   catch (error) {
     mapGitHubError(error, 'Failed to list pull requests you authored.')
+  }
+}
+
+export async function refreshPullRequestFeeds(login: string): Promise<void> {
+  await requireGitHubToken()
+  try {
+    await Promise.all([
+      searchAuthoredPullRequests(login, null, 'force'),
+      searchReviewingPullRequests(login, null, 'force'),
+    ])
+  }
+  catch (error) {
+    mapGitHubError(error, 'Failed to refresh pull requests from GitHub.')
   }
 }
 

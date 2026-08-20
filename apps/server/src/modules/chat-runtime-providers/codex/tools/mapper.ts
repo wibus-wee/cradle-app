@@ -322,7 +322,6 @@ export function buildCodexToolResult(
       return {
         status: item.status,
         revisedPrompt: (item as { revisedPrompt?: string | null }).revisedPrompt ?? null,
-        result: (item as { result?: string }).result ?? '',
         savedPath: (item as { savedPath?: string }).savedPath ?? null,
       }
     case 'enteredReviewMode':

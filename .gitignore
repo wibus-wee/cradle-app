@@ -25,12 +25,15 @@ apps/desktop/resources/relayd/**/relayd
 apps/desktop/resources/relayd/**/relayd.exe
 apps/desktop/resources/relayd/**/relayd-runtime.json
 .cradle/
+.expo/
 .claude/worktrees/
 apps/server/openapi.json
+apps/server/dist-benchmark/
 apps/web/i18n-hardcoded-report.json
 apps/web/i18n-missing-report.json
 apps/web/i18n-unused-keys-report.json
 apps/web/storybook-static/
+apps/mobile/.expo/
 
 .build
 tmp

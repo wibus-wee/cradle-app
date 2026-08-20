@@ -1,11 +1,28 @@
 import { useEffect } from 'react'
 
-import { Spinner } from '~/components/ui/spinner'
+import type { LayoutSlots } from '~/components/layout/use-layout-slots'
+import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { ChatSessionRouteContent } from '~/features/chat/session/chat-session-route-content'
 import { workSurfaceId } from '~/navigation/surface-identity'
 import { useSurfaceStore } from '~/navigation/surface-store'
 
 import { useWorkDetail } from './use-work'
+
+const PENDING_WORK_LAYOUT_SLOTS = {
+  aside: undefined,
+  asideSessionId: null,
+  asideWorkspaceId: null,
+  panel: undefined,
+  hasAside: false,
+  hasPanel: false,
+  hasBrowserPanel: false,
+  headerActions: undefined,
+} satisfies LayoutSlots
+
+function PendingWorkLayoutSlots({ slotId }: { slotId: string }) {
+  useRegisterLayoutSlots(slotId, PENDING_WORK_LAYOUT_SLOTS)
+  return null
+}
 
 export function WorkPage({ workId }: { workId: string }) {
   const updateSurfaceTitle = useSurfaceStore(state => state.updateSurfaceTitle)
@@ -22,11 +39,7 @@ export function WorkPage({ workId }: { workId: string }) {
     throw workQuery.error
   }
   if (!workQuery.data) {
-    return (
-      <div className="flex h-full items-center justify-center" data-testid="work-page-loading">
-        <Spinner className="size-4" />
-      </div>
-    )
+    return <PendingWorkLayoutSlots slotId={workSurfaceId(workId)} />
   }
 
   return (

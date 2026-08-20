@@ -1,4 +1,6 @@
-import { getServerUrl, isElectron, platform } from './electron'
+import { postObservabilityEvents } from '~/api-gen/sdk.gen'
+
+import { isElectron, platform } from './electron'
 
 type ObservabilitySeverity = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
 type ObservabilityCategory = 'chat' | 'provider' | 'event-bus' | 'ipc' | 'system' | 'performance' | 'diagnostics'
@@ -47,10 +49,9 @@ export function reportRendererObservabilityEvent(input: RendererObservabilityEve
     },
   }
 
-  void fetch(new URL('/observability/events', getServerUrl()), {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
+  void postObservabilityEvents({
+    body: payload,
+    throwOnError: true,
   }).catch(() => {})
 }
 

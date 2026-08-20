@@ -8,7 +8,9 @@ import { clampPercent, formatTokenCount } from '~/lib/number-format'
 import type {
   ChatRuntimeCompactUiSlotState,
   ChatRuntimeContextUsage,
+  ChatRuntimeUsageUiSlotState,
 } from '../../capabilities/chat-capabilities'
+import { UsageSlotContent } from '../../composer/composer-slots/usage-slot-content'
 import {
   readCompactUsageRows,
   readContextUsageAggregate,
@@ -21,6 +23,7 @@ import {
 interface ContextUsageDetailPanelViewProps {
   usage: ChatRuntimeContextUsage | null
   compactState?: ChatRuntimeCompactUiSlotState | null
+  runtimeUsageState?: ChatRuntimeUsageUiSlotState | null
   loadState: 'loading' | 'error' | 'ready'
   onClose: () => void
   onOpenReport: () => void
@@ -44,6 +47,7 @@ const sectionAccentClasses: Record<string, { dot: string, bar: string }> = {
 export function ContextUsageDetailPanelView({
   usage,
   compactState,
+  runtimeUsageState,
   loadState,
   onClose,
   onOpenReport,
@@ -93,6 +97,12 @@ export function ContextUsageDetailPanelView({
           </Button>
         </div>
       </div>
+
+      {runtimeUsageState && (
+        <div className="border-b border-border px-3 py-2">
+          <UsageSlotContent state={runtimeUsageState} layout="stacked" className="text-[11px]" />
+        </div>
+      )}
 
       <div className="px-3 py-2.5">
         <AnimatePresence mode="wait">

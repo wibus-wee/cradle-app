@@ -1,6 +1,11 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import {
+  readActiveLayoutSlots,
+  useLayoutSlotsStore,
+} from '~/components/layout/layout-slots-context'
+import { workSurfaceId } from '~/navigation/surface-identity'
 import { useLayoutStore } from '~/store/layout'
 
 import { WorkPage } from './work-page'
@@ -40,6 +45,11 @@ describe('workPage', () => {
       asideOpen: false,
       asideActiveTab: 'git',
     })
+    useLayoutSlotsStore.getState().resetSlots()
+    useLayoutSlotsStore.getState().setSlotScope(
+      workSurfaceId('work-1'),
+      [workSurfaceId('work-1')],
+    )
   })
 
   afterEach(cleanup)
@@ -51,6 +61,21 @@ describe('workPage', () => {
     expect(useLayoutStore.getState()).toMatchObject({
       asideOpen: false,
       asideActiveTab: 'git',
+    })
+  })
+
+  it('renders no standalone loading chrome while the Work resolves', () => {
+    mocks.getWorkDetail.mockReturnValue(undefined)
+
+    const { container } = render(<WorkPage workId="work-1" />)
+
+    expect(container.childElementCount).toBe(0)
+    expect(readActiveLayoutSlots()).toMatchObject({
+      asideSessionId: null,
+      asideWorkspaceId: null,
+      hasAside: false,
+      hasPanel: false,
+      hasBrowserPanel: false,
     })
   })
 })

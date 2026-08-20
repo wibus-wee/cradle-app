@@ -82,8 +82,7 @@ import {
 import type { CodexAppServerClientOptions, CodexAppServerMessage } from './app-server/client'
 import { buildCodexAppServerEnv } from './app-server/env'
 import type { CodexAppServerHostLease } from './app-server/host-lease'
-import { acquireCodexAppServerHostLease, codexChatSessionAppServerScopeId } from './app-server/host-lease'
-import { subscribeCodexAppServerHostNotifications } from './app-server/host-resource'
+import { acquireCodexAppServerHostLease } from './app-server/host-lease'
 import {
   isCodexAppServerToolApprovalRequest,
   isCodexAppServerUserInputRequest,
@@ -119,22 +118,20 @@ import {
   CODEX_RUNTIME_METADATA,
 } from './metadata'
 import { createCodexRuntimePresentation } from './presentation'
-import { projectCodexEstimatedContextUsage } from './projection/context-usage-projector'
 import {
   clearCodexGoalSnapshot,
   hasActiveGoal,
-  hasCompleteCurrentCodexNativeHistory,
   pauseCodexGoalSnapshot,
   projectCodexGoalSnapshotFromGoal,
   projectCodexProviderStateSnapshot,
   readCodexLastTokenUsage,
   readCodexProviderSnapshot,
-  readRestorableCodexNativeHistory,
   writeCodexGoalSnapshot,
   writeCodexThreadSnapshot,
 } from './projection/state-projector'
-import { projectCodexUiSlotStates } from './projection/ui-slot-projector'
+import { projectCodexUiSlotStates, readCodexCrewState } from './projection/ui-slot-projector'
 import { codexRequestError, formatUnknownError } from './provider-errors'
+import { decodeCodexDurableCheckpoint } from './state/durable-checkpoint'
 import type { CodexAppServerItem } from './tools/mapper'
 import { buildCodexToolInput, buildCodexToolOutput, readCodexToolError, readCodexToolName } from './tools/mapper'
 import { CodexActiveTurnRegistry } from './turn/active-turn-registry'
@@ -170,11 +167,10 @@ import {
 import type { CodexStreamTurnContext } from './turn/stream-turn-context'
 import { resolveCodexStreamTurnContext } from './turn/stream-turn-context'
 import {
-  hydrateCodexNativeHistory,
   injectCodexHarnessFragments,
-  injectCodexNativeHistory,
   injectCodexSideBoundary,
   injectCradleTranscriptHistory,
+  markCodexThreadLoaded,
   readLiveSideForkThreadStart,
   requestCodexAppServerWithTimeout,
   startOrResumeThread,
@@ -191,7 +187,6 @@ import {
 import type {
   ActiveCodexTurn,
   CodexAppServerClientLike,
-  CodexAppServerHostResource,
   CodexAppServerResourceRequestHandler,
   CodexAppsListResponse,
   CodexCollaborationModeListResponse,
@@ -205,6 +200,8 @@ import type {
   CodexProviderDeps,
   CodexRateLimitsResponse,
   CodexSkillsListResponse,
+  CodexUiSlotHostFacts,
+  CodexUiSlotThreadFacts,
   ThreadGoalGetResponse,
   ThreadResponse,
   ThreadTokenUsageUpdatedNotificationParams,
@@ -213,9 +210,6 @@ import type {
 import { CodexUsageEventProjector } from './usage-event-projector'
 
 const CODEX_EPHEMERAL_REQUEST_TIMEOUT_MS = 20_000
-function codexEphemeralAppServerScopeId(kind: string, id: string): string {
-  return `ephemeral:${kind}:${id}:${randomUUID()}`
-}
 
 export function createCodexProvider(ctx: ProviderContext, config: CodexProviderConfig = {}): CodexProvider {
   return new CodexProvider({ ...ctx, ...config })
@@ -271,32 +265,26 @@ export class CodexProvider implements ChatRuntime {
 
   async startChatSession(input: StartChatSessionInput): Promise<RuntimeSession> {
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
-    const previousNativeHistory = readRestorableCodexNativeHistory(input.previousProviderStateSnapshot)
     const runtimeContext = resolveCodexRuntimeContext(input.workspacePath, input.agentId)
+    const checkpoint = decodeCodexDurableCheckpoint(JSON.stringify({
+      workspacePath: input.workspacePath,
+      agentId: input.agentId ?? null,
+      agentHome: runtimeContext.agentHome,
+      models: { currentModelId: input.modelId },
+    }))
     return {
       id: input.chatSessionId,
       chatSessionId: input.chatSessionId,
       providerTargetId: profile.providerTargetId,
       runtimeKind: RUNTIME_KIND,
       providerSessionId: null,
-      providerStateSnapshot: JSON.stringify({
-        workspacePath: input.workspacePath,
-        agentId: input.agentId ?? null,
-        agentHome: runtimeContext.agentHome,
-        models: { currentModelId: input.modelId },
-        ...(previousNativeHistory
-          ? {
-              codex: {
-                previousNativeHistory,
-              },
-            }
-          : {}),
-      }),
+      providerStateSnapshot: checkpoint.serialized,
     }
   }
 
   async resumeChatSession(input: ResumeChatSessionInput): Promise<RuntimeSession> {
-    const snapshot = readWorkspaceProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
+    const decoded = decodeCodexDurableCheckpoint(input.runtimeSession.providerStateSnapshot)
+    const snapshot = decoded.checkpoint
     const agentId = input.agentId ?? snapshot.agentId ?? null
     const runtimeContext = resolveCodexRuntimeContext(input.workspacePath, agentId)
     return {
@@ -333,21 +321,24 @@ export class CodexProvider implements ChatRuntime {
     const skillExtraRoots = resolveCodexSkillExtraRoots(config, workspacePath, this.resolveSkillPaths)
     const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     const chatgptAuth = readCodexChatgptAuth(auth)
+    const codexEnv = buildCodexAppServerEnv({
+      chatSessionId: input.childChatSessionId,
+      workspaceId: input.workspaceId,
+      workspacePath,
+      agentId,
+      agentHome: runtimeContext.agentHome,
+    }, auth)
+    const threadCodexConfig = bindCodexCradleMcpInvocation(codexConfig, codexEnv)
+    let forkThreadId = input.sourceRuntimeSession.providerSessionId
     const hostLease = await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
-      scopeId: codexChatSessionAppServerScopeId(input.childChatSessionId),
       chatgptAuth,
       pinned: true,
+      readThreadId: () => forkThreadId,
       options: {
         apiKey: readCodexApiKeyAuth(auth) ?? undefined,
-        config: codexConfig,
-        env: buildCodexAppServerEnv({
-          chatSessionId: input.childChatSessionId,
-          workspaceId: input.workspaceId,
-          workspacePath,
-          agentId,
-          agentHome: runtimeContext.agentHome,
-        }, auth),
+        config: threadCodexConfig,
+        env: codexEnv,
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
           readSecret: this.deps.readSecret,
@@ -355,11 +346,19 @@ export class CodexProvider implements ChatRuntime {
         }),
       },
     })
-    const client = hostLease.resource.client
+    const client = hostLease.client
     let leaseTransferred = false
 
     try {
-      await syncCodexSkillExtraRoots(client, skillExtraRoots)
+      await syncCodexSkillExtraRoots(hostLease.resource, skillExtraRoots)
+      await startOrResumeThread(client, hostLease.resource, input.sourceRuntimeSession, {
+        model: effectiveModel,
+        cwd: runtimeContext.cwd,
+        runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
+        approvalPolicy: config.approvalPolicy,
+        sandbox: config.sandboxMode,
+        config: threadCodexConfig,
+      })
       const forkParams: ThreadForkParams = {
         threadId: input.sourceRuntimeSession.providerSessionId,
         path: null,
@@ -367,7 +366,7 @@ export class CodexProvider implements ChatRuntime {
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
         approvalPolicy: config.approvalPolicy,
         sandbox: config.sandboxMode,
-        config: codexConfig,
+        config: threadCodexConfig,
         model: effectiveModel ?? null,
         ephemeral: true,
         threadSource: 'user',
@@ -378,6 +377,8 @@ export class CodexProvider implements ChatRuntime {
       if (!threadId) {
         throw codexRequestError('forkRuntimeSession', 'Codex app-server did not return a forked thread id')
       }
+      forkThreadId = threadId
+      markCodexThreadLoaded(hostLease.resource, threadId)
 
       await injectCodexSideBoundary(client, threadId)
 
@@ -451,15 +452,17 @@ export class CodexProvider implements ChatRuntime {
       agentId: snapshot.agentId ?? null,
       agentHome: runtimeContext.agentHome,
     }, auth)
+    const threadCodexConfig = bindCodexCradleMcpInvocation(codexConfig, codexEnv)
+    let quickQuestionThreadId: string | null = null
 
     const hostLease = await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
-      scopeId: codexEphemeralAppServerScopeId('quick-question', input.runtimeSession.chatSessionId),
       chatgptAuth,
       pinned: false,
+      readThreadId: () => quickQuestionThreadId,
       options: {
         apiKey: readCodexApiKeyAuth(auth) ?? undefined,
-        config: codexConfig,
+        config: threadCodexConfig,
         env: codexEnv,
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
@@ -468,7 +471,7 @@ export class CodexProvider implements ChatRuntime {
         }),
       },
     })
-    const client = hostLease.resource.client
+    const client = hostLease.client
     const abortController = new AbortController()
     const diagnostics = createCodexStreamDiagnostics()
 
@@ -482,7 +485,7 @@ export class CodexProvider implements ChatRuntime {
           runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
           approvalPolicy: config.approvalPolicy,
           sandbox: config.sandboxMode,
-          config: codexConfig,
+          config: threadCodexConfig,
           model: effectiveModel ?? null,
           ephemeral: true,
           threadSource: 'user',
@@ -496,6 +499,8 @@ export class CodexProvider implements ChatRuntime {
       if (!threadId) {
         throw codexRequestError('quickQuestion', 'Failed to create ephemeral thread')
       }
+      quickQuestionThreadId = threadId
+      markCodexThreadLoaded(hostLease.resource, threadId)
 
       // Inject transcript history to reuse prompt cache
       await injectCradleTranscriptHistory(client, threadId, input.transcript)
@@ -577,14 +582,8 @@ export class CodexProvider implements ChatRuntime {
     return getCodexAppServerCapabilities()
   }
 
-  async getContextUsage(input: GetContextUsageInput): Promise<RuntimeContextUsage | null> {
-    return projectCodexEstimatedContextUsage({
-      providerSessionId: input.runtimeSession.providerSessionId,
-      providerStateSnapshot: input.runtimeSession.providerStateSnapshot,
-      systemPrompt: input.systemPrompt ?? null,
-      modelId: input.modelId ?? null,
-      updatedAt: Date.now(),
-    })
+  async getContextUsage(_input: GetContextUsageInput): Promise<RuntimeContextUsage | null> {
+    return null
   }
 
   async invokeCodexAppServer(
@@ -615,7 +614,8 @@ export class CodexProvider implements ChatRuntime {
 
     const snapshot = readWorkspaceProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
     const workspacePath = snapshot.workspacePath ?? input.workspacePath
-    const runtimeContext = resolveCodexRuntimeContext(workspacePath, input.agentId ?? snapshot.agentId ?? null)
+    const agentId = input.agentId ?? snapshot.agentId ?? null
+    const runtimeContext = resolveCodexRuntimeContext(workspacePath, agentId)
     const skillExtraRoots = resolveCodexSkillExtraRoots(config, workspacePath, this.resolveSkillPaths)
     const runtimeSession = input.runtimeSession.providerSessionId
       ? input.runtimeSession
@@ -633,20 +633,24 @@ export class CodexProvider implements ChatRuntime {
       return []
     }
     const chatgptAuth = readCodexChatgptAuth(auth)
+    const effectiveModel = input.modelId ?? snapshot.models.currentModelId
+    const codexEnv = buildCodexAppServerEnv({
+      chatSessionId: input.runtimeSession.chatSessionId,
+      workspaceId: input.workspaceId,
+      workspacePath,
+      agentId,
+      agentHome: runtimeContext.agentHome,
+    }, auth)
+    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
+    const threadCodexConfig = bindCodexCradleMcpInvocation(codexConfig, codexEnv)
     const hostLease = await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
-      scopeId: codexChatSessionAppServerScopeId(input.runtimeSession.chatSessionId),
       chatgptAuth,
+      readThreadId: () => runtimeSession.providerSessionId,
       options: {
         apiKey: readCodexApiKeyAuth(auth) ?? undefined,
-        config: buildCodexConfig(config, workspacePath, this.resolveSkillPaths, input.modelId ?? snapshot.models.currentModelId, auth),
-        env: buildCodexAppServerEnv({
-          chatSessionId: input.runtimeSession.chatSessionId,
-          workspaceId: input.workspaceId,
-          workspacePath,
-          agentId: input.agentId ?? snapshot.agentId ?? null,
-          agentHome: runtimeContext.agentHome,
-        }, auth),
+        config: threadCodexConfig,
+        env: codexEnv,
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
           readSecret: this.deps.readSecret,
@@ -654,72 +658,48 @@ export class CodexProvider implements ChatRuntime {
         }),
       },
     })
-    const client = hostLease.resource.client
+    const client = hostLease.client
 
     try {
-      await syncCodexSkillExtraRoots(client, skillExtraRoots)
-      const [goalResult, configResult, providerCapabilitiesResult, modelListResult, mcpStatusResult, rateLimitsResult, configRequirementsResult, skillsResult, pluginResult, appsResult, collaborationModesResult, backgroundTerminalsResult] = await Promise.allSettled([
-        client.request('thread/goal/get', {
-          threadId: runtimeSession.providerSessionId,
-        }) as Promise<ThreadGoalGetResponse>,
-        client.request('config/read', {
-          cwd: runtimeContext.cwd,
-          includeLayers: false,
-        }) as Promise<CodexConfigReadResponse>,
-        client.request('modelProvider/capabilities/read', {}) as Promise<CodexModelProviderCapabilitiesReadResponse>,
-        client.request('model/list', {
-          includeHidden: true,
-          limit: 100,
-        }) as Promise<CodexModelListResponse>,
-        client.request('mcpServerStatus/list', {
-          threadId: runtimeSession.providerSessionId,
-          limit: 100,
-          detail: 'toolsAndAuthOnly',
-        }) as Promise<CodexListMcpServerStatusResponse>,
-        client.request('account/rateLimits/read', {}) as Promise<CodexRateLimitsResponse>,
-        client.request('configRequirements/read', {}) as Promise<CodexConfigRequirementsReadResponse>,
-        client.request('skills/list', {
-          cwd: runtimeContext.cwd,
-        }) as Promise<CodexSkillsListResponse>,
-        client.request('plugin/list', {}) as Promise<CodexPluginListResponse>,
-        client.request('app/list', {
-          limit: 100,
-        }) as Promise<CodexAppsListResponse>,
-        client.request('collaborationMode/list', {}) as Promise<CodexCollaborationModeListResponse>,
-        client.request('thread/backgroundTerminals/list', {
-          threadId: runtimeSession.providerSessionId,
-          limit: 20,
-        }) as Promise<ThreadBackgroundTerminalsListResponse>,
-      ])
-      const configResponse = configResult.status === 'fulfilled' ? configResult.value : null
-      const providerCapabilities = providerCapabilitiesResult.status === 'fulfilled' ? providerCapabilitiesResult.value : null
-      const modelList = modelListResult.status === 'fulfilled' ? modelListResult.value : null
-      const mcpStatus = mcpStatusResult.status === 'fulfilled' ? mcpStatusResult.value : null
-      const rateLimits = rateLimitsResult.status === 'fulfilled' ? rateLimitsResult.value : null
-      const configRequirements = configRequirementsResult.status === 'fulfilled' ? configRequirementsResult.value : null
-      const skills = skillsResult.status === 'fulfilled' ? skillsResult.value : null
-      const plugins = pluginResult.status === 'fulfilled' ? pluginResult.value : null
-      const apps = appsResult.status === 'fulfilled' ? appsResult.value : null
-      const collaborationModes = collaborationModesResult.status === 'fulfilled' ? collaborationModesResult.value : null
-      const backgroundTerminals = backgroundTerminalsResult.status === 'fulfilled'
-        ? projectCodexBackgroundTerminals(backgroundTerminalsResult.value.data)
-        : []
+      await syncCodexSkillExtraRoots(hostLease.resource, skillExtraRoots)
+      await startOrResumeThread(client, hostLease.resource, runtimeSession, {
+        model: effectiveModel,
+        cwd: runtimeContext.cwd,
+        runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
+        approvalPolicy: config.approvalPolicy,
+        sandbox: config.sandboxMode,
+        config: threadCodexConfig,
+      })
+      hostLease.resource.uiSlotHostFacts ??= loadCodexUiSlotHostFacts(client, runtimeContext.cwd)
+      const hostFacts = await hostLease.resource.uiSlotHostFacts
+      let threadFactsPromise = hostLease.resource.uiSlotThreadFacts.get(runtimeSession.providerSessionId)
+      if (!threadFactsPromise) {
+        threadFactsPromise = loadCodexUiSlotThreadFacts(
+          client,
+          runtimeSession.providerSessionId,
+          runtimeSession.providerStateSnapshot,
+          hostFacts.collaborationModes,
+        )
+        hostLease.resource.uiSlotThreadFacts.set(runtimeSession.providerSessionId, threadFactsPromise)
+      }
+      const threadFacts = await threadFactsPromise
       return await projectCodexUiSlotStates({
         client,
         threadId: runtimeSession.providerSessionId,
         providerStateSnapshot: runtimeSession.providerStateSnapshot,
-        goal: goalResult.status === 'fulfilled' ? goalResult.value.goal : undefined,
-        configResponse,
-        providerCapabilities,
-        modelList,
-        mcpStatus,
-        rateLimits,
-        configRequirements,
-        skills,
-        plugins,
-        apps,
-        collaborationModes,
-        backgroundTerminals,
+        goal: threadFacts.goal,
+        configResponse: hostFacts.configResponse,
+        providerCapabilities: hostFacts.providerCapabilities,
+        modelList: hostFacts.modelList,
+        mcpStatus: threadFacts.mcpStatus,
+        rateLimits: hostFacts.rateLimits,
+        configRequirements: hostFacts.configRequirements,
+        skills: hostFacts.skills,
+        plugins: hostFacts.plugins,
+        apps: hostFacts.apps,
+        collaborationModes: hostFacts.collaborationModes,
+        backgroundTerminals: threadFacts.backgroundTerminals,
+        crewState: threadFacts.crewState,
       })
     }
     catch {
@@ -943,21 +923,25 @@ export class CodexProvider implements ChatRuntime {
           modelId: input.modelId,
         })
 
+    const effectiveModel = input.modelId ?? snapshot.models.currentModelId ?? config.model
+    const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
+    const codexEnv = buildCodexAppServerEnv({
+      chatSessionId: runtimeSession.chatSessionId,
+      workspaceId: input.workspaceId,
+      workspacePath,
+      agentId,
+      agentHome: runtimeContext.agentHome,
+    }, auth)
+    const threadCodexConfig = bindCodexCradleMcpInvocation(codexConfig, codexEnv)
     const chatgptAuth = readCodexChatgptAuth(auth)
     const hostLease = await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
-      scopeId: codexChatSessionAppServerScopeId(input.runtimeSession.chatSessionId),
       chatgptAuth,
+      readThreadId: () => runtimeSession.providerSessionId,
       options: {
         apiKey: readCodexApiKeyAuth(auth) ?? undefined,
-        config: buildCodexConfig(config, workspacePath, this.resolveSkillPaths, input.modelId ?? snapshot.models.currentModelId, auth),
-        env: buildCodexAppServerEnv({
-          chatSessionId: input.runtimeSession.chatSessionId,
-          workspaceId: input.workspaceId,
-          workspacePath,
-          agentId,
-          agentHome: runtimeContext.agentHome,
-        }, auth),
+        config: threadCodexConfig,
+        env: codexEnv,
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
           readSecret: this.deps.readSecret,
@@ -965,7 +949,21 @@ export class CodexProvider implements ChatRuntime {
         }),
       },
     })
-    return { client: hostLease.resource.client, hostLease, runtimeSession, workspacePath }
+    try {
+      await startOrResumeThread(hostLease.client, hostLease.resource, runtimeSession, {
+        model: effectiveModel,
+        cwd: runtimeContext.cwd,
+        runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
+        approvalPolicy: config.approvalPolicy,
+        sandbox: config.sandboxMode,
+        config: threadCodexConfig,
+      })
+      return { client: hostLease.client, hostLease, runtimeSession, workspacePath }
+    }
+    catch (error) {
+      hostLease.release()
+      throw error
+    }
   }
 
   async executeShellCommand(input: ExecuteShellCommandInput): Promise<ExecuteShellCommandResult> {
@@ -989,20 +987,22 @@ export class CodexProvider implements ChatRuntime {
     const skillExtraRoots = resolveCodexSkillExtraRoots(config, workspacePath, this.resolveSkillPaths)
     const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     const chatgptAuth = readCodexChatgptAuth(auth)
+    const codexEnv = buildCodexAppServerEnv({
+      chatSessionId: input.runtimeSession.chatSessionId,
+      workspaceId: input.workspaceId,
+      workspacePath,
+      agentId,
+      agentHome: runtimeContext.agentHome,
+    }, auth)
+    const threadCodexConfig = bindCodexCradleMcpInvocation(codexConfig, codexEnv)
     const hostLease = await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
-      scopeId: codexChatSessionAppServerScopeId(input.runtimeSession.chatSessionId),
       chatgptAuth,
+      readThreadId: () => input.runtimeSession.providerSessionId,
       options: {
         apiKey: readCodexApiKeyAuth(auth) ?? undefined,
-        config: codexConfig,
-        env: buildCodexAppServerEnv({
-          chatSessionId: input.runtimeSession.chatSessionId,
-          workspaceId: input.workspaceId,
-          workspacePath,
-          agentId,
-          agentHome: runtimeContext.agentHome,
-        }, auth),
+        config: threadCodexConfig,
+        env: codexEnv,
         serverRequestHandler: request => buildDefaultCodexAppServerRequestResult(request, {
           chatgptAuth,
           readSecret: this.deps.readSecret,
@@ -1010,18 +1010,18 @@ export class CodexProvider implements ChatRuntime {
         }),
       },
     })
-    const client = hostLease.resource.client
+    const client = hostLease.client
     const startedAt = Date.now()
 
     try {
-      await syncCodexSkillExtraRoots(client, skillExtraRoots)
-      const threadStart = await startOrResumeThread(client, input.runtimeSession, {
+      await syncCodexSkillExtraRoots(hostLease.resource, skillExtraRoots)
+      const threadStart = await startOrResumeThread(client, hostLease.resource, input.runtimeSession, {
         model: effectiveModel,
         cwd: runtimeContext.cwd,
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
         approvalPolicy: config.approvalPolicy,
         sandbox: config.sandboxMode,
-        config: codexConfig,
+        config: threadCodexConfig,
       })
       const threadId = threadStart.threadId
       input.runtimeSession.providerSessionId = threadId
@@ -1034,8 +1034,6 @@ export class CodexProvider implements ChatRuntime {
         command,
         signal: input.signal,
       })
-      await hydrateCodexNativeHistory(client, input.runtimeSession, threadId)
-
       const output = result.item.aggregatedOutput ?? result.output ?? ''
       return {
         command: result.item.command ?? command,
@@ -1080,8 +1078,8 @@ export class CodexProvider implements ChatRuntime {
     const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
     return await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
-      scopeId: codexChatSessionAppServerScopeId(input.runtimeSession.chatSessionId),
       chatgptAuth: readCodexChatgptAuth(context.auth),
+      readThreadId: () => input.runtimeSession.providerSessionId,
       options: {
         apiKey: readCodexApiKeyAuth(context.auth) ?? undefined,
         config: context.codexConfig,
@@ -1096,7 +1094,7 @@ export class CodexProvider implements ChatRuntime {
     context: CodexStreamTurnContext,
     hostLease: CodexAppServerHostLease,
   ): AsyncGenerator<UIMessageChunk, void, void> {
-    const client = hostLease.resource.client
+    const client = hostLease.client
     const abortController = new AbortController()
     const sessionId = input.runtimeSession.chatSessionId
     this._lastUsage = null
@@ -1112,11 +1110,10 @@ export class CodexProvider implements ChatRuntime {
     const outputTextCollector = createBoundedTextCollector()
 
     try {
-      const threadContext = await this.openCodexStreamThread(input, context, client)
+      const threadContext = await this.openCodexStreamThread(input, context, hostLease)
       activeEntry = this.registerActiveCodexTurn(input, context, client, hostLease, abortController, threadContext)
       const runTitleGeneration = this.createCodexThreadTitleScheduler(input, context, client, threadContext)
 
-      await this.syncCodexStreamHistory(input, context, client, threadContext.threadId)
       await this.syncCodexHarnessContext(input, client, threadContext.threadId)
       const dispatch = await this.dispatchCodexStreamTurn(
         input,
@@ -1168,12 +1165,13 @@ export class CodexProvider implements ChatRuntime {
   private async openCodexStreamThread(
     input: StreamTurnInput,
     context: CodexStreamTurnContext,
-    client: CodexAppServerClientLike,
+    hostLease: CodexAppServerHostLease,
   ): Promise<CodexStreamThreadContext> {
-    await syncCodexSkillExtraRoots(client, context.skillExtraRoots)
+    const client = hostLease.client
+    await syncCodexSkillExtraRoots(hostLease.resource, context.skillExtraRoots)
     const threadStart = context.isLiveSideFork
       ? readLiveSideForkThreadStart(input.runtimeSession, context.effectiveModel)
-      : await startOrResumeThread(client, input.runtimeSession, {
+      : await startOrResumeThread(client, hostLease.resource, input.runtimeSession, {
           model: context.effectiveModel,
           cwd: context.runtimeContext.cwd,
           runtimeWorkspaceRoots: context.runtimeContext.runtimeWorkspaceRoots,
@@ -1258,26 +1256,6 @@ export class CodexProvider implements ChatRuntime {
         thinkingEffort: titleGeneration.thinkingEffort,
         reportSessionTitle: input.reportSessionTitle,
       })
-    }
-  }
-
-  private async syncCodexStreamHistory(
-    input: StreamTurnInput,
-    context: CodexStreamTurnContext,
-    client: CodexAppServerClientLike,
-    threadId: string,
-  ): Promise<void> {
-    if (context.shouldInjectReconstructedHistory) {
-      await injectCodexNativeHistory(client, threadId, readCodexProviderSnapshot(input.runtimeSession.providerStateSnapshot).codex?.previousNativeHistory)
-      await injectCradleTranscriptHistory(client, threadId, input.transcript?.history ?? input.history)
-      return
-    }
-    const hasCurrentHistory = hasCompleteCurrentCodexNativeHistory(
-      input.runtimeSession.providerStateSnapshot,
-      threadId,
-    )
-    if (!context.isLiveSideFork && !hasCurrentHistory) {
-      await hydrateCodexNativeHistory(client, input.runtimeSession, threadId)
     }
   }
 
@@ -1390,54 +1368,50 @@ export class CodexProvider implements ChatRuntime {
     const usageEventProjector = new CodexUsageEventProjector(
       context.effectiveModel ?? threadContext.threadStart.modelId ?? context.config.model ?? null,
     )
-    const notificationClient = createCodexSubscribedNotificationClient(client, input.activeEntry.hostLease.resource, abortController.signal)
-    try {
-      for await (const event of streamCodexMappedTurnEvents({
-        client: notificationClient,
-        threadId: threadContext.threadId,
-        turnId: input.turnId,
-        signal: abortController.signal,
-        mapperState,
-        diagnostics,
-        readGoal: () => readCodexProviderSnapshot(turnInput.runtimeSession.providerStateSnapshot).codex?.goal ?? null,
-        onProviderNotification: async (providerNotification) => {
-          publishProviderThreadEvent(
-            turnInput.onProviderThreadEvent,
-            providerNotification,
-            input.providerThreadMapperStates,
-          )
-          const usageEvent = usageEventProjector.project(providerNotification)
-          if (usageEvent) {
-            await turnInput.onUsageEvent?.(usageEvent)
-          }
-        },
-      })) {
-        const { notification } = event
-        for (const chunk of event.chunks) {
-          if (input.generation && chunk.type === 'text-delta' && 'delta' in chunk) {
-            input.outputTextCollector.append((chunk as { delta: string }).delta)
-          }
-          yield chunk
+    const notificationClient = client
+    for await (const event of streamCodexMappedTurnEvents({
+      client: notificationClient,
+      threadId: threadContext.threadId,
+      turnId: input.turnId,
+      signal: abortController.signal,
+      mapperState,
+      diagnostics,
+      readGoal: () => readCodexProviderSnapshot(turnInput.runtimeSession.providerStateSnapshot).codex?.goal ?? null,
+      onProviderNotification: async (providerNotification) => {
+        publishProviderThreadEvent(
+          turnInput.onProviderThreadEvent,
+          providerNotification,
+          input.providerThreadMapperStates,
+        )
+        const usageEvent = usageEventProjector.project(providerNotification)
+        if (usageEvent) {
+          await turnInput.onUsageEvent?.(usageEvent)
         }
+      },
+    })) {
+      const { notification } = event
+      for (const chunk of event.chunks) {
+        if (input.generation && chunk.type === 'text-delta' && 'delta' in chunk) {
+          input.outputTextCollector.append((chunk as { delta: string }).delta)
+        }
+        yield chunk
+      }
 
-        if (notification.method === 'turn/started') {
-          input.activeEntry.turnId = getTurnId(notification) ?? input.activeEntry.turnId
-        }
-        if (notification.method === 'thread/name/updated') {
-          const title = readThreadNameUpdate(notification, threadContext.threadId)
-          if (title) {
-            turnInput.reportSessionTitle?.(title)
-          }
-        }
-        projectCodexProviderStateSnapshot(turnInput.runtimeSession, notification, threadContext.threadId)
-        this.captureLastTokenUsage(notification)
-        if (isCompletedGoalUpdate(notification)) {
-          await client.request('thread/goal/clear', { threadId: threadContext.threadId }).catch(() => undefined)
+      if (notification.method === 'turn/started') {
+        input.activeEntry.turnId = getTurnId(notification) ?? input.activeEntry.turnId
+      }
+      if (notification.method === 'thread/name/updated') {
+        const title = readThreadNameUpdate(notification, threadContext.threadId)
+        if (title) {
+          turnInput.reportSessionTitle?.(title)
         }
       }
-    }
-    finally {
-      await notificationClient.close()
+      invalidateCodexUiSlotFacts(input.activeEntry.hostLease.resource, notification)
+      projectCodexProviderStateSnapshot(turnInput.runtimeSession, notification, threadContext.threadId)
+      this.captureLastTokenUsage(notification)
+      if (isCompletedGoalUpdate(notification)) {
+        await client.request('thread/goal/clear', { threadId: threadContext.threadId }).catch(() => undefined)
+      }
     }
 
     const finalTitle = await readLatestThreadTitle(client, threadContext.threadId)
@@ -1445,7 +1419,6 @@ export class CodexProvider implements ChatRuntime {
       turnInput.reportSessionTitle?.(finalTitle)
     }
     if (!context.isLiveSideFork) {
-      await hydrateCodexNativeHistory(client, turnInput.runtimeSession, threadContext.threadId)
       await this.deps.reconcileUsage?.({
         client,
         sessionId: turnInput.runtimeSession.chatSessionId,
@@ -1713,10 +1686,10 @@ export class CodexProvider implements ChatRuntime {
 
   private async acquireCodexAppServerHost(input: {
     providerTargetId: string
-    scopeId: string
     options: CodexAppServerClientOptions
     chatgptAuth: CodexChatgptAuthCredential | null
     pinned?: boolean
+    readThreadId?: () => string | null
   }): Promise<CodexAppServerHostLease> {
     const options = {
       ...input.options,
@@ -1727,10 +1700,10 @@ export class CodexProvider implements ChatRuntime {
     return await acquireCodexAppServerHostLease({
       runtimeKind: this.runtimeKind,
       providerTargetId: input.providerTargetId,
-      scopeId: input.scopeId,
       options,
       chatgptAuth: input.chatgptAuth,
       pinned: input.pinned ?? false,
+      readThreadId: input.readThreadId,
       deps: {
         readSecret: this.deps.readSecret,
         createAppServerClient: this.deps.createAppServerClient,
@@ -1818,7 +1791,6 @@ export class CodexProvider implements ChatRuntime {
         try {
           hostLease = await this.acquireCodexAppServerHost({
             providerTargetId: input.providerTargetId,
-            scopeId: codexEphemeralAppServerScopeId('title', input.mainThreadId),
             chatgptAuth: input.chatgptAuth,
             options: {
               apiKey: input.apiKey ?? undefined,
@@ -1831,7 +1803,7 @@ export class CodexProvider implements ChatRuntime {
               }),
             },
           })
-          const client = hostLease.resource.client
+          const client = hostLease.client
           const generatedTitle = await generateAndSetCodexThreadTitle(client, input.mainClient, {
             mainThreadId: input.mainThreadId,
             promptText: input.promptText,
@@ -1883,8 +1855,8 @@ export class CodexProvider implements ChatRuntime {
     const codexEnv = buildCodexAppServerEnv(codexEnvInput, auth)
     const mainHostLease = await this.acquireCodexAppServerHost({
       providerTargetId: profile.providerTargetId,
-      scopeId: codexChatSessionAppServerScopeId(input.runtimeSession.chatSessionId),
       chatgptAuth,
+      readThreadId: () => input.runtimeSession.providerSessionId,
       options: {
         apiKey: readCodexApiKeyAuth(auth) ?? undefined,
         config: codexConfig,
@@ -1900,8 +1872,8 @@ export class CodexProvider implements ChatRuntime {
     let titleHostLease: CodexAppServerHostLease | null = null
 
     try {
-      const mainClient = mainHostLease.resource.client
-      const threadStart = await startOrResumeThread(mainClient, input.runtimeSession, {
+      const mainClient = mainHostLease.client
+      const threadStart = await startOrResumeThread(mainClient, mainHostLease.resource, input.runtimeSession, {
         model: effectiveModel,
         cwd: runtimeContext.cwd,
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
@@ -1924,7 +1896,6 @@ export class CodexProvider implements ChatRuntime {
       const titleChatgptAuth = readCodexChatgptAuth(titleGeneration.auth)
       titleHostLease = await this.acquireCodexAppServerHost({
         providerTargetId: profile.providerTargetId,
-        scopeId: codexEphemeralAppServerScopeId('title', threadStart.threadId),
         chatgptAuth: titleChatgptAuth,
         options: {
           apiKey: readCodexApiKeyAuth(titleGeneration.auth) ?? undefined,
@@ -1938,7 +1909,7 @@ export class CodexProvider implements ChatRuntime {
         },
       })
 
-      return await generateAndSetCodexThreadTitleOrThrow(titleHostLease.resource.client, mainClient, {
+      return await generateAndSetCodexThreadTitleOrThrow(titleHostLease.client, mainClient, {
         mainThreadId: threadStart.threadId,
         promptText: input.promptText,
         cwd: runtimeContext.cwd,
@@ -1966,6 +1937,99 @@ export class CodexProvider implements ChatRuntime {
     if (usage) {
       this._lastUsage = usage
     }
+  }
+}
+
+async function loadCodexUiSlotHostFacts(
+  client: CodexAppServerClientLike,
+  cwd: string,
+): Promise<CodexUiSlotHostFacts> {
+  const results = await Promise.allSettled([
+    client.request('config/read', { cwd, includeLayers: false }) as Promise<CodexConfigReadResponse>,
+    client.request('modelProvider/capabilities/read', {}) as Promise<CodexModelProviderCapabilitiesReadResponse>,
+    client.request('model/list', { includeHidden: true, limit: 100 }) as Promise<CodexModelListResponse>,
+    client.request('account/rateLimits/read', {}) as Promise<CodexRateLimitsResponse>,
+    client.request('configRequirements/read', {}) as Promise<CodexConfigRequirementsReadResponse>,
+    client.request('skills/list', { cwd }) as Promise<CodexSkillsListResponse>,
+    client.request('plugin/list', {}) as Promise<CodexPluginListResponse>,
+    client.request('app/list', { limit: 100 }) as Promise<CodexAppsListResponse>,
+    client.request('collaborationMode/list', {}) as Promise<CodexCollaborationModeListResponse>,
+  ] as const)
+  return {
+    configResponse: readSettledValue(results[0]),
+    providerCapabilities: readSettledValue(results[1]),
+    modelList: readSettledValue(results[2]),
+    rateLimits: readSettledValue(results[3]),
+    configRequirements: readSettledValue(results[4]),
+    skills: readSettledValue(results[5]),
+    plugins: readSettledValue(results[6]),
+    apps: readSettledValue(results[7]),
+    collaborationModes: readSettledValue(results[8]),
+  }
+}
+
+async function loadCodexUiSlotThreadFacts(
+  client: CodexAppServerClientLike,
+  threadId: string,
+  providerStateSnapshot: string | null | undefined,
+  collaborationModes: CodexCollaborationModeListResponse | null,
+): Promise<CodexUiSlotThreadFacts> {
+  const [goalResult, mcpStatusResult, backgroundTerminalsResult, crewStateResult] = await Promise.allSettled([
+    client.request('thread/goal/get', { threadId }) as Promise<ThreadGoalGetResponse>,
+    client.request('mcpServerStatus/list', {
+      threadId,
+      limit: 100,
+      detail: 'toolsAndAuthOnly',
+    }) as Promise<CodexListMcpServerStatusResponse>,
+    client.request('thread/backgroundTerminals/list', {
+      threadId,
+      limit: 20,
+    }) as Promise<ThreadBackgroundTerminalsListResponse>,
+    readCodexCrewState(
+      client,
+      threadId,
+      readCodexProviderSnapshot(providerStateSnapshot),
+      collaborationModes,
+    ),
+  ] as const)
+  return {
+    goal: goalResult.status === 'fulfilled' ? goalResult.value.goal : undefined,
+    mcpStatus: readSettledValue(mcpStatusResult),
+    backgroundTerminals: backgroundTerminalsResult.status === 'fulfilled'
+      ? projectCodexBackgroundTerminals(backgroundTerminalsResult.value.data)
+      : [],
+    crewState: readSettledValue(crewStateResult),
+  }
+}
+
+function readSettledValue<Value>(result: PromiseSettledResult<Value>): Value | null {
+  return result.status === 'fulfilled' ? result.value : null
+}
+
+function invalidateCodexUiSlotFacts(
+  resource: ActiveCodexTurn['hostLease']['resource'],
+  notification: CodexAppServerMessage,
+): void {
+  if (notification.method === 'account/rateLimits/updated'
+    || notification.method === 'config/changed'
+    || notification.method === 'thread/settings/updated') {
+    resource.uiSlotHostFacts = undefined
+  }
+
+  const params = readRecord(notification.params)
+  const method = notification.method ?? ''
+  const threadId = typeof params?.threadId === 'string' ? params.threadId : null
+  if (!threadId) {
+    return
+  }
+  const item = readRecord(params?.item)
+  const changesThreadFacts = method === 'thread/goal/updated'
+    || method === 'thread/goal/cleared'
+    || method.startsWith('mcpServer/')
+    || method.startsWith('thread/backgroundTerminals/')
+    || (method === 'item/completed' && item?.type === 'collabAgentToolCall')
+  if (changesThreadFacts) {
+    resource.uiSlotThreadFacts.delete(threadId)
   }
 }
 
@@ -2031,82 +2095,6 @@ function projectCodexTurn(turn: Turn): ProviderThreadTurn {
     durationMs: turn.durationMs ?? null,
     itemsView: turn.itemsView,
     items: turn.items,
-  }
-}
-
-function createCodexSubscribedNotificationClient(
-  client: CodexAppServerClientLike,
-  resource: CodexAppServerHostResource,
-  streamSignal: AbortSignal,
-): CodexAppServerClientLike {
-  const queue: CodexAppServerMessage[] = []
-  const waiters: Array<(message: CodexAppServerMessage | null) => void> = []
-  let closed = false
-  const unsubscribe = subscribeCodexAppServerHostNotifications(resource, {
-    onMessage: (message) => {
-      const waiter = waiters.shift()
-      if (waiter) {
-        waiter(message)
-      }
-      else {
-        queue.push(message)
-      }
-      return false
-    },
-    onClose: () => {
-      closed = true
-      for (const waiter of waiters.splice(0)) {
-        waiter(null)
-      }
-    },
-  })
-
-  const close = () => {
-    if (closed) {
-      return
-    }
-    closed = true
-    unsubscribe()
-    for (const waiter of waiters.splice(0)) {
-      waiter(null)
-    }
-  }
-  if (streamSignal.aborted) {
-    close()
-  }
-  else {
-    streamSignal.addEventListener('abort', close, { once: true })
-  }
-
-  return {
-    pid: client.pid,
-    initialize: client.initialize.bind(client),
-    request: client.request.bind(client),
-    nextNotification: async (signal?: AbortSignal) => {
-      if (queue.length > 0) {
-        return queue.shift() ?? null
-      }
-      if (closed || signal?.aborted) {
-        return null
-      }
-      return await new Promise<CodexAppServerMessage | null>((resolve) => {
-        let waiter: ((message: CodexAppServerMessage | null) => void) | null = null
-        const onAbort = () => {
-          const index = waiter ? waiters.indexOf(waiter) : -1
-          if (index >= 0) {
-            waiters.splice(index, 1)
-          }
-          resolve(null)
-        }
-        signal?.addEventListener('abort', onAbort, { once: true })
-        waiter = (message) => {
-          signal?.removeEventListener('abort', onAbort)
-          resolve(message)
-        }
-        waiters.push(waiter)
-      })
-    },
-    close,
   }
 }
 
@@ -2309,7 +2297,7 @@ function codexProviderThreadPartMetadata(
   turnId: string,
   itemId: string,
   itemType: string,
-  item: unknown,
+  _item: CodexAppServerItem,
 ): ProviderMetadata {
   return {
     codex: {
@@ -2317,9 +2305,8 @@ function codexProviderThreadPartMetadata(
       turnId,
       itemId,
       itemType,
-      item,
     },
-  } as unknown as ProviderMetadata
+  }
 }
 
 function readThreadStatusType(status: Thread['status']): string {

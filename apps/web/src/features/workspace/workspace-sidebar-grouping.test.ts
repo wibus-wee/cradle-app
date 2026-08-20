@@ -106,6 +106,20 @@ describe('classifyStatusBucket', () => {
     )).toBe('needsYou')
     expect(classifyStatusBucket(session, null, noStreaming, noErrored, noAttention)).toBe('error')
     expect(classifyStatusBucket(
+      createSession({ id: 'read-error', status: 'error', unread: false }),
+      null,
+      noStreaming,
+      noErrored,
+      noAttention,
+    )).toBe('idle')
+    expect(classifyStatusBucket(
+      createSession({ id: 'local-read-error', unread: false }),
+      null,
+      noStreaming,
+      new Set(['local-read-error']),
+      noAttention,
+    )).toBe('idle')
+    expect(classifyStatusBucket(
       createSession({ id: 's2', unread: true }),
       null,
       noStreaming,

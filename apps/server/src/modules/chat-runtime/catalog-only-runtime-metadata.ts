@@ -1,9 +1,3 @@
-/**
- * Output: Chat Runtime catalog-only builtin runtime metadata.
- * Input: no runtime data.
- * Position: Chat Runtime metadata owner for runtimes launched outside Provider Runtime.
- */
-
 import type { RuntimeKind } from '../provider-contracts/types'
 import type { ChatRuntimeMetadata } from './runtime-provider-types'
 

@@ -1,5 +1,6 @@
 import type { UIMessageChunk } from 'ai'
 
+import { projectChatChunkForClient } from '../client-message-projection'
 import { serializeChatError } from '../run/errors'
 import { isTerminalUIMessageChunk, mergeBufferedStreamChunk } from '../run/stream-chunks'
 import type { ChunkSubscriber } from './subscriber-registry'
@@ -264,7 +265,11 @@ export function openDirectChunkStream(
         if (terminalPublished) {
           return
         }
-        controller.enqueue({ kind: 'chunk', chunk })
+        const clientChunk = projectChatChunkForClient(chunk)
+        if (!clientChunk) {
+          return
+        }
+        controller.enqueue({ kind: 'chunk', chunk: clientChunk })
         if (terminal) {
           terminalPublished = true
         }

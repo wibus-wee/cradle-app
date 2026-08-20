@@ -19,7 +19,7 @@ function command(
 }
 
 describe('slash command panel grouping', () => {
-  it('partitions product commands above runtime controls', () => {
+  it('partitions runtime controls above product commands', () => {
     const items = partitionSlashCommandPanelItems([
       command({ id: 'runtime:goal', name: 'goal', source: 'runtime', iconKey: 'goal' }),
       command({ id: 'cradle:review', name: 'review', source: 'cradle', iconKey: 'code-review' }),
@@ -28,7 +28,7 @@ describe('slash command panel grouping', () => {
       command({ id: 'cradle:side', name: 'side', source: 'cradle', iconKey: 'side-chat' }),
     ])
 
-    expect(items.map(item => item.name)).toEqual(['review', 'btw', 'side', 'goal', 'terminal'])
+    expect(items.map(item => item.name)).toEqual(['goal', 'terminal', 'review', 'btw', 'side'])
   })
 
   it('groups side and btw together under Commands by product semantics', () => {
@@ -41,19 +41,19 @@ describe('slash command panel grouping', () => {
 
     expect(sections).toEqual([
       {
+        id: 'runtime',
+        label: 'Runtime',
+        items: [
+          expect.objectContaining({ name: 'goal' }),
+        ],
+      },
+      {
         id: 'commands',
         label: 'Commands',
         items: [
           expect.objectContaining({ name: 'btw' }),
           expect.objectContaining({ name: 'side' }),
           expect.objectContaining({ name: 'commit' }),
-        ],
-      },
-      {
-        id: 'runtime',
-        label: 'Runtime',
-        items: [
-          expect.objectContaining({ name: 'goal' }),
         ],
       },
     ])

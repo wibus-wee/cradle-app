@@ -8,6 +8,7 @@ import {
   fetchPullRequest,
   fetchWorkflowRunJobs,
   fetchWorkflowRunsForHead,
+  GitHubApiError,
   GitHubTargetValidationError,
   hasGitHubToken,
   isGitHubMissingTarget,
@@ -653,17 +654,31 @@ export const githubCISource: SessionAwaitSource = {
         }
 
         const workspacePatterns = getMatchingBypassPatterns(row.workspaceId, `${target.owner}/${target.repo}`)
+        const hasBypassRules = perAwaitBypassed.length > 0 || workspacePatterns.length > 0
         let requiredContexts: string[]
-        try {
-          requiredContexts = target.baseBranch
-            ? (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))
-                ?.required_status_checks
-?.contexts ?? []
-            : []
+        if (!hasBypassRules || !target.baseBranch) {
+          requiredContexts = []
         }
-        catch {
-          results.push({ awaitId: row.id, matched: false, transientError: 'GitHub branch protection API unavailable' })
-          continue
+        else {
+          try {
+            requiredContexts = (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))
+              ?.required_status_checks
+?.contexts ?? []
+          }
+          catch (err) {
+            if (!(err instanceof GitHubApiError && err.status === 403)) {
+              results.push({ awaitId: row.id, matched: false, transientError: 'GitHub branch protection API unavailable' })
+              continue
+            }
+
+            // Branch protection is only needed to decide whether a bypass rule
+            // may remove a signal. If the connected GitHub App cannot read it,
+            // fail closed and keep every visible signal in the aggregate.
+            requiredContexts = [
+              ...aggregate.checkRuns.map(run => run.name),
+              ...aggregate.statuses.map(status => status.context),
+            ]
+          }
         }
         aggregate = filterBypassedCI(aggregate, perAwaitBypassed, workspacePatterns, new Set(requiredContexts))
 
@@ -826,11 +841,22 @@ export async function fetchLiveCIStatus(filterJson: string): Promise<LiveCIStatu
   const workflowFailure = workflowRuns.some(run =>
     run.status === 'completed' && (!run.conclusion || !PASSING_CHECK_CONCLUSIONS.has(run.conclusion)))
 
-  const requiredContexts = target.baseBranch
-    ? (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))
+  let requiredContexts: string[] = []
+  if (target.baseBranch) {
+    try {
+      requiredContexts = (await fetchBranchProtection(target.owner, target.repo, target.baseBranch))
         ?.required_status_checks
 ?.contexts ?? []
-    : []
+    }
+    catch (err) {
+      // Branch protection is optional display metadata. GitHub Apps without
+      // Administration: read access receive 403 here, but the live CI data is
+      // still useful and should not make the status endpoint fail.
+      if (!(err instanceof GitHubApiError && err.status === 403)) {
+        throw err
+      }
+    }
+  }
   const requiredSet = new Set(requiredContexts)
 
   return {

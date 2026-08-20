@@ -13,6 +13,19 @@ type ClaudeAssistantUsage = {
   cache_creation_input_tokens?: number
 }
 
+type ClaudeLiveUsageIdentity = {
+  providerSessionId: string
+  providerThreadId: string
+  providerTurnId: string
+  modelId: string
+  occurredAt: number
+  initialUsage: ClaudeAssistantUsage
+}
+
+export interface ClaudeLiveUsageProjectionState {
+  pendingMessage: ClaudeLiveUsageIdentity | null
+}
+
 type ClaudeAssistantMessage = {
   id?: string
   model?: string
@@ -25,6 +38,91 @@ type ClaudeAssistantSdkMessage = {
   parent_tool_use_id?: string
   timestamp?: string
   message?: ClaudeAssistantMessage
+}
+
+type ClaudeMessageStartSdkMessage = {
+  type: 'stream_event'
+  session_id?: string
+  parent_tool_use_id?: string | null
+  event?: {
+    type?: string
+    message?: ClaudeAssistantMessage
+  }
+}
+
+type ClaudeMessageDeltaSdkMessage = {
+  type: 'stream_event'
+  event?: {
+    type?: string
+    usage?: ClaudeAssistantUsage
+  }
+}
+
+export function createClaudeLiveUsageProjectionState(): ClaudeLiveUsageProjectionState {
+  return { pendingMessage: null }
+}
+
+export function projectClaudeLiveUsageEvent(input: {
+  message: SDKMessage
+  state: ClaudeLiveUsageProjectionState
+  fallbackModelId: string | null | undefined
+  occurredAt?: number
+}): RuntimeUsageEvent | null {
+  if (input.message.type !== 'stream_event') {
+    return null
+  }
+
+  const message = input.message as ClaudeMessageStartSdkMessage | ClaudeMessageDeltaSdkMessage
+  if (message.event?.type === 'message_start') {
+    const start = message as ClaudeMessageStartSdkMessage
+    const providerSessionId = start.session_id?.trim()
+    const providerTurnId = start.event?.message?.id?.trim()
+    const modelId = start.event?.message?.model?.trim() || input.fallbackModelId?.trim()
+    if (!providerSessionId || !providerTurnId || !modelId) {
+      throw new ClaudeUsageEventProjectionError(
+        'Claude message-start usage is missing provider session, message, or model identity.',
+      )
+    }
+    input.state.pendingMessage = {
+      providerSessionId,
+      providerThreadId: start.parent_tool_use_id?.trim() || providerSessionId,
+      providerTurnId,
+      modelId,
+      occurredAt: input.occurredAt ?? Math.floor(Date.now() / 1000),
+      initialUsage: start.event?.message?.usage ?? {},
+    }
+    return null
+  }
+
+  const delta = message as ClaudeMessageDeltaSdkMessage
+  if (delta.event?.type !== 'message_delta' || !delta.event.usage) {
+    return null
+  }
+
+  const pending = input.state.pendingMessage
+  if (!pending) {
+    throw new ClaudeUsageEventProjectionError(
+      'Claude final message usage arrived without a matching message-start identity.',
+    )
+  }
+  input.state.pendingMessage = null
+  const tokenUsage = toTokenUsage(mergeFinalUsage(pending.initialUsage, delta.event.usage))
+  if (tokenUsage.totalTokens <= 0) {
+    return null
+  }
+  return {
+    id: createClaudeUsageEventId(
+      pending.providerSessionId,
+      pending.providerThreadId,
+      pending.providerTurnId,
+    ),
+    providerThreadId: pending.providerThreadId,
+    providerTurnId: pending.providerTurnId,
+    modelId: pending.modelId,
+    occurredAt: pending.occurredAt,
+    usage: tokenUsage,
+    providerTotal: tokenUsage,
+  }
 }
 
 export function projectClaudeAssistantUsageEvent(input: {
@@ -92,5 +190,17 @@ function toTokenUsage(usage: ClaudeAssistantUsage): TokenUsage {
     totalTokens: promptTokens + completionTokens,
     cachedInputTokens,
     cacheWriteInputTokens,
+  }
+}
+
+function mergeFinalUsage(
+  initial: ClaudeAssistantUsage,
+  final: ClaudeAssistantUsage,
+): ClaudeAssistantUsage {
+  return {
+    input_tokens: final.input_tokens ?? initial.input_tokens,
+    output_tokens: final.output_tokens ?? initial.output_tokens,
+    cache_read_input_tokens: final.cache_read_input_tokens ?? initial.cache_read_input_tokens,
+    cache_creation_input_tokens: final.cache_creation_input_tokens ?? initial.cache_creation_input_tokens,
   }
 }

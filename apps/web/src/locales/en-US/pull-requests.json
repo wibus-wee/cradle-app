@@ -108,6 +108,8 @@
   "page.loadingMore": "Loading…",
   "page.loadMore": "Load more",
   "page.searchPlaceholder": "Search pull requests",
+  "page.refresh": "Refresh pull requests from GitHub",
+  "page.refreshError": "Could not refresh pull requests",
   "page.title": "Pull request",
   "status.closed": "Closed",
   "status.draft": "Draft",

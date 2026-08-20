@@ -25,14 +25,13 @@ import type { FirstRunSetupStepKey } from './credential-setup-store'
 import {
   areAllFirstRunSetupStepsCompleted,
   isFirstRunSetupStepCompleted,
+  isProviderSetupSatisfied,
   resolvePendingFirstRunSetupSteps,
   useFirstRunSetupStore,
 } from './credential-setup-store'
 import { useOnboardingStore } from './onboarding-store'
 
 type DialogStep = FirstRunSetupStepKey | 'done'
-
-const CC_SWITCH_SOURCE_ID = 'cc-switch'
 
 /**
  * First-run setup dialog keyed by step.
@@ -50,19 +49,15 @@ export function CredentialSetupDialog() {
   const completeSteps = useFirstRunSetupStore(s => s.completeSteps)
 
   const { providerOptions, isSuccess: targetsReady } = useProviderTargets()
-  const { data: externalSources = [], isSuccess: sourcesReady } = useQuery(getExternalProviderSourcesOptions())
+  const { isSuccess: sourcesReady } = useQuery(getExternalProviderSourcesOptions())
   const { data: externalRecords = [], isSuccess: recordsReady } = useQuery(getExternalProviderSourcesRecordsOptions())
   const github = useGithubAppConnectionController()
 
-  const hasExternalProviderData = useMemo(() => {
-    const sources = externalSources as Array<{ sourceId?: string }>
-    const records = externalRecords as Array<{ sourceKind?: string, sourceKey?: string }>
-    return records.length > 0
-      || sources.some(source => source.sourceId === CC_SWITCH_SOURCE_ID)
-      || records.some(record => record.sourceKind === CC_SWITCH_SOURCE_ID || record.sourceKey === CC_SWITCH_SOURCE_ID)
-  }, [externalRecords, externalSources])
-
-  const providerSatisfied = targetsReady && (providerOptions.length > 0 || hasExternalProviderData)
+  const providerSatisfied = isProviderSetupSatisfied({
+    targetsReady,
+    providerOptionCount: providerOptions.length,
+    externalProviderRecordCount: externalRecords.length,
+  })
   const githubSatisfied = github.isConnected
   const inventoryReady = targetsReady && sourcesReady && recordsReady && !github.loading
 
@@ -125,7 +120,12 @@ export function CredentialSetupDialog() {
         }
       }}
     >
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[520px]" showCloseButton={false}>
+      <DialogContent
+        className="gap-0 overflow-hidden p-0 sm:max-w-[520px]"
+        showCloseButton={false}
+        data-testid="first-run-setup-dialog"
+        data-setup-step={step ?? 'loading'}
+      >
         <div className="px-5 pt-5 pb-3">
           <div className="mb-3 flex items-center gap-1.5">
             {Array.from({ length: Math.max(visibleSteps.length, 1) }, (_, index) => (
@@ -226,20 +226,20 @@ export function CredentialSetupDialog() {
         </div>
 
         <DialogFooter variant="bare" className="justify-between border-t border-border px-4 py-3 sm:justify-between">
-          <Button variant="ghost" size="sm" onClick={dismissRemaining} className="h-7 text-xs text-muted-foreground">
+          <Button variant="ghost" size="sm" onClick={dismissRemaining} className="h-7 text-xs text-muted-foreground" data-testid="first-run-skip-all">
             {t('setup.skip')}
           </Button>
           <div className="flex items-center gap-2">
             {step === 'provider'
               ? (
-                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => advanceFrom('provider')}>
+                  <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => advanceFrom('provider')} data-testid="first-run-provider-skip">
                     {t('setup.provider.skip')}
                   </Button>
                 )
               : null}
             {step === 'github'
               ? (
-                  <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => advanceFrom('github')}>
+                  <Button size="sm" className="h-7 gap-1 text-xs" onClick={() => advanceFrom('github')} data-testid="first-run-github-continue">
                     {github.isConnected ? t('setup.continue') : t('setup.github.continueAnyway')}
                     <ArrowRightIcon className="size-3.5" />
                   </Button>
@@ -247,7 +247,7 @@ export function CredentialSetupDialog() {
               : null}
             {step === 'done'
               ? (
-                  <Button size="sm" className="h-7 text-xs" onClick={closeSession}>
+                  <Button size="sm" className="h-7 text-xs" onClick={closeSession} data-testid="first-run-finish">
                     {t('setup.finish')}
                   </Button>
                 )

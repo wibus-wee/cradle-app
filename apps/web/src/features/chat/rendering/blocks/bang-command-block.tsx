@@ -34,7 +34,10 @@ export function BangCommandBlock({ result }: { result: BangResultMetadata }) {
   const ok = !result.timedOut && result.exitCode === 0
 
   return (
-    <div className="grid min-w-0 gap-2 rounded-lg border border-border/60 bg-background/70 p-2.5 text-left shadow-xs">
+    <div
+      className="grid min-w-0 gap-2 rounded-lg border border-border/60 bg-background/70 p-2.5 text-left shadow-xs"
+      data-testid="chat-bang-command-result"
+    >
       <Button
         type="button"
         variant="ghost"

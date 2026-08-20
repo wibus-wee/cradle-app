@@ -78,8 +78,8 @@ export const externalProviderSources = new Elysia({
       }),
     },
   })
-  .patch('/external-provider-sources/:sourceKey/records/:externalRecordId/runtime-target', ({ params, body }) => {
-    const target = ExternalProviderSources.updateExternalRuntimeTargetEnabled(
+  .patch('/external-provider-sources/:sourceKey/records/:externalRecordId/runtime-target', async ({ params, body }) => {
+    const target = await ExternalProviderSources.updateExternalRuntimeTargetEnabled(
       params.sourceKey,
       params.externalRecordId,
       body.enabled,

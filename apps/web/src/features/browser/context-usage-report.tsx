@@ -117,7 +117,7 @@ export function ContextUsageReport({
     queryKey: ['chat', 'context-window-usage', sessionId],
     queryFn: ({ signal }) => getChatRuntimeContextUsage(sessionId, signal),
     staleTime: 5_000,
-    refetchInterval: 5_000,
+    refetchInterval: query => query.state.data?.usage !== null ? 5_000 : false,
     retry: false,
   })
 

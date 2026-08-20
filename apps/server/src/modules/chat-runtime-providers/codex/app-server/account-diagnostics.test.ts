@@ -11,7 +11,7 @@ import {
 } from './account-diagnostics'
 import { CODEX_CHATGPT_AUTH_SECRET_KIND } from './chatgpt-auth'
 import type { CodexAppServerClientOptions } from './client'
-import { codexProviderTargetDiagnosticsAppServerScopeId } from './host-lease'
+import { codexProviderAppServerScopeId } from './host-lease'
 
 class FakeCodexAccountClient implements CodexAppServerClientLike {
   readonly pid = null
@@ -135,8 +135,8 @@ describe('codex account diagnostics', () => {
       planType: 'pro',
       requiresOpenaiAuth: false,
     })
-    expect(diagnostics.rateLimits?.primary?.usedPercent).toBe(40)
-    expect(diagnostics.rateLimits?.individualLimit).toEqual({
+    expect(diagnostics.rateLimitsByLimitId?.codex?.primary?.usedPercent).toBe(40)
+    expect(diagnostics.rateLimitsByLimitId?.codex?.individualLimit).toEqual({
       limit: '100.00',
       used: '12.34',
       remainingPercent: 87.66,
@@ -163,10 +163,35 @@ describe('codex account diagnostics', () => {
       'account/rateLimits/read',
       'account/usage/read',
     ])
-    expect(appServerOptions[0]?.env?.CRADLE_CHAT_SESSION_ID).toBe(
-      codexProviderTargetDiagnosticsAppServerScopeId('codex-chatgpt-target'),
-    )
-    expect(client.close).toHaveBeenCalled()
+    expect(appServerOptions[0]?.env?.CRADLE_CHAT_SESSION_ID).toBeUndefined()
+    expect(client.close).not.toHaveBeenCalled()
+  })
+
+  it('returns the app-server failure message as a typed diagnostics error', async () => {
+    const client = new FakeCodexAccountClient()
+    vi.spyOn(client, 'request').mockImplementation(async (method, params) => {
+      if (method === 'account/usage/read') {
+        throw new Error('token usage profile fetch timed out')
+      }
+      return FakeCodexAccountClient.prototype.request.call(client, method, params)
+    })
+
+    const result = readCodexAccountDiagnostics({
+      providerTargetId: 'codex-chatgpt-timeout-target',
+    }, createDiagnosticsDeps({
+      providerTargetId: 'codex-chatgpt-timeout-target',
+      providerKind: 'openai-compatible',
+      credentialRef: 'credential-chatgpt',
+      client,
+    }))
+
+    await expect(result).rejects.toMatchObject({
+      code: 'codex_account_diagnostics_read_failed',
+      status: 502,
+      message: 'token usage profile fetch timed out',
+      details: { providerTargetId: 'codex-chatgpt-timeout-target' },
+    })
+    expect(client.close).not.toHaveBeenCalled()
   })
 
   it('uses a provider-target diagnostics host scope while account reads are active', async () => {
@@ -205,7 +230,7 @@ describe('codex account diagnostics', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'codex-chatgpt-target',
-        scopeId: codexProviderTargetDiagnosticsAppServerScopeId('codex-chatgpt-target'),
+        scopeId: codexProviderAppServerScopeId(),
         hasResource: true,
       }),
     ])
@@ -356,6 +381,8 @@ function createResolvedProviderTarget(input: {
     customModelsJson: '[]',
     iconSlug: null,
     sourceMetadata: null,
+    extensionBinding: null,
+    effectiveModelId: null,
   }
 }
 

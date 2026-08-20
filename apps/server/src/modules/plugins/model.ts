@@ -46,6 +46,7 @@ const pluginSource = t.Object({
   trusted: t.Boolean(),
   reason: t.Union([t.String(), t.Null()]),
   checksum: t.Union([t.String(), t.Null()]),
+  grantedPermissions: t.Array(t.String()),
 }, { additionalProperties: false })
 
 const pluginMentionCapability = t.Object({

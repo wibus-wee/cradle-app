@@ -17,6 +17,15 @@ log() {
   printf '%s\n' "$*"
 }
 
+print_gatekeeper_help() {
+  log "If macOS blocks this installer before it opens:"
+  log "  In Finder, Control-click (or right-click) 'Install Cradle' and choose Open."
+  log "  If it is still blocked, use System Settings > Privacy & Security > Open Anyway."
+  log "  Only if Open Anyway is unavailable, run: sudo spctl --master-disable"
+  log "  Re-enable Gatekeeper after installation with: sudo spctl --master-enable"
+  log ""
+}
+
 fail() {
   log ""
   log "Install failed: $*"
@@ -349,6 +358,8 @@ main() {
   log "Cradle installer"
   log "==============="
   log ""
+
+  print_gatekeeper_help
 
   resolve_source_app || return 1
 

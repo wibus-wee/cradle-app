@@ -6,7 +6,11 @@ import { z } from 'zod'
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
 import type { ModelRegistryMappingEntry, ModelsDevModel } from '../model-registry/model-info-registry'
-import { lookupModelRaw, ModelsDevModelSchema } from '../model-registry/model-info-registry'
+import {
+  lookupModelRaw,
+  ModelsDevModelSchema,
+  updateCachedModelRegistryMapping,
+} from '../model-registry/model-info-registry'
 
 const nonEmptyTrimmedString = z.string().trim().min(1)
 
@@ -118,10 +122,19 @@ export async function upsertMapping(rawInput: {
     })
     .run()
 
-  return getMapping(input.modelId)!
+  const mapping = getMapping(input.modelId)!
+  updateCachedModelRegistryMapping(mapping.modelId, {
+    modelId: mapping.modelId,
+    registryModelId: mapping.registryModelId,
+    matchType: mapping.matchType,
+    ...(mapping.model ? { model: mapping.model } : {}),
+    updatedAt: mapping.updatedAt,
+  })
+  return mapping
 }
 
 export function deleteMapping(modelId: string): void {
   const id = nonEmptyTrimmedString.parse(modelId)
   db().delete(modelRegistryMappings).where(eq(modelRegistryMappings.modelId, id)).run()
+  updateCachedModelRegistryMapping(id, null)
 }

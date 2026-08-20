@@ -1,7 +1,3 @@
-// Input: window.ipcDevtool preload API, Zustand create/selectors
-// Output: useIpcDevtoolStore / useIpcFiltersStore / useIpcTraces / useIpcFilteredTraces hooks driving the devtool UI
-// Position: Core state layer for the ipc-devtool feature (single producer, single consumer per devtool window)
-
 import { useMemo } from 'react'
 import { create } from 'zustand'
 

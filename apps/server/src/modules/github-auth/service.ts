@@ -6,6 +6,8 @@ import type { GitHubAuthIdentity } from '../../lib/github/auth-provider'
 import { clearGitHubReadInFlight } from '../../lib/github/cache-gate'
 import { resetGitHubClientState } from '../../lib/github/client'
 import { outboundFetch } from '../../lib/outbound-network'
+import type { CredentialAuthDriver, CredentialLifecycleStore } from '../provider-auth/credential-lifecycle'
+import { resolveFreshAccessToken } from '../provider-auth/credential-lifecycle'
 import * as Secrets from '../secrets/service'
 
 const GITHUB_APP_CREDENTIAL_ID = 'system:github-app-user'
@@ -107,6 +109,21 @@ let fetchForTests: FetchLike | null = null
 const pendingLogins = new Map<string, PendingLogin>()
 const finishedLogins = new Map<string, GitHubDeviceLoginStatus>()
 
+const githubCredentialStore: CredentialLifecycleStore = {
+  readSecret: credentialRef => Secrets.readSecret(credentialRef),
+  updateSecretValue: (_credentialRef, secret) => {
+    const credential = parseCredential(secret)
+    if (!credential) {
+      throw new AppError({
+        code: 'github_app_credential_invalid',
+        status: 500,
+        message: 'The saved GitHub connection is invalid.',
+      })
+    }
+    writeCredential(credential)
+  },
+}
+
 export async function getGitHubAppConnection(): Promise<GitHubAppConnectionView> {
   const config = loadGitHubAppConfig()
   if (!config.clientId || !config.slug) {
@@ -136,10 +153,25 @@ export async function getGitHubAppConnection(): Promise<GitHubAppConnectionView>
     }
   }
 
-  const credential = readCredential()
+  let credential = readCredential()
   if (!credential) {
     return baseConnection(config, 'disconnected')
   }
+
+  if (needsRefresh(credential)) {
+    try {
+      credential = await resolveFreshGitHubCredential(config.clientId)
+    }
+    catch (error) {
+      if (!(error instanceof AppError) || error.code !== 'github_app_connection_expired') {
+        throw error
+      }
+      // Keep projecting the durable credential after a failed refresh. The
+      // refresh path records the re-auth-required state when GitHub rejects it.
+      credential = readCredential() ?? credential
+    }
+  }
+
   const expired = isExpired(credential.expiresAt)
   return {
     state: expired ? 'expired' : credential.lastError ? 'error' : 'connected',
@@ -264,9 +296,7 @@ export async function resolveGitHubAppIdentity(): Promise<GitHubAuthIdentity | n
     return null
   }
 
-  const activeCredential = needsRefresh(credential)
-    ? await refreshCredential(config.clientId, credential)
-    : credential
+  const activeCredential = await resolveFreshGitHubCredential(config.clientId)
   if (isExpired(activeCredential.expiresAt)) {
     throw expiredConnectionError()
   }
@@ -330,7 +360,7 @@ async function pollLogin(pending: PendingLogin): Promise<void> {
   }
 }
 
-async function refreshCredential(clientId: string, credential: GitHubAppCredential): Promise<GitHubAppCredential> {
+async function refreshGitHubCredential(clientId: string, credential: GitHubAppCredential): Promise<GitHubAppCredential> {
   if (!credential.refreshToken || isExpired(credential.refreshTokenExpiresAt)) {
     throw expiredConnectionError()
   }
@@ -349,26 +379,33 @@ async function refreshCredential(clientId: string, credential: GitHubAppCredenti
     writeCredential({ ...credential, lastError: 'GitHub rejected the saved connection. Connect again to continue.', updatedAt: now() })
     throw expiredConnectionError()
   }
-  const refreshed = await credentialFromTokenResponse(response, credential.viewer)
-  writeCredential(refreshed)
-  return refreshed
+  // Refresh tokens are rotated and the old refresh token becomes invalid as
+  // soon as GitHub accepts this request. Persist the new credential from the
+  // token response without making persistence depend on another network call.
+  return credentialFromTokenResponse(response, credential)
 }
 
-async function credentialFromTokenResponse(response: TokenResponse, existingViewer: GitHubViewer | null = null): Promise<GitHubAppCredential> {
+async function credentialFromTokenResponse(response: TokenResponse, existingCredential: GitHubAppCredential | null = null): Promise<GitHubAppCredential> {
   const accessToken = response.access_token
   if (!accessToken) {
     throw expiredConnectionError()
   }
   const currentTime = now()
-  const viewer = await fetchViewer(accessToken)
+  // The initial device flow must verify the user before persisting. During a
+  // refresh, keep the already verified viewer: GitHub has already accepted
+  // the rotated token, and a second request here could fail after the refresh
+  // token has been consumed.
+  const viewer = existingCredential ? existingCredential.viewer : await fetchViewer(accessToken)
   return {
     version: GITHUB_APP_CREDENTIAL_VERSION,
     identityVersion: randomUUID(),
     accessToken,
-    refreshToken: response.refresh_token ?? null,
+    refreshToken: response.refresh_token ?? existingCredential?.refreshToken ?? null,
     expiresAt: response.expires_in ? currentTime + response.expires_in : null,
-    refreshTokenExpiresAt: response.refresh_token_expires_in ? currentTime + response.refresh_token_expires_in : null,
-    viewer: viewer ?? existingViewer,
+    refreshTokenExpiresAt: response.refresh_token_expires_in
+      ? currentTime + response.refresh_token_expires_in
+      : existingCredential?.refreshTokenExpiresAt ?? null,
+    viewer,
     updatedAt: currentTime,
     lastError: null,
   }
@@ -421,6 +458,18 @@ async function postForm<T>(url: string, body: Record<string, string>, signal?: A
 function readCredential(): GitHubAppCredential | null {
   try {
     const raw = Secrets.readSecret(GITHUB_APP_CREDENTIAL_ID)
+    return parseCredential(raw)
+  }
+  catch (error) {
+    if (error instanceof AppError && (error.code === 'secret_not_found' || error.code === 'secret_not_configured')) {
+      return null
+    }
+    throw error
+  }
+}
+
+function parseCredential(raw: string): GitHubAppCredential | null {
+  try {
     const credential = JSON.parse(raw) as GitHubAppCredential
     return credential.version === GITHUB_APP_CREDENTIAL_VERSION && credential.accessToken
       ? {
@@ -429,11 +478,8 @@ function readCredential(): GitHubAppCredential | null {
         }
       : null
   }
-  catch (error) {
-    if (error instanceof AppError && (error.code === 'secret_not_found' || error.code === 'secret_not_configured')) {
-      return null
-    }
-    throw error
+  catch {
+    return null
   }
 }
 
@@ -504,6 +550,36 @@ function installationUrl(slug: string): string {
 
 function needsRefresh(credential: GitHubAppCredential): boolean {
   return credential.expiresAt !== null && credential.expiresAt <= now() + REFRESH_WINDOW_SECONDS
+}
+
+function resolveFreshGitHubCredential(clientId: string): Promise<GitHubAppCredential> {
+  return resolveFreshAccessToken({
+    credentialRef: GITHUB_APP_CREDENTIAL_ID,
+    store: githubCredentialStore,
+    driver: githubCredentialDriver(clientId),
+  })
+}
+
+function githubCredentialDriver(clientId: string): CredentialAuthDriver<GitHubAppCredential> {
+  return {
+    id: 'github-app-user',
+    parseCredential: (_credentialRef, secret) => {
+      const credential = parseCredential(secret)
+      if (!credential) {
+        throw new AppError({
+          code: 'github_app_credential_invalid',
+          status: 500,
+          message: 'The saved GitHub connection is invalid.',
+        })
+      }
+      return credential
+    },
+    hasFreshAccessToken: credential => !needsRefresh(credential),
+    refreshCredential: credential => refreshGitHubCredential(clientId, credential),
+    serializeCredential: credential => JSON.stringify(credential),
+    isReauthRequired: error => error instanceof AppError && error.code === 'github_app_connection_expired',
+    createReauthRequiredError: () => expiredConnectionError(),
+  }
 }
 
 function isExpired(timestamp: number | null): boolean {

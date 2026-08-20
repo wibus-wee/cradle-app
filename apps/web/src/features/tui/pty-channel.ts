@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { getI18n } from '~/i18n/instance'
-import { getAuthenticatedServerWebSocketUrl } from '~/lib/electron'
+import { getAuthenticatedServerWebSocketUrl } from '~/lib/authenticated-server-url'
 
 import type { PtyClientEvent, PtyErrorEvent, PtyExitEvent, PtyOutputEvent, PtySnapshotEvent, PtyStatusEvent } from './pty-protocol'
 import { PtyServerEventJsonSchema } from './pty-protocol'
@@ -53,6 +53,7 @@ const WebSocketMessageSchema = z.object({
 export function createPtyChannel(rawOptions: PtyChannelOptions): PtyChannel {
   const options = PtyChannelOptionsSchema.parse(rawOptions)
   let socket: WebSocket | null = null
+  let connecting: Promise<void> | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let pingTimer: ReturnType<typeof setInterval> | null = null
   let closedManually = false
@@ -174,38 +175,65 @@ export function createPtyChannel(rawOptions: PtyChannelOptions): PtyChannel {
       return
     }
 
-    const url = await getAuthenticatedServerWebSocketUrl(
-      options.socketPath,
-      lastSeq === null ? undefined : { fromSeq: lastSeq },
-    )
-    socket = new WebSocket(url)
+    if (connecting) {
+      return connecting
+    }
 
-    socket.addEventListener('open', () => {
-      clearReconnectTimer()
-      startPingLoop()
-      flushPendingMessages()
-      options.onOpen?.()
-    })
-
-    socket.addEventListener('message', (event) => {
-      const message = WebSocketMessageSchema.safeParse(event)
-      if (!message.success) {
-        emitError('INVALID_SERVER_EVENT', 'Received malformed terminal socket message.')
+    connecting = (async () => {
+      const url = await getAuthenticatedServerWebSocketUrl(
+        options.socketPath,
+        lastSeq === null ? undefined : { fromSeq: lastSeq },
+      )
+      if (closedManually) {
         return
       }
-      handleMessage(message.data.data)
+
+      const nextSocket = new WebSocket(url)
+      socket = nextSocket
+
+      nextSocket.addEventListener('open', () => {
+        if (socket !== nextSocket) {
+          return
+        }
+        clearReconnectTimer()
+        startPingLoop()
+        flushPendingMessages()
+        options.onOpen?.()
+      })
+
+      nextSocket.addEventListener('message', (event) => {
+        if (socket !== nextSocket) {
+          return
+        }
+        const message = WebSocketMessageSchema.safeParse(event)
+        if (!message.success) {
+          emitError('INVALID_SERVER_EVENT', 'Received malformed terminal socket message.')
+          return
+        }
+        handleMessage(message.data.data)
+      })
+
+      nextSocket.addEventListener('error', () => {
+        if (socket !== nextSocket) {
+          return
+        }
+        emitError('SOCKET_ERROR', getI18n().t('common:pty.socketConnectionError'))
+      })
+
+      nextSocket.addEventListener('close', () => {
+        if (socket !== nextSocket) {
+          return
+        }
+        stopPingLoop()
+        socket = null
+        options.onClose?.()
+        scheduleReconnect()
+      })
+    })().finally(() => {
+      connecting = null
     })
 
-    socket.addEventListener('error', () => {
-      emitError('SOCKET_ERROR', getI18n().t('common:pty.socketConnectionError'))
-    })
-
-    socket.addEventListener('close', () => {
-      stopPingLoop()
-      socket = null
-      options.onClose?.()
-      scheduleReconnect()
-    })
+    return connecting
   }
 
   return {

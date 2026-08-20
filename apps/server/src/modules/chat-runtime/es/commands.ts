@@ -1,16 +1,21 @@
 import type { ChatSessionQueueItem } from '@cradle/db'
-import { chatSessionQueueItems } from '@cradle/db'
-import { and, eq, isNull } from 'drizzle-orm'
+import { backendRuns, chatSessionQueueItems } from '@cradle/db'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 
 import { AppError } from '../../../errors/app-error'
 import { currentUnixSeconds } from '../../../helpers/time'
 import { db } from '../../../infra'
 import type { ChatMessageStatus } from '../run/stream-chunks'
-import { reduceChatSessionEvents } from './aggregate'
+import type { ChatSessionState } from './aggregate'
+import { createInitialChatSessionState, reduceChatSessionEvents } from './aggregate'
 import type { ChatSessionDomainError } from './decide'
 import { decideChatSessionEvents } from './decide'
 import type { ChatRuntimeTx } from './event-store'
-import { appendSessionEvent, readSessionEvents } from './event-store'
+import {
+  appendSessionEvents,
+  readCurrentSessionEventVersion,
+  readSessionEvents,
+} from './event-store'
 import { publishSessionTailEvents } from './event-tail'
 import type {
   ChatSessionEvent,
@@ -98,28 +103,114 @@ export function appendDecidedSessionEvents(
     return []
   }
 
-  const state = reduceChatSessionEvents(readSessionEvents(sessionId, tx))
-  state.aggregateId = sessionId
+  const state = readSessionDecisionState(tx, sessionId, events)
   const decision = decideChatSessionEvents(state, events)
   if (!decision.ok) {
     throwDomainError(decision.error)
   }
 
-  const storedEvents: StoredChatSessionEvent[] = []
-  let expectedVersion = state.version
-  for (const event of decision.events) {
-    const stored = appendSessionEvent(tx, {
-      aggregateId: sessionId,
-      event,
-      expectedVersion,
-    })
+  const storedEvents = appendSessionEvents(tx, {
+    aggregateId: sessionId,
+    events: decision.events,
+    expectedVersion: state.version,
+    knownCurrentVersion: state.version,
+  })
+  for (const stored of storedEvents) {
     if (options.projectEvent?.(stored) ?? true) {
       projectSessionEvent(tx, stored)
     }
-    storedEvents.push(stored)
-    expectedVersion = stored.version
   }
   return storedEvents
+}
+
+/**
+ * Normal commands decide from same-transaction projections instead of
+ * replaying the append-only stream. Recovery and rebuild paths continue to
+ * replay the authoritative facts; these rows are maintained atomically with
+ * every append and provide the minimal state needed by command invariants.
+ */
+function readSessionDecisionState(
+  tx: ChatRuntimeTx,
+  sessionId: string,
+  events: ChatSessionEvent[],
+): ChatSessionState {
+  const state = createInitialChatSessionState(sessionId)
+  state.version = readCurrentSessionEventVersion(tx, sessionId)
+
+  const activeRun = tx
+    .select({
+      id: backendRuns.id,
+      messageId: backendRuns.messageId,
+      origin: backendRuns.origin,
+      startedAt: backendRuns.startedAt,
+    })
+    .from(backendRuns)
+    .where(and(
+      eq(backendRuns.chatSessionId, sessionId),
+      eq(backendRuns.status, 'streaming'),
+    ))
+    .limit(1)
+    .get()
+  if (activeRun) {
+    state.activeRun = {
+      runId: activeRun.id,
+      messageId: activeRun.messageId,
+      queueItemId: null,
+      startedAt: activeRun.startedAt,
+    }
+    state.runOriginById.set(activeRun.id, activeRun.origin)
+    state.runMessageIdById.set(activeRun.id, activeRun.messageId)
+    state.runStatusById.set(activeRun.id, 'streaming')
+  }
+
+  const queueItemIds = readReferencedQueueItemIds(events)
+  if (queueItemIds.length > 0) {
+    const queueItems = tx
+      .select({
+        id: chatSessionQueueItems.id,
+        status: chatSessionQueueItems.status,
+        startedRunId: chatSessionQueueItems.startedRunId,
+      })
+      .from(chatSessionQueueItems)
+      .where(and(
+        eq(chatSessionQueueItems.sessionId, sessionId),
+        inArray(chatSessionQueueItems.id, queueItemIds),
+      ))
+      .all()
+    for (const item of queueItems) {
+      state.queueItemById.set(item.id, {
+        status: item.status,
+        startedRunId: item.startedRunId,
+      })
+    }
+  }
+  return state
+}
+
+function readReferencedQueueItemIds(events: ChatSessionEvent[]): string[] {
+  const ids = new Set<string>()
+  for (const event of events) {
+    switch (event.type) {
+      case 'RunStarted':
+        if (event.payload.queueItemId) {
+          ids.add(event.payload.queueItemId)
+        }
+        break
+      case 'QueueItemClaimed':
+      case 'QueueItemReleased':
+      case 'QueueItemFailed':
+      case 'QueueItemCompleted':
+      case 'QueueItemReordered':
+      case 'QueueItemUpdated':
+      case 'QueueItemProviderTargetCleared':
+      case 'QueueItemCancelled':
+        ids.add(event.payload.queueItemId)
+        break
+      default:
+        break
+    }
+  }
+  return [...ids]
 }
 
 /**
@@ -145,20 +236,19 @@ export function appendValidatedRecoverySessionEvents(
   }
 
   const state = reduceChatSessionEvents(readSessionEvents(sessionId, tx))
-  let expectedVersion = state.version
-  const storedEvents: StoredChatSessionEvent[] = []
   for (const event of input.events) {
     assertRecoveryEventBelongsToRun(event, input)
-    const stored = appendSessionEvent(tx, {
-      aggregateId: sessionId,
-      event,
-      expectedVersion,
-    })
+  }
+  const storedEvents = appendSessionEvents(tx, {
+    aggregateId: sessionId,
+    events: input.events,
+    expectedVersion: state.version,
+    knownCurrentVersion: state.version,
+  })
+  for (const stored of storedEvents) {
     if (input.projectEvent?.(stored) ?? true) {
       projectSessionEvent(tx, stored)
     }
-    storedEvents.push(stored)
-    expectedVersion = stored.version
   }
   return storedEvents
 }

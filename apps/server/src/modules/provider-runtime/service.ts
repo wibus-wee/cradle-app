@@ -159,15 +159,30 @@ async function resolveExistingCandidate(
     agentId: input.agentId,
     modelId: input.modelId,
   })
+  const requestedModelId = readRequestedModelId({
+    modelId: input.modelId,
+    binding: candidate.reusableBinding,
+    runtimeSession,
+  })
+  const providerSessionId = runtimeSession.providerSessionId ?? candidate.reusableBinding.backendSessionId
+  if (!providerSessionId) {
+    throw new Error(`Resumed provider runtime session is missing a provider session id: ${input.chatSessionId}`)
+  }
+  const binding = runtimeSession.providerStateSnapshot === candidate.reusableBinding.backendStateSnapshot
+    ? candidate.reusableBinding
+    : writeProviderRuntimeBinding({
+        chatSessionId: input.chatSessionId,
+        providerTargetId: input.providerTargetId,
+        runtimeKind: input.runtimeKind,
+        providerSessionId,
+        providerStateSnapshot: runtimeSession.providerStateSnapshot,
+        requestedModelId,
+      })
   return {
     runtimeSession,
-    binding: candidate.reusableBinding,
+    binding,
     source: 'durable-binding',
-    requestedModelId: readRequestedModelId({
-      modelId: input.modelId,
-      binding: candidate.reusableBinding,
-      runtimeSession,
-    }),
+    requestedModelId,
   }
 }
 

@@ -275,7 +275,6 @@ export function startOrAttach(input: { sessionId: string, cols: number, rows: nu
     ptyStartedAt: context.session.ptyStartedAt,
     workspacePath: context.workspacePath,
     providerSession: sessionConfig.providerSession,
-    codexCliSession: sessionConfig.codexCliSession,
     harnessSystemPrompt: getCradleHarnessSystemInstructions(),
   })
 
@@ -426,20 +425,7 @@ export function getProviderSession(sessionId: string): {
   const config = SessionRuntimeConfigJsonSchema.parse(context.session.configJson)
   return {
     sessionId,
-    providerSession: config.providerSession
-      ?? (config.codexCliSession
-        ? {
-            source: 'cradle:codex',
-            agent: 'codex',
-            kind: 'id' as const,
-            value: config.codexCliSession.sessionId,
-            workspacePath: config.codexCliSession.workspacePath,
-            capturedAt: config.codexCliSession.capturedAt,
-            startedAt: config.codexCliSession.startedAt,
-            sourcePath: config.codexCliSession.sourcePath,
-            confidence: 'exact' as const,
-          }
-        : null),
+    providerSession: config.providerSession ?? null,
   }
 }
 
@@ -525,11 +511,11 @@ export function clearProviderSession(sessionId: string): {
 } {
   const context = requireTerminalContext(sessionId)
   const config = SessionRuntimeConfigJsonSchema.parse(context.session.configJson)
-  if (!config.providerSession && !config.codexCliSession) {
+  if (!config.providerSession) {
     return { sessionId, providerSession: null }
   }
 
-  const { providerSession: _providerSession, codexCliSession: _codexCliSession, ...rest } = config
+  const { providerSession: _providerSession, ...rest } = config
   db()
     .update(sessions)
     .set({ configJson: JSON.stringify(rest) })

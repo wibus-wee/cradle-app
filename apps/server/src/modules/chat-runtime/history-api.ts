@@ -4,13 +4,14 @@ import { and, desc, eq, lt, sql } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { reduceChatSessionEventHeaders } from './es/aggregate'
-import { readSessionEventHeaders } from './es/event-store'
+import { projectChatMessageForClient } from './client-message-projection'
+import { readCurrentSessionEventVersion } from './es/event-store'
 import { messagePayloadJoinCondition } from './message-payload-store'
 import type { ChatMessageStatus } from './run/stream-chunks'
 import { assertStoredSession } from './runtime-session-context'
 import {
   parseStoredMessageSnapshot as parseTrustedStoredMessageSnapshot,
+  projectChatMessageDisplay,
 } from './ui-message'
 
 const messageInsertOrder = sql<number>`messages.rowid`
@@ -36,6 +37,16 @@ export interface ChatMessageRow {
 export interface ChatMessageSnapshot {
   revision: number
   rows: ChatMessageRow[]
+  nextCursor: string | null
+}
+
+export type ChatMessagePreviewRow = Omit<ChatMessageRow, 'message'> & {
+  message: ChatMessageDetail['message']
+}
+
+export interface ChatMessagePreviewSnapshot {
+  revision: number
+  rows: ChatMessagePreviewRow[]
   nextCursor: string | null
 }
 
@@ -120,13 +131,15 @@ export async function getMessageGroups(
 async function getMessagePage(
   sessionId: string,
   input: ChatMessagePageInput,
+  projectMessage: (message: ChatMessageDetail['message']) => ChatMessageDetail['message']
+    = message => message,
 ): Promise<{
   rows: ChatMessageRow[]
   nextCursor: string | null
   revision: number
 }> {
   assertStoredSession(sessionId)
-  const headerState = reduceChatSessionEventHeaders(readSessionEventHeaders(sessionId))
+  const revision = readCurrentSessionEventVersion(db(), sessionId)
   const limit = Math.min(Math.max(Math.floor(input.limit ?? 100), 1), 200)
   const beforeRowId = decodeMessageCursor(input.cursor ?? null)
 
@@ -163,11 +176,11 @@ async function getMessagePage(
 
   return {
     nextCursor,
-    revision: headerState.version,
+    revision,
     rows: rows.map(row => ({
       messageId: row.messageId,
       role: row.role as 'user' | 'assistant',
-      status: headerState.messageStatusById.get(row.messageId) ?? row.status as ChatMessageStatus,
+      status: row.status as ChatMessageStatus,
       errorText: row.errorText ?? undefined,
       preview: row.preview.slice(0, CHAT_HISTORY_PREVIEW_MAX_CHARS),
       previewTruncated: row.preview.length > CHAT_HISTORY_PREVIEW_MAX_CHARS,
@@ -175,10 +188,10 @@ async function getMessagePage(
       parentToolCallId: row.parentToolCallId,
       taskId: row.taskId,
       depth: row.depth,
-      message: parseStoredMessageSnapshot(
+      message: projectMessage(parseStoredMessageSnapshot(
         { id: row.messageId, messageJson: row.messageJson },
         row.role as 'user' | 'assistant',
-      ),
+      )),
     })),
   }
 }
@@ -187,7 +200,19 @@ export async function getMessageSnapshot(
   sessionId: string,
   input: ChatMessagePageInput = {},
 ): Promise<ChatMessageSnapshot> {
-  const page = await getMessagePage(sessionId, input)
+  const page = await getMessagePage(sessionId, input, projectChatMessageForClient)
+  return {
+    revision: page.revision,
+    rows: page.rows,
+    nextCursor: page.nextCursor,
+  }
+}
+
+export async function getMessagePreviewSnapshot(
+  sessionId: string,
+  input: ChatMessagePageInput = {},
+): Promise<ChatMessagePreviewSnapshot> {
+  const page = await getMessagePage(sessionId, input, projectChatMessageDisplay)
   return {
     revision: page.revision,
     rows: page.rows,
@@ -242,22 +267,7 @@ export function getMessageDetail(sessionId: string, messageId: string): ChatMess
     { id: row.message.id, messageJson: row.payload.messageJson },
     role,
   )
-  if (message.id !== row.message.id || message.role !== role) {
-    throw new AppError({
-      code: 'chat_message_snapshot_invalid',
-      status: 500,
-      message: 'Stored chat message snapshot is invalid',
-      details: {
-        messageId: row.message.id,
-        role,
-        reason:
-          message.id !== row.message.id
-            ? 'message_json.id must match messages.id'
-            : 'message_json.role must match messages.role',
-      },
-    })
-  }
-  return { message }
+  return { message: projectChatMessageForClient(message) }
 }
 
 function encodeMessageCursor(beforeRowId: number): string {
@@ -296,7 +306,17 @@ function parseStoredMessageSnapshot(
   role: 'user' | 'assistant',
 ): ChatMessageDetail['message'] {
   try {
-    return parseTrustedStoredMessageSnapshot(row.messageJson) as ChatMessageDetail['message']
+    const message = parseTrustedStoredMessageSnapshot(row.messageJson) as ChatMessageDetail['message']
+    if (message.id !== row.id) {
+      throw new TypeError('message_json.id must match messages.id')
+    }
+    if (message.role !== role) {
+      throw new TypeError('message_json.role must match messages.role')
+    }
+    if (!Array.isArray(message.parts)) {
+      throw new TypeError('message_json.parts must be an array')
+    }
+    return message
   }
  catch (error) {
     throw new AppError({

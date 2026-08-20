@@ -69,6 +69,10 @@ const thinkingEffort = t.Union([
 export const WorkModel = {
   work,
   summary,
+  page: t.Object({
+    items: t.Array(summary),
+    nextCursor: t.Nullable(t.String()),
+  }),
   detail,
   activity,
   readiness,
@@ -81,6 +85,8 @@ export const WorkModel = {
     workspaceId: t.Optional(t.String({ minLength: 1 })),
     linkedIssueId: t.Optional(t.String({ minLength: 1 })),
     archived: t.Optional(t.Boolean()),
+    cursor: t.Optional(t.String({ minLength: 1 })),
+    limit: t.Optional(t.Numeric({ minimum: 1, maximum: 200 })),
   }),
 
   createBody: t.Object({
@@ -90,15 +96,10 @@ export const WorkModel = {
     objective: t.Optional(t.String({ minLength: 1 })),
     linkedIssueId: t.Optional(t.String({ minLength: 1 })),
     /**
-     * How to choose the isolation base commit.
-     * - `source-head` (default): local HEAD; requires a clean source checkout.
-     * - `remote-default`: remote-tracking default branch tip (e.g. origin/main);
-     *   allowed even when the source checkout is dirty.
+     * Exact local or remote branch ref to use as the isolation base.
+     * When omitted, the current workspace HEAD is used.
      */
-    baseStrategy: t.Optional(t.Union([
-      t.Literal('source-head'),
-      t.Literal('remote-default'),
-    ])),
+    baseBranch: t.Optional(t.String({ minLength: 1 })),
     providerTargetId: t.Optional(t.String({ minLength: 1 })),
     modelId: t.Optional(t.Nullable(t.String({ minLength: 1 }))),
     thinkingEffort: t.Optional(thinkingEffort),

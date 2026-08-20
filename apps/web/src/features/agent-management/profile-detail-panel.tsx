@@ -84,6 +84,7 @@ import {
 import { CustomModelsEditor } from './custom-models-editor'
 import { ModelsPanel } from './models-panel'
 import { ProviderConnectionTestControls } from './provider-connection-test'
+import { ProviderExtensionsContainer } from './provider-extensions/provider-extensions-container'
 import {
   ALL_DISABLED_SENTINEL,
   presetForProviderKind,
@@ -1065,7 +1066,12 @@ function ProfileDetailHeader({
         <SaveIndicator state={saveState} />
 
         <div className="flex items-center gap-2 rounded-full bg-muted/50 px-2.5 py-1">
-          <Switch size="sm" checked={profile.enabled} onCheckedChange={onToggle} />
+          <Switch
+            size="sm"
+            checked={profile.enabled}
+            onCheckedChange={onToggle}
+            data-testid="provider-enabled-toggle"
+          />
           <span className="text-[11px] font-medium text-muted-foreground">
             {profile.enabled ? 'Active' : 'Off'}
           </span>
@@ -1334,6 +1340,10 @@ function ProfileGeneralSettings({
             </div>
           </div>
         </section>
+      )}
+
+      {supportsModels && (
+        <ProviderExtensionsContainer providerTargetId={profile.id} disabled={readOnly} />
       )}
     </div>
   )

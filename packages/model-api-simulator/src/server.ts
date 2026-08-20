@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 
 import { anthropicRoutes, handleAnthropicRequest } from './anthropic/routes'
+import type { AutoRespondMode } from './contract'
 import { SimulatorProtocolValidator } from './core/protocol-validation'
 import { ScenarioController } from './core/scenario-runtime'
 import { OpenAiResourceStore } from './openai/resource-store'
@@ -21,25 +22,25 @@ export function createSimulatorRuntime(): SimulatorRuntime {
 
 export function createSimulatorApp(
   runtime: SimulatorRuntime,
-  options: { strictRequestValidation?: boolean, autoRespond?: boolean } = {},
+  options: { strictRequestValidation?: boolean, autoRespond?: AutoRespondMode } = {},
 ) {
   const { controller, openAiResources } = runtime
   const protocol = new SimulatorProtocolValidator(options.strictRequestValidation ?? false)
-  const autoRespond = options.autoRespond ?? false
+  const autoRespond: AutoRespondMode = options.autoRespond ?? false
   return new Elysia({
     name: 'cradle.model-api-simulator',
     normalize: 'typebox',
   })
     .use(anthropicRoutes(controller, protocol, autoRespond))
-    .use(openAiRoutes(controller, protocol, openAiResources))
+    .use(openAiRoutes(controller, protocol, openAiResources, autoRespond))
     .get('/v1/models', ({ request }) =>
       isAnthropicRequest(request)
         ? handleAnthropicRequest(controller, protocol, request, autoRespond)
-        : handleOpenAiRequest(controller, protocol, openAiResources, request))
+        : handleOpenAiRequest(controller, protocol, openAiResources, request, autoRespond))
     .get('/v1/models/:model', ({ request }) =>
       isAnthropicRequest(request)
         ? handleAnthropicRequest(controller, protocol, request, autoRespond)
-        : handleOpenAiRequest(controller, protocol, openAiResources, request))
+        : handleOpenAiRequest(controller, protocol, openAiResources, request, autoRespond))
 }
 
 function isAnthropicRequest(request: Request): boolean {

@@ -21,5 +21,5 @@ export function readClaudeAgentPermissionMode(
 export function readClaudeAgentAllowDangerouslySkipPermissions(
   settings: RuntimeSettings | null | undefined,
 ): boolean {
-  return readClaudeAgentPermissionMode(settings) !== 'plan'
+  return readClaudeAgentPermissionMode(settings) === 'bypassPermissions'
 }

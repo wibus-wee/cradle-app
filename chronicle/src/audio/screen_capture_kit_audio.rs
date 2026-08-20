@@ -99,7 +99,6 @@ pub fn capture_system_audio_samples(duration_ms: u64) -> ChronicleResult<Microph
         configuration.setHeight(2);
         configuration.setQueueDepth(3);
         configuration.setCapturesAudio(true);
-        configuration.setCaptureMicrophone(false);
         configuration.setSampleRate(SCREEN_CAPTURE_SAMPLE_RATE as isize);
         configuration.setChannelCount(SCREEN_CAPTURE_CHANNELS as isize);
         configuration.setExcludesCurrentProcessAudio(false);
@@ -303,7 +302,7 @@ fn read_mono_samples(sample_buffer: &CMSampleBuffer) -> Option<Vec<f32>> {
     if status != 0 {
         return None;
     }
-    let _retained_block = unsafe { Retained::retain(block_buffer) };
+    let _retained_block = unsafe { Retained::from_raw(block_buffer) };
     let list = unsafe { &*list_ptr };
     let channels = description.mChannelsPerFrame.max(1) as usize;
     let frame_count = samples_per_channel as usize;

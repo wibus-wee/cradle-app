@@ -1,32 +1,19 @@
 import { Refresh1Line as RefreshIcon, TaskLine as TaskIcon } from '@mingcute/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { z } from 'zod'
 
+import {
+  getBackgroundActivitiesOptions,
+  getBackgroundActivitiesQueryKey,
+  postBackgroundActivitiesByOwnerNamespaceByKeyRunMutation,
+} from '~/api-gen/@tanstack/react-query.gen'
+import type { GetBackgroundActivitiesResponse } from '~/api-gen/types.gen'
 import { Button } from '~/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { cn } from '~/lib/cn'
-import { getServerUrl } from '~/lib/electron'
 
 const REFRESH_INTERVAL_MS = 2_000
-const BACKGROUND_ACTIVITIES_QUERY_KEY = ['background-activities']
 
-const BackgroundActivitySchema = z.object({
-  ownerNamespace: z.string(),
-  key: z.string(),
-  title: z.string(),
-  priority: z.enum(['low', 'normal', 'high']),
-  trigger: z.string(),
-  status: z.enum(['idle', 'running', 'succeeded', 'failed']),
-  manuallyRunnable: z.boolean(),
-  startedAt: z.number().nullable(),
-  updatedAt: z.number(),
-  progress: z.record(z.string(), z.unknown()).nullable(),
-  lastError: z.string().nullable(),
-})
-
-const BackgroundActivityListSchema = z.array(BackgroundActivitySchema)
-
-type BackgroundActivity = z.infer<typeof BackgroundActivitySchema>
+type BackgroundActivity = GetBackgroundActivitiesResponse[number]
 
 function formatTimestamp(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, {
@@ -53,30 +40,19 @@ function statusClassName(status: BackgroundActivity['status']): string {
 }
 
 function formatProgress(progress: BackgroundActivity['progress'], trigger: string): string {
-  if (!progress) { return `Triggered by ${trigger}` }
-  if (typeof progress.completed === 'number' && typeof progress.total === 'number') {
-    return `${progress.completed}/${progress.total} worktrees measured`
+  if (!progress || typeof progress !== 'object') { return `Triggered by ${trigger}` }
+  const progressRecord = progress as Record<string, unknown>
+  if (typeof progressRecord.completed === 'number' && typeof progressRecord.total === 'number') {
+    return `${progressRecord.completed}/${progressRecord.total} worktrees measured`
   }
   return 'Reporting progress'
-}
-
-async function getBackgroundActivities(): Promise<BackgroundActivity[]> {
-  const response = await fetch(new URL('/background-activities', getServerUrl()))
-  if (!response.ok) { throw new Error(await response.text()) }
-  return BackgroundActivityListSchema.parse(await response.json())
-}
-
-async function runBackgroundActivity(activity: BackgroundActivity): Promise<void> {
-  const path = `/background-activities/${encodeURIComponent(activity.ownerNamespace)}/${encodeURIComponent(activity.key)}/run`
-  const response = await fetch(new URL(path, getServerUrl()), { method: 'POST' })
-  if (!response.ok) { throw new Error(await response.text()) }
 }
 
 function ActivityRow({ activity }: { activity: BackgroundActivity }) {
   const queryClient = useQueryClient()
   const run = useMutation({
-    mutationFn: () => runBackgroundActivity(activity),
-    onSuccess: async () => queryClient.invalidateQueries({ queryKey: BACKGROUND_ACTIVITIES_QUERY_KEY }),
+    ...postBackgroundActivitiesByOwnerNamespaceByKeyRunMutation(),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: getBackgroundActivitiesQueryKey() }),
   })
 
   return (
@@ -110,7 +86,7 @@ priority
           {activity.lastError && <p className="mt-1 text-[10px] text-destructive">{activity.lastError}</p>}
         </div>
         {activity.manuallyRunnable && (
-          <Button type="button" variant="ghost" size="icon-sm" disabled={run.isPending || activity.status === 'running'} onClick={() => run.mutate()} className="shrink-0 active:scale-[0.96] transition-transform" aria-label={`Run ${activity.title}`} title={`Run ${activity.title}`}>
+          <Button type="button" variant="ghost" size="icon-sm" disabled={run.isPending || activity.status === 'running'} onClick={() => run.mutate({ path: { ownerNamespace: activity.ownerNamespace, key: activity.key } })} className="shrink-0 active:scale-[0.96] transition-transform" aria-label={`Run ${activity.title}`} title={`Run ${activity.title}`}>
             <RefreshIcon className={cn('size-3.5', { 'animate-spin': run.isPending || activity.status === 'running' })} aria-hidden="true" />
           </Button>
         )}
@@ -121,8 +97,7 @@ priority
 
 export function BackgroundActivityPopover() {
   const activities = useQuery({
-    queryKey: BACKGROUND_ACTIVITIES_QUERY_KEY,
-    queryFn: getBackgroundActivities,
+    ...getBackgroundActivitiesOptions(),
     refetchInterval: query => query.state.data?.some(activity => activity.status === 'running') ? REFRESH_INTERVAL_MS : false,
   })
 

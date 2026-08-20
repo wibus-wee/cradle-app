@@ -7,16 +7,18 @@ import { Dialog as DialogPrimitive } from 'radix-ui'
 import { useCallback, useEffect, useState } from 'react'
 
 import { Button } from '~/components/ui/button'
+import { useProtectedBlobUrl } from '~/features/assets/use-protected-blob-url'
 import { cn } from '~/lib/cn'
 
 interface ImageLightboxProps {
   images: Array<{ url: string, alt: string }>
+  sessionId: string
   initialIndex: number
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function ImageLightbox({ images, initialIndex, open, onOpenChange }: ImageLightboxProps) {
+export function ImageLightbox({ images, sessionId, initialIndex, open, onOpenChange }: ImageLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
 
   useEffect(() => {
@@ -50,9 +52,10 @@ export function ImageLightbox({ images, initialIndex, open, onOpenChange }: Imag
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, handlePrevious, handleNext, onOpenChange])
 
-  if (images.length === 0) { return null }
+  const currentImage = images[currentIndex] ?? images[0]
+  const currentImageUrl = useProtectedBlobUrl(open ? currentImage?.url ?? '' : '', open ? sessionId : null)
 
-  const currentImage = images[currentIndex]
+  if (!currentImage) { return null }
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -103,11 +106,7 @@ export function ImageLightbox({ images, initialIndex, open, onOpenChange }: Imag
             )}
 
             <div className="flex max-h-full max-w-full flex-col items-center gap-4">
-              <img
-                src={currentImage.url}
-                alt={currentImage.alt}
-                className="max-h-[85vh] max-w-full rounded-lg object-contain"
-              />
+              {currentImageUrl && <img src={currentImageUrl} alt={currentImage.alt} className="max-h-[85vh] max-w-full rounded-lg object-contain" />}
 
               {images.length > 1 && (
                 <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-sm">

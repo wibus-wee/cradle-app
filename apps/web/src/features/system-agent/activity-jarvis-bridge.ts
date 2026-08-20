@@ -6,7 +6,6 @@ import {
   AMBIENT_OBSERVATION_LIMIT,
   MIN_OBSERVATION_DURATION_MS,
 } from '~/features/activity/types'
-import { formatObservationText } from '~/lib/web-activity-registry'
 
 import type { JarvisAmbientSessionPrefs } from './jarvis-ambient-session'
 import {
@@ -15,6 +14,11 @@ import {
 } from './jarvis-ambient-session'
 
 const recentObservationTexts: string[] = []
+type SegmentEndedEvent = Extract<UiActivityEvent, { kind: 'ui.segment.ended' }>
+
+export function formatObservationText(activity: SegmentEndedEvent): string {
+  return `[activity] segment ended: entity=${activity.entity} type=${activity.entityType} durationMs=${activity.durationMs} endReason=${activity.endReason}`
+}
 
 function rememberObservationText(text: string): void {
   recentObservationTexts.unshift(text)
@@ -31,8 +35,6 @@ export function readRecentAmbientObservationTexts(): string[] {
 export function clearRecentAmbientObservationTextsForTests(): void {
   recentObservationTexts.length = 0
 }
-
-type SegmentEndedEvent = Extract<UiActivityEvent, { kind: 'ui.segment.ended' }>
 
 async function defaultPostObservation(
   sessionId: string,

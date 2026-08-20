@@ -113,7 +113,7 @@ export function getSlashCommandPanelSectionLabel(sectionId: SlashCommandPanelSec
   return sectionId === 'commands' ? 'Commands' : 'Runtime'
 }
 
-/** Keep product Commands above Runtime controls while preserving relative order within each section. */
+/** Keep Runtime controls above product Commands while preserving relative order within each section. */
 export function partitionSlashCommandPanelItems(
   items: ChatComposerSlashCommand[],
 ): ChatComposerSlashCommand[] {
@@ -127,7 +127,7 @@ export function partitionSlashCommandPanelItems(
       runtimeItems.push(item)
     }
   }
-  return [...commandItems, ...runtimeItems]
+  return [...runtimeItems, ...commandItems]
 }
 
 export function groupSlashCommandPanelItems(

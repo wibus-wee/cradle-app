@@ -662,7 +662,11 @@ export function openFileEvents(workspaceId: string): ReadableStream<Uint8Array> 
       unsubscribe = subscribeWorkspaceFileChanges({
         workspaceId,
         workspacePath: locator.path,
-        listener: send,
+        listener(event) {
+          if (event.type === 'directory-changed') {
+            send(event)
+          }
+        },
       })
       keepAlive = setInterval(() => {
         try {

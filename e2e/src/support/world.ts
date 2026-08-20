@@ -1,28 +1,49 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { chmodSync, mkdtempSync, rmSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
+import type { SimulatorExchange, SimulatorScenario } from '@cradle/model-api-simulator'
 import type { IWorldOptions } from '@cucumber/cucumber'
 import { setWorldConstructor, World } from '@cucumber/cucumber'
 import type { Browser, BrowserContext, Page } from '@playwright/test'
 import { chromium, expect } from '@playwright/test'
 
-import type { MockLlmFailureMode, MockToolCall } from './mock-llm-server'
-import { MockLlmServer } from './mock-llm-server'
-import { getManagedServerUrl, getManagedWebUrl } from './server-lifecycle'
-import type { ScenarioArtifactPaths } from './world-utils'
+import type { E2ESimulator } from './model-api-simulator'
+import { startE2ESimulator } from './model-api-simulator'
+import { dismissTransientOverlays } from './overlays'
+import { AwaitPage } from './pages/await'
+import { ApprovalPage, ChatPage, NewChatPage } from './pages/chat'
+import { DiffPage } from './pages/diff'
+import { FirstRunPage } from './pages/first-run'
+import { GitPage } from './pages/git'
+import { KanbanPage } from './pages/kanban'
+import { SearchPage } from './pages/search'
+import { SettingsPage } from './pages/settings'
+import { TerminalPage } from './pages/terminal'
+import { UsagePage } from './pages/usage'
+import { WorkPage } from './pages/work'
+import { WorkspacePage } from './pages/workspace'
 import {
-  buildScenarioArtifactPaths,
-} from './world-utils'
-
-// ── World parameters (from cucumber.mjs worldParameters) ─────────────────────
+  configureClaudeAgentSimulatorProvider,
+  configureCodexSimulatorProvider,
+  configureStandardSimulatorProvider,
+  E2E_CLAUDE_AGENT_NAME,
+  E2E_CODEX_AGENT_NAME,
+  E2E_OPENAI_AGENT_NAME,
+} from './providers'
+import { anthropicApprovalExchanges, anthropicScenario, anthropicTextExchange } from './scenarios/anthropic'
+import {
+  openAiHttpErrorExchange,
+  openAiScenario,
+  openAiTextExchange,
+} from './scenarios/openai'
+import { getManagedDataDir, getManagedServerUrl, getManagedWebUrl } from './server-lifecycle'
+import type { ScenarioArtifactPaths } from './world-utils'
+import { buildScenarioArtifactPaths } from './world-utils'
 
 interface WorldParameters {
   webUrl: string
   serverUrl: string
 }
-
-// ── Custom world ──────────────────────────────────────────────────────────────
 
 export class CradleWorld extends World {
   private static scenarioCounter = 0
@@ -35,9 +56,11 @@ export class CradleWorld extends World {
   scenarioArtifacts: ScenarioArtifactPaths | null = null
   scenarioName = ''
   consoleMessages: string[] = []
-  mockLlmServer: MockLlmServer | null = null
-  mockLlmBaseUrl = ''
+  simulator: E2ESimulator | null = null
+  /** Scenarios tagged @first-run start with no onboarding/setup persistence. */
+  firstRunMode = false
   private readonly scenarioState = new Map<string, unknown>()
+  private readonly tempWorkspaceDirs = new Set<string>()
 
   constructor(options: IWorldOptions) {
     super(options)
@@ -54,15 +77,76 @@ export class CradleWorld extends World {
     }
   }
 
+  get newChat(): NewChatPage {
+    return new NewChatPage(this.page)
+  }
+
+  get chat(): ChatPage {
+    return new ChatPage(this.page)
+  }
+
+  get approval(): ApprovalPage {
+    return new ApprovalPage(this.page)
+  }
+
+  get awaitPage(): AwaitPage {
+    return new AwaitPage(this)
+  }
+
+  get diffPage(): DiffPage {
+    return new DiffPage(this.page)
+  }
+
+  get search(): SearchPage {
+    return new SearchPage(this.page)
+  }
+
+  get settingsPage(): SettingsPage {
+    return new SettingsPage(this.page)
+  }
+
+  get gitPage(): GitPage {
+    return new GitPage(this.page)
+  }
+
+  get firstRunPage(): FirstRunPage {
+    return new FirstRunPage(this.page)
+  }
+
+  get terminalPage(): TerminalPage {
+    return new TerminalPage(this.page)
+  }
+
+  get usagePage(): UsagePage {
+    return new UsagePage(this.page)
+  }
+
+  get workPage(): WorkPage {
+    return new WorkPage(this)
+  }
+
+  get workspacePage(): WorkspacePage {
+    return new WorkspacePage(this)
+  }
+
+  get kanbanPage(): KanbanPage {
+    return new KanbanPage(this)
+  }
+
   static nextScenarioIndex(): number {
     CradleWorld.scenarioCounter += 1
     return CradleWorld.scenarioCounter
   }
 
-  prepareScenario(name: string, artifactsRoot = join(process.cwd(), 'e2e', 'artifacts')): void {
+  prepareScenario(
+    name: string,
+    tags: readonly string[] = [],
+    artifactsRoot = join(process.cwd(), 'e2e', 'artifacts'),
+  ): void {
     this.scenarioName = name
     this.consoleMessages = []
     this.scenarioState.clear()
+    this.firstRunMode = tags.includes('@first-run')
     this.scenarioArtifacts = buildScenarioArtifactPaths(
       artifactsRoot,
       name,
@@ -86,104 +170,172 @@ export class CradleWorld extends World {
   }
 
   createTempWorkspaceDir(prefix = 'cradle-e2e-ws-'): string {
-    return mkdtempSync(join(tmpdir(), prefix))
+    // Directory Browser rejects arbitrary OS temp paths by design. A sibling
+    // of the checkout is both allowed by the real browser and outside its git tree.
+    const fixtureRoot = getManagedDataDir()
+      ? join(getManagedDataDir()!, 'home')
+      : dirname(process.cwd())
+    const workspaceDir = mkdtempSync(join(fixtureRoot, prefix))
+    chmodSync(workspaceDir, 0o777)
+    this.tempWorkspaceDirs.add(workspaceDir)
+    return workspaceDir
   }
 
-  /**
-   * Selects a directory via the DirectoryBrowserDialog UI.
-   * Call this AFTER clicking the button that opens the dialog.
-   * Double-clicks the breadcrumb to enter edit mode, types the path, presses Enter, then clicks confirm.
-   */
   async selectDirectoryInBrowser(dirPath: string): Promise<void> {
     const dialog = this.page.locator('[data-testid="directory-browser-dialog"]')
-    await expect(dialog).toBeVisible({ timeout: 10_000 })
-
-    // Double-click the breadcrumb bar to enter edit mode
+    await expect(dialog).toBeVisible({ timeout: 20_000 })
     const breadcrumbBar = dialog.locator('[data-testid="directory-browser-breadcrumb"]')
     await breadcrumbBar.dblclick()
-
-    // Fill the path input that appears
     const pathInput = dialog.locator('[data-testid="directory-browser-path-input"]')
     await expect(pathInput).toBeVisible({ timeout: 5_000 })
     await pathInput.fill(dirPath)
     await pathInput.press('Enter')
-
-    // Wait for the confirm button to become enabled (loading done)
-    await expect(dialog.locator('[data-testid="directory-browser-confirm"]')).toBeEnabled({ timeout: 10_000 })
-
-    await dialog.locator('[data-testid="directory-browser-confirm"]').click()
-    await expect(dialog).toBeHidden({ timeout: 5_000 })
+    // Wait until the browser has navigated to the target folder (last segment visible).
+    const leaf = dirPath.split('/').filter(Boolean).at(-1) ?? dirPath
+    await expect(dialog.locator('[data-testid="directory-browser-breadcrumb"]')).toContainText(leaf, { timeout: 10_000 })
+    const confirm = dialog.locator('[data-testid="directory-browser-confirm"]')
+    await expect(confirm).toBeEnabled({ timeout: 10_000 })
+    await confirm.click()
+    await expect(dialog).toBeHidden({ timeout: 10_000 })
   }
 
   pushConsoleMessage(message: string): void {
     this.consoleMessages.push(message)
   }
 
-  async configureMockLlmProvider(options: {
-    responseText?: string
-    responseTexts?: string[]
+  async ensureSimulator(): Promise<E2ESimulator> {
+    if (!this.simulator) {
+      this.simulator = await startE2ESimulator()
+    }
+    return this.simulator
+  }
+
+  enqueue(scenario: SimulatorScenario): void {
+    if (!this.simulator) {
+      throw new Error('Simulator is not started')
+    }
+    this.simulator.enqueue(scenario)
+  }
+
+  enqueueOpenAi(...exchanges: SimulatorExchange[]): void {
+    this.enqueue(openAiScenario(exchanges))
+  }
+
+  enqueueAnthropic(...exchanges: SimulatorExchange[]): void {
+    this.enqueue(anthropicScenario(exchanges))
+  }
+
+  async configureStandardChat(options: {
+    texts?: string[]
     reasoningText?: string
-    toolCalls?: MockToolCall[]
-    chunkDelay?: number
-    failureMode?: MockLlmFailureMode
-    errorStatusCode?: number
-    errorMessage?: string
+    gateAfterCreated?: string
+    chunkDelayYields?: number
+    failureMessage?: string
   } = {}): Promise<void> {
-    if (this.mockLlmServer) {
-      await this.mockLlmServer.stop()
+    const simulator = await this.ensureSimulator()
+    simulator.reset()
+
+    if (options.failureMessage) {
+      this.enqueueOpenAi(openAiHttpErrorExchange({
+        label: 'forced-failure',
+        message: options.failureMessage,
+      }))
+    }
+    else {
+      const texts = options.texts?.length ? options.texts : ['Hello from E2E simulator!']
+      this.enqueueOpenAi(...texts.map((text, index) => openAiTextExchange({
+        label: `turn-${index + 1}`,
+        text,
+        reasoningText: index === 0 ? options.reasoningText : undefined,
+        gateAfterCreated: index === 0 ? options.gateAfterCreated : undefined,
+        chunkDelayYields: options.chunkDelayYields,
+      })))
     }
 
-    this.mockLlmServer = new MockLlmServer(options)
-    this.mockLlmBaseUrl = await this.mockLlmServer.start()
-
-    const response = await fetch(`${this.params.serverUrl}/profiles/mock-llm-profile`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: 'Mock LLM',
-        providerKind: 'openai-compatible',
-        enabled: true,
-        config: {
-          baseUrl: this.mockLlmBaseUrl,
-          model: 'mock-model',
-          apiMode: 'responses',
-          apiKey: 'sk-mock-test-key',
-        },
-        credentialRef: null,
-      }),
+    await configureStandardSimulatorProvider({
+      serverUrl: this.params.serverUrl,
+      openaiBaseUrl: simulator.openaiBaseUrl,
+      createTempDir: () => this.createTempWorkspaceDir(),
     })
-    if (!response.ok) {
-      throw new Error(`Failed to configure mock LLM provider: ${response.status} ${await response.text()}`)
-    }
-
-    const agentsResponse = await fetch(`${this.params.serverUrl}/agents`)
-    if (!agentsResponse.ok) {
-      throw new Error(`Failed to list agents for mock LLM provider: ${agentsResponse.status} ${await agentsResponse.text()}`)
-    }
-    const agents = await agentsResponse.json() as Array<{ name?: unknown, providerTargetId?: unknown }>
-    const hasMockAgent = agents.some(agent => agent.name === 'Mock LLM' && agent.providerTargetId === 'mock-llm-profile')
-    if (!hasMockAgent) {
-      const agentResponse = await fetch(`${this.params.serverUrl}/agents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Mock LLM',
-          avatarStyle: 'dicebear',
-          avatarSeed: 'Mock LLM',
-          providerTargetId: 'mock-llm-profile',
-          modelId: 'mock-model',
-          runtimeKind: 'standard',
-        }),
-      })
-      if (!agentResponse.ok) {
-        throw new Error(`Failed to create mock LLM agent: ${agentResponse.status} ${await agentResponse.text()}`)
-      }
-    }
-
-    // Ensure at least one workspace exists so the send button becomes enabled
-    await this.ensureWorkspaceExists()
-
+    this.remember('chat.preferred-runtime', 'standard' as const)
+    this.remember('chat.preferred-provider', E2E_OPENAI_AGENT_NAME)
     await this.page?.reload({ waitUntil: 'domcontentloaded' })
+  }
+
+  async configureClaudeAgentChat(options: {
+    mode?: 'approval' | 'text'
+    text?: string
+    planText?: string
+    completionText?: string
+  } = {}): Promise<void> {
+    const simulator = await this.ensureSimulator()
+    simulator.reset()
+
+    if (options.mode === 'approval') {
+      this.enqueueAnthropic(...anthropicApprovalExchanges({
+        planText: options.planText,
+        completionText: options.completionText,
+      }))
+    }
+    else {
+      this.enqueueAnthropic(anthropicTextExchange({
+        label: 'claude-text',
+        text: options.text ?? 'Hello from Claude Agent E2E simulator!',
+      }))
+    }
+
+    await configureClaudeAgentSimulatorProvider({
+      serverUrl: this.params.serverUrl,
+      anthropicBaseUrl: simulator.anthropicBaseUrl,
+      createTempDir: () => this.createTempWorkspaceDir(),
+      permissionMode: options.mode === 'approval' ? 'default' : 'bypassPermissions',
+    })
+    this.remember('chat.preferred-runtime', 'claude-agent' as const)
+    this.remember('chat.preferred-provider', E2E_CLAUDE_AGENT_NAME)
+    this.remember('chat.claude-permission-mode', options.mode === 'approval' ? 'default' : 'acceptEdits')
+    await this.page?.reload({ waitUntil: 'domcontentloaded' })
+  }
+
+  /**
+   * Real Codex app-server whose upstream OpenAI Responses wire hits the simulator.
+   */
+  async configureCodexChat(options: {
+    texts?: string[]
+    failureMessage?: string
+  } = {}): Promise<void> {
+    const simulator = await this.ensureSimulator()
+    simulator.reset()
+
+    if (options.failureMessage) {
+      this.enqueueOpenAi(openAiHttpErrorExchange({
+        label: 'codex-forced-failure',
+        message: options.failureMessage,
+      }))
+    }
+    else {
+      const texts = options.texts?.length ? options.texts : ['Hello from Codex E2E simulator!']
+      this.enqueueOpenAi(...texts.map((text, index) => openAiTextExchange({
+        label: `codex-turn-${index + 1}`,
+        text,
+      })))
+    }
+
+    await configureCodexSimulatorProvider({
+      serverUrl: this.params.serverUrl,
+      openaiBaseUrl: simulator.openaiBaseUrl,
+      createTempDir: () => this.createTempWorkspaceDir(),
+    })
+    this.remember('chat.preferred-runtime', 'codex' as const)
+    this.remember('chat.preferred-provider', E2E_CODEX_AGENT_NAME)
+    await this.page?.reload({ waitUntil: 'domcontentloaded' })
+  }
+
+  /** Fail the scenario if any scripted simulator exchange remains unused. */
+  assertSimulatorExhausted(): void {
+    if (!this.simulator) {
+      throw new Error('Simulator is not started')
+    }
+    this.simulator.assertExhausted()
   }
 
   async ensureWorkspaceExists(): Promise<void> {
@@ -206,41 +358,76 @@ export class CradleWorld extends World {
   }
 
   async launch(): Promise<void> {
-    // Reset server state for clean test isolation
     const resetResponse = await fetch(`${this.params.serverUrl}/test/reset`, { method: 'POST' })
     if (!resetResponse.ok) {
       throw new Error(`Failed to reset server state: ${resetResponse.status} ${await resetResponse.text()}`)
     }
 
-    // Launch browser
-    this.browser = await chromium.launch({ headless: !process.env.CRADLE_E2E_HEADED })
+    this.simulator = await startE2ESimulator()
+
+    const browserExecutable = process.env.CRADLE_E2E_BROWSER_PATH?.trim()
+    this.browser = await chromium.launch({
+      headless: !process.env.CRADLE_E2E_HEADED,
+      ...(browserExecutable ? { executablePath: browserExecutable } : {}),
+    })
+    const videoDir = this.scenarioArtifacts?.scenarioDir
     this.context = await this.browser.newContext({
       permissions: ['clipboard-read', 'clipboard-write'],
+      ...(videoDir
+        ? {
+            recordVideo: {
+              dir: videoDir,
+              size: { width: 1280, height: 720 },
+            },
+          }
+        : {}),
+      viewport: { width: 1280, height: 720 },
     })
-    await this.context.addInitScript(() => {
-      window.localStorage.setItem('cradle:onboarding:v1', JSON.stringify({
-        state: { completed: true, step: 4 },
+    await this.context.addInitScript(({ firstRunMode }) => {
+      if (!firstRunMode) {
+        window.localStorage.setItem('cradle:onboarding:v1', JSON.stringify({
+          state: { completed: true, step: 4 },
+          version: 1,
+        }))
+        // Most scenarios intentionally start after setup; @first-run owns the clean-install path.
+        window.localStorage.setItem('cradle:first-run-setup:v2', JSON.stringify({
+          state: { completedSteps: { provider: true, github: true } },
+          version: 2,
+        }))
+      }
+      // Suppress What's New corner popup noise (dev mock versions + tips).
+      window.localStorage.setItem('cradle:whats-new:v1', JSON.stringify({
+        state: {
+          dismissedAnnouncements: [
+            'dev-mock-20260723.1',
+            'dev-mock-20260710.1',
+          ],
+          dismissedTips: [
+            'dev-mock-tip-split-workspace',
+            'dev-mock-tip-external-link',
+          ],
+        },
         version: 1,
       }))
-    })
+    }, { firstRunMode: this.firstRunMode })
     this.page = await this.context.newPage()
     await this.page.goto(this.params.webUrl)
     await this.page.waitForLoadState('domcontentloaded')
+    await dismissTransientOverlays(this.page)
   }
 
   async close(): Promise<void> {
-    if (this.mockLlmServer) {
-      await this.mockLlmServer.stop()
-      this.mockLlmServer = null
-      this.mockLlmBaseUrl = ''
+    if (this.simulator) {
+      await this.simulator.close()
+      this.simulator = null
     }
     await this.context?.close()
     await this.browser?.close()
+    for (const workspaceDir of this.tempWorkspaceDirs) {
+      rmSync(workspaceDir, { recursive: true, force: true })
+    }
+    this.tempWorkspaceDirs.clear()
   }
-
-  /**
-   * @deprecated mainProcess() is not available in web mode. Use page.evaluate() or server API instead.
-   */
 
   async mainProcess<T = unknown>(_fn: unknown, _arg?: unknown): Promise<T> {
     throw new Error('mainProcess() is not available in web mode. Use page.evaluate() or server API instead.')

@@ -6,7 +6,6 @@ export interface BrowserAnnotationToolbarButtonInput {
   active?: boolean
   danger?: boolean
   disabled?: boolean
-  badge?: number
   onClick: () => void
 }
 
@@ -19,25 +18,15 @@ export type BrowserAnnotationToolbarIcon
     | 'layout'
     | 'pause'
     | 'play'
-    | 'sparkle'
     | 'trash'
 
 export interface BrowserAnnotationToolbarInput {
   buttons: BrowserAnnotationToolbarButtonInput[]
-  count: number
-  expanded: boolean
   entrance: boolean
   tooltipBelow: boolean
   position: { x: number, y: number } | null
-  onCollapsedClick: () => void
   onPointerDown: (event: PointerEvent, toolbar: HTMLDivElement) => void
 }
-
-const TOOLBAR_BUTTON_SIZE = 34
-const TOOLBAR_BUTTON_GAP = 6
-const TOOLBAR_HORIZONTAL_PADDING = 12
-const TOOLBAR_DIVIDER_WIDTH = 1
-const TOOLBAR_EXPANDED_MIN_WIDTH = 297
 
 export const BROWSER_ANNOTATION_TOOLBAR_CSS = `
   #cradle-browser-comment-root [data-cradle-browser-comment-toolbar] svg[fill="none"] {
@@ -69,8 +58,8 @@ export const BROWSER_ANNOTATION_TOOLBAR_CSS = `
     bottom: 1.25rem;
     left: auto;
     top: auto;
-    z-index: 10;
-    width: var(--cradle-browser-comment-toolbar-width, 297px);
+    z-index: 70;
+    width: max-content;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     pointer-events: none;
     transition: left 0s, top 0s, right 0s, bottom 0s;
@@ -80,105 +69,29 @@ export const BROWSER_ANNOTATION_TOOLBAR_CSS = `
     display: flex;
     align-items: center;
     justify-content: center;
+    height: 44px;
+    gap: 0.375rem;
     margin-left: auto;
+    border-radius: 1.5rem;
+    padding: 0.375rem;
     color: #fff;
     background: #1a1a1a;
     border: 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.1);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.08),
+      0 2px 8px rgba(0, 0, 0, 0.2),
+      0 8px 24px rgba(0, 0, 0, 0.12);
     pointer-events: auto;
     user-select: none;
-    transition:
-      width 0.4s cubic-bezier(0.19, 1, 0.22, 1),
-      transform 0.4s cubic-bezier(0.19, 1, 0.22, 1);
   }
   #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-container][data-entrance="true"] {
-    animation: cradle-browser-comment-toolbar-enter 0.5s cubic-bezier(0.34, 1.2, 0.64, 1) forwards;
+    animation: cradle-browser-comment-toolbar-enter 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-container][data-expanded="false"] {
-    width: 44px;
-    height: 44px;
-    border-radius: 22px;
-    padding: 0;
-    cursor: pointer;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-container][data-expanded="false"] svg {
-    margin-top: -1px;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-container][data-expanded="false"]:hover {
-    background: #2a2a2a;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-container][data-expanded="false"]:active {
-    transform: scale(0.95);
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-container][data-expanded="true"] {
-    width: var(--cradle-browser-comment-toolbar-width, 297px);
-    height: 44px;
-    border-radius: 1.5rem;
-    padding: 0.375rem;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-toggle],
   #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-controls] {
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-toggle] {
-    position: absolute;
-    transition: opacity 0.1s cubic-bezier(0.19, 1, 0.22, 1);
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-toggle][data-visible="false"] {
-    opacity: 0;
-    pointer-events: none;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-toggle][data-visible="true"] {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-controls] {
     gap: 0.375rem;
-    transition:
-      filter 0.8s cubic-bezier(0.19, 1, 0.22, 1),
-      opacity 0.8s cubic-bezier(0.19, 1, 0.22, 1),
-      transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-controls][data-visible="true"] {
-    opacity: 1;
-    filter: blur(0);
-    transform: scale(1);
-    visibility: visible;
-    pointer-events: auto;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-controls][data-visible="false"] {
-    opacity: 0;
-    filter: blur(10px);
-    transform: scale(0.4);
-    pointer-events: none;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-badge] {
-    position: absolute;
-    top: -13px;
-    right: -13px;
-    min-width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 9px;
-    padding: 0 5px;
-    color: #fff;
-    background: var(--cradle-browser-comment-accent);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
-    font: 600 0.625rem/18px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    user-select: none;
-    opacity: 1;
-    transform: scale(1);
-    transition: transform 0.3s ease, opacity 0.2s ease;
-  }
-  #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-badge][data-fade-out="true"] {
-    opacity: 0;
-    transform: scale(0);
-    pointer-events: none;
   }
   #cradle-browser-comment-root [data-cradle-browser-comment-toolbar-button-wrapper] {
     position: relative;
@@ -224,29 +137,11 @@ export const BROWSER_ANNOTATION_TOOLBAR_CSS = `
     color: var(--cradle-browser-comment-red);
     background: color-mix(in srgb, var(--cradle-browser-comment-red) 25%, transparent);
   }
-  #cradle-browser-comment-root [data-cradle-browser-comment-button-badge] {
-    position: absolute;
-    top: 0;
-    right: 0;
-    min-width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    padding: 0 4px;
-    color: #fff;
-    background: var(--cradle-browser-comment-accent);
-    box-shadow: 0 0 0 2px #1a1a1a, 0 1px 3px rgba(0, 0, 0, 0.2);
-    font-size: 0.625rem;
-    font-weight: 600;
-    pointer-events: none;
-  }
   #cradle-browser-comment-root [data-cradle-browser-comment-button-tooltip] {
     position: absolute;
     bottom: calc(100% + 14px);
     left: 50%;
-    z-index: 100001;
+    z-index: 100;
     padding: 6px 10px;
     border-radius: 8px;
     color: rgba(255, 255, 255, 0.9);
@@ -305,7 +200,6 @@ export const BROWSER_ANNOTATION_TOOLBAR_CSS = `
 `
 
 const ICONS: Record<BrowserAnnotationToolbarIcon, string> = {
-  sparkle: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M11.5 12L5.5 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.5 6.75L5.5 6.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.25 17.25L5.5 17.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 12.75L16.5179 13.9677C16.8078 14.6494 17.3506 15.1922 18.0323 15.4821L19.25 16L18.0323 16.5179C17.3506 16.8078 16.8078 17.3506 16.5179 18.0323L16 19.25L15.4821 18.0323C15.1922 17.3506 14.6494 16.8078 13.9677 16.5179L12.75 16L13.9677 15.4821C14.6494 15.1922 15.1922 14.6494 15.4821 13.9677L16 12.75Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
   pause: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M8 6L8 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M16 18L16 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   play: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M17.75 10.701C18.75 11.2783 18.75 12.7217 17.75 13.299L8.75 18.4952C7.75 19.0725 6.5 18.3509 6.5 17.1962L6.5 6.80384C6.5 5.64914 7.75 4.92746 8.75 5.50481L17.75 10.701Z" stroke="currentColor" stroke-width="1.5"/></svg>`,
   layout: `<svg width="21" height="21" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" stroke-width="1.5"/><line x1="9" y1="9" x2="9" y2="21" stroke="currentColor" stroke-width="1.5"/></svg>`,
@@ -320,8 +214,6 @@ const ICONS: Record<BrowserAnnotationToolbarIcon, string> = {
 export function renderBrowserAnnotationToolbar(input: BrowserAnnotationToolbarInput): HTMLDivElement {
   const toolbar = document.createElement('div')
   toolbar.setAttribute('data-cradle-browser-comment-toolbar', 'true')
-  toolbar.setAttribute('data-agentation-toolbar', 'true')
-  toolbar.style.setProperty('--cradle-browser-comment-toolbar-width', `${expandedToolbarWidth(input.buttons.length)}px`)
   if (input.position) {
     toolbar.style.left = `${input.position.x}px`
     toolbar.style.top = `${input.position.y}px`
@@ -331,35 +223,11 @@ export function renderBrowserAnnotationToolbar(input: BrowserAnnotationToolbarIn
 
   const container = document.createElement('div')
   container.setAttribute('data-cradle-browser-comment-toolbar-container', 'true')
-  container.setAttribute('data-expanded', String(input.expanded))
   container.setAttribute('data-entrance', String(input.entrance))
   container.addEventListener('pointerdown', event => input.onPointerDown(event, toolbar))
-  if (!input.expanded) {
-    container.setAttribute('role', 'button')
-    container.tabIndex = 0
-    container.title = 'Start feedback mode'
-    container.addEventListener('click', (event) => {
-      event.preventDefault()
-      event.stopPropagation()
-      input.onCollapsedClick()
-    })
-  }
-
-  const toggle = document.createElement('div')
-  toggle.setAttribute('data-cradle-browser-comment-toolbar-toggle', 'true')
-  toggle.setAttribute('data-visible', String(!input.expanded))
-  toggle.innerHTML = ICONS.sparkle
-  if (input.count > 0) {
-    const badge = document.createElement('span')
-    badge.setAttribute('data-cradle-browser-comment-toolbar-badge', 'true')
-    badge.setAttribute('data-fade-out', String(input.expanded))
-    badge.textContent = String(input.count)
-    toggle.appendChild(badge)
-  }
 
   const controls = document.createElement('div')
   controls.setAttribute('data-cradle-browser-comment-toolbar-controls', 'true')
-  controls.setAttribute('data-visible', String(input.expanded))
   controls.setAttribute('data-tooltip-below', String(input.tooltipBelow))
   input.buttons.forEach((buttonInput, index) => {
     if (index === input.buttons.length - 1) {
@@ -370,20 +238,9 @@ export function renderBrowserAnnotationToolbar(input: BrowserAnnotationToolbarIn
     controls.appendChild(createToolbarButton(buttonInput))
   })
 
-  container.append(toggle, controls)
+  container.appendChild(controls)
   toolbar.appendChild(container)
   return toolbar
-}
-
-function expandedToolbarWidth(buttonCount: number): number {
-  const dividerCount = buttonCount > 0 ? 1 : 0
-  return Math.max(
-    TOOLBAR_EXPANDED_MIN_WIDTH,
-    TOOLBAR_HORIZONTAL_PADDING
-    + buttonCount * TOOLBAR_BUTTON_SIZE
-    + Math.max(0, buttonCount - 1 + dividerCount) * TOOLBAR_BUTTON_GAP
-    + dividerCount * TOOLBAR_DIVIDER_WIDTH,
-  )
 }
 
 function createToolbarButton(input: BrowserAnnotationToolbarButtonInput): HTMLDivElement {
@@ -396,6 +253,8 @@ function createToolbarButton(input: BrowserAnnotationToolbarButtonInput): HTMLDi
   button.setAttribute('aria-label', input.label)
   button.setAttribute('data-cradle-browser-comment-toolbar-button', 'true')
   button.setAttribute('data-toolbar-button-id', input.id)
+  // Toolbar buttons must never pull focus away from the browsed page.
+  button.tabIndex = -1
   button.innerHTML = ICONS[input.icon]
   button.disabled = Boolean(input.disabled)
   if (input.active) {
@@ -411,13 +270,6 @@ function createToolbarButton(input: BrowserAnnotationToolbarButtonInput): HTMLDi
       input.onClick()
     }
   })
-
-  if (input.badge !== undefined && input.badge > 0) {
-    const badge = document.createElement('span')
-    badge.setAttribute('data-cradle-browser-comment-button-badge', 'true')
-    badge.textContent = String(input.badge)
-    button.appendChild(badge)
-  }
 
   const tooltip = document.createElement('span')
   tooltip.setAttribute('data-cradle-browser-comment-button-tooltip', 'true')

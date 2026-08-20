@@ -1,55 +1,50 @@
 import { describe, expect, it } from 'vitest'
 
-import { hasCompleteCurrentCodexNativeHistory } from './state-projector'
+import { decodeCodexDurableCheckpoint } from '../state/durable-checkpoint'
 
-function snapshot(codex: Record<string, unknown>): string {
+function legacySnapshot(turns: unknown[]): string {
   return JSON.stringify({
     workspacePath: '/tmp/workspace',
-    models: { currentModelId: null },
-    codex,
+    models: { currentModelId: 'gpt-5-codex' },
+    codex: {
+      compact: {
+        threadId: 'thread-1',
+        tokenUsage: {
+          total: { totalTokens: 10_000 },
+          last: { totalTokens: 2_500 },
+          modelContextWindow: 200_000,
+        },
+      },
+      nativeHistory: { threadId: 'thread-1', turns },
+      previousNativeHistory: { threadId: 'old-thread', turns },
+    },
   })
 }
 
-describe('hasCompleteCurrentCodexNativeHistory', () => {
-  it('accepts a complete empty current history for the resumed thread', () => {
-    expect(hasCompleteCurrentCodexNativeHistory(snapshot({
-      nativeHistory: {
-        threadId: 'thread-1',
-        itemsView: 'full',
-        fetchedAt: 1,
-        complete: true,
-        turns: [],
-        turnCount: 0,
-        itemCount: 0,
-        nextCursor: null,
-        error: null,
-      },
-    }), 'thread-1')).toBe(true)
+describe('decodeCodexDurableCheckpoint', () => {
+  it('keeps only native aggregate usage regardless of rollout size', () => {
+    const small = decodeCodexDurableCheckpoint(legacySnapshot([{ id: 'turn-1' }]))
+    const large = decodeCodexDurableCheckpoint(legacySnapshot(Array.from(
+      { length: 1_000 },
+      (_, index) => ({ id: `turn-${index}`, output: 'x'.repeat(10_000) }),
+    )))
+
+    expect(small.didNormalize).toBe(true)
+    expect(large.didNormalize).toBe(true)
+    expect(large.serialized).toBe(small.serialized)
+    expect(large.checkpoint.codex).not.toHaveProperty('nativeHistory')
+    expect(large.checkpoint.codex).not.toHaveProperty('previousNativeHistory')
+    expect(large.checkpoint.codex.contextUsage).toMatchObject({
+      last: { totalTokens: 2_500 },
+      modelContextWindow: 200_000,
+    })
   })
 
-  it('rejects stale previous, incomplete, errored, and different-thread histories', () => {
-    const complete = {
-      threadId: 'thread-1',
-      itemsView: 'full',
-      fetchedAt: 1,
-      complete: true,
-      turns: [],
-      turnCount: 0,
-      itemCount: 0,
-      nextCursor: null,
-      error: null,
-    }
-    expect(hasCompleteCurrentCodexNativeHistory(snapshot({
-      previousNativeHistory: complete,
-    }), 'thread-1')).toBe(false)
-    expect(hasCompleteCurrentCodexNativeHistory(snapshot({
-      nativeHistory: { ...complete, complete: false },
-    }), 'thread-1')).toBe(false)
-    expect(hasCompleteCurrentCodexNativeHistory(snapshot({
-      nativeHistory: { ...complete, error: 'failed to list turns' },
-    }), 'thread-1')).toBe(false)
-    expect(hasCompleteCurrentCodexNativeHistory(snapshot({
-      nativeHistory: complete,
-    }), 'thread-2')).toBe(false)
+  it('is idempotent for a normalized checkpoint', () => {
+    const first = decodeCodexDurableCheckpoint(legacySnapshot([]))
+    const second = decodeCodexDurableCheckpoint(first.serialized)
+
+    expect(second.didNormalize).toBe(false)
+    expect(second.serialized).toBe(first.serialized)
   })
 })
