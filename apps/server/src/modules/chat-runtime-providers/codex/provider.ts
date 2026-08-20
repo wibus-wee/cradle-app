@@ -552,26 +552,8 @@ export class CodexProvider implements ChatRuntime {
     }
   }
 
-  async getPresentation(input: GetCapabilitiesInput): Promise<RuntimePresentationCapabilities> {
-    if (!input.profile || !input.runtimeSession.providerSessionId) {
-      return createCodexRuntimePresentation()
-    }
-    try {
-      const context = await this.createProviderThreadClient(input)
-      try {
-        const requirementsResponse = await context.client.request(
-          'configRequirements/read',
-          {},
-        ) as CodexConfigRequirementsReadResponse
-        return createCodexRuntimePresentation(requirementsResponse.requirements ?? null)
-      }
-      finally {
-        context.hostLease.release()
-      }
-    }
-    catch {
-      return createCodexRuntimePresentation()
-    }
+  async getPresentation(_input: GetCapabilitiesInput): Promise<RuntimePresentationCapabilities> {
+    return createCodexRuntimePresentation()
   }
 
   getDraftPresentation(): RuntimePresentationCapabilities {
