@@ -71,7 +71,7 @@ import {
   submitPrompt,
 } from './protocol/rest/sdk.gen'
 import type { GetApiV1SessionsBySessionIdQuestionsResponses } from './protocol/rest/types.gen'
-import type { KimiTranscriptTurn } from './transcript-projector'
+import type { KimiTranscriptAgentMetadata, KimiTranscriptData, KimiTranscriptTurn } from './transcript-projector'
 import {
   findKimiPhaseTranscriptTurn,
   projectKimiTranscriptCrewState,
@@ -244,6 +244,11 @@ class KimiProvider implements ChatRuntime {
       ])
       const updatedAt = Date.now()
       const states: RuntimeUiSlotState[] = []
+      const subagentMetadata = await readKimiSubagentMetadata({
+        client: lease.resource.http,
+        providerSessionId,
+        transcript,
+      })
       const usageState = projectKimiOauthUsageSlotState({
         threadId: providerSessionId,
         data: oauthUsage,
@@ -346,7 +351,12 @@ lastOutputPreview: null,
         backgroundTerminals: terminals.items.filter(terminal => terminal.status === 'running').map(terminal => ({ itemId: terminal.id, processId: terminal.id, command: terminal.shell, cwd: terminal.cwd, osPid: null, cpuPercent: null, rssKb: null })),
 updatedAt,
       })
-      const crewState = projectKimiTranscriptCrewState(transcript, providerSessionId, updatedAt)
+      const crewState = projectKimiTranscriptCrewState(
+        transcript,
+        providerSessionId,
+        updatedAt,
+        subagentMetadata,
+      )
       if (crewState) {
         states.push(crewState)
       }
@@ -809,6 +819,25 @@ path: { session_id: sessionId },
         return { reason: null, turn }
     }
   }
+}
+
+async function readKimiSubagentMetadata(input: {
+  client: KimiWebHostLease['resource']['http']
+  providerSessionId: string
+  transcript: KimiTranscriptData
+}): Promise<ReadonlyMap<string, KimiTranscriptAgentMetadata>> {
+  const subagentIds = input.transcript.agents
+    .filter(agent => agent.type !== 'main')
+    .map(agent => agent.agentId)
+  const entries = await Promise.all(subagentIds.map(async (agentId) => {
+    const transcript = await input.client.request(getApiV1SessionsBySessionIdTranscript({
+      client: input.client.client,
+      path: { session_id: input.providerSessionId },
+      query: { agent_id: agentId, page_size: 1 },
+    }))
+    return [agentId, transcript.meta.agent] as const
+  }))
+  return new Map(entries)
 }
 
 interface KimiStreamItem { event: Parameters<KimiWebHostLease['resource']['events']['subscribe']>[1] extends (event: infer Event) => void ? Event : never }

@@ -1,4 +1,4 @@
-import type { SDKControlGetContextUsageResponse } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKContextUsage, SDKControlGetContextUsageResponse } from '@anthropic-ai/claude-agent-sdk'
 
 import type {
   RuntimeCompactUiSlotState,
@@ -144,6 +144,75 @@ export function projectClaudeAgentContextUsage(input: {
     sections: Array.from(sections.values()),
     messageBreakdown: messageBreakdown ? { ...messageBreakdown } : null,
     apiUsage: input.response.apiUsage ? { ...input.response.apiUsage } : null,
+    raw: input.response,
+    updatedAt: input.updatedAt,
+  }
+}
+
+export function projectClaudeAgentAssistantContextUsage(input: {
+  providerSessionId: string | null
+  response: SDKContextUsage
+  updatedAt: number
+}): RuntimeContextUsage {
+  const sections = new Map<string, RuntimeContextUsageSection>()
+
+  for (const category of input.response.categories) {
+    upsertContextUsageSection(sections, {
+      kind: readContextUsageKind(category.name),
+      label: category.name,
+      tokenCount: readTokenCount(category.tokens),
+      color: null,
+      isDeferred: category.kind === 'deferred',
+      items: [],
+      raw: category,
+    })
+  }
+
+  appendItem(sections, 'memory-files', 'Memory files', input.response.memory_files, file => ({
+    kind: 'memory-file',
+    label: file.path,
+    tokenCount: readTokenCount(file.tokens),
+    metadata: { path: file.path, type: file.type },
+    raw: file,
+  }))
+  appendItem(sections, 'mcp-tools', 'MCP tools', input.response.mcp_tools, tool => ({
+    kind: 'mcp-tool',
+    label: tool.server_name ? `${tool.server_name}.${tool.name}` : tool.name,
+    tokenCount: readTokenCount(tool.tokens),
+    metadata: { name: tool.name, serverName: tool.server_name },
+    raw: tool,
+  }))
+  appendItem(sections, 'agents', 'Agents', input.response.agents, agent => ({
+    kind: 'agent',
+    label: agent.agent_type,
+    tokenCount: readTokenCount(agent.tokens),
+    metadata: { agentType: agent.agent_type, source: agent.source },
+    raw: agent,
+  }))
+  appendItem(sections, 'skills', 'Skills', input.response.skills ?? [], skill => ({
+    kind: 'skill',
+    label: skill.name,
+    tokenCount: readTokenCount(skill.tokens),
+    metadata: {
+      name: skill.name,
+      source: skill.source,
+      pluginName: skill.plugin_name ?? null,
+    },
+    raw: skill,
+  }))
+
+  return {
+    runtimeKind: CLAUDE_AGENT_RUNTIME_KIND,
+    providerSessionId: input.providerSessionId,
+    source: 'claude-agent-sdk.assistant.context_usage',
+    model: input.response.model,
+    totalTokens: readTokenCount(input.response.total_tokens),
+    maxTokens: readNullableTokenCount(input.response.raw_max_tokens),
+    rawMaxTokens: readNullableTokenCount(input.response.raw_max_tokens),
+    percentage: readNullableNumber(input.response.percentage),
+    sections: Array.from(sections.values()),
+    messageBreakdown: null,
+    apiUsage: null,
     raw: input.response,
     updatedAt: input.updatedAt,
   }

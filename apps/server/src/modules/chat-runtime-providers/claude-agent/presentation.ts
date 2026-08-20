@@ -1,4 +1,4 @@
-import type { Query } from '@anthropic-ai/claude-agent-sdk'
+import type { Query, SDKContextUsage } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 
 import type {
@@ -13,6 +13,7 @@ import type {
 } from '../../chat-runtime/runtime-provider-types'
 import { emptyClaudeAgentInput } from './async-input-stream'
 import {
+  projectClaudeAgentAssistantContextUsage,
   projectClaudeAgentCompactState,
   projectClaudeAgentContextUsage,
 } from './context-usage-projector'
@@ -101,6 +102,19 @@ export class ClaudeAgentPresentation {
     })
   }
 
+  captureAssistantContextUsage(
+    runtimeSession: RuntimeSession,
+    providerSessionId: string,
+    response: SDKContextUsage,
+  ): void {
+    const usage = projectClaudeAgentAssistantContextUsage({
+      providerSessionId,
+      response,
+      updatedAt: Math.floor(Date.now() / 1000),
+    })
+    this.cacheContextUsage(runtimeSession, usage)
+  }
+
   private readLiveRuntimeSession(runtimeSession: RuntimeSession): RuntimeSession {
     return this.context.activeQueries.get(runtimeSession.chatSessionId)?.runtimeSession
       ?? runtimeSession
@@ -135,10 +149,15 @@ export class ClaudeAgentPresentation {
       response,
       updatedAt,
     })
+    this.cacheContextUsage(input.runtimeSession, usage)
+    return usage
+  }
+
+  private cacheContextUsage(runtimeSession: RuntimeSession, usage: RuntimeContextUsage): void {
+    const sessionId = runtimeSession.chatSessionId
     this.lastContextUsageBySession.set(sessionId, usage)
     this.lastContextUsageSampledAtBySession.set(sessionId, Date.now())
-    this.compactStates.set(sessionId, this.projectCompactState(input.runtimeSession, usage))
-    return usage
+    this.compactStates.set(sessionId, this.projectCompactState(runtimeSession, usage))
   }
 
   private readFreshCompactState(sessionId: string): RuntimeCompactUiSlotState | null {

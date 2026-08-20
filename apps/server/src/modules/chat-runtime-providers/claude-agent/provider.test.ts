@@ -5873,6 +5873,73 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
     await pendingNext
   })
 
+  it('refreshes cached context usage cards from assistant context_usage', async () => {
+    const activeQuery = createControllableQuery()
+    sdkMocks.query.mockReturnValue(activeQuery)
+
+    const provider = new ClaudeAgentProvider({
+      readSecret: () => 'sk-ant-test',
+    })
+    const runtimeSession = createResumedRuntimeSession({
+      providerSessionId: 'claude-session-assistant-context',
+    })
+    const stream = provider.streamTurn({
+      runId: 'run-claude-agent-assistant-context',
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Inspect assistant context usage'),
+      workspaceId: 'workspace-1',
+    })
+    const pendingNext = stream.next()
+
+    await vi.waitFor(() => {
+      expect(sdkMocks.query).toHaveBeenCalledOnce()
+    })
+
+    activeQuery.push({
+      type: 'assistant',
+      session_id: 'claude-session-assistant-context',
+      message: {
+        content: [{ type: 'text', text: 'Context is current.' }],
+      },
+      context_usage: {
+        model: 'claude-opus-4-6',
+        total_tokens: 160_000,
+        raw_max_tokens: 200_000,
+        percentage: 80,
+        categories: [
+          { name: 'Messages', tokens: 150_000, kind: 'used' },
+          { name: 'Deferred tools', tokens: 10_000, kind: 'deferred' },
+        ],
+        mcp_tools: [{ name: 'search', server_name: 'browser', tokens: 500 }],
+        memory_files: [{ path: '/tmp/CLAUDE.md', type: 'project', tokens: 1_000 }],
+        agents: [{ agent_type: 'reviewer', source: 'project', tokens: 750 }],
+        skills: [{ name: 'review', source: 'project', plugin_name: 'quality', tokens: 250 }],
+      },
+    })
+
+    await pendingNext
+    const slotStates = await provider.getUiSlotStates({
+      runtimeSession,
+      profile: createProfile(),
+      workspacePath: '/tmp/cradle-workspace',
+    })
+
+    expect(activeQuery.getContextUsage).not.toHaveBeenCalled()
+    expect(slotStates).toEqual([
+      expect.objectContaining({
+        kind: 'compact',
+        status: 'nearLimit',
+        total: expect.objectContaining({ totalTokens: 160_000 }),
+        modelContextWindow: 200_000,
+        usagePercent: 80,
+      }),
+    ])
+
+    activeQuery.close()
+    await stream.return(undefined)
+  })
+
   it('reuses cached compact slot state when Claude Agent context usage refresh fails', async () => {
     vi.useFakeTimers()
     const provider = new ClaudeAgentProvider({

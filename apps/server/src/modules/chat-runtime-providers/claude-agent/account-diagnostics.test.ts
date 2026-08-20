@@ -231,6 +231,7 @@ describe('claude agent auth diagnostics', () => {
         organization: 'Cradle',
         subscriptionType: 'pro',
         tokenSource: 'claudeAi',
+        apiKeySource: '/login managed key',
         apiProvider: 'firstParty',
       }))
       const diagnostics = await readClaudeAgentAuthDiagnostics({
@@ -256,7 +257,8 @@ describe('claude agent auth diagnostics', () => {
           organization: 'Cradle',
           subscriptionType: 'pro',
           tokenSource: 'claudeAi',
-          apiKeySource: null,
+          apiKeySource: '/login managed key',
+          apiKeySourceLabel: 'Claude /login managed key',
           apiProvider: 'firstParty',
         },
       } satisfies Partial<ClaudeAgentAuthDiagnostics>)

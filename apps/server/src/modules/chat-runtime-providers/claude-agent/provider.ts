@@ -154,6 +154,8 @@ export class ClaudeAgentProvider implements ChatRuntime {
       liveSettings: this.liveSettings,
       providerThreadTurns: this.providerThreadTurns,
       sessionArtifacts: this.sessionArtifacts,
+      captureContextUsage: (runtimeSession, providerSessionId, response) =>
+        this.presentation.captureAssistantContextUsage(runtimeSession, providerSessionId, response),
       finalizeClaudeUserTurn: (entry, turn, terminalChunk) =>
         this.finalizeClaudeUserTurn(entry, turn, terminalChunk),
     })

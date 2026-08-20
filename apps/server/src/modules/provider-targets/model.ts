@@ -239,6 +239,7 @@ export const ProviderTargetsModel = {
         subscriptionType: nullableString,
         tokenSource: nullableString,
         apiKeySource: nullableString,
+        apiKeySourceLabel: nullableString,
         apiProvider: nullableString,
       }, { additionalProperties: false }),
       t.Null(),

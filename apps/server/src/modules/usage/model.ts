@@ -96,6 +96,38 @@ export const UsageModel = {
       totalTokens: t.Number(),
       turnCount: t.Number(),
     })),
+    providerBillingCheck: t.Nullable(t.Object({
+      source: t.Literal('codex.account.usage.thread'),
+      status: t.Union([
+        t.Literal('available'),
+        t.Literal('unavailable'),
+        t.Literal('error'),
+      ]),
+      reason: t.Nullable(t.String()),
+      threadId: t.String(),
+      reconciliationStatus: t.Union([
+        t.Literal('pending'),
+        t.Literal('completed'),
+        t.Literal('blocked'),
+        t.Literal('unavailable'),
+      ]),
+      estimatedUsageCreditsMicros: t.Nullable(t.String()),
+      estimatedUsageUsdMicros: t.Nullable(t.String()),
+      providerTotalTokens: t.Nullable(t.String()),
+      ledgerTotalTokens: t.Number(),
+      tokenDelta: t.Nullable(t.String()),
+      groups: t.Array(t.Object({
+        model: t.Nullable(t.String()),
+        reasoningEffort: t.Nullable(t.String()),
+        speed: t.Nullable(t.String()),
+        estimatedUsageCreditsMicros: t.String(),
+        netNewInputTokens: t.Nullable(t.String()),
+        cachedInputTokens: t.Nullable(t.String()),
+        inputTokens: t.Nullable(t.String()),
+        outputTokens: t.Nullable(t.String()),
+        totalTokens: t.Nullable(t.String()),
+      })),
+    })),
   }),
 
   recentSession: t.Object({

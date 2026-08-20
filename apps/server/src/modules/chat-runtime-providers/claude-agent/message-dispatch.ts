@@ -1,7 +1,8 @@
-import type { SDKCommandsChangedMessage, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { SDKCommandsChangedMessage, SDKContextUsage, SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { UIMessageChunk } from 'ai'
 
 import { liveRuntimeSessionRegistry } from '../../chat-runtime/runtime-live-session-registry'
+import type { RuntimeSession } from '../../chat-runtime/runtime-provider-types'
 import {
   getDefaultRuntimeSettings,
   mergeRuntimeSettings,
@@ -37,6 +38,11 @@ export interface ClaudeAgentMessageDispatchContext {
   liveSettings: ClaudeAgentLiveSettings
   providerThreadTurns: ClaudeAgentProviderThreadTurns
   sessionArtifacts: ClaudeAgentSessionArtifacts
+  captureContextUsage: (
+    runtimeSession: RuntimeSession,
+    providerSessionId: string,
+    response: SDKContextUsage,
+  ) => void
   finalizeClaudeUserTurn: (
     entry: ActiveClaudeQuery,
     turn: ActiveClaudeTurn,
@@ -105,6 +111,9 @@ export class ClaudeAgentMessageDispatch {
     }
 
     this.sessionArtifacts.projectClaudeAgentRuntimeState(entry.runtimeSession, message)
+    if (message.type === 'assistant' && message.context_usage) {
+      this.context.captureContextUsage(entry.runtimeSession, message.session_id, message.context_usage)
+    }
 
     if (turn) {
       const providerThreadId = readClaudeActiveProviderThreadId(message)
