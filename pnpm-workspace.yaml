@@ -12,6 +12,11 @@ packageExtensions:
   tiptap-markdown:
     peerDependencies:
       '@tiptap/pm': '*'
+  # electron-vite resolves Electron from its own realpath. Link the app's
+  # Electron runtime into the virtual package so this works with GVS enabled.
+  electron-vite:
+    dependencies:
+      electron: 42.4.1
 allowBuilds:
   '@google/genai': true
   '@swc/core': true

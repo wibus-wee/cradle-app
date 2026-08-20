@@ -1,58 +1,87 @@
-// Loads usage series from every online Fabric node via the upstream proxy and
-// merges them with this device's local series into a FleetUsage model.
+// Loads the full usage surface from every online Fabric node via the upstream
+// proxy and merges it with this device's local data into a FleetUsage model.
 // Remote nodes expose the same Usage API (same server), so the generated
-// response types are reused directly.
+// response types are reused directly. Range-scoped endpoints (summary / cost
+// summary / tools / performance) take the same `from` as the local queries so
+// fleet rows line up; dense series use a fixed 365-day window and are sliced
+// client-side like the local ones.
 import { useQueries } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type {
   GetUsageCostDailyResponse,
+  GetUsageCostEfficiencyResponse,
+  GetUsageCostSummaryResponse,
   GetUsageDailyByModelResponse,
   GetUsageDailyResponse,
+  GetUsagePatternsHourlyResponse,
+  GetUsagePerformanceResponse,
+  GetUsageSummaryResponse,
+  GetUsageToolsResponse,
 } from '~/api-gen/types.gen'
 import { fetchNodeUpstreamJson, nodeUpstreamQueryKey } from '~/features/nodes/upstream-fetch'
 import { useNodes } from '~/features/nodes/use-nodes'
 
 import type { FleetDeviceUsage, FleetUsage } from './usage-fleet'
 import { LOCAL_DEVICE_KEY } from './usage-fleet'
-import type { DailyCost, DailyUsage, DailyUsageByModel } from './use-usage-overview'
+import type { FleetMergeDevice } from './usage-fleet-merge'
+import { mergeFleetUsage } from './usage-fleet-merge'
+import type { UsageRangeKey } from './usage-time-range'
+import { rangeDays } from './usage-time-range'
 
-interface LocalUsageSeries {
-  daily: DailyUsage[]
-  dailyByModel: DailyUsageByModel[]
-  dailyCost: DailyCost[]
-}
+type LocalUsageSeries = FleetMergeDevice
 
 interface RemoteUsageSeries {
   daily: GetUsageDailyResponse
   dailyByModel: GetUsageDailyByModelResponse
   dailyCost: GetUsageCostDailyResponse
+  hourly: GetUsagePatternsHourlyResponse
+  costEfficiency: GetUsageCostEfficiencyResponse
+  summary: GetUsageSummaryResponse
+  costSummary: GetUsageCostSummaryResponse
+  tools: GetUsageToolsResponse
+  performance: GetUsagePerformanceResponse
 }
 
-async function fetchRemoteUsageSeries(nodeId: string, signal: AbortSignal): Promise<RemoteUsageSeries> {
-  const [daily, dailyByModel, dailyCost] = await Promise.all([
+async function fetchRemoteUsageSeries(nodeId: string, from: string, signal: AbortSignal): Promise<RemoteUsageSeries> {
+  const [daily, dailyByModel, dailyCost, hourly, costEfficiency, summary, costSummary, tools, performance] = await Promise.all([
     fetchNodeUpstreamJson<GetUsageDailyResponse>(nodeId, '/usage/daily?days=365', { signal }),
     fetchNodeUpstreamJson<GetUsageDailyByModelResponse>(nodeId, '/usage/daily-by-model?days=365', { signal }),
     fetchNodeUpstreamJson<GetUsageCostDailyResponse>(nodeId, '/usage/cost/daily', { signal }),
+    fetchNodeUpstreamJson<GetUsagePatternsHourlyResponse>(nodeId, '/usage/patterns/hourly', { signal }),
+    fetchNodeUpstreamJson<GetUsageCostEfficiencyResponse>(nodeId, '/usage/cost-efficiency?days=365', { signal }),
+    fetchNodeUpstreamJson<GetUsageSummaryResponse>(nodeId, `/usage/summary?from=${from}`, { signal }),
+    fetchNodeUpstreamJson<GetUsageCostSummaryResponse>(nodeId, `/usage/cost/summary?from=${from}`, { signal }),
+    fetchNodeUpstreamJson<GetUsageToolsResponse>(nodeId, `/usage/tools?from=${from}`, { signal }),
+    fetchNodeUpstreamJson<GetUsagePerformanceResponse>(nodeId, `/usage/performance?from=${from}`, { signal }),
   ])
-  return { daily, dailyByModel, dailyCost }
+  return { daily, dailyByModel, dailyCost, hourly, costEfficiency, summary, costSummary, tools, performance }
 }
 
 /**
  * Returns `null` when this device has no Fabric nodes at all — callers then
- * render the single-device dashboard exactly as before.
+ * render the single-device dashboard exactly as before. Remote series fill in
+ * progressively: a node still loading simply isn't part of `devices`/`merged`
+ * yet (isLoading signals that state).
  */
-export function useFleetUsage(local: LocalUsageSeries, enabled: boolean): FleetUsage | null {
+export function useFleetUsage(local: LocalUsageSeries, range: UsageRangeKey, enabled: boolean): FleetUsage | null {
   const { t } = useTranslation('usage')
   const nodesQuery = useNodes(enabled)
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
   const onlineNodes = useMemo(() => nodes.filter(node => node.status === 'online'), [nodes])
 
+  // Same rangeFrom contract as useUsageOverview (bare YYYY-MM-DD date).
+  const rangeFrom = useMemo(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - rangeDays(range))
+    return date.toISOString().slice(0, 10)
+  }, [range])
+
   const remoteQueries = useQueries({
     queries: onlineNodes.map(node => ({
-      queryKey: nodeUpstreamQueryKey(node.nodeId, 'usage-fleet'),
-      queryFn: ({ signal }: { signal: AbortSignal }) => fetchRemoteUsageSeries(node.nodeId, signal),
+      queryKey: nodeUpstreamQueryKey(node.nodeId, 'usage-fleet', rangeFrom),
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchRemoteUsageSeries(node.nodeId, rangeFrom, signal),
       staleTime: 60_000,
       // Offline links and missing grants are expected states surfaced in the
       // UI as unavailable devices, not worth retry storms.
@@ -71,9 +100,7 @@ export function useFleetUsage(local: LocalUsageSeries, enabled: boolean): FleetU
       platform: null,
       isLocal: true,
       status: 'online',
-      daily: local.daily,
-      dailyByModel: local.dailyByModel,
-      dailyCost: local.dailyCost,
+      ...local,
     }
 
     const devices: FleetDeviceUsage[] = [localDevice]
@@ -103,12 +130,10 @@ export function useFleetUsage(local: LocalUsageSeries, enabled: boolean): FleetU
         platform: node.platform,
         isLocal: false,
         status: 'online',
-        daily: query.data.daily,
-        dailyByModel: query.data.dailyByModel,
-        dailyCost: query.data.dailyCost,
+        ...query.data,
       })
     })
 
-    return { devices, unavailable, isLoading }
+    return { devices, unavailable, isLoading, merged: mergeFleetUsage(devices) }
   }, [enabled, nodes, onlineNodes, remoteQueries, local, t])
 }

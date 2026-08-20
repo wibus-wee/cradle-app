@@ -1,12 +1,19 @@
 // Fleet usage model: this device plus every reachable Fabric node, each
-// carrying the same daily usage series so dashboard surfaces can stack or
-// split by device. Remote series come from the node's own Usage API via the
+// carrying the same usage series so dashboard surfaces can stack, split, or
+// merge by device. Remote series come from the node's own Usage API via the
 // upstream proxy — the server never aggregates across devices, merging is a
-// renderer concern.
+// renderer concern (see usage-fleet-merge.ts).
+import type { MergedFleetUsage } from './usage-fleet-merge'
 import type {
+  CostEfficiency,
+  CostSummary,
   DailyCost,
   DailyUsage,
   DailyUsageByModel,
+  HourlyUsage,
+  RuntimePerformanceOverview,
+  ToolUsageBreakdown,
+  UsageSummary,
 } from './use-usage-overview'
 
 export const LOCAL_DEVICE_KEY = 'local'
@@ -21,6 +28,12 @@ export interface FleetDeviceUsage {
   daily: DailyUsage[]
   dailyByModel: DailyUsageByModel[]
   dailyCost: DailyCost[]
+  hourly: HourlyUsage[]
+  costEfficiency: CostEfficiency[]
+  summary: UsageSummary | null
+  costSummary: CostSummary | null
+  tools: ToolUsageBreakdown | null
+  performance: RuntimePerformanceOverview | null
 }
 
 export interface FleetUnavailableDevice {
@@ -38,4 +51,6 @@ export interface FleetUsage {
   unavailable: FleetUnavailableDevice[]
   /** True while any remote node's usage query is still in flight. */
   isLoading: boolean
+  /** All devices folded into one fleet-wide view — what the dashboard renders when a Fabric exists. */
+  merged: MergedFleetUsage
 }
