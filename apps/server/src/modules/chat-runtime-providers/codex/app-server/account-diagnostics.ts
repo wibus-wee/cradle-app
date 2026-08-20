@@ -8,6 +8,7 @@ import type { ConsumeAccountRateLimitResetCreditParams } from '../app-server-pro
 import type { ConsumeAccountRateLimitResetCreditResponse } from '../app-server-protocol/v2/ConsumeAccountRateLimitResetCreditResponse'
 import type { GetAccountRateLimitsResponse } from '../app-server-protocol/v2/GetAccountRateLimitsResponse'
 import type { GetAccountResponse } from '../app-server-protocol/v2/GetAccountResponse'
+import type { GetAccountTokenUsageParams } from '../app-server-protocol/v2/GetAccountTokenUsageParams'
 import type { GetAccountTokenUsageResponse } from '../app-server-protocol/v2/GetAccountTokenUsageResponse'
 import type { RateLimitResetCredit } from '../app-server-protocol/v2/RateLimitResetCredit'
 import type { RateLimitSnapshot } from '../app-server-protocol/v2/RateLimitSnapshot'
@@ -92,6 +93,24 @@ export interface CodexRateLimitResetCreditConsumption {
   providerTargetId: string
   outcome: ConsumeAccountRateLimitResetCreditResponse['outcome']
   consumedAt: number
+}
+
+export interface CodexThreadUsageDiagnostics {
+  source: 'codex.account.usage.thread'
+  threadId: string
+  estimatedUsageCreditsMicros: string
+  estimatedUsageUsdMicros: string | null
+  groups: Array<{
+    model: string | null
+    reasoningEffort: string | null
+    speed: string | null
+    estimatedUsageCreditsMicros: string
+    netNewInputTokens: string | null
+    cachedInputTokens: string | null
+    inputTokens: string | null
+    outputTokens: string | null
+    totalTokens: string | null
+  }>
 }
 
 export type CodexWhamEndpointKey = 'usage' | 'rateLimitResetCredits' | 'referralEligibilityRules'
@@ -277,6 +296,52 @@ export async function consumeCodexRateLimitResetCredit(
       providerTargetId: resolved.target.id,
       outcome: response.outcome,
       consumedAt: Date.now(),
+    }
+  }
+  finally {
+    hostLease.release()
+  }
+}
+
+export async function readCodexThreadUsage(
+  input: { providerTargetId: string, threadId: string },
+  deps: CodexAccountDiagnosticsDeps = DEFAULT_CODEX_ACCOUNT_DIAGNOSTICS_DEPS,
+): Promise<CodexThreadUsageDiagnostics | null> {
+  const resolved = resolveSupportedCodexAccountDiagnosticsTarget(input.providerTargetId, deps)
+  if (!resolved.supported) {
+    return null
+  }
+
+  const hostLease = await acquireDiagnosticsHostLease({
+    providerTargetId: resolved.target.id,
+    config: resolved.config,
+    auth: resolved.auth,
+    deps,
+  })
+
+  try {
+    const params: GetAccountTokenUsageParams = { threadId: input.threadId }
+    const response = await hostLease.client.request('account/usage/read', params) as GetAccountTokenUsageResponse
+    if (!response.threadUsage) {
+      return null
+    }
+
+    return {
+      source: 'codex.account.usage.thread',
+      threadId: response.threadUsage.threadId,
+      estimatedUsageCreditsMicros: formatCounter(response.threadUsage.estimatedUsageCreditsMicros),
+      estimatedUsageUsdMicros: formatNullableCounter(response.threadUsage.estimatedUsageUsdMicros),
+      groups: response.threadUsage.groups.map(group => ({
+        model: group.model,
+        reasoningEffort: group.reasoningEffort,
+        speed: group.speed,
+        estimatedUsageCreditsMicros: formatCounter(group.estimatedUsageCreditsMicros),
+        netNewInputTokens: formatNullableCounter(group.netNewInputTokens),
+        cachedInputTokens: formatNullableCounter(group.cachedInputTokens),
+        inputTokens: formatNullableCounter(group.inputTokens),
+        outputTokens: formatNullableCounter(group.outputTokens),
+        totalTokens: formatNullableCounter(group.totalTokens),
+      })),
     }
   }
   finally {

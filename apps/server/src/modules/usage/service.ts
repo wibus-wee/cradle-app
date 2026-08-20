@@ -1,8 +1,12 @@
-import { agents, backendRunSnapshotEvents, backendRunSnapshots, providerTargets, sessions, usageLogs } from '@cradle/db'
-import { sql } from 'drizzle-orm'
+import { agents, backendRunSnapshotEvents, backendRunSnapshots, backendSessionBindings, providerTargets, sessions, usageLogs } from '@cradle/db'
+import { and, eq, sql } from 'drizzle-orm'
 
 import { db } from '../../infra'
 import { reconcileCompletedCradleClaudeUsage } from '../chat-runtime-providers/claude-agent/usage-reconciliation'
+import type { CodexThreadUsageDiagnostics } from '../chat-runtime-providers/codex/app-server/account-diagnostics'
+import {
+  readCodexThreadUsage,
+} from '../chat-runtime-providers/codex/app-server/account-diagnostics'
 import { estimateCost, estimateCostBreakdown } from './pricing'
 
 const usageTurnKey = sql`COALESCE(${usageLogs.runId}, ${usageLogs.providerTurnId}, ${usageLogs.id})`
@@ -336,7 +340,21 @@ export function getUsageStats(): {
   }
 }
 
-export function getSessionUsage(sessionId: string): {
+export interface SessionProviderBillingCheck {
+  source: 'codex.account.usage.thread'
+  status: 'available' | 'unavailable' | 'error'
+  reason: string | null
+  threadId: string
+  reconciliationStatus: 'pending' | 'completed' | 'blocked' | 'unavailable'
+  estimatedUsageCreditsMicros: string | null
+  estimatedUsageUsdMicros: string | null
+  providerTotalTokens: string | null
+  ledgerTotalTokens: number
+  tokenDelta: string | null
+  groups: CodexThreadUsageDiagnostics['groups']
+}
+
+export interface SessionUsage {
   totalTokens: number
   promptTokens: number
   completionTokens: number
@@ -348,7 +366,10 @@ export function getSessionUsage(sessionId: string): {
     totalTokens: number
     turnCount: number
   }>
-} {
+  providerBillingCheck: SessionProviderBillingCheck | null
+}
+
+export function getSessionUsage(sessionId: string): SessionUsage {
   const row = db().get<{
     prompt_tokens: number
     completion_tokens: number
@@ -395,7 +416,114 @@ export function getSessionUsage(sessionId: string): {
       totalTokens: model.total_tokens,
       turnCount: model.turn_count,
     })),
+    providerBillingCheck: null,
   }
+}
+
+export async function getSessionUsageWithProviderBillingCheck(
+  sessionId: string,
+  readThreadUsage: typeof readCodexThreadUsage = readCodexThreadUsage,
+): Promise<SessionUsage> {
+  const ledgerUsage = getSessionUsage(sessionId)
+  return {
+    ...ledgerUsage,
+    providerBillingCheck: await readSessionProviderBillingCheck(
+      sessionId,
+      ledgerUsage.totalTokens,
+      readThreadUsage,
+    ),
+  }
+}
+
+async function readSessionProviderBillingCheck(
+  sessionId: string,
+  ledgerTotalTokens: number,
+  readThreadUsage: typeof readCodexThreadUsage,
+): Promise<SessionProviderBillingCheck | null> {
+  const binding = db().select({
+    providerTargetId: backendSessionBindings.providerTargetId,
+    threadId: backendSessionBindings.backendSessionId,
+    reconciliationStatus: backendSessionBindings.usageReconciliationStatus,
+  }).from(backendSessionBindings).where(and(
+    eq(backendSessionBindings.chatSessionId, sessionId),
+    eq(backendSessionBindings.runtimeKind, 'codex'),
+  )).get()
+
+  if (!binding?.threadId) {
+    return null
+  }
+
+  const base = {
+    source: 'codex.account.usage.thread' as const,
+    threadId: binding.threadId,
+    reconciliationStatus: binding.reconciliationStatus,
+    ledgerTotalTokens,
+  }
+
+  if (!binding.providerTargetId) {
+    return {
+      ...base,
+      status: 'unavailable',
+      reason: 'The Codex session has no provider target for billing diagnostics.',
+      estimatedUsageCreditsMicros: null,
+      estimatedUsageUsdMicros: null,
+      providerTotalTokens: null,
+      tokenDelta: null,
+      groups: [],
+    }
+  }
+
+  try {
+    const providerUsage = await readThreadUsage({
+      providerTargetId: binding.providerTargetId,
+      threadId: binding.threadId,
+    })
+    if (!providerUsage) {
+      return {
+        ...base,
+        status: 'unavailable',
+        reason: 'The Codex provider did not return per-thread billing usage.',
+        estimatedUsageCreditsMicros: null,
+        estimatedUsageUsdMicros: null,
+        providerTotalTokens: null,
+        tokenDelta: null,
+        groups: [],
+      }
+    }
+
+    const providerTotalTokens = sumProviderTotalTokens(providerUsage.groups)
+    return {
+      ...base,
+      status: 'available',
+      reason: null,
+      estimatedUsageCreditsMicros: providerUsage.estimatedUsageCreditsMicros,
+      estimatedUsageUsdMicros: providerUsage.estimatedUsageUsdMicros,
+      providerTotalTokens,
+      tokenDelta: providerTotalTokens === null
+        ? null
+        : String(BigInt(providerTotalTokens) - BigInt(ledgerTotalTokens)),
+      groups: providerUsage.groups,
+    }
+  }
+  catch (error) {
+    return {
+      ...base,
+      status: 'error',
+      reason: error instanceof Error ? error.message : String(error),
+      estimatedUsageCreditsMicros: null,
+      estimatedUsageUsdMicros: null,
+      providerTotalTokens: null,
+      tokenDelta: null,
+      groups: [],
+    }
+  }
+}
+
+function sumProviderTotalTokens(groups: CodexThreadUsageDiagnostics['groups']): string | null {
+  const totals = groups.flatMap(group => group.totalTokens === null ? [] : [BigInt(group.totalTokens)])
+  return totals.length === 0
+    ? null
+    : String(totals.reduce((total, value) => total + value, 0n))
 }
 
 // ── Cost Dashboard queries ──

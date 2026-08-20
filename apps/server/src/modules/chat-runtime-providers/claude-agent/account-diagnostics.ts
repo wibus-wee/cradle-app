@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 
-import type { AccountInfo, Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import type { AccountInfo, ApiKeySource, Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 
 import { resolveAnthropicWireAuth } from '../../provider-catalog/provider-endpoint-registry'
@@ -31,6 +31,7 @@ export interface ClaudeAgentAuthDiagnostics {
     subscriptionType: string | null
     tokenSource: string | null
     apiKeySource: string | null
+    apiKeySourceLabel: string | null
     apiProvider: string | null
   } | null
 }
@@ -567,7 +568,39 @@ function projectClaudeAccount(account: AccountInfo | null): NonNullable<ClaudeAg
     subscriptionType: account.subscriptionType ?? null,
     tokenSource: account.tokenSource ?? null,
     apiKeySource: account.apiKeySource ?? null,
+    apiKeySourceLabel: claudeApiKeySourceLabel(account.apiKeySource ?? null),
     apiProvider: account.apiProvider ?? null,
+  }
+}
+
+const CLAUDE_API_KEY_SOURCE_LABELS = {
+  'ANTHROPIC_API_KEY': 'ANTHROPIC_API_KEY environment variable',
+  'apiKeyHelper': 'API key helper',
+  '/login managed key': 'Claude /login managed key',
+  'none': 'No API key',
+  'user': 'User settings (legacy)',
+  'project': 'Project settings (legacy)',
+  'org': 'Organization settings (legacy)',
+  'temporary': 'Temporary key (legacy)',
+  'oauth': 'OAuth (legacy)',
+} satisfies Record<ApiKeySource, string>
+
+function claudeApiKeySourceLabel(source: string | null): string | null {
+  switch (source) {
+    case 'ANTHROPIC_API_KEY':
+    case 'apiKeyHelper':
+    case '/login managed key':
+    case 'none':
+    case 'user':
+    case 'project':
+    case 'org':
+    case 'temporary':
+    case 'oauth':
+      return CLAUDE_API_KEY_SOURCE_LABELS[source]
+    case null:
+      return null
+    default:
+      return source
   }
 }
 

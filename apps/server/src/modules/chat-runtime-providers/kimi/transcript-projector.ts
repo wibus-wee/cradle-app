@@ -19,6 +19,7 @@ export type KimiTranscriptTurn = Extract<KimiTranscriptData['items'][number], { 
 type KimiTranscriptStep = KimiTranscriptTurn['steps'][number]
 type KimiTranscriptFrame = KimiTranscriptStep['frames'][number]
 type KimiTranscriptTask = KimiTranscriptData['tasks'][number]
+export type KimiTranscriptAgentMetadata = KimiTranscriptData['meta']['agent']
 
 export interface KimiTranscriptTurnProjection {
   turns: ProviderThreadTurn[]
@@ -54,6 +55,7 @@ export function projectKimiTranscriptCrewState(
   data: KimiTranscriptData,
   threadId: string,
   updatedAt: number,
+  agentMetadataById: ReadonlyMap<string, KimiTranscriptAgentMetadata> = new Map(),
 ): RuntimeCrewUiSlotState | null {
   const subagentTasks = data.tasks.filter(task => task.kind === 'subagent')
   const agents = data.agents
@@ -63,7 +65,12 @@ export function projectKimiTranscriptCrewState(
       agent.agentId,
       subagentTasks.find(task => task.agentId === agent.agentId) ?? null,
     ))
-  const calls = subagentTasks.map(task => projectKimiCrewCall(data, task, threadId))
+  const calls = subagentTasks.map(task => projectKimiCrewCall(
+    data,
+    task,
+    threadId,
+    task.agentId ? agentMetadataById.get(task.agentId) : undefined,
+  ))
   if (agents.length === 0 && calls.length === 0) {
     return null
   }
@@ -193,6 +200,7 @@ function projectKimiCrewCall(
   data: KimiTranscriptData,
   task: KimiTranscriptTask,
   senderThreadId: string,
+  agentMetadata: KimiTranscriptAgentMetadata,
 ): RuntimeCrewCallItem {
   const retry = findKimiTaskRetry(data, task)
   const agentId = task.agentId ?? task.taskId
@@ -203,8 +211,8 @@ function projectKimiCrewCall(
     senderThreadId,
     receiverThreadIds: task.agentId ? [task.agentId] : [],
     prompt: task.description ?? task.resultSummary ?? null,
-    model: null,
-    reasoningEffort: null,
+    model: agentMetadata?.model ?? null,
+    reasoningEffort: agentMetadata?.thinkingEffort ?? null,
     agents: task.agentId ? [projectKimiCrewAgent(data, task.agentId, task)] : [],
     retry: retry
       ? {

@@ -1622,6 +1622,29 @@ export type GetUsageSessionsBySessionIdResponses = {
             totalTokens: number;
             turnCount: number;
         }>;
+        providerBillingCheck: {
+            source: 'codex.account.usage.thread';
+            status: 'available' | 'unavailable' | 'error';
+            reason: string | null;
+            threadId: string;
+            reconciliationStatus: 'pending' | 'completed' | 'blocked' | 'unavailable';
+            estimatedUsageCreditsMicros: string | null;
+            estimatedUsageUsdMicros: string | null;
+            providerTotalTokens: string | null;
+            ledgerTotalTokens: number;
+            tokenDelta: string | null;
+            groups: Array<{
+                model: string | null;
+                reasoningEffort: string | null;
+                speed: string | null;
+                estimatedUsageCreditsMicros: string;
+                netNewInputTokens: string | null;
+                cachedInputTokens: string | null;
+                inputTokens: string | null;
+                outputTokens: string | null;
+                totalTokens: string | null;
+            }>;
+        } | null;
     };
 };
 
@@ -2453,6 +2476,7 @@ export type GetProviderTargetsByProviderTargetIdAuthDiagnosticsResponses = {
             subscriptionType: string | null;
             tokenSource: string | null;
             apiKeySource: string | null;
+            apiKeySourceLabel: string | null;
             apiProvider: string | null;
         } | null;
     };
@@ -7883,6 +7907,29 @@ export type GetSessionsByIdEnvironmentResponses = {
                 totalTokens: number;
                 turnCount: number;
             }>;
+            providerBillingCheck: {
+                source: 'codex.account.usage.thread';
+                status: 'available' | 'unavailable' | 'error';
+                reason: string | null;
+                threadId: string;
+                reconciliationStatus: 'pending' | 'completed' | 'blocked' | 'unavailable';
+                estimatedUsageCreditsMicros: string | null;
+                estimatedUsageUsdMicros: string | null;
+                providerTotalTokens: string | null;
+                ledgerTotalTokens: number;
+                tokenDelta: string | null;
+                groups: Array<{
+                    model: string | null;
+                    reasoningEffort: string | null;
+                    speed: string | null;
+                    estimatedUsageCreditsMicros: string;
+                    netNewInputTokens: string | null;
+                    cachedInputTokens: string | null;
+                    inputTokens: string | null;
+                    outputTokens: string | null;
+                    totalTokens: string | null;
+                }>;
+            } | null;
         };
         pullRequest: {
             owner: string;

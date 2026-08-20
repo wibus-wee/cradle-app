@@ -320,6 +320,7 @@ describe('usage capability', () => {
           totalTokens: 45,
           turnCount: 2,
         }],
+        providerBillingCheck: null,
       })
 
       const recentSessionsRes = await app.handle(new Request('http://localhost/usage/sessions/recent?limit=2'))

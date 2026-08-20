@@ -12,7 +12,10 @@ import {
   updateServerProcessMetrics,
 } from '../../telemetry/metrics'
 import * as ChatRuntime from '../chat-runtime/runtime'
-import { getCodexAppServerResources } from '../chat-runtime-providers/codex/app-server/resources'
+import {
+  getCodexAppServerNativeDiagnostics,
+  getCodexAppServerResources,
+} from '../chat-runtime-providers/codex/app-server/resources'
 import type { KimiServerResources } from '../chat-runtime-providers/kimi/resources'
 import { getKimiServerResources } from '../chat-runtime-providers/kimi/resources'
 import type { OpencodeServerResources } from '../chat-runtime-providers/opencode/runtime-context'
@@ -366,11 +369,17 @@ export async function getRuntimeSnapshot() {
     .map(run => ChatRuntime.getActiveRunStreamPublicationSummary(run.runId))
     .filter(item => item !== null)
   const providerHosts = providerRuntimeHostManager.listHosts()
-  const pty = await Pty.listResources()
+  const [pty, codexNativeDiagnostics] = await Promise.all([
+    Pty.listResources(),
+    getCodexAppServerNativeDiagnostics(),
+  ])
   const chronicle = getDaemonResources()
   const opencodeServer = summarizeOpencodeServerResources(getOpencodeServerResources())
   const kimiServer = summarizeKimiServerResources(getKimiServerResources())
-  const codexAppServer = summarizeRuntimeProcessResources(getCodexAppServerResources())
+  const codexAppServer = {
+    ...summarizeRuntimeProcessResources(getCodexAppServerResources()),
+    nativeDiagnostics: codexNativeDiagnostics,
+  }
   const observability = getQueueHealth()
   const desktop = {
     latestSamples: getDesktopRuntimeSamples(),

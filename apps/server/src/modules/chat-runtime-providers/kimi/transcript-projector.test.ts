@@ -47,14 +47,22 @@ describe('kimi transcript projector', () => {
 
   it('projects subagent lifecycle, retry metadata, and task progress', () => {
     const data = transcript()
+    const agentMetadata = new Map([
+      ['sub-1', {
+        model: 'kimi-k2.5-fast',
+        thinkingEffort: 'high',
+      }],
+    ])
 
-    expect(projectKimiTranscriptCrewState(data, 'session-1', 123)).toMatchObject({
+    expect(projectKimiTranscriptCrewState(data, 'session-1', 123, agentMetadata)).toMatchObject({
       slotId: 'kimi:crew',
       activeCount: 1,
       calls: [{
         id: 'task-1',
         status: 'running',
         receiverThreadIds: ['sub-1'],
+        model: 'kimi-k2.5-fast',
+        reasoningEffort: 'high',
         retry: {
           agentId: 'sub-1',
           attempt: 1,

@@ -888,6 +888,7 @@ describe('elysia migration skeleton', () => {
           totalTokens: 45,
           turnCount: 2,
         }],
+        providerBillingCheck: null,
       })
 
       const missingSessionResponse = await app.handle(new Request(`http://localhost/usage/sessions/${randomUUID()}`))
@@ -898,6 +899,7 @@ describe('elysia migration skeleton', () => {
         completionTokens: 0,
         count: 0,
         byModel: [],
+        providerBillingCheck: null,
       })
 
       const invalidDailyResponse = await app.handle(new Request('http://localhost/usage/daily?days=0'))

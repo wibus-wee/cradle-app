@@ -80,7 +80,7 @@ export const usage = new Elysia({
     query: UsageModel.recentSessionsQuery,
     response: { 200: t.Array(UsageModel.recentSession) },
   })
-  .get('/sessions/:sessionId', ({ params }) => Usage.getSessionUsage(params.sessionId), {
+  .get('/sessions/:sessionId', ({ params }) => Usage.getSessionUsageWithProviderBillingCheck(params.sessionId), {
     detail: {
       'summary': 'Get session usage',
       'x-cradle-cli': {

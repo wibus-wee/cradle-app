@@ -7,6 +7,7 @@ import type { CodexWhamEndpointKey, CodexWhamEndpointResult } from './account-di
 import {
   consumeCodexRateLimitResetCredit,
   readCodexAccountDiagnostics,
+  readCodexThreadUsage,
   readCodexWhamDiagnostics,
 } from './account-diagnostics'
 import { CODEX_CHATGPT_AUTH_SECRET_KIND } from './chatgpt-auth'
@@ -67,6 +68,34 @@ class FakeCodexAccountClient implements CodexAppServerClientLike {
           },
         }
       case 'account/usage/read':
+        if ((params as { threadId?: string } | undefined)?.threadId) {
+          return {
+            summary: {
+              lifetimeTokens: null,
+              peakDailyTokens: null,
+              longestRunningTurnSec: null,
+              currentStreakDays: null,
+              longestStreakDays: null,
+            },
+            dailyUsageBuckets: null,
+            threadUsage: {
+              threadId: (params as { threadId: string }).threadId,
+              estimatedUsageCreditsMicros: 12_500n,
+              estimatedUsageUsdMicros: 7_500n,
+              groups: [{
+                model: 'gpt-5.6-sol',
+                reasoningEffort: 'high',
+                speed: 'fast',
+                estimatedUsageCreditsMicros: 12_500n,
+                netNewInputTokens: 80n,
+                cachedInputTokens: 20n,
+                inputTokens: 100n,
+                outputTokens: 25n,
+                totalTokens: 125n,
+              }],
+            },
+          }
+        }
         return {
           summary: {
             lifetimeTokens: 1234567890123456789n,
@@ -257,6 +286,41 @@ describe('codex account diagnostics', () => {
     expect(client.requests).toContainEqual({
       method: 'account/rateLimitResetCredit/consume',
       params: { idempotencyKey: 'reset-attempt-1' },
+    })
+  })
+
+  it('projects per-thread billing usage without creating provider usage events', async () => {
+    const client = new FakeCodexAccountClient()
+    const usage = await readCodexThreadUsage({
+      providerTargetId: 'codex-chatgpt-target',
+      threadId: 'thread-1',
+    }, createDiagnosticsDeps({
+      providerTargetId: 'codex-chatgpt-target',
+      providerKind: 'openai-compatible',
+      credentialRef: 'credential-chatgpt',
+      client,
+    }))
+
+    expect(usage).toEqual({
+      source: 'codex.account.usage.thread',
+      threadId: 'thread-1',
+      estimatedUsageCreditsMicros: '12500',
+      estimatedUsageUsdMicros: '7500',
+      groups: [{
+        model: 'gpt-5.6-sol',
+        reasoningEffort: 'high',
+        speed: 'fast',
+        estimatedUsageCreditsMicros: '12500',
+        netNewInputTokens: '80',
+        cachedInputTokens: '20',
+        inputTokens: '100',
+        outputTokens: '25',
+        totalTokens: '125',
+      }],
+    })
+    expect(client.requests).toContainEqual({
+      method: 'account/usage/read',
+      params: { threadId: 'thread-1' },
     })
   })
 
