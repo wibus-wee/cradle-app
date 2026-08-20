@@ -4,6 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { AfterAll, BeforeAll } from '@cucumber/cucumber'
 
@@ -74,7 +75,7 @@ async function runProcess(command: string, args: string[], options: Parameters<t
   })
 }
 
-const ROOT = resolve(__dirname, '..', '..', '..')
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 interface E2EServerInstance {
   serverProcess: ChildProcess
