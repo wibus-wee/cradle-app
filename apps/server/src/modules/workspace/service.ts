@@ -4,15 +4,25 @@ import { homedir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve, sep } from 'node:path'
 
 import type { Workspace } from '@cradle/db'
-import { automationDefinitions, kanbanBoards, workspaces } from '@cradle/db'
-import { desc, eq } from 'drizzle-orm'
+import { automationDefinitions, kanbanBoards, sessions, works, workspaces, workThreads, worktrees } from '@cradle/db'
+import { desc, eq, inArray } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
+import type {
+  RemoteWorkspaceFileContent,
+  RemoteWorkspaceFileEntry,
+  RemoteWorkspaceFileInfo,
+  RemoteWorkspaceView,
+} from '../../http/upstream'
+import { proxyUpstreamRequestWithReconnect, upstreamJsonWithReconnect } from '../../http/upstream'
 import { db, getServerConfig } from '../../infra'
+import * as ChatRuntime from '../chat-runtime/runtime'
 import type { MigrateIssuesOptions, MigrateIssuesResult } from '../issue/service'
 import { migrateIssues } from '../issue/service'
 import { assertAppFeatureFlagEnabled, isAppFeatureFlagEnabled } from '../preferences/service'
-import * as RemoteHosts from '../remote-hosts/service'
+import { getFabricNodeLinkManager } from '../relay-transport/node-link-manager'
+import * as Session from '../session/service'
+import * as Worktree from '../worktree/service'
 import { subscribeWorkspaceFileChanges } from './file-watch'
 import {
   createDirectory,
@@ -141,11 +151,11 @@ export function planHistoricalWorkspace(input: HistoricalWorkspaceEvidence): His
   const lexicalPath = input.sourceHostId === 'local' ? resolve(rawPath) : rawPath
   const canonicalPath = canonicalWorkspacePath(input.sourceHostId, rawPath)
   const locator: WorkspaceLocator = {
-    hostId: input.sourceHostId,
+    nodeId: input.sourceHostId,
     path: canonicalPath,
   }
   const exact = resolveByLocator({
-    hostId: input.sourceHostId,
+    nodeId: input.sourceHostId,
     path: lexicalPath,
   }) ?? resolveByLocator(locator)
   if (exact) {
@@ -153,7 +163,7 @@ export function planHistoricalWorkspace(input: HistoricalWorkspaceEvidence): His
   }
 
   const containing = findContainingWorkspace({
-    hostId: input.sourceHostId,
+    nodeId: input.sourceHostId,
     path: lexicalPath,
   }) ?? findContainingWorkspace(locator)
   if (containing) {
@@ -180,7 +190,7 @@ export function planHistoricalWorkspace(input: HistoricalWorkspaceEvidence): His
     historicalKey,
     name: basename(recoveredPath) || 'Recovered Workspace',
     locator: {
-      hostId: input.sourceHostId,
+      nodeId: input.sourceHostId,
       path: recoveredPath,
     },
     gitIdentity,
@@ -228,12 +238,39 @@ export function recoverHistoricalWorkspaceInTransaction(
   })
 }
 
-export function relinkWorkspace(id: string, path: string): WorkspaceView | null {
+export async function relinkWorkspace(id: string, path: string): Promise<WorkspaceView | null> {
   const record = getRecord(id)
   if (!record) {
     return null
   }
   const trimmedPath = path.trim()
+  const currentLocator = readWorkspaceLocator(record)
+  if (!isLocalWorkspaceLocator(currentLocator)) {
+    const remoteWorkspace = await resolveRemoteCradleWorkspace(currentLocator)
+    const nextLocator: WorkspaceLocator = {
+      ...currentLocator,
+      path: trimmedPath,
+      sourceWorkspaceId: remoteWorkspace.id,
+    }
+    assertWorkspaceLocatorAvailable(id, nextLocator)
+    const updatedRemoteWorkspace = await nodeUpstreamJson<RemoteWorkspaceView>(
+      currentLocator.nodeId,
+      remoteWorkspacePath(remoteWorkspace.id, '/location'),
+      jsonRequestInit('PATCH', { path: trimmedPath }),
+    )
+    const updatedLocator: WorkspaceLocator = {
+      ...nextLocator,
+      path: updatedRemoteWorkspace.locator.path,
+    }
+    assertWorkspaceLocatorAvailable(id, updatedLocator)
+    const updated = db().update(workspaces).set({
+      locatorJson: serializeWorkspaceLocator(updatedLocator),
+      gitIdentityJson: serializeWorkspaceGitIdentity(updatedRemoteWorkspace.gitIdentity),
+      updatedAt: Math.floor(Date.now() / 1000),
+    }).where(eq(workspaces.id, id)).returning().get()
+    return updated ? toWorkspaceView(updated) : null
+  }
+
   if (!isDirectory(trimmedPath)) {
     throw new AppError({
       code: 'workspace_location_not_found',
@@ -242,20 +279,8 @@ export function relinkWorkspace(id: string, path: string): WorkspaceView | null 
       details: { path: trimmedPath },
     })
   }
-  const currentLocator = readWorkspaceLocator(record)
-  if (!isLocalWorkspaceLocator(currentLocator)) {
-    throw unsupportedRemoteWorkspaceOperation('relink workspace location')
-  }
   const nextLocator = localWorkspaceLocator(canonicalWorkspacePath('local', trimmedPath))
-  const existing = resolveByLocator(nextLocator)
-  if (existing && existing.id !== id) {
-    throw new AppError({
-      code: 'workspace_locator_exists',
-      status: 409,
-      message: 'Workspace locator already exists',
-      details: { locator: nextLocator, workspaceId: existing.id },
-    })
-  }
+  assertWorkspaceLocatorAvailable(id, nextLocator)
   const gitIdentity = readWorkspaceGitIdentity(record)
   const updated = db().update(workspaces).set({
     locatorJson: serializeWorkspaceLocator(nextLocator),
@@ -512,8 +537,54 @@ export function update(input: { id: string, name?: string, pinned?: boolean }): 
   return updated ? toWorkspaceView(updated) : null
 }
 
-export function remove(id: string): void {
+export interface WorkspaceRemovalResult {
+  removedSessionIds: string[]
+  removedWorkIds: string[]
+}
+
+export async function remove(id: string): Promise<WorkspaceRemovalResult> {
+  const workspace = getRecord(id)
+  if (!workspace) {
+    return { removedSessionIds: [], removedWorkIds: [] }
+  }
+
+  // SQLite cascades only database rows. Remove the owners explicitly so their
+  // lifecycle hooks release PTYs/runtime state and managed Git checkouts.
+  const sessionIds = db()
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(eq(sessions.workspaceId, id))
+    .all()
+    .map(session => session.id)
+  const workIds = sessionIds.length === 0
+    ? []
+    : db()
+        .selectDistinct({ id: workThreads.workId })
+        .from(workThreads)
+        .where(inArray(workThreads.sessionId, sessionIds))
+        .all()
+        .map(work => work.id)
+  const worktreeIds = db()
+    .select({ id: worktrees.id })
+    .from(worktrees)
+    .where(eq(worktrees.sourceWorkspaceId, id))
+    .all()
+    .map(worktree => worktree.id)
+
+  for (const sessionId of sessionIds) {
+    await ChatRuntime.cancelSession(sessionId)
+  }
+  for (const sessionId of sessionIds) {
+    await Session.remove(sessionId)
+  }
+  for (const worktreeId of worktreeIds) {
+    await Worktree.cleanupWorktree({ worktreeId, mode: 'abandon' })
+  }
+  if (workIds.length > 0) {
+    db().delete(works).where(inArray(works.id, workIds)).run()
+  }
   db().delete(workspaces).where(eq(workspaces.id, id)).run()
+  return { removedSessionIds: sessionIds, removedWorkIds: workIds }
 }
 
 // ── workspace migration ──
@@ -599,7 +670,10 @@ export async function getFiles(workspaceId: string) {
     return listFiles(locator.path)
   }
   const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
-  return await RemoteHosts.listRemoteCradleWorkspaceFiles(locator.hostId, remoteWorkspace.id)
+  return await nodeUpstreamJson<RemoteWorkspaceFileEntry[]>(
+    locator.nodeId,
+    `/workspaces/${encodeURIComponent(remoteWorkspace.id)}/files`,
+  )
 }
 
 export async function getFileChildren(workspaceId: string, relativePath = '') {
@@ -612,7 +686,9 @@ export async function getFileChildren(workspaceId: string, relativePath = '') {
     return listFileChildren(locator.path, relativePath)
   }
   const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
-  return await RemoteHosts.listRemoteCradleWorkspaceFileChildren(locator.hostId, remoteWorkspace.id, relativePath)
+  const childrenUrl = new URL(`/workspaces/${encodeURIComponent(remoteWorkspace.id)}/files/children`, 'http://127.0.0.1')
+  childrenUrl.searchParams.set('path', relativePath)
+  return await nodeUpstreamJson<RemoteWorkspaceFileEntry[]>(locator.nodeId, `${childrenUrl.pathname}${childrenUrl.search}`)
 }
 
 export async function searchFiles(workspaceId: string, input: { query?: string, limit?: number }) {
@@ -621,17 +697,24 @@ export async function searchFiles(workspaceId: string, input: { query?: string, 
     return []
   }
   const locator = readWorkspaceLocator(workspace)
-  if (!isLocalWorkspaceLocator(locator)) {
-    throw unsupportedRemoteWorkspaceOperation('search workspace files')
+  if (isLocalWorkspaceLocator(locator)) {
+    return searchWorkspaceFiles({
+      workspacePath: locator.path,
+      query: input.query,
+      limit: input.limit,
+    })
   }
-  return searchWorkspaceFiles({
-    workspacePath: locator.path,
-    query: input.query,
-    limit: input.limit,
-  })
+  const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+  return await nodeUpstreamJson<RemoteWorkspaceFileEntry[]>(
+    locator.nodeId,
+    remoteWorkspacePath(remoteWorkspace.id, '/files/search', {
+      q: input.query,
+      limit: input.limit,
+    }),
+  )
 }
 
-export function openFileEvents(workspaceId: string): ReadableStream<Uint8Array> {
+export function openLocalFileEvents(workspaceId: string): ReadableStream<Uint8Array> {
   const workspace = getRecord(workspaceId)
   if (!workspace) {
     return new ReadableStream<Uint8Array>({
@@ -643,7 +726,11 @@ export function openFileEvents(workspaceId: string): ReadableStream<Uint8Array> 
 
   const locator = readWorkspaceLocator(workspace)
   if (!isLocalWorkspaceLocator(locator)) {
-    throw unsupportedRemoteWorkspaceOperation('subscribe to file changes')
+    throw new AppError({
+      code: 'workspace_file_events_must_be_proxied',
+      status: 500,
+      message: 'Remote workspace file events must be opened through the Node upstream proxy.',
+    })
   }
 
   const encoder = new TextEncoder()
@@ -691,6 +778,28 @@ export function openFileEvents(workspaceId: string): ReadableStream<Uint8Array> 
   })
 }
 
+export async function proxyRemoteWorkspaceRequest(
+  workspaceId: string,
+  request: Request,
+  remoteSuffix: string,
+): Promise<Response | null> {
+  const workspace = getRecord(workspaceId)
+  if (!workspace) {
+    return null
+  }
+  const locator = readWorkspaceLocator(workspace)
+  if (isLocalWorkspaceLocator(locator)) {
+    return null
+  }
+  const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+  const requestUrl = new URL(request.url)
+  return await proxyUpstreamRequestWithReconnect(
+    async () => (await getFabricNodeLinkManager().ensure(locator.nodeId)).localBaseUrl,
+    request,
+    `${remoteWorkspacePath(remoteWorkspace.id, remoteSuffix)}${requestUrl.search}`,
+  )
+}
+
 export async function getFileContent(workspaceId: string, relativePath: string): Promise<string | null> {
   const workspace = getRecord(workspaceId)
   if (!workspace) {
@@ -701,7 +810,9 @@ export async function getFileContent(workspaceId: string, relativePath: string):
     return readTextFile(locator.path, relativePath)
   }
   const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
-  return (await RemoteHosts.readRemoteCradleWorkspaceFileContent(locator.hostId, remoteWorkspace.id, relativePath)).content
+  const contentUrl = new URL(`/workspaces/${encodeURIComponent(remoteWorkspace.id)}/files/content`, 'http://127.0.0.1')
+  contentUrl.searchParams.set('path', relativePath)
+  return (await nodeUpstreamJson<RemoteWorkspaceFileContent>(locator.nodeId, `${contentUrl.pathname}${contentUrl.search}`)).content
 }
 
 export async function getFileInfo(workspaceId: string, relativePath: string) {
@@ -714,17 +825,23 @@ export async function getFileInfo(workspaceId: string, relativePath: string) {
     return getWorkspaceFileInfo(locator.path, relativePath)
   }
   const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
-  return await RemoteHosts.readRemoteCradleWorkspaceFileInfo(locator.hostId, remoteWorkspace.id, relativePath)
+  const infoUrl = new URL(`/workspaces/${encodeURIComponent(remoteWorkspace.id)}/files/info`, 'http://127.0.0.1')
+  infoUrl.searchParams.set('path', relativePath)
+  return await nodeUpstreamJson<RemoteWorkspaceFileInfo | null>(locator.nodeId, `${infoUrl.pathname}${infoUrl.search}`)
 }
 
-export async function getFileBytes(workspaceId: string, relativePath: string) {
+export async function getLocalFileBytes(workspaceId: string, relativePath: string) {
   const workspace = getRecord(workspaceId)
   if (!workspace) {
     return null
   }
   const locator = readWorkspaceLocator(workspace)
   if (!isLocalWorkspaceLocator(locator)) {
-    throw unsupportedRemoteWorkspaceOperation('read raw file bytes')
+    throw new AppError({
+      code: 'workspace_file_bytes_must_be_proxied',
+      status: 500,
+      message: 'Remote workspace file bytes must be read through the Node upstream proxy.',
+    })
   }
   const info = await getWorkspaceFileInfo(locator.path, relativePath)
   if (!info) {
@@ -744,7 +861,11 @@ export async function getFilePdfRendition(workspaceId: string, relativePath: str
   }
   const locator = readWorkspaceLocator(workspace)
   if (!isLocalWorkspaceLocator(locator)) {
-    throw unsupportedRemoteWorkspaceOperation('render PDF rendition')
+    throw new AppError({
+      code: 'workspace_file_rendition_must_be_proxied',
+      status: 500,
+      message: 'Remote workspace renditions must be opened through the Node upstream proxy.',
+    })
   }
   const config = getServerConfig()
   const cacheRoot = config.dataDir
@@ -778,7 +899,16 @@ export async function setFileContent(input: {
   }
   const locator = readWorkspaceLocator(workspace)
   if (!isLocalWorkspaceLocator(locator)) {
-    throw unsupportedRemoteWorkspaceOperation('write file content')
+    const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+    return await nodeUpstreamJson<ReturnType<typeof createFileOperationResult>>(
+      locator.nodeId,
+      remoteWorkspacePath(remoteWorkspace.id, '/files/content'),
+      jsonRequestInit('PUT', {
+        path: relativePath,
+        content,
+        confirmedNonCradleOwnedWrite: input.confirmedNonCradleOwnedWrite,
+      }),
+    )
   }
   return {
     success: await writeTextFile(locator.path, relativePath, content),
@@ -801,7 +931,15 @@ export async function createFile(input: {
   }
   const locator = readWorkspaceLocator(workspace)
   if (!isLocalWorkspaceLocator(locator)) {
-    throw unsupportedRemoteWorkspaceOperation('create file')
+    const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+    return await nodeUpstreamJson<ReturnType<typeof createFileOperationResult>>(
+      locator.nodeId,
+      remoteWorkspacePath(remoteWorkspace.id, '/files/file'),
+      jsonRequestInit('POST', {
+        path: input.relativePath,
+        confirmedNonCradleOwnedWrite: input.confirmedNonCradleOwnedWrite,
+      }),
+    )
   }
   return createFileOperationResult(
     await createEmptyFile(locator.path, input.relativePath),
@@ -822,7 +960,15 @@ export async function createFolder(input: {
   }
   const locator = readWorkspaceLocator(workspace)
   if (!isLocalWorkspaceLocator(locator)) {
-    throw unsupportedRemoteWorkspaceOperation('create folder')
+    const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+    return await nodeUpstreamJson<ReturnType<typeof createFileOperationResult>>(
+      locator.nodeId,
+      remoteWorkspacePath(remoteWorkspace.id, '/files/folder'),
+      jsonRequestInit('POST', {
+        path: input.relativePath,
+        confirmedNonCradleOwnedWrite: input.confirmedNonCradleOwnedWrite,
+      }),
+    )
   }
   return createFileOperationResult(
     await createDirectory(locator.path, input.relativePath),
@@ -854,7 +1000,20 @@ export async function renameFilePath(input: {
   }
   const locator = readWorkspaceLocator(workspace)
   if (!isLocalWorkspaceLocator(locator)) {
-    throw unsupportedRemoteWorkspaceOperation('rename file path')
+    const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+    return await nodeUpstreamJson<{
+      success: boolean
+      sourceBoundary: ReturnType<typeof createWorkspaceFileWriteBoundary>
+      destinationBoundary: ReturnType<typeof createWorkspaceFileWriteBoundary>
+    }>(
+      locator.nodeId,
+      remoteWorkspacePath(remoteWorkspace.id, '/files/path'),
+      jsonRequestInit('PATCH', {
+        sourcePath: input.sourcePath,
+        destinationPath: input.destinationPath,
+        confirmedNonCradleOwnedWrite: input.confirmedNonCradleOwnedWrite,
+      }),
+    )
   }
   return {
     success: await renameWorkspacePath(locator.path, input.sourcePath, input.destinationPath),
@@ -918,7 +1077,7 @@ export function isMultiFolderWorkspace(workspace: Pick<WorkspaceView, 'locator' 
 }
 
 function isMultiFolderWorkspaceLocator(locator: WorkspaceLocator): boolean {
-  if (locator.hostId !== 'local') {
+  if (locator.nodeId !== 'local') {
     return false
   }
   return existsSync(join(locator.path, MULTI_WORKSPACE_CONFIG_FILE))
@@ -932,7 +1091,7 @@ function existingHistoricalWorkspacePlan(
     kind: 'existing',
     reason,
     historicalKey: historicalWorkspaceKey(
-      workspace.locator.hostId,
+      workspace.locator.nodeId,
       workspace.locator.path,
       workspace.gitIdentity,
     ),
@@ -940,8 +1099,8 @@ function existingHistoricalWorkspacePlan(
   }
 }
 
-function canonicalWorkspacePath(hostId: string, path: string): string {
-  if (hostId !== 'local') {
+function canonicalWorkspacePath(nodeId: string, path: string): string {
+  if (nodeId !== 'local') {
     return path
   }
   const absolutePath = resolve(path)
@@ -955,7 +1114,7 @@ function canonicalWorkspacePath(hostId: string, path: string): string {
 
 function findContainingWorkspace(locator: WorkspaceLocator): WorkspaceView | null {
   const candidates = list()
-    .filter(workspace => workspace.locator.hostId === locator.hostId)
+    .filter(workspace => workspace.locator.nodeId === locator.nodeId)
     .filter(workspace => isPathContainedBy(locator.path, workspace.locator.path))
     .sort((left, right) => right.locator.path.length - left.locator.path.length)
   return candidates[0] ?? null
@@ -970,7 +1129,7 @@ function findWorkspaceByGitIdentity(
     return null
   }
   const matches = list().filter(workspace =>
-    workspace.locator.hostId === sourceHostId
+    workspace.locator.nodeId === sourceHostId
     && workspace.gitIdentity.originUrl?.trim() === originUrl)
   return matches.length === 1 ? matches[0]! : null
 }
@@ -993,14 +1152,14 @@ function findHistoricalProjectRoot(path: string, reportedRepoRoot: string | null
 }
 
 function historicalWorkspaceKey(
-  hostId: string,
+  nodeId: string,
   path: string,
   gitIdentity: WorkspaceGitIdentity,
 ): string {
   const originUrl = gitIdentity.originUrl?.trim()
   return originUrl
-    ? `${hostId}:git:${originUrl}`
-    : `${hostId}:path:${path}`
+    ? `${nodeId}:git:${originUrl}`
+    : `${nodeId}:path:${path}`
 }
 
 function isPathContainedBy(path: string, root: string): boolean {
@@ -1042,25 +1201,70 @@ export function getLocalWorkspacePath(workspaceId: string): string | null {
     : null
 }
 
-function unsupportedRemoteWorkspaceOperation(operation: string): never {
+function assertWorkspaceLocatorAvailable(workspaceId: string, locator: WorkspaceLocator): void {
+  const existing = resolveByLocator(locator)
+  if (!existing || existing.id === workspaceId) {
+    return
+  }
   throw new AppError({
-    code: 'workspace_operation_not_supported_for_remote_cradle_server',
+    code: 'workspace_locator_exists',
     status: 409,
-    message: `This workspace operation is not available for remote Cradle Server workspaces yet: ${operation}.`,
+    message: 'Workspace locator already exists',
+    details: { locator, workspaceId: existing.id },
   })
 }
 
 async function resolveRemoteCradleWorkspace(locator: WorkspaceLocator) {
-  const remoteWorkspace = await RemoteHosts.resolveRemoteWorkspaceByPath(locator.hostId, locator.path)
+  if (locator.sourceWorkspaceId) {
+    const remoteWorkspace = await nodeUpstreamJson<RemoteWorkspaceView | null>(
+      locator.nodeId,
+      `/workspaces/${encodeURIComponent(locator.sourceWorkspaceId)}`,
+    )
+    if (remoteWorkspace) {
+      return remoteWorkspace
+    }
+  }
+  const remoteWorkspaces = await nodeUpstreamJson<RemoteWorkspaceView[]>(locator.nodeId, '/workspaces')
+  const remoteWorkspace = remoteWorkspaces.find(workspace => workspace.locator.path === locator.path) ?? null
   if (!remoteWorkspace) {
     throw new AppError({
       code: 'remote_cradle_workspace_not_found',
       status: 404,
       message: 'Remote Cradle Server workspace was not found.',
-      details: { hostId: locator.hostId, path: locator.path },
+      details: { nodeId: locator.nodeId, path: locator.path },
     })
   }
   return remoteWorkspace
+}
+
+function remoteWorkspacePath(
+  remoteWorkspaceId: string,
+  suffix = '',
+  query: Record<string, string | number | undefined> = {},
+): string {
+  const url = new URL(`/workspaces/${encodeURIComponent(remoteWorkspaceId)}${suffix}`, 'http://127.0.0.1')
+  for (const [name, value] of Object.entries(query)) {
+    if (value !== undefined) {
+      url.searchParams.set(name, String(value))
+    }
+  }
+  return `${url.pathname}${url.search}`
+}
+
+function jsonRequestInit(method: 'PATCH' | 'POST' | 'PUT', body: object): RequestInit {
+  return {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }
+}
+
+async function nodeUpstreamJson<T>(nodeId: string, upstreamPathWithQuery: string, init?: RequestInit): Promise<T> {
+  return await upstreamJsonWithReconnect<T>(
+    async () => (await getFabricNodeLinkManager().ensure(nodeId)).localBaseUrl,
+    upstreamPathWithQuery,
+    init,
+  )
 }
 
 function assertMultiWorkspacePocEnabled(): void {
@@ -1191,7 +1395,7 @@ function normalizeMultiFolderWorkspaceConfig(
  */
 function assertRegisteredMultiFolderMember(absolutePath: string): WorkspaceView {
   const workspace = resolveByPath(absolutePath)
-  if (!workspace || workspace.locator.hostId !== 'local') {
+  if (!workspace || workspace.locator.nodeId !== 'local') {
     throw new AppError({
       code: 'multi_workspace_member_not_registered',
       status: 400,

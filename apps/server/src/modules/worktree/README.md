@@ -15,7 +15,7 @@ Session isolation routes live in `modules/session/index.ts`. Issue isolation con
 ## Routes
 
 - `GET /workspaces/:workspaceId/worktrees`
-- `POST /workspaces/:workspaceId/worktrees` creates a checkout. Optional `.cradle/worktrees.json` setup hooks are skipped unless the request includes `confirmedSetupHooks: true` or the workspace already has a stored setup-hook trust grant; hooks are always skipped while relay host enrollments expose the server.
+- `POST /workspaces/:workspaceId/worktrees` creates a checkout. Optional `.cradle/worktrees.json` setup hooks are skipped unless the request includes `confirmedSetupHooks: true` or the workspace already has a stored setup-hook trust grant; hooks are always skipped while the server is enrolled as a Fabric node.
 - `POST /workspaces/:workspaceId/worktrees/:worktreeId/cleanup`
 - `GET /worktrees/managed`
 - `POST /worktrees/cleanup`

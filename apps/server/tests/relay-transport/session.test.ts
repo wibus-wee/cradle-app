@@ -1,521 +1,167 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { generateRelayKeyPair } from '../../src/modules/relay-transport/crypto'
-import type { RelayEnvelope } from '../../src/modules/relay-transport/protocol'
+import { generateFabricSessionKeyPair } from '../../src/modules/relay-transport/crypto'
 import {
-  decodeInnerFrame,
-  decodeRelayEnvelope,
-  encodeInnerFrame,
+  decodeFabricSessionEnvelope,
+  encodeFabricSessionEnvelope,
+  FABRIC_SESSION_PROTOCOL_VERSION,
+  RELAY_STREAM_MIN_CREDIT_BYTES,
 } from '../../src/modules/relay-transport/protocol'
-import { RelaySession } from '../../src/modules/relay-transport/session'
+import type { FabricSessionCallbacks } from '../../src/modules/relay-transport/session'
+import { FabricSession } from '../../src/modules/relay-transport/session'
 
-/**
- * Wire two sessions together as if relayd were forwarding envelopes between
- * them. Returns a pair of send callbacks; each stamps the roomId and hands the
- * envelope to the peer's handleEnvelope.
- */
-function wireSessions(
-  host: RelaySession,
-  controller: RelaySession,
-  roomId: string,
-): { hostSend: (data: Uint8Array) => void, controllerSend: (data: Uint8Array) => void } {
-  const hostSend = (data: Uint8Array) => {
-    const env = decodeRelayEnvelope(data)
-    controller.handleEnvelope({ ...env, roomId })
-  }
-  const controllerSend = (data: Uint8Array) => {
-    const env = decodeRelayEnvelope(data)
-    host.handleEnvelope({ ...env, roomId })
-  }
-  return { hostSend, controllerSend }
+const fabricId = 'fabric-test'
+const linkId = 'link-test'
+
+function encode(data: Omit<Parameters<typeof encodeFabricSessionEnvelope>[0], 'version' | 'linkId'>): Uint8Array {
+  return encodeFabricSessionEnvelope({
+    version: FABRIC_SESSION_PROTOCOL_VERSION,
+    linkId,
+    ...data,
+  })
 }
 
-describe('relay session', () => {
-  it('completes the first-pairing handshake and exchanges stream data end-to-end', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const pairingCode = 'PAIR-ABCD'
-    const roomId = 'room_test_1'
+function wire(left: FabricSession, right: FabricSession): void {
+  ;(left as unknown as { cb: { send: (data: Uint8Array) => void } }).cb.send = (data) => {
+    right.handleEnvelope(decodeFabricSessionEnvelope(data))
+  }
+  ;(right as unknown as { cb: { send: (data: Uint8Array) => void } }).cb.send = (data) => {
+    left.handleEnvelope(decodeFabricSessionEnvelope(data))
+  }
+}
 
-    const hostReady = vi.fn()
+function session(
+  role: 'node' | 'controller',
+  keys: { privateKeyBase64: string, publicKeyBase64: string },
+  expectedPeerPubkey: string,
+  callbacks: FabricSessionCallbacks,
+): FabricSession {
+  return new FabricSession(role, keys.privateKeyBase64, {
+    fabricId,
+    linkId,
+    expectedPeerPubkey,
+    ourPublicKeyBase64: keys.publicKeyBase64,
+    encodeOutboundEnvelope: encode,
+  }, callbacks)
+}
+
+describe('fabric Session', () => {
+  it('authenticates both Fabric members and exchanges stream data', () => {
+    const nodeKeys = generateFabricSessionKeyPair()
+    const controllerKeys = generateFabricSessionKeyPair()
+    const nodeReady = vi.fn()
     const controllerReady = vi.fn()
-    const hostStreamOpen = vi.fn()
-    const hostStreamData: Array<{ streamId: string, data: Uint8Array }> = []
+    const received: Uint8Array[] = []
+    const node = session('node', nodeKeys, controllerKeys.publicKeyBase64, {
+      send: () => {},
+      onReady: nodeReady,
+      onStreamOpen: () => {},
+      onStreamData: (_streamId, data) => received.push(data),
+    })
+    const controller = session('controller', controllerKeys, nodeKeys.publicKeyBase64, {
+      send: () => {},
+      onReady: controllerReady,
+    })
+    wire(node, controller)
 
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      { roomId, pairingCode, ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      {
-        send: () => {},
-        onReady: hostReady,
-        onStreamOpen: hostStreamOpen,
-        onStreamData: (streamId, data) => hostStreamData.push({ streamId, data }),
-      },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      { roomId, pairingCode, ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
-      { send: () => {}, onReady: controllerReady },
-    )
-
-    // Rebind the send callbacks now that both sessions exist.
-    const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
-      = wire.controllerSend
-
-    host.start()
     controller.start()
 
-    expect(hostReady).toHaveBeenCalledTimes(1)
-    expect(controllerReady).toHaveBeenCalledTimes(1)
-    expect(host.isReady).toBe(true)
+    expect(node.isReady).toBe(true)
     expect(controller.isReady).toBe(true)
-    expect(host.peerPublicKey).toBe(controllerKeys.publicKeyBase64)
-    expect(controller.peerPublicKey).toBe(hostKeys.publicKeyBase64)
+    expect(nodeReady).toHaveBeenCalledOnce()
+    expect(controllerReady).toHaveBeenCalledOnce()
 
-    // Controller opens a stream and sends data; host receives it.
-    controller.openStream('c1')
-    expect(hostStreamOpen).toHaveBeenCalledWith('c1')
-
-    const payload = new TextEncoder().encode('hello over the relay tunnel')
-    controller.writeStreamData('c1', payload)
-
-    expect(hostStreamData).toHaveLength(1)
-    expect(hostStreamData[0].streamId).toBe('c1')
-    expect(Buffer.from(hostStreamData[0].data).equals(Buffer.from(payload))).toBe(true)
+    controller.openStream('stream-1')
+    const payload = new TextEncoder().encode('Fabric stream payload')
+    controller.writeStreamData('stream-1', payload)
+    expect(received).toHaveLength(1)
+    expect(received[0]).toEqual(payload)
   })
 
-  it('reconnects using a pinned peer pubkey (no confirm exchange)', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const roomId = 'room_reconnect'
-
-    const hostReady = vi.fn()
-    const controllerReady = vi.fn()
-
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      {
-        roomId,
-        pinnedPeerPubkey: controllerKeys.publicKeyBase64,
-        ourPublicKeyBase64: hostKeys.publicKeyBase64,
+  it('flushes data queued beyond stream credit before closing', () => {
+    const nodeKeys = generateFabricSessionKeyPair()
+    const controllerKeys = generateFabricSessionKeyPair()
+    const received: Uint8Array[] = []
+    const events: string[] = []
+    let acknowledge = false
+    const node = session('node', nodeKeys, controllerKeys.publicKeyBase64, {
+      send: () => {},
+      onStreamData: (streamId, data) => {
+        received.push(data)
+        events.push('data')
+        if (acknowledge) {
+          node.reportStreamDataConsumed(streamId, data.byteLength, { flush: true })
+        }
       },
-      { send: () => {}, onReady: hostReady },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      {
-        roomId,
-        pinnedPeerPubkey: hostKeys.publicKeyBase64,
-        ourPublicKeyBase64: controllerKeys.publicKeyBase64,
-      },
-      { send: () => {}, onReady: controllerReady },
-    )
-
-    const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
-      = wire.controllerSend
-
-    host.start()
+      onStreamClose: () => events.push('close'),
+    })
+    const controller = session('controller', controllerKeys, nodeKeys.publicKeyBase64, {
+      send: () => {},
+    })
+    wire(node, controller)
     controller.start()
+    controller.openStream('stream-large')
 
-    // No pairing code → no hello_confirm exchange, but pinning makes both ready.
-    expect(hostReady).toHaveBeenCalledTimes(1)
-    expect(controllerReady).toHaveBeenCalledTimes(1)
+    const payload = new Uint8Array(RELAY_STREAM_MIN_CREDIT_BYTES + 128 * 1024).fill(7)
+    controller.writeStreamData('stream-large', payload)
+    controller.closeStream('stream-large', 'local socket closed')
+
+    expect(received.reduce((total, chunk) => total + chunk.byteLength, 0))
+      .toBe(RELAY_STREAM_MIN_CREDIT_BYTES)
+    expect(events).not.toContain('close')
+
+    acknowledge = true
+    node.reportStreamDataConsumed(
+      'stream-large',
+      RELAY_STREAM_MIN_CREDIT_BYTES,
+      { flush: true },
+    )
+
+    expect(received.reduce((total, chunk) => total + chunk.byteLength, 0)).toBe(payload.byteLength)
+    expect(events.at(-1)).toBe('close')
   })
 
-  it('rejects a reconnect when a MITM substitutes the peer pubkey', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const mitmKeys = generateRelayKeyPair()
-    const roomId = 'room_mitm'
+  it('rejects a session when the peer key is not the Fabric certificate key', () => {
+    const nodeKeys = generateFabricSessionKeyPair()
+    const controllerKeys = generateFabricSessionKeyPair()
+    const error = vi.fn()
+    const node = session('node', nodeKeys, controllerKeys.publicKeyBase64, {
+      send: () => {},
+      onError: error,
+    })
+    const controller = session('controller', controllerKeys, generateFabricSessionKeyPair().publicKeyBase64, {
+      send: () => {},
+      onError: error,
+    })
+    wire(node, controller)
 
-    const hostError = vi.fn()
-    const controllerError = vi.fn()
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      {
-        roomId,
-        pinnedPeerPubkey: controllerKeys.publicKeyBase64,
-        ourPublicKeyBase64: hostKeys.publicKeyBase64,
-      },
-      { send: () => {}, onError: hostError },
-    )
-    // Real controller, pinned to the host.
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      {
-        roomId,
-        pinnedPeerPubkey: hostKeys.publicKeyBase64,
-        ourPublicKeyBase64: controllerKeys.publicKeyBase64,
-      },
-      { send: () => {}, onError: controllerError },
-    )
-
-    // Simulate a relay MITM: it rewrites the pubkey on each forwarded hello to
-    // its own, so each honest peer sees the MITM's pubkey where it expects the
-    // real peer's. At least one honest peer must reject (whichever receives the
-    // rewritten hello first); in a real relay the detection is symmetric.
-    const wire = (b: RelaySession) => (data: Uint8Array) => {
-      const env = decodeRelayEnvelope(data)
-      const frame = decodeInnerFrame(env.payload)
-      if (frame.kind === 'hello') {
-        b.handleEnvelope({
-          ...env,
-          roomId,
-          payload: encodeInnerFrame({ ...frame, pubkey: mitmKeys.publicKeyBase64 }),
-        })
-        return
-      }
-      b.handleEnvelope({ ...env, roomId })
-    }
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire(controller)
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire(host)
-
-    host.start()
     controller.start()
 
-    expect(hostError.mock.calls.length + controllerError.mock.calls.length).toBeGreaterThan(0)
-    expect(host.isReady).toBe(false)
+    expect(error).toHaveBeenCalledOnce()
     expect(controller.isReady).toBe(false)
   })
 
-  it('rejects a first-pairing handshake when the pairing code differs', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const roomId = 'room_code_mismatch'
-
-    const hostError = vi.fn()
-    const controllerError = vi.fn()
-
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      { roomId, pairingCode: 'RIGHT-CODE', ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      { send: () => {}, onError: hostError },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      { roomId, pairingCode: 'WRONG-CODE', ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
-      { send: () => {}, onError: controllerError },
-    )
-
-    const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
-      = wire.controllerSend
-
-    host.start()
+  it('rejects frames from another Fabric link', () => {
+    const nodeKeys = generateFabricSessionKeyPair()
+    const controllerKeys = generateFabricSessionKeyPair()
+    const nodeError = vi.fn()
+    const node = session('node', nodeKeys, controllerKeys.publicKeyBase64, {
+      send: () => {},
+      onError: nodeError,
+    })
+    const controller = session('controller', controllerKeys, nodeKeys.publicKeyBase64, {
+      send: () => {},
+    })
+    wire(node, controller)
     controller.start()
 
-    // The confirm values won't match → at least one side errors.
-    expect(hostError.mock.calls.length + controllerError.mock.calls.length).toBeGreaterThan(0)
-  })
-
-  it('does not mark ready when an encrypted stream frame arrives before the handshake', () => {
-    const hostKeys = generateRelayKeyPair()
-
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      { roomId: 'r', pairingCode: 'CODE', ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      { send: () => {}, onError: () => {} },
-    )
-
-    // A bare plaintext stream_open injected pre-handshake must be rejected.
-    const malicious: RelayEnvelope = {
-      version: 2,
-      roomId: 'r',
-      seq: 99,
+    const foreign = decodeFabricSessionEnvelope(encode({
+      seq: 0,
       kind: 'relay_data_frame',
       priority: 'control',
-      payload: encodeInnerFrame({ kind: 'stream_open', streamId: 'evil' }),
-    }
-    host.handleEnvelope(malicious)
-    expect(host.isReady).toBe(false)
-  })
-
-  it('chunks large stream data across multiple frames and reassembles', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const pairingCode = 'PAIR-LARGE'
-    const roomId = 'room_large'
-
-    const hostStreamData: Uint8Array[] = []
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      { roomId, pairingCode, ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      {
-        send: () => {},
-        onStreamOpen: () => {},
-        onStreamData: (streamId, data) => {
-          hostStreamData.push(data)
-          host.reportStreamDataConsumed(streamId, data.byteLength)
-        },
-      },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      { roomId, pairingCode, ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
-      { send: () => {} },
-    )
-
-    const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
-      = wire.controllerSend
-
-    host.start()
-    controller.start()
-
-    controller.openStream('c1')
-    // 1 MiB payload — forces multiple 256 KiB chunks.
-    const payload = new Uint8Array(1024 * 1024)
-    for (let i = 0; i < payload.length; i++) {
-      payload[i] = i & 0xFF
-    }
-    controller.writeStreamData('c1', payload)
-
-    const reassembled = Buffer.concat(hostStreamData.map(chunk => Buffer.from(chunk)))
-    expect(reassembled.length).toBe(payload.length)
-    expect(reassembled.equals(Buffer.from(payload))).toBe(true)
-  })
-
-  it('pauses the sender when unacked send credit is exhausted and resumes after peer acks', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const pairingCode = 'PAIR-CREDIT'
-    const roomId = 'room_credit'
-
-    const onPause = vi.fn()
-    const onResume = vi.fn()
-
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      { roomId, pairingCode, ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      {
-        send: () => {},
-        onStreamOpen: () => {},
-        onStreamData: (streamId, data) => {
-          // Apply immediately so the host acks and the controller can keep sending
-          // past the first credit window in a later assertion path.
-          host.reportStreamDataConsumed(streamId, data.byteLength)
-        },
-      },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      { roomId, pairingCode, ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
-      {
-        send: () => {},
-        onPauseStream: onPause,
-        onResumeStream: onResume,
-      },
-    )
-
-    const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
-      = wire.controllerSend
-
-    host.start()
-    controller.start()
-    controller.openStream('c1')
-
-    // Hold acks on the host so the controller exhausts its 512 KiB window.
-    ;(
-      host as unknown as { cb: { onStreamData: (s: string, d: Uint8Array) => void } }
-    ).cb.onStreamData = () => {}
-
-    const payload = new Uint8Array(512 * 1024)
-    controller.writeStreamData('c1', payload)
-    expect(onPause).toHaveBeenCalledWith('c1')
-    expect(onResume).not.toHaveBeenCalled()
-
-    // Explicit cumulative ack releases send credit without touching receive-side state.
-    host.ackStream('c1', payload.byteLength)
-    expect(onResume).toHaveBeenCalledWith('c1')
-  })
-
-  it('keeps send and receive credit independent on a duplex stream', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const pairingCode = 'PAIR-DUPLEX'
-    const roomId = 'room_duplex'
-
-    const controllerPause = vi.fn()
-    const controllerResume = vi.fn()
-    const hostPause = vi.fn()
-    const hostResume = vi.fn()
-
-    // Buffer delivered bytes so tests control when credit is released.
-    const hostReceived: Uint8Array[] = []
-    const controllerReceived: Uint8Array[] = []
-
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      { roomId, pairingCode, ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      {
-        send: () => {},
-        onStreamOpen: () => {},
-        onStreamData: (_id, data) => hostReceived.push(data),
-        onPauseStream: hostPause,
-        onResumeStream: hostResume,
-      },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      { roomId, pairingCode, ourPublicKeyBase64: controllerKeys.publicKeyBase64 },
-      {
-        send: () => {},
-        onStreamData: (_id, data) => controllerReceived.push(data),
-        onPauseStream: controllerPause,
-        onResumeStream: controllerResume,
-      },
-    )
-
-    const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
-      = wire.controllerSend
-
-    host.start()
-    controller.start()
-    controller.openStream('c1')
-
-    // Controller → host: 1 MiB request. Host does NOT apply yet, so no acks.
-    const request = new Uint8Array(1024 * 1024)
-    controller.writeStreamData('c1', request)
-    // 512 KiB credit window pauses after first window; without acks it stays paused.
-    expect(controllerPause).toHaveBeenCalled()
-    expect(hostReceived.length).toBeGreaterThan(0)
-
-    // Host → controller: large response on the same streamId. Even though the
-    // host has received a lot, that must not pollute the host's *send* credit
-    // (the old single-ackedBytes bug would over-release send credit here).
-    const response = new Uint8Array(600 * 1024)
-    host.writeStreamData('c1', response)
-    expect(hostPause).toHaveBeenCalledWith('c1')
-    // Controller has not applied response bytes yet.
-    expect(hostResume).not.toHaveBeenCalled()
-
-    // Applying host-received request bytes must NOT resume the host's send side.
-    for (const chunk of hostReceived) {
-      host.reportStreamDataConsumed('c1', chunk.byteLength)
-    }
-    expect(hostResume).not.toHaveBeenCalled()
-    // But it should unpause the controller's send credit.
-    expect(controllerResume).toHaveBeenCalled()
-
-    // Applying controller-received response bytes resumes the host sender.
-    for (const chunk of controllerReceived) {
-      controller.reportStreamDataConsumed('c1', chunk.byteLength)
-    }
-    expect(hostResume).toHaveBeenCalledWith('c1')
-  })
-
-  it('grows a stream window only after the peer has applied a substantial window', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const roomId = 'room_adaptive_credit'
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      {
-        roomId,
-        pairingCode: 'PAIR-ADAPTIVE',
-        ourPublicKeyBase64: hostKeys.publicKeyBase64,
-      },
-      {
-        send: () => {},
-        onStreamOpen: () => {},
-        onStreamData: (streamId, data) => host.reportStreamDataConsumed(streamId, data.byteLength),
-      },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      {
-        roomId,
-        pairingCode: 'PAIR-ADAPTIVE',
-        ourPublicKeyBase64: controllerKeys.publicKeyBase64,
-        maxStreamCreditBytes: 2 * 1024 * 1024,
-      },
-      { send: () => {} },
-    )
-    const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
-      = wire.controllerSend
-    host.start()
-    controller.start()
-    controller.openStream('c1')
-    controller.writeStreamData('c1', new Uint8Array(1024 * 1024))
-    const flow = (
-      controller as unknown as { streams: Map<string, { creditBytes: number }> }
-    ).streams.get('c1')
-    expect(flow?.creditBytes).toBeGreaterThan(512 * 1024)
-  })
-
-  it('caps aggregate in-flight data across concurrent streams', () => {
-    const hostKeys = generateRelayKeyPair()
-    const controllerKeys = generateRelayKeyPair()
-    const roomId = 'room_connection_credit'
-    const host = new RelaySession(
-      'host',
-      hostKeys.privateKeyBase64,
-      { roomId, pairingCode: 'PAIR-CONNECTION-CREDIT', ourPublicKeyBase64: hostKeys.publicKeyBase64 },
-      { send: () => {}, onStreamOpen: () => {}, onStreamData: () => {} },
-    )
-    const controller = new RelaySession(
-      'controller',
-      controllerKeys.privateKeyBase64,
-      {
-        roomId,
-        pairingCode: 'PAIR-CONNECTION-CREDIT',
-        ourPublicKeyBase64: controllerKeys.publicKeyBase64,
-        maxConnectionCreditBytes: 1024 * 1024,
-      },
-      { send: () => {} },
-    )
-    const wire = wireSessions(host, controller, roomId)
-    ;(host as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send = wire.hostSend
-    ;(controller as unknown as { cb: { send: (d: Uint8Array) => void } }).cb.send
-      = wire.controllerSend
-    host.start()
-    controller.start()
-    controller.openStream('c1')
-    controller.openStream('c2')
-    controller.openStream('c3')
-
-    const window = new Uint8Array(512 * 1024)
-    controller.writeStreamData('c1', window)
-    controller.writeStreamData('c2', window)
-    controller.writeStreamData('c3', window)
-
-    const flows = (
-      controller as unknown as {
-        streams: Map<string, { sentBytes: number, peerAckedBytes: number, pendingData: Uint8Array[] }>
-      }
-    ).streams
-    const inFlight = [...flows.values()]
-      .reduce((total, flow) => total + flow.sentBytes - flow.peerAckedBytes, 0)
-    expect(inFlight).toBe(1024 * 1024)
-    expect(flows.get('c3')?.pendingData).toHaveLength(1)
+      payload: new Uint8Array([1]),
+    }))
+    node.handleEnvelope({ ...foreign, linkId: 'another-link' })
+    expect(nodeError).toHaveBeenCalledOnce()
   })
 })

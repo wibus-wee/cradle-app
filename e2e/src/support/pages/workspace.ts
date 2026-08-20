@@ -155,7 +155,7 @@ export class WorkspacePage {
 
   async expectListEmpty(): Promise<void> {
     await expect(this.workspaceList()).toBeVisible({ timeout: SIDEBAR_TIMEOUT })
-    await expect(this.addWorkspaceEmptyButton()).toBeVisible({ timeout: SIDEBAR_TIMEOUT })
+    await this.expectAddWorkspaceButtonVisible()
   }
 
   async expectAddWorkspaceButtonVisible(): Promise<void> {
@@ -319,7 +319,16 @@ export class WorkspacePage {
   async removeWorkspaceFromMenu(): Promise<void> {
     const removeItem = this.page.locator('[data-slot="menu-item"][data-variant="destructive"]')
     await expect(removeItem).toBeVisible({ timeout: WORKSPACE_TIMEOUT })
-    await removeItem.click()
+    await Promise.all([
+      this.page.waitForResponse(response =>
+        response.request().method() === 'DELETE'
+        && new URL(response.url()).pathname.startsWith('/workspaces/')),
+      removeItem.click(),
+    ])
+  }
+
+  async expectHomeRoute(): Promise<void> {
+    await expect.poll(() => new URL(this.page.url()).pathname).toBe('/')
   }
 
   async addWorkspaceViaApi(fixture: WorkspaceFixture): Promise<void> {

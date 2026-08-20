@@ -374,7 +374,7 @@ describe('acp chat runtime capability', () => {
         id: 'workspace-acp',
         name: 'Workspace ACP',
         path: workspaceRoot,
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
       }).run()
 
       await createAcpProfileAndSession(app, 'workspace-acp')
@@ -464,7 +464,7 @@ describe('acp chat runtime capability', () => {
         id: 'workspace-acp-agent',
         name: 'Workspace ACP Agent',
         path: workspaceRoot,
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
       }).run()
       db().insert(acpAgents).values({
         id: 'kimi-test-agent',
@@ -684,7 +684,7 @@ describe('acp chat runtime capability', () => {
         id: 'workspace-acp-local',
         name: 'Workspace ACP Local',
         path: workspaceRoot,
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
       }).run()
       db().insert(acpAgents).values({
         id: 'local-spawn-agent',

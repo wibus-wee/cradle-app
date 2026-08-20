@@ -686,8 +686,8 @@ export async function startDesktopApp(): Promise<void> {
       }
     }
   })
-  browserManager.subscribeToWebContentsCreated((webContents, tabId) => {
-    notifyWebviewCreated(webContents, tabId)
+  browserManager.subscribeToWebContentsCreated((webContents, ownerId, tabId) => {
+    notifyWebviewCreated(webContents, ownerId, tabId)
   })
   browserManager.subscribeToPromptRequests((request) => {
     for (const window of BrowserWindow.getAllWindows()) {

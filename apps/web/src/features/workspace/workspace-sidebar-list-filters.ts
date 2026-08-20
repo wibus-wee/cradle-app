@@ -118,7 +118,7 @@ function matchesSourceFilters(
 export function classifyWorkspaceSidebarEnvironment(
   session: WorkspaceSession,
 ): WorkspaceSidebarEnvironmentFilter {
-  return session.execution.kind === 'remote-host' ? 'remote' : 'local'
+  return session.execution.kind === 'node' ? 'remote' : 'local'
 }
 
 function matchesEnvironmentFilters(

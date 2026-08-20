@@ -1,12 +1,14 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { AfterAll, BeforeAll } from '@cucumber/cucumber'
+
+import { resolveManagedCodexAppServerPath } from './codex-runtime'
 
 function killProcessGroup(proc: ChildProcess, signal: NodeJS.Signals) {
   try {
@@ -73,9 +75,7 @@ async function runProcess(command: string, args: string[], options: Parameters<t
   })
 }
 
-const ROOT = resolve(__dirname, '..', '..', '..')
-const CODEX_APP_SERVER_PATH_ENV = 'CRADLE_CODEX_APP_SERVER_PATH'
-const CODEX_APP_SERVER_PACKAGE_PATH = '@openai/codex/bin/codex.js'
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 interface E2EServerInstance {
   serverProcess: ChildProcess
@@ -142,38 +142,6 @@ async function reserveAvailablePort(): Promise<number> {
   })
 }
 
-function resolveManagedCodexAppServerPath(): string | null {
-  const configuredPath = process.env[CODEX_APP_SERVER_PATH_ENV]?.trim()
-  if (configuredPath) {
-    return configuredPath
-  }
-
-  try {
-    return createRequire(join(ROOT, 'package.json')).resolve(CODEX_APP_SERVER_PACKAGE_PATH)
-  }
-  catch {
-    // Fall through to the desktop-synced native binary when the npm package is absent.
-  }
-
-  // Prefer the desktop `sync:codex-runtime` artifact (gitignored binaries under resources/codex).
-  const platformArch = `${process.platform}-${process.arch}`
-  const bundled = join(
-    ROOT,
-    'apps',
-    'desktop',
-    'resources',
-    'codex',
-    platformArch,
-    process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server',
-  )
-  if (existsSync(bundled)) {
-    return bundled
-  }
-
-  // Codex is optional for essence E2E paths that do not exercise the Codex runtime.
-  return null
-}
-
 /**
  * If CRADLE_SERVER_URL is set, we assume the user is managing the server themselves.
  * Otherwise, we start an isolated server with a temp data directory.
@@ -194,7 +162,7 @@ BeforeAll({ timeout: 120_000 }, async () => {
   chmodSync(dataDir, 0o777)
   chmodSync(serverHomeDir, 0o777)
   const serverPort = await reserveAvailablePort()
-  const codexAppServerPath = resolveManagedCodexAppServerPath()
+  const codexAppServerPath = resolveManagedCodexAppServerPath(ROOT)
 
   let serverProcess: ChildProcess | null = null
   let webProcess: ChildProcess | null = null

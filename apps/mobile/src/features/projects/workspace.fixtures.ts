@@ -4,7 +4,7 @@ export const workspaceFixture: WorkspaceViewProps = {
   workspace: {
     id: 'workspace-1',
     name: 'Cradle',
-    locator: { hostId: 'local', path: '/Users/demo/dev/cradle', kind: 'project' },
+    locator: { nodeId: 'local', path: '/Users/demo/dev/cradle', kind: 'project' },
     gitIdentity: { branch: 'main' },
     identifier: 'cradle',
     multiFolder: false,
@@ -17,7 +17,7 @@ export const workspaceFixture: WorkspaceViewProps = {
     {
       id: 'workspace-1',
       name: 'Cradle',
-      locator: { hostId: 'local', path: '/Users/demo/dev/cradle', kind: 'project' },
+      locator: { nodeId: 'local', path: '/Users/demo/dev/cradle', kind: 'project' },
       gitIdentity: { branch: 'main' },
       identifier: 'cradle',
       multiFolder: false,

@@ -37,8 +37,7 @@ import {
 } from './metadata'
 import {
   applySystemAgentModelRegistryConfig,
-  inferSystemAgentApiFromKind,
-  inferSystemAgentProviderFromKind,
+  resolveSystemAgentConnection,
   resolveSystemAgentRuntimeRegistryModel,
   selectSystemAgentThinkingLevel,
 } from './model-registry-bridge'
@@ -109,9 +108,13 @@ export class SystemAgentProvider implements ChatRuntime {
     const config = readTrustedSystemAgentConfig(profile.configJson)
     const userPrompt = projectSystemAgentUserPrompt(input.message)
 
-    const provider = config.provider ?? inferSystemAgentProviderFromKind(profile.providerKind ?? 'universal')
+    const connection = resolveSystemAgentConnection({
+      config,
+      profileProviderKind: profile.providerKind ?? 'universal',
+      rawConfigJson: profile.configJson,
+    })
+    const { api, baseUrl, provider } = connection
     const model = jarvisPrefs.model
-    const { baseUrl } = config
     if (!model) {
       throw new ProviderRuntimeError(ProviderErrors.modelNotFound(this.runtimeKind, ''))
     }
@@ -132,7 +135,10 @@ export class SystemAgentProvider implements ChatRuntime {
     const sessionId = input.runtimeSession.chatSessionId
 
     const runtimeContext = resolveSystemAgentRuntimeContext()
-    const mcpTools = await createSystemAgentMcpTools(getRegisteredMcpServers(), this.deps.logger)
+    const mcpTools = await createSystemAgentMcpTools(
+      getRegisteredMcpServers({ chatSessionId: sessionId }),
+      this.deps.logger,
+    )
 
     const runtimeConfigOptions: DefaultRuntimeConfigOptions = {
       provider,
@@ -155,7 +161,7 @@ export class SystemAgentProvider implements ChatRuntime {
     }
     else {
       // Always provide api protocol — jar-core requires it for non-builtin models
-      runtimeConfigOptions.api = inferSystemAgentApiFromKind(profile.providerKind ?? 'universal') as DefaultRuntimeConfigOptions['api']
+      runtimeConfigOptions.api = api as DefaultRuntimeConfigOptions['api']
     }
 
     applySystemAgentModelRegistryConfig(runtimeConfigOptions, {

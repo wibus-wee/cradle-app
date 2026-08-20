@@ -12,6 +12,7 @@ import { isElectron, platform } from '~/lib/electron'
 
 import type {
   ChatRuntimeCompactUiSlotState,
+  ChatRuntimeModelUiSlotState,
   ChatRuntimeUiSlot,
   ChatRuntimeUiSlotState,
   ChatRuntimeUsageUiSlotState,
@@ -33,6 +34,7 @@ import {
   CRADLE_SIDE_CHAT_SLASH_COMMAND,
   projectRuntimeComposerSlashCommands,
   RUNTIME_CODE_REVIEW_COMMAND_ACTION_ID,
+  RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID,
   RUNTIME_USAGE_COMMAND_ACTION_ID,
   withSlashCommandAvailability,
 } from '../slash-commands/chat-slash-commands'
@@ -80,7 +82,7 @@ interface UseChatComposerRuntimeOptions {
   canStop: boolean
   isReady: boolean
   workspaceId?: string | null
-  remoteHostId?: string | null
+  nodeId?: string | null
   composerModel?: ModelDescriptor | null
   sendOverridesRef?: React.MutableRefObject<ChatComposerSendOverrides>
   sendMessage: (
@@ -138,7 +140,7 @@ export function useChatComposerRuntime({
   canStop,
   isReady,
   workspaceId,
-  remoteHostId = null,
+  nodeId = null,
   composerModel,
   sendOverridesRef,
   sendMessage,
@@ -181,7 +183,7 @@ export function useChatComposerRuntime({
   }, [sessionBinding?.providerTargetId])
   const { models: providerSessionModels } = useProviderTargetModels(boundProviderTarget, {
     workspaceId,
-    hostId: remoteHostId,
+    nodeId,
   })
   const sessionModels = providerSessionModels
   const hasRuntimeCodeReviewSlot = useMemo(() => {
@@ -260,6 +262,30 @@ export function useChatComposerRuntime({
             ? undefined
             : { enabled: false, reason: 'Usage rate limits are unavailable for this session.' },
         )
+      }
+      if (
+        command.action.kind === 'uiAction'
+        && command.action.actionId === RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID
+      ) {
+        const modelState = runtimeUiSlotStates?.states.find(
+          (state): state is ChatRuntimeModelUiSlotState => state.kind === 'model',
+        )
+        const supportsFast = modelState?.serviceTiers.some(tier => tier.id === 'fast') ?? false
+        const availableCommand = withSlashCommandAvailability(
+          command,
+          supportsFast
+            ? undefined
+            : { enabled: false, reason: 'Fast service tier is unavailable for the active model.' },
+        )
+        return {
+          ...availableCommand,
+          ...(supportsFast && modelState?.serviceTier === 'fast'
+            ? {
+                stateLabel: 'Active',
+                stateTone: 'success' as const,
+              }
+            : {}),
+        }
       }
       return command
     },

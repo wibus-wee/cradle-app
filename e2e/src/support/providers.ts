@@ -100,10 +100,10 @@ export async function upsertCodexSimulatorProfile(input: {
 }
 
 /**
- * Route Claude Agent title generation to a dead endpoint so it cannot steal
- * FIFO conversation exchanges from the shared simulator.
+ * Route runtime title generation to a dead endpoint so it cannot steal FIFO
+ * conversation exchanges from the shared simulator.
  */
-export async function disableClaudeTitleGeneration(serverUrl: string): Promise<void> {
+export async function configureTitleGenerationSink(serverUrl: string): Promise<void> {
   const sink = await putJson(`${serverUrl}/profiles/${E2E_TITLE_SINK_PROFILE_ID}`, {
     name: 'E2E Title Sink',
     providerKind: 'anthropic',
@@ -212,7 +212,7 @@ export async function configureClaudeAgentSimulatorProvider(input: {
   permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
 }): Promise<void> {
   await upsertAnthropicSimulatorProfile(input)
-  await disableClaudeTitleGeneration(input.serverUrl)
+  await configureTitleGenerationSink(input.serverUrl)
   await ensureAgentForProfile({
     serverUrl: input.serverUrl,
     name: E2E_CLAUDE_AGENT_NAME,
@@ -229,6 +229,7 @@ export async function configureCodexSimulatorProvider(input: {
   createTempDir: () => string
 }): Promise<void> {
   await upsertCodexSimulatorProfile(input)
+  await configureTitleGenerationSink(input.serverUrl)
   await ensureAgentForProfile({
     serverUrl: input.serverUrl,
     name: E2E_CODEX_AGENT_NAME,

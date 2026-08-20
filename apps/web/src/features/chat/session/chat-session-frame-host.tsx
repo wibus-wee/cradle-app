@@ -22,8 +22,8 @@ export interface ChatSessionFrameDescriptor {
   workspaceId: string | null
   workspacePath?: string | null
   agentId: string | null
-  /** Remote host id when this session executes via Upstream Gateway. */
-  remoteHostId?: string | null
+  /** Fabric Node id when this session executes on a remote Node. */
+  nodeId?: string | null
 }
 
 export function ChatSessionFrameHost({
@@ -115,7 +115,7 @@ const ChatSessionFrame = ({
           workspaceId={descriptor.workspaceId}
           workspacePath={descriptor.workspacePath ?? null}
           agentId={descriptor.agentId}
-          remoteHostId={descriptor.remoteHostId ?? null}
+          nodeId={descriptor.nodeId ?? null}
         />
       </SurfaceActivityProvider>
     </div>
@@ -184,6 +184,6 @@ function areFrameListsEqual(
       && frame.workspaceId === nextFrame.workspaceId
       && (frame.workspacePath ?? null) === (nextFrame.workspacePath ?? null)
       && frame.agentId === nextFrame.agentId
-      && (frame.remoteHostId ?? null) === (nextFrame.remoteHostId ?? null)
+      && (frame.nodeId ?? null) === (nextFrame.nodeId ?? null)
   })
 }

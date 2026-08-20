@@ -25,7 +25,7 @@ export type SurfaceRoute
     | { to: '/work/new', params?: undefined, search?: { workspaceId?: string, issueId?: string } }
     | { to: '/work/$workId', params: { workId: string }, search?: undefined }
     | { to: '/pull-requests', params?: undefined, search?: { workId?: string } }
-    | { to: '/chat/new', params?: undefined, search?: { issueId?: string } }
+    | { to: '/chat/new', params?: undefined, search?: { issueId?: string, workspaceId?: string, sessionGroupId?: string } }
     | { to: '/chat/$sessionId', params: { sessionId: string }, search?: undefined }
     | { to: '/diff', params?: undefined, search?: { workspace?: string, repo?: string, path?: string, review?: string } }
     | { to: '/workspaces/$workspaceId', params: { workspaceId: string }, search?: undefined }
@@ -193,7 +193,14 @@ function surfaceRouteFromParts(
     case '/devtool':
       return { to }
     case '/chat/new':
-      return { to, search: { issueId: readString(search?.issueId) } }
+      return {
+        to,
+        search: {
+          issueId: readString(search?.issueId),
+          workspaceId: readString(search?.workspaceId),
+          sessionGroupId: readString(search?.sessionGroupId),
+        },
+      }
     case '/work/new':
       return { to, search: { workspaceId: readString(search?.workspaceId), issueId: readString(search?.issueId) } }
     case '/pull-requests':
@@ -275,7 +282,14 @@ export function surfaceDraftFromRoute(input: {
       id: 'new-chat',
       kind: 'new-chat',
       title: getI18n().t('chrome:surface.newChat'),
-      route: { to: '/chat/new' },
+      route: {
+        to: '/chat/new',
+        search: {
+          issueId: readString(search.issueId),
+          workspaceId: readString(search.workspaceId),
+          sessionGroupId: readString(search.sessionGroupId),
+        },
+      },
       closable: true,
     }
   }

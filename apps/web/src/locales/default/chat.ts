@@ -18,7 +18,6 @@ export default {
   'error.loadMessages': 'Failed to load messages. (Unknown error)',
   'history.loadEarlier': 'Load earlier messages',
   'history.loadingEarlier': 'Loading earlier messages…',
-  'execution.badge': 'On {{hostName}}',
   'execution.disconnected.message': '{{hostName}} is disconnected. Connect before sending.',
   'execution.disconnected.unknownHost': 'Remote host {{hostName}} was not found. Reconnect it in Settings.',
   'minimap.assistantReply': 'Assistant reply',

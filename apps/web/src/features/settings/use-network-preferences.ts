@@ -8,9 +8,12 @@ export type NetworkProxyMode = 'system' | 'custom' | 'environment'
 export type NetworkProxyStatusMode = NetworkProxyMode | 'off'
 export type NetworkProxySource = 'none' | 'system' | 'custom' | 'environment'
 export type NetworkInboundAccessMode = 'local' | 'network'
+export type NetworkRelaySource = 'managed' | 'external'
 
 export interface NetworkInboundPreferences {
   serverAccessMode: NetworkInboundAccessMode
+  relaySource: NetworkRelaySource
+  relayUrl: string | null
   managedRelayAccessMode: NetworkInboundAccessMode
   managedRelayPublicUrl: string | null
 }
@@ -37,11 +40,15 @@ const NetworkPreferencesSchema = z.object({
   customProxyUrl: z.string().nullable().default(null),
   inbound: z.object({
     serverAccessMode: z.enum(['local', 'network']).default('local'),
-    managedRelayAccessMode: z.enum(['local', 'network']).default('local'),
+    relaySource: z.enum(['managed', 'external']).default('managed'),
+    relayUrl: z.string().nullable().default(null),
+    managedRelayAccessMode: z.enum(['local', 'network']).default('network'),
     managedRelayPublicUrl: z.string().nullable().default(null),
   }).default({
     serverAccessMode: 'local',
-    managedRelayAccessMode: 'local',
+    relaySource: 'managed',
+    relayUrl: null,
+    managedRelayAccessMode: 'network',
     managedRelayPublicUrl: null,
   }),
 })

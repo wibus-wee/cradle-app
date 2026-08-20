@@ -8,6 +8,8 @@ import { formatTokenCount } from '~/lib/number-format'
 import { UsageBreakdown } from './usage-breakdown'
 import { UsageCacheBreakdownView } from './usage-cache-breakdown-view'
 import { CostEfficiencyTrend } from './usage-cost-efficiency'
+import { UsageDeviceBreakdown } from './usage-device-breakdown'
+import type { FleetUsage } from './usage-fleet'
 import { UsageHeatmap } from './usage-heatmap'
 import { UsageHeroCards } from './usage-hero-cards'
 import { UsagePatterns } from './usage-patterns'
@@ -40,6 +42,8 @@ export interface UsageDashboardViewProps {
   tools: ToolUsageBreakdown | null
   costEfficiency: CostEfficiency[]
   performance: RuntimePerformanceOverview | null
+  /** Fabric fleet usage (this device + remote nodes), null when unenrolled / no nodes. */
+  fleet: FleetUsage | null
   usageReady: boolean
   range: UsageRangeKey
   onRangeChange: (range: UsageRangeKey) => void
@@ -57,6 +61,7 @@ export function UsageDashboardView({
   tools,
   costEfficiency,
   performance,
+  fleet,
   usageReady,
   range,
   onRangeChange,
@@ -141,6 +146,7 @@ export function UsageDashboardView({
                 range={range}
                 hasCost={hasCost}
                 themeMode={themeMode}
+                fleet={fleet}
               />
             </div>
 
@@ -181,6 +187,12 @@ export function UsageDashboardView({
               {hasRankedUsage && (
                 <SectionCard>
                   <UsageBreakdown summary={summary} costSummary={costSummary} />
+                </SectionCard>
+              )}
+
+              {fleet && fleet.devices.length > 1 && (
+                <SectionCard>
+                  <UsageDeviceBreakdown fleet={fleet} range={range} />
                 </SectionCard>
               )}
 

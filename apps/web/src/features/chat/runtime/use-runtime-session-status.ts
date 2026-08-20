@@ -9,6 +9,7 @@ export {
 
 export interface RuntimeSessionStatusQueryOptions {
   refetchInterval?: number | false
+  refetchWhileActiveInterval?: number | false
 }
 
 export function useRuntimeSessionStatus(
@@ -17,12 +18,21 @@ export function useRuntimeSessionStatus(
   options: RuntimeSessionStatusQueryOptions = {},
 ) {
   const refetchInterval = options.refetchInterval ?? false
+  const refetchWhileActiveInterval = options.refetchWhileActiveInterval ?? false
 
   return useQuery({
     ...runtimeSessionStatusQueryOptions(sessionId),
     enabled: active && !!sessionId,
     staleTime: 1_000,
-    refetchInterval: active ? refetchInterval : false,
+    refetchInterval: (query) => {
+      if (!active) {
+        return false
+      }
+      if (refetchWhileActiveInterval && query.state.data?.activeRun) {
+        return refetchWhileActiveInterval
+      }
+      return refetchInterval
+    },
     refetchIntervalInBackground: true,
   })
 }

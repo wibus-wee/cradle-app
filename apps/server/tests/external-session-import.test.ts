@@ -144,7 +144,7 @@ describe('external session import', () => {
     expect(db().select().from(sessions).all()).toHaveLength(1)
 
     const relinkedPath = makeTempDirectory('cradle-import-relinked-')
-    expect(Workspace.relinkWorkspace(imported.items[0]!.workspaceId!, relinkedPath)).toMatchObject({
+    expect(await Workspace.relinkWorkspace(imported.items[0]!.workspaceId!, relinkedPath)).toMatchObject({
       availability: 'available',
       locator: { path: realpathSync(relinkedPath) },
     })

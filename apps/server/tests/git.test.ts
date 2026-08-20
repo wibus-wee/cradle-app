@@ -14,6 +14,7 @@ import {
   isWorkingTreeDirty,
   listGitWorktrees,
   removeGitWorktree,
+  resolveGitRepoRoot,
   stashAndPopAcrossCheckouts,
 } from '../src/modules/git/worktree-ops'
 import { workspaceFixture } from './helpers/workspace-fixture'
@@ -131,6 +132,19 @@ function createGitWorkspaceFixture(dir: string): void {
 }
 
 describe('git capability', () => {
+  it('classifies a non-Git workspace as an unavailable repository', async () => {
+    const workspaceRoot = makeTempDir('cradle-non-git-workspace-')
+    try {
+      await expect(resolveGitRepoRoot(workspaceRoot)).rejects.toMatchObject({
+        code: 'git_repository_unavailable',
+        status: 409,
+      })
+    }
+    finally {
+      rmSync(workspaceRoot, { recursive: true, force: true })
+    }
+  })
+
   it('reads diffs from an isolated session worktree', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const workspaceRoot = makeTempDir('cradle-git-workspace-')

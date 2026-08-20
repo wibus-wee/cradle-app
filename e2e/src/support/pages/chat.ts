@@ -211,7 +211,7 @@ export class ChatPage {
   }
 
   stopButton(): Locator {
-    return this.page.locator('[data-testid="chat-stop-btn"]')
+    return this.view().locator('[data-testid="chat-stop-btn"]')
   }
 
   async stop(): Promise<void> {
@@ -374,6 +374,13 @@ export class ChatPage {
 
   async waitForSessionInSidebar(sessionId: string, timeout = 10_000): Promise<void> {
     await expect(this.sessionItem(sessionId)).toBeVisible({ timeout })
+  }
+
+  async openSession(sessionId: string): Promise<void> {
+    const item = this.sessionItem(sessionId)
+    await expect(item).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await item.click()
+    await expect(this.view()).toHaveAttribute('data-chat-session-id', sessionId, { timeout: CHAT_TIMEOUT })
   }
 
   async openSessionMenu(sessionId: string): Promise<void> {

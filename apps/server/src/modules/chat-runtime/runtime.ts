@@ -41,6 +41,7 @@ import type { ActiveRunLifecycleDeps } from './lifecycle/cancel'
 import {
   abortAllRuns as abortAllRunsFromLifecycle,
   abortRun as abortRunFromLifecycle,
+  cancelProviderTargetSessions as cancelProviderTargetSessionsFromLifecycle,
   cancelSession as cancelSessionFromLifecycle,
   completeTerminalPersistedActiveRunForSession as completeTerminalPersistedActiveRunForSessionFromLifecycle,
 } from './lifecycle/cancel'
@@ -575,6 +576,10 @@ export async function abortRun(runId: string): Promise<void> {
  */
 export async function cancelSession(sessionId: string): Promise<void> {
   return cancelSessionFromLifecycle(sessionId, activeRunLifecycleDeps)
+}
+
+export async function cancelProviderTargetSessions(providerTargetId: string): Promise<void> {
+  return cancelProviderTargetSessionsFromLifecycle(providerTargetId, activeRunLifecycleDeps)
 }
 
 export async function abortAllRuns(): Promise<void> {

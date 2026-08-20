@@ -7,22 +7,18 @@ Rendered at the `/devtool` route in a separate Electron window or at `#/devtool`
 The root page owns the devtool tab model and window-level `Cmd/Ctrl + 1..5` tab switching listener.
 User-facing diagnostic labels and status text are owned by the `devtool` i18n namespace.
 
-## Directories
+| Area | Location | Responsibility |
+| --- | --- | --- |
+| Window shell | [`ipc-devtool-page.tsx`](./ipc-devtool-page.tsx) | Composes the devtool panels and owns `Cmd/Ctrl + 1..5` tab switching. |
+| IPC and ACP | [`ipc`](./ipc), [`acp`](./acp), [`flow-color.ts`](./flow-color.ts) | Inspects typed renderer/main IPC and ACP protocol events with shared flow colors. |
+| Agent context | [`agent-context`](./agent-context) | Displays context snapshots captured before provider stream execution. |
+| Observability | [`observability`](./observability) | Inspects canonical events and incidents and exposes local export controls. |
+| Plugins | [`plugins`](./plugins) | Diagnoses discovery, layers, contributions, client panels, and commands. |
+| Resources | [`resources`](./resources) | Separates the Server-querying container from a fixture-renderable View and reports renderer, Server, managed Relay, runtime, CLI TUI, and bottom-panel memory/CPU with partial failure feedback. |
+| Background work | [`background-activity`](./background-activity) | Displays the Server-owned registry of maintenance and runtime activity in the dev footer. |
+| Surfaces | [`surfaces`](./surfaces) | Diagnoses active routes, opened surfaces, ordering, and owner identity. |
+| Health and memory | [`health`](./health), [`memory`](./memory) | Displays localized Server health, renderer memory, and Web Vitals. |
 
-- **ipc/**: IPC trace inspection — real-time view of all typed IPC calls between renderer and main process
-- **acp/**: ACP event inspection — real-time view of ACP agent protocol events
-- **agent-context/**: Agent context snapshots captured before provider stream execution
-- **observability/**: Canonical observability event/incident inspection and local export controls
-- **plugins/**: Plugin discovery, layer state, declared/runtime contribution graph, client panel registration, and command execution diagnostics
-- **resources/**: AppHeader resources popover with renderer, server, CLI TUI, bottom-panel process memory breakdown, and partial endpoint failure feedback
-- **background-activity/**: Dev footer popover for the server-owned registry of runtime maintenance and other background activity
-- **surfaces/**: Router and app surface diagnostics for active route, opened surfaces, ordering, and owner identity
-
-## Files
-
-- **ipc-devtool-page.tsx**: DevtoolPage — root component for the devtool window; composes all devtool panels and installs `Cmd/Ctrl + 1..5` tab shortcuts
-- **ipc-devtool-page.test.tsx**: Regression tests for devtool tab shortcut routing
-- **flow-color.ts**: Shared color helpers for flow direction rendering (shared by ipc/ and acp/)
-- **health/health-panel.tsx**: Server health panel with localized loading/error labels and health metric rows.
-- **memory/memory-panel.tsx**: Renderer memory and Web Vitals panel with localized headings and empty states.
-- **index.ts**: Barrel export
+[`ipc-devtool-page.test.tsx`](./ipc-devtool-page.test.tsx) owns the devtool tab
+shortcut regression coverage. [`index.ts`](./index.ts) is the public feature
+barrel.

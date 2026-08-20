@@ -70,7 +70,7 @@ describe('desktop tray projection', () => {
       store.insert(workspaces).values({
         id: workspaceId,
         name: 'Desktop Workspace',
-        locatorJson: JSON.stringify({ hostId: 'local', path: workspaceRoot }),
+        locatorJson: JSON.stringify({ nodeId: 'local', path: workspaceRoot }),
         path: workspaceRoot,
       }).run()
       store.insert(sessions).values({

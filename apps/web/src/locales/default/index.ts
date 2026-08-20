@@ -13,6 +13,7 @@ import git from './git'
 import home from './home'
 import kanban from './kanban'
 import newChat from './new-chat'
+import nodes from './nodes'
 import onboarding from './onboarding'
 import pullRequests from './pull-requests'
 import resourcesPage from './resources'
@@ -43,6 +44,7 @@ const resources = {
   home,
   kanban,
   'new-chat': newChat,
+  nodes,
   onboarding,
   'pull-requests': pullRequests,
   'resources': resourcesPage,

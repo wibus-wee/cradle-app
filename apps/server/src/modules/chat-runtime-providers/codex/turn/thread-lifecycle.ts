@@ -136,6 +136,7 @@ export async function startOrResumeThread(
   runtimeSession: RuntimeSession,
   params: {
     model?: string | null
+    serviceTier?: string | null
     cwd: string
     runtimeWorkspaceRoots: string[]
     approvalPolicy: CodexConfig['approvalPolicy']
@@ -147,6 +148,7 @@ export async function startOrResumeThread(
 ): Promise<CodexThreadStart> {
   const baseParams = {
     model: params.model,
+    ...(params.serviceTier ? { serviceTier: params.serviceTier } : {}),
     cwd: params.cwd,
     runtimeWorkspaceRoots: params.runtimeWorkspaceRoots,
     approvalPolicy: params.approvalPolicy,

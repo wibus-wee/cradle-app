@@ -2,7 +2,7 @@ import type { GetSessionsByIdResponse } from '~/api-gen/types.gen'
 
 export type SessionExecution
   = | { kind: 'local' }
-    | { kind: 'remote-host', hostId: string, remoteSessionId: string }
+    | { kind: 'node', nodeId: string, remoteSessionId: string }
 
 type SessionWithExecution = {
   // Accept API payloads and loosely typed list rows; validate at runtime.
@@ -14,24 +14,24 @@ export function readSessionExecution(session: SessionWithExecution | null | unde
   if (!execution || typeof execution !== 'object') {
     return { kind: 'local' }
   }
-  const record = execution as { kind?: unknown, hostId?: unknown, remoteSessionId?: unknown }
-  if (record.kind === 'remote-host'
-    && typeof record.hostId === 'string'
+  const record = execution as { kind?: unknown, nodeId?: unknown, remoteSessionId?: unknown }
+  if (record.kind === 'node'
+    && typeof record.nodeId === 'string'
     && typeof record.remoteSessionId === 'string') {
     return {
-      kind: 'remote-host',
-      hostId: record.hostId,
+      kind: 'node',
+      nodeId: record.nodeId,
       remoteSessionId: record.remoteSessionId,
     }
   }
   return { kind: 'local' }
 }
 
-export function isRemoteHostExecution(session: SessionWithExecution | null | undefined): boolean {
-  return readSessionExecution(session).kind === 'remote-host'
+export function isNodeExecution(session: SessionWithExecution | null | undefined): boolean {
+  return readSessionExecution(session).kind === 'node'
 }
 
-export function getRemoteHostId(session: SessionWithExecution | null | undefined): string | null {
+export function getSessionNodeId(session: SessionWithExecution | null | undefined): string | null {
   const execution = readSessionExecution(session)
-  return execution.kind === 'remote-host' ? execution.hostId : null
+  return execution.kind === 'node' ? execution.nodeId : null
 }

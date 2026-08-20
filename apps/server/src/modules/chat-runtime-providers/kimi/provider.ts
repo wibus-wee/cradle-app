@@ -254,7 +254,7 @@ class KimiProvider implements ChatRuntime {
       }
       if (status && 'busy' in status) {
         states.push({ kind: 'status', slotId: 'kimi:status', threadId: providerSessionId, status: status.busy ? 'active' : 'idle', activeFlags: [], updatedAt })
-        states.push({ kind: 'model', slotId: 'kimi:model', threadId: providerSessionId, modelId: status.model ?? null, modelLabel: status.model ?? null, modelProvider: null, serviceTier: null, supportsImages: null, supportsWebSearch: null, supportsNamespaceTools: null, updatedAt })
+        states.push({ kind: 'model', slotId: 'kimi:model', threadId: providerSessionId, modelId: status.model ?? null, modelLabel: status.model ?? null, modelProvider: null, serviceTier: null, serviceTiers: [], supportsImages: null, supportsWebSearch: null, supportsNamespaceTools: null, updatedAt })
         states.push({ kind: 'config', slotId: 'kimi:config', threadId: providerSessionId, modelId: status.model ?? null, approvalPolicy: status.permission, sandboxMode: null, allowedApprovalPolicyCount: null, allowedSandboxModeCount: null, featureRequirementCount: null, webSearchModeCount: null, updatedAt })
         if (status.plan_mode) {
           states.push({

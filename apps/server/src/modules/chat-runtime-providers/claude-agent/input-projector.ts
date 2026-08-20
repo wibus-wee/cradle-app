@@ -297,7 +297,9 @@ export function buildClaudeQueryOptions(input: {
     queryOptions.model = effectiveModel
   }
 
-  const registeredServers = getRegisteredMcpServers()
+  const registeredServers = getRegisteredMcpServers({
+    chatSessionId: input.input.runtimeSession.chatSessionId,
+  })
   if (Object.keys(registeredServers).length > 0) {
     queryOptions.mcpServers = {
       ...queryOptions.mcpServers,

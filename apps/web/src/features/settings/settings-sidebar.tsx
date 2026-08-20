@@ -3,6 +3,7 @@ import {
   ArrowToDownLine as ArrowDownToLineIcon,
   Box3Line as BoxesIcon,
   ChipLine as ChipIcon,
+  ComputerLine as ComputerIcon,
   Cursor2Line as MousePointer2Icon,
   CylinderLine as DatabaseIcon,
   DownloadLine as DownloadIcon,
@@ -20,7 +21,6 @@ import {
   PluginLine as PlugIcon,
   RobotLine as BotIcon,
   SandglassLine as HourglassIcon,
-  ServerLine as ServerIcon,
   TerminalBoxLine as TerminalIcon,
   WifiLine as WifiIcon,
 } from '@mingcute/react'
@@ -185,6 +185,12 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     labelKey: 'sidebar.section.system',
     items: [
       {
+        id: 'nodes',
+        labelKey: 'nav.nodes',
+        icon: ComputerIcon,
+        searchKeys: ['nav.nodes'],
+      },
+      {
         id: 'serverEndpoint',
         labelKey: 'nav.network',
         icon: WifiIcon,
@@ -207,12 +213,6 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
           'features.nativeProviderSkillProjection.label',
           'features.localAuthForDangerousActions.label',
         ],
-      },
-      {
-        id: 'remoteHosts',
-        labelKey: 'nav.remoteHosts',
-        icon: ServerIcon,
-        searchKeys: ['remoteHosts.form.sshTarget' as SettingsKey, 'remoteHosts.form.displayName' as SettingsKey],
       },
       { id: 'downloads', labelKey: 'nav.downloads', icon: DownloadIcon },
       {

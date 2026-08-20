@@ -36,7 +36,6 @@ const INBOUND_ACCESS_OPTIONS: Array<{ value: NetworkInboundAccessMode, labelKey:
   { value: 'local', labelKey: 'network.inbound.access.local' },
   { value: 'network', labelKey: 'network.inbound.access.network' },
 ]
-
 function normalizeProxyUrl(value: string): string | null {
   const raw = value.trim()
   if (!raw) {
@@ -252,7 +251,7 @@ export function ProxySettingsGroup() {
   )
 }
 
-export function InboundAccessSettingsGroup() {
+export function ServerAccessSettingsGroup() {
   const { t } = useTranslation('settings')
   const {
     prefs,

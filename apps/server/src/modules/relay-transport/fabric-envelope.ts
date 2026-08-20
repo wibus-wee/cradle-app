@@ -1,18 +1,18 @@
 import { AppError } from '../../errors/app-error'
-import type { RelayEnvelope, RelayEnvelopeKind, RelayPriority } from './protocol'
-import { RELAY_PROTOCOL_VERSION } from './protocol'
-import type { RelayOutboundEnvelope } from './session'
+import type { FabricSessionEnvelope, FabricSessionEnvelopeKind, RelayPriority } from './protocol'
+import { FABRIC_SESSION_PROTOCOL_VERSION } from './protocol'
+import type { FabricSessionOutboundEnvelope } from './session'
 
 export const FABRIC_ENVELOPE_VERSION = 3
 const HEADER_BYTES = 24
 
 export interface FabricEnvelopeRoute { fabricId: string, nodeId: string, linkId: string }
-export interface DecodedFabricEnvelope extends FabricEnvelopeRoute { streamId?: string, seq: number, ack: number, kind: 'link_open' | 'link_ready' | RelayEnvelopeKind, priority: RelayPriority, payload: Uint8Array }
+export interface DecodedFabricEnvelope extends FabricEnvelopeRoute { streamId?: string, seq: number, ack: number, kind: 'link_open' | 'link_ready' | FabricSessionEnvelopeKind, priority: RelayPriority, payload: Uint8Array }
 
 const kindToCode = { link_open: 1, link_ready: 2, relay_data_frame: 3, relay_peer_closed: 4, relay_error: 5 } as const
 const codeToKind = new Map<number, DecodedFabricEnvelope['kind']>(Object.entries(kindToCode).map(([kind, code]) => [code, kind as DecodedFabricEnvelope['kind']]))
 
-export function encodeFabricEnvelope(route: FabricEnvelopeRoute, frame: RelayOutboundEnvelope): Uint8Array {
+export function encodeFabricEnvelope(route: FabricEnvelopeRoute, frame: FabricSessionOutboundEnvelope): Uint8Array {
   const fields = [utf8(route.fabricId, 'Fabric id'), utf8(route.nodeId, 'Node id'), utf8(route.linkId, 'Link id'), frame.streamId ? utf8(frame.streamId, 'Stream id') : new Uint8Array()]
   const kind = kindToCode[frame.kind]
   if (!kind || frame.payload.byteLength === 0) { throw protocolError('Invalid Fabric relay envelope.') }
@@ -41,13 +41,12 @@ export function decodeFabricEnvelope(bytes: Uint8Array): DecodedFabricEnvelope {
 }
 
 /**
- * Converts a real v3 envelope into the logical envelope consumed by the
- * existing encrypted session state machine. Routing has already been checked
- * by FabricNodeLinkManager, so it is deliberately not retained here.
+ * Converts a validated Fabric v3 envelope into the session's logical frame.
+ * The link identity is retained so the session can reject cross-link frames.
  */
-export function toRelaySessionEnvelope(envelope: DecodedFabricEnvelope): RelayEnvelope {
+export function toFabricSessionEnvelope(envelope: DecodedFabricEnvelope): FabricSessionEnvelope {
   if (envelope.kind === 'link_open' || envelope.kind === 'link_ready') { throw protocolError('Fabric link control is not an encrypted session frame.') }
-  return { version: RELAY_PROTOCOL_VERSION, roomId: envelope.linkId, seq: envelope.seq, kind: envelope.kind, priority: envelope.priority, ...(envelope.streamId ? { streamId: envelope.streamId } : {}), payload: envelope.payload }
+  return { version: FABRIC_SESSION_PROTOCOL_VERSION, linkId: envelope.linkId, seq: envelope.seq, kind: envelope.kind, priority: envelope.priority, ...(envelope.streamId ? { streamId: envelope.streamId } : {}), payload: envelope.payload }
 }
 
 function utf8(value: string, label: string): Uint8Array { const bytes = new TextEncoder().encode(value); if (!bytes.byteLength || bytes.byteLength > 0xFFFF) { throw protocolError(`${label} is invalid.`) } return bytes }

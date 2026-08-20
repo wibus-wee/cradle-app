@@ -4,8 +4,13 @@ import { useTranslation } from 'react-i18next'
 
 import {
   deleteWorkspacesByWorkspaceIdMutation,
+  getSessionsByIdQueryKey,
+  getSessionsByIdWorkQueryKey,
+  getSessionsQueryKey,
+  getWorksByIdQueryKey,
   getWorkspacesOptions,
   getWorkspacesQueryKey,
+  getWorksQueryKey,
   patchWorkspacesByWorkspaceIdMutation,
   postWorkspacesFromDirectoryMutation,
   postWorkspacesInspectDirectoryMutation,
@@ -168,7 +173,7 @@ export function useAddWorkspace() {
     })
     try {
       const name = path.split('/').filter(Boolean).pop() ?? path
-      await createWorkspace.mutateAsync({ body: { name, locator: { hostId: 'local', path } } })
+      await createWorkspace.mutateAsync({ body: { name, locator: { nodeId: 'local', path } } })
       trackProductTaskFinished(analyticsTask, 'success')
       setRecognition(null)
     }
@@ -187,7 +192,7 @@ export function useAddWorkspace() {
 
   const createFromLocator = useCallback(async (input: CreateWorkspaceInput) => {
     setAdding(true)
-    const taskVariant = input.locator.hostId === 'local' ? 'local' : 'remote'
+    const taskVariant = input.locator.nodeId === 'local' ? 'local' : 'remote'
     const analyticsTask = trackProductTaskStarted({
       feature_domain: 'workspace',
       task_kind: 'workspace_add',
@@ -224,9 +229,22 @@ export function useAddWorkspace() {
 export function useDeleteWorkspace() {
   const queryClient = useQueryClient()
 
-  const { mutate: remove } = useMutation({
+  const { mutateAsync: remove } = useMutation({
     ...deleteWorkspacesByWorkspaceIdMutation(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
+    onSuccess: async (result) => {
+      for (const sessionId of result.removedSessionIds) {
+        queryClient.removeQueries({ queryKey: getSessionsByIdQueryKey({ path: { id: sessionId } }) })
+        queryClient.removeQueries({ queryKey: getSessionsByIdWorkQueryKey({ path: { id: sessionId } }) })
+      }
+      for (const workId of result.removedWorkIds) {
+        queryClient.removeQueries({ queryKey: getWorksByIdQueryKey({ path: { id: workId } }) })
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
+      ])
+    },
   })
 
   return { remove }

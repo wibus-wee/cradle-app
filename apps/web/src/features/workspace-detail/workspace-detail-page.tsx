@@ -817,7 +817,7 @@ function WorkspaceDetailMainColumn({ active, owner }: { active: boolean, owner: 
         <div className="pointer-events-auto mx-auto max-w-160">
           <DraftChatComposer
             workspaceId={workspaceId}
-            remoteHostId={workspace && !isLocalWorkspace(workspace) ? workspace.locator.hostId : null}
+            nodeId={workspace && !isLocalWorkspace(workspace) ? workspace.locator.nodeId : null}
             active={active}
             onSend={handleDraftComposerSend}
             onSendInNewWindow={handleDraftComposerSendInNewWindow}

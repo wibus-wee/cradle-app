@@ -1,104 +1,72 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  computeRelayConfirm,
-  computeRelaySharedSecret,
-  deriveRelayKeys,
-  generateRelayKeyPair,
+  computeFabricSharedSecret,
+  deriveFabricSessionKeys,
+  fabricPublicKeyFingerprint,
+  FabricSessionCipher,
+  generateFabricSessionKeyPair,
   loadPrivateKeyBytes,
   publicKeyFromPrivate,
   receiveKeyForRole,
-  RelayCipher,
-  relayPublicKeyFingerprint,
   sendKeyForRole,
 } from '../../src/modules/relay-transport/crypto'
 
 describe('relay crypto', () => {
   it('derives matching ECDH shared secrets from both sides', () => {
-    const host = generateRelayKeyPair()
-    const controller = generateRelayKeyPair()
+    const node = generateFabricSessionKeyPair()
+    const controller = generateFabricSessionKeyPair()
 
-    const hostSecret = computeRelaySharedSecret(host.privateKeyBase64, controller.publicKeyBase64)
-    const controllerSecret = computeRelaySharedSecret(controller.privateKeyBase64, host.publicKeyBase64)
+    const nodeSecret = computeFabricSharedSecret(node.privateKeyBase64, controller.publicKeyBase64)
+    const controllerSecret = computeFabricSharedSecret(controller.privateKeyBase64, node.publicKeyBase64)
 
-    expect(Buffer.from(hostSecret).equals(Buffer.from(controllerSecret))).toBe(true)
+    expect(Buffer.from(nodeSecret).equals(Buffer.from(controllerSecret))).toBe(true)
   })
 
-  it('derives matching traffic keys when the pairing code matches', () => {
-    const host = generateRelayKeyPair()
-    const controller = generateRelayKeyPair()
-    const code = 'PAIR-1234'
+  it('derives matching traffic keys for the same Fabric link', () => {
+    const node = generateFabricSessionKeyPair()
+    const controller = generateFabricSessionKeyPair()
+    const nodeSecret = computeFabricSharedSecret(node.privateKeyBase64, controller.publicKeyBase64)
+    const controllerSecret = computeFabricSharedSecret(controller.privateKeyBase64, node.publicKeyBase64)
 
-    const hostSecret = computeRelaySharedSecret(host.privateKeyBase64, controller.publicKeyBase64)
-    const controllerSecret = computeRelaySharedSecret(controller.privateKeyBase64, host.publicKeyBase64)
+    const nodeKeys = deriveFabricSessionKeys(nodeSecret, { fabricId: 'fabric-a', linkId: 'link-a' })
+    const controllerKeys = deriveFabricSessionKeys(controllerSecret, { fabricId: 'fabric-a', linkId: 'link-a' })
 
-    const hostKeys = deriveRelayKeys(hostSecret, code)
-    const controllerKeys = deriveRelayKeys(controllerSecret, code)
-
-    expect(Buffer.from(hostKeys.hostSendKey).equals(Buffer.from(controllerKeys.hostSendKey))).toBe(true)
-    expect(Buffer.from(hostKeys.controllerSendKey).equals(Buffer.from(controllerKeys.controllerSendKey))).toBe(true)
-    expect(Buffer.from(hostKeys.confirmKey).equals(Buffer.from(controllerKeys.confirmKey))).toBe(true)
+    expect(Buffer.from(nodeKeys.nodeSendKey).equals(Buffer.from(controllerKeys.nodeSendKey))).toBe(true)
+    expect(Buffer.from(nodeKeys.controllerSendKey).equals(Buffer.from(controllerKeys.controllerSendKey))).toBe(true)
   })
 
-  it('derives different keys when the pairing code differs', () => {
-    const host = generateRelayKeyPair()
-    const controller = generateRelayKeyPair()
-    const secret = computeRelaySharedSecret(host.privateKeyBase64, controller.publicKeyBase64)
+  it('derives different keys when the Fabric link context differs', () => {
+    const node = generateFabricSessionKeyPair()
+    const controller = generateFabricSessionKeyPair()
+    const secret = computeFabricSharedSecret(node.privateKeyBase64, controller.publicKeyBase64)
 
-    const a = deriveRelayKeys(secret, 'CODE-A')
-    const b = deriveRelayKeys(secret, 'CODE-B')
+    const a = deriveFabricSessionKeys(secret, { fabricId: 'fabric-a', linkId: 'link-a' })
+    const b = deriveFabricSessionKeys(secret, { fabricId: 'fabric-b', linkId: 'link-b' })
 
-    expect(Buffer.from(a.hostSendKey).equals(Buffer.from(b.hostSendKey))).toBe(false)
-    expect(Buffer.from(a.confirmKey).equals(Buffer.from(b.confirmKey))).toBe(false)
-  })
-
-  it('computes identical confirm values from both peers (canonical transcript)', () => {
-    const host = generateRelayKeyPair()
-    const controller = generateRelayKeyPair()
-    const code = 'PAIR-XYZ'
-
-    const hostSecret = computeRelaySharedSecret(host.privateKeyBase64, controller.publicKeyBase64)
-    const controllerSecret = computeRelaySharedSecret(controller.privateKeyBase64, host.publicKeyBase64)
-    const hostKeys = deriveRelayKeys(hostSecret, code)
-    const controllerKeys = deriveRelayKeys(controllerSecret, code)
-
-    const hostConfirm = computeRelayConfirm({
-      confirmKey: hostKeys.confirmKey,
-      controllerPublicKeyBase64: controller.publicKeyBase64,
-      hostPublicKeyBase64: host.publicKeyBase64,
-      sharedSecret: hostSecret,
-    })
-    const controllerConfirm = computeRelayConfirm({
-      confirmKey: controllerKeys.confirmKey,
-      controllerPublicKeyBase64: controller.publicKeyBase64,
-      hostPublicKeyBase64: host.publicKeyBase64,
-      sharedSecret: controllerSecret,
-    })
-
-    expect(hostConfirm).toBe(controllerConfirm)
+    expect(Buffer.from(a.nodeSendKey).equals(Buffer.from(b.nodeSendKey))).toBe(false)
   })
 
   it('round-trips AEAD encryption with per-direction keys', () => {
-    const host = generateRelayKeyPair()
-    const controller = generateRelayKeyPair()
-    const secret = computeRelaySharedSecret(host.privateKeyBase64, controller.publicKeyBase64)
-    const keys = deriveRelayKeys(secret, 'CODE')
+    const node = generateFabricSessionKeyPair()
+    const controller = generateFabricSessionKeyPair()
+    const secret = computeFabricSharedSecret(node.privateKeyBase64, controller.publicKeyBase64)
+    const keys = deriveFabricSessionKeys(secret, { fabricId: 'fabric-a', linkId: 'link-a' })
 
-    // Host encrypts with its send key; controller decrypts with the same key
-    // (controller's "receive" key == host's send key).
-    const hostSender = new RelayCipher(sendKeyForRole(keys, 'host'))
-    const controllerReceiver = new RelayCipher(receiveKeyForRole(keys, 'controller'))
+    // The Node encrypts with its send key; the Controller decrypts with it.
+    const nodeSender = new FabricSessionCipher(sendKeyForRole(keys, 'node'))
+    const controllerReceiver = new FabricSessionCipher(receiveKeyForRole(keys, 'controller'))
 
     const plaintext = new TextEncoder().encode('hello relay tunnel — end to end')
-    const sealed = hostSender.encrypt(plaintext)
+    const sealed = nodeSender.encrypt(plaintext)
     const opened = controllerReceiver.decrypt(sealed)
 
     expect(Buffer.from(opened).equals(Buffer.from(plaintext))).toBe(true)
   })
 
   it('produces a fresh ciphertext (random nonce) per encryption', () => {
-    const keys = deriveRelayKeys(new Uint8Array(32).fill(1), 'CODE')
-    const cipher = new RelayCipher(sendKeyForRole(keys, 'host'))
+    const keys = deriveFabricSessionKeys(new Uint8Array(32).fill(1), { fabricId: 'fabric-a', linkId: 'link-a' })
+    const cipher = new FabricSessionCipher(sendKeyForRole(keys, 'node'))
     const plaintext = new TextEncoder().encode('same input')
 
     const a = cipher.encrypt(plaintext)
@@ -110,7 +78,7 @@ describe('relay crypto', () => {
   })
 
   it('keeps the benchmark baseline on XChaCha for bulk frames', () => {
-    const cipher = new RelayCipher(new Uint8Array(32).fill(7), false)
+    const cipher = new FabricSessionCipher(new Uint8Array(32).fill(7), false)
     const plaintext = new Uint8Array(64 * 1024)
     const sealed = cipher.encrypt(plaintext)
 
@@ -120,30 +88,30 @@ describe('relay crypto', () => {
   })
 
   it('rejects tampered ciphertext (auth tag verification)', () => {
-    const keys = deriveRelayKeys(new Uint8Array(32).fill(1), 'CODE')
-    const cipher = new RelayCipher(sendKeyForRole(keys, 'host'))
+    const keys = deriveFabricSessionKeys(new Uint8Array(32).fill(1), { fabricId: 'fabric-a', linkId: 'link-a' })
+    const cipher = new FabricSessionCipher(sendKeyForRole(keys, 'node'))
     const sealed = cipher.encrypt(new TextEncoder().encode('payload'))
 
     const buf = Buffer.from(sealed, 'base64')
     buf[buf.length - 1] ^= 0x01 // flip a bit in the auth tag
-    const tampered = buf.toString('base64')
+    const tampered = new Uint8Array(buf)
 
     expect(() => cipher.decrypt(tampered)).toThrow()
   })
 
   it('round-trips a private key through storage and re-derives the public key', () => {
-    const pair = generateRelayKeyPair()
+    const pair = generateFabricSessionKeyPair()
     const reloaded = publicKeyFromPrivate(pair.privateKeyBase64)
     expect(reloaded).toBe(pair.publicKeyBase64)
     expect(loadPrivateKeyBytes(pair.privateKeyBase64).length).toBe(32)
   })
 
   it('produces stable, distinct fingerprints', () => {
-    const a = generateRelayKeyPair()
-    const b = generateRelayKeyPair()
-    const fpA = relayPublicKeyFingerprint(a.publicKeyBase64)
-    const fpA2 = relayPublicKeyFingerprint(a.publicKeyBase64)
-    const fpB = relayPublicKeyFingerprint(b.publicKeyBase64)
+    const a = generateFabricSessionKeyPair()
+    const b = generateFabricSessionKeyPair()
+    const fpA = fabricPublicKeyFingerprint(a.publicKeyBase64)
+    const fpA2 = fabricPublicKeyFingerprint(a.publicKeyBase64)
+    const fpB = fabricPublicKeyFingerprint(b.publicKeyBase64)
 
     expect(fpA).toBe(fpA2) // stable
     expect(fpA).not.toBe(fpB) // distinct

@@ -46,6 +46,8 @@ export interface WorkspaceSessionItemViewProps {
   isRegeneratingTitle: boolean
   runtimeIcon: RuntimeIconDescriptor | undefined
   relativeTime: string
+  /** Pre-resolved Node display name when this session executes on a Fabric Node. */
+  nodeLabel?: string | null
   draggable: boolean
   canOpenInNewWindow: boolean
   onOpen: () => void
@@ -84,6 +86,7 @@ export function WorkspaceSessionItemView({
   isRegeneratingTitle,
   runtimeIcon,
   relativeTime,
+  nodeLabel,
   draggable,
   canOpenInNewWindow,
   onOpen,
@@ -101,6 +104,7 @@ export function WorkspaceSessionItemView({
 }: WorkspaceSessionItemViewProps) {
   const { t } = useTranslation('workspace')
   const { t: tWork } = useTranslation('work')
+  const { t: tNodes } = useTranslation('nodes')
   const sessionTitle = session.title?.trim()
     || work?.title
     || t('session.fallbackTitle')
@@ -375,6 +379,18 @@ export function WorkspaceSessionItemView({
                     >
                       <FolderIcon className="size-3 shrink-0" aria-hidden="true" />
                       <span className="min-w-0 truncate">{workspace.name}</span>
+                    </span>
+                    )
+                  : null}
+                {nodeLabel
+                  ? (
+                    <span
+                      className="flex min-w-0 items-center gap-1.5 px-2.5 pb-1.5 pl-8 text-[11px] text-muted-foreground"
+                      data-testid={`session-node-${session.id}`}
+                    >
+                      <span className="min-w-0 truncate">
+                        {tNodes('session.onNode', { nodeName: nodeLabel })}
+                      </span>
                     </span>
                     )
                   : null}

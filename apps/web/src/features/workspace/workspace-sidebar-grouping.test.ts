@@ -1,10 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { RemoteHostRecord } from '~/features/remote-hosts/use-remote-host-connection'
-
 import type { Workspace } from './types'
 import type { WorkspaceSession } from './use-session'
-import type { SidebarSessionEntry } from './workspace-sidebar-grouping'
+import type { FabricNodeSummary, SidebarSessionEntry } from './workspace-sidebar-grouping'
 import {
   classifyStatusBucket,
   classifyUpdatedBucket,
@@ -13,7 +11,7 @@ import {
 } from './workspace-sidebar-grouping'
 
 function createSession(overrides: Partial<WorkspaceSession> & Pick<WorkspaceSession, 'id'>): WorkspaceSession {
-  const now = 1_700_000_000_000
+  const now = 1_700_000_000
   return {
     workspaceId: 'workspace-1',
     title: overrides.id,
@@ -45,46 +43,48 @@ function createSession(overrides: Partial<WorkspaceSession> & Pick<WorkspaceSess
 const workspace: Workspace = {
   id: 'workspace-1',
   name: 'Cradle',
-  locator: { hostId: 'local', path: '/tmp/cradle' },
+  locator: { nodeId: 'local', path: '/tmp/cradle' },
   gitIdentity: {},
   identifier: 'cradle',
   availability: 'available',
   multiFolder: false,
   pinned: 0,
-  createdAt: 1_700_000_000_000,
-  updatedAt: 1_700_000_000_000,
+  createdAt: 1_700_000_000,
+  updatedAt: 1_700_000_000,
 }
 
 function entry(session: WorkspaceSession): SidebarSessionEntry {
   return { session, workspace }
 }
 
-function createRemoteHost(overrides: Partial<RemoteHostRecord> & Pick<RemoteHostRecord, 'id'>): RemoteHostRecord {
+function createNode(overrides: Partial<FabricNodeSummary> & Pick<FabricNodeSummary, 'nodeId'>): FabricNodeSummary {
   return {
-    displayName: overrides.id,
-    enabled: true,
-    lastSeenAt: null,
-    connectionConfigJson: '{}',
-    capabilitiesJson: '{}',
-    createdAt: 1_700_000_000_000,
-    updatedAt: 1_700_000_000_000,
-    connectionState: 'connected',
-    lastError: null,
+    fabricId: 'fabric-1',
+    displayName: overrides.nodeId,
+    platform: 'darwin',
+    version: '0.0.0',
+    capabilities: [],
+    status: 'online',
+    lastSeenAt: '2026-07-20T00:00:00.000Z',
+    revision: 1,
     ...overrides,
   }
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000
+const DAY_SECONDS = 24 * 60 * 60
 // A fixed local "now" at noon so calendar-day bucketing is deterministic.
-const NOW = new Date(2026, 6, 20, 12, 0, 0).getTime()
+const NOW_MS = new Date(2026, 6, 20, 12, 0, 0).getTime()
+const NOW_SECONDS = Math.floor(NOW_MS / 1000)
 
 describe('classifyUpdatedBucket', () => {
-  it('buckets by local calendar day distance', () => {
-    expect(classifyUpdatedBucket(NOW - 60_000, NOW)).toBe('today')
-    expect(classifyUpdatedBucket(NOW - DAY_MS, NOW)).toBe('yesterday')
-    expect(classifyUpdatedBucket(NOW - 3 * DAY_MS, NOW)).toBe('previous7Days')
-    expect(classifyUpdatedBucket(NOW - 7 * DAY_MS, NOW)).toBe('previous7Days')
-    expect(classifyUpdatedBucket(NOW - 8 * DAY_MS, NOW)).toBe('earlier')
+  it('splits the current day at one hour, then buckets by local calendar day distance', () => {
+    expect(classifyUpdatedBucket(NOW_SECONDS - 60, NOW_MS)).toBe('lastHour')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 3_599, NOW_MS)).toBe('lastHour')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 3_600, NOW_MS)).toBe('earlierToday')
+    expect(classifyUpdatedBucket(NOW_SECONDS - DAY_SECONDS, NOW_MS)).toBe('yesterday')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 3 * DAY_SECONDS, NOW_MS)).toBe('previous7Days')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 7 * DAY_SECONDS, NOW_MS)).toBe('previous7Days')
+    expect(classifyUpdatedBucket(NOW_SECONDS - 8 * DAY_SECONDS, NOW_MS)).toBe('earlier')
   })
 })
 
@@ -145,7 +145,7 @@ function baseGroupingInput(entries: SidebarSessionEntry[]) {
     locallyStreamingSessionIds: new Set<string>(),
     locallyErroredSessionIds: new Set<string>(),
     attentionBySessionId: new Map<string, 'userInput' | 'toolApproval'>(),
-    remoteHosts: [],
+    nodes: [],
   }
 }
 
@@ -153,16 +153,18 @@ describe('groupSidebarSessions', () => {
   it('groups by updated buckets in fixed order, skipping empty buckets', () => {
     const sections = groupSidebarSessions({
       ...baseGroupingInput([
-        entry(createSession({ id: 'today', listActivityAt: NOW - 60_000 })),
-        entry(createSession({ id: 'earlier', listActivityAt: NOW - 30 * DAY_MS })),
-        entry(createSession({ id: 'yesterday', listActivityAt: NOW - DAY_MS })),
+        entry(createSession({ id: 'last-hour', listActivityAt: NOW_SECONDS - 60 })),
+        entry(createSession({ id: 'earlier-today', listActivityAt: NOW_SECONDS - 3_600 })),
+        entry(createSession({ id: 'earlier', listActivityAt: NOW_SECONDS - 30 * DAY_SECONDS })),
+        entry(createSession({ id: 'yesterday', listActivityAt: NOW_SECONDS - DAY_SECONDS })),
       ]),
       grouping: 'updated',
-      now: NOW,
+      now: NOW_MS,
     })
 
     expect(sections.map(section => section.labelKey)).toEqual([
-      'sidebar.filter.bucket.today',
+      'sidebar.filter.bucket.lastHour',
+      'sidebar.filter.bucket.earlierToday',
       'sidebar.filter.bucket.yesterday',
       'sidebar.filter.bucket.earlier',
     ])
@@ -171,38 +173,38 @@ describe('groupSidebarSessions', () => {
   it('sorts pinned sessions first within a bucket, then by ordering', () => {
     const [section] = groupSidebarSessions({
       ...baseGroupingInput([
-        entry(createSession({ id: 'old', listActivityAt: NOW - 2 * 60_000 })),
-        entry(createSession({ id: 'pinned', pinned: 1, listActivityAt: NOW - 3 * 60_000 })),
-        entry(createSession({ id: 'new', listActivityAt: NOW - 60_000 })),
+        entry(createSession({ id: 'old', listActivityAt: NOW_SECONDS - 120 })),
+        entry(createSession({ id: 'pinned', pinned: 1, listActivityAt: NOW_SECONDS - 180 })),
+        entry(createSession({ id: 'new', listActivityAt: NOW_SECONDS - 60 })),
       ]),
       grouping: 'updated',
-      now: NOW,
+      now: NOW_MS,
     })
 
     expect(section.entries.map(({ session }) => session.id)).toEqual(['pinned', 'new', 'old'])
   })
 
-  it('groups by environment with a local bucket and named remote host buckets', () => {
+  it('groups by environment with a local bucket and named Node buckets', () => {
     const sections = groupSidebarSessions({
       ...baseGroupingInput([
         entry(createSession({ id: 'local' })),
         entry(createSession({
           id: 'remote',
-          execution: { kind: 'remote-host', hostId: 'host-1', remoteSessionId: 'r1' },
+          execution: { kind: 'node', nodeId: 'node-1', remoteSessionId: 'r1' },
         })),
         entry(createSession({
-          id: 'unknown-host',
-          execution: { kind: 'remote-host', hostId: 'host-gone', remoteSessionId: 'r2' },
+          id: 'unknown-node',
+          execution: { kind: 'node', nodeId: 'node-gone', remoteSessionId: 'r2' },
         })),
       ]),
       grouping: 'environment',
-      remoteHosts: [createRemoteHost({ id: 'host-1', displayName: 'Build Server' })],
+      nodes: [createNode({ nodeId: 'node-1', displayName: 'Build Server' })],
     })
 
     expect(sections.map(section => [section.labelKey ?? null, section.label ?? null])).toEqual([
       ['sidebar.filter.environment.local', null],
       [null, 'Build Server'],
-      [null, 'host-gone'],
+      [null, 'node-gone'],
     ])
   })
 })

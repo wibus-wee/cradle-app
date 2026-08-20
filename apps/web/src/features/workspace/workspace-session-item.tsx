@@ -8,6 +8,8 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
+import { getSessionNodeId } from '~/features/chat/session/session-execution'
+import { useNodeDisplayName } from '~/features/nodes/use-nodes'
 import { writeSurfaceRouteDrag } from '~/features/split-view/dnd/split-drag-payload'
 import type { WorkSummary } from '~/features/work/use-work'
 import type { Workspace } from '~/features/workspace/types'
@@ -105,6 +107,7 @@ export const WorkspaceSessionItem = memo(
   }: WorkspaceSessionItemProps) => {
     const { t } = useTranslation('workspace')
     const nowMs = useWorkspaceSessionListNow()
+    const nodeLabel = useNodeDisplayName(getSessionNodeId(session))
     const previewCard = usePreviewCard()
     const sessionSurfaceId = work
       ? workSurfaceId(work.id)
@@ -272,6 +275,7 @@ export const WorkspaceSessionItem = memo(
         isRegeneratingTitle={isRegeneratingTitle}
         runtimeIcon={runtimeIcon}
         relativeTime={formatRelativeTime(session.listActivityAt, nowMs, t)}
+        nodeLabel={nodeLabel}
         draggable={!isRenaming && !work}
         canOpenInNewWindow={isElectron}
         onOpen={() => {

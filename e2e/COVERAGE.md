@@ -6,8 +6,8 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
-| Web feature namespaces | 19 | 10 | 16 | 1 |
-| Server module namespaces | 28 | 15 | 22 | 6 |
+| Web feature namespaces | 20 | 10 | 15 | 1 |
+| Server module namespaces | 30 | 15 | 20 | 6 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
 
@@ -51,28 +51,34 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Issue × isolated delegation × Work × worktree × linked Chat | `CRADLE-ISSUE-AGENT-003` | The Issue-owned action creates a Work-owned isolated execution without losing linkage |
 | Issue × active isolated Work × reload × undelegate × abort | `CRADLE-ISSUE-AGENT-004` | Cancellation stops runtime work while retaining the Work and worktree as explicit audit state |
 | Work × Git × worktree × file mutation × Session | `CRADLE-WORK-001` | Isolated execution uses a managed worktree and persistent primary thread |
+| Work × provider failure × reload × retry × worktree × Session | `CRADLE-WORK-002` | A failed initial run retains exactly one isolated Work primary thread; reload and retry recover in that same session and mutate its worktree |
+| Work × stop × reload × retry × worktree × Session | `CRADLE-WORK-003` | Stopping an active initial run returns the Work UI to idle without duplicating its isolated primary thread; reload and retry recover in that same session and mutate its worktree |
+| Workspace removal × Work primary Session × live PTY × managed worktree × reload | `CRADLE-WS-004` | Destructive Workspace removal explicitly releases Session-owned runtime/PTY resources, removes Work and managed checkout state, and leaves no stale server or filesystem projection |
+| Workspace removal × active Work run × runtime cancellation × delayed provider response × reload | `CRADLE-WS-005` | Destructive Workspace removal cancels the active Work run before Session disposal, so a delayed provider response cannot recreate deleted state |
 | Git branch × external file changes × diff refresh | `CRADLE-GIT-001`, `002`, `CRADLE-DIFF-001` | Repository projections refresh from real Git/filesystem state |
 | Await pending × external event × Agent continuation | `CRADLE-AWAIT-001` | Durable pending work resumes from an external signal |
 | Multiple PTYs × active-session input routing | `CRADLE-PTY-002` | Input reaches only the selected terminal session |
 | Completed Agent run × usage aggregation × reload | `CRADLE-USAGE-001` | Runtime usage is counted once and persists |
 | Provider profile × Agent selection × disable | `CRADLE-PROVIDER-001` | A UI-created provider can run and later become unavailable |
+| Provider disable/delete × two active sessions × queued continuation × runtime cancellation | `CRADLE-PROVIDER-002`, `003` | Disabling or deleting a UI-created provider cancels every in-flight run and prevents a queued continuation in another session from executing |
+| Fabric pairing × two databases × bidirectional Workspace/Chat/Work × Node-owned worktrees × remote tool approval × Session discovery × relay/server restart | `CRADLE-FABRIC-001` | Two real Nodes enroll through the UI, create Work and managed worktrees on the selected authority in both directions, continue each Work conversation, approve a remote Claude Agent tool request from each controller, discover conversations created by the other controller, and recover mounted routing without re-pairing |
 
 ## Web Feature Namespace Disposition
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-management`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `onboarding`, `search`, `session`, `session-await`, `settings`, `split-view`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
+| Direct | `agent-management`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `search`, `session`, `session-await`, `settings`, `split-view`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
 | Indirect | `activity`, `agent-runtime`, `agent-runtimes`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `plugins`, `tui` | Real code is traversed, but its own visible contract is not asserted |
-| User-visible gap | `assets`, `automation`, `browser`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `remote-hosts`, `session-environment`, `shortcuts`, `skills`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
+| User-visible gap | `assets`, `automation`, `browser`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `session-environment`, `shortcuts`, `skills`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
 | Service/infra contract | `product-analytics` | Verify event correctness at the event boundary; add browser coverage only for user-visible consent controls |
 
 ## Server Module Namespace Disposition
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `search`, `session`, `session-await`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
+| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
 | Indirect | `background-activity`, `code-activity`, `desktop`, `mcp-servers`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `skills`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources`, `plugins` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
-| User-visible gap | `acp`, `assets`, `automation`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `external-session-import`, `fabric`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `relay-servers`, `relay-transport`, `remote-hosts`, `session-environment`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
+| User-visible gap | `acp`, `assets`, `automation`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `external-session-import`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-environment`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
 | Service/infra contract | `background-job`, `blob-store`, `health`, `maintenance`, `observability`, `test-reset` | Prefer focused service/contract verification; `test-reset` is harness-only |
 
 ## Prioritized Missing Journeys
@@ -81,14 +87,11 @@ The backlog below is ordered by semantic fan-out and state-corruption risk, not 
 
 | Priority | Proposed journey | State fusion and owning namespaces |
 | --- | --- | --- |
-| P0 | Stop/fail Work, reload, retry, and verify exactly one active primary thread | Work × Session × runtime × worktree × recovery |
-| P0 | Disable/delete a provider while one run is active and another session is queued | profiles × provider target × active Run × queue × recovery |
-| P0 | Remove/rename workspace while Sessions, PTYs, and Work reference it | workspace × session × PTY × Work × destructive confirmation |
 | P0 | Application process restart with active stream and queued continuation | desktop lifecycle × persisted Run × queue × rehydration |
 | P1 | Await timeout/cancel/restart plus late external resolution | Await × terminal state × idempotent external event |
 | P1 | Automation run success/failure/cancel with linked Session and notification | automation × background job/activity × session |
 | P1 | Pull-request delivery from Work, update, and failure recovery | Work × Git × pull request × provider auth |
-| P1 | Remote host disconnect/reconnect during active terminal or Agent run | remote host × relay × PTY/runtime × session |
+| P1 | Fabric Node disconnect/reconnect during an active terminal or Agent run | Fabric Node × relay × PTY/runtime × Session |
 | P1 | Session environment edit while idle versus locked during a run | environment × session × runtime process configuration |
 | P1 | Skill create/import/delete, then invoke from a real Agent | skills × Agent identity × runtime tool catalog |
 | P1 | Plugin install/enable/disable/reload with a visible contribution | marketplace × plugin lifecycle × shell state |

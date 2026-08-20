@@ -76,7 +76,7 @@ describe('relay chunk compression', () => {
       seq: 10,
       data: rawData,
     })
-    expect(raw[0]).toBe(4)
+    expect(raw[0]).toBe(3)
     expect(raw.byteLength).toBe(7 + 2 + rawData.byteLength)
     expect(decodeInnerFrame(raw)).toEqual({
       kind: 'stream_data',

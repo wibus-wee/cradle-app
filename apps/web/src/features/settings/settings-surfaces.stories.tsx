@@ -7,7 +7,6 @@ import {
   PaletteLine as PaletteIcon,
   PluginLine as PluginIcon,
   RobotLine as RobotIcon,
-  ServerLine as ServerIcon,
 } from '@mingcute/react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
@@ -52,7 +51,6 @@ const settingsSections: SettingsNavigationSection[] = [
     id: 'system',
     label: 'System',
     items: [
-      { id: 'remote-hosts', label: 'Remote hosts', icon: ServerIcon, searchTerms: ['SSH', 'connection'] },
       { id: 'about', label: 'About', icon: InfoIcon, searchTerms: ['storage', 'version'] },
     ],
   },

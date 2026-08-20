@@ -46,7 +46,7 @@ export const workspace = new Elysia({
     name: trimValue(body.name),
     locator: {
       ...body.locator,
-      hostId: trimValue(body.locator.hostId),
+      nodeId: trimValue(body.locator.nodeId),
       path: trimValue(body.locator.path),
     },
     gitIdentity: body.gitIdentity,
@@ -110,7 +110,7 @@ export const workspace = new Elysia({
     response: { 200: WorkspaceModel.record, 409: WorkspaceModel.locatorExistsError },
   })
   .get('/resolve', ({ query }) => nullableJsonResponse(Workspace.resolveByLocator({
-    hostId: trimValue(query.hostId),
+    nodeId: trimValue(query.nodeId),
     path: trimValue(query.path),
   })), {
     detail: {
@@ -152,8 +152,16 @@ export const workspace = new Elysia({
     query: WorkspaceModel.fileSearchQuery,
     response: { 200: t.Array(WorkspaceModel.fileEntry) },
   })
-  .get('/:workspaceId/files/events', ({ params }) => {
-    return new Response(Workspace.openFileEvents(params.workspaceId), {
+  .get('/:workspaceId/files/events', async ({ params, request }) => {
+    const remoteResponse = await Workspace.proxyRemoteWorkspaceRequest(
+      params.workspaceId,
+      request,
+      '/files/events',
+    )
+    if (remoteResponse) {
+      return remoteResponse
+    }
+    return new Response(Workspace.openLocalFileEvents(params.workspaceId), {
       headers: {
         'content-type': 'text/event-stream',
         'cache-control': 'no-cache',
@@ -203,8 +211,16 @@ export const workspace = new Elysia({
     query: WorkspaceModel.fileInfoQuery,
     response: { 200: WorkspaceModel.fileInfoResponse },
   })
-  .get('/:workspaceId/files/raw', async ({ params, query }) => {
-    const result = await Workspace.getFileBytes(params.workspaceId, trimValue(query.path))
+  .get('/:workspaceId/files/raw', async ({ params, query, request }) => {
+    const remoteResponse = await Workspace.proxyRemoteWorkspaceRequest(
+      params.workspaceId,
+      request,
+      '/files/raw',
+    )
+    if (remoteResponse) {
+      return remoteResponse
+    }
+    const result = await Workspace.getLocalFileBytes(params.workspaceId, trimValue(query.path))
     if (!result) {
       workspaceFileNotFound('Workspace file was not found.')
     }
@@ -222,8 +238,16 @@ export const workspace = new Elysia({
     params: WorkspaceModel.workspaceIdParams,
     query: WorkspaceModel.fileInfoQuery,
   })
-  .get('/:workspaceId/files/rendition/pdf', async ({ params, query }) => {
+  .get('/:workspaceId/files/rendition/pdf', async ({ params, query, request }) => {
     try {
+      const remoteResponse = await Workspace.proxyRemoteWorkspaceRequest(
+        params.workspaceId,
+        request,
+        '/files/rendition/pdf',
+      )
+      if (remoteResponse) {
+        return remoteResponse
+      }
       const result = await Workspace.getFilePdfRendition(params.workspaceId, trimValue(query.path))
       if (!result) {
         workspaceFileNotFound('Workspace file PDF rendition was not found.')
@@ -366,15 +390,15 @@ export const workspace = new Elysia({
     body: WorkspaceModel.updateBody,
     response: { 200: WorkspaceModel.nullableRecord },
   })
-  .patch('/:workspaceId/location', ({ params, body }) => {
-    return nullableJsonResponse(Workspace.relinkWorkspace(
+  .patch('/:workspaceId/location', async ({ params, body }) => {
+    return Response.json(await Workspace.relinkWorkspace(
       params.workspaceId,
       trimValue(body.path),
     ))
   }, {
     detail: {
-      'summary': 'Relink a missing local workspace location',
-      'description': 'Replace the last-known path of an offline historical workspace with an existing local directory.',
+      'summary': 'Relink workspace location',
+      'description': 'Replace a local workspace path, or ask the owning Node to relink a remote workspace before updating its local projection.',
       'x-cradle-cli': {
         command: ['workspace', 'relink'],
       },
@@ -402,9 +426,9 @@ export const workspace = new Elysia({
     body: WorkspaceModel.migrateBody,
     response: { 200: WorkspaceModel.migrateResponse },
   })
-  .delete('/:workspaceId', ({ params }) => {
-    Workspace.remove(params.workspaceId)
-    return { ok: true as const }
+  .delete('/:workspaceId', async ({ params }) => {
+    const removed = await Workspace.remove(params.workspaceId)
+    return { ok: true as const, ...removed }
   }, {
     detail: {
       'summary': 'Delete workspace',

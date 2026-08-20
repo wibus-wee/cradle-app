@@ -22,7 +22,7 @@ import { useSessionActivityStore } from '~/store/session-activity'
 
 import { ChatSessionFrameHost } from './chat-session-frame-host'
 import { CHAT_SESSION_FALLBACK_LABEL } from './chat-session-label'
-import { getRemoteHostId } from './session-execution'
+import { getSessionNodeId } from './session-execution'
 import { readSessionThinkingEffort } from './session-thinking-effort'
 
 function loadTerminalPanelView() {
@@ -156,7 +156,7 @@ export function ChatSessionRouteContent({
 
   const workspaceId = session?.workspaceId ?? null
   const agentId = session?.agentId ?? null
-  const remoteHostId = getRemoteHostId(session)
+  const nodeId = getSessionNodeId(session)
 
   const { data: workspace } = useQuery({
     ...getWorkspacesByWorkspaceIdOptions({ path: { workspaceId: workspaceId! } }),
@@ -175,8 +175,8 @@ export function ChatSessionRouteContent({
     workspaceId,
     workspacePath,
     agentId,
-    remoteHostId,
-  }), [agentId, remoteHostId, session?.runtimeKind, sessionId, sessionModelId, sessionProviderTargetId, sessionThinkingEffort, workspaceId, workspacePath])
+    nodeId,
+  }), [agentId, nodeId, session?.runtimeKind, sessionId, sessionModelId, sessionProviderTargetId, sessionThinkingEffort, workspaceId, workspacePath])
 
   useEffect(() => {
     if (workspacePath) {

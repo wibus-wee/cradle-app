@@ -40,7 +40,7 @@ function seedSession(): { workspaceId: string, sessionId: string } {
     id: workspaceId,
     name: 'ws',
     // locator_json is uniquely indexed — each seed needs a distinct path.
-    locatorJson: JSON.stringify({ hostId: 'local', path: `/tmp/session-await-${workspaceId}` }),
+    locatorJson: JSON.stringify({ nodeId: 'local', path: `/tmp/session-await-${workspaceId}` }),
   }).run()
   db().insert(providerTargets).values({
     id: providerTargetId,

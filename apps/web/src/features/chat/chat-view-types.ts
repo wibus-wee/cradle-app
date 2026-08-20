@@ -58,8 +58,8 @@ export interface ChatViewProps {
   workspaceId?: string | null
   /** Absolute local workspace path for Composer bang PTY. */
   workspacePath?: string | null
-  /** When set, composer catalogs and connection gating use the remote host. */
-  remoteHostId?: string | null
+  /** When set, composer catalogs and connection gating use the remote Node. */
+  nodeId?: string | null
   messageTextTransform?: MessageTextTransform
   prepareSend?: (input: {
     text: Parameters<ChatComposerRuntime['send']>[0]

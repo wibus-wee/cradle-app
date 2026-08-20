@@ -11,7 +11,7 @@ const DirectoryPickerOptionsSchema = z.object({
    * Browse a connected remote Cradle Server filesystem instead of this machine.
    * Always uses the in-app directory dialog (native OS pickers only see local disks).
    */
-  hostId: z.string().min(1).optional(),
+  nodeId: z.string().min(1).optional(),
 }).default({ title: 'Select Directory' })
 
 type DirectoryPickerOptions = z.input<typeof DirectoryPickerOptionsSchema>
@@ -39,7 +39,7 @@ export function DirectoryPickerProvider({ children }: { children: React.ReactNod
   const selectDirectory = async (rawOptions?: DirectoryPickerOptions) => {
     const options = DirectoryPickerOptionsSchema.parse(rawOptions)
     // Native OS dialog only sees local disks — remote hosts always use the in-app browser.
-    if (!options.hostId && isElectron && nativeIpc) {
+    if (!options.nodeId && isElectron && nativeIpc) {
       const result = await nativeIpc.native.showOpenDialog({
         title: options.title,
         properties: ['openDirectory'],
@@ -76,7 +76,7 @@ export function DirectoryPickerProvider({ children }: { children: React.ReactNod
         onSelect={handleSelect}
         title={dialogProps.title}
         description={dialogProps.description}
-        hostId={dialogProps.hostId}
+        nodeId={dialogProps.nodeId}
       />
     </DirectoryPickerContext>
   )

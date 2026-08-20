@@ -8,7 +8,7 @@ import { resolveCodeActivityTarget } from './code-activity-resolver'
 const workspaces: GetWorkspacesResponse = [{
   id: 'workspace-1',
   name: 'Cradle',
-  locator: { hostId: 'local', path: '/private/cradle' },
+  locator: { nodeId: 'local', path: '/private/cradle' },
   gitIdentity: {},
   identifier: 'cradle',
   availability: 'available',

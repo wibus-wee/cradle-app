@@ -61,6 +61,12 @@ describe('runtime-settings-registry', () => {
     })
   })
 
+  it('accepts Fast as the Codex-only service tier', () => {
+    const entry = resolveRuntimeSettingsEntry('codex')
+    expect(entry?.normalize({ serviceTier: 'fast' })).toEqual({ serviceTier: 'fast' })
+    expect(entry?.normalize({ serviceTier: 'priority' })).toEqual({})
+  })
+
   it('uses the same 2D runtime settings contract for Kimi', () => {
     const entry = resolveRuntimeSettingsEntry('kimi')
     expect(readRuntimeSettingsDefaults('kimi')).toEqual({

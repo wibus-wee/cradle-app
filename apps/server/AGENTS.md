@@ -15,7 +15,7 @@ Cradle server 是一个 Elysia 应用：
 - `src/config/`、`src/database/`、`src/logging/`、`src/telemetry/`、`src/observability/` 是横切基础设施。
 - `src/plugins/` 是 server plugin loading/runtime support，不属于普通业务模块。
 
-`createServerContractApp()` 组合纯 HTTP contract surface；`createServerApp()` 在 contract app 之上启动 runtime-only concerns，例如 plugins、background tasks、provider runtime、relay host connector 和 cleanup hooks。
+`createServerContractApp()` 组合纯 HTTP contract surface；`createServerApp()` 在 contract app 之上启动 runtime-only concerns，例如 plugins、background tasks、provider runtime、Fabric node connector 和 cleanup hooks。
 
 ## 目录职责
 
@@ -107,7 +107,7 @@ export const workspace = new Elysia({
 
 ## Background tasks 和 lifecycle
 
-- `createServerApp()` 启动 runtime concerns，例如 plugin activation、external provider refresh、Chronicle background sync、relay connector、provider runtime cleanup。
+- `createServerApp()` 启动 runtime concerns，例如 plugin activation、external provider refresh、Chronicle background sync、Fabric node connector、provider runtime cleanup。
 - 长生命周期资源必须注册到 composition-root-owned `RuntimeResourceRegistry`，不要各自追加分散的 `app.onStop()` callbacks。
 - shutdown 顺序是：立即停止接受新命令并触发 abort signal；取消 pending connectors/background work；drain chat runs/finalization；停止 providers/watchers/plugins；最后关闭 database/infra。资源 stop 必须可重复调用。
 - Boot-time background work 必须显式处理 rejection；不要留下 floating promise 造成 unhandled rejection。

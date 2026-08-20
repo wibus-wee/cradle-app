@@ -17,14 +17,19 @@ import * as echarts from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import ReactECharts from 'echarts-for-react'
 import type { TFunction } from 'i18next'
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { formatTokenCount, formatUsd } from '~/lib/number-format'
 
+import type { FleetUsage } from './usage-fleet'
 import {
   denseCostModelStackSeries,
+  denseFleetCostStackSeries,
+  denseFleetModelCostStackSeries,
+  denseFleetModelTokenStackSeries,
+  denseFleetTokenStackSeries,
   denseModelStackSeries,
   modelDisplayLabel,
   OTHER_MODEL_KEY,
@@ -45,6 +50,7 @@ echarts.use([
 ])
 
 type TrendMetric = 'tokens' | 'cost'
+type TrendDimension = 'model' | 'device' | 'deviceModel'
 
 interface UsageTrendChartViewProps {
   dailyCost: DailyCost[]
@@ -52,6 +58,8 @@ interface UsageTrendChartViewProps {
   range: UsageRangeKey
   hasCost: boolean
   themeMode: 'light' | 'dark'
+  /** Fabric fleet series; when it holds more than one device the chart offers device-level stacking. */
+  fleet: FleetUsage | null
 }
 
 export function UsageTrendChartView({
@@ -60,25 +68,72 @@ export function UsageTrendChartView({
   range,
   hasCost,
   themeMode,
+  fleet,
 }: UsageTrendChartViewProps) {
   const { t } = useTranslation('usage')
   const isDark = themeMode === 'dark'
   const [metric, setMetric] = useState<TrendMetric>('tokens')
+  const [dimension, setDimension] = useState<TrendDimension>('model')
   const days = rangeDays(range)
   const activeMetric: TrendMetric = hasCost ? metric : 'tokens'
+  const hasFleet = Boolean(fleet && fleet.devices.length > 1)
+  const activeDimension: TrendDimension = hasFleet ? dimension : 'model'
 
-  const costStack = useMemo(
-    () => denseCostModelStackSeries(dailyCost, days, Infinity),
-    [dailyCost, days],
+  const deviceLabelById = useMemo(
+    () => new Map((fleet?.devices ?? []).map(device => [device.key, device.label])),
+    [fleet],
   )
-  const tokenStack = useMemo(
-    () => denseModelStackSeries(dailyByModel, days, Infinity),
-    [dailyByModel, days],
+
+  // In fleet mode the model stacks aggregate every device so each dimension is
+  // just a different grouping of the same fleet-wide rows.
+  const modelDailyByModel = useMemo(
+    () => (hasFleet && fleet ? fleet.devices.flatMap(device => device.dailyByModel) : dailyByModel),
+    [hasFleet, fleet, dailyByModel],
   )
+  const modelDailyCost = useMemo(
+    () => (hasFleet && fleet ? fleet.devices.flatMap(device => device.dailyCost) : dailyCost),
+    [hasFleet, fleet, dailyCost],
+  )
+
+  const costStack = useMemo(() => {
+    if (activeDimension === 'device') {
+      return denseFleetCostStackSeries(fleet?.devices ?? [], days)
+    }
+    if (activeDimension === 'deviceModel') {
+      return denseFleetModelCostStackSeries(fleet?.devices ?? [], days)
+    }
+    return denseCostModelStackSeries(modelDailyCost, days, Infinity)
+  }, [activeDimension, fleet, modelDailyCost, days])
+  const tokenStack = useMemo(() => {
+    if (activeDimension === 'device') {
+      return denseFleetTokenStackSeries(fleet?.devices ?? [], days)
+    }
+    if (activeDimension === 'deviceModel') {
+      return denseFleetModelTokenStackSeries(fleet?.devices ?? [], days)
+    }
+    return denseModelStackSeries(modelDailyByModel, days, Infinity)
+  }, [activeDimension, fleet, modelDailyByModel, days])
   const activeStack = activeMetric === 'cost' ? costStack : tokenStack
   const dates = activeStack.series.map(row => String(row.date))
   const rangeStart = dates[0]
   const rangeEnd = dates.at(-1)
+
+  const labelForSeries = useCallback(
+    (key: string): string => {
+      if (key === OTHER_MODEL_KEY) {
+        return activeDimension === 'model' ? modelDisplayLabel(key, t) : t('tooltip.otherModels')
+      }
+      if (activeDimension === 'device') {
+        return deviceLabelById.get(key) ?? key
+      }
+      if (activeDimension === 'deviceModel') {
+        const [deviceKey, modelId] = key.split('::')
+        return `${deviceLabelById.get(deviceKey) ?? deviceKey} · ${modelDisplayLabel(modelId, t)}`
+      }
+      return modelDisplayLabel(key, t)
+    },
+    [activeDimension, deviceLabelById, t],
+  )
 
   const option = useMemo(
     () =>
@@ -88,8 +143,9 @@ export function UsageTrendChartView({
         days,
         isDark,
         t,
+        labelForSeries,
       }),
-    [activeMetric, activeStack, days, isDark, t],
+    [activeMetric, activeStack, days, isDark, t, labelForSeries],
   )
 
   return (
@@ -102,35 +158,62 @@ export function UsageTrendChartView({
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{t('trend.description')}</p>
         </div>
-        {hasCost && (
-          <ToggleGroup
-            type="single"
-            value={activeMetric}
-            onValueChange={(value) => {
-              if (value === 'tokens' || value === 'cost') {
-                setMetric(value)
-              }
-            }}
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 gap-px rounded-md"
-          >
-            <ToggleGroupItem value="tokens" className="h-7 px-2.5 text-xs">
-              {t('trend.toggleTokens')}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="cost" className="h-7 px-2.5 text-xs">
-              {t('trend.toggleCost')}
-            </ToggleGroupItem>
-          </ToggleGroup>
-        )}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {hasFleet && (
+            <ToggleGroup
+              type="single"
+              value={activeDimension}
+              onValueChange={(value) => {
+                if (value === 'model' || value === 'device' || value === 'deviceModel') {
+                  setDimension(value)
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="h-7 gap-px rounded-md"
+              data-testid="usage-trend-dimension"
+            >
+              <ToggleGroupItem value="model" className="h-7 px-2.5 text-xs">
+                {t('trend.stackBy.model')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="device" className="h-7 px-2.5 text-xs">
+                {t('trend.stackBy.device')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="deviceModel" className="h-7 px-2.5 text-xs">
+                {t('trend.stackBy.deviceModel')}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
+          {hasCost && (
+            <ToggleGroup
+              type="single"
+              value={activeMetric}
+              onValueChange={(value) => {
+                if (value === 'tokens' || value === 'cost') {
+                  setMetric(value)
+                }
+              }}
+              variant="outline"
+              size="sm"
+              className="h-7 gap-px rounded-md"
+            >
+              <ToggleGroupItem value="tokens" className="h-7 px-2.5 text-xs">
+                {t('trend.toggleTokens')}
+              </ToggleGroupItem>
+              <ToggleGroupItem value="cost" className="h-7 px-2.5 text-xs">
+                {t('trend.toggleCost')}
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
+        </div>
       </div>
 
       <div className="mt-4" data-testid="usage-trend-chart">
         <ReactECharts
-          // Remount on metric switch so the token stack and the cost stack don't
+          // Remount on metric/dimension switch so differently-keyed stacks don't
           // try to morph series into each other; range changes keep the same
           // instance and animate the data transition.
-          key={activeMetric}
+          key={`${activeMetric}-${activeDimension}`}
           echarts={echarts}
           option={option}
           notMerge={false}
@@ -161,6 +244,7 @@ interface TrendOptionInput {
   days: number
   isDark: boolean
   t: TFunction<'usage'>
+  labelForSeries: (key: string) => string
 }
 
 function buildTrendOption({
@@ -169,6 +253,7 @@ function buildTrendOption({
   days,
   isDark,
   t,
+  labelForSeries,
 }: TrendOptionInput): EChartsOption {
   // Canvas can't resolve CSS vars / currentColor, so pick concrete theme colors
   // from the resolved light/dark mode (recharts got this for free via SVG).
@@ -220,7 +305,7 @@ function buildTrendOption({
 
   const dates = stack.series.map(d => String(d.date))
   const series = stack.models.map((modelId, index) => ({
-    name: modelDisplayLabel(modelId, t),
+    name: labelForSeries(modelId),
     type: 'bar' as const,
     stack: metric,
     data: stack.series.map(d => Number(d[modelId] ?? 0)),

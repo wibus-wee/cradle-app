@@ -2,6 +2,9 @@ import { t } from 'elysia'
 
 const nonBlankString = t.String({ minLength: 1, pattern: '.*\\S.*' })
 
+const fabricScope = t.Union([t.Literal('view'), t.Literal('control'), t.Literal('approve'), t.Literal('admin')])
+const relayAccessMode = t.Union([t.Literal('local'), t.Literal('network'), t.Literal('external')])
+
 const nodeSummary = t.Object(
   {
     nodeId: t.String(),
@@ -13,6 +16,19 @@ const nodeSummary = t.Object(
     status: t.Union([t.Literal('online'), t.Literal('offline')]),
     lastSeenAt: t.String(),
     revision: t.Number(),
+    scopes: t.Optional(t.Array(fabricScope)),
+  },
+  { additionalProperties: false },
+)
+
+const nodeGrant = t.Object(
+  {
+    grantId: t.String(),
+    fabricId: t.String(),
+    controllerId: t.String(),
+    nodeId: t.String(),
+    scope: fabricScope,
+    revokedAt: t.Optional(t.String()),
   },
   { additionalProperties: false },
 )
@@ -50,7 +66,37 @@ export const FabricModel = {
     },
     { additionalProperties: false },
   ),
+  pendingEnrollment: t.Union([
+    t.Object(
+      {
+        version: t.Literal(1),
+        relayUrl: t.String(),
+        fabricId: t.String(),
+        requestId: t.String(),
+        deliverySecret: t.String(),
+        expiresAt: t.Union([t.String(), t.Null()]),
+        createdAt: t.Number(),
+      },
+      { additionalProperties: false },
+    ),
+    t.Null(),
+  ]),
+  pendingNodeRequest: t.Object(
+    {
+      requestId: t.String(),
+      displayName: t.String(),
+      platform: t.String(),
+      version: t.String(),
+      capabilities: t.Array(t.String()),
+      requestedAt: t.String(),
+      expiresAt: t.String(),
+    },
+    { additionalProperties: false },
+  ),
+  requestIdParams: t.Object({ requestId: nonBlankString }, { additionalProperties: false }),
   nodeIdParams: t.Object({ nodeId: nonBlankString }, { additionalProperties: false }),
+  nodeGrantParams: t.Object({ nodeId: nonBlankString, grantId: nonBlankString }, { additionalProperties: false }),
+  nodeGrant,
   link: t.Object(
     { linkId: t.String(), expiresAt: t.String(), nodeCertificate: t.Any() },
     { additionalProperties: false },
@@ -86,5 +132,26 @@ export const FabricModel = {
     ),
     t.Null(),
   ]),
+  managedRelay: t.Union([
+    t.Object(
+      {
+        relayUrl: t.String(),
+        accessMode: relayAccessMode,
+      },
+      { additionalProperties: false },
+    ),
+    t.Null(),
+  ]),
+  managedRelayResources: t.Object(
+    {
+      source: t.Union([t.Literal('managed'), t.Literal('external'), t.Literal('unavailable')]),
+      running: t.Boolean(),
+      pid: t.Nullable(t.Number()),
+      rssMB: t.Nullable(t.Number()),
+      cpuPercent: t.Nullable(t.Number()),
+      descendantCount: t.Nullable(t.Number()),
+    },
+    { additionalProperties: false },
+  ),
   nodeSummary,
 } as const

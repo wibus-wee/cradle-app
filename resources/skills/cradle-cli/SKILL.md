@@ -351,18 +351,15 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `plugin` | 11 | Generated Cradle CLI module. | `cradle man plugin` |
 | `preferences` | 11 | Read and update server preferences. | `cradle man preferences` |
 | `profile` | 5 | Manage agent profiles. | `cradle man profile` |
-| `provider` | 7 | Inspect provider model availability. | `cradle man provider` |
+| `provider` | 9 | Inspect provider model availability. | `cradle man provider` |
 | `pull-request` | 16 | Generated Cradle CLI module. | `cradle man pull-request` |
-| `relay-server` | 4 | Generated Cradle CLI module. | `cradle man relay-server` |
-| `relay-transport` | 5 | Generated Cradle CLI module. | `cradle man relay-transport` |
-| `remote-host` | 8 | Generated Cradle CLI module. | `cradle man remote-host` |
 | `search` | 2 | Search Cradle data. | `cradle man search` |
 | `secret` | 2 | Manage secret metadata. | `cradle man secret` |
 | `session` | 27 | Manage chat sessions and session links. | `cradle man session` |
 | `session-group` | 7 | Generated Cradle CLI module. | `cradle man session-group` |
 | `skill` | 10 | Manage skills and skill sources. | `cradle man skill` |
 | `usage` | 14 | Inspect usage and cost data. | `cradle man usage` |
-| `work` | 7 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
+| `work` | 8 | Manage user-controlled local Work containers and Draft PR delivery. | `cradle man work` |
 | `workflow-rule` | 4 | Manage workflow rules. | `cradle man workflow-rule` |
 | `workspace` | 51 | Manage workspaces, files, and git helpers. | `cradle man workspace` |
 

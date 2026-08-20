@@ -6,7 +6,7 @@ export const localWorkspaceDetailFixture = {
   id: 'workspace-cradle',
   name: 'Cradle App',
   locator: {
-    hostId: 'local',
+    nodeId: 'local',
     path: '/Users/demo/Projects/cradle-app',
     kind: 'project',
   },
@@ -29,7 +29,7 @@ export const remoteWorkspaceDetailFixture = {
   id: 'workspace-remote-docs',
   name: 'Product Documentation',
   locator: {
-    hostId: 'studio-mac',
+    nodeId: 'studio-mac',
     path: '/Volumes/Projects/product-docs',
     kind: 'project',
   },

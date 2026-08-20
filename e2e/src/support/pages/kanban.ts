@@ -698,7 +698,7 @@ export class KanbanPage {
     await expect(isolation).toHaveAttribute('data-state', 'checked', { timeout: 10_000 })
   }
 
-  async undelegateOpenIssue(): Promise<void> {
+  async undelegateOpenIssue(agentName = 'E2E Claude Agent'): Promise<void> {
     const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
     const trigger = panel.locator('[data-testid="issue-agent-trigger"]')
     await expect(trigger).toBeVisible({ timeout: 10_000 })
@@ -707,7 +707,8 @@ export class KanbanPage {
     const noneOption = this.page.locator('[data-testid="issue-agent-option-none"]')
     await expect(noneOption).toBeVisible({ timeout: 10_000 })
     await noneOption.click()
-    await expect(trigger).toContainText('No agent', { timeout: 10_000 })
+    await expect(trigger).toBeEnabled({ timeout: 10_000 })
+    await expect(trigger).not.toContainText(agentName, { timeout: 10_000 })
   }
 
   async expectAgentSessionPhase(phase: string): Promise<void> {

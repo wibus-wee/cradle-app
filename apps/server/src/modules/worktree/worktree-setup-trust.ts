@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { relayHostEnrollments, trustGrants } from '@cradle/db'
+import { fabricMembership, trustGrants } from '@cradle/db'
 import { and, eq, sql } from 'drizzle-orm'
 
 import { db } from '../../infra'
@@ -62,10 +62,10 @@ export function hasWorktreeSetupHookTrust(workspaceId: string): boolean {
   return readWorktreeSetupHookTrustGrant(workspaceId) !== null
 }
 
-export function isRelayHostExposed(): boolean {
+export function isFabricNodeExposed(): boolean {
   return db()
-    .select({ id: relayHostEnrollments.id })
-    .from(relayHostEnrollments)
+    .select({ fabricId: fabricMembership.fabricId })
+    .from(fabricMembership)
     .limit(1)
     .get() !== undefined
 }

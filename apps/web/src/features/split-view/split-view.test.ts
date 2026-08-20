@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { setI18nInstance } from '~/i18n/instance'
+import { removeWorkspaceOwnedSurfaces } from '~/navigation/navigation-commands'
 import type { SurfaceRoute } from '~/navigation/surface-identity'
+import { HOME_SURFACE } from '~/navigation/surface-identity'
+import { useSurfaceStore } from '~/navigation/surface-store'
 
 import { directionFromPoint } from './model/split-direction'
 import { isSplitWorkspace, readSplitWorkspace, useSplitWorkspaceStore } from './store/split-workspace-store'
@@ -9,7 +13,9 @@ const CHAT_ROUTE: SurfaceRoute = { to: '/chat/$sessionId', params: { sessionId: 
 const SURFACE_ID = 'chat:primary'
 
 function resetStore() {
+  setI18nInstance({ t: (key: string) => key } as never)
   useSplitWorkspaceStore.setState({ workspaces: {} })
+  useSurfaceStore.setState({ surfaces: [HOME_SURFACE] })
 }
 
 describe('directionFromPoint', () => {
@@ -97,5 +103,50 @@ describe('split workspace store', () => {
     const workspace = readSplitWorkspace(SURFACE_ID)!
     expect(workspace.primaryPaneId).toBe(SURFACE_ID)
     expect(workspace.panes[SURFACE_ID]).toBeDefined()
+  })
+
+  it('removes deleted workspace resources from background surfaces and split panes', () => {
+    const store = useSplitWorkspaceStore.getState()
+    store.ensureWorkspace(SURFACE_ID, CHAT_ROUTE)
+    const deletedPaneId = store.registerPane(SURFACE_ID, {
+      to: '/work/$workId',
+      params: { workId: 'deleted-work' },
+    })
+    if (!deletedPaneId) {
+      throw new Error('Expected a deleted Work pane to be registered')
+    }
+    useSurfaceStore.setState({
+      surfaces: [
+        HOME_SURFACE,
+        {
+          id: SURFACE_ID,
+          kind: 'chat',
+          title: 'Preserved chat',
+          route: CHAT_ROUTE,
+          order: 1,
+          closable: true,
+        },
+        {
+          id: 'chat:deleted-session',
+          kind: 'chat',
+          title: 'Deleted chat',
+          route: { to: '/chat/$sessionId', params: { sessionId: 'deleted-session' } },
+          order: 2,
+          closable: true,
+        },
+      ],
+    })
+
+    removeWorkspaceOwnedSurfaces({
+      workspaceId: 'workspace-1',
+      removedSessionIds: ['deleted-session'],
+      removedWorkIds: ['deleted-work'],
+    })
+
+    expect(useSurfaceStore.getState().surfaces.map(surface => surface.id)).toEqual([
+      HOME_SURFACE.id,
+      SURFACE_ID,
+    ])
+    expect(readSplitWorkspace(SURFACE_ID)?.panes[deletedPaneId]).toBeUndefined()
   })
 })

@@ -49,7 +49,7 @@ describe('workspace capability', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           name: 'Manual Workspace',
-          locator: { hostId: 'local', path: explicitWorkspaceRoot },
+          locator: { nodeId: 'local', path: explicitWorkspaceRoot },
         }),
       }))
       expect(explicitRes.status).toBe(200)
@@ -72,8 +72,8 @@ describe('workspace capability', () => {
       const list = await listRes.json()
       expect(list[0]).toEqual(expect.objectContaining({ id: explicit.id, pinned: 1 }))
       expect(list).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: created.id, locator: { hostId: 'local', path: workspaceRoot } }),
-        expect.objectContaining({ id: explicit.id, locator: { hostId: 'local', path: explicitWorkspaceRoot } }),
+        expect.objectContaining({ id: created.id, locator: { nodeId: 'local', path: workspaceRoot } }),
+        expect.objectContaining({ id: explicit.id, locator: { nodeId: 'local', path: explicitWorkspaceRoot } }),
       ]))
 
       const getRes = await app.handle(new Request(`http://localhost/workspaces/${created.id}`))
@@ -84,7 +84,7 @@ describe('workspace capability', () => {
       expect(missingGet.status).toBe(200)
       expect(await missingGet.json()).toBeNull()
 
-      const resolveRes = await app.handle(new Request(`http://localhost/workspaces/resolve?hostId=local&path=${encodeURIComponent(workspaceRoot)}`))
+      const resolveRes = await app.handle(new Request(`http://localhost/workspaces/resolve?nodeId=local&path=${encodeURIComponent(workspaceRoot)}`))
       const resolved = await resolveRes.json()
       expect(resolved).toEqual(expect.objectContaining({ id: created.id }))
 
@@ -127,7 +127,7 @@ describe('workspace capability', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           name: 'Dup',
-          locator: { hostId: 'local', path: explicitWorkspaceRoot },
+          locator: { nodeId: 'local', path: explicitWorkspaceRoot },
         }),
       }))
       expect(duplicateRes.status).toBe(409)
@@ -156,12 +156,12 @@ describe('workspace capability', () => {
       const deleteRes = await app.handle(new Request(`http://localhost/workspaces/${created.id}`, { method: 'DELETE' }))
       expect(deleteRes.status).toBe(200)
       const deleteBody = await deleteRes.json()
-      expect(deleteBody).toEqual({ ok: true })
+      expect(deleteBody).toEqual({ ok: true, removedSessionIds: [], removedWorkIds: [] })
 
       const deleteExplicit = await app.handle(new Request(`http://localhost/workspaces/${explicit.id}`, { method: 'DELETE' }))
       expect(deleteExplicit.status).toBe(200)
       const deleteExplicitBody = await deleteExplicit.json()
-      expect(deleteExplicitBody).toEqual({ ok: true })
+      expect(deleteExplicitBody).toEqual({ ok: true, removedSessionIds: [], removedWorkIds: [] })
 
       const afterList = await (await app.handle(new Request('http://localhost/workspaces'))).json()
       expect(afterList).toEqual([])
@@ -449,7 +449,7 @@ describe('workspace capability', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           name: 'frontend',
-          locator: { hostId: 'local', path: frontendRoot },
+          locator: { nodeId: 'local', path: frontendRoot },
         }),
       }))
       expect(frontendWorkspaceRes.status).toBe(200)
@@ -458,7 +458,7 @@ describe('workspace capability', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           name: 'backend',
-          locator: { hostId: 'local', path: backendRoot },
+          locator: { nodeId: 'local', path: backendRoot },
         }),
       }))
       expect(backendWorkspaceRes.status).toBe(200)
@@ -480,7 +480,7 @@ describe('workspace capability', () => {
       expect(workspace).toEqual(expect.objectContaining({
         name: 'my-monorepo',
         multiFolder: true,
-        locator: { hostId: 'local', path: workspacePath },
+        locator: { nodeId: 'local', path: workspacePath },
       }))
       expect(JSON.parse(readFileSync(join(workspacePath, 'cradle-workspace.json'), 'utf8'))).toEqual({
         name: 'my-monorepo',
@@ -494,7 +494,7 @@ describe('workspace capability', () => {
 
       const listRes = await app.handle(new Request('http://localhost/workspaces'))
       expect(await listRes.json()).toEqual(expect.arrayContaining([
-        expect.objectContaining({ id: workspace.id, multiFolder: true, locator: { hostId: 'local', path: workspacePath } }),
+        expect.objectContaining({ id: workspace.id, multiFolder: true, locator: { nodeId: 'local', path: workspacePath } }),
       ]))
 
       const collisionRes = await app.handle(new Request('http://localhost/workspaces/multi-folder', {
@@ -528,7 +528,7 @@ describe('workspace capability', () => {
       expect(importedWorkspace).toEqual(expect.objectContaining({
         name: 'imported-monorepo',
         multiFolder: true,
-        locator: { hostId: 'local', path: join(multiRoot, 'imported-monorepo') },
+        locator: { nodeId: 'local', path: join(multiRoot, 'imported-monorepo') },
       }))
     }
     finally {

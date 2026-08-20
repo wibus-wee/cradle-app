@@ -45,7 +45,7 @@ describe('worktree setup hooks', () => {
 
     const warnings = await runWorktreeSetupHooks(workspacePath, checkoutPath, {
       trusted: false,
-      relayExposed: false,
+      fabricNodeExposed: false,
     })
 
     expect(warnings).toHaveLength(1)
@@ -61,7 +61,7 @@ describe('worktree setup hooks', () => {
 
     const warnings = await runWorktreeSetupHooks(workspacePath, checkoutPath, {
       trusted: true,
-      relayExposed: false,
+      fabricNodeExposed: false,
     })
 
     expect(warnings).toEqual([])
@@ -75,7 +75,7 @@ describe('worktree setup hooks', () => {
 
     const warnings = await runWorktreeSetupHooks(workspacePath, checkoutPath, {
       trusted: true,
-      relayExposed: true,
+      fabricNodeExposed: true,
     })
 
     expect(warnings).toHaveLength(1)
