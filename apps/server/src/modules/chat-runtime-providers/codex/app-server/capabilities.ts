@@ -25,11 +25,12 @@ export interface CodexAppServerCapabilityManifest {
 }
 
 const CODEX_APP_SERVER_PROTOCOL = 'codex-app-server'
-const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.146.0'
-const CODEX_APP_SERVER_GENERATED_DATE = '2026-07-31'
+const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.148.0'
+const CODEX_APP_SERVER_GENERATED_DATE = '2026-08-20'
 
 export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'initialize', paramsType: 'InitializeParams', category: 'initialize', operation: 'initialize', interaction: 'request' },
+  { method: 'server/diagnostics', paramsType: 'ServerDiagnosticsParams', category: 'server', operation: 'diagnostics', interaction: 'request' },
   { method: 'thread/start', paramsType: 'ThreadStartParams', category: 'thread', operation: 'start', interaction: 'request' },
   { method: 'thread/resume', paramsType: 'ThreadResumeParams', category: 'thread', operation: 'resume', interaction: 'request' },
   { method: 'thread/fork', paramsType: 'ThreadForkParams', category: 'thread', operation: 'fork', interaction: 'request' },
@@ -42,7 +43,14 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'thread/goal/set', paramsType: 'ThreadGoalSetParams', category: 'thread', operation: 'goal/set', interaction: 'request' },
   { method: 'thread/goal/get', paramsType: 'ThreadGoalGetParams', category: 'thread', operation: 'goal/get', interaction: 'request' },
   { method: 'thread/goal/clear', paramsType: 'ThreadGoalClearParams', category: 'thread', operation: 'goal/clear', interaction: 'request' },
+  { method: 'thread/queue/add', paramsType: 'ThreadQueueAddParams', category: 'thread', operation: 'queue/add', interaction: 'request' },
+  { method: 'thread/queue/list', paramsType: 'ThreadQueueListParams', category: 'thread', operation: 'queue/list', interaction: 'request' },
+  { method: 'thread/queue/update', paramsType: 'ThreadQueueUpdateParams', category: 'thread', operation: 'queue/update', interaction: 'request' },
+  { method: 'thread/queue/delete', paramsType: 'ThreadQueueDeleteParams', category: 'thread', operation: 'queue/delete', interaction: 'request' },
+  { method: 'thread/queue/reorder', paramsType: 'ThreadQueueReorderParams', category: 'thread', operation: 'queue/reorder', interaction: 'request' },
+  { method: 'thread/queue/start', paramsType: 'ThreadQueueStartParams', category: 'thread', operation: 'queue/start', interaction: 'request' },
   { method: 'thread/metadata/update', paramsType: 'ThreadMetadataUpdateParams', category: 'thread', operation: 'metadata/update', interaction: 'request' },
+  { method: 'thread/section/move', paramsType: 'ThreadSectionMoveParams', category: 'thread', operation: 'section/move', interaction: 'request' },
   { method: 'thread/settings/update', paramsType: 'ThreadSettingsUpdateParams', category: 'thread', operation: 'settings/update', interaction: 'request' },
   { method: 'thread/memoryMode/set', paramsType: 'ThreadMemoryModeSetParams', category: 'thread', operation: 'memoryMode/set', interaction: 'request' },
   { method: 'memory/reset', paramsType: null, category: 'memory', operation: 'reset', interaction: 'request' },
@@ -54,7 +62,12 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'thread/backgroundTerminals/list', paramsType: 'ThreadBackgroundTerminalsListParams', category: 'thread', operation: 'backgroundTerminals/list', interaction: 'request' },
   { method: 'thread/backgroundTerminals/terminate', paramsType: 'ThreadBackgroundTerminalsTerminateParams', category: 'thread', operation: 'backgroundTerminals/terminate', interaction: 'request' },
   { method: 'thread/rollback', paramsType: 'ThreadRollbackParams', category: 'thread', operation: 'rollback', interaction: 'request' },
+  { method: 'thread/revert', paramsType: 'ThreadRevertParams', category: 'thread', operation: 'revert', interaction: 'request' },
   { method: 'thread/list', paramsType: 'ThreadListParams', category: 'thread', operation: 'list', interaction: 'request' },
+  { method: 'threadSection/list', paramsType: 'ThreadSectionListParams', category: 'thread-section', operation: 'list', interaction: 'request' },
+  { method: 'threadSection/create', paramsType: 'ThreadSectionCreateParams', category: 'thread-section', operation: 'create', interaction: 'request' },
+  { method: 'threadSection/update', paramsType: 'ThreadSectionUpdateParams', category: 'thread-section', operation: 'update', interaction: 'request' },
+  { method: 'threadSection/delete', paramsType: 'ThreadSectionDeleteParams', category: 'thread-section', operation: 'delete', interaction: 'request' },
   { method: 'thread/search', paramsType: 'ThreadSearchParams', category: 'thread', operation: 'search', interaction: 'request' },
   { method: 'thread/searchOccurrences', paramsType: 'ThreadSearchOccurrencesParams', category: 'thread', operation: 'searchOccurrences', interaction: 'request' },
   { method: 'thread/loaded/list', paramsType: 'ThreadLoadedListParams', category: 'thread', operation: 'loaded/list', interaction: 'request' },
@@ -69,6 +82,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'marketplace/remove', paramsType: 'MarketplaceRemoveParams', category: 'marketplace', operation: 'remove', interaction: 'request' },
   { method: 'marketplace/upgrade', paramsType: 'MarketplaceUpgradeParams', category: 'marketplace', operation: 'upgrade', interaction: 'request' },
   { method: 'plugin/list', paramsType: 'PluginListParams', category: 'plugin', operation: 'list', interaction: 'request' },
+  { method: 'plugin/search', paramsType: 'PluginSearchParams', category: 'plugin', operation: 'search', interaction: 'request' },
   { method: 'plugin/installed', paramsType: 'PluginInstalledParams', category: 'plugin', operation: 'installed', interaction: 'request' },
   { method: 'plugin/read', paramsType: 'PluginReadParams', category: 'plugin', operation: 'read', interaction: 'request' },
   { method: 'plugin/skill/read', paramsType: 'PluginSkillReadParams', category: 'plugin', operation: 'skill/read', interaction: 'request' },
@@ -131,7 +145,6 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'account/logout', paramsType: null, category: 'account', operation: 'logout', interaction: 'request' },
   { method: 'account/rateLimits/read', paramsType: null, category: 'account', operation: 'rateLimits/read', interaction: 'request' },
   { method: 'account/rateLimitResetCredit/consume', paramsType: 'ConsumeAccountRateLimitResetCreditParams', category: 'account', operation: 'rateLimitResetCredit/consume', interaction: 'request' },
-  { method: 'account/usage/read', paramsType: null, category: 'account', operation: 'usage/read', interaction: 'request' },
   { method: 'account/workspaceMessages/read', paramsType: null, category: 'account', operation: 'workspaceMessages/read', interaction: 'request' },
   { method: 'account/sendAddCreditsNudgeEmail', paramsType: 'SendAddCreditsNudgeEmailParams', category: 'account', operation: 'sendAddCreditsNudgeEmail', interaction: 'request' },
   { method: 'feedback/upload', paramsType: 'FeedbackUploadParams', category: 'feedback', operation: 'upload', interaction: 'request' },
@@ -183,10 +196,12 @@ export const CODEX_APP_SERVER_SERVER_NOTIFICATIONS = [
   { method: 'thread/deleted', paramsType: 'ThreadDeletedNotification', category: 'thread' },
   { method: 'thread/unarchived', paramsType: 'ThreadUnarchivedNotification', category: 'thread' },
   { method: 'thread/closed', paramsType: 'ThreadClosedNotification', category: 'thread' },
+  { method: 'thread/reverted', paramsType: 'ThreadRevertedNotification', category: 'thread' },
   { method: 'skills/changed', paramsType: 'SkillsChangedNotification', category: 'skills' },
   { method: 'thread/name/updated', paramsType: 'ThreadNameUpdatedNotification', category: 'thread' },
   { method: 'thread/goal/updated', paramsType: 'ThreadGoalUpdatedNotification', category: 'thread' },
   { method: 'thread/goal/cleared', paramsType: 'ThreadGoalClearedNotification', category: 'thread' },
+  { method: 'thread/queue/changed', paramsType: 'ThreadQueueChangedNotification', category: 'thread' },
   { method: 'thread/environment/connected', paramsType: 'EnvironmentConnectionNotification', category: 'thread' },
   { method: 'thread/environment/disconnected', paramsType: 'EnvironmentConnectionNotification', category: 'thread' },
   { method: 'thread/settings/updated', paramsType: 'ThreadSettingsUpdatedNotification', category: 'thread' },

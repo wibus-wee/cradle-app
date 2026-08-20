@@ -519,6 +519,12 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 'session.question_handler_error',
                 'session.init_failed',
                 'agent.not_found',
+                'agent.already_exists',
+                'agent.already_running',
+                'agent.not_a_subagent',
+                'agent.not_owned',
+                'agent.type_not_allowed',
+                'agent.max_tokens_exceeded',
                 'activity.agent_busy',
                 'activity.cancelling',
                 'activity.disposing',
@@ -555,21 +561,26 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 'skill.not_found',
                 'skill.type_unsupported',
                 'skill.name_empty',
+                'skill.parse_failed',
+                'skill.nested_too_deep',
                 'records.write_failed',
                 'compaction.failed',
                 'compaction.unable',
                 'task.task_id_empty',
+                'task.limit_exceeded',
                 'usage.turn_id_conflict',
                 'mcp.server_not_found',
                 'mcp.server_disabled',
                 'mcp.startup_failed',
                 'mcp.tool_name_collision',
+                'mcp.oauth_failed',
                 'message.not_found',
                 'plugin.not_found',
                 'plugin.load_failed',
                 'request.invalid',
                 'request.work_dir_required',
                 'request.prompt_input_empty',
+                'prompt.id_conflict',
                 'prompt.not_found',
                 'prompt.already_completed',
                 'session.busy',
@@ -588,6 +599,13 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 'fs.too_many_results',
                 'fs.grep_timeout',
                 'fs.git_unavailable',
+                'wire.migration_missing',
+                'storage.permission_denied',
+                'storage.disk_full',
+                'cron.expression_invalid',
+                'web.invalid_url',
+                'web.private_address',
+                'web.fetch_failed',
                 'validation.failed',
                 'not_implemented',
                 'internal',
@@ -663,6 +681,12 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         'session.question_handler_error',
                         'session.init_failed',
                         'agent.not_found',
+                        'agent.already_exists',
+                        'agent.already_running',
+                        'agent.not_a_subagent',
+                        'agent.not_owned',
+                        'agent.type_not_allowed',
+                        'agent.max_tokens_exceeded',
                         'activity.agent_busy',
                         'activity.cancelling',
                         'activity.disposing',
@@ -699,21 +723,26 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         'skill.not_found',
                         'skill.type_unsupported',
                         'skill.name_empty',
+                        'skill.parse_failed',
+                        'skill.nested_too_deep',
                         'records.write_failed',
                         'compaction.failed',
                         'compaction.unable',
                         'task.task_id_empty',
+                        'task.limit_exceeded',
                         'usage.turn_id_conflict',
                         'mcp.server_not_found',
                         'mcp.server_disabled',
                         'mcp.startup_failed',
                         'mcp.tool_name_collision',
+                        'mcp.oauth_failed',
                         'message.not_found',
                         'plugin.not_found',
                         'plugin.load_failed',
                         'request.invalid',
                         'request.work_dir_required',
                         'request.prompt_input_empty',
+                        'prompt.id_conflict',
                         'prompt.not_found',
                         'prompt.already_completed',
                         'session.busy',
@@ -732,6 +761,13 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         'fs.too_many_results',
                         'fs.grep_timeout',
                         'fs.git_unavailable',
+                        'wire.migration_missing',
+                        'storage.permission_denied',
+                        'storage.disk_full',
+                        'cron.expression_invalid',
+                        'web.invalid_url',
+                        'web.private_address',
+                        'web.fetch_failed',
                         'validation.failed',
                         'not_implemented',
                         'internal',
@@ -1276,6 +1312,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         archived: {
                           type: 'boolean',
                         },
+                        archived_at: {
+                          type: 'string',
+                        },
                         busy: {
                           type: 'boolean',
                         },
@@ -1681,6 +1720,94 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    error: {
+                      type: 'string',
+                    },
+                    scope: {
+                      minLength: 1,
+                      type: 'string',
+                    },
+                    state: {
+                      enum: [
+                        'Pending',
+                        'Activating',
+                        'Active',
+                        'Unloading',
+                        'Failed',
+                      ],
+                      type: 'string',
+                    },
+                    token: {
+                      minLength: 1,
+                      type: 'string',
+                    },
+                    type: {
+                      const: 'event.di.unit_changed',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                    'scope',
+                    'token',
+                    'state',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    type: {
+                      const: 'event.plugin.changed',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    capability_id: {
+                      type: 'string',
+                    },
+                    install: {
+                      properties: {
+                        error: {
+                          type: 'string',
+                        },
+                        note: {
+                          type: 'string',
+                        },
+                        percent: {
+                          type: 'number',
+                        },
+                        running: {
+                          type: 'boolean',
+                        },
+                        step: {
+                          type: 'string',
+                        },
+                      },
+                      required: [
+                        'running',
+                      ],
+                      type: 'object',
+                    },
+                    type: {
+                      const: 'event.capability.changed',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                    'capability_id',
+                    'install',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
                     change: {
                       properties: {
                         actor: {
@@ -1972,6 +2099,42 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             kind: {
                               const: 'user',
                               type: 'string',
+                            },
+                            skillActivations: {
+                              items: {
+                                properties: {
+                                  activationId: {
+                                    type: 'string',
+                                  },
+                                  skillArgs: {
+                                    type: 'string',
+                                  },
+                                  skillName: {
+                                    type: 'string',
+                                  },
+                                  skillPath: {
+                                    type: 'string',
+                                  },
+                                  skillSource: {
+                                    enum: [
+                                      'project',
+                                      'user',
+                                      'extra',
+                                      'builtin',
+                                    ],
+                                    type: 'string',
+                                  },
+                                  skillType: {
+                                    type: 'string',
+                                  },
+                                },
+                                required: [
+                                  'activationId',
+                                  'skillName',
+                                ],
+                                type: 'object',
+                              },
+                              type: 'array',
                             },
                           },
                           required: [
@@ -2276,6 +2439,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     prompt: {
                       type: 'string',
                     },
+                    promptId: {
+                      type: 'string',
+                    },
                     turnId: {
                       type: 'number',
                     },
@@ -2327,6 +2493,12 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             'session.question_handler_error',
                             'session.init_failed',
                             'agent.not_found',
+                            'agent.already_exists',
+                            'agent.already_running',
+                            'agent.not_a_subagent',
+                            'agent.not_owned',
+                            'agent.type_not_allowed',
+                            'agent.max_tokens_exceeded',
                             'activity.agent_busy',
                             'activity.cancelling',
                             'activity.disposing',
@@ -2363,21 +2535,26 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             'skill.not_found',
                             'skill.type_unsupported',
                             'skill.name_empty',
+                            'skill.parse_failed',
+                            'skill.nested_too_deep',
                             'records.write_failed',
                             'compaction.failed',
                             'compaction.unable',
                             'task.task_id_empty',
+                            'task.limit_exceeded',
                             'usage.turn_id_conflict',
                             'mcp.server_not_found',
                             'mcp.server_disabled',
                             'mcp.startup_failed',
                             'mcp.tool_name_collision',
+                            'mcp.oauth_failed',
                             'message.not_found',
                             'plugin.not_found',
                             'plugin.load_failed',
                             'request.invalid',
                             'request.work_dir_required',
                             'request.prompt_input_empty',
+                            'prompt.id_conflict',
                             'prompt.not_found',
                             'prompt.already_completed',
                             'session.busy',
@@ -2396,6 +2573,13 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             'fs.too_many_results',
                             'fs.grep_timeout',
                             'fs.git_unavailable',
+                            'wire.migration_missing',
+                            'storage.permission_denied',
+                            'storage.disk_full',
+                            'cron.expression_invalid',
+                            'web.invalid_url',
+                            'web.private_address',
+                            'web.fetch_failed',
                             'validation.failed',
                             'not_implemented',
                             'internal',
@@ -2445,6 +2629,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         'blocked',
                       ],
                       type: 'string',
+                    },
+                    time: {
+                      type: 'number',
                     },
                     turnId: {
                       type: 'number',
@@ -3312,6 +3499,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             'failed',
                             'disabled',
                             'needs-auth',
+                            'removed',
                           ],
                           type: 'string',
                         },
@@ -3353,6 +3541,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     description: {
                       type: 'string',
                     },
+                    model: {
+                      type: 'string',
+                    },
                     parentAgentId: {
                       type: 'string',
                     },
@@ -3373,6 +3564,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     },
                     swarmIndex: {
                       type: 'number',
+                    },
+                    thinkingEffort: {
+                      type: 'string',
                     },
                     type: {
                       const: 'subagent.spawned',
@@ -3692,6 +3886,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                               const: 'agent',
                               type: 'string',
                             },
+                            model: {
+                              type: 'string',
+                            },
                             startedAt: {
                               type: 'number',
                             },
@@ -3717,6 +3914,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             },
                             terminalNotificationSuppressed: {
                               type: 'boolean',
+                            },
+                            thinkingEffort: {
+                              type: 'string',
                             },
                             timeoutMs: {
                               type: 'number',
@@ -3918,6 +4118,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                               const: 'agent',
                               type: 'string',
                             },
+                            model: {
+                              type: 'string',
+                            },
                             startedAt: {
                               type: 'number',
                             },
@@ -3943,6 +4146,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             },
                             terminalNotificationSuppressed: {
                               type: 'boolean',
+                            },
+                            thinkingEffort: {
+                              type: 'string',
                             },
                             timeoutMs: {
                               type: 'number',
@@ -4144,6 +4350,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                               const: 'agent',
                               type: 'string',
                             },
+                            model: {
+                              type: 'string',
+                            },
                             startedAt: {
                               type: 'number',
                             },
@@ -4169,6 +4378,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             },
                             terminalNotificationSuppressed: {
                               type: 'boolean',
+                            },
+                            thinkingEffort: {
+                              type: 'string',
                             },
                             timeoutMs: {
                               type: 'number',
@@ -4370,6 +4582,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                               const: 'agent',
                               type: 'string',
                             },
+                            model: {
+                              type: 'string',
+                            },
                             startedAt: {
                               type: 'number',
                             },
@@ -4395,6 +4610,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             },
                             terminalNotificationSuppressed: {
                               type: 'boolean',
+                            },
+                            thinkingEffort: {
+                              type: 'string',
                             },
                             timeoutMs: {
                               type: 'number',
@@ -4669,6 +4887,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                     ],
                                     type: 'object',
                                   },
+                                  {
+                                    properties: {
+                                      file_id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
+                                      kind: {
+                                        const: 'session_media',
+                                        type: 'string',
+                                      },
+                                    },
+                                    required: [
+                                      'kind',
+                                      'file_id',
+                                    ],
+                                    type: 'object',
+                                  },
                                 ],
                               },
                               type: {
@@ -4737,6 +4972,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                       },
                                       kind: {
                                         const: 'file',
+                                        type: 'string',
+                                      },
+                                    },
+                                    required: [
+                                      'kind',
+                                      'file_id',
+                                    ],
+                                    type: 'object',
+                                  },
+                                  {
+                                    properties: {
+                                      file_id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
+                                      kind: {
+                                        const: 'session_media',
                                         type: 'string',
                                       },
                                     },
@@ -5028,6 +5280,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                     ],
                                     type: 'object',
                                   },
+                                  {
+                                    properties: {
+                                      file_id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
+                                      kind: {
+                                        const: 'session_media',
+                                        type: 'string',
+                                      },
+                                    },
+                                    required: [
+                                      'kind',
+                                      'file_id',
+                                    ],
+                                    type: 'object',
+                                  },
                                 ],
                               },
                               type: {
@@ -5096,6 +5365,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                       },
                                       kind: {
                                         const: 'file',
+                                        type: 'string',
+                                      },
+                                    },
+                                    required: [
+                                      'kind',
+                                      'file_id',
+                                    ],
+                                    type: 'object',
+                                  },
+                                  {
+                                    properties: {
+                                      file_id: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
+                                      kind: {
+                                        const: 'session_media',
                                         type: 'string',
                                       },
                                     },
@@ -6289,6 +6575,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
             recursive: {
               type: 'boolean',
             },
+            runtime_id: {
+              minLength: 1,
+              type: 'string',
+            },
             session_id: {
               type: 'string',
             },
@@ -6378,6 +6668,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 type: 'string',
               },
               type: 'array',
+            },
+            runtime_id: {
+              minLength: 1,
+              type: 'string',
             },
             session_id: {
               type: 'string',
