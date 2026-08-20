@@ -40,8 +40,13 @@ export async function outboundFetch(input: RequestInfo | URL, init?: RequestInit
   }
 
   const dispatcher = getDispatcherForProxy(resolved.proxyUrl, resolved.status.source)
+  const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+  // Node fetch does not transparently decompress responses when a dispatcher is supplied.
+  // Request identity encoding so proxy-routed callers retain normal fetch semantics.
+  headers.set('accept-encoding', 'identity')
   const requestInit: DispatcherRequestInit = {
     ...init,
+    headers,
     dispatcher,
   }
   return fetch(input, requestInit)

@@ -1,12 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import { gzipSync } from 'node:zlib'
 
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+import { setNetworkPreferences } from '../modules/preferences/service'
 import {
   normalizeProxyUrl,
+  outboundFetch,
   parseMacScutilProxy,
   parseWindowsProxySettings,
   selectWindowsProxyUrl,
   shouldBypassProxy,
 } from './outbound-network'
+
+afterEach(async () => {
+  await setNetworkPreferences({
+    proxyEnabled: true,
+    proxyMode: 'system',
+    customProxyUrl: null,
+  })
+})
 
 describe('outbound-network proxy parsing', () => {
   it('parses macOS HTTP, HTTPS, SOCKS, and bypass settings from scutil output', () => {
@@ -55,5 +67,35 @@ describe('outbound-network proxy parsing', () => {
     expect(shouldBypassProxy('service.local', ['*.local'], false)).toBe(true)
     expect(shouldBypassProxy('localhost', ['<local>'], false)).toBe(true)
     expect(shouldBypassProxy('api.openai.com', ['*.local'], false)).toBe(false)
+  })
+
+  it('requests identity encoding so proxied responses can be parsed as JSON', async () => {
+    await setNetworkPreferences({
+      proxyEnabled: true,
+      proxyMode: 'custom',
+      customProxyUrl: 'http://127.0.0.1:7890',
+    })
+
+    const compressed = gzipSync(Buffer.from(JSON.stringify({ ok: true })))
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      const encoding = new Headers(init?.headers).get('accept-encoding')
+      const body = encoding === 'identity' ? JSON.stringify({ ok: true }) : compressed
+      return Promise.resolve(new Response(body, {
+        headers: {
+          'content-type': 'application/json',
+          ...(encoding === 'identity' ? {} : { 'content-encoding': 'gzip' }),
+        },
+      }))
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      const response = await outboundFetch('https://api.github.com/user')
+      await expect(response.json()).resolves.toEqual({ ok: true })
+      expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('accept-encoding')).toBe('identity')
+    }
+    finally {
+      vi.unstubAllGlobals()
+    }
   })
 })
