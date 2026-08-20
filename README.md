@@ -9,6 +9,7 @@
     <br />
     <img src='https://img.shields.io/github/stars/wibus-wee/cradle-app?style=flat-square'>
     <img src='https://img.shields.io/github/downloads/wibus-wee/cradle-app/total?style=flat-square'>
+    <a href="https://deepwiki.com/wibus-wee/cradle-app"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
     <br />
     <br />
     <b>Download for </b>
