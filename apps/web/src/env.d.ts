@@ -99,6 +99,12 @@ interface Window {
       minimize: () => Promise<unknown>
       maximize: () => Promise<unknown>
       close: () => Promise<unknown>
+      isMaximized?: () => Promise<boolean>
+      setCaptionButtons?: (input: unknown) => Promise<unknown>
+      onCaptionHover?: (
+        handler: (event: { button: string, phase: string }) => void,
+      ) => () => void
+      onMaximizedChanged?: (handler: (maximized: boolean) => void) => () => void
       startPointerMonitor: () => Promise<unknown>
       stopPointerMonitor: () => Promise<unknown>
       onTearoffSurfaceClosed: (handler: (surfaceId: string) => void) => () => void

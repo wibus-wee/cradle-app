@@ -16,12 +16,14 @@ export const MACOS_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = {
   height: 44,
 }
 
+// Windows draws its own caption buttons in the renderer (see
+// main/windows-caption-buttons.ts), so there is no native overlay to reserve.
 export const WINDOWS_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = {
-  side: 'right',
+  side: 'none',
   x: 0,
   y: 0,
-  width: 130,
-  height: 50,
+  width: 0,
+  height: 0,
 }
 
 export const LINUX_WINDOW_CONTROLS_SAFE_AREA: DesktopWindowControlsSafeArea = {

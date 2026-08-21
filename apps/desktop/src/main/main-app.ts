@@ -87,6 +87,7 @@ import { TrayManager } from './tray-manager'
 import { DesktopUpdateManager } from './update-manager'
 import { WindowManager } from './window-manager'
 import { readStoredWindowBounds, resolveVisibleWindowBounds } from './window-state'
+import { installWindowsCaptionButtons } from './windows-caption-buttons'
 
 let mainWindow: BrowserWindow | null = null
 let windowManager: WindowManager | undefined
@@ -203,6 +204,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
 
   const isMacOS = process.platform === 'darwin'
   const windowControlsSafeArea = resolveWindowControlsSafeArea(process.platform)
+  const useNativeTitleBarOverlay = isMacOS || process.platform === 'linux'
   const windowControlsOverlay = resolveWindowControlsOverlay(
     nativeTheme.shouldUseDarkColors,
     windowControlsSafeArea,
@@ -217,7 +219,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
     minHeight: MAIN_WINDOW_MIN_HEIGHT,
     titleBarStyle: isMacOS ? 'hiddenInset' : 'hidden',
     backgroundColor: windowControlsOverlay.color,
-    titleBarOverlay: isMacOS ? true : windowControlsOverlay,
+    titleBarOverlay: useNativeTitleBarOverlay ? (isMacOS ? true : windowControlsOverlay) : false,
     ...(isMacOS && { trafficLightPosition: resolveTrafficLightPosition(windowControlsSafeArea) }),
     webPreferences: {
       preload: resolveDesktopPreloadPath(__dirname),
@@ -233,6 +235,7 @@ async function createMainWindow(): Promise<BrowserWindow> {
   })
   mainWindowState.manage(win)
   installExternalLinkPolicy(win.webContents)
+  installWindowsCaptionButtons(win)
 
   win.once('ready-to-show', () => {
     win.show()

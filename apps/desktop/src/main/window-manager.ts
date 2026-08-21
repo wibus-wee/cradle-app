@@ -16,6 +16,7 @@ import {
 import { installExternalLinkPolicy } from './external-link-policy'
 import { subscribeAcpDevtool, subscribeIpcDevtool } from './ipc-devtool'
 import { readStoredWindowSize, resolveWindowBoundsNearPoint, resolveWindowSize, writeStoredWindowSize } from './window-state'
+import { installWindowsCaptionButtons } from './windows-caption-buttons'
 
 const TEAROFF_WINDOW_DEFAULT_WIDTH = 720
 const TEAROFF_WINDOW_DEFAULT_HEIGHT = 640
@@ -91,6 +92,7 @@ export class WindowManager {
 
     const isMacOS = process.platform === 'darwin'
     const windowControlsSafeArea = resolveWindowControlsSafeArea(process.platform)
+    const useNativeTitleBarOverlay = isMacOS || process.platform === 'linux'
     const windowControlsOverlay = resolveWindowControlsOverlay(
       nativeTheme.shouldUseDarkColors,
       windowControlsSafeArea,
@@ -102,7 +104,7 @@ export class WindowManager {
       minHeight: TEAROFF_WINDOW_MIN_HEIGHT,
       titleBarStyle: isMacOS ? 'hiddenInset' : 'hidden',
       backgroundColor: windowControlsOverlay.color,
-      titleBarOverlay: isMacOS ? true : windowControlsOverlay,
+      titleBarOverlay: useNativeTitleBarOverlay ? (isMacOS ? true : windowControlsOverlay) : false,
       ...(isMacOS && { trafficLightPosition: resolveTrafficLightPosition(windowControlsSafeArea) }),
       webPreferences: {
         preload: resolveDesktopPreloadPath(__dirname),
@@ -123,6 +125,7 @@ export class WindowManager {
 
     this.surfaceWindows.set(surfaceId, win)
     installExternalLinkPolicy(win.webContents)
+    installWindowsCaptionButtons(win)
     this.trackAppshotCaptureWindow(win)
 
     let lastTearoffWindowSize = { width: targetBounds.width, height: targetBounds.height }

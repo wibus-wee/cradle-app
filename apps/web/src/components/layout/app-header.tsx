@@ -6,8 +6,9 @@ import { CHROME_COLLAPSED_SIDEBAR_WIDTH } from '~/components/layout/layout-respo
 import { useChatSessionLayoutRecord } from '~/components/layout/use-layout-query-records'
 import { SessionIsolationChrome } from '~/features/session/session-isolation-chrome'
 import { SessionPullRequestChrome } from '~/features/session/session-pull-request-chrome'
+import { WindowsCaptionButtons } from '~/features/window-controls/windows-caption-buttons'
 import { WorkHeaderChrome } from '~/features/work/work-header-chrome'
-import { isTearoffWindow, windowControlsSafeArea } from '~/lib/electron'
+import { isElectron, isTearoffWindow, platform, windowControlsSafeArea } from '~/lib/electron'
 import { useActiveSurface } from '~/navigation/active-surface'
 import { SurfaceBar } from '~/navigation/surface-bar'
 import { chatSessionIdForSurface, workIdForSurface } from '~/navigation/surface-identity'
@@ -112,6 +113,9 @@ export function AppHeader({
       windowControls={{
         leftReservedWidth: reserveLeftWindowControls ? windowControlsSafeArea.width : 0,
         rightReservedWidth: reserveRightWindowControls ? windowControlsSafeArea.width : 0,
+        captionButtons: isElectron && platform === 'win32'
+          ? <WindowsCaptionButtons />
+          : undefined,
       }}
       surface={sessionScoped
         ? (

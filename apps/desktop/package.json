@@ -14,10 +14,11 @@
   "main": "dist/main/index.js",
   "scripts": {
     "postinstall": "node node_modules/electron/install.js && node scripts/rebuild-sparkle.mjs",
-    "dev": "pnpm build:relayd-resource && pnpm build:chronicle && pnpm build:mac-bridge && electron-vite dev",
+    "dev": "pnpm build:relayd-resource && pnpm build:chronicle && pnpm build:mac-bridge && pnpm build:win-caption && electron-vite dev",
     "sync:codex-runtime": "node scripts/sync-codex-runtime.mjs --current",
     "sync:codex-runtime:all": "node scripts/sync-codex-runtime.mjs --all",
-    "build": "pnpm --filter @cradle/server build:desktop-runtime && pnpm --filter @cradle/server build:desktop-plugins && pnpm --filter @cradle/cli build && pnpm build:relayd-resource && pnpm build:chronicle && pnpm build:mac-bridge && pnpm rebuild:sparkle && electron-vite build",
+    "build": "pnpm --filter @cradle/server build:desktop-runtime && pnpm --filter @cradle/server build:desktop-plugins && pnpm --filter @cradle/cli build && pnpm build:relayd-resource && pnpm build:chronicle && pnpm build:mac-bridge && pnpm rebuild:sparkle && electron-vite build && node scripts/build-win-caption.mjs --stage",
+    "build:win-caption": "node scripts/build-win-caption.mjs",
     "build:relayd-resource": "pnpm --filter @cradle/relayd build:desktop-resource",
     "build:chronicle": "node scripts/build-chronicle.mjs",
     "build:mac-bridge": "node scripts/build-mac-bridge.mjs",
@@ -61,6 +62,8 @@
     "electron": "42.4.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "node-addon-api": "^8.3.1",
+    "node-gyp": "^11.1.0",
     "typescript": "^5.9.3",
     "vite": "^7.2.6"
   }

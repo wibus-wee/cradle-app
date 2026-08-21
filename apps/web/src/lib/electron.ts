@@ -396,6 +396,12 @@ interface WindowServiceMethods {
   focusCurrent: () => Promise<boolean>
   setTitleBarOverlay: (input: WindowTitleBarOverlayInput) => Promise<void>
   close: () => Promise<void>
+  isMaximized: () => Promise<boolean>
+  setCaptionButtons: (input: {
+    minimize?: { x: number, y: number, width: number, height: number }
+    maximize?: { x: number, y: number, width: number, height: number }
+    close?: { x: number, y: number, width: number, height: number }
+  }) => Promise<void>
 }
 
 export interface DesktopUpdateFile {
@@ -810,6 +816,10 @@ function formatHexColor(red: number, green: number, blue: number): string {
 
 export function syncDesktopWindowControlsOverlay(): void {
   if (!isElectron || !nativeIpc) {
+    return
+  }
+  // Windows draws its own caption buttons and has no title bar overlay to sync.
+  if (platform === 'win32') {
     return
   }
 

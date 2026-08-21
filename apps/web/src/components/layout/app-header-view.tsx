@@ -30,6 +30,7 @@ interface AppHeaderViewProps {
   windowControls: {
     leftReservedWidth: number
     rightReservedWidth: number
+    captionButtons?: React.ReactNode
   }
   surface: React.ReactNode
   actions?: React.ReactNode
@@ -146,12 +147,14 @@ export function AppHeaderView({
             <PanelRightIcon className="size-3.5" aria-hidden="true" />
           </Button>
         )}
-        {windowControls.rightReservedWidth > 0 && (
-          <div
-            aria-hidden="true"
-            className="h-full shrink-0"
-            style={{ width: windowControls.rightReservedWidth }}
-          />
+        {windowControls.captionButtons ?? (
+          windowControls.rightReservedWidth > 0 && (
+            <div
+              aria-hidden="true"
+              className="h-full shrink-0"
+              style={{ width: windowControls.rightReservedWidth }}
+            />
+          )
         )}
       </div>
     </div>

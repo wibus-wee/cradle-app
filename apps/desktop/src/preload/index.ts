@@ -97,6 +97,13 @@ const cradleElectron = {
     minimize: () => ipcRenderer.invoke('window.minimize'),
     maximize: () => ipcRenderer.invoke('window.maximize'),
     close: () => ipcRenderer.invoke('window.close'),
+    isMaximized: () => ipcRenderer.invoke('window.isMaximized'),
+    setCaptionButtons: (input: unknown) =>
+      ipcRenderer.invoke('window.setCaptionButtons', input),
+    onCaptionHover: (handler: (event: { button: string, phase: string }) => void) =>
+      subscribeIpc('window:caption-hover', handler),
+    onMaximizedChanged: (handler: (maximized: boolean) => void) =>
+      subscribeIpc('window:maximized-changed', handler),
     startPointerMonitor: () => ipcRenderer.invoke('window.startPointerMonitor'),
     stopPointerMonitor: () => ipcRenderer.invoke('window.stopPointerMonitor'),
     onTearoffSurfaceClosed: (handler: (surfaceId: string) => void) => {

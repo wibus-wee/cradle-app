@@ -70,6 +70,8 @@ import { launchPathInTerminal } from './native-terminal-launcher'
 import type { QuitGuard } from './quit-guard'
 import type { DesktopUpdateManager, DesktopUpdateStatus } from './update-manager'
 import type { TearoffSurfaceRoute, WindowManager } from './window-manager'
+import type { CaptionButtonRectsInput } from './windows-caption-buttons'
+import { applyWindowsCaptionButtonRects } from './windows-caption-buttons'
 
 const DEFAULT_PRIVACY_SENSITIVE_APP_BUNDLE_IDS = [
   'com.apple.keychainaccess',
@@ -749,6 +751,20 @@ class WindowService extends IpcService {
   }
 
   @IpcMethod()
+  async isMaximized(): Promise<boolean> {
+    const win = readIpcSenderWindow()
+    return win?.isMaximized() ?? false
+  }
+
+  @IpcMethod()
+  async setCaptionButtons(input: CaptionButtonRectsInput): Promise<void> {
+    const win = readIpcSenderWindow()
+    if (win) {
+      applyWindowsCaptionButtonRects(win, input)
+    }
+  }
+
+  @IpcMethod()
   async setTitleBarOverlay(input: WindowTitleBarOverlayInput): Promise<void> {
     const win = readIpcSenderWindow()
     if (!win || win.isDestroyed()) {
@@ -756,7 +772,7 @@ class WindowService extends IpcService {
     }
     const safeArea = resolveWindowControlsSafeArea(process.platform)
     win.setBackgroundColor(input.color)
-    if (process.platform !== 'darwin') {
+    if (process.platform === 'linux') {
       win.setTitleBarOverlay({
         color: input.color,
         symbolColor: input.symbolColor,
