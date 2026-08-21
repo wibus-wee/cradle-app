@@ -7,24 +7,31 @@ export interface SectionProps {
   description?: string
   children?: ReactNode
   className?: string
-  /** When true, omit the bottom border (useful for the last section). */
-  flush?: boolean
 }
 
-export function Section({ title, description, children, className, flush }: SectionProps) {
+/** Titled content block. Separation comes from the parent's spacing, not borders. */
+export function Section({ title, description, children, className }: SectionProps) {
   return (
-    <section className={cn(flush ? 'py-3' : 'border-b border-[var(--color-border-content)] py-3', className)}>
+    <section className={cn('flex flex-col gap-3.5', className)}>
       {(title || description)
         ? (
-          <div className="mb-2">
-            {title
-              ? <h2 className="text-[13px] font-medium text-[var(--text-primary)]">{title}</h2>
-              : null}
-            {description
-              ? <p className="mt-0.5 text-[12px] leading-4 text-[var(--text-secondary)]">{description}</p>
-              : null}
-          </div>
-        )
+            <div>
+              {title
+                ? (
+                    <h2 className="text-balance text-[15px] font-semibold leading-snug text-[var(--foreground)]">
+                      {title}
+                    </h2>
+                  )
+                : null}
+              {description
+                ? (
+                    <p className="mt-0.5 max-w-[540px] text-pretty text-xs leading-relaxed text-[var(--muted-foreground)]">
+                      {description}
+                    </p>
+                  )
+                : null}
+            </div>
+          )
         : null}
       {children}
     </section>

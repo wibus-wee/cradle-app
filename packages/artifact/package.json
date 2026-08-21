@@ -9,6 +9,9 @@
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "dependencies": {
+    "@mingcute/react": "^1.4.1"
+  },
   "peerDependencies": {
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0"

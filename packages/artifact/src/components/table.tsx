@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { cn } from '../cn'
+import { EmptyState } from './empty-state'
 
 export interface TableColumn<T extends Record<string, unknown> = Record<string, unknown>> {
   key: keyof T & string
@@ -16,6 +17,7 @@ export interface TableProps<T extends Record<string, unknown> = Record<string, u
   emptyMessage?: string
 }
 
+/** Hairline-ringed well, airy rows, mono numerics for right-aligned columns. */
 export function Table<T extends Record<string, unknown> = Record<string, unknown>>({
   columns,
   rows,
@@ -24,22 +26,33 @@ export function Table<T extends Record<string, unknown> = Record<string, unknown
 }: TableProps<T>) {
   if (rows.length === 0) {
     return (
-      <div className={cn('rounded-[var(--radius-lg)] px-3 py-4 text-[12px] text-[var(--text-tertiary)] shadow-[var(--shadow-inset-ring)]', className)}>
-        {emptyMessage}
+      <div
+        className={cn(
+          'overflow-hidden rounded-[var(--radius-lg)] shadow-[inset_0_0_0_1px_var(--border)]',
+          className,
+        )}
+      >
+        <EmptyState message={emptyMessage} className="py-6" />
       </div>
     )
   }
 
   return (
-    <div className={cn('overflow-x-auto rounded-[var(--radius-lg)] shadow-[var(--shadow-inset-ring)]', className)}>
-      <table className="w-full border-collapse text-left text-[12px]">
+    <div
+      className={cn(
+        'overflow-x-auto rounded-[var(--radius-lg)] shadow-[inset_0_0_0_1px_var(--border)]',
+        className,
+      )}
+    >
+      <table className="w-full border-collapse text-left text-xs">
         <thead>
-          <tr className="border-b border-[var(--color-border-content)] bg-[var(--color-fill)]">
+          <tr className="border-b border-[var(--border)]">
             {columns.map(column => (
               <th
                 key={column.key}
+                scope="col"
                 className={cn(
-                  'px-3 py-2 font-medium text-[var(--text-secondary)]',
+                  'px-3.5 py-2.5 text-[11px] font-medium text-[var(--muted-foreground)]',
                   column.align === 'right' && 'text-right',
                 )}
               >
@@ -48,17 +61,20 @@ export function Table<T extends Record<string, unknown> = Record<string, unknown
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[var(--color-border-content)]">
+        <tbody>
           {rows.map((row) => {
             const rowKey = columns.map(column => String(row[column.key] ?? '')).join('|') || JSON.stringify(row)
             return (
-              <tr key={rowKey} className="transition-colors duration-[var(--duration-quick)] ease-[var(--ease-standard)] hover:bg-[var(--color-fill)]">
+              <tr
+                key={rowKey}
+                className="border-b border-[var(--border)] transition-colors duration-[var(--duration-quick)] ease-[var(--ease-standard)] last:border-b-0 hover:bg-[var(--muted)]"
+              >
                 {columns.map(column => (
                   <td
                     key={column.key}
                     className={cn(
-                      'px-3 py-2 tabular-nums text-[var(--text-primary)]',
-                      column.align === 'right' && 'text-right',
+                      'px-3.5 py-2.5 text-[var(--foreground)]',
+                      column.align === 'right' && 'text-right font-mono tabular-nums text-[var(--muted-foreground)]',
                     )}
                   >
                     {column.render

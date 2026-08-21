@@ -1,4 +1,7 @@
+import { Bar, BarChart as RechartsBarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+
 import { cn } from '../cn'
+import { ChartTooltip } from './chart-tooltip'
 
 export interface BarChartItem {
   label: string
@@ -7,46 +10,47 @@ export interface BarChartItem {
 
 export interface BarChartProps {
   items: BarChartItem[]
-  className?: string
-  /** Max bar height in pixels. */
   height?: number
+  /** Format tooltip values; defaults to `en-US` locale. */
+  formatValue?: (value: number) => string
+  className?: string
 }
 
 /**
- * Simple horizontal-comparison bar chart. Prefer SegmentedBar for share-of-total views.
+ * Vertical comparison bars following the usage dashboard conventions:
+ * rounded tops, max bar width, dimmed ticks, peak at full intensity.
  */
-export function BarChart({ items, className, height = 120 }: BarChartProps) {
-  const max = Math.max(0, ...items.map(item => item.value))
+export function BarChart({ items, height = 150, formatValue, className }: BarChartProps) {
+  const peakIndex = items.reduce((best, item, index) => (item.value > items[best]!.value ? index : best), 0)
+  const data = items.map(item => ({ label: item.label, value: item.value }))
 
   return (
-    <div className={cn('space-y-2', className)}>
-      <div className="flex items-end gap-2" style={{ height }}>
-        {items.map((item) => {
-          const ratio = max > 0 ? item.value / max : 0
-          return (
-            <div key={item.label} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1">
-              <span className="text-[10px] tabular-nums text-[var(--text-tertiary)]">
-                {item.value.toLocaleString('en-US')}
-              </span>
-              <div
-                className="w-full max-w-10 rounded-t-[var(--radius-sm)] bg-[var(--color-accent)]"
-                style={{ height: `${Math.max(4, ratio * (height - 28))}px` }}
-                title={`${item.label}: ${item.value}`}
+    <div className={cn('w-full', className)} style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RechartsBarChart data={data} margin={{ top: 8, right: 0, bottom: 0, left: 0 }}>
+          <XAxis
+            dataKey="label"
+            tickLine={false}
+            axisLine={false}
+            interval={0}
+            tick={{ fontSize: 10, fillOpacity: 0.55 }}
+          />
+          <YAxis hide domain={[0, 'dataMax']} />
+          <Tooltip cursor={false} content={<ChartTooltip formatValue={formatValue} />} />
+          <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={false}>
+            {items.map((item, index) => (
+              <Cell
+                key={item.label}
+                fill={
+                  index === peakIndex
+                    ? 'var(--viz-blue)'
+                    : 'color-mix(in srgb, var(--viz-blue) 40%, transparent)'
+                }
               />
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex gap-2">
-        {items.map(item => (
-          <div
-            key={`label:${item.label}`}
-            className="min-w-0 flex-1 truncate text-center text-[10px] text-[var(--text-tertiary)]"
-          >
-            {item.label}
-          </div>
-        ))}
-      </div>
+            ))}
+          </Bar>
+        </RechartsBarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
