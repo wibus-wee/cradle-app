@@ -88,7 +88,6 @@
     "drizzle-orm": "^0.45.2",
     "elysia": "^1.4.28",
     "es-module-lexer": "^2.0.0",
-    "extract-zip": "^2.0.1",
     "fast-glob": "^3.3.3",
     "format-duration": "^3.0.2",
     "hono": "4.11.9",
@@ -110,6 +109,7 @@
     "tsyringe": "^4.10.0",
     "undici": "^7.25.0",
     "ws": "^8.18.3",
+    "yauzl": "^3.4.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -121,6 +121,7 @@
     "@sinclair/typebox": "0.34.49",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.19.1",
+    "@types/yauzl": "^3.4.0",
     "nodemon": "^3.1.9",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

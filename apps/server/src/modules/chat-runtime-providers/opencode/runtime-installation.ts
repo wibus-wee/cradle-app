@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { accessSync, constants, existsSync, readFileSync, statSync } from 'node:fs'
+import { accessSync, constants, createWriteStream, existsSync, readFileSync, statSync } from 'node:fs'
 import {
   chmod,
   lstat,
@@ -12,11 +12,13 @@ import {
   stat,
 } from 'node:fs/promises'
 import path from 'node:path'
+import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
 
 import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
-import extractZip from 'extract-zip'
 import { extract as extractTar, list as listTar } from 'tar'
+import type { Entry, ZipFile } from 'yauzl'
+import { openPromise as openZipPromise } from 'yauzl'
 
 import { AppError } from '../../../errors/app-error'
 import { getServerConfig } from '../../../infra'
@@ -28,6 +30,7 @@ import { OPENCODE_RUNTIME_MANIFEST, resolveOpencodeReleaseTarget } from './runti
 const execFileAsync = promisify(execFile)
 const INSTALLATION_SCHEMA_VERSION = 1
 const VERSION_PATTERN = /^(?:opencode\s+)?v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/
+const EXTRACT_TIMEOUT_MS = 60_000
 
 export type OpencodeExecutableSource = 'configured' | 'managed' | 'path'
 
@@ -258,15 +261,45 @@ export function validateOpencodeArchivePath(entryPath: string): void {
   }
 }
 
+function readNextZipEntry(zipfile: ZipFile): Promise<Entry | null> {
+  return new Promise((resolve, reject) => {
+    const onEntry = (entry: Entry): void => {
+      cleanup()
+      resolve(entry)
+    }
+    const onEnd = (): void => {
+      cleanup()
+      resolve(null)
+    }
+    const onError = (error: Error): void => {
+      cleanup()
+      reject(error)
+    }
+    const cleanup = (): void => {
+      zipfile.off('entry', onEntry)
+      zipfile.off('end', onEnd)
+      zipfile.off('error', onError)
+    }
+    zipfile.on('entry', onEntry)
+    zipfile.on('end', onEnd)
+    zipfile.on('error', onError)
+    zipfile.readEntry()
+  })
+}
+
 async function extractZipExecutable(
   archivePath: string,
   target: ResolvedOpencodeReleaseTarget,
   destination: string,
 ): Promise<string> {
   let executableRelativePath: string | null = null
-  await extractZip(archivePath, {
-    dir: destination,
-    onEntry(entry) {
+  const zipfile = await openZipPromise(archivePath, { lazyEntries: true })
+  try {
+    for (;;) {
+      const entry = await readNextZipEntry(zipfile)
+      if (!entry) {
+        break
+      }
       validateOpencodeArchivePath(entry.fileName)
       const normalized = entry.fileName.replaceAll('\\', '/')
       const isDirectory = normalized.endsWith('/')
@@ -278,14 +311,21 @@ async function extractZipExecutable(
         throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive contains an unsupported entry.' })
       }
       if (isDirectory) {
-        return
+        continue
       }
       if (path.posix.basename(normalized) !== target.executableName || executableRelativePath) {
         throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive contains unexpected executable contents.' })
       }
       executableRelativePath = normalized
-    },
-  })
+      const executablePath = path.resolve(destination, normalized)
+      await mkdir(path.dirname(executablePath), { recursive: true })
+      const readStream = await zipfile.openReadStreamPromise(entry)
+      await pipeline(readStream, createWriteStream(executablePath))
+    }
+  }
+  finally {
+    zipfile.close()
+  }
   if (!executableRelativePath) {
     throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive does not contain the CLI executable.' })
   }
@@ -399,6 +439,30 @@ export class OpencodeRuntimeInstallationService {
     this.extractExecutable = options.extractExecutable ?? extractOpencodeExecutable
     this.prepareManagedPathForRemoval = options.prepareManagedPathForRemoval ?? (async () => true)
     this.now = options.now ?? (() => new Date())
+  }
+
+  private extractExecutableWithTimeout(
+    archivePath: string,
+    target: ResolvedOpencodeReleaseTarget,
+    destination: string,
+  ): Promise<string> {
+    let timer: NodeJS.Timeout | undefined
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new AppError({
+          code: 'opencode_runtime_extract_timeout',
+          status: 500,
+          message: `OpenCode archive extraction did not finish within ${EXTRACT_TIMEOUT_MS}ms.`,
+        }))
+      }, EXTRACT_TIMEOUT_MS)
+      timer.unref()
+    })
+    return Promise.race([
+      this.extractExecutable(archivePath, target, destination),
+      timeout,
+    ]).finally(() => {
+      clearTimeout(timer)
+    })
   }
 
   async boot(): Promise<void> {
@@ -598,7 +662,7 @@ export class OpencodeRuntimeInstallationService {
     const operationRoot = path.join(this.rootDir, 'staging', randomUUID())
     const versionStagingRoot = path.join(operationRoot, target.version)
     try {
-      const extractedPath = await this.extractExecutable(
+      const extractedPath = await this.extractExecutableWithTimeout(
         artifact.filePath,
         target,
         path.join(operationRoot, 'extract'),
