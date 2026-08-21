@@ -219,4 +219,95 @@ describe('browser-use desktop webview lifecycle', () => {
     })
     expect(sessionBWebview.close).not.toHaveBeenCalled()
   })
+
+  it('restores the previous active tab after concurrent background tab creation', async () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'cradle-browser-use-'))
+    tempDirectories.push(userDataPath)
+
+    let onCreated: ((webview: DesktopWebview, tabId: string, ownerId: string) => void) | undefined
+    let activeTabId = 'tab-existing'
+    const activateTab = vi.fn(async (_ownerId: string, tabId: string) => {
+      activeTabId = tabId
+      return true
+    })
+    const requestTab = vi.fn(async (_ownerId: string, url?: string) => {
+      const tabId = url?.includes('second') ? 'tab-second' : 'tab-first'
+      const webview: DesktopWebview = {
+        ownerId: 'chat:session-a',
+        tabId,
+        isDestroyed: () => false,
+        navigate: async () => {},
+        getUrl: () => url ?? 'about:blank',
+        getTitle: () => tabId,
+        capturePng: async () => new Uint8Array(),
+        close: vi.fn(),
+        onDestroyed: () => ({ dispose: () => {} }),
+        cdp: {
+          attach: vi.fn(),
+          detach: vi.fn(),
+          sendCommand: async <T>() => undefined as T,
+          onDetached: () => ({ dispose: () => {} }),
+        },
+      }
+      queueMicrotask(() => onCreated?.(webview, tabId, webview.ownerId))
+      return tabId
+    })
+    const context: DesktopPluginContext = {
+      userDataPath,
+      subscriptions: [],
+      webviews: {
+        onCreated(handler) {
+          onCreated = handler
+          return { dispose: () => {} }
+        },
+      },
+      browserTabs: {
+        request: requestTab,
+        activate: activateTab,
+        goOffScreen: async () => false,
+        getActive: async () => activeTabId,
+      },
+      sharedConfig: { set: vi.fn() },
+      logger: {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+        debug: vi.fn(),
+      },
+      manifest: {
+        name: '@cradle/browser-use',
+        version: '0.0.1',
+        packageDir: userDataPath,
+        cradle: {
+          apiVersion: '1',
+          contributes: { capabilities: [], permissions: [] },
+        },
+      },
+    }
+    await activate(context)
+
+    const socketPath = join(userDataPath, 'browser-backend.sock')
+    const [first, second] = await Promise.all([
+      sendCommand(socketPath, {
+        id: 'new-first',
+        ownerId: 'chat:session-a',
+        type: 'tabs_new',
+        url: 'https://first.example.test/',
+      }),
+      sendCommand(socketPath, {
+        id: 'new-second',
+        ownerId: 'chat:session-a',
+        type: 'tabs_new',
+        url: 'https://second.example.test/',
+      }),
+    ])
+
+    expect(first.ok).toBe(true)
+    expect(second.ok).toBe(true)
+    expect(requestTab).toHaveBeenCalledTimes(2)
+    expect(activateTab).toHaveBeenCalledTimes(2)
+    expect(activateTab).toHaveBeenNthCalledWith(1, 'chat:session-a', 'tab-existing')
+    expect(activateTab).toHaveBeenNthCalledWith(2, 'chat:session-a', 'tab-existing')
+    expect(activeTabId).toBe('tab-existing')
+  })
 })

@@ -70,6 +70,7 @@ interface CdpAxTreeResult {
 
 const webviewRegistry = new Map<string, WebviewEntry>()
 const pendingWebviewResolvers = new Map<string, Array<(tabId: string) => void>>()
+const browserTabRequestQueues = new Map<string, Promise<string>>()
 
 let desktopContext: DesktopPluginContext | null = null
 
@@ -247,16 +248,34 @@ function waitForRegisteredWebview(ownerId: string, rendererTabId: string): Promi
 }
 
 async function requestRendererBrowserTab(ownerId: string, url?: string): Promise<string> {
-  if (!desktopContext) {
+  const context = desktopContext
+  if (!context) {
     throw new Error('Desktop plugin context is not available')
   }
 
-  const rendererTabId = await desktopContext.browserTabs.request(ownerId, url)
-  if (!rendererTabId) {
-    throw new Error('Renderer did not create a browser tab')
-  }
+  const previousRequest = browserTabRequestQueues.get(ownerId) ?? Promise.resolve('')
+  const request = previousRequest.catch(() => '').then(async () => {
+    const previousActiveTabId = await context.browserTabs.getActive(ownerId)
+    const rendererTabId = await context.browserTabs.request(ownerId, url)
+    if (!rendererTabId) {
+      throw new Error('Renderer did not create a browser tab')
+    }
 
-  return waitForRegisteredWebview(ownerId, rendererTabId)
+    const registeredTabId = await waitForRegisteredWebview(ownerId, rendererTabId)
+    if (previousActiveTabId && previousActiveTabId !== registeredTabId) {
+      await context.browserTabs.activate(ownerId, previousActiveTabId)
+    }
+    return registeredTabId
+  })
+  browserTabRequestQueues.set(ownerId, request)
+  try {
+    return await request
+  }
+  finally {
+    if (browserTabRequestQueues.get(ownerId) === request) {
+      browserTabRequestQueues.delete(ownerId)
+    }
+  }
 }
 
 async function handleCommand(cmd: BrowserCommand): Promise<BrowserResponse> {
@@ -650,6 +669,7 @@ export async function activate(ctx: DesktopPluginContext): Promise<void> {
 export function deactivate(): void {
   desktopContext = null
   pendingWebviewResolvers.clear()
+  browserTabRequestQueues.clear()
   // Detach all debuggers
   for (const [, entry] of webviewRegistry) {
     disposeWebviewEntry(entry)

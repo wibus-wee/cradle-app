@@ -854,6 +854,7 @@ export function BrowserPanel({
   const animationFrameRef = useRef<number | null>(null)
   const lastNativeBoundsSignatureRef = useRef<string | null>(null)
   const newTabRequestInFlightRef = useRef(false)
+  const requestedTabInFlightRef = useRef<number | null>(null)
   const pendingBrowserTabSelectionRef = useRef<string | null>(null)
   const [addressValue, setAddressValue] = useState('')
   const [isEditingAddress, setIsEditingAddress] = useState(false)
@@ -863,6 +864,7 @@ export function BrowserPanel({
     = useState<BrowserAnnotationRuntimeSession | null>(null)
   const [, setAnnotationSubmitting] = useState(false)
   const [newTabRequestPending, setNewTabRequestPending] = useState(false)
+  const [, setRequestedTabPump] = useState(0)
   const [dirtyPlanRefineTabIds, setDirtyPlanRefineTabIds] = useState<Set<string>>(() => new Set())
   const [discardPromptTabId, setDiscardPromptTabId] = useState<string | null>(null)
   const nativeBrowserAvailable = Boolean(readBrowserBridge())
@@ -971,6 +973,13 @@ export function BrowserPanel({
       return
     }
 
+    if (requestedTabInFlightRef.current !== null) {
+      return
+    }
+
+    const requestId = requestedTab.id
+    requestedTabInFlightRef.current = requestId
+
     const bridge = readBrowserBridge()
     if (!bridge) {
       createBrowserTab(
@@ -982,6 +991,7 @@ export function BrowserPanel({
         resolvedOwnerId,
       )
       fulfillRequestedTab(requestedTab.id, resolvedOwnerId)
+      requestedTabInFlightRef.current = null
       return
     }
 
@@ -1001,13 +1011,19 @@ export function BrowserPanel({
         setLocalError(formatBrowserActionError(error))
       })
       .finally(() => {
-        fulfillRequestedTab(requestedTab.id, resolvedOwnerId)
+        if (requestedTabInFlightRef.current !== requestId) {
+          return
+        }
+        requestedTabInFlightRef.current = null
+        fulfillRequestedTab(requestId, resolvedOwnerId)
+        setRequestedTabPump(value => value + 1)
       })
   }, [
     browserState?.open,
     createBrowserTab,
     fulfillRequestedTab,
     requestedTab,
+    setRequestedTabPump,
     resolvedOwnerId,
     setActiveTab,
     upsertOwnerState,
