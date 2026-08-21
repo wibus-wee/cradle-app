@@ -168,13 +168,14 @@ describe('collectProviderPresets', () => {
     expect(volcengine?.models).toEqual([{ id: 'glm-5.2' }])
 
     // Groq has no api in models.dev but the overlay claims it by id and supplies the base URL.
+    // Its discoverable model directory stays out of the preset's user-owned model inventory.
     const groq = byId.get('groq')
     expect(groq).toMatchObject({
       baseUrl: 'https://api.groq.com/openai/v1',
       source: 'overlay',
       providerId: 'groq',
     })
-    expect(groq?.models.map(model => model.id)).toEqual(['llama-3.3-70b-versatile'])
+    expect(groq?.models).toEqual([])
 
     // models.dev providers without an api base URL and without an overlay claim are excluded.
     expect(byId.has('no-api-vendor')).toBe(false)
