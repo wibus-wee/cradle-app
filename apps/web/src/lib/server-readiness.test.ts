@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { waitForDesktopServer } from './server-readiness'
 import {
-  CRADLE_SERVER_LOCAL_BASE,
+  getDesktopServerGeneration,
   getRendererServerUrl,
   getServerNetworkUrl,
   resetServerTransportBaseUrlStateForTests,
@@ -49,7 +49,7 @@ describe('desktop server readiness bridge', () => {
     expect(onStatusChanged).not.toHaveBeenCalled()
   })
 
-  it('applies owned-proxy renderer base and keeps network URL for WebSocket', async () => {
+  it('applies owned-ipc generation and keeps the HTTP URL for request construction', async () => {
     window.cradle = {
       env: { isElectron: true },
       serverRuntime: {
@@ -57,9 +57,9 @@ describe('desktop server readiness bridge', () => {
           state: 'ready' as const,
           serverUrl: 'http://127.0.0.1:21423',
           connection: {
-            kind: 'owned-proxy' as const,
+            kind: 'owned-ipc' as const,
             serverUrl: 'http://127.0.0.1:21423',
-            rendererBaseUrl: CRADLE_SERVER_LOCAL_BASE,
+            rendererBaseUrl: 'http://127.0.0.1:21423',
             generation: 2,
           },
           bootstrap: {
@@ -71,8 +71,9 @@ describe('desktop server readiness bridge', () => {
       },
     } as unknown as typeof window.cradle
 
-    await expect(waitForDesktopServer()).resolves.toBe(CRADLE_SERVER_LOCAL_BASE)
-    expect(getRendererServerUrl()).toBe(CRADLE_SERVER_LOCAL_BASE)
+    await expect(waitForDesktopServer()).resolves.toBe('http://127.0.0.1:21423')
+    expect(getRendererServerUrl()).toBe('http://127.0.0.1:21423')
     expect(getServerNetworkUrl()).toBe('http://127.0.0.1:21423')
+    expect(getDesktopServerGeneration()).toBe(2)
   })
 })

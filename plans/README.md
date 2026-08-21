@@ -112,11 +112,30 @@ framing、`desktop-server-contracts` pull-credit 协议、Server `desktop-transp
 剥离 renderer 凭证并注入 owned bearer → undici Agent 代理到现有 Elysia HTTP listener
 （v1 loopback；v2 可选 UDS/named pipe）。PTY 与 `/sync` 保持 native WebSocket，经 Main 在
 defaultSession 建立的 HttpOnly browser-session cookie 鉴权（WS 不占用 HTTP/1.1 六连接池）。
+这一 cookie 鉴权细节已在 2026-08-13 重定基线时由 scoped single-use ticket 方案取代。
 连接判别改为 `owned-proxy` / `attached-http`（不再使用 `owned-ipc`）。不变量是「renderer
 对 owned Server 零 Chromium HTTP/1.1 pool 连接」，而非发明私有协议的 zero-socket。
 Effort XL→M–L；M0 packaged custom-scheme gate 仍为 STOP；若 M0 失败则另议 Plan B
 （local HTTP/2 TLS），不得回退到 IPC framing。只迁 transport，不改 Plan 061 Chat lifecycle
 或 Plan 071 snapshot-first recovery。
+
+2026-08-13 在 commit `d40f895e` 上再次重定基线：Web 已落地 runtime base、`cradleFetch`、
+`eventsource-parser` SSE adapter 与 audience/path-bound single-use ticket API，但 Desktop 尚未
+注册/提供 `cradle-server://local`，也没有 Main transport、connection generation 或 credential
+removal，因此 M5 仅算 scaffold。鉴权方案改为保留现有的 30 秒、单次、audience-bound
+WebSocket ticket；custom-scheme 模式的 image/PDF/plugin module 直接走 scheme，resource ticket
+只允许 explicit browser/attached HTTP(S) fallback。旧 HttpOnly cookie bootstrap 不再执行。
+交付顺序改为独立 replan → M0 fixture + packaged CI gate → Main transport/scheme → Main/Web
+migration + bearer removal → ratchet/stress；M0 前不得接入生产 routing。
+
+2026-08-13 在 PR #163 head `2b372814` 上补充 Plan 075，作为 Plan 063
+`FAILED / ARCHITECTURE STOP` 之后的独立 successor：不绑本地 TLS，不复活 custom scheme，
+也不自研 socket transport。生成 OpenAPI Client 继续使用标准 Fetch 接口，但 Desktop owned
+mode 的 `cradleFetch` 经 Electron IPC 交给 Main，由可配置 Undici pool 请求现有 localhost
+HTTP Server。response head 先返回，body 按 Renderer pull credit 以不超过 64 KiB 的 chunk
+流送；Web/remote/attached 请求仍用 native Fetch，PTY 与 `/sync` 保持票据化 WebSocket。
+首个实现与真实 localhost 21 并发测试、类型检查及 Electron production bundle 已通过；仍需
+完成 raw fetch 清单、bearer 移除与 packaged main+20 Tearoff smoke。
 
 2026-07-26 在 commit `cc3facef` 上补充 Plans 065-069：Claude Agent SDK 集成正确性系列，
 源自对该 provider 的完整审查（advisor 会话转录）。065 修权限启动竞态、dispose 未接线、
@@ -234,7 +253,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
 | 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
 | 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | DONE |
-| 063  | Eliminate Desktop Tearoff HTTP/1.1 pool starvation via custom-scheme + undici proxy | P0 | M–L | 038, 040, 054, 071 | TODO (rewritten 2026-08-02: custom-scheme→undici loopback/UDS; native cookie WS; IPC framing deleted; M0 packaged gate remains) |
+| 063  | Eliminate Desktop Tearoff HTTP/1.1 pool starvation via custom-scheme + undici proxy | P0 | M–L | 038, 040, 054, 071 | REJECTED (M0 Architecture STOP: packaged renderer 64→128 MiB RSS slope exceeded locked 16 MiB bound on Linux/Windows; production migration not started) |
 | 064  | Connect GitHub through the Cradle App and attribute PR actions to the user | P1 | L | current PR Console work reconciled | IN PROGRESS (implementation complete; real GitHub App acceptance pending) |
 | 065  | Make the Claude Agent SDK integration honest (permission modes, dispose, settle-on-cancel teardown, presentation, snapshot bounds) | P0 | L | — | DONE |
 | 066  | Make the long-lived Claude Query the authority for history and live config | P0 | M | 065 | DONE |
@@ -247,6 +266,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 073  | Cradle Platform Constitution — Jarvis as Agent Kind | P0 | — | 061, 062 (conceptual) | FINAL — awaiting human accept / amend / reject (direction only; not an implementation plan) |
 | 073  | Provider first-class identity + dual-endpoint platform (no Kimi OAuth) | P1 | XL | — | TODO |
 | 074  | Bound Codex runtime state, native Context Usage, and shared-host pressure | P0 | XL | 052 | DONE (scoped implementation/tests pass; repository typechecks remain red on unrelated plugin-SDK drift) |
+| 075  | Route Desktop Server fetch through Electron Main | P0 | L | 063 STOP; existing Desktop Server lifecycle | IN PROGRESS (core carrier and 21-request proof pass; coverage and packaged smoke remain) |
 | 075  | Add per-Provider extensions and make CPA the first protocol converter | P1 | XL | — (coordinate with 073 if active) | TODO |
 | 076  | Replace point-to-point Remote Hosts with the Cradle Fabric | P0 | XL | 032, 033, 034 | IN PROGRESS — directory/membership/v3 link/projection/legacy removal done; Nodes UI surface in flight |
 
@@ -375,7 +395,7 @@ splitting until this track is stable.
 - 054 follows completed Plans 024 and 040: chat-runtime owns the run cursor/log, while persisted Session projections remain the recovery authority when exact in-memory replay is impossible. It does not depend on unfinished Plans 044 or 050, but those plans must preserve its terminal-publication and snapshot-recovery contracts.
 - 056 consumes Plan 047's already-landed thin Download Center but adds a separate declaration/dispatch layer: Managed Resources owns catalog projection and exact-key command routing; each adapter keeps discovery, versions, installation truth, storage, activation, rollback, and uninstall; Download Center keeps bytes/cancel/resume/history. Chronicle model manifests are the first adapter. Reconcile 047's stale TODO row and execute from a clean worktree because current Server composition, Chronicle, navigation, locale, and generated-client paths overlap operator work.
 - 057 follows 056 and declares `{ opencode, runtime, cli }` through the shared catalog. OpenCode owns release identity, archive extraction, executable verification, installation truth, process leases, and uninstall; its archive transfer uses the same exact resource identity. It must not add an OpenCode-only Settings installer or parallel HTTP command surface.
-- 063 follows completed Plans 038, 040, 054, and 071: proxied HTTP must still cross the established auth boundary, generated clients remain transport infrastructure beneath feature-owned projections, and cursor-aware snapshot-first recovery remains owned by Chat Runtime. It coordinates with in-progress Plan 061 only at transport injection points and must stop rather than alter Chat admission/completion/queue semantics or restore active-run replay superseded by 071. Its internal order is mandatory: packaged custom-protocol proof -> parity fixtures -> undici `DesktopServerTransport.fetch` + `owned-proxy`/`attached-http` -> default-session `cradle-server://local` handler -> Desktop/Web/SSE migration -> credential removal + HttpOnly cookie bootstrap (native WS for PTY/`/sync`) -> Chromium-pool ratchet and many-Tearoff packaged smoke. Do not invent process IPC Request/Response framing. Plan 028's HTTP choice is superseded only as transport; plugin ownership remains unchanged.
+- 063 follows completed Plans 038, 040, 054, and 071: proxied HTTP must still cross the established auth boundary, generated clients remain transport infrastructure beneath feature-owned projections, and cursor-aware snapshot-first recovery remains owned by Chat Runtime. It coordinates with in-progress Plan 061 only at transport injection points and must stop rather than alter Chat admission/completion/queue semantics or restore active-run replay superseded by 071. Its internal order is mandatory: packaged custom-protocol proof -> parity/ticket fixtures -> undici `DesktopServerTransport.fetch` + `owned-proxy`/`attached-http` -> default-session `cradle-server://local` handler -> Desktop/Web/SSE/subresource migration -> renderer bearer removal while preserving scoped single-use WS/resource tickets -> Chromium-pool ratchet and many-Tearoff packaged smoke. Do not invent process IPC Request/Response framing or revive cookie bootstrap. Plan 028's HTTP choice is superseded only as transport; plugin ownership remains unchanged.
 - 040 supersedes blocked Plan 023: generated clients remain transport infrastructure, while feature-owned gateways own query/error/invalidation semantics.
 - 041 supersedes blocked Plans 020 and 021: dependency enforcement and lifecycle ownership precede god-file extraction.
 

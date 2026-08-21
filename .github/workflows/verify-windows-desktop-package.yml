@@ -7,7 +7,6 @@ on:
         description: Git ref in this repository to checkout (branch, tag, or SHA)
         required: true
         default: main
-
 permissions:
   contents: read
 

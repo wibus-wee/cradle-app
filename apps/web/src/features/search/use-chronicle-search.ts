@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 
 import type { ChronicleSearchHit } from '~/features/search/types'
 import { getServerUrl } from '~/lib/electron'
+import { cradleFetch } from '~/lib/server-credential'
 
 import { ChronicleSearchHitsSchema } from './chronicle-search-normalize'
 
@@ -47,7 +48,7 @@ export function useChronicleSearch({
       if (workspaceId) {
         params.set('workspaceId', workspaceId)
       }
-      const response = await fetch(`${getServerUrl()}/search/chronicle?${params.toString()}`)
+      const response = await cradleFetch(`${getServerUrl()}/search/chronicle?${params.toString()}`)
       if (!response.ok) {
         throw new Error(`Chronicle search failed with status ${response.status}`)
       }

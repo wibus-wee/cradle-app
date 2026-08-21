@@ -8,6 +8,7 @@ import {
   DESKTOP_SERVER_STATUS_GET_CHANNEL,
 } from '../shared/server-runtime'
 import { resolveWindowControlsSafeArea } from '../shared/window-controls-safe-area'
+import { createDesktopServerFetchBridge } from './server-fetch'
 
 // Parse --server-url, --surface and --surface-route from additionalArguments
 function getArg(name: string): string | null {
@@ -141,6 +142,9 @@ const cradleElectron = {
     onStatusChanged: (handler: (status: DesktopServerStatus) => void) =>
       subscribeIpc(DESKTOP_SERVER_STATUS_CHANGED_CHANNEL, handler),
   },
+
+  /** Fetch-compatible transport for requests to the Desktop-managed Server. */
+  serverFetch: createDesktopServerFetchBridge(ipcRenderer),
 
   /** Desktop app icon badge bridge */
   desktopAppBadge: {

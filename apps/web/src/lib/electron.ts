@@ -5,7 +5,6 @@ import type { SurfaceRoute } from '~/navigation/surface-identity'
 import {
   getRendererServerUrl,
   getServerNetworkUrl as getTransportServerNetworkUrl,
-  isCradleServerLocalUrl,
 } from './server-transport/base-url'
 
 /**
@@ -22,13 +21,13 @@ export function isLocalMode(): boolean {
   if (!isElectron) {
     return false
   }
-  // Use the network/loopback URL — never the cradle-server custom scheme.
+  // Use the network/loopback URL.
   const serverUrl = getServerNetworkUrl()
   return serverUrl.startsWith('http://127.0.0.1') || serverUrl.startsWith('http://localhost')
 }
 
 /**
- * Renderer-facing Server base URL (`cradle-server://local` when Main proxies).
+ * Renderer-facing Server base URL used for request construction.
  * WARNING: Unless you need to bypass api-gen's react-query integration, do not use this client directly.
  * For native WebSocket (PTY, /sync), use `getServerNetworkUrl()` instead.
  */
@@ -38,23 +37,20 @@ export function getServerUrl(): string {
 
 /**
  * Loopback/network Server URL from Desktop status.`serverUrl`.
- * Always HTTP(S) — never `cradle-server:`. Use for native WebSocket.
+ * Always HTTP(S). Use for native WebSocket.
  */
 export function getServerNetworkUrl(): string {
   return getTransportServerNetworkUrl()
 }
 
 /**
- * Build a WebSocket URL from the network Server base (never cradle-server).
+ * Build a WebSocket URL from the network Server base.
  */
 export function getServerWebSocketUrl(
   path: string,
   query?: Record<string, string | number | boolean | null | undefined>,
 ): string {
   const networkBase = getServerNetworkUrl()
-  if (isCradleServerLocalUrl(networkBase)) {
-    throw new Error('WebSocket cannot use cradle-server://; getServerNetworkUrl() returned a custom scheme')
-  }
   const url = new URL(path, networkBase)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
 

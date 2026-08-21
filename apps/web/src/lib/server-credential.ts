@@ -1,18 +1,17 @@
 import {
   getRendererServerUrl,
   getServerNetworkUrl,
-  isCustomSchemeProxyMode,
+  isDesktopIpcProxyMode,
   isSameServerEndpoint,
   rebaseToServerBase,
 } from './server-transport/base-url'
+import { desktopIpcFetch, isDesktopIpcFetchAvailable } from './server-transport/desktop-ipc-fetch'
 
 /**
  * Fetch hook for Cradle Server traffic.
- * Rebases absolute/relative Server URLs onto the renderer base (`cradle-server://local`
- * in proxy mode). Treats both the renderer base and the network/loopback `serverUrl` as
- * Cradle Server destinations so stale HTTP absolute URLs still migrate to the custom scheme.
- * In custom-scheme proxy mode, strips renderer Authorization/Cookie — Electron Main injects
- * credentials. Attached/browser HTTP may still attach Bearer.
+ * Classifies requests against the active renderer and network Server bases. In owned Desktop
+ * mode, Main owns the bounded localhost transport and Renderer credential headers are stripped.
+ * Browser/attached HTTP continues to use native Fetch.
  */
 export async function cradleFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const rendererBase = getRendererServerUrl()
@@ -30,8 +29,6 @@ export async function cradleFetch(input: RequestInfo | URL, init: RequestInit = 
         ? new Request(rebaseToServerBase(inputUrl, rendererBase), input)
         : rebaseToServerBase(inputUrl, rendererBase)
 
-  const customScheme = targetsServer && isCustomSchemeProxyMode()
-
   // api-gen calls `fetch(request)` with no init. Start from the Request's
   // headers so Content-Type / auth already on the Request are not wiped by an
   // empty Headers override — then strip credential headers in proxy mode.
@@ -40,24 +37,23 @@ export async function cradleFetch(input: RequestInfo | URL, init: RequestInit = 
     headers.set(key, value)
   })
 
-  if (customScheme) {
+  const contentType = headers.get('content-type')?.toLowerCase() ?? ''
+  const ipcEligible = !contentType.startsWith('multipart/form-data')
+  if (
+    targetsServer
+    && ipcEligible
+    && isDesktopIpcProxyMode()
+    && isDesktopIpcFetchAvailable()
+  ) {
     headers.delete('authorization')
     headers.delete('cookie')
     headers.delete('proxy-authorization')
-    // Rebuild Request so credential headers are not left on the Request object
-    // itself (fetch(init.headers) alone can leave them visible to inspectors/tests).
-    if (resolvedInput instanceof Request) {
-      return await fetch(new Request(resolvedInput, {
-        ...init,
-        credentials: 'omit',
-        headers,
-      }))
-    }
-    return await fetch(resolvedInput, {
-      ...init,
-      credentials: 'omit',
-      headers,
-    })
+    headers.delete('x-cradle-relay-token')
+    headers.delete('x-cradle-token')
+    const request = resolvedInput instanceof Request
+      ? new Request(resolvedInput, { ...init, credentials: 'omit', headers })
+      : new Request(resolvedInput, { ...init, credentials: 'omit', headers })
+    return await desktopIpcFetch(request)
   }
 
   return await fetch(resolvedInput, { ...init, credentials: 'include', headers })

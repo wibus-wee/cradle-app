@@ -389,6 +389,9 @@ importers:
       tar:
         specifier: ^7.5.13
         version: 7.5.13
+      undici:
+        specifier: 7.25.0
+        version: 7.25.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3

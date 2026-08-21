@@ -6,11 +6,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cradleFetch } from './server-credential'
 import {
   applyDesktopServerReadyEndpoint,
-  CRADLE_SERVER_LOCAL_BASE,
   resetServerTransportBaseUrlStateForTests,
 } from './server-transport/base-url'
+import { resetDesktopIpcFetchForTests } from './server-transport/desktop-ipc-fetch'
 
 afterEach(() => {
+  resetDesktopIpcFetchForTests()
   resetServerTransportBaseUrlStateForTests()
   window.localStorage.clear()
   delete window.cradle
@@ -18,38 +19,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('cradleFetch credential injection', () => {
-  it('does not attach Authorization on cradle-server:// requests', async () => {
-    applyDesktopServerReadyEndpoint({
-      serverUrl: 'http://127.0.0.1:21423',
-      connection: {
-        kind: 'owned-proxy',
-        serverUrl: 'http://127.0.0.1:21423',
-        rendererBaseUrl: CRADLE_SERVER_LOCAL_BASE,
-        generation: 1,
-      },
-    })
-    window.cradle = {
-      env: {
-        isElectron: true,
-        serverUrl: 'http://127.0.0.1:21423',
-      },
-    } as unknown as typeof window.cradle
-
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('ok'))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await cradleFetch(new URL('/health', CRADLE_SERVER_LOCAL_BASE))
-
-    expect(fetchMock).toHaveBeenCalledOnce()
-    const [input, init] = fetchMock.mock.calls[0]!
-    const url = input instanceof Request ? input.url : String(input)
-    expect(url).toBe('cradle-server://local/health')
-    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
-    expect(headers.has('authorization')).toBe(false)
-    expect(init?.credentials).toBe('omit')
-  })
-
+describe('cradleFetch transport selection', () => {
   it('does not attach a bearer token for browser/attached HTTP Server requests', async () => {
     applyDesktopServerReadyEndpoint({
       serverUrl: 'http://127.0.0.1:21423',
@@ -72,30 +42,86 @@ describe('cradleFetch credential injection', () => {
     expect(init?.credentials).toBe('include')
   })
 
-  it('rebases HTTP Server URLs onto cradle-server://local in owned-proxy mode', async () => {
+  it('routes owned Desktop requests through the IPC fetch bridge with pull credit', async () => {
     applyDesktopServerReadyEndpoint({
       serverUrl: 'http://127.0.0.1:21423',
       connection: {
-        kind: 'owned-proxy',
+        kind: 'owned-ipc',
         serverUrl: 'http://127.0.0.1:21423',
-        rendererBaseUrl: CRADLE_SERVER_LOCAL_BASE,
+        rendererBaseUrl: 'http://127.0.0.1:21423',
+        generation: 1,
       },
     })
 
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('ok'))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await cradleFetch(new Request('http://127.0.0.1:21423/sessions', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'authorization': 'Bearer leak' },
-      body: '{"ok":true}',
+    let onChunk: ((event: { requestId: string, bytes: Uint8Array }) => void) | null = null
+    let onClosed: ((event: { requestId: string }) => void) | null = null
+    const open = vi.fn(async (request: {
+      requestId: string
+      generation: number
+      method: string
+      path: string
+      headers: Array<[string, string]>
+      body: Uint8Array | null
+    }) => ({
+      requestId: request.requestId,
+      status: 200,
+      statusText: 'OK',
+      headers: [['content-type', 'application/json']] as Array<[string, string]>,
+      url: 'http://127.0.0.1:21423/sessions?limit=2',
     }))
+    const credit = vi.fn((requestId: string) => {
+      if (credit.mock.calls.length === 1) {
+        onChunk?.({ requestId, bytes: new TextEncoder().encode('{"ok":true}') })
+      }
+      else {
+        onClosed?.({ requestId })
+      }
+    })
+    const nativeFetch = vi.fn<typeof fetch>()
+    vi.stubGlobal('fetch', nativeFetch)
+    window.cradle = {
+      env: {
+        isElectron: true,
+        serverAuthToken: 'renderer-must-not-send-this',
+        serverUrl: 'http://127.0.0.1:21423',
+      },
+      serverFetch: {
+        open,
+        credit,
+        cancel: vi.fn(),
+        onChunk: (handler: typeof onChunk) => {
+          onChunk = handler
+          return () => {}
+        },
+        onClosed: (handler: typeof onClosed) => {
+          onClosed = handler
+          return () => {}
+        },
+        onError: () => () => {},
+      },
+    } as unknown as typeof window.cradle
 
-    const [input, init] = fetchMock.mock.calls[0]!
-    const request = input instanceof Request ? input : new Request(input, init)
-    expect(request.url).toBe('cradle-server://local/sessions')
+    const response = await cradleFetch(new Request(
+      'http://127.0.0.1:21423/sessions?limit=2',
+      {
+        method: 'POST',
+        headers: {
+          'authorization': 'Bearer leaked-renderer-token',
+          'content-type': 'application/json',
+        },
+        body: '{"name":"ipc"}',
+      },
+    ))
+
+    expect(await response.json()).toEqual({ ok: true })
+    expect(nativeFetch).not.toHaveBeenCalled()
+    expect(open).toHaveBeenCalledOnce()
+    const request = open.mock.calls[0]![0]
     expect(request.method).toBe('POST')
-    expect(request.headers.has('authorization')).toBe(false)
-    expect(await request.text()).toBe('{"ok":true}')
+    expect(request.generation).toBe(1)
+    expect(request.path).toBe('/sessions?limit=2')
+    expect(new Headers(request.headers).has('authorization')).toBe(false)
+    expect(new TextDecoder().decode(request.body!)).toBe('{"name":"ipc"}')
+    expect(credit).toHaveBeenCalledTimes(2)
   })
 })

@@ -20,10 +20,9 @@ import {
   postChatSessionsBySessionIdUserInputByRequestId,
 } from '~/api-gen/sdk.gen'
 import { getServerUrl } from '~/lib/electron'
+import { cradleFetch } from '~/lib/server-credential'
 
 import type { ChatContextPart } from '../context/chat-context-parts'
-
-const SERVER_BASE = getServerUrl()
 
 export type ChatThinkingEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra'
 export type ChatContinuationMode = 'queue' | 'steer'
@@ -337,9 +336,9 @@ async function requestChatRuntimeSse(args: {
   body: ChatRuntimeSseRequestBody
   signal?: AbortSignal
 }): Promise<Response> {
-  return fetch(`${SERVER_BASE}/chat/sessions/${args.sessionId}/${args.route}`, {
+  return cradleFetch(new URL(`/chat/sessions/${args.sessionId}/${args.route}`, getServerUrl()), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Accept': 'text/event-stream', 'Content-Type': 'application/json' },
     body: JSON.stringify(args.body),
     signal: args.signal,
   })
@@ -349,9 +348,10 @@ export async function subscribeChatSessionStream(args: {
   sessionId: string
   signal?: AbortSignal
 }): Promise<Response> {
-  const url = new URL(`${SERVER_BASE}/chat/sessions/${args.sessionId}/stream`)
-  return fetch(url.toString(), {
+  const url = new URL(`/chat/sessions/${args.sessionId}/stream`, getServerUrl())
+  return cradleFetch(url, {
     method: 'GET',
+    headers: { Accept: 'text/event-stream' },
     signal: args.signal,
   })
 }
@@ -412,9 +412,12 @@ export async function startSideConversationResponse(args: {
   body: Omit<ChatResponseRequestBody, 'providerTargetId' | 'messages'>
   signal?: AbortSignal
 }): Promise<Response> {
-  return fetch(`${SERVER_BASE}/chat/side-conversations/${args.sideConversationId}/response`, {
+  return cradleFetch(new URL(
+    `/chat/side-conversations/${args.sideConversationId}/response`,
+    getServerUrl(),
+  ), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Accept': 'text/event-stream', 'Content-Type': 'application/json' },
     body: JSON.stringify(buildChatResponseRequestBody({
       text: args.body.text,
       files: args.body.files,
