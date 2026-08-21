@@ -39,8 +39,8 @@
       "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
       "id": 3,
       "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
-      "targets": [{ "editorMode": "code", "expr": "max(process_resident_memory_bytes{job=\"cradle-relayd\", instance=~\"$instance\"})", "legendFormat": "RSS", "range": true, "refId": "A" }],
-      "title": "Resident memory",
+      "targets": [{ "editorMode": "code", "expr": "max(process_resident_memory_bytes{job=\"cradle-relayd\", instance=~\"$instance\"}) or max(go_memstats_sys_bytes{job=\"cradle-relayd\", instance=~\"$instance\"})", "legendFormat": "RSS / Go runtime fallback", "range": true, "refId": "A" }],
+      "title": "Process memory (RSS with Go fallback)",
       "type": "stat"
     },
     {
