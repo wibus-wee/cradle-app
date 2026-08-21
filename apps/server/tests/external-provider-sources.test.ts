@@ -702,9 +702,7 @@ describe('external provider sources capability', () => {
       const legacySettings = ProviderTargetModelSettingsResponseSchema.parse(
         await legacySettingsRes.json(),
       )
-      expect(JSON.parse(legacySettings.customModelsJson)).toEqual([
-        { id: 'gpt-legacy', label: 'gpt-legacy' },
-      ])
+      expect(JSON.parse(legacySettings.customModelsJson)).toEqual([])
 
       registration.dispose()
     }
@@ -715,7 +713,7 @@ describe('external provider sources capability', () => {
     }
   })
 
-  it('applies endpoint templates to external target model and config defaults', async () => {
+  it('keeps source and endpoint model facts out of user custom inventory', async () => {
     const dataDir = makeTempDir('cradle-external-provider-source-model-bootstrap-')
     const previous = {
       dataDir: process.env.CRADLE_DATA_DIR,
@@ -805,9 +803,7 @@ describe('external provider sources capability', () => {
       const defaultModelSettings = ProviderTargetModelSettingsResponseSchema.parse(
         await defaultModelSettingsRes.json(),
       )
-      expect(JSON.parse(defaultModelSettings.customModelsJson)).toEqual([
-        { id: 'provider-private-model', label: 'provider-private-model' },
-      ])
+      expect(JSON.parse(defaultModelSettings.customModelsJson)).toEqual([])
 
       const volcengineTargetRes = await app.handle(
         new Request(
@@ -832,9 +828,7 @@ describe('external provider sources capability', () => {
         model: 'glm-5.2',
         enabledModels: [],
       })
-      expect(JSON.parse(volcengineSettings.customModelsJson)).toEqual([
-        { id: 'glm-5.2', label: 'GLM 5.2' },
-      ])
+      expect(JSON.parse(volcengineSettings.customModelsJson)).toEqual([])
 
       registration.dispose()
     }
@@ -930,9 +924,7 @@ describe('external provider sources capability', () => {
         model: 'deepseek-v4-pro',
         enabledModels: [],
       })
-      expect(JSON.parse(settings.customModelsJson)).toEqual([
-        { id: 'deepseek-v4-pro', label: 'deepseek-v4-pro' },
-      ])
+      expect(JSON.parse(settings.customModelsJson)).toEqual([])
 
       registration.dispose()
     }
@@ -1043,6 +1035,17 @@ describe('external provider sources capability', () => {
       expect(targetRes.status).toBe(200)
       const target = RuntimeTargetResponseSchema.parse(await targetRes.json())
 
+      db()
+        .update(providerTargets)
+        .set({
+          customModelsJson: JSON.stringify([
+            { id: 'gpt-4.1', label: 'Duplicate live model' },
+            { id: 'provider-private-model', label: 'Provider Private Model' },
+          ]),
+        })
+        .where(eq(providerTargets.id, target.id))
+        .run()
+
       const modelsRes = await app.handle(
         new Request('http://localhost/providers/models', {
           method: 'POST',
@@ -1060,6 +1063,18 @@ describe('external provider sources capability', () => {
       expect(modelsRes.status).toBe(200)
       expect(await modelsRes.json()).toEqual([
         expect.objectContaining({ id: 'gpt-4.1', providerKind: 'openai-compatible' }),
+        expect.objectContaining({ id: 'provider-private-model', providerKind: 'openai-compatible' }),
+      ])
+
+      const prunedSettingsRes = await app.handle(
+        new Request(`http://localhost/provider-targets/${target.id}/model-settings`),
+      )
+      expect(prunedSettingsRes.status).toBe(200)
+      const prunedSettings = ProviderTargetModelSettingsResponseSchema.parse(
+        await prunedSettingsRes.json(),
+      )
+      expect(JSON.parse(prunedSettings.customModelsJson)).toEqual([
+        { id: 'provider-private-model', label: 'Provider Private Model' },
       ])
 
       const visibilityRes = await app.handle(

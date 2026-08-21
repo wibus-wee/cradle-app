@@ -509,6 +509,7 @@ export async function upsertManualProviderTarget(
   const disabling = existing?.enabled === true && !nextEnabled
   const connectionConfigJson = normalizeManualConnectionConfig(input)
   const enabledModelsJson = providerKindChanged ? '[]' : (existing?.enabledModelsJson ?? '[]')
+  const customModelsJson = providerKindChanged ? '[]' : (existing?.customModelsJson ?? '[]')
   const nextProviderId = input.providerId !== undefined
     ? (input.providerId?.trim() || null)
     : (existing?.providerId ?? null)
@@ -542,7 +543,7 @@ export async function upsertManualProviderTarget(
         iconSlug: input.iconSlug ?? null,
         providerId: nextProviderId,
         enabledModelsJson,
-        customModelsJson: existing?.customModelsJson ?? '[]',
+        customModelsJson,
         createdAt: now,
         updatedAt: now,
       })
@@ -556,7 +557,7 @@ export async function upsertManualProviderTarget(
           credentialRef: input.credentialRef ?? null,
           ...(input.iconSlug !== undefined ? { iconSlug: input.iconSlug } : {}),
           ...(input.providerId !== undefined ? { providerId: nextProviderId } : {}),
-          ...(providerKindChanged ? { enabledModelsJson } : {}),
+          ...(providerKindChanged ? { enabledModelsJson, customModelsJson } : {}),
           updatedAt: now,
         },
       })
@@ -843,6 +844,44 @@ export async function updateProviderTargetCustomModels(
     label: model.label ?? model.id,
     capabilities: {},
   }))
+
+  db()
+    .update(providerTargets)
+    .set({
+      customModelsJson: JSON.stringify(entries.map(({ id, label }) => ({ id, label }))),
+      updatedAt: nowUnix(),
+    })
+    .where(eq(providerTargets.id, providerTargetId))
+    .run()
+
+  return entries
+}
+
+/**
+ * Remove custom-model rows that the provider has just reported itself.
+ *
+ * Custom models are an escape hatch for incomplete model endpoints, not a
+ * second copy of live inventory. Pruning only after a successful upstream
+ * response preserves every user entry the provider did not actually return.
+ */
+export function pruneDiscoveredProviderTargetCustomModels(
+  input: ProviderTarget | string,
+  discoveredModelIds: readonly string[],
+): CustomModelEntry[] {
+  const providerTargetId = parseTargetId(input)
+  const target = resolveProviderTarget(providerTargetId)
+  const customModels = z.array(CustomModelInputSchema).parse(JSON.parse(target.customModelsJson))
+  const discovered = new Set(z.array(z.string().trim().min(1)).parse(discoveredModelIds))
+  const remaining = customModels.filter(model => !discovered.has(model.id))
+  const entries: CustomModelEntry[] = remaining.map(model => ({
+    id: model.id,
+    label: model.label ?? model.id,
+    capabilities: {},
+  }))
+
+  if (remaining.length === customModels.length) {
+    return entries
+  }
 
   db()
     .update(providerTargets)

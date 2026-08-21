@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import { getProviderTargetsByProviderTargetIdTestQueryKey } from '~/api-gen/@tanstack/react-query.gen'
-import { patchProfilesByIdCustomModels, postProviderTargetsByProviderTargetIdTest, postSecrets } from '~/api-gen/sdk.gen'
+import { postProviderTargetsByProviderTargetIdTest, postSecrets } from '~/api-gen/sdk.gen'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Spinner } from '~/components/ui/spinner'
@@ -41,7 +41,6 @@ import {
 import { warmManualProviderModelCache } from './provider-model-cache'
 import { buildProfileId } from './provider-settings-utils'
 import type { ProviderPreset } from './provider-templates'
-import { presetModelsToCustomModels } from './provider-templates'
 import type { ChatgptCredentialLoginStart } from './use-chatgpt-credential-login'
 import {
   openChatgptCredentialLoginUrl,
@@ -409,15 +408,6 @@ export function ProviderSetupForm({
           providerId,
         },
       })
-
-      // Pre-fill known models from the server catalog so the model picker is
-      // useful before the first successful upstream fetch.
-      if (preset.models && preset.models.length > 0) {
-        void patchProfilesByIdCustomModels({
-          path: { id: profileId },
-          body: { models: presetModelsToCustomModels(preset.models) },
-        }).catch(error => console.error('[ProviderSetup] custom models prefill failed', error))
-      }
 
       void warmManualProviderModelCache({
         id: profileId,

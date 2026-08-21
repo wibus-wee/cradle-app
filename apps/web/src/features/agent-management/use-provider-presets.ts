@@ -31,7 +31,6 @@ function toUiPreset(preset: ServerProviderPreset): ProviderPreset {
     id: preset.id,
     name: preset.name,
     tagline: preset.local ? 'Runs on your machine' : preset.baseUrl,
-    description: preset.models.length > 0 ? `${preset.models.length} known models` : undefined,
     providerKind: preset.providerKind,
     accent: '',
     fields,
@@ -45,7 +44,6 @@ function toUiPreset(preset: ServerProviderPreset): ProviderPreset {
         : {}),
     },
     iconSlug: preset.iconSlug,
-    models: preset.models,
     providerId: preset.providerId ?? preset.id,
     tier: preset.tier ?? 'generic',
     authMethods,
@@ -58,7 +56,8 @@ function toUiPreset(preset: ServerProviderPreset): ProviderPreset {
  * Merges the server-side provider catalog (`GET /provider-presets`) with the
  * three local wizard presets. Local presets keep their richer taglines and
  * auth flows while loading; server presets contribute baseUrl, authMethods,
- * endpointProfiles, and known model lists.
+ * endpointProfiles, and display metadata. Model inventory is discovered from
+ * the configured provider target, not copied from preset metadata.
  */
 export function useMergedProviderPresets(): { presets: ProviderPreset[], isLoading: boolean } {
   const query = useQuery(getProviderPresetsOptions())

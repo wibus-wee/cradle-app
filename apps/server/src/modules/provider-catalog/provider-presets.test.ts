@@ -67,6 +67,21 @@ function createModelsDevStub(): ModelsDevData {
         },
       },
     },
+    'openrouter': {
+      name: 'OpenRouter',
+      api: 'https://openrouter.ai/api/v1',
+      npm: '@ai-sdk/openai-compatible',
+      models: {
+        'anthropic/claude-sonnet-4': {
+          id: 'anthropic/claude-sonnet-4',
+          name: 'Claude Sonnet 4',
+        },
+        'openai/gpt-5': {
+          id: 'openai/gpt-5',
+          name: 'GPT-5',
+        },
+      },
+    },
   }
 }
 
@@ -177,15 +192,12 @@ describe('collectProviderPresets', () => {
       tier: 'generic',
     })
     expect(acme?.authMethods).toEqual([{ id: 'apiKey', label: 'API Key' }])
-    expect(acme?.models).toEqual([
-      {
-        id: 'acme-vision-1',
-        name: 'Acme Vision 1',
-        reasoning: true,
-        toolCall: true,
-        vision: true,
-      },
-    ])
+    expect(acme?.models).toEqual([])
+
+    // A provider's complete models.dev directory is not setup metadata. In
+    // particular, OpenRouter's large catalog must be discovered live instead
+    // of being copied into the user's custom-model list.
+    expect(byId.get('openrouter')?.models).toEqual([])
   })
 
   it('falls back to overlay-only presets when models.dev data is unavailable', async () => {
