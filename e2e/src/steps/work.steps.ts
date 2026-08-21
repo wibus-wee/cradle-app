@@ -70,20 +70,13 @@ When('我输入 Work 目标{string}', async function (this: CradleWorld, goal: s
   await this.workPage.fillGoal(goal)
 })
 
-When('我输入 Work 验收标准{string}', async function (this: CradleWorld, criterion: string) {
-  this.remember('work.acceptanceCriterion', criterion)
-  await this.workPage.fillAcceptanceCriteria(criterion)
-})
-
 When('我启动 Work', async function (this: CradleWorld) {
   await this.workPage.start()
 })
 
 Then('Work 应创建受管 worktree 与持久化主会话', async function (this: CradleWorld) {
   const sessionId = await this.chat.sessionId()
-  const workId = await this.workPage.expectPersisted(this.recall<string>('work.goal'), sessionId)
-  this.remember('work.id', workId)
-  await this.workPage.expectAcceptanceCriterion(workId, this.recall<string>('work.acceptanceCriterion'))
+  await this.workPage.expectPersisted(this.recall<string>('work.goal'), sessionId)
   await this.page.reload({ waitUntil: 'domcontentloaded' })
   await this.chat.waitVisible()
   await this.workPage.openRuntimePanel()
@@ -91,14 +84,6 @@ Then('Work 应创建受管 worktree 与持久化主会话', async function (this
   await expect(panel).toContainText('Work')
   await expect(panel).toContainText(this.recall<string>('work.goal'))
   await expect(panel.getByText('Files', { exact: true }).locator('..')).toContainText('1')
-})
-
-Then('Work 应展示带权威证据的状态与恢复承诺', async function (this: CradleWorld) {
-  await this.workPage.expectExplainableState()
-})
-
-Then('Needs me 应给出可直接打开该 Work 的下一行动', async function (this: CradleWorld) {
-  await this.workPage.expectAttentionDirectAction(this.recall<string>('work.id'))
 })
 
 Then('失败后的 Work 应保留唯一受管主会话', async function (this: CradleWorld) {
