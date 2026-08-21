@@ -24,7 +24,6 @@ import {
   getExternalProviderSource,
   listExternalProviderSources as listRegisteredExternalProviderSources,
 } from '../../plugins/external-provider-source-registry'
-import { matchProviderEndpoint } from '../provider-catalog/provider-endpoint-registry'
 import {
   applyClaudeAgentConfigPatch,
   readClaudeAgentConfig,
@@ -266,39 +265,6 @@ function sourceIconSlugFromMetadata(record: ParsedExternalProviderRecord): strin
   return iconSlugFromMetadata(record.metadata)
 }
 
-function recordConfigString(record: ParsedExternalProviderRecord, key: string): string | null {
-  const value = record.config[key]
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
-}
-
-function bootstrapCustomModelsJson(record: ParsedExternalProviderRecord): string | null {
-  if (record.providerKind === 'cli-tool') {
-    return null
-  }
-
-  const openaiBaseUrl = recordConfigString(record, 'openaiBaseUrl')
-  const baseUrl = record.providerKind === 'universal'
-    ? openaiBaseUrl
-    : recordConfigString(record, 'baseUrl')
-  const template = baseUrl
-    ? matchProviderEndpoint(
-        baseUrl,
-        record.providerKind === 'universal' ? 'openai-compatible' : record.providerKind,
-      )
-    : null
-  if (template && template.models.length > 0) {
-    return JSON.stringify(template.models.map(model => ({
-      id: model.id,
-      label: model.label,
-    })))
-  }
-
-  const defaultModel = recordConfigString(record, 'model') ?? metadataString(record.metadata, 'model')
-  return defaultModel
-    ? JSON.stringify([{ id: defaultModel, label: defaultModel }])
-    : null
-}
-
 function sourceStatusFromWarnings(warnings: ExternalProviderWarning[]): 'ok' | 'warning' | 'error' {
   return warnings.some(warning => warning.severity === 'error')
     ? 'error'
@@ -534,12 +500,6 @@ function syncRuntimeTarget(
     existing?.connectionConfigJson,
   )
 
-  const existingCustomModelsJson = existing?.customModelsJson ?? '[]'
-  const bootstrappedCustomModelsJson = !existingCustomModelsJson || existingCustomModelsJson === '[]'
-    ? bootstrapCustomModelsJson(record)
-    : null
-  const customModelsJson = bootstrappedCustomModelsJson ?? existingCustomModelsJson
-
   database
     .insert(providerTargets)
     .values({
@@ -553,7 +513,9 @@ function syncRuntimeTarget(
       connectionConfigJson: JSON.stringify(connectionConfig),
       credentialRef,
       enabledModelsJson: existing?.enabledModelsJson ?? '[]',
-      customModelsJson,
+      // External discovery owns connection facts, not user-authored custom
+      // inventory. Models reported by the provider stay in the model cache.
+      customModelsJson: existing?.customModelsJson ?? '[]',
       iconSlug: sourceIconSlug,
       sourceFingerprint: recordFingerprint(record),
       createdAt: now,
@@ -572,7 +534,6 @@ function syncRuntimeTarget(
           : {}),
         iconSlug: sourceIconSlug,
         sourceFingerprint: recordFingerprint(record),
-        ...(bootstrappedCustomModelsJson ? { customModelsJson } : {}),
         updatedAt: now,
       },
     })

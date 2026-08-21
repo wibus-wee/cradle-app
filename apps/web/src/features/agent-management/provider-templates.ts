@@ -1,13 +1,4 @@
-import type { PatchProfilesByIdCustomModelsData } from '~/api-gen/types.gen'
 import type { ApiProviderKind } from '~/features/agent-runtime/types'
-
-export interface ProviderPresetModel {
-  id: string
-  name?: string
-  reasoning?: boolean
-  toolCall?: boolean
-  vision?: boolean
-}
 
 export interface ProviderPresetAuthMethod {
   id: string
@@ -33,8 +24,6 @@ export interface ProviderPreset {
   description?: string
   /** Server-provided icon hint; falls back to the preset id. */
   iconSlug?: string
-  /** Known models from the server catalog, used to pre-fill custom models. */
-  models?: ProviderPresetModel[]
   providerId: string
   tier: 'first-class' | 'generic'
   authMethods: ProviderPresetAuthMethod[]
@@ -127,51 +116,6 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     featured: true,
   },
 ]
-
-type CustomModelEntry = PatchProfilesByIdCustomModelsData['body']['models'][number]
-
-/** Maps catalog preset models to the custom-models PATCH payload shape. */
-export function presetModelsToCustomModels(models: ProviderPresetModel[]): CustomModelEntry[] {
-  return models.map(model => ({
-    id: model.id,
-    label: model.name ?? model.id,
-    capabilities: {
-      ...(model.reasoning !== undefined ? { reasoning: model.reasoning } : {}),
-      ...(model.toolCall !== undefined ? { toolCall: model.toolCall } : {}),
-      ...(model.vision ? { inputModalities: ['text', 'image'] } : {}),
-    },
-  }))
-}
-
-function hostnameOf(url: string): string | null {
-  try {
-    return new URL(url).hostname.toLowerCase()
-  }
-  catch {
-    return null
-  }
-}
-
-/**
- * Suggest gallery presets whose base URL hostname matches the given endpoint.
- * Suggestion only — never writes providerId.
- */
-export function suggestCatalogPresetsByEndpoint(
-  presets: ProviderPreset[],
-  endpoint: string,
-): ProviderPreset[] {
-  const host = hostnameOf(endpoint.trim())
-  if (!host) {
-    return []
-  }
-  return presets.filter((preset) => {
-    const urls = [
-      typeof preset.defaults.baseUrl === 'string' ? preset.defaults.baseUrl : '',
-      ...preset.endpointProfiles.map(p => p.defaultBaseUrl ?? ''),
-    ]
-    return urls.some(url => url && hostnameOf(url) === host)
-  })
-}
 
 /** Auth methods for unbound profiles (no providerId). */
 export function unboundAuthMethods(): ProviderPresetAuthMethod[] {

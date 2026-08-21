@@ -8,7 +8,10 @@ import * as ModelRegistry from '../model-registry/service'
 import { listRuntimeOwnedProviderTargetModels } from '../provider-contracts/runtime-compatibility'
 import type { ModelDescriptor, ProviderKind, ProviderRequest } from '../provider-contracts/types'
 import type { ResolvedProviderTarget } from '../provider-targets/service'
-import { resolveProviderTarget } from '../provider-targets/service'
+import {
+  pruneDiscoveredProviderTargetCustomModels,
+  resolveProviderTarget,
+} from '../provider-targets/service'
 import * as Secrets from '../secrets/service'
 import * as Workspace from '../workspace/service'
 import { getProviderCatalog } from './catalog'
@@ -150,6 +153,12 @@ export async function collectProviderModelInventory(input: ProviderRequest & { w
       readSecret: secretRef => Secrets.readSecret(secretRef),
       updateSecretValue: (secretRef, secret) => Secrets.updateSecretValue(secretRef, secret),
     })
+    if (effective.resolved) {
+      pruneDiscoveredProviderTargetCustomModels(
+        effective.resolved.target,
+        models.map(model => model.id),
+      )
+    }
     recordModelList({
       profileId: effective.request.profileId,
       providerTargetKind: effective.resolved?.kind ?? null,

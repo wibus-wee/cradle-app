@@ -129,9 +129,11 @@ function buildOverlaySeed(
   provider: ModelsDevProvider | undefined,
 ): CatalogSeed {
   const registryModels = provider?.models ?? {}
-  const models = overlay.defaultModels
-    ? overlay.defaultModels.map(id => projectModel(id, registryModels[id]))
-    : Object.keys(registryModels).map(id => projectModel(id, registryModels[id]))
+  // Presets describe how to connect. They must never transport the provider's
+  // full models.dev inventory to clients: live inventory belongs to the
+  // configured provider target and is fetched through its models endpoint.
+  const models = (overlay.defaultModels ?? [])
+    .map(id => projectModel(id, registryModels[id]))
   const docsUrl = overlay.docsUrl ?? provider?.doc
   return {
     id: overlay.id,
@@ -158,7 +160,9 @@ function buildModelsDevSeed(id: string, provider: ModelsDevProvider): CatalogSee
     local: false,
     requiresApiKey: true,
     source: 'models.dev',
-    models: Object.entries(provider.models).map(([modelId, model]) => projectModel(modelId, model)),
+    // models.dev metadata remains owned by Model Registry. Provider presets do
+    // not duplicate that inventory into the setup surface.
+    models: [],
   }
 }
 

@@ -1,9 +1,9 @@
 /**
  * Provider Endpoint Template Registry
  *
- * Maps known provider API hostnames to pre-configured model lists.
- * Used to auto-populate custom models for providers that don't expose /v1/models,
- * or to give users a head start when importing a known provider.
+ * Maps known provider API hostnames to endpoint-specific runtime metadata and
+ * curated fallback model hints. These hints must never be persisted as user
+ * custom models; live inventory belongs to Provider Catalog.
  *
  * Templates derive from the preset overlay (single source of truth); only
  * overlay entries carrying defaultModels become endpoint templates.
@@ -33,9 +33,8 @@ export interface ProviderEndpointTemplate {
 }
 
 /**
- * Legacy display labels retained for bootstrapCustomModelsJson compatibility.
- * The overlay stores canonical model ids; labels stay here because they only
- * matter to this template projection.
+ * The overlay stores canonical model ids; labels stay here because endpoint
+ * catalog consumers need a readable projection of curated fallback hints.
  */
 const ENDPOINT_MODEL_LABELS: Record<string, string> = {
   'deepseek-v4-flash': 'DeepSeek V4 Flash',

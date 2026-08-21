@@ -10,8 +10,11 @@ import {
 } from '../provider-contracts/runtime-compatibility'
 import {
   assertProviderTargetCompatibleWithRuntime,
+  getProviderTargetModelSettings,
   listProviderTargets,
+  pruneDiscoveredProviderTargetCustomModels,
   resolveProviderTarget,
+  upsertManualProviderTarget,
 } from './service'
 
 const RUNTIME_OWNED_TEST_RUNTIME = 'runtime-owned-test'
@@ -96,5 +99,59 @@ describe('runtime-owned provider targets', () => {
     const targets = await listProviderTargets({ runtimeKind: RUNTIME_OWNED_TEST_RUNTIME })
 
     expect(targets.map(target => target.id)).toEqual([ANTHROPIC_PROVIDER_TARGET_ID])
+  })
+})
+
+describe('custom model inventory', () => {
+  it('prunes only custom models confirmed by a successful provider inventory', () => {
+    db().insert(providerTargets).values({
+      id: ORDINARY_PROVIDER_TARGET_ID,
+      kind: 'manual',
+      providerKind: 'openai-compatible',
+      displayName: 'OpenRouter',
+      enabled: true,
+      connectionConfigJson: JSON.stringify({ baseUrl: 'https://openrouter.ai/api/v1' }),
+      enabledModelsJson: '[]',
+      customModelsJson: JSON.stringify([
+        { id: 'openai/gpt-5', label: 'GPT-5' },
+        { id: 'private/model', label: 'Private model' },
+      ]),
+    }).run()
+
+    expect(pruneDiscoveredProviderTargetCustomModels(
+      ORDINARY_PROVIDER_TARGET_ID,
+      ['openai/gpt-5', 'anthropic/claude-sonnet-4'],
+    )).toEqual([
+      { id: 'private/model', label: 'Private model', capabilities: {} },
+    ])
+    expect(JSON.parse(
+      getProviderTargetModelSettings(ORDINARY_PROVIDER_TARGET_ID).customModelsJson,
+    )).toEqual([
+      { id: 'private/model', label: 'Private model' },
+    ])
+  })
+
+  it('clears endpoint-specific custom models when the provider protocol changes', async () => {
+    db().insert(providerTargets).values({
+      id: ORDINARY_PROVIDER_TARGET_ID,
+      kind: 'manual',
+      providerKind: 'openai-compatible',
+      displayName: 'OpenAI-compatible provider',
+      enabled: true,
+      connectionConfigJson: JSON.stringify({ baseUrl: 'https://openrouter.ai/api/v1' }),
+      enabledModelsJson: JSON.stringify(['openai/gpt-5']),
+      customModelsJson: JSON.stringify([{ id: 'private/model', label: 'Private model' }]),
+    }).run()
+
+    await upsertManualProviderTarget({
+      id: ORDINARY_PROVIDER_TARGET_ID,
+      displayName: 'Anthropic provider',
+      providerKind: 'anthropic',
+      connectionConfigJson: JSON.stringify({ baseUrl: 'https://api.anthropic.com/v1' }),
+    })
+
+    const settings = getProviderTargetModelSettings(ORDINARY_PROVIDER_TARGET_ID)
+    expect(JSON.parse(settings.enabledModelsJson)).toEqual([])
+    expect(JSON.parse(settings.customModelsJson)).toEqual([])
   })
 })

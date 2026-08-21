@@ -5,7 +5,6 @@ import {
   GlobeLine as GlobeIcon,
   Key2Line as KeyIcon,
   SearchLine as ScanIcon,
-  SparklesLine as SparklesIcon,
   UnlockLine as DecodeIcon,
 } from '@mingcute/react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -20,7 +19,7 @@ import {
   getProviderTargetsQueryKey,
   postExternalProviderSourcesLocalScanMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
-import { patchProfilesByIdCustomModels, postProviderTargetsByProviderTargetIdTest, postSecrets } from '~/api-gen/sdk.gen'
+import { postProviderTargetsByProviderTargetIdTest, postSecrets } from '~/api-gen/sdk.gen'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import {
@@ -52,8 +51,6 @@ import type { ParsedProvider, ParseResult } from './import-provider-parser'
 import { isBase64Like, parseProviderConfig, tryDecodeBase64 } from './import-provider-parser'
 import { warmManualProviderModelCache } from './provider-model-cache'
 import { buildProfileId } from './provider-settings-utils'
-import { presetModelsToCustomModels, suggestCatalogPresetsByEndpoint } from './provider-templates'
-import { useMergedProviderPresets } from './use-provider-presets'
 
 const SecretCreateResponseSchema = z.object({ id: z.string().min(1) })
 
@@ -133,7 +130,6 @@ export function ImportProviderDialog({
 }) {
   const queryClient = useQueryClient()
   const { createProfile, profiles } = useAgentProfiles()
-  const { presets: catalogPresets } = useMergedProviderPresets()
   const [text, setText] = useState('')
   const [importing, setImporting] = useState(false)
   const [enabledSet, setEnabledSet] = useState<Set<number>>(() => new Set())
@@ -383,19 +379,6 @@ export function ImportProviderDialog({
           },
         })
 
-        // Suggest catalog models by endpoint hostname only — never write providerId on import.
-        const suggestedPreset = suggestCatalogPresetsByEndpoint(
-          catalogPresets,
-          kind === 'universal' ? openaiBaseUrl : baseUrl,
-        )[0]
-        if (suggestedPreset?.models?.length) {
-          void patchProfilesByIdCustomModels({
-            path: { id: profileId },
-            body: { models: presetModelsToCustomModels(suggestedPreset.models) },
-            throwOnError: true,
-          }).catch(error => console.error('[ImportProvider] custom models auto-config failed', error))
-        }
-
         void warmManualProviderModelCache({
           id: profileId,
           name,
@@ -561,17 +544,6 @@ export function ImportProviderDialog({
                             ? (openaiBaseUrls[i] ?? universalEndpointDefaults(p.baseUrl).openaiBaseUrl)
                             : (baseUrls[i] ?? p.baseUrl),
                         ))}
-                        autoModelsHint={(() => {
-                          const suggested = suggestCatalogPresetsByEndpoint(
-                            catalogPresets,
-                            (kinds[i] ?? p.providerKind) === 'universal'
-                              ? (openaiBaseUrls[i] ?? universalEndpointDefaults(p.baseUrl).openaiBaseUrl)
-                              : (baseUrls[i] ?? p.baseUrl),
-                          )[0]
-                          return suggested?.models?.length
-                            ? { name: suggested.name, count: suggested.models.length }
-                            : null
-                        })()}
                         enabled={enabledSet.has(i)}
                         canDecode={canDecodeApiKey(i)}
                         canRevert={(decodeHistory.get(i)?.length ?? 0) > 0}
@@ -682,7 +654,6 @@ function ProviderCard({
   openaiBaseUrl,
   anthropicBaseUrl,
   conflict,
-  autoModelsHint,
   enabled,
   canDecode,
   canRevert,
@@ -703,7 +674,6 @@ function ProviderCard({
   openaiBaseUrl: string
   anthropicBaseUrl: string
   conflict: boolean
-  autoModelsHint: { name: string, count: number } | null
   enabled: boolean
   canDecode: boolean
   canRevert: boolean
@@ -814,17 +784,6 @@ function ProviderCard({
             <Input type="text" value={apiKey} onChange={event => onApiKeyChange(event.target.value)} placeholder="Enter API key" className={FLAT_IMPORT_FIELD_CLASS} />
           </label>
           {kind !== 'universal' && shouldShowV1Reminder(baseUrl) && <BaseUrlV1Reminder />}
-          {autoModelsHint && (
-            <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/8 px-2 py-1 text-[11px] leading-snug text-emerald-700 dark:text-emerald-300">
-              <SparklesIcon className="size-3 shrink-0" />
-              <span>
-                {autoModelsHint.name}
-                {' — '}
-                {autoModelsHint.count}
-                {' models will be auto-configured'}
-              </span>
-            </div>
-          )}
         </div>
       </div>
     </div>

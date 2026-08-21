@@ -67,6 +67,21 @@ function createModelsDevStub(): ModelsDevData {
         },
       },
     },
+    'openrouter': {
+      name: 'OpenRouter',
+      api: 'https://openrouter.ai/api/v1',
+      npm: '@ai-sdk/openai-compatible',
+      models: {
+        'anthropic/claude-sonnet-4': {
+          id: 'anthropic/claude-sonnet-4',
+          name: 'Claude Sonnet 4',
+        },
+        'openai/gpt-5': {
+          id: 'openai/gpt-5',
+          name: 'GPT-5',
+        },
+      },
+    },
   }
 }
 
@@ -153,13 +168,14 @@ describe('collectProviderPresets', () => {
     expect(volcengine?.models).toEqual([{ id: 'glm-5.2' }])
 
     // Groq has no api in models.dev but the overlay claims it by id and supplies the base URL.
+    // Its discoverable model directory stays out of the preset's user-owned model inventory.
     const groq = byId.get('groq')
     expect(groq).toMatchObject({
       baseUrl: 'https://api.groq.com/openai/v1',
       source: 'overlay',
       providerId: 'groq',
     })
-    expect(groq?.models.map(model => model.id)).toEqual(['llama-3.3-70b-versatile'])
+    expect(groq?.models).toEqual([])
 
     // models.dev providers without an api base URL and without an overlay claim are excluded.
     expect(byId.has('no-api-vendor')).toBe(false)
@@ -177,15 +193,12 @@ describe('collectProviderPresets', () => {
       tier: 'generic',
     })
     expect(acme?.authMethods).toEqual([{ id: 'apiKey', label: 'API Key' }])
-    expect(acme?.models).toEqual([
-      {
-        id: 'acme-vision-1',
-        name: 'Acme Vision 1',
-        reasoning: true,
-        toolCall: true,
-        vision: true,
-      },
-    ])
+    expect(acme?.models).toEqual([])
+
+    // A provider's complete models.dev directory is not setup metadata. In
+    // particular, OpenRouter's large catalog must be discovered live instead
+    // of being copied into the user's custom-model list.
+    expect(byId.get('openrouter')?.models).toEqual([])
   })
 
   it('falls back to overlay-only presets when models.dev data is unavailable', async () => {

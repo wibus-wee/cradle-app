@@ -9,6 +9,9 @@ Provider live catalog HTTP API 与模型列表缓存。
 This module owns **Inventory** (layer 1):
 - `collectProviderModelInventory(input)` fetches raw upstream models WITHOUT enrichment. This is
   the correct payload to write to `provider_target_model_cache`.
+- A successful upstream list prunes same-id entries from `custom_models_json` through the
+  Provider Targets owner. Custom models therefore contain only IDs the provider did not report;
+  failed list requests never delete user configuration.
 - `listModels(input)` = collectProviderModelInventory → enrichModelsFromRegistryMappings → projectProviderModelListCapabilities.
 - `model-cache.ts`:
   - `setCachedModelsForTarget` strips all registry-enrichment-derived fields (registryMatch,
@@ -26,7 +29,7 @@ This module owns **Inventory** (layer 1):
 - `model.ts`: Route-local TypeBox schemas for provider catalog requests and responses.
 - `provider-preset-overlay.ts`: Curated overlay (base URLs, hostnames, default models) used for models.dev merge + endpoint suggest hints.
 - `provider-registry.ts`: Provider setup contributions (`providerId` identity, authMethods, endpointProfiles). Gallery auth/endpoints project from here.
-- `provider-presets.ts`: `collectProviderPresets()` = models.dev + overlay seeds, then contribution projection (`providerId`, `tier`, `authMethods`, `endpointProfiles`).
+- `provider-presets.ts`: `collectProviderPresets()` = models.dev + overlay seeds, then contribution projection (`providerId`, `tier`, `authMethods`, `endpointProfiles`). It publishes connection metadata and explicit curated defaults only, never the full models.dev provider inventory.
 - `provider-endpoint-registry.ts`: Hostname → endpoint template matching derived from the overlay; owns `matchProviderEndpoint` / suggest-style helpers. Must never write `providerId`.
 - `service.ts`: Provider target override resolution, `collectProviderModelInventory` (raw upstream), `listModels` (full pipeline), custom model/default model fallback, and audit writes.
 - `catalog.ts`: Provider-specific metadata implementations for OpenAI-compatible, Anthropic, and Universal model APIs.
