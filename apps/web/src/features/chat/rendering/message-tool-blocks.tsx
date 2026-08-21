@@ -32,6 +32,7 @@ export function ToolCallBlockFromPart({
   onToolApprovalResponse,
   children,
   animated,
+  autoOpenArtifact,
   sessionId,
   workspaceDiffTarget,
 }: {
@@ -40,6 +41,7 @@ export function ToolCallBlockFromPart({
   onToolApprovalResponse?: MessageToolApprovalHandler
   children?: ReactNode
   animated?: boolean
+  autoOpenArtifact?: boolean
   sessionId?: string | null
   workspaceDiffTarget?: { workspaceId: string, ownerId?: string | null }
 }) {
@@ -56,6 +58,7 @@ export function ToolCallBlockFromPart({
       output={part.output}
       errorText={part.errorText}
       animated={animated}
+      autoOpenArtifact={autoOpenArtifact}
       sessionId={sessionId}
       workspaceDiffTarget={workspaceDiffTarget}
       onApprovalResponse={
@@ -79,11 +82,13 @@ export function ToolCallBlockByPartIndex({
   messageId,
   partIndex,
   onToolApprovalResponse,
+  autoOpenArtifact,
 }: {
   sessionId: string
   messageId: string
   partIndex: number
   onToolApprovalResponse?: MessageToolApprovalHandler
+  autoOpenArtifact?: boolean
 }) {
   const workspaceId = useSessionBinding(sessionId, true)?.workspaceId ?? null
   const workspaceDiffTarget = useMemo(
@@ -113,6 +118,7 @@ export function ToolCallBlockByPartIndex({
       sessionId={sessionId}
       workspaceDiffTarget={workspaceDiffTarget}
       onToolApprovalResponse={onToolApprovalResponse}
+      autoOpenArtifact={autoOpenArtifact}
     />
   )
 }

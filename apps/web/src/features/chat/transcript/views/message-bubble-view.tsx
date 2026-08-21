@@ -205,6 +205,7 @@ export function MessageBubbleView({
             input={item.part.input}
             output={item.part.output}
             errorText={item.part.errorText}
+            autoOpenArtifact={isStreaming}
             blobSessionId={sessionId}
             onApprovalResponse={approval && onToolApprovalResponse
               ? response => onToolApprovalResponse({ messageId: message.id, approvalId: response.id, approved: response.approved })

@@ -400,6 +400,7 @@ export function ToolCallBlockView({
   input,
   output,
   errorText,
+  autoOpenArtifact,
   onApprovalResponse,
   onOpenWorkspaceDiff,
   onOpenSubagentOutput,
@@ -682,6 +683,7 @@ export function ToolCallBlockView({
                 output={outputPayload}
                 errorText={errorText}
                 toolCallId={toolCallId}
+                autoOpenArtifact={autoOpenArtifact}
                 onOpenPlanDocument={onOpenPlanDocument}
                 onOpenArtifact={onOpenArtifact}
                 blobSessionId={blobSessionId}

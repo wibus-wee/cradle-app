@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 
 import type { ToolPayload } from '../../../rendering/tool-ui-classifier'
+import { readArtifactToolRecord } from '../../lib/artifact-tool-payload'
 import type { ArtifactOpenInput } from '../artifact-preview-view'
 import { ArtifactPreviewView } from '../artifact-preview-view'
 
@@ -10,11 +11,11 @@ export interface ArtifactSummaryViewProps {
   toolCallId: string
   sessionId?: string | null
   onOpenArtifact?: (input: ArtifactOpenInput) => void
-  /** When true (default), open the Browser Panel once the Artifact meta is ready. */
+  /** Only enabled for a newly-created Artifact during the active run. */
   autoOpen?: boolean
 }
 
-/** Session-scoped keys already auto-opened this page load (avoids remount storms). */
+/** Live-run keys already auto-opened (avoids remount storms while output settles). */
 const autoOpenedArtifactKeys = new Set<string>()
 
 export function ArtifactSummaryView({
@@ -23,9 +24,10 @@ export function ArtifactSummaryView({
   toolCallId,
   sessionId,
   onOpenArtifact,
-  autoOpen = true,
+  autoOpen = false,
 }: ArtifactSummaryViewProps) {
   const meta = useMemo(() => readArtifactMeta(input, output), [input, output])
+  const inputArtifactId = readArtifactToolRecord(input.rawValue)?.artifactId ?? null
   const resolvedSessionId = meta.sessionId ?? sessionId ?? null
 
   const openPayload = useMemo((): ArtifactOpenInput | null => {
@@ -43,7 +45,7 @@ export function ArtifactSummaryView({
   }, [meta.artifactId, meta.revision, meta.source, meta.title, resolvedSessionId, toolCallId])
 
   useEffect(() => {
-    if (!autoOpen || !onOpenArtifact || !openPayload) {
+    if (!autoOpen || !onOpenArtifact || !openPayload || meta.revision !== 1 || inputArtifactId) {
       return
     }
     const key = `${openPayload.sessionId}:${openPayload.artifactId}:${openPayload.revision}`
@@ -52,7 +54,7 @@ export function ArtifactSummaryView({
     }
     autoOpenedArtifactKeys.add(key)
     onOpenArtifact(openPayload)
-  }, [autoOpen, onOpenArtifact, openPayload])
+  }, [autoOpen, inputArtifactId, meta.revision, onOpenArtifact, openPayload])
 
   if (!openPayload) {
     return null
@@ -78,95 +80,17 @@ function readArtifactMeta(input: ToolPayload, output: ToolPayload): {
   source: string | null
   revision: number | null
 } {
-  const fromOutput = readArtifactRecord(output.rawValue)
-    ?? readArtifactRecordFromText(output.rawText)
-  const fromInput = readArtifactRecord(input.rawValue)
+  const fromOutput = readArtifactToolRecord(output.rawValue)
+    ?? readArtifactToolRecord(output.rawText)
+  const fromInput = readArtifactToolRecord(input.rawValue)
 
   return {
-    artifactId: fromOutput?.artifactId
-      ?? fromInput?.artifactId
-      ?? readStringField(output, 'artifactId')
-      ?? readStringField(input, 'artifactId')
-      ?? null,
-    sessionId: fromOutput?.sessionId
-      ?? fromInput?.sessionId
-      ?? readStringField(output, 'sessionId')
-      ?? readStringField(input, 'sessionId')
-      ?? null,
-    title: fromOutput?.title
-      ?? fromInput?.title
-      ?? readStringField(output, 'title')
-      ?? readStringField(input, 'title')
-      ?? null,
-    source: fromOutput?.source
-      ?? fromInput?.source
-      ?? readStringField(output, 'source')
-      ?? readStringField(input, 'source')
-      ?? null,
+    artifactId: fromOutput?.artifactId ?? fromInput?.artifactId ?? null,
+    sessionId: fromOutput?.sessionId ?? fromInput?.sessionId ?? null,
+    title: fromOutput?.title ?? fromInput?.title ?? null,
+    source: fromOutput?.source ?? fromInput?.source ?? null,
     revision: fromOutput?.revision
       ?? fromInput?.revision
       ?? null,
   }
-}
-
-function readArtifactRecord(value: unknown): {
-  artifactId?: string
-  sessionId?: string
-  title?: string
-  source?: string
-  revision?: number
-} | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    // MCP text content is often `[{ type: 'text', text: '{...}' }]`
-    if (Array.isArray(value)) {
-      for (const block of value) {
-        if (block && typeof block === 'object' && 'text' in block && typeof (block as { text: unknown }).text === 'string') {
-          const parsed = readArtifactRecordFromText((block as { text: string }).text)
-          if (parsed) {
-            return parsed
-          }
-        }
-      }
-    }
-    return null
-  }
-  const record = value as Record<string, unknown>
-  const artifactId = typeof record.artifactId === 'string'
-    ? record.artifactId
-    : typeof record.id === 'string'
-      ? record.id
-      : undefined
-  const source = typeof record.source === 'string' ? record.source : undefined
-  // Metadata-only tool results still identify the Artifact without echoing JSX.
-  if (!artifactId && !source) {
-    return null
-  }
-  return {
-    artifactId,
-    sessionId: typeof record.sessionId === 'string' ? record.sessionId : undefined,
-    title: typeof record.title === 'string' ? record.title : undefined,
-    source,
-    revision: typeof record.revision === 'number' ? record.revision : undefined,
-  }
-}
-
-function readArtifactRecordFromText(text: string | null): ReturnType<typeof readArtifactRecord> {
-  if (!text?.trim()) {
-    return null
-  }
-  try {
-    return readArtifactRecord(JSON.parse(text))
-  }
-  catch {
-    return null
-  }
-}
-
-function readStringField(payload: ToolPayload, key: 'artifactId' | 'sessionId' | 'title' | 'source'): string | null {
-  const record = payload.rawValue
-  if (!record || typeof record !== 'object' || Array.isArray(record)) {
-    return null
-  }
-  const value = (record as Record<string, unknown>)[key]
-  return typeof value === 'string' ? value : null
 }

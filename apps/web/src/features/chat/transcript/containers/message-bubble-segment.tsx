@@ -39,7 +39,7 @@ export function MessageBubbleSegment({
     case 'activity-feed':
       return <ActivityFeedByPartIndexes entries={segment.entries} sessionId={sessionId} />
     case 'tool-call':
-      return <ToolCallBlockByPartIndex sessionId={sessionId} messageId={segment.messageId} partIndex={segment.partIndex} onToolApprovalResponse={onToolApprovalResponse} />
+      return <ToolCallBlockByPartIndex sessionId={sessionId} messageId={segment.messageId} partIndex={segment.partIndex} autoOpenArtifact={isActiveStreamingSegment} onToolApprovalResponse={onToolApprovalResponse} />
     case 'file-attachment':
       return <MessageFilePartById sessionId={sessionId} messageId={segment.messageId} partIndex={segment.partIndex} onImageClick={onImageClick} />
     case 'skill-context':

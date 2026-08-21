@@ -24,6 +24,7 @@ export interface ToolHeroViewProps {
   errorText?: string
   toolCallId: string
   blobSessionId?: string | null
+  autoOpenArtifact?: boolean
   onOpenPlanDocument?: (input: PlanDocumentOpenInput) => void
   onOpenArtifact?: (input: ArtifactOpenInput) => void
 }
@@ -37,6 +38,7 @@ export function ToolHeroView({
   errorText,
   toolCallId,
   blobSessionId,
+  autoOpenArtifact,
   onOpenPlanDocument,
   onOpenArtifact,
 }: ToolHeroViewProps) {
@@ -77,6 +79,7 @@ export function ToolHeroView({
         output={output}
         toolCallId={toolCallId}
         sessionId={blobSessionId}
+        autoOpen={autoOpenArtifact}
         onOpenArtifact={onOpenArtifact}
       />
     )
