@@ -46,6 +46,12 @@ async function startTearoffApp(): Promise<void> {
       </AppErrorBoundary>
     </React.StrictMode>,
   )
+
+  queueMicrotask(() => {
+    void import('~/lib/perf-monitor').then(({ initPerfMonitor }) => {
+      initPerfMonitor()
+    })
+  })
 }
 
 void startTearoffApp().catch(showBootstrapError)
