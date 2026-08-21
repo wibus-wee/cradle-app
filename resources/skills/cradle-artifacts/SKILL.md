@@ -41,19 +41,35 @@ Ambient session comes from `CRADLE_CHAT_SESSION_ID`. No separate session id arg.
 
 | Component | Role |
 | --- | --- |
-| `Artifact` | Root shell |
-| `Header` | Eyebrow / title / summary |
-| `MetricGrid` / `MetricCell` | KPI row |
-| `Section` | Titled block (`flush` for tight tables) |
-| `SegmentedBar` | Proportional segments |
-| `Table` | Columnar data |
-| `List` | Simple item list |
-| `Callout` | Highlight / warning |
-| `BarChart` | Bar series |
+| `Artifact` | Root shell (quiet document column) |
+| `Header` | Eyebrow / title / summary / meta fragments |
+| `Section` | Titled block; sections separate by space, not borders |
+| `Metrics` | Quiet KPI strip — big tabular values, optional `delta` + `sparkline: number[]` |
+| `DeltaBadge` | Trend indicator (`up` / `down` / `flat` + pre-formatted label) |
+| `Sparkline` | Tiny trend line for recent values |
+| `BarChart` | Vertical bars, peak highlighted, hover tooltip |
+| `LineChart` | Time-series area chart |
+| `DonutChart` | Share-of-total donut with legend rows |
+| `Gauge` | Percent radial gauge with center readout |
+| `ShareList` | Share-of-total progress rows (label + track + value + %) |
+| `Progress` | Determinate goal bar with percent |
+| `Table` | Columnar data; right-aligned columns render as mono numerics |
+| `List` | Item rows with status icons via `tone` (`info`/`success`/`warning`/`danger`) |
+| `Timeline` | Vertical event stream with tone ticks and meta |
+| `Steps` | Horizontal workflow indicator (`done`/`current`/`upcoming`) |
+| `Callout` | Highlight / warning wash with tone icon |
+| `Badge` | Compact status chip |
+| `KeyValue` | Label/value metadata rows |
+| `CodeBlock` | Mono snippet well with optional title + language badge |
+| `Collapsible` | Expandable block for long secondary content |
+| `Tabs` | View-local tab switcher (content passed inline) |
+| `EmptyState` | Quiet placeholder for empty collections |
 | `ActionButton` | Sends `prompt` into the owning chat |
 | `Stack` / `HStack` | Layout |
 | `Text` | Body copy |
 | `Divider` | Separator |
+
+Prefer real visualizations over prose or color-coded text: give `Metrics` sparklines, use `BarChart`/`LineChart` for series, `DonutChart`/`ShareList` for share-of-total.
 
 ## Updates
 
@@ -72,7 +88,7 @@ Reuse the same `artifactId` from a prior `write_artifact` result to revise in pl
 ## Example
 
 ```tsx
-import { Artifact, Header, MetricGrid, Section, Table, ActionButton } from 'cradle/artifact'
+import { Artifact, Header, Metrics, Section, Table, ActionButton } from 'cradle/artifact'
 
 export default function ReviewBoard() {
   return (
@@ -82,13 +98,13 @@ export default function ReviewBoard() {
         title="Priority changes"
         summary="Grouped by risk. Click through to dig into each cluster."
       />
-      <MetricGrid
+      <Metrics
         items={[
-          { label: 'Files', value: '24', meta: 'changed' },
-          { label: 'High risk', value: '3', meta: 'review first' },
+          { label: 'Files', value: '24', caption: 'changed' },
+          { label: 'High risk', value: '3', caption: 'review first' },
         ]}
       />
-      <Section title="Clusters" flush>
+      <Section title="Clusters">
         <Table
           columns={[
             { key: 'area', header: 'Area' },

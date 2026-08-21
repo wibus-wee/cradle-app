@@ -10,7 +10,7 @@ export const WRITE_ARTIFACT_TOOL_DESCRIPTION = [
   'Create or update a Cradle Agent Artifact — an interactive JSX view rendered next to chat (Cursor Canvas analogue).',
   'Use when a dashboard, audit, review board, chart, table, or other structured UI is clearer than markdown.',
   'Source MUST be JSX that imports ONLY from "cradle/artifact" (optionally "react") and `export default` a React component.',
-  'Available components: Artifact, Header, MetricGrid, MetricCell, Section, SegmentedBar, Table, List, Callout, BarChart, ActionButton, Stack, HStack, Text, Divider.',
+  'Available components: Artifact, Header, Section, Metrics, DeltaBadge, Sparkline, BarChart, LineChart, DonutChart, Gauge, ShareList, Progress, Table, List, Timeline, Steps, Callout, Badge, KeyValue, CodeBlock, Collapsible, Tabs, EmptyState, ActionButton, Stack, HStack, Text, Divider.',
   'Pass the same artifactId to update an existing Artifact (revision increments). Omit artifactId to create a new one.',
   'After writing, tell the user the Artifact is available in the side panel; do not dump the full JSX into chat.',
 ].join(' ')

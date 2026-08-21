@@ -17,7 +17,7 @@ type ToolFixtureProps = Omit<
 
 /** Valid cradle/artifact JSX used by artifact tool fixtures and Storybook. */
 export const sampleArtifactSource = `
-import { Artifact, Header, MetricGrid, Section, Table, ActionButton } from 'cradle/artifact'
+import { Artifact, Header, Metrics, Section, Table, ActionButton } from 'cradle/artifact'
 
 export default function ReviewBoard() {
   return (
@@ -27,13 +27,13 @@ export default function ReviewBoard() {
         title="Priority changes"
         summary="Grouped by risk. Click through to dig into each cluster."
       />
-      <MetricGrid
+      <Metrics
         items={[
-          { label: 'Files', value: '24', meta: 'changed' },
-          { label: 'High risk', value: '3', meta: 'review first' },
+          { label: 'Files', value: '24', caption: 'changed' },
+          { label: 'High risk', value: '3', caption: 'review first' },
         ]}
       />
-      <Section title="Clusters" flush>
+      <Section title="Clusters">
         <Table
           columns={[
             { key: 'area', header: 'Area' },
