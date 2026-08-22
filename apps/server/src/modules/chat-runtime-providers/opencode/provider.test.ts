@@ -2247,6 +2247,7 @@ describe('opencodeProvider streamTurn', () => {
       workspacePath: '/tmp/workspace',
     })
 
+    const firstChunk = stream.next()
     await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
     events.push({
       id: 'evt_permission_auto',
@@ -2271,7 +2272,18 @@ describe('opencodeProvider streamTurn', () => {
       reply: 'once',
     }))
     expect(requestToolApproval).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(stream.next()).resolves.toMatchObject({
+    await expect(firstChunk).resolves.toMatchObject({
+      done: false,
+      value: { type: 'tool-input-start', toolCallId: 'server-request-perm-auto-1' },
+    })
+    await expect(stream.next()).resolves.toMatchObject({
+      done: false,
+      value: {
+        type: 'tool-input-available',
+        toolCallId: 'server-request-perm-auto-1',
+      },
+    })
+    await expect(stream.next()).resolves.toMatchObject({
       done: false,
       value: {
         type: 'tool-output-available',
@@ -2281,7 +2293,7 @@ describe('opencodeProvider streamTurn', () => {
           result: expect.objectContaining({ approved: true }),
         }),
       },
-    }))
+    })
     await stream.return(undefined)
   })
 
