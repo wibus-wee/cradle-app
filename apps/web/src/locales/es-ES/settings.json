@@ -10,7 +10,7 @@
   "about.external.claudeDir.description": "Al iniciar sesión con una suscripción oficial de Claude, las conversaciones en Cradle se persisten en tu directorio ~/.claude. Cradle pasa este directorio, compartiendo sesiones y memoria con Claude CLI.",
   "about.external.claudeDir.label": "Datos de sesión de Claude",
   "about.external.claudeDir.path": "~/.claude/projects/*, ~/.claude/settings.json",
-  "about.external.cli.description": "Instalar el comando empaquetado crea o elimina un symlink solo cuando eliges esa acción.",
+  "about.external.cli.description": "Instalar el comando empaquetado crea o elimina el punto de entrada de la línea de comandos solo cuando eliges esa acción.",
   "about.external.cli.label": "Comando CLI de escritorio",
   "about.external.cli.path": "/usr/local/bin/cradle",
   "about.external.description": "Algunas funciones tocan rutas fuera de Application Support para que Cradle pueda trabajar con tus proyectos y herramientas locales.",

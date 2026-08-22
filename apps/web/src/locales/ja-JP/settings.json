@@ -10,7 +10,7 @@
   "about.external.claudeDir.description": "Claude 公式サブスクリプションでサインインすると、Cradle 内の会話は ~/.claude ディレクトリに永続化されます。Cradle はこのディレクトリを透過的に渡し、Claude CLI とセッション・メモリを共有します。",
   "about.external.claudeDir.label": "Claude セッションデータ",
   "about.external.claudeDir.path": "~/.claude/projects/*, ~/.claude/settings.json",
-  "about.external.cli.description": "パッケージ済みコマンドのインストールは、ユーザーがその操作を選んだ場合だけ symlink を作成または削除します。",
+  "about.external.cli.description": "パッケージ済みコマンドのインストールは、ユーザーがその操作を選んだ場合だけコマンドライン用エントリポイントを作成または削除します。",
   "about.external.cli.label": "デスクトップ CLI コマンド",
   "about.external.cli.path": "/usr/local/bin/cradle",
   "about.external.description": "一部の機能は、プロジェクトやローカルツールと連携するために Application Support 外のパスへ意図的に触れます。",

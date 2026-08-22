@@ -10,7 +10,7 @@
   "about.external.claudeDir.description": "使用 Claude 官方订阅登录时，Cradle 内的对话会被持久化写入 ~/.claude 目录。Cradle 会透传该目录，与 Claude CLI 共享会话和记忆。",
   "about.external.claudeDir.label": "Claude 会话数据",
   "about.external.claudeDir.path": "~/.claude/projects/*, ~/.claude/settings.json",
-  "about.external.cli.description": "只有在你选择安装、修复或移除命令时，Cradle 才会创建或删除这个 symlink。",
+  "about.external.cli.description": "只有在你选择安装、修复或移除命令时，Cradle 才会创建或删除这个命令行入口。",
   "about.external.cli.label": "桌面端 CLI 命令",
   "about.external.cli.path": "/usr/local/bin/cradle",
   "about.external.description": "有些功能需要有意触达 Application Support 之外的路径，这样 Cradle 才能和你的项目、本地工具一起工作。",

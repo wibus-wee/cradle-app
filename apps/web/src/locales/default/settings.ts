@@ -114,7 +114,7 @@ export default {
   'about.external.agentActions.description': 'Approved agent and tool actions may read or write the local paths covered by that action.',
   'about.external.agentActions.label': 'Approved agent actions',
   'about.external.agentActions.path': 'approved workspace and client paths',
-  'about.external.cli.description': 'Installing the packaged command creates or removes a symlink only when you choose that action.',
+  'about.external.cli.description': 'Installing the packaged command creates or removes the command-line entry point only when you choose that action.',
   'about.external.cli.label': 'Desktop CLI command',
   'about.external.claudeDir.description': 'When signed in with a Claude official subscription, conversations in Cradle are persisted into your ~/.claude directory. Cradle passes through this directory, sharing sessions and memory with Claude CLI.',
   'about.external.claudeDir.label': 'Claude session data',

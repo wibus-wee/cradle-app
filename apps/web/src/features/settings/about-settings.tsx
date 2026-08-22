@@ -64,6 +64,7 @@ const EXTERNAL_ACCESS_ROW_KEYS: Array<{
 export function AboutSettings() {
   const { t } = useTranslation('settings')
   const [paths, setPaths] = useState<CradleDataPaths | null>(null)
+  const [cliCommandPath, setCliCommandPath] = useState<string | null>(null)
   const analyticsEnabled = useProductAnalyticsStore(state => state.enabled)
   const setAnalyticsEnabled = useProductAnalyticsStore(state => state.setEnabled)
 
@@ -83,6 +84,16 @@ export function AboutSettings() {
       }
     })
 
+    void nativeIpc.native.getDesktopCliStatus().then((status) => {
+      if (!cancelled && status.commandPath) {
+        setCliCommandPath(status.commandPath)
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setCliCommandPath(null)
+      }
+    })
+
     return () => {
       cancelled = true
     }
@@ -98,7 +109,9 @@ export function AboutSettings() {
         kind: row.kind,
         label: t(row.labelKey),
         description: t(row.descriptionKey),
-        path: t(row.pathKey),
+        path: row.pathKey === 'about.external.cli.path' && cliCommandPath
+          ? cliCommandPath
+          : t(row.pathKey),
       }))}
       labels={{
         pageTitle: t('about.page.title'),
