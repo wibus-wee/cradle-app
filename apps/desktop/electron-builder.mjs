@@ -24,17 +24,6 @@ if (!hasAppleSigningIdentity) {
   process.env.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
 }
 
-const keepElectronFrameworkLocales = new Set([
-  'en',
-  'en_GB',
-  'en-US',
-  'en_US',
-  'es',
-  'ja',
-  'zh_CN',
-  'zh_TW',
-])
-
 function getPublishConfig() {
   if (!updateServerUrl) {
     return undefined
@@ -97,7 +86,7 @@ function loadSparkleBuilderFragments() {
 
 const sparkle = loadSparkleBuilderFragments()
 
-async function removeUnusedMacFrameworkLocales(context) {
+async function removeMacFrameworkLocales(context) {
   if (!['darwin', 'mas'].includes(context.electronPlatformName)) {
     return
   }
@@ -128,11 +117,6 @@ async function removeUnusedMacFrameworkLocales(context) {
         return
       }
 
-      const locale = entry.slice(0, -'.lproj'.length)
-      if (keepElectronFrameworkLocales.has(locale)) {
-        return
-      }
-
       await fs.rm(path.join(frameworkResources, entry), { recursive: true, force: true })
       removed = true
     }),
@@ -160,7 +144,7 @@ async function adHocSignAfterPack(context) {
 
 async function afterPack(context) {
   await copyCodexRuntimeToPackagedResources(context)
-  await removeUnusedMacFrameworkLocales(context)
+  await removeMacFrameworkLocales(context)
   if (['darwin', 'mas'].includes(context.electronPlatformName)) {
     const appPath = path.join(
       context.appOutDir,
@@ -256,11 +240,6 @@ const config = {
     {
       from: 'resources/relayd',
       to: 'relayd',
-      filter: ['**/*'],
-    },
-    {
-      from: 'resources/chronicle',
-      to: 'chronicle',
       filter: ['**/*'],
     },
     {

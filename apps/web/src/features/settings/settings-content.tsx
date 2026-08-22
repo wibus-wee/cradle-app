@@ -16,7 +16,7 @@ interface SettingsContentProps {
 }
 
 export function SettingsContent({ section }: SettingsContentProps) {
-  const activeSection = !import.meta.env.DEV && (section === 'chronicle' || section === 'externalIssues') ? 'appearance' : section
+  const activeSection = !import.meta.env.DEV && section === 'externalIssues' ? 'appearance' : section
   const ActiveSection = SECTION_MAP[activeSection] ?? SECTION_MAP.appearance
   const fixedHeight = FIXED_HEIGHT_SECTIONS.has(activeSection)
   const fullBleed = activeSection === 'downloads'

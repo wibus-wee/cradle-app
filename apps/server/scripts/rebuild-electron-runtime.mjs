@@ -166,12 +166,12 @@ function removeMatchingFiles(root, patterns, pruned) {
 }
 
 function pruneNodePty(pruned) {
-  const packageDir = findPnpmPackageDir('node-pty@')
-  if (!packageDir) {
+  const nodePtyDir = join(serverRuntimeNodeModules, 'node-pty')
+  if (!existsSync(nodePtyDir)) {
     return
   }
 
-  const prebuildsDir = join(packageDir, 'node_modules/node-pty/prebuilds')
+  const prebuildsDir = join(nodePtyDir, 'prebuilds')
   const targetPrebuild = `${process.platform}-${targetArch}`
   if (existsSync(prebuildsDir)) {
     for (const entry of readdirSync(prebuildsDir, { withFileTypes: true })) {
@@ -183,12 +183,11 @@ function pruneNodePty(pruned) {
 }
 
 function pruneBetterSqlite3(pruned) {
-  const packageDir = findPnpmPackageDir('better-sqlite3@')
-  if (!packageDir) {
+  const betterSqliteDir = join(serverRuntimeNodeModules, 'better-sqlite3')
+  if (!existsSync(betterSqliteDir)) {
     return
   }
 
-  const betterSqliteDir = join(packageDir, 'node_modules/better-sqlite3')
   for (const relativePath of [
     'bin',
     'deps',

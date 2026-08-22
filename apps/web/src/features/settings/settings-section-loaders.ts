@@ -16,7 +16,6 @@ export const settingsSectionLoaders: Record<string, SettingsSectionLoader> = {
   await: () => import('./await-settings').then(module => ({ default: module.AwaitSettings })),
   worktrees: () => import('./worktree-settings').then(module => ({ default: module.WorktreeSettings })),
   jarvis: () => import('./jarvis-settings').then(module => ({ default: module.JarvisSettings })),
-  chronicle: () => import('~/features/chronicle/chronicle-settings').then(module => ({ default: module.ChronicleSettings })),
   integrations: () => import('./integrations-settings').then(module => ({ default: module.IntegrationsSettings })),
   mcpServers: () => import('~/features/mcp-servers/mcp-servers-settings').then(module => ({ default: module.McpServersSettings })),
   shortcut: () => import('./shortcut-settings').then(module => ({ default: module.ShortcutSettings })),

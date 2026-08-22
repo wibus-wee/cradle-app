@@ -103,11 +103,38 @@ function preparePlugin(directoryName) {
     cradle,
     packageName: packageJson.name ?? directoryName,
   })
+  prunePluginBuildArtifacts(pluginArtifactDir)
 
   return {
     name: packageJson.name,
     version: packageJson.version ?? '0.0.0',
     directoryName,
+  }
+}
+
+function prunePluginBuildArtifacts(pluginArtifactDir) {
+  removeMatchingFiles(join(pluginArtifactDir, 'node_modules'), [
+    /\.d\.ts$/,
+    /\.map$/,
+    /\.md$/i,
+    /\.pdb$/i,
+  ])
+}
+
+function removeMatchingFiles(root, patterns) {
+  if (!existsSync(root)) {
+    return
+  }
+
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    const entryPath = join(root, entry.name)
+    if (entry.isDirectory()) {
+      removeMatchingFiles(entryPath, patterns)
+      continue
+    }
+    if (entry.isFile() && patterns.some(pattern => pattern.test(entry.name))) {
+      rmSync(entryPath, { force: true })
+    }
   }
 }
 

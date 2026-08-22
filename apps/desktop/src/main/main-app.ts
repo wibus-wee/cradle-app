@@ -84,7 +84,7 @@ import { QuitGuard } from './quit-guard'
 import { DesktopServerFetchBroker } from './server-fetch-broker'
 import { startServer, stopServer } from './server-process'
 import { TrayManager } from './tray-manager'
-import { DesktopUpdateManager } from './update-manager'
+import type { DesktopUpdateManager } from './update-manager'
 import { WindowManager } from './window-manager'
 import { readStoredWindowBounds, resolveVisibleWindowBounds } from './window-state'
 import { installWindowsCaptionButtons } from './windows-caption-buttons'
@@ -688,6 +688,20 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
   stopPluginDevSessionSync = startPluginDevSessionSync()
 }
 
+async function initializeDesktopUpdateManager(): Promise<void> {
+  const { DesktopUpdateManager } = await import('./update-manager')
+  updateManager = new DesktopUpdateManager({
+    prepareQuitForUpdate: async () => {
+      quitGuard.allowNextQuit()
+      await prepareDesktopExitForExternalQuit({
+        reason: 'desktop update',
+        stopServerRuntime: true,
+      })
+    },
+  })
+  updateManager.on('statusChanged', broadcastUpdateStatus)
+}
+
 export async function startDesktopApp(): Promise<void> {
   registerProcessShutdownHandlers()
   registerPluginInstallProtocol()
@@ -724,15 +738,6 @@ export async function startDesktopApp(): Promise<void> {
     return
   }
 
-  updateManager = new DesktopUpdateManager({
-    prepareQuitForUpdate: async () => {
-      quitGuard.allowNextQuit()
-      await prepareDesktopExitForExternalQuit({
-        reason: 'desktop update',
-        stopServerRuntime: true,
-      })
-    },
-  })
   const appBadgeManager = new DesktopAppBadgeManager()
   desktopAppBadgeManager = appBadgeManager
   macBridgeManager = new MacBridgeManager({
@@ -772,7 +777,6 @@ export async function startDesktopApp(): Promise<void> {
     },
   })
   registerPluginSourceSyncIpcHandlers()
-  updateManager.on('statusChanged', broadcastUpdateStatus)
   ipcMain.handle(DESKTOP_SERVER_STATUS_GET_CHANNEL, () => desktopServerStatus)
 
   app.on('open-url', (event, url) => {
@@ -789,6 +793,12 @@ export async function startDesktopApp(): Promise<void> {
   app
     .whenReady()
     .then(async () => {
+      // Begin navigating the renderer before disk-bound recovery work. The
+      // renderer remains on its static shell until the server publishes ready.
+      mainWindow = await createMainWindow()
+      setMainWindow(mainWindow)
+
+      await initializeDesktopUpdateManager()
       await initializeDesktopDataDirectory()
       await initializeDesktopDataBackup()
       desktopDownloadCenter = new DesktopDownloadCenterService({
@@ -804,8 +814,6 @@ export async function startDesktopApp(): Promise<void> {
         }
       })
       appBadgeManager.initialize()
-      mainWindow = await createMainWindow()
-      setMainWindow(mainWindow)
 
       app.on('activate', async () => {
         if (!mainWindow || mainWindow.isDestroyed()) {

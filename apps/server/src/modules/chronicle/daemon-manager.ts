@@ -129,11 +129,6 @@ export function findChronicleBinary(): string {
   const candidates = [
     join(process.cwd(), '..', '..', 'chronicle', 'target', 'release', 'cradle-chronicle'),
     join(process.cwd(), '..', '..', 'chronicle', 'target', 'debug', 'cradle-chronicle'),
-    join(
-      (process as { resourcesPath?: string }).resourcesPath ?? '',
-      'chronicle',
-      'cradle-chronicle',
-    ),
   ]
 
   for (const candidate of candidates) {
@@ -149,7 +144,7 @@ export function findChronicleBinary(): string {
     }
   }
   throw new Error(
-    'Chronicle runtime is missing. Build it with `pnpm --filter @cradle/desktop build:chronicle`.',
+    'Chronicle runtime is missing. Set CRADLE_CHRONICLE_PATH or build the repository Chronicle target.',
   )
 }
 

@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { createDaemonArgs, findChronicleBinary } from '../src/modules/chronicle/daemon-manager'
 
 describe('chronicle daemon manager', () => {
-  it('uses the Desktop-provided Chronicle runtime path', () => {
+  it('uses an externally configured Chronicle runtime path', () => {
     const root = mkdtempSync(join(tmpdir(), 'cradle-chronicle-binary-'))
     const binary = join(root, 'cradle-chronicle')
     const previousPath = process.env.CRADLE_CHRONICLE_PATH

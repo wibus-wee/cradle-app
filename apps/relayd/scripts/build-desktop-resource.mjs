@@ -24,7 +24,7 @@ const result = spawnSync('go', [
   'build',
   '-trimpath',
   '-ldflags',
-  `-X main.relaydVersion=${packageVersion}`,
+  `-s -w -X main.relaydVersion=${packageVersion}`,
   '-o',
   tmpBinary,
   './cmd/relayd',

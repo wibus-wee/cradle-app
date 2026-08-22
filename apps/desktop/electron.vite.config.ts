@@ -132,6 +132,7 @@ export default defineConfig({
     },
     build: {
       outDir: resolve(__dirname, 'dist/renderer'),
+      emptyOutDir: true,
       rollupOptions: {
         input: {
           main: resolve(webRoot, 'index.html'),

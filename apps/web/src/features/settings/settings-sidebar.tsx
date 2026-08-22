@@ -10,7 +10,6 @@ import {
   Flag2Line as FlagIcon,
   GiftLine as GiftIcon,
   GitBranchLine as GitBranchIcon,
-  HeartbeatLine as ActivityIcon,
   InformationLine as InfoIcon,
   KeyboardLine as KeyboardIcon,
   LifebuoyLine as LifeBuoyIcon,
@@ -224,9 +223,6 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
           'backup.restore.label',
         ],
       },
-      ...(import.meta.env.DEV
-        ? [{ id: 'chronicle', labelKey: 'nav.chronicle', icon: ActivityIcon } satisfies SettingsNavItem]
-        : []),
       ...(import.meta.env.DEV
         ? [{ id: 'externalIssues', labelKey: 'nav.externalIssues', icon: BoxesIcon } satisfies SettingsNavItem]
         : []),

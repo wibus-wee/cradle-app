@@ -138,9 +138,6 @@ export function useDesktopTrayActionBridge({ onOpenGlobalSearch }: DesktopTrayAc
       case 'open-providers':
         openSettingsRouteSection('providers')
         return
-      case 'open-chronicle':
-        openSettingsRouteSection('chronicle')
-        return
       case 'open-usage':
         openUsage()
         return

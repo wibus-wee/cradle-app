@@ -296,62 +296,6 @@ describe('desktop server process identity', () => {
   })
 })
 
-describe('desktop Chronicle runtime path', () => {
-  it('resolves configured and packaged macOS runtimes', async () => {
-    const { resolveDesktopChroniclePath } = await import('./server-process')
-    const root = mkdtempSync(join(tmpdir(), 'cradle-chronicle-runtime-'))
-    const configuredPath = join(root, 'configured', 'cradle-chronicle')
-    const packagedPath = join(root, 'chronicle', 'darwin-arm64', 'cradle-chronicle')
-
-    try {
-      mkdirSync(join(root, 'configured'), { recursive: true })
-      mkdirSync(join(root, 'chronicle', 'darwin-arm64'), { recursive: true })
-      writeFileSync(configuredPath, '')
-      writeFileSync(packagedPath, '')
-
-      expect(resolveDesktopChroniclePath({
-        isDev: true,
-        moduleDir: root,
-        platform: 'darwin',
-        arch: 'arm64',
-        configuredPath,
-      })).toBe(configuredPath)
-      expect(resolveDesktopChroniclePath({
-        isDev: false,
-        moduleDir: root,
-        platform: 'darwin',
-        arch: 'arm64',
-        resourcesPath: root,
-        configuredPath: '',
-      })).toBe(packagedPath)
-    }
-    finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  it('warns and skips a missing macOS runtime and skips other platforms', async () => {
-    const { resolveDesktopChroniclePath } = await import('./server-process')
-
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-    expect(resolveDesktopChroniclePath({
-      isDev: true,
-      moduleDir: '/tmp',
-      platform: 'darwin',
-      configuredPath: '/tmp/missing-cradle-chronicle',
-    })).toBeUndefined()
-    expect(warn).toHaveBeenCalledWith(
-      '[desktop] Chronicle runtime is unavailable at /tmp/missing-cradle-chronicle; skipping Chronicle startup.',
-    )
-    expect(resolveDesktopChroniclePath({
-      isDev: false,
-      moduleDir: '/tmp',
-      platform: 'linux',
-    })).toBeUndefined()
-  })
-})
-
 describe('desktop server inbound access preferences', () => {
   it('defaults to local-only server binding', async () => {
     const { desktopServerBindHostForAccessMode, readDesktopServerAccessMode }

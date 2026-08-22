@@ -49,7 +49,6 @@ const SHELL_PATH_MARKER_START = '__CRADLE_SHELL_PATH_START__'
 const SHELL_PATH_MARKER_END = '__CRADLE_SHELL_PATH_END__'
 const CREDENTIAL_SECRET_FILE = 'credential-secret'
 const CODEX_APP_SERVER_PATH_ENV = 'CRADLE_CODEX_APP_SERVER_PATH'
-const CHRONICLE_PATH_ENV = 'CRADLE_CHRONICLE_PATH'
 const RELAYD_PATH_ENV = 'CRADLE_RELAYD_PATH'
 const SAFE_STORAGE_PREFIX = 'v1-safe:'
 const PLAIN_STORAGE_PREFIX = 'v1-plain:'
@@ -542,7 +541,6 @@ async function spawnServer(opts: {
     = configuredMigrationsDir || (isDev ? undefined : join(process.resourcesPath, 'drizzle'))
   const builtinSkillsDir = isDev ? undefined : join(process.resourcesPath, 'resources/skills')
   const codexAppServerPath = resolveDesktopCodexAppServerPath({ isDev, moduleDir: __dirname })
-  const chroniclePath = resolveDesktopChroniclePath({ isDev, moduleDir: __dirname })
   const installedPluginsDir = resolveDesktopInstalledPluginsDir(app.getPath('userData'))
   const externalPluginsDirs = [installedPluginsDir, process.env.CRADLE_EXTERNAL_PLUGINS_DIRS]
   const externalPluginsDirList
@@ -565,7 +563,6 @@ async function spawnServer(opts: {
     CRADLE_EXTERNAL_PLUGINS_DIRS: externalPluginsDirList,
     CRADLE_MARKETPLACE_PLUGINS_DIR: installedPluginsDir,
     ...(codexAppServerPath ? { [CODEX_APP_SERVER_PATH_ENV]: codexAppServerPath } : {}),
-    ...(chroniclePath ? { [CHRONICLE_PATH_ENV]: chroniclePath } : {}),
     ...(migrationsDir ? { CRADLE_MIGRATIONS_DIR: migrationsDir } : {}),
     ...(builtinSkillsDir ? { CRADLE_BUILTIN_SKILLS_DIR: builtinSkillsDir } : {}),
     NODE_ENV: isDev ? 'development' : 'production',
@@ -971,77 +968,6 @@ function resolveDesktopCodexAppServerPath(input: {
 
 function getCodexAppServerExecutableName(): string {
   return process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server'
-}
-
-export function resolveDesktopChroniclePath(input: {
-  isDev: boolean
-  moduleDir: string
-  platform?: NodeJS.Platform
-  arch?: string
-  resourcesPath?: string
-  configuredPath?: string
-}): string | undefined {
-  const platform = input.platform ?? process.platform
-  if (platform !== 'darwin') {
-    return undefined
-  }
-
-  const configuredPath = input.configuredPath ?? process.env[CHRONICLE_PATH_ENV]?.trim()
-  if (configuredPath) {
-    if (!existsSync(configuredPath)) {
-      console.warn(
-        `[desktop] Chronicle runtime is unavailable at ${configuredPath}; skipping Chronicle startup.`,
-      )
-      return undefined
-    }
-    return configuredPath
-  }
-
-  const arch = input.arch ?? process.arch
-  const executableName = 'cradle-chronicle'
-  if (!input.isDev) {
-    const resourcesPath = input.resourcesPath ?? process.resourcesPath
-    const bundledPath = join(resourcesPath, 'chronicle', `${platform}-${arch}`, executableName)
-    if (!existsSync(bundledPath)) {
-      console.warn(
-        `[desktop] Chronicle runtime is unavailable at ${bundledPath}; skipping Chronicle startup.`,
-      )
-      return undefined
-    }
-    return bundledPath
-  }
-
-  const candidates = [
-    resolve(
-      input.moduleDir,
-      '../../resources/chronicle',
-      `${platform}-${arch}`,
-      executableName,
-    ),
-    resolve(
-      process.cwd(),
-      'resources/chronicle',
-      `${platform}-${arch}`,
-      executableName,
-    ),
-    resolve(
-      process.cwd(),
-      'apps/desktop/resources/chronicle',
-      `${platform}-${arch}`,
-      executableName,
-    ),
-    resolve(process.cwd(), '../../chronicle/target/release', executableName),
-    resolve(input.moduleDir, '../../../../chronicle/target/release', executableName),
-  ]
-  const runtimePath = candidates.find(candidate => existsSync(candidate))
-  if (!runtimePath) {
-    console.warn(
-      '[desktop] Chronicle development runtime is unavailable; skipping Chronicle startup. '
-      + 'Run `pnpm --filter @cradle/desktop build:chronicle` to enable it.',
-    )
-    return undefined
-  }
-  return runtimePath
 }
 
 function readDesktopCommandPathFallbackSegments(env: NodeJS.ProcessEnv): string[] {

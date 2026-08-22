@@ -10,7 +10,6 @@ export type TrayActionId
     | 'open-workspace'
     | 'open-agents'
     | 'open-providers'
-    | 'open-chronicle'
     | 'open-usage'
     | 'open-plugins'
     | 'open-desktop-settings'
