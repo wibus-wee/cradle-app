@@ -129,6 +129,16 @@ const OPENCODE_CREW_SLOT: RuntimeUiSlot = {
   surfaces: ['runtimePanel'],
 }
 
+const OPENCODE_USER_INPUT_SLOT: RuntimeUiSlot = {
+  id: 'opencode:user-input',
+  name: 'ask-user',
+  label: 'Ask user',
+  description: 'Show pending opencode questions for the user.',
+  argumentHint: '',
+  iconKey: 'user-input',
+  surfaces: ['composerState', 'runtimePanel'],
+}
+
 export function createOpencodeRuntimePresentation(
   commands: OpencodeCommand[] = [],
   skills: string[] = [],
@@ -148,6 +158,7 @@ export function createOpencodeRuntimePresentation(
       OPENCODE_FILESYSTEM_SLOT,
       OPENCODE_CONFIG_SLOT,
       OPENCODE_CREW_SLOT,
+      OPENCODE_USER_INPUT_SLOT,
     ],
     skills,
   }

@@ -11,7 +11,7 @@
 | Shell 执行 | `session.shell()` | ✅ `supportsShellExecution: true` | 高 |
 | 呈现能力 (Presentation) | command/slot 系统 | ✅ 已实现 `getPresentation`/`getDraftPresentation` | 高 |
 | Event-first Turn | `event.subscribe()` + `session.promptAsync()` | ✅ session-scoped 持续 event pump；同时投影 `message.*` 与 `session.next.*`；prompt/idle recovery 前有 bounded `v2.session.wait` barrier | 高 |
-| Permission Approval | `permission.updated` + `postSessionIdPermissionsPermissionId()` | ✅ 已切 v2：消费 `permission.v2.asked/replied`（兼容 legacy），审批非阻塞（不卡事件泵），reload/missed event 从 `v2.session.permission.list()` 恢复，支持 `always` scope | 高 |
+| Permission Approval | `permission.updated` + `postSessionIdPermissionsPermissionId()` | ✅ 已切 v2：消费 `permission.v2.asked/replied`（兼容 legacy），审批非阻塞（不卡事件泵），reload/missed event 从 `v2.session.permission.list()` 恢复，支持 `always` scope。accessMode 语义：`full-access`（默认）镜像 opencode `--auto`——请求到达即自动回 `once`，不经过用户（显式 deny 在服务端仍生效）；`approval-required` 走用户审批桥 | 高 |
 | File/Image 输入 | `FilePartInput` | ✅ AI SDK file part 会投影为 opencode file part | 高 |
 | Native MCP 配置 | `Config.mcp` local/remote servers | ✅ 继承用户 OpenCode config 与 workspace project scope；Cradle plugin registry 不做跨 namespace 投影 | 高 |
 | MCP 生命周期管理 | `mcp.add/connect/disconnect/auth.*` | ⏸ 只读取原生 `mcp.status()` 状态；未提供 Cradle UI/route 管理 OpenCode MCP 生命周期 | 中 |
@@ -21,7 +21,7 @@
 | Steer Turn | `session.revert()` / `session.unrevert()` | ⏸ 未声明；Chat Runtime hook 是 live-turn steer，opencode 当前无等价 active-turn API | 中 |
 | 回滚 (Rollback) | `session.messages()` + `session.revert()` | ✅ `supportsLastTurnRollback: true` | 中 |
 | btw / Quick Question | SDK 无原生 no-history 概念 | ✅ 临时 opencode session + transcript prompt，不写 Cradle 历史 | 中 |
-| Structured User Input | v2 `session.question.list/reply/reject()` + `question` tool parts | ✅ 已接入 Chat Runtime `requestUserInput`，按当前 session 的 pending question request 回写 OpenCode | 中 |
+| Structured User Input | v2 `session.question.list/reply/reject()` + `question` tool parts | ✅ 已接入 Chat Runtime `requestUserInput`，按当前 session 的 pending question request 回写 OpenCode；`opencode:user-input` slot 已声明 `composerState`/`runtimePanel` surface，composer 会渲染交互式问答表单 | 中 |
 | Skills | v2 `SkillV2Info.slash` | ✅ `getPresentation` 读取 `v2.skill.list()` 投影到 presentation.skills；slash 化展示待 UI | 低 |
 | Runtime 设置 | SDK 支持 mode/agent 切换 | ✅ `supportsRuntimeSettings: true`；interactionMode：default→`build`，plan→`plan`，每 turn 生效，`updateRuntimeSettings()` 通过 v2 `session.switchAgent/switchModel` 写入 sticky 设置。accessMode：host 级生效——`approval-required` 的 managed host 注入 `OPENCODE_PERMISSION={"*":"ask"}`（deep-merge，用户显式 allow/deny 规则仍优先），`full-access` 不注入、继承用户原生 permission config；accessMode 参与 host 池 key，改动在下一个 run 的 resume 时切换到对应 host | 低 |
 
@@ -139,7 +139,7 @@
 - 文本 projector 使用 overlap-aware merge，`message.part.delta` 先于完整 part snapshot 到达时不会把已有文本重复成 `HelHel`。
 - adapter 用“不在 baseline 中的新 terminal assistant message”识别旧事件族的终态 message；终态时再读 `session.message()` 补偿 missed parts，然后发 AI SDK `finish`。projector 也会忽略 baseline 内的旧 message，避免第二轮复用 session 时重放上一轮文本。
 - `promptAsync` accepted 后会启动 bounded recovery：按短延迟尝试从 `session.messages()` 读取终态 assistant；若没有任何 provider activity，会以明确 stuck provider error 结束。session idle 早于 assistant activity，或 tool-call finish 后没有 final assistant，也会由 idle watchdog 在有界时间内失败，而不是无限等待。
-- `permission.v2.asked`（兼容 legacy `permission.asked`）被投影为 AI SDK `tool-input-*` + `tool-approval-request` chunks，approval id 形如 `server-request-${permission.id}`；审批派发是非阻塞的——等待用户操作期间事件泵继续消费其他事件，turn 关闭前会等未决审批落地。用户审批后按 resolution scope 回复 OpenCode `once`/`always`/`reject`。事件泵断线或 Cradle 重启期间的 pending 权限由 `v2.session.permission.list()` 在 turn 开始时恢复派发，approvals slot 也会合并该权威列表；`permission.*.replied` 事件同步外部回复状态。
+- `permission.v2.asked`（兼容 legacy `permission.asked`）被投影为 AI SDK `tool-input-*` + `tool-approval-request` chunks，approval id 形如 `server-request-${permission.id}`；审批派发是非阻塞的——等待用户操作期间事件泵继续消费其他事件，turn 关闭前会等未决审批落地。accessMode 决定路径：`full-access`（默认）直接自动回 `once` 并在 transcript 记录 auto-approved 输出（同 opencode `--auto`）；`approval-required` 走用户审批桥，按 resolution scope 回复 `once`/`always`/`reject`。事件泵断线或 Cradle 重启期间的 pending 权限由 `v2.session.permission.list()` 在 turn 开始时恢复派发，approvals slot 也会合并该权威列表；`permission.*.replied` 事件同步外部回复状态。
 - `projectOpencodePromptParts()` 支持 text 与 file parts，AI SDK `file.mediaType/filename/url` 会映射到 OpenCode `mime/filename/url`。
 
 ### 7. Provider Threads / Fork

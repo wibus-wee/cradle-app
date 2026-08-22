@@ -2084,6 +2084,7 @@ describe('opencodeProvider streamTurn', () => {
       runId: 'run-approval',
       runtimeSession: createRuntimeSession(fake.resource),
       profile: null,
+      providerOptions: { runtimeSettings: { accessMode: 'approval-required' } },
       message: {
         id: 'user-1',
         role: 'user',
@@ -2171,6 +2172,7 @@ describe('opencodeProvider streamTurn', () => {
       runId: 'run-approval-v2',
       runtimeSession: createRuntimeSession(fake.resource),
       profile: null,
+      providerOptions: { runtimeSettings: { accessMode: 'approval-required' } },
       message: {
         id: 'user-1',
         role: 'user',
@@ -2220,6 +2222,65 @@ describe('opencodeProvider streamTurn', () => {
       sessionID: 'ses_1',
       requestID: 'perm-v2-1',
       reply: 'always',
+    }))
+    await stream.return(undefined)
+  })
+
+  it('auto-approves permission events in full-access mode without a user round-trip', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    const requestToolApproval = vi.fn()
+    const provider = new OpencodeProvider({
+      readSecret: () => 'secret',
+      requestToolApproval,
+    })
+    const stream = provider.streamTurn({
+      runId: 'run-approval-auto',
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      providerOptions: { runtimeSettings: { accessMode: 'full-access' } },
+      message: {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Run a command' }],
+      },
+      workspacePath: '/tmp/workspace',
+    })
+
+    await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
+    events.push({
+      id: 'evt_permission_auto',
+      type: 'permission.v2.asked',
+      properties: {
+        id: 'perm-auto-1',
+        sessionID: 'ses_1',
+        action: 'bash',
+        resources: ['rm -rf build'],
+        metadata: {},
+        source: {
+          type: 'tool',
+          messageID: 'msg_assistant',
+          callID: 'call-1',
+        },
+      },
+    } as never)
+
+    await vi.waitFor(() => expect(fake.permissionReply).toHaveBeenCalledWith({
+      sessionID: 'ses_1',
+      requestID: 'perm-auto-1',
+      reply: 'once',
+    }))
+    expect(requestToolApproval).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(stream.next()).resolves.toMatchObject({
+      done: false,
+      value: {
+        type: 'tool-output-available',
+        toolCallId: 'server-request-perm-auto-1',
+        output: expect.objectContaining({
+          apiName: 'approval.permissions',
+          result: expect.objectContaining({ approved: true }),
+        }),
+      },
     }))
     await stream.return(undefined)
   })

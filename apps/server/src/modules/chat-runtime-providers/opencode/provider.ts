@@ -1732,6 +1732,45 @@ export class OpencodeProvider implements ChatRuntime {
         toolName: 'server_request_opencode_permission',
         input: buildOpencodePermissionInput(permission),
       }))
+    }
+
+    // Full-access mode mirrors opencode's own `--auto` semantics: auto-approve every
+    // request that reaches the client. Explicit deny rules never emit requests, so they
+    // stay enforced server-side.
+    const autoApprove = readOpencodeAccessMode(input.input.providerOptions?.runtimeSettings) === 'full-access'
+    if (autoApprove && !input.chunks.done) {
+      const reply = await input.resource.v2Client.v2.session.permission.reply({
+        sessionID: permission.sessionID,
+        requestID: permission.id,
+        reply: 'once',
+      })
+      this.recordPermissionApproval({
+        chatSessionId: input.input.runtimeSession.chatSessionId,
+        permission,
+        status: reply.error ? 'denied' : 'approved',
+      })
+      if (reply.error) {
+        input.chunks.push(providerChunk.toolOutputError(
+          toolCallId,
+          formatOpencodeError(reply.error),
+        ))
+      }
+      else {
+        input.chunks.push(providerChunk.toolOutputAvailable({
+          toolCallId,
+          output: buildOpencodePermissionOutput({
+            permission,
+            response: 'once',
+            approved: true,
+            reason: 'Auto-approved: full access mode.',
+          }),
+        }))
+      }
+      this.activePermissionIds.delete(toolCallId)
+      return
+    }
+
+    if (!input.chunks.done) {
       input.chunks.push(providerChunk.toolApprovalRequest(toolCallId))
     }
 
