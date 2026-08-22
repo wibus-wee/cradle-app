@@ -131,6 +131,7 @@ const OPENCODE_CREW_SLOT: RuntimeUiSlot = {
 
 export function createOpencodeRuntimePresentation(
   commands: OpencodeCommand[] = [],
+  skills: string[] = [],
 ): RuntimePresentationCapabilities {
   return {
     runtimeKind: OPENCODE_RUNTIME_KIND,
@@ -148,7 +149,7 @@ export function createOpencodeRuntimePresentation(
       OPENCODE_CONFIG_SLOT,
       OPENCODE_CREW_SLOT,
     ],
-    skills: [],
+    skills,
   }
 }
 

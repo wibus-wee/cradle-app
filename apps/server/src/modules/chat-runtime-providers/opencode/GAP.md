@@ -10,8 +10,8 @@
 | Slash Commands | `command` config、`client.command.list()`、`session.command()` | ✅ 已实现列表投影与 `/command` 路由 | 高 |
 | Shell 执行 | `session.shell()` | ✅ `supportsShellExecution: true` | 高 |
 | 呈现能力 (Presentation) | command/slot 系统 | ✅ 已实现 `getPresentation`/`getDraftPresentation` | 高 |
-| Event-first Turn | `event.subscribe()` + `session.promptAsync()` | ✅ session-scoped 持续 event pump；同时投影 `message.*` 与 `session.next.*`；prompt/idle recovery 有上限 | 高 |
-| Permission Approval | `permission.updated` + `postSessionIdPermissionsPermissionId()` | ✅ 已接入 Chat Runtime pending tool approval | 高 |
+| Event-first Turn | `event.subscribe()` + `session.promptAsync()` | ✅ session-scoped 持续 event pump；同时投影 `message.*` 与 `session.next.*`；prompt/idle recovery 前有 bounded `v2.session.wait` barrier | 高 |
+| Permission Approval | `permission.updated` + `postSessionIdPermissionsPermissionId()` | ✅ 已切 v2：消费 `permission.v2.asked/replied`（兼容 legacy），审批非阻塞（不卡事件泵），reload/missed event 从 `v2.session.permission.list()` 恢复，支持 `always` scope | 高 |
 | File/Image 输入 | `FilePartInput` | ✅ AI SDK file part 会投影为 opencode file part | 高 |
 | Native MCP 配置 | `Config.mcp` local/remote servers | ✅ 继承用户 OpenCode config 与 workspace project scope；Cradle plugin registry 不做跨 namespace 投影 | 高 |
 | MCP 生命周期管理 | `mcp.add/connect/disconnect/auth.*` | ⏸ 只读取原生 `mcp.status()` 状态；未提供 Cradle UI/route 管理 OpenCode MCP 生命周期 | 中 |
@@ -22,8 +22,8 @@
 | 回滚 (Rollback) | `session.messages()` + `session.revert()` | ✅ `supportsLastTurnRollback: true` | 中 |
 | btw / Quick Question | SDK 无原生 no-history 概念 | ✅ 临时 opencode session + transcript prompt，不写 Cradle 历史 | 中 |
 | Structured User Input | v2 `session.question.list/reply/reject()` + `question` tool parts | ✅ 已接入 Chat Runtime `requestUserInput`，按当前 session 的 pending question request 回写 OpenCode | 中 |
-| Skills | v2 `SkillV2Info.slash` | ⏸ 当前 adapter 使用 SDK v1 surface，未读取 v2 skills | 低 |
-| Runtime 设置 | SDK 支持 mode/agent 切换 | ✅ `supportsRuntimeSettings: true`；default→`build`，plan→`plan`，每 turn 生效 | 低 |
+| Skills | v2 `SkillV2Info.slash` | ✅ `getPresentation` 读取 `v2.skill.list()` 投影到 presentation.skills；slash 化展示待 UI | 低 |
+| Runtime 设置 | SDK 支持 mode/agent 切换 | ✅ `supportsRuntimeSettings: true`；interactionMode：default→`build`，plan→`plan`，每 turn 生效，`updateRuntimeSettings()` 通过 v2 `session.switchAgent/switchModel` 写入 sticky 设置。accessMode：host 级生效——`approval-required` 的 managed host 注入 `OPENCODE_PERMISSION={"*":"ask"}`（deep-merge，用户显式 allow/deny 规则仍优先），`full-access` 不注入、继承用户原生 permission config；accessMode 参与 host 池 key，改动在下一个 run 的 resume 时切换到对应 host | 低 |
 
 ## 详细分析
 
@@ -37,7 +37,7 @@
 
 **Cradle 接口**: `ChatRuntime.generateSessionTitle(input: GenerateSessionTitleInput): Promise<string | null>`
 
-**当前实现**: 利用 `small_model` 或主模型调用 `session.summarize()`。在 `@opencode-ai/sdk@1.17.11` 中 `session.summarize()` 返回 `boolean`，标题需要再通过 `session.get()` 读取；adapter 会将非空标题通过 Chat Runtime title hook 返回。
+**当前实现**: 利用 `small_model` 或主模型调用 `session.summarize()`。在 `@opencode-ai/sdk@1.18.21` 中 `session.summarize()` 返回 `boolean`，标题需要再通过 `session.get()` 读取；adapter 会将非空标题通过 Chat Runtime title hook 返回。
 
 ### 2. Slash Commands
 
@@ -139,7 +139,7 @@
 - 文本 projector 使用 overlap-aware merge，`message.part.delta` 先于完整 part snapshot 到达时不会把已有文本重复成 `HelHel`。
 - adapter 用“不在 baseline 中的新 terminal assistant message”识别旧事件族的终态 message；终态时再读 `session.message()` 补偿 missed parts，然后发 AI SDK `finish`。projector 也会忽略 baseline 内的旧 message，避免第二轮复用 session 时重放上一轮文本。
 - `promptAsync` accepted 后会启动 bounded recovery：按短延迟尝试从 `session.messages()` 读取终态 assistant；若没有任何 provider activity，会以明确 stuck provider error 结束。session idle 早于 assistant activity，或 tool-call finish 后没有 final assistant，也会由 idle watchdog 在有界时间内失败，而不是无限等待。
-- `permission.updated` 被投影为 AI SDK `tool-input-*` + `tool-approval-request` chunks，approval id 形如 `server-request-${permission.id}`，builtin apiName 为 `approval.permissions`；用户审批后回复 OpenCode `once` 或 `reject`。
+- `permission.v2.asked`（兼容 legacy `permission.asked`）被投影为 AI SDK `tool-input-*` + `tool-approval-request` chunks，approval id 形如 `server-request-${permission.id}`；审批派发是非阻塞的——等待用户操作期间事件泵继续消费其他事件，turn 关闭前会等未决审批落地。用户审批后按 resolution scope 回复 OpenCode `once`/`always`/`reject`。事件泵断线或 Cradle 重启期间的 pending 权限由 `v2.session.permission.list()` 在 turn 开始时恢复派发，approvals slot 也会合并该权威列表；`permission.*.replied` 事件同步外部回复状态。
 - `projectOpencodePromptParts()` 支持 text 与 file parts，AI SDK `file.mediaType/filename/url` 会映射到 OpenCode `mime/filename/url`。
 
 ### 7. Provider Threads / Fork
@@ -164,7 +164,7 @@
 - API: `mcp.status()` — 读取当前 workspace directory 下 MCP server 状态
 - API: `mcp.add()`、`mcp.connect()`、`mcp.disconnect()`、`mcp.auth.start()`、`mcp.auth.callback()`、`mcp.auth.authenticate()`、`mcp.auth.remove()` — OpenCode 原生 MCP server 生命周期与 OAuth 管理
 
-**Cradle 接口**: OpenCode provider 使用用户原生的 OpenCode config、auth、project scope 与 MCP 配置。`runtime-context.ts` 按 binary path 和 workspace cwd 池化 managed `opencode serve` 进程，不设置 `OPENCODE_CONFIG_CONTENT`、`OPENCODE_CONFIG_DIR`、`OPENCODE_DB` 或 `OPENCODE_DISABLE_PROJECT_CONFIG`，也不向 active workspace 写入 Cradle-owned OpenCode 配置。Cradle plugin registry 当前不会投影进 native OpenCode host；插件 MCP 与 OpenCode 原生 MCP 的生命周期保持各自 namespace 所有权。
+**Cradle 接口**: OpenCode provider 使用用户原生的 OpenCode config、auth、project scope 与 MCP 配置。`runtime-context.ts` 按 binary path、workspace cwd 和 accessMode 池化 managed `opencode serve` 进程，不设置 `OPENCODE_CONFIG_CONTENT`、`OPENCODE_CONFIG_DIR`、`OPENCODE_DB` 或 `OPENCODE_DISABLE_PROJECT_CONFIG`，也不向 active workspace 写入 Cradle-owned OpenCode 配置。唯一的权限相关注入是 `approval-required` accessMode 下的 `OPENCODE_PERMISSION={"*":"ask"}`：它以 deep-merge 方式叠加在用户 config 之上，opencode 按“具体工具规则优先于 `*` catch-all”解析，因此用户显式的 allow/deny 规则仍然生效，只有未配置的动作被强制 ask。Cradle plugin registry 当前不会投影进 native OpenCode host；插件 MCP 与 OpenCode 原生 MCP 的生命周期保持各自 namespace 所有权。
 
 **当前状态**: OpenCode host 继承用户原生 MCP 配置，Cradle plugin registry 不会投影为 OpenCode local/remote MCP。`getUiSlotStates()` 通过 `mcp.status()` 读取当前 workspace 的原生状态。尚未实现面向用户的 Cradle MCP lifecycle UI/route：用户还不能在 Cradle 内对 OpenCode 调用 `mcp.add/connect/disconnect/auth.*`。
 
@@ -192,7 +192,7 @@
 
 ### 11. Structured User Input
 
-**SDK 可用资源**: `@opencode-ai/sdk@1.17.11` 的 root event stream 会把结构化提问表现为 `question` tool part；同包 v2 surface 暴露 session-scoped `session.question.list()`、`session.question.reply()`、`session.question.reject()`，pending request 带 `tool.callID` 可与 tool part 对齐。
+**SDK 可用资源**: `@opencode-ai/sdk@1.18.21` 的 root event stream 会把结构化提问表现为 `question` tool part；同包 v2 surface 暴露 session-scoped `session.question.list()`、`session.question.reply()`、`session.question.reject()`，pending request 带 `tool.callID` 可与 tool part 对齐。
 
 **Cradle 接口**: Chat Runtime 已有 `ProviderContext.requestUserInput`、pending user-input registry、`/chat/sessions/:sessionId/user-input/:requestId` route 和 web composer/runtime-panel UI。
 
@@ -200,21 +200,21 @@
 
 ## OpenCode v2 Endpoint 对齐
 
-`@opencode-ai/sdk@1.17.11` 同时暴露 root SDK surface 和 `/api/*` v2 surface。当前 adapter 主要使用 root surface，question bridge 与 context usage 已使用 v2 session endpoint。下面按 Cradle ownership/kit 状态分类。
+`@opencode-ai/sdk@1.18.21` 同时暴露 root SDK surface 和 `/api/*` v2 surface。当前 adapter 主要使用 root surface，question bridge 与 context usage 已使用 v2 session endpoint。下面按 Cradle ownership/kit 状态分类。
 
 ### 已有 Cradle kit，OpenCode adapter 还没完全接
 
 | v2 endpoint | OpenCode 能力 | Cradle 对应 kit | 当前差距 | 优先级 |
 |------|------|------|------|------|
-| `/api/health`、`/api/location` | runtime health/location | `ChatRuntime.healthCheck`、resource/observability | OpenCode provider 未实现 healthCheck；Resource Panel 只看进程级状态 | 中 |
+| `/api/health`、`/api/location` | runtime health/location | `ChatRuntime.healthCheck`、resource/observability | ✅ `healthCheck` 在安装检查之外逐个 ping 池内 host 的 `/api/health`（延迟聚合）；location 未用 | 已接 |
 | `/api/model`、`/api/provider`、`/api/provider/{providerID}` | runtime model/provider catalog | `listModels`、runtime-owned provider targets | 当前仍以 root `provider.list()` 为主；v2 provider detail 未用于 enrich provider target/model capabilities | 中 |
-| `/api/session/{sessionID}/model`、`/api/session/{sessionID}/agent` | session sticky model/agent switch | `sessionModelSwitch`、`updateRuntimeSettings`、per-turn `modelId/agentId` | adapter 现在每 turn 带 model/agent，`updateRuntimeSettings()` no-op；未把 v2 sticky switch 接入 session settings | 中 |
-| `/api/session/{sessionID}/wait` | 等 session agent loop idle，204 无 payload | stream close/recovery 内部能力 | 当前靠 SSE terminal/idle + history recovery；可用 v2 wait 作为 promptAsync 后 completion recovery barrier，再读 history/context；不能替代流式 chunks/result | 中 |
+| `/api/session/{sessionID}/model`、`/api/session/{sessionID}/agent` | session sticky model/agent switch | `sessionModelSwitch`、`updateRuntimeSettings`、per-turn `modelId/agentId` | ✅ `updateRuntimeSettings()` 调用 v2 sticky switch；每 turn 仍带 model/agent 作为兼容 fallback | 已接 |
+| `/api/session/{sessionID}/wait` | 等 session agent loop idle，204 无 payload | stream close/recovery 内部能力 | ✅ history recovery 前有 5s bounded wait barrier | 已接 |
 | `/api/session/{sessionID}/context` | active context messages after compaction，含 user files/agents、shell command/output、assistant tool outputPaths/tokens | `getContextUsage` | ✅ 已实现 OpenCode `getContextUsage`，按 v2 context messages 汇总 assistant token breakdown，并在 raw message 中保留 files/commands/outputPaths | 已接 |
 | `/api/pty/*` | OpenCode PTY list/create/remove/update/connect token | `listBackgroundTerminals`、`terminateBackgroundTerminal`，以及 Cradle PTY module | provider 未实现 background terminal list/terminate；interactive connect 还缺 runtime-provider PTY socket bridge | 中 |
-| `/api/skill` | native OpenCode skills | `RuntimePresentationCapabilities.skills`、`RuntimeSkillsUiSlotState` | presentation.skills 为空；skills slot 未读取 OpenCode skill list | 低 |
+| `/api/skill` | native OpenCode skills | `RuntimePresentationCapabilities.skills`、`RuntimeSkillsUiSlotState` | ✅ presentation.skills 读取 `v2.skill.list()`；skills slot 的独立状态投影待做 | 低 |
 | `/api/command` | v2 slash command list | `getPresentation` | 当前用 root `command.list()`，可迁到 v2 但不是功能缺口 | 低 |
-| `/api/permission/request`、`/api/session/{sessionID}/permission` | pending permission list/reply；`/api/permission/request` 是按 location 列 pending，session endpoint 是按 session 列 pending | pending tool approval + approvals slot | 当前只从 events 维护 active/recent approvals；missed event/reload 后不能从 v2 pending list 恢复。它和 saved permissions 不同，不是另一个隐藏用途 | 中 |
+| `/api/permission/request`、`/api/session/{sessionID}/permission` | pending permission list/reply；`/api/permission/request` 是按 location 列 pending，session endpoint 是按 session 列 pending | pending tool approval + approvals slot | ✅ 审批链路已切 v2：事件消费 `permission.v2.asked/replied`（legacy 兼容），reload/missed event 从 session pending list 恢复，approvals slot 合并 v2 pending list，reply 支持 `once/always/reject` | 已接 |
 | `/api/question/request`、`/api/session/{sessionID}/question` | pending question list/reply/reject；global endpoint 按 location，session endpoint 按 session | pending user input + userInput slot | ✅ active turn 与 reload/missed event recovery 已接；仍可补 reject/timeout UI 行为 | 已接 |
 
 ### OpenCode 有能力，但 Cradle 还没有明确 ChatRuntime kit

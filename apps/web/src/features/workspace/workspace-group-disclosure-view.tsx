@@ -48,6 +48,8 @@ export interface WorkspaceGroupDisclosureViewProps {
   workspaceActions: WorkspaceMenuAction[]
   expanded: boolean
   runningSessionCount: number
+  /** Machine label for repo clusters spanning several devices (e.g. "MacBook"). */
+  machineLabel?: string | null
   overlays: ReactNode
   children: ReactNode
   onToggleExpanded: () => void
@@ -106,6 +108,7 @@ export function WorkspaceGroupDisclosureView({
   workspaceActions,
   expanded,
   runningSessionCount,
+  machineLabel,
   overlays,
   children,
   onToggleExpanded,
@@ -198,6 +201,16 @@ export function WorkspaceGroupDisclosureView({
         <span className="truncate text-xs font-medium text-sidebar-foreground/80">
           {workspace.name}
         </span>
+        {machineLabel
+          ? (
+              <span
+                className="inline-flex shrink-0 items-center rounded-full bg-fill/70 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground"
+                data-testid={`workspace-machine-label-${workspace.id}`}
+              >
+                {machineLabel}
+              </span>
+            )
+          : null}
         {workspace.availability === 'missing'
           ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive">

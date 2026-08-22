@@ -6,8 +6,8 @@ describe('openCode runtime release manifest', () => {
   it('pins the installed SDK-compatible release and official integrity metadata', () => {
     expect(OPENCODE_RUNTIME_MANIFEST).toMatchObject({
       schemaVersion: 1,
-      sdkVersion: '1.17.11',
-      releaseTag: 'v1.17.11',
+      sdkVersion: '1.18.21',
+      releaseTag: 'v1.18.21',
       repository: 'anomalyco/opencode',
     })
     for (const target of Object.values(OPENCODE_RUNTIME_MANIFEST.targets)) {

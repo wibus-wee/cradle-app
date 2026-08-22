@@ -36,6 +36,7 @@ import type {
   ChatThinkingEffort,
   RuntimeProviderTargetProfile,
   RuntimeSession,
+  RuntimeSettings,
 } from './runtime-provider-types'
 import { readRuntimeSessionProviderCheckpointRevision } from './runtime-session-checkpoint'
 
@@ -285,6 +286,7 @@ export async function resolveExistingRuntimeSessionForContext(input: {
   runtimeKind: RuntimeKind
   runtime: ChatRuntime
   modelId?: string | null
+  settings?: RuntimeSettings
 }): Promise<{
   runtimeSession: RuntimeSession
   requestedModelId: string | null
@@ -298,6 +300,7 @@ export async function resolveExistingRuntimeSessionForContext(input: {
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
     modelId: input.context.effectiveModelId ?? input.modelId,
+    settings: input.settings,
   })
   return resolution
     ? {
@@ -314,6 +317,7 @@ export async function resolveRuntimeSessionForContext(input: {
   runtime: ChatRuntime
   modelId?: string | null
   requestedProviderTargetId?: string
+  settings?: RuntimeSettings
 }): Promise<{
   runtimeSession: RuntimeSession
   requestedModelId: string | null
@@ -327,6 +331,7 @@ export async function resolveRuntimeSessionForContext(input: {
     workspacePath: input.context.workspacePath,
     agentId: input.context.session.agentId,
     modelId: input.context.effectiveModelId ?? input.modelId,
+    settings: input.settings,
   })
   try {
     validateResolvedRuntimeSessionContext({

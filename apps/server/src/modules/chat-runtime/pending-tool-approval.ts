@@ -94,6 +94,7 @@ export async function submitRuntimeToolApproval(input: {
   sessionId: string
   requestId: string
   approved: boolean
+  scope?: 'once' | 'always'
   reason?: string
 }): Promise<RuntimeToolApprovalResolution> {
   const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
@@ -114,6 +115,7 @@ export function submitRuntimeToolApprovalIfPending(input: {
   sessionId: string
   requestId: string
   approved: boolean
+  scope?: 'once' | 'always'
   reason?: string
 }): RuntimeToolApprovalResolution | null {
   const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
@@ -128,6 +130,7 @@ function submitRuntimeToolApprovalIfPendingWithEvent(input: {
   sessionId: string
   requestId: string
   approved: boolean
+  scope?: 'once' | 'always'
   reason?: string
 }): { resolution: RuntimeToolApprovalResolution, eventRecorded: Promise<void> } | null {
   const pendingKey = readPendingKey(input.sessionId, input.requestId)
@@ -140,6 +143,7 @@ function submitRuntimeToolApprovalIfPendingWithEvent(input: {
   const resolution: RuntimeToolApprovalResolution = {
     requestId: input.requestId,
     approved: input.approved,
+    ...(input.scope ? { scope: input.scope } : {}),
     ...(input.reason ? { reason: input.reason } : {}),
   }
   pending.resolve(resolution)

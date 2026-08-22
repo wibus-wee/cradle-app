@@ -1023,6 +1023,10 @@ export interface RuntimeToolApprovalRequest {
 export interface RuntimeToolApprovalResolution {
   requestId: string
   approved: boolean
+  /**
+   * How far the approval applies. Defaults to `once` when omitted.
+   */
+  scope?: 'once' | 'always'
   reason?: string
 }
 
@@ -1202,6 +1206,11 @@ export interface StartChatSessionInput {
   workspacePath: string
   agentId?: string | null
   modelId?: string | null
+  /**
+   * Resolved session runtime settings, when the caller has them. Providers may use them
+   * to configure host-level runtime behavior (e.g. permission mode) at session start.
+   */
+  settings?: RuntimeSettings
   previousProviderStateSnapshot?: string | null
 }
 
@@ -1211,6 +1220,7 @@ export interface ResumeChatSessionInput {
   workspacePath: string
   agentId?: string | null
   modelId?: string | null
+  settings?: RuntimeSettings
 }
 
 export interface ForkRuntimeSessionInput {
@@ -1221,6 +1231,7 @@ export interface ForkRuntimeSessionInput {
   workspacePath: string
   agentId?: string | null
   modelId?: string | null
+  settings?: RuntimeSettings
   systemPrompt?: string
 }
 

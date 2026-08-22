@@ -11,7 +11,7 @@ import type {
   Todo as OpencodeTodo,
   ToolPart as OpencodeToolPart,
 } from '@opencode-ai/sdk'
-import type { Event as OpencodeEvent, QuestionV2Info, QuestionV2Request, SessionMessage } from '@opencode-ai/sdk/v2'
+import type { Event as OpencodeEvent, PermissionV2Request, QuestionV2Info, QuestionV2Request, SessionMessage, SkillV2Info } from '@opencode-ai/sdk/v2'
 import type { UIMessage, UIMessageChunk } from 'ai'
 
 import { appendHarnessFragmentsToSystemPrompt } from '../../chat-runtime/harness/projection'
@@ -49,6 +49,7 @@ import type {
   RuntimePresentationCapabilities,
   RuntimeProviderTargetProfile,
   RuntimeSession,
+  RuntimeSettings,
   RuntimeUiSlotState,
   RuntimeUserInputQuestion,
   RuntimeUserInputResolution,
@@ -90,8 +91,8 @@ import { listOpencodeRuntimeModels, OPENCODE_RUNTIME_NATIVE_PROVIDER_TARGET_ID }
 import { readOpenCodeRuntimeNativeProviderId } from './native-provider-target-id'
 import { OPENCODE_RUNTIME_OWNED_PROVIDER_TARGETS } from './owned-provider-targets'
 import { createOpencodeRuntimePresentation } from './presentation'
-import type { OpencodeRuntimeResource } from './runtime-context'
-import { acquireOpencodeRuntimeResource, tryRetainOpencodeRuntimeResource } from './runtime-context'
+import type { OpencodeAccessMode, OpencodeRuntimeResource } from './runtime-context'
+import { acquireOpencodeRuntimeResource, checkOpencodeServerHealth, tryRetainOpencodeRuntimeResource } from './runtime-context'
 import { checkOpencodeRuntimeHealth } from './runtime-installation'
 import type { OpencodeSubagentBinding } from './subagent-bridge'
 import {
@@ -134,6 +135,8 @@ interface OpencodePermissionApprovalRecord {
 
 type OpencodePermissionAskedProperties = Extract<OpencodeEvent, { type: 'permission.asked' }>['properties']
 
+type OpencodePermissionV2AskedProperties = Extract<OpencodeEvent, { type: 'permission.v2.asked' }>['properties']
+
 export interface OpencodeProviderOptions {
   promptAcceptedRecoveryDelaysMs?: readonly number[]
   promptAcceptedActivityTimeoutMs?: number
@@ -144,6 +147,7 @@ const OPENCODE_SESSION_TITLE_MAX_LENGTH = 60
 const DEFAULT_PROMPT_ACCEPTED_RECOVERY_DELAYS_MS = [750, 2_000, 5_000] as const
 const DEFAULT_PROMPT_ACCEPTED_ACTIVITY_TIMEOUT_MS = 30_000
 const DEFAULT_PREMATURE_IDLE_TIMEOUT_MS = 10_000
+const OPENCODE_WAIT_BARRIER_TIMEOUT_MS = 5_000
 
 export function createOpencodeProvider(ctx: ProviderContext): ChatRuntime {
   return new OpencodeProvider(ctx)
@@ -192,7 +196,31 @@ export class OpencodeProvider implements ChatRuntime {
   }
 
   async healthCheck(): Promise<ProviderHealthStatus> {
-    return await checkOpencodeRuntimeHealth()
+    const installation = await checkOpencodeRuntimeHealth()
+    if (installation.status !== 'healthy') {
+      return installation
+    }
+
+    const lastCheckedAt = Math.floor(Date.now() / 1000)
+    const servers = await checkOpencodeServerHealth()
+    if (servers.length === 0) {
+      return installation
+    }
+    const unhealthy = servers.filter(server => !server.healthy)
+    if (unhealthy.length > 0) {
+      return {
+        status: 'unhealthy',
+        message: `OpenCode server health check failed: ${unhealthy.map(server => server.message ?? server.hostId).join('; ')}`,
+        lastCheckedAt,
+      }
+    }
+    const slowestLatencyMs = Math.max(...servers.map(server => server.latencyMs ?? 0))
+    return {
+      status: 'healthy',
+      message: `${installation.message ?? 'OpenCode runtime is available.'} ${servers.length} active server(s) healthy.`,
+      latencyMs: slowestLatencyMs,
+      lastCheckedAt,
+    }
   }
 
   getDraftPresentation(): RuntimePresentationCapabilities {
@@ -209,7 +237,7 @@ export class OpencodeProvider implements ChatRuntime {
         ProviderErrors.requestFailed(this.runtimeKind, 'command.list', formatOpencodeError(result.error)),
       )
     }
-    return createOpencodeRuntimePresentation(result.data)
+    return createOpencodeRuntimePresentation(result.data, await readOpencodeSkills(handle))
   }
 
   async getUiSlotStates(input: GetUiSlotStatesInput): Promise<RuntimeUiSlotState[]> {
@@ -224,7 +252,7 @@ export class OpencodeProvider implements ChatRuntime {
     const providerModel = parseOpenCodeModelRef(modelId)
     const updatedAt = Date.now()
     const subagentRegistry = this.readSubagentRegistry(input.runtimeSession.chatSessionId)
-    const [status, todos, diff, mcpStatus, fileStatus, taskBindings, questionRequests] = await Promise.all([
+    const [status, todos, diff, mcpStatus, fileStatus, taskBindings, questionRequests, pendingPermissions] = await Promise.all([
       readOpencodeSessionStatus(handle, input.workspacePath, providerSessionId),
       readOpencodeSessionTodo(handle, input.workspacePath, providerSessionId),
       readOpencodeSessionDiff(handle, input.workspacePath, providerSessionId),
@@ -232,6 +260,7 @@ export class OpencodeProvider implements ChatRuntime {
       readOpencodeFileStatus(handle, input.workspacePath),
       readOpencodeParentTaskBindings(handle, input.workspacePath, providerSessionId),
       readOpencodeSessionQuestionRequests(handle, providerSessionId),
+      readOpencodeSessionPermissionRequests(handle, providerSessionId),
     ])
     for (const binding of taskBindings) {
       subagentRegistry.register(binding)
@@ -239,7 +268,10 @@ export class OpencodeProvider implements ChatRuntime {
     const subagentBindings = subagentRegistry
       .listBindings()
       .filter(binding => binding.parentSessionId === providerSessionId)
-    const approvalRecords = this.permissionApprovalsByChatSessionId.get(input.runtimeSession.chatSessionId) ?? []
+    const approvalRecords = this.readApprovalRecordsWithPendingRecovery(
+      input.runtimeSession.chatSessionId,
+      pendingPermissions,
+    )
     const states: RuntimeUiSlotState[] = [
       {
         kind: 'status',
@@ -384,12 +416,14 @@ export class OpencodeProvider implements ChatRuntime {
       profile: input.profile,
       requestedModelId: input.modelId,
     })
+    const accessMode = readOpencodeAccessMode(input.settings)
     const lease = await acquireOpencodeRuntimeResource({
       runtimeKind: this.runtimeKind,
       providerTargetId: resolved.hostProviderTargetId,
       chatSessionId: input.chatSessionId,
       config: resolved.config,
       directory: input.workspacePath,
+      accessMode,
     })
 
     let leaseTransferred = false
@@ -409,6 +443,7 @@ export class OpencodeProvider implements ChatRuntime {
           opencode: {
             serverUrl: lease.resource.server.url,
             providerModel: resolved.model,
+            accessMode,
           },
         }),
       }
@@ -425,12 +460,14 @@ export class OpencodeProvider implements ChatRuntime {
       profile: input.profile,
       requestedModelId: input.modelId,
     })
+    const accessMode = readOpencodeAccessMode(input.settings)
     const lease = await acquireOpencodeRuntimeResource({
       runtimeKind: this.runtimeKind,
       providerTargetId: resolved.hostProviderTargetId,
       chatSessionId: input.runtimeSession.chatSessionId,
       config: resolved.config,
       directory: input.workspacePath,
+      accessMode,
     })
 
     const snapshot = readProviderStateSnapshot(input.runtimeSession.providerStateSnapshot)
@@ -443,8 +480,10 @@ export class OpencodeProvider implements ChatRuntime {
         workspacePath: input.workspacePath,
         models: { currentModelId: resolved.modelId ?? snapshot.models.currentModelId },
         opencode: {
+          ...(snapshot.opencode as Record<string, unknown> | undefined),
           serverUrl: lease.resource.server.url,
           providerModel: resolved.model,
+          accessMode,
         },
       }),
     }
@@ -461,6 +500,7 @@ export class OpencodeProvider implements ChatRuntime {
       requestedModelId: input.modelId,
     })
     const sourceLease = input.sourceRuntimeSession.providerRuntimeLease as RuntimeLiveResourceLease<OpencodeRuntimeResource> | undefined
+    const accessMode = readOpencodeAccessMode(input.settings)
     const lease = sourceLease
       ? createOpencodeChildRuntimeLease(sourceLease.resource)
       : await acquireOpencodeRuntimeResource({
@@ -469,6 +509,7 @@ export class OpencodeProvider implements ChatRuntime {
           chatSessionId: input.childChatSessionId,
           config: resolved.config,
           directory: input.workspacePath,
+          accessMode,
         })
     let leaseTransferred = false
     try {
@@ -503,6 +544,7 @@ export class OpencodeProvider implements ChatRuntime {
           opencode: {
             serverUrl: resource.server.url,
             providerModel: resolved.model,
+            accessMode,
             sideConversation: {
               sessionId: session.id,
               liveFork: true,
@@ -673,8 +715,41 @@ export class OpencodeProvider implements ChatRuntime {
     }
   }
 
-  async updateRuntimeSettings(_input: UpdateRuntimeSettingsInput): Promise<void> {
-    // OpenCode mode is applied per turn in streamTurn via providerOptions.runtimeSettings.
+  async updateRuntimeSettings(input: UpdateRuntimeSettingsInput): Promise<void> {
+    const providerSessionId = input.runtimeSession.providerSessionId
+    if (!providerSessionId) {
+      return
+    }
+
+    // Persist settings on the native session via the v2 sticky switch endpoints so the
+    // choice survives across turns and is visible to other opencode clients.
+    const handle = readOpencodeRuntimeHandle(this.runtimeKind, input.runtimeSession)
+    const agent = readOpencodeTurnAgentFromSettings(input.settings)
+    const agentSwitch = await handle.v2Client.v2.session.switchAgent({
+      sessionID: providerSessionId,
+      agent,
+    }).catch(() => null)
+    if (agentSwitch?.error) {
+      throw new ProviderRuntimeError(
+        ProviderErrors.requestFailed(this.runtimeKind, 'session.switchAgent', formatOpencodeError(agentSwitch.error)),
+      )
+    }
+
+    const modelRef = parseOpenCodeModelRef(readOptionalStringSetting(input.settings, 'model'))
+    if (modelRef) {
+      const modelSwitch = await handle.v2Client.v2.session.switchModel({
+        sessionID: providerSessionId,
+        model: {
+          id: modelRef.modelID,
+          providerID: modelRef.providerID,
+        },
+      }).catch(() => null)
+      if (modelSwitch?.error) {
+        throw new ProviderRuntimeError(
+          ProviderErrors.requestFailed(this.runtimeKind, 'session.switchModel', formatOpencodeError(modelSwitch.error)),
+        )
+      }
+    }
   }
 
   async listProviderThreadTurns(input: ProviderThreadTurnsInput): Promise<ProviderThreadTurnsResult> {
@@ -992,6 +1067,24 @@ export class OpencodeProvider implements ChatRuntime {
     const chunks = new AsyncChunkQueue()
     const subagentRegistry = this.readSubagentRegistry(input.runtimeSession.chatSessionId)
     const pendingTaskParts: OpencodeToolPart[] = []
+    const dispatchedPermissionIds = new Set<string>()
+    const pendingInteractionWork = new Set<Promise<void>>()
+    // Permission/question approvals wait on the user, so they run detached from the event
+    // pump loop. Blocking the loop here would stall every other event (tool progress,
+    // step ends, idle) until the user responds.
+    const trackInteractionWork = (work: Promise<void>): void => {
+      pendingInteractionWork.add(work)
+      void work.catch((error) => {
+        this.deps.logger?.warn('opencode interaction work failed', { error })
+      }).then(() => {
+        pendingInteractionWork.delete(work)
+      })
+    }
+    const waitPendingInteractionWork = async (): Promise<void> => {
+      while (pendingInteractionWork.size > 0) {
+        await Promise.allSettled([...pendingInteractionWork])
+      }
+    }
     const turnTimers = new Set<ReturnType<typeof setTimeout>>()
     let eventSubscription: OpencodeEventPumpSubscription | null = null
     let asyncPromptBaselineMessageIds: ReadonlySet<string> | null = null
@@ -1280,6 +1373,16 @@ export class OpencodeProvider implements ChatRuntime {
       })
       eventSubscription = eventPump.subscribe()
       await eventPump.ready
+      // Recover permissions that were asked while the pump was disconnected or before
+      // Cradle restarted. The v2 pending list is authoritative; events only supplement it.
+      trackInteractionWork(this.recoverPendingOpencodePermissions({
+        input,
+        resource,
+        chunks,
+        sessionId: opencodeSessionId,
+        dispatchedPermissionIds,
+        interactionWork: pendingInteractionWork,
+      }))
       void (async () => {
         if (!eventSubscription) {
           return
@@ -1317,12 +1420,49 @@ export class OpencodeProvider implements ChatRuntime {
               asyncPromptSessionBecameIdle = true
             }
             if (event.type === 'permission.asked') {
-              await this.handleOpencodePermissionAskedEvent({
+              this.dispatchOpencodePermissionRequest({
                 input,
                 resource,
                 chunks,
-                permission: event.properties,
+                permission: projectOpencodePermissionAsked(event.properties),
+                dispatchedPermissionIds,
+                interactionWork: pendingInteractionWork,
               })
+            }
+            if (event.type === 'permission.v2.asked' && event.properties.sessionID === opencodeSessionId) {
+              this.dispatchOpencodePermissionRequest({
+                input,
+                resource,
+                chunks,
+                permission: projectOpencodePermissionV2Request(event.properties),
+                dispatchedPermissionIds,
+                interactionWork: pendingInteractionWork,
+              })
+            }
+            if (event.type === 'permission.replied') {
+              // Legacy and v2 replied events share the discriminator but not the payload.
+              const properties = event.properties
+              if ('permissionID' in properties) {
+                this.markOpencodePermissionReplied(
+                  input.runtimeSession.chatSessionId,
+                  properties.permissionID,
+                  readOpencodeLegacyPermissionReplyApproval(properties.response),
+                )
+              }
+              else {
+                this.markOpencodePermissionReplied(
+                  input.runtimeSession.chatSessionId,
+                  properties.requestID,
+                  properties.reply !== 'reject',
+                )
+              }
+            }
+            if (event.type === 'permission.v2.replied' && event.properties.sessionID === opencodeSessionId) {
+              this.markOpencodePermissionReplied(
+                input.runtimeSession.chatSessionId,
+                event.properties.requestID,
+                event.properties.reply !== 'reject',
+              )
             }
             if (isOpencodeQuestionLifecycleEvent(event) && event.properties.sessionID === opencodeSessionId) {
               chunks.push({
@@ -1334,12 +1474,12 @@ export class OpencodeProvider implements ChatRuntime {
               })
             }
             if (event.type === 'question.v2.asked' && event.properties.sessionID === opencodeSessionId) {
-              await this.handleOpencodeQuestionRequest({
+              trackInteractionWork(this.handleOpencodeQuestionRequest({
                 input,
                 resource,
                 chunks,
                 request: event.properties,
-              })
+              }))
             }
             this.registerOpencodeSubagentFromEvent({
               event,
@@ -1387,6 +1527,10 @@ export class OpencodeProvider implements ChatRuntime {
             }
             if (isTerminalOpencodeStepEndedEvent(event, opencodeSessionId)) {
               this._lastUsage = projector.usage
+              await waitPendingInteractionWork()
+              if (chunks.done) {
+                return
+              }
               scheduleTitleGeneration()
               clearTurnTimers()
               chunks.close()
@@ -1403,6 +1547,10 @@ export class OpencodeProvider implements ChatRuntime {
               sawFinalAssistant = isTerminalOpencodeAssistant(terminalAssistant)
               if (terminalAssistant.finish === 'tool-calls' || terminalAssistant.finish === 'unknown') {
                 sawToolCallFinish = true
+              }
+              await waitPendingInteractionWork()
+              if (chunks.done) {
+                return
               }
               await this.closeAsyncPromptTurn({
                 resource,
@@ -1495,21 +1643,81 @@ export class OpencodeProvider implements ChatRuntime {
     }
   }
 
-  private async handleOpencodePermissionAskedEvent(input: {
+  private dispatchOpencodePermissionRequest(context: {
     input: StreamTurnInput
     resource: OpencodeRuntimeResource
     chunks: AsyncChunkQueue
-    permission: OpencodePermissionAskedProperties
+    permission: OpencodePermission
+    dispatchedPermissionIds: Set<string>
+    interactionWork: Set<Promise<void>>
+  }): void {
+    const work = this.handleOpencodePermissionRequest(context)
+    context.interactionWork.add(work)
+    void work.catch((error) => {
+      this.deps.logger?.warn('opencode permission approval work failed', { error })
+    }).then(() => {
+      context.interactionWork.delete(work)
+    })
+  }
+
+  private async recoverPendingOpencodePermissions(context: {
+    input: StreamTurnInput
+    resource: OpencodeRuntimeResource
+    chunks: AsyncChunkQueue
+    sessionId: string
+    dispatchedPermissionIds: Set<string>
+    interactionWork: Set<Promise<void>>
   }): Promise<void> {
-    const permission = projectOpencodePermissionAsked(input.permission)
+    const requests = await readOpencodeSessionPermissionRequests(context.resource, context.sessionId)
+    for (const request of requests) {
+      this.dispatchOpencodePermissionRequest({
+        input: context.input,
+        resource: context.resource,
+        chunks: context.chunks,
+        permission: projectOpencodePermissionV2Request(request),
+        dispatchedPermissionIds: context.dispatchedPermissionIds,
+        interactionWork: context.interactionWork,
+      })
+    }
+  }
+
+  private markOpencodePermissionReplied(
+    chatSessionId: string,
+    permissionId: string,
+    approved: boolean,
+  ): void {
+    const records = this.permissionApprovalsByChatSessionId.get(chatSessionId)
+    if (!records) {
+      return
+    }
+    for (const record of records) {
+      if (record.id === permissionId && record.status === 'pending') {
+        record.status = approved ? 'approved' : 'denied'
+        record.completedAt = Date.now()
+        record.updatedAt = record.completedAt
+      }
+    }
+  }
+
+  private async handleOpencodePermissionRequest(input: {
+    input: StreamTurnInput
+    resource: OpencodeRuntimeResource
+    chunks: AsyncChunkQueue
+    permission: OpencodePermission
+    dispatchedPermissionIds: Set<string>
+  }): Promise<void> {
+    const permission = input.permission
     if (permission.sessionID !== input.input.runtimeSession.providerSessionId) {
       return
     }
 
     const toolCallId = toOpencodePermissionToolCallId(permission.id)
-    if (this.activePermissionIds.has(toolCallId)) {
+    // Synchronous dedup guard: both live events and pending-list recovery may race to
+    // dispatch the same request, so claim it before the first await.
+    if (input.dispatchedPermissionIds.has(toolCallId) || this.activePermissionIds.has(toolCallId)) {
       return
     }
+    input.dispatchedPermissionIds.add(toolCallId)
     this.activePermissionIds.add(toolCallId)
     this.recordPermissionApproval({
       chatSessionId: input.input.runtimeSession.chatSessionId,
@@ -1517,14 +1725,17 @@ export class OpencodeProvider implements ChatRuntime {
       status: 'pending',
     })
 
-    input.chunks.push(providerChunk.toolInputStart(toolCallId, 'server_request_opencode_permission'))
-    input.chunks.push(providerChunk.toolInputAvailable({
-      toolCallId,
-      toolName: 'server_request_opencode_permission',
-      input: buildOpencodePermissionInput(permission),
-    }))
-    input.chunks.push(providerChunk.toolApprovalRequest(toolCallId))
+    if (!input.chunks.done) {
+      input.chunks.push(providerChunk.toolInputStart(toolCallId, 'server_request_opencode_permission'))
+      input.chunks.push(providerChunk.toolInputAvailable({
+        toolCallId,
+        toolName: 'server_request_opencode_permission',
+        input: buildOpencodePermissionInput(permission),
+      }))
+      input.chunks.push(providerChunk.toolApprovalRequest(toolCallId))
+    }
 
+    let replied = false
     try {
       const profileProviderKind = input.input.profile?.providerKind ?? 'universal'
       const resolution = await requestProviderToolApproval({
@@ -1536,9 +1747,10 @@ export class OpencodeProvider implements ChatRuntime {
         runtimeKind: this.runtimeKind,
         providerMethod: 'permission.asked',
         toolCallId,
-        metadata: { permission: input.permission },
+        metadata: { permission },
       })
-      const response = resolution.approved ? 'once' : 'reject'
+      const response = readOpencodePermissionReply(resolution)
+      replied = true
       const reply = await input.resource.v2Client.v2.session.permission.reply({
         sessionID: permission.sessionID,
         requestID: permission.id,
@@ -1555,15 +1767,17 @@ export class OpencodeProvider implements ChatRuntime {
         permission,
         status: resolution.approved ? 'approved' : 'denied',
       })
-      input.chunks.push(providerChunk.toolOutputAvailable({
-        toolCallId,
-        output: buildOpencodePermissionOutput({
-          permission,
-          response,
-          approved: resolution.approved,
-          reason: resolution.reason,
-        }),
-      }))
+      if (!input.chunks.done) {
+        input.chunks.push(providerChunk.toolOutputAvailable({
+          toolCallId,
+          output: buildOpencodePermissionOutput({
+            permission,
+            response,
+            approved: resolution.approved,
+            reason: resolution.reason,
+          }),
+        }))
+      }
     }
     catch (error) {
       this.recordPermissionApproval({
@@ -1571,12 +1785,18 @@ export class OpencodeProvider implements ChatRuntime {
         permission,
         status: 'denied',
       })
-      input.chunks.push(providerChunk.toolOutputError(toolCallId, formatOpencodeError(error)))
-      await input.resource.v2Client.v2.session.permission.reply({
-        sessionID: permission.sessionID,
-        requestID: permission.id,
-        reply: 'reject',
-      }).catch(() => undefined)
+      if (!input.chunks.done) {
+        input.chunks.push(providerChunk.toolOutputError(toolCallId, formatOpencodeError(error)))
+      }
+      // Only auto-reject when we never managed to answer opencode; replying again after a
+      // successful reply would reject a request the user already approved.
+      if (!replied) {
+        await input.resource.v2Client.v2.session.permission.reply({
+          sessionID: permission.sessionID,
+          requestID: permission.id,
+          reply: 'reject',
+        }).catch(() => undefined)
+      }
     }
     finally {
       this.activePermissionIds.delete(toolCallId)
@@ -1746,6 +1966,10 @@ export class OpencodeProvider implements ChatRuntime {
       return true
     }
 
+    // Bounded v2 wait barrier: give the opencode agent loop a chance to settle before
+    // reading history, so recovery does not race an in-flight turn.
+    await waitForOpencodeSessionIdle(input.resource, input.sessionId, OPENCODE_WAIT_BARRIER_TIMEOUT_MS)
+
     const messages = await input.resource.client.session.messages({
       path: { id: input.sessionId },
       query: { directory: input.workspacePath, limit: 50 },
@@ -1858,6 +2082,38 @@ export class OpencodeProvider implements ChatRuntime {
     }
     const withoutCurrent = existing.filter(record => record.id !== input.permission.id)
     this.permissionApprovalsByChatSessionId.set(input.chatSessionId, [nextRecord, ...withoutCurrent].slice(0, 20))
+  }
+
+  /**
+   * Merges the authoritative v2 pending permission list into the locally tracked approval
+   * records so approvals asked outside the current turn (pump disconnected, Cradle
+   * restarted) still surface as pending.
+   */
+  private readApprovalRecordsWithPendingRecovery(
+    chatSessionId: string,
+    pendingPermissions: PermissionV2Request[],
+  ): OpencodePermissionApprovalRecord[] {
+    const records = (this.permissionApprovalsByChatSessionId.get(chatSessionId) ?? [])
+      .map(record => ({ ...record }))
+    const knownIds = new Set(records.map(record => record.id))
+    for (const request of pendingPermissions) {
+      if (knownIds.has(request.id)) {
+        continue
+      }
+      const permission = projectOpencodePermissionV2Request(request)
+      records.unshift({
+        id: permission.id,
+        targetItemId: permission.callID || permission.messageID || null,
+        status: 'pending',
+        label: permission.title || permission.type,
+        riskLevel: typeof permission.metadata.riskLevel === 'string' ? permission.metadata.riskLevel : null,
+        rationale: typeof permission.metadata.reason === 'string' ? permission.metadata.reason : null,
+        startedAt: permission.time.created,
+        completedAt: null,
+        updatedAt: Date.now(),
+      })
+    }
+    return records
   }
 
   private async createNativeSession(
@@ -2363,6 +2619,19 @@ function readOpencodeTurnAgent(input: StreamTurnInput): string {
   return input.providerOptions?.runtimeSettings?.interactionMode === 'plan' ? 'plan' : 'build'
 }
 
+function readOpencodeTurnAgentFromSettings(settings: RuntimeSettings): string {
+  return settings.interactionMode === 'plan' ? 'plan' : 'build'
+}
+
+function readOpencodeAccessMode(settings: RuntimeSettings | undefined): OpencodeAccessMode {
+  return settings?.accessMode === 'approval-required' ? 'approval-required' : 'full-access'
+}
+
+function readOptionalStringSetting(settings: RuntimeSettings, key: string): string | null {
+  const value = settings[key]
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
 function shouldGenerateOpencodeSessionTitle(input: {
   history?: StreamTurnInput['history']
   originalMessages?: StreamTurnInput['originalMessages']
@@ -2459,6 +2728,78 @@ function projectOpencodePermissionAsked(permission: OpencodePermissionAskedPrope
     title: permission.permission,
     metadata: permission.metadata,
     time: { created: Date.now() },
+  }
+}
+
+function projectOpencodePermissionV2Request(request: OpencodePermissionV2AskedProperties | PermissionV2Request): OpencodePermission {
+  const metadata = request.metadata ?? {}
+  const title = typeof metadata.title === 'string' && metadata.title.trim().length > 0
+    ? metadata.title
+    : request.action
+  return {
+    id: request.id,
+    type: request.action,
+    pattern: request.resources,
+    sessionID: request.sessionID,
+    messageID: request.source?.type === 'tool' ? request.source.messageID : '',
+    callID: request.source?.type === 'tool' ? request.source.callID : undefined,
+    title,
+    metadata,
+    time: { created: Date.now() },
+  }
+}
+
+function readOpencodePermissionReply(resolution: { approved: boolean, scope?: 'once' | 'always' }): 'once' | 'always' | 'reject' {
+  if (!resolution.approved) {
+    return 'reject'
+  }
+  return resolution.scope === 'always' ? 'always' : 'once'
+}
+
+function readOpencodeLegacyPermissionReplyApproval(response: string): boolean {
+  return response === 'once' || response === 'always'
+}
+
+async function readOpencodeSessionPermissionRequests(
+  resource: OpencodeRuntimeResource,
+  sessionId: string,
+): Promise<PermissionV2Request[]> {
+  const result = await resource.v2Client.v2.session.permission.list({
+    sessionID: sessionId,
+  }).catch(() => null)
+  if (!result || result.error) {
+    return []
+  }
+  return result.data?.data ?? []
+}
+
+async function readOpencodeSkills(resource: OpencodeRuntimeResource): Promise<string[]> {
+  const result = await resource.v2Client.v2.skill.list().catch(() => null)
+  if (!result || result.error) {
+    return []
+  }
+  return (result.data?.data ?? []).map((skill: SkillV2Info) => skill.name)
+}
+
+async function waitForOpencodeSessionIdle(
+  resource: OpencodeRuntimeResource,
+  sessionId: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      resource.v2Client.v2.session.wait({ sessionID: sessionId })
+        .then(result => !result.error)
+        .catch(() => false),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(resolve, timeoutMs, false)
+        timer.unref?.()
+      }),
+    ])
+  }
+  finally {
+    clearTimeout(timer)
   }
 }
 

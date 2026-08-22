@@ -262,6 +262,7 @@ export async function createRun(
       runtime,
       modelId: requestedModelId,
       requestedProviderTargetId,
+      settings: runtimeSettings,
     })
     const runtimeSession = runtimeResolution.runtimeSession
 

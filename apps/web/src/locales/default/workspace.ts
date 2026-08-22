@@ -341,4 +341,9 @@ export default {
   'workspace.toast.renameFailed': 'Workspace could not be renamed',
   'workspace.toast.relinkFailed': 'Workspace could not be relinked',
   'workspace.state.missing': 'Missing',
+  'workspace.machine.thisDevice': 'This device',
+  'workspace.repoCluster.aria.toggleExpanded': 'Toggle repository {{name}} collapse state',
+  'workspace.repoCluster.aria.replicaCount': '{{count}} copies on your devices',
+  'workspace.repoCluster.mount': 'Mount from this device',
+  'workspace.repoCluster.toast.mountFailed': 'Failed to mount workspace',
 } as const

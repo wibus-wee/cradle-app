@@ -1,56 +1,56 @@
 {
   "schemaVersion": 1,
-  "sdkVersion": "1.17.11",
-  "releaseTag": "v1.17.11",
+  "sdkVersion": "1.18.21",
+  "releaseTag": "v1.18.21",
   "repository": "anomalyco/opencode",
   "targets": {
     "darwin-arm64": {
       "assetName": "opencode-darwin-arm64.zip",
       "format": "zip",
-      "sizeBytes": 41266381,
-      "sha256": "40723446013dea8252eea4f180d707f75e805af54ee85a14fd7c126513ba8342"
+      "sizeBytes": 46179582,
+      "sha256": "72f4b6029af185eb030995cfa062d038914e3142c9aa38f714fe56448e6e87d2"
     },
     "darwin-x64": {
       "assetName": "opencode-darwin-x64-baseline.zip",
       "format": "zip",
-      "sizeBytes": 43576694,
-      "sha256": "256fae47f27a60fb9994ecf46c564f24a86997d041911862fcf665554b94a527"
+      "sizeBytes": 48379227,
+      "sha256": "13569e2d9850330922999ab9172145483b50e3f00c569a4d2315ab8d722d63d5"
     },
     "linux-arm64-glibc": {
       "assetName": "opencode-linux-arm64.tar.gz",
       "format": "tar.gz",
-      "sizeBytes": 54589724,
-      "sha256": "6c0ae8212401c78f9dcddead35d385953c7a44eb1616309365b58503dbd1b4cd"
+      "sizeBytes": 60312400,
+      "sha256": "d30d2cba74617f4e7b96e25563c9572ffe453f9eae70fc0df16286813537ee72"
     },
     "linux-arm64-musl": {
       "assetName": "opencode-linux-arm64-musl.tar.gz",
       "format": "tar.gz",
-      "sizeBytes": 53185070,
-      "sha256": "8531805bdbcdd0b912652a989992a8857651fd09d715ee70c0eb9dd2f134953e"
+      "sizeBytes": 62436827,
+      "sha256": "55fad084e7a684a5f5e979657b28c955bb3871c1601b286ab86e1e215cf7309d"
     },
     "linux-x64-glibc": {
       "assetName": "opencode-linux-x64-baseline.tar.gz",
       "format": "tar.gz",
-      "sizeBytes": 54787669,
-      "sha256": "36064327d5a3fba662264f5726f517eafa26d1aefb0d59bc95e66bddccf3497b"
+      "sizeBytes": 60498986,
+      "sha256": "64acfb7f2857e7b9cd2cedbcd605f5a9ebf3bc3d786b0ed66a560670629513da"
     },
     "linux-x64-musl": {
       "assetName": "opencode-linux-x64-baseline-musl.tar.gz",
       "format": "tar.gz",
-      "sizeBytes": 53557956,
-      "sha256": "cdb8f1a435f7ef67798276397fc890b762f7946d2d77e5cd9be38ecbe32ae245"
+      "sizeBytes": 62864904,
+      "sha256": "d44d62db99925cd3c0b57cca135bd771fcad6a6d5102e734b4ae50023b00b492"
     },
     "win32-arm64": {
       "assetName": "opencode-windows-arm64.zip",
       "format": "zip",
-      "sizeBytes": 54004333,
-      "sha256": "cdc2c564b0a70bdba57fb94810a437cf64397b042c5a507aaed2840b8171f598"
+      "sizeBytes": 58781343,
+      "sha256": "f0470c160152ee23175d3e489018a927e8eedc7de7832f71654b2bede1807637"
     },
     "win32-x64": {
       "assetName": "opencode-windows-x64-baseline.zip",
       "format": "zip",
-      "sizeBytes": 55834359,
-      "sha256": "8f635056f0397a0af3376d6e17de7cfc1ba12f6c4100769d446f1041fa685438"
+      "sizeBytes": 60622012,
+      "sha256": "cffd857166a52c7ae36a337d6b42136910aaa534cf2b9d658c4ce71b903d12b8"
     }
   }
 }

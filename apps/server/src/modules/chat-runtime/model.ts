@@ -281,12 +281,14 @@ export const ChatRuntimeModel = {
 
   toolApprovalBody: t.Object({
     approved: t.Boolean(),
+    scope: t.Optional(t.Union([t.Literal('once'), t.Literal('always')])),
     reason: t.Optional(t.String()),
   }),
 
   toolApprovalResponse: t.Object({
     requestId: t.String(),
     approved: t.Boolean(),
+    scope: t.Optional(t.Union([t.Literal('once'), t.Literal('always')])),
     reason: t.Optional(t.String()),
   }),
 

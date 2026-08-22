@@ -4,6 +4,7 @@ import type {
   ChatRuntime,
   RuntimeProviderTargetProfile,
   RuntimeSession,
+  RuntimeSettings,
 } from '../chat-runtime/runtime-provider-types'
 import { readProviderStateSnapshot } from '../chat-runtime-providers/kit/state-snapshot'
 import type { RuntimeKind } from '../provider-contracts/types'
@@ -35,6 +36,7 @@ export interface ProviderRuntimeSessionRequest {
   workspacePath: string
   agentId?: string | null
   modelId?: string | null
+  settings?: RuntimeSettings
 }
 
 export interface ProviderRuntimeSessionResolution {
@@ -158,6 +160,7 @@ async function resolveExistingCandidate(
     workspacePath: input.workspacePath,
     agentId: input.agentId,
     modelId: input.modelId,
+    settings: input.settings,
   })
   const requestedModelId = readRequestedModelId({
     modelId: input.modelId,
@@ -201,6 +204,7 @@ export async function resolveProviderRuntimeSession(
     workspacePath: input.workspacePath,
     agentId: input.agentId,
     modelId: input.modelId,
+    settings: input.settings,
     previousProviderStateSnapshot: null,
   })
 

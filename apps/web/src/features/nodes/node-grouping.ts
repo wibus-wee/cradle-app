@@ -1,3 +1,5 @@
+import { workspaceRepoKey } from '~/lib/repo-identity'
+
 import type { FabricNode } from './types'
 
 /**
@@ -86,31 +88,10 @@ export interface LocalWorkspaceLocation {
   path: string
 }
 
-function normalizeOriginUrl(originUrl: string | null | undefined): string | null {
-  if (!originUrl) {
-    return null
-  }
-  const trimmed = originUrl.trim()
-  if (!trimmed) {
-    return null
-  }
-  // Canonicalize `git@host:org/repo.git` and `https://host/org/repo.git` forms
-  // so the same repository merges across Nodes regardless of remote syntax.
-  const scpLike = /^git@([^:]+):(.+)$/.exec(trimmed)
-  const normalized = (scpLike ? `https://${scpLike[1]}/${scpLike[2]}` : trimmed)
-    .replace(/\/+$/, '')
-    .replace(/\.git$/i, '')
-    .toLowerCase()
-  return normalized
-}
-
 function workspaceMergeKey(summary: NodeWorkspaceSummary, nodeId: string): string {
-  const origin = normalizeOriginUrl(summary.originUrl)
-  if (origin) {
-    return `origin:${origin}`
-  }
-  if (summary.repoRoot) {
-    return `repo:${summary.repoRoot.toLowerCase()}`
+  const key = workspaceRepoKey(summary)
+  if (key) {
+    return key
   }
   // No Git identity: the workspace can never merge across machines.
   return `path:${nodeId}:${summary.path}`

@@ -47,6 +47,7 @@ describe('openCode runtime host options', () => {
       binaryPath: 'opencode-test',
       managed: false,
       cwd: process.cwd(),
+      accessMode: 'full-access',
     })
   })
 
@@ -57,14 +58,36 @@ describe('openCode runtime host options', () => {
       .not
 .toHaveProperty('env')
   })
+
+  it('injects OPENCODE_PERMISSION only for approval-required hosts', () => {
+    const approvalRequired = createOpencodeServerProcessOptions({
+      binaryPath: '/managed/opencode',
+      managed: true,
+      cwd: '/workspace',
+      accessMode: 'approval-required',
+      port: 45123,
+    })
+    expect(approvalRequired.env).toMatchObject({
+      OPENCODE_PERMISSION: JSON.stringify({ '*': 'ask' }),
+    })
+
+    const fullAccess = createOpencodeServerProcessOptions({
+      binaryPath: '/managed/opencode',
+      managed: true,
+      cwd: '/workspace',
+      accessMode: 'full-access',
+      port: 45123,
+    })
+    expect(fullAccess.env).not.toHaveProperty('OPENCODE_PERMISSION')
+  })
 })
 
 describe('opencodeRuntimePool', () => {
-  it('pools by binary path and cwd, ref-counts leases, and closes after the idle TTL', async () => {
+  it('pools by binary path, cwd, and access mode, ref-counts leases, and closes after the idle TTL', async () => {
     vi.useFakeTimers()
     const hosts: OpencodeManagedHost[] = []
     const startHost = vi.fn(async (input) => {
-      const host = createManagedHost(`${input.binaryPath}:${input.cwd}:${hosts.length}`)
+      const host = createManagedHost(`${input.binaryPath}:${input.cwd}:${input.accessMode}:${hosts.length}`, input.accessMode)
       hosts.push(host)
       return host
     })
@@ -74,15 +97,19 @@ describe('opencodeRuntimePool', () => {
     const second = await pool.acquire({ binaryPath: 'opencode-a', directory: '/workspace/a' })
     const otherCwd = await pool.acquire({ binaryPath: 'opencode-a', directory: '/workspace/b' })
     const otherBinary = await pool.acquire({ binaryPath: 'opencode-b', directory: '/workspace/a' })
+    const approvalRequired = await pool.acquire({ binaryPath: 'opencode-a', directory: '/workspace/a', accessMode: 'approval-required' })
 
-    expect(startHost).toHaveBeenCalledTimes(3)
+    expect(startHost).toHaveBeenCalledTimes(4)
     expect(first.resource).toBe(second.resource)
+    expect(first.resource).not.toBe(approvalRequired.resource)
+    expect(hosts[3]?.accessMode).toBe('approval-required')
     const resources = pool.getResources()
-    expect(resources).toHaveLength(3)
+    expect(resources).toHaveLength(4)
     expect(resources.map(resource => resource.url)).toEqual(expect.arrayContaining([
-      'http://opencode-a:/workspace/a:0',
-      'http://opencode-a:/workspace/b:1',
-      'http://opencode-b:/workspace/a:2',
+      'http://opencode-a:/workspace/a:full-access:0',
+      'http://opencode-a:/workspace/b:full-access:1',
+      'http://opencode-b:/workspace/a:full-access:2',
+      'http://opencode-a:/workspace/a:approval-required:3',
     ]))
     first.release()
     await vi.advanceTimersByTimeAsync(100)
@@ -96,6 +123,7 @@ describe('opencodeRuntimePool', () => {
 
     otherCwd.release()
     otherBinary.release()
+    approvalRequired.release()
     await pool.shutdown()
   })
 
@@ -166,7 +194,7 @@ function createManagedProcess(): ManagedChildProcess {
   return proc as unknown as ManagedChildProcess
 }
 
-function createManagedHost(id: string): OpencodeManagedHost {
+function createManagedHost(id: string, accessMode: 'approval-required' | 'full-access' = 'full-access'): OpencodeManagedHost {
   const close = vi.fn(async () => undefined)
   return {
     resource: {
@@ -178,6 +206,7 @@ function createManagedHost(id: string): OpencodeManagedHost {
     url: `http://${id}`,
     binaryPath: 'opencode',
     cwd: '/workspace',
+    accessMode,
     startedAt: Date.now(),
     close,
   }

@@ -26,8 +26,13 @@ if (typeof version !== 'string' || !/^\d+\.\d+\.\d+/.test(version)) {
 }
 
 const releaseTag = `v${version}`
+const githubToken = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN
 const response = await fetch(`https://api.github.com/repos/anomalyco/opencode/releases/tags/${releaseTag}`, {
-  headers: { 'accept': 'application/vnd.github+json', 'user-agent': 'cradle-opencode-runtime-manifest' },
+  headers: {
+    'accept': 'application/vnd.github+json',
+    'user-agent': 'cradle-opencode-runtime-manifest',
+    ...(githubToken ? { authorization: `Bearer ${githubToken}` } : {}),
+  },
 })
 if (!response.ok) {
   throw new Error(`OpenCode release metadata request failed: ${response.status}`)

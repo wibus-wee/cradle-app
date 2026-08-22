@@ -163,6 +163,7 @@ export const chatRuntimeInteractionRoutes = new Elysia({
         sessionId: params.sessionId,
         requestId: params.requestId,
         approved: body.approved,
+        scope: body.scope,
         reason: body.reason,
       })
     },

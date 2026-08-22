@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback } from 'react'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useMemo } from 'react'
 
 import {
   deleteFabricMutation,
@@ -234,6 +234,38 @@ export function useNodeWorkspaces(node: FabricNode | null, enabled: boolean) {
     select: workspaces => workspaces.map(toNodeWorkspaceSummary),
     staleTime: 30_000,
   })
+}
+
+export interface NodeWorkspaceInventory {
+  node: { nodeId: string, nodeName: string }
+  workspaces: NodeWorkspaceSummary[]
+}
+
+/**
+ * Fetch workspace inventories of several Nodes at once (used by repo-cluster
+ * shadow discovery). Only successful inventories are returned; offline or
+ * unreachable Nodes are silently skipped.
+ */
+export function useNodeWorkspaceInventories(nodes: readonly FabricNode[], enabled: boolean): NodeWorkspaceInventory[] {
+  const queries = useQueries({
+    queries: nodes.map(node => ({
+      ...nodeUpstreamQueryOptions<GetWorkspacesResponse>(node.nodeId, '/workspaces', ['workspaces']),
+      enabled: enabled && node.status === 'online',
+      select: (workspaces: GetWorkspacesResponse) => workspaces.map(toNodeWorkspaceSummary),
+      staleTime: 30_000,
+    })),
+  })
+  return useMemo(
+    () =>
+      queries.flatMap((query, index) => {
+        const node = nodes[index]
+        if (!node || !query.data) {
+          return []
+        }
+        return [{ node: { nodeId: node.nodeId, nodeName: node.displayName }, workspaces: query.data }]
+      }),
+    [nodes, queries],
+  )
 }
 
 export type { FabricNodeInvitation }

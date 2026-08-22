@@ -89,7 +89,7 @@ export function buildOpencodePermissionInput(permission: Permission) {
 
 export function buildOpencodePermissionOutput(input: {
   permission: Permission
-  response: 'once' | 'reject'
+  response: 'once' | 'always' | 'reject'
   approved: boolean
   reason?: string
 }) {

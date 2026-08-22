@@ -13,6 +13,8 @@ export interface WorkspaceGroupDisclosureProps {
   workspacePinned: boolean
   workspaceActions: WorkspaceMenuAction[]
   runningSessionCount: number
+  /** Machine label for repo clusters spanning several devices. */
+  machineLabel?: string | null
   overlays: ReactNode
   children: ReactNode
 }
@@ -22,6 +24,7 @@ export function WorkspaceGroupDisclosure({
   workspacePinned,
   workspaceActions,
   runningSessionCount,
+  machineLabel,
   overlays,
   children,
 }: WorkspaceGroupDisclosureProps) {
@@ -45,6 +48,7 @@ export function WorkspaceGroupDisclosure({
       workspaceActions={workspaceActions}
       expanded={expanded}
       runningSessionCount={runningSessionCount}
+      machineLabel={machineLabel}
       overlays={overlays}
       onToggleExpanded={toggleExpanded}
       onOpenWorkspace={openWorkspace}

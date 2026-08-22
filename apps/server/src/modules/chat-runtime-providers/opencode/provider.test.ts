@@ -158,6 +158,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     sessionCreateData: unknown
     sessionChildrenData: unknown[]
     sessionQuestionRequestsData: unknown[]
+    sessionPermissionRequestsData: unknown[]
     sessionContextMessagesData: unknown[]
     mcpStatusData: Record<string, unknown>
     fileStatusData: unknown[]
@@ -173,6 +174,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     sessionCreateData: { id: 'ses_recovered' },
     sessionChildrenData: [],
     sessionQuestionRequestsData: [],
+    sessionPermissionRequestsData: [],
     sessionContextMessagesData: [],
     mcpStatusData: {},
     fileStatusData: [],
@@ -252,24 +254,34 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
       },
       postSessionIdPermissionsPermissionId: postPermission,
     },
-    v2Client: {
-      event: {
-        subscribe: vi.fn(async () => ({ stream: events })),
-      },
-      v2: {
-        session: {
-          context: vi.fn(async () => ({ data: { data: state.sessionContextMessagesData }, error: undefined })),
-          permission: {
-            reply: permissionReply,
+      v2Client: {
+        event: {
+          subscribe: vi.fn(async () => ({ stream: events })),
+        },
+        v2: {
+          health: {
+            get: vi.fn(async () => ({ data: {}, error: undefined })),
           },
-          question: {
-            list: questionList,
-            reply: questionReply,
-            reject: questionReject,
+          skill: {
+            list: vi.fn(async () => ({ data: { data: [] }, error: undefined })),
+          },
+          session: {
+            context: vi.fn(async () => ({ data: { data: state.sessionContextMessagesData }, error: undefined })),
+            wait: vi.fn(async () => ({ data: undefined, error: undefined })),
+            switchAgent: vi.fn(async () => ({ data: undefined, error: undefined })),
+            switchModel: vi.fn(async () => ({ data: undefined, error: undefined })),
+            permission: {
+              list: vi.fn(async () => ({ data: { data: state.sessionPermissionRequestsData }, error: undefined })),
+              reply: permissionReply,
+            },
+            question: {
+              list: questionList,
+              reply: questionReply,
+              reject: questionReject,
+            },
           },
         },
       },
-    },
     server: {
       url: 'http://127.0.0.1:1234',
       close() {},
@@ -2138,6 +2150,77 @@ describe('opencodeProvider streamTurn', () => {
         output: expect.objectContaining({ apiName: 'approval.permissions' }),
       },
     })
+    await stream.return(undefined)
+  })
+
+  it('bridges OpenCode v2 permission events and replies with the requested scope', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    const approvalResolver: {
+      resolve?: (resolution: RuntimeToolApprovalResolution) => void
+    } = {}
+    const requestToolApproval = vi.fn((_request: RuntimeToolApprovalRequest) =>
+      new Promise<RuntimeToolApprovalResolution>((resolve) => {
+        approvalResolver.resolve = resolve
+      }))
+    const provider = new OpencodeProvider({
+      readSecret: () => 'secret',
+      requestToolApproval,
+    })
+    const stream = provider.streamTurn({
+      runId: 'run-approval-v2',
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      message: {
+        id: 'user-1',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Run a command' }],
+      },
+      workspacePath: '/tmp/workspace',
+    })
+
+    const firstChunk = stream.next()
+    await vi.waitFor(() => expect(fake.promptAsync).toHaveBeenCalledTimes(1))
+    events.push({
+      id: 'evt_permission_v2_asked',
+      type: 'permission.v2.asked',
+      properties: {
+        id: 'perm-v2-1',
+        sessionID: 'ses_1',
+        action: 'bash',
+        resources: ['rm -rf build'],
+        metadata: { reason: 'destructive command' },
+        source: {
+          type: 'tool',
+          messageID: 'msg_assistant',
+          callID: 'call-1',
+        },
+      },
+    } as never)
+
+    await expect(firstChunk).resolves.toMatchObject({
+      done: false,
+      value: { type: 'tool-input-start', toolCallId: 'server-request-perm-v2-1' },
+    })
+    await expect(stream.next()).resolves.toMatchObject({
+      done: false,
+      value: {
+        type: 'tool-input-available',
+        toolCallId: 'server-request-perm-v2-1',
+        input: expect.objectContaining({ apiName: 'approval.permissions' }),
+      },
+    })
+    await expect(stream.next()).resolves.toMatchObject({
+      done: false,
+      value: { type: 'tool-approval-request', approvalId: 'server-request-perm-v2-1' },
+    })
+
+    approvalResolver.resolve?.({ requestId: 'perm-v2-1', approved: true, scope: 'always' })
+    await vi.waitFor(() => expect(fake.permissionReply).toHaveBeenCalledWith({
+      sessionID: 'ses_1',
+      requestID: 'perm-v2-1',
+      reply: 'always',
+    }))
     await stream.return(undefined)
   })
 

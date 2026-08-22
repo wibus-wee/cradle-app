@@ -318,6 +318,7 @@ function createRuntimeHostOptions(input: { directory?: string } = {}) {
     binaryPath: '/opt/opencode',
     managed: false,
     cwd: input.directory ?? '/workspace/project',
+    accessMode: 'full-access' as const,
   }
 }
 

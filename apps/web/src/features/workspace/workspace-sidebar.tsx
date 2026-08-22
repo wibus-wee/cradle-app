@@ -26,6 +26,7 @@ import {
   postWorkspacesByWorkspaceIdFilesFileMutation,
   postWorkspacesByWorkspaceIdFilesFolderMutation,
   postWorkspacesMultiFolderMutation,
+  postWorkspacesMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { toastManager } from '~/components/ui/toast'
@@ -34,6 +35,8 @@ import { runtimeSessionStatusQueryOptions } from '~/features/chat/commands/runti
 import { prefetchChatSession } from '~/features/chat/session/chat-session-prefetch'
 import { useDirectoryPicker } from '~/features/filesystem/directory-picker-provider'
 import { KanbanSidebar } from '~/features/kanban/kanban-sidebar'
+import { resolveNodeDisplayName } from '~/features/nodes/node-grouping'
+import { useFabricMembership, useNodeWorkspaceInventories } from '~/features/nodes/use-nodes'
 import { PluginsSidebar } from '~/features/plugins/plugins-sidebar'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
 import { GithubRequiredDialog } from '~/features/settings/github-required-dialog'
@@ -92,6 +95,9 @@ import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
 import { WorkspaceProjectsSectionView } from './workspace-projects-section-view'
 import { WorkspaceRecentSessionListView } from './workspace-recent-session-list-view'
 import { WorkspaceRecognitionDialogView } from './workspace-recognition-dialog-view'
+import { WorkspaceRepoClusterView } from './workspace-repo-cluster-view'
+import type { RepoWorkspaceShadow } from './workspace-repo-clusters'
+import { findRepoShadows, groupWorkspacesByRepo } from './workspace-repo-clusters'
 import { WorkspaceSessionActionsMenu } from './workspace-session-actions-menu'
 import type { WorkspaceSessionActionsMenuState } from './workspace-session-actions-menu-state'
 import { CLOSED_WORKSPACE_SESSION_ACTIONS_MENU_STATE } from './workspace-session-actions-menu-state'
@@ -197,6 +203,7 @@ const WorkspaceGroup = memo(
     listFilters,
     workByPrimarySessionId,
     runtimeIconByKind,
+    machineLabel,
     onDelete,
     onTogglePin,
   }: {
@@ -206,6 +213,8 @@ const WorkspaceGroup = memo(
     listFilters: WorkspaceSidebarListFilters
     workByPrimarySessionId: ReadonlyMap<string, WorkSummary>
     runtimeIconByKind: RuntimeIconByKind
+    /** Machine label shown when this workspace is part of a repo cluster. */
+    machineLabel?: string | null
     onDelete: (id: string) => void
     onTogglePin: (id: string, pinned: boolean) => void
   }) => {
@@ -959,6 +968,7 @@ const WorkspaceGroup = memo(
         workspacePinned={workspacePinned}
         workspaceActions={workspaceActions}
         runningSessionCount={runningSessionCount}
+        machineLabel={machineLabel}
         overlays={overlays}
       >
         <div className="flex min-w-0 flex-col">
@@ -1168,6 +1178,119 @@ const WorkspaceSidebarBody = memo(
       workByPrimarySessionId,
       workspaces,
     ])
+    const repoGrouping = useMemo(() => groupWorkspacesByRepo(visibleWorkspaces), [visibleWorkspaces])
+    const { data: nodes = [] } = useQuery({ ...getNodesOptions() })
+    const { data: membership } = useFabricMembership()
+    const localNodeId = membership?.localNodeId ?? null
+    const repoClustersActive = grouping === 'workspace' && repoGrouping.clusters.length > 0
+    const remoteOnlineNodes = useMemo(
+      () => nodes.filter(node => node.nodeId !== localNodeId && node.status === 'online'),
+      [localNodeId, nodes],
+    )
+    const nodeInventories = useNodeWorkspaceInventories(remoteOnlineNodes, repoClustersActive)
+    const addedLocators = useMemo(
+      () => workspaces.map(workspace => ({ nodeId: workspace.locator.nodeId, path: workspace.locator.path })),
+      [workspaces],
+    )
+    const shadowsByClusterKey = useMemo(
+      () => (repoClustersActive ? findRepoShadows(nodeInventories, addedLocators) : new Map()),
+      [addedLocators, nodeInventories, repoClustersActive],
+    )
+    const shadowMount = useMutation({ ...postWorkspacesMutation() })
+    const bodyQueryClient = useQueryClient()
+    const [mountingShadowKey, setMountingShadowKey] = useState<string | null>(null)
+    const [collapsedClusterKeys, setCollapsedClusterKeys] = useState<ReadonlySet<string>>(EMPTY_SESSION_ID_SET)
+    const mountShadow = useCallback(async (shadow: RepoWorkspaceShadow) => {
+      setMountingShadowKey(`${shadow.nodeId}:${shadow.path}`)
+      try {
+        await shadowMount.mutateAsync({
+          body: {
+            name: shadow.path.split('/').filter(Boolean).pop() ?? shadow.path,
+            locator: {
+              nodeId: shadow.nodeId,
+              path: shadow.path,
+              ...(shadow.kind ? { kind: shadow.kind } : {}),
+              ...(shadow.sourceWorkspaceId ? { sourceWorkspaceId: shadow.sourceWorkspaceId } : {}),
+            },
+          },
+        })
+        await bodyQueryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY })
+      }
+      catch (error) {
+        toastManager.add({
+          type: 'error',
+          title: t('workspace.repoCluster.toast.mountFailed'),
+          description: formatToastError(error),
+        })
+      }
+      finally {
+        setMountingShadowKey(null)
+      }
+    }, [bodyQueryClient, shadowMount, t])
+
+    const toggleClusterExpanded = useCallback((clusterKey: string) => {
+      setCollapsedClusterKeys((current) => {
+        const next = new Set(current)
+        if (next.has(clusterKey)) {
+          next.delete(clusterKey)
+        }
+        else {
+          next.add(clusterKey)
+        }
+        return next
+      })
+    }, [])
+
+    // Machine label for replicas inside an active repo cluster; `null` keeps
+    // single-repo users' sidebars unchanged.
+    const machineLabelForClusterReplica = useCallback((workspaceId: string): string | null => {
+      if (!repoClustersActive) {
+        return null
+      }
+      const workspace = visibleWorkspaces.find(candidate => candidate.id === workspaceId)
+      if (!workspace) {
+        return null
+      }
+      if (isLocalWorkspace(workspace)) {
+        return t('workspace.machine.thisDevice')
+      }
+      return resolveNodeDisplayName(nodes, workspace.locator.nodeId) ?? workspace.locator.nodeId
+    }, [nodes, repoClustersActive, t, visibleWorkspaces])
+
+    // Ordered render list: a cluster appears at the position of its first
+    // replica in the sorted list, so pinning and name order are preserved.
+    const renderedSidebarItems = useMemo(() => {
+      type SidebarItem
+        = | { kind: 'workspace', key: string, workspace: Workspace }
+          | { kind: 'cluster', key: string, name: string, replicas: Workspace[], shadows: RepoWorkspaceShadow[] }
+      const clusterByWorkspaceId = new Map<string, (typeof repoGrouping.clusters)[number]>()
+      for (const cluster of repoGrouping.clusters) {
+        for (const replica of cluster.replicas) {
+          clusterByWorkspaceId.set(replica.id, cluster)
+        }
+      }
+      const items: SidebarItem[] = []
+      const emittedClusterKeys = new Set<string>()
+      for (const workspace of visibleWorkspaces) {
+        const cluster = clusterByWorkspaceId.get(workspace.id)
+        if (!cluster) {
+          items.push({ kind: 'workspace', key: workspace.id, workspace })
+          continue
+        }
+        if (emittedClusterKeys.has(cluster.key)) {
+          continue
+        }
+        emittedClusterKeys.add(cluster.key)
+        items.push({
+          kind: 'cluster',
+          key: cluster.key,
+          name: cluster.name,
+          replicas: cluster.replicas,
+          shadows: shadowsByClusterKey.get(cluster.key) ?? [],
+        })
+      }
+      return items
+    }, [shadowsByClusterKey, visibleWorkspaces, repoGrouping])
     const filteredFlatEntries = useMemo(() => {
       const candidates: SidebarSessionEntry[] = []
 
@@ -1202,7 +1325,6 @@ const WorkspaceSidebarBody = memo(
       workByPrimarySessionId,
       workspaces,
     ])
-    const { data: nodes = [] } = useQuery({ ...getNodesOptions(), enabled: grouping === 'environment' })
     const flatSections = useMemo(() => {
       if (grouping === 'workspace') {
         return []
@@ -1339,18 +1461,49 @@ const WorkspaceSidebarBody = memo(
                   </div>
                 )
               })
-            : visibleWorkspaces.map(workspace => (
-                <WorkspaceGroup
-                  key={workspace.id}
-                  workspace={workspace}
-                  sessions={sessionsByWorkspaceId.get(workspace.id) ?? EMPTY_WORKSPACE_SESSIONS}
-                  listFilters={listFilters}
-                  workByPrimarySessionId={workByPrimarySessionId}
-                  runtimeIconByKind={runtimeIconByKind}
-                  onDelete={onDelete}
-                  onTogglePin={onTogglePin}
-                />
-              ))}
+            : renderedSidebarItems.map((item) => {
+                if (item.kind === 'cluster') {
+                  const clusterExpanded = !collapsedClusterKeys.has(item.key)
+                  return (
+                    <WorkspaceRepoClusterView
+                      key={item.key}
+                      name={item.name}
+                      replicaCount={item.replicas.length}
+                      expanded={clusterExpanded}
+                      shadows={item.shadows}
+                      mountingKey={mountingShadowKey}
+                      onToggleExpanded={() => toggleClusterExpanded(item.key)}
+                      onMountShadow={shadow => void mountShadow(shadow)}
+                    >
+                      {item.replicas.map(replica => (
+                        <WorkspaceGroup
+                          key={replica.id}
+                          workspace={replica}
+                          sessions={sessionsByWorkspaceId.get(replica.id) ?? EMPTY_WORKSPACE_SESSIONS}
+                          listFilters={listFilters}
+                          workByPrimarySessionId={workByPrimarySessionId}
+                          runtimeIconByKind={runtimeIconByKind}
+                          machineLabel={machineLabelForClusterReplica(replica.id)}
+                          onDelete={onDelete}
+                          onTogglePin={onTogglePin}
+                        />
+                      ))}
+                    </WorkspaceRepoClusterView>
+                  )
+                }
+                return (
+                  <WorkspaceGroup
+                    key={item.workspace.id}
+                    workspace={item.workspace}
+                    sessions={sessionsByWorkspaceId.get(item.workspace.id) ?? EMPTY_WORKSPACE_SESSIONS}
+                    listFilters={listFilters}
+                    workByPrimarySessionId={workByPrimarySessionId}
+                    runtimeIconByKind={runtimeIconByKind}
+                    onDelete={onDelete}
+                    onTogglePin={onTogglePin}
+                  />
+                )
+              })}
         </WorkspaceProjectsSectionView>
       </PreviewCardProvider>
     )

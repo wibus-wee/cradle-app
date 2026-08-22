@@ -38,6 +38,7 @@ import {
   searchWorkspaceFiles,
   writeTextFile,
 } from './files'
+import { probeLocalGitIdentity } from './repo-identity'
 import type { WorkspaceGitIdentity, WorkspaceLocator } from './workspace-locator'
 import {
   isLocalWorkspaceLocator,
@@ -282,18 +283,21 @@ export async function relinkWorkspace(id: string, path: string): Promise<Workspa
   const nextLocator = localWorkspaceLocator(canonicalWorkspacePath('local', trimmedPath))
   assertWorkspaceLocatorAvailable(id, nextLocator)
   const gitIdentity = readWorkspaceGitIdentity(record)
+  const probed = await probeLocalGitIdentity(nextLocator.path)
   const updated = db().update(workspaces).set({
     locatorJson: serializeWorkspaceLocator(nextLocator),
     gitIdentityJson: serializeWorkspaceGitIdentity({
-      ...gitIdentity,
-      repoRoot: findHistoricalProjectRoot(nextLocator.path, gitIdentity.repoRoot),
+      originUrl: gitIdentity.originUrl ?? probed.originUrl ?? null,
+      repoRoot: findHistoricalProjectRoot(nextLocator.path, gitIdentity.repoRoot ?? probed.repoRoot),
+      headSha: probed.headSha ?? gitIdentity.headSha ?? null,
+      branch: probed.branch ?? gitIdentity.branch ?? null,
     }),
     updatedAt: Math.floor(Date.now() / 1000),
   }).where(eq(workspaces.id, id)).returning().get()
   return updated ? toWorkspaceView(updated) : null
 }
 
-export function addFromDirectory(path: string): WorkspaceView {
+export async function addFromDirectory(path: string): Promise<WorkspaceView> {
   const absolutePath = resolve(path.trim())
   if (!isDirectory(absolutePath)) {
     throw new AppError({
@@ -303,6 +307,9 @@ export function addFromDirectory(path: string): WorkspaceView {
       details: { path: absolutePath },
     })
   }
+  // Probe the git identity up-front so every import path below (existing
+  // backfill, single-folder create) can attach cross-machine repo identity.
+  const probedIdentity = await probeLocalGitIdentity(absolutePath)
   const configPath = join(absolutePath, MULTI_WORKSPACE_CONFIG_FILE)
   // Recognize a cradle-workspace.json and route to the multi-folder import — but
   // only when the experimental feature flag is on. When the flag is off we fall
@@ -322,9 +329,48 @@ export function addFromDirectory(path: string): WorkspaceView {
   // safely ensure-then-open without a separate resolve round-trip.
   const existing = resolveByPath(absolutePath)
   if (existing) {
-    return existing
+    return backfillGitIdentity(existing, probedIdentity)
   }
-  return create({ name: basename(absolutePath), locator: localWorkspaceLocator(absolutePath) })
+  return create({
+    name: basename(absolutePath),
+    locator: localWorkspaceLocator(absolutePath),
+    ...(hasGitIdentity(probedIdentity) ? { gitIdentity: probedIdentity } : {}),
+  })
+}
+
+function hasGitIdentity(identity: WorkspaceGitIdentity): boolean {
+  return Boolean(identity.originUrl || identity.repoRoot || identity.headSha || identity.branch)
+}
+
+/**
+ * Upgrade an already-registered workspace with a freshly probed git identity.
+ * Only fills fields the stored identity is missing — never overwrites user-
+ * visible values that were set from an authoritative source earlier.
+ */
+function backfillGitIdentity(workspace: WorkspaceView, probed: WorkspaceGitIdentity): WorkspaceView {
+  if (!hasGitIdentity(probed)) {
+    return workspace
+  }
+  const current = workspace.gitIdentity
+  const merged: WorkspaceGitIdentity = {
+    originUrl: current.originUrl ?? probed.originUrl ?? null,
+    repoRoot: current.repoRoot ?? probed.repoRoot ?? null,
+    headSha: current.headSha ?? probed.headSha ?? null,
+    branch: current.branch ?? probed.branch ?? null,
+  }
+  if (
+    merged.originUrl === workspace.gitIdentity.originUrl
+    && merged.repoRoot === workspace.gitIdentity.repoRoot
+    && merged.branch === workspace.gitIdentity.branch
+    && merged.headSha === workspace.gitIdentity.headSha
+  ) {
+    return workspace
+  }
+  db().update(workspaces).set({
+    gitIdentityJson: serializeWorkspaceGitIdentity(merged),
+    updatedAt: Math.floor(Date.now() / 1000),
+  }).where(eq(workspaces.id, workspace.id)).run()
+  return get(workspace.id) ?? workspace
 }
 
 export type DirectoryInspectionAction = 'multi-folder' | 'single-folder'

@@ -44,15 +44,19 @@ export interface OpencodeManagedHost {
   url: string
   binaryPath: string
   cwd: string
+  accessMode: OpencodeAccessMode
   startedAt: number
   close: () => Promise<void>
 }
+
+export type OpencodeAccessMode = 'approval-required' | 'full-access'
 
 interface OpencodePoolEntry {
   key: string
   binaryPath: string
   managed: boolean
   cwd: string
+  accessMode: OpencodeAccessMode
   refCount: number
   hostPromise: Promise<OpencodeManagedHost>
   host: OpencodeManagedHost | null
@@ -66,6 +70,7 @@ export interface OpencodeRuntimePoolOptions {
     binaryPath: string
     managed: boolean
     cwd: string
+    accessMode: OpencodeAccessMode
     startupTimeoutMs: number
     onExit: (code: number | null, signal: NodeJS.Signals | null) => void
   }) => Promise<OpencodeManagedHost>
@@ -99,9 +104,10 @@ export class OpencodeRuntimePool {
     binaryPath?: string
     managed?: boolean
     directory?: string
+    accessMode?: OpencodeAccessMode
   }): Promise<RuntimeLiveResourceLease<OpencodeRuntimeResource>> {
-    const { binaryPath, cwd, managed } = resolveOpencodeRuntimeHostOptions(input)
-    const key = opencodePoolKey(binaryPath, cwd)
+    const { binaryPath, cwd, managed, accessMode } = resolveOpencodeRuntimeHostOptions(input)
+    const key = opencodePoolKey(binaryPath, cwd, accessMode)
     let entry = this.entries.get(key)
 
     if (entry) {
@@ -109,7 +115,7 @@ export class OpencodeRuntimePool {
       entry.refCount += 1
     }
     else {
-      entry = this.createEntry({ key, binaryPath, managed, cwd })
+      entry = this.createEntry({ key, binaryPath, managed, cwd, accessMode })
       this.entries.set(key, entry)
     }
 
@@ -182,6 +188,7 @@ export class OpencodeRuntimePool {
     binaryPath: string
     managed: boolean
     cwd: string
+    accessMode: OpencodeAccessMode
   }): OpencodePoolEntry {
     const entry: OpencodePoolEntry = {
       ...input,
@@ -194,6 +201,7 @@ export class OpencodeRuntimePool {
       binaryPath: input.binaryPath,
       managed: input.managed,
       cwd: input.cwd,
+      accessMode: input.accessMode,
       startupTimeoutMs: this.startupTimeoutMs,
       onExit: (code, signal) => this.handleHostExit(entry, code, signal),
     }).then(async (host) => {
@@ -305,12 +313,19 @@ export function resolveOpencodeRuntimeHostOptions(input: {
   binaryPath?: string
   managed?: boolean
   directory?: string
-} = {}): { binaryPath: string, managed: boolean, cwd: string } {
+  accessMode?: OpencodeAccessMode
+} = {}): {
+  binaryPath: string
+  managed: boolean
+  cwd: string
+  accessMode: OpencodeAccessMode
+} {
   const executable = resolveOpencodeExecutable({ binaryPath: input.binaryPath })
   return {
     binaryPath: executable.command,
     managed: input.managed ?? executable.managed,
     cwd: input.directory?.trim() || process.cwd(),
+    accessMode: input.accessMode === 'approval-required' ? 'approval-required' : 'full-access',
   }
 }
 
@@ -322,11 +337,13 @@ export async function acquireOpencodeRuntimeResource(input: {
   directory?: string
   binaryPath?: string
   managed?: boolean
+  accessMode?: OpencodeAccessMode
 }): Promise<RuntimeLiveResourceLease<OpencodeRuntimeResource>> {
   return await opencodeRuntimePool.acquire({
     directory: input.directory,
     binaryPath: input.binaryPath,
     managed: input.managed,
+    accessMode: input.accessMode,
   })
 }
 
@@ -355,10 +372,67 @@ export function getOpencodeServerResources(): OpencodeServerResources[] {
   return opencodeRuntimePool.getResources()
 }
 
+export interface OpencodeServerHealthResult {
+  hostId: string
+  url: string | null
+  healthy: boolean
+  latencyMs: number | null
+  message: string | null
+}
+
+/**
+ * Pings `/api/health` on every pooled OpenCode host. Process liveness alone does not
+ * mean the server can serve requests; this verifies the HTTP surface end to end.
+ */
+export async function checkOpencodeServerHealth(): Promise<OpencodeServerHealthResult[]> {
+  return await Promise.all(opencodeRuntimePool.getResources().map(async (resource) => {
+    if (!resource.url) {
+      return {
+        hostId: resource.hostId,
+        url: null,
+        healthy: false,
+        latencyMs: null,
+        message: 'OpenCode server URL is unknown.',
+      }
+    }
+    const startedAt = Date.now()
+    try {
+      const client = createOpencodeV2Client({ baseUrl: resource.url })
+      const result = await client.v2.health.get()
+      if (result.error) {
+        return {
+          hostId: resource.hostId,
+          url: resource.url,
+          healthy: false,
+          latencyMs: Date.now() - startedAt,
+          message: formatError(result.error),
+        }
+      }
+      return {
+        hostId: resource.hostId,
+        url: resource.url,
+        healthy: true,
+        latencyMs: Date.now() - startedAt,
+        message: null,
+      }
+    }
+    catch (error) {
+      return {
+        hostId: resource.hostId,
+        url: resource.url,
+        healthy: false,
+        latencyMs: Date.now() - startedAt,
+        message: formatError(error),
+      }
+    }
+  }))
+}
+
 async function startManagedOpencodeHost(input: {
   binaryPath: string
   managed: boolean
   cwd: string
+  accessMode: OpencodeAccessMode
   startupTimeoutMs: number
   onExit: (code: number | null, signal: NodeJS.Signals | null) => void
 }): Promise<OpencodeManagedHost> {
@@ -367,6 +441,7 @@ async function startManagedOpencodeHost(input: {
     binaryPath: input.binaryPath,
     managed: input.managed,
     cwd: input.cwd,
+    accessMode: input.accessMode,
     port,
     startupTimeoutMs: input.startupTimeoutMs,
   })
@@ -384,6 +459,7 @@ async function startManagedOpencodeHost(input: {
   logger.info('opencode server started', {
     binaryPath: input.binaryPath,
     cwd: input.cwd,
+    accessMode: input.accessMode,
     url,
     port,
     childPid: readManagedProcessPid(proc),
@@ -394,6 +470,7 @@ async function startManagedOpencodeHost(input: {
     url,
     binaryPath: input.binaryPath,
     cwd: input.cwd,
+    accessMode: input.accessMode,
     startedAt,
     close,
   }
@@ -403,6 +480,7 @@ function launchOpencodeServer(input: {
   binaryPath: string
   managed: boolean
   cwd: string
+  accessMode: OpencodeAccessMode
   port: number
   startupTimeoutMs: number
 }): Promise<{ process: ManagedChildProcess, url: string }> {
@@ -477,6 +555,7 @@ export function createOpencodeServerProcessOptions(input: {
   binaryPath: string
   managed?: boolean
   cwd: string
+  accessMode?: OpencodeAccessMode
   port: number
 }): ManagedSpawnOptions {
   return {
@@ -484,10 +563,30 @@ export function createOpencodeServerProcessOptions(input: {
     command: input.binaryPath,
     args: ['serve', '--hostname=127.0.0.1', `--port=${input.port}`],
     cwd: input.cwd,
-    ...(input.managed ? { env: { ...process.env, OPENCODE_DISABLE_AUTOUPDATE: '1' } } : {}),
+    ...(input.managed
+      ? { env: { ...process.env, OPENCODE_DISABLE_AUTOUPDATE: '1', ...buildOpencodePermissionEnv(input.accessMode) } }
+      : {}),
     stdin: 'ignore',
     shutdownGraceMs: 3_000,
   }
+}
+
+/**
+ * Builds the process-local `OPENCODE_PERMISSION` override for hosts serving sessions that
+ * require approval for every action. The value is deep-merged over the user's own config,
+ * and opencode resolves more specific rules (per tool) ahead of the `*` catch-all — so the
+ * user's explicit allow/deny rules keep winning; only unconfigured actions are forced to ask.
+ * Full-access hosts inject nothing and inherit the user's native permission config.
+ */
+function buildOpencodePermissionEnv(accessMode: OpencodeAccessMode | undefined): Record<string, string> {
+  if (accessMode !== 'approval-required') {
+    return {}
+  }
+  return { OPENCODE_PERMISSION: JSON.stringify({ '*': 'ask' }) }
+}
+
+function opencodePoolKey(binaryPath: string, cwd: string, accessMode: OpencodeAccessMode): string {
+  return JSON.stringify({ binaryPath, cwd, accessMode })
 }
 
 async function stopProcess(proc: ManagedChildProcess): Promise<void> {
@@ -495,10 +594,6 @@ async function stopProcess(proc: ManagedChildProcess): Promise<void> {
     return
   }
   await proc.stop('SIGTERM')
-}
-
-function opencodePoolKey(binaryPath: string, cwd: string): string {
-  return JSON.stringify({ binaryPath, cwd })
 }
 
 async function findAvailablePort(): Promise<number> {
