@@ -456,3 +456,8 @@ function readUpdatePlatform(): 'darwin' | 'linux' | 'win32' | null {
 }
 
 export { readUpdateFeedUrl, resolveElectronUpdaterFeedUrl }
+
+/** Synchronous supportability probe for native UI (application menu) enablement. */
+export function isDesktopUpdateSupported(): boolean {
+  return readUnsupportedReason(readUpdateFeedUrl()) === null
+}

@@ -14,6 +14,7 @@ import {
   resolveWindowControlsOverlay,
   resolveWindowControlsSafeArea,
 } from '../shared/window-controls-safe-area'
+import { setupApplicationMenu } from './application-menu'
 import {
   registerBrowserIpcHandlers,
   sendBrowserAnnotationRuntimeEvent,
@@ -797,6 +798,14 @@ export async function startDesktopApp(): Promise<void> {
       // renderer remains on its static shell until the server publishes ready.
       mainWindow = await createMainWindow()
       setMainWindow(mainWindow)
+      setupApplicationMenu({
+        checkForUpdates: () => {
+          void updateManager?.checkForUpdates()
+        },
+        openSettings: () => {
+          void trayManager?.performAction('open-desktop-settings')
+        },
+      })
 
       await initializeDesktopUpdateManager()
       await initializeDesktopDataDirectory()
