@@ -191,7 +191,8 @@ jobs:
     name: Build Desktop (mac arm64)
     needs: [resolve]
     runs-on: macos-latest
-    timeout-minutes: 60
+    # Sparkle delta generation over multiple large app archives can exceed an hour.
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
