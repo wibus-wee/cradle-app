@@ -57,10 +57,6 @@
   "surface.home": "Home",
   "surface.kanban": "Kanban",
   "surface.newChat": "New chat",
-  "windowControl.close": "Close",
-  "windowControl.maximize": "Maximize",
-  "windowControl.minimize": "Minimize",
-  "windowControl.restore": "Restore",
   "surface.usage": "Usage",
   "update.button": "Updates",
   "update.status.available": "Update {{version}}",
@@ -78,5 +74,9 @@
   "whatsNew.eyebrow": "What's New",
   "whatsNew.history": "Release history",
   "whatsNew.later": "Later",
-  "whatsNew.seeDetails": "See details"
+  "whatsNew.seeDetails": "See details",
+  "windowControl.close": "Close",
+  "windowControl.maximize": "Maximize",
+  "windowControl.minimize": "Minimize",
+  "windowControl.restore": "Restore"
 }
