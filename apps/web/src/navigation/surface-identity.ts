@@ -425,7 +425,7 @@ export function surfaceDraftFromRoute(input: {
     return {
       id: pluginSurfaceId(routeSegment, localId),
       kind: 'plugin',
-      title: 'Plugin',
+      title: getI18n().t('settings:plugins.panel.fallbackTitle'),
       route: { to: '/plugins/$routeSegment/$localId', params: { routeSegment, localId } },
       closable: true,
     }

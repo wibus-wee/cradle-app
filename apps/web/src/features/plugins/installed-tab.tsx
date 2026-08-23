@@ -6,12 +6,12 @@
  * external goes through TrustConsentDialog; uninstalling a source that fans out
  * to >1 plugin asks for confirmation. No footer telemetry strip.
  */
-import { DeleteLine as TrashIcon, PuzzledLine as PuzzleIcon, Refresh2Line as RefreshIcon, SearchLine as SearchIcon } from '@mingcute/react'
+import { DeleteLine as TrashIcon, PuzzledLine as PuzzleIcon, Refresh2Line as RefreshIcon, SearchLine as SearchIcon, WarningLine as WarningIcon } from '@mingcute/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { deletePluginsSourcesById, getPlugins, getPluginsSources, getPluginsSourcesByIdUninstallPlan, patchPluginsByRouteSegmentEnabled } from '~/api-gen/sdk.gen'
+import { deletePluginsSourcesById, getPlugins, getPluginsSources, getPluginsSourcesByIdUninstallPlan, patchPluginsByRouteSegmentEnabled, postPluginsSourcesByIdRefresh } from '~/api-gen/sdk.gen'
 import type { GetPluginsResponse, GetPluginsSourcesByIdUninstallPlanResponse, GetPluginsSourcesResponse } from '~/api-gen/types.gen'
 import {
   AlertDialog,
@@ -29,6 +29,7 @@ import { Switch } from '~/components/ui/switch'
 import { toastManager } from '~/components/ui/toast'
 import { cn } from '~/lib/cn'
 import { getServerUrl } from '~/lib/electron'
+import { usePluginStore } from '~/lib/plugin-store'
 
 import { TrustConsentDialog } from './plugins-trust-consent-dialog'
 
@@ -69,15 +70,15 @@ function provenanceLabel(plugin: InstalledPlugin, sources: PluginSourceEntry[], 
   return t('plugins.provenance.local')
 }
 
-function unsyncDesktopPlugins(plugins: Array<{ identity: string, hasDesktop: boolean }>): void {
+function unsyncDesktopPlugins(plugins: Array<{ identity: string, hasDesktop: boolean }>, onSyncFailed: () => void): void {
   for (const plugin of plugins) {
     if (plugin.hasDesktop) {
-      void window.cradle?.plugins?.unsyncSource(plugin.identity).catch(() => undefined)
+      void window.cradle?.plugins?.unsyncSource(plugin.identity).catch(onSyncFailed)
     }
   }
 }
 
-export function InstalledTab() {
+export function InstalledTab({ onBrowseMarketplace, onImportSource }: { onBrowseMarketplace?: () => void, onImportSource?: () => void }) {
   const { t } = useTranslation('settings')
   const queryClient = useQueryClient()
 
@@ -156,6 +157,25 @@ export function InstalledTab() {
     },
   })
 
+  const updateSourceMutation = useMutation({
+    mutationFn: async (sourceId: string) => {
+      const { error } = await postPluginsSourcesByIdRefresh({ path: { id: sourceId } })
+      if (error) {
+        throw new Error(String(error))
+      }
+    },
+    onSuccess: () => {
+      toastManager.add({ type: 'success', title: t('plugins.sources.toast.refreshed') })
+    },
+    onError: () => {
+      toastManager.add({ type: 'error', title: t('plugins.sources.toast.refreshFailed') })
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['plugins', 'list'] })
+      void queryClient.invalidateQueries({ queryKey: ['plugins', 'sources'] })
+    },
+  })
+
   const uninstallMutation = useMutation({
     mutationFn: async ({ sourceId, confirmationToken }: { sourceId: string, confirmationToken: string }) => {
       const { error } = await deletePluginsSourcesById({
@@ -171,7 +191,9 @@ export function InstalledTab() {
       if (target) {
         const owner = findOwningSource(target, sourcesQuery.data ?? [])
         if (owner) {
-          unsyncDesktopPlugins(owner.plugins)
+          unsyncDesktopPlugins(owner.plugins, () => {
+            toastManager.add({ type: 'warning', title: t('plugins.sources.toast.desktopUnsyncFailed') })
+          })
         }
       }
       toastManager.add({ type: 'success', title: t('plugins.sources.toast.removed') })
@@ -189,6 +211,7 @@ export function InstalledTab() {
 
   const plugins = useMemo(() => pluginsQuery.data ?? [], [pluginsQuery.data])
   const sources = useMemo(() => sourcesQuery.data ?? [], [sourcesQuery.data])
+  const webLayerStates = usePluginStore(s => s.webLayerStates)
   const loading = pluginsQuery.isLoading
 
   const enabledCount = useMemo(() => plugins.filter(p => p.activation.enabled).length, [plugins])
@@ -296,7 +319,12 @@ export function InstalledTab() {
               )
             : plugins.length === 0
               ? (
-                  <EmptyState title={t('plugins.empty.title')} description={t('plugins.empty.description')} />
+                  <EmptyState
+                    title={t('plugins.empty.title')}
+                    description={t('plugins.empty.description')}
+                    onBrowseMarketplace={onBrowseMarketplace}
+                    onImportSource={onImportSource}
+                  />
                 )
               : visiblePlugins.length === 0
                 ? (
@@ -304,16 +332,26 @@ export function InstalledTab() {
                   )
                 : (
                     <ul className="flex flex-col gap-2">
-                      {visiblePlugins.map(plugin => (
-                        <InstalledCard
-                          key={plugin.routeSegment}
-                          plugin={plugin}
-                          sources={sources}
-                          toggling={toggleMutation.isPending && toggleMutation.variables?.routeSegment === plugin.routeSegment}
-                          onToggle={next => handleToggle(plugin, next)}
-                          onUninstall={() => setUninstallTarget(plugin)}
-                        />
-                      ))}
+                      {visiblePlugins.map((plugin) => {
+                        const owningSource = findOwningSource(plugin, sources)
+                        const webLayerState = webLayerStates[plugin.identity]
+                        const webActivationError = webLayerState?.status === 'failed'
+                          ? webLayerState.error ?? ''
+                          : null
+                        return (
+                          <InstalledCard
+                            key={plugin.routeSegment}
+                            plugin={plugin}
+                            sources={sources}
+                            toggling={toggleMutation.isPending && toggleMutation.variables?.routeSegment === plugin.routeSegment}
+                            updating={updateSourceMutation.isPending && updateSourceMutation.variables === owningSource?.id}
+                            webActivationError={webActivationError}
+                            onToggle={next => handleToggle(plugin, next)}
+                            onUninstall={() => setUninstallTarget(plugin)}
+                            onUpdate={owningSource ? () => updateSourceMutation.mutate(owningSource.id) : undefined}
+                          />
+                        )
+                      })}
                     </ul>
                   )}
       </div>
@@ -405,11 +443,15 @@ interface InstalledCardProps {
   plugin: InstalledPlugin
   sources: PluginSourceEntry[]
   toggling: boolean
+  updating: boolean
+  /** Non-null when the web bundle failed to activate; carries the error message. */
+  webActivationError: string | null
   onToggle: (next: boolean) => void
   onUninstall: () => void
+  onUpdate?: () => void
 }
 
-function InstalledCard({ plugin, sources, toggling, onToggle, onUninstall }: InstalledCardProps) {
+function InstalledCard({ plugin, sources, toggling, updating, webActivationError, onToggle, onUninstall, onUpdate }: InstalledCardProps) {
   const { t } = useTranslation('settings')
   const enabled = plugin.activation.enabled
   const canUninstall = plugin.source.kind === 'externalLocal'
@@ -432,6 +474,18 @@ v
             {plugin.description || t('plugins.noDescription')}
           </p>
           <p className="mt-1 text-[10.5px] text-muted-foreground/70">{provenance}</p>
+          {webActivationError !== null && (
+            <p
+              className="mt-1 flex items-center gap-1 text-[10.5px] text-amber-600 dark:text-amber-300"
+              title={webActivationError || undefined}
+            >
+              <WarningIcon className="size-3 shrink-0" aria-hidden="true" />
+              <span className="shrink-0">{t('plugins.activation.failed')}</span>
+              {webActivationError && (
+                <span className="min-w-0 truncate text-amber-600/80 dark:text-amber-300/80">{webActivationError}</span>
+              )}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
           <Switch
@@ -441,6 +495,19 @@ v
             onCheckedChange={onToggle}
             aria-label={t('plugins.toggleAria', { name: plugin.displayName })}
           />
+          {onUpdate && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={onUpdate}
+              disabled={updating}
+              aria-label={t('plugins.marketplace.update')}
+              title={t('plugins.marketplace.update')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <RefreshIcon className={cn('size-3.5', updating && 'animate-spin')} aria-hidden="true" />
+            </Button>
+          )}
           {canUninstall && (
             <Button
               variant="ghost"
@@ -475,12 +542,27 @@ function PluginAvatar({ iconUrl, name }: { iconUrl: string | null, name: string 
   )
 }
 
-function EmptyState({ title, description }: { title: string, description: string }) {
+function EmptyState({ title, description, onBrowseMarketplace, onImportSource }: { title: string, description: string, onBrowseMarketplace?: () => void, onImportSource?: () => void }) {
+  const { t } = useTranslation('settings')
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-foreground/10 bg-muted/20 px-6 py-12 text-center">
       <PuzzleIcon className="size-5 text-muted-foreground/60" aria-hidden="true" />
       <h3 className="text-[13px] font-medium text-foreground">{title}</h3>
       <p className="max-w-sm text-[12px] leading-relaxed text-muted-foreground">{description}</p>
+      {(onBrowseMarketplace || onImportSource) && (
+        <div className="mt-2 flex items-center gap-2">
+          {onBrowseMarketplace && (
+            <Button variant="outline" size="sm" onClick={onBrowseMarketplace}>
+              {t('plugins.empty.browseMarketplace')}
+            </Button>
+          )}
+          {onImportSource && (
+            <Button variant="ghost" size="sm" onClick={onImportSource}>
+              {t('plugins.empty.importSource')}
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -8,7 +8,7 @@ const meta = {
   component: PluginInstallErrorView,
   decorators: [
     Story => (
-      <main className="mx-auto w-full max-w-xl p-6">
+      <main className="w-full p-6">
         <Story />
       </main>
     ),
@@ -29,5 +29,11 @@ export const InvalidPlugin: Story = {}
 export const NetworkFailure: Story = {
   args: {
     message: 'The plugin source could not be reached. Check the network connection and retry.',
+  },
+}
+
+export const RepoNotFound: Story = {
+  args: {
+    message: 'Couldn\'t find that repository. Check the owner/repo name or whether it is private.',
   },
 }

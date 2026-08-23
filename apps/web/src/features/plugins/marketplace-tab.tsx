@@ -28,6 +28,7 @@ import { getServerUrl } from '~/lib/electron'
 
 import type { WizardSource } from './install-wizard'
 import { InstallWizard } from './install-wizard'
+import { TrustConsentDialog } from './plugins-trust-consent-dialog'
 
 type MarketplaceEntry = GetPluginsMarketplaceResponse['plugins'][number]
 type InstalledPlugin = GetPluginsResponse[number]
@@ -64,6 +65,7 @@ export function MarketplaceTab() {
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState<Category>('all')
   const [installEntry, setInstallEntry] = useState<MarketplaceEntry | null>(null)
+  const [trustTarget, setTrustTarget] = useState<string | null>(null)
 
   const marketplaceQuery = useQuery({
     queryKey: ['plugins', 'marketplace'],
@@ -109,6 +111,9 @@ export function MarketplaceTab() {
     onSuccess: () => {
       toastManager.add({ type: 'success', title: t('plugins.center.refresh') })
     },
+    onError: () => {
+      toastManager.add({ type: 'error', title: t('plugins.center.refreshFailed') })
+    },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'marketplace'] })
     },
@@ -128,7 +133,19 @@ export function MarketplaceTab() {
     onError: () => {
       toastManager.add({ type: 'error', title: t('plugins.toast.toggleFailed') })
     },
+    onSettled: () => {
+      setTrustTarget(null)
+    },
   })
+
+  const handleEnable = (plugin: InstalledPlugin) => {
+    const untrustedExternal = plugin.source.kind === 'externalLocal' && !plugin.source.trusted
+    if (untrustedExternal) {
+      setTrustTarget(plugin.routeSegment)
+      return
+    }
+    enableMutation.mutate(plugin.routeSegment)
+  }
 
   const entries = marketplaceQuery.data?.plugins ?? []
   const installedPlugins = installedQuery.data ?? []
@@ -251,7 +268,7 @@ export function MarketplaceTab() {
                                 installedPlugins={installedPlugins}
                                 sources={sources}
                                 enabling={enableMutation.isPending && enableMutation.variables === findRouteSegment(installedPlugins, entry)}
-                                onEnable={routeSegment => enableMutation.mutate(routeSegment)}
+                                onEnable={handleEnable}
                                 onInstall={() => setInstallEntry(entry)}
                               />
                             ))}
@@ -267,7 +284,7 @@ export function MarketplaceTab() {
                             installedPlugins={installedPlugins}
                             sources={sources}
                             enabling={enableMutation.isPending && enableMutation.variables === findRouteSegment(installedPlugins, entry)}
-                            onEnable={routeSegment => enableMutation.mutate(routeSegment)}
+                            onEnable={handleEnable}
                             onInstall={() => setInstallEntry(entry)}
                           />
                         ))}
@@ -282,28 +299,47 @@ export function MarketplaceTab() {
             <SheetTitle>{installEntry?.displayName ?? ''}</SheetTitle>
             <SheetDescription>{installEntry?.description ?? ''}</SheetDescription>
           </SheetHeader>
-          {installEntry?.source && (
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-              <InstallWizard
-                initialSource={entryToWizardSource(installEntry)}
-                sourceLabel={installEntry.displayName}
-                mode="source"
-                onDismiss={() => setInstallEntry(null)}
-              />
-            </div>
-          )}
+          {installEntry?.source
+            ? (
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+                  <InstallWizard
+                    initialSource={entryToWizardSource(installEntry)}
+                    sourceLabel={installEntry.displayName}
+                    mode="source"
+                    onDismiss={() => setInstallEntry(null)}
+                  />
+                </div>
+              )
+            : (
+                <div className="px-4 pb-4 text-[12px] text-muted-foreground">
+                  {t('plugins.marketplace.notInstallable')}
+                </div>
+              )}
         </SheetContent>
       </Sheet>
+
+      <TrustConsentDialog
+        routeSegment={trustTarget}
+        onConfirm={() => trustTarget && enableMutation.mutate(trustTarget)}
+        onCancel={() => setTrustTarget(null)}
+        confirmPending={enableMutation.isPending}
+      />
     </div>
   )
 }
 
-function findRouteSegment(installedPlugins: InstalledPlugin[], entry: MarketplaceEntry): string | null {
+function findBundledMatch(installedPlugins: InstalledPlugin[], entry: MarketplaceEntry): InstalledPlugin | undefined {
   if (!entry.bundled) {
-    return null
+    return undefined
   }
-  const match = installedPlugins.find(plugin => plugin.displayName.toLowerCase() === entry.displayName.toLowerCase())
-  return match?.routeSegment ?? null
+  // Marketplace entry ids mirror the bundled plugins' route segments
+  // (e.g. `@cradle/browser-use` -> `browser-use`); displayName is a fallback.
+  return installedPlugins.find(plugin => plugin.routeSegment === entry.id)
+    ?? installedPlugins.find(plugin => plugin.displayName.toLowerCase() === entry.displayName.toLowerCase())
+}
+
+function findRouteSegment(installedPlugins: InstalledPlugin[], entry: MarketplaceEntry): string | null {
+  return findBundledMatch(installedPlugins, entry)?.routeSegment ?? null
 }
 
 function entryToWizardSource(entry: MarketplaceEntry): WizardSource | undefined {
@@ -333,7 +369,7 @@ interface MarketplaceCardProps {
   installedPlugins: InstalledPlugin[]
   sources: PluginSourceEntry[]
   enabling: boolean
-  onEnable: (routeSegment: string) => void
+  onEnable: (plugin: InstalledPlugin) => void
   onInstall: () => void
 }
 
@@ -341,7 +377,7 @@ function MarketplaceCard({ entry, featured, installedPlugins, sources, enabling,
   const { t } = useTranslation('settings')
   const iconUrl = useMemo(() => resolveIconUrl(entry.icon), [entry.icon])
 
-  const bundledMatch = entry.bundled ? installedPlugins.find(plugin => plugin.displayName.toLowerCase() === entry.displayName.toLowerCase()) : undefined
+  const bundledMatch = findBundledMatch(installedPlugins, entry)
   const bundledEnabled = bundledMatch?.activation.enabled ?? false
   const installableInstalled = isInstallableInstalled(entry, sources)
 
@@ -389,7 +425,7 @@ function MarketplaceCard({ entry, featured, installedPlugins, sources, enabling,
                   </span>
                 )
               : (
-                  <Button size="sm" variant="outline" className="h-7 gap-1.5" disabled={enabling} onClick={() => bundledMatch && onEnable(bundledMatch.routeSegment)}>
+                  <Button size="sm" variant="outline" className="h-7 gap-1.5" disabled={enabling} onClick={() => bundledMatch && onEnable(bundledMatch)}>
                     {enabling ? <Spinner className="size-3" /> : null}
                     {t('plugins.marketplace.enable')}
                   </Button>
@@ -413,6 +449,8 @@ function MarketplaceCard({ entry, featured, installedPlugins, sources, enabling,
             href={entry.homepage}
             target="_blank"
             rel="noreferrer"
+            aria-label={t('plugins.marketplace.visitHomepage')}
+            title={t('plugins.marketplace.visitHomepage')}
             className="ml-auto text-[10.5px] text-muted-foreground/70 transition hover:text-foreground"
           >
             ↗

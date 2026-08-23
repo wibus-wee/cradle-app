@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
@@ -12,6 +13,7 @@ export const Route = createFileRoute('/plugins/')({
 
 function PluginCenter() {
   const { t } = useTranslation('settings')
+  const [tab, setTab] = useState('marketplace')
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden px-8 pt-8">
@@ -19,7 +21,7 @@ function PluginCenter() {
         <h1 className="text-[15px] font-semibold text-foreground">{t('plugins.center.title')}</h1>
       </div>
 
-      <Tabs defaultValue="marketplace" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TabsList className="self-start">
           <TabsTrigger value="marketplace">{t('plugins.center.tab.marketplace')}</TabsTrigger>
           <TabsTrigger value="installed">{t('plugins.center.tab.installed')}</TabsTrigger>
@@ -30,7 +32,10 @@ function PluginCenter() {
           <MarketplaceTab />
         </TabsContent>
         <TabsContent value="installed" className="min-h-0 flex-1 overflow-hidden">
-          <InstalledTab />
+          <InstalledTab
+            onBrowseMarketplace={() => setTab('marketplace')}
+            onImportSource={() => setTab('import')}
+          />
         </TabsContent>
         <TabsContent value="import" className="min-h-0 flex-1 overflow-hidden">
           <ImportTab />

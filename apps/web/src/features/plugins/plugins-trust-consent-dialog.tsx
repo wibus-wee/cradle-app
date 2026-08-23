@@ -75,7 +75,7 @@ export function TrustConsentDialog({ routeSegment, onConfirm, onCancel, confirmP
                 )
               : permissions.length === 0
                 ? (
-                    <p className="text-[12px] text-muted-foreground">{t('plugins.preview.empty')}</p>
+                    <p className="text-[12px] text-muted-foreground">{t('plugins.trust.noPermissions')}</p>
                   )
                 : (
                     <ul className="flex flex-col gap-2">

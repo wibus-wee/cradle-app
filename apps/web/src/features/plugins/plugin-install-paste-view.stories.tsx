@@ -8,16 +8,16 @@ const meta = {
   component: PluginInstallPasteView,
   decorators: [
     Story => (
-      <main className="mx-auto w-full max-w-xl p-6">
+      <main className="w-full p-6">
         <Story />
       </main>
     ),
   ],
   args: {
-    input: 'cradle-app/example-plugin',
+    input: 'cradle-app/official-plugins',
     parsed: {
       kind: 'git',
-      location: 'cradle-app/example-plugin',
+      location: 'cradle-app/official-plugins',
     },
     looksLikeLocalPath: false,
     pending: false,
@@ -31,15 +31,40 @@ export default meta
 
 type Story = StoryObj<typeof meta>
 
+export const Empty: Story = {
+  args: {
+    input: '',
+    parsed: null,
+  },
+}
+
 export const RecognizedGitHub: Story = {}
 
 export const RecognizedNpm: Story = {
   args: {
-    input: '@cradle/example-plugin',
+    input: '@cradle/browser-use',
     parsed: {
       kind: 'npm',
-      location: '@cradle/example-plugin',
+      location: '@cradle/browser-use',
     },
+  },
+}
+
+export const RecognizedCradleLink: Story = {
+  args: {
+    input: 'cradle://plugins/install?source=github&repository=owner/repo',
+    parsed: {
+      kind: 'git',
+      location: 'owner/repo',
+    },
+  },
+}
+
+export const InvalidInput: Story = {
+  args: {
+    input: 'not a plugin source at all ???',
+    parsed: null,
+    looksLikeLocalPath: false,
   },
 }
 

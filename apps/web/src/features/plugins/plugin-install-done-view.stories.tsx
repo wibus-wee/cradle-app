@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { fn } from 'storybook/test'
 
-import { pluginInstallResultFixture } from './fixtures/plugin-install'
+import {
+  installedPluginFixture,
+  pluginInstallResultFixture,
+} from './fixtures/plugin-install'
 import { PluginInstallDoneView } from './plugin-install-done-view'
 
 const meta = {
@@ -9,7 +12,7 @@ const meta = {
   component: PluginInstallDoneView,
   decorators: [
     Story => (
-      <main className="mx-auto w-full max-w-xl p-6">
+      <main className="w-full p-6">
         <Story />
       </main>
     ),
@@ -31,9 +34,22 @@ type Story = StoryObj<typeof meta>
 
 export const Installed: Story = {}
 
+export const SinglePlugin: Story = {
+  args: {
+    result: {
+      ...pluginInstallResultFixture,
+      source: {
+        ...pluginInstallResultFixture.source,
+        plugins: [installedPluginFixture],
+      },
+      discoveredPlugins: [installedPluginFixture],
+    },
+  },
+}
+
 export const EnablingPlugin: Story = {
   args: {
-    enablingRouteSegment: 'local-bridge',
+    enablingRouteSegment: 'slack-conversation-bridge',
   },
 }
 

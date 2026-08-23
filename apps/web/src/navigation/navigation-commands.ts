@@ -277,7 +277,7 @@ export function openPluginPanel(input: {
   openSurface({
     id: pluginSurfaceId(input.routeSegment, input.localId),
     kind: 'plugin',
-    title: 'Plugin',
+    title: getI18n().t('settings:plugins.panel.fallbackTitle'),
     route: {
       to: '/plugins/$routeSegment/$localId',
       params: {

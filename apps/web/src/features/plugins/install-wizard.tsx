@@ -27,6 +27,17 @@ import type {
   PostPluginsSourcesPreviewResponse,
   PostPluginsSourcesResponse,
 } from '~/api-gen/types.gen'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '~/components/ui/alert-dialog'
+import { Spinner } from '~/components/ui/spinner'
 import { toastManager } from '~/components/ui/toast'
 import { getServerUrl } from '~/lib/electron'
 
@@ -60,14 +71,14 @@ type Step = 'paste' | 'previewing' | 'review' | 'installing' | 'done' | 'error'
 
 type InstalledDescriptor = PostPluginsSourcesResponse['discoveredPlugins'][number]
 
-function syncDesktopSource(sourceId: string): void {
-  void window.cradle?.plugins?.syncSource(sourceId).catch(() => undefined)
+function syncDesktopSource(sourceId: string, onSyncFailed: () => void): void {
+  void window.cradle?.plugins?.syncSource(sourceId).catch(onSyncFailed)
 }
 
-function unsyncDesktopPlugins(plugins: Array<{ identity: string, hasDesktop: boolean }>): void {
+function unsyncDesktopPlugins(plugins: Array<{ identity: string, hasDesktop: boolean }>, onSyncFailed: () => void): void {
   for (const plugin of plugins) {
     if (plugin.hasDesktop) {
-      void window.cradle?.plugins?.unsyncSource(plugin.identity).catch(() => undefined)
+      void window.cradle?.plugins?.unsyncSource(plugin.identity).catch(onSyncFailed)
     }
   }
 }
@@ -100,7 +111,8 @@ function mapPluginError(error: unknown, t: TFunction<'settings'>): string {
   if ((status && status >= 500) || lower.includes('network') || lower.includes('failed to fetch') || lower.includes('fetch failed') || lower.includes('econnrefused') || lower.includes('enotfound')) {
     return t('plugins.add.error.network')
   }
-  return message
+  console.error('[plugins] install flow error:', error)
+  return t('plugins.add.errorGeneric')
 }
 
 function sourceBody(source: WizardSource) {
@@ -125,6 +137,7 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
   const [installResult, setInstallResult] = useState<PostPluginsSourcesResponse | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [trustTarget, setTrustTarget] = useState<string | null>(null)
+  const [undoConfirmOpen, setUndoConfirmOpen] = useState(false)
 
   const parsed = useMemo(() => parsePluginSourceInput(input), [input])
   const inputLooksLikeLocalPath = useMemo(() => looksLikeLocalPath(input), [input])
@@ -172,7 +185,9 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
     onSuccess: (data) => {
       setInstallResult(data)
       if (data?.source.id) {
-        syncDesktopSource(data.source.id)
+        syncDesktopSource(data.source.id, () => {
+          toastManager.add({ type: 'warning', title: t('plugins.sources.toast.desktopSyncFailed') })
+        })
       }
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'list'] })
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'sources'] })
@@ -224,7 +239,9 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
     },
     onSuccess: () => {
       if (installResult?.discoveredPlugins) {
-        unsyncDesktopPlugins(installResult.discoveredPlugins)
+        unsyncDesktopPlugins(installResult.discoveredPlugins, () => {
+          toastManager.add({ type: 'warning', title: t('plugins.sources.toast.desktopUnsyncFailed') })
+        })
       }
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'list'] })
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'sources'] })
@@ -291,7 +308,11 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
       )}
 
       {step === 'previewing' && (
-        <PluginInstallProgressView label={t('plugins.add.resolving')} />
+        <PluginInstallProgressView
+          label={t('plugins.add.resolving')}
+          hint={t('plugins.add.progress.resolvingHint')}
+          step="source"
+        />
       )}
 
       {step === 'review' && preview && (
@@ -309,7 +330,11 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
       )}
 
       {step === 'installing' && (
-        <PluginInstallProgressView label={t('plugins.add.installing')} />
+        <PluginInstallProgressView
+          label={t('plugins.add.installing')}
+          hint={t('plugins.add.progress.installingHint')}
+          step="install"
+        />
       )}
 
       {step === 'done' && installResult && (
@@ -318,7 +343,7 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
           serverUrl={getServerUrl()}
           enablingRouteSegment={enableMutation.isPending ? enableMutation.variables ?? null : null}
           onEnable={handleEnable}
-          onUndo={() => installResult.source.id && undoMutation.mutate(installResult.source.id)}
+          onUndo={() => setUndoConfirmOpen(true)}
           undoing={undoMutation.isPending}
           onDone={onDismiss}
         />
@@ -338,6 +363,34 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
           onCancel={onDismiss}
         />
       )}
+
+      <AlertDialog open={undoConfirmOpen} onOpenChange={setUndoConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('plugins.add.undo')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('plugins.add.undoConfirm', {
+                count: installResult?.discoveredPlugins.length ?? 0,
+                source: sourceDisplayName,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={undoMutation.isPending}>{t('plugins.add.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault()
+                if (installResult?.source.id) {
+                  undoMutation.mutate(installResult.source.id)
+                }
+              }}
+              disabled={undoMutation.isPending}
+            >
+              {undoMutation.isPending ? <Spinner className="size-3.5" /> : t('plugins.add.undo')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <TrustConsentDialog
         routeSegment={trustTarget}
