@@ -237,6 +237,40 @@ describe('codexAppServerBridge stream lifecycle', () => {
     expect(client.close).not.toHaveBeenCalled()
   })
 
+  it('ends with a truncation error when the consumer stops keeping up', async () => {
+    const client = new FakeBridgeAppServerClient({
+      'turn/start': { turn: { id: 'turn-1', status: 'inProgress' } },
+    })
+    const stream = createBridge(client).openEventStream({
+      ...createBridgeContext(),
+      method: 'turn/start',
+      params: { threadId: 'codex-thread-1', input: [{ type: 'text', text: 'Hi' }] },
+    })
+
+    await vi.waitFor(() => {
+      expect(client.requests.map(request => request.method)).toEqual(['thread/resume', 'turn/start'])
+    })
+
+    // Flood notifications without reading: let the bridge loop park frames
+    // in the bounded backlog until the overflow policy fires.
+    for (let i = 0; i < 300; i += 1) {
+      client.pushNotification({
+        method: 'other/event',
+        params: { index: i },
+      } as CodexAppServerMessage)
+    }
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    const events = await Promise.race([
+      readSseEvents(stream),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('stream did not end')), 5000)),
+    ])
+    const names = events.map(event => event.event)
+    expect(names.slice(-2)).toEqual(['error', 'done'])
+    expect(names.filter(name => name === 'notification').length).toBeLessThan(300)
+    expect((events.at(-2)?.data as { message?: string }).message).toContain('overflowed')
+  })
+
   it('reuses one scoped host while bridge streams overlap for the same session', async () => {
     const appServerOptions: CodexAppServerClientOptions[] = []
     const clients: FakeBridgeAppServerClient[] = []

@@ -12,7 +12,21 @@ vi.mock('../worktree/service', () => ({ resolveSessionExecutionRootById: vi.fn()
 
 function decodeSseChunk(chunk: Uint8Array): unknown {
   const frame = new TextDecoder().decode(chunk)
+  if (frame.startsWith(':')) {
+    throw new Error(`unexpected SSE comment frame: ${frame}`)
+  }
   return JSON.parse(frame.slice('data: '.length).trim())
+}
+
+async function readDataChunk(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<unknown> {
+  let result = await reader.read()
+  while (!result.done && new TextDecoder().decode(result.value).startsWith(':')) {
+    result = await reader.read()
+  }
+  if (result.done) {
+    throw new Error('stream ended before a data frame')
+  }
+  return decodeSseChunk(result.value!)
 }
 
 describe('code activity service', () => {
@@ -48,16 +62,15 @@ describe('code activity service', () => {
   })
 
   it('observes the session worktree and emits only relative file metadata', async () => {
-    const stream = openSessionEvents('session-1')
+    const stream = openSessionEvents('session-1', new AbortController().signal)
     const reader = stream.getReader()
-    const ready = await reader.read()
+    const ready = await readDataChunk(reader)
 
     expect(subscribeWorkspaceFileChanges).toHaveBeenCalledWith(expect.objectContaining({
       workspaceId: 'workspace-1',
       workspacePath: '/managed/worktrees/session-1',
     }))
-    expect(ready.done).toBe(false)
-    expect(decodeSseChunk(ready.value!)).toMatchObject({
+    expect(ready).toMatchObject({
       type: 'ready',
       sessionId: 'session-1',
       workspace: { id: 'workspace-1', name: 'Cradle' },

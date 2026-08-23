@@ -7,8 +7,8 @@ export const codeActivity = new Elysia({
   prefix: '/code-activity',
   detail: { tags: ['code-activity'] },
 })
-  .get('/sessions/:sessionId/events', ({ params }) => {
-    return new Response(CodeActivity.openSessionEvents(params.sessionId), {
+  .get('/sessions/:sessionId/events', ({ params, request }) => {
+    return new Response(CodeActivity.openSessionEvents(params.sessionId, request.signal), {
       headers: {
         'content-type': 'text/event-stream',
         'cache-control': 'no-cache',

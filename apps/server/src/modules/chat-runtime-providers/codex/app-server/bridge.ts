@@ -1,3 +1,9 @@
+import type { DeliveryStallWatchdog } from '../../../../infra/sse-event-stream'
+import {
+  DEFAULT_STREAM_STALL_MS,
+  sseStreamPressureCounters,
+  startDeliveryStallWatchdog,
+} from '../../../../infra/sse-event-stream'
 import type { RuntimeProviderTargetProfile, RuntimeSession } from '../../../chat-runtime/runtime-provider-types'
 import type { CodexConfig } from '../../../provider-contracts/provider-base'
 import { readTrustedCodexConfig } from '../../../provider-contracts/provider-base'
@@ -115,8 +121,124 @@ export class CodexAppServerBridge {
     )
     let hostLease: CodexAppServerHostLease | null = null
 
+    // Plan 077: notification frames are buffered through a bounded backlog
+    // with the `close` overflow policy. Protocol frames are never dropped
+    // silently — under pressure the backlog is replaced by an explicit
+    // truncation error plus the terminal done frame, and the host lease is
+    // released so the client can simply re-invoke.
+    const maxBufferedFrames = 128
+    const maxBufferedBytes = 1024 * 1024
+    let controllerRef: ReadableStreamDefaultController<Uint8Array> | null = null
+    let watchdog: DeliveryStallWatchdog | null = null
+    let closed = false
+    let terminalAfterDrain = false
+    let pendingBytes = 0
+    const pending: Uint8Array[] = []
+
+    const finish = (closeController: boolean) => {
+      if (closed) {
+        return
+      }
+      closed = true
+      watchdog?.stop()
+      watchdog = null
+      pending.length = 0
+      pendingBytes = 0
+      if (closeController) {
+        try {
+          controllerRef?.close()
+        }
+        catch {
+        }
+      }
+    }
+
+    function drain(streamController: ReadableStreamDefaultController<Uint8Array>, pullRequested = false) {
+      if (closed) {
+        return
+      }
+      while (
+        pending.length > 0
+        && (pullRequested || (streamController.desiredSize ?? 0) > 0)
+      ) {
+        const bytes = pending.shift()!
+        pendingBytes -= bytes.byteLength
+        streamController.enqueue(bytes)
+        watchdog?.touch()
+        pullRequested = false
+      }
+      if (!closed && terminalAfterDrain && pending.length === 0) {
+        finish(true)
+      }
+    }
+
+    const encodeEventFrame = (event: string, data: unknown): Uint8Array => {
+      return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+    }
+
+    const terminateForPressure = () => {
+      if (closed || terminalAfterDrain) {
+        return
+      }
+      sseStreamPressureCounters.overflowCloses += 1
+      pending.length = 0
+      pendingBytes = 0
+      for (const bytes of [
+        encodeEventFrame('error', { message: 'codex app-server event stream overflowed its delivery buffer; re-invoke the method' }),
+        encoder.encode('event: done\ndata: {}\n\n'),
+      ]) {
+        pending.push(bytes)
+        pendingBytes += bytes.byteLength
+      }
+      terminalAfterDrain = true
+      abortController.abort()
+      if (controllerRef) {
+        drain(controllerRef)
+      }
+    }
+
+    const pushFrame = (bytes: Uint8Array): void => {
+      if (closed || terminalAfterDrain) {
+        return
+      }
+      const byteOver = pendingBytes + bytes.byteLength > maxBufferedBytes && pendingBytes <= maxBufferedBytes
+      if (
+        pending.length > 0
+        && (pending.length + 1 > maxBufferedFrames || byteOver)
+      ) {
+        terminateForPressure()
+        return
+      }
+      pending.push(bytes)
+      pendingBytes += bytes.byteLength
+      if (controllerRef) {
+        drain(controllerRef)
+      }
+    }
+
+    const writeSse = (event: string, data: unknown): void => {
+      pushFrame(encodeEventFrame(event, data))
+    }
+
+    const writeDone = (): void => {
+      pushFrame(encoder.encode('event: done\ndata: {}\n\n'))
+      // The done frame is the wire-level terminal; once it is queued nothing
+      // else may produce, and the stream closes after the backlog drains.
+      terminalAfterDrain = true
+      if (controllerRef) {
+        drain(controllerRef)
+      }
+    }
+
     return new ReadableStream<Uint8Array>({
       start: (controller) => {
+        controllerRef = controller
+        watchdog = startDeliveryStallWatchdog({
+          stallMs: DEFAULT_STREAM_STALL_MS,
+          isClosed: () => closed || terminalAfterDrain,
+          isBuffering: () => pending.length > 0,
+          onStall: terminateForPressure,
+        })
         void (async () => {
           try {
             hostLease = await this.acquireHostLease(input, input.method, {
@@ -126,7 +248,7 @@ export class CodexAppServerBridge {
                   readSecret: this.deps.readSecret,
                   updateSecretValue: this.deps.updateSecretValue,
                 })
-                writeSse(controller, encoder, 'server_request', {
+                writeSse('server_request', {
                   method: request.method,
                   id: request.id,
                   params: request.params,
@@ -145,14 +267,14 @@ export class CodexAppServerBridge {
                 if (!message) {
                   return
                 }
-                writeSse(controller, encoder, 'notification', message)
+                writeSse('notification', message)
                 if (message.method && closeOnMethods.has(message.method)) {
                   return
                 }
               }
             })()
             const resultPromise = hostLease.client.request(input.method, normalizeParams(capability, input.params))
-            writeSse(controller, encoder, 'request_started', { method: input.method, capability })
+            writeSse('request_started', { method: input.method, capability })
 
             const abortPromise = new Promise<void>((resolve) => {
               if (abortController.signal.aborted) {
@@ -166,7 +288,7 @@ export class CodexAppServerBridge {
               : abortPromise
 
             const result = await resultPromise
-            writeSse(controller, encoder, 'result', { method: input.method, result })
+            writeSse('result', { method: input.method, result })
             if (shouldWaitForNotifications) {
               await notificationWait.catch(() => undefined)
             }
@@ -174,13 +296,13 @@ export class CodexAppServerBridge {
               abortController.abort()
               await abortPromise.catch(() => undefined)
             }
-            writeDone(controller, encoder)
+            writeDone()
           }
           catch (error) {
-            writeSse(controller, encoder, 'error', {
+            writeSse('error', {
               message: error instanceof Error ? error.message : String(error),
             })
-            writeDone(controller, encoder)
+            writeDone()
           }
           finally {
             hostLease?.release()
@@ -190,6 +312,10 @@ export class CodexAppServerBridge {
       cancel: () => {
         abortController.abort()
         hostLease?.release()
+        finish(false)
+      },
+      pull: (streamController) => {
+        drain(streamController, true)
       },
     })
   }
@@ -336,22 +462,6 @@ function shouldKeepStreamOpenAfterResult(
     return false
   }
   return method === 'fs/watch'
-}
-
-function writeSse(
-  controller: ReadableStreamDefaultController<Uint8Array>,
-  encoder: TextEncoder,
-  event: string,
-  data: unknown,
-): void {
-  controller.enqueue(encoder.encode(`event: ${event}\n`))
-  controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
-}
-
-function writeDone(controller: ReadableStreamDefaultController<Uint8Array>, encoder: TextEncoder): void {
-  controller.enqueue(encoder.encode('event: done\n'))
-  controller.enqueue(encoder.encode('data: {}\n\n'))
-  controller.close()
 }
 
 export async function buildDefaultCodexAppServerRequestResult(

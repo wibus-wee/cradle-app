@@ -1,5 +1,7 @@
 import type { DownloadTaskView } from '@cradle/download-center'
 
+import { openSseEventStream } from '../../infra/sse-event-stream'
+
 type Listener = (task: DownloadTaskView) => void
 
 export class DownloadTaskEvents {
@@ -10,25 +12,17 @@ export class DownloadTaskEvents {
   }
 
   stream(signal: AbortSignal): ReadableStream<Uint8Array> {
-    const encoder = new TextEncoder()
-    let unsubscribe = (): void => undefined
-    return new ReadableStream({
-      start: (controller) => {
-        const emit = (task: DownloadTaskView) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(task)}\n\n`))
-        const listener: Listener = emit
-        const onAbort = (): void => {
-          unsubscribe()
-          controller.close()
-        }
-        unsubscribe = (): void => {
-          this.listeners.delete(listener)
-          signal.removeEventListener('abort', onAbort)
-        }
-        this.listeners.add(listener)
-        signal.addEventListener('abort', onAbort, { once: true })
-        if (signal.aborted) { onAbort() }
+    return openSseEventStream({
+      signal,
+      overflow: 'drop-oldest',
+      source: {
+        subscribe: (listener) => {
+          this.listeners.add(listener)
+          return () => {
+            this.listeners.delete(listener)
+          }
+        },
       },
-      cancel: () => unsubscribe(),
     })
   }
 

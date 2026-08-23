@@ -1,4 +1,5 @@
 import { AppError } from '../../errors/app-error'
+import { openSseEventStream } from '../../infra/sse-event-stream'
 import { subscribeWorkspaceFileChanges } from '../workspace/file-watch'
 import * as Workspace from '../workspace/service'
 import { resolveSessionExecutionRootById } from '../worktree/service'
@@ -46,58 +47,37 @@ function resolveSessionCodeActivitySource(sessionId: string): {
   }
 }
 
-export function openSessionEvents(sessionId: string): ReadableStream<Uint8Array> {
+export function openSessionEvents(sessionId: string, signal: AbortSignal): ReadableStream<Uint8Array> {
   const { rootPath, workspace } = resolveSessionCodeActivitySource(sessionId)
-  const encoder = new TextEncoder()
-  let unsubscribe = () => {}
-  let keepAlive: NodeJS.Timeout | null = null
 
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      const send = (event: unknown) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
-      }
-      send({
-        type: 'ready',
-        sessionId,
-        workspace,
-        occurredAt: Date.now(),
-      })
-      unsubscribe = subscribeWorkspaceFileChanges({
-        workspaceId: workspace.id,
-        workspacePath: rootPath,
-        listener(event) {
-          if (event.type !== 'file-changed') {
-            return
-          }
-          send({
-            type: 'file-changed',
-            sessionId,
-            workspace,
-            file: { relativePath: event.path },
-            occurredAt: event.timestamp,
-          })
-        },
-      })
-      keepAlive = setInterval(() => {
-        try {
-          controller.enqueue(encoder.encode(': keepalive\n\n'))
-        }
-        catch {
-          unsubscribe()
-          if (keepAlive) {
-            clearInterval(keepAlive)
-            keepAlive = null
-          }
-        }
-      }, 15000)
-    },
-    cancel() {
-      unsubscribe()
-      if (keepAlive) {
-        clearInterval(keepAlive)
-        keepAlive = null
-      }
+  return openSseEventStream({
+    signal,
+    overflow: 'drop-oldest',
+    source: {
+      subscribe(listener) {
+        listener({
+          type: 'ready',
+          sessionId,
+          workspace,
+          occurredAt: Date.now(),
+        })
+        return subscribeWorkspaceFileChanges({
+          workspaceId: workspace.id,
+          workspacePath: rootPath,
+          listener(event) {
+            if (event.type !== 'file-changed') {
+              return
+            }
+            listener({
+              type: 'file-changed',
+              sessionId,
+              workspace,
+              file: { relativePath: event.path },
+              occurredAt: event.timestamp,
+            })
+          },
+        })
+      },
     },
   })
 }

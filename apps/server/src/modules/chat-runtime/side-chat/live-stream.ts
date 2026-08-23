@@ -42,80 +42,119 @@ export function createLiveSideConversationStream(
   const encoder = new TextEncoder()
   const controller = new AbortController()
 
+  let iterator: AsyncIterator<UIMessageChunk> | null = null
+  const sideProjection = createSideMessageProjection(input.responseMessageId)
+  let terminalPublished = false
+  let completed = false
+  let finished = false
+
+  const encodeFrame = (chunk: UIMessageChunk): Uint8Array => {
+    return encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`)
+  }
+
+  /**
+   * Pull-driven consumption keeps memory bounded when the consumer stalls:
+   * the provider iterable is only advanced when the client actually reads,
+   * so nothing accumulates server-side. Side effects (projection, completion
+   * persistence) stay tied to consumed chunks exactly as before.
+   */
   return new ReadableStream<Uint8Array>({
-    async start(streamController) {
-      let terminalPublished = false
-      const publish = (chunk: UIMessageChunk, terminal = isTerminalUIMessageChunk(chunk)) => {
-        if (terminalPublished) {
+    async pull(streamController) {
+      if (finished || terminalPublished) {
+        return
+      }
+      const finishWithoutFlush = () => {
+        if (finished) {
           return
         }
-        const clientChunk = projectChatChunkForClient(chunk)
-        if (!clientChunk) {
+        finished = true
+        try {
+          streamController.close()
+        }
+        catch {
+        }
+      }
+      try {
+        if (!iterator) {
+          streamController.enqueue(encodeFrame({ type: 'start', messageId: input.responseMessageId }))
+          iterator = input.runtime.streamTurn({
+            runId: input.runId,
+            runtimeSession: input.runtimeSession,
+            profile: input.profile,
+            message: input.message,
+            responseMessageId: input.responseMessageId,
+            modelId: input.modelId,
+            history: input.history,
+            workspaceId: input.workspaceId,
+            workspacePath: input.workspacePath,
+            agentId: input.agentId,
+            providerOptions:
+              input.thinkingEffort || input.runtimeSettings
+                ? {
+                    ...(input.thinkingEffort ? { thinkingEffort: input.thinkingEffort } : {}),
+                    runtimeSettings: input.runtimeSettings,
+                  }
+                : undefined,
+            systemPrompt: input.systemPrompt,
+          })[Symbol.asyncIterator]()
+        }
+
+        if (controller.signal.aborted) {
+          terminalPublished = true
+          streamController.enqueue(encodeFrame({ type: 'abort', reason: 'user' } as UIMessageChunk))
+          streamController.enqueue(encoder.encode('data: [DONE]\n\n'))
+          finishWithoutFlush()
           return
         }
-        streamController.enqueue(encoder.encode(`data: ${JSON.stringify(clientChunk)}\n\n`))
+
+        const { value: chunk, done } = await iterator.next()
+        if (finished || terminalPublished) {
+          return
+        }
+        if (done) {
+          terminalPublished = true
+          completed = true
+          streamController.enqueue(encodeFrame({ type: 'finish', finishReason: 'stop' }))
+          streamController.enqueue(encoder.encode('data: [DONE]\n\n'))
+          flushFinalMessageProjection(sideProjection)
+          input.onComplete?.(sideProjection.finalMessage)
+          finishWithoutFlush()
+          return
+        }
+        if (chunk.type === 'start') {
+          // Provider start frames are folded into our synthetic start frame;
+          // returning without enqueueing triggers the next pull.
+          return
+        }
+        projectFinalMessageChunk(sideProjection, chunk)
+        const terminal = isTerminalUIMessageChunk(chunk)
         if (terminal) {
           terminalPublished = true
+          completed = chunk.type === 'finish'
+        }
+        const clientChunk = projectChatChunkForClient(chunk)
+        if (clientChunk) {
+          streamController.enqueue(encodeFrame(clientChunk))
+        }
+        if (terminal) {
           streamController.enqueue(encoder.encode('data: [DONE]\n\n'))
+          flushFinalMessageProjection(sideProjection)
+          if (completed) {
+            input.onComplete?.(sideProjection.finalMessage)
+          }
+          finishWithoutFlush()
         }
       }
-
-      try {
-        publish({ type: 'start', messageId: input.responseMessageId }, false)
-        const sideProjection = createSideMessageProjection(input.responseMessageId)
-        let completed = false
-        for await (const chunk of input.runtime.streamTurn({
-          runId: input.runId,
-          runtimeSession: input.runtimeSession,
-          profile: input.profile,
-          message: input.message,
-          responseMessageId: input.responseMessageId,
-          modelId: input.modelId,
-          history: input.history,
-          workspaceId: input.workspaceId,
-          workspacePath: input.workspacePath,
-          agentId: input.agentId,
-          providerOptions:
-            input.thinkingEffort || input.runtimeSettings
-              ? {
-                  ...(input.thinkingEffort ? { thinkingEffort: input.thinkingEffort } : {}),
-                  runtimeSettings: input.runtimeSettings,
-                }
-              : undefined,
-          systemPrompt: input.systemPrompt,
-        })) {
-          if (controller.signal.aborted) {
-            publish({ type: 'abort', reason: 'user' }, true)
-            break
-          }
-          if (chunk.type === 'start') {
-            continue
-          }
-          projectFinalMessageChunk(sideProjection, chunk)
-          if (isTerminalUIMessageChunk(chunk)) {
-            completed = chunk.type === 'finish'
-          }
-          publish(chunk)
-        }
-        if (!terminalPublished) {
-          publish({ type: 'finish', finishReason: 'stop' }, true)
-          completed = true
-        }
-        flushFinalMessageProjection(sideProjection)
-        if (completed) {
-          input.onComplete?.(sideProjection.finalMessage)
-        }
-      }
- catch (error) {
+      catch (error) {
+        terminalPublished = true
         if (controller.signal.aborted) {
-          publish({ type: 'abort', reason: 'user' }, true)
+          streamController.enqueue(encodeFrame({ type: 'abort', reason: 'user' } as UIMessageChunk))
         }
- else {
-          publish({ type: 'error', errorText: serializeChatError(error).text }, true)
+        else {
+          streamController.enqueue(encodeFrame({ type: 'error', errorText: serializeChatError(error).text }))
         }
-      }
- finally {
-        streamController.close()
+        streamController.enqueue(encoder.encode('data: [DONE]\n\n'))
+        finishWithoutFlush()
       }
     },
     async cancel() {
@@ -126,7 +165,7 @@ export function createLiveSideConversationStream(
           profile: input.profile,
         })
       }
- catch {
+      catch {
         /* best-effort live side cancellation */
       }
     },

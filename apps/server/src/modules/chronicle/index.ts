@@ -1,5 +1,6 @@
 import { Elysia, t } from 'elysia'
 
+import { openSseEventStream } from '../../infra/sse-event-stream'
 import { getDaemonResources } from './daemon-manager'
 import { ChronicleModel } from './model'
 import * as Chronicle from './service'
@@ -520,54 +521,72 @@ export function createChronicleModule(downloadCenter?: Chronicle.ModelResourceDo
     query: ChronicleModel.realtimeEventsQuery,
     response: { 200: t.Array(ChronicleModel.realtimeEvent) },
   })
-  .get('/events/stream', ({ query }) => {
-    const encoder = new TextEncoder()
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        let cursor = query.after ?? 0
-        const sentIds = new Set<string>()
-        const sendEvents = () => {
-          const events = Chronicle.listRealtimeEvents({
-            limit: query.limit,
-            after: cursor === 0 ? cursor : Math.max(cursor - 1, 0),
-          })
-          let sentCount = 0
-          for (const event of events) {
-            if (sentIds.has(event.id)) {
-              continue
-            }
-            sentIds.add(event.id)
-            cursor = Math.max(cursor, event.createdAtUnix)
-            controller.enqueue(encodeSseEvent(event))
-            sentCount += 1
-          }
-          return sentCount
-        }
-        sendEvents()
-        if (query.once) {
-          controller.close()
-          return
-        }
-        const interval = setInterval(() => {
-          try {
-            const sentCount = sendEvents()
-            if (sentCount === 0) {
-              controller.enqueue(encoder.encode(': keepalive\n\n'))
-            }
-          }
-          catch {
-            clearInterval(interval)
-          }
-        }, query.intervalMs ?? 1000)
-      },
-    })
-    return new Response(stream, {
+  .get('/events/stream', ({ query, request }) => {
+    const sseHeaders = {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
       },
-    })
+    } as const
+    if (query.once) {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          let cursor = query.after ?? 0
+          const sentIds = new Set<string>()
+          const sendOnce = () => {
+            const events = Chronicle.listRealtimeEvents({
+              limit: query.limit,
+              after: cursor === 0 ? cursor : Math.max(cursor - 1, 0),
+            })
+            for (const event of events) {
+              if (sentIds.has(event.id)) {
+                continue
+              }
+              sentIds.add(event.id)
+              cursor = Math.max(cursor, event.createdAtUnix)
+              controller.enqueue(encodeSseEvent(event))
+            }
+          }
+          sendOnce()
+          controller.close()
+        },
+      })
+      return new Response(stream, sseHeaders)
+    }
+    return new Response(openSseEventStream({
+      signal: request.signal,
+      overflow: 'drop-oldest',
+      encodeEvent: encodeSseEvent,
+      source: {
+        subscribe(listener) {
+          let cursor = query.after ?? 0
+          const sentIds = new Set<string>()
+          const poll = () => {
+            try {
+              const events = Chronicle.listRealtimeEvents({
+                limit: query.limit,
+                after: cursor === 0 ? cursor : Math.max(cursor - 1, 0),
+              })
+              for (const event of events) {
+                if (sentIds.has(event.id)) {
+                  continue
+                }
+                sentIds.add(event.id)
+                cursor = Math.max(cursor, event.createdAtUnix)
+                listener(event)
+              }
+            }
+            catch {
+              clearInterval(interval)
+            }
+          }
+          poll()
+          const interval = setInterval(poll, query.intervalMs ?? 1000)
+          return () => clearInterval(interval)
+        },
+      },
+    }), sseHeaders)
   }, {
     detail: { summary: 'SSE stream of Chronicle realtime-compatible events', tags: ['chronicle'] },
     query: ChronicleModel.realtimeEventsStreamQuery,

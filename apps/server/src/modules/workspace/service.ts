@@ -16,6 +16,7 @@ import type {
 } from '../../http/upstream'
 import { proxyUpstreamRequestWithReconnect, upstreamJsonWithReconnect } from '../../http/upstream'
 import { db, getServerConfig } from '../../infra'
+import { openSseEventStream } from '../../infra/sse-event-stream'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import type { MigrateIssuesOptions, MigrateIssuesResult } from '../issue/service'
 import { migrateIssues } from '../issue/service'
@@ -760,7 +761,7 @@ export async function searchFiles(workspaceId: string, input: { query?: string, 
   )
 }
 
-export function openLocalFileEvents(workspaceId: string): ReadableStream<Uint8Array> {
+export function openLocalFileEvents(workspaceId: string, signal: AbortSignal): ReadableStream<Uint8Array> {
   const workspace = getRecord(workspaceId)
   if (!workspace) {
     return new ReadableStream<Uint8Array>({
@@ -779,47 +780,26 @@ export function openLocalFileEvents(workspaceId: string): ReadableStream<Uint8Ar
     })
   }
 
-  const encoder = new TextEncoder()
-  let unsubscribe = () => {}
-  let keepAlive: NodeJS.Timeout | null = null
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      const send = (event: unknown) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
-      }
-      send({
-        type: 'ready',
-        workspaceId,
-        timestamp: Date.now(),
-      })
-      unsubscribe = subscribeWorkspaceFileChanges({
-        workspaceId,
-        workspacePath: locator.path,
-        listener(event) {
-          if (event.type === 'directory-changed') {
-            send(event)
-          }
-        },
-      })
-      keepAlive = setInterval(() => {
-        try {
-          controller.enqueue(encoder.encode(': keepalive\n\n'))
-        }
-        catch {
-          unsubscribe()
-          if (keepAlive) {
-            clearInterval(keepAlive)
-            keepAlive = null
-          }
-        }
-      }, 15000)
-    },
-    cancel() {
-      unsubscribe()
-      if (keepAlive) {
-        clearInterval(keepAlive)
-        keepAlive = null
-      }
+  return openSseEventStream({
+    signal,
+    overflow: 'drop-oldest',
+    source: {
+      subscribe(listener) {
+        listener({
+          type: 'ready',
+          workspaceId,
+          timestamp: Date.now(),
+        })
+        return subscribeWorkspaceFileChanges({
+          workspaceId,
+          workspacePath: locator.path,
+          listener(event) {
+            if (event.type === 'directory-changed') {
+              listener(event)
+            }
+          },
+        })
+      },
     },
   })
 }

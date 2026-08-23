@@ -1,5 +1,11 @@
 import type { UIMessageChunk } from 'ai'
 
+import type { DeliveryStallWatchdog } from '../../../infra/sse-event-stream'
+import {
+  DEFAULT_STREAM_STALL_MS,
+  sseStreamPressureCounters,
+  startDeliveryStallWatchdog,
+} from '../../../infra/sse-event-stream'
 import { projectChatChunkForClient } from '../client-message-projection'
 import { serializeChatError } from '../run/errors'
 import { isTerminalUIMessageChunk, mergeBufferedStreamChunk } from '../run/stream-chunks'
@@ -13,6 +19,11 @@ export interface BufferedChunkStreamInput {
   shouldCloseWithoutSubscriber?: boolean
   coalesceMaxChars: number
   subscribe: (subscriber: ChunkSubscriber) => () => void
+  /** Backlog cap before the overflow-close policy ends the stream. */
+  maxBufferedEvents?: number
+  maxBufferedBytes?: number
+  /** Consumer-stall watchdog window. */
+  stallMs?: number
 }
 
 const encoder = new TextEncoder()
@@ -136,11 +147,27 @@ function encodeChunkStreamAsSse(stream: ReadableStream<ChunkStreamItem>): Readab
   )
 }
 
+const CHUNK_STREAM_MAX_BUFFERED_EVENTS = 128
+const CHUNK_STREAM_MAX_BUFFERED_BYTES = 1024 * 1024
+
+interface BufferedChunkItem {
+  bytes: Uint8Array
+  chars: number
+}
+
 export function openBufferedChunkStream(input: BufferedChunkStreamInput): ReadableStream<Uint8Array> {
+  const maxBufferedEvents = Math.max(1, input.maxBufferedEvents ?? CHUNK_STREAM_MAX_BUFFERED_EVENTS)
+  const maxBufferedBytes = Math.max(1, input.maxBufferedBytes ?? CHUNK_STREAM_MAX_BUFFERED_BYTES)
   let unsubscribe = () => {}
   let queuedChunk: UIMessageChunk | null = null
   let flushTimer: ReturnType<typeof setTimeout> | null = null
   let closed = false
+  let terminalAfterDrain = false
+  let controllerRef: ReadableStreamDefaultController<Uint8Array> | null = null
+  let watchdog: DeliveryStallWatchdog | null = null
+  const pending: BufferedChunkItem[] = []
+  let pendingChars = 0
+
   const clearQueuedFlush = () => {
     if (flushTimer) {
       clearTimeout(flushTimer)
@@ -149,78 +176,192 @@ export function openBufferedChunkStream(input: BufferedChunkStreamInput): Readab
     queuedChunk = null
   }
 
-  const chunkStream = new ReadableStream<ChunkStreamItem>({
-    start: (controller) => {
-      const clearFlushTimer = () => {
-        if (flushTimer) {
-          clearTimeout(flushTimer)
-          flushTimer = null
-        }
-      }
+  const stopProducer = () => {
+    unsubscribe()
+    unsubscribe = () => {}
+  }
 
-      const closeStream = (flushQueued: boolean) => {
-        if (closed) {
-          return
-        }
-        if (flushQueued) {
-          clearFlushTimer()
-          flushQueuedChunk()
-        }
-        closed = true
-        clearQueuedFlush()
-        unsubscribe()
-        controller.close()
+  const finish = (closeController: boolean) => {
+    if (closed) {
+      return
+    }
+    closed = true
+    clearQueuedFlush()
+    stopProducer()
+    watchdog?.stop()
+    watchdog = null
+    pending.length = 0
+    pendingChars = 0
+    if (closeController) {
+      try {
+        controllerRef?.close()
       }
-
-      const writeChunkToStream = (chunk: UIMessageChunk, terminal: boolean) => {
-        if (closed) {
-          return
-        }
-        controller.enqueue({ kind: 'chunk', chunk })
-        if (terminal) {
-          closeStream(false)
-        }
+      catch {
       }
+    }
+  }
 
-      const flushQueuedChunk = () => {
-        flushTimer = null
-        const chunk = queuedChunk
-        queuedChunk = null
-        if (chunk) {
-          writeChunkToStream(chunk, false)
-        }
-      }
+  /**
+   * Overflow policy `close`: the consumer stopped keeping up, so stop the
+   * producer, drop the backlog and end the stream. Clients recover losslessly
+   * through cursor + snapshot reconnect (Plan 071).
+   */
+  const overflowClose = () => {
+    if (closed) {
+      return
+    }
+    sseStreamPressureCounters.overflowCloses += 1
+    pending.length = 0
+    pendingChars = 0
+    terminalAfterDrain = true
+    clearQueuedFlush()
+    stopProducer()
+    if (controllerRef) {
+      drain(controllerRef)
+    }
+  }
 
-      const scheduleFlush = () => {
-        flushTimer ??= setTimeout(flushQueuedChunk, 0)
-      }
+  function drain(controller: ReadableStreamDefaultController<Uint8Array>, pullRequested = false) {
+    if (closed) {
+      return
+    }
+    while (
+      pending.length > 0
+      && (pullRequested || (controller.desiredSize ?? 0) > 0)
+    ) {
+      const item = pending.shift()!
+      pendingChars -= item.chars
+      controller.enqueue(item.bytes)
+      watchdog?.touch()
+      pullRequested = false
+    }
+    if (!closed && terminalAfterDrain && pending.length === 0) {
+      finish(true)
+    }
+  }
 
-      const writeChunk = (chunk: UIMessageChunk, terminal: boolean) => {
-        if (closed) {
-          return
-        }
-        if (terminal) {
-          clearFlushTimer()
-          flushQueuedChunk()
-          writeChunkToStream(chunk, true)
-          return
-        }
-        if (!queuedChunk) {
-          queuedChunk = chunk
-          scheduleFlush()
-          return
-        }
-        const merged = mergeBufferedStreamChunk(queuedChunk, chunk, input.coalesceMaxChars)
-        if (merged) {
-          queuedChunk = merged
-          scheduleFlush()
-          return
-        }
+  const encodeChunkItem = (item: ChunkStreamItem): BufferedChunkItem => {
+    if (item.kind === 'replay-end') {
+      return { bytes: encoder.encode(REPLAY_END_COMMENT), chars: REPLAY_END_COMMENT.length }
+    }
+    const text = `data: ${JSON.stringify(item.chunk)}\n\n`
+    return { bytes: encoder.encode(text), chars: text.length }
+  }
+
+  /**
+   * Emits the terminal `[DONE]` frame and marks the stream to close once the
+   * backlog drains. The frame is force-accepted: under backlog pressure the
+   * oldest buffered chunks are evicted so a clean terminal always lands.
+   */
+  const beginTerminal = () => {
+    if (closed || terminalAfterDrain) {
+      return
+    }
+    const done = encoder.encode('data: [DONE]\n\n')
+    while (
+      pending.length > 0
+      && (pending.length + 1 > maxBufferedEvents || pendingChars + done.length > maxBufferedBytes)
+    ) {
+      const evicted = pending.shift()!
+      pendingChars -= evicted.chars
+    }
+    pending.push({ bytes: done, chars: done.length })
+    pendingChars += done.length
+    terminalAfterDrain = true
+    clearQueuedFlush()
+    stopProducer()
+    if (controllerRef) {
+      drain(controllerRef)
+    }
+  }
+
+  const pushItem = (item: ChunkStreamItem) => {
+    if (closed || terminalAfterDrain) {
+      return
+    }
+    const encoded = encodeChunkItem(item)
+    // A single oversized chunk (e.g. a recovery snapshot) is always accepted;
+    // the caps exist to bound backlog accumulation, not to reject real events.
+    // While an oversized item dominates the buffer, the count cap keeps the
+    // backlog bounded instead of closing on every follow-up event.
+    const byteOver = pendingChars + encoded.chars > maxBufferedBytes && pendingChars <= maxBufferedBytes
+    if (
+      pending.length > 0
+      && (pending.length + 1 > maxBufferedEvents || byteOver)
+    ) {
+      overflowClose()
+      return
+    }
+    pending.push(encoded)
+    pendingChars += encoded.chars
+    if (controllerRef) {
+      drain(controllerRef)
+    }
+  }
+
+  /** Clears only the coalescing timer; the queued chunk stays pending. */
+  const clearFlushTimer = () => {
+    if (flushTimer) {
+      clearTimeout(flushTimer)
+      flushTimer = null
+    }
+  }
+
+  const flushQueuedChunk = () => {
+    flushTimer = null
+    const chunk = queuedChunk
+    queuedChunk = null
+    if (chunk) {
+      pushItem({ kind: 'chunk', chunk })
+    }
+  }
+
+  const scheduleFlush = () => {
+    flushTimer ??= setTimeout(flushQueuedChunk, 0)
+  }
+
+  const writeChunk = (chunk: UIMessageChunk, terminal: boolean) => {
+    if (closed || terminalAfterDrain) {
+      return
+    }
+    if (terminal) {
+      if (queuedChunk) {
+        clearFlushTimer()
         flushQueuedChunk()
-        queuedChunk = chunk
-        scheduleFlush()
+        if (closed || terminalAfterDrain) {
+          return
+        }
       }
+      pushItem({ kind: 'chunk', chunk })
+      beginTerminal()
+      return
+    }
+    if (!queuedChunk) {
+      queuedChunk = chunk
+      scheduleFlush()
+      return
+    }
+    const merged = mergeBufferedStreamChunk(queuedChunk, chunk, input.coalesceMaxChars)
+    if (merged) {
+      queuedChunk = merged
+      scheduleFlush()
+      return
+    }
+    flushQueuedChunk()
+    queuedChunk = chunk
+    scheduleFlush()
+  }
 
+  const chunkStream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controllerRef = controller
+      controller.enqueue(encoder.encode(STREAM_OPEN_COMMENT))
+      watchdog = startDeliveryStallWatchdog({
+        stallMs: input.stallMs ?? DEFAULT_STREAM_STALL_MS,
+        isClosed: () => closed,
+        isBuffering: () => pending.length > 0,
+        onStall: overflowClose,
+      })
       if (!input.terminal && !input.shouldCloseWithoutSubscriber) {
         unsubscribe = input.subscribe((chunk, terminal) => writeChunk(chunk, terminal))
       }
@@ -228,26 +369,35 @@ export function openBufferedChunkStream(input: BufferedChunkStreamInput): Readab
       for (const chunk of input.replayChunks) {
         const terminal = isTerminalUIMessageChunk(chunk)
         writeChunk(chunk, terminal)
-        if (terminal) {
+        if (terminal || closed) {
           return
         }
       }
+      if (closed) {
+        return
+      }
       clearFlushTimer()
       flushQueuedChunk()
-      controller.enqueue({ kind: 'replay-end' })
+      if (closed || terminalAfterDrain) {
+        return
+      }
+      pushItem({ kind: 'replay-end' })
 
       if (input.terminal || input.shouldCloseWithoutSubscriber) {
-        closeStream(true)
+        beginTerminal()
+        return
       }
+      drain(controller)
     },
-    cancel: () => {
-      closed = true
-      clearQueuedFlush()
-      unsubscribe()
+    pull(controller) {
+      drain(controller, true)
+    },
+    cancel() {
+      finish(false)
     },
   })
 
-  return encodeChunkStreamAsSse(chunkStream)
+  return chunkStream
 }
 
 /**

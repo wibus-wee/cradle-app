@@ -24,7 +24,7 @@ Workspace file writes target non-Cradle-owned user directories. Write, create, a
 
 Workspace Explorer uses a VS Code-style shallow model. `/workspaces/:id/files/children?path=` reads direct children, follows resolvable symlink files and directories, skips generated directories such as `.git` and `node_modules`, and honors root `.gitignore`. `/workspaces/:id/files/search?q=&limit=` uses the workspace-owned FFF index and merges bounded symlink-subtree results. Slash-suffixed searches perform shallow directory completion.
 
-`/workspaces/:id/files/events` emits SSE directory refresh hints so loaded directories and ancestors can refresh without full rescans. The same local watcher supplies metadata-only relative file changes to Code Activity; the public Explorer stream remains directory-only.
+`/workspaces/:id/files/events` emits SSE directory refresh hints so loaded directories and ancestors can refresh without full rescans. The same local watcher supplies metadata-only relative file changes to Code Activity; the public Explorer stream remains directory-only. The stream buffers through the shared bounded primitive (`src/infra/sse-event-stream.ts`): slow consumers drop the oldest hints, and a stalled consumer is closed by the stall watchdog instead of accumulating heap.
 
 Full listing remains bounded for consumers that need broad workspace paths. The service supplements FFF results with workspace-owned directory entries so empty folders remain visible, invalidates cached indexes after mutations, prunes idle entries, and caps retained workspace roots.
 

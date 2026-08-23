@@ -7,6 +7,11 @@ import { messages, sessionEvents, sessions } from '@cradle/db'
 import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm'
 
 import { db } from '../../../infra'
+import type { DeliveryStallWatchdog } from '../../../infra/sse-event-stream'
+import {
+  DEFAULT_STREAM_STALL_MS,
+  startDeliveryStallWatchdog,
+} from '../../../infra/sse-event-stream'
 import { readMessagePayloads } from '../message-payload-store'
 import { parseStoredMessageSnapshot } from '../ui-message'
 import { publishChatRunActivities } from './activity-tail'
@@ -336,6 +341,7 @@ export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalS
 }): ReadableStream<Uint8Array> {
   let unsubscribe = () => {}
   let keepAlive: ReturnType<typeof setInterval> | null = null
+  let watchdog: DeliveryStallWatchdog | null = null
   let closed = false
   let accepting = true
   let terminalAfterDrain = false
@@ -364,6 +370,20 @@ export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalS
     pending.length = 0
     pendingBytes = 0
   }
+  const terminateForStall = () => {
+    if (closed) {
+      return
+    }
+    closed = true
+    stopProducer()
+    pending.length = 0
+    pendingBytes = 0
+    try {
+      controllerRef?.close()
+    }
+    catch {
+    }
+  }
   const drain = (
     controller: ReadableStreamDefaultController<Uint8Array>,
     pullRequested = false,
@@ -378,6 +398,7 @@ export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalS
       const chunk = pending.shift()!
       pendingBytes -= chunk.byteLength
       controller.enqueue(chunk)
+      watchdog?.touch()
       pullRequested = false
     }
     if (!closed && terminalAfterDrain && pending.length === 0) {
@@ -444,6 +465,12 @@ export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalS
   return new ReadableStream<Uint8Array>({
     start(controller) {
       controllerRef = controller
+      watchdog = startDeliveryStallWatchdog({
+        stallMs: DEFAULT_STREAM_STALL_MS,
+        isClosed: () => closed,
+        isBuffering: () => pending.length > 0,
+        onStall: terminateForStall,
+      })
       if (!enqueueReplay(input.replay)) {
         drain(controller)
         return
@@ -473,8 +500,14 @@ export function openTailStream<TEvent extends ChatSessionTailEvent | ChatGlobalS
       drain(controller, true)
     },
     cancel() {
+      watchdog?.stop()
+      watchdog = null
       close()
     },
+    // `highWaterMark: 0` is intentional: the tail's snapshot-required
+    // contract depends on the backlog staying in `pending` until the reader
+    // explicitly pulls. A reader parked on an empty queue with a late event
+    // is reaped by the stall watchdog instead.
   }, { highWaterMark: 0 })
 }
 

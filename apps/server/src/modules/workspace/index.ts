@@ -161,7 +161,7 @@ export const workspace = new Elysia({
     if (remoteResponse) {
       return remoteResponse
     }
-    return new Response(Workspace.openLocalFileEvents(params.workspaceId), {
+    return new Response(Workspace.openLocalFileEvents(params.workspaceId, request.signal), {
       headers: {
         'content-type': 'text/event-stream',
         'cache-control': 'no-cache',
