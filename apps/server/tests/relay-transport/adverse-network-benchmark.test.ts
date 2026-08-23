@@ -156,7 +156,8 @@ function runTransfer(
   const makeOptions = () => ({
     fabricId: 'fabric-benchmark',
     linkId: 'adverse-network-link',
-    optimizedCodecEnabled: mode === 'V2 optimized',
+    supportedCipherSuites: mode === 'V2 optimized' ? ['aes-256-gcm' as const] : ['xchacha20poly1305' as const],
+    supportedCompressions: mode === 'V2 optimized' ? ['zstd' as const, 'none' as const] : ['none' as const],
     maxStreamCreditBytes: 8 * 1024 * 1024,
   })
   const host = new FabricSession('node', hostKeys.privateKeyBase64, {

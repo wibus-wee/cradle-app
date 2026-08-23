@@ -93,6 +93,32 @@ export const FabricModel = {
     },
     { additionalProperties: false },
   ),
+  pendingControllerRequest: t.Object(
+    {
+      requestId: t.String(),
+      subjectId: t.String(),
+      identityPubkey: t.String(),
+      encryptionPubkey: t.String(),
+      displayName: t.String(),
+      platform: t.String(),
+      version: t.String(),
+      capabilities: t.Array(t.String()),
+      requestedAt: t.String(),
+      expiresAt: t.String(),
+    },
+    { additionalProperties: false },
+  ),
+  approveControllerRequest: t.Object(
+    {
+      nodeId: nonBlankString,
+      scopes: t.Array(t.Union([t.Literal('view'), t.Literal('control'), t.Literal('approve')]), { minItems: 1, uniqueItems: true }),
+    },
+    { additionalProperties: false },
+  ),
+  controllerApproval: t.Object(
+    { fabricId: t.String(), controllerId: t.String() },
+    { additionalProperties: false },
+  ),
   requestIdParams: t.Object({ requestId: nonBlankString }, { additionalProperties: false }),
   nodeIdParams: t.Object({ nodeId: nonBlankString }, { additionalProperties: false }),
   nodeGrantParams: t.Object({ nodeId: nonBlankString, grantId: nonBlankString }, { additionalProperties: false }),

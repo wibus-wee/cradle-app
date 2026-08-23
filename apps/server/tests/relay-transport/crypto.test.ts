@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   computeFabricSharedSecret,
   deriveFabricSessionKeys,
+  FABRIC_CIPHER_SUITE,
   fabricPublicKeyFingerprint,
   FabricSessionCipher,
   generateFabricSessionKeyPair,
@@ -78,7 +79,7 @@ describe('relay crypto', () => {
   })
 
   it('keeps the benchmark baseline on XChaCha for bulk frames', () => {
-    const cipher = new FabricSessionCipher(new Uint8Array(32).fill(7), false)
+    const cipher = new FabricSessionCipher(new Uint8Array(32).fill(7), FABRIC_CIPHER_SUITE.xchacha20Poly1305)
     const plaintext = new Uint8Array(64 * 1024)
     const sealed = cipher.encrypt(plaintext)
 

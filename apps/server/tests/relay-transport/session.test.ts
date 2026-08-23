@@ -7,7 +7,10 @@ import {
   FABRIC_SESSION_PROTOCOL_VERSION,
   RELAY_STREAM_MIN_CREDIT_BYTES,
 } from '../../src/modules/relay-transport/protocol'
-import type { FabricSessionCallbacks } from '../../src/modules/relay-transport/session'
+import type {
+  FabricSessionCallbacks,
+  FabricSessionOptions,
+} from '../../src/modules/relay-transport/session'
 import { FabricSession } from '../../src/modules/relay-transport/session'
 
 const fabricId = 'fabric-test'
@@ -35,12 +38,14 @@ function session(
   keys: { privateKeyBase64: string, publicKeyBase64: string },
   expectedPeerPubkey: string,
   callbacks: FabricSessionCallbacks,
+  capabilities: Pick<FabricSessionOptions, 'supportedCipherSuites' | 'supportedCompressions'> = {},
 ): FabricSession {
   return new FabricSession(role, keys.privateKeyBase64, {
     fabricId,
     linkId,
     expectedPeerPubkey,
     ourPublicKeyBase64: keys.publicKeyBase64,
+    ...capabilities,
     encodeOutboundEnvelope: encode,
   }, callbacks)
 }
@@ -76,6 +81,58 @@ describe('fabric Session', () => {
     controller.writeStreamData('stream-1', payload)
     expect(received).toHaveLength(1)
     expect(received[0]).toEqual(payload)
+  })
+
+  it('negotiates the CryptoKit AES-GCM and uncompressed portable baseline', () => {
+    const nodeKeys = generateFabricSessionKeyPair()
+    const controllerKeys = generateFabricSessionKeyPair()
+    const nodeNegotiated = vi.fn()
+    const controllerNegotiated = vi.fn()
+    const received: Uint8Array[] = []
+    const node = session('node', nodeKeys, controllerKeys.publicKeyBase64, {
+      send: () => {},
+      onNegotiatedCapabilities: nodeNegotiated,
+      onStreamOpen: () => {},
+      onStreamData: (_streamId, data) => received.push(data),
+    })
+    const controller = session('controller', controllerKeys, nodeKeys.publicKeyBase64, {
+      send: () => {},
+      onNegotiatedCapabilities: controllerNegotiated,
+    }, {
+      supportedCipherSuites: ['aes-256-gcm'],
+      supportedCompressions: ['none'],
+    })
+    wire(node, controller)
+
+    controller.start()
+    controller.openStream('portable-stream')
+    controller.writeStreamData('portable-stream', new Uint8Array(4 * 1024).fill(9))
+
+    const expected = { cipherSuite: 'aes-256-gcm', compression: 'none' }
+    expect(nodeNegotiated).toHaveBeenCalledWith(expected)
+    expect(controllerNegotiated).toHaveBeenCalledWith(expected)
+    expect(received).toEqual([new Uint8Array(4 * 1024).fill(9)])
+  })
+
+  it('fails closed when peers have no common cipher suite', () => {
+    const nodeKeys = generateFabricSessionKeyPair()
+    const controllerKeys = generateFabricSessionKeyPair()
+    const error = vi.fn()
+    const node = session('node', nodeKeys, controllerKeys.publicKeyBase64, {
+      send: () => {},
+      onError: error,
+    }, { supportedCipherSuites: ['xchacha20poly1305'] })
+    const controller = session('controller', controllerKeys, nodeKeys.publicKeyBase64, {
+      send: () => {},
+      onError: error,
+    }, { supportedCipherSuites: ['aes-256-gcm'] })
+    wire(node, controller)
+
+    controller.start()
+
+    expect(node.isReady).toBe(false)
+    expect(controller.isReady).toBe(false)
+    expect(error).toHaveBeenCalledOnce()
   })
 
   it('flushes data queued beyond stream credit before closing', () => {

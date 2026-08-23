@@ -140,7 +140,7 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 		t.Fatalf("pending join requests = %#v", pending.Requests)
 	}
 	ownerHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodPost, "/v1/join-requests/join-node-a/approve", clock, "approve-node")
-	postDirectoryJSON(t, httpServer.URL+"/v1/join-requests/join-node-a/approve", approveJoinRequest{NodeCertificate: nodeCertificate, ControllerCertificate: joinedControllerCertificate}, ownerHeaders, http.StatusOK, &fabric.NodeSummary{})
+	postDirectoryJSON(t, httpServer.URL+"/v1/join-requests/join-node-a/approve", approveJoinRequest{NodeCertificate: &nodeCertificate, ControllerCertificate: &joinedControllerCertificate}, ownerHeaders, http.StatusOK, &fabric.NodeSummary{})
 
 	var approved struct {
 		Status                string                 `json:"status"`
@@ -269,6 +269,25 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	}
 
 	controllerPublic, controllerPrivate := directoryKey(t)
+	controllerDeliverySecret := "controller-delivery-secret"
+	controllerJoin, err := membership.SignJoinRequest(controllerPrivate, membership.JoinRequest{
+		RequestID:          "join-controller-a",
+		FabricID:           created.Fabric.ID,
+		SubjectKind:        membership.SubjectController,
+		SubjectID:          "controller-a",
+		EncryptionPubkey:   "controller-x25519",
+		DisplayName:        "iPhone",
+		Platform:           "ios",
+		Version:            "1.0.0",
+		Capabilities:       []string{"chat", "work"},
+		DeliverySecretHash: directorySecretHash(controllerDeliverySecret),
+		IssuedAt:           clock.Unix(),
+		ExpiresAt:          clock.Add(5 * time.Minute).Unix(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	postDirectoryJSON(t, httpServer.URL+"/v1/join-requests", controllerJoin, nil, http.StatusCreated, &map[string]any{})
 	controllerCertificate, err := membership.SignCertificate(ownerPrivate, membership.Certificate{
 		Version:          1,
 		FabricID:         created.Fabric.ID,
@@ -276,6 +295,7 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 		SubjectID:        "controller-a",
 		IdentityPubkey:   encodeDirectoryKey(controllerPublic),
 		EncryptionPubkey: "controller-x25519",
+		NodeID:           "node-a",
 		Scopes:           []membership.Scope{membership.ScopeView, membership.ScopeControl},
 		IssuedAt:         clock.Unix(),
 		Nonce:            "controller-certificate",
@@ -283,18 +303,25 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controllerBody := registerControllerRequest{
-		Certificate: controllerCertificate,
-		Grants: []fabric.Grant{{
-			ID:           "grant-node-a-view",
-			FabricID:     created.Fabric.ID,
-			ControllerID: "controller-a",
-			NodeID:       "node-a",
-			Scope:        membership.ScopeView,
-		}},
+	controllerGrants := []fabric.Grant{{
+		ID:           "grant-node-a-view",
+		FabricID:     created.Fabric.ID,
+		ControllerID: "controller-a",
+		NodeID:       "node-a",
+		Scope:        membership.ScopeView,
+	}}
+	controllerApprovalPath := "/v1/join-requests/" + controllerJoin.RequestID + "/approve"
+	ownerHeaders = directoryProofHeaders(t, ownerPrivate, http.MethodPost, controllerApprovalPath, clock, "approve-controller")
+	postDirectoryJSON(t, httpServer.URL+controllerApprovalPath, approveJoinRequest{ControllerCertificate: &controllerCertificate, Grants: controllerGrants}, ownerHeaders, http.StatusOK, &map[string]string{})
+	var approvedController struct {
+		Status                string                  `json:"status"`
+		NodeCertificate       *membership.Certificate `json:"nodeCertificate"`
+		ControllerCertificate membership.Certificate  `json:"controllerCertificate"`
 	}
-	ownerHeaders = directoryProofHeaders(t, ownerPrivate, http.MethodPost, "/v1/fabrics/"+created.Fabric.ID+"/controllers", clock, "register-controller")
-	postDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/controllers", controllerBody, ownerHeaders, http.StatusNoContent, nil)
+	getDirectoryJSON(t, httpServer.URL+"/v1/join-requests/"+controllerJoin.RequestID+"?secret="+controllerDeliverySecret, nil, http.StatusOK, &approvedController)
+	if approvedController.Status != "approved" || approvedController.NodeCertificate != nil || approvedController.ControllerCertificate.SubjectID != "controller-a" {
+		t.Fatalf("Controller join request result = %#v", approvedController)
+	}
 
 	controllerHeaders := directoryProofHeaders(t, controllerPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "list-nodes")
 	controllerHeaders.Set(certificateHeader, directoryHeaderJSON(t, controllerCertificate))

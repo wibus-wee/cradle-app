@@ -62,8 +62,9 @@ type createJoinRequestResponse struct {
 }
 
 type approveJoinRequest struct {
-	NodeCertificate       membership.Certificate `json:"nodeCertificate"`
-	ControllerCertificate membership.Certificate `json:"controllerCertificate"`
+	NodeCertificate       *membership.Certificate `json:"nodeCertificate,omitempty"`
+	ControllerCertificate *membership.Certificate `json:"controllerCertificate,omitempty"`
+	Grants                []fabric.Grant          `json:"grants,omitempty"`
 }
 
 type registerControllerRequest struct {
@@ -164,13 +165,18 @@ func (s *Server) readJoinRequest(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"status":                "approved",
-		"request":               result.Request,
-		"nodeCertificate":       result.NodeCertificate,
-		"controllerCertificate": result.ControllerCertificate,
-		"approvedAt":            result.ApprovedAt,
-	})
+	response := map[string]any{
+		"status":     "approved",
+		"request":    result.Request,
+		"approvedAt": result.ApprovedAt,
+	}
+	if result.NodeCertificate != nil {
+		response["nodeCertificate"] = result.NodeCertificate
+	}
+	if result.ControllerCertificate != nil {
+		response["controllerCertificate"] = result.ControllerCertificate
+	}
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *Server) listJoinRequests(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +222,12 @@ func (s *Server) approveJoinRequest(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	fabricRecord, err := s.store.GetFabric(r.Context(), request.NodeCertificate.FabricID)
+	joinRequest, err := s.store.GetJoinRequest(r.Context(), requestID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	fabricRecord, err := s.store.GetFabric(r.Context(), joinRequest.FabricID)
 	if err != nil {
 		writeStoreError(w, err)
 		return
@@ -225,25 +236,59 @@ func (s *Server) approveJoinRequest(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
-	if err := s.validator.VerifyCertificate(request.NodeCertificate, fabricRecord.OwnerPublicKey, fabricRecord.ID); err != nil {
-		writeMembershipError(w, err)
-		return
+	switch joinRequest.SubjectKind {
+	case membership.SubjectNode:
+		if request.NodeCertificate == nil || request.ControllerCertificate == nil || len(request.Grants) != 0 {
+			writeError(w, http.StatusBadRequest, "Node and companion Controller certificates are required")
+			return
+		}
+		if err := s.validator.VerifyCertificate(*request.NodeCertificate, fabricRecord.OwnerPublicKey, fabricRecord.ID); err != nil {
+			writeMembershipError(w, err)
+			return
+		}
+		if err := s.validator.VerifyCertificate(*request.ControllerCertificate, fabricRecord.OwnerPublicKey, fabricRecord.ID); err != nil {
+			writeMembershipError(w, err)
+			return
+		}
+		if request.ControllerCertificate.SubjectKind != membership.SubjectController || !membership.HasAnyScope(request.ControllerCertificate.Scopes, membership.ScopeAdmin) {
+			writeError(w, http.StatusBadRequest, "admin Controller certificate is required")
+			return
+		}
+		node, err := s.store.ApproveJoinRequest(r.Context(), requestID, *request.NodeCertificate, *request.ControllerCertificate)
+		if err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		s.broker.publish(node.FabricID, event{Type: "node.upsert", Revision: node.Revision, Node: &node})
+		writeJSON(w, http.StatusOK, node)
+	case membership.SubjectController:
+		if request.NodeCertificate != nil || request.ControllerCertificate == nil || len(request.Grants) == 0 {
+			writeError(w, http.StatusBadRequest, "Controller certificate and grants are required")
+			return
+		}
+		certificate := *request.ControllerCertificate
+		if err := s.validator.VerifyCertificate(certificate, fabricRecord.OwnerPublicKey, fabricRecord.ID); err != nil {
+			writeMembershipError(w, err)
+			return
+		}
+		if certificate.NodeID == "" || membership.HasAnyScope(certificate.Scopes, membership.ScopeAdmin) {
+			writeError(w, http.StatusForbidden, "Controller enrollment must be restricted to one Node without admin scope")
+			return
+		}
+		for _, grant := range request.Grants {
+			if grant.FabricID != certificate.FabricID || grant.ControllerID != certificate.SubjectID || grant.NodeID != certificate.NodeID || grant.Scope == membership.ScopeAdmin || !membership.HasAnyScope(certificate.Scopes, grant.Scope) {
+				writeError(w, http.StatusForbidden, "Controller certificate does not authorize this grant")
+				return
+			}
+		}
+		if err := s.store.ApproveControllerJoinRequest(r.Context(), requestID, certificate, request.Grants); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"fabricId": certificate.FabricID, "controllerId": certificate.SubjectID})
+	default:
+		writeError(w, http.StatusBadRequest, "unsupported join subject")
 	}
-	if err := s.validator.VerifyCertificate(request.ControllerCertificate, fabricRecord.OwnerPublicKey, fabricRecord.ID); err != nil {
-		writeMembershipError(w, err)
-		return
-	}
-	if request.ControllerCertificate.SubjectKind != membership.SubjectController || !membership.HasAnyScope(request.ControllerCertificate.Scopes, membership.ScopeAdmin) {
-		writeError(w, http.StatusBadRequest, "admin Controller certificate is required")
-		return
-	}
-	node, err := s.store.ApproveJoinRequest(r.Context(), requestID, request.NodeCertificate, request.ControllerCertificate)
-	if err != nil {
-		writeStoreError(w, err)
-		return
-	}
-	s.broker.publish(node.FabricID, event{Type: "node.upsert", Revision: node.Revision, Node: &node})
-	writeJSON(w, http.StatusOK, node)
 }
 
 func (s *Server) registerController(w http.ResponseWriter, r *http.Request) {

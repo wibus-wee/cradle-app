@@ -35,7 +35,7 @@
       "properties": {
         "requestId": { "type": "string", "minLength": 1 },
         "fabricId": { "type": "string", "minLength": 1 },
-        "subjectKind": { "const": "node" },
+        "subjectKind": { "type": "string", "enum": ["node", "controller"] },
         "subjectId": { "type": "string", "minLength": 1 },
         "identityPubkey": { "type": "string", "minLength": 1 },
         "encryptionPubkey": { "type": "string", "minLength": 1 },
@@ -50,13 +50,30 @@
       }
     },
     "joinApproval": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["nodeCertificate", "controllerCertificate"],
-      "properties": {
-        "nodeCertificate": { "$ref": "#/definitions/certificate" },
-        "controllerCertificate": { "$ref": "#/definitions/certificate" }
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nodeCertificate", "controllerCertificate"],
+          "properties": {
+            "nodeCertificate": { "$ref": "#/definitions/certificate" },
+            "controllerCertificate": { "$ref": "#/definitions/certificate" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["controllerCertificate", "grants"],
+          "properties": {
+            "controllerCertificate": { "$ref": "#/definitions/certificate" },
+            "grants": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/definitions/nodeGrant" }
+            }
+          }
+        }
+      ]
     },
     "nodeSummary": {
       "type": "object",

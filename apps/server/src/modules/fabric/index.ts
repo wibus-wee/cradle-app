@@ -60,6 +60,24 @@ export const fabric = new Elysia({ prefix: '/fabric', detail: { tags: ['fabric']
     params: FabricModel.requestIdParams,
     response: { 204: t.Void() },
   })
+  .get('/controller-invitations/requests', () => Fabric.listPendingControllerRequests(), {
+    detail: { summary: 'List pending Controller enrollment requests (owner only)' },
+    response: { 200: t.Array(FabricModel.pendingControllerRequest) },
+  })
+  .post('/controller-invitations/requests/:requestId/approve', ({ params, body }) => Fabric.approvePendingControllerRequest(params.requestId, body), {
+    detail: { summary: 'Approve a Controller for one Node with explicit scopes (owner only)' },
+    params: FabricModel.requestIdParams,
+    body: FabricModel.approveControllerRequest,
+    response: { 200: FabricModel.controllerApproval },
+  })
+  .delete('/controller-invitations/requests/:requestId', async ({ params, set }) => {
+    await Fabric.rejectPendingNodeRequest(params.requestId)
+    set.status = 204
+  }, {
+    detail: { summary: 'Reject a pending Controller enrollment request (owner only)' },
+    params: FabricModel.requestIdParams,
+    response: { 204: t.Void() },
+  })
 
 export interface FabricNodeLinkProvider {
   ensure: (nodeId: string) => Promise<{ localBaseUrl: string }>

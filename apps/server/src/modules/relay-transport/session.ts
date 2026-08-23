@@ -1,15 +1,21 @@
 import { x25519 } from '@noble/curves/ed25519'
 
 import { AppError } from '../../errors/app-error'
+import type { RelayCompressionKind } from './compression'
 import {
   decodeRelayChunk,
   encodeRelayChunk,
   RELAY_MIN_COMPRESSION_INPUT_BYTES,
 } from './compression'
-import type { FabricSessionKeys, FabricSessionRole as FabricCryptoRole } from './crypto'
+import type {
+  FabricCipherSuite,
+  FabricSessionKeys,
+  FabricSessionRole as FabricCryptoRole,
+} from './crypto'
 import {
   computeFabricSharedSecret,
   deriveFabricSessionKeys,
+  FABRIC_CIPHER_SUITE,
   fabricPublicKeyFingerprint,
   FabricSessionCipher,
 } from './crypto'
@@ -34,7 +40,7 @@ import {
  * transports. It owns:
  *
  * 1. The Fabric certificate-bound `hello` handshake (ECDH → key derivation).
- * 2. Size-adaptive XChaCha20-Poly1305/AES-256-GCM encryption of inner frames.
+ * 2. Negotiated AEAD encryption and stream compression.
  * 3. Stream multiplexing over one Fabric link.
  * 4. Credit-based flow control so a fast sender can't overrun the relayd queue
  *    (64 frames / 4 MiB) or the peer.
@@ -63,8 +69,10 @@ export interface FabricSessionOptions {
   maxStreamCreditBytes?: number
   /** Hard aggregate byte allowance across all streams. Defaults to 16 MiB. */
   maxConnectionCreditBytes?: number
-  /** Disable Zstandard and bulk AES for controlled codec benchmarks. */
-  optimizedCodecEnabled?: boolean
+  /** Supported AEAD suites. AES-256-GCM is the portable CryptoKit baseline. */
+  supportedCipherSuites?: FabricCipherSuite[]
+  /** Supported stream compression modes. `none` is the portable baseline. */
+  supportedCompressions?: RelayCompressionKind[]
   /**
    * Fabric v3 envelope encoding. Routing is owned by Fabric and is never
    * projected into this session state machine.
@@ -84,6 +92,7 @@ export interface FabricSessionCallbacks {
   /** Write one encoded binary envelope to relayd. */
   send: (data: Uint8Array) => void
   onReady?: () => void
+  onNegotiatedCapabilities?: (capabilities: { cipherSuite: FabricCipherSuite, compression: RelayCompressionKind }) => void
   onPeerPubkey?: (peerPubkey: string, fingerprint: string) => void
   onStreamOpen?: (streamId: string) => void
   onStreamData?: (streamId: string, data: Uint8Array) => void
@@ -157,6 +166,18 @@ function streamIdForFrame(frame: InnerFrame): string | undefined {
   }
 }
 
+function validatedCapabilities<T extends string>(values: T[], label: string): T[] {
+  const unique = [...new Set(values)]
+  if (unique.length === 0 || unique.length !== values.length) {
+    throw new AppError({ code: 'relay_capabilities_invalid', status: 500, message: `Fabric Session ${label} must be non-empty and unique.` })
+  }
+  return unique
+}
+
+function selectCapability<T extends string>(preferred: T[], offered: T[]): T | null {
+  return preferred.find(value => offered.includes(value)) ?? null
+}
+
 const ACK_INTERVAL_BYTES = 256 * 1024
 
 export class FabricSession {
@@ -181,7 +202,10 @@ export class FabricSession {
   private readonly initialStreamCreditBytes: number
   private readonly maxStreamCreditBytes: number
   private readonly maxConnectionCreditBytes: number
-  private readonly optimizedCodecEnabled: boolean
+  private readonly supportedCipherSuites: FabricCipherSuite[]
+  private readonly supportedCompressions: RelayCompressionKind[]
+  private selectedCipherSuite: FabricCipherSuite | null = null
+  private selectedCompression: RelayCompressionKind | null = null
   private readonly encodeOutboundEnvelope: (frame: FabricSessionOutboundEnvelope) => Uint8Array
   private connectionInFlightBytes = 0
   private flushCursor = 0
@@ -211,7 +235,14 @@ export class FabricSession {
     this.maxStreamCreditBytes = options.maxStreamCreditBytes ?? RELAY_STREAM_MAX_CREDIT_BYTES
     this.maxConnectionCreditBytes
       = options.maxConnectionCreditBytes ?? RELAY_CONNECTION_MAX_CREDIT_BYTES
-    this.optimizedCodecEnabled = options.optimizedCodecEnabled ?? true
+    this.supportedCipherSuites = validatedCapabilities(
+      options.supportedCipherSuites ?? [FABRIC_CIPHER_SUITE.aes256Gcm, FABRIC_CIPHER_SUITE.xchacha20Poly1305],
+      'cipher suites',
+    )
+    this.supportedCompressions = validatedCapabilities(
+      options.supportedCompressions ?? ['zstd', 'none'],
+      'compression modes',
+    )
     this.encodeOutboundEnvelope = options.encodeOutboundEnvelope
     if (
       !Number.isSafeInteger(this.initialStreamCreditBytes)
@@ -300,6 +331,13 @@ export class FabricSession {
       kind: INNER_FRAME_KIND.hello,
       version: FABRIC_SESSION_PROTOCOL_VERSION,
       pubkey: this.ourPublicKeyBase64,
+      selection: this.role === 'node',
+      cipherSuites: this.role === 'node' && this.selectedCipherSuite
+        ? [this.selectedCipherSuite]
+        : this.supportedCipherSuites,
+      compressions: this.role === 'node' && this.selectedCompression
+        ? [this.selectedCompression]
+        : this.supportedCompressions,
     }
     // Set helloSent BEFORE sendPlainEnvelope: sendPlainEnvelope is delivered
     // synchronously by the Fabric transport, which can re-enter handleHello →
@@ -375,6 +413,9 @@ export class FabricSession {
     kind: 'hello'
     version: number
     pubkey: string
+    selection: boolean
+    cipherSuites: FabricCipherSuite[]
+    compressions: RelayCompressionKind[]
   }): void {
     if (this.peerPubkey !== null) {
       this.fail(
@@ -386,6 +427,10 @@ export class FabricSession {
       )
       return
     }
+    if (frame.version !== FABRIC_SESSION_PROTOCOL_VERSION) {
+      this.fail(new AppError({ code: 'relay_handshake_version_mismatch', status: 400, message: `Unsupported Fabric Session hello version ${frame.version}.` }))
+      return
+    }
     if (frame.pubkey !== this.expectedPeerPubkey) {
       this.fail(
         new AppError({
@@ -394,6 +439,27 @@ export class FabricSession {
           message: 'Peer public key does not match its Fabric membership certificate.',
         }),
       )
+      return
+    }
+
+    if (this.role === 'node') {
+      if (frame.selection) {
+        this.fail(new AppError({ code: 'relay_handshake_invalid_offer', status: 400, message: 'Controller hello must offer Fabric Session capabilities.' }))
+        return
+      }
+      this.selectedCipherSuite = selectCapability(this.supportedCipherSuites, frame.cipherSuites)
+      this.selectedCompression = selectCapability(this.supportedCompressions, frame.compressions)
+    }
+    else {
+      if (!frame.selection || frame.cipherSuites.length !== 1 || frame.compressions.length !== 1 || !this.supportedCipherSuites.includes(frame.cipherSuites[0]) || !this.supportedCompressions.includes(frame.compressions[0])) {
+        this.fail(new AppError({ code: 'relay_handshake_invalid_selection', status: 400, message: 'Node selected unsupported Fabric Session capabilities.' }))
+        return
+      }
+      this.selectedCipherSuite = frame.cipherSuites[0]
+      this.selectedCompression = frame.compressions[0]
+    }
+    if (!this.selectedCipherSuite || !this.selectedCompression) {
+      this.fail(new AppError({ code: 'relay_handshake_no_common_capability', status: 400, message: 'Fabric peers have no common cipher suite or compression mode.' }))
       return
     }
 
@@ -418,16 +484,16 @@ export class FabricSession {
     this.keys = deriveFabricSessionKeys(sharedSecret, { fabricId: this.fabricId, linkId: this.linkId })
     this.sendCipher = new FabricSessionCipher(
       this.role === 'node' ? this.keys.nodeSendKey : this.keys.controllerSendKey,
-      this.optimizedCodecEnabled,
+      this.selectedCipherSuite!,
     )
     this.receiveCipher = new FabricSessionCipher(
       this.role === 'node' ? this.keys.controllerSendKey : this.keys.nodeSendKey,
-      this.optimizedCodecEnabled,
+      this.selectedCipherSuite!,
     )
   }
 
   private maybeMarkReady(): void {
-    if (this.helloSent && this.peerPubkey !== null && this.keys !== null) {
+    if (this.helloSent && this.peerPubkey !== null && this.keys !== null && this.selectedCipherSuite && this.selectedCompression) {
       this.markReady()
     }
   }
@@ -437,6 +503,7 @@ export class FabricSession {
       return
     }
     this.state = 'ready'
+    this.cb.onNegotiatedCapabilities?.({ cipherSuite: this.selectedCipherSuite!, compression: this.selectedCompression! })
     this.cb.onReady?.()
   }
 
@@ -600,6 +667,10 @@ export class FabricSession {
       )
       return
     }
+    if (frame.compression === 'zstd' && this.selectedCompression !== 'zstd') {
+      this.fail(new AppError({ code: 'relay_protocol_unnegotiated_compression', status: 400, message: 'Peer used Zstandard without negotiating it.' }))
+      return
+    }
     const data = decodeRelayChunk({
       data: frame.data,
       compression: frame.compression ?? 'none',
@@ -712,7 +783,7 @@ export class FabricSession {
     const seq = flow.sentBytes
     flow.sentBytes += chunk.byteLength
     this.connectionInFlightBytes += chunk.byteLength
-    if (chunk.byteLength < RELAY_MIN_COMPRESSION_INPUT_BYTES || !this.optimizedCodecEnabled) {
+    if (chunk.byteLength < RELAY_MIN_COMPRESSION_INPUT_BYTES || this.selectedCompression !== 'zstd') {
       this.sendEncryptedFrame({
         kind: INNER_FRAME_KIND.streamData,
         streamId,

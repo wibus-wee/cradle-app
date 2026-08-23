@@ -121,6 +121,57 @@ func TestJoinRequestIsBoundToNodeIdentity(t *testing.T) {
 	}
 }
 
+func TestControllerJoinRequestIsBoundToControllerIdentity(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	validator := NewValidator(func() time.Time { return now }, time.Minute)
+	identityPublic, identityPrivate, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := SignJoinRequest(identityPrivate, JoinRequest{
+		RequestID:          "join-controller-1",
+		FabricID:           "fab_a",
+		SubjectKind:        SubjectController,
+		SubjectID:          "controller_ios_1",
+		EncryptionPubkey:   "x25519-controller-public-key",
+		DisplayName:        "iPhone",
+		Platform:           "ios",
+		Version:            "1.0.0",
+		Capabilities:       []string{"chat", "work"},
+		DeliverySecretHash: testDeliverySecretHash("controller-delivery-secret"),
+		IssuedAt:           now.Unix(),
+		ExpiresAt:          now.Add(5 * time.Minute).Unix(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if request.IdentityPubkey != base64.StdEncoding.EncodeToString(identityPublic) {
+		t.Fatal("SignJoinRequest did not bind the Controller signing key")
+	}
+	if err := validator.VerifyJoinRequest(request); err != nil {
+		t.Fatalf("VerifyJoinRequest() error = %v", err)
+	}
+}
+
+func TestSignedJSONUsesCrossLanguageStringEscaping(t *testing.T) {
+	payload, err := marshalSignedJSON(struct {
+		HTML       string `json:"html"`
+		Separators string `json:"separators"`
+		Literal    string `json:"literal"`
+	}{
+		HTML:       "A&B<C>",
+		Separators: "line\u2028paragraph\u2029",
+		Literal:    `literal \u2028`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "{\"html\":\"A&B<C>\",\"separators\":\"line\u2028paragraph\u2029\",\"literal\":\"literal \\\\u2028\"}"
+	if string(payload) != want {
+		t.Fatalf("canonical signed JSON = %q, want %q", payload, want)
+	}
+}
+
 func testDeliverySecretHash(secret string) string {
 	sum := sha256.Sum256([]byte(secret))
 	return base64.RawURLEncoding.EncodeToString(sum[:])

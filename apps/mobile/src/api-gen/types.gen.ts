@@ -1148,6 +1148,8 @@ export type DeleteWorkspacesByWorkspaceIdResponses = {
      */
     200: {
         ok: boolean;
+        removedSessionIds: Array<string>;
+        removedWorkIds: Array<string>;
     };
 };
 
@@ -2953,6 +2955,29 @@ export type GetFabricManagedRelayResponses = {
 
 export type GetFabricManagedRelayResponse = GetFabricManagedRelayResponses[keyof GetFabricManagedRelayResponses];
 
+export type GetFabricManagedRelayResourcesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/managed-relay/resources';
+};
+
+export type GetFabricManagedRelayResourcesResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: 'managed' | 'external' | 'unavailable';
+        running: boolean;
+        pid: number | null;
+        rssMB: number | null;
+        cpuPercent: number | null;
+        descendantCount: number | null;
+    };
+};
+
+export type GetFabricManagedRelayResourcesResponse = GetFabricManagedRelayResourcesResponses[keyof GetFabricManagedRelayResourcesResponses];
+
 export type PostFabricNodeInvitationsData = {
     body: {
         relayUrl: string;
@@ -3150,6 +3175,73 @@ export type DeleteFabricNodeInvitationsRequestsByRequestIdResponses = {
     204: unknown;
 };
 
+export type GetFabricControllerInvitationsRequestsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/controller-invitations/requests';
+};
+
+export type GetFabricControllerInvitationsRequestsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        requestId: string;
+        subjectId: string;
+        identityPubkey: string;
+        encryptionPubkey: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        requestedAt: string;
+        expiresAt: string;
+    }>;
+};
+
+export type GetFabricControllerInvitationsRequestsResponse = GetFabricControllerInvitationsRequestsResponses[keyof GetFabricControllerInvitationsRequestsResponses];
+
+export type PostFabricControllerInvitationsRequestsByRequestIdApproveData = {
+    body: {
+        nodeId: string;
+        scopes: Array<'view' | 'control' | 'approve'>;
+    };
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/fabric/controller-invitations/requests/{requestId}/approve';
+};
+
+export type PostFabricControllerInvitationsRequestsByRequestIdApproveResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        fabricId: string;
+        controllerId: string;
+    };
+};
+
+export type PostFabricControllerInvitationsRequestsByRequestIdApproveResponse = PostFabricControllerInvitationsRequestsByRequestIdApproveResponses[keyof PostFabricControllerInvitationsRequestsByRequestIdApproveResponses];
+
+export type DeleteFabricControllerInvitationsRequestsByRequestIdData = {
+    body?: never;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/fabric/controller-invitations/requests/{requestId}';
+};
+
+export type DeleteFabricControllerInvitationsRequestsByRequestIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
 export type GetNodesData = {
     body?: never;
     path?: never;
@@ -3176,6 +3268,22 @@ export type GetNodesResponses = {
 };
 
 export type GetNodesResponse = GetNodesResponses[keyof GetNodesResponses];
+
+export type DeleteNodesByNodeIdData = {
+    body?: never;
+    path: {
+        nodeId: string;
+    };
+    query?: never;
+    url: '/nodes/{nodeId}';
+};
+
+export type DeleteNodesByNodeIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
 
 export type GetNodesByNodeIdData = {
     body?: never;
@@ -6780,6 +6888,88 @@ export type GetBlobsByIdResponses = {
 };
 
 export type GetBlobsByIdResponse = GetBlobsByIdResponses[keyof GetBlobsByIdResponses];
+
+export type PostChatArtifactsData = {
+    body: {
+        chatSessionId: string;
+        artifactId?: string;
+        title: string;
+        source: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/chat-artifacts';
+};
+
+export type PostChatArtifactsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        title: string;
+        source: string;
+        revision: number;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostChatArtifactsResponse = PostChatArtifactsResponses[keyof PostChatArtifactsResponses];
+
+export type GetChatArtifactsBySessionIdData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat-artifacts/{sessionId}';
+};
+
+export type GetChatArtifactsBySessionIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        id: string;
+        sessionId: string;
+        title: string;
+        source: string;
+        revision: number;
+        createdAt: number;
+        updatedAt: number;
+    }>;
+};
+
+export type GetChatArtifactsBySessionIdResponse = GetChatArtifactsBySessionIdResponses[keyof GetChatArtifactsBySessionIdResponses];
+
+export type GetChatArtifactsBySessionIdByArtifactIdData = {
+    body?: never;
+    path: {
+        sessionId: string;
+        artifactId: string;
+    };
+    query?: never;
+    url: '/chat-artifacts/{sessionId}/{artifactId}';
+};
+
+export type GetChatArtifactsBySessionIdByArtifactIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        sessionId: string;
+        title: string;
+        source: string;
+        revision: number;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type GetChatArtifactsBySessionIdByArtifactIdResponse = GetChatArtifactsBySessionIdByArtifactIdResponses[keyof GetChatArtifactsBySessionIdByArtifactIdResponses];
 
 export type GetBackgroundActivitiesData = {
     body?: never;
@@ -19783,6 +19973,11 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             modelLabel: string | null;
             modelProvider: string | null;
             serviceTier: string | null;
+            serviceTiers: Array<{
+                id: string;
+                name: string;
+                description: string;
+            }>;
             supportsImages: boolean | null;
             supportsWebSearch: boolean | null;
             supportsNamespaceTools: boolean | null;

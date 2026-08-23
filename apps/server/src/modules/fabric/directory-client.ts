@@ -63,8 +63,12 @@ export class FabricDirectoryClient {
     return this.request<{ requests: FabricJoinRequest[] }>(`/v1/fabrics/${encodeURIComponent(fabricId)}/join-requests`, { headers }).then(result => result.requests)
   }
 
-  approveJoinRequest(requestId: string, nodeCertificate: MembershipCertificate, controllerCertificate: MembershipCertificate, headers: Headers) {
+  approveNodeJoinRequest(requestId: string, nodeCertificate: MembershipCertificate, controllerCertificate: MembershipCertificate, headers: Headers) {
     return this.request<NodeSummary>(`/v1/join-requests/${encodeURIComponent(requestId)}/approve`, jsonRequest('POST', { nodeCertificate, controllerCertificate }, headers))
+  }
+
+  approveControllerJoinRequest(requestId: string, controllerCertificate: MembershipCertificate, grants: FabricNodeGrant[], headers: Headers) {
+    return this.request<{ fabricId: string, controllerId: string }>(`/v1/join-requests/${encodeURIComponent(requestId)}/approve`, jsonRequest('POST', { controllerCertificate, grants }, headers))
   }
 
   rejectJoinRequest(fabricId: string, requestId: string, headers: Headers) {

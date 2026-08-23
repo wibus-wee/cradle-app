@@ -59,7 +59,7 @@ export interface FabricNodeGrant {
 export interface FabricJoinRequest {
   requestId: string
   fabricId: string
-  subjectKind: 'node'
+  subjectKind: FabricSubjectKind
   subjectId: string
   identityPubkey: string
   encryptionPubkey: string
@@ -107,7 +107,7 @@ export function signFabricCertificate(
     identityPubkey: input.identityPubkey,
     encryptionPubkey: input.encryptionPubkey,
     ...(input.nodeId ? { nodeId: input.nodeId } : {}),
-    scopes: [...new Set(input.scopes)].sort(),
+    scopes: canonicalStrings([...new Set(input.scopes)]),
     issuedAt: input.issuedAt ?? unixSeconds(),
     ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
     nonce: input.nonce ?? randomUUID(),
@@ -150,6 +150,7 @@ export function signFabricCreateRequest(ownerPrivateKeyBase64: string): {
 
 export function signFabricJoinRequest(input: {
   fabricId: string
+  subjectKind?: FabricSubjectKind
   subjectId: string
   identityPrivateKeyBase64: string
   encryptionPubkey: string
@@ -162,14 +163,14 @@ export function signFabricJoinRequest(input: {
   const request = {
     requestId: `join_${randomUUID()}`,
     fabricId: input.fabricId,
-    subjectKind: 'node' as const,
+    subjectKind: input.subjectKind ?? 'node',
     subjectId: input.subjectId,
     identityPubkey: publicFabricSigningKey(input.identityPrivateKeyBase64),
     encryptionPubkey: input.encryptionPubkey,
     displayName: input.displayName,
     platform: input.platform,
     version: input.version,
-    capabilities: [...new Set(input.capabilities)].sort(),
+    capabilities: canonicalStrings([...new Set(input.capabilities)]),
     deliverySecretHash: createHash('sha256').update(input.deliverySecret).digest('base64url'),
     issuedAt: unixSeconds(),
     expiresAt: unixSeconds() + 15 * 60,
@@ -217,7 +218,7 @@ function certificatePayload(certificate: MembershipCertificate): Record<string, 
     identityPubkey: certificate.identityPubkey,
     encryptionPubkey: certificate.encryptionPubkey,
     ...(certificate.nodeId ? { nodeId: certificate.nodeId } : {}),
-    scopes: [...certificate.scopes].sort(),
+    scopes: canonicalStrings(certificate.scopes),
     issuedAt: certificate.issuedAt,
     ...(certificate.expiresAt ? { expiresAt: certificate.expiresAt } : {}),
     nonce: certificate.nonce,
@@ -227,6 +228,10 @@ function certificatePayload(certificate: MembershipCertificate): Record<string, 
 
 function sign(privateKeyBase64: string, payload: Record<string, unknown>): string {
   return toBase64(ed25519.sign(new TextEncoder().encode(JSON.stringify(payload)), fromBase64(privateKeyBase64)))
+}
+
+function canonicalStrings<T extends string>(values: T[]): T[] {
+  return [...values].sort((left, right) => Buffer.compare(Buffer.from(left, 'utf8'), Buffer.from(right, 'utf8')))
 }
 
 function unixSeconds(): number { return Math.floor(Date.now() / 1000) }

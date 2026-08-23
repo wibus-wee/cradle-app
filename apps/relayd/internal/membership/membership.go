@@ -3,6 +3,7 @@
 package membership
 
 import (
+	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
@@ -107,9 +108,9 @@ type createFabricPayload struct {
 	Nonce       string `json:"nonce"`
 }
 
-// JoinRequest is signed by the joining Node's identity key. The Node generates
-// its own delivery secret, puts only its SHA-256 hash here, and renders the raw
-// secret with fabric/request ids in the QR join string. Relayd never stores it.
+// JoinRequest is signed by the joining device's identity key. The device
+// generates its own delivery secret and puts only its SHA-256 hash here.
+// Relayd never stores the raw secret.
 type JoinRequest struct {
 	RequestID          string      `json:"requestId"`
 	FabricID           string      `json:"fabricId"`
@@ -206,7 +207,7 @@ func (v *Validator) VerifyRequestProof(proof RequestProof, expectedPubkey, metho
 	if err := v.validateFresh(proof.IssuedAt); err != nil {
 		return err
 	}
-	payload, err := json.Marshal(requestProofPayload{
+	payload, err := marshalSignedJSON(requestProofPayload{
 		Pubkey: proof.Pubkey, Method: proof.Method, Path: proof.Path, IssuedAt: proof.IssuedAt, Nonce: proof.Nonce,
 	})
 	if err != nil {
@@ -225,7 +226,7 @@ func (v *Validator) VerifyCreateFabric(request CreateFabricRequest) error {
 	if err := v.validateFresh(request.IssuedAt); err != nil {
 		return err
 	}
-	payload, err := json.Marshal(createFabricPayload{
+	payload, err := marshalSignedJSON(createFabricPayload{
 		OwnerPubkey: request.OwnerPubkey, RequestID: request.RequestID, IssuedAt: request.IssuedAt, Nonce: request.Nonce,
 	})
 	if err != nil {
@@ -238,7 +239,7 @@ func (v *Validator) VerifyCreateFabric(request CreateFabricRequest) error {
 }
 
 func (v *Validator) VerifyJoinRequest(request JoinRequest) error {
-	if request.SubjectKind != SubjectNode || request.RequestID == "" || request.FabricID == "" || request.SubjectID == "" || request.IdentityPubkey == "" || request.EncryptionPubkey == "" || !validDeliverySecretHash(request.DeliverySecretHash) || request.IssuedAt == 0 || request.ExpiresAt == 0 {
+	if (request.SubjectKind != SubjectNode && request.SubjectKind != SubjectController) || request.RequestID == "" || request.FabricID == "" || request.SubjectID == "" || request.IdentityPubkey == "" || request.EncryptionPubkey == "" || !validDeliverySecretHash(request.DeliverySecretHash) || request.IssuedAt == 0 || request.ExpiresAt == 0 {
 		return ErrInvalidDocument
 	}
 	if !v.now().Before(time.Unix(request.ExpiresAt, 0)) {
@@ -272,7 +273,7 @@ func SignRequestProof(privateKey ed25519.PrivateKey, proof RequestProof) (Reques
 	if proof.Pubkey == "" {
 		proof.Pubkey = base64.StdEncoding.EncodeToString(privateKey.Public().(ed25519.PublicKey))
 	}
-	payload, err := json.Marshal(requestProofPayload{
+	payload, err := marshalSignedJSON(requestProofPayload{
 		Pubkey: proof.Pubkey, Method: proof.Method, Path: proof.Path, IssuedAt: proof.IssuedAt, Nonce: proof.Nonce,
 	})
 	if err != nil {
@@ -287,7 +288,7 @@ func SignCreateFabric(privateKey ed25519.PrivateKey, request CreateFabricRequest
 	if request.OwnerPubkey == "" {
 		request.OwnerPubkey = base64.StdEncoding.EncodeToString(privateKey.Public().(ed25519.PublicKey))
 	}
-	payload, err := json.Marshal(createFabricPayload{
+	payload, err := marshalSignedJSON(createFabricPayload{
 		OwnerPubkey: request.OwnerPubkey, RequestID: request.RequestID, IssuedAt: request.IssuedAt, Nonce: request.Nonce,
 	})
 	if err != nil {
@@ -333,7 +334,7 @@ func HasAnyScope(scopes []Scope, expected ...Scope) bool {
 func canonicalCertificate(c Certificate) ([]byte, error) {
 	scopes := append([]Scope(nil), c.Scopes...)
 	sort.Slice(scopes, func(i, j int) bool { return scopes[i] < scopes[j] })
-	return json.Marshal(certificatePayload{
+	return marshalSignedJSON(certificatePayload{
 		Version: c.Version, FabricID: c.FabricID, SubjectKind: c.SubjectKind, SubjectID: c.SubjectID,
 		IdentityPubkey: c.IdentityPubkey, EncryptionPubkey: c.EncryptionPubkey, NodeID: c.NodeID,
 		Scopes: scopes, IssuedAt: c.IssuedAt, ExpiresAt: c.ExpiresAt, Nonce: c.Nonce, IssuerPubkey: c.IssuerPubkey,
@@ -343,11 +344,44 @@ func canonicalCertificate(c Certificate) ([]byte, error) {
 func canonicalJoinRequest(request JoinRequest) ([]byte, error) {
 	capabilities := append([]string(nil), request.Capabilities...)
 	sort.Strings(capabilities)
-	return json.Marshal(joinRequestPayload{
+	return marshalSignedJSON(joinRequestPayload{
 		RequestID: request.RequestID, FabricID: request.FabricID, SubjectKind: request.SubjectKind, SubjectID: request.SubjectID,
 		IdentityPubkey: request.IdentityPubkey, EncryptionPubkey: request.EncryptionPubkey, DisplayName: request.DisplayName,
 		Platform: request.Platform, Version: request.Version, Capabilities: capabilities, DeliverySecretHash: request.DeliverySecretHash, IssuedAt: request.IssuedAt, ExpiresAt: request.ExpiresAt,
 	})
+}
+
+// marshalSignedJSON matches ECMAScript JSON.stringify string escaping while
+// preserving the declaration order of the fixed signed-payload structs.
+func marshalSignedJSON(value any) ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := json.NewEncoder(&buffer)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(value); err != nil {
+		return nil, err
+	}
+	encoded := bytes.TrimSuffix(buffer.Bytes(), []byte{'\n'})
+	result := make([]byte, 0, len(encoded))
+	for index := 0; index < len(encoded); {
+		if encoded[index] == '\\' && index+1 < len(encoded) && encoded[index+1] == '\\' {
+			result = append(result, encoded[index], encoded[index+1])
+			index += 2
+			continue
+		}
+		if index+6 <= len(encoded) && bytes.Equal(encoded[index:index+6], []byte(`\u2028`)) {
+			result = append(result, []byte("\u2028")...)
+			index += 6
+			continue
+		}
+		if index+6 <= len(encoded) && bytes.Equal(encoded[index:index+6], []byte(`\u2029`)) {
+			result = append(result, []byte("\u2029")...)
+			index += 6
+			continue
+		}
+		result = append(result, encoded[index])
+		index++
+	}
+	return result, nil
 }
 
 func (v *Validator) validateFresh(issuedAt int64) error {

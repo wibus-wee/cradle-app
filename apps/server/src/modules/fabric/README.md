@@ -6,7 +6,7 @@ bytes travel only through authenticated encrypted Node links.
 
 | Area | Owner | Responsibility |
 | --- | --- | --- |
-| Membership and enrollment | [`service.ts`](./service.ts) | Persists one local Fabric membership, recovers pending enrollment, manages the owner approval inbox, and lists granted Nodes. |
+| Membership and enrollment | [`service.ts`](./service.ts) | Persists one local Fabric membership, recovers pending Node enrollment, manages Node and Controller owner approval inboxes, and lists granted Nodes. |
 | Signed protocol | [`protocol.ts`](./protocol.ts), [`directory-client.ts`](./directory-client.ts) | Signs membership documents and calls the versioned relayd directory API. |
 | Controller links | [`node-link-manager.ts`](../relay-transport/node-link-manager.ts) | Opens one demand-driven encrypted tunnel to a selected Node and reuses it for upstream traffic. |
 | Node connection | [`node-connector.ts`](../relay-transport/node-connector.ts) | Maintains the local Node's authenticated WebSocket and reconnects after relay or server interruption. |
@@ -20,6 +20,12 @@ and a Controller. A joining device submits its own identity and encryption
 keys. The owner approves that exact request and returns two owner-signed
 certificates: a Node certificate for the persistent Node socket and a
 Controller certificate for directory and link operations.
+
+A Controller-only client submits the same self-signed join document with
+`subjectKind: controller`. The owner approves it for one Node and explicit
+`view`, `control`, or `approve` scopes. The resulting certificate is restricted
+to that Node and the approval creates no Node record. The complete cross-language
+contract is [`apps/relayd/protocol`](../../../../relayd/protocol/README.md).
 
 Controller certificates identify a device but do not restrict it to that
 device's Node. Admin Controllers share one authoritative device directory;

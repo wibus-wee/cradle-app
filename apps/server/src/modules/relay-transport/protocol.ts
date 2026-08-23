@@ -1,11 +1,13 @@
 import { AppError } from '../../errors/app-error'
 import type { RelayCompressionKind } from './compression'
+import type { FabricCipherSuite } from './crypto'
+import { FABRIC_CIPHER_SUITE } from './crypto'
 
 /**
  * Fabric Session protocol. The Fabric v3 envelope owns routing and relayd
  * scheduling; this envelope only carries one encrypted session payload.
  */
-export const FABRIC_SESSION_PROTOCOL_VERSION = 1
+export const FABRIC_SESSION_PROTOCOL_VERSION = 2
 
 export const RELAY_MAX_FRAME_BYTES = 1 << 20 // 1 MiB
 export const RELAY_MAX_STREAM_CHUNK_BYTES = 64 * 1024 // 64 KiB
@@ -54,6 +56,9 @@ export type InnerFrame
       kind: 'hello'
       version: number
       pubkey: string
+      selection: boolean
+      cipherSuites: FabricCipherSuite[]
+      compressions: RelayCompressionKind[]
     }
     | { kind: 'stream_open', streamId: string }
     | {
@@ -72,6 +77,16 @@ const decoder = new TextDecoder('utf8', { fatal: true })
 const OUTER_HEADER_BYTES = 16
 const FLAG_HAS_STREAM_ID = 1
 const COMPRESSED_STREAM_DATA_CODE = 7
+const HELLO_SELECTION_FLAG = 1
+
+const cipherSuiteBits: Record<FabricCipherSuite, number> = {
+  [FABRIC_CIPHER_SUITE.aes256Gcm]: 1,
+  [FABRIC_CIPHER_SUITE.xchacha20Poly1305]: 2,
+}
+const compressionBits: Record<RelayCompressionKind, number> = {
+  zstd: 1,
+  none: 2,
+}
 
 const envelopeKindCode: Record<FabricSessionEnvelopeKind, number> = {
   [FABRIC_SESSION_ENVELOPE_KIND.dataFrame]: 1,
@@ -271,13 +286,11 @@ export function encodeInnerFrame(frame: InnerFrame): Uint8Array {
         throw protocolError('Hello public keys must be 32 bytes.')
       }
       const out = new Uint8Array(8 + pubkey.length)
-      const view = new DataView(out.buffer)
       out[0] = innerFrameCode[frame.kind]
       out[1] = frame.version
-      out[2] = 0
-      out[3] = 0
-      view.setUint16(4, 0)
-      view.setUint16(6, 0)
+      out[2] = frame.selection ? HELLO_SELECTION_FLAG : 0
+      out[3] = capabilityMask(frame.cipherSuites, cipherSuiteBits, 'cipher suite')
+      out[4] = capabilityMask(frame.compressions, compressionBits, 'compression')
       out.set(pubkey, 8)
       return out
     }
@@ -400,16 +413,51 @@ export function decodeInnerFrame(bytes: Uint8Array): InnerFrame {
 function decodeHelloFrame(bytes: Uint8Array, view: DataView): InnerFrame {
   if (bytes.length < 40) { throw protocolError('Hello frame is too short.') }
   const flags = bytes[2]
-  const nameLength = view.getUint16(4)
-  const signingLength = view.getUint16(6)
-  if (flags !== 0 || nameLength !== 0 || signingLength !== 0 || bytes.length !== 40) { throw protocolError('Invalid hello fields.') }
+  const cipherMask = bytes[3]
+  const compressionMask = bytes[4]
+  if ((flags & ~HELLO_SELECTION_FLAG) !== 0 || bytes[5] !== 0 || view.getUint16(6) !== 0 || bytes.length !== 40) { throw protocolError('Invalid hello fields.') }
+  const cipherSuites = capabilitiesFromMask(cipherMask, cipherSuiteBits, 'cipher suite')
+  const compressions = capabilitiesFromMask(compressionMask, compressionBits, 'compression')
+  const selection = (flags & HELLO_SELECTION_FLAG) !== 0
+  if (selection && (cipherSuites.length !== 1 || compressions.length !== 1)) {
+    throw protocolError('Hello selection must choose exactly one cipher suite and compression mode.')
+  }
   const offset = 8
   const pubkey = bytes.slice(offset, offset + 32)
   return {
     kind: INNER_FRAME_KIND.hello,
     version: bytes[1],
     pubkey: Buffer.from(pubkey).toString('base64'),
+    selection,
+    cipherSuites,
+    compressions,
   }
+}
+
+function capabilityMask<T extends string>(values: T[], bits: Record<T, number>, label: string): number {
+  const unique = new Set(values)
+  if (unique.size === 0 || unique.size !== values.length) {
+    throw protocolError(`Hello ${label} capabilities must be non-empty and unique.`)
+  }
+  let mask = 0
+  for (const value of unique) {
+    const bit = bits[value]
+    if (!bit) {
+      throw protocolError(`Unknown hello ${label} capability.`)
+    }
+    mask |= bit
+  }
+  return mask
+}
+
+function capabilitiesFromMask<T extends string>(mask: number, bits: Record<T, number>, label: string): T[] {
+  const knownMask = (Object.values(bits) as number[]).reduce((result, bit) => result | bit, 0)
+  if (mask === 0 || (mask & ~knownMask) !== 0) {
+    throw protocolError(`Invalid hello ${label} capability mask.`)
+  }
+  return (Object.entries(bits) as Array<[T, number]>)
+    .filter(([, bit]) => (mask & bit) !== 0)
+    .map(([value]) => value)
 }
 
 function decodeStreamStringFrame(

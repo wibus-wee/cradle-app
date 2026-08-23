@@ -25,8 +25,9 @@ interface FakeDirectoryState {
   revokedGrants: string[]
   removedNodes: string[]
   approvedRequestBodies: Array<{
-    nodeCertificate: MembershipCertificate
+    nodeCertificate?: MembershipCertificate
     controllerCertificate: MembershipCertificate
+    grants?: Array<{ grantId: string, fabricId: string, controllerId: string, nodeId: string, scope: string }>
   }>
   rejectedRequests: string[]
 }
@@ -48,6 +49,16 @@ const pendingJoinRequest = {
   issuedAt: 1_776_000_000,
   expiresAt: 1_776_000_900,
   signature: 'relay-validated-signature',
+}
+
+const pendingControllerRequest = {
+  ...pendingJoinRequest,
+  requestId: 'join-controller-pending',
+  subjectKind: 'controller',
+  subjectId: 'controller-ios',
+  displayName: 'iPhone',
+  platform: 'ios',
+  capabilities: ['chat', 'work'],
 }
 
 const nodeASummary = {
@@ -89,18 +100,23 @@ function startFakeDirectory(state: FakeDirectoryState): Promise<{ baseUrl: strin
       return
     }
     if (url.pathname === '/v1/fabrics/fabric-1/join-requests' && request.method === 'GET') {
-      writeJson(200, { requests: [pendingJoinRequest] })
+      writeJson(200, { requests: [pendingJoinRequest, pendingControllerRequest] })
       return
     }
-    if (url.pathname === '/v1/join-requests/join-pending/approve' && request.method === 'POST') {
+    if (/^\/v1\/join-requests\/[\w-]+\/approve$/u.test(url.pathname) && request.method === 'POST') {
       const chunks: Buffer[] = []
       for await (const chunk of request) {
         chunks.push(Buffer.from(chunk))
       }
       state.approvedRequestBodies.push(JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
-        nodeCertificate: MembershipCertificate
+        nodeCertificate?: MembershipCertificate
         controllerCertificate: MembershipCertificate
+        grants?: Array<{ grantId: string, fabricId: string, controllerId: string, nodeId: string, scope: string }>
       })
+      if (url.pathname.includes('controller')) {
+        writeJson(200, { fabricId: 'fabric-1', controllerId: 'controller-ios' })
+        return
+      }
       writeJson(200, { ...offlineNodeSummary, nodeId: 'node-pending', displayName: 'Studio Mac' })
       return
     }
@@ -266,6 +282,39 @@ describe('fabric node directory routes', () => {
     const rejected = await server.handle(new Request('http://localhost/fabric/node-invitations/requests/join-pending', { method: 'DELETE' }))
     expect(rejected.status).toBe(204)
     expect(state.rejectedRequests).toEqual(['join-pending'])
+  })
+
+  it('approves a Controller for one Node with explicit least-privilege grants', async () => {
+    const server = await setup()
+    const listed = await server.handle(new Request('http://localhost/fabric/controller-invitations/requests'))
+    expect(listed.status).toBe(200)
+    expect(await listed.json()).toEqual([expect.objectContaining({
+      requestId: 'join-controller-pending',
+      subjectId: 'controller-ios',
+      displayName: 'iPhone',
+      platform: 'ios',
+    })])
+
+    const approved = await server.handle(new Request('http://localhost/fabric/controller-invitations/requests/join-controller-pending/approve', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nodeId: 'node-a', scopes: ['view', 'control', 'approve'] }),
+    }))
+    expect(approved.status).toBe(200)
+    expect(await approved.json()).toEqual({ fabricId: 'fabric-1', controllerId: 'controller-ios' })
+    const body = state.approvedRequestBodies[0]!
+    expect(body.nodeCertificate).toBeUndefined()
+    expect(body.controllerCertificate).toMatchObject({
+      subjectKind: 'controller',
+      subjectId: 'controller-ios',
+      nodeId: 'node-a',
+      scopes: ['approve', 'control', 'view'],
+    })
+    expect(body.grants).toEqual(expect.arrayContaining([
+      expect.objectContaining({ controllerId: 'controller-ios', nodeId: 'node-a', scope: 'view' }),
+      expect.objectContaining({ controllerId: 'controller-ios', nodeId: 'node-a', scope: 'control' }),
+      expect.objectContaining({ controllerId: 'controller-ios', nodeId: 'node-a', scope: 'approve' }),
+    ]))
   })
 
   it('rejects Nodes outside the caller grant filter', async () => {

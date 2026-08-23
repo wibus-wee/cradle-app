@@ -381,6 +381,107 @@ func enrollNode(t *testing.T, store *Store, owner ed25519.PrivateKey, fabricReco
 	return node
 }
 
+func TestApproveControllerJoinRequestPersistsCertificateAndScopedGrants(t *testing.T) {
+	now := time.Date(2026, 8, 16, 12, 0, 0, 0, time.UTC)
+	store := newTestStore(t, &now)
+	ownerPublic, ownerPrivate := newKey(t)
+	fabricRecord, err := store.CreateFabric(t.Context(), "create-controller-fabric", encodeKey(ownerPublic))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = enrollNode(t, store, ownerPrivate, fabricRecord, "node-a", "Studio", now)
+
+	controllerPublic, controllerPrivate := newKey(t)
+	deliverySecret := "ios-controller-delivery-secret"
+	joinRequest, err := membership.SignJoinRequest(controllerPrivate, membership.JoinRequest{
+		RequestID:          "join-controller-ios",
+		FabricID:           fabricRecord.ID,
+		SubjectKind:        membership.SubjectController,
+		SubjectID:          "controller-ios",
+		EncryptionPubkey:   "controller-ios-x25519",
+		DisplayName:        "iPhone",
+		Platform:           "ios",
+		Version:            "1.0.0",
+		Capabilities:       []string{"chat", "work"},
+		DeliverySecretHash: hashSecret(deliverySecret),
+		IssuedAt:           now.Unix(),
+		ExpiresAt:          now.Add(5 * time.Minute).Unix(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateJoinRequest(t.Context(), joinRequest); err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := membership.SignCertificate(ownerPrivate, membership.Certificate{
+		Version:          1,
+		FabricID:         fabricRecord.ID,
+		SubjectKind:      membership.SubjectController,
+		SubjectID:        joinRequest.SubjectID,
+		IdentityPubkey:   encodeKey(controllerPublic),
+		EncryptionPubkey: joinRequest.EncryptionPubkey,
+		NodeID:           "node-a",
+		Scopes:           []membership.Scope{membership.ScopeView, membership.ScopeControl},
+		IssuedAt:         now.Unix(),
+		Nonce:            "controller-ios-certificate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	grants := []Grant{
+		{ID: "grant-ios-view", FabricID: fabricRecord.ID, ControllerID: joinRequest.SubjectID, NodeID: "node-a", Scope: membership.ScopeView},
+		{ID: "grant-ios-control", FabricID: fabricRecord.ID, ControllerID: joinRequest.SubjectID, NodeID: "node-a", Scope: membership.ScopeControl},
+	}
+	unrestrictedCertificate, err := membership.SignCertificate(ownerPrivate, membership.Certificate{
+		Version:          1,
+		FabricID:         fabricRecord.ID,
+		SubjectKind:      membership.SubjectController,
+		SubjectID:        joinRequest.SubjectID,
+		IdentityPubkey:   encodeKey(controllerPublic),
+		EncryptionPubkey: joinRequest.EncryptionPubkey,
+		Scopes:           []membership.Scope{membership.ScopeView},
+		IssuedAt:         now.Unix(),
+		Nonce:            "controller-ios-unrestricted-certificate",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.ApproveControllerJoinRequest(t.Context(), joinRequest.RequestID, unrestrictedCertificate, grants[:1]); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("unrestricted Controller approval error = %v, want access denied", err)
+	}
+	adminCertificate := certificate
+	adminCertificate.Scopes = []membership.Scope{membership.ScopeAdmin}
+	adminCertificate.Nonce = "controller-ios-admin-certificate"
+	adminCertificate, err = membership.SignCertificate(ownerPrivate, adminCertificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminGrant := []Grant{{ID: "grant-ios-admin", FabricID: fabricRecord.ID, ControllerID: joinRequest.SubjectID, NodeID: "node-a", Scope: membership.ScopeAdmin}}
+	if err := store.ApproveControllerJoinRequest(t.Context(), joinRequest.RequestID, adminCertificate, adminGrant); !errors.Is(err, ErrAccessDenied) {
+		t.Fatalf("admin Controller enrollment error = %v, want access denied", err)
+	}
+	if err := store.ApproveControllerJoinRequest(t.Context(), joinRequest.RequestID, certificate, grants); err != nil {
+		t.Fatal(err)
+	}
+	result, err := store.ReadJoinRequest(t.Context(), joinRequest.RequestID, deliverySecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.NodeCertificate != nil || result.ControllerCertificate == nil || result.ControllerCertificate.SubjectID != joinRequest.SubjectID {
+		t.Fatalf("Controller enrollment result = %#v", result)
+	}
+	nodes, _, err := store.ListAuthorizedNodes(t.Context(), fabricRecord.ID, joinRequest.SubjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(nodes) != 1 || nodes[0].NodeID != "node-a" || len(nodes[0].Scopes) != 2 {
+		t.Fatalf("Controller authorized Nodes = %#v", nodes)
+	}
+	if err := store.ApproveControllerJoinRequest(t.Context(), joinRequest.RequestID, certificate, grants); err != nil {
+		t.Fatalf("idempotent Controller approval error = %v", err)
+	}
+}
+
 func newTestStore(t *testing.T, clock *time.Time) *Store {
 	t.Helper()
 	store, err := OpenStore(StoreConfig{

@@ -7,7 +7,7 @@ import {
   encodeRelayChunk,
   RELAY_MIN_COMPRESSION_INPUT_BYTES,
 } from '../../src/modules/relay-transport/compression'
-import { FabricSessionCipher } from '../../src/modules/relay-transport/crypto'
+import { FABRIC_CIPHER_SUITE, FabricSessionCipher } from '../../src/modules/relay-transport/crypto'
 import { decodeInnerFrame, encodeInnerFrame } from '../../src/modules/relay-transport/protocol'
 
 type PayloadProfile = 'compressible' | 'incompressible'
@@ -24,7 +24,7 @@ interface CodecResult {
 }
 
 const KEY = new Uint8Array(32).fill(7)
-const BASELINE_CIPHER = new FabricSessionCipher(KEY, false)
+const BASELINE_CIPHER = new FabricSessionCipher(KEY, FABRIC_CIPHER_SUITE.xchacha20Poly1305)
 const OPTIMIZED_CIPHER = new FabricSessionCipher(KEY)
 
 function payloadFor(profile: PayloadProfile, length: number): Uint8Array {
@@ -181,7 +181,7 @@ describe('relay endpoint codec throughput benchmark', () => {
         samples: 5,
         statistic: 'median',
         baseline: 'binary inner frame + XChaCha20-Poly1305',
-        optimized: 'adaptive Zstandard + binary inner frame + size-adaptive AEAD',
+        optimized: 'negotiated Zstandard + binary inner frame + AES-256-GCM',
       },
       rows,
     }))

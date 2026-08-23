@@ -228,7 +228,7 @@ function printBenchmark(codecSamples: CodecSample[], rows: BenchmarkRow[]): void
     ...rows.map(row =>
       `| ${row.checkpoint} | ${row.old} ${row.unit} | ${row.new} ${row.unit} | ${deltaPercent(row.old, row.new)} | ${row.evidence} |`),
     '',
-    'V2 baseline is the PR wire format before endpoint compression/adaptive AEAD. Optimized V2 keeps the relay envelope version, adds independently decodable Zstandard chunks, keeps low-latency XChaCha for small frames, and uses native AES-GCM for bulk frames. Incompressible chunks are sent raw, so compression never expands the wire.',
+    'V2 baseline models XChaCha without compression. Optimized V2 keeps the relay envelope version and models a negotiated AES-256-GCM plus independently decodable Zstandard session. Incompressible chunks are sent raw, so compression never expands the wire.',
   ].join('\n')
   console.info(markdown)
   console.info(JSON.stringify(report))

@@ -594,6 +594,23 @@ export const zDeleteFabricNodeInvitationsRequestsByRequestIdPath = z.object({
     requestId: z.string().min(1).regex(/.*\S.*/)
 });
 
+export const zPostFabricControllerInvitationsRequestsByRequestIdApproveBody = z.object({
+    nodeId: z.string().min(1).regex(/.*\S.*/),
+    scopes: z.array(z.enum([
+        'view',
+        'control',
+        'approve'
+    ])).min(1)
+});
+
+export const zPostFabricControllerInvitationsRequestsByRequestIdApprovePath = z.object({
+    requestId: z.string().min(1).regex(/.*\S.*/)
+});
+
+export const zDeleteFabricControllerInvitationsRequestsByRequestIdPath = z.object({
+    requestId: z.string().min(1).regex(/.*\S.*/)
+});
+
 export const zDeleteNodesByNodeIdPath = z.object({
     nodeId: z.string().min(1).regex(/.*\S.*/)
 });

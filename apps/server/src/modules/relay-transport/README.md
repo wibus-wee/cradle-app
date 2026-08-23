@@ -32,8 +32,8 @@ Fabric membership rows, certificates, and directory access remain owned by
 
 - `protocol.ts`: Fabric Session envelope and encrypted inner frame schemas.
 - `crypto.ts`: X25519 key agreement, Fabric-route-scoped HKDF key derivation,
-  public-key fingerprints, and size-adaptive XChaCha20-Poly1305/AES-256-GCM
-  frame encryption.
+  public-key fingerprints, and negotiated AES-256-GCM or
+  XChaCha20-Poly1305 frame encryption.
 - `compression.ts`: independent Zstandard chunk encoding with bounded decode
   output and raw fallback for data that does not shrink.
 - `session.ts`: shared node/controller handshake state machine, encrypted frame
@@ -59,12 +59,15 @@ The controller side opens a local listener on `127.0.0.1:<port>` and returns
 they become encrypted `stream_data` frames over relayd and exit on the Node
 side as a TCP connection to the Node Cradle Server's own local HTTP port.
 
-The binary v2 stream protocol uses 64 KiB maximum data chunks. Chunks of at
-least 1 KiB are compressed independently with native Zstandard level 1 only
-when the result is at least 64 bytes smaller; incompressible and interactive
-small chunks remain raw. Small protocol frames retain low-fixed-cost
-XChaCha20-Poly1305, while bulk frames use native AES-256-GCM. Both choices are
-authenticated end to end and opaque to relayd.
+Fabric Session v2 negotiates one AEAD and one compression mode during its hello
+exchange. AES-256-GCM with no compression is the portable baseline for native
+clients. Server peers also advertise XChaCha20-Poly1305 and Zstandard; the Node
+selects them only when the Controller offered them. The stream protocol uses
+64 KiB maximum uncompressed chunks. With Zstandard selected, chunks of at least
+1 KiB are compressed independently at level 1 only when the result is at least
+64 bytes smaller. Both cipher choices are authenticated end to end and opaque
+to relayd. The byte-level contract is
+[`apps/relayd/protocol`](../../../../relayd/protocol/README.md).
 
 Native Zstandard requires Node.js 22.15.0 or newer. Server bootstrap validates
 that both compression and decompression APIs exist and reports the current and

@@ -3175,6 +3175,73 @@ export type DeleteFabricNodeInvitationsRequestsByRequestIdResponses = {
     204: unknown;
 };
 
+export type GetFabricControllerInvitationsRequestsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/fabric/controller-invitations/requests';
+};
+
+export type GetFabricControllerInvitationsRequestsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        requestId: string;
+        subjectId: string;
+        identityPubkey: string;
+        encryptionPubkey: string;
+        displayName: string;
+        platform: string;
+        version: string;
+        capabilities: Array<string>;
+        requestedAt: string;
+        expiresAt: string;
+    }>;
+};
+
+export type GetFabricControllerInvitationsRequestsResponse = GetFabricControllerInvitationsRequestsResponses[keyof GetFabricControllerInvitationsRequestsResponses];
+
+export type PostFabricControllerInvitationsRequestsByRequestIdApproveData = {
+    body: {
+        nodeId: string;
+        scopes: Array<'view' | 'control' | 'approve'>;
+    };
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/fabric/controller-invitations/requests/{requestId}/approve';
+};
+
+export type PostFabricControllerInvitationsRequestsByRequestIdApproveResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        fabricId: string;
+        controllerId: string;
+    };
+};
+
+export type PostFabricControllerInvitationsRequestsByRequestIdApproveResponse = PostFabricControllerInvitationsRequestsByRequestIdApproveResponses[keyof PostFabricControllerInvitationsRequestsByRequestIdApproveResponses];
+
+export type DeleteFabricControllerInvitationsRequestsByRequestIdData = {
+    body?: never;
+    path: {
+        requestId: string;
+    };
+    query?: never;
+    url: '/fabric/controller-invitations/requests/{requestId}';
+};
+
+export type DeleteFabricControllerInvitationsRequestsByRequestIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
 export type GetNodesData = {
     body?: never;
     path?: never;

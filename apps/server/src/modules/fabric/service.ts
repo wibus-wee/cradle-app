@@ -11,7 +11,7 @@ import { db } from '../../infra'
 import { readProcessTreeResourceUsage } from '../../infra/process-resources'
 import { readSecret, removeSecret, upsertSecret } from '../secrets/service'
 import { FabricDirectoryClient } from './directory-client'
-import type { FabricJoinRequest, FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
+import type { FabricJoinRequest, FabricNodeGrant, FabricScope, MembershipCertificate, NodeSummary } from './protocol'
 import {
   assertFabricCertificate,
   fabricAuthHeaders,
@@ -76,6 +76,12 @@ export interface PendingFabricNodeRequestView {
   capabilities: string[]
   requestedAt: string
   expiresAt: string
+}
+
+export interface PendingFabricControllerRequestView extends PendingFabricNodeRequestView {
+  subjectId: string
+  identityPubkey: string
+  encryptionPubkey: string
 }
 
 type FabricMembershipChangedListener = () => void
@@ -289,7 +295,7 @@ version: input.version ?? 'cradle-server',
 deliverySecret,
   })
   const join = await directory.createJoinRequest(joinRequest)
-  await directory.approveJoinRequest(join.requestId, nodeCertificate, controllerCertificate, ownerProofHeaders(owner.privateKeyBase64, 'POST', `/v1/join-requests/${join.requestId}/approve`))
+  await directory.approveNodeJoinRequest(join.requestId, nodeCertificate, controllerCertificate, ownerProofHeaders(owner.privateKeyBase64, 'POST', `/v1/join-requests/${join.requestId}/approve`))
 
   upsertSecret({ id: ownerKeySecretId, kind: 'system-fabric-owner-key', label: 'Cradle Fabric owner key', secret: owner.privateKeyBase64 })
   upsertSecret({ id: identityKeySecretId, kind: 'system-fabric-identity-key', label: 'Cradle Fabric identity key', secret: identity.privateKeyBase64 })
@@ -406,6 +412,9 @@ export async function approveNodeInvitation(invitation: FabricNodeInvitation): P
   if (pending.status === 'rejected') {
     throw new AppError({ code: 'fabric_invitation_rejected', status: 409, message: 'This Node invitation was rejected.' })
   }
+  if (pending.request.subjectKind !== 'node') {
+    throw new AppError({ code: 'fabric_invitation_subject_invalid', status: 409, message: 'This invitation belongs to a Controller, not a Node.' })
+  }
   return await approveJoinRequest(pending.request)
 }
 
@@ -417,7 +426,7 @@ export async function listPendingNodeRequests(): Promise<PendingFabricNodeReques
     membership.fabricId,
     ownerProofHeaders(ownerPrivateKey, 'GET', path),
   )
-  return requests.map(request => ({
+  return requests.filter(request => request.subjectKind === 'node').map(request => ({
     requestId: request.requestId,
     displayName: request.displayName,
     platform: request.platform,
@@ -436,11 +445,79 @@ export async function approvePendingNodeRequest(requestId: string): Promise<Node
     membership.fabricId,
     ownerProofHeaders(ownerPrivateKey, 'GET', path),
   )
-  const request = requests.find(candidate => candidate.requestId === requestId)
+  const request = requests.find(candidate => candidate.requestId === requestId && candidate.subjectKind === 'node')
   if (!request) {
     throw new AppError({ code: 'fabric_join_request_not_found', status: 404, message: 'This Fabric join request is no longer pending.' })
   }
   return await approveJoinRequest(request)
+}
+
+export async function listPendingControllerRequests(): Promise<PendingFabricControllerRequestView[]> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  const path = `/v1/fabrics/${membership.fabricId}/join-requests`
+  const requests = await new FabricDirectoryClient(membership.relayUrl).listJoinRequests(
+    membership.fabricId,
+    ownerProofHeaders(ownerPrivateKey, 'GET', path),
+  )
+  return requests.filter(request => request.subjectKind === 'controller').map(request => ({
+    requestId: request.requestId,
+    subjectId: request.subjectId,
+    identityPubkey: request.identityPubkey,
+    encryptionPubkey: request.encryptionPubkey,
+    displayName: request.displayName,
+    platform: request.platform,
+    version: request.version,
+    capabilities: request.capabilities,
+    requestedAt: new Date(request.issuedAt * 1000).toISOString(),
+    expiresAt: new Date(request.expiresAt * 1000).toISOString(),
+  }))
+}
+
+export async function approvePendingControllerRequest(
+  requestId: string,
+  input: { nodeId: string, scopes: FabricScope[] },
+): Promise<{ fabricId: string, controllerId: string }> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  const allowedScopes = new Set<FabricScope>(['view', 'control', 'approve'])
+  const scopes = [...new Set(input.scopes)]
+  if (scopes.length === 0 || scopes.some(scope => !allowedScopes.has(scope))) {
+    throw new AppError({ code: 'fabric_controller_scopes_invalid', status: 400, message: 'Controller enrollment requires view, control, or approve scopes.' })
+  }
+  await getNode(input.nodeId)
+  const listPath = `/v1/fabrics/${membership.fabricId}/join-requests`
+  const requests = await new FabricDirectoryClient(membership.relayUrl).listJoinRequests(
+    membership.fabricId,
+    ownerProofHeaders(ownerPrivateKey, 'GET', listPath),
+  )
+  const request = requests.find(candidate => candidate.requestId === requestId && candidate.subjectKind === 'controller')
+  if (!request) {
+    throw new AppError({ code: 'fabric_join_request_not_found', status: 404, message: 'This Controller enrollment request is no longer pending.' })
+  }
+  const certificate = signFabricCertificate(ownerPrivateKey, {
+    fabricId: membership.fabricId,
+    subjectKind: 'controller',
+    subjectId: request.subjectId,
+    identityPubkey: request.identityPubkey,
+    encryptionPubkey: request.encryptionPubkey,
+    nodeId: input.nodeId,
+    scopes,
+  })
+  const grants: FabricNodeGrant[] = scopes.map(scope => ({
+    grantId: `grant_${randomUUID()}`,
+    fabricId: membership.fabricId,
+    controllerId: request.subjectId,
+    nodeId: input.nodeId,
+    scope,
+  }))
+  const path = `/v1/join-requests/${request.requestId}/approve`
+  return await new FabricDirectoryClient(membership.relayUrl).approveControllerJoinRequest(
+    request.requestId,
+    certificate,
+    grants,
+    ownerProofHeaders(ownerPrivateKey, 'POST', path),
+  )
 }
 
 export async function rejectPendingNodeRequest(requestId: string): Promise<void> {
@@ -460,6 +537,9 @@ async function approveJoinRequest(request: FabricJoinRequest): Promise<NodeSumma
   if (request.fabricId !== membership.fabricId) {
     throw new AppError({ code: 'fabric_invitation_wrong_fabric', status: 409, message: 'This Node invitation belongs to a different Fabric.' })
   }
+  if (request.subjectKind !== 'node') {
+    throw new AppError({ code: 'fabric_invitation_subject_invalid', status: 409, message: 'Only Node join requests can use Node approval.' })
+  }
   const nodeCertificate = signFabricCertificate(ownerPrivateKey, {
     fabricId: membership.fabricId,
 subjectKind: 'node',
@@ -477,7 +557,7 @@ scopes: ['admin'],
     scopes: ['admin', 'approve', 'control', 'view'],
   })
   const directory = new FabricDirectoryClient(membership.relayUrl)
-  return await directory.approveJoinRequest(request.requestId, nodeCertificate, controllerCertificate, ownerProofHeaders(ownerPrivateKey, 'POST', `/v1/join-requests/${request.requestId}/approve`))
+  return await directory.approveNodeJoinRequest(request.requestId, nodeCertificate, controllerCertificate, ownerProofHeaders(ownerPrivateKey, 'POST', `/v1/join-requests/${request.requestId}/approve`))
 }
 
 export async function listNodes(): Promise<NodeSummary[]> {

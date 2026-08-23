@@ -14,11 +14,8 @@ import { AppError } from '../../errors/app-error'
  *
  * - X25519 ECDH (`@noble/curves`) for key agreement.
  * - HKDF-SHA512 (`@noble/hashes`) with a distinct `info` label per key.
- * - XChaCha20-Poly1305 for small frames, where avoiding an OpenSSL call has
- *   lower fixed latency.
- * - Native AES-256-GCM for bulk frames, where hardware acceleration provides
- *   materially higher throughput. Fresh random nonces avoid counter state
- *   across reconnects.
+ * - A session-negotiated AEAD: native AES-256-GCM or XChaCha20-Poly1305.
+ * - Fresh random nonces, avoiding counter state across reconnects.
  *
  * relayd never sees any of this: it forwards opaque Fabric envelope payloads.
  */
@@ -29,12 +26,17 @@ const XCHACHA_NONCE_BYTES = 24
 const AES_GCM_NONCE_BYTES = 12
 const AES_GCM_TAG_BYTES = 16
 const XCHACHA_ALGORITHM_BIT = 0x80
-const NATIVE_AES_MIN_PLAINTEXT_BYTES = 1024
+export const FABRIC_CIPHER_SUITE = {
+  aes256Gcm: 'aes-256-gcm',
+  xchacha20Poly1305: 'xchacha20poly1305',
+} as const
+
+export type FabricCipherSuite = (typeof FABRIC_CIPHER_SUITE)[keyof typeof FABRIC_CIPHER_SUITE]
 
 /** Roles for key derivation: each direction's key is tagged with the sender. */
 export type FabricSessionRole = 'node' | 'controller'
 
-export const RELAY_CRYPTO_ALG = 'xchacha20poly1305-small+aes-256-gcm-bulk'
+export const RELAY_CRYPTO_ALG = 'negotiated:aes-256-gcm|xchacha20poly1305'
 
 export interface FabricSessionKeyPair {
   /** X25519 private key (raw 32 bytes, base64). Safe to persist as a managed secret. */
@@ -155,9 +157,9 @@ export function fabricPublicKeyFingerprint(publicKeyBase64: string): string {
  */
 export class FabricSessionCipher {
   private readonly key: Uint8Array
-  private readonly nativeBulkEnabled: boolean
+  readonly suite: FabricCipherSuite
 
-  constructor(key: Uint8Array, nativeBulkEnabled = true) {
+  constructor(key: Uint8Array, suite: FabricCipherSuite = FABRIC_CIPHER_SUITE.aes256Gcm) {
     if (key.length !== KEY_BYTES) {
       throw new AppError({
         code: 'relay_crypto_invalid_key',
@@ -166,12 +168,12 @@ export class FabricSessionCipher {
       })
     }
     this.key = key
-    this.nativeBulkEnabled = nativeBulkEnabled
+    this.suite = suite
   }
 
-  /** Encrypt a frame with the latency- or throughput-optimized Fabric AEAD. */
+  /** Encrypt a frame with the AEAD selected during the Fabric hello exchange. */
   encrypt(plaintext: Uint8Array): Uint8Array {
-    if (plaintext.byteLength < NATIVE_AES_MIN_PLAINTEXT_BYTES || !this.nativeBulkEnabled) {
+    if (this.suite === FABRIC_CIPHER_SUITE.xchacha20Poly1305) {
       const nonce = randomBytes(XCHACHA_NONCE_BYTES)
       nonce[0] |= XCHACHA_ALGORITHM_BIT
       return concatBytes(nonce, xchacha20poly1305(this.key, nonce).encrypt(plaintext))
@@ -194,7 +196,13 @@ export class FabricSessionCipher {
       })
     }
     try {
-      if (blob[0] & XCHACHA_ALGORITHM_BIT) {
+      const encodedSuite = blob[0] & XCHACHA_ALGORITHM_BIT
+        ? FABRIC_CIPHER_SUITE.xchacha20Poly1305
+        : FABRIC_CIPHER_SUITE.aes256Gcm
+      if (encodedSuite !== this.suite) {
+        throw new Error(`Relay ciphertext uses ${encodedSuite}, expected ${this.suite}.`)
+      }
+      if (encodedSuite === FABRIC_CIPHER_SUITE.xchacha20Poly1305) {
         if (blob.length < XCHACHA_NONCE_BYTES + AES_GCM_TAG_BYTES) {
           throw new Error('Relay XChaCha ciphertext is too short.')
         }

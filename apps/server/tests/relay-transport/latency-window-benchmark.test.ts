@@ -185,7 +185,7 @@ function printVirtualResults(results: VirtualTransferResult[]): void {
   const markdown = [
     '# Relay session virtual-time RTT matrix',
     '',
-    'This is a deterministic FabricSession simulation: real handshake, binary codec, adaptive AEAD frames, ACKs, pause/resume, and credit state; it is not a real relayd, WebSocket, Tailscale, or WAN measurement.',
+    'This is a deterministic FabricSession simulation: real capability negotiation, binary codec, negotiated AEAD frames, ACKs, pause/resume, and credit state; it is not a real relayd, WebSocket, Tailscale, or WAN measurement.',
     '',
     '| RTT | V2 fixed 512 KiB completion / useful rate / pause-resume | V2 adaptive 8 MiB completion / useful rate / pause-resume | Adaptive improvement |',
     '| ---: | --- | --- | ---: |',
