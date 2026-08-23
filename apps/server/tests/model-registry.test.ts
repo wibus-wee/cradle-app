@@ -13,6 +13,7 @@ import {
   fetchModelsDevData,
   getCachedModelsDevCost,
   resolveModelEnrichment,
+  searchModelsInData,
 } from '../src/modules/model-registry/model-info-registry'
 import { getCachedModelsForTarget, setCachedModelsForTarget } from '../src/modules/provider-catalog/model-cache'
 import type { ModelDescriptor } from '../src/modules/provider-contracts/types'
@@ -198,6 +199,29 @@ describe('enrichModelsWithRegistryData', () => {
     const result = enrichModelsWithRegistryData(inventory, data, mappings)
     expect(result[0].capabilities.registryMatch).toBe('alias')
     expect(result[0].capabilities.registryModelId).toBe('gpt-4o')
+  })
+})
+
+describe('searchModelsInData', () => {
+  const data = {
+    stealth: {
+      name: 'Stealth',
+      models: {
+        'ox-alpha': {
+          id: 'ox-alpha',
+          name: 'Ox Alpha',
+        },
+      },
+    },
+  }
+
+  it('matches provider-qualified and provider-local model IDs', () => {
+    expect(searchModelsInData(data, 'stealth/ox-alpha').map(result => result.id)).toEqual(['ox-alpha'])
+    expect(searchModelsInData(data, 'ox-alpha').map(result => result.id)).toEqual(['ox-alpha'])
+  })
+
+  it('matches the provider name when searching the catalog', () => {
+    expect(searchModelsInData(data, 'Stealth').map(result => result.id)).toEqual(['ox-alpha'])
   })
 })
 
@@ -463,6 +487,44 @@ describe('fetchModelsDevData concurrency', () => {
       else { delete process.env.CRADLE_DATA_DIR }
       rmSync(dataDir, { recursive: true, force: true })
       vi.restoreAllMocks()
+    }
+  })
+
+  it('retries a failed initial refresh in the background', async () => {
+    vi.useFakeTimers()
+    const dataDir = makeTempDir('cradle-data-model-retry-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+    let requestCount = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = new Request(input).url
+      if (url !== MODELS_DEV_URL) {
+        throw new Error(`Unexpected fetch: ${url}`)
+      }
+      requestCount += 1
+      if (requestCount === 1) {
+        throw new Error('temporary models.dev outage')
+      }
+      return new Response(JSON.stringify(makeModelsDevData({
+        'recovered-model': { limit: { context: 16_384 } },
+      })), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+
+    try {
+      expect(await fetchModelsDevData({ forceRefresh: true })).toBeNull()
+
+      await vi.advanceTimersByTimeAsync(5_000)
+
+      expect(requestCount).toBe(2)
+      expect((await fetchModelsDevData())?.['test-provider']?.models['recovered-model']).toBeDefined()
+    }
+    finally {
+      shutdownInfra()
+      if (previousDataDir !== undefined) { process.env.CRADLE_DATA_DIR = previousDataDir }
+      else { delete process.env.CRADLE_DATA_DIR }
+      rmSync(dataDir, { recursive: true, force: true })
+      vi.restoreAllMocks()
+      vi.useRealTimers()
     }
   })
 })

@@ -118,11 +118,15 @@ const CACHE_KEY = 'models_dev_api_json'
 const SOFT_TTL_MS = 1000 * 60 * 60 // 1 hour
 /** After this age, block on a network refresh (still fall back to stale on failure). */
 const HARD_TTL_MS = 1000 * 60 * 60 * 24 // 24 hours
+/** Retry a failed initial/background refresh without making every request retry. */
+const REFRESH_RETRY_DELAYS_MS = [5_000, 30_000, 5 * 60_000, 30 * 60_000] as const
 
 let memCache: ModelsDevData | null = null
 /** Wall-clock ms when the in-memory snapshot was fetched from the network. */
 let memFetchedAt = 0
 let refreshInFlight: Promise<ModelsDevData | null> | null = null
+let refreshRetryTimer: ReturnType<typeof setTimeout> | null = null
+let refreshRetryAttempt = 0
 let cacheGeneration = 0
 let dbCacheLoaded = false
 let mappingCacheLoaded = false
@@ -188,6 +192,11 @@ interface ModelsDevCost {
 registerBeforeDatabaseShutdown(() => {
   cacheGeneration += 1
   refreshInFlight = null
+  if (refreshRetryTimer) {
+    clearTimeout(refreshRetryTimer)
+    refreshRetryTimer = null
+  }
+  refreshRetryAttempt = 0
   memCache = null
   memFetchedAt = 0
   dbCacheLoaded = false
@@ -296,6 +305,7 @@ function applyFresh(data: ModelsDevData): ModelsDevData {
   memCache = data
   memFetchedAt = Date.now()
   dbCacheLoaded = true
+  refreshRetryAttempt = 0
   invalidateDerivedModelCaches()
   writeDbCache(data)
   return data
@@ -315,13 +325,36 @@ async function refreshFromNetwork(): Promise<ModelsDevData | null> {
   return null
 }
 
+function scheduleRefreshRetry(): void {
+  if (refreshRetryTimer) {
+    return
+  }
+
+  const delay = REFRESH_RETRY_DELAYS_MS[Math.min(refreshRetryAttempt, REFRESH_RETRY_DELAYS_MS.length - 1)]
+  refreshRetryAttempt += 1
+  refreshRetryTimer = setTimeout(() => {
+    refreshRetryTimer = null
+    void refreshModelsDevData()
+  }, delay)
+}
+
 function refreshModelsDevData(): Promise<ModelsDevData | null> {
   if (refreshInFlight) {
     return refreshInFlight
   }
+  if (refreshRetryTimer) {
+    clearTimeout(refreshRetryTimer)
+    refreshRetryTimer = null
+  }
+  const generation = cacheGeneration
   const promise = refreshFromNetwork().finally(() => {
     if (refreshInFlight === promise) {
       refreshInFlight = null
+    }
+  })
+  void promise.then((data) => {
+    if (!data && generation === cacheGeneration) {
+      scheduleRefreshRetry()
     }
   })
   refreshInFlight = promise
@@ -858,16 +891,21 @@ export async function lookupModelRawExact(modelId: string): Promise<ModelsDevMod
 }
 
 /**
- * Search models by substring match on ID or name.
- * Returns up to `limit` results.
+ * Search a models.dev snapshot by any identifier users see in provider model
+ * lists. Provider catalogs commonly expose both `provider/model` and the
+ * provider-local model key, while models.dev may also carry a canonical ID on
+ * the model object itself.
  */
-export async function searchModels(query: string, limit = 20): Promise<ModelRegistrySearchResult[]> {
-  const data = await fetchModelsDevData()
-  if (!data) {
+export function searchModelsInData(
+  data: ModelsDevData,
+  query: string,
+  limit = 20,
+): ModelRegistrySearchResult[] {
+  const q = query.trim().toLowerCase()
+  if (!q) {
     return []
   }
 
-  const q = query.toLowerCase()
   const results: ModelRegistrySearchResult[] = []
 
   const modelIds = [...new Set(Object.values(data).flatMap(provider => Object.keys(provider.models)))].toSorted()
@@ -877,9 +915,22 @@ export async function searchModels(query: string, limit = 20): Promise<ModelRegi
       continue
     }
     const name = model.name ?? id
-    const providerNameMatches = Object.values(data).some(provider =>
-      provider.models[id]?.name?.toLowerCase().includes(q) === true)
-    if (id.toLowerCase().includes(q) || name.toLowerCase().includes(q) || providerNameMatches) {
+    const providerMatches = Object.entries(data).some(([providerId, provider]) => {
+      if (!provider.models[id]) {
+        return false
+      }
+
+      return [
+        providerId,
+        provider.name,
+        model.id,
+        `${providerId}/${id}`,
+        `${providerId}:${id}`,
+        provider.name ? `${provider.name}/${id}` : undefined,
+      ].some(value => value?.toLowerCase().includes(q) === true)
+    })
+
+    if (id.toLowerCase().includes(q) || name.toLowerCase().includes(q) || providerMatches) {
       results.push({
         id,
         label: name,
@@ -892,4 +943,13 @@ export async function searchModels(query: string, limit = 20): Promise<ModelRegi
   }
 
   return results
+}
+
+/**
+ * Search models by substring match on ID, name, or provider-qualified ID.
+ * Returns up to `limit` results.
+ */
+export async function searchModels(query: string, limit = 20): Promise<ModelRegistrySearchResult[]> {
+  const data = await fetchModelsDevData()
+  return data ? searchModelsInData(data, query, limit) : []
 }
