@@ -39,6 +39,9 @@ export interface DetectedEditor {
   applicationPath?: string
 }
 
+// Finder always lives here on modern macOS; used for the file-manager icon.
+const MAC_FINDER_APP_PATH = '/System/Library/CoreServices/Finder.app'
+
 // Detects which editors from the catalog are installed on this machine.
 // `file-manager` and `system-default` are always available (OS-provided).
 // An editor is available if any of its CLI commands is on PATH OR (on macOS) any
@@ -47,7 +50,13 @@ export async function readAvailableEditors(platform: NodeJS.Platform = process.p
   const result: DetectedEditor[] = []
   for (const editor of EDITORS) {
     if (editor.id === 'file-manager' || editor.id === 'system-default') {
-      result.push({ id: editor.id, label: editor.label })
+      result.push({
+        id: editor.id,
+        label: editor.label,
+        applicationPath: platform === 'darwin' && editor.id === 'file-manager' && existsSync(MAC_FINDER_APP_PATH)
+          ? MAC_FINDER_APP_PATH
+          : undefined,
+      })
       continue
     }
     const cliAvailable = editor.commands

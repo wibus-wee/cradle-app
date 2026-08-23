@@ -234,12 +234,18 @@ class NativeService extends IpcService {
       }
 
       try {
-        const iconPath = process.platform === 'darwin'
-          ? await resolveMacApplicationIconPath(applicationPath)
-          : undefined
-        const icon = iconPath
-          ? nativeImage.createFromPath(iconPath)
-          : await app.getFileIcon(applicationPath, { size: 'normal' })
+        let icon = nativeImage.createEmpty()
+        if (process.platform === 'darwin') {
+          // Bundle icons are usually .icns, which createFromPath cannot decode,
+          // so fall back to the platform-provided file icon when decoding fails.
+          const iconPath = await resolveMacApplicationIconPath(applicationPath)
+          if (iconPath) {
+            icon = nativeImage.createFromPath(iconPath)
+          }
+        }
+        if (icon.isEmpty()) {
+          icon = await app.getFileIcon(applicationPath, { size: 'normal' })
+        }
         return icon.isEmpty() ? editor : { ...editor, iconDataUrl: icon.toDataURL() }
       }
       catch {
