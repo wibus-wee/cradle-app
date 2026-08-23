@@ -44,7 +44,6 @@ export interface WorkspaceSession {
   latestUserMessageAt: number | null
   latestAssistantMessageAt: number | null
   unread: boolean
-  listActivityAt: number
   /**
    * How the session was created. `'manual'` (or empty) means the user started
    * it themselves; any other value (`'automation'`, `'cradle-review'`,
@@ -299,11 +298,6 @@ function asWorkspaceSession(session: GetSessionsResponse['items'][number]): Work
     latestUserMessageAt: normalizedLatestUserMessageAt,
     latestAssistantMessageAt: normalizedLatestAssistantMessageAt,
     unread: session.unread === true,
-    listActivityAt: Math.max(
-      session.createdAt,
-      normalizedLatestUserMessageAt ?? 0,
-      normalizedLatestAssistantMessageAt ?? 0,
-    ),
     origin: typeof session.origin === 'string' && session.origin ? session.origin : 'manual',
     isIsolated: session.isIsolated === true,
     worktreeId: nullableString(session.worktreeId),

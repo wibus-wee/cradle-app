@@ -126,7 +126,7 @@ export function compareSidebarSessions(
   }
 
   const orderingValue = (session: WorkspaceSession) =>
-    ordering === 'created' ? session.createdAt : session.listActivityAt
+    ordering === 'created' ? session.createdAt : session.updatedAt
   const keyDiff = orderingValue(right) - orderingValue(left)
   const directedKeyDiff = direction === 'desc' ? keyDiff : -keyDiff
   if (directedKeyDiff !== 0) {
@@ -169,7 +169,7 @@ export function groupSidebarSessions(input: GroupSidebarSessionsInput): SidebarS
       const now = input.now ?? Date.now()
       const byBucket = new Map<SidebarUpdatedBucket, SidebarSessionEntry[]>()
       for (const entry of input.entries) {
-        const bucket = classifyUpdatedBucket(entry.session.listActivityAt, now)
+        const bucket = classifyUpdatedBucket(entry.session.updatedAt, now)
         const bucketEntries = byBucket.get(bucket)
         if (bucketEntries) {
           bucketEntries.push(entry)

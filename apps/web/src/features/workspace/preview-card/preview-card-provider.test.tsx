@@ -38,7 +38,6 @@ function createSession(id: string): WorkspaceSession {
     latestUserMessageAt: null,
     latestAssistantMessageAt: null,
     unread: false,
-    listActivityAt: 0,
     origin: 'manual',
     isIsolated: false,
     worktreeId: null,

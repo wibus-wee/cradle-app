@@ -30,7 +30,6 @@ function createSession(overrides: Partial<WorkspaceSession> & Pick<WorkspaceSess
     latestUserMessageAt: null,
     latestAssistantMessageAt: null,
     unread: false,
-    listActivityAt: now,
     origin: 'manual',
     isIsolated: false,
     worktreeId: null,
@@ -153,10 +152,10 @@ describe('groupSidebarSessions', () => {
   it('groups by updated buckets in fixed order, skipping empty buckets', () => {
     const sections = groupSidebarSessions({
       ...baseGroupingInput([
-        entry(createSession({ id: 'last-hour', listActivityAt: NOW_SECONDS - 60 })),
-        entry(createSession({ id: 'earlier-today', listActivityAt: NOW_SECONDS - 3_600 })),
-        entry(createSession({ id: 'earlier', listActivityAt: NOW_SECONDS - 30 * DAY_SECONDS })),
-        entry(createSession({ id: 'yesterday', listActivityAt: NOW_SECONDS - DAY_SECONDS })),
+        entry(createSession({ id: 'last-hour', updatedAt: NOW_SECONDS - 60 })),
+        entry(createSession({ id: 'earlier-today', updatedAt: NOW_SECONDS - 3_600 })),
+        entry(createSession({ id: 'earlier', updatedAt: NOW_SECONDS - 30 * DAY_SECONDS })),
+        entry(createSession({ id: 'yesterday', updatedAt: NOW_SECONDS - DAY_SECONDS })),
       ]),
       grouping: 'updated',
       now: NOW_MS,
@@ -173,9 +172,9 @@ describe('groupSidebarSessions', () => {
   it('sorts pinned sessions first within a bucket, then by ordering', () => {
     const [section] = groupSidebarSessions({
       ...baseGroupingInput([
-        entry(createSession({ id: 'old', listActivityAt: NOW_SECONDS - 120 })),
-        entry(createSession({ id: 'pinned', pinned: 1, listActivityAt: NOW_SECONDS - 180 })),
-        entry(createSession({ id: 'new', listActivityAt: NOW_SECONDS - 60 })),
+        entry(createSession({ id: 'old', updatedAt: NOW_SECONDS - 120 })),
+        entry(createSession({ id: 'pinned', pinned: 1, updatedAt: NOW_SECONDS - 180 })),
+        entry(createSession({ id: 'new', updatedAt: NOW_SECONDS - 60 })),
       ]),
       grouping: 'updated',
       now: NOW_MS,

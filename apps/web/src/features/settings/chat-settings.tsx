@@ -119,7 +119,6 @@ function normalizeArchivedSession(session: {
     latestUserMessageAt,
     latestAssistantMessageAt,
     unread: session.unread === true,
-    listActivityAt: latestUserMessageAt ?? session.createdAt,
     origin: typeof session.origin === 'string' && session.origin ? session.origin : 'manual',
     isIsolated: session.isIsolated === true,
     worktreeId: typeof session.worktreeId === 'string' ? session.worktreeId : null,

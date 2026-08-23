@@ -43,7 +43,7 @@ describe('session service provider target projection', () => {
 })
 
 describe('session list activity and status projection', () => {
-  it('orders by latest user message within the listed workspace and ignores other workspaces', () => {
+  it('orders by session update time within the listed workspace and ignores message ordering', () => {
     db().insert(workspaces).values([
       {
         id: 'ws-listed',
@@ -63,21 +63,21 @@ describe('session list activity and status projection', () => {
         workspaceId: 'ws-listed',
         title: 'Older activity',
         createdAt: 100,
-        updatedAt: 100,
+        updatedAt: 300,
       },
       {
         id: 'sess-newer-activity',
         workspaceId: 'ws-listed',
         title: 'Newer activity',
         createdAt: 50,
-        updatedAt: 50,
+        updatedAt: 400,
       },
       {
         id: 'sess-other-workspace',
         workspaceId: 'ws-other',
         title: 'Other workspace',
         createdAt: 200,
-        updatedAt: 200,
+        updatedAt: 900,
       },
     ]).run()
 
@@ -88,7 +88,7 @@ describe('session list activity and status projection', () => {
         role: 'user',
         content: 'older',
         messageJson: '[]',
-        createdAt: 300,
+        createdAt: 500,
       },
       {
         id: 'msg-user-newer',
@@ -96,7 +96,7 @@ describe('session list activity and status projection', () => {
         role: 'user',
         content: 'newer',
         messageJson: '[]',
-        createdAt: 400,
+        createdAt: 100,
       },
       {
         id: 'msg-user-other',
@@ -113,15 +113,15 @@ describe('session list activity and status projection', () => {
         status: 'complete',
         content: 'reply',
         messageJson: '[]',
-        createdAt: 410,
+        createdAt: 110,
       },
     ])
 
     const rows = list({ workspaceId: 'ws-listed' }).items
     expect(rows.map(row => row.id)).toEqual(['sess-newer-activity', 'sess-older-activity'])
-    expect(rows[0]?.latestUserMessageAt).toBe(400)
-    expect(rows[0]?.latestAssistantMessageAt).toBe(410)
-    expect(rows[1]?.latestUserMessageAt).toBe(300)
+    expect(rows[0]?.latestUserMessageAt).toBe(100)
+    expect(rows[0]?.latestAssistantMessageAt).toBe(110)
+    expect(rows[1]?.latestUserMessageAt).toBe(500)
     expect(rows.every(row => row.id !== 'sess-other-workspace')).toBe(true)
   })
 

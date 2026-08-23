@@ -112,7 +112,7 @@ export interface SessionListInput {
 }
 
 interface SessionListCursor {
-  activityAt: number
+  updatedAt: number
   createdAt: number
   id: string
 }
@@ -459,7 +459,7 @@ function decodeSessionListCursor(cursor: string): SessionListCursor {
   try {
     const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as SessionListCursor
     if (
-      !Number.isFinite(value.activityAt)
+      !Number.isFinite(value.updatedAt)
       || !Number.isFinite(value.createdAt)
       || typeof value.id !== 'string'
       || value.id.length === 0
@@ -477,24 +477,17 @@ function decodeSessionListCursor(cursor: string): SessionListCursor {
   }
 }
 
-function listRowsByActivity(input: SessionListInput): {
+function listRowsByUpdatedAt(input: SessionListInput): {
   rows: Array<{
-  session: Session
-  latestUserMessageAt: number | null
-  latestAssistantMessageAt: number | null
-    activityAt: number
+    session: Session
+    latestUserMessageAt: number | null
+    latestAssistantMessageAt: number | null
+    updatedAt: number
   }>
   nextCursor: string | null
 } {
   const limit = Math.min(Math.max(input.limit ?? SESSION_LIST_DEFAULT_LIMIT, 1), SESSION_LIST_MAX_LIMIT)
   const cursor = input.cursor ? decodeSessionListCursor(input.cursor) : null
-  const latestUserMessageAtExpression = sql<number | null>`(
-    SELECT MAX(session_user_messages.created_at)
-    FROM messages AS session_user_messages
-    WHERE session_user_messages.session_id = ${sessions.id}
-      AND session_user_messages.role = 'user'
-  )`
-  const activityAtExpression = sql<number>`COALESCE(${latestUserMessageAtExpression}, ${sessions.createdAt})`
   const predicates = [
     input.workspaceId ? eq(sessions.workspaceId, input.workspaceId) : undefined,
     input.origin ? eq(sessions.origin, input.origin) : undefined,
@@ -503,10 +496,10 @@ function listRowsByActivity(input: SessionListInput): {
     input.archived ? isNotNull(sessions.archivedAt) : isNull(sessions.archivedAt),
     cursor
       ? or(
-          lt(activityAtExpression, cursor.activityAt),
-          and(eq(activityAtExpression, cursor.activityAt), lt(sessions.createdAt, cursor.createdAt)),
+          lt(sessions.updatedAt, cursor.updatedAt),
+          and(eq(sessions.updatedAt, cursor.updatedAt), lt(sessions.createdAt, cursor.createdAt)),
           and(
-            eq(activityAtExpression, cursor.activityAt),
+            eq(sessions.updatedAt, cursor.updatedAt),
             eq(sessions.createdAt, cursor.createdAt),
             lt(sessions.id, cursor.id),
           ),
@@ -516,11 +509,11 @@ function listRowsByActivity(input: SessionListInput): {
   const rows = db()
     .select({
       session: sessions,
-      activityAt: activityAtExpression.as('activity_at'),
+      updatedAt: sessions.updatedAt,
     })
     .from(sessions)
     .where(and(...predicates))
-    .orderBy(desc(activityAtExpression), desc(sessions.createdAt), desc(sessions.id))
+    .orderBy(desc(sessions.updatedAt), desc(sessions.createdAt), desc(sessions.id))
     .limit(limit + 1)
     .all()
   const hasNextPage = rows.length > limit
@@ -567,7 +560,7 @@ function listRowsByActivity(input: SessionListInput): {
     })),
     nextCursor: hasNextPage && last
       ? encodeSessionListCursor({
-          activityAt: last.activityAt,
+          updatedAt: last.updatedAt,
           createdAt: last.session.createdAt,
           id: last.session.id,
         })
@@ -650,7 +643,7 @@ function assertRuntimeOwnedProviderTargetForRuntime(input: {
 }
 
 export function list(input: SessionListInput = {}): SessionPage {
-  const page = listRowsByActivity(input)
+  const page = listRowsByUpdatedAt(input)
   const activityBySessionId = new Map(page.rows.map(row => [row.session.id, {
     latestUserMessageAt: row.latestUserMessageAt,
     latestAssistantMessageAt: row.latestAssistantMessageAt,
