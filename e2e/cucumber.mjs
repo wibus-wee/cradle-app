@@ -10,7 +10,8 @@ export default {
   format: ['progress-bar', 'html:e2e/artifacts/cucumber-report.html'],
   formatOptions: { snippetInterface: 'async-await' },
   requireModule: [tsxEntry],
-  parallel: 1,
+  /** Each parallel worker gets its own managed server + web stack (see server-lifecycle). */
+  parallel: Number(process.env.CRADLE_E2E_PARALLEL ?? 1),
   publishQuiet: true,
   retry: 0,
   timeout: 60_000,

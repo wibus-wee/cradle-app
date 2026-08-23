@@ -31,7 +31,12 @@ export const WORK_STOP_RECOVERY_RESPONSE = 'Work 停止后的重试已完成'
 export const WORK_STOP_RECOVERY_FILE_NAME = 'e2e-work-stop-recovery.txt'
 export const WORK_STOP_RECOVERY_FILE_CONTENT = 'created after the initial Work was stopped\n'
 const SLOW_GATE = 'e2e-slow-stream'
-export const CHAT_STATUS_TIMEOUT = 30_000
+/**
+ * Turn-settlement budget. Parallel workers share one machine, so provider round-trips
+ * stretch with worker count (TTFT can go from ~0.3s serial to 9s+ at 3 workers);
+ * scale the budget instead of letting load flakes fail timing-sensitive assertions.
+ */
+export const CHAT_STATUS_TIMEOUT = 30_000 * Math.max(1, Number(process.env.CRADLE_E2E_PARALLEL ?? 1))
 const SESSION_ALIASES_KEY = 'chat.session-aliases'
 const SELECTED_NEW_CHAT_WORKSPACE_KEY = 'chat.selected-new-chat-workspace'
 const PREFERRED_RUNTIME_KEY = 'chat.preferred-runtime'
@@ -41,7 +46,7 @@ type SessionAlias = {
   firstUserText: string
 }
 
-type PreferredChatRuntime = 'standard' | 'claude-agent' | 'codex'
+type PreferredChatRuntime = 'claude-agent' | 'codex'
 
 function requireSimulator(world: CradleWorld) {
   if (!world.simulator) {
@@ -51,7 +56,7 @@ function requireSimulator(world: CradleWorld) {
 }
 
 function recallPreferredChatRuntime(world: CradleWorld): PreferredChatRuntime {
-  return world.maybeRecall<PreferredChatRuntime>(PREFERRED_RUNTIME_KEY) ?? 'standard'
+  return world.maybeRecall<PreferredChatRuntime>(PREFERRED_RUNTIME_KEY) ?? 'claude-agent'
 }
 
 function recallSessionAliases(world: CradleWorld): Record<string, SessionAlias> {
@@ -375,16 +380,12 @@ export async function navigateToNewChatWithSimulator(world: CradleWorld): Promis
   console.warn('[step] navigate to new-chat page')
   await world.newChat.openFromNav()
 
-  if (recallPreferredChatRuntime(world) === 'claude-agent') {
-    await selectClaudeAgentSimulator(world)
+  if (recallPreferredChatRuntime(world) === 'codex') {
+    await selectCodexSimulator(world)
     return
   }
 
-  await world.newChat.selectRuntime('Agents')
-  const preferredProvider = world.maybeRecall<string>('chat.preferred-provider')
-  if (preferredProvider) {
-    await world.newChat.selectProvider(new RegExp(preferredProvider, 'i'))
-  }
+  await selectClaudeAgentSimulator(world)
 }
 
 export async function selectClaudeAgentSimulator(world: CradleWorld): Promise<void> {
@@ -480,7 +481,7 @@ export async function enqueueNextScriptedReply(world: CradleWorld, fallbackText?
   if (!next) {
     return
   }
-  if (['codex', 'standard'].includes(recallPreferredChatRuntime(world))) {
+  if (recallPreferredChatRuntime(world) === 'codex') {
     world.enqueueOpenAi(openAiTextExchange({
       label: `scripted-openai-${Date.now()}`,
       text: next,

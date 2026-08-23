@@ -8,7 +8,7 @@ import type { CradleWorld } from './world'
 import type { FailureArtifactIndexEntry } from './world-utils'
 import {
   ARTIFACTS_GUIDE_FILENAME,
-  FAILURE_INDEX_FILENAME,
+  failureIndexFilename,
 } from './world-utils'
 
 const E2E_HOOK_TIMEOUT_MS = 120_000
@@ -48,7 +48,7 @@ Also at the artifact root:
 
 function appendFailureIndex(entry: FailureArtifactIndexEntry): void {
   mkdirSync(ARTIFACTS_ROOT, { recursive: true })
-  const indexPath = join(ARTIFACTS_ROOT, FAILURE_INDEX_FILENAME)
+  const indexPath = join(ARTIFACTS_ROOT, failureIndexFilename())
   const existing = existsSync(indexPath)
     ? JSON.parse(readFileSync(indexPath, 'utf8')) as FailureArtifactIndexEntry[]
     : []

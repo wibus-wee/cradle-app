@@ -25,10 +25,8 @@ import { WorkspacePage } from './pages/workspace'
 import {
   configureClaudeAgentSimulatorProvider,
   configureCodexSimulatorProvider,
-  configureStandardSimulatorProvider,
   E2E_CLAUDE_AGENT_NAME,
   E2E_CODEX_AGENT_NAME,
-  E2E_OPENAI_AGENT_NAME,
 } from './providers'
 import { anthropicApprovalExchanges, anthropicScenario, anthropicTextExchange } from './scenarios/anthropic'
 import {
@@ -223,43 +221,6 @@ export class CradleWorld extends World {
 
   enqueueAnthropic(...exchanges: SimulatorExchange[]): void {
     this.enqueue(anthropicScenario(exchanges))
-  }
-
-  async configureStandardChat(options: {
-    texts?: string[]
-    reasoningText?: string
-    gateAfterCreated?: string
-    chunkDelayYields?: number
-    failureMessage?: string
-  } = {}): Promise<void> {
-    const simulator = await this.ensureSimulator()
-    simulator.reset()
-
-    if (options.failureMessage) {
-      this.enqueueOpenAi(openAiHttpErrorExchange({
-        label: 'forced-failure',
-        message: options.failureMessage,
-      }))
-    }
-    else {
-      const texts = options.texts?.length ? options.texts : ['Hello from E2E simulator!']
-      this.enqueueOpenAi(...texts.map((text, index) => openAiTextExchange({
-        label: `turn-${index + 1}`,
-        text,
-        reasoningText: index === 0 ? options.reasoningText : undefined,
-        gateAfterCreated: index === 0 ? options.gateAfterCreated : undefined,
-        chunkDelayYields: options.chunkDelayYields,
-      })))
-    }
-
-    await configureStandardSimulatorProvider({
-      serverUrl: this.params.serverUrl,
-      openaiBaseUrl: simulator.openaiBaseUrl,
-      createTempDir: () => this.createTempWorkspaceDir(),
-    })
-    this.remember('chat.preferred-runtime', 'standard' as const)
-    this.remember('chat.preferred-provider', E2E_OPENAI_AGENT_NAME)
-    await this.page?.reload({ waitUntil: 'domcontentloaded' })
   }
 
   async configureClaudeAgentChat(options: {

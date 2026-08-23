@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, rmSync, statSync, unlinkSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -142,6 +142,50 @@ async function reserveAvailablePort(): Promise<number> {
   })
 }
 
+const BUILD_LOCK_PATH = join(ROOT, 'node_modules', '.cache', 'cradle-e2e-web-build.lock')
+const BUILD_LOCK_TIMEOUT_MS = 10 * 60_000
+const BUILD_LOCK_STALE_MS = 15 * 60_000
+
+/**
+ * Serialize the shared `plugin-sdk` build across parallel Cucumber workers: concurrent
+ * tsc runs would write the same dist directory. A worker that died holding the lock is
+ * stolen once its lock file goes stale.
+ */
+async function acquireBuildLock(): Promise<() => void> {
+  mkdirSync(dirname(BUILD_LOCK_PATH), { recursive: true })
+  const start = Date.now()
+  for (;;) {
+    try {
+      const fd = openSync(BUILD_LOCK_PATH, 'wx')
+      return () => {
+        closeSync(fd)
+        try {
+          unlinkSync(BUILD_LOCK_PATH)
+        }
+        catch { /* already released */ }
+      }
+    }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+        throw error
+      }
+      // Steal a lock left behind by a crashed worker.
+      try {
+        const stats = statSync(BUILD_LOCK_PATH)
+        if (Date.now() - stats.mtimeMs > BUILD_LOCK_STALE_MS) {
+          unlinkSync(BUILD_LOCK_PATH)
+          continue
+        }
+      }
+      catch { /* someone else released or stole it first — retry loop handles it */ }
+    }
+    if (Date.now() - start > BUILD_LOCK_TIMEOUT_MS) {
+      throw new Error('Timed out waiting for the e2e web build lock')
+    }
+    await new Promise(resolve => setTimeout(resolve, 500))
+  }
+}
+
 /**
  * If CRADLE_SERVER_URL is set, we assume the user is managing the server themselves.
  * Otherwise, we start an isolated server with a temp data directory.
@@ -233,25 +277,32 @@ BeforeAll({ timeout: 120_000 }, async () => {
       const vite = join(ROOT, 'apps', 'web', 'node_modules', '.bin', process.platform === 'win32' ? 'vite.cmd' : 'vite')
       webDistDir = mkdtempSync(join(tmpdir(), 'cradle-e2e-web-dist-'))
 
-      await runProcess(pnpm, ['--filter', '@cradle/plugin-sdk', 'build'], {
-        cwd: ROOT,
-        env: {
-          ...process.env,
-          CRADLE_E2E: '1',
-          VITE_SERVER_URL: serverUrl,
-        },
-        stdio: process.env.CRADLE_E2E_VERBOSE ? 'inherit' : ['ignore', 'ignore', 'pipe'],
-      })
+      // The plugin-sdk dist is shared across parallel workers; serialize the build.
+      const releaseBuildLock = await acquireBuildLock()
+      try {
+        await runProcess(pnpm, ['--filter', '@cradle/plugin-sdk', 'build'], {
+          cwd: ROOT,
+          env: {
+            ...process.env,
+            CRADLE_E2E: '1',
+            VITE_SERVER_URL: serverUrl,
+          },
+          stdio: process.env.CRADLE_E2E_VERBOSE ? 'inherit' : ['ignore', 'ignore', 'pipe'],
+        })
 
-      await runProcess(vite, ['build', '--outDir', webDistDir, '--emptyOutDir'], {
-        cwd: join(ROOT, 'apps', 'web'),
-        env: {
-          ...process.env,
-          CRADLE_E2E: '1',
-          VITE_SERVER_URL: serverUrl,
-        },
-        stdio: process.env.CRADLE_E2E_VERBOSE ? 'inherit' : ['ignore', 'ignore', 'pipe'],
-      })
+        await runProcess(vite, ['build', '--outDir', webDistDir, '--emptyOutDir'], {
+          cwd: join(ROOT, 'apps', 'web'),
+          env: {
+            ...process.env,
+            CRADLE_E2E: '1',
+            VITE_SERVER_URL: serverUrl,
+          },
+          stdio: process.env.CRADLE_E2E_VERBOSE ? 'inherit' : ['ignore', 'ignore', 'pipe'],
+        })
+      }
+      finally {
+        releaseBuildLock()
+      }
 
       webProcess = spawn(vite, ['preview', '--outDir', webDistDir, '--host', '127.0.0.1', '--port', String(webPort), '--strictPort'], {
         cwd: join(ROOT, 'apps', 'web'),

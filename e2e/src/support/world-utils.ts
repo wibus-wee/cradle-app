@@ -24,13 +24,19 @@ export function slugifyScenarioName(name: string): string {
   return finalValue || 'unnamed-scenario'
 }
 
+/** Cucumber parallel workers are separate processes; suffix shared artifact paths by worker. */
+export function cucumberWorkerId(): string | null {
+  return process.env.CUCUMBER_WORKER_ID ?? null
+}
+
 export function buildScenarioArtifactPaths(
   artifactsRoot: string,
   scenarioName: string,
   caseIndex: number,
 ): ScenarioArtifactPaths {
   const slug = slugifyScenarioName(scenarioName)
-  const folderName = `${slug}-${caseIndex}`
+  const worker = cucumberWorkerId()
+  const folderName = worker ? `${slug}-w${worker}-${caseIndex}` : `${slug}-${caseIndex}`
   const scenarioDir = join(artifactsRoot, 'scenarios', folderName)
   return {
     slug,
@@ -52,5 +58,8 @@ export interface FailureArtifactIndexEntry {
   console: string
 }
 
-export const FAILURE_INDEX_FILENAME = 'failure-index.json'
+export function failureIndexFilename(): string {
+  const worker = cucumberWorkerId()
+  return worker ? `failure-index.w${worker}.json` : 'failure-index.json'
+}
 export const ARTIFACTS_GUIDE_FILENAME = 'ARTIFACTS.md'
