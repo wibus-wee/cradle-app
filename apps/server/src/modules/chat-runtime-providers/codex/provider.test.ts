@@ -4387,20 +4387,20 @@ describe('codexProvider app-server integration', () => {
     expect(client.requests[0]).toEqual({
       method: 'thread/start',
       params: expect.objectContaining({
-        approvalPolicy: 'untrusted',
-        sandbox: 'read-only',
+        approvalPolicy: 'on-request',
+        sandbox: 'workspace-write',
         serviceTier: 'fast',
         config: expect.objectContaining({
-          approval_policy: 'untrusted',
-          sandbox_mode: 'read-only',
+          approval_policy: 'on-request',
+          sandbox_mode: 'workspace-write',
         }),
       }),
     })
     expect(client.requests[1]).toEqual({
       method: 'turn/start',
       params: expect.objectContaining({
-        approvalPolicy: 'untrusted',
-        sandboxPolicy: expect.objectContaining({ type: 'readOnly' }),
+        approvalPolicy: 'on-request',
+        sandboxPolicy: expect.objectContaining({ type: 'workspaceWrite' }),
         serviceTier: 'fast',
         collaborationMode: {
           mode: 'plan',
@@ -4507,8 +4507,8 @@ describe('codexProvider app-server integration', () => {
     expect(turnStartRequest).toEqual({
       method: 'turn/start',
       params: expect.objectContaining({
-        approvalPolicy: 'untrusted',
-        sandboxPolicy: expect.objectContaining({ type: 'readOnly' }),
+        approvalPolicy: 'on-request',
+        sandboxPolicy: expect.objectContaining({ type: 'workspaceWrite' }),
       }),
     })
     expect(turnStartRequest.params).not.toHaveProperty('collaborationMode')
@@ -6503,8 +6503,8 @@ describe('codexProvider app-server integration', () => {
       { type: 'text-end', id: 'assistant-message-1' },
       { type: 'tool-input-start', toolCallId: 'tool-1', toolName: 'command_execution' },
       { type: 'tool-input-available', toolCallId: 'tool-1', toolName: 'command_execution', input: codexInput('command_execution', { command: 'pwd' }) },
-      { type: 'tool-output-available', toolCallId: 'tool-1', preliminary: true, output: codexOutput('command_execution', { command: 'pwd' }, { command: 'pwd', output: '/tmp', exitCode: null, code: null, status: 'inProgress' }) },
-      { type: 'tool-output-available', toolCallId: 'tool-1', output: codexOutput('command_execution', { command: 'pwd' }, { command: 'pwd', output: '/tmp', exitCode: 0, code: 0 }) },
+      { type: 'tool-output-available', toolCallId: 'tool-1', preliminary: true, output: codexOutput('command_execution', { command: 'pwd' }, { command: 'pwd', output: '/tmp', stdout: '/tmp', exitCode: null, code: null, status: 'inProgress' }) },
+      { type: 'tool-output-available', toolCallId: 'tool-1', output: codexOutput('command_execution', { command: 'pwd' }, { command: 'pwd', output: '/tmp', stdout: '/tmp', exitCode: 0, code: 0 }) },
       { type: 'text-start', id: 'assistant-message-2' },
       { type: 'text-delta', id: 'assistant-message-2', delta: 'After tool' },
       { type: 'text-end', id: 'assistant-message-2' },

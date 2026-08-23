@@ -145,6 +145,18 @@ export function readCodexReasoningEffort(
   }
 }
 
+/**
+ * Vendored Codex ≥0.147 no longer accepts `untrusted` in thread config
+ * ("approval_policy = untrusted is no longer supported"). Stored profiles may
+ * still carry the legacy value; project it to the nearest supported policy at
+ * the wire boundary instead of failing thread/start.
+ */
+export function toSupportedCodexApprovalPolicy(
+  policy: CodexConfig['approvalPolicy'],
+): 'on-request' | 'never' {
+  return policy === 'never' ? 'never' : 'on-request'
+}
+
 export function buildCodexConfig(
   config: CodexConfig,
   _workspacePath: string,
@@ -158,7 +170,7 @@ export function buildCodexConfig(
     disable_response_storage: true,
   }
   const mcpServers = buildCodexMcpServersConfig()
-  codexConfig.approval_policy = config.approvalPolicy
+  codexConfig.approval_policy = toSupportedCodexApprovalPolicy(config.approvalPolicy)
   codexConfig.sandbox_mode = config.sandboxMode
   if (Object.keys(mcpServers).length > 0) {
     codexConfig.mcp_servers = mcpServers
@@ -189,10 +201,14 @@ export function projectCodexRuntimeAccessMode(
   sandboxPolicy: SandboxPolicy
 } {
   if (accessMode === 'approval-required') {
+    // Codex ≥0.147 dropped `untrusted`. "Approval required" now maps to the
+    // supported strictest combo: workspace-write sandbox with on-request
+    // approvals — escalations (e.g. writes outside the workspace) surface as
+    // real approval requests instead of failing thread/start.
     return {
-      approvalPolicy: 'untrusted',
-      sandbox: 'read-only',
-      sandboxPolicy: toSandboxPolicy('read-only', input.writableRoots, input.additionalDirectories),
+      approvalPolicy: 'on-request',
+      sandbox: 'workspace-write',
+      sandboxPolicy: toSandboxPolicy('workspace-write', input.writableRoots, input.additionalDirectories),
     }
   }
   return {

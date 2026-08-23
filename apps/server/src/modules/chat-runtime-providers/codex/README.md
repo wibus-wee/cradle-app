@@ -23,6 +23,7 @@ Codex UI slots are projected from the app-server capability manifest and declare
 
 - `provider.ts`: Codex `ChatRuntime` facade; delegates app-server host leases, stream-turn context preparation, active-turn tracking, bounded checkpointing, and host-fact hydration, then starts/resumes app-server threads, forks ephemeral provider-native side threads, reports titles, executes provider-native operations, and streams notifications.
 - `provider.test.ts`: Regression tests for Codex thread startup, provider title projection, provider config, transcript reconstruction, UI slot state projection, streaming, steering, cancellation, and diagnostics.
+- `integration/live-steer-goal-handoff.integration.test.ts`: Opt-in real app-server plus `model-api-simulator` witness for the known goal-handoff live-steer `session_not_found` regression.
 - `metadata.ts`: Codex runtime kind, catalog metadata, static capabilities, and app-server capability presentation projection.
 - `types.ts`: Codex provider-private client, dependency, and active-turn types shared by package modules.
 - `app-server/`: Codex app-server boundary: JSON-RPC client, generated capability manifest, provider-native app-server bridge, interactive server-request method helpers, host lease/resource/fingerprint helpers, ChatGPT auth/account and per-thread billing readers, native diagnostics, and model listing.
@@ -41,3 +42,10 @@ Codex UI slots are projected from the app-server capability manifest and declare
 ## Regeneration
 
 After regenerating `app-server-protocol/`, run `pnpm --filter @cradle/server generate:codex-app-server-capabilities` to refresh `app-server/capabilities.ts`. The capability generator derives method names and params from the generated protocol files, and keeps only Cradle-owned runtime semantics such as stream-capable methods in the generator.
+
+Run the isolated live-steer reproduction with `CRADLE_CODEX_APP_SERVER_PATH` pointing to a synced app-server binary:
+
+```sh
+CRADLE_CODEX_APP_SERVER_INTEGRATION=1 \
+pnpm --filter @cradle/server exec vitest run src/modules/chat-runtime-providers/codex/integration/live-steer-goal-handoff.integration.test.ts
+```

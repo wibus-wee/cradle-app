@@ -247,14 +247,17 @@ export function buildCodexToolResult(
   bufferedCommand?: string,
 ): unknown {
   switch (item.type) {
-    case 'commandExecution':
+    case 'commandExecution': {
+      const outputText = item.aggregatedOutput ?? bufferedCommandOutput ?? ''
       return {
         ...projectCodexCommandExecutionArgs(item, bufferedCommand),
-        output: item.aggregatedOutput ?? bufferedCommandOutput ?? '',
+        output: outputText,
+        stdout: outputText,
         exitCode: item.exitCode ?? null,
         code: item.exitCode ?? null,
         ...projectCodexDuration(item.durationMs),
       }
+    }
     case 'fileChange':
       return {
         ...projectCodexFileChangePatch(item.changes),
