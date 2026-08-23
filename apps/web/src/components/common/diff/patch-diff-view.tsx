@@ -7,6 +7,7 @@ import { cn } from '~/lib/cn'
 import type { DiffData } from './diff-data'
 import type { DiffStyle } from './diff-options'
 import { buildDiffOptions } from './diff-options'
+import { useAppThemeType } from './use-app-theme'
 
 export interface PatchDiffViewHandle {
   scrollToPath: (path: string) => boolean
@@ -22,9 +23,10 @@ interface PatchDiffViewProps {
 export const PatchDiffView = forwardRef<PatchDiffViewHandle, PatchDiffViewProps>(
   ({ data, diffStyle, className, enableLineSelection = false }, ref) => {
     const viewerRef = useRef<CodeViewHandle<undefined>>(null)
+    const themeType = useAppThemeType()
     const options = useMemo(
-      () => buildDiffOptions(diffStyle, { enableLineSelection }),
-      [diffStyle, enableLineSelection],
+      () => buildDiffOptions(diffStyle, { enableLineSelection, themeType }),
+      [diffStyle, enableLineSelection, themeType],
     )
 
     const scrollToPath = useStableCallback((path: string): boolean => {

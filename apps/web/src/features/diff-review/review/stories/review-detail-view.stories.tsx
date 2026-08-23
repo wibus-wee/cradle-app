@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { buildDiffData } from '~/components/common/diff/diff-data'
 import { buildDiffOptions } from '~/components/common/diff/diff-options'
 import { DiffWorkerProvider } from '~/components/common/diff/diff-runtime'
+import { useAppThemeType } from '~/components/common/diff/use-app-theme'
 
 import type { CradleDiffReview, DiffStyle, ReviewFile } from '../../shared/types'
 import { reviewFixture, workingTreeReviewFixture } from '../fixtures/review-fixtures'
@@ -26,7 +27,8 @@ function ReviewDetailScene({ review: initialReview }: { review: CradleDiffReview
     () => buildDiffData(review.currentRevision?.patch ?? ''),
     [review.currentRevision?.patch],
   )
-  const options = useMemo(() => buildDiffOptions(diffStyle), [diffStyle])
+  const themeType = useAppThemeType()
+  const options = useMemo(() => buildDiffOptions(diffStyle, { themeType }), [diffStyle, themeType])
 
   const toggleViewed = (target: ReviewFile) => {
     setReview(current => ({

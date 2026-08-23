@@ -35,5 +35,6 @@ export default {
   'reviews.remote.title': 'GitHub pull requests',
   'reviews.workingTree.cta': 'Working tree',
   'thread.addComment.placeholder': 'Add a comment...',
+  'thread.composer.submitHint': '{{shortcut}} to submit · Esc to dismiss',
   'thread.reply.placeholder': 'Reply...',
 }

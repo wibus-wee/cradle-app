@@ -35,5 +35,6 @@
   "reviews.remote.title": "GitHub プルリクエスト",
   "reviews.workingTree.cta": "ワーキングツリー",
   "thread.addComment.placeholder": "Add a comment...",
+  "thread.composer.submitHint": "{{shortcut}} で送信 · Esc で閉じる",
   "thread.reply.placeholder": "Reply..."
 }

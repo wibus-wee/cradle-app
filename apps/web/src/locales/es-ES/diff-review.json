@@ -35,5 +35,6 @@
   "reviews.remote.title": "Pull requests de GitHub",
   "reviews.workingTree.cta": "Árbol de trabajo",
   "thread.addComment.placeholder": "Add a comment...",
+  "thread.composer.submitHint": "{{shortcut}} para enviar · Esc para descartar",
   "thread.reply.placeholder": "Reply..."
 }

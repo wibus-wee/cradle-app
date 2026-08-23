@@ -65,6 +65,20 @@
   font-feature-settings: 'cv01', 'ss03';
 }
 
+/*
+ * Pierre paints through `light-dark()`, which resolves against the used
+ * color-scheme — not our `.dark` class. Pin it here so the diff always
+ * matches the app theme, even when the OS theme disagrees.
+ */
+[data-review-surface] {
+  color-scheme: light;
+}
+
+.dark [data-review-surface],
+[data-review-surface].dark {
+  color-scheme: dark;
+}
+
 /* Digits that stack in columns (line counts, stats, check tallies) must align. */
 [data-review-surface] [data-rv-num] {
   font-variant-numeric: tabular-nums;
@@ -76,11 +90,31 @@
   border-radius: 3px;
 }
 
-/* Pierre's CodeView paints its own chrome; align it to app diff washes. */
+/*
+ * Pierre's CodeView paints its own chrome through `--diffs-*-override` hooks.
+ * Map them onto app tokens so additions/deletions read as quiet washes over
+ * the app background (Linear-style), not saturated blocks.
+ */
 [data-review-surface] [data-rv-code] {
-  --pierre-diff-addition-bg: var(--rv-add-wash);
-  --pierre-diff-deletion-bg: var(--rv-del-wash);
+  --diffs-bg-addition-override: color-mix(in srgb, var(--success) 9%, var(--background));
+  --diffs-bg-deletion-override: color-mix(in srgb, var(--destructive) 9%, var(--background));
+  --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--success) 26%, var(--background));
+  --diffs-bg-deletion-emphasis-override: color-mix(in srgb, var(--destructive) 26%, var(--background));
+  --diffs-bg-addition-number-override: color-mix(in srgb, var(--success) 13%, var(--background));
+  --diffs-bg-deletion-number-override: color-mix(in srgb, var(--destructive) 13%, var(--background));
+  --diffs-fg-number-override: var(--text-tertiary);
+  --diffs-bg-context-override: transparent;
+  --diffs-bg-buffer-override: transparent;
+  --diffs-bg-separator-override: var(--border);
+  --diffs-bg-hover-override: color-mix(in srgb, var(--foreground) 4%, transparent);
+  --diffs-bg-selection-override: color-mix(in srgb, var(--primary) 16%, transparent);
+  --diffs-bg-selection-number-override: color-mix(in srgb, var(--primary) 22%, transparent);
   font-family: var(--rv-font-mono);
   font-size: 12px;
   line-height: var(--rv-code-line-h);
+}
+
+/* Inline comment cards live inside Pierre's annotation slots; give them air. */
+[data-review-surface] [data-rv-code] [data-gutter-buffer='annotation'] {
+  padding-block: 3px;
 }

@@ -6,7 +6,7 @@ import { Textarea } from '~/components/ui/textarea'
 import { cn } from '~/lib/cn'
 
 import type { CodeViewLineSelection } from '../shared/diff-items'
-import { formatSelectedReviewRange, getSelectedReviewRange } from '../shared/diff-items'
+import { getSelectedReviewRange } from '../shared/diff-items'
 import type { ReviewFile } from '../shared/types'
 
 type DiffReviewKey = keyof typeof import('~/locales/default').default['diff-review']
@@ -20,6 +20,14 @@ interface ThreadComposerProps {
   pending: boolean
 }
 
+/**
+ * Inline "add a comment" composer, rendered inside a Pierre annotation slot.
+ *
+ * Annotation slots are half the diff width in split view and wrap-hostile
+ * (pre-wrap, min-width:0 flow roots), so this card must be self-contained:
+ * no wide intrinsic content, everything flexes or wraps. The selected lines
+ * above it already communicate the anchor — the composer only asks for text.
+ */
 export function ThreadComposer({
   selection,
   files,
@@ -55,13 +63,15 @@ export function ThreadComposer({
 
   return (
     <div
-      className="my-px border-l border-border bg-background"
+      className="min-w-0 px-1.5 py-0.5"
       data-testid="thread-composer"
     >
-      <div className="flex items-start gap-2 px-3 py-2 pl-5">
-        <span className="mt-1.5 max-w-48 shrink-0 truncate font-mono text-[12px] text-muted-foreground">
-          {formatSelectedReviewRange(range)}
-        </span>
+      <div
+        className={cn(
+          'min-w-0 overflow-hidden rounded-lg border border-border bg-card',
+          'shadow-[var(--rv-shadow-pop)]',
+        )}
+      >
         <Textarea
           autoFocus
           value={draft}
@@ -78,30 +88,35 @@ export function ThreadComposer({
           }}
           placeholder={t('thread.addComment.placeholder' as DiffReviewKey)}
           className={cn(
-            'min-h-7 flex-1 resize-none border-0 bg-transparent p-0 text-[13px] shadow-none focus-visible:ring-0',
+            'max-h-48 min-h-14 w-full resize-none border-0 bg-transparent p-2.5',
+            'text-[12.5px] shadow-none focus-visible:ring-0',
             'placeholder:text-muted-foreground/60',
           )}
-          rows={1}
         />
-        <div className="mt-0.5 flex shrink-0 items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-6 text-[12px] text-muted-foreground"
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="h-6 text-[12px]"
-            disabled={!draft.trim() || pending}
-            onClick={submit}
-          >
-            Comment
-          </Button>
+        <div className="flex items-center justify-between gap-2 border-t border-border/60 px-2 py-1.5">
+          <span className="min-w-0 truncate text-[11px] text-muted-foreground/60">
+            {t('thread.composer.submitHint' as DiffReviewKey, { shortcut: '⌘↵' })}
+          </span>
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-[12px] text-muted-foreground"
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-6 px-2.5 text-[12px]"
+              disabled={!draft.trim() || pending}
+              onClick={submit}
+            >
+              Comment
+            </Button>
+          </div>
         </div>
       </div>
     </div>

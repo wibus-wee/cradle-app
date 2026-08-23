@@ -1,4 +1,9 @@
-import { useState } from 'react'
+import {
+  CheckLine as CheckIcon,
+  DownLine as ChevronDownIcon,
+  RightLine as ChevronRightIcon,
+} from '@mingcute/react'
+import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
@@ -20,6 +25,36 @@ interface InlineThreadProps {
   onExpandedChange?: (id: string | null) => void
 }
 
+function ThreadAction({ onClick, disabled, children }: {
+  onClick: () => void
+  disabled?: boolean
+  children: string
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'h-auto px-0 py-0 text-[11.5px] font-normal text-muted-foreground',
+        'hover:bg-transparent hover:text-foreground',
+      )}
+    >
+      {children}
+    </Button>
+  )
+}
+
+/**
+ * Inline comment thread, rendered inside a Pierre annotation slot.
+ *
+ * A raised card with one bordered bubble per comment — Linear-style: quiet
+ * chrome, the words carry the weight. Annotation slots are half the diff
+ * width in split view, so everything wraps and nothing has wide intrinsic
+ * width.
+ */
 export function InlineThread({
   thread,
   onReply,
@@ -33,7 +68,6 @@ export function InlineThread({
   const [expanded, setExpanded] = useState(thread.state !== 'resolved')
   const [draft, setDraft] = useState('')
   const [replying, setReplying] = useState(false)
-  const lastComment = thread.comments.at(-1)
   const resolved = thread.state === 'resolved'
 
   const toggle = () => {
@@ -42,157 +76,139 @@ export function InlineThread({
     onExpandedChange?.(next ? thread.id : null)
   }
 
+  const submitReply = () => {
+    const body = draft.trim()
+    if (!body) {
+      return
+    }
+    onReply(thread.id, body)
+    setDraft('')
+    setReplying(false)
+  }
+
   return (
     <div
-      className="my-px border-l border-border bg-muted/30"
+      className="min-w-0 px-1.5 py-0.5"
       data-testid="inline-thread"
       data-thread-state={thread.state}
     >
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={toggle}
-        className="h-auto w-full justify-start rounded-none px-3 py-1.5 text-left font-normal hover:bg-muted/50"
+      <div
+        className={cn(
+          'min-w-0 overflow-hidden rounded-lg border bg-card',
+          resolved ? 'border-border/60' : 'border-border shadow-[var(--rv-shadow-raised)]',
+        )}
       >
-        <span
-          className={cn(
-            'size-1.5 shrink-0 rounded-full',
-            resolved ? 'bg-emerald-500' : thread.state === 'stale' ? 'bg-amber-500' : 'bg-orange-500',
-          )}
-          aria-hidden
-        />
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">
-          {lastComment ? lastComment.bodyMarkdown.split('\n')[0] : 'Thread'}
-        </span>
-        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
-          {thread.comments.length}
-        </span>
-      </Button>
+        {resolved && (
+          <button
+            type="button"
+            onClick={toggle}
+            className={cn(
+              'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left',
+              'text-[11.5px] text-muted-foreground hover:bg-muted/50',
+            )}
+          >
+            {expanded
+              ? <ChevronDownIcon className="size-3 shrink-0" aria-hidden />
+              : <ChevronRightIcon className="size-3 shrink-0" aria-hidden />}
+            <CheckIcon className="size-3 shrink-0 text-emerald-500" aria-hidden />
+            <span className="min-w-0 flex-1 truncate">
+              {thread.comments[0]?.bodyMarkdown.split('\n')[0]}
+            </span>
+            <span className="shrink-0 tabular-nums">{thread.comments.length}</span>
+          </button>
+        )}
 
-      {expanded && (
-        <div className="space-y-1.5 px-3 pb-2 pl-5">
-          {thread.comments.map(comment => (
-            <div key={comment.id} className="space-y-0.5">
-              <div className="flex items-baseline gap-1.5 text-[11px] text-muted-foreground">
-                <span className="font-medium text-foreground/80">{comment.authorId}</span>
-                <span className="tabular-nums">{formatTimestamp(comment.createdAt)}</span>
-              </div>
-              <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-foreground/90">
-                {comment.bodyMarkdown}
-              </p>
+        {expanded && (
+          <>
+            <div className="min-w-0 divide-y divide-border/60">
+              {thread.comments.map(comment => (
+                <div key={comment.id} className="min-w-0 px-2.5 py-2">
+                  <div className="flex items-baseline gap-1.5 text-[11px] leading-none">
+                    <span className="font-medium text-foreground/80">{comment.authorId}</span>
+                    <span className="tabular-nums text-muted-foreground/60">
+                      {formatTimestamp(comment.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-foreground/90">
+                    {comment.bodyMarkdown}
+                  </p>
+                </div>
+              ))}
             </div>
-          ))}
 
-          {resolved
-            ? null
-            : replying
-              ? (
-                  <div className="space-y-1.5 pt-1">
-                    <Textarea
-                      autoFocus
-                      value={draft}
-                      onChange={event => setDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                          event.preventDefault()
-                          const body = draft.trim()
-                          if (body) {
-                            onReply(thread.id, body)
-                            setDraft('')
-                            setReplying(false)
-                          }
-                        }
-                        if (event.key === 'Escape') {
-                          event.preventDefault()
-                          setReplying(false)
-                          setDraft('')
-                        }
-                      }}
-                      placeholder={t('thread.reply.placeholder' as DiffReviewKey)}
-                      className="min-h-7 resize-none text-[12px]"
-                    />
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-[12px] text-muted-foreground"
-                        onClick={() => {
-                          setReplying(false)
-                          setDraft('')
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-[12px] text-muted-foreground"
-                        onClick={() => onResolve(thread.id)}
-                        disabled={resolvePending}
-                      >
-                        Resolve
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="h-6 text-[12px]"
-                        disabled={!draft.trim() || replyPending}
-                        onClick={() => {
-                          const body = draft.trim()
-                          if (body) {
-                            onReply(thread.id, body)
-                            setDraft('')
-                            setReplying(false)
-                          }
-                        }}
-                      >
-                        Reply
-                      </Button>
-                    </div>
-                  </div>
-                )
-              : (
-                  <div className="flex items-center gap-2 pt-0.5">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setReplying(true)}
-                      className="h-auto px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
-                    >
-                      Reply
-                    </Button>
-                    {onAskAgent && (
-                      <>
+            {!resolved && (
+              <div className="border-t border-border/60">
+                {replying
+                  ? (
+                      <div className="space-y-1 p-2 pt-1.5">
+                        <Textarea
+                          autoFocus
+                          value={draft}
+                          onChange={event => setDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                              event.preventDefault()
+                              submitReply()
+                            }
+                            if (event.key === 'Escape') {
+                              event.preventDefault()
+                              setReplying(false)
+                              setDraft('')
+                            }
+                          }}
+                          placeholder={t('thread.reply.placeholder' as DiffReviewKey)}
+                          className="max-h-48 min-h-9 resize-none text-[12.5px]"
+                        />
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="truncate text-[11px] text-muted-foreground/60">
+                            {t('thread.composer.submitHint' as DiffReviewKey, { shortcut: '⌘↵' })}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-[12px] text-muted-foreground"
+                              onClick={() => {
+                                setReplying(false)
+                                setDraft('')
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-6 px-2.5 text-[12px]"
+                              disabled={!draft.trim() || replyPending}
+                              onClick={submitReply}
+                            >
+                              Reply
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  : (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-2.5 py-1.5">
+                        <ThreadAction onClick={() => setReplying(true)}>Reply</ThreadAction>
+                        {onAskAgent && (
+                          <Fragment>
+                            <span className="text-muted-foreground/30">·</span>
+                            <ThreadAction onClick={() => onAskAgent(thread.id)}>Ask agent</ThreadAction>
+                          </Fragment>
+                        )}
                         <span className="text-muted-foreground/30">·</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onAskAgent(thread.id)}
-                          className="h-auto px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
-                        >
-                          Ask agent
-                        </Button>
-                      </>
+                        <ThreadAction onClick={() => onResolve(thread.id)} disabled={resolvePending}>
+                          Resolve
+                        </ThreadAction>
+                      </div>
                     )}
-                    <span className="text-muted-foreground/30">·</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onResolve(thread.id)}
-                      disabled={resolvePending}
-                      className="h-auto px-0 py-0 text-[12px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
-                    >
-                      Resolve
-                    </Button>
-                  </div>
-                )}
-        </div>
-      )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   )
 }

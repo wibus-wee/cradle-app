@@ -35,5 +35,6 @@
   "reviews.remote.title": "GitHub 拉取请求",
   "reviews.workingTree.cta": "工作区改动",
   "thread.addComment.placeholder": "Add a comment...",
+  "thread.composer.submitHint": "{{shortcut}} 提交 · Esc 关闭",
   "thread.reply.placeholder": "Reply..."
 }

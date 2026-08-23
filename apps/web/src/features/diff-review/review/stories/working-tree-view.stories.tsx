@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { buildDiffData } from '~/components/common/diff/diff-data'
 import { buildDiffOptions } from '~/components/common/diff/diff-options'
 import { DiffWorkerProvider } from '~/components/common/diff/diff-runtime'
+import { useAppThemeType } from '~/components/common/diff/use-app-theme'
 
 import type { DiffStyle } from '../../shared/types'
 import { reviewPatchFixture } from '../fixtures/review-fixtures'
@@ -19,7 +20,8 @@ function WorkingTreeScene({ model: initialModel }: { model: WorkingTreeModel }) 
   const [commitSubject, setCommitSubject] = useState('')
 
   const diffData = useMemo(() => buildDiffData(reviewPatchFixture), [])
-  const options = useMemo(() => buildDiffOptions(diffStyle), [diffStyle])
+  const themeType = useAppThemeType()
+  const options = useMemo(() => buildDiffOptions(diffStyle, { themeType }), [diffStyle, themeType])
 
   const setStaged = (ids: string[], staged: boolean) => {
     setModel(current => ({

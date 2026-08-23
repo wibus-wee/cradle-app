@@ -7,6 +7,7 @@ import { cn } from '~/lib/cn'
 import { DIFF_THEME } from './diff-constants'
 import { diffContentCacheKey } from './diff-data'
 import type { DiffStyle } from './diff-options'
+import { useAppThemeType } from './use-app-theme'
 
 type DiffOptions = NonNullable<MultiFileDiffProps<undefined>['options']>
 
@@ -37,9 +38,10 @@ export function FileContentsDiffView({
     contents: newContent,
     cacheKey: diffContentCacheKey('new', filePath, newContent),
   }), [filePath, newContent])
+  const themeType = useAppThemeType()
   const options = useMemo<DiffOptions>(() => ({
     theme: DIFF_THEME,
-    themeType: 'system',
+    themeType,
     diffStyle,
     disableFileHeader: !showFileHeader,
     disableBackground: false,
@@ -48,7 +50,7 @@ export function FileContentsDiffView({
     lineDiffType: 'word',
     overflow: 'scroll',
     parseDiffOptions: { context: 3 },
-  }), [diffStyle, showFileHeader])
+  }), [diffStyle, showFileHeader, themeType])
 
   return (
     <MultiFileDiff

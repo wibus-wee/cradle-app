@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react'
 
 import type { DiffData } from '~/components/common/diff/diff-data'
 import { buildDiffOptions } from '~/components/common/diff/diff-options'
+import { useAppThemeType } from '~/components/common/diff/use-app-theme'
 
 import type { CodeViewLineSelection, ThreadAnnotation } from '../shared/diff-items'
 import {
@@ -95,6 +96,7 @@ export function DiffStage({
   handleRef,
 }: DiffStageProps) {
   const viewerRef = useRef<CodeViewHandle<ThreadAnnotation>>(null)
+  const appThemeType = useAppThemeType()
 
   const handleGutterUtilityClick = useStableCallback((range: SelectedLineRange, context: { item: { id: string } }) => {
     const selection: CodeViewLineSelection = { id: context.item.id, range }
@@ -113,9 +115,10 @@ export function DiffStage({
       enableGutterUtility: true,
       enableLineSelection: true,
       structuralHighlighting: review.preferences.structuralHighlighting,
+      themeType: appThemeType,
       onGutterUtilityClick: handleGutterUtilityClick,
     }),
-    [diffStyle, handleGutterUtilityClick, review.preferences.structuralHighlighting],
+    [appThemeType, diffStyle, handleGutterUtilityClick, review.preferences.structuralHighlighting],
   )
 
   const annotationsByItem = useMemo(

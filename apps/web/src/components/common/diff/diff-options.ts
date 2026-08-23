@@ -9,6 +9,8 @@ interface DiffInteractionOptions<TAnnotation> {
   enableGutterUtility?: boolean
   enableLineSelection?: boolean
   structuralHighlighting?: boolean
+  /** Follows the app theme, not the OS. See `useAppThemeType`. */
+  themeType?: 'light' | 'dark'
   onGutterUtilityClick?: CodeViewOptions<TAnnotation>['onGutterUtilityClick']
 }
 
@@ -18,7 +20,7 @@ export function buildDiffOptions<TAnnotation = undefined>(
 ): CodeViewOptions<TAnnotation> {
   return {
     theme: DIFF_THEME,
-    themeType: 'system',
+    themeType: interaction.themeType ?? 'system',
     diffStyle,
     diffIndicators: 'bars',
     overflow: 'scroll',
