@@ -197,7 +197,10 @@ describe('desktop server fetch broker', () => {
     await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledOnce())
     listeners.get(DESKTOP_SERVER_FETCH_CANCEL_CHANNEL)!({ sender }, 'pending-headers')
 
-    await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(opening).resolves.toEqual({
+      requestId: 'pending-headers',
+      cancelled: true,
+    })
     expect(sender.send).not.toHaveBeenCalled()
   })
 
@@ -244,7 +247,10 @@ describe('desktop server fetch broker', () => {
     await vi.waitFor(() => expect(fetchFn).toHaveBeenCalledOnce())
     broker.setServerUrl('http://127.0.0.1:21424', 2)
 
-    await expect(opening).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(opening).resolves.toEqual({
+      requestId: 'generation-change',
+      cancelled: true,
+    })
     expect(broker.diagnostics().activeRequests).toBe(0)
   })
 

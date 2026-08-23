@@ -17,6 +17,15 @@ interface DesktopServerFetchResponseHead {
   url: string
 }
 
+interface DesktopServerFetchCancelledResponse {
+  requestId: string
+  cancelled: true
+}
+
+type DesktopServerFetchOpenResponse
+  = | DesktopServerFetchResponseHead
+    | DesktopServerFetchCancelledResponse
+
 interface DesktopServerFetchChunk {
   requestId: string
   bytes: Uint8Array
@@ -31,7 +40,7 @@ interface DesktopServerFetchErrorEvent extends DesktopServerFetchTerminalEvent {
 }
 
 interface DesktopServerFetchBridge {
-  open: (request: DesktopServerFetchRequest) => Promise<DesktopServerFetchResponseHead>
+  open: (request: DesktopServerFetchRequest) => Promise<DesktopServerFetchOpenResponse>
   credit: (requestId: string, credit: number) => void
   cancel: (requestId: string) => void
   onChunk: (handler: (event: DesktopServerFetchChunk) => void) => () => void
@@ -86,6 +95,9 @@ export async function desktopIpcFetch(request: Request): Promise<Response> {
     const body = request.method === 'GET' || request.method === 'HEAD'
       ? null
       : new Uint8Array(await request.arrayBuffer())
+    if (request.signal.aborted) {
+      throw request.signal.reason ?? new DOMException('The operation was aborted.', 'AbortError')
+    }
     const head = await bridge.open({
       requestId,
       generation,
@@ -94,6 +106,10 @@ export async function desktopIpcFetch(request: Request): Promise<Response> {
       headers: [...request.headers.entries()],
       body,
     })
+
+    if ('cancelled' in head) {
+      throw request.signal.reason ?? new DOMException('The operation was aborted.', 'AbortError')
+    }
 
     const responseBody = request.method === 'HEAD' || [204, 205, 304].includes(head.status)
       ? null

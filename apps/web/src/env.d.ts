@@ -139,6 +139,9 @@ interface Window {
         statusText: string
         headers: Array<[string, string]>
         url: string
+      } | {
+        requestId: string
+        cancelled: true
       }>
       credit: (requestId: string, credit: number) => void
       cancel: (requestId: string) => void

@@ -25,6 +25,15 @@ export interface DesktopServerFetchResponseHead {
   url: string
 }
 
+export interface DesktopServerFetchCancelledResponse {
+  requestId: string
+  cancelled: true
+}
+
+export type DesktopServerFetchOpenResponse
+  = | DesktopServerFetchResponseHead
+    | DesktopServerFetchCancelledResponse
+
 export interface DesktopServerFetchChunk {
   requestId: string
   bytes: Uint8Array

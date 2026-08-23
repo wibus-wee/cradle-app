@@ -4,6 +4,7 @@ import { Agent, fetch as undiciFetch } from 'undici'
 import type {
   DesktopServerFetchChunk,
   DesktopServerFetchErrorEvent,
+  DesktopServerFetchOpenResponse,
   DesktopServerFetchRequest,
   DesktopServerFetchResponseHead,
   DesktopServerFetchTerminalEvent,
@@ -82,7 +83,20 @@ export class DesktopServerFetchBroker {
   register(ipcMain: IpcMain): void {
     ipcMain.handle(
       DESKTOP_SERVER_FETCH_OPEN_CHANNEL,
-      async (event, request: DesktopServerFetchRequest) => await this.open(event, request),
+      async (event, request: DesktopServerFetchRequest): Promise<DesktopServerFetchOpenResponse> => {
+        try {
+          return await this.open(event, request)
+        }
+        catch (error) {
+          if (error instanceof DesktopServerFetchCancelledError) {
+            return {
+              requestId: error.requestId,
+              cancelled: true,
+            }
+          }
+          throw error
+        }
+      },
     )
     ipcMain.on(DESKTOP_SERVER_FETCH_CREDIT_CHANNEL, (event, requestId: unknown, credit: unknown) => {
       if (!this.isAllowedSender(event.sender) || typeof requestId !== 'string') {
@@ -203,13 +217,17 @@ export class DesktopServerFetchBroker {
       })
     }
     catch (error) {
+      const cancelled = active.closed || controller.signal.aborted
       this.take(active)
+      if (cancelled) {
+        throw new DesktopServerFetchCancelledError(request.requestId)
+      }
       throw error
     }
 
     if (active.closed || controller.signal.aborted) {
       await response.body?.cancel().catch(() => {})
-      throw new DOMException('The operation was aborted.', 'AbortError')
+      throw new DesktopServerFetchCancelledError(request.requestId)
     }
     active.reader = response.body?.getReader() ?? null
 
@@ -346,6 +364,16 @@ export class DesktopServerFetchBroker {
 
   private key(sender: WebContents, requestId: string): string {
     return `${sender.id}:${requestId}`
+  }
+}
+
+class DesktopServerFetchCancelledError extends Error {
+  readonly requestId: string
+
+  constructor(requestId: string) {
+    super('Desktop Server fetch was cancelled.')
+    this.name = 'DesktopServerFetchCancelledError'
+    this.requestId = requestId
   }
 }
 

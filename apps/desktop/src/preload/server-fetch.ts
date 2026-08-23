@@ -3,8 +3,8 @@ import type { IpcRenderer } from 'electron'
 import type {
   DesktopServerFetchChunk,
   DesktopServerFetchErrorEvent,
+  DesktopServerFetchOpenResponse,
   DesktopServerFetchRequest,
-  DesktopServerFetchResponseHead,
   DesktopServerFetchTerminalEvent,
 } from '../shared/server-fetch-transport'
 import {
@@ -30,7 +30,7 @@ export function createDesktopServerFetchBridge(ipcRenderer: ServerFetchIpcRender
       ipcRenderer.invoke(
         DESKTOP_SERVER_FETCH_OPEN_CHANNEL,
         request,
-      ) as Promise<DesktopServerFetchResponseHead>,
+      ) as Promise<DesktopServerFetchOpenResponse>,
     credit: (requestId: string, credit: number) =>
       ipcRenderer.send(DESKTOP_SERVER_FETCH_CREDIT_CHANNEL, requestId, credit),
     cancel: (requestId: string) =>
