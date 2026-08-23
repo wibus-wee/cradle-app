@@ -119,7 +119,10 @@ export async function configureCodexFileChangeSimulator(world: CradleWorld): Pro
 
 /**
  * A write outside the sandboxed workspace forces the real approval round-trip:
- * `item/commandExecution/requestApproval` → Cradle approval card → Allow → execution.
+ * the tool call requests escalation (`sandbox_permissions: "require_escalated"`,
+ * exactly how real models ask), the app-server surfaces
+ * `item/commandExecution/requestApproval`, Cradle renders the approval card,
+ * and Allow resumes execution.
  */
 export async function configureCodexApprovalSimulator(world: CradleWorld): Promise<void> {
   console.warn('[step] configure Codex approval simulator')
@@ -131,6 +134,8 @@ export async function configureCodexApprovalSimulator(world: CradleWorld): Promi
     argumentsJson: JSON.stringify({
       cmd: `echo ${CODEX_COMMAND_OUTPUT_MARKER} > "$HOME/cradle-e2e-approval-probe"`,
       yield_time_ms: 1000,
+      justification: 'E2E 需要在沙盒外写入探针文件',
+      sandbox_permissions: 'require_escalated',
     }),
   })
 }

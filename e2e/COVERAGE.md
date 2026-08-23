@@ -95,6 +95,8 @@ The backlog below is ordered by semantic fan-out and state-corruption risk, not 
 
 | Priority | Proposed journey | State fusion and owning namespaces |
 | --- | --- | --- |
+| P0 | Fix `/btw` quick-question regression surfaced by `CRADLE-CODEX-003`: the question and answer persist into the main chat timeline instead of the transient quick-question slot (`composerRuntime.uiSlots` never yields the `codex:quick-question` composerState slot, so the composer falls back to a normal send) | chat-runtime interaction × composer slash dispatch × runtime ui-slot projection |
+| P0 | Fix Codex app-server notification starvation under concurrent threads: with parallel e2e workers (`CRADLE_E2E_PARALLEL≥2`), main turns stall at "Thinking…" (TTFT never arrives), and quick-question results misroute — concurrent streams (main / title / ephemeral) share one host client queue, and `readTurnNotifications` drops other-thread events instead of demultiplexing them. Evidence: `e2e/artifacts/scenarios/{edit-last-message-codex-w1-6,update_plan-w2-9,codex-btw-*}` | codex app-server client multiplexing × turn streaming × quick-question |
 | P0 | Application process restart with active stream and queued continuation | desktop lifecycle × persisted Run × queue × rehydration |
 | P1 | Await timeout/cancel/restart plus late external resolution | Await × terminal state × idempotent external event |
 | P1 | Automation run success/failure/cancel with linked Session and notification | automation × background job/activity × session |

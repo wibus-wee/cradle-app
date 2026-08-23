@@ -33,7 +33,9 @@ binary. `CRADLE_E2E_BROWSER_PATH` may point local runs at an existing Chromium
 executable; CI installs the Playwright-pinned browser instead.
 `CRADLE_E2E_PARALLEL` sets the Cucumber worker count (default `1`). Each worker
 boots its own managed server + web stack; the chat settlement timeout scales with
-the worker count to absorb shared-machine load.
+the worker count to absorb shared-machine load. Note: Codex scenarios can flake
+at `≥2` workers due to a known app-server notification-starvation race (see
+`COVERAGE.md` Prioritized Missing Journeys) — Claude-only runs parallelize safely.
 
 ## CI gate
 

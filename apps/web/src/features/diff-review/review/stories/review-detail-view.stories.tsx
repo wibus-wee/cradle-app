@@ -1,4 +1,5 @@
-import { CodeView } from '@pierre/diffs/react'
+import type { DiffLineAnnotation } from '@pierre/diffs'
+import { CodeView, useStableCallback } from '@pierre/diffs/react'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useMemo, useState } from 'react'
 
@@ -7,6 +8,10 @@ import { buildDiffOptions } from '~/components/common/diff/diff-options'
 import { DiffWorkerProvider } from '~/components/common/diff/diff-runtime'
 import { useAppThemeType } from '~/components/common/diff/use-app-theme'
 
+import { InlineThread } from '../../review-detail/inline-thread'
+import { ThreadComposer } from '../../review-detail/thread-composer'
+import type { CodeViewLineSelection, ThreadAnnotation } from '../../shared/diff-items'
+import { buildThreadAnnotations } from '../../shared/diff-items'
 import type { CradleDiffReview, DiffStyle, ReviewFile } from '../../shared/types'
 import { reviewFixture, workingTreeReviewFixture } from '../fixtures/review-fixtures'
 import { ReviewDetailView } from '../review-detail-view'
@@ -24,11 +29,81 @@ function ReviewDetailScene({ review: initialReview }: { review: CradleDiffReview
   const [threadsOpen, setThreadsOpen] = useState(false)
 
   const diffData = useMemo(
-    () => buildDiffData(review.currentRevision?.patch ?? ''),
+    () => buildDiffData<ThreadAnnotation>(review.currentRevision?.patch ?? ''),
     [review.currentRevision?.patch],
   )
   const themeType = useAppThemeType()
-  const options = useMemo(() => buildDiffOptions(diffStyle, { themeType }), [diffStyle, themeType])
+  const [composerAnchor, setComposerAnchor] = useState<CodeViewLineSelection | null>(null)
+
+  const options = useMemo(
+    () => buildDiffOptions<ThreadAnnotation>(diffStyle, {
+      themeType,
+      enableGutterUtility: true,
+      enableLineSelection: true,
+      onGutterUtilityClick: (range, context) => {
+        setComposerAnchor({ id: context.item.id, range })
+      },
+    }),
+    [diffStyle, themeType],
+  )
+
+  const itemsWithAnnotations = useMemo(
+    () => buildThreadAnnotations(review.threads, diffData.itemIdToPath),
+    [diffData.itemIdToPath, review.threads],
+  )
+
+  const annotatedItems = useMemo(() => {
+    const byItem = new Map(itemsWithAnnotations)
+    if (composerAnchor) {
+      const list = byItem.get(composerAnchor.id) ?? []
+      list.push({
+        side: composerAnchor.range.side === 'deletions' ? 'deletions' : 'additions',
+        lineNumber: composerAnchor.range.start,
+        metadata: { kind: 'composer' },
+      })
+      byItem.set(composerAnchor.id, list)
+    }
+    return diffData.items.map((item) => {
+      const annotations = byItem.get(item.id)
+      if (!annotations) { return item }
+      return {
+        ...item,
+        annotations,
+        version: (typeof item.version === 'number' ? item.version : 0) + 1,
+      } as typeof item
+    })
+  }, [composerAnchor, diffData.items, itemsWithAnnotations])
+
+  const renderAnnotation = useStableCallback((annotation: DiffLineAnnotation<ThreadAnnotation>) => {
+    if (annotation.metadata?.kind === 'composer' && composerAnchor) {
+      return (
+        <ThreadComposer
+          selection={composerAnchor}
+          files={review.files}
+          itemIdToPath={diffData.itemIdToPath}
+          onClose={() => setComposerAnchor(null)}
+          onCreate={() => setComposerAnchor(null)}
+          pending={false}
+        />
+      )
+    }
+    const metadata = annotation.metadata
+    const thread = metadata?.kind === 'thread'
+      ? review.threads.find(item => item.id === metadata.threadId)
+      : undefined
+    if (!thread) {
+      return null
+    }
+    return (
+      <InlineThread
+        thread={thread}
+        onReply={() => {}}
+        replyPending={false}
+        onResolve={() => {}}
+        resolvePending={false}
+      />
+    )
+  })
 
   const toggleViewed = (target: ReviewFile) => {
     setReview(current => ({
@@ -58,8 +133,11 @@ function ReviewDetailScene({ review: initialReview }: { review: CradleDiffReview
           onToggleThreads={() => setThreadsOpen(value => !value)}
           diffSlot={(
             <CodeView
-              items={diffData.items}
+              items={annotatedItems}
               options={options}
+              selectedLines={composerAnchor}
+              onSelectedLinesChange={selection => setComposerAnchor(selection)}
+              renderAnnotation={renderAnnotation}
               className="h-full overflow-auto overscroll-contain [overflow-anchor:none]"
             />
           )}
@@ -107,4 +185,76 @@ export const PullRequest: Story = {
 
 export const WorkingTree: Story = {
   args: { review: workingTreeReviewFixture },
+}
+
+/** Annotation-slot cards rendered standalone, at split-view column width. */
+function AnnotationCardsScene() {
+  const diffData = useMemo(
+    () => buildDiffData<ThreadAnnotation>(workingTreeReviewFixture.currentRevision?.patch ?? ''),
+    [],
+  )
+  const filePaths = new Set(workingTreeReviewFixture.files.map(file => file.path))
+  const firstItemId = [...diffData.itemIdToPath.entries()]
+    .find(([, path]) => filePaths.has(path))?.[0] ?? ''
+  const [thread, setThread] = useState(reviewFixture.threads[0]!)
+
+  return (
+    <div className="dark min-h-screen bg-background p-6">
+      <div className="mx-auto flex w-96 min-w-0 flex-col gap-4">
+        <p className="text-[11px] text-muted-foreground">Composer (split-view column width)</p>
+        <p data-testid="debug-info" className="text-[10px] text-red-400">
+          {JSON.stringify({
+            firstItemId,
+            total: diffData.itemIdToPath.size,
+            sample: [...diffData.itemIdToPath.entries()].slice(0, 4),
+            filePaths: [...filePaths].slice(0, 4),
+          })}
+        </p>
+        <ThreadComposer
+          selection={{ id: firstItemId, range: { start: 76, end: 78, side: 'additions' } }}
+          files={workingTreeReviewFixture.files}
+          itemIdToPath={diffData.itemIdToPath}
+          onClose={() => {}}
+          onCreate={() => {}}
+          pending={false}
+        />
+        <p className="text-[11px] text-muted-foreground">Open thread</p>
+        <InlineThread
+          thread={thread}
+          onReply={(_threadId, bodyMarkdown) => {
+            setThread(current => ({
+              ...current,
+              comments: [...current.comments, {
+                id: `cm-${current.comments.length + 1}`,
+                threadId: current.id,
+                authorKind: 'user',
+                authorId: 'wibus-wee',
+                bodyMarkdown,
+                externalUrl: null,
+                createdAt: Math.floor(Date.now() / 1000),
+                updatedAt: Math.floor(Date.now() / 1000),
+              }],
+            }))
+          }}
+          replyPending={false}
+          onResolve={() => setThread(current => ({ ...current, state: 'resolved' }))}
+          resolvePending={false}
+          onAskAgent={() => {}}
+        />
+        <p className="text-[11px] text-muted-foreground">Resolved thread</p>
+        <InlineThread
+          thread={reviewFixture.threads[1]!}
+          onReply={() => {}}
+          replyPending={false}
+          onResolve={() => {}}
+          resolvePending={false}
+        />
+      </div>
+    </div>
+  )
+}
+
+export const AnnotationCards: Story = {
+  args: { review: reviewFixture },
+  render: () => <AnnotationCardsScene />,
 }
