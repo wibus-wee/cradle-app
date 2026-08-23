@@ -178,6 +178,16 @@ tool 输出内联），以及一个静默 bug：超过 128 000 字符的 tool pa
 住 blob，收益也不随历史累积）、不给 `chat_message_payloads` 加 `schema_version`。本计划取代
 最初的 072/073/074 三份拆分草稿与其未写的 075 回填。
 
+2026-08-22 在 commit `aec5f553` 上补充 Plan 077（P0）：Server 堆快照定位到 ~1.5 GB
+ retained 于 520 万个 ~300 B 的 SSE chunk Uint8Array（43 Queue / 46 active requests）。
+静态分析确认 HTTP 层（srvx drain、Elysia pull wrapper）无责，债务在应用层生产者：
+`openBufferedChunkStream` 等多处从事件订阅/interval 里无条件 `controller.enqueue`，
+慢客户端（后台 renderer、half-open TCP）导致 controller queue 无界增长并被 subscriber
+fan-out 放大。方案：以 `infra/sse-event-stream.ts` 为唯一背压 owner（加 byte cap、
+overflow policy `'drop-oldest'/'close'`、负 desiredSize 停滞 watchdog），chat run/provider
+流走 `'close'` + Plan 071 snapshot 重连，side-chat 改 pull 驱动消费，其余低频 SSE 全部
+迁入共享 primitive，并用 grep ratchet 封死「绕过 bounded primitive 的 enqueue」。
+
 2026-08-02 补充 Plan 073：Cradle Platform Constitution — Jarvis as Agent Kind。
 **宪法/方向**文档（非实现计划）。核心定论：Jarvis 是窄义 Platform Kind（管家身份），不是聊天升级、不是 HiJarvis 品牌、不是第二调度器；默认 propose-before-act；诚实委托语义 + 工作账本 + Session 执行载体双中心；IRON LAW 升格为对所有 native 与 Kind 概念本身的宪法。竞争姿态是拒克隆 / niche 天花板，不是征服。人类决策：accept / amend / reject。不重开 Plan 061/062 的既定生命周期边界。
 
@@ -219,10 +229,10 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 026  | Publish plugin SDK + open marketplace to any repo        | P2       | M      | —          | DONE                                                                                   |
 | 027  | Persisted, live-reloadable external plugin sources        | P1       | L      | 026        | DONE                                                                                   |
 | 028  | Mirror dynamic plugin sources into the desktop layer      | P2       | M      | 027        | DONE                                                                                   |
-| 029  | Redesign Plugins Settings for C-end                      | P1       | M      | 027        | TODO (see plan file; duplicate number with review-guide plan)                          |
+| 029  | Redesign Plugins Settings for C-end                      | P1       | M      | 027        | DONE (intent absorbed by Plans 030/031: source parser + trust-consent dialog landed in `apps/web/src/features/plugins/`; old settings files removed) |
 | 029b | Review Guide UX overhaul (`029-review-guide-ux-overhaul`) | P2       | M      | —          | TODO (filename collision with plugin 029 — execute by path)                            |
-| 030  | Plugin install foundation: preview endpoint + shared wizard + trust consent | P1 | L | 027, 029 | TODO                                                                                   |
-| 031  | Plugin Center: marketplace + installed + import surfaces (consumes 030) | P1 | XL | 027, 030 | TODO                                                                                   |
+| 030  | Plugin install foundation: preview endpoint + shared wizard + trust consent | P1 | L | 027, 029 | DONE (`POST /plugins/sources/preview` in `modules/plugins`; `install-wizard.tsx` + paste/review/done views with stories) |
+| 031  | Plugin Center: marketplace + installed + import surfaces (consumes 030) | P1 | XL | 027, 030 | DONE (`routes/plugins/index.tsx` marketplace/installed/import tabs; `modules/plugin-marketplace/`) |
 | 032  | Transparent remote-host Upstream Gateway; delete RemoteCradleClient | P1 | L | —     | DONE                                                                                   |
 | 033  | Remote session projection + link; block local runtime    | P1       | L      | 032        | DONE                                                                                   |
 | 034  | Web remote-execution UX for projected sessions           | P1       | M      | 032, 033   | DONE                                                                                   |
@@ -236,13 +246,13 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 043  | Deepen Composer Draft lifecycle ownership                | P1       | M      | 040        | TODO                                                                                  |
 | 044  | Establish one Chat turn completion owner                 | P1       | L      | 024, 041   | REJECTED (superseded by end-to-end lifecycle Plan 061)                                |
 | 045  | Close the Provider Catalog target query seam             | P2       | M      | 035, 048   | TODO (execute after Plan 035 status is reconciled and Plan 048 lands)                  |
-| 046  | Deepen Terminal lifetime ownership                       | P2       | M      | 041        | TODO                                                                                  |
-| 047  | Build a unified, thin Download Center                    | P1       | XL     | 028, 041   | TODO                                                                                  |
-| 048  | Publish a safe Provider Endpoint catalog projection      | P1       | M      | 035        | TODO (execute only after Plan 035 status is reconciled)                               |
+| 046  | Deepen Terminal lifetime ownership                       | P2       | M      | 041        | DONE (all adapters + navigation route through `terminal-lifetime-controller.ts`; note: `tui-runtime-registry.ts` reintroduced with new xterm-parking semantics) |
+| 047  | Build a unified, thin Download Center                    | P1       | XL     | 028, 041   | DONE (`packages/download-center` wired through server module, desktop service/preload, and web projection) |
+| 048  | Publish a safe Provider Endpoint catalog projection      | P1       | M      | 035        | DONE (landed as `GET /provider-presets` with `endpointProfiles`; web mirror registry deleted; runtime wireAuth stays server-internal) |
 | 049  | Complete lossless Navigation surface round-trip          | P1       | L      | 040        | TODO                                                                                  |
 | 050  | Own Session projection and cache coherence               | P0       | L      | 040        | TODO                                                                                  |
 | 051  | Own Issue–execution association end to end               | P0       | L      | 050        | TODO                                                                                  |
-| 052  | Make Codex app-server provider-owned and thread-multiplexed | P0     | XL     | 041        | TODO                                                                                  |
+| 052  | Make Codex app-server provider-owned and thread-multiplexed | P0     | XL     | 041        | DONE (`codex/app-server/host-lease.ts`: single `provider-host` scope, `retainOnRelease` + idle TTL, thread routing via `inferredThreadId`; tests assert one host across sessions) |
 | 054  | Make WebSocket run streams resumable and liveness-aware   | P0       | L      | 024, 040   | DONE                                                                                  |
 | 055  | Record authoritative Cradle Codex model-call usage in `usage_logs` | P0 | L | operator cleanup of 053 | DONE |
 | 056  | Declare managed resources and add a unified Resources page | P1      | L      | 047        | DONE                                                                                  |
@@ -250,7 +260,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 058  | Add a configurable, crash-safe desktop server data directory | P1       | L      | —         | DONE (`cb781d4`; reviewed in disposable worktree)                                     |
 | 059  | Programmable JavaScript Session Awaits via worker-thread cells | P1       | L      | —         | DONE (`cc7c1e9`; reviewed in `tmp/worktree-plan-059`)                                 |
 | 060  | Rename agent tool to `manage_pull_request` + pre-PR branch rename | P2  | M      | branch `feat/enhance-work` | DONE (`dfe2fb88`..`a7aa8e93` on `feat/enhance-work`; advisor-reviewed)   |
-| 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | IN PROGRESS |
+| 061  | Unify Chat turn lifecycle authority and eliminate synthetic run storms | P0 | XL | 024, 041, 054 | DONE (all-origin single-active-run invariant + partial unique index `backend_runs_one_streaming_per_session_unique`; synthetic-turn identity inbox; unified completion owner in `run/turn-completion.ts`; boot recovery barrier; bounded history hydration) |
 | 062  | Cradle Recall — agent cognition stack + CodeAct retrieval contract | P1 | XL     | 024, 041   | TODO (Phase A: design docs; Phase B+: `recall_query` runtime)            |
 | 062  | Claude native session projection (SDK owns queue; Cradle projects UI Runs) | P0 | XL | 061 (compose) | DONE |
 | 063  | Eliminate Desktop Tearoff HTTP/1.1 pool starvation via custom-scheme + undici proxy | P0 | M–L | 038, 040, 054, 071 | REJECTED (M0 Architecture STOP: packaged renderer 64→128 MiB RSS slope exceeded locked 16 MiB bound on Linux/Windows; production migration not started) |
@@ -262,17 +272,28 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 069  | Demote the claude-agent state snapshot to a checkpoint; rebuild the UI activity feed from authoritative history | P2 | XL | 065, 066 (coordinate with 050, 061) | BLOCKED (SDK transcripts are pruned and omit provider activity facts; re-plan over Cradle `session_events`) |
 | 070  | Test the Claude Agent provider against the real wire via a shared model-api-simulator harness | P1 | L | 065, 066 | DONE |
 | 071  | Eliminate active-run replay retention and recover from snapshots | P0 | M | — (supersedes Plan 054 replay retention only) | DONE |
-| 072  | Move chat message bytes into a content-addressed blob store, losslessly | P0 | XL | — | TODO (Step 0 is a standalone web-only bug fix; Step 9 backfill is what shrinks existing sessions) |
+| 072  | Move chat message bytes into a content-addressed blob store, losslessly | P0 | XL | — | DONE (`blobs` + `chat_message_payloads`/`chat_message_blob_refs` with restrict-on-delete GC; `cradle-blob://` resolution; `toDurableMessagePayload` seam; `chat-blob-backfill-v1` maintenance task sweeping existing rows) |
 | 073  | Cradle Platform Constitution — Jarvis as Agent Kind | P0 | — | 061, 062 (conceptual) | FINAL — awaiting human accept / amend / reject (direction only; not an implementation plan) |
-| 073  | Provider first-class identity + dual-endpoint platform (no Kimi OAuth) | P1 | XL | — | TODO |
+| 073  | Provider first-class identity + dual-endpoint platform (no Kimi OAuth) | P1 | XL | — | DONE (`a02e9ffb`: `providerId` column + migration 0054; dual-endpoint presets for DeepSeek/Moonshot; contribution-driven auth methods; explicit `POST /profiles/:id/bind-provider`; import never writes providerId) |
 | 074  | Bound Codex runtime state, native Context Usage, and shared-host pressure | P0 | XL | 052 | DONE (scoped implementation/tests pass; repository typechecks remain red on unrelated plugin-SDK drift) |
-| 075  | Route Desktop Server fetch through Electron Main | P0 | L | 063 STOP; existing Desktop Server lifecycle | IN PROGRESS (core carrier and 21-request proof pass; coverage and packaged smoke remain) |
-| 075  | Add per-Provider extensions and make CPA the first protocol converter | P1 | XL | — (coordinate with 073 if active) | TODO |
-| 076  | Replace point-to-point Remote Hosts with the Cradle Fabric | P0 | XL | 032, 033, 034 | IN PROGRESS — directory/membership/v3 link/projection/legacy removal done; Nodes UI surface in flight |
+| 075  | Route Desktop Server fetch through Electron Main | P0 | L | 063 STOP; existing Desktop Server lifecycle | IN PROGRESS (Main broker with undici pools + pull credits, renderer `cradleFetch` IPC path, raw-fetch audit, and bearer removal done in code; packaged main+20-Tearoff smoke on Linux/Windows remains) |
+| 075  | Add per-Provider extensions and make CPA the first protocol converter | P1 | XL | — (coordinate with 073 if active) | IN PROGRESS (API-key extension path implemented and verified; Codex OAuth codec/two-phase lease implemented but disabled at M0 gate pending authorized real refresh-credential test against pinned `7.2.130`) |
+| 076  | Replace point-to-point Remote Hosts with the Cradle Fabric | P0 | XL | 032, 033, 034 | IN PROGRESS — implementation essentially complete (relayd directory/membership/v3 links, server `modules/fabric/` + node projections, Nodes UI, legacy removal; two-node e2e spec landed via PR #185 and wired into CI) ; remaining: manual desktop smoke + plan doc reconciliation |
+| 077  | Bound every server stream producer behind one backpressure seam | P0 | M–L | — (composes with 054/071 recovery) | DONE (bounded primitive + watchdog + close-policy chat streams; HWM-0 deadlock fixed; ratchet in typecheck; codex app-server bridge also bounded (close policy + truncation error frame)) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 
 ## Follow-up notes
+
+- 2026-08-21，状态对账（代码审计 vs 本索引）：核实并更新以下行——029/030/031（插件
+  Settings/install/Plugin Center 均已落地于 `features/plugins` 与 `modules/plugin-marketplace`）、
+  046（terminal lifetime controller 全 adapter 接入）、047（Download Center 全链路）、048（以
+  `GET /provider-presets` + `endpointProfiles` 形态等价落地，web mirror 已删）、052（Codex 单一
+  provider-host lease + thread 多路复用）、061（五里程碑全部落地：唯一活跃 run 不变量 + 部分唯一
+  索引、synthetic-turn inbox、统一 completion owner、boot 恢复屏障、有界 history hydration）、
+  072（blob store/GC/cradle-blob:// 解析/回填任务均已运行）、073 Provider identity（`a02e9ffb`
+  一次落地）。075 Desktop fetch、075 CPA、076 Fabric 保持 IN PROGRESS 但备注已更新为真实剩余项
+  （packaged smoke / M0 OAuth gate / 手动 desktop smoke）。经核实仍未开始的：043、045、050、051。
 
 - 2026-07-15，Plan 055 完成：Codex `thread/tokenUsage/updated` 在 root filtering 前投影为
   deterministic per-call usage events，TurnExecutor 附加 Cradle session/run/message/provider identity，
