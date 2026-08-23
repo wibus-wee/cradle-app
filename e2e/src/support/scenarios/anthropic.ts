@@ -77,6 +77,8 @@ export function anthropicTextExchange(input: {
   label: string
   text: string
   gateAfterStart?: string
+  /** Emit an SSE `ping` frame before the text block, as the real API does between blocks. */
+  pingBeforeText?: boolean
   bodyTextIncludes?: string | readonly string[]
   bodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange {
@@ -84,6 +86,9 @@ export function anthropicTextExchange(input: {
   const steps: StreamStep[] = [messageStart(messageId)]
   if (input.gateAfterStart) {
     steps.push({ kind: 'gate', name: input.gateAfterStart })
+  }
+  if (input.pingBeforeText) {
+    steps.push({ kind: 'event', event: { type: 'ping' } })
   }
   steps.push(
     {
@@ -135,56 +140,99 @@ function withBodyTextMatch(
   }
 }
 
+interface AnthropicToolUseSpec {
+  toolUseId: string
+  toolName: string
+  toolInput: Record<string, unknown>
+  /** Split the tool input across several `input_json_delta` frames instead of one. */
+  inputJsonChunks?: readonly string[]
+}
+
+function toolUseContentBlockStart(index: number, spec: AnthropicToolUseSpec): StreamStep {
+  return {
+    kind: 'event',
+    event: {
+      type: 'content_block_start',
+      index,
+      content_block: {
+        type: 'tool_use',
+        id: spec.toolUseId,
+        name: spec.toolName,
+        input: {},
+        caller: { type: 'direct' },
+      },
+    },
+  }
+}
+
+function toolUseInputDeltas(index: number, spec: AnthropicToolUseSpec): StreamStep[] {
+  const serialized = JSON.stringify(spec.toolInput)
+  const chunks = spec.inputJsonChunks ?? [serialized]
+  return chunks.map(chunk => ({
+    kind: 'event' as const,
+    event: {
+      type: 'content_block_delta',
+      index,
+      delta: { type: 'input_json_delta', partial_json: chunk },
+    },
+  }))
+}
+
 export function anthropicToolUseExchange(input: {
   label: string
   toolUseId: string
   toolName: string
   toolInput: Record<string, unknown>
+  inputJsonChunks?: readonly string[]
+  gateAfterStart?: string
   bodyTextIncludes?: string | readonly string[]
   bodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange {
+  return anthropicParallelToolUsesExchange({
+    label: input.label,
+    tools: [{
+      toolUseId: input.toolUseId,
+      toolName: input.toolName,
+      toolInput: input.toolInput,
+      ...(input.inputJsonChunks === undefined ? {} : { inputJsonChunks: input.inputJsonChunks }),
+    }],
+    ...(input.gateAfterStart === undefined ? {} : { gateAfterStart: input.gateAfterStart }),
+    ...(input.bodyTextIncludes === undefined ? {} : { bodyTextIncludes: input.bodyTextIncludes }),
+    ...(input.bodyTextExcludes === undefined ? {} : { bodyTextExcludes: input.bodyTextExcludes }),
+  })
+}
+
+/**
+ * One assistant message carrying multiple concurrent `tool_use` blocks (indices 0..n),
+ * the way real models emit parallel tool calls in a single streaming turn.
+ */
+export function anthropicParallelToolUsesExchange(input: {
+  label: string
+  tools: readonly AnthropicToolUseSpec[]
+  gateAfterStart?: string
+  bodyTextIncludes?: string | readonly string[]
+  bodyTextExcludes?: string | readonly string[]
+}): SimulatorExchange {
+  if (input.tools.length === 0) {
+    throw new Error(`anthropicParallelToolUsesExchange(${input.label}) requires at least one tool`)
+  }
   const messageId = `msg_${input.label.replaceAll(/[^a-z0-9]+/gi, '_')}`
-  const exchange = streamExchange(input.label, [
-    messageStart(messageId),
-    {
-      kind: 'event',
-      event: {
-        type: 'content_block_start',
-        index: 0,
-        content_block: {
-          type: 'tool_use',
-          id: input.toolUseId,
-          name: input.toolName,
-          input: {},
-          caller: { type: 'direct' },
-        },
-      },
-    },
-    {
-      kind: 'event',
-      event: {
-        type: 'content_block_delta',
-        index: 0,
-        delta: { type: 'input_json_delta', partial_json: JSON.stringify(input.toolInput) },
-      },
-    },
-    { kind: 'event', event: { type: 'content_block_stop', index: 0 } },
+  const steps: StreamStep[] = [messageStart(messageId)]
+  if (input.gateAfterStart) {
+    steps.push({ kind: 'gate', name: input.gateAfterStart })
+  }
+  input.tools.forEach((spec, index) => {
+    steps.push(toolUseContentBlockStart(index, spec))
+    steps.push(...toolUseInputDeltas(index, spec))
+    steps.push({ kind: 'event', event: { type: 'content_block_stop', index } })
+  })
+  steps.push(
     { kind: 'event', event: messageDelta('tool_use') },
     { kind: 'event', event: { type: 'message_stop' } },
     { kind: 'close' },
-  ])
-  return {
-    ...exchange,
-    request: {
-      ...exchange.request,
-      ...(input.bodyTextIncludes === undefined
-        ? {}
-        : { bodyTextIncludes: input.bodyTextIncludes }),
-      ...(input.bodyTextExcludes === undefined
-        ? {}
-        : { bodyTextExcludes: input.bodyTextExcludes }),
-    },
-  }
+  )
+  const exchange = streamExchange(input.label, steps)
+  return withBodyTextMatch(exchange, input)
 }
 
 export function anthropicThinkingTextExchange(input: {
@@ -253,6 +301,95 @@ export function anthropicThinkingTextExchange(input: {
     { kind: 'event', event: { type: 'message_stop' } },
     { kind: 'close' },
   ])
+  return withBodyTextMatch(exchange, input)
+}
+
+/**
+ * `redacted_thinking` blocks carry opaque encrypted payloads with no readable text.
+ * The stream must still complete and render the following text block.
+ */
+export function anthropicRedactedThinkingTextExchange(input: {
+  label: string
+  text: string
+  bodyTextIncludes?: string | readonly string[]
+  bodyTextExcludes?: string | readonly string[]
+}): SimulatorExchange {
+  const messageId = `msg_${input.label.replaceAll(/[^a-z0-9]+/gi, '_')}`
+  const exchange = streamExchange(input.label, [
+    messageStart(messageId),
+    { kind: 'event', event: { type: 'ping' } },
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: {
+          type: 'redacted_thinking',
+          data: 'e2e_redacted_thinking_payload',
+        },
+      },
+    },
+    { kind: 'event', event: { type: 'content_block_stop', index: 0 } },
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_start',
+        index: 1,
+        content_block: { type: 'text', text: '', citations: null },
+      },
+    },
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_delta',
+        index: 1,
+        delta: { type: 'text_delta', text: input.text },
+      },
+    },
+    { kind: 'event', event: { type: 'content_block_stop', index: 1 } },
+    { kind: 'event', event: messageDelta('end_turn') },
+    { kind: 'event', event: { type: 'message_stop' } },
+    { kind: 'close' },
+  ])
+  return withBodyTextMatch(exchange, input)
+}
+
+/**
+ * Cut the SSE connection mid-text after the first visible delta — exercises the
+ * provider transport failure path that HTTP-status errors cannot reach.
+ */
+export function anthropicDisconnectAfterStartExchange(input: {
+  label: string
+  partialText: string
+  gateAfterStart?: string
+  bodyTextIncludes?: string | readonly string[]
+  bodyTextExcludes?: string | readonly string[]
+}): SimulatorExchange {
+  const messageId = `msg_${input.label.replaceAll(/[^a-z0-9]+/gi, '_')}`
+  const steps: StreamStep[] = [messageStart(messageId)]
+  if (input.gateAfterStart) {
+    steps.push({ kind: 'gate', name: input.gateAfterStart })
+  }
+  steps.push(
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_start',
+        index: 0,
+        content_block: { type: 'text', text: '', citations: null },
+      },
+    },
+    {
+      kind: 'event',
+      event: {
+        type: 'content_block_delta',
+        index: 0,
+        delta: { type: 'text_delta', text: input.partialText },
+      },
+    },
+    { kind: 'disconnect', reason: `${input.label}: simulated mid-stream disconnect` },
+  )
+  const exchange = streamExchange(input.label, steps)
   return withBodyTextMatch(exchange, input)
 }
 

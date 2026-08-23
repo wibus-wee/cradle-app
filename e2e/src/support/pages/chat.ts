@@ -487,6 +487,18 @@ export class ChatPage {
     await expect(feed).toContainText(text, { timeout })
   }
 
+  /** Expand one tool entry row inside the activity feed so its details render. */
+  async expandActivityEntry(entryText: string | RegExp): Promise<void> {
+    const bubble = await this.expectAssistantVisible()
+    await this.expandExecutionDetails(bubble)
+    const feed = this.view().locator('[data-testid="chat-activity-feed"]').last()
+    const row = feed.getByRole('button').filter({ hasText: entryText }).first()
+    await expect(row).toBeVisible({ timeout: 10_000 })
+    if (await row.getAttribute('aria-expanded') === 'false') {
+      await row.click()
+    }
+  }
+
   async toolCallBlock(toolName: string): Promise<Locator> {
     const bubble = await this.expectAssistantVisible()
     let block = this.page.locator(`[data-testid^="chat-tool-call-"][data-tool-name="${toolName}"]`).first()

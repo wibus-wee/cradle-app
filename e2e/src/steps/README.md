@@ -10,6 +10,8 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `approval.steps.ts` | Claude approval prompt, allow, deny, and visible result |
 | `await.steps.ts` | Await creation, pending state, external resolution, and Agent continuation |
 | `chat.steps.ts` | Chat setup, send/stop/reload, queue operations, message/session assertions, and simulator exhaustion |
+| `claude-agent-tools.steps.ts` | Tool matrix simulator configuration keyed by canonical tool scenario |
+| `codex-tools.steps.ts` | Codex shell/plan/patch/approval simulator configuration and approval allowance |
 | `composer.steps.ts` | Bang command execution and persisted command output |
 | `diff.steps.ts` | Real repository mutation and diff-review assertions |
 | `first-run.steps.ts` | Clean-install provider onboarding and first conversation |
@@ -18,6 +20,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `provider.steps.ts` | Provider profile UI lifecycle and runtime selection |
 | `search.steps.ts` | Global search result and command navigation |
 | `settings.steps.ts` | Settings navigation and appearance persistence |
+| `stream-vocabulary.steps.ts` | Parallel tool blocks, redacted thinking, disconnect, and error-status vocabulary setup |
 | `tab-management.steps.ts` | Live tab creation, activation, reload, close, and content isolation |
 | `terminal.steps.ts` | Bottom panel, PTY command execution, and active-session routing |
 | `usage.steps.ts` | Usage dashboard navigation and exact aggregate assertions |

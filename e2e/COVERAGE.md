@@ -6,7 +6,7 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
-| Web feature namespaces | 20 | 10 | 15 | 1 |
+| Web feature namespaces | 21 | 10 | 15 | 1 |
 | Server module namespaces | 30 | 15 | 20 | 6 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
@@ -43,6 +43,14 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Streaming × multiple queue items × edit × reorder × cancel × reload | `CRADLE-CHAT-010` | Final durable queue order is the only order executed |
 | Approval pending × reload × allow/deny | `CRADLE-AGENT-001`, `002` | Pending permission state rehydrates and both decisions control the real runtime continuation |
 | Claude runtime × Read tool × tool result × final reply | `CRADLE-AGENT-004` | The simulator drives a real Claude Agent tool loop rather than replacing the runtime |
+| Claude runtime × parallel tool_use blocks × incremental tool input | `CRADLE-CHAT-011` | Concurrent content blocks project as separate tool calls; chunked `input_json_delta` reassembles |
+| Claude runtime × redacted thinking × SSE ping | `CRADLE-CHAT-012` | Opaque encrypted thinking blocks do not block answer projection |
+| Streaming transport failure (mid-stream disconnect) × retry | `CRADLE-CHAT-013` | A cut SSE stream never persists a partial answer and the next turn recovers |
+| Claude runtime × TodoWrite / TaskCreate / WebFetch / MCP naming / generic tools | `CRADLE-AGENT-005`–`009` | Each canonical tool kind completes a real execution and input-projection loop |
+| Codex × real shell execution (`exec_command`) × terminal tool UI | `CRADLE-CODEX-005` | The app-server runs the command locally and the output crosses back through the model continuation |
+| Codex × update_plan execution round-trip | `CRADLE-CODEX-006` | The plan handler executes and its result crosses back through the model continuation; plan-item UI projection stays a backlog item |
+| Codex × apply_patch file change × file-diff UI | `CRADLE-CODEX-007` | In-workspace patches execute under sandbox and project file-change tool state |
+| Codex × sandbox escape × real approval round-trip | `CRADLE-CODEX-008` | With Approval-required access mode, an out-of-workspace command requests approval, and Allow resumes the same turn |
 | Codex × rollback branch / transient `btw` | `CRADLE-CODEX-002`–`004` | Persistent history branches correctly and transient turns do not leak |
 | Filesystem context × provider request | `CRADLE-CONTEXT-001` | Selected `AGENTS.md` content crosses the UI/runtime boundary |
 | Two live sessions × tabs × reload × close | `CRADLE-TAB-001` | Active content and session identity do not bleed across tabs |
@@ -68,7 +76,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
 | Direct | `agent-management`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `search`, `session`, `session-await`, `settings`, `split-view`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
-| Indirect | `activity`, `agent-runtime`, `agent-runtimes`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `plugins`, `tui` | Real code is traversed, but its own visible contract is not asserted |
+| Indirect | `activity`, `agent-runtime`, `agent-runtimes`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `plugins`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
 | User-visible gap | `assets`, `automation`, `browser`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `session-environment`, `shortcuts`, `skills`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
 | Service/infra contract | `product-analytics` | Verify event correctness at the event boundary; add browser coverage only for user-visible consent controls |
 

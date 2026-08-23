@@ -119,6 +119,11 @@ Then('Simulator 请求应包含文件内容{string}', function (this: CradleWorl
   expect(JSON.stringify(requests)).toContain(content)
 })
 
+Then('Simulator 请求应包含{string}', function (this: CradleWorld, content: string) {
+  const requests = this.simulator?.requests() ?? []
+  expect(JSON.stringify(requests)).toContain(content)
+})
+
 Given('我已配置 Codex 多轮 Simulator', async function (this: CradleWorld) {
   await configureCodexMultiTurnSimulator(this)
 })
@@ -421,6 +426,10 @@ Then('最后一条 AI 消息应显示已展开的 Thought 条目', async functio
 
 Then('聊天活动流应包含{string}', async function (this: CradleWorld, text: string) {
   await this.chat.expectActivityContains(text, CHAT_STATUS_TIMEOUT)
+})
+
+When('我展开聊天活动流中包含{string}的条目', async function (this: CradleWorld, text: string) {
+  await this.chat.expandActivityEntry(text)
 })
 
 Then('最后一条 AI 消息应显示名为{string}的 Tool Call', async function (this: CradleWorld, toolName: string) {

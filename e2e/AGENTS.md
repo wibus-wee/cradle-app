@@ -23,9 +23,17 @@ pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0 or @P1"
 ```
 
+`pnpm e2e:check` enforces two contracts: the suite inventory (scenario tags,
+IDs, README indexes, module disposition) and **tool coverage** — every canonical
+`CradleToolKind` must have a live journey or an explicit accepted-gap reason
+(`e2e/scripts/check-tool-coverage.mts`).
+
 `CRADLE_E2E_NODE` may point the managed server at a repository-compatible Node
 binary. `CRADLE_E2E_BROWSER_PATH` may point local runs at an existing Chromium
 executable; CI installs the Playwright-pinned browser instead.
+`CRADLE_E2E_PARALLEL` sets the Cucumber worker count (default `1`). Each worker
+boots its own managed server + web stack; the chat settlement timeout scales with
+the worker count to absorb shared-machine load.
 
 ## CI gate
 
@@ -81,8 +89,9 @@ Daily/smoke CI uploads all of the above and links them from the failure Issue / 
 
 - `configureClaudeAgentChat` — Anthropic Messages + real Claude Agent
 - `configureCodexChat` — OpenAI Responses + real Codex app-server
-- `configureStandardChat` — OpenAI Responses + standard runtime (legacy / Agents path)
-- Scenario builders live in `e2e/src/support/scenarios/`
+- Standard runtime was removed from the new-chat catalog; do not add a standard chat configuration path
+- Scenario builders live in `e2e/src/support/scenarios/` (`anthropic.ts`, `openai.ts`, `tool-matrix.ts`)
+- Stream/tool vocabulary helpers live in `support/helpers/stream-vocabulary-scenario.ts`; Codex tool-loop helpers in `support/helpers/codex-tool-scenario.ts`
 - Just-in-time enqueue for multi-turn Claude so intermediate SDK calls cannot steal FIFO
 - Page objects live in `e2e/src/support/pages/` — keep step defs thin
 - Cradle wire fixtures / conformance: `packages/model-api-simulator/fixtures/cradle/`
