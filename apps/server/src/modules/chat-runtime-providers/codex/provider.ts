@@ -151,6 +151,7 @@ import { waitForCodexShellCommandCompletion } from './turn/shell-command'
 import {
   createCodexEmptyStreamError,
   createCodexStreamDiagnostics,
+  getNotificationTurnId,
   getTurnId,
   normalizeProviderTitle,
   readLatestThreadTitle,
@@ -1105,7 +1106,9 @@ export class CodexProvider implements ChatRuntime {
         threadContext,
         runTitleGeneration,
       )
-      activeEntry.turnId = dispatch.turnId
+      if (dispatch.turnId) {
+        this.activeTurns.markStarted(sessionId, activeEntry, dispatch.turnId)
+      }
 
       if (!dispatch.shouldStream) {
         return
@@ -1375,6 +1378,19 @@ export class CodexProvider implements ChatRuntime {
       },
     })) {
       const { notification } = event
+      if (notification.method === 'turn/started') {
+        const turnId = getTurnId(notification)
+        if (turnId) {
+          this.activeTurns.markStarted(turnInput.runtimeSession.chatSessionId, input.activeEntry, turnId)
+        }
+      }
+      if (notification.method === 'turn/completed') {
+        this.activeTurns.markCompleted(
+          turnInput.runtimeSession.chatSessionId,
+          input.activeEntry,
+          getNotificationTurnId(notification),
+        )
+      }
       for (const chunk of event.chunks) {
         if (input.generation && chunk.type === 'text-delta' && 'delta' in chunk) {
           input.outputTextCollector.append((chunk as { delta: string }).delta)
@@ -1382,9 +1398,6 @@ export class CodexProvider implements ChatRuntime {
         yield chunk
       }
 
-      if (notification.method === 'turn/started') {
-        input.activeEntry.turnId = getTurnId(notification) ?? input.activeEntry.turnId
-      }
       if (notification.method === 'thread/name/updated') {
         const title = readThreadNameUpdate(notification, threadContext.threadId)
         if (title) {
@@ -1577,14 +1590,19 @@ export class CodexProvider implements ChatRuntime {
   }
 
   async steerTurn(input: SteerTurnInput): Promise<void> {
-    const entry = this.activeTurns.readStartedTurn(input.runtimeSession.chatSessionId)
+    const sessionId = input.runtimeSession.chatSessionId
+    const entry = this.activeTurns.read(sessionId)
     if (!entry) {
-      throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId))
+      throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, sessionId))
+    }
+    const turnId = await this.activeTurns.waitForStartedTurn(sessionId, entry)
+    if (!turnId) {
+      throw new ProviderRuntimeError(ProviderErrors.sessionClosed(this.runtimeKind, sessionId))
     }
     const userInput = projectCodexUserInput(input.message, 'Codex provider live steer')
     await entry.client.request('turn/steer', {
       threadId: entry.threadId,
-      expectedTurnId: entry.turnId,
+      expectedTurnId: turnId,
       input: userInput,
     })
   }

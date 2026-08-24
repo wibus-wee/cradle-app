@@ -10,9 +10,6 @@ import { describe, expect, it } from 'vitest'
 import type {
   RuntimeProviderTargetProfile,
 } from '../../../chat-runtime/runtime-provider-types'
-import {
-  ProviderRuntimeError,
-} from '../../../chat-runtime/runtime-provider-types'
 import { CodexAppServerClient } from '../app-server/client'
 import type { ThreadGoalSetParams } from '../app-server-protocol/v2/ThreadGoalSetParams'
 import { CodexProvider } from '../provider'
@@ -25,7 +22,7 @@ const describeIntegration = RUN_REAL_INTEGRATION && existsSync(APP_SERVER_PATH)
   : describe.skip
 
 describeIntegration('Codex real app-server live steer integration', () => {
-  it('reproduces session_not_found while a goal handoff still owns a live provider thread', async () => {
+  it('applies live steer after a goal handoff publishes its active turn', async () => {
     const repoRoot = resolve(process.cwd(), '..', '..')
     const cacheRoot = join(repoRoot, 'node_modules', '.cache')
     mkdirSync(cacheRoot, { recursive: true })
@@ -111,26 +108,21 @@ describeIntegration('Codex real app-server live steer integration', () => {
       expect(runtimeSession.providerSessionId).not.toBe(chatSessionId)
       expect(goalStreamSettled).toBe(false)
 
-      // Known regression witness: the active entry exists, but readStartedTurn hides it
-      // until app-server publishes turn/started, so steer misreports the chat session as missing.
+      let steerSettled = false
       const steer = provider.steerTurn({
         runtimeSession,
         profile,
         message: userMessage('Steer during the goal handoff.'),
+      }).finally(() => {
+        steerSettled = true
       })
-      await expect(steer).rejects.toBeInstanceOf(ProviderRuntimeError)
-      await expect(steer).rejects.toMatchObject({
-        name: 'ProviderRuntimeError',
-        providerError: {
-          _tag: 'session_not_found',
-          provider: 'codex',
-          sessionId: chatSessionId,
-        },
-      })
+      await Promise.resolve()
+      expect(steerSettled).toBe(false)
 
       objectiveGate.release()
       await simulator.controller.waitForGate(simulatorGate)
       simulatorGateReached = true
+      await expect(steer).resolves.toBeUndefined()
 
       expect(goalStreamSettled).toBe(false)
       expect(simulator.controller.requests()).toEqual(expect.arrayContaining([

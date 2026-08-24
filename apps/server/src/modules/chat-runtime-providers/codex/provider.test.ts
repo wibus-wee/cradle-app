@@ -1843,6 +1843,18 @@ describe('codexProvider app-server integration', () => {
         params: { threadId: 'codex-thread-1', status: 'active' },
       })
     })
+    let initialSteerSettled = false
+    const initialSteer = provider.steerTurn({
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Prioritize the provider boundary'),
+    }).finally(() => {
+      initialSteerSettled = true
+    })
+    await Promise.resolve()
+    expect(initialSteerSettled).toBe(false)
+    expect(client.requests.map(request => request.method)).not.toContain('turn/steer')
+
     client.pushNotification({
       method: 'turn/started',
       params: {
@@ -1850,6 +1862,16 @@ describe('codexProvider app-server integration', () => {
         turn: { id: 'codex-turn-1', status: 'inProgress' },
       },
     })
+    await expect(initialSteer).resolves.toBeUndefined()
+    expect(client.requests).toContainEqual({
+      method: 'turn/steer',
+      params: {
+        threadId: 'codex-thread-1',
+        expectedTurnId: 'codex-turn-1',
+        input: [{ type: 'text', text: 'Prioritize the provider boundary', text_elements: [] }],
+      },
+    })
+
     client.pushNotification({
       method: 'turn/completed',
       params: {
@@ -1877,6 +1899,17 @@ describe('codexProvider app-server integration', () => {
       },
     })
 
+    let continuationSteerSettled = false
+    const continuationSteer = provider.steerTurn({
+      runtimeSession,
+      profile: createProfile(),
+      message: createUserMessage('Apply the same boundary to the continuation'),
+    }).finally(() => {
+      continuationSteerSettled = true
+    })
+    await Promise.resolve()
+    expect(continuationSteerSettled).toBe(false)
+
     client.pushNotification({
       method: 'turn/started',
       params: {
@@ -1884,6 +1917,16 @@ describe('codexProvider app-server integration', () => {
         turn: { id: 'codex-turn-2', status: 'inProgress' },
       },
     })
+    await expect(continuationSteer).resolves.toBeUndefined()
+    expect(client.requests).toContainEqual({
+      method: 'turn/steer',
+      params: {
+        threadId: 'codex-thread-1',
+        expectedTurnId: 'codex-turn-2',
+        input: [{ type: 'text', text: 'Apply the same boundary to the continuation', text_elements: [] }],
+      },
+    })
+
     client.pushNotification({
       method: 'thread/goal/updated',
       params: {
