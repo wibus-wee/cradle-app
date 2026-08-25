@@ -2,6 +2,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { openPassiveSessionStream } from './session-passive-stream'
 import { useChatSessionDriver } from './use-chat-session-driver'
 
 interface FakeSyncEngine {
@@ -9,6 +10,11 @@ interface FakeSyncEngine {
   stop: ReturnType<typeof vi.fn>
   reconcileRuntimeState: ReturnType<typeof vi.fn>
   updatePassiveStream: ReturnType<typeof vi.fn>
+  passiveStreamFactory: ((request: {
+    sessionId: string
+    messageId: string
+    onSettled: () => void
+  }) => unknown) | null
 }
 
 const mocks = vi.hoisted(() => {
@@ -78,7 +84,12 @@ vi.mock('./use-chat-session-types', () => ({
 }))
 vi.mock('./session-snapshot-projection', () => ({
   deriveSessionPassiveStreamProjection: () => ({ locallyDriven: false }),
-  deriveSessionSnapshotProjection: () => null,
+  deriveSessionSnapshotProjection: () => ({
+    messages: [],
+    passiveRunState: { messageIds: [], status: 'idle' },
+    failedMessage: null,
+    requestSnapshotRefresh: false,
+  }),
   deriveStableSessionSnapshotProjection: () => null,
 }))
 vi.mock('./session-passive-stream', () => ({ openPassiveSessionStream: vi.fn() }))
@@ -92,12 +103,13 @@ vi.mock('~/store/chat', () => ({
 }))
 vi.mock('./session-sync-engine', () => ({
   SessionSyncEngine: class {
-    constructor() {
+    constructor(options: { passiveStreamFactory: FakeSyncEngine['passiveStreamFactory'] }) {
       const engine: FakeSyncEngine = {
         start: vi.fn(),
         stop: vi.fn(),
         reconcileRuntimeState: vi.fn(),
         updatePassiveStream: vi.fn(),
+        passiveStreamFactory: options.passiveStreamFactory,
       }
       mocks.engineInstances.push(engine)
       return engine
@@ -149,5 +161,41 @@ describe('useChatSessionDriver', () => {
       locallyDriven: false,
       runtimeActiveRunMessageId: 'assistant-1',
     })
+  })
+
+  it('releases a settled passive lease when its terminal snapshot arrived first', () => {
+    const driver = renderHook(() => useChatSessionDriver('new-session'))
+
+    act(() => {
+      mocks.snapshotQuery = {
+        data: { pages: [{ revision: 1, rows: [], nextCursor: null }] },
+        dataUpdatedAt: 10,
+        isError: false,
+        isFetching: false,
+      }
+      driver.rerender()
+    })
+
+    const factory = mocks.engineInstances[0]?.passiveStreamFactory
+    expect(factory).not.toBeNull()
+    factory?.({
+      sessionId: 'new-session',
+      messageId: 'assistant-1',
+      onSettled: vi.fn(),
+    })
+    const passiveStreamInput = vi.mocked(openPassiveSessionStream).mock.calls[0]?.[0]
+    expect(passiveStreamInput).toBeDefined()
+
+    act(() => {
+      passiveStreamInput?.releaseStreamLeaseAfterSnapshot('assistant-1')
+      mocks.runtimeStatusQuery = {
+        data: { status: 'idle', activeRun: null },
+        dataUpdatedAt: 10,
+        isFetchedAfterMount: true,
+      }
+      driver.rerender()
+    })
+
+    expect(mocks.store.releaseStreamLease).toHaveBeenCalledWith('assistant-1')
   })
 })

@@ -65,27 +65,17 @@ export async function requestRuntimeToolApproval(
     })
   })
 
-  try {
-    await recordRuntimeInteractionRequested({
-      sessionId: input.sessionId,
-      runId: input.runId,
-      requestId: input.providerRequestId,
-      interactionKind: 'toolApproval',
-      providerKind: input.providerKind,
-      runtimeKind: input.runtimeKind,
-      providerMethod: input.providerMethod,
-      toolCallId: input.toolCallId,
-      createdAt,
-    })
-  }
- catch (error) {
-    const current = pendingToolApprovalById.get(pendingKey)
-    if (current?.request === input) {
-      pendingToolApprovalById.delete(pendingKey)
-      current.reject(error instanceof Error ? error : new Error(String(error)))
-    }
-    throw error
-  }
+  void recordRuntimeInteractionRequested({
+    sessionId: input.sessionId,
+    runId: input.runId,
+    requestId: input.providerRequestId,
+    interactionKind: 'toolApproval',
+    providerKind: input.providerKind,
+    runtimeKind: input.runtimeKind,
+    providerMethod: input.providerMethod,
+    toolCallId: input.toolCallId,
+    createdAt,
+  }).catch(() => undefined)
 
   return pending
 }
@@ -99,7 +89,7 @@ export async function submitRuntimeToolApproval(input: {
 }): Promise<RuntimeToolApprovalResolution> {
   const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
   if (submitted) {
-    await submitted.eventRecorded
+    void submitted.eventRecorded.catch(() => undefined)
     return submitted.resolution
   }
 

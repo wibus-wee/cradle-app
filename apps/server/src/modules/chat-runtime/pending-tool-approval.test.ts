@@ -140,4 +140,43 @@ describe('pending runtime tool approval', () => {
 
     expect(hasPendingRuntimeToolApproval('session-pending-tool-approval-3')).toBe(false)
   })
+
+  it('does not block the native approval on interaction event persistence', async () => {
+    let releaseRequestedEvent!: () => void
+    setRuntimeInteractionEventRecorder(async (_sessionId, events) => {
+      recordedEvents.push(...events)
+      if (events[0]?.type === 'InteractionRequested') {
+        await new Promise<void>((resolve) => {
+          releaseRequestedEvent = resolve
+        })
+      }
+    })
+
+    const pending = requestRuntimeToolApproval({
+      sessionId: 'session-pending-tool-approval-4',
+      runId: 'run-pending-tool-approval-4',
+      providerRequestId: 'request-4',
+      providerKind: 'openai-compatible',
+      runtimeKind: 'codex',
+      providerMethod: 'item/commandExecution/requestApproval',
+      toolCallId: 'server-request-request-4',
+      metadata: { command: 'echo approval' },
+    })
+
+    const submitted = submitRuntimeToolApprovalIfPending({
+      sessionId: 'session-pending-tool-approval-4',
+      requestId: 'request-4',
+      approved: true,
+    })
+
+    expect(submitted).toEqual({
+      requestId: 'request-4',
+      approved: true,
+    })
+    await expect(pending).resolves.toEqual({
+      requestId: 'request-4',
+      approved: true,
+    })
+    releaseRequestedEvent()
+  })
 })
