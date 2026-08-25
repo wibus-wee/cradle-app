@@ -11,7 +11,7 @@ import type {
   Todo as OpencodeTodo,
   ToolPart as OpencodeToolPart,
 } from '@opencode-ai/sdk'
-import type { Event as OpencodeEvent, PermissionV2Request, QuestionV2Info, QuestionV2Request, SessionMessage, SkillV2Info } from '@opencode-ai/sdk/v2'
+import type { Event as OpencodeEvent, PermissionV2Request, QuestionInfo, QuestionRequest, SessionMessage, SkillV2Info } from '@opencode-ai/sdk/v2'
 import type { UIMessage, UIMessageChunk } from 'ai'
 
 import { appendHarnessFragmentsToSystemPrompt } from '../../chat-runtime/harness/projection'
@@ -259,7 +259,7 @@ export class OpencodeProvider implements ChatRuntime {
       readOpencodeMcpStatus(handle, input.workspacePath),
       readOpencodeFileStatus(handle, input.workspacePath),
       readOpencodeParentTaskBindings(handle, input.workspacePath, providerSessionId),
-      readOpencodeSessionQuestionRequests(handle, providerSessionId),
+      readOpencodeSessionQuestionRequests(handle, input.workspacePath, providerSessionId),
       readOpencodeSessionPermissionRequests(handle, providerSessionId),
     ])
     for (const binding of taskBindings) {
@@ -386,6 +386,7 @@ export class OpencodeProvider implements ChatRuntime {
     const handle = readOpencodeRuntimeHandle(this.runtimeKind, input.runtimeSession)
     const request = await resolveOpencodeQuestionRequestById({
       resource: handle,
+      workspacePath: input.workspacePath,
       sessionId: providerSessionId,
       requestId: input.requestId,
     })
@@ -393,16 +394,14 @@ export class OpencodeProvider implements ChatRuntime {
       return null
     }
 
-    const result = await handle.v2Client.v2.session.question.reply({
-      sessionID: providerSessionId,
+    const result = await handle.v2Client.question.reply({
       requestID: input.requestId,
-      questionV2Reply: {
-        answers: request.questions.map((_, index) => input.answers[`question-${index + 1}`] ?? []),
-      },
+      directory: input.workspacePath,
+      answers: request.questions.map((_, index) => input.answers[`question-${index + 1}`] ?? []),
     })
     if (result.error) {
       throw new ProviderRuntimeError(
-        ProviderErrors.requestFailed(this.runtimeKind, 'session.question.reply', formatOpencodeError(result.error)),
+        ProviderErrors.requestFailed(this.runtimeKind, 'question.reply', formatOpencodeError(result.error)),
       )
     }
     return {
@@ -1473,7 +1472,10 @@ export class OpencodeProvider implements ChatRuntime {
                 },
               })
             }
-            if (event.type === 'question.v2.asked' && event.properties.sessionID === opencodeSessionId) {
+            if (
+              (event.type === 'question.asked' || event.type === 'question.v2.asked')
+              && event.properties.sessionID === opencodeSessionId
+            ) {
               trackInteractionWork(this.handleOpencodeQuestionRequest({
                 input,
                 resource,
@@ -1509,13 +1511,13 @@ export class OpencodeProvider implements ChatRuntime {
               chunks.push(chunk)
             }
             if (event.type === 'message.part.updated' && event.properties.part.type === 'tool') {
-              await this.handleOpencodeQuestionToolPart({
+              trackInteractionWork(this.handleOpencodeQuestionToolPart({
                 input,
                 resource,
                 chunks,
                 part: event.properties.part as OpencodeToolPart,
                 sessionId: opencodeSessionId,
-              })
+              }))
             }
 
             const stepFailedMessage = readOpencodeStepFailedMessage(event)
@@ -1853,14 +1855,36 @@ export class OpencodeProvider implements ChatRuntime {
       return
     }
 
-    projectOpencodeQuestionToolQuestions(input.part)
+    const questions = projectOpencodeQuestionToolQuestions(input.part)
+    if (questions.length === 0) {
+      return
+    }
+
+    const request = await resolveOpencodeQuestionRequest({
+      resource: input.resource,
+      workspacePath: input.input.workspacePath,
+      sessionId: input.sessionId,
+      toolCallId: input.part.callID,
+    })
+    if (!request) {
+      return
+    }
+    await this.handleOpencodeQuestionRequest({
+      input: input.input,
+      resource: input.resource,
+      chunks: input.chunks,
+      request,
+      toolCallId: input.part.callID,
+      params: input.part.state.input,
+      messageID: input.part.messageID,
+    })
   }
 
   private async handleOpencodeQuestionRequest(input: {
     input: StreamTurnInput
     resource: OpencodeRuntimeResource
     chunks: AsyncChunkQueue
-    request: QuestionV2Request
+    request: QuestionRequest
     toolCallId?: string
     params?: unknown
     messageID?: string
@@ -1906,24 +1930,22 @@ export class OpencodeProvider implements ChatRuntime {
           },
         },
       })
-      const reply = await input.resource.v2Client.v2.session.question.reply({
-        sessionID: input.request.sessionID,
+      const reply = await input.resource.v2Client.question.reply({
         requestID: input.request.id,
-        questionV2Reply: {
-          answers: questions.map(question => resolution.answers[question.id] ?? []),
-        },
+        directory: input.input.workspacePath,
+        answers: questions.map(question => resolution.answers[question.id] ?? []),
       })
       if (reply.error) {
         throw new ProviderRuntimeError(
-          ProviderErrors.requestFailed(this.runtimeKind, 'session.question.reply', formatOpencodeError(reply.error)),
+          ProviderErrors.requestFailed(this.runtimeKind, 'question.reply', formatOpencodeError(reply.error)),
         )
       }
     }
     catch (error) {
       input.chunks.push(providerChunk.toolOutputError(toolCallId, formatOpencodeError(error)))
-      await input.resource.v2Client.v2.session.question.reject({
-        sessionID: input.request.sessionID,
+      await input.resource.v2Client.question.reject({
         requestID: input.request.id,
+        directory: input.input.workspacePath,
       }).catch(() => undefined)
     }
     finally {
@@ -2749,9 +2771,20 @@ function toOpencodeQuestionToolCallId(requestId: string): string {
 
 function isOpencodeQuestionLifecycleEvent(event: OpencodeStreamEvent): event is Extract<
   OpencodeStreamEvent,
-  { type: 'question.v2.asked' | 'question.v2.replied' | 'question.v2.rejected' }
+  {
+    type:
+      | 'question.asked'
+      | 'question.replied'
+      | 'question.rejected'
+      | 'question.v2.asked'
+      | 'question.v2.replied'
+      | 'question.v2.rejected'
+  }
 > {
-  return event.type === 'question.v2.asked'
+  return event.type === 'question.asked'
+    || event.type === 'question.replied'
+    || event.type === 'question.rejected'
+    || event.type === 'question.v2.asked'
     || event.type === 'question.v2.replied'
     || event.type === 'question.v2.rejected'
 }
@@ -3392,30 +3425,52 @@ function readTerminalAssistantAfterBaseline(
 
 async function resolveOpencodeQuestionRequestById(input: {
   resource: OpencodeRuntimeResource
+  workspacePath?: string
   sessionId: string
   requestId: string
-}): Promise<QuestionV2Request | null> {
-  const requests = await readOpencodeSessionQuestionRequests(input.resource, input.sessionId)
+}): Promise<QuestionRequest | null> {
+  const requests = await readOpencodeSessionQuestionRequests(
+    input.resource,
+    input.workspacePath,
+    input.sessionId,
+  )
   return requests.find(request => request.id === input.requestId) ?? null
+}
+
+async function resolveOpencodeQuestionRequest(input: {
+  resource: OpencodeRuntimeResource
+  workspacePath?: string
+  sessionId: string
+  toolCallId: string
+}): Promise<QuestionRequest | null> {
+  const requests = await readOpencodeSessionQuestionRequests(
+    input.resource,
+    input.workspacePath,
+    input.sessionId,
+  )
+  return requests.find(request => request.tool?.callID === input.toolCallId) ?? null
 }
 
 async function readOpencodeSessionQuestionRequests(
   resource: OpencodeRuntimeResource,
+  workspacePath: string | undefined,
   sessionId: string,
-): Promise<QuestionV2Request[]> {
-  const result = await resource.v2Client.v2.session.question.list({
-    sessionID: sessionId,
+): Promise<QuestionRequest[]> {
+  // OpenCode's question tool and /question routes share the workspace-scoped
+  // Question.Service. The /api/session projection is not the interaction owner.
+  const result = await resource.v2Client.question.list({
+    directory: workspacePath,
   })
   if (result.error) {
     throw new ProviderRuntimeError(
-      ProviderErrors.requestFailed('opencode', 'session.question.list', formatOpencodeError(result.error)),
+      ProviderErrors.requestFailed('opencode', 'question.list', formatOpencodeError(result.error)),
     )
   }
-  return result.data?.data ?? []
+  return (result.data ?? []).filter(request => request.sessionID === sessionId)
 }
 
 function projectOpencodeQuestionRequestState(input: {
-  request: QuestionV2Request
+  request: QuestionRequest
   threadId: string
   updatedAt: number
 }): RuntimeUiSlotState {
@@ -3444,7 +3499,7 @@ function projectOpencodeQuestionToolQuestions(part: OpencodeToolPart): RuntimeUs
 }
 
 function projectOpencodeQuestionInfos(
-  questions: Array<QuestionV2Info | OpencodeQuestionToolQuestion>,
+  questions: Array<QuestionInfo | OpencodeQuestionToolQuestion>,
 ): RuntimeUserInputQuestion[] {
   return questions.map((question, index) => ({
     id: `question-${index + 1}`,

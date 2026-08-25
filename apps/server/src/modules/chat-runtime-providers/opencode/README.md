@@ -18,7 +18,7 @@ Normal turn streaming is event-first. `streamTurn()` subscribes to `event.subscr
 
 OpenCode permission requests are bridged into Chat Runtime pending tool approvals. `permission.updated` events emit standard AI SDK tool input and `tool-approval-request` chunks with ids shaped as `server-request-${permission.id}` and builtin api name `approval.permissions`. User decisions are returned to OpenCode through `postSessionIdPermissionsPermissionId()` as `once` for approvals and `reject` for denials. Recent permission decisions are retained in-memory for the opencode approvals UI slot.
 
-OpenCode question tools are bridged into Chat Runtime pending user input. When the active session emits a `question` tool part with structured `questions`, the adapter finds the matching v2 pending question request by `tool.callID`, calls `ProviderContext.requestUserInput`, and replies through `v2.session.question.reply()` with answers in OpenCode's original question order.
+OpenCode question tools are bridged into Chat Runtime pending user input through the workspace-scoped `question.list/reply/reject` API owned by OpenCode's `Question.Service`. The adapter filters pending requests by `sessionID`, matches `tool.callID`, calls `ProviderContext.requestUserInput`, and returns answers in the original question order. Legacy and v2 question lifecycle events provide a low-latency trigger, while the structured `question` tool part recovers the request from the authoritative pending list when an event is absent. A running question remains pending in the transcript and is not projected as `Done` before OpenCode reports completion.
 
 `/btw` quick questions use a temporary opencode session seeded with Cradle-owned transcript text and are deleted after streaming. This keeps Cradle's no-history quick-question contract without requiring users to define an opencode command. Shell execution uses `session.shell()` against the active opencode session and projects the resulting message parts into the Chat Runtime shell result envelope. Rollback uses the full `session.messages()` history to locate the requested historical assistant message, then calls `session.revert()`; workspace file changes are not reverted.
 
@@ -34,20 +34,13 @@ Runtime settings are supported for interaction mode: Cradle `default` mode maps 
 
 Live steer-turn is not declared for opencode. The current Chat Runtime `steerTurn` hook is a live-turn operation without workspace/model/system-prompt context, while opencode exposes revert/unrevert primitives rather than an active-turn steer API.
 
-OpenCode SDK 1.18.21 exposes session-scoped v2 question list/reply endpoints. The root event stream still surfaces question activity as normal `question` tool parts, so the adapter uses the tool part for Chat Runtime projection and the v2 session question endpoint for the native reply.
-
 ## Files
 
-- `metadata.ts`: runtime identity and static capability metadata.
-- `presentation.ts`: opencode command and UI slot projection.
-- `config.ts`: OpenCode model selection projection retained at the provider boundary; it is not injected into the native host environment.
-- `runtime-context.ts`: cwd-scoped OpenCode SDK server pool and managed-process lifecycle.
-- `runtime-release.ts` and `opencode-runtime-manifest.json`: SDK-aligned official release and target identity.
-- `runtime-installation.ts`: executable resolution, health probe, Download Center handoff, secure extraction, atomic promotion, and managed uninstall.
-- `managed-resource-adapter.ts`: optional CLI declaration and owner-truth projection for the generic resource catalog.
-- `model-inventory.ts`: concurrent SDK/CLI model discovery, parsing, and descriptor merge.
-- `input-projector.ts`: Chat Runtime message input to opencode prompt parts.
-- `event-to-chunk-mapper.ts`: opencode prompt result parts to AI SDK `UIMessageChunk` events.
-- `event-stream.ts`: opencode live event to AI SDK chunk projection and async prompt terminal detection.
-- `tools/`: Cradle-owned stable tool envelope projection for opencode tool parts.
-- `provider.ts`: `ChatRuntime` facade for session start/resume/fork, event-first prompt turns, permission approvals, provider-thread APIs, shell, rollback, title generation, UI slot states, and cancellation.
+| Area | Location | Responsibility |
+| --- | --- | --- |
+| Runtime contract | `metadata.ts`, `presentation.ts`, `provider.ts` | Own runtime identity, UI capabilities, sessions, turns, interactions, and provider hooks. |
+| Native host | `runtime-context.ts`, `runtime-installation.ts`, `managed-resource-adapter.ts` | Own the cwd-scoped server pool, executable resolution, health, install, and resource lifecycle. |
+| Release identity | `runtime-release.ts`, `opencode-runtime-manifest.json` | Pin the SDK-aligned official CLI release and target artifacts. |
+| Model and input projection | `model-inventory.ts`, `config.ts`, `input-projector.ts` | Discover native models and translate Cradle model, prompt, file, and image inputs. |
+| Streaming | `event-stream.ts`, `event-to-chunk-mapper.ts` | Translate native events and recovered message parts into valid AI SDK chunks. |
+| Tools | `tools/` | Project OpenCode tool calls into Cradle's canonical tool envelopes. |

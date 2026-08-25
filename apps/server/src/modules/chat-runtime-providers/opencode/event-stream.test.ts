@@ -32,6 +32,39 @@ function assistantMessage(input: Partial<OpencodeAssistantMessage> = {}): Openco
 }
 
 describe('opencodeEventStreamProjector', () => {
+  it('keeps a running question pending until OpenCode reports a completed result', () => {
+    const projector = new OpencodeEventStreamProjector('ses_1')
+    const part = {
+      id: 'part_question',
+      sessionID: 'ses_1',
+      messageID: 'msg_assistant',
+      type: 'tool',
+      callID: 'call_question',
+      tool: 'question',
+      state: {
+        status: 'running',
+        input: {
+          questions: [{
+            header: 'Next step',
+            question: 'How should I continue?',
+            options: [{ label: 'Continue', description: 'Keep working' }],
+          }],
+        },
+        time: { start: 1 },
+      },
+    } satisfies OpencodeToolPart
+
+    const chunks = projector.projectEvent({
+      type: 'message.part.updated',
+      properties: { part },
+    })
+
+    expect(chunks.map(chunk => chunk.type)).toEqual([
+      'tool-input-start',
+      'tool-input-available',
+    ])
+  })
+
   it('projects OpenCode streamed tool parts before final assistant text', () => {
     const projector = new OpencodeEventStreamProjector('ses_1')
     const toolPart = {

@@ -21,7 +21,7 @@
 | Steer Turn | `session.revert()` / `session.unrevert()` | ⏸ 未声明；Chat Runtime hook 是 live-turn steer，opencode 当前无等价 active-turn API | 中 |
 | 回滚 (Rollback) | `session.messages()` + `session.revert()` | ✅ `supportsLastTurnRollback: true` | 中 |
 | btw / Quick Question | SDK 无原生 no-history 概念 | ✅ 临时 opencode session + transcript prompt，不写 Cradle 历史 | 中 |
-| Structured User Input | v2 `session.question.list/reply/reject()` + `question` tool parts | ✅ 已接入 Chat Runtime `requestUserInput`，按当前 session 的 pending question request 回写 OpenCode；`opencode:user-input` slot 已声明 `composerState`/`runtimePanel` surface，composer 会渲染交互式问答表单 | 中 |
+| Structured User Input | workspace `question.list/reply/reject()` + legacy/v2 question events + `question` tool parts | ✅ 已接入 Chat Runtime `requestUserInput`；按 `sessionID + tool.callID` 从 OpenCode `Question.Service` 的 pending list 恢复并回写；`opencode:user-input` slot 在 composer/runtime panel 渲染交互式问答表单 | 中 |
 | Skills | v2 `SkillV2Info.slash` | ✅ `getPresentation` 读取 `v2.skill.list()` 投影到 presentation.skills；slash 化展示待 UI | 低 |
 | Runtime 设置 | SDK 支持 mode/agent 切换 | ✅ `supportsRuntimeSettings: true`；interactionMode：default→`build`，plan→`plan`，每 turn 生效，`updateRuntimeSettings()` 通过 v2 `session.switchAgent/switchModel` 写入 sticky 设置。accessMode：host 级生效——`approval-required` 的 managed host 注入 `OPENCODE_PERMISSION={"*":"ask"}`（deep-merge，用户显式 allow/deny 规则仍优先），`full-access` 不注入、继承用户原生 permission config；accessMode 参与 host 池 key，改动在下一个 run 的 resume 时切换到对应 host | 低 |
 
@@ -192,15 +192,15 @@
 
 ### 11. Structured User Input
 
-**SDK 可用资源**: `@opencode-ai/sdk@1.18.21` 的 root event stream 会把结构化提问表现为 `question` tool part；同包 v2 surface 暴露 session-scoped `session.question.list()`、`session.question.reply()`、`session.question.reject()`，pending request 带 `tool.callID` 可与 tool part 对齐。
+**SDK 可用资源**: `@opencode-ai/sdk@1.18.21` 的 workspace-scoped `question.list()`、`question.reply()`、`question.reject()` 与 OpenCode question tool 共用 `Question.Service`；pending request 带 `sessionID` 和 `tool.callID`。事件流可能发出 legacy `question.*` 或 v2 `question.v2.*` lifecycle event，结构化问题也会出现在 `question` tool part 中。
 
 **Cradle 接口**: Chat Runtime 已有 `ProviderContext.requestUserInput`、pending user-input registry、`/chat/sessions/:sessionId/user-input/:requestId` route 和 web composer/runtime-panel UI。
 
-**当前状态**: 已实现 OpenCode question bridge。adapter 在 active session 收到 `question` tool running input 后，从 v2 pending question list 中按 `tool.callID` 找到当前 request，调用 Cradle 通用 `requestUserInput`，用户提交后用 v2 session question reply 按原问题顺序回写答案。reload/missed event recovery 也已接入：`getUiSlotStates()` 会读取 v2 session question list 投影为 `userInput` slot；Cradle `/chat/sessions/:sessionId/user-input/:requestId` 在内存 pending 丢失时会回退到 provider `submitUserInput()`，由 OpenCode adapter 直接回复 v2 pending question。
+**当前状态**: 已实现 OpenCode question bridge。legacy/v2 lifecycle event 可直接触发交互；若 lifecycle event 缺失，adapter 会在收到 structured `question` tool part 后读取 authoritative workspace pending list，并按 `sessionID + tool.callID` 恢复 request。Cradle 调用通用 `requestUserInput`，再通过 workspace `question.reply()` 按原问题顺序回写。`getUiSlotStates()` 读取同一 pending list 投影 `userInput` slot；内存 pending 丢失时，Chat Runtime route 会回退到 provider `submitUserInput()`。running question 不产生 tool output，因此用户回答前不会显示 `Done`。
 
 ## OpenCode v2 Endpoint 对齐
 
-`@opencode-ai/sdk@1.18.21` 同时暴露 root SDK surface 和 `/api/*` v2 surface。当前 adapter 主要使用 root surface，question bridge 与 context usage 已使用 v2 session endpoint。下面按 Cradle ownership/kit 状态分类。
+`@opencode-ai/sdk@1.18.21` 同时暴露 root SDK surface 和 `/api/*` v2 surface。当前 adapter 主要使用 root surface；question bridge 使用与 native question tool 共用 `Question.Service` 的 workspace `/question` API，context usage 使用 v2 session endpoint。下面按 Cradle ownership/kit 状态分类。
 
 ### 已有 Cradle kit，OpenCode adapter 还没完全接
 
@@ -215,7 +215,7 @@
 | `/api/skill` | native OpenCode skills | `RuntimePresentationCapabilities.skills`、`RuntimeSkillsUiSlotState` | ✅ presentation.skills 读取 `v2.skill.list()`；skills slot 的独立状态投影待做 | 低 |
 | `/api/command` | v2 slash command list | `getPresentation` | 当前用 root `command.list()`，可迁到 v2 但不是功能缺口 | 低 |
 | `/api/permission/request`、`/api/session/{sessionID}/permission` | pending permission list/reply；`/api/permission/request` 是按 location 列 pending，session endpoint 是按 session 列 pending | pending tool approval + approvals slot | ✅ 审批链路已切 v2：事件消费 `permission.v2.asked/replied`（legacy 兼容），reload/missed event 从 session pending list 恢复，approvals slot 合并 v2 pending list，reply 支持 `once/always/reject` | 已接 |
-| `/api/question/request`、`/api/session/{sessionID}/question` | pending question list/reply/reject；global endpoint 按 location，session endpoint 按 session | pending user input + userInput slot | ✅ active turn 与 reload/missed event recovery 已接；仍可补 reject/timeout UI 行为 | 已接 |
+| `/api/question/request`、`/api/session/{sessionID}/question` | v2 pending question projection | pending user input + userInput slot | 不作为 interaction owner；bridge 使用 native question tool 实际拥有的 workspace `/question` API，并按 session 过滤。仍可补 reject/timeout UI 行为 | 不使用 |
 
 ### OpenCode 有能力，但 Cradle 还没有明确 ChatRuntime kit
 
@@ -228,7 +228,7 @@
 | `/api/agent` | supported OpenCode agents，可作为 composer `@agent` 提及/选择 catalog | runtime agent catalog/selector | 不应进入 crew slot；若要展示/选择，需要新增 agent catalog/agent picker kit |
 | `/api/integration/*`、`/api/credential/*` | OpenCode integrations and credentials | runtime integration/auth flow + credential ownership | 需要先定 Cradle 是否拥有 OpenCode isolated credential lifecycle；不要直接把 OpenCode credential mutation 塞进 generic provider target |
 | `/experimental/project/{projectID}/copy*` | OpenCode project copy | workspace/project-copy ownership | 和 Cradle workspace/worktree 语义重叠，需产品决策；不应默认接到 ChatRuntime |
-| `/api/event` v2 | v2 event stream with `session.next.*`, question/permission v2 events | adapter-internal projector, no new generic kit | ✅ active turn 已通过持续 event pump 消费 v2 event stream；`session.next.*` 与 root `message.*` 双事件族并存，question/permission v2 bridge 继续复用现有 Chat Runtime kit |
+| `/api/event` v2 | v2 event stream with `session.next.*`, question/permission event families | adapter-internal projector, no new generic kit | ✅ active turn 已通过持续 event pump 消费 v2 event stream；`session.next.*` 与 root `message.*` 双事件族并存；question 同时接受 legacy/v2 lifecycle event，并以 workspace pending list 保证恢复 |
 
 ### 当前不建议接入 ChatRuntime 的 v2 能力
 

@@ -577,7 +577,10 @@ export class OpencodeEventStreamProjector {
       if (part.state.status === 'error') {
         chunks.push(providerChunk.toolOutputError(part.callID, part.state.error))
       }
-      else if (part.state.status === 'running' || part.state.status === 'completed') {
+      else if (
+        part.state.status === 'completed'
+        || (part.state.status === 'running' && part.tool !== 'question')
+      ) {
         chunks.push(providerChunk.toolOutputAvailable({
           toolCallId: part.callID,
           output: buildOpencodeToolOutput(part),

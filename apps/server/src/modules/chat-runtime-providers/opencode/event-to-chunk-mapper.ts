@@ -96,9 +96,17 @@ function mapOpencodeToolPartToChunks(part: Extract<OpencodePart, { type: 'tool' 
   ]
 
   switch (part.state.status) {
-    case 'completed':
     case 'running':
     case 'pending':
+      if (part.tool === 'question') {
+        return chunks
+      }
+      chunks.push(providerChunk.toolOutputAvailable({
+        toolCallId: part.callID,
+        output: buildOpencodeToolOutput(part),
+      }))
+      return chunks
+    case 'completed':
       chunks.push(providerChunk.toolOutputAvailable({
         toolCallId: part.callID,
         output: buildOpencodeToolOutput(part),

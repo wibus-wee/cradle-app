@@ -202,9 +202,9 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
   }))
   const postPermission = vi.fn(async () => ({ data: true, error: undefined }))
   const permissionReply = vi.fn(async () => ({ data: undefined, error: undefined }))
-  const questionList = vi.fn(async () => ({ data: { data: state.sessionQuestionRequestsData }, error: undefined }))
-  const questionReply = vi.fn(async () => ({ data: undefined, error: undefined }))
-  const questionReject = vi.fn(async () => ({ data: undefined, error: undefined }))
+  const questionList = vi.fn(async () => ({ data: state.sessionQuestionRequestsData, error: undefined }))
+  const questionReply = vi.fn(async () => ({ data: true, error: undefined }))
+  const questionReject = vi.fn(async () => ({ data: true, error: undefined }))
   const session = {
     promptAsync,
     create: vi.fn(async () => ({ data: state.sessionCreateData, error: undefined })),
@@ -258,6 +258,11 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
         event: {
           subscribe: vi.fn(async () => ({ stream: events })),
         },
+        question: {
+          list: questionList,
+          reply: questionReply,
+          reject: questionReject,
+        },
         v2: {
           health: {
             get: vi.fn(async () => ({ data: {}, error: undefined })),
@@ -273,11 +278,6 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
             permission: {
               list: vi.fn(async () => ({ data: { data: state.sessionPermissionRequestsData }, error: undefined })),
               reply: permissionReply,
-            },
-            question: {
-              list: questionList,
-              reply: questionReply,
-              reject: questionReject,
             },
           },
         },
@@ -950,11 +950,9 @@ describe('opencodeProvider native user-input submission', () => {
       },
     })
     expect(fake.questionReply).toHaveBeenCalledWith({
-      sessionID: 'ses_1',
       requestID: 'question-request-native',
-      questionV2Reply: {
-        answers: [['A'], ['B', 'Other']],
-      },
+      directory: '/tmp/workspace',
+      answers: [['A'], ['B', 'Other']],
     })
   })
 })
@@ -2377,7 +2375,7 @@ describe('opencodeProvider streamTurn', () => {
 
     events.push({
       id: 'evt_question_asked',
-      type: 'question.v2.asked',
+      type: 'question.asked',
       properties: {
         id: 'question-request-1',
         sessionID: 'ses_1',
@@ -2419,19 +2417,33 @@ describe('opencodeProvider streamTurn', () => {
       answers: { 'question-1': ['跑测试验证'] },
     })
     await vi.waitFor(() => expect(fake.questionReply).toHaveBeenCalledWith({
-      sessionID: 'ses_1',
       requestID: 'question-request-1',
-      questionV2Reply: {
-        answers: [['跑测试验证']],
-      },
+      directory: '/tmp/workspace',
+      answers: [['跑测试验证']],
     }))
     expect(fake.questionReject).not.toHaveBeenCalled()
     await stream.return(undefined)
   })
 
-  it('bridges OpenCode question requests from v2 events when the root tool event arrives before list visibility', async () => {
+  it('recovers OpenCode question requests from the workspace question list when lifecycle events are missing', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)
+    fake.state.sessionQuestionRequestsData.push({
+      id: 'question-request-recovered-from-tool',
+      sessionID: 'ses_1',
+      questions: [{
+        question: 'Should I continue?',
+        header: 'Confirm next step',
+        options: [
+          { label: 'Continue', description: 'Proceed with the change' },
+          { label: 'Stop', description: 'Do not continue' },
+        ],
+      }],
+      tool: {
+        messageID: 'msg_assistant',
+        callID: 'call_question_missing',
+      },
+    })
     const userInputResolver: {
       resolve?: (resolution: RuntimeUserInputResolution) => void
     } = {}
@@ -2500,39 +2512,8 @@ describe('opencodeProvider streamTurn', () => {
         toolCallId: 'call_question_missing',
       },
     })
-    await expect(stream.next()).resolves.toMatchObject({
-      done: false,
-      value: {
-        type: 'tool-output-available',
-        toolCallId: 'call_question_missing',
-      },
-    })
-    expect(fake.questionList).not.toHaveBeenCalled()
-    expect(requestUserInput).not.toHaveBeenCalled()
-
-    events.push({
-      id: 'evt_question_asked',
-      type: 'question.v2.asked',
-      properties: {
-        id: 'question-request-race',
-        sessionID: 'ses_1',
-        questions: [{
-          question: 'Should I continue?',
-          header: 'Confirm next step',
-          options: [
-            { label: 'Continue', description: 'Proceed with the change' },
-            { label: 'Stop', description: 'Do not continue' },
-          ],
-        }],
-        tool: {
-          messageID: 'msg_assistant',
-          callID: 'call_question_missing',
-        },
-      },
-    })
-
     await vi.waitFor(() => expect(requestUserInput).toHaveBeenCalledWith(expect.objectContaining({
-      providerRequestId: 'question-request-race',
+      providerRequestId: 'question-request-recovered-from-tool',
       providerMethod: 'question',
       toolCallId: 'call_question_missing',
       questions: [{
@@ -2550,26 +2531,16 @@ describe('opencodeProvider streamTurn', () => {
     })))
 
     userInputResolver.resolve?.({
-      requestId: 'question-request-race',
+      requestId: 'question-request-recovered-from-tool',
       answers: { 'question-1': ['Continue'] },
     })
     await vi.waitFor(() => expect(fake.questionReply).toHaveBeenCalledWith({
-      sessionID: 'ses_1',
-      requestID: 'question-request-race',
-      questionV2Reply: {
-        answers: [['Continue']],
-      },
+      requestID: 'question-request-recovered-from-tool',
+      directory: '/tmp/workspace',
+      answers: [['Continue']],
     }))
     expect(fake.questionReject).not.toHaveBeenCalled()
-    await expect(stream.next()).resolves.toMatchObject({
-      done: false,
-      value: {
-        type: 'data-runtime-event',
-        data: {
-          kind: 'opencode.question.v2.asked',
-        },
-      },
-    })
+    expect(fake.questionList).toHaveBeenCalledWith({ directory: '/tmp/workspace' })
     await stream.return(undefined)
   })
 })
