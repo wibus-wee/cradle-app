@@ -22,7 +22,8 @@ import {
   closeActiveSurface,
   openNewChat,
 } from '~/navigation/navigation-commands'
-import { chatSessionIdForSurface } from '~/navigation/surface-identity'
+import { chatSessionIdForSurface, HOME_SURFACE_ID } from '~/navigation/surface-identity'
+import { useSurfaceStore } from '~/navigation/surface-store'
 import {
   BROWSER_PANEL_WEBVIEW_TAB_SHORTCUT_CHANNEL,
   closeActiveBrowserPanelTab,
@@ -110,7 +111,13 @@ export function useGlobalEventListeners(
         void nativeIpc?.window.close().catch(() => {})
         return
       }
-      closeActiveSurface()
+      if (closeActiveSurface()) {
+        return
+      }
+      const surfaces = useSurfaceStore.getState().surfaces
+      if (surfaces.length === 1 && surfaces[0]?.id === HOME_SURFACE_ID) {
+        void nativeIpc?.window.close().catch(() => {})
+      }
     }, []),
   )
   useShortcut(

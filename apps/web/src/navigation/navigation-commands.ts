@@ -388,17 +388,21 @@ export function closeSurfaceById(surfaceId: string): void {
   navigateToSurface(nextSurface, { replace: true })
 }
 
-export function closeActiveSurface(): void {
+export function closeActiveSurface(): boolean {
   const activeSurfaceId = readActiveSurfaceId()
   if (!activeSurfaceId) {
-    return
+    return false
   }
   // VSCode-style Cmd+W: close the focused split pane first, only closing the
   // whole tab once the surface is back down to its single primary pane.
   if (closeFocusedSplitPane(activeSurfaceId)) {
-    return
+    return true
+  }
+  if (!readActiveSurface()?.closable) {
+    return false
   }
   closeSurfaceById(activeSurfaceId)
+  return true
 }
 
 export function activateSurface(surfaceId: string): void {
