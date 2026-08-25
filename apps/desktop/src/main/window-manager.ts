@@ -277,14 +277,12 @@ export class WindowManager {
       })
     }
 
+    subscribeIpcDevtool(win.webContents)
+    subscribeAcpDevtool(win.webContents)
+
     this.devtoolWindow = win
     win.on('closed', () => {
       this.devtoolWindow = null
-    })
-
-    win.webContents.once('did-finish-load', () => {
-      subscribeIpcDevtool(win.webContents)
-      subscribeAcpDevtool(win.webContents)
     })
 
     return win

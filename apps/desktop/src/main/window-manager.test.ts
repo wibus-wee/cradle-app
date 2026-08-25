@@ -118,6 +118,11 @@ const electronMocks = vi.hoisted(() => {
   }
 })
 
+const ipcDevtoolMocks = vi.hoisted(() => ({
+  subscribeAcpDevtool: vi.fn(() => vi.fn()),
+  subscribeIpcDevtool: vi.fn(() => vi.fn()),
+}))
+
 vi.mock('electron', () => electronMocks)
 vi.mock('./desktop-assets', () => ({
   resolveDesktopBrowserPanelPreloadUrl: vi.fn(() => 'file:///tmp/browser-panel.js'),
@@ -129,8 +134,8 @@ vi.mock('./external-link-policy', () => ({
   installExternalLinkPolicy: vi.fn(),
 }))
 vi.mock('./ipc-devtool', () => ({
-  subscribeAcpDevtool: vi.fn(() => vi.fn()),
-  subscribeIpcDevtool: vi.fn(() => vi.fn()),
+  subscribeAcpDevtool: ipcDevtoolMocks.subscribeAcpDevtool,
+  subscribeIpcDevtool: ipcDevtoolMocks.subscribeIpcDevtool,
 }))
 vi.mock('./server-process', () => ({}))
 
@@ -155,6 +160,18 @@ afterEach(() => {
 })
 
 describe('windowManager tear-off windows', () => {
+  it('subscribes the devtool window after its renderer has loaded', async () => {
+    process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
+
+    const { WindowManager } = await import('./window-manager')
+    const manager = new WindowManager('http://localhost:3010')
+
+    const devtoolWindow = await manager.openDevtoolWindow()
+
+    expect(ipcDevtoolMocks.subscribeIpcDevtool).toHaveBeenCalledWith(devtoolWindow.webContents)
+    expect(ipcDevtoolMocks.subscribeAcpDevtool).toHaveBeenCalledWith(devtoolWindow.webContents)
+  })
+
   it('uses the last focused main or tear-off window for AppShot capture routing', async () => {
     const userDataPath = mkdtempSync(join(tmpdir(), 'cradle-window-manager-'))
     tempRoots.push(userDataPath)
