@@ -523,11 +523,24 @@ export class ApprovalPage {
   }
 
   async allow(): Promise<void> {
-    await this.page.locator('[data-testid="approval-allow-btn"]').click()
+    await this.clickResponse('[data-testid="approval-allow-btn"]')
   }
 
   async deny(): Promise<void> {
-    await this.page.locator('[data-testid="approval-deny-btn"]').click()
+    await this.clickResponse('[data-testid="approval-deny-btn"]')
+  }
+
+  private async clickResponse(selector: string): Promise<void> {
+    const button = this.page.locator(selector)
+    await expect(button).toBeVisible()
+    const bounds = await button.boundingBox()
+    if (!bounds) {
+      throw new Error(`Approval response button has no clickable bounds: ${selector}`)
+    }
+    await this.page.mouse.click(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    )
   }
 
   async expectHidden(timeout = 20_000): Promise<void> {

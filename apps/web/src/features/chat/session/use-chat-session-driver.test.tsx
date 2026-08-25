@@ -17,6 +17,15 @@ interface FakeSyncEngine {
   }) => unknown) | null
 }
 
+interface FakeRuntimeStatusQuery {
+  data: {
+    status: 'idle' | 'streaming'
+    activeRun: { runId: string, messageId: string } | null
+  }
+  dataUpdatedAt: number
+  isFetchedAfterMount: boolean
+}
+
 const mocks = vi.hoisted(() => {
   const engineInstances: FakeSyncEngine[] = []
   const store = {
@@ -30,6 +39,15 @@ const mocks = vi.hoisted(() => {
     releaseStreamLease: vi.fn(),
   }
 
+  const runtimeStatusQuery: FakeRuntimeStatusQuery = {
+    data: {
+      status: 'streaming',
+      activeRun: { runId: 'run-1', messageId: 'assistant-1' },
+    },
+    dataUpdatedAt: Number.MAX_SAFE_INTEGER,
+    isFetchedAfterMount: true,
+  }
+
   return {
     engineInstances,
     snapshotQuery: {
@@ -38,14 +56,7 @@ const mocks = vi.hoisted(() => {
       isError: false,
       isFetching: false,
     },
-    runtimeStatusQuery: {
-      data: {
-        status: 'streaming',
-        activeRun: { runId: 'run-1', messageId: 'assistant-1' },
-      },
-      dataUpdatedAt: Number.MAX_SAFE_INTEGER,
-      isFetchedAfterMount: true,
-    },
+    runtimeStatusQuery,
     controls: {
       scheduleSnapshotRefresh: vi.fn(),
       refreshQueue: vi.fn(),
@@ -134,6 +145,7 @@ describe('useChatSessionDriver', () => {
       dataUpdatedAt: Number.MAX_SAFE_INTEGER,
       isFetchedAfterMount: true,
     }
+    mocks.store.streamLeaseMap.clear()
     vi.clearAllMocks()
   })
 
@@ -187,6 +199,7 @@ describe('useChatSessionDriver', () => {
     expect(passiveStreamInput).toBeDefined()
 
     act(() => {
+      mocks.store.streamLeaseMap.set('assistant-1', { sessionId: 'new-session' })
       passiveStreamInput?.releaseStreamLeaseAfterSnapshot('assistant-1')
       mocks.runtimeStatusQuery = {
         data: { status: 'idle', activeRun: null },
