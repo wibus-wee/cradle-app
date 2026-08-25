@@ -533,14 +533,14 @@ export class ApprovalPage {
   private async clickResponse(selector: string): Promise<void> {
     const button = this.page.locator(selector)
     await expect(button).toBeVisible()
-    const bounds = await button.boundingBox()
-    if (!bounds) {
-      throw new Error(`Approval response button has no clickable bounds: ${selector}`)
+    try {
+      await button.click()
     }
-    await this.page.mouse.click(
-      bounds.x + bounds.width / 2,
-      bounds.y + bounds.height / 2,
-    )
+    catch (error) {
+      if (await this.card().isVisible()) {
+        throw error
+      }
+    }
   }
 
   async expectHidden(timeout = 20_000): Promise<void> {
