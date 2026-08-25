@@ -190,10 +190,10 @@ export const WorkingTree: Story = {
 /** Annotation-slot cards rendered standalone, at split-view column width. */
 function AnnotationCardsScene() {
   const diffData = useMemo(
-    () => buildDiffData<ThreadAnnotation>(workingTreeReviewFixture.currentRevision?.patch ?? ''),
+    () => buildDiffData<ThreadAnnotation>(reviewFixture.currentRevision?.patch ?? ''),
     [],
   )
-  const filePaths = new Set(workingTreeReviewFixture.files.map(file => file.path))
+  const filePaths = new Set(reviewFixture.files.map(file => file.path))
   const firstItemId = [...diffData.itemIdToPath.entries()]
     .find(([, path]) => filePaths.has(path))?.[0] ?? ''
   const [thread, setThread] = useState(reviewFixture.threads[0]!)
@@ -202,17 +202,9 @@ function AnnotationCardsScene() {
     <div className="dark min-h-screen bg-background p-6">
       <div className="mx-auto flex w-96 min-w-0 flex-col gap-4">
         <p className="text-[11px] text-muted-foreground">Composer (split-view column width)</p>
-        <p data-testid="debug-info" className="text-[10px] text-red-400">
-          {JSON.stringify({
-            firstItemId,
-            total: diffData.itemIdToPath.size,
-            sample: [...diffData.itemIdToPath.entries()].slice(0, 4),
-            filePaths: [...filePaths].slice(0, 4),
-          })}
-        </p>
         <ThreadComposer
           selection={{ id: firstItemId, range: { start: 76, end: 78, side: 'additions' } }}
-          files={workingTreeReviewFixture.files}
+          files={reviewFixture.files}
           itemIdToPath={diffData.itemIdToPath}
           onClose={() => {}}
           onCreate={() => {}}
