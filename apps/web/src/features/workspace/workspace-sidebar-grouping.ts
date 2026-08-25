@@ -3,6 +3,7 @@ import type { WorkSummary } from '~/features/work/use-work'
 
 import type { Workspace } from './types'
 import type { WorkspaceSession } from './use-session'
+import { getSessionActivityAt } from './use-session'
 import {
   hasUnreadWorkspaceSessionError,
   isWorkspaceSessionRunning,
@@ -126,7 +127,7 @@ export function compareSidebarSessions(
   }
 
   const orderingValue = (session: WorkspaceSession) =>
-    ordering === 'created' ? session.createdAt : session.updatedAt
+    ordering === 'created' ? session.createdAt : getSessionActivityAt(session)
   const keyDiff = orderingValue(right) - orderingValue(left)
   const directedKeyDiff = direction === 'desc' ? keyDiff : -keyDiff
   if (directedKeyDiff !== 0) {
@@ -169,7 +170,7 @@ export function groupSidebarSessions(input: GroupSidebarSessionsInput): SidebarS
       const now = input.now ?? Date.now()
       const byBucket = new Map<SidebarUpdatedBucket, SidebarSessionEntry[]>()
       for (const entry of input.entries) {
-        const bucket = classifyUpdatedBucket(entry.session.updatedAt, now)
+        const bucket = classifyUpdatedBucket(getSessionActivityAt(entry.session), now)
         const bucketEntries = byBucket.get(bucket)
         if (bucketEntries) {
           bucketEntries.push(entry)

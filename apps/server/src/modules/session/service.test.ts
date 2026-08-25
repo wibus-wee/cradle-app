@@ -43,7 +43,7 @@ describe('session service provider target projection', () => {
 })
 
 describe('session list activity and status projection', () => {
-  it('orders by session update time within the listed workspace and ignores message ordering', () => {
+  it('orders by latest user message within the listed workspace and ignores metadata updates', () => {
     db().insert(workspaces).values([
       {
         id: 'ws-listed',
@@ -118,10 +118,10 @@ describe('session list activity and status projection', () => {
     ])
 
     const rows = list({ workspaceId: 'ws-listed' }).items
-    expect(rows.map(row => row.id)).toEqual(['sess-newer-activity', 'sess-older-activity'])
-    expect(rows[0]?.latestUserMessageAt).toBe(100)
-    expect(rows[0]?.latestAssistantMessageAt).toBe(110)
-    expect(rows[1]?.latestUserMessageAt).toBe(500)
+    expect(rows.map(row => row.id)).toEqual(['sess-older-activity', 'sess-newer-activity'])
+    expect(rows[0]?.latestUserMessageAt).toBe(500)
+    expect(rows[1]?.latestUserMessageAt).toBe(100)
+    expect(rows[1]?.latestAssistantMessageAt).toBe(110)
     expect(rows.every(row => row.id !== 'sess-other-workspace')).toBe(true)
   })
 

@@ -64,6 +64,12 @@ export interface WorkspaceSession {
   execution: SessionExecution
 }
 
+export function getSessionActivityAt(
+  session: Pick<WorkspaceSession, 'createdAt' | 'latestUserMessageAt'>,
+): number {
+  return session.latestUserMessageAt ?? session.createdAt
+}
+
 /**
  * A session is "manual" when the user started it themselves. Everything else
  * (automation runs, issue-agent spawns, diff-review, conversation-bridge, …)

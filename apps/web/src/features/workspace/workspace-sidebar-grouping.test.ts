@@ -152,10 +152,10 @@ describe('groupSidebarSessions', () => {
   it('groups by updated buckets in fixed order, skipping empty buckets', () => {
     const sections = groupSidebarSessions({
       ...baseGroupingInput([
-        entry(createSession({ id: 'last-hour', updatedAt: NOW_SECONDS - 60 })),
-        entry(createSession({ id: 'earlier-today', updatedAt: NOW_SECONDS - 3_600 })),
-        entry(createSession({ id: 'earlier', updatedAt: NOW_SECONDS - 30 * DAY_SECONDS })),
-        entry(createSession({ id: 'yesterday', updatedAt: NOW_SECONDS - DAY_SECONDS })),
+        entry(createSession({ id: 'last-hour', latestUserMessageAt: NOW_SECONDS - 60 })),
+        entry(createSession({ id: 'earlier-today', latestUserMessageAt: NOW_SECONDS - 3_600 })),
+        entry(createSession({ id: 'earlier', latestUserMessageAt: NOW_SECONDS - 30 * DAY_SECONDS })),
+        entry(createSession({ id: 'yesterday', latestUserMessageAt: NOW_SECONDS - DAY_SECONDS })),
       ]),
       grouping: 'updated',
       now: NOW_MS,
@@ -172,9 +172,9 @@ describe('groupSidebarSessions', () => {
   it('sorts pinned sessions first within a bucket, then by ordering', () => {
     const [section] = groupSidebarSessions({
       ...baseGroupingInput([
-        entry(createSession({ id: 'old', updatedAt: NOW_SECONDS - 120 })),
-        entry(createSession({ id: 'pinned', pinned: 1, updatedAt: NOW_SECONDS - 180 })),
-        entry(createSession({ id: 'new', updatedAt: NOW_SECONDS - 60 })),
+        entry(createSession({ id: 'old', latestUserMessageAt: NOW_SECONDS - 120 })),
+        entry(createSession({ id: 'pinned', pinned: 1, latestUserMessageAt: NOW_SECONDS - 180 })),
+        entry(createSession({ id: 'new', latestUserMessageAt: NOW_SECONDS - 60 })),
       ]),
       grouping: 'updated',
       now: NOW_MS,

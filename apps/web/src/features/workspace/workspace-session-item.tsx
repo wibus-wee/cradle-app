@@ -34,7 +34,7 @@ import { useTitleRegenerationStore } from '~/store/title-regeneration'
 import { usePreviewCard } from './preview-card/preview-card-context'
 import { SESSION_DRAG_MIME_TYPE } from './session-drag-data'
 import type { WorkspaceSession } from './use-session'
-import { isManualSession } from './use-session'
+import { getSessionActivityAt, isManualSession } from './use-session'
 import type {
   WorkspaceSessionAttentionKind,
   WorkspaceSessionMenuAnchor,
@@ -274,7 +274,7 @@ export const WorkspaceSessionItem = memo(
         isRenaming={isRenaming}
         isRegeneratingTitle={isRegeneratingTitle}
         runtimeIcon={runtimeIcon}
-        relativeTime={formatRelativeTime(session.updatedAt, nowMs, t)}
+        relativeTime={formatRelativeTime(getSessionActivityAt(session), nowMs, t)}
         nodeLabel={nodeLabel}
         draggable={!isRenaming && !work}
         canOpenInNewWindow={isElectron}
