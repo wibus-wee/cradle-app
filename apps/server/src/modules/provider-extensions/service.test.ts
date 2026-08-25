@@ -419,4 +419,27 @@ describe('provider extension lifecycle', () => {
     })
     expect(onReconcile).toHaveBeenCalledOnce()
   })
+
+  it('keeps owner reconciliation alive when a binding fails', async () => {
+    const source = saveSecret({ kind: 'api-key', label: 'Source', secret: 'sk-source' })
+    insertTarget(source.id)
+    const extension = borrowedExtension()
+    extension.onReconcile = async () => {
+      throw new Error('CPA management API returned 422: invalid upstream')
+    }
+    registerProviderExtension(OWNER, extension)
+    await setProviderTargetExtensionEnabled({
+      providerTargetId: TARGET_ID,
+      owner: OWNER,
+      id: extension.id,
+      enabled: true,
+    })
+
+    await expect(reconcileProviderExtensionsForOwner(OWNER)).resolves.toBeUndefined()
+    expect(listProviderTargetExtensions(TARGET_ID)[0]).toMatchObject({
+      desiredEnabled: true,
+      status: 'error',
+      lastError: 'CPA management API returned 422: invalid upstream',
+    })
+  })
 })

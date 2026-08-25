@@ -16,6 +16,7 @@ import { and, eq } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
+import { createChildLogger } from '../../logging/logger'
 import { findProviderExtension, listProviderExtensions } from '../../plugins/provider-extension-registry'
 import {
   readSecretValueWithMetadata,
@@ -35,6 +36,7 @@ import type {
 
 const operations = new Map<string, Promise<void>>()
 const EMPTY_JSON = '{}'
+const logger = createChildLogger({ module: 'provider-extensions' })
 
 function nowUnix(): number {
   return Math.floor(Date.now() / 1000)
@@ -843,7 +845,9 @@ export async function suspendProviderExtensionsForTarget(providerTargetId: strin
 async function reconcileProviderExtensions(input: {
   extensionOwner?: string
   providerTargetId?: string
-}): Promise<void> {
+}, options: {
+  continueOnError?: boolean
+} = {}): Promise<void> {
   const conditions = [eq(providerExtensionBindings.desiredEnabled, true)]
   if (input.extensionOwner) {
     conditions.push(eq(providerExtensionBindings.extensionOwner, input.extensionOwner))
@@ -914,19 +918,31 @@ async function reconcileProviderExtensions(input: {
         emit('reconciled', current, binding.status)
         getProviderExtensionHost().releaseRuntimeSessions(current.providerTargetId)
       }
-      catch {
+      catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        const lastError = message.trim() || 'Provider extension reconcile failed'
         db().update(providerExtensionBindings).set({
           status: 'error',
-          lastError: 'Provider extension reconcile failed',
+          lastError,
           updatedAt: nowUnix(),
         }).where(eq(providerExtensionBindings.id, current.id)).run()
         const failed = readBinding(current.id)
         emit('failed', failed, binding.status, undefined, 'provider_extension_reconcile_failed')
+        logger.warn('provider extension reconcile failed', {
+          bindingId: current.id,
+          providerTargetId: current.providerTargetId,
+          extensionOwner: current.extensionOwner,
+          extensionId: current.extensionId,
+          error: lastError,
+        })
+        if (options.continueOnError) {
+          return
+        }
         throw new AppError({
           code: 'provider_extension_reconcile_failed',
           status: 409,
-          message: 'Provider extension reconcile failed',
-          details: { bindingId: current.id },
+          message: lastError,
+          details: { bindingId: current.id, cause: lastError },
         })
       }
     })
@@ -934,7 +950,7 @@ async function reconcileProviderExtensions(input: {
 }
 
 export async function reconcileProviderExtensionsForOwner(extensionOwner: string): Promise<void> {
-  await reconcileProviderExtensions({ extensionOwner })
+  await reconcileProviderExtensions({ extensionOwner }, { continueOnError: true })
 }
 
 export async function reconcileProviderExtensionsForTarget(providerTargetId: string): Promise<void> {

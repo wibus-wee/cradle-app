@@ -831,6 +831,16 @@ export async function refreshExternalProviderSource(
   )
 }
 
+export async function refreshExternalProviderSourcesForOwner(
+  owner: string,
+): Promise<ExternalProviderRefreshResult[]> {
+  const results: ExternalProviderRefreshResult[] = []
+  for (const source of listRegisteredExternalProviderSources().filter(source => source.owner === owner)) {
+    results.push(await refreshExternalProviderSource(source.key))
+  }
+  return results
+}
+
 export async function refreshAllExternalProviderSources(): Promise<
   ExternalProviderRefreshResult[]
 > {

@@ -408,6 +408,26 @@ async function activatePluginServerLayer(manifest: PluginManifest, moduleRevisio
     subscriptions = ctx.subscriptions
     await mod.activate(ctx)
 
+    const { refreshExternalProviderSourcesForOwner } = await import('../modules/external-provider-sources/service')
+    void refreshExternalProviderSourcesForOwner(manifest.name)
+      .then((results) => {
+        for (const result of results) {
+          if (result.status === 'error') {
+            logger.warn('plugin external provider source refresh failed', {
+              plugin: manifest.name,
+              sourceKey: result.sourceKey,
+              message: result.message ?? 'Unknown sync error',
+            })
+          }
+        }
+      })
+      .catch((err) => {
+        logger.warn('plugin external provider source refresh failed', {
+          plugin: manifest.name,
+          err,
+        })
+      })
+
     const { reconcileProviderExtensionsForOwner } = await import('../modules/provider-extensions/service')
     await reconcileProviderExtensionsForOwner(manifest.name)
 
