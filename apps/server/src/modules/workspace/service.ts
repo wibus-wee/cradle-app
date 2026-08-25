@@ -39,7 +39,12 @@ import {
   searchWorkspaceFiles,
   writeTextFile,
 } from './files'
-import { probeLocalGitIdentity } from './repo-identity'
+import {
+  hasWorkspaceGitIdentity,
+  mergeWorkspaceGitIdentity,
+  probeLocalGitIdentity,
+  workspaceGitIdentityEquals,
+} from './repo-identity'
 import type { WorkspaceGitIdentity, WorkspaceLocator } from './workspace-locator'
 import {
   isLocalWorkspaceLocator,
@@ -335,12 +340,8 @@ export async function addFromDirectory(path: string): Promise<WorkspaceView> {
   return create({
     name: basename(absolutePath),
     locator: localWorkspaceLocator(absolutePath),
-    ...(hasGitIdentity(probedIdentity) ? { gitIdentity: probedIdentity } : {}),
+    ...(hasWorkspaceGitIdentity(probedIdentity) ? { gitIdentity: probedIdentity } : {}),
   })
-}
-
-function hasGitIdentity(identity: WorkspaceGitIdentity): boolean {
-  return Boolean(identity.originUrl || identity.repoRoot || identity.headSha || identity.branch)
 }
 
 /**
@@ -349,22 +350,12 @@ function hasGitIdentity(identity: WorkspaceGitIdentity): boolean {
  * visible values that were set from an authoritative source earlier.
  */
 function backfillGitIdentity(workspace: WorkspaceView, probed: WorkspaceGitIdentity): WorkspaceView {
-  if (!hasGitIdentity(probed)) {
+  if (!hasWorkspaceGitIdentity(probed)) {
     return workspace
   }
   const current = workspace.gitIdentity
-  const merged: WorkspaceGitIdentity = {
-    originUrl: current.originUrl ?? probed.originUrl ?? null,
-    repoRoot: current.repoRoot ?? probed.repoRoot ?? null,
-    headSha: current.headSha ?? probed.headSha ?? null,
-    branch: current.branch ?? probed.branch ?? null,
-  }
-  if (
-    merged.originUrl === workspace.gitIdentity.originUrl
-    && merged.repoRoot === workspace.gitIdentity.repoRoot
-    && merged.branch === workspace.gitIdentity.branch
-    && merged.headSha === workspace.gitIdentity.headSha
-  ) {
+  const merged = mergeWorkspaceGitIdentity(current, probed)
+  if (workspaceGitIdentityEquals(merged, current)) {
     return workspace
   }
   db().update(workspaces).set({
@@ -372,6 +363,26 @@ function backfillGitIdentity(workspace: WorkspaceView, probed: WorkspaceGitIdent
     updatedAt: Math.floor(Date.now() / 1000),
   }).where(eq(workspaces.id, workspace.id)).run()
   return get(workspace.id) ?? workspace
+}
+
+/**
+ * Read fresh Git identity from the workspace owner. Remote projections ask the
+ * owning Node to relink its current path so probing happens against that Node's
+ * filesystem before the refreshed identity is returned.
+ */
+export async function refreshWorkspaceGitIdentity(
+  locator: WorkspaceLocator,
+): Promise<WorkspaceGitIdentity> {
+  if (isLocalWorkspaceLocator(locator)) {
+    return probeLocalGitIdentity(locator.path)
+  }
+  const remoteWorkspace = await resolveRemoteCradleWorkspace(locator)
+  const refreshed = await nodeUpstreamJson<RemoteWorkspaceView>(
+    locator.nodeId,
+    remoteWorkspacePath(remoteWorkspace.id, '/location'),
+    jsonRequestInit('PATCH', { path: remoteWorkspace.locator.path }),
+  )
+  return refreshed.gitIdentity
 }
 
 export type DirectoryInspectionAction = 'multi-folder' | 'single-folder'

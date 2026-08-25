@@ -9,12 +9,19 @@ The Workspace module owns workspace records, filesystem capability routing, and 
 | Request and response schemas | [`model.ts`](./model.ts)           | Defines workspace records, file operations, rich preview metadata, migration payloads, and non-Cradle-owned write boundary responses.                                     |
 | File operations              | [`files.ts`](./files.ts)           | Performs path-contained local listing, search, preview, text and binary I/O, create, rename, and Office-to-PDF rendition work.                                            |
 | Change events                | [`file-watch.ts`](./file-watch.ts) | Shares local `fs.watch` subscriptions, invalidates indexes, and emits debounced directory refresh hints.                                                                  |
+| Git identity migration       | [`repo-identity-backfill.ts`](./repo-identity-backfill.ts) | Backfills historical local records and remote projections through an observable, resumable background activity.                                            |
 
 ## Local And Node Workspaces
 
 Local workspace operations execute against the locator path on this Server. For a remote projection, the service resolves the target workspace by its stable `sourceWorkspaceId`, falling back to the Node path when needed, and sends the same operation through the Fabric upstream connection. The target Node remains authoritative for filesystem access, path containment, write confirmation, file watching, and rendition resources.
 
 Remote projections support the complete workspace file surface: full and shallow listing, fuzzy search, text and metadata reads, raw bytes, PDF renditions, SSE file-change events, file writes, file and folder creation, and rename. Streaming and binary routes transparently return the target Node response so status, headers, cancellation, and backpressure retain their HTTP semantics. Relink succeeds on the target Node before the controller updates the projection locator and Git identity.
+
+## Git Identity Backfill
+
+Workspace owns the `workspace/backfill-git-identity` maintenance activity. It runs on server startup, remains manually runnable through Background Activity, and records durable completion in `database_maintenance_tasks` under `workspace-git-identity-backfill-v1`. Repeated runs are idempotent and only fill missing identity fields.
+
+Local records are probed directly. Remote projections ask the owning Node to relink the source workspace to its current path, which refreshes identity against the owner filesystem before the controller updates its projection. Unreachable remote records are reported as deferred and retried by the scheduled activity; they do not block eligible records in the same pass.
 
 ## Write Boundary
 

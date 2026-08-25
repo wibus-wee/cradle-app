@@ -114,6 +114,7 @@ import { flushUsageWriteBehind } from './modules/usage/write-behind'
 import { sessionWork, work } from './modules/work'
 import { workflowRules } from './modules/workflow-rules'
 import { workspace } from './modules/workspace'
+import { registerWorkspaceGitIdentityBackfillMaintenance } from './modules/workspace/repo-identity-backfill'
 import { worktree } from './modules/worktree'
 import * as Worktree from './modules/worktree/service'
 import { RuntimeResourceRegistry } from './runtime-resource-registry'
@@ -412,6 +413,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     registerBlobStoreMaintenance()
     registerMessageBlobBackfillMaintenance()
     registerMessageSteerSplitBackfillMaintenance()
+    registerWorkspaceGitIdentityBackfillMaintenance()
     Maintenance.registerTask({
       ownerNamespace: 'logging',
       key: 'rotate-server-log',

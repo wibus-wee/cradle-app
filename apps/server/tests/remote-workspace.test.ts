@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { createServerApp } from '../src/app'
 import { shutdownInfra } from '../src/infra'
+import { refreshWorkspaceGitIdentity } from '../src/modules/workspace/service'
 
 const fabricNodeLinkTestState = vi.hoisted(() => ({ baseUrl: null as string | null }))
 
@@ -232,6 +233,12 @@ describe('remote workspace parity', () => {
       )
       const workspace = (await createResponse.json()) as { id: string }
       const workspaceUrl = `http://localhost/workspaces/${workspace.id}`
+
+      await expect(refreshWorkspaceGitIdentity({
+        nodeId: 'node-studio',
+        path: '/remote/project',
+        sourceWorkspaceId: 'remote-workspace-1',
+      })).resolves.toEqual({ repoRoot: '/remote/project' })
 
       const searchResponse = await app.handle(
         new Request(`${workspaceUrl}/files/search?q=main&limit=5`),

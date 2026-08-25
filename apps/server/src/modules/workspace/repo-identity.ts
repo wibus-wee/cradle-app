@@ -58,3 +58,29 @@ export async function probeLocalGitIdentity(path: string): Promise<WorkspaceGitI
     return {}
   }
 }
+
+export function mergeWorkspaceGitIdentity(
+  current: WorkspaceGitIdentity,
+  probed: WorkspaceGitIdentity,
+): WorkspaceGitIdentity {
+  return {
+    originUrl: current.originUrl ?? probed.originUrl ?? null,
+    repoRoot: current.repoRoot ?? probed.repoRoot ?? null,
+    headSha: current.headSha ?? probed.headSha ?? null,
+    branch: current.branch ?? probed.branch ?? null,
+  }
+}
+
+export function hasWorkspaceGitIdentity(identity: WorkspaceGitIdentity): boolean {
+  return Boolean(identity.originUrl || identity.repoRoot || identity.headSha || identity.branch)
+}
+
+export function workspaceGitIdentityEquals(
+  left: WorkspaceGitIdentity,
+  right: WorkspaceGitIdentity,
+): boolean {
+  return (left.originUrl ?? null) === (right.originUrl ?? null)
+    && (left.repoRoot ?? null) === (right.repoRoot ?? null)
+    && (left.headSha ?? null) === (right.headSha ?? null)
+    && (left.branch ?? null) === (right.branch ?? null)
+}
