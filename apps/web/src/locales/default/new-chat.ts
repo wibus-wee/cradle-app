@@ -1,4 +1,6 @@
 export default {
+  'machine.group': 'Machines',
+  'machine.thisDevice': 'This device',
   'placeholder.task': 'Describe the task you want the agent to do in this project...',
   'placeholder.structure': 'Explain the codebase structure and where to begin...',
   'placeholder.risk': 'Find risky changes and suggest the safest next step...',

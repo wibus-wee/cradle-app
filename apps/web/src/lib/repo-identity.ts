@@ -46,6 +46,40 @@ export function workspaceRepoKey(input: {
   return null
 }
 
+/** Structured parts of an `origin:` repo key (`host/owner/repo[/subgroup...]`). */
+export interface RepoKeyParts {
+  host: string
+  owner: string
+  repo: string
+}
+
+/**
+ * Split a repo key from `workspaceRepoKey` into host/owner/repo parts.
+ * Only `origin:` keys carry a host/owner structure; `repo:` fallback keys
+ * (git repositories without a remote) return `null`.
+ */
+export function parseRepoKey(key: string | null | undefined): RepoKeyParts | null {
+  if (!key || !key.startsWith('origin:')) {
+    return null
+  }
+  const segments = key.slice('origin:'.length).split('/').filter(Boolean)
+  const [host, owner, ...repoSegments] = segments
+  if (!host || !owner || repoSegments.length === 0) {
+    return null
+  }
+  return { host, owner, repo: repoSegments.join('/') }
+}
+
+/**
+ * Avatar image URL for the repository owner, when the host exposes one
+ * (GitHub only). Other hosts fall back to the owner's initial.
+ */
+export function repoOwnerAvatarUrl(parts: RepoKeyParts): string | null {
+  return parts.host === 'github.com'
+    ? `https://github.com/${parts.owner}.png?size=32`
+    : null
+}
+
 /** Short human label for a repo key: the last path segment of the repository. */
 export function repoDisplayNameFromKey(key: string): string {
   const segment = key.split(':').pop() ?? key

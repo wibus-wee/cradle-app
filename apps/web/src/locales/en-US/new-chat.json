@@ -4,6 +4,8 @@
   "isolatedDefaultTitle": "Isolated chat",
   "isolatedProviderRequired": "Select an agent or provider first",
   "isolatedStartError": "Could not start isolated chat",
+  "machine.group": "Machines",
+  "machine.thisDevice": "This device",
   "placeholder.fixTest": "Fix a failing test and explain the root cause...",
   "placeholder.refactor": "Plan a refactor before editing implementation code...",
   "placeholder.risk": "Find risky changes and suggest the safest next step...",

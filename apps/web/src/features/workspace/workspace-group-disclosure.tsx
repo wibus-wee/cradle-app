@@ -4,7 +4,7 @@ import { useCallback } from 'react'
 import type { Workspace } from '~/features/workspace/types'
 import { openWorkspaceDetail } from '~/navigation/navigation-commands'
 
-import type { WorkspaceMenuAction } from './workspace-group-disclosure-view'
+import type { WorkspaceMenuAction, WorkspaceRepoDisplay } from './workspace-group-disclosure-view'
 import { WorkspaceGroupDisclosureView } from './workspace-group-disclosure-view'
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'
 
@@ -13,8 +13,8 @@ export interface WorkspaceGroupDisclosureProps {
   workspacePinned: boolean
   workspaceActions: WorkspaceMenuAction[]
   runningSessionCount: number
-  /** Machine label for repo clusters spanning several devices. */
-  machineLabel?: string | null
+  /** Git origin display (owner avatar + `owner/repo`) for git-backed workspaces. */
+  repo?: WorkspaceRepoDisplay | null
   overlays: ReactNode
   children: ReactNode
 }
@@ -24,7 +24,7 @@ export function WorkspaceGroupDisclosure({
   workspacePinned,
   workspaceActions,
   runningSessionCount,
-  machineLabel,
+  repo = null,
   overlays,
   children,
 }: WorkspaceGroupDisclosureProps) {
@@ -48,7 +48,7 @@ export function WorkspaceGroupDisclosure({
       workspaceActions={workspaceActions}
       expanded={expanded}
       runningSessionCount={runningSessionCount}
-      machineLabel={machineLabel}
+      repo={repo}
       overlays={overlays}
       onToggleExpanded={toggleExpanded}
       onOpenWorkspace={openWorkspace}

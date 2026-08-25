@@ -11,6 +11,7 @@ import type { MouseEvent, PointerEvent, ReactNode } from 'react'
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { RepoOwnerAvatar } from '~/components/common/repo-owner-avatar'
 import { Button } from '~/components/ui/button'
 import {
   ContextMenu,
@@ -42,14 +43,21 @@ export interface WorkspaceMenuAction {
   separatorBefore?: boolean
 }
 
+export interface WorkspaceRepoDisplay {
+  owner: string
+  /** Display label, usually `owner/repo`. */
+  name: string
+  avatarUrl: string | null
+}
+
 export interface WorkspaceGroupDisclosureViewProps {
   workspace: Workspace
   workspacePinned: boolean
   workspaceActions: WorkspaceMenuAction[]
   expanded: boolean
   runningSessionCount: number
-  /** Machine label for repo clusters spanning several devices (e.g. "MacBook"). */
-  machineLabel?: string | null
+  /** Git origin display (owner avatar + `owner/repo`); replaces the folder icon. */
+  repo?: WorkspaceRepoDisplay | null
   overlays: ReactNode
   children: ReactNode
   onToggleExpanded: () => void
@@ -108,7 +116,7 @@ export function WorkspaceGroupDisclosureView({
   workspaceActions,
   expanded,
   runningSessionCount,
-  machineLabel,
+  repo = null,
   overlays,
   children,
   onToggleExpanded,
@@ -176,11 +184,19 @@ export function WorkspaceGroupDisclosureView({
         className="-ml-1 flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 hover:bg-fill/70 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         data-testid={`workspace-toggle-${workspace.id}`}
       >
-        {isLocalWorkspace(workspace)
-          ? visibleExpanded
-            ? <FolderOpenIcon className="size-3.5" aria-hidden="true" />
-            : <FolderClosedIcon className="size-3.5" aria-hidden="true" />
-          : <FolderSymlinkIcon className="size-3.5" aria-hidden="true" />}
+        {repo
+          ? (
+              <RepoOwnerAvatar
+                owner={repo.owner}
+                avatarUrl={repo.avatarUrl}
+                className="size-3.5"
+              />
+            )
+          : isLocalWorkspace(workspace)
+            ? visibleExpanded
+              ? <FolderOpenIcon className="size-3.5" aria-hidden="true" />
+              : <FolderClosedIcon className="size-3.5" aria-hidden="true" />
+            : <FolderSymlinkIcon className="size-3.5" aria-hidden="true" />}
       </button>
 
       <button
@@ -199,18 +215,8 @@ export function WorkspaceGroupDisclosureView({
             )
           : null}
         <span className="truncate text-xs font-medium text-sidebar-foreground/80">
-          {workspace.name}
+          {repo ? repo.name : workspace.name}
         </span>
-        {machineLabel
-          ? (
-              <span
-                className="inline-flex shrink-0 items-center rounded-full bg-fill/70 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground"
-                data-testid={`workspace-machine-label-${workspace.id}`}
-              >
-                {machineLabel}
-              </span>
-            )
-          : null}
         {workspace.availability === 'missing'
           ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[9px] font-medium text-destructive">

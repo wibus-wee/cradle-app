@@ -4,12 +4,16 @@ import {
   NewFolderLine as FolderPlusIcon,
 } from '@mingcute/react'
 
+import { RepoOwnerAvatar } from '~/components/common/repo-owner-avatar'
 import { Button } from '~/components/ui/button'
 import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from '~/components/ui/menu'
 
 export interface NewChatWorkspaceOption {
+  /** Workspace id, or `repo:<key>` for a merged repository entry. */
   id: string
   name: string
+  /** Git origin display; merged repo entries show the owner avatar. */
+  repo?: { owner: string, avatarUrl: string | null } | null
 }
 
 export interface NewChatWorkspaceSelectorViewProps {
@@ -42,7 +46,15 @@ export function NewChatWorkspaceSelectorView({
         render={<Button variant="ghost" size="xs" className="text-foreground hover:text-foreground" />}
         data-testid="new-chat-workspace-selector"
       >
-        <FolderIcon className="size-3 shrink-0" aria-hidden="true" />
+        {selectedWorkspace?.repo
+          ? (
+              <RepoOwnerAvatar
+                owner={selectedWorkspace.repo.owner}
+                avatarUrl={selectedWorkspace.repo.avatarUrl}
+                className="size-3.5"
+              />
+            )
+          : <FolderIcon className="size-3 shrink-0" aria-hidden="true" />}
         <span className="max-w-24 truncate">{selectedWorkspace?.name ?? adhocLabel}</span>
       </MenuTrigger>
       <MenuPopup>
@@ -62,7 +74,15 @@ export function NewChatWorkspaceSelectorView({
               onClick={() => onSelectWorkspace(workspace.id)}
               data-testid={`new-chat-workspace-option-${workspace.id}`}
             >
-              <FolderIcon className="size-3" aria-hidden="true" />
+              {workspace.repo
+                ? (
+                    <RepoOwnerAvatar
+                      owner={workspace.repo.owner}
+                      avatarUrl={workspace.repo.avatarUrl}
+                      className="size-3.5"
+                    />
+                  )
+                : <FolderIcon className="size-3" aria-hidden="true" />}
               <span className="flex-1">{workspace.name}</span>
             </MenuItem>
           ))}

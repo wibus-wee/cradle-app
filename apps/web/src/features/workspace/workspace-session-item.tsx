@@ -57,6 +57,8 @@ export interface WorkspaceSessionItemProps {
   hasError: boolean
   isRenaming: boolean
   runtimeIcon: RuntimeIconDescriptor | undefined
+  /** Remote machine hosting this session's workspace (merged repo rows only). */
+  remoteHost?: { name: string, path: string } | null
   onPrepareSessionOpen: (session: WorkspaceSession) => void
   onPrefetchSession: (sessionId: string) => void
   onRenameCommit: (
@@ -99,6 +101,7 @@ export const WorkspaceSessionItem = memo(
     hasError,
     isRenaming,
     runtimeIcon,
+    remoteHost = null,
     onPrepareSessionOpen,
     onPrefetchSession,
     onRenameCommit,
@@ -276,6 +279,7 @@ export const WorkspaceSessionItem = memo(
         runtimeIcon={runtimeIcon}
         relativeTime={formatRelativeTime(getSessionActivityAt(session), nowMs, t)}
         nodeLabel={nodeLabel}
+        remoteHost={remoteHost}
         draggable={!isRenaming && !work}
         canOpenInNewWindow={isElectron}
         onOpen={() => {

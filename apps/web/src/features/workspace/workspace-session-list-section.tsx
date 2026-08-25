@@ -47,6 +47,8 @@ export interface WorkspaceSessionListSectionProps {
   >
   locallyErroredSessionIds: ReadonlySet<string>
   runtimeIconByKind: WorkspaceRuntimeIconByKind
+  /** Remote machine hosting these sessions' workspace (merged repo rows only). */
+  remoteHost?: { name: string, path: string } | null
   onPrepareSessionOpen: (session: WorkspaceSession) => void
   onPrefetchSession: (sessionId: string) => void
   onRenameCommit: (
@@ -69,6 +71,7 @@ export function WorkspaceSessionListSection({
   sessionAttentionBySessionId,
   locallyErroredSessionIds,
   runtimeIconByKind,
+  remoteHost = null,
   onPrepareSessionOpen,
   onPrefetchSession,
   onRenameCommit,
@@ -196,6 +199,7 @@ export function WorkspaceSessionListSection({
             }
             isRenaming={session.id === renamingSessionId}
             runtimeIcon={runtimeIconByKind.get(session.runtimeKind)}
+            remoteHost={remoteHost}
             onPrepareSessionOpen={onPrepareSessionOpen}
             onPrefetchSession={onPrefetchSession}
             onRenameCommit={onRenameCommit}

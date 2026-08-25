@@ -1,8 +1,9 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FileUIPart } from 'ai'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { getNodesOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { postSessions, postSessionsByIdIsolationStart } from '~/api-gen/sdk.gen'
 import type { PostSessionsData } from '~/api-gen/types.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
@@ -24,18 +25,22 @@ import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-
 import { useComposerState } from '~/features/composer-toolbar'
 import type { IssueIsolationStartChoice } from '~/features/new-chat/issue-isolation-start-dialog'
 import { IssueIsolationStartDialog } from '~/features/new-chat/issue-isolation-start-dialog'
+import { resolveNodeDisplayName } from '~/features/nodes/node-grouping'
 import {
   useIssueIsolationContext,
 } from '~/features/session/use-session-isolation'
 import { getLocalWorkspacePath, isLocalWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey, updateSessionInSessionLists, useWorkspaceSessions } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
+import { parseRepoKey, repoOwnerAvatarUrl, workspaceRepoKey } from '~/lib/repo-identity'
 import { openChatSession } from '~/navigation/navigation-commands'
 import { openTearoffChatSessionWindow } from '~/navigation/tearoff-surfaces'
 import { useNewChatStore } from '~/store/new-chat'
 
+import { NewChatMachineSelectorView } from './new-chat-machine-selector-view'
 import { NewChatQuickActionsView } from './new-chat-quick-actions-view'
 import { NewChatSurfaceView } from './new-chat-surface-view'
+import type { NewChatWorkspaceOption } from './new-chat-workspace-selector-view'
 import { NewChatWorkspaceSelectorView } from './new-chat-workspace-selector-view'
 
 /* ─── Constants ───────────────────────────────────────────────────────── */
@@ -114,6 +119,105 @@ function useNewChatPageOwner(
   const nodeId = selectedWorkspace && !isLocalWorkspace(selectedWorkspace)
     ? selectedWorkspace.locator.nodeId
     : null
+  const { data: nodes = [] } = useQuery({ ...getNodesOptions() })
+
+  // Git-backed workspaces with a parseable origin collapse into one merged
+  // repository entry per repo; other workspaces stay individual options.
+  const repoReplicasByKey = useMemo(() => {
+    const byKey = new Map<string, typeof workspaces>()
+    for (const workspace of workspaces) {
+      const key = workspaceRepoKey(workspace.gitIdentity)
+      if (!key || !parseRepoKey(key)) {
+        continue
+      }
+      const replicas = byKey.get(key) ?? []
+      replicas.push(workspace)
+      byKey.set(key, replicas)
+    }
+    return byKey
+  }, [workspaces])
+
+  const workspaceOptions = useMemo<NewChatWorkspaceOption[]>(() => {
+    const options: NewChatWorkspaceOption[] = []
+    const groupedWorkspaceIds = new Set<string>()
+    for (const [key, replicas] of repoReplicasByKey) {
+      const parts = parseRepoKey(key)
+      if (!parts) {
+        continue
+      }
+      for (const replica of replicas) {
+        groupedWorkspaceIds.add(replica.id)
+      }
+      options.push({
+        id: `repo:${key}`,
+        name: `${parts.owner}/${parts.repo}`,
+        repo: { owner: parts.owner, avatarUrl: repoOwnerAvatarUrl(parts) },
+      })
+    }
+    for (const workspace of workspaces) {
+      if (!groupedWorkspaceIds.has(workspace.id)) {
+        options.push({ id: workspace.id, name: workspace.name })
+      }
+    }
+    return options
+  }, [repoReplicasByKey, workspaces])
+
+  const selectedRepoKey = useMemo(() => {
+    if (!selectedWorkspace) {
+      return null
+    }
+    const key = workspaceRepoKey(selectedWorkspace.gitIdentity)
+    return key && repoReplicasByKey.has(key) ? key : null
+  }, [repoReplicasByKey, selectedWorkspace])
+
+  const selectedWorkspaceOption = useMemo(() => {
+    if (selectedRepoKey) {
+      return workspaceOptions.find(option => option.id === `repo:${selectedRepoKey}`) ?? null
+    }
+    if (selectedWorkspace) {
+      return workspaceOptions.find(option => option.id === selectedWorkspace.id) ?? null
+    }
+    return null
+  }, [selectedRepoKey, selectedWorkspace, workspaceOptions])
+
+  const machineOptions = useMemo(() => {
+    if (!selectedRepoKey) {
+      return []
+    }
+    return (repoReplicasByKey.get(selectedRepoKey) ?? [])
+      .map(replica => ({
+        nodeId: replica.locator.nodeId,
+        label: isLocalWorkspace(replica)
+          ? t('machine.thisDevice')
+          : resolveNodeDisplayName(nodes, replica.locator.nodeId) ?? replica.locator.nodeId,
+        local: isLocalWorkspace(replica),
+      }))
+      .sort((left, right) =>
+        Number(right.local) - Number(left.local) || left.label.localeCompare(right.label))
+  }, [nodes, repoReplicasByKey, selectedRepoKey, t])
+
+  const handleSelectWorkspaceOption = useCallback((optionId: string | null) => {
+    if (optionId === null || !optionId.startsWith('repo:')) {
+      setSelectedWorkspaceId(optionId)
+      return
+    }
+    // Switching repositories resets the machine to the local replica when one
+    // exists, otherwise to the first available replica.
+    const replicas = repoReplicasByKey.get(optionId.slice('repo:'.length)) ?? []
+    const preferred = replicas.find(isLocalWorkspace) ?? replicas[0]
+    setSelectedWorkspaceId(preferred?.id ?? null)
+  }, [repoReplicasByKey])
+
+  const handleSelectMachine = useCallback((machineNodeId: string) => {
+    if (!selectedRepoKey) {
+      return
+    }
+    const replica = (repoReplicasByKey.get(selectedRepoKey) ?? [])
+      .find(candidate => candidate.locator.nodeId === machineNodeId)
+    if (replica) {
+      setSelectedWorkspaceId(replica.id)
+    }
+  }, [repoReplicasByKey, selectedRepoKey])
   const composerState = useComposerState({
     context: 'new-chat',
     workspaceId: selectedProjectWorkspaceId,
@@ -418,6 +522,11 @@ function useNewChatPageOwner(
     selectedProjectWorkspaceId,
     selectedWorkspaceLocalPath,
     nodeId,
+    workspaceOptions,
+    selectedWorkspaceOption,
+    machineOptions,
+    handleSelectWorkspaceOption,
+    handleSelectMachine,
     setDraft,
     promptInputCollapsed,
     addFromPicker,
@@ -449,25 +558,36 @@ function NewChatComposerCard({
     quickActionText,
     addFromPicker,
     addingWorkspace,
-    setSelectedWorkspaceId,
     setDraft,
     selectedWorkspace,
     t,
-    workspaces,
   } = owner
 
-  const workspaceSelector = (
-    <NewChatWorkspaceSelectorView
-      selectedWorkspace={selectedWorkspace}
-      workspaces={workspaces}
-      groupLabel={t('workspace.group')}
-      adhocLabel={t('workspace.adhoc')}
-      addProjectLabel={t('workspace.addProject')}
-      addingProjectLabel={t('workspace.adding')}
-      addingProject={addingWorkspace}
-      onSelectWorkspace={setSelectedWorkspaceId}
-      onAddProject={() => void addFromPicker()}
-    />
+  const contextBar = (
+    <div className="flex min-w-0 items-center gap-1">
+      <NewChatWorkspaceSelectorView
+        selectedWorkspace={owner.selectedWorkspaceOption}
+        workspaces={owner.workspaceOptions}
+        groupLabel={t('workspace.group')}
+        adhocLabel={t('workspace.adhoc')}
+        addProjectLabel={t('workspace.addProject')}
+        addingProjectLabel={t('workspace.adding')}
+        addingProject={addingWorkspace}
+        onSelectWorkspace={owner.handleSelectWorkspaceOption}
+        onAddProject={() => void addFromPicker()}
+      />
+      {owner.machineOptions.length > 1
+        ? (
+            <NewChatMachineSelectorView
+              options={owner.machineOptions}
+              selectedNodeId={selectedWorkspace?.locator.nodeId ?? null}
+              groupLabel={t('machine.group')}
+              fallbackLabel={t('machine.thisDevice')}
+              onSelectMachine={owner.handleSelectMachine}
+            />
+          )
+        : null}
+    </div>
   )
 
   return (
@@ -476,7 +596,7 @@ function NewChatComposerCard({
       workspaceId={selectedWorkspace?.id ?? null}
       nodeId={owner.nodeId}
       active={active}
-      contextBar={workspaceSelector}
+      contextBar={contextBar}
       onSendIsolated={handleSendIsolated}
       replaceText={quickActionText}
       replaceTextKey={quickActionKey}

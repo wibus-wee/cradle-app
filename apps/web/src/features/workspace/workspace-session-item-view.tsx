@@ -1,5 +1,6 @@
 import {
   AlertLine as CircleAlertIcon,
+  ComputerLine as ComputerIcon,
   FolderLine as FolderIcon,
   GitPullRequestLine as WorkIcon,
   LoadingLine,
@@ -13,6 +14,11 @@ import { useTranslation } from 'react-i18next'
 
 import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import { RuntimeIcon } from '~/components/common/provider-icons'
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from '~/components/ui/preview-card'
 import {
   STATUS_ICON,
   STATUS_ICON_CLASS,
@@ -48,6 +54,8 @@ export interface WorkspaceSessionItemViewProps {
   relativeTime: string
   /** Pre-resolved Node display name when this session executes on a Fabric Node. */
   nodeLabel?: string | null
+  /** Remote machine hosting this session's workspace (merged repo rows only). */
+  remoteHost?: { name: string, path: string } | null
   draggable: boolean
   canOpenInNewWindow: boolean
   onOpen: () => void
@@ -87,6 +95,7 @@ export function WorkspaceSessionItemView({
   runtimeIcon,
   relativeTime,
   nodeLabel,
+  remoteHost = null,
   draggable,
   canOpenInNewWindow,
   onOpen,
@@ -311,6 +320,28 @@ export function WorkspaceSessionItemView({
                 >
                   {sessionTitle}
                 </span>
+                {remoteHost
+                  ? (
+                      <HoverCard>
+                        <HoverCardTrigger
+                          render={(
+                            <span
+                              className="grid size-3.5 shrink-0 place-items-center text-muted-foreground/70"
+                              aria-label={remoteHost.name}
+                              data-testid={`session-remote-host-${session.id}`}
+                              onClick={event => event.stopPropagation()}
+                            />
+                          )}
+                        >
+                          <ComputerIcon className="size-3" aria-hidden="true" />
+                        </HoverCardTrigger>
+                        <HoverCardContent side="top" className="w-auto max-w-72 p-2 text-xs">
+                          <div className="font-medium">{remoteHost.name}</div>
+                          <div className="truncate text-muted-foreground">{remoteHost.path}</div>
+                        </HoverCardContent>
+                      </HoverCard>
+                    )
+                  : null}
                 {session.unread && !isStreaming && !active
                   ? (
                       <span
