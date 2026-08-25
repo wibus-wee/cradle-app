@@ -89,7 +89,7 @@ export async function submitRuntimeToolApproval(input: {
 }): Promise<RuntimeToolApprovalResolution> {
   const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
   if (submitted) {
-    return submitted.resolution
+    return submitted
   }
 
   throw new AppError({
@@ -111,7 +111,7 @@ export function submitRuntimeToolApprovalIfPending(input: {
   if (!submitted) {
     return null
   }
-  return submitted.resolution
+  return submitted
 }
 
 function submitRuntimeToolApprovalIfPendingWithEvent(input: {
