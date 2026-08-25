@@ -266,6 +266,9 @@ describe('download center service', () => {
     expect(service.events.listenerCount).toBe(1)
     controller.abort()
     expect(service.events.listenerCount).toBe(0)
+    const openingFrame = await reader.read()
+    expect(openingFrame.done).toBe(false)
+    expect(new TextDecoder().decode(openingFrame.value)).toBe(': cradle-event-stream-open\n\n')
     await expect(reader.read()).resolves.toEqual({ done: true, value: undefined })
   })
 
