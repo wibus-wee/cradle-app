@@ -179,4 +179,34 @@ describe('pending runtime tool approval', () => {
     })
     releaseRequestedEvent()
   })
+
+  it('does not reject the native approval when the interaction recorder throws synchronously', async () => {
+    setRuntimeInteractionEventRecorder(() => {
+      throw new Error('synchronous interaction audit failure')
+    })
+
+    const pending = requestRuntimeToolApproval({
+      sessionId: 'session-pending-tool-approval-5',
+      runId: 'run-pending-tool-approval-5',
+      providerRequestId: 'request-5',
+      providerKind: 'openai-compatible',
+      runtimeKind: 'codex',
+      providerMethod: 'item/commandExecution/requestApproval',
+      toolCallId: 'server-request-request-5',
+      metadata: { command: 'echo approval' },
+    })
+
+    await expect(submitRuntimeToolApproval({
+      sessionId: 'session-pending-tool-approval-5',
+      requestId: 'request-5',
+      approved: true,
+    })).resolves.toEqual({
+      requestId: 'request-5',
+      approved: true,
+    })
+    await expect(pending).resolves.toEqual({
+      requestId: 'request-5',
+      approved: true,
+    })
+  })
 })

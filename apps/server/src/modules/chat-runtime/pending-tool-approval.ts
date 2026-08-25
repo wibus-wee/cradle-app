@@ -65,7 +65,7 @@ export async function requestRuntimeToolApproval(
     })
   })
 
-  void recordRuntimeInteractionRequested({
+  void recordRuntimeToolApprovalInteraction(() => recordRuntimeInteractionRequested({
     sessionId: input.sessionId,
     runId: input.runId,
     requestId: input.providerRequestId,
@@ -75,7 +75,7 @@ export async function requestRuntimeToolApproval(
     providerMethod: input.providerMethod,
     toolCallId: input.toolCallId,
     createdAt,
-  }).catch(() => undefined)
+  }))
 
   return pending
 }
@@ -89,7 +89,6 @@ export async function submitRuntimeToolApproval(input: {
 }): Promise<RuntimeToolApprovalResolution> {
   const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
   if (submitted) {
-    void submitted.eventRecorded.catch(() => undefined)
     return submitted.resolution
   }
 
@@ -112,7 +111,6 @@ export function submitRuntimeToolApprovalIfPending(input: {
   if (!submitted) {
     return null
   }
-  void submitted.eventRecorded.catch(() => undefined)
   return submitted.resolution
 }
 
@@ -122,7 +120,7 @@ function submitRuntimeToolApprovalIfPendingWithEvent(input: {
   approved: boolean
   scope?: 'once' | 'always'
   reason?: string
-}): { resolution: RuntimeToolApprovalResolution, eventRecorded: Promise<void> } | null {
+}): RuntimeToolApprovalResolution | null {
   const pendingKey = readPendingKey(input.sessionId, input.requestId)
   const pending = pendingToolApprovalById.get(pendingKey)
   if (!pending || pending.request.sessionId !== input.sessionId) {
@@ -137,18 +135,16 @@ function submitRuntimeToolApprovalIfPendingWithEvent(input: {
     ...(input.reason ? { reason: input.reason } : {}),
   }
   pending.resolve(resolution)
-  return {
-    resolution,
-    eventRecorded: recordRuntimeInteractionResolved({
-      sessionId: pending.request.sessionId,
-      runId: pending.request.runId,
-      requestId: input.requestId,
-      interactionKind: 'toolApproval',
-      resolution: 'submitted',
-      approved: input.approved,
-      updatedAt: currentUnixSeconds(),
-    }),
-  }
+  void recordRuntimeToolApprovalInteraction(() => recordRuntimeInteractionResolved({
+    sessionId: pending.request.sessionId,
+    runId: pending.request.runId,
+    requestId: input.requestId,
+    interactionKind: 'toolApproval',
+    resolution: 'submitted',
+    approved: input.approved,
+    updatedAt: currentUnixSeconds(),
+  }))
+  return resolution
 }
 
 export function rejectPendingToolApprovalsForRun(runId: string, error: Error): void {
@@ -158,14 +154,28 @@ export function rejectPendingToolApprovalsForRun(runId: string, error: Error): v
     }
     pendingToolApprovalById.delete(requestId)
     pending.reject(error)
-    void recordRuntimeInteractionResolved({
+    void recordRuntimeToolApprovalInteraction(() => recordRuntimeInteractionResolved({
       sessionId: pending.request.sessionId,
       runId: pending.request.runId,
       requestId: pending.request.providerRequestId,
       interactionKind: 'toolApproval',
       resolution: 'cancelled',
       updatedAt: currentUnixSeconds(),
-    }).catch(() => undefined)
+    }))
+  }
+}
+
+/**
+ * Interaction facts are diagnostic/audit records. Their recorder can be a
+ * synchronous database call, so catch both an immediate throw and an async
+ * rejection without allowing either to abort the native approval handshake.
+ */
+function recordRuntimeToolApprovalInteraction(record: () => Promise<void>): Promise<void> {
+  try {
+    return record().catch(() => undefined)
+  }
+  catch {
+    return Promise.resolve()
   }
 }
 
