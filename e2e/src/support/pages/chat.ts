@@ -523,11 +523,24 @@ export class ApprovalPage {
   }
 
   async allow(): Promise<void> {
-    await this.page.locator('[data-testid="approval-allow-btn"]').click()
+    await this.clickResponse('[data-testid="approval-allow-btn"]')
   }
 
   async deny(): Promise<void> {
-    await this.page.locator('[data-testid="approval-deny-btn"]').click()
+    await this.clickResponse('[data-testid="approval-deny-btn"]')
+  }
+
+  private async clickResponse(selector: string): Promise<void> {
+    const button = this.page.locator(selector)
+    await expect(button).toBeVisible()
+    try {
+      await button.click()
+    }
+    catch (error) {
+      if (await this.card().isVisible()) {
+        throw error
+      }
+    }
   }
 
   async expectHidden(timeout = 20_000): Promise<void> {

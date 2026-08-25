@@ -279,7 +279,10 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     if (
       pendingPassiveStreamLeaseRelease
       && !snapshotRowsQuery.isFetching
-      && snapshotRowsQuery.dataUpdatedAt > pendingPassiveStreamLeaseRelease.requestedDataUpdatedAt
+      && (
+        snapshotRowsQuery.dataUpdatedAt > pendingPassiveStreamLeaseRelease.requestedDataUpdatedAt
+        || runtimeIdle
+      )
     ) {
       pendingPassiveStreamLeaseReleaseRef.current = null
       const state = useChatStore.getState()

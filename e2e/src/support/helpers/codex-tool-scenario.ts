@@ -33,6 +33,7 @@ export function codexToolTurnExchanges(input: {
   toolName: string
   argumentsJson: string
   finalText?: string
+  continuationBodyTextExcludes?: string | readonly string[]
 }): SimulatorExchange[] {
   return [
     openAiFunctionCallExchange({
@@ -45,6 +46,7 @@ export function codexToolTurnExchanges(input: {
       label: `${input.label}-continuation`,
       text: input.finalText ?? CODEX_FINAL_TEXT,
       bodyTextIncludes: input.callId,
+      bodyTextExcludes: input.continuationBodyTextExcludes,
     }),
   ]
 }
@@ -137,5 +139,10 @@ export async function configureCodexApprovalSimulator(world: CradleWorld): Promi
       justification: 'E2E 需要在沙盒外写入探针文件',
       sandbox_permissions: 'require_escalated',
     }),
+    // The command string itself contains the output marker. Requiring the
+    // continuation not to contain the native failure envelope ensures this is
+    // an actual allow-and-execute round trip, not a failed tool call followed
+    // by a superficially successful scripted response.
+    continuationBodyTextExcludes: 'exec_command failed',
   })
 }
