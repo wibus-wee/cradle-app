@@ -18,6 +18,7 @@ import {
   getNodesByNodeIdGrantsQueryKey,
   getNodesOptions,
   getNodesQueryKey,
+  patchFabricRelayUrlMutation,
   postFabricMutation,
   postFabricNodeInvitationsApproveMutation,
   postFabricNodeInvitationsCompleteMutation,
@@ -40,6 +41,15 @@ export function useFabricMembership(enabled = true) {
 /** Current Relay endpoint used when creating the first Fabric. */
 export function useManagedRelay() {
   return useQuery({ ...getFabricManagedRelayOptions(), staleTime: 30_000 })
+}
+
+/** Update this device's saved Fabric Relay URL without changing its membership. */
+export function useUpdateFabricRelayUrl() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...patchFabricRelayUrlMutation(),
+    onSuccess: membership => queryClient.setQueryData(getFabricQueryKey(), membership),
+  })
 }
 
 /** Enrollment this device is waiting for an existing Fabric owner to approve. */

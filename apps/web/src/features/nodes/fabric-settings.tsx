@@ -18,6 +18,8 @@ import type {
 } from '~/features/settings/use-network-preferences'
 import { useNetworkPreferences } from '~/features/settings/use-network-preferences'
 
+import { useFabricMembership, useUpdateFabricRelayUrl } from './use-nodes'
+
 const ACCESS_OPTIONS: Array<{ value: NetworkInboundAccessMode, labelKey: 'settings.fabric.access.local' | 'settings.fabric.access.network' }> = [
   { value: 'local', labelKey: 'settings.fabric.access.local' },
   { value: 'network', labelKey: 'settings.fabric.access.network' },
@@ -49,10 +51,14 @@ function normalizeFabricUrl(value: string): string | null {
 export function FabricSettingsGroup() {
   const { t } = useTranslation('nodes')
   const { prefs, isLoading, savePrefs, isSaving } = useNetworkPreferences()
+  const membershipQuery = useFabricMembership()
+  const updateFabricRelayUrl = useUpdateFabricRelayUrl()
   const [externalUrlDraft, setExternalUrlDraft] = useState('')
   const [externalUrlError, setExternalUrlError] = useState(false)
   const [publicUrlDraft, setPublicUrlDraft] = useState('')
   const [publicUrlError, setPublicUrlError] = useState(false)
+  const [memberRelayUrlDraft, setMemberRelayUrlDraft] = useState('')
+  const [memberRelayUrlError, setMemberRelayUrlError] = useState(false)
 
   useEffect(() => {
     setExternalUrlDraft(prefs?.inbound.relayUrl ?? '')
@@ -63,6 +69,11 @@ export function FabricSettingsGroup() {
     setPublicUrlDraft(prefs?.inbound.managedRelayPublicUrl ?? '')
     setPublicUrlError(false)
   }, [prefs?.inbound.managedRelayPublicUrl])
+
+  useEffect(() => {
+    setMemberRelayUrlDraft(membershipQuery.data?.relayUrl ?? '')
+    setMemberRelayUrlError(false)
+  }, [membershipQuery.data?.relayUrl])
 
   const saveInboundPreference = (updates: Partial<NetworkInboundPreferences>) => {
     if (!prefs) {
@@ -92,6 +103,18 @@ export function FabricSettingsGroup() {
     }
   }
 
+  const saveMemberRelayUrl = (value: string) => {
+    const normalized = normalizeFabricUrl(value)
+    if (!normalized) {
+      setMemberRelayUrlError(true)
+      return
+    }
+    setMemberRelayUrlError(false)
+    updateFabricRelayUrl.mutate({ body: { relayUrl: normalized } }, {
+      onError: () => setMemberRelayUrlError(true),
+    })
+  }
+
   const disabled = !prefs || isSaving
 
   return (
@@ -108,6 +131,33 @@ export function FabricSettingsGroup() {
         )
         : (
           <>
+            {membershipQuery.data && (
+              <SettingsRow
+                label={t('settings.fabric.memberRelay.label')}
+                description={memberRelayUrlError
+                  ? t('settings.fabric.memberRelay.invalid')
+                  : t('settings.fabric.memberRelay.description')}
+                vertical
+              >
+                <Input
+                  value={memberRelayUrlDraft}
+                  onChange={(event) => {
+                    setMemberRelayUrlDraft(event.target.value)
+                    setMemberRelayUrlError(false)
+                  }}
+                  onBlur={() => saveMemberRelayUrl(memberRelayUrlDraft)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.currentTarget.blur()
+                    }
+                  }}
+                  disabled={updateFabricRelayUrl.isPending}
+                  placeholder="http://100.64.0.1:8787"
+                  aria-invalid={memberRelayUrlError ? true : undefined}
+                  aria-label={t('settings.fabric.memberRelay.label')}
+                />
+              </SettingsRow>
+            )}
             <SettingsRow
               label={t('settings.fabric.source.label')}
               description={t('settings.fabric.source.description')}

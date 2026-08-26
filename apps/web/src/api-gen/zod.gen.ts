@@ -568,6 +568,10 @@ export const zPostFabricBody = z.object({
     capabilities: z.array(z.string().min(1).regex(/.*\S.*/)).optional()
 });
 
+export const zPatchFabricRelayUrlBody = z.object({
+    relayUrl: z.string().min(1).regex(/.*\S.*/)
+});
+
 export const zPostFabricNodeInvitationsBody = z.object({
     relayUrl: z.string().min(1).regex(/.*\S.*/),
     fabricId: z.string().min(1).regex(/.*\S.*/),
@@ -3884,6 +3888,7 @@ export const zPostChatSessionsBySessionIdUserInputByRequestIdPath = z.object({
 
 export const zPostChatSessionsBySessionIdToolApprovalByRequestIdBody = z.object({
     approved: z.boolean(),
+    scope: z.enum(['once', 'always']).optional(),
     reason: z.string().optional()
 });
 

@@ -2936,6 +2936,34 @@ export type PostFabricResponses = {
 
 export type PostFabricResponse = PostFabricResponses[keyof PostFabricResponses];
 
+export type PatchFabricRelayUrlData = {
+    body: {
+        relayUrl: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/fabric/relay-url';
+};
+
+export type PatchFabricRelayUrlResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        fabricId: string;
+        relayUrl: string;
+        localNodeId: string;
+        role: string;
+        ownerPubkey: string;
+        nodeCertificate: unknown;
+        controllerCertificate?: unknown;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchFabricRelayUrlResponse = PatchFabricRelayUrlResponses[keyof PatchFabricRelayUrlResponses];
+
 export type GetFabricManagedRelayData = {
     body?: never;
     path?: never;
@@ -22047,6 +22075,7 @@ export type PostChatSessionsBySessionIdUserInputByRequestIdResponse = PostChatSe
 export type PostChatSessionsBySessionIdToolApprovalByRequestIdData = {
     body: {
         approved: boolean;
+        scope?: 'once' | 'always';
         reason?: string;
     };
     path: {
@@ -22064,6 +22093,7 @@ export type PostChatSessionsBySessionIdToolApprovalByRequestIdResponses = {
     200: {
         requestId: string;
         approved: boolean;
+        scope?: 'once' | 'always';
         reason?: string;
     };
 };
