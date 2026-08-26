@@ -34,6 +34,10 @@ const nodeGrant = t.Object(
 )
 
 export const FabricModel = {
+  updateRelayUrlBody: t.Object(
+    { relayUrl: nonBlankString },
+    { additionalProperties: false },
+  ),
   createBody: t.Object(
     {
       relayUrl: nonBlankString,

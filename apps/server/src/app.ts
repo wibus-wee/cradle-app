@@ -502,7 +502,10 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
   const runtimeResources = new RuntimeResourceRegistry()
   const fabricNodeConnector = new FabricNodeConnector('127.0.0.1', serverConfig.port)
   const unregisterFabricMembershipChangedListener = startBackgroundTasks
-    ? registerFabricMembershipChangedListener(() => fabricNodeConnector.start())
+    ? registerFabricMembershipChangedListener(() => {
+      fabricNodeConnector.stop()
+      fabricNodeConnector.start()
+    })
     : undefined
   const claudeUsageReconciliation = new ClaudeUsageReconciliationScheduler()
   const codexUsageReconciliation = new CodexUsageReconciliationScheduler()

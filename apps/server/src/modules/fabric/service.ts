@@ -119,6 +119,24 @@ export function getFabricMembership(): FabricMembershipView | null {
   return row && row.role !== 'pending-node' ? toView(row) : null
 }
 
+/** Update this Server's local Relay bootstrap address without changing Fabric identity. */
+export function updateFabricRelayUrl(input: { relayUrl: string }): FabricMembershipView {
+  const membership = getFabricMembership()
+  if (!membership) {
+    throw new AppError({ code: 'fabric_membership_required', status: 409, message: 'This Cradle Server has not joined a Fabric yet.' })
+  }
+  const relayUrl = normalizeRelayUrl(input.relayUrl)
+  const updated = db().update(fabricMembership).set({
+    relayUrl,
+    updatedAt: currentUnixSeconds(),
+  }).where(eq(fabricMembership.fabricId, membership.fabricId)).returning().get()
+  if (!updated) {
+    throw new AppError({ code: 'fabric_membership_invalid', status: 500, message: 'Fabric membership disappeared while updating its Relay URL.' })
+  }
+  notifyFabricMembershipChanged()
+  return toView(updated)
+}
+
 /**
  * Return the Relay endpoint selected by Cradle Desktop. Standalone servers
  * intentionally have no implicit relay.

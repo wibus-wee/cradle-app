@@ -255,6 +255,23 @@ describe('fabric node directory routes', () => {
     expect(offlineBody.scopes).toEqual(['view'])
   })
 
+  it('updates the local Relay URL without changing Fabric identity', async () => {
+    const server = await setup()
+    const updated = await server.handle(new Request('http://localhost/fabric/relay-url', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ relayUrl: 'http://100.82.14.23:8787' }),
+    }))
+
+    expect(updated.status).toBe(200)
+    expect(await updated.json()).toMatchObject({
+      fabricId: 'fabric-1',
+      relayUrl: 'http://100.82.14.23:8787',
+      localNodeId: 'node-local',
+    })
+    expect(db().select({ relayUrl: fabricMembership.relayUrl }).from(fabricMembership).get()).toEqual({ relayUrl: 'http://100.82.14.23:8787' })
+  })
+
   it('projects pending join requests and sends dual certificates for owner decisions', async () => {
     const server = await setup()
     const listed = await server.handle(new Request('http://localhost/fabric/node-invitations/requests'))
