@@ -414,6 +414,14 @@ export function resolveProviderTargetForRuntime(
       details: { providerTargetId: target.id, runtimeKind },
     })
   }
+  const borrowedRoute = readProviderExtensionRuntimeRoute({
+    providerTargetId: target.id,
+    acceptedProviderKinds,
+    publicModelId,
+  })
+  if (borrowedRoute) {
+    return projectProviderExtensionRoute(target, borrowedRoute)
+  }
   if (target.providerKind === 'universal') {
     const projected = projectUniversalProviderTargetForRuntime(target, runtimeKind)
     if (runtimeSupportsProviderKind(runtimeKind, projected.providerKind)) {
@@ -423,12 +431,7 @@ export function resolveProviderTargetForRuntime(
   if (runtimeSupportsProviderKind(runtimeKind, target.providerKind)) {
     return target
   }
-  const borrowedRoute = readProviderExtensionRuntimeRoute({
-    providerTargetId: target.id,
-    acceptedProviderKinds,
-    publicModelId,
-  })
-  return borrowedRoute ? projectProviderExtensionRoute(target, borrowedRoute) : target
+  return target
 }
 
 function projectProviderExtensionRoute(

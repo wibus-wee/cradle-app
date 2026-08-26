@@ -12,6 +12,7 @@ import {
   registerProviderExtension,
   resetProviderExtensionRegistry,
 } from '../../plugins/provider-extension-registry'
+import { resolveProviderTargetForRuntime } from '../provider-targets/service'
 import { readSecret, resetCredentialKeyringForTests, saveSecret } from '../secrets/service'
 import { resetProviderExtensionLifecycleListenersForTests, subscribeProviderExtensionLifecycle } from './events'
 import { configureProviderExtensionHost } from './host'
@@ -167,6 +168,47 @@ describe('provider extension lifecycle', () => {
     expect(onDisable).toHaveBeenCalledWith(expect.objectContaining({ reason: 'user-disabled' }))
     expect(events).toEqual(['enabling', 'enabled', 'disabling', 'disabled'])
     expect(listProviderTargetExtensions(TARGET_ID)).toHaveLength(1)
+  })
+
+  it('routes native Codex and Claude runtimes through an enabled borrowed extension', async () => {
+    const source = saveSecret({ kind: 'api-key', label: 'Source', secret: 'sk-source' })
+    insertTarget(source.id)
+    const extension = borrowedExtension()
+    extension.conversions = [{
+      fromProviderKind: 'openai-compatible',
+      routedProviderKinds: ['universal'],
+      addedProviderKinds: ['universal'],
+    }]
+    extension.onEnable = async () => ({
+      providerKinds: ['universal'],
+      state: { endpoint: 'http://127.0.0.1:8317/v1' },
+      outputCredential: { kind: 'api-key', label: 'CPA key', value: 'local-key' },
+    })
+    extension.onReconcile = extension.onEnable
+    extension.resolveRuntime = ({ publicModelId }) => ({
+      providerKind: 'universal',
+      config: { openaiBaseUrl: 'http://127.0.0.1:8317/v1' },
+      effectiveModelId: publicModelId ?? undefined,
+    })
+    registerProviderExtension(OWNER, extension)
+    await setProviderTargetExtensionEnabled({
+      providerTargetId: TARGET_ID,
+      owner: OWNER,
+      id: extension.id,
+      enabled: true,
+    })
+
+    for (const runtimeKind of ['codex', 'claude-agent'] as const) {
+      const resolved = resolveProviderTargetForRuntime(TARGET_ID, runtimeKind, 'model-a')
+      expect(resolved.providerKind).toBe('universal')
+      expect(JSON.parse(resolved.configJson)).toMatchObject({
+        openaiBaseUrl: 'http://127.0.0.1:8317/v1',
+      })
+      expect(resolved.extensionBinding).toMatchObject({
+        owner: OWNER,
+        extensionId: extension.id,
+      })
+    }
   })
 
   it('leases and losslessly returns a refreshable credential', async () => {
