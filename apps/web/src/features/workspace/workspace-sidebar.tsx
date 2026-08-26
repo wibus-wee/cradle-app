@@ -203,7 +203,7 @@ const WorkspaceGroup = memo(
     runtimeIconByKind,
     repo = null,
     headerHidden = false,
-    remoteHost = null,
+    remoteHostByWorkspaceId = null,
     onDelete,
     onTogglePin,
   }: {
@@ -217,8 +217,8 @@ const WorkspaceGroup = memo(
     repo?: WorkspaceRepoDisplay | null
     /** Render only the session lists; the parent merged repo row owns the header. */
     headerHidden?: boolean
-    /** Remote machine hosting this replica; shown per session in merged repo rows. */
-    remoteHost?: { name: string, path: string } | null
+    /** Per-session remote host resolution inside a merged repo row: replica workspace id → hosting machine. */
+    remoteHostByWorkspaceId?: ReadonlyMap<string, { name: string, path: string }> | null
     onDelete: (id: string) => void
     onTogglePin: (id: string, pinned: boolean) => void
   }) => {
@@ -987,7 +987,7 @@ const WorkspaceGroup = memo(
               sessionAttentionBySessionId={sessionAttentionBySessionId}
               locallyErroredSessionIds={locallyErroredSessionIds}
               runtimeIconByKind={runtimeIconByKind}
-              remoteHost={remoteHost}
+              remoteHostByWorkspaceId={remoteHostByWorkspaceId}
               onPrepareSessionOpen={handlePrepareSessionOpen}
               onPrefetchSession={prefetchSession}
               onRenameCommit={handleRenameSession}
@@ -1007,7 +1007,7 @@ const WorkspaceGroup = memo(
             sessionAttentionBySessionId={sessionAttentionBySessionId}
             locallyErroredSessionIds={locallyErroredSessionIds}
             runtimeIconByKind={runtimeIconByKind}
-            remoteHost={remoteHost}
+            remoteHostByWorkspaceId={remoteHostByWorkspaceId}
             onPrepareSessionOpen={handlePrepareSessionOpen}
             onPrefetchSession={prefetchSession}
             onRenameCommit={handleRenameSession}
@@ -1217,16 +1217,20 @@ const WorkspaceSidebarBody = memo(
       })
     }, [])
 
-    /** Remote host indicator for a replica's sessions inside a merged repo row. */
-    const remoteHostForReplica = useCallback(
-      (workspace: Workspace): { name: string, path: string } | null => {
-        if (isLocalWorkspace(workspace)) {
-          return null
+    /** Remote host resolution per replica inside a merged repo row (local replica excluded). */
+    const remoteHostByWorkspaceIdForReplicas = useCallback(
+      (replicas: Workspace[]): ReadonlyMap<string, { name: string, path: string }> => {
+        const byWorkspaceId = new Map<string, { name: string, path: string }>()
+        for (const replica of replicas) {
+          if (isLocalWorkspace(replica)) {
+            continue
+          }
+          byWorkspaceId.set(replica.id, {
+            name: resolveNodeDisplayName(nodes, replica.locator.nodeId) ?? replica.locator.nodeId,
+            path: replica.locator.path,
+          })
         }
-        return {
-          name: resolveNodeDisplayName(nodes, workspace.locator.nodeId) ?? workspace.locator.nodeId,
-          path: workspace.locator.path,
-        }
+        return byWorkspaceId
       },
       [nodes],
     )
@@ -1236,7 +1240,18 @@ const WorkspaceSidebarBody = memo(
     const renderedSidebarItems = useMemo(() => {
       type SidebarItem
         = | { kind: 'workspace', key: string, workspace: Workspace }
-          | { kind: 'cluster', key: string, name: string, replicas: Workspace[] }
+          | {
+            kind: 'cluster'
+            key: string
+            name: string
+            replicas: Workspace[]
+            /** Local replica when present, else the first replica; owns session groups/menus. */
+            primaryWorkspace: Workspace
+            /** Sessions of every replica, concatenated into one merged list. */
+            sessions: WorkspaceSession[]
+            /** Non-local replica workspace id → hosting machine, for per-session indicators. */
+            remoteHostByWorkspaceId: ReadonlyMap<string, { name: string, path: string }>
+          }
       const clusterByWorkspaceId = new Map<string, (typeof repoGrouping.clusters)[number]>()
       for (const cluster of repoGrouping.clusters) {
         for (const replica of cluster.replicas) {
@@ -1260,10 +1275,14 @@ const WorkspaceSidebarBody = memo(
           key: cluster.key,
           name: cluster.name,
           replicas: cluster.replicas,
+          primaryWorkspace: cluster.replicas.find(isLocalWorkspace) ?? cluster.replicas[0],
+          sessions: cluster.replicas.flatMap(replica =>
+            sessionsByWorkspaceId.get(replica.id) ?? EMPTY_WORKSPACE_SESSIONS),
+          remoteHostByWorkspaceId: remoteHostByWorkspaceIdForReplicas(cluster.replicas),
         })
       }
       return items
-    }, [visibleWorkspaces, repoGrouping])
+    }, [visibleWorkspaces, repoGrouping, sessionsByWorkspaceId, remoteHostByWorkspaceIdForReplicas])
     const filteredFlatEntries = useMemo(() => {
       const candidates: SidebarSessionEntry[] = []
 
@@ -1448,20 +1467,20 @@ const WorkspaceSidebarBody = memo(
                       onToggleExpanded={() => toggleClusterExpanded(item.key)}
                     >
                       {clusterExpanded
-                        ? item.replicas.map(replica => (
+                        ? (
                             <WorkspaceGroup
-                              key={replica.id}
-                              workspace={replica}
-                              sessions={sessionsByWorkspaceId.get(replica.id) ?? EMPTY_WORKSPACE_SESSIONS}
+                              key={item.key}
+                              workspace={item.primaryWorkspace}
+                              sessions={item.sessions}
                               listFilters={listFilters}
                               workByPrimarySessionId={workByPrimarySessionId}
                               runtimeIconByKind={runtimeIconByKind}
                               headerHidden
-                              remoteHost={remoteHostForReplica(replica)}
+                              remoteHostByWorkspaceId={item.remoteHostByWorkspaceId}
                               onDelete={onDelete}
                               onTogglePin={onTogglePin}
                             />
-                          ))
+                          )
                         : null}
                     </WorkspaceRepoRowView>
                   )

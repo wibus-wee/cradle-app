@@ -14,7 +14,7 @@ export interface RepoOwnerAvatarProps {
  */
 export function RepoOwnerAvatar({ owner, avatarUrl, className }: RepoOwnerAvatarProps) {
   return (
-    <Avatar size="sm" className={cn('size-4', className)} aria-label={owner}>
+    <Avatar className={cn('size-4', className)} aria-label={owner}>
       {avatarUrl
         ? <AvatarImage src={avatarUrl} alt="" loading="lazy" />
         : null}

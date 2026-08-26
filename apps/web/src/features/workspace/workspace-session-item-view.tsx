@@ -52,8 +52,6 @@ export interface WorkspaceSessionItemViewProps {
   isRegeneratingTitle: boolean
   runtimeIcon: RuntimeIconDescriptor | undefined
   relativeTime: string
-  /** Pre-resolved Node display name when this session executes on a Fabric Node. */
-  nodeLabel?: string | null
   /** Remote machine hosting this session's workspace (merged repo rows only). */
   remoteHost?: { name: string, path: string } | null
   draggable: boolean
@@ -94,7 +92,6 @@ export function WorkspaceSessionItemView({
   isRegeneratingTitle,
   runtimeIcon,
   relativeTime,
-  nodeLabel,
   remoteHost = null,
   draggable,
   canOpenInNewWindow,
@@ -113,7 +110,6 @@ export function WorkspaceSessionItemView({
 }: WorkspaceSessionItemViewProps) {
   const { t } = useTranslation('workspace')
   const { t: tWork } = useTranslation('work')
-  const { t: tNodes } = useTranslation('nodes')
   const sessionTitle = session.title?.trim()
     || work?.title
     || t('session.fallbackTitle')
@@ -297,7 +293,7 @@ export function WorkspaceSessionItemView({
                 {session.pinned
                   ? (
                       <PinIcon
-                        className="size-3 shrink-0 !text-primary/60"
+                        className="size-3.5 shrink-0 !text-primary/60"
                         aria-label={t('session.aria.pinned')}
                         data-testid={`session-pin-indicator-${session.id}`}
                       />
@@ -333,7 +329,7 @@ export function WorkspaceSessionItemView({
                             />
                           )}
                         >
-                          <ComputerIcon className="size-3" aria-hidden="true" />
+                          <ComputerIcon className="size-3.5" aria-hidden="true" />
                         </HoverCardTrigger>
                         <HoverCardContent side="top" className="w-auto max-w-72 p-2 text-xs">
                           <div className="font-medium">{remoteHost.name}</div>
@@ -410,18 +406,6 @@ export function WorkspaceSessionItemView({
                     >
                       <FolderIcon className="size-3 shrink-0" aria-hidden="true" />
                       <span className="min-w-0 truncate">{workspace.name}</span>
-                    </span>
-                    )
-                  : null}
-                {nodeLabel
-                  ? (
-                    <span
-                      className="flex min-w-0 items-center gap-1.5 px-2.5 pb-1.5 pl-8 text-[11px] text-muted-foreground"
-                      data-testid={`session-node-${session.id}`}
-                    >
-                      <span className="min-w-0 truncate">
-                        {tNodes('session.onNode', { nodeName: nodeLabel })}
-                      </span>
                     </span>
                     )
                   : null}

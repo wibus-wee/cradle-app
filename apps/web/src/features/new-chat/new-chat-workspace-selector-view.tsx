@@ -54,7 +54,7 @@ export function NewChatWorkspaceSelectorView({
                 className="size-3.5"
               />
             )
-          : <FolderIcon className="size-3 shrink-0" aria-hidden="true" />}
+          : <FolderIcon className="size-3.5 shrink-0" aria-hidden="true" />}
         <span className="max-w-24 truncate">{selectedWorkspace?.name ?? adhocLabel}</span>
       </MenuTrigger>
       <MenuPopup>
@@ -65,7 +65,7 @@ export function NewChatWorkspaceSelectorView({
             onClick={() => onSelectWorkspace(null)}
             data-testid="new-chat-workspace-option-adhoc"
           >
-            <MessageSquareIcon className="size-3" aria-hidden="true" />
+            <MessageSquareIcon className="size-3.5" aria-hidden="true" />
             <span className="flex-1">{adhocLabel}</span>
           </MenuItem>
           {workspaces.map(workspace => (
@@ -82,7 +82,7 @@ export function NewChatWorkspaceSelectorView({
                       className="size-3.5"
                     />
                   )
-                : <FolderIcon className="size-3" aria-hidden="true" />}
+                : <FolderIcon className="size-3.5" aria-hidden="true" />}
               <span className="flex-1">{workspace.name}</span>
             </MenuItem>
           ))}
@@ -92,7 +92,7 @@ export function NewChatWorkspaceSelectorView({
             disabled={addingProject}
             data-testid="new-chat-workspace-add-project"
           >
-            <FolderPlusIcon className="size-3" aria-hidden="true" />
+            <FolderPlusIcon className="size-3.5" aria-hidden="true" />
             <span className="flex-1">{addingProject ? addingProjectLabel : addProjectLabel}</span>
           </MenuItem>
         </MenuGroup>

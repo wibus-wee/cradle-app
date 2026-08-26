@@ -52,7 +52,7 @@ export function WorkspaceRepoRowView({
           aria-hidden="true"
         />
         {owner
-          ? <RepoOwnerAvatar owner={owner} avatarUrl={avatarUrl} />
+          ? <RepoOwnerAvatar owner={owner} avatarUrl={avatarUrl} className="size-3.5" />
           : <GitBranchLine className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />}
         <span className="truncate text-xs font-medium text-sidebar-foreground">
           {name}
