@@ -6,6 +6,7 @@ import type {
   CancelTurnInput,
   ChatRuntime,
   ForkRuntimeSessionInput,
+  GenerateSessionTitleInput,
   GetCapabilitiesInput,
   GetContextUsageInput,
   GetUiSlotStatesInput,
@@ -273,6 +274,16 @@ export class AcpChatProvider implements ChatRuntime {
     return createAcpPresentation(resolved.state)
   }
 
+  async getDynamicCapabilities(input: GetCapabilitiesInput) {
+    const resolved = await this.resolveConnectedSession(input)
+    return {
+      ...this.capabilities,
+      sessionModelSwitch: resolved.state.configOptions.some(isAcpModelConfigOption)
+        ? 'in-session' as const
+        : 'unsupported' as const,
+    }
+  }
+
   async getUiSlotStates(input: GetUiSlotStatesInput) {
     const resolved = await this.resolveConnectedSession(input)
     return projectAcpUiSlotStates(input.runtimeSession.chatSessionId, resolved.state)
@@ -283,6 +294,11 @@ export class AcpChatProvider implements ChatRuntime {
     if (!providerSessionId) { return null }
     const resolved = await this.resolveConnectedSession(input)
     return projectAcpContextUsage(providerSessionId, resolved.state)
+  }
+
+  async generateSessionTitle(input: GenerateSessionTitleInput): Promise<string | null> {
+    const resolved = await this.resolveConnectedSession(input)
+    return resolved.state.title
   }
 
   async updateRuntimeMode(input: UpdateRuntimeModeInput): Promise<void> {

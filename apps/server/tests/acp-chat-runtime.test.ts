@@ -62,6 +62,17 @@ vi.mock('@agentclientprotocol/sdk', () => {
         readTextFile: 'fs/read_text_file',
         writeTextFile: 'fs/write_text_file',
       },
+      elicitation: {
+        create: 'elicitation/create',
+        complete: 'elicitation/complete',
+      },
+      terminal: {
+        create: 'terminal/create',
+        output: 'terminal/output',
+        waitForExit: 'terminal/wait_for_exit',
+        kill: 'terminal/kill',
+        release: 'terminal/release',
+      },
     },
   } as const
 
@@ -835,6 +846,10 @@ describe('acp chat runtime capability', () => {
           readTextFile: true,
           writeTextFile: true,
         },
+        plan: {},
+        elicitation: { form: {}, url: {} },
+        session: { configOptions: { boolean: {} } },
+        terminal: true,
       },
     }))
   })

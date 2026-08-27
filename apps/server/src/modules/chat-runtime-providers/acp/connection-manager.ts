@@ -69,6 +69,7 @@ export interface AcpConnectionManagerOptions {
 }
 
 export interface AcpSessionState {
+  title: string | null
   modes: SessionModeState | null
   configOptions: SessionConfigOption[]
   availableCommands: AvailableCommand[]
@@ -1049,6 +1050,9 @@ export class AcpConnectionManager {
     const state = conn?.sessionStates.get(params.sessionId)
     if (params.update.sessionUpdate === 'session_info_update') {
       if (params.update.title) {
+        if (state) {
+          state.title = params.update.title
+        }
         for (const handler of [...this.sessionTitleHandlers]) {
           try {
             handler(params.sessionId, params.update.title)
@@ -1315,6 +1319,7 @@ function readUsage(response: PromptResponse | null): {
 
 function readAcpSessionState(response: { modes?: SessionModeState | null, configOptions?: SessionConfigOption[] | null }): AcpSessionState {
   return {
+    title: null,
     modes: response.modes ?? null,
     configOptions: response.configOptions ?? [],
     availableCommands: [],
