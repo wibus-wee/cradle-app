@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
   ChatRuntimeGoalUiSlotState,
+  ChatRuntimeModeUiSlotState,
   ChatRuntimePlanUiSlotState,
   ChatRuntimeProgressUiSlotState,
   ChatRuntimeTerminalUiSlotState,
@@ -13,6 +14,7 @@ import type {
   ChatRuntimeUserInputUiSlotState,
 } from '../capabilities/chat-capabilities'
 import { GoalSlotState } from './composer-slots/goal-slot-state'
+import { ModeSlotState } from './composer-slots/mode-slot-state'
 import { PlanSlotState } from './composer-slots/plan-slot-state'
 import { ProgressSlotState } from './composer-slots/progress-slot-state'
 import { QuickQuestionSlotState } from './composer-slots/quick-question-slot-state'
@@ -91,6 +93,9 @@ export function ComposerSlotStates({
   const goalState = states.find((state): state is ChatRuntimeGoalUiSlotState => {
     return state.kind === 'goal' && composerSlotIds.has(state.slotId)
   })
+  const modeState = states.find((state): state is ChatRuntimeModeUiSlotState => {
+    return state.kind === 'mode' && composerSlotIds.has(state.slotId)
+  })
   const standaloneProgressState = findComposerStandaloneProgressState(states, composerSlotIds)
   const planState = states.find((state): state is ChatRuntimePlanUiSlotState => {
     return (
@@ -142,6 +147,12 @@ export function ComposerSlotStates({
   }, [dismissPlanSignal])
 
   const entryCandidates: Array<ComposerSlotEntry | null> = [
+    modeState && sessionId
+      ? {
+        key: `mode:${modeState.threadId}`,
+        node: <ModeSlotState state={modeState} sessionId={sessionId} className={className} />,
+      }
+      : null,
     usageState
       ? {
         key: 'usage',

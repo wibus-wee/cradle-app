@@ -27,7 +27,7 @@ export const ACP_RUNTIME_METADATA = {
     {
       capability: 'runtime',
       status: 'experimental',
-      reason: 'ACP agent implementations vary; Cradle currently supports chat streaming and bridged tool approvals only.',
+      reason: 'ACP agent implementations vary and unstable protocol capabilities are exposed only when advertised by the connected agent.',
     },
     {
       capability: 'lastTurnRollback',
@@ -47,8 +47,8 @@ export const ACP_RUNTIME_CAPABILITIES = {
   supportsShellExecution: false,
   supportsLastTurnRollback: false,
   supportsRuntimeSettings: false,
-  supportsUiSlotStates: false,
-  supportsDynamicCapabilities: false,
-  supportsTitleGeneration: false,
+  supportsUiSlotStates: true,
+  supportsDynamicCapabilities: true,
+  supportsTitleGeneration: true,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities

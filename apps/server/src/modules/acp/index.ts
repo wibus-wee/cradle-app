@@ -205,6 +205,17 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     body: AcpModel.draftSessionBody,
     response: { 200: AcpModel.draftSessionResult },
   })
+  .delete('/agents/:agentId/draft-session/:sessionId', async ({ params }) => {
+    await requireAcpRuntime().closeDraftSession({
+      agentId: requireNonBlankString(params.agentId, 'agentId'),
+      sessionId: requireNonBlankString(params.sessionId, 'sessionId'),
+    })
+    return { ok: true as const }
+  }, {
+    detail: { summary: 'Close an abandoned ACP draft session' },
+    params: AcpModel.draftSessionParams,
+    response: { 200: t.Object({ ok: t.Literal(true) }) },
+  })
   .put('/agents/:agentId/installation', ({ params, body }) => {
     return Acp.install(
       requireNonBlankString(params.agentId, 'agentId'),

@@ -19287,6 +19287,27 @@ export type PostAcpAgentsByAgentIdDraftSessionResponses = {
 
 export type PostAcpAgentsByAgentIdDraftSessionResponse = PostAcpAgentsByAgentIdDraftSessionResponses[keyof PostAcpAgentsByAgentIdDraftSessionResponses];
 
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdData = {
+    body?: never;
+    path: {
+        agentId: string;
+        sessionId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/draft-session/{sessionId}';
+};
+
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponse = DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses[keyof DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses];
+
 export type DeleteAcpAgentsByAgentIdInstallationData = {
     body?: never;
     path: {
@@ -20096,6 +20117,17 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             supportsNamespaceTools: boolean | null;
             updatedAt: number;
         } | {
+            kind: 'mode';
+            slotId: string;
+            threadId: string;
+            currentModeId: string;
+            modes: Array<{
+                id: string;
+                name: string;
+                description: string;
+            }>;
+            updatedAt: number;
+        } | {
             kind: 'reasoning';
             slotId: string;
             threadId: string;
@@ -20158,6 +20190,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                 options: Array<{
                     label: string;
                     description: string;
+                    url?: string;
                 }> | null;
             }>;
             createdAt: number;
@@ -22157,11 +22190,34 @@ export type PostChatSessionsBySessionIdUserInputByRequestIdResponses = {
 
 export type PostChatSessionsBySessionIdUserInputByRequestIdResponse = PostChatSessionsBySessionIdUserInputByRequestIdResponses[keyof PostChatSessionsBySessionIdUserInputByRequestIdResponses];
 
+export type PutChatSessionsBySessionIdRuntimeModeData = {
+    body: {
+        modeId: string;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-mode';
+};
+
+export type PutChatSessionsBySessionIdRuntimeModeResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type PutChatSessionsBySessionIdRuntimeModeResponse = PutChatSessionsBySessionIdRuntimeModeResponses[keyof PutChatSessionsBySessionIdRuntimeModeResponses];
+
 export type PostChatSessionsBySessionIdToolApprovalByRequestIdData = {
     body: {
         approved: boolean;
         scope?: 'once' | 'always';
         reason?: string;
+        selectedOptionId?: string;
     };
     path: {
         sessionId: string;
@@ -22180,6 +22236,7 @@ export type PostChatSessionsBySessionIdToolApprovalByRequestIdResponses = {
         approved: boolean;
         scope?: 'once' | 'always';
         reason?: string;
+        selectedOptionId?: string;
     };
 };
 

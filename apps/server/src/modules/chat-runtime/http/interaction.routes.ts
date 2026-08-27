@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 
 import { releaseSideConversation } from '../../provider-runtime/side-conversation-registry'
+import { updateChatRuntimeMode } from '../interaction/runtime-mode'
 import { submitChatRuntimeUserInput } from '../interaction/user-input'
 import { ChatRuntimeModel } from '../model'
 import { submitRuntimeToolApproval } from '../pending-tool-approval'
@@ -155,6 +156,19 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       response: { 200: ChatRuntimeModel.userInputResponse },
     },
   )
+  .put(
+    '/sessions/:sessionId/runtime-mode',
+    async ({ params, body }) => updateChatRuntimeMode({
+      sessionId: params.sessionId,
+      modeId: body.modeId,
+    }),
+    {
+      detail: { summary: 'Set the provider-native mode for a chat runtime session' },
+      params: ChatRuntimeModel.sessionIdParams,
+      body: ChatRuntimeModel.runtimeModeBody,
+      response: { 200: ChatRuntimeModel.cancelResponse },
+    },
+  )
   // POST /chat/sessions/:sessionId/tool-approval/:requestId -> resolve a provider pending tool approval request
   .post(
     '/sessions/:sessionId/tool-approval/:requestId',
@@ -165,6 +179,7 @@ export const chatRuntimeInteractionRoutes = new Elysia({
         approved: body.approved,
         scope: body.scope,
         reason: body.reason,
+        selectedOptionId: body.selectedOptionId,
       })
     },
     {

@@ -87,6 +87,11 @@ export const AcpModel = {
     })),
   }),
 
+  draftSessionParams: t.Object({
+    agentId: t.String({ minLength: 1 }),
+    sessionId: t.String({ minLength: 1 }),
+  }),
+
   authMethod,
 
   authMethodsResult: t.Object({

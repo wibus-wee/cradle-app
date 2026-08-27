@@ -3036,6 +3036,11 @@ export const zPostAcpAgentsByAgentIdDraftSessionPath = z.object({
     agentId: z.string().min(1)
 });
 
+export const zDeleteAcpAgentsByAgentIdDraftSessionBySessionIdPath = z.object({
+    agentId: z.string().min(1),
+    sessionId: z.string().min(1)
+});
+
 export const zDeleteAcpAgentsByAgentIdInstallationPath = z.object({
     agentId: z.string().min(1)
 });
@@ -3903,10 +3908,19 @@ export const zPostChatSessionsBySessionIdUserInputByRequestIdPath = z.object({
     requestId: z.string().min(1)
 });
 
+export const zPutChatSessionsBySessionIdRuntimeModeBody = z.object({
+    modeId: z.string().min(1)
+});
+
+export const zPutChatSessionsBySessionIdRuntimeModePath = z.object({
+    sessionId: z.string().min(1)
+});
+
 export const zPostChatSessionsBySessionIdToolApprovalByRequestIdBody = z.object({
     approved: z.boolean(),
     scope: z.enum(['once', 'always']).optional(),
-    reason: z.string().optional()
+    reason: z.string().optional(),
+    selectedOptionId: z.string().min(1).optional()
 });
 
 export const zPostChatSessionsBySessionIdToolApprovalByRequestIdPath = z.object({

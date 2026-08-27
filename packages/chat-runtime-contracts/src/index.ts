@@ -286,6 +286,7 @@ export type RuntimeUiSlotStateKind
     | 'goal'
     | 'mcp'
     | 'model'
+    | 'mode'
     | 'plan'
     | 'progress'
     | 'plugin'
@@ -419,6 +420,15 @@ export interface RuntimeModelUiSlotState {
   supportsImages: boolean | null
   supportsWebSearch: boolean | null
   supportsNamespaceTools: boolean | null
+  updatedAt: number
+}
+
+export interface RuntimeModeUiSlotState {
+  kind: 'mode'
+  slotId: string
+  threadId: string
+  currentModeId: string
+  modes: Array<{ id: string, name: string, description: string }>
   updatedAt: number
 }
 
@@ -759,6 +769,7 @@ export type RuntimeUiSlotState
     | RuntimeGoalUiSlotState
     | RuntimeMcpUiSlotState
     | RuntimeModelUiSlotState
+    | RuntimeModeUiSlotState
     | RuntimePlanUiSlotState
     | RuntimeProgressUiSlotState
     | RuntimePluginUiSlotState
@@ -967,6 +978,11 @@ export interface ProviderContext {
     patch: RuntimeSettingsPatch
   }) => Promise<void>
   requestUserInput?: (input: RuntimeUserInputRequest) => Promise<RuntimeUserInputResolution>
+  resolveUserInput?: (input: {
+    sessionId: string
+    requestId: string
+    answers: Record<string, string[]>
+  }) => Promise<RuntimeUserInputResolution>
   requestToolApproval?: (input: RuntimeToolApprovalRequest) => Promise<RuntimeToolApprovalResolution>
   recordObservability?: (input: RuntimeObservabilityEventInput) => void
   logger?: RuntimeLogger
@@ -975,6 +991,7 @@ export interface ProviderContext {
 export interface RuntimeUserInputOption {
   label: string
   description: string
+  url?: string
 }
 
 export interface RuntimeUserInputQuestion {
@@ -1017,6 +1034,11 @@ export interface RuntimeToolApprovalRequest {
   runtimeKind: RuntimeKind
   providerMethod: string
   toolCallId: string
+  options?: Array<{
+    optionId: string
+    label: string
+    kind: 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always'
+  }>
   metadata?: Record<string, unknown>
 }
 
@@ -1028,6 +1050,7 @@ export interface RuntimeToolApprovalResolution {
    */
   scope?: 'once' | 'always'
   reason?: string
+  selectedOptionId?: string
 }
 
 export interface ProviderAuthMethod {
@@ -1527,6 +1550,10 @@ export interface UpdateRuntimeSettingsInput {
   settings: RuntimeSettings
 }
 
+export interface UpdateRuntimeModeInput extends GetCapabilitiesInput {
+  modeId: string
+}
+
 export interface RuntimeGoalContinuationOptions {
   includeBlockedGoals?: boolean
 }
@@ -1627,6 +1654,7 @@ export interface ChatRuntime {
   cancelTurn: (input: CancelTurnInput) => Promise<void>
   listModels?: (input: ListRuntimeModelsInput) => Promise<RuntimeModelCatalog>
   updateRuntimeSettings?: (input: UpdateRuntimeSettingsInput) => Promise<void>
+  updateRuntimeMode?: (input: UpdateRuntimeModeInput) => Promise<void>
   healthCheck?: () => Promise<ProviderHealthStatus>
   dispose?: () => Promise<void>
 }

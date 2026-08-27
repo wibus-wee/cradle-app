@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import type { RuntimeToolApprovalOption } from '../../rendering/chat-tool-entities'
 import type { ToolState } from '../../rendering/tool-ui-classifier'
 
 export interface ToolCallBlockProps {
@@ -11,6 +12,7 @@ export interface ToolCallBlockProps {
     id: string
     approved?: boolean
     reason?: string
+    options?: RuntimeToolApprovalOption[]
   }
   argumentsText?: string
   input?: unknown
@@ -19,6 +21,6 @@ export interface ToolCallBlockProps {
   sessionId?: string | null
   autoOpenArtifact?: boolean
   workspaceDiffTarget?: { workspaceId: string, ownerId?: string | null }
-  onApprovalResponse?: (approval: { id: string, approved: boolean }) => void
+  onApprovalResponse?: (approval: { id: string, approved: boolean, selectedOptionId?: string }) => void
   children?: ReactNode
 }

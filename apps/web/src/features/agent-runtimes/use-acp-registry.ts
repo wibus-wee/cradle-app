@@ -61,6 +61,20 @@ export function listAcpDistributionTypes(agent: AcpRegistryAgent): AcpDistributi
   return ACP_DISTRIBUTION_TYPES.filter(type => agent.distribution[type] != null)
 }
 
+export function useAcpDistributionTypes(agent: AcpRegistryAgent) {
+  const query = useQuery({
+    ...acpRegistryApi.distributionTypesOptions({ path: { agentId: agent.id } }),
+    staleTime: 5 * 60_000,
+  })
+  const serverTypes = (query.data?.types ?? []).filter(
+    (type): type is AcpDistributionType => ACP_DISTRIBUTION_TYPES.includes(type as AcpDistributionType),
+  )
+  return {
+    ...query,
+    distributionTypes: query.isSuccess ? serverTypes : listAcpDistributionTypes(agent),
+  }
+}
+
 export function useAcpRegistry() {
   const query = useQuery({
     ...acpRegistryApi.registryOptions(),

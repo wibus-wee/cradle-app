@@ -10,6 +10,7 @@ import type {
 import type { UIMessageChunk } from 'ai'
 
 import { providerChunk } from '../kit/chunk-mapper'
+import { buildAcpToolInput, buildAcpToolOutput } from './tools/mapper'
 
 export class AcpChunkMapper {
   private currentMessageItemId: string | null = null
@@ -47,10 +48,10 @@ export class AcpChunkMapper {
   }
 
   private handleAgentMessage(update: ContentChunk): UIMessageChunk[] {
+    const file = extractFile(update.content)
+    if (file) { return [providerChunk.file(file)] }
     const text = extractText(update.content)
-    if (text === null) {
-      return []
-    }
+    if (text === null) { return [] }
 
     if (!this.currentMessageItemId) {
       this.currentMessageItemId = randomUUID()
@@ -81,33 +82,46 @@ export class AcpChunkMapper {
   }
 
   private handleToolCall(update: ToolCall): UIMessageChunk[] {
-    const output = stringifyPayload(update.rawOutput)
     const chunks: UIMessageChunk[] = [
       providerChunk.toolInputStart(update.toolCallId, update.title),
+      providerChunk.toolInputAvailable({
+        toolCallId: update.toolCallId,
+        toolName: update.title,
+        input: buildAcpToolInput(update, update.title),
+      }),
     ]
-
-    const input = update.rawInput
-    if (input !== undefined) {
-      chunks.push(providerChunk.toolInputAvailable({ toolCallId: update.toolCallId, toolName: update.title, input }))
-    }
-
     if (update.status === 'completed') {
-      chunks.push(providerChunk.toolOutputAvailable({ toolCallId: update.toolCallId, output: output || '' }))
+      chunks.push(providerChunk.toolOutputAvailable({
+        toolCallId: update.toolCallId,
+        output: buildAcpToolOutput(update, update.title),
+      }))
+    }
+    if (update.status === 'failed') {
+      chunks.push(providerChunk.toolOutputError(update.toolCallId, stringifyPayload(update.rawOutput) ?? 'ACP tool call failed'))
     }
 
     return chunks
   }
 
   private handleToolCallUpdate(update: ToolCallUpdate): UIMessageChunk[] {
-    const output = stringifyPayload(update.rawOutput)
     const chunks: UIMessageChunk[] = []
-
-    if (update.rawInput !== undefined) {
-      chunks.push(providerChunk.toolInputAvailable({ toolCallId: update.toolCallId, toolName: update.title ?? update.kind ?? 'tool', input: update.rawInput }))
+    const title = update.title ?? update.kind ?? 'tool'
+    if (update.rawInput !== undefined || update.content || update.locations || update.kind) {
+      chunks.push(providerChunk.toolInputAvailable({
+        toolCallId: update.toolCallId,
+        toolName: title,
+        input: buildAcpToolInput(update, title),
+      }))
     }
-
-    if (output) {
-      chunks.push(providerChunk.toolOutputAvailable({ toolCallId: update.toolCallId, output: output || '' }))
+    if (update.status === 'completed' || update.rawOutput !== undefined || update.content) {
+      chunks.push(providerChunk.toolOutputAvailable({
+        toolCallId: update.toolCallId,
+        output: buildAcpToolOutput(update, title),
+        preliminary: update.status !== 'completed',
+      }))
+    }
+    if (update.status === 'failed') {
+      chunks.push(providerChunk.toolOutputError(update.toolCallId, stringifyPayload(update.rawOutput) ?? 'ACP tool call failed'))
     }
 
     return chunks
@@ -115,7 +129,23 @@ export class AcpChunkMapper {
 }
 
 function extractText(block: ContentBlock): string | null {
-  return block.type === 'text' ? block.text : null
+  if (block.type === 'text') { return block.text }
+  if (block.type === 'resource' && 'text' in block.resource) { return block.resource.text }
+  return null
+}
+
+function extractFile(block: ContentBlock): { mediaType: string, url: string } | null {
+  if (block.type === 'image' || block.type === 'audio') {
+    return { mediaType: block.mimeType, url: `data:${block.mimeType};base64,${block.data}` }
+  }
+  if (block.type === 'resource_link') {
+    return { mediaType: block.mimeType ?? 'application/octet-stream', url: block.uri }
+  }
+  if (block.type === 'resource' && 'blob' in block.resource) {
+    const mediaType = block.resource.mimeType ?? 'application/octet-stream'
+    return { mediaType, url: `data:${mediaType};base64,${block.resource.blob}` }
+  }
+  return null
 }
 
 function stringifyPayload(value: unknown): string | null {

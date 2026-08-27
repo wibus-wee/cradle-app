@@ -279,10 +279,15 @@ export const ChatRuntimeModel = {
     answers: t.Record(t.String(), t.Array(t.String())),
   }),
 
+  runtimeModeBody: t.Object({
+    modeId: t.String({ minLength: 1 }),
+  }),
+
   toolApprovalBody: t.Object({
     approved: t.Boolean(),
     scope: t.Optional(t.Union([t.Literal('once'), t.Literal('always')])),
     reason: t.Optional(t.String()),
+    selectedOptionId: t.Optional(t.String({ minLength: 1 })),
   }),
 
   toolApprovalResponse: t.Object({
@@ -290,6 +295,7 @@ export const ChatRuntimeModel = {
     approved: t.Boolean(),
     scope: t.Optional(t.Union([t.Literal('once'), t.Literal('always')])),
     reason: t.Optional(t.String()),
+    selectedOptionId: t.Optional(t.String()),
   }),
 
   planImplementationApprovalBody: t.Object({

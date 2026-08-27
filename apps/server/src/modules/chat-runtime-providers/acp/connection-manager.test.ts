@@ -110,7 +110,7 @@ describe('listRegisteredAcpMcpServers', () => {
     removeHostMcpServer('nowledge-mem')
   })
 
-  it('projects stdio MCP servers and skips streamable HTTP MCP servers', () => {
+  it('projects session-scoped stdio and registered HTTP MCP servers', () => {
     addHostMcpServer({
       transport: 'stdio',
       name: 'browser-use',
@@ -126,7 +126,13 @@ describe('listRegisteredAcpMcpServers', () => {
       headers: { Authorization: 'Bearer secret-token' },
     })
 
-    expect(listRegisteredAcpMcpServers()).toEqual([])
+    const httpServer = {
+      type: 'http' as const,
+      name: 'nowledge-mem',
+      url: 'https://nowledge.example.test/mcp',
+      headers: [{ name: 'Authorization', value: 'Bearer secret-token' }],
+    }
+    expect(listRegisteredAcpMcpServers()).toEqual([httpServer])
     expect(listRegisteredAcpMcpServers('session-a')).toEqual([
       {
         name: 'browser-use',
@@ -137,8 +143,8 @@ describe('listRegisteredAcpMcpServers', () => {
           { name: 'CRADLE_CHAT_SESSION_ID', value: 'session-a' },
         ],
       },
+      httpServer,
     ])
-    expect(JSON.stringify(listRegisteredAcpMcpServers('session-a'))).not.toContain('secret-token')
   })
 })
 

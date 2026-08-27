@@ -108,6 +108,7 @@ const KIND_GROUPS: Partial<Record<ChatRuntimeUiSlotState['kind'], SlotGroupKey>>
   filesystem: 'activity',
   mcp: 'environment',
   model: 'environment',
+  mode: 'environment',
   plugin: 'environment',
   progress: 'activity',
   reasoning: 'environment',
@@ -127,6 +128,7 @@ const STATE_ORDER: Record<ChatRuntimeUiSlotState['kind'], number> = {
   compact: 30,
   status: 100,
   model: 110,
+  mode: 115,
   reasoning: 120,
   config: 130,
   usage: 140,
@@ -557,6 +559,17 @@ function readStateView(
           },
         ],
       }
+    case 'mode':
+      return {
+        tone: 'neutral',
+        summary: state.modes.find(mode => mode.id === state.currentModeId)?.name ?? state.currentModeId,
+        meta: `${state.modes.length} modes`,
+        progress: null,
+        lines: state.modes.map(mode => ({
+          label: mode.id === state.currentModeId ? 'Active' : 'Available',
+          value: mode.name,
+        })),
+      }
     case 'reasoning':
       return {
         tone: state.effort ? 'neutral' : 'muted',
@@ -828,6 +841,8 @@ function readSlotIcon(iconKey?: ChatRuntimeUiSlotIconKey, kind?: ChatRuntimeUiSl
       return Code2Icon
     case 'mcp':
       return ServerIcon
+    case 'mode':
+      return Settings2Icon
     case 'model':
       return CpuIcon
     case 'personality':

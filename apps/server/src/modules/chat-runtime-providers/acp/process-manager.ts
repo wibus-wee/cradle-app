@@ -1,4 +1,7 @@
+import { randomUUID } from 'node:crypto'
 import { Readable, Writable } from 'node:stream'
+
+import type { AcpDevtoolEvent } from '@cradle/ipc'
 
 import type { ManagedChildProcess } from '../../../infra/managed-process'
 import { spawnManagedProcess } from '../../../infra/managed-process'
@@ -37,6 +40,7 @@ export interface AcpProcessHost {
   spawn: (options: AcpProcessSpawnOptions) => ProcessEntry
   stop: (agentId: string) => Promise<void>
   getMetrics: () => ProcessMetrics[]
+  getDiagnostics?: (agentId: string) => string[]
 }
 
 const STDERR_MAX = 200
@@ -49,6 +53,7 @@ interface LineCollector {
 
 export class AcpProcessManager implements AcpProcessHost {
   private readonly processes = new Map<string, ProcessEntry>()
+  private readonly lastDiagnostics = new Map<string, string[]>()
   private disposed = false
 
   constructor() {
@@ -79,6 +84,18 @@ export class AcpProcessManager implements AcpProcessHost {
       cwd,
       shutdownGraceMs: 5_000,
     })
+    publishAcpDevtoolEvent({
+      agentId: opts.agentId,
+      pid: proc.targetPid ?? proc.pid ?? null,
+      kind: 'spawn',
+      stream: 'lifecycle',
+      text: 'ACP agent process started',
+      command,
+      args: finalArgs,
+      cwd,
+      exitCode: null,
+      signal: null,
+    })
 
     const stderrBuf: string[] = []
     const sensitiveValues = (opts.sensitiveEnvNames ?? [])
@@ -86,11 +103,38 @@ export class AcpProcessManager implements AcpProcessHost {
       .filter((value): value is string => typeof value === 'string' && value.length > 0)
     const stderrCollector = createLineCollector((line) => {
       pushStderr(stderrBuf, redactSensitiveValues(line, sensitiveValues))
+      this.lastDiagnostics.set(opts.agentId, [...stderrBuf])
     })
 
     proc.stderr?.setEncoding('utf-8')
     proc.stderr?.on('data', (chunk: string) => {
       stderrCollector.consume(chunk)
+      publishAcpDevtoolEvent({
+        agentId: opts.agentId,
+        pid: proc.targetPid ?? proc.pid ?? null,
+        kind: 'output',
+        stream: 'stderr',
+        text: redactSensitiveValues(chunk, sensitiveValues),
+        command: null,
+        args: null,
+        cwd: null,
+        exitCode: null,
+        signal: null,
+      })
+    })
+    proc.stdout?.on('data', (chunk: Buffer | string) => {
+      publishAcpDevtoolEvent({
+        agentId: opts.agentId,
+        pid: proc.targetPid ?? proc.pid ?? null,
+        kind: 'output',
+        stream: 'stdout',
+        text: chunk.toString(),
+        command: null,
+        args: null,
+        cwd: null,
+        exitCode: null,
+        signal: null,
+      })
     })
     proc.stderr?.on('end', () => {
       stderrCollector.flush()
@@ -109,9 +153,21 @@ export class AcpProcessManager implements AcpProcessHost {
     }
 
     this.processes.set(opts.agentId, entry)
-    proc.on('exit', () => {
+    proc.on('exit', (exitCode, signal) => {
       stderrCollector.flush()
       this.processes.delete(opts.agentId)
+      publishAcpDevtoolEvent({
+        agentId: opts.agentId,
+        pid: proc.targetPid ?? proc.pid ?? null,
+        kind: 'exit',
+        stream: 'lifecycle',
+        text: 'ACP agent process exited',
+        command: null,
+        args: null,
+        cwd: null,
+        exitCode,
+        signal,
+      })
     })
 
     return entry
@@ -152,6 +208,10 @@ export class AcpProcessManager implements AcpProcessHost {
     }))
   }
 
+  getDiagnostics(agentId: string): string[] {
+    return [...(this.processes.get(agentId)?.stderrBuf ?? this.lastDiagnostics.get(agentId) ?? [])]
+  }
+
   disposeAll(): void {
     this.disposed = true
     for (const entry of this.processes.values()) {
@@ -161,6 +221,13 @@ export class AcpProcessManager implements AcpProcessHost {
     }
     this.processes.clear()
   }
+}
+
+function publishAcpDevtoolEvent(event: Omit<AcpDevtoolEvent, 'id' | 'timestamp'>): void {
+  process.send?.({
+    type: 'cradle-acp-devtool-event',
+    event: { id: randomUUID(), timestamp: Date.now(), ...event },
+  })
 }
 
 function resolveLaunchCommand(opts: {

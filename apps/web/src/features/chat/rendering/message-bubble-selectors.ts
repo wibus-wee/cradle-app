@@ -29,6 +29,7 @@ import {
   isRuntimeUserInputToolPart,
   readRenderableToolPart,
 } from './chat-render-plan'
+import { readBuiltinToolCallInputPayload } from './chat-tool-entities'
 import type { RunTimingMetrics } from './run-debug-timings'
 import type { RenderableToolPart } from './tool-ui-classifier'
 import { describeToolCallCached } from './tool-ui-classifier'
@@ -507,7 +508,7 @@ function isToolPartActiveInState(
 
 export function readToolApproval(
   part: RenderableToolPart,
-): { id: string, approved?: boolean, reason?: string } | undefined {
+): { id: string, approved?: boolean, reason?: string, options?: import('./chat-tool-entities').RuntimeToolApprovalOption[] } | undefined {
   const approval = (part as { approval?: { id?: unknown, approved?: unknown, reason?: unknown } })
     .approval
   if (!approval || typeof approval.id !== 'string') {
@@ -517,5 +518,8 @@ export function readToolApproval(
     id: approval.id,
     ...(typeof approval.approved === 'boolean' ? { approved: approval.approved } : {}),
     ...(typeof approval.reason === 'string' ? { reason: approval.reason } : {}),
+    ...(readBuiltinToolCallInputPayload(part.input)?.approvalOptions
+      ? { options: readBuiltinToolCallInputPayload(part.input)!.approvalOptions }
+      : {}),
   }
 }

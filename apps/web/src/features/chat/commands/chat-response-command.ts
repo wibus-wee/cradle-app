@@ -18,6 +18,7 @@ import {
   postChatSessionsBySessionIdSteer,
   postChatSessionsBySessionIdToolApprovalByRequestId,
   postChatSessionsBySessionIdUserInputByRequestId,
+  putChatSessionsBySessionIdRuntimeMode,
 } from '~/api-gen/sdk.gen'
 import { getServerUrl } from '~/lib/electron'
 import { cradleFetch } from '~/lib/server-credential'
@@ -526,11 +527,25 @@ export async function submitRuntimeUserInput(args: {
   return readSdkData(result, 'Failed to submit runtime user input') as { requestId: string, answers: Record<string, string[]> }
 }
 
+export async function updateRuntimeMode(args: {
+  sessionId: string
+  modeId: string
+  signal?: AbortSignal
+}): Promise<void> {
+  const result = await putChatSessionsBySessionIdRuntimeMode({
+    path: { sessionId: args.sessionId },
+    body: { modeId: args.modeId },
+    signal: args.signal,
+  })
+  readSdkData(result, 'Failed to update runtime mode')
+}
+
 export async function submitRuntimeToolApproval(args: {
   sessionId: string
   requestId: string
   approved: boolean
   reason?: string
+  selectedOptionId?: string
   signal?: AbortSignal
 }): Promise<{ requestId: string, approved: boolean, reason?: string }> {
   const result = await postChatSessionsBySessionIdToolApprovalByRequestId({
@@ -538,6 +553,7 @@ export async function submitRuntimeToolApproval(args: {
     body: {
       approved: args.approved,
       ...(args.reason ? { reason: args.reason } : {}),
+      ...(args.selectedOptionId ? { selectedOptionId: args.selectedOptionId } : {}),
     },
     signal: args.signal,
   })
