@@ -14,6 +14,7 @@ conditions, and update the status row when done.
 | 001 | Build a deterministic Anthropic Messages and OpenAI Responses API simulator | P1 | L | — | IN PROGRESS |
 | 002 | Expose committed chat-run activity to server plugins | P1 | M | — | DONE |
 | 003 | UI activity pipeline with Jarvis, analytics, and web plugin sinks | P1 | L | — | DONE |
+| 004 | ACP chat runtime gap remediation: initialize negotiation, turn correctness, auth chain | P1 | M | — | TODO |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with a one-line
 reason) | `REJECTED` (with a one-line rationale).
@@ -30,6 +31,12 @@ reason) | `REJECTED` (with a one-line rationale).
   activity** segments and ships three built-in sinks (Jarvis ambient session,
   product analytics, web plugin SDK). A future WakaTime plugin is a documented
   reference consumer only; it is not implemented in Plan 003.
+- Plan 004 is independent of Plans 001–003. It remediates the ACP chat
+  runtime provider's recorded gaps (initialization negotiation, turn
+  concurrency/timeout/stop-reason correctness, and the authentication chain)
+  in `apps/server/src/modules/chat-runtime-providers/acp/`. It is a
+  prerequisite for registering auth-required ACP agents such as Cline, but it
+  deliberately registers none itself.
 
 ## Findings considered and rejected
 
