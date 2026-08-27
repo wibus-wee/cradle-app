@@ -1030,12 +1030,29 @@ export interface RuntimeToolApprovalResolution {
   reason?: string
 }
 
+export interface ProviderAuthMethod {
+  id: string
+  name: string
+  description?: string
+  kind: 'agent' | 'env_var' | 'terminal'
+  status: 'supported' | 'unsupported'
+  unavailableReason?: string
+  link?: string
+  fields?: Array<{
+    name: string
+    label?: string
+    secret: boolean
+    optional: boolean
+  }>
+}
+
 export type ProviderError
   = | { _tag: 'provider_unsupported', provider: string }
     | { _tag: 'session_not_found', provider: string, sessionId: string }
     | { _tag: 'session_closed', provider: string, sessionId: string }
     | { _tag: 'request_failed', provider: string, method: string, detail: string }
     | { _tag: 'process_error', provider: string, detail: string }
+    | { _tag: 'auth_required', provider: string, methods: ProviderAuthMethod[] }
     | { _tag: 'auth_failed', provider: string }
     | { _tag: 'rate_limited', provider: string, retryAfter?: number }
     | { _tag: 'model_not_found', provider: string, model: string }
@@ -1062,6 +1079,8 @@ function formatProviderErrorMessage(error: ProviderError): string {
       return error.detail
     case 'process_error':
       return error.detail
+    case 'auth_required':
+      return `${error.provider} authentication is required`
     case 'auth_failed':
       return `${error.provider} authentication failed`
     case 'rate_limited':
@@ -1100,6 +1119,11 @@ export const ProviderErrors = {
     _tag: 'process_error',
     provider,
     detail,
+  }),
+  authRequired: (provider: string, methods: ProviderAuthMethod[]): ProviderError => ({
+    _tag: 'auth_required',
+    provider,
+    methods,
   }),
   authFailed: (provider: string): ProviderError => ({
     _tag: 'auth_failed',

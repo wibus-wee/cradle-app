@@ -167,6 +167,8 @@ function formatProviderRuntimeErrorText(error: ProviderRuntimeError['providerErr
       return `${error.provider} request failed in ${error.method}: ${error.detail}`
     case 'process_error':
       return `${error.provider} process error: ${error.detail}`
+    case 'auth_required':
+      return `${error.provider} authentication is required`
     case 'auth_failed':
       return `${error.provider} authentication failed`
     case 'rate_limited':

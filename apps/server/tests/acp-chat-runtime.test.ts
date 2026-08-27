@@ -21,6 +21,7 @@ const acpMocks = vi.hoisted(() => {
 
   return {
     initialize: vi.fn(),
+    authenticate: vi.fn(),
     newSession: vi.fn(),
     loadSession: vi.fn(),
     resumeSession: vi.fn(),
@@ -42,6 +43,7 @@ vi.mock('@agentclientprotocol/sdk', () => {
   const methods = {
     agent: {
       initialize: 'initialize',
+      authenticate: 'authenticate',
       session: {
         new: 'session/new',
         load: 'session/load',
@@ -63,7 +65,14 @@ vi.mock('@agentclientprotocol/sdk', () => {
     },
   } as const
 
+  class RequestError extends Error {
+    constructor(readonly code: number, message: string, readonly data?: unknown) {
+      super(message)
+    }
+  }
+
   return {
+    RequestError,
     client: () => {
       const requestHandlers = new Map<string, (input: { params: never }) => Promise<unknown>>()
       const notificationHandlers = new Map<string, (input: { params: never }) => Promise<void>>()
@@ -102,11 +111,14 @@ vi.mock('@agentclientprotocol/sdk', () => {
           return {
             closed: new Promise<void>(() => {}),
             signal: new AbortController().signal,
+            close: vi.fn(),
             agent: {
               request(method: string, params: unknown) {
                 switch (method) {
                   case methods.agent.initialize:
                     return acpMocks.initialize(params)
+                  case methods.agent.authenticate:
+                    return acpMocks.authenticate(params)
                   case methods.agent.session.new:
                     return acpMocks.newSession(params)
                   case methods.agent.session.load:
@@ -249,6 +261,7 @@ describe('acp chat runtime capability', () => {
   beforeEach(() => {
     acpMocks.setClient(null)
     acpMocks.initialize.mockReset()
+    acpMocks.authenticate.mockReset()
     acpMocks.newSession.mockReset()
     acpMocks.loadSession.mockReset()
     acpMocks.resumeSession.mockReset()
@@ -267,12 +280,14 @@ describe('acp chat runtime capability', () => {
     })
 
     acpMocks.initialize.mockResolvedValue({
-      protocolVersion: '1.0',
+      protocolVersion: 1,
       agentCapabilities: {
         loadSession: true,
         sessionCapabilities: { resume: {} },
       },
+      authMethods: [],
     })
+    acpMocks.authenticate.mockResolvedValue({})
     acpMocks.newSession.mockResolvedValue({
       sessionId: 'acp-session-1',
       modes: null,
@@ -346,6 +361,7 @@ describe('acp chat runtime capability', () => {
       })
 
       return {
+        stopReason: 'end_turn',
         usage: {
           inputTokens: 7,
           outputTokens: 4,
@@ -568,6 +584,8 @@ describe('acp chat runtime capability', () => {
       cmd: '@demo/acp-agent',
       args: JSON.stringify(['--stdio']),
       env: JSON.stringify({ LEGACY_FLAG: '1' }),
+      authMethodId: null,
+      authSecretRefs: {},
     })
   })
 
@@ -606,6 +624,8 @@ describe('acp chat runtime capability', () => {
         cmd: '/usr/local/bin/my-acp',
         args: JSON.stringify(['--stdio']),
         env: JSON.stringify({ LOCAL: '1' }),
+        authMethodId: null,
+        authSecretRefs: {},
       })
 
       db().insert(acpAgents).values({

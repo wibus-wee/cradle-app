@@ -22,6 +22,23 @@ export interface ProcessEntry {
   stdoutWeb: ReadableStream<Uint8Array>
 }
 
+export interface AcpProcessSpawnOptions {
+  agentId: string
+  cmd: string
+  args: string[]
+  env: Record<string, string>
+  sensitiveEnvNames?: string[]
+  cwd?: string
+  distributionType: AcpLaunchDistributionType
+  installPath?: string | null
+}
+
+export interface AcpProcessHost {
+  spawn: (options: AcpProcessSpawnOptions) => ProcessEntry
+  stop: (agentId: string) => Promise<void>
+  getMetrics: () => ProcessMetrics[]
+}
+
 const STDERR_MAX = 200
 const RE_CARRIAGE_RETURN = /\r/g
 
@@ -30,7 +47,7 @@ interface LineCollector {
   flush: () => void
 }
 
-export class AcpProcessManager {
+export class AcpProcessManager implements AcpProcessHost {
   private readonly processes = new Map<string, ProcessEntry>()
   private disposed = false
 
@@ -40,15 +57,7 @@ export class AcpProcessManager {
     })
   }
 
-  spawn(opts: {
-    agentId: string
-    cmd: string
-    args: string[]
-    env: Record<string, string>
-    cwd?: string
-    distributionType: AcpLaunchDistributionType
-    installPath?: string | null
-  }): ProcessEntry {
+  spawn(opts: AcpProcessSpawnOptions): ProcessEntry {
     if (this.disposed) {
       throw new Error('AcpProcessManager has been disposed')
     }
@@ -72,8 +81,11 @@ export class AcpProcessManager {
     })
 
     const stderrBuf: string[] = []
+    const sensitiveValues = (opts.sensitiveEnvNames ?? [])
+      .map(name => opts.env[name])
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
     const stderrCollector = createLineCollector((line) => {
-      pushStderr(stderrBuf, line)
+      pushStderr(stderrBuf, redactSensitiveValues(line, sensitiveValues))
     })
 
     proc.stderr?.setEncoding('utf-8')
@@ -189,6 +201,13 @@ function pushStderr(buf: string[], line: string): void {
   if (buf.length > STDERR_MAX) {
     buf.shift()
   }
+}
+
+function redactSensitiveValues(line: string, sensitiveValues: readonly string[]): string {
+  return sensitiveValues.reduce(
+    (redacted, value) => redacted.replaceAll(value, '[REDACTED]'),
+    line,
+  )
 }
 
 function createLineCollector(onLine: (line: string) => void): LineCollector {

@@ -17,6 +17,8 @@ export const acpAgents = sqliteTable('acp_agents', {
   overrideCmd: text('override_cmd'),
   overrideArgs: text('override_args'),
   overrideEnv: text('override_env'),
+  authMethodId: text('auth_method_id'),
+  authSecretRefsJson: text('auth_secret_refs_json').notNull().default('{}'),
   status: text('status').notNull().default('installing'),
   ...timestamps(),
 })

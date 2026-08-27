@@ -1,7 +1,7 @@
 import type { AcpChatConfig } from '../../../helpers/provider-config-schemas'
 import type { AcpLaunchDistributionType } from '../../acp/launch-config'
 import { resolveEffectiveLaunch } from '../../acp/launch-config'
-import { getInstalled } from '../../acp/service'
+import { getInstalled, readAgentAuthConfig } from '../../acp/service'
 import { ProviderErrors, ProviderRuntimeError } from '../../chat-runtime/runtime-provider-types'
 import { ACP_RUNTIME_KIND } from './metadata'
 
@@ -14,6 +14,8 @@ export interface AcpConnectionRecord {
   cmd: string
   args: string
   env: string
+  authMethodId: string | null
+  authSecretRefs: Record<string, string>
 }
 
 export interface ResolvedAcpConnection {
@@ -37,6 +39,8 @@ export function buildAcpConnectionRecord(configJson: string): AcpConnectionRecor
     cmd: parsed.cmd,
     args: JSON.stringify(parsed.args),
     env: JSON.stringify(parsed.env),
+    authMethodId: null,
+    authSecretRefs: {},
   }
 }
 
@@ -71,6 +75,7 @@ export function resolveAcpConnectionRecord(configJson: string, legacyConnectionK
   }
 
   const effective = resolveEffectiveLaunch(installed)
+  const auth = readAgentAuthConfig(acpAgentId)
 
   return {
     record: {
@@ -79,6 +84,8 @@ export function resolveAcpConnectionRecord(configJson: string, legacyConnectionK
       cmd: effective.cmd,
       args: JSON.stringify(effective.args),
       env: JSON.stringify(effective.env),
+      authMethodId: auth.methodId,
+      authSecretRefs: auth.secretRefs,
     },
     connectionKey: `acp:${acpAgentId}`,
   }

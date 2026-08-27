@@ -456,6 +456,13 @@
       "when": 1787209405000,
       "tag": "0064_work_acceptance_criteria",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "6",
+      "when": 1787835033252,
+      "tag": "0065_polite_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

@@ -1,390 +1,448 @@
-# 004 — ACP Chat Runtime Gap Remediation: Initialization Negotiation, Turn Correctness, Authentication
+# 004 - ACP Runtime Negotiation, Turn Correctness, and Authentication
 
-## Goal
+## Objective
 
-Close three tiers of gaps in the ACP chat runtime projection
-(`apps/server/src/modules/chat-runtime-providers/acp/`) recorded in that
-directory's `GAP.md`:
+Make the ACP Chat Runtime boundary fail predictably and support ACP-native
+authentication without persisting credential values in ACP-owned storage.
+The implementation covers three related areas:
 
-1. **Initialization negotiation** — the provider discards almost all of the
-   `InitializeResponse`; capability gating has no data source.
-2. **Turn correctness** — concurrent prompts on one native session corrupt
-   timelines; hung agents leave runs streaming forever; `stopReason` is thrown
-   away so refusals/cancellations render as normal turn ends.
-3. **Authentication chain** — Cradle never reads `authMethods`, never sends
-   `authenticate`, and cannot recover from auth-required failures. This blocks
-   every registry agent that requires sign-in (motivating example: Cline via
-   `cline --acp`, whose free models require account login).
+1. retain and validate the result of ACP initialization;
+2. make prompt concurrency, deadlines, cancellation, and stop reasons explicit;
+3. persist an installed agent's auth selection as secret references, inject
+   env-var credentials before process spawn, and send `authenticate` before
+   session methods.
 
-This plan is server-side only. It deliberately does NOT register any specific
-agent (e.g. Cline) and does NOT build new web UI screens; where a frontend
-surface is needed it reuses the existing Codex re-auth error channel.
+The current gaps are recorded in the
+[ACP runtime GAP document](../apps/server/src/modules/chat-runtime-providers/acp/GAP.md).
+Update that document only after each behavior is implemented.
 
-## Protocol source of truth
+## Scope
 
-`@agentclientprotocol/sdk` **1.2.1** (`node_modules/@agentclientprotocol/sdk`),
-plus https://agentclientprotocol.com. Verified facts (from
-`dist/schema/types.gen.d.ts` unless noted):
+| Area | Owner | Planned responsibility |
+| --- | --- | --- |
+| ACP wire protocol | [`connection-manager.ts`](../apps/server/src/modules/chat-runtime-providers/acp/connection-manager.ts) | Initialization, typed requests, deadlines, auth handshake, session channels, and native-to-runtime errors. |
+| Agent process | [`process-manager.ts`](../apps/server/src/modules/chat-runtime-providers/acp/process-manager.ts) | Spawn with resolved env, stop an unhealthy process, and retain bounded stderr diagnostics. |
+| Runtime projection | [`provider.ts`](../apps/server/src/modules/chat-runtime-providers/acp/provider.ts) | Connection resolution, session fallback policy, and Chat Runtime error/finish projection. |
+| Auth configuration | [`modules/acp`](../apps/server/src/modules/acp) | Persist the selected auth method and env-name-to-secret-ref bindings; expose HTTP/CLI commands. |
+| Credential values | [`modules/secrets`](../apps/server/src/modules/secrets) | Encrypt, store, and resolve credential values. ACP stores references only. |
+| Shared errors | [`chat-runtime-contracts`](../packages/chat-runtime-contracts/src/index.ts) | Represent generic provider auth-required failures without ACP-specific frontend parsing. |
 
-- `InitializeResponse.authMethods?: Array<AuthMethod>` (line 1422).
-- `AuthMethod` is a union discriminated by `type`: `"env_var"`
-  (`AuthMethodEnvVar`, with `vars: Array<AuthEnvVar>`; each var has `name`,
-  optional `label`, `secret` default true, `optional` default false),
-  `"terminal"` (`AuthMethodTerminal`, optional `args`/`env` for interactive
-  binary auth), or `AuthMethodAgent` (no `type` on the wire; agent handles
-  auth itself, e.g. browser OAuth). All variants share `id`, `name`,
-  optional `description`.
-- `ClientContext.authenticate(params)` exists (`dist/acp.d.ts:1131`); the
-  agent method name is `"authenticate"`, request carries `{ methodId }`.
-- `PromptResponse.stopReason: StopReason` where
-  `StopReason = "end_turn" | "max_tokens" | "max_turn_requests" | "refusal" | "cancelled"` (line 3027).
-- JSON-RPC errors use reserved codes `-32000..-32099`. Agents signal
-  **authentication required** with code `-32000` (per
-  agentclientprotocol.com). If an observed agent uses a different code,
-  treat `-32000` as primary but match message content as fallback, and
-  record what the real binary sends.
+This plan does not register Cline or another agent, add terminal-based auth,
+build an ACP-specific web auth screen, implement elicitation, add remote ACP
+transports, or address other entries in `GAP.md`.
 
-## Current state (verified against source)
+## Verified protocol and runtime facts
 
-All paths relative to repo root. File:line references were accurate at
-authoring time; re-locate by symbol name if lines drifted.
+The protocol source of truth is `@agentclientprotocol/sdk` 1.2.1 and its
+generated types in `node_modules/@agentclientprotocol/sdk/dist`.
 
-### `connection-manager.ts`
+- `InitializeResponse` already remains intact on `ConnectionEntry.initResult`.
+  The missing piece is a single typed read path for its protocol version,
+  capabilities, agent info, and auth methods.
+- ACP protocol version 1 is a breaking-version identifier. An agent returns
+  the requested version when supported or its latest version otherwise; the
+  client must disconnect when it cannot support the returned version.
+- `ClientContext.request` accepts `SendRequestOptions.cancellationSignal`.
+  Aborting sends `$/cancel_request`, but cancellation is cooperative and the
+  returned promise remains pending until the peer responds. A deadline must
+  therefore both abort the request and settle Cradle's local operation.
+- The SDK exports `RequestError` with numeric `code` and optional `data`.
+  `RequestError.authRequired()` uses `-32000`; no message parsing is needed.
+- `PromptResponse.stopReason` is one of `end_turn`, `max_tokens`,
+  `max_turn_requests`, `refusal`, or `cancelled`.
+- AI SDK `FinishReason` accepts `stop`, `length`, `content-filter`,
+  `tool-calls`, `error`, and `other`.
+- Chat Runtime owns failed and aborted terminal chunks. A provider timeout must
+  throw a typed error; a user cancellation must unwind the provider stream;
+  neither path should emit a successful `finish` chunk first.
+- [`resumeChatSession`](../apps/server/src/modules/chat-runtime-providers/acp/provider.ts)
+  currently catches every resume/load error and silently creates a new native
+  session. That would hide auth failures, timeouts, and protocol faults.
+- `provider-auth/credential-lifecycle.ts` coordinates refreshable token
+  refresh. It is not the generic credential store. Static ACP env-var values
+  are read through `ProviderContext.readSecret` from the Secrets owner.
+- The existing Codex re-auth error is translated only in the provider-model
+  catalog path. It is not a reusable Chat Runtime auth UI channel.
+- Existing ACP tests cover MCP projection and timeline mapping, but do not
+  construct `AcpConnectionManager`. This plan must add a real manager harness;
+  it cannot rely on a fake-double pattern that does not exist.
 
-- `connect()` dedupes concurrent connects via `pendingConnects`;
-  `openConnection()` (line 394) spawns the agent through `AcpProcessManager`,
-  builds `client({ name: 'Cradle Server' })`, registers handlers for
-  `session.requestPermission`, `session.update`, `fs.readTextFile`,
-  `fs.writeTextFile`, then sends `initialize` with `PROTOCOL_VERSION` and
-  hardcoded `clientInfo: { name: 'Cradle Server', version: '1.0.0' }`
-  (lines 419–428).
-- The full `InitializeResponse` **is** retained on the connection entry
-  (`ConnectionEntry.initResult`, line 143), but the only readers are
-  `supportsLoadSession()` / `supportsResumeSession()`. `authMethods`,
-  negotiated `protocolVersion`, and the rest of `agentCapabilities` are never
-  consulted.
-- `prompt(agentId, sessionId, message, runtimeContext?)` (~line 280) creates
-  `SessionChannel { mapper, queue, closedBy }` and does
-  `conn.channels.set(sessionId, channel)`. **A second overlapping prompt on
-  the same native session overwrites the map entry; the first run stops
-  receiving updates mid-flight.** No guard, no queueing, no timeout:
-  `conn.agent.request(methods.agent.session.prompt, …)` (line 298) hangs
-  indefinitely if the agent hangs after accepting.
-- Prompt completion stores usage from the final `PromptResponse`
-  (`toTokenUsage`, lines 634–652). `response.stopReason` is **never read**.
-- Cancel path (`closeChannel` `{ kind: 'cancelled' }`) closes the queue; the
-  consuming generator returns early (lines 331–334) **without emitting a
-  finish chunk**, so a cancelled turn just… ends.
-- Errors are plain `Error`s. Nothing typed escapes this module except
-  permission outcomes.
+## Cross-cutting invariants
 
-### `runtime-integration.ts` / `provider.ts`
+- Never write auth secret values introduced by this plan to `acp_agents`,
+  runtime config JSON, snapshots, audit details, logs, errors, test snapshots,
+  or `GAP.md`. Existing plaintext launch `env` storage remains a separately
+  recorded gap and is not expanded by this work.
+- Persist only the selected auth method ID and a map from advertised env names
+  to Secrets-owned credential IDs.
+- Resolve secret values immediately before process spawn. Keep them only in
+  the spawn input and child environment; do not cache them on connection or
+  auth view objects.
+- Never infer auth failure from error-message text. Match `RequestError` and an
+  exact code. If a real agent uses another representation, record that exact
+  representation and add an explicit mapping.
+- Every native request has one lifecycle owner and a bounded local deadline.
+  A timed-out connection is unhealthy and must not remain available for later
+  sessions.
+- A native session has at most one active prompt channel. Chat Runtime already
+  serializes turns per chat session; the ACP guard is a race backstop, not a
+  second queue.
+- Normal prompt completion emits one finish chunk. Provider failure throws and
+  user cancellation unwinds; Chat Runtime creates their terminal chunks.
+- Do not widen `clientCapabilities`. Terminal and elicitation handlers remain
+  unadvertised.
 
-- `wireAcpIntegration` routes permission requests into
-  `requestProviderToolApproval` (kit permission bridge); resolution is binary
-  (first `allow_*` option) — known gap, out of scope here.
-- `AcpChatProvider.startChatSession` ensures connection, resumes-or-creates
-  the native session, applies model via config options; `streamTurn` iterates
-  `runtime.prompt(...)`; errors propagate raw.
+## Workstream A - Connection negotiation and bounded requests
 
-### Existing precedents you must reuse
+### A1. Report the server package version
 
-- **Typed provider errors**: `ProviderErrors` / `ProviderRuntimeError` come
-  from `@cradle/chat-runtime-contracts` (re-exported by
-  `apps/server/src/modules/chat-runtime/runtime-provider-types.ts`). Read
-  their definitions in `packages/chat-runtime-contracts` before inventing.
-- **Re-auth surfaced to users**: Codex defines
-  `CodexChatgptAuthReauthRequiredError` with a stable `code` property
-  (`codex/app-server/chatgpt-auth.ts:33`); `provider-catalog/catalog.ts:256`
-  translates it for consumers; `host-lease.ts` maps it across leases. The ACP
-  auth-required error must travel this same channel.
-- **Credential lifecycle**: `modules/provider-auth/credential-lifecycle.ts`
-  owns refresh/reauth drivers over the secrets service. Env-var auth secrets
-  belong behind that boundary, not in `acp_agents.env` JSON.
-- **Finish reasons**: `kit/chunk-mapper.ts` exposes
-  `providerChunk.finish(finishReason)`. Native-mapping precedents:
-  `kimi/event-to-chunk-mapper.ts:142` (failed/blocked → `'error'`),
-  `opencode/event-stream.ts:865`. Verify the allowed `finishReason` union
-  from AI SDK's `UIMessageChunk` finish variant rather than trusting any list
-  blindly.
+Use the existing package-JSON import pattern from
+[`telemetry/resource.ts`](../apps/server/src/telemetry/resource.ts). Send
+`apps/server/package.json`'s version as `clientInfo.version` instead of the
+hardcoded `1.0.0`. Do not add a second version constant.
 
-### Test infrastructure
+### A2. Make initialization the connection contract
 
-`connection-manager.test.ts` / `timeline-mapper.test.ts` exist in the acp
-package and construct the manager with fake doubles. Follow their patterns.
-Tests run with vitest from repo root.
+After `initialize` resolves:
 
-## Constraints (hard rules)
+1. require `initResult.protocolVersion === PROTOCOL_VERSION`;
+2. on mismatch, close the SDK connection, stop the spawned process, and throw
+   `ProviderRuntimeError(ProviderErrors.requestFailed(...))` naming both
+   versions;
+3. only then publish the entry in `connections`;
+4. expose typed accessors for the negotiated version, full auth method list,
+   and capability predicates;
+5. route `supportsLoadSession` and `supportsResumeSession` through the same
+   capability accessor.
 
-- Never persist credentials in `acp_agents` rows, launch configs, logs, or
-  error messages. Secrets go through the secrets service / `provider-auth`
-  boundary only. Log key names only, never values.
-- Do not widen advertised `clientCapabilities`; do not advertise terminal or
-  elicitation — those stay GAP'd.
-- Do not implement mode switching, slash commands, tool-kind mapping, or
-  reconnect/respawn here. They remain in `GAP.md`.
-- Match existing style: TypeScript strict, named exports, JSDoc only for
-  non-obvious contracts.
+If spawn, stream connection, initialize, validation, or auth fails before the
+entry is published, clean up both the SDK connection and process. No failed
+connect may leave an orphan child process.
 
-## Workstream A — Initialization negotiation
+### A3. Add one deadline helper
 
-**Files**: `connection-manager.ts`, new `auth.ts` (built in Workstream C),
-`GAP.md`.
+Add a private typed request helper in the ACP boundary. It must:
 
-### A1. Honest `clientInfo`
+- accept the method, params, operation label, and timeout;
+- create an `AbortController` and pass its signal to SDK `request`;
+- race the cooperative SDK promise against Cradle's deadline so the local
+  caller settles even when the peer ignores cancellation;
+- attach a terminal rejection handler to the SDK promise before racing;
+- clear the timer in `finally`;
+- convert timeout into `ProviderRuntimeError` with the ACP runtime kind,
+  operation, and duration;
+- preserve `RequestError` as the cause for later exact auth classification.
 
-Replace the hardcoded `'1.0.0'` with the actual server package version.
-Grep for an existing runtime version accessor in `apps/server/src` (health /
-report modules); if none exists, keep a module-level constant adjacent to a
-comment stating it must track the server release. Do not import JSON with a
-new loader pattern just for this.
+Constructor options own deterministic budgets:
 
-### A2. Retain and expose the full initialize result
+| Operation | Default |
+| --- | ---: |
+| `initialize`, `session/new`, `session/load`, `session/resume`, config writes | 30 seconds |
+| `authenticate` | 5 minutes |
+| `session/prompt` | 10 minutes |
 
-Add to `AcpConnectionManager` accessors over the stored `initResult`, at
-minimum:
+Tests inject short budgets or fake timers; production does not read timeout
+values from environment variables.
 
-```ts
-getNegotiatedProtocolVersion(agentId: string): number | undefined
-getAuthMethods(agentId: string): AuthMethod[]
-supportsCapability(agentId: string, predicate: (caps: AgentCapabilities) => boolean): boolean
-```
+On a metadata or prompt timeout, abort the request, best-effort notify
+`session/cancel` when a session exists, close the SDK connection with the typed
+error, fail all local channels, remove the connection entry, and stop the
+process. Killing the per-agent process is intentional: after a peer ignores
+protocol cancellation, its session state and pending-request capacity are no
+longer trustworthy.
 
-Signatures may flex to fit call sites; the invariant is that no caller
-re-derives capability facts from anything other than the stored `initResult`.
-Refactor `supportsLoadSession` / `supportsResumeSession` onto this path so
-there is one reading route.
+## Workstream B - Turn correctness
 
-### A3. Typed version failure
+### B1. Reject overlapping prompts
 
-After `initialize` resolves, validate the negotiated `protocolVersion`
-against what this client requires. First inspect what tolerance the SDK
-already applies — do not double-enforce. If Cradle's requirement is stricter,
-fail with a `ProviderRuntimeError` (via `ProviderErrors`) whose message names
-both versions. Today's behavior (inscrutable downstream protocol errors) is
-the thing being replaced.
+Before installing a new `SessionChannel`, reject when `conn.channels` already
+contains the native session ID. Use `ProviderErrors.requestFailed` and include
+the agent connection key and native session ID. Do not replace, cancel, or
+queue behind the existing channel.
 
-### A4. Update `GAP.md`
+The guard and channel insertion must be synchronous relative to each other.
+Cleanup removes the channel only when the map still points to that exact
+channel instance.
 
-Rewrite the "Initialization negotiation" section to describe what remains
-(e.g. `_meta` forwarding if still unread). State what changed; do not delete
-history silently.
+### B2. Separate normal, failed, and cancelled termination
 
-## Workstream B — Turn correctness
+Normal response:
 
-**Files**: `connection-manager.ts`, `GAP.md`. Finish-chunk emission lives in
-the manager, not the mapper (see B3).
+1. capture usage from `PromptResponse`;
+2. flush open mapper blocks;
+3. emit exactly one mapped finish chunk;
+4. close the queue.
 
-### B1. Reject concurrent prompts per native session
+Provider error or timeout:
 
-In `prompt()`, before creating a channel: if `conn.channels.get(sessionId)`
-exists and is not closing, throw a `ProviderRuntimeError` naming agent,
-native session, and the fact that another run is active. Do NOT silently
-rebind. Queueing is a deliberate non-goal: Chat Runtime already serializes
-turns per chat session upstream; the rejection is a backstop against races,
-and a wrong-silent-failure is worse than a loud one. Record this decision in
-`GAP.md`.
+1. flush mapper blocks that were already received;
+2. fail the queue with `ProviderRuntimeError`;
+3. do not emit `finish`; `turn-executor.ts` will persist an `error` terminal.
 
-### B2. Bounded prompt lifetime
+User cancellation:
 
-Bound the `session/prompt` request in time. First inspect whether the SDK's
-`ClientContext.request` accepts an abort/signal; use it if so, otherwise
-`Promise.race` (verify losing-promise rejections cannot go unhandled). Policy:
+1. mark the channel cancelled before sending `session/cancel`;
+2. abort the in-flight prompt request as well as sending the ACP notification;
+3. close the local queue immediately without awaiting the peer;
+4. do not emit `finish`; the active-run cancellation owner persists `abort`.
 
-- Total turn budget exported as e.g. `ACP_PROMPT_TIMEOUT_MS`, default
-  **10 minutes**, overridable via manager constructor options (not env vars).
-- On timeout: typed error ("ACP agent prompt timed out after Xms"),
-  best-effort `this.cancel(agentId, sessionId)` so the agent receives
-  `session/cancel`, channel closed as disconnected with that error. The run
-  must reach a terminal state; never leave the consumer awaiting forever.
-- Same bounding for `newSession` / `loadSession` / `resumeSession` with a
-  **30s** metadata budget.
+Late prompt settlement after cancellation or timeout may perform cleanup but
+must not enqueue chunks, usage, or another terminal result.
 
-Test determinism: fake timers or injected tiny timeout via constructor
-options; never sleeps.
+### B3. Map native stop reasons
 
-### B3. Project `stopReason` into the finish chunk
+Map successful `PromptResponse.stopReason` values as follows:
 
-Mapping (validate each target against AI SDK's `UIMessageChunk` finish union;
-substitute nearest valid member and comment if any is absent):
+| ACP stop reason | AI SDK finish reason |
+| --- | --- |
+| `end_turn` | `stop` |
+| `max_tokens` | `length` |
+| `max_turn_requests` | `other` |
+| `refusal` | `content-filter` |
+| `cancelled` | `other` |
 
-| `StopReason` | `finishReason` |
-|---|---|
-| `end_turn` | `'stop'` |
-| `max_tokens` | `'length'` |
-| `max_turn_requests` | `'other'` |
-| `refusal` | `'content-filter'` |
-| `cancelled` | `'other'` |
+Keep this mapping exhaustive over the SDK `StopReason` type. A returned
+`cancelled` response is not automatically a user abort: only Chat Runtime's
+own `cancelRequested` state owns that classification.
 
-Implementation: in `prompt()`'s success path push
-`providerChunk.finish(mapped)` after the `mapper.flush()` chunks and before
-`queue.close()`. The cancel paths (user cancel, B2 timeout) also emit exactly
-one finish chunk before close/fail. Every terminal path emits exactly one
-finish chunk — assert this invariant in tests.
+### B4. Preserve resume failures
 
-## Workstream C — Authentication chain
+Replace the two blanket `catch` blocks in `resumeChatSession` with an explicit
+fallback predicate. Fall back from resume to load/new only for SDK
+`RequestError` codes `-32601` (`methodNotFound`) or `-32002`
+(`resourceNotFound`). Re-throw auth-required, timeout, process, protocol, and
+unknown failures.
 
-**Files**: new `chat-runtime-providers/acp/auth.ts`, `connection-manager.ts`,
-`runtime-integration.ts` (wiring), `provider.ts` (error translation),
-`GAP.md`. Depends on A2 (`getAuthMethods`).
+If a real agent uses another exact code for a missing session, record the wire
+response before adding it. Do not match message substrings.
 
-### C1. Project auth methods
+## Workstream C - Shared auth-required contract
 
-In `auth.ts`:
+Add a provider-neutral auth method view to
+[`chat-runtime-contracts`](../packages/chat-runtime-contracts/src/index.ts):
 
 ```ts
-export interface AcpAuthMethodView {
+export interface ProviderAuthMethod {
   id: string
   name: string
   description?: string
   kind: 'agent' | 'env_var' | 'terminal'
-  // env_var only:
-  vars?: Array<{ name: string, label?: string, secret: boolean, optional: boolean }>
-}
-
-export function projectAuthMethods(methods: AuthMethod[]): AcpAuthMethodView[]
-```
-
-`terminal` methods are projected but marked unusable in v1 — Cradle cannot
-sanely host an interactive TUI inside the agent subprocess yet. They stay
-visible so the UI can explain why; `GAP.md` records the limitation.
-
-### C2. Send `authenticate` when a selection exists
-
-Flow:
-
-1. After connect, if the stored init result has non-empty `authMethods` and a
-   selection exists for this agent (see C4), send
-   `conn.agent.request('authenticate', { methodId })` **before** any
-   `session/new` / `session/load` / `session/resume`.
-2. `env_var` methods need the variables present in the agent process env,
-   which is fixed at spawn. Resolving an env-var selection therefore requires
-   disconnect → resolve secret values through the secrets service → reconnect
-   passing extra env to `processManager.spawn` → `authenticate`. Implement
-   exactly that; do not mutate env of a live process.
-3. Selection state lives **in memory per agentId** on the manager:
-   `Map<string, { methodId: string, envValues?: Record<string, string> }>`.
-   Values are never logged. Persisted env-var secrets go through the existing
-   secrets service keyed by agent + method id; the in-memory map holds only
-   what is needed for the current connection. If wiring persistence through
-   the secrets service requires contract changes beyond this plan, STOP and
-   report (escape hatch).
-
-### C3. Map auth-required failures to a typed error
-
-Define in `auth.ts`:
-
-```ts
-export class AcpAuthRequiredError extends Error {
-  readonly code = 'acp_auth_required'
-  constructor(message: string, readonly agentId: string, readonly methods: AcpAuthMethodView[])
+  status: 'supported' | 'unsupported'
+  unavailableReason?: string
+  link?: string
+  fields?: Array<{
+    name: string
+    label?: string
+    secret: boolean
+    optional: boolean
+  }>
 }
 ```
 
-Throw it when `session/new`, `session/load`, `session/resume`, or
-`session/prompt` rejects with JSON-RPC code `-32000` (detect via the SDK's
-error envelope — inspect how the SDK surfaces `data.code`; if it wraps plain
-`Error`s, parse defensively and record the real format), or when one of those
-calls fails while `authMethods` exist and no authentication has been performed
-on this connection.
+Extend `ProviderError` with
+`{ _tag: 'auth_required', provider: string, methods: ProviderAuthMethod[] }`
+and add `ProviderErrors.authRequired`. Update the exhaustive formatters in the
+contract and [`run/errors.ts`](../apps/server/src/modules/chat-runtime/run/errors.ts).
+The serialized payload may include auth metadata but never secret refs or
+values.
 
-Translate it at the boundary where Codex translates its re-auth error
-(`provider-catalog/catalog.ts` pattern) so the frontend receives the same
-"sign in required" signal shape it already handles for Codex. Trace that path
-end-to-end first (catalog.ts:256 → web render). If the channel proves
-Codex-specific in a way that cannot carry a generic agent auth payload,
-implement the typed error + server mapping, wire the web surface as far as
-the existing channel allows, and report the remainder as follow-up — do not
-build new UI screens in this plan.
+Keep `auth_failed` for a selected method whose `authenticate` request fails.
+Use `auth_required` when no usable selection exists or the agent rejects a
+session request with `RequestError.code === -32000`.
 
-### C4. Minimal API surface for selection
+## Workstream D - ACP auth projection, persistence, and API
 
-Expose on the manager (thread through `AcpChatProvider` if needed):
+### D1. Project auth methods faithfully
 
-```ts
-listAgentAuthMethods(agentId: string): AcpAuthMethodView[]
-selectAgentAuthMethod(agentId: string, input: { methodId: string, envValues?: Record<string, string> }): Promise<void>
-isAgentAuthenticated(agentId: string): boolean
-```
+Add `auth.ts` beside the ACP connection manager. Project SDK `AuthMethod`
+without frontend-only guesses:
 
-`selectAgentAuthMethod` performs the handshake (and env-inject respawn for
-env_var) and marks the connection authenticated. It must be safe to call
-twice — re-authenticate, never open a second connection (reuse `connect()`'s
-pending/dedup discipline).
+- no `type` means `agent`;
+- `env_var` includes `link` and normalized fields; omitted `secret` defaults
+  to `true`, omitted `optional` defaults to `false`;
+- `terminal` is returned with `status: 'unsupported'` and a stable reason;
+- `agent` and `env_var` are supported.
 
-If a REST/IPC route is needed for the web UI to drive selection, check
-whether `modules/acp/service.ts` already exposes agent-scoped routes and add
-the smallest route consistent with that file's conventions. If it would be
-more than a thin passthrough, defer the route to a follow-up plan and report.
+Projection must not include terminal `args`, terminal `env`, `_meta`, secret
+refs, or secret values.
 
-### C5. GAP.md rewrite of the Authentication section
+### D2. Persist selection in the ACP namespace
 
-Document what now works (capture, selection, authenticate, -32000 recovery),
-what stays open (terminal-method TUI hosting, credential vault UX, web UI
-depth), and the decision that selections live in memory with secrets in the
-secrets service.
+Add a reviewed Drizzle migration for nullable `auth_method_id` and
+`auth_secret_refs_json` (default `{}`) on `acp_agents`. These fields belong on
+the installed agent because one process and one connection are keyed by
+`acp:<agentId>` and shared by that agent's sessions.
+
+The persisted map is `{ [advertisedEnvName]: credentialId }`. Validate it
+against the currently advertised method before saving:
+
+- reject unknown variables;
+- require every non-optional variable;
+- reject refs for agent auth;
+- reject terminal auth because the client does not advertise terminals;
+- preserve user-owned Secrets rows when selection is changed, cleared, or the
+  ACP agent is uninstalled.
+
+Registry reinstall preserves the selection. If the updated binary no longer
+advertises it, connection returns `auth_required`; it does not silently choose
+another method.
+
+### D3. Expose complete server-side operations
+
+Add TypeBox models, service methods, module README entries, and routes:
+
+| Method | Path | CLI | Behavior |
+| --- | --- | --- | --- |
+| `GET` | `/acp/agents/:agentId/auth-methods` | `acp agent auth-methods` | Ensure an initialization result exists; return projected methods and selected method ID. |
+| `PUT` | `/acp/agents/:agentId/auth` | `acp agent auth-set` | Validate and persist `{ methodId, secretRefs }`, then reconnect and authenticate. |
+| `DELETE` | `/acp/agents/:agentId/auth` | `acp agent auth-clear` | Clear the selection and disconnect the current process. |
+
+Expose generated CLI metadata for all three operations. The PUT route accepts
+credential IDs only. Users create or update credential values through the
+Secrets owner; ACP never accepts plaintext credential values.
+
+The route layer may obtain the registered `AcpChatProvider` using the existing
+draft-session composition pattern, but persistence and validation semantics
+remain in `modules/acp/service.ts` and runtime handshake semantics remain in
+the ACP provider boundary.
+
+### D4. Authenticate before session lifecycle methods
+
+Extend the resolved ACP connection record with the persisted method ID and
+secret-ref map. Inject `ProviderContext.readSecret` into the connection
+manager; resolve each selected env-var value immediately before spawn.
+
+Every cold connection first spawns without ACP auth secret values, initializes,
+validates the protocol version, and reads the current auth methods. This
+discovery stage prevents a changed agent binary or method contract from
+receiving credentials based only on stale persisted metadata.
+
+After discovery:
+
+1. no selection keeps the discovery connection and allows session requests;
+2. an `agent` selection sends `authenticate` on the discovery connection;
+3. an `env_var` selection validates the exact advertised fields, closes and
+   stops the discovery connection, resolves the selected secret refs, respawns
+   once with those env values, initializes again, revalidates the method, and
+   sends `authenticate`;
+4. a successful handshake marks the published connection entry with
+   `authenticatedMethodId` before session requests are allowed.
+
+Saving or clearing a selection disconnects the current process. The next
+connection follows the same discovery sequence. Never mutate a live child
+process environment, and never publish the short-lived discovery connection
+while an auth-selected reconnect is in progress.
+
+When no selection exists, do not assume advertised methods mean the agent is
+currently unauthenticated. Attempt the session operation and map only an exact
+`RequestError(-32000)` to `ProviderErrors.authRequired` with the projected
+method list. This preserves agents that advertise login methods while reusing
+provider-owned login state.
+
+When a selected method's `authenticate` request fails, throw `auth_failed` and
+retain the persisted refs for explicit correction or retry. If a later
+session or config request returns exact `RequestError(-32000)`, clear only the
+connection-local authenticated marker and throw `auth_required`. Do not
+automatically retry an operation that may have reached the agent.
 
 ## Tests
 
-Follow the fake-double patterns in `connection-manager.test.ts`. One
-`describe` per workstream:
+Add a manager-level harness using an in-memory ACP SDK peer plus a narrow
+process-manager test boundary. Do not spawn a real child process in unit tests.
 
-1. **A**: init result exposes auth methods + negotiated version; version
-   mismatch throws a typed error naming both versions; `clientInfo.version`
-   reflects the injected version.
-2. **B1**: second `prompt()` on the same session rejects with a typed error;
-   the first run keeps receiving updates (channel untouched).
-3. **B2**: hanging prompt terminates with a typed timeout error within an
-   injected budget; `session/cancel` was notified; finish chunk emitted
-   before close.
-4. **B3**: exhaustive `StopReason` → `finishReason` mapping; success, user
-   cancel, and timeout paths each emit exactly one finish chunk.
-5. **C2/C3**: `-32000` on session/new surfaces `AcpAuthRequiredError` carrying
-   projected methods; `authenticate` precedes `session/new`; env_var selection
-   respawns with env exactly once; secret values never appear in logs or
-   errors (assert against spies/fakes).
-6. **C4**: calling `selectAgentAuthMethod` twice does not open a second
-   connection.
+Focused coverage must include:
 
-Validation commands (from repo root):
+1. initialization reports the server package version, exposes the complete
+   result, and cleans up process + connection on version mismatch;
+2. every request class receives its configured deadline;
+3. a peer that ignores cooperative cancellation causes local timeout,
+   `$/cancel_request`, best-effort `session/cancel`, connection teardown, and
+   no unhandled rejection;
+4. a second prompt on one native session is rejected without disturbing the
+   first channel;
+5. each ACP stop reason emits exactly one expected finish chunk;
+6. provider failure emits no finish and user cancellation emits no finish;
+7. late completion after timeout/cancel cannot mutate queue or usage state;
+8. resume/load auth and timeout errors are not swallowed by fallback;
+9. auth projection applies SDK defaults and marks terminal auth unsupported;
+10. persisted auth config contains refs only, validates required/unknown vars,
+    and survives registry reinstall;
+11. cold env-var auth discovers and validates without secrets before exactly
+    one credential-bearing respawn; values do not appear in records, logs,
+    errors, audit entries, or snapshots;
+12. `authenticate` precedes every session method and repeated ensure/connect
+    calls do not open a second process;
+13. exact `RequestError(-32000)` becomes `auth_required`; unrelated JSON-RPC
+    errors remain request failures;
+14. GET/PUT/DELETE auth route contracts and generated CLI metadata are valid.
+
+## Validation
+
+Run focused checks only; do not restart an existing development server and do
+not run browser tests.
 
 ```bash
+pnpm --filter @cradle/db generate
+pnpm vitest run apps/server/src/modules/chat-runtime-providers/acp \
+  apps/server/src/modules/acp
 pnpm --filter @cradle/server typecheck
-pnpm vitest run apps/server/src/modules/chat-runtime-providers/acp
-pnpm lint --cache   # confirm no new violations in touched files only
+pnpm --filter @cradle/server check:boundaries
+pnpm exec eslint \
+  packages/chat-runtime-contracts/src/index.ts \
+  packages/db/src/schema/acp.ts \
+  apps/server/src/modules/chat-runtime-providers/acp \
+  apps/server/src/modules/acp
 git diff --check
 ```
 
-(If any script name differs from the above, use the repo's actual script —
-verify in root/package.json before running.)
+Inspect generated migration SQL and metadata before accepting them. Do not
+hand-edit generated Drizzle snapshots.
 
-## Real-binary verification (manual, opt-in)
+## Real-agent verification
 
-With an ACP agent that requires auth registered locally (registration of
-specific agents like Cline is out of scope), start the server and create a
-session: session/new must fail with the typed auth-required error;
-`authenticate` fires after method selection; a subsequent small turn streams.
-Record the observed JSON-RPC code/format in `GAP.md`. Never write to agent
-home state (e.g. `~/.cline`) from Cradle during this test.
+This verification is opt-in and must use an explicitly named binary/version.
+It must not reuse or mutate provider-owned home state without approval.
 
-## Escape hatches — STOP and report instead of improvising if:
+1. register an auth-required ACP agent against a temporary workspace;
+2. GET advertised methods and record the exact JSON-RPC auth-required shape;
+3. create Secrets-owned credentials, PUT their refs as the auth selection, and
+   verify `authenticate` occurs before `session/new`;
+4. run one small prompt and verify the mapped finish reason;
+5. cancel one prompt and verify the Cradle run becomes `aborted`;
+6. use an injected test-only short deadline or a controlled fake agent to
+   verify timeout tears down the unhealthy process and the next operation
+   reconnects cleanly;
+7. confirm no credential value appears in audit output, stderr capture,
+   observability, or runtime snapshots.
 
-- The SDK's request path accepts no abort/signal and `Promise.race` would
-  leak unhandled rejections on the losing promise.
-- Persisted-secrets integration for env-var auth requires schema or
-  ownership changes beyond `auth.ts`.
-- The Codex re-auth frontend channel cannot carry generic agent auth payloads
-  and no equally established alternative exists.
-- The real binary's auth-required code differs materially from `-32000` such
-  that matching would misfire for other agents.
+Do not claim end-to-end auth UX complete until a separate web surface can list
+methods, select existing Secrets credentials, and retry session creation. This
+plan delivers the protocol, storage, HTTP/CLI, and generic error foundations.
 
-## Maintenance notes
+## Implementation order
 
-- A2's capability accessors are the hook future gaps (elicitation, terminals,
-  fork gating) will read from — keep them the single source.
-- B1's reject-don't-queue decision should be revisited if Chat Runtime ever
-  allows true concurrent turns per chat session.
-- When Cline is later registered as an ACP agent (separate future plan), its
-  free models depend directly on Workstream C working end-to-end; that plan
-  should consume `listAgentAuthMethods` / `selectAgentAuthMethod`, never
-  bypass them.
+1. A: request lifecycle, initialization validation, and cleanup.
+2. B: prompt exclusivity, terminal semantics, and strict resume fallback.
+3. C: shared provider auth-required contract.
+4. D1-D2: auth projection and durable reference schema.
+5. D3-D4: HTTP/CLI operations and runtime handshake.
+6. focused tests, type/boundary checks, `GAP.md`, and module README updates.
+7. optional real-agent verification after the unit/contract checks pass.
+
+Each step should remain independently reviewable. Do not combine the schema
+migration with unrelated ACP gap work.
+
+## Completion criteria
+
+- A hung ACP request cannot leave a Cradle run streaming indefinitely.
+- An unhealthy timed-out connection is removed and its child process stops.
+- Concurrent prompts cannot silently replace each other's update channel.
+- Normal ACP stop reasons survive projection into the stored terminal chunk.
+- Resume fallback never hides auth, timeout, process, or protocol failures.
+- Auth selection survives server restart without storing secret values in the
+  ACP namespace.
+- Exact ACP auth-required failures retain projected method metadata in the
+  shared provider error payload.
+- An API/CLI user can discover methods, select Secrets-owned credential refs,
+  authenticate, create a session, and run a prompt.
+- Remaining unsupported behavior is accurately listed in `GAP.md`.

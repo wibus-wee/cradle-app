@@ -1,4 +1,5 @@
 import type { SessionConfigOption, SessionModeState } from '@agentclientprotocol/sdk'
+import { RequestError } from '@agentclientprotocol/sdk'
 import type { UIMessageChunk } from 'ai'
 
 import type {
@@ -36,7 +37,9 @@ export function createAcpProvider(ctx: ProviderContext, deps?: AcpChatProviderDe
 }
 
 function createDefaultAcpRuntime(ctx: ProviderContext): AcpConnectionManager {
-  const runtime = new AcpConnectionManager(new AcpProcessManager())
+  const runtime = new AcpConnectionManager(new AcpProcessManager(), {
+    readSecret: ctx.readSecret,
+  })
   wireAcpIntegration(runtime, { deps: ctx })
   return runtime
 }
@@ -53,6 +56,29 @@ export class AcpChatProvider implements ChatRuntime {
   }
 
   constructor(private readonly deps: AcpChatProviderDeps) {}
+
+  async listAgentAuthMethods(agentId: string) {
+    const configJson = JSON.stringify({ acpAgentId: agentId })
+    const { record, connectionKey } = resolveAcpConnectionRecord(configJson, `acp:${agentId}`)
+    if (!this.deps.runtime.isConnected(connectionKey)) {
+      await this.deps.runtime.connect(connectionKey, {
+        ...record,
+        authMethodId: null,
+        authSecretRefs: {},
+      })
+    }
+    return this.deps.runtime.getAuthMethods(connectionKey)
+  }
+
+  async reconnectAgent(agentId: string): Promise<void> {
+    const connectionKey = `acp:${agentId}`
+    await this.deps.runtime.disconnect(connectionKey)
+    await this.ensureConnected(connectionKey, JSON.stringify({ acpAgentId: agentId }))
+  }
+
+  async disconnectAgent(agentId: string): Promise<void> {
+    await this.deps.runtime.disconnect(`acp:${agentId}`)
+  }
 
   async openDraftSession(input: { agentId: string, workspacePath: string }): Promise<{
     sessionId: string
@@ -128,8 +154,10 @@ export class AcpChatProvider implements ChatRuntime {
           }),
         }
       }
-      catch {
-        // fall back to load/new session below
+      catch (error) {
+        if (!isAcpSessionFallbackError(error)) {
+          throw error
+        }
       }
     }
 
@@ -150,8 +178,10 @@ export class AcpChatProvider implements ChatRuntime {
           }),
         }
       }
-      catch {
-        // fall back to new session below
+      catch (error) {
+        if (!isAcpSessionFallbackError(error)) {
+          throw error
+        }
       }
     }
 
@@ -180,6 +210,9 @@ export class AcpChatProvider implements ChatRuntime {
       providerKind: profile.providerKind ?? 'universal',
       runtimeKind: this.runtimeKind,
     })) {
+      if (event.type === 'finish') {
+        this._lastUsage = this.deps.runtime.getLastUsage(connectionKey, acpSessionId)
+      }
       yield event
     }
 
@@ -239,13 +272,19 @@ export class AcpChatProvider implements ChatRuntime {
     if (!modelId) {
       return
     }
-    try {
-      await this.deps.runtime.setSessionModel(connectionKey, sessionId, modelId)
-    }
-    catch {
-      // ACP agents may reject explicit model changes and keep their default.
-    }
+    await this.deps.runtime.setSessionModel(connectionKey, sessionId, modelId)
   }
+}
+
+function isAcpSessionFallbackError(error: unknown): boolean {
+  let current: unknown = error
+  while (current instanceof Error) {
+    if (current instanceof RequestError) {
+      return current.code === -32601 || current.code === -32002
+    }
+    current = current.cause
+  }
+  return false
 }
 
 function flattenModelOptions(options: Array<{ value: string, name: string } | { name: string, options: Array<{ value: string, name: string }> }>): Array<{ id: string, label: string }> {

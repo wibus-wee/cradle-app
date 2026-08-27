@@ -4,18 +4,13 @@ This file records Agent Client Protocol (ACP) capabilities that the current Crad
 
 Registry browsing, install/uninstall, local agents, and launch-config overrides live in `apps/server/src/modules/acp/` and are complete for their scope; gaps below concern the chat runtime projection and its surfaces unless stated otherwise.
 
-## Authentication
+## Authentication UI and interoperability
 
-ACP agents advertise auth requirements through `initialize` → `authMethods` and expect a follow-up `authenticate` request. Cradle never reads `authMethods` and never sends `authenticate`; there is no recovery flow for an `auth_required` error on `session/new`.
+The server projects advertised auth methods, stores method IDs and Secrets-owned credential refs, performs agent or env-var authentication, and exposes generated API/CLI operations. There is no ACP-specific web surface for selecting existing credentials or retrying a failed session, and this implementation has not been verified against a named real auth-required agent binary.
 
 ### Current effect
 
-- Registry agents that require authentication (API key, OAuth, etc.) cannot be used at all: session creation fails with an unexplained error instead of surfacing a login/auth-method choice.
-- `authMethods` metadata is discarded at connect time (connection-manager.ts keeps only capabilities).
-
-### Needed
-
-Persist per-agent auth method selection, send `authenticate` after `initialize` when required, map `auth_required` errors into a typed provider error that the frontend can turn into an auth surface. Temporary credentials stay in memory or the credential store; never in `acp_agents` rows or logs.
+API and CLI callers can complete the auth flow, while web users receive the generic typed `auth_required` failure without an in-app recovery workflow. Provider-specific deviations from the SDK's standard error codes remain unverified until a real-agent smoke test records them.
 
 ## Elicitation
 
@@ -89,7 +84,7 @@ All ACP tool calls render as generic unknown tools with stringified payloads, in
 
 ## Lifecycle: reconnect, respawn, stderr
 
-There is no bounded reconnect policy, no automatic respawn after agent-process crash, and stderr is captured only for metrics, never surfaced to users. A crashed process fails open channels with a generic disconnect error and the connection stays down until something restarts it. Usage is captured solely from the final `PromptResponse`; incremental usage updates do not exist in ACP today but any `_meta` variants will need a home.
+There is no bounded reconnect policy or active automatic respawn after an agent-process crash. A crash fails open channels, removes the connection, and leaves the next provider operation to open a fresh process. Stderr is captured only for metrics, with injected auth values redacted, and is never surfaced to users. Usage is captured solely from the final `PromptResponse`; incremental usage updates do not exist in ACP today but any `_meta` variants will need a home.
 
 ## Declared degradations
 
@@ -112,42 +107,6 @@ Cradle uses `session/new`, `session/load`, `session/resume`, `session/prompt`, `
 ### Needed
 
 A cleanup owner: when Cradle deletes a chat session bound to an ACP durable provider session, call `session/delete`/`session/close` best-effort; add draft-session TTL or explicit close; consider `session/list` for reconciliation.
-
-## Stop reason projection
-
-The `stopReason` of the final `session/prompt` response is ignored. `end_turn`, `cancelled`, refusal, and limit stop reasons all produce the same normal turn end.
-
-### Current effect
-
-Refusals and context/turn limits render as if the agent simply finished; users get no signal that the turn was cut short or declined.
-
-### Needed
-
-Map each ACP stop reason onto the Chat Runtime finish-reason contract before discarding the prompt result.
-
-## Turn concurrency and timeouts
-
-Channels are keyed by native session ID (`conn.channels.set(sessionId, channel)` in `prompt()`), so two overlapping runs on the same native session silently rebind the update stream to the newest channel — the older run stops receiving updates mid-flight. There is also no timeout or abort policy on any agent request: an agent that hangs after accepting `session/prompt` leaves the Cradle run streaming forever.
-
-### Current effect
-
-Concurrent prompts on one session corrupt both timelines; hung agents violate the "never leave a run streaming" lifecycle rule with no terminal failure path.
-
-### Needed
-
-Reject or queue concurrent prompts per native session explicitly; wrap agent requests in a bounded timeout/abort policy that terminates the run and releases the lease on exhaustion.
-
-## Initialization negotiation
-
-`initialize` sends the SDK's `PROTOCOL_VERSION` and hardcodes `clientInfo.version: '1.0.0'`; the negotiated `protocolVersion` and `agentCapabilities` beyond `loadSession`/`resume` from the response are ignored. `_meta` extensibility fields are neither read nor forwarded anywhere.
-
-### Current effect
-
-Version mismatches surface as inscrutable downstream protocol errors instead of a typed unsupported-version failure; capability-dependent features (auth, elicitation, terminals, fork) cannot be gated on what the agent actually advertised because only two flags survive.
-
-### Needed
-
-Capability gating must read the full `InitializeResponse`; the server version should reflect the actual server version.
 
 ## Module-level follow-ups
 
@@ -180,4 +139,4 @@ Hosted/remote ACP agents cannot be used from Cradle; every registry agent costs 
 
 ## Agent credentials in plaintext
 
-Local-agent env maps (typically containing API keys) are JSON-serialized directly into `acp_agents.env`; audit logging records only key names (`envKeysOnly`). There is no secret-store integration, so anyone with DB/file access reads every configured agent credential.
+Legacy local-agent launch env maps (typically containing API keys) are JSON-serialized directly into `acp_agents.env`; audit logging records only key names (`envKeysOnly`). The dedicated ACP auth selection uses Secrets-owned references, but arbitrary launch env values have not migrated to that model, so anyone with DB/file access can still read credentials placed in the launch config.

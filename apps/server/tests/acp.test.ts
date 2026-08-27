@@ -67,12 +67,14 @@ describe('acp capability', () => {
         body: JSON.stringify({ distributionType: 'npx' }),
       }))
       expect(installRes.status).toBe(200)
-      expect(await installRes.json()).toEqual(expect.objectContaining({
+      const installedAgent = await installRes.json()
+      expect(installedAgent).toEqual(expect.objectContaining({
         id: 'demo-agent',
         distributionType: 'npx',
         status: 'installed',
         cmd: '@demo/agent',
       }))
+      expect(installedAgent).not.toHaveProperty('authSecretRefsJson')
 
       const listInstalledRes = await app.handle(new Request('http://localhost/acp/agents'))
       expect(listInstalledRes.status).toBe(200)

@@ -1,5 +1,8 @@
 import type { Command } from 'commander'
 
+import { register as registerAcpAgentAuthClear } from '../acp/agent/auth-clear'
+import { register as registerAcpAgentAuthMethods } from '../acp/agent/auth-methods'
+import { register as registerAcpAgentAuthSet } from '../acp/agent/auth-set'
 import { register as registerAcpAgentCancelInstall } from '../acp/agent/cancel-install'
 import { register as registerAcpAgentCreate } from '../acp/agent/create'
 import { register as registerAcpAgentGet } from '../acp/agent/get'
@@ -13,6 +16,9 @@ import { register as registerAcpRegistryDistributionTypes } from '../acp/registr
 import { register as registerAcpRegistryList } from '../acp/registry/list'
 
 export function registerGeneratedCommands(program: Command): void {
+  registerAcpAgentAuthClear(program)
+  registerAcpAgentAuthMethods(program)
+  registerAcpAgentAuthSet(program)
   registerAcpAgentCancelInstall(program)
   registerAcpAgentCreate(program)
   registerAcpAgentGet(program)

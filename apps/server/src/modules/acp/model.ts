@@ -1,5 +1,28 @@
 import { t } from 'elysia'
 
+const authMethod = t.Object({
+  id: t.String(),
+  name: t.String(),
+  description: t.Optional(t.String()),
+  kind: t.Union([
+    t.Literal('agent'),
+    t.Literal('env_var'),
+    t.Literal('terminal'),
+  ]),
+  status: t.Union([
+    t.Literal('supported'),
+    t.Literal('unsupported'),
+  ]),
+  unavailableReason: t.Optional(t.String()),
+  link: t.Optional(t.String()),
+  fields: t.Optional(t.Array(t.Object({
+    name: t.String(),
+    label: t.Optional(t.String()),
+    secret: t.Boolean(),
+    optional: t.Boolean(),
+  }))),
+})
+
 export const AcpModel = {
   registryAgent: t.Object({
     id: t.String(),
@@ -31,6 +54,7 @@ export const AcpModel = {
     overrideCmd: t.Nullable(t.String()),
     overrideArgs: t.Nullable(t.String()),
     overrideEnv: t.Nullable(t.String()),
+    authMethodId: t.Nullable(t.String()),
     status: t.String(),
     createdAt: t.Number(),
     updatedAt: t.Number(),
@@ -61,6 +85,25 @@ export const AcpModel = {
       id: t.String(),
       label: t.String(),
     })),
+  }),
+
+  authMethod,
+
+  authMethodsResult: t.Object({
+    methods: t.Array(authMethod),
+    selectedMethodId: t.Nullable(t.String()),
+  }),
+
+  authSelectionBody: t.Object({
+    methodId: t.String({ minLength: 1 }),
+    secretRefs: t.Optional(t.Record(
+      t.String({ minLength: 1 }),
+      t.String({ minLength: 1 }),
+    )),
+  }),
+
+  authSelectionResult: t.Object({
+    selectedMethodId: t.Nullable(t.String()),
   }),
 
   installBody: t.Object({

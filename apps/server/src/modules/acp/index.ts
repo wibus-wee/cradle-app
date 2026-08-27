@@ -3,6 +3,7 @@ import { Elysia, t } from 'elysia'
 import { AppError } from '../../errors/app-error'
 import { getRuntimeRegistry } from '../chat-runtime/chat-runtime-provider-registry'
 import { AcpChatProvider } from '../chat-runtime-providers/acp/provider'
+import * as Secrets from '../secrets/service'
 import * as Workspace from '../workspace/service'
 import { AcpModel } from './model'
 import type { AcpDownloadCenter } from './service'
@@ -18,6 +19,14 @@ function requireNonBlankString(value: string | undefined, field: string): string
     })
   }
   return trimmed
+}
+
+function requireAcpRuntime(): AcpChatProvider {
+  const runtime = getRuntimeRegistry().get('acp-chat')
+  if (!(runtime instanceof AcpChatProvider)) {
+    throw new AppError({ code: 'acp_runtime_not_available', status: 501, message: 'ACP Chat runtime is not available' })
+  }
+  return runtime
 }
 
 export function createAcpModule(downloadCenter: AcpDownloadCenter) {
@@ -91,6 +100,62 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     params: AcpModel.agentIdParams,
     response: { 200: AcpModel.acpAgent },
   })
+  .get('/agents/:agentId/auth-methods', async ({ params }) => {
+    const agentId = requireNonBlankString(params.agentId, 'agentId')
+    const selection = Acp.readAgentAuthConfig(agentId)
+    const methods = await requireAcpRuntime().listAgentAuthMethods(agentId)
+    return { methods, selectedMethodId: selection.methodId }
+  }, {
+    detail: {
+      'summary': 'List ACP agent authentication methods',
+      'x-cradle-cli': {
+        command: ['acp', 'agent', 'auth-methods'],
+      },
+    },
+    params: AcpModel.agentIdParams,
+    response: { 200: AcpModel.authMethodsResult },
+  })
+  .put('/agents/:agentId/auth', async ({ params, body }) => {
+    const agentId = requireNonBlankString(params.agentId, 'agentId')
+    const runtime = requireAcpRuntime()
+    Acp.readAgentAuthConfig(agentId)
+    const availableSecretIds = body.secretRefs && Object.keys(body.secretRefs).length > 0
+      ? new Set(Secrets.listSecrets().map(secret => secret.id))
+      : new Set<string>()
+    const methods = await runtime.listAgentAuthMethods(agentId)
+    const selection = Acp.setAgentAuthSelection(agentId, {
+      methodId: body.methodId,
+      secretRefs: body.secretRefs,
+    }, methods, availableSecretIds)
+    await runtime.reconnectAgent(agentId)
+    return { selectedMethodId: selection.methodId }
+  }, {
+    detail: {
+      'summary': 'Select and authenticate an ACP agent method',
+      'x-cradle-cli': {
+        command: ['acp', 'agent', 'auth-set'],
+      },
+    },
+    params: AcpModel.agentIdParams,
+    body: AcpModel.authSelectionBody,
+    response: { 200: AcpModel.authSelectionResult },
+  })
+  .delete('/agents/:agentId/auth', async ({ params }) => {
+    const agentId = requireNonBlankString(params.agentId, 'agentId')
+    const runtime = requireAcpRuntime()
+    Acp.clearAgentAuthSelection(agentId)
+    await runtime.disconnectAgent(agentId)
+    return { selectedMethodId: null }
+  }, {
+    detail: {
+      'summary': 'Clear an ACP agent authentication selection',
+      'x-cradle-cli': {
+        command: ['acp', 'agent', 'auth-clear'],
+      },
+    },
+    params: AcpModel.agentIdParams,
+    response: { 200: AcpModel.authSelectionResult },
+  })
   .patch('/agents/:agentId/launch-config', ({ params, body }) => {
     return Acp.updateLaunchConfig(requireNonBlankString(params.agentId, 'agentId'), {
       name: body.name,
@@ -129,10 +194,7 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
         details: { workspaceId: body.workspaceId },
       })
     }
-    const runtime = getRuntimeRegistry().get('acp-chat')
-    if (!(runtime instanceof AcpChatProvider)) {
-      throw new AppError({ code: 'acp_runtime_not_available', status: 501, message: 'ACP Chat runtime is not available' })
-    }
+    const runtime = requireAcpRuntime()
     return runtime.openDraftSession({ agentId, workspacePath: workspacePath ?? '' })
   }, {
     detail: { summary: 'Open an ACP draft session and read its native model choices' },
