@@ -8,6 +8,7 @@ import {
   bindCodexCradleMcpInvocation,
   buildCodexConfig,
   buildCodexMcpServersEnvironment,
+  projectCodexRuntimeAccessMode,
   readCodexReasoningEffort,
 } from './runtime-config'
 
@@ -125,5 +126,32 @@ describe('buildCodexConfig MCP projection', () => {
 describe('codex reasoning effort projection', () => {
   it('forwards ultra to the app-server boundary', () => {
     expect(readCodexReasoningEffort('ultra', 'high')).toBe('ultra')
+  })
+})
+
+describe('codex runtime access projection', () => {
+  const input = { writableRoots: ['/tmp/workspace'], additionalDirectories: [] }
+
+  it('uses the native auto reviewer without weakening the sandbox', () => {
+    expect(projectCodexRuntimeAccessMode('approve-for-me', input)).toMatchObject({
+      approvalPolicy: 'on-request',
+      approvalsReviewer: 'auto_review',
+      sandbox: 'workspace-write',
+      sandboxPolicy: { type: 'workspaceWrite' },
+    })
+  })
+
+  it('keeps manual review and unrestricted access distinct', () => {
+    expect(projectCodexRuntimeAccessMode('approval-required', input)).toMatchObject({
+      approvalPolicy: 'on-request',
+      approvalsReviewer: 'user',
+      sandbox: 'workspace-write',
+    })
+    expect(projectCodexRuntimeAccessMode('full-access', input)).toMatchObject({
+      approvalPolicy: 'never',
+      approvalsReviewer: 'user',
+      sandbox: 'danger-full-access',
+      sandboxPolicy: { type: 'dangerFullAccess' },
+    })
   })
 })

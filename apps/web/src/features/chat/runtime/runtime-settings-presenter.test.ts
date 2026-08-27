@@ -5,6 +5,7 @@ import {
   buildPlanModeTogglePatch,
   isPlanRuntimeSettings,
   readRunRuntimeSettingsPatch,
+  readRuntimeSettingsIconKey,
   supportsPlanModeToggle,
 } from './runtime-settings-presenter'
 
@@ -54,5 +55,11 @@ describe('runtime-settings-presenter', () => {
       permissionMode: 'plan',
       claudeAgent: { modelAliases: { haiku: 'x', sonnet: 'y', opus: 'z' } },
     })).toEqual({ permissionMode: 'plan' })
+  })
+
+  it('uses a distinct icon for automatic approval review', () => {
+    expect(readRuntimeSettingsIconKey({ accessMode: 'approve-for-me' })).toBe('auto-approval')
+    expect(readRuntimeSettingsIconKey({ accessMode: 'approval-required' })).toBe('approval')
+    expect(readRuntimeSettingsIconKey({ accessMode: 'full-access' })).toBe('full-access')
   })
 })

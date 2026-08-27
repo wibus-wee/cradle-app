@@ -61,6 +61,18 @@ describe('runtime-settings-registry', () => {
     })
   })
 
+  it('exposes automatic review only for runtimes with a native reviewer', () => {
+    expect(readRuntimeSettingsSchema('codex')).toMatchObject({ properties: { accessMode: {
+      enum: ['approval-required', 'approve-for-me', 'full-access'],
+    } } })
+    expect(readRuntimeSettingsSchema('kimi')).toMatchObject({ properties: { accessMode: {
+      enum: ['approval-required', 'approve-for-me', 'full-access'],
+    } } })
+    expect(readRuntimeSettingsSchema('opencode')).toMatchObject({ properties: { accessMode: {
+      enum: ['approval-required', 'full-access'],
+    } } })
+  })
+
   it('accepts Fast as the Codex-only service tier', () => {
     const entry = resolveRuntimeSettingsEntry('codex')
     expect(entry?.normalize({ serviceTier: 'fast' })).toEqual({ serviceTier: 'fast' })

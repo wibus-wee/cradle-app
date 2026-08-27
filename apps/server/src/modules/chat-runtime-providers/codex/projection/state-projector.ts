@@ -818,7 +818,7 @@ function projectCodexApprovalsSnapshot(
         id: params.reviewId,
         targetItemId: params.targetItemId ?? null,
         status: normalizeApprovalStatus(params.review?.status) ?? (notification.method === 'item/autoApprovalReview/completed' ? 'approved' : 'pending'),
-        label: readApprovalActionLabel(params.action),
+        label: `Auto review · ${readApprovalActionLabel(params.action)}`,
         riskLevel: typeof params.review?.riskLevel === 'string' ? params.review.riskLevel : null,
         rationale: typeof params.review?.rationale === 'string' ? params.review.rationale : null,
         startedAt: typeof params.startedAtMs === 'number' ? params.startedAtMs : null,

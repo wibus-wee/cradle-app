@@ -4,6 +4,7 @@ import {
   LockLine as LockIcon,
   RouteLine as RouteIcon,
   SafeShieldLine as ShieldCheckIcon,
+  SparklesLine as SparklesIcon,
 } from '@mingcute/react'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -147,16 +148,32 @@ function RuntimeSettingsFieldGroup({
           )
         })}
       </DropdownMenuRadioGroup>
+      {field.key === 'accessMode' && currentValue === 'approve-for-me' && (
+        <div className="mx-2 mb-1 mt-1 flex gap-2 rounded-md bg-[var(--color-warning)]/10 p-2 shadow-[var(--shadow-inset-ring)]">
+          <SparklesIcon className="mt-0.5 size-3.5 shrink-0 text-[var(--color-warning)]" aria-hidden="true" />
+          <div className="min-w-0">
+            <div className="text-xs font-medium text-[var(--text-primary)]">
+              {t('runtimeSettings.approveForMe.noticeTitle')}
+            </div>
+            <p className="mt-0.5 text-pretty text-[11px] leading-snug text-[var(--text-secondary)]">
+              {t('runtimeSettings.approveForMe.noticeBody', { runtime: field.runtimeLabel })}
+            </p>
+          </div>
+        </div>
+      )}
     </>
   )
 }
 
-function RuntimeSettingsIcon({ iconKey }: { iconKey: 'plan' | 'approval' | 'full-access' }) {
+function RuntimeSettingsIcon({ iconKey }: { iconKey: 'plan' | 'approval' | 'auto-approval' | 'full-access' }) {
   if (iconKey === 'plan') {
     return <RouteIcon className="size-3.5" aria-hidden="true" />
   }
   if (iconKey === 'approval') {
     return <LockIcon className="size-3.5" aria-hidden="true" />
+  }
+  if (iconKey === 'auto-approval') {
+    return <SparklesIcon className="size-3.5" aria-hidden="true" />
   }
   return <ShieldCheckIcon className="size-3.5" aria-hidden="true" />
 }
@@ -170,6 +187,9 @@ function RuntimeSettingsEnumIcon({ fieldKey, value }: { fieldKey: string, value:
   }
   if (fieldKey === 'accessMode' && value === 'approval-required') {
     return <LockIcon className="size-3.5" aria-hidden="true" />
+  }
+  if (fieldKey === 'accessMode' && value === 'approve-for-me') {
+    return <SparklesIcon className="size-3.5" aria-hidden="true" />
   }
   if (fieldKey === 'accessMode' && value === 'full-access') {
     return <ShieldCheckIcon className="size-3.5" aria-hidden="true" />

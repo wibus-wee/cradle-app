@@ -382,6 +382,7 @@ export class CodexAppServerBridge {
           cwd: runtimeContext.cwd,
           runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
           approvalPolicy: config.approvalPolicy,
+          approvalsReviewer: 'user',
           sandbox: config.sandboxMode,
           config: threadConfig,
         })

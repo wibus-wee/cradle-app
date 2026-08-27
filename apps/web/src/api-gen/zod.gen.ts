@@ -1379,7 +1379,11 @@ export const zPostSessionsBody = z.object({
             'bypassPermissions',
             'plan'
         ]).nullish(),
-        accessMode: z.enum(['approval-required', 'full-access']).nullish(),
+        accessMode: z.enum([
+            'approval-required',
+            'approve-for-me',
+            'full-access'
+        ]).nullish(),
         interactionMode: z.enum(['default', 'plan']).nullish(),
         claudeAgent: z.object({
             modelAliases: z.object({
@@ -1662,7 +1666,11 @@ export const zPostWorksBody = z.object({
             'bypassPermissions',
             'plan'
         ]).nullish(),
-        accessMode: z.enum(['approval-required', 'full-access']).nullish(),
+        accessMode: z.enum([
+            'approval-required',
+            'approve-for-me',
+            'full-access'
+        ]).nullish(),
         interactionMode: z.enum(['default', 'plan']).nullish(),
         claudeAgent: z.object({
             modelAliases: z.object({
@@ -3582,7 +3590,11 @@ export const zPatchChatSessionsBySessionIdRuntimeSettingsBody = z.object({
         'bypassPermissions',
         'plan'
     ]).nullish(),
-    accessMode: z.enum(['approval-required', 'full-access']).nullish(),
+    accessMode: z.enum([
+        'approval-required',
+        'approve-for-me',
+        'full-access'
+    ]).nullish(),
     interactionMode: z.enum(['default', 'plan']).nullish(),
     claudeAgent: z.object({
         modelAliases: z.object({

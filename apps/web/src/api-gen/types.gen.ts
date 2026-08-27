@@ -7283,7 +7283,7 @@ export type PostSessionsData = {
         runtimeKind?: string;
         runtimeSettings?: {
             permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-            accessMode?: 'approval-required' | 'full-access' | null;
+            accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
             interactionMode?: 'default' | 'plan' | null;
             claudeAgent?: {
                 modelAliases?: {
@@ -7292,7 +7292,7 @@ export type PostSessionsData = {
                     opus?: string;
                 };
             } | null;
-            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
                 modelAliases?: {
                     haiku?: string;
                     sonnet?: string;
@@ -8644,7 +8644,7 @@ export type PostWorksData = {
         runtimeKind?: string;
         runtimeSettings?: {
             permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-            accessMode?: 'approval-required' | 'full-access' | null;
+            accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
             interactionMode?: 'default' | 'plan' | null;
             claudeAgent?: {
                 modelAliases?: {
@@ -8653,7 +8653,7 @@ export type PostWorksData = {
                     opus?: string;
                 };
             } | null;
-            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
                 modelAliases?: {
                     haiku?: string;
                     sonnet?: string;
@@ -21643,7 +21643,7 @@ export type GetChatSessionsBySessionIdRuntimeSettingsResponse = GetChatSessionsB
 export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
     body: {
         permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-        accessMode?: 'approval-required' | 'full-access' | null;
+        accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
         interactionMode?: 'default' | 'plan' | null;
         claudeAgent?: {
             modelAliases?: {
@@ -21652,7 +21652,7 @@ export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
                 opus?: string;
             };
         } | null;
-        [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+        [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
             modelAliases?: {
                 haiku?: string;
                 sonnet?: string;

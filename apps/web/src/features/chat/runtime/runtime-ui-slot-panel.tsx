@@ -329,6 +329,7 @@ function KeyValueLine({ line }: { line: SlotCardLine }) {
     <div className="flex min-w-0 items-center gap-2 text-[10px]">
       <span className="shrink-0 text-muted-foreground">{line.label}</span>
       <span
+        title={line.value}
         className={cn(
           'min-w-0 flex-1 truncate text-right tabular-nums',
           readToneTextClassName(line.tone ?? 'neutral'),
@@ -627,7 +628,11 @@ function readStateView(
         progress: null,
         lines: state.recentItems.slice(0, 4).map(item => ({
           label: formatStatusLike(item.status),
-          value: item.label,
+          value: [
+            item.label,
+            item.riskLevel ? `${formatStatusLike(item.riskLevel)} risk` : null,
+            item.rationale,
+          ].filter((value): value is string => Boolean(value)).join(' · '),
           tone: readApprovalTone(item.status),
         })),
       }
