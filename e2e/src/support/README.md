@@ -39,6 +39,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 
 - Claude scenarios launch the real Claude Agent SDK; Codex scenarios launch the real Codex app-server.
 - Only upstream model HTTP is simulated. Unmatched conversation requests fail; probe endpoints such as token counting may auto-respond.
+- Temporary workspaces live under the managed home accepted by Directory Browser. The server sets that data directory as Git's discovery ceiling so repository grouping cannot merge independent scenario fixtures with the checkout.
 - Agent-scoped provider sessions use Agent Home as their runtime `cwd`. Tests that mutate an isolated Work must target the provider-owned `CRADLE_WORKSPACE_PATH` instead of assuming relative paths resolve inside the worktree.
 - Title-generation and primary-turn requests share provider infrastructure. Match primary turns by semantic body content and enqueue follow-up replies at the action boundary when background title work can interleave.
 - `CRADLE_E2E_NODE` selects the Node binary used by managed child processes.
