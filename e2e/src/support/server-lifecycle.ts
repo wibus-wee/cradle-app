@@ -225,6 +225,10 @@ BeforeAll({ timeout: 120_000 }, async () => {
         ...process.env,
         PATH: `${dirname(nodeBinary)}:${process.env.PATH ?? ''}`,
         HOME: serverHomeDir,
+        // Workspace fixtures live below the checkout-owned data cache so the
+        // directory browser can reach them. Do not let Git inherit the Cradle
+        // repository identity through that parent path.
+        GIT_CEILING_DIRECTORIES: serverHomeDir,
         CRADLE_DATA_DIR: dataDir,
         // Keep ad-hoc chat workspaces inside the per-run writable sandbox. The
         // production default (~/Documents/Cradle) may not exist or be writable
