@@ -19024,6 +19024,7 @@ export type GetAcpAgentsResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19066,6 +19067,7 @@ export type PostAcpAgentsResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19120,6 +19122,7 @@ export type GetAcpAgentsByAgentIdResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19127,6 +19130,86 @@ export type GetAcpAgentsByAgentIdResponses = {
 };
 
 export type GetAcpAgentsByAgentIdResponse = GetAcpAgentsByAgentIdResponses[keyof GetAcpAgentsByAgentIdResponses];
+
+export type GetAcpAgentsByAgentIdAuthMethodsData = {
+    body?: never;
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth-methods';
+};
+
+export type GetAcpAgentsByAgentIdAuthMethodsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        methods: Array<{
+            id: string;
+            name: string;
+            description?: string;
+            kind: 'agent' | 'env_var' | 'terminal';
+            status: 'supported' | 'unsupported';
+            unavailableReason?: string;
+            link?: string;
+            fields?: Array<{
+                name: string;
+                label?: string;
+                secret: boolean;
+                optional: boolean;
+            }>;
+        }>;
+        selectedMethodId: string | null;
+    };
+};
+
+export type GetAcpAgentsByAgentIdAuthMethodsResponse = GetAcpAgentsByAgentIdAuthMethodsResponses[keyof GetAcpAgentsByAgentIdAuthMethodsResponses];
+
+export type DeleteAcpAgentsByAgentIdAuthData = {
+    body?: never;
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth';
+};
+
+export type DeleteAcpAgentsByAgentIdAuthResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        selectedMethodId: string | null;
+    };
+};
+
+export type DeleteAcpAgentsByAgentIdAuthResponse = DeleteAcpAgentsByAgentIdAuthResponses[keyof DeleteAcpAgentsByAgentIdAuthResponses];
+
+export type PutAcpAgentsByAgentIdAuthData = {
+    body: {
+        methodId: string;
+        secretRefs?: {
+            [key: string]: unknown;
+        };
+    };
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth';
+};
+
+export type PutAcpAgentsByAgentIdAuthResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        selectedMethodId: string | null;
+    };
+};
+
+export type PutAcpAgentsByAgentIdAuthResponse = PutAcpAgentsByAgentIdAuthResponses[keyof PutAcpAgentsByAgentIdAuthResponses];
 
 export type PatchAcpAgentsByAgentIdLaunchConfigData = {
     body: {
@@ -19168,6 +19251,7 @@ export type PatchAcpAgentsByAgentIdLaunchConfigResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19251,6 +19335,7 @@ export type PutAcpAgentsByAgentIdInstallationResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;

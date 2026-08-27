@@ -2991,6 +2991,23 @@ export const zGetAcpAgentsByAgentIdPath = z.object({
     agentId: z.string().min(1)
 });
 
+export const zGetAcpAgentsByAgentIdAuthMethodsPath = z.object({
+    agentId: z.string().min(1)
+});
+
+export const zDeleteAcpAgentsByAgentIdAuthPath = z.object({
+    agentId: z.string().min(1)
+});
+
+export const zPutAcpAgentsByAgentIdAuthBody = z.object({
+    methodId: z.string().min(1),
+    secretRefs: z.record(z.string(), z.unknown()).optional()
+});
+
+export const zPutAcpAgentsByAgentIdAuthPath = z.object({
+    agentId: z.string().min(1)
+});
+
 export const zPatchAcpAgentsByAgentIdLaunchConfigBody = z.object({
     name: z.string().min(1).optional(),
     overrideCmd: z.string().nullish(),

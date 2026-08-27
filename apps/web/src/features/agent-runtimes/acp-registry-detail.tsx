@@ -32,6 +32,7 @@ import type { Agent } from '~/features/agent-runtime/use-agents'
 import { nativeIpc } from '~/lib/electron'
 
 import { AcpAgentIcon } from './acp-agent-icon'
+import { AcpAuthSection } from './acp-auth-section'
 import type { AcpDistributionType, AcpInstalledAgent, AcpRegistryAgent } from './use-acp-registry'
 import { listAcpDistributionTypes, useAcpAgentMutations } from './use-acp-registry'
 import { CreateAgentButton, UsedBySection } from './used-by-section'
@@ -319,6 +320,10 @@ export function AcpRegistryDetail({
           </>
         )}
       </div>
+
+      {isReady && installed && (
+        <AcpAuthSection agentId={installed.id} configuredMethodId={installed.authMethodId} />
+      )}
 
       {/* Used by + create */}
       <UsedBySection agents={usedByAgents} />

@@ -8,6 +8,8 @@ import { acpRegistryApi } from './api/acp-registry'
 
 export const ACP_DISTRIBUTION_TYPES = ['npx', 'uvx', 'binary'] as const
 export type AcpDistributionType = (typeof ACP_DISTRIBUTION_TYPES)[number]
+export const ACP_LOCAL_DISTRIBUTION_TYPES = ['command', 'npx', 'uvx'] as const
+export type AcpLocalDistributionType = (typeof ACP_LOCAL_DISTRIBUTION_TYPES)[number]
 
 const AcpRegistryAgentSchema = z.object({
   id: z.string().min(1),
@@ -30,12 +32,19 @@ const AcpInstalledAgentSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   version: z.string().nullable(),
+  source: z.enum(['registry', 'local']),
   distributionType: z.string().min(1),
   installPath: z.string().nullable(),
   cmd: z.string().nullable(),
   args: z.string().nullable(),
   env: z.string().nullable(),
+  overrideCmd: z.string().nullable(),
+  overrideArgs: z.string().nullable(),
+  overrideEnv: z.string().nullable(),
+  authMethodId: z.string().nullable(),
   status: z.enum(['installing', 'installed', 'failed']),
+  createdAt: z.number(),
+  updatedAt: z.number(),
 })
 
 export type AcpRegistryAgent = z.infer<typeof AcpRegistryAgentSchema>
@@ -99,7 +108,19 @@ export function useAcpAgentMutations() {
     onSettled: invalidate,
   })
 
+  const createLocalAgent = useMutation({
+    ...acpRegistryApi.createLocalMutation(),
+    onSettled: invalidate,
+  })
+
+  const updateLaunchConfig = useMutation({
+    ...acpRegistryApi.updateLaunchConfigMutation(),
+    onSettled: invalidate,
+  })
+
   return {
+    createLocalAgent,
+    updateLaunchConfig,
     installAgent,
     cancelInstall,
     uninstallAgent,

@@ -11,6 +11,7 @@ import { useAgents } from '~/features/agent-runtime/use-agents'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 
 import { SettingsMasterDetail } from '../settings/settings-container'
+import { AcpLocalAgentDetail } from './acp-local-agent-detail'
 import { AcpRegistryDetail } from './acp-registry-detail'
 import { BuiltinRuntimeDetail } from './builtin-runtime-detail'
 import type { AcpListEntry, AcpListFilter, RuntimeSelection } from './runtime-list-pane'
@@ -28,7 +29,10 @@ function selectionKey(selection: RuntimeSelection | null): string {
   if (!selection) {
     return 'none'
   }
-  return selection.type === 'builtin' ? `builtin:${selection.runtimeKind}` : `acp:${selection.agentId}`
+  if (selection.type === 'builtin') {
+    return `builtin:${selection.runtimeKind}`
+  }
+  return selection.type === 'acp' ? `acp:${selection.agentId}` : 'acp-local-new'
 }
 
 export function RuntimesSettings() {
@@ -48,7 +52,11 @@ export function RuntimesSettings() {
   )
 
   const acpEntries = useMemo<AcpListEntry[]>(() => {
-    const installedById = new Map(installedQuery.installedAgents.map(agent => [agent.id, agent]))
+    const installedById = new Map(
+      installedQuery.installedAgents
+        .filter(agent => agent.source === 'registry')
+        .map(agent => [agent.id, agent]),
+    )
     return registryQuery.registryAgents
       .map((agent) => {
         const installed = installedById.get(agent.id)
@@ -64,11 +72,21 @@ export function RuntimesSettings() {
       })
   }, [registryQuery.registryAgents, installedQuery.installedAgents])
 
+  const localAgents = useMemo(
+    () => installedQuery.installedAgents
+      .filter(agent => agent.source === 'local')
+      .sort((left, right) => left.name.localeCompare(right.name)),
+    [installedQuery.installedAgents],
+  )
+
   const selectedBuiltin = selection?.type === 'builtin'
     ? builtinRuntimes.find(runtime => runtime.runtimeKind === selection.runtimeKind)
     : undefined
   const selectedAcpEntry = selection?.type === 'acp'
     ? acpEntries.find(entry => entry.agent.id === selection.agentId)
+    : undefined
+  const selectedLocalAgent = selection?.type === 'acp'
+    ? localAgents.find(agent => agent.id === selection.agentId)
     : undefined
 
   const acpUsedByAgents = useMemo(() => {
@@ -92,6 +110,36 @@ export function RuntimesSettings() {
   if (selectedBuiltin) {
     detailContent = <BuiltinRuntimeDetail runtime={selectedBuiltin} usedByAgents={builtinUsedByAgents} />
   }
+  else if (selection?.type === 'acp-local-new') {
+    detailContent = (
+      <AcpLocalAgentDetail
+        usedByAgents={[]}
+        onCreated={agentId => setSelection({ type: 'acp', agentId })}
+        onDeleted={() => setSelection(null)}
+        onCancel={() => setSelection(null)}
+      />
+    )
+  }
+  else if (selectedLocalAgent) {
+    detailContent = (
+      <AcpLocalAgentDetail
+        agent={selectedLocalAgent}
+        usedByAgents={acpUsedByAgents}
+        onCreated={agentId => setSelection({ type: 'acp', agentId })}
+        onDeleted={() => setSelection(null)}
+        onCancel={() => setSelection(null)}
+      />
+    )
+  }
+  else if (selectedAcpEntry) {
+    detailContent = (
+      <AcpRegistryDetail
+        agent={selectedAcpEntry.agent}
+        installed={selectedAcpEntry.installed}
+        usedByAgents={acpUsedByAgents}
+      />
+    )
+  }
   else if (registryError) {
     detailContent = (
       <div className="flex flex-1 items-center justify-center p-6">
@@ -114,15 +162,6 @@ export function RuntimesSettings() {
       </div>
     )
   }
-  else if (selectedAcpEntry) {
-    detailContent = (
-      <AcpRegistryDetail
-        agent={selectedAcpEntry.agent}
-        installed={selectedAcpEntry.installed}
-        usedByAgents={acpUsedByAgents}
-      />
-    )
-  }
   else {
     detailContent = (
       <div className="flex flex-1 items-center justify-center p-6">
@@ -139,6 +178,7 @@ export function RuntimesSettings() {
       list={(
         <RuntimeListPane
           builtinRuntimes={builtinRuntimes}
+          localAgents={localAgents}
           acpEntries={acpEntries}
           isAcpLoading={isAcpLoading}
           selection={selection}
@@ -147,6 +187,7 @@ export function RuntimesSettings() {
           onSearchChange={setSearch}
           acpFilter={acpFilter}
           onAcpFilterChange={setAcpFilter}
+          onCreateLocal={() => setSelection({ type: 'acp-local-new' })}
         />
       )}
       detail={(

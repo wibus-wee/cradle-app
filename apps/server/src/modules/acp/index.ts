@@ -156,8 +156,9 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     params: AcpModel.agentIdParams,
     response: { 200: AcpModel.authSelectionResult },
   })
-  .patch('/agents/:agentId/launch-config', ({ params, body }) => {
-    return Acp.updateLaunchConfig(requireNonBlankString(params.agentId, 'agentId'), {
+  .patch('/agents/:agentId/launch-config', async ({ params, body }) => {
+    const agentId = requireNonBlankString(params.agentId, 'agentId')
+    const agent = Acp.updateLaunchConfig(agentId, {
       name: body.name,
       overrideCmd: body.overrideCmd,
       overrideArgs: body.overrideArgs,
@@ -168,6 +169,8 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
       distributionType: body.distributionType,
       version: body.version,
     })
+    await requireAcpRuntime().disconnectAgent(agentId)
+    return agent
   }, {
     detail: {
       'summary': 'Update ACP agent launch config (local base or registry overrides)',
@@ -233,7 +236,9 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     response: { 200: t.Object({ ok: t.Literal(true) }) },
   })
   .delete('/agents/:agentId', async ({ params }) => {
-    await Acp.uninstall(requireNonBlankString(params.agentId, 'agentId'))
+    const agentId = requireNonBlankString(params.agentId, 'agentId')
+    await requireAcpRuntime().disconnectAgent(agentId)
+    await Acp.uninstall(agentId)
     return { ok: true as const }
   }, {
     detail: {

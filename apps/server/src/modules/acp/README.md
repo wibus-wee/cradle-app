@@ -40,10 +40,10 @@ Resolve (`chat-runtime-providers/acp/config.ts`) requires `status === 'installed
 | `GET` | `/acp/agents/:agentId/auth-methods` | `acp agent auth-methods` | Initialize without ACP credential values and return live advertised methods. |
 | `PUT` | `/acp/agents/:agentId/auth` | `acp agent auth-set` | Persist a method ID and Secrets-owned credential refs, then reconnect and authenticate. |
 | `DELETE` | `/acp/agents/:agentId/auth` | `acp agent auth-clear` | Clear the selection and disconnect the current process. |
-| `PATCH` | `/acp/agents/:agentId/launch-config` | `acp agent launch-config` | Local base or registry overrides |
+| `PATCH` | `/acp/agents/:agentId/launch-config` | `acp agent launch-config` | Local base or registry overrides; disconnects the current process |
 | `PUT` | `/acp/agents/:agentId/installation` | `acp agent install` | Registry only; preserves `override_*` unless distribution type changes |
 | `DELETE` | `/acp/agents/:agentId/installation` | `acp agent cancel-install` | Cancel in-flight install (not uninstall) |
-| `DELETE` | `/acp/agents/:agentId` | `acp agent uninstall` | Remove row; FS cleanup only for registry binary |
+| `DELETE` | `/acp/agents/:agentId` | `acp agent uninstall` | Disconnect, remove row; FS cleanup only for registry binary |
 
 ## Reinstall vs overrides
 

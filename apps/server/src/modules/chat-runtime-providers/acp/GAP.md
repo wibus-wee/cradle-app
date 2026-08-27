@@ -4,13 +4,13 @@ This file records Agent Client Protocol (ACP) capabilities that the current Crad
 
 Registry browsing, install/uninstall, local agents, and launch-config overrides live in `apps/server/src/modules/acp/` and are complete for their scope; gaps below concern the chat runtime projection and its surfaces unless stated otherwise.
 
-## Authentication UI and interoperability
+## Authentication interoperability and session recovery
 
-The server projects advertised auth methods, stores method IDs and Secrets-owned credential refs, performs agent or env-var authentication, and exposes generated API/CLI operations. There is no ACP-specific web surface for selecting existing credentials or retrying a failed session, and this implementation has not been verified against a named real auth-required agent binary.
+The server projects advertised auth methods, stores method IDs and Secrets-owned credential refs, performs agent or env-var authentication, and exposes generated API/CLI operations. The Runtimes settings surface can select existing Secrets, run agent authentication, and clear or change the selection. This implementation has not been verified against a named real auth-required agent binary, and an active chat that fails with `auth_required` has no inline recovery action that resumes the failed turn after configuration.
 
 ### Current effect
 
-API and CLI callers can complete the auth flow, while web users receive the generic typed `auth_required` failure without an in-app recovery workflow. Provider-specific deviations from the SDK's standard error codes remain unverified until a real-agent smoke test records them.
+Web, API, and CLI callers can configure authentication, but chat users must leave the failed session, configure the agent under Runtimes, and retry the turn manually. Provider-specific deviations from the SDK's standard error codes remain unverified until a real-agent smoke test records them.
 
 ## Elicitation
 
@@ -112,7 +112,6 @@ A cleanup owner: when Cradle deletes a chat session bound to an ACP durable prov
 
 Recorded here for visibility; owned by `modules/acp` plans rather than this provider:
 
-- Local agent registration (`POST /acp/agents`) and launch-config override editing have CLI/API support but no web UI (plans/2026-07-19-acp-local-agents-launch-overrides.md).
 - The devtool ACP tab has no event producer calling `recordAcp`, so it renders empty.
 - Distribution-type filtering in the web registry list is computed client-side instead of using the platform-aware `/acp/registry/distribution-types` endpoint.
 - No e2e coverage exists for any ACP journey (e2e/COVERAGE.md lists `acp` as a user-visible gap namespace).
