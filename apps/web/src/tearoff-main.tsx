@@ -19,13 +19,34 @@ const queryClient = new QueryClient({
 const initialLocale = resolveInitialLocale()
 const applicationPromise = import('~/app').then(module => module.App)
 const stylesheetPromise = import('./styles.css')
+const root = ReactDOMClient.createRoot(document.getElementById('app')!)
 
-function showBootstrapError(error: unknown): void {
-  const shell = document.getElementById('bootstrap-shell')
-  const message = shell?.querySelector<HTMLElement>('[data-bootstrap-message]')
-  shell?.classList.add('is-failed')
+function renderBootstrapFallback(error: unknown): void {
+  const message = document.querySelector<HTMLElement>('[data-bootstrap-message]')
+  document.getElementById('bootstrap-shell')?.classList.add('is-failed')
   if (message) {
     message.textContent = error instanceof Error ? error.message : String(error)
+  }
+}
+
+async function showBootstrapError(error: unknown): Promise<void> {
+  try {
+    const [{ ServerConnectionRecovery }] = await Promise.all([
+      import('~/features/server-connection/server-connection-recovery'),
+      stylesheetPromise,
+    ])
+    root.render(
+      <React.StrictMode>
+        <AppErrorBoundary>
+          <I18nProvider initialLocale={initialLocale}>
+            <ServerConnectionRecovery error={error instanceof Error ? error : new Error(String(error))} />
+          </I18nProvider>
+        </AppErrorBoundary>
+      </React.StrictMode>,
+    )
+  }
+  catch (recoveryError) {
+    renderBootstrapFallback(recoveryError)
   }
 }
 
@@ -35,7 +56,7 @@ async function startTearoffApp(): Promise<void> {
     waitForServer(),
     stylesheetPromise,
   ])
-  ReactDOMClient.createRoot(document.getElementById('app')!).render(
+  root.render(
     <React.StrictMode>
       <AppErrorBoundary>
         <I18nProvider initialLocale={initialLocale}>
@@ -54,4 +75,4 @@ async function startTearoffApp(): Promise<void> {
   })
 }
 
-void startTearoffApp().catch(showBootstrapError)
+void startTearoffApp().catch(error => void showBootstrapError(error))
