@@ -257,6 +257,10 @@ const config = {
       filter: ['**/*'],
     },
     {
+      from: '../../packages/plugin-sdk/DEVELOPERS.md',
+      to: 'plugin-sdk/DEVELOPERS.md',
+    },
+    {
       from: '../server/dist/desktop-plugins',
       to: 'server/plugins',
       filter: ['**/*'],

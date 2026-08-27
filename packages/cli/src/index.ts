@@ -9,6 +9,7 @@ import { registerJavascriptCommand } from './commands/javascript'
 import { applyOpenPathSugar, registerOpenCommand } from './commands/open'
 import { registerSessionAwaitCommand } from './commands/session-await'
 import { registerPluginDevCommand } from './commands/plugin-dev'
+import { registerPluginDocsCommand } from './commands/plugin-docs'
 import { createCommandContext } from './runtime/context'
 import { resolveGeneratedCommandGroup } from './runtime/generated-command-selection'
 import { registerManualCommand } from './runtime/manual-command'
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
   registerSessionAwaitCommand(program)
   registerJavascriptCommand(program)
   registerPluginDevCommand(program)
+  registerPluginDocsCommand(program)
   registerManualCommand(program)
   registerGeneratedCommandPlaceholders(program, loadedGroup)
 

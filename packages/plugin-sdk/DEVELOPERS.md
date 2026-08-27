@@ -1,6 +1,22 @@
 # Cradle Plugin System — Developer Guide
 
-This document provides everything you need to build a Cradle plugin from scratch.
+This is the canonical architecture and usage guide for the Plugin SDK version in
+this repository. The published SDK package and Cradle Desktop distribute this
+same file; do not maintain a second API reference in an Agent Skill or Plugin
+template.
+
+Examples use the monorepo package name `@cradle/plugin-sdk`. In an external
+Plugin repository, use `@cradleapp/plugin-sdk` for both the dependency and every
+SDK import specifier.
+
+From a Cradle-managed terminal, list or read individual sections without loading
+the complete guide:
+
+```bash
+cradle plugin docs
+cradle plugin docs getting-started
+cradle plugin docs server-plugin-api
+```
 
 ---
 
@@ -84,7 +100,10 @@ pnpm add -D @cradleapp/plugin-sdk
     "apiVersion": "1",
     "displayName": "My Plugin",
     "description": "Does something useful",
-    "server": "src/server.ts",
+    "server": "dist/server.mjs",
+    "dev": {
+      "server": "src/server.ts"
+    },
     "contributes": {
       "capabilities": [
         {
@@ -126,13 +145,43 @@ export function activate(ctx: ServerPluginContext): void {
 pnpm install
 ```
 
-### Step 5: Start the server
+### Step 5: Start a Plugin development session
 
 ```bash
-pnpm dev:server
+cradle plugin dev --package-dir plugins/my-plugin
 ```
 
-Your route is now live at `GET http://127.0.0.1:21423/api/plugins/my-plugin/hello`
+The CLI builds each `cradle.dev` source entry, loads the successful outputs into
+the running Cradle Desktop app, watches for changes, and reloads only the layer
+that rebuilt. The session is temporary and deactivates when the command stops.
+Your route is live at
+`GET http://127.0.0.1:21423/api/plugins/my-plugin/hello` while the session is
+active.
+
+### From preview to a persistent local source
+
+Build every production entry declared by `cradle.server`, `cradle.web`, or
+`cradle.desktop`, then add the package directory through Cradle:
+
+```bash
+cradle plugin source add \
+  --kind localPath \
+  --location "$PWD/plugins/my-plugin" \
+  --label "My Plugin" \
+  --added-reason "Local Plugin development"
+```
+
+The source is persisted but remains disabled until an operator reviews its
+identity, layers, permissions, and location and enables it:
+
+```bash
+cradle plugin set-enabled my-plugin --enabled true
+```
+
+After changing an installed local package, rebuild it and run
+`cradle plugin source refresh <source-id>`. Package changes produce a new
+checksum and invalidate the prior trust grant, so the new revision remains
+disabled until the operator enables that exact revision.
 
 ---
 
@@ -148,11 +197,13 @@ plugins/
     ├── tsconfig.json         # Optional (can inherit from root)
     ├── SKILL.md              # Optional (for skill registration)
     ├── src/
-    │   ├── server.ts         # Server entry (loaded by vite-node in dev)
-    │   ├── web.tsx           # Web entry (built to dist/web.mjs)
-    │   └── desktop.ts        # Desktop entry
+    │   ├── server.ts         # cradle.dev.server source entry
+    │   ├── web.tsx           # cradle.dev.web source entry
+    │   └── desktop.ts        # cradle.dev.desktop source entry
     └── dist/
-        └── web.mjs           # Built web bundle (committed or CI-built)
+        ├── server.mjs        # Production server entry
+        ├── web.mjs           # Production web entry
+        └── desktop.mjs       # Production desktop entry
 ```
 
 ### package.json Requirements
@@ -169,6 +220,7 @@ plugins/
 | `cradle.server` | No* | Path to server entry relative to package root |
 | `cradle.web` | No* | Path to web entry (pre-built `.mjs`) |
 | `cradle.desktop` | No* | Path to desktop entry |
+| `cradle.dev` | No | Source entries compiled and watched by `cradle plugin dev`; each dev layer requires its matching production entry |
 | `cradle.deployments` | No | `['desktop']` or `['web']` — restricts where plugin loads |
 | `cradle.apiVersion` | Yes | Plugin SDK contract version. Must be `"1"` for the current manifest shape. |
 | `cradle.contributes` | Yes | Structured static capability and permission declarations. Use empty arrays when the plugin declares no capabilities or permissions. |
@@ -1164,9 +1216,10 @@ The **Plugins** tab shows:
 
 ### Debugging Server Plugins
 
-- Server plugins are loaded via `vite-node` in development — hot reload works
+- `cradle plugin dev` reports successful builds and the active server revision
+- Server bundles reload with a revisioned module URL so Node's ESM cache cannot retain the previous build
 - Console output is tagged: `[plugin:@cradle/my-plugin] message`
-- Startup errors appear in the server terminal
+- Build failures remain in the CLI and do not replace the last successful revision
 
 ### Debugging Web Plugins
 
@@ -2008,12 +2061,15 @@ The monorepo keeps the workspace package name `@cradle/plugin-sdk`; CI rewrites 
 | `packages/plugin-sdk/src/web.ts` | Web plugin context interface |
 | `packages/plugin-sdk/src/desktop.ts` | Desktop plugin context interface |
 | `packages/plugin-sdk/src/vite-plugin-import-map.ts` | Shared Vite import map + React wrapper modules for runtime-loaded web plugins |
+| `packages/cli/src/commands/plugin-dev.ts` | Builds source entries, maintains the temporary development session, and reloads successful layer builds |
+| `packages/cli/src/commands/plugin-docs.ts` | Reads this canonical guide by section from source checkouts and packaged Desktop resources |
 | `apps/server/src/plugins/discovery.ts` | Plugin discovery (reads `plugins/*/package.json`) |
 | `apps/server/src/plugins/loader.ts` | Server plugin activation orchestrator |
 | `apps/server/src/plugins/validation.ts` | Module validation + `PluginLoadError` |
 | `apps/server/src/plugins/context.ts` | Creates `ServerPluginContext` instances |
 | `apps/server/src/plugins/static-server.ts` | Serves web bundles + plugin list API |
-| `apps/server/src/plugins/event-bus.ts` | Global plugin event bus |
+| `apps/server/src/plugins/route-registry.ts` | Owns plugin-scoped HTTP route registration and dispatch |
+| `apps/server/src/plugins/runtime-registry.ts` | Projects discovered layers, capabilities, activation state, and warnings |
 | `apps/web/src/lib/plugin-host.ts` | Browser-side plugin loader |
 | `apps/web/src/lib/plugin-store.ts` | Zustand store for panels/commands |
 | `apps/web/src/lib/vite-plugin-import-map.ts` | Compatibility re-export for the shared plugin import map |
