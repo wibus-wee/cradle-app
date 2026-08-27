@@ -3026,7 +3026,7 @@ describe('codexProvider app-server integration', () => {
         pendingCount: 0,
         approvedCount: 1,
         deniedCount: 0,
-        recentItems: [expect.objectContaining({ id: 'approval-1', status: 'approved', label: 'Command' })],
+        recentItems: [expect.objectContaining({ id: 'approval-1', status: 'approved', label: 'Auto review · Command' })],
       }),
     ]))
   })
