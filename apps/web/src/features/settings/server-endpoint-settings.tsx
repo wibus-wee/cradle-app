@@ -18,6 +18,7 @@ import {
   readCustomServerUrl,
   writeCustomServerUrl,
 } from '~/lib/server-endpoint-preferences'
+import { probeServerHealth } from '~/lib/server-health'
 
 import { ProxySettingsGroup, ServerAccessSettingsGroup } from './network-settings'
 import { SettingsGroup, SettingsPage } from './settings-container'
@@ -91,20 +92,15 @@ export function ServerEndpointSettings() {
     setTestStatus({ kind: 'checking' })
 
     let nextStatus: TestStatus
-    try {
-      const response = await fetch(new URL('/health', url), {
-        cache: 'no-store',
-        signal: controller.signal,
-      })
+    const result = await probeServerHealth(url, { signal: controller.signal })
 
-      if (!response.ok) {
-        nextStatus = { kind: 'error', message: t('serverEndpoint.test.httpError', { status: response.status }) }
-      }
-      else {
-        nextStatus = { kind: 'success', message: t('serverEndpoint.test.success') }
-      }
+    if (result.kind === 'http-error') {
+      nextStatus = { kind: 'error', message: t('serverEndpoint.test.httpError', { status: result.status }) }
     }
-    catch {
+    else if (result.kind === 'healthy') {
+      nextStatus = { kind: 'success', message: t('serverEndpoint.test.success') }
+    }
+    else {
       nextStatus = { kind: 'error', message: t('serverEndpoint.test.unreachable') }
     }
     window.clearTimeout(timeout)

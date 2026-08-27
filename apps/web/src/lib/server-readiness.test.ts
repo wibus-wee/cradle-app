@@ -3,7 +3,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { waitForDesktopServer } from './server-readiness'
+import { waitForDesktopServer, waitForHostedServer } from './server-readiness'
 import {
   getDesktopServerGeneration,
   getRendererServerUrl,
@@ -16,9 +16,42 @@ vi.mock('./client.config', () => ({
 }))
 
 afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   delete window.cradle
   resetServerTransportBaseUrlStateForTests()
   window.localStorage.clear()
+})
+
+describe('hosted server readiness', () => {
+  it('recovers when the server becomes reachable during the startup retry sequence', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockRejectedValueOnce(new TypeError('unreachable'))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const readiness = waitForHostedServer()
+    await vi.advanceTimersByTimeAsync(200)
+
+    await expect(readiness).resolves.toBe('http://127.0.0.1:21423')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('stops retrying and exposes a recovery path when the server stays unreachable', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('unreachable'))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const readiness = expect(waitForHostedServer()).rejects.toThrow(
+      'Could not reach Cradle Server at http://127.0.0.1:21423.',
+    )
+    await vi.runAllTimersAsync()
+
+    await readiness
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+  })
 })
 
 describe('desktop server readiness bridge', () => {
