@@ -120,8 +120,8 @@ export function MarketplaceTab() {
   })
 
   const enableMutation = useMutation({
-    mutationFn: async (routeSegment: string) => {
-      const { error } = await patchPluginsByRouteSegmentEnabled({ path: { routeSegment }, body: { enabled: true } })
+    mutationFn: async ({ routeSegment, grantedPermissions }: { routeSegment: string, grantedPermissions?: string[] }) => {
+      const { error } = await patchPluginsByRouteSegmentEnabled({ path: { routeSegment }, body: { enabled: true, grantedPermissions } })
       if (error) {
         throw error
       }
@@ -144,7 +144,7 @@ export function MarketplaceTab() {
       setTrustTarget(plugin.routeSegment)
       return
     }
-    enableMutation.mutate(plugin.routeSegment)
+    enableMutation.mutate({ routeSegment: plugin.routeSegment })
   }
 
   const entries = marketplaceQuery.data?.plugins ?? []
@@ -267,7 +267,7 @@ export function MarketplaceTab() {
                                 featured
                                 installedPlugins={installedPlugins}
                                 sources={sources}
-                                enabling={enableMutation.isPending && enableMutation.variables === findRouteSegment(installedPlugins, entry)}
+                                enabling={enableMutation.isPending && enableMutation.variables?.routeSegment === findRouteSegment(installedPlugins, entry)}
                                 onEnable={handleEnable}
                                 onInstall={() => setInstallEntry(entry)}
                               />
@@ -283,7 +283,7 @@ export function MarketplaceTab() {
                             entry={entry}
                             installedPlugins={installedPlugins}
                             sources={sources}
-                            enabling={enableMutation.isPending && enableMutation.variables === findRouteSegment(installedPlugins, entry)}
+                            enabling={enableMutation.isPending && enableMutation.variables?.routeSegment === findRouteSegment(installedPlugins, entry)}
                             onEnable={handleEnable}
                             onInstall={() => setInstallEntry(entry)}
                           />
@@ -320,7 +320,7 @@ export function MarketplaceTab() {
 
       <TrustConsentDialog
         routeSegment={trustTarget}
-        onConfirm={() => trustTarget && enableMutation.mutate(trustTarget)}
+        onConfirm={grantedPermissions => trustTarget && enableMutation.mutate({ routeSegment: trustTarget, grantedPermissions })}
         onCancel={() => setTrustTarget(null)}
         confirmPending={enableMutation.isPending}
       />

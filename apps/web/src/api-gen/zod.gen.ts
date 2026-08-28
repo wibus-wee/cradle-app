@@ -2407,6 +2407,24 @@ export const zDeletePluginsDevSessionsByIdPath = z.object({
     id: z.string().min(1)
 });
 
+export const zGetPluginsReviewsQuery = z.object({
+    chatSessionId: z.string().min(1)
+});
+
+export const zPostPluginsPersonalBody = z.object({
+    packageDir: z.string().min(1),
+    label: z.string().nullish(),
+    addedReason: z.string().nullish()
+});
+
+export const zPostPluginsPersonalBySourceIdBody = z.object({
+    packageDir: z.string().min(1)
+});
+
+export const zPostPluginsPersonalBySourceIdPath = z.object({
+    sourceId: z.string().min(1)
+});
+
 export const zPostPluginsSourcesPreviewBody = z.object({
     kind: z.enum(['git', 'npm']),
     location: z.string().min(1),
@@ -2444,7 +2462,8 @@ export const zGetPluginsByRouteSegmentPath = z.object({
 
 export const zPatchPluginsByRouteSegmentEnabledBody = z.object({
     enabled: z.boolean(),
-    reason: z.string().nullish()
+    reason: z.string().nullish(),
+    grantedPermissions: z.array(z.string().min(1)).optional()
 });
 
 export const zPatchPluginsByRouteSegmentEnabledPath = z.object({

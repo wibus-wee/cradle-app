@@ -133,9 +133,17 @@ const pluginDescriptor = t.Object({
 const updatePluginActivationBody = t.Object({
   enabled: t.Boolean(),
   reason: t.Optional(t.Union([t.String(), t.Null()])),
+  grantedPermissions: t.Optional(t.Array(t.String({ minLength: 1 }))),
 }, { additionalProperties: false })
 
 const pluginSourceRegistryKind = t.Union([
+  t.Literal('localPath'),
+  t.Literal('personal'),
+  t.Literal('git'),
+  t.Literal('npm'),
+])
+
+const addPluginSourceKind = t.Union([
   t.Literal('localPath'),
   t.Literal('git'),
   t.Literal('npm'),
@@ -157,7 +165,7 @@ const pluginSourceRegistryEntry = t.Object({
 }, { additionalProperties: false })
 
 const addPluginSourceBody = t.Object({
-  kind: pluginSourceRegistryKind,
+  kind: addPluginSourceKind,
   location: t.String({ minLength: 1 }),
   ref: t.Optional(t.Union([t.String(), t.Null()])),
   subPath: t.Optional(t.Union([t.String(), t.Null()])),
@@ -168,6 +176,46 @@ const addPluginSourceBody = t.Object({
 const addPluginSourceResult = t.Object({
   source: pluginSourceRegistryEntry,
   discoveredPlugins: t.Array(pluginDescriptor),
+  operation: t.Object({
+    action: t.Union([t.Literal('install'), t.Literal('update'), t.Literal('refresh')]),
+    status: t.Union([t.Literal('success'), t.Literal('failed')]),
+    error: t.Union([t.String(), t.Null()]),
+    reviewRequired: t.Boolean(),
+    reviewPath: t.Union([t.String(), t.Null()]),
+    previousSnapshotPreserved: t.Boolean(),
+  }, { additionalProperties: false }),
+}, { additionalProperties: false })
+
+const pendingPluginReview = t.Object({
+  sourceId: t.String({ minLength: 1 }),
+  createdAt: t.Number(),
+  source: pluginSourceRegistryEntry,
+}, { additionalProperties: false })
+
+const pluginLifecycleEvent = t.Object({
+  id: t.String({ minLength: 1 }),
+  type: t.Union([
+    t.Literal('source-installed'),
+    t.Literal('source-updated'),
+    t.Literal('source-refreshed'),
+    t.Literal('source-removed'),
+    t.Literal('activation-changed'),
+    t.Literal('review-completed'),
+  ]),
+  sourceId: t.Union([t.String({ minLength: 1 }), t.Null()]),
+  pluginIdentities: t.Array(t.String({ minLength: 1 })),
+  chatSessionId: t.Union([t.String({ minLength: 1 }), t.Null()]),
+  createdAt: t.Number(),
+}, { additionalProperties: false })
+
+const installPersonalPluginBody = t.Object({
+  packageDir: t.String({ minLength: 1 }),
+  label: t.Optional(t.Union([t.String(), t.Null()])),
+  addedReason: t.Optional(t.Union([t.String(), t.Null()])),
+}, { additionalProperties: false })
+
+const updatePersonalPluginBody = t.Object({
+  packageDir: t.String({ minLength: 1 }),
 }, { additionalProperties: false })
 
 const pluginPreviewItem = t.Object({
@@ -286,6 +334,10 @@ const removePluginSourceBody = t.Object({
 export const PluginsModel = {
   addPluginSourceBody,
   addPluginSourceResult,
+  pendingPluginReview,
+  pluginLifecycleEvent,
+  installPersonalPluginBody,
+  updatePersonalPluginBody,
   pluginActivationState,
   pluginDescriptor,
   pluginMentionCapability,

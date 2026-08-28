@@ -11,7 +11,11 @@ const CRADLE_RUNTIME_ENV_KEYS = [
 ] as const
 const HttpErrorPayloadJsonSchema = z.string()
   .transform(value => JSON.parse(value))
-  .pipe(z.object({ message: z.string() }).passthrough())
+  .pipe(z.object({
+    message: z.string(),
+    code: z.string().optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
+  }).passthrough())
 const HttpResponseJsonSchema = z.string()
   .transform(value => JSON.parse(value))
   .pipe(z.unknown())
@@ -72,12 +76,26 @@ function assertIssueMutationRuntimeContext(input: Pick<RequestInput, 'method' | 
   throw new Error('Issue mutations from a Cradle runtime require CRADLE_CHAT_SESSION_ID so Activity can record the real actor.')
 }
 
-async function readError(response: Response): Promise<string> {
+export class CliHttpError extends Error {
+  readonly status: number
+  readonly code?: string
+  readonly details?: Record<string, unknown>
+
+  constructor(response: Response, payload: { message: string, code?: string, details?: Record<string, unknown> }) {
+    super(payload.message)
+    this.name = 'CliHttpError'
+    this.status = response.status
+    this.code = payload.code
+    this.details = payload.details
+  }
+}
+
+async function readError(response: Response): Promise<CliHttpError> {
   const text = await response.text()
   if (!text) {
-    return `${response.status} ${response.statusText}`
+    return new CliHttpError(response, { message: `${response.status} ${response.statusText}` })
   }
-  return HttpErrorPayloadJsonSchema.parse(text).message
+  return new CliHttpError(response, HttpErrorPayloadJsonSchema.parse(text))
 }
 
 export async function requestJson(input: RequestInput): Promise<unknown> {
@@ -108,7 +126,7 @@ export async function requestJson(input: RequestInput): Promise<unknown> {
   }
 
   if (!response.ok) {
-    throw new Error(await readError(response))
+    throw await readError(response)
   }
 
   const text = await response.text()

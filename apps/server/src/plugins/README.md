@@ -22,6 +22,7 @@
 - **static-server.ts**：提供 governed `/api/plugins` descriptor list、validated web plugin bundles、生产 web bundle 共享 React import rewrite，以及 `/api/plugins/-/deps/*` renderer shared-module wrapper。
 - **storage.ts**：提供 plugin-scoped server KV storage；使用 Cradle DB 的 `plugin_storage_entries` 表，按 plugin package identity 和 key 隔离。
 - **storage.test.ts**：覆盖 plugin storage 的持久化、同 key owner 隔离和删除语义。
+- **trust-grants.ts**：在统一 trust grant store 中记录 checksum-bound package trust 与逐 permission 授权；新 package checksum 不继承旧 revision 的执行或 permission 授权。
 - **validation.ts**：验证 plugin module exports，并报告结构化 plugin load errors。
 
 ## Host activation policy
@@ -30,7 +31,7 @@ Plugin activation is Cradle host-owned lifecycle state. It answers whether a plu
 
 This is intentionally separate from plugin-owned settings. For example, Nowledge Mem may keep an internal `enabled` setting in its own namespace, but that setting only controls Nowledge Mem behavior after Cradle has activated the package. The host activation policy controls whether Cradle imports the server entry, serves the web bundle, exposes plugin routes, and keeps runtime registrations such as MCP servers, skills, activity subscriptions, provider sources, and issue sources.
 
-Disabling a plugin through `disablePlugin()` writes the policy, disposes tracked subscriptions before awaiting the plugin `deactivate()` hook, clears dispatcher routes, removes runtime capabilities, and leaves the descriptor visible with disabled layers so management APIs can re-enable it. Re-enabling through `enablePlugin()` writes the policy back to enabled, retries server activation, and serves the web bundle again when the layer is valid.
+Disabling a plugin through `disablePlugin()` writes the policy, disposes tracked subscriptions before awaiting the plugin `deactivate()` hook, clears dispatcher routes, removes runtime capabilities, and leaves the descriptor visible with disabled layers so management APIs can re-enable it. Re-enabling an external local plugin records package trust and the exact reviewed permission IDs against its current package checksum before `enablePlugin()` retries server activation. Web and Desktop consume the persisted-source lifecycle stream and reconcile from the authoritative Server descriptors; neither runtime treats source discovery as approval.
 
 ## Plugin activity subscription
 

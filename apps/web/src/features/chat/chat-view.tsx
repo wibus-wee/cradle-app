@@ -3,12 +3,14 @@ import {
   CloseLine as XIcon,
   PencilLine as PencilIcon,
 } from '@mingcute/react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UIMessage } from 'ai'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
+import { getPluginsReviews, patchPluginsByRouteSegmentEnabled } from '~/api-gen/sdk.gen'
+import type { GetPluginsReviewsResponse } from '~/api-gen/types.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
 import { Button } from '~/components/ui/button'
 import { toastManager } from '~/components/ui/toast'
@@ -71,6 +73,7 @@ import type { MessageBubbleEditAction } from './transcript/views/message-bubble-
 import type { RollbackDraftSignal } from './ui/chat-composer-section'
 import { ChatComposerSection } from './ui/chat-composer-section'
 import { ChatGoalEditorDialog } from './ui/chat-goal-editor-dialog'
+import { PersonalPluginReviewCardView } from './ui/personal-plugin-review-card-view'
 import { useChatScrollRuntime } from './ui/use-chat-scroll-runtime'
 
 export type { ChatViewProps } from './chat-view-types'
@@ -104,6 +107,7 @@ export function ChatView({
   const queryClient = useQueryClient()
   const { t } = useTranslation('chat')
   const { t: tNodes } = useTranslation('nodes')
+  const { t: tSettings } = useTranslation('settings')
   const threadHandoffsEnabled = useFeatureFlag('threadHandoffs')
   const surfaceActive = useSurfaceActive()
   const chatActive = active && surfaceActive
@@ -140,6 +144,44 @@ export function ChatView({
     ...getSessionsByIdOptions({ path: { id: sessionId ?? '' } }),
     enabled: chatActive && !!sessionId,
     staleTime: 5_000,
+  })
+  const pluginReviewsQuery = useQuery({
+    queryKey: ['plugins', 'reviews', sessionId],
+    enabled: chatActive && !!sessionId,
+    queryFn: async () => {
+      const { data, error } = await getPluginsReviews({ query: { chatSessionId: sessionId! } })
+      if (error) {
+        throw new Error(String(error))
+      }
+      return (data ?? []) as GetPluginsReviewsResponse
+    },
+  })
+  const activatePluginReviewMutation = useMutation({
+    mutationFn: async (review: GetPluginsReviewsResponse[number]) => {
+      for (const plugin of review.source.plugins) {
+        const { error } = await patchPluginsByRouteSegmentEnabled({
+          path: { routeSegment: plugin.routeSegment },
+          body: {
+            enabled: true,
+            grantedPermissions: plugin.declaredPermissions.map(permission => permission.localId),
+          },
+        })
+        if (error) {
+          throw new Error(String(error))
+        }
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['plugins'] })
+      toastManager.add({ type: 'success', title: tSettings('plugins.toast.enabled') })
+    },
+    onError: (error) => {
+      toastManager.add({
+        type: 'error',
+        title: tSettings('plugins.toast.toggleFailed'),
+        description: error instanceof Error ? error.message : undefined,
+      })
+    },
   })
   const isolationStateQuery = useSessionIsolationState(sessionId)
   const { data: awaitSummary } = useSessionAwaitSummary(sessionId, chatActive)
@@ -829,6 +871,31 @@ export function ChatView({
                 {tNodes('session.viewOnly')}
               </p>
             )}
+            {(pluginReviewsQuery.data ?? []).map(review => (
+              <PersonalPluginReviewCardView
+                key={review.sourceId}
+                title={tSettings('plugins.chatReview.title')}
+                description={tSettings('plugins.chatReview.description')}
+                actionLabel={tSettings('plugins.chatReview.action')}
+                permissionFallback={tSettings('plugins.trust.noPermissions')}
+                activating={activatePluginReviewMutation.isPending
+                  && activatePluginReviewMutation.variables?.sourceId === review.sourceId}
+                onActivate={() => activatePluginReviewMutation.mutate(review)}
+                plugins={review.source.plugins.map(plugin => ({
+                  identity: plugin.identity,
+                  displayName: plugin.displayName,
+                  permissions: plugin.declaredPermissions.map(permission => ({
+                    id: permission.id,
+                    label: permission.label ?? permission.localId,
+                  })),
+                  layers: [
+                    ...(plugin.hasServer ? [{ layer: 'server' as const, status: plugin.layers.server.status }] : []),
+                    ...(plugin.hasWeb ? [{ layer: 'web' as const, status: plugin.layers.web.status }] : []),
+                    ...(plugin.hasDesktop ? [{ layer: 'desktop' as const, status: plugin.layers.desktop.status }] : []),
+                  ],
+                }))}
+              />
+            ))}
             <ChatComposerSection
               sessionId={sessionId}
               workspacePath={workspacePath}

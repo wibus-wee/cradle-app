@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -162,7 +162,10 @@ describe('plugin source HTTP operations', () => {
     const cachePublications = renameCalls.mock.calls.filter(([from, to]) =>
       String(to) === cacheDir && String(from).includes('.staging-'))
     expect(cachePublications).toHaveLength(1)
-    const cachedPackage = join(cacheDir, 'packages', 'acme-plugin-source', 'package.json')
+    const packageNames = await readdir(join(cacheDir, 'packages'))
+    expect(packageNames).toHaveLength(1)
+    expect(packageNames[0]).toMatch(/^acme-plugin-source-[a-f0-9]{12}$/)
+    const cachedPackage = join(cacheDir, 'packages', packageNames[0]!, 'package.json')
     await expect(readFile(cachedPackage, 'utf8')).resolves.toContain('@acme/plugin-source')
   })
 

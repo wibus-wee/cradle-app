@@ -70,14 +70,6 @@ function provenanceLabel(plugin: InstalledPlugin, sources: PluginSourceEntry[], 
   return t('plugins.provenance.local')
 }
 
-function unsyncDesktopPlugins(plugins: Array<{ identity: string, hasDesktop: boolean }>, onSyncFailed: () => void): void {
-  for (const plugin of plugins) {
-    if (plugin.hasDesktop) {
-      void window.cradle?.plugins?.unsyncSource(plugin.identity).catch(onSyncFailed)
-    }
-  }
-}
-
 export function InstalledTab({ onBrowseMarketplace, onImportSource }: { onBrowseMarketplace?: () => void, onImportSource?: () => void }) {
   const { t } = useTranslation('settings')
   const queryClient = useQueryClient()
@@ -125,8 +117,8 @@ export function InstalledTab({ onBrowseMarketplace, onImportSource }: { onBrowse
   })
 
   const toggleMutation = useMutation({
-    mutationFn: async ({ routeSegment, enabled }: { routeSegment: string, enabled: boolean }) => {
-      const { data, error } = await patchPluginsByRouteSegmentEnabled({ path: { routeSegment }, body: { enabled } })
+    mutationFn: async ({ routeSegment, enabled, grantedPermissions }: { routeSegment: string, enabled: boolean, grantedPermissions?: string[] }) => {
+      const { data, error } = await patchPluginsByRouteSegmentEnabled({ path: { routeSegment }, body: { enabled, grantedPermissions } })
       if (error) {
         throw new Error(String(error))
       }
@@ -187,15 +179,6 @@ export function InstalledTab({ onBrowseMarketplace, onImportSource }: { onBrowse
       }
     },
     onSuccess: () => {
-      const target = uninstallTarget
-      if (target) {
-        const owner = findOwningSource(target, sourcesQuery.data ?? [])
-        if (owner) {
-          unsyncDesktopPlugins(owner.plugins, () => {
-            toastManager.add({ type: 'warning', title: t('plugins.sources.toast.desktopUnsyncFailed') })
-          })
-        }
-      }
       toastManager.add({ type: 'success', title: t('plugins.sources.toast.removed') })
       setUninstallTarget(null)
     },
@@ -358,7 +341,7 @@ export function InstalledTab({ onBrowseMarketplace, onImportSource }: { onBrowse
 
       <TrustConsentDialog
         routeSegment={trustTarget}
-        onConfirm={() => trustTarget && toggleMutation.mutate({ routeSegment: trustTarget, enabled: true })}
+        onConfirm={grantedPermissions => trustTarget && toggleMutation.mutate({ routeSegment: trustTarget, enabled: true, grantedPermissions })}
         onCancel={() => setTrustTarget(null)}
         confirmPending={toggleMutation.isPending}
       />

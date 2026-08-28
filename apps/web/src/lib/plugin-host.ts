@@ -71,6 +71,18 @@ const PluginDevSessionEventSchema = z.object({
   session: PluginDevSessionSchema,
 })
 
+const PluginLifecycleEventSchema = z.object({
+  type: z.enum([
+    'source-installed',
+    'source-updated',
+    'source-refreshed',
+    'source-removed',
+    'activation-changed',
+    'review-completed',
+  ]),
+  pluginIdentities: z.array(z.string().min(1)),
+})
+
 type PluginDevSession = z.infer<typeof PluginDevSessionSchema>
 
 interface WebRuntimeCapabilityRegistration {
@@ -312,16 +324,21 @@ export function isWebLayerLoadable(plugin: WebPluginDescriptor): boolean {
  * Called after the React shell renders so plugin networking never blocks first paint.
  */
 export async function loadWebPlugins(): Promise<void> {
-  const baseUrl = getServerUrl()
   const plugins = await readPluginDescriptors()
-  const webPlugins = plugins.filter(isWebLayerLoadable)
+  await activatePersistedWebPlugins(plugins.filter(isWebLayerLoadable))
+}
+
+async function activatePersistedWebPlugins(webPlugins: PluginDescriptor[]): Promise<void> {
+  const baseUrl = getServerUrl()
 
   await Promise.all(
     webPlugins.map(async (plugin) => {
       const owner = plugin.identity ?? plugin.name
-      const moduleUrl = await getAuthenticatedServerResourceUrl(
-        `${baseUrl}/api/plugins/${getWebBundleRouteSegment(plugin)}/web.mjs`,
-      )
+      const bundleUrl = new URL(`/api/plugins/${getWebBundleRouteSegment(plugin)}/web.mjs`, baseUrl)
+      if (plugin.source.checksum) {
+        bundleUrl.searchParams.set('checksum', plugin.source.checksum)
+      }
+      const moduleUrl = await getAuthenticatedServerResourceUrl(bundleUrl.toString())
       try {
         setWebLayerState(owner, 'activating')
         const mod = await import(/* @vite-ignore */ moduleUrl)
@@ -335,6 +352,42 @@ export async function loadWebPlugins(): Promise<void> {
       }
     }),
   )
+}
+
+async function reconcilePersistedWebPlugins(pluginIdentities: string[]): Promise<void> {
+  const affected = new Set(pluginIdentities)
+  const descriptors = await readPluginDescriptors()
+  const byIdentity = new Map(descriptors.map(descriptor => [descriptor.identity, descriptor]))
+  for (const identity of affected) {
+    await deactivateWebPlugin(identity)
+  }
+  await activatePersistedWebPlugins(
+    Array.from(affected, identity => byIdentity.get(identity))
+      .filter((descriptor): descriptor is PluginDescriptor => descriptor !== undefined && isWebLayerLoadable(descriptor)),
+  )
+}
+
+export function startPluginLifecycleWatcher(onReconciled?: () => void): () => void {
+  const eventsUrl = new URL('/plugins/events', getServerUrl()).toString()
+  const source = openServerEventSource(eventsUrl)
+  let reconcileQueue = Promise.resolve()
+  source.onmessage = (message) => {
+    reconcileQueue = reconcileQueue
+      .then(() => {
+        const event = PluginLifecycleEventSchema.parse(JSON.parse(message.data))
+        return event.type === 'review-completed'
+          ? undefined
+          : reconcilePersistedWebPlugins(event.pluginIdentities)
+      })
+      .then(() => onReconciled?.())
+      .catch((error: unknown) => {
+        console.error('[plugin-host] persisted plugin reconciliation failed:', error)
+      })
+  }
+  source.onerror = () => {
+    console.warn('[plugin-host] persisted plugin event stream disconnected; fetch SSE will retry')
+  }
+  return () => source.close()
 }
 
 async function readPluginDescriptors(): Promise<PluginDescriptor[]> {

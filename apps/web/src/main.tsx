@@ -100,6 +100,9 @@ async function startApp(): Promise<void> {
         reactDiagnostics.initializeReactDiagnostics()
         rendererDiagnostics.installRendererDiagnostics()
         await pluginHost.loadWebPlugins()
+        pluginHost.startPluginLifecycleWatcher(() => {
+          void queryClient.invalidateQueries({ queryKey: ['plugins'] })
+        })
         await pluginHost.startPluginDevSessionWatcher()
       })
       .catch((error) => {

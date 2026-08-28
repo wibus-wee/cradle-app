@@ -231,4 +231,12 @@ export const pluginInstallResultFixture = {
     plugins: [installedPluginFixture, disabledPluginFixture, systemInfoInstalledFixture],
   },
   discoveredPlugins: [installedPluginFixture, disabledPluginFixture, systemInfoInstalledFixture],
+  operation: {
+    action: 'install',
+    status: 'success',
+    error: null,
+    reviewRequired: true,
+    reviewPath: '/plugins',
+    previousSnapshotPreserved: false,
+  },
 } satisfies PostPluginsSourcesResponse

@@ -28,7 +28,7 @@ interface TrustConsentDialogProps {
   /** The routeSegment of the plugin to enable, or null when closed. */
   routeSegment: string | null
   /** Called when the operator confirms trust. The caller issues the PATCH. */
-  onConfirm: () => void
+  onConfirm: (grantedPermissions: string[]) => void
   /** Called when the dialog is cancelled (button or backdrop). */
   onCancel: () => void
   /** Disable the confirm button + show pending state while the PATCH runs. */
@@ -103,9 +103,9 @@ export function TrustConsentDialog({ routeSegment, onConfirm, onCancel, confirmP
           <AlertDialogAction
             onClick={(event) => {
               event.preventDefault()
-              onConfirm()
+              onConfirm(permissions.map(permission => permission.localId))
             }}
-            disabled={confirmPending || descriptorQuery.isLoading}
+            disabled={confirmPending || descriptorQuery.data === undefined || descriptorQuery.isError}
           >
             {confirmPending ? <Spinner className="size-3.5" /> : t('plugins.trust.confirm')}
           </AlertDialogAction>

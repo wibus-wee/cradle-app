@@ -1,8 +1,10 @@
 import { Elysia, t } from 'elysia'
 
+import { resolveActorContext } from '../../http/actor-context'
 import type { PluginSourceInstallerOptions } from '../../plugins/source-installer'
 import { pluginMarketplaceRoutes } from '../plugin-marketplace'
 import { pluginDevSessions } from './dev-session-service'
+import { pluginLifecycle } from './lifecycle-service'
 import { PluginsModel } from './model'
 import * as Plugins from './service'
 
@@ -70,7 +72,21 @@ export function createPluginsModule(options: PluginSourceInstallerOptions = {}) 
   }), {
     detail: { summary: 'Subscribe to plugin development session changes' },
   })
-  .post('/sources', ({ body }) => Plugins.createSource(body, options), {
+  .get('/events', ({ request }) => new Response(pluginLifecycle.stream(request.signal), {
+    headers: {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      'connection': 'keep-alive',
+    },
+  }), {
+    detail: { summary: 'Subscribe to persisted plugin lifecycle changes' },
+  })
+  .get('/reviews', ({ query }) => Plugins.listPendingReviews(query.chatSessionId), {
+    detail: { summary: 'List pending plugin reviews for a chat session' },
+    query: t.Object({ chatSessionId: t.String({ minLength: 1 }) }),
+    response: { 200: t.Array(PluginsModel.pendingPluginReview) },
+  })
+  .post('/sources', ({ body, request }) => Plugins.createSource(body, options, resolveActorContext(request)), {
     detail: {
       'summary': 'Add plugin source',
       'x-cradle-cli': {
@@ -78,6 +94,17 @@ export function createPluginsModule(options: PluginSourceInstallerOptions = {}) 
       },
     },
     body: PluginsModel.addPluginSourceBody,
+    response: { 200: PluginsModel.addPluginSourceResult },
+  })
+  .post('/personal', ({ body, request }) => Plugins.installPersonalPlugin(body, options, resolveActorContext(request)), {
+    detail: { summary: 'Build snapshot installation for a personal plugin' },
+    body: PluginsModel.installPersonalPluginBody,
+    response: { 200: PluginsModel.addPluginSourceResult },
+  })
+  .post('/personal/:sourceId', ({ body, params, request }) => Plugins.updatePersonalPlugin(params.sourceId, body, options, resolveActorContext(request)), {
+    detail: { summary: 'Replace a personal plugin with a newly built snapshot' },
+    params: t.Object({ sourceId: t.String({ minLength: 1 }) }),
+    body: PluginsModel.updatePersonalPluginBody,
     response: { 200: PluginsModel.addPluginSourceResult },
   })
   .post('/sources/preview', ({ body }) => Plugins.previewSource(body, options), {
@@ -99,7 +126,7 @@ export function createPluginsModule(options: PluginSourceInstallerOptions = {}) 
     }),
     response: { 200: PluginsModel.pluginSourceRegistryEntry },
   })
-  .post('/sources/:id/refresh', ({ params }) => Plugins.refreshSource(params.id, options), {
+  .post('/sources/:id/refresh', ({ params, request }) => Plugins.refreshSource(params.id, options, resolveActorContext(request)), {
     detail: {
       'summary': 'Refresh plugin source',
       'x-cradle-cli': {

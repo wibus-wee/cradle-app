@@ -6,6 +6,7 @@ import {
   isWebLayerLoadable,
   loadWebPlugins,
   startPluginDevSessionWatcher,
+  startPluginLifecycleWatcher,
 } from './plugin-host'
 
 const mocks = vi.hoisted(() => ({
@@ -111,5 +112,29 @@ describe('plugin host web layer filtering', () => {
     expect(mocks.openServerEventSource).toHaveBeenCalledOnce()
     dispose()
     expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('deactivates a persisted web plugin after a lifecycle removal event', async () => {
+    const deactivate = vi.fn()
+    await activateWebPluginModule('@personal/removed', {
+      activate: () => undefined,
+      deactivate,
+    })
+    mocks.getPlugins.mockResolvedValueOnce({ data: [] })
+    const source = {
+      close: vi.fn(),
+      onerror: null,
+      onmessage: null as ((event: MessageEvent<string>) => void) | null,
+    }
+    mocks.openServerEventSource.mockReturnValueOnce(source)
+
+    const dispose = startPluginLifecycleWatcher()
+    source.onmessage?.(new MessageEvent('message', {
+      data: JSON.stringify({ type: 'source-removed', pluginIdentities: ['@personal/removed'] }),
+    }))
+    await vi.waitFor(() => expect(deactivate).toHaveBeenCalledOnce())
+
+    dispose()
+    expect(source.close).toHaveBeenCalledOnce()
   })
 })

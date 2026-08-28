@@ -4,7 +4,7 @@ import type { PluginSourceDescriptor } from '@cradle/plugin-sdk'
 import { db } from '../infra'
 import { MARKETPLACE_INSTALL_RECEIPT_FILE } from './install-receipt'
 import { calculatePluginPackageChecksum } from './package-checksum'
-import { readPluginTrustGrant } from './trust-grants'
+import { readGrantedPluginPermissions, readPluginTrustGrant } from './trust-grants'
 import { validateMarketplacePackageIntegrity } from './validation'
 
 interface PluginTrustEvaluationInput {
@@ -76,6 +76,7 @@ export async function evaluatePluginSourceTrust(
       ...input.source,
       checksum,
       trusted: true,
+      grantedPermissions: readGrantedPluginPermissions(input.pluginName, checksum),
       reason: 'External local plugin matches a stored operator trust grant.',
     }
   }
