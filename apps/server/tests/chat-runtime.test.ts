@@ -1307,6 +1307,37 @@ class TestPendingRuntimeSettingsRuntime implements ChatRuntime {
 }
 
 describe('chat runtime capability', () => {
+  it('encodes an absent authentication recovery as JSON null', async () => {
+    const dataDir = makeTempDir('cradle-data-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+
+    try {
+      const app = await createServerApp()
+      db()
+        .insert(sessions)
+        .values({
+          id: 'session-no-auth-recovery',
+          title: 'No authentication recovery',
+          runtimeKind: 'codex',
+        })
+        .run()
+
+      const response = await app.handle(
+        new Request('http://localhost/chat/sessions/session-no-auth-recovery/auth-recovery'),
+      )
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toContain('application/json')
+      expect(await response.text()).toBe('null')
+    }
+    finally {
+      shutdownInfra()
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
   it('ignores trivial and subsequent provider session titles', async () => {
     const dataDir = makeTempDir('cradle-data-')
     const previousDataDir = process.env.CRADLE_DATA_DIR

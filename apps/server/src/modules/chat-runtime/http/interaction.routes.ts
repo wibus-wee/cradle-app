@@ -158,7 +158,12 @@ export const chatRuntimeInteractionRoutes = new Elysia({
   )
   .get(
     '/sessions/:sessionId/auth-recovery',
-    async ({ params }) => (await loadChatRuntime()).getRuntimeAuthRecovery(params.sessionId),
+    async ({ params }) => {
+      const recovery = (await loadChatRuntime()).getRuntimeAuthRecovery(params.sessionId)
+      return new Response(JSON.stringify(recovery), {
+        headers: { 'content-type': 'application/json' },
+      })
+    },
     {
       detail: {
         'summary': 'Get the pending runtime authentication recovery for a chat session',
