@@ -2983,6 +2983,15 @@ export const zPostAcpAgentsBody = z.object({
     version: z.string().min(1).optional()
 });
 
+export const zPostAcpAgentsRemoteBody = z.object({
+    id: z.string().min(1).optional(),
+    name: z.string().min(1),
+    connectionType: z.enum(['http', 'websocket']),
+    endpointUrl: z.string().min(1),
+    headerSecretRefs: z.record(z.string(), z.unknown()).optional(),
+    version: z.string().min(1).optional()
+});
+
 export const zDeleteAcpAgentsByAgentIdPath = z.object({
     agentId: z.string().min(1)
 });
@@ -3025,6 +3034,18 @@ export const zPatchAcpAgentsByAgentIdLaunchConfigBody = z.object({
 });
 
 export const zPatchAcpAgentsByAgentIdLaunchConfigPath = z.object({
+    agentId: z.string().min(1)
+});
+
+export const zPatchAcpAgentsByAgentIdRemoteConfigBody = z.object({
+    name: z.string().min(1).optional(),
+    connectionType: z.enum(['http', 'websocket']).optional(),
+    endpointUrl: z.string().min(1).optional(),
+    headerSecretRefs: z.record(z.string(), z.unknown()).optional(),
+    version: z.string().min(1).optional()
+});
+
+export const zPatchAcpAgentsByAgentIdRemoteConfigPath = z.object({
     agentId: z.string().min(1)
 });
 
@@ -3906,6 +3927,18 @@ export const zPostChatSessionsBySessionIdUserInputByRequestIdBody = z.object({
 export const zPostChatSessionsBySessionIdUserInputByRequestIdPath = z.object({
     sessionId: z.string().min(1),
     requestId: z.string().min(1)
+});
+
+export const zDeleteChatSessionsBySessionIdAuthRecoveryPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdAuthRecoveryPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdAuthRecoveryRetryPath = z.object({
+    sessionId: z.string().min(1)
 });
 
 export const zPutChatSessionsBySessionIdRuntimeModeBody = z.object({

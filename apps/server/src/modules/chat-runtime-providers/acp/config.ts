@@ -8,15 +8,28 @@ import { ACP_RUNTIME_KIND } from './metadata'
 export type AcpDistributionType = AcpLaunchDistributionType
 export type AcpRuntimeConfig = AcpChatConfig
 
-export interface AcpConnectionRecord {
+interface AcpConnectionAuth {
+  authMethodId: string | null
+  authSecretRefs: Record<string, string>
+  configurationTarget?: { namespace: 'acp', resourceId: string }
+}
+
+export interface AcpLocalConnectionRecord extends AcpConnectionAuth {
+  connectionType: 'stdio'
   distributionType: AcpDistributionType
   installPath: string | null
   cmd: string
   args: string
   env: string
-  authMethodId: string | null
-  authSecretRefs: Record<string, string>
 }
+
+export interface AcpRemoteConnectionRecord extends AcpConnectionAuth {
+  connectionType: 'http' | 'websocket'
+  endpointUrl: string
+  headerSecretRefs: Record<string, string>
+}
+
+export type AcpConnectionRecord = AcpLocalConnectionRecord | AcpRemoteConnectionRecord
 
 export interface ResolvedAcpConnection {
   record: AcpConnectionRecord
@@ -34,6 +47,7 @@ export function buildAcpConnectionRecord(configJson: string): AcpConnectionRecor
   const parsed = readTrustedAcpRuntimeConfig(configJson)
 
   return {
+    connectionType: 'stdio',
     distributionType: parsed.distributionType,
     installPath: parsed.installPath,
     cmd: parsed.cmd,
@@ -74,11 +88,32 @@ export function resolveAcpConnectionRecord(configJson: string, legacyConnectionK
     )
   }
 
-  const effective = resolveEffectiveLaunch(installed)
   const auth = readAgentAuthConfig(acpAgentId)
+
+  if (installed.connectionType === 'http' || installed.connectionType === 'websocket') {
+    if (!installed.endpointUrl) {
+      throw new ProviderRuntimeError(
+        ProviderErrors.requestFailed(ACP_RUNTIME_KIND, 'resolve-connection', `ACP remote endpoint is missing: ${acpAgentId}`),
+      )
+    }
+    return {
+      record: {
+        connectionType: installed.connectionType,
+        endpointUrl: installed.endpointUrl,
+        headerSecretRefs: JSON.parse(installed.remoteHeadersSecretRefsJson) as Record<string, string>,
+        authMethodId: auth.methodId,
+        authSecretRefs: auth.secretRefs,
+        configurationTarget: { namespace: 'acp', resourceId: acpAgentId },
+      },
+      connectionKey: `acp:${acpAgentId}`,
+    }
+  }
+
+  const effective = resolveEffectiveLaunch(installed)
 
   return {
     record: {
+      connectionType: 'stdio',
       distributionType: effective.distributionType,
       installPath: effective.installPath,
       cmd: effective.cmd,
@@ -86,6 +121,7 @@ export function resolveAcpConnectionRecord(configJson: string, legacyConnectionK
       env: JSON.stringify(effective.env),
       authMethodId: auth.methodId,
       authSecretRefs: auth.secretRefs,
+      configurationTarget: { namespace: 'acp', resourceId: acpAgentId },
     },
     connectionKey: `acp:${acpAgentId}`,
   }

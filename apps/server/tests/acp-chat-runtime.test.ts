@@ -590,6 +590,7 @@ describe('acp chat runtime capability', () => {
 
     expect(resolved.connectionKey).toBe('provider-target-acp')
     expect(resolved.record).toEqual({
+      connectionType: 'stdio',
       distributionType: 'npx',
       installPath: null,
       cmd: '@demo/acp-agent',
@@ -630,6 +631,7 @@ describe('acp chat runtime capability', () => {
       )
       expect(localResolved.connectionKey).toBe('acp:local-cmd-agent')
       expect(localResolved.record).toEqual({
+        connectionType: 'stdio',
         distributionType: 'command',
         installPath: null,
         cmd: '/usr/local/bin/my-acp',
@@ -637,6 +639,7 @@ describe('acp chat runtime capability', () => {
         env: JSON.stringify({ LOCAL: '1' }),
         authMethodId: null,
         authSecretRefs: {},
+        configurationTarget: { namespace: 'acp', resourceId: 'local-cmd-agent' },
       })
 
       db().insert(acpAgents).values({
@@ -812,11 +815,14 @@ describe('acp chat runtime capability', () => {
     } as never)
 
     await manager.connect('profile-acp', {
+      connectionType: 'stdio',
       distributionType: 'npx',
       cmd: '@demo/acp-agent',
       args: '[]',
       env: '{}',
       installPath: null,
+      authMethodId: null,
+      authSecretRefs: {},
     })
 
     await manager.loadSession('profile-acp', 'acp-session-load', '/tmp/workspace')
@@ -888,11 +894,14 @@ describe('acp chat runtime capability', () => {
     acpMocks.setSessionConfigOption.mockResolvedValueOnce({ configOptions: [] })
 
     await manager.connect('profile-acp', {
+      connectionType: 'stdio',
       distributionType: 'npx',
       cmd: '@demo/acp-agent',
       args: '[]',
       env: '{}',
       installPath: null,
+      authMethodId: null,
+      authSecretRefs: {},
     })
     await manager.newSession('profile-acp', '/tmp/workspace')
     await manager.setSessionModel('profile-acp', 'acp-model-session', 'model-b')
@@ -924,11 +933,14 @@ describe('acp chat runtime capability', () => {
 
     try {
       await manager.connect('profile-acp', {
+        connectionType: 'stdio',
         distributionType: 'npx',
         cmd: '@demo/acp-agent',
         args: '[]',
         env: '{}',
         installPath: null,
+        authMethodId: null,
+        authSecretRefs: {},
       })
 
       const client = acpMocks.getClient()
@@ -969,11 +981,14 @@ describe('acp chat runtime capability', () => {
 
     try {
       await manager.connect('profile-acp', {
+        connectionType: 'stdio',
         distributionType: 'npx',
         cmd: '@demo/acp-agent',
         args: '[]',
         env: '{}',
         installPath: null,
+        authMethodId: null,
+        authSecretRefs: {},
       })
 
       const client = acpMocks.getClient()

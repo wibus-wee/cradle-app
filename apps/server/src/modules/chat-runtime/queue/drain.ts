@@ -1,6 +1,7 @@
 import type { FileUIPart } from 'ai'
 
 import { AppError } from '../../../errors/app-error'
+import { recordRuntimeAuthRecovery } from '../auth-recovery'
 import type { ChatContextPart } from '../context-parts'
 import {
   cancelQueuedSessionItem,
@@ -151,6 +152,15 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
           await releaseClaimedQueueItem(sessionId, claimed.id)
           return
         }
+
+        const failedSession = assertStoredSession(sessionId)
+        recordRuntimeAuthRecovery({
+          error,
+          sessionId,
+          queueItemId: claimed.id,
+          providerTargetId: claimed.providerTargetId,
+          runtimeKind: failedSession.runtimeKind ?? 'standard',
+        })
 
         await failClaimedQueueItem(sessionId, claimed.id, deps.serializeError(error).text)
         await normalizeSessionQueuePositions(sessionId)

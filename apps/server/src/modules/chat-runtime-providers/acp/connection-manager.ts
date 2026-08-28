@@ -34,7 +34,13 @@ import {
   PROTOCOL_VERSION,
   RequestError,
 } from '@agentclientprotocol/sdk'
+import {
+  createHttpStream,
+  MemoryAcpCookieStore,
+} from '@agentclientprotocol/sdk/experimental/http-client'
+import { createWebSocketStream } from '@agentclientprotocol/sdk/experimental/ws-client'
 import type { UIMessageChunk } from 'ai'
+import { WebSocket } from 'ws'
 
 import packageJson from '../../../../package.json'
 import { getRegisteredMcpServers } from '../../../plugins/mcp-registry'
@@ -210,6 +216,8 @@ interface SessionChannel {
 
 interface ConnectionEntry {
   agentId: string
+  connectionType: AcpConnectionRecord['connectionType']
+  configurationTarget?: AcpConnectionRecord['configurationTarget']
   connection: ClientConnection
   agent: ClientContext
   initResult: InitializeResponse | null
@@ -225,6 +233,7 @@ export class AcpConnectionManager {
   private readonly sessionTitleHandlers = new Set<(acpSessionId: string, title: string) => void>()
   private readonly usageBySessionKey = new Map<string, TokenUsage | null>()
   private readonly promptRuntimeContexts = new Map<string, AcpPromptRuntimeContext>()
+  private readonly remoteCookieStores = new Map<string, MemoryAcpCookieStore>()
   private readonly readSecret: (secretRef: string) => string
   private readonly requestTimeouts: AcpRequestTimeouts
   private permissionHandler: AcpPermissionHandler | null = null
@@ -306,7 +315,10 @@ export class AcpConnectionManager {
   }
 
   getAuthMethods(agentId: string): ProviderAuthMethod[] {
-    return projectAcpAuthMethods(this.getConnection(agentId).initResult?.authMethods ?? [])
+    const conn = this.getConnection(agentId)
+    return projectAcpAuthMethods(conn.initResult?.authMethods ?? [], {
+      supportsEnvironmentAuth: conn.connectionType === 'stdio',
+    })
   }
 
   async loadSession(agentId: string, sessionId: string, cwd: string, chatSessionId?: string): Promise<LoadSessionResponse & AcpSessionState> {
@@ -639,6 +651,8 @@ export class AcpConnectionManager {
       }
     }
     await this.processManager.stop(agentId)
+    this.remoteCookieStores.get(agentId)?.clear()
+    this.remoteCookieStores.delete(agentId)
   }
 
   isConnected(agentId: string): boolean {
@@ -677,7 +691,8 @@ export class AcpConnectionManager {
           if (restartedMethod.kind !== 'env_var') {
             throw new ProviderRuntimeError(ProviderErrors.authRequired(
               ACP_RUNTIME_KIND,
-              projectAcpAuthMethods(entry.initResult?.authMethods ?? []),
+              this.projectAuthMethods(entry),
+              entry.configurationTarget,
             ))
           }
         }
@@ -716,25 +731,9 @@ export class AcpConnectionManager {
     authEnv: Record<string, string>,
     excludedEnvNames: readonly string[] = [],
   ): Promise<ConnectionEntry> {
-    const args = JSON.parse(record.args) as string[]
-    const env = JSON.parse(record.env) as Record<string, string>
-    const excludedEnv = new Set(excludedEnvNames)
-    const launchEnv = Object.fromEntries(
-      Object.entries(env).filter(([name]) => !excludedEnv.has(name)),
-    )
     let connection: ClientConnection | null = null
     try {
-      const procEntry = this.processManager.spawn({
-        agentId,
-        cmd: record.cmd,
-        args,
-        env: { ...launchEnv, ...authEnv },
-        sensitiveEnvNames: Object.keys(authEnv),
-        distributionType: record.distributionType,
-        installPath: record.installPath,
-      })
-
-      connection = client({ name: 'Cradle Server' })
+      const clientApp = client({ name: 'Cradle Server' })
         .onRequest(methods.client.session.requestPermission, async ({ params }) => this.handlePermissionRequest(agentId, params))
         .onNotification(methods.client.session.update, async ({ params }) => {
           this.handleSessionUpdate(agentId, params)
@@ -769,10 +768,42 @@ export class AcpConnectionManager {
         .onRequest(methods.client.terminal.waitForExit, async ({ params }) => this.terminalHost.wait(params.sessionId, params.terminalId))
         .onRequest(methods.client.terminal.kill, async ({ params }) => this.terminalHost.kill(params.sessionId, params.terminalId))
         .onRequest(methods.client.terminal.release, async ({ params }) => this.terminalHost.release(params.sessionId, params.terminalId))
-        .connect(ndJsonStream(procEntry.stdinWeb, procEntry.stdoutWeb))
+
+      if (record.connectionType === 'stdio') {
+        const args = JSON.parse(record.args) as string[]
+        const env = JSON.parse(record.env) as Record<string, string>
+        const excludedEnv = new Set(excludedEnvNames)
+        const launchEnv = Object.fromEntries(
+          Object.entries(env).filter(([name]) => !excludedEnv.has(name)),
+        )
+        const procEntry = this.processManager.spawn({
+          agentId,
+          cmd: record.cmd,
+          args,
+          env: { ...launchEnv, ...authEnv },
+          sensitiveEnvNames: Object.keys(authEnv),
+          distributionType: record.distributionType,
+          installPath: record.installPath,
+        })
+        connection = clientApp.connect(ndJsonStream(procEntry.stdinWeb, procEntry.stdoutWeb))
+      }
+      else {
+        if (Object.keys(authEnv).length > 0) {
+          throw new ProviderRuntimeError(ProviderErrors.authFailed(ACP_RUNTIME_KIND))
+        }
+        const headers = this.resolveRemoteHeaders(record.headerSecretRefs)
+        const cookieStore = this.remoteCookieStores.get(agentId) ?? new MemoryAcpCookieStore()
+        this.remoteCookieStores.set(agentId, cookieStore)
+        const stream = record.connectionType === 'http'
+          ? createHttpStream(record.endpointUrl, { headers, cookieStore })
+          : createWebSocketStream(record.endpointUrl, { headers, cookieStore, WebSocket })
+        connection = clientApp.connect(stream)
+      }
 
       const entry: ConnectionEntry = {
         agentId,
+        connectionType: record.connectionType,
+        configurationTarget: record.configurationTarget,
         connection,
         agent: connection.agent,
         initResult: null,
@@ -843,14 +874,18 @@ export class AcpConnectionManager {
     methodId: string,
     secretRefs: Record<string, string>,
   ): ProviderAuthMethod {
-    const advertisedMethods = projectAcpAuthMethods(entry.initResult?.authMethods ?? [])
+    const advertisedMethods = this.projectAuthMethods(entry)
     const method = advertisedMethods.find(candidate => candidate.id === methodId)
     const invalid = !method
       || method.status !== 'supported'
       || (method.kind !== 'env_var' && Object.keys(secretRefs).length > 0)
 
     if (invalid || !method) {
-      throw new ProviderRuntimeError(ProviderErrors.authRequired(ACP_RUNTIME_KIND, advertisedMethods))
+      throw new ProviderRuntimeError(ProviderErrors.authRequired(
+        ACP_RUNTIME_KIND,
+        advertisedMethods,
+        entry.configurationTarget,
+      ))
     }
 
     if (method.kind === 'env_var') {
@@ -859,7 +894,11 @@ export class AcpConnectionManager {
       const hasUnknownRef = Object.keys(secretRefs).some(name => !advertisedNames.has(name))
       const hasMissingRef = fields.some(field => !field.optional && !secretRefs[field.name])
       if (hasUnknownRef || hasMissingRef) {
-        throw new ProviderRuntimeError(ProviderErrors.authRequired(ACP_RUNTIME_KIND, advertisedMethods))
+        throw new ProviderRuntimeError(ProviderErrors.authRequired(
+          ACP_RUNTIME_KIND,
+          advertisedMethods,
+          entry.configurationTarget,
+        ))
       }
     }
 
@@ -873,6 +912,21 @@ export class AcpConnectionManager {
     catch (error) {
       throw new ProviderRuntimeError(ProviderErrors.authFailed(ACP_RUNTIME_KIND), { cause: error })
     }
+  }
+
+  private resolveRemoteHeaders(secretRefs: Record<string, string>): Record<string, string> {
+    try {
+      return Object.fromEntries(Object.entries(secretRefs).map(([name, ref]) => [name, this.readSecret(ref)]))
+    }
+    catch (error) {
+      throw new ProviderRuntimeError(ProviderErrors.authFailed(ACP_RUNTIME_KIND), { cause: error })
+    }
+  }
+
+  private projectAuthMethods(entry: ConnectionEntry): ProviderAuthMethod[] {
+    return projectAcpAuthMethods(entry.initResult?.authMethods ?? [], {
+      supportsEnvironmentAuth: entry.connectionType === 'stdio',
+    })
   }
 
   private async closeUnpublishedConnection(entry: ConnectionEntry): Promise<void> {
@@ -923,7 +977,11 @@ export class AcpConnectionManager {
       if (error instanceof RequestError && error.code === -32000 && input.mapAuthRequired !== false) {
         input.conn.authenticatedMethodId = null
         throw new ProviderRuntimeError(
-          ProviderErrors.authRequired(ACP_RUNTIME_KIND, projectAcpAuthMethods(input.conn.initResult?.authMethods ?? [])),
+          ProviderErrors.authRequired(
+            ACP_RUNTIME_KIND,
+            this.projectAuthMethods(input.conn),
+            input.conn.configurationTarget,
+          ),
           { cause: sanitizedRequestError(error) },
         )
       }

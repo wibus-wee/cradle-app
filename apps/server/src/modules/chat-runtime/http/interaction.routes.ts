@@ -156,6 +156,42 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       response: { 200: ChatRuntimeModel.userInputResponse },
     },
   )
+  .get(
+    '/sessions/:sessionId/auth-recovery',
+    async ({ params }) => (await loadChatRuntime()).getRuntimeAuthRecovery(params.sessionId),
+    {
+      detail: {
+        'summary': 'Get the pending runtime authentication recovery for a chat session',
+        'x-cradle-cli': { command: ['chat', 'auth-recovery', 'get'] },
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      response: { 200: ChatRuntimeModel.authRecoveryResponse },
+    },
+  )
+  .post(
+    '/sessions/:sessionId/auth-recovery/retry',
+    async ({ params }) => (await loadChatRuntime()).retryRuntimeAuthRecovery(params.sessionId),
+    {
+      detail: {
+        'summary': 'Retry the exact failed input after runtime authentication succeeds',
+        'x-cradle-cli': { command: ['chat', 'auth-recovery', 'retry'] },
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      response: { 200: ChatRuntimeModel.authRecoveryRetryResponse },
+    },
+  )
+  .delete(
+    '/sessions/:sessionId/auth-recovery',
+    async ({ params }) => (await loadChatRuntime()).cancelRuntimeAuthRecovery(params.sessionId),
+    {
+      detail: {
+        'summary': 'Dismiss a pending runtime authentication recovery',
+        'x-cradle-cli': { command: ['chat', 'auth-recovery', 'cancel'] },
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      response: { 200: ChatRuntimeModel.cancelResponse },
+    },
+  )
   .put(
     '/sessions/:sessionId/runtime-mode',
     async ({ params, body }) => updateChatRuntimeMode({

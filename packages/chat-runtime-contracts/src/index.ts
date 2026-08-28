@@ -1069,13 +1069,23 @@ export interface ProviderAuthMethod {
   }>
 }
 
+export interface ProviderConfigurationTarget {
+  namespace: string
+  resourceId: string
+}
+
 export type ProviderError
   = | { _tag: 'provider_unsupported', provider: string }
     | { _tag: 'session_not_found', provider: string, sessionId: string }
     | { _tag: 'session_closed', provider: string, sessionId: string }
     | { _tag: 'request_failed', provider: string, method: string, detail: string }
     | { _tag: 'process_error', provider: string, detail: string }
-    | { _tag: 'auth_required', provider: string, methods: ProviderAuthMethod[] }
+    | {
+      _tag: 'auth_required'
+      provider: string
+      methods: ProviderAuthMethod[]
+      configurationTarget?: ProviderConfigurationTarget
+    }
     | { _tag: 'auth_failed', provider: string }
     | { _tag: 'rate_limited', provider: string, retryAfter?: number }
     | { _tag: 'model_not_found', provider: string, model: string }
@@ -1143,10 +1153,15 @@ export const ProviderErrors = {
     provider,
     detail,
   }),
-  authRequired: (provider: string, methods: ProviderAuthMethod[]): ProviderError => ({
+  authRequired: (
+    provider: string,
+    methods: ProviderAuthMethod[],
+    configurationTarget?: ProviderConfigurationTarget,
+  ): ProviderError => ({
     _tag: 'auth_required',
     provider,
     methods,
+    ...(configurationTarget ? { configurationTarget } : {}),
   }),
   authFailed: (provider: string): ProviderError => ({
     _tag: 'auth_failed',

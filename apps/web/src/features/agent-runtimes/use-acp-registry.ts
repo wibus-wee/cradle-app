@@ -32,7 +32,7 @@ const AcpInstalledAgentSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   version: z.string().nullable(),
-  source: z.enum(['registry', 'local']),
+  source: z.enum(['registry', 'local', 'remote']),
   distributionType: z.string().min(1),
   installPath: z.string().nullable(),
   cmd: z.string().nullable(),
@@ -42,6 +42,9 @@ const AcpInstalledAgentSchema = z.object({
   overrideArgs: z.string().nullable(),
   overrideEnv: z.string().nullable(),
   authMethodId: z.string().nullable(),
+  connectionType: z.enum(['stdio', 'http', 'websocket']),
+  endpointUrl: z.string().nullable(),
+  remoteHeadersSecretRefs: z.record(z.string(), z.string()),
   status: z.enum(['installing', 'installed', 'failed']),
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -127,14 +130,26 @@ export function useAcpAgentMutations() {
     onSettled: invalidate,
   })
 
+  const createRemoteAgent = useMutation({
+    ...acpRegistryApi.createRemoteMutation(),
+    onSettled: invalidate,
+  })
+
   const updateLaunchConfig = useMutation({
     ...acpRegistryApi.updateLaunchConfigMutation(),
     onSettled: invalidate,
   })
 
+  const updateRemoteConfig = useMutation({
+    ...acpRegistryApi.updateRemoteConfigMutation(),
+    onSettled: invalidate,
+  })
+
   return {
     createLocalAgent,
+    createRemoteAgent,
     updateLaunchConfig,
+    updateRemoteConfig,
     installAgent,
     cancelInstall,
     uninstallAgent,

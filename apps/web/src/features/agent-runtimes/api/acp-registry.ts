@@ -7,7 +7,9 @@ import {
   getAcpRegistryOptions,
   getAcpRegistryQueryKey,
   patchAcpAgentsByAgentIdLaunchConfigMutation,
+  patchAcpAgentsByAgentIdRemoteConfigMutation,
   postAcpAgentsMutation,
+  postAcpAgentsRemoteMutation,
   putAcpAgentsByAgentIdInstallationMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 
@@ -18,7 +20,9 @@ export const acpRegistryApi = {
   registryQueryKey: getAcpRegistryQueryKey,
   distributionTypesOptions: getAcpRegistryByAgentIdDistributionTypesOptions,
   createLocalMutation: postAcpAgentsMutation,
+  createRemoteMutation: postAcpAgentsRemoteMutation,
   updateLaunchConfigMutation: patchAcpAgentsByAgentIdLaunchConfigMutation,
+  updateRemoteConfigMutation: patchAcpAgentsByAgentIdRemoteConfigMutation,
   installMutation: putAcpAgentsByAgentIdInstallationMutation,
   cancelInstallMutation: deleteAcpAgentsByAgentIdInstallationMutation,
   uninstallMutation: deleteAcpAgentsByAgentIdMutation,

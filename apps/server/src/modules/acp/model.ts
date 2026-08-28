@@ -55,6 +55,13 @@ export const AcpModel = {
     overrideArgs: t.Nullable(t.String()),
     overrideEnv: t.Nullable(t.String()),
     authMethodId: t.Nullable(t.String()),
+    connectionType: t.Union([
+      t.Literal('stdio'),
+      t.Literal('http'),
+      t.Literal('websocket'),
+    ]),
+    endpointUrl: t.Nullable(t.String()),
+    remoteHeadersSecretRefs: t.Record(t.String(), t.String()),
     status: t.String(),
     createdAt: t.Number(),
     updatedAt: t.Number(),
@@ -130,6 +137,35 @@ export const AcpModel = {
       t.Literal('npx'),
       t.Literal('uvx'),
     ])),
+    version: t.Optional(t.String({ minLength: 1 })),
+  }),
+
+  createRemoteAgentBody: t.Object({
+    id: t.Optional(t.String({ minLength: 1 })),
+    name: t.String({ minLength: 1 }),
+    connectionType: t.Union([
+      t.Literal('http'),
+      t.Literal('websocket'),
+    ]),
+    endpointUrl: t.String({ minLength: 1 }),
+    headerSecretRefs: t.Optional(t.Record(
+      t.String({ minLength: 1 }),
+      t.String({ minLength: 1 }),
+    )),
+    version: t.Optional(t.String({ minLength: 1 })),
+  }),
+
+  remoteConfigBody: t.Object({
+    name: t.Optional(t.String({ minLength: 1 })),
+    connectionType: t.Optional(t.Union([
+      t.Literal('http'),
+      t.Literal('websocket'),
+    ])),
+    endpointUrl: t.Optional(t.String({ minLength: 1 })),
+    headerSecretRefs: t.Optional(t.Record(
+      t.String({ minLength: 1 }),
+      t.String({ minLength: 1 }),
+    )),
     version: t.Optional(t.String({ minLength: 1 })),
   }),
 

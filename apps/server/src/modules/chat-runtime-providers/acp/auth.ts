@@ -4,8 +4,13 @@ import type { ProviderAuthMethod } from '../../chat-runtime/runtime-provider-typ
 
 const TERMINAL_AUTH_UNAVAILABLE_REASON
   = 'Cradle does not host interactive ACP terminal authentication.'
+const REMOTE_ENV_AUTH_UNAVAILABLE_REASON
+  = 'Environment-variable authentication requires a local ACP process.'
 
-export function projectAcpAuthMethods(methods: readonly AuthMethod[]): ProviderAuthMethod[] {
+export function projectAcpAuthMethods(
+  methods: readonly AuthMethod[],
+  options: { supportsEnvironmentAuth?: boolean } = {},
+): ProviderAuthMethod[] {
   return methods.map((method) => {
     const description = method.description ?? undefined
 
@@ -15,7 +20,10 @@ export function projectAcpAuthMethods(methods: readonly AuthMethod[]): ProviderA
         name: method.name,
         ...(description ? { description } : {}),
         kind: 'env_var',
-        status: 'supported',
+        status: options.supportsEnvironmentAuth === false ? 'unsupported' : 'supported',
+        ...(options.supportsEnvironmentAuth === false
+          ? { unavailableReason: REMOTE_ENV_AUTH_UNAVAILABLE_REASON }
+          : {}),
         ...(method.link ? { link: method.link } : {}),
         fields: method.vars.map(variable => ({
           name: variable.name,

@@ -4,7 +4,7 @@ This module projects a locally installed Agent Client Protocol (ACP) agent into 
 
 | Area | Owner | Responsibility |
 | --- | --- | --- |
-| Connection and process | [`connection-manager.ts`](./connection-manager.ts), [`process-manager.ts`](./process-manager.ts) | Spawn one process per installed agent, initialize ACP, apply request deadlines, retry cold connection startup with a bounded policy, and surface redacted process diagnostics. |
+| Connection and process | [`connection-manager.ts`](./connection-manager.ts), [`process-manager.ts`](./process-manager.ts) | Connect one target-scoped stdio, HTTP, or WebSocket client, initialize ACP, apply request deadlines, retry cold startup with a bounded policy, and surface redacted process diagnostics. |
 | Native sessions | [`provider.ts`](./provider.ts) | Create, resume, load, fork, list, close, and delete ACP sessions; expire abandoned draft sessions; bind native IDs to Chat Runtime sessions. |
 | Prompts and timeline | [`input-projector.ts`](./input-projector.ts), [`timeline-mapper.ts`](./timeline-mapper.ts) | Preserve text, image, audio, resource, usage, plan, command, and canonical tool facts at the ACP boundary. |
 | Interactions | [`runtime-integration.ts`](./runtime-integration.ts), [`terminal-host.ts`](./terminal-host.ts) | Bridge exact permission options, form/URL elicitation, filesystem access, and terminal execution through shared approval and user-input owners. |
@@ -15,7 +15,11 @@ This module projects a locally installed Agent Client Protocol (ACP) agent into 
 
 Initialization sends the server package version and requires the agent to return the SDK `PROTOCOL_VERSION`. A connection is published only after negotiation and the selected authentication method succeed. Cold startup uses three bounded attempts; authentication failures are never retried. A process disconnect fails active channels so the Chat Runtime run owner can terminate the stream, release the run lease, and reconnect on the next operation.
 
-An installed agent stores an auth method ID and Secrets-owned credential references. For env-var authentication, the first process discovers the live method contract without credential values. The runtime then stops it, resolves values through `modules/secrets`, and spawns the authenticated process. Agent-managed authentication runs on the discovery connection. Startup tokens and resolved secret values are not logged.
+An installed agent stores an auth method ID and Secrets-owned credential references. For env-var authentication, the first local process discovers the live method contract without credential values. The runtime then stops it, resolves values through `modules/secrets`, and spawns the authenticated process. Remote targets advertise env-var methods as unsupported because no local process environment exists. Agent-managed authentication runs on the discovery connection. Startup tokens and resolved secret values are not logged.
+
+Remote targets use the SDK HTTP or WebSocket transport selected by the ACP-owned connection record. Header values are resolved from Secrets only while connecting. HTTP cookies remain in a target-scoped in-memory SDK cookie store across reconnects and are cleared on explicit disconnect; they are never persisted by Chat Runtime.
+
+Structured `auth_required` failures carry an ACP configuration target into the shared Chat Runtime recovery owner. The failed durable queue item remains historical. The transcript can render the ACP authentication form inline and, after successful configuration, enqueue an exact copy of the failed text, files, context, model, thinking effort, runtime settings, provider target, and queue/steer mode. Dismissal closes only the recovery record.
 
 Metadata requests have a 30-second deadline, authentication has a five-minute deadline, and prompts have a ten-minute deadline. A timeout sends best-effort `session/cancel`, closes the connection, fails every active channel, and stops the process. Redacted stderr is retained in bounded process diagnostics and included in disconnect errors.
 

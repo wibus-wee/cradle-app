@@ -22,6 +22,7 @@ export interface ChatTranscriptViewProps<Message> {
   onVirtualScroll?: (offset: number) => void
   compactInset?: boolean
   historyControl?: ReactNode
+  authRecovery?: ReactNode
 }
 
 /** Props-only transcript surface shared by the runtime adapter and preview fixtures. */
@@ -39,6 +40,7 @@ export function ChatTranscriptView<Message>({
   onVirtualScroll,
   compactInset,
   historyControl,
+  authRecovery,
 }: ChatTranscriptViewProps<Message>) {
   const localViewportRef = useRef<HTMLDivElement>(null)
   const resolvedViewportRef = viewportRef ?? localViewportRef
@@ -79,7 +81,9 @@ export function ChatTranscriptView<Message>({
             {renderMessage}
           </Virtualizer>
 
-          {status === 'error'
+          {authRecovery}
+
+          {status === 'error' && !authRecovery
             ? (
                 <m.div
                   data-testid="chat-error-banner"

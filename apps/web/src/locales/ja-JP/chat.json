@@ -1,4 +1,11 @@
 {
+  "authRecovery.action.dismiss": "閉じる",
+  "authRecovery.action.dismissing": "閉じています…",
+  "authRecovery.action.retry": "メッセージを再試行",
+  "authRecovery.action.retrying": "再試行中…",
+  "authRecovery.description": "認証を設定してから、失敗した同じメッセージを再試行します。",
+  "authRecovery.title": "認証が必要です",
+  "authRecovery.unsupportedTarget": "ランタイム設定でこのプロバイダーを設定してから、メッセージを再試行してください。",
   "await.action.view": "表示",
   "await.source.event": "イベント",
   "await.waitingFor": "{{source}} を待機中...",
