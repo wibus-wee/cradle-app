@@ -1,6 +1,7 @@
 import type { FileUIPart } from 'ai'
 
 import { AppError } from '../../../errors/app-error'
+import type { RuntimeKind } from '../../provider-contracts/types'
 import { recordRuntimeAuthRecovery } from '../auth-recovery'
 import type { ChatContextPart } from '../context-parts'
 import {
@@ -123,9 +124,10 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
         continue
       }
 
+      let runtimeKind: RuntimeKind | null = null
       try {
         const session = assertStoredSession(sessionId)
-        const runtimeKind = session.runtimeKind ?? 'standard'
+        runtimeKind = session.runtimeKind ?? 'standard'
         const runtimeSettings = readQueueItemRuntimeSettings(runtimeKind, claimed)
         await deps.createQueuedRun({
           sessionId,
@@ -153,16 +155,16 @@ async function drainSessionQueue(sessionId: string, deps: QueueDrainDeps): Promi
           return
         }
 
-        const failedSession = assertStoredSession(sessionId)
-        recordRuntimeAuthRecovery({
-          error,
-          sessionId,
-          queueItemId: claimed.id,
-          providerTargetId: claimed.providerTargetId,
-          runtimeKind: failedSession.runtimeKind ?? 'standard',
-        })
-
         await failClaimedQueueItem(sessionId, claimed.id, deps.serializeError(error).text)
+        if (runtimeKind) {
+          recordRuntimeAuthRecovery({
+            error,
+            sessionId,
+            queueItemId: claimed.id,
+            providerTargetId: claimed.providerTargetId,
+            runtimeKind,
+          })
+        }
         await normalizeSessionQueuePositions(sessionId)
       }
     }
