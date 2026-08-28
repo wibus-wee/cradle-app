@@ -35,6 +35,7 @@ const claudeAgentPermissionModePatchSchema = t.Union([
 
 const accessModePatchSchema = t.Union([
   t.Literal('approval-required'),
+  t.Literal('approve-for-me'),
   t.Literal('full-access'),
   t.Null(),
 ])

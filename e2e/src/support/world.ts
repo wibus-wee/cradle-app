@@ -168,8 +168,8 @@ export class CradleWorld extends World {
   }
 
   createTempWorkspaceDir(prefix = 'cradle-e2e-ws-'): string {
-    // Directory Browser rejects arbitrary OS temp paths by design. A sibling
-    // of the checkout is both allowed by the real browser and outside its git tree.
+    // Managed HOME is allowed by the real Directory Browser. The managed server's
+    // GIT_CEILING_DIRECTORIES keeps these fixtures outside the checkout's Git identity.
     const fixtureRoot = getManagedDataDir()
       ? join(getManagedDataDir()!, 'home')
       : dirname(process.cwd())

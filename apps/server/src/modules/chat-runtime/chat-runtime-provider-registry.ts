@@ -33,7 +33,7 @@ import {
   CATALOG_ONLY_BUILTIN_RUNTIMES,
 } from './catalog-only-runtime-metadata'
 import { requestRuntimeToolApproval } from './pending-tool-approval'
-import { requestRuntimeUserInput } from './pending-user-input'
+import { requestRuntimeUserInput, submitRuntimeUserInput } from './pending-user-input'
 import type {
   ChatRuntime,
   ChatRuntimeCapabilities,
@@ -470,6 +470,7 @@ function createProviderContext(): ProviderContext {
       await updateChatSessionRuntimeSettings(input)
     },
     requestUserInput: requestRuntimeUserInput,
+    resolveUserInput: submitRuntimeUserInput,
     requestToolApproval: requestRuntimeToolApproval,
     recordObservability,
     logger: createChildLogger({ module: 'chat-runtime-provider' }),

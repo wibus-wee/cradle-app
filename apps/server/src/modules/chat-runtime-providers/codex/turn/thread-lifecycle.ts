@@ -140,6 +140,7 @@ export async function startOrResumeThread(
     cwd: string
     runtimeWorkspaceRoots: string[]
     approvalPolicy: CodexConfig['approvalPolicy']
+    approvalsReviewer: NonNullable<ThreadForkParams['approvalsReviewer']>
     sandbox: CodexConfig['sandboxMode']
     config: NonNullable<ThreadForkParams['config']>
     developerInstructions?: string | null
@@ -152,6 +153,7 @@ export async function startOrResumeThread(
     cwd: params.cwd,
     runtimeWorkspaceRoots: params.runtimeWorkspaceRoots,
     approvalPolicy: params.approvalPolicy,
+    approvalsReviewer: params.approvalsReviewer,
     sandbox: params.sandbox,
     config: params.config,
     ...(params.developerInstructions ? { developerInstructions: params.developerInstructions } : {}),

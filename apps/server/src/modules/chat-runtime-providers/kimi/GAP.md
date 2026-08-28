@@ -2,6 +2,8 @@
 
 This file records native Kimi Web capabilities that the current Cradle Chat Runtime contract cannot represent without changing the contract. They are deliberately not exposed as misleading provider behavior.
 
+Kimi's native `permission_mode: auto` is projected as the shared `approve-for-me` access mode. It is intentionally distinct from `yolo` full access and from persistent "always allow" permission rules in other runtimes.
+
 ## Session deletion
 
 Kimi Web exposes `POST /api/v1/sessions/{session_id}:archive`, but no irreversible session-delete operation. Cradle's `deleteProviderThread` contract promises deletion, so the Kimi provider does not implement it. Archive remains available in Kimi itself and is returned by provider-thread listing when requested.

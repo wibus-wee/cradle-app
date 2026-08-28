@@ -17,6 +17,7 @@ export interface ProviderToolApprovalRequestInput {
   runtimeKind: RuntimeKind
   providerMethod: string
   toolCallId: string
+  options?: RuntimeToolApprovalRequest['options']
   metadata?: Record<string, unknown>
 }
 
@@ -60,6 +61,7 @@ export function buildProviderToolApprovalRequest(input: ProviderToolApprovalRequ
     runtimeKind: input.runtimeKind,
     providerMethod: input.providerMethod,
     toolCallId: input.toolCallId,
+    ...(input.options ? { options: input.options } : {}),
   }
 
   if (input.metadata !== undefined) {

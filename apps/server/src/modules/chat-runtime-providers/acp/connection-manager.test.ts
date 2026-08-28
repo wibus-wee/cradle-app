@@ -1,3 +1,6 @@
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
+
 import type {
   Agent,
   AuthenticateRequest,
@@ -9,17 +12,22 @@ import type {
   StopReason,
 } from '@agentclientprotocol/sdk'
 import {
+  agent,
   AgentSideConnection,
+  methods,
   ndJsonStream,
   PROTOCOL_VERSION,
   RequestError,
 } from '@agentclientprotocol/sdk'
+import { createNodeHttpHandler, createNodeWebSocketUpgradeHandler } from '@agentclientprotocol/sdk/experimental/node'
+import { AcpServer } from '@agentclientprotocol/sdk/experimental/server'
 import type { UIMessageChunk } from 'ai'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { WebSocketServer } from 'ws'
 
 import { addHostMcpServer, removeHostMcpServer } from '../../../plugins/mcp-registry'
 import { ProviderRuntimeError } from '../../chat-runtime/runtime-provider-types'
-import type { AcpConnectionRecord } from './config'
+import type { AcpConnectionRecord, AcpLocalConnectionRecord } from './config'
 import { AcpConnectionManager, listRegisteredAcpMcpServers } from './connection-manager'
 import type { AcpProcessHost, AcpProcessSpawnOptions, ProcessEntry } from './process-manager'
 
@@ -78,8 +86,9 @@ class MemoryAcpProcessHost implements AcpProcessHost {
   }
 }
 
-function connectionRecord(overrides: Partial<AcpConnectionRecord> = {}): AcpConnectionRecord {
+function connectionRecord(overrides: Partial<AcpLocalConnectionRecord> = {}): AcpConnectionRecord {
   return {
+    connectionType: 'stdio',
     distributionType: 'command',
     installPath: null,
     cmd: '/fake/acp-agent',
@@ -110,7 +119,7 @@ describe('listRegisteredAcpMcpServers', () => {
     removeHostMcpServer('nowledge-mem')
   })
 
-  it('projects stdio MCP servers and skips streamable HTTP MCP servers', () => {
+  it('projects session-scoped stdio and registered HTTP MCP servers', () => {
     addHostMcpServer({
       transport: 'stdio',
       name: 'browser-use',
@@ -126,7 +135,13 @@ describe('listRegisteredAcpMcpServers', () => {
       headers: { Authorization: 'Bearer secret-token' },
     })
 
-    expect(listRegisteredAcpMcpServers()).toEqual([])
+    const httpServer = {
+      type: 'http' as const,
+      name: 'nowledge-mem',
+      url: 'https://nowledge.example.test/mcp',
+      headers: [{ name: 'Authorization', value: 'Bearer secret-token' }],
+    }
+    expect(listRegisteredAcpMcpServers()).toEqual([httpServer])
     expect(listRegisteredAcpMcpServers('session-a')).toEqual([
       {
         name: 'browser-use',
@@ -137,12 +152,67 @@ describe('listRegisteredAcpMcpServers', () => {
           { name: 'CRADLE_CHAT_SESSION_ID', value: 'session-a' },
         ],
       },
+      httpServer,
     ])
-    expect(JSON.stringify(listRegisteredAcpMcpServers('session-a'))).not.toContain('secret-token')
   })
 })
 
 describe('acpConnectionManager', () => {
+  it.each(['http', 'websocket'] as const)('connects through the remote %s transport with Secrets-backed headers', async (connectionType) => {
+    const authorizationHeaders: Array<string | undefined> = []
+    const remoteAgent = agent({ name: 'remote-test-agent' })
+      .onRequest(methods.agent.initialize, () => ({
+        protocolVersion: PROTOCOL_VERSION,
+        agentCapabilities: {},
+        authMethods: [],
+      }))
+    const acpServer = new AcpServer({ agent: remoteAgent })
+    const httpHandler = createNodeHttpHandler(acpServer)
+    const webSocketServer = new WebSocketServer({ noServer: true })
+    const upgradeHandler = createNodeWebSocketUpgradeHandler(acpServer, webSocketServer)
+    const httpServer = createServer((request, response) => {
+      authorizationHeaders.push(request.headers.authorization)
+      httpHandler(request, response)
+    })
+    httpServer.on('upgrade', (request, socket, head) => {
+      authorizationHeaders.push(request.headers.authorization)
+      upgradeHandler(request, socket, head)
+    })
+    await new Promise<void>((resolve, reject) => {
+      httpServer.once('error', reject)
+      httpServer.listen(0, '127.0.0.1', resolve)
+    })
+    const port = (httpServer.address() as AddressInfo).port
+    const host = new MemoryAcpProcessHost({})
+    const runtime = new AcpConnectionManager(host, {
+      readSecret: secretId => secretId === 'remote-token' ? 'Bearer resolved-token' : '',
+    })
+
+    try {
+      await runtime.connect('remote-agent', {
+        connectionType,
+        endpointUrl: `${connectionType === 'http' ? 'http' : 'ws'}://127.0.0.1:${port}`,
+        headerSecretRefs: { Authorization: 'remote-token' },
+        authMethodId: null,
+        authSecretRefs: {},
+        configurationTarget: { namespace: 'acp', resourceId: 'remote-agent' },
+      })
+
+      expect(runtime.isConnected('remote-agent')).toBe(true)
+      expect(host.spawns).toEqual([])
+      expect(authorizationHeaders).toContain('Bearer resolved-token')
+    }
+    finally {
+      await runtime.disconnect('remote-agent').catch(() => {})
+      await acpServer.close()
+      for (const client of webSocketServer.clients) {
+        client.terminate()
+      }
+      await new Promise<void>(resolve => webSocketServer.close(() => resolve()))
+      await new Promise<void>(resolve => httpServer.close(() => resolve()))
+    }
+  })
+
   it('discovers env auth without secrets, respawns once with resolved values, then authenticates', async () => {
     const authenticate = vi.fn()
     const initialize = vi.fn((_request: InitializeRequest) => ({
@@ -198,12 +268,15 @@ describe('acpConnectionManager', () => {
       },
     })
     const runtime = new AcpConnectionManager(host)
-    await runtime.connect('agent', connectionRecord())
+    await runtime.connect('agent', connectionRecord({
+      configurationTarget: { namespace: 'acp', resourceId: 'configured-agent' },
+    }))
 
     await expect(runtime.newSession('agent', '/workspace')).rejects.toMatchObject({
       providerError: {
         _tag: 'auth_required',
         methods: [expect.objectContaining({ id: 'login', kind: 'agent' })],
+        configurationTarget: { namespace: 'acp', resourceId: 'configured-agent' },
       },
     })
   })

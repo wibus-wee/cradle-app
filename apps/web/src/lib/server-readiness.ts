@@ -2,6 +2,7 @@ import { client } from './client.config'
 import { getServerUrl } from './electron'
 import { cradleFetch } from './server-credential'
 import { getConfiguredServerUrl } from './server-endpoint-preferences'
+import { probeServerHealth } from './server-health'
 import type { DesktopServerConnectionProjection } from './server-transport/base-url'
 import {
   applyDesktopServerReadyEndpoint,
@@ -33,29 +34,43 @@ type DesktopServerBootstrapSnapshot = {
 }
 
 const HEALTH_RETRY_DELAYS_MS = [200, 400, 800, 1_000] as const
+const HOSTED_SERVER_TIMEOUT_MS = 4_000
 
 function wait(delayMs: number): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, delayMs))
 }
 
-async function waitForHostedServer(): Promise<string> {
+export async function waitForHostedServer(): Promise<string> {
   const serverUrl = getConfiguredServerUrl()
-  let attempt = 0
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), HOSTED_SERVER_TIMEOUT_MS)
 
-  while (true) {
-    try {
-      const response = await cradleFetch(new URL('/health', serverUrl))
-      if (response.ok) {
+  try {
+    for (const delayMs of HEALTH_RETRY_DELAYS_MS) {
+      const result = await probeServerHealth(serverUrl, {
+        fetcher: cradleFetch,
+        signal: controller.signal,
+      })
+      if (result.kind === 'healthy') {
         return serverUrl
       }
-    }
-    catch {
-      // The server is still starting or temporarily unreachable.
+      if (controller.signal.aborted) {
+        break
+      }
+      await wait(delayMs)
     }
 
-    const delayMs = HEALTH_RETRY_DELAYS_MS[Math.min(attempt, HEALTH_RETRY_DELAYS_MS.length - 1)]
-    attempt += 1
-    await wait(delayMs)
+    const finalResult = await probeServerHealth(serverUrl, {
+      fetcher: cradleFetch,
+      signal: controller.signal,
+    })
+    if (finalResult.kind === 'healthy') {
+      return serverUrl
+    }
+    throw new Error(`Could not reach Cradle Server at ${serverUrl}.`)
+  }
+  finally {
+    window.clearTimeout(timeout)
   }
 }
 

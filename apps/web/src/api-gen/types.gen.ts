@@ -7283,7 +7283,7 @@ export type PostSessionsData = {
         runtimeKind?: string;
         runtimeSettings?: {
             permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-            accessMode?: 'approval-required' | 'full-access' | null;
+            accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
             interactionMode?: 'default' | 'plan' | null;
             claudeAgent?: {
                 modelAliases?: {
@@ -7292,7 +7292,7 @@ export type PostSessionsData = {
                     opus?: string;
                 };
             } | null;
-            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
                 modelAliases?: {
                     haiku?: string;
                     sonnet?: string;
@@ -8644,7 +8644,7 @@ export type PostWorksData = {
         runtimeKind?: string;
         runtimeSettings?: {
             permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-            accessMode?: 'approval-required' | 'full-access' | null;
+            accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
             interactionMode?: 'default' | 'plan' | null;
             claudeAgent?: {
                 modelAliases?: {
@@ -8653,7 +8653,7 @@ export type PostWorksData = {
                     opus?: string;
                 };
             } | null;
-            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
                 modelAliases?: {
                     haiku?: string;
                     sonnet?: string;
@@ -19597,6 +19597,11 @@ export type GetAcpAgentsResponses = {
         overrideArgs: string | null;
         overrideEnv: string | null;
         authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19640,6 +19645,11 @@ export type PostAcpAgentsResponses = {
         overrideArgs: string | null;
         overrideEnv: string | null;
         authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19647,6 +19657,53 @@ export type PostAcpAgentsResponses = {
 };
 
 export type PostAcpAgentsResponse = PostAcpAgentsResponses[keyof PostAcpAgentsResponses];
+
+export type PostAcpAgentsRemoteData = {
+    body: {
+        id?: string;
+        name: string;
+        connectionType: 'http' | 'websocket';
+        endpointUrl: string;
+        headerSecretRefs?: {
+            [key: string]: unknown;
+        };
+        version?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/acp/agents/remote';
+};
+
+export type PostAcpAgentsRemoteResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        version: string | null;
+        source: string;
+        distributionType: string;
+        installPath: string | null;
+        cmd: string | null;
+        args: string | null;
+        env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
+        status: string;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostAcpAgentsRemoteResponse = PostAcpAgentsRemoteResponses[keyof PostAcpAgentsRemoteResponses];
 
 export type DeleteAcpAgentsByAgentIdData = {
     body?: never;
@@ -19695,6 +19752,11 @@ export type GetAcpAgentsByAgentIdResponses = {
         overrideArgs: string | null;
         overrideEnv: string | null;
         authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19824,6 +19886,11 @@ export type PatchAcpAgentsByAgentIdLaunchConfigResponses = {
         overrideArgs: string | null;
         overrideEnv: string | null;
         authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19831,6 +19898,54 @@ export type PatchAcpAgentsByAgentIdLaunchConfigResponses = {
 };
 
 export type PatchAcpAgentsByAgentIdLaunchConfigResponse = PatchAcpAgentsByAgentIdLaunchConfigResponses[keyof PatchAcpAgentsByAgentIdLaunchConfigResponses];
+
+export type PatchAcpAgentsByAgentIdRemoteConfigData = {
+    body: {
+        name?: string;
+        connectionType?: 'http' | 'websocket';
+        endpointUrl?: string;
+        headerSecretRefs?: {
+            [key: string]: unknown;
+        };
+        version?: string;
+    };
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/remote-config';
+};
+
+export type PatchAcpAgentsByAgentIdRemoteConfigResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        version: string | null;
+        source: string;
+        distributionType: string;
+        installPath: string | null;
+        cmd: string | null;
+        args: string | null;
+        env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
+        status: string;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchAcpAgentsByAgentIdRemoteConfigResponse = PatchAcpAgentsByAgentIdRemoteConfigResponses[keyof PatchAcpAgentsByAgentIdRemoteConfigResponses];
 
 export type PostAcpAgentsByAgentIdDraftSessionData = {
     body: {
@@ -19858,6 +19973,27 @@ export type PostAcpAgentsByAgentIdDraftSessionResponses = {
 };
 
 export type PostAcpAgentsByAgentIdDraftSessionResponse = PostAcpAgentsByAgentIdDraftSessionResponses[keyof PostAcpAgentsByAgentIdDraftSessionResponses];
+
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdData = {
+    body?: never;
+    path: {
+        agentId: string;
+        sessionId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/draft-session/{sessionId}';
+};
+
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponse = DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses[keyof DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses];
 
 export type DeleteAcpAgentsByAgentIdInstallationData = {
     body?: never;
@@ -19908,6 +20044,11 @@ export type PutAcpAgentsByAgentIdInstallationResponses = {
         overrideArgs: string | null;
         overrideEnv: string | null;
         authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -20668,6 +20809,17 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             supportsNamespaceTools: boolean | null;
             updatedAt: number;
         } | {
+            kind: 'mode';
+            slotId: string;
+            threadId: string;
+            currentModeId: string;
+            modes: Array<{
+                id: string;
+                name: string;
+                description: string;
+            }>;
+            updatedAt: number;
+        } | {
             kind: 'reasoning';
             slotId: string;
             threadId: string;
@@ -20730,6 +20882,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                 options: Array<{
                     label: string;
                     description: string;
+                    url?: string;
                 }> | null;
             }>;
             createdAt: number;
@@ -22300,7 +22453,7 @@ export type GetChatSessionsBySessionIdRuntimeSettingsResponse = GetChatSessionsB
 export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
     body: {
         permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-        accessMode?: 'approval-required' | 'full-access' | null;
+        accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
         interactionMode?: 'default' | 'plan' | null;
         claudeAgent?: {
             modelAliases?: {
@@ -22309,7 +22462,7 @@ export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
                 opus?: string;
             };
         } | null;
-        [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+        [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
             modelAliases?: {
                 haiku?: string;
                 sonnet?: string;
@@ -22729,11 +22882,121 @@ export type PostChatSessionsBySessionIdUserInputByRequestIdResponses = {
 
 export type PostChatSessionsBySessionIdUserInputByRequestIdResponse = PostChatSessionsBySessionIdUserInputByRequestIdResponses[keyof PostChatSessionsBySessionIdUserInputByRequestIdResponses];
 
+export type DeleteChatSessionsBySessionIdAuthRecoveryData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/auth-recovery';
+};
+
+export type DeleteChatSessionsBySessionIdAuthRecoveryResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteChatSessionsBySessionIdAuthRecoveryResponse = DeleteChatSessionsBySessionIdAuthRecoveryResponses[keyof DeleteChatSessionsBySessionIdAuthRecoveryResponses];
+
+export type GetChatSessionsBySessionIdAuthRecoveryData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/auth-recovery';
+};
+
+export type GetChatSessionsBySessionIdAuthRecoveryResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        queueItemId: string;
+        runId: string | null;
+        providerTargetId: string | null;
+        runtimeKind: string;
+        provider: string;
+        methods: Array<{
+            id: string;
+            name: string;
+            description?: string;
+            kind: 'agent' | 'env_var' | 'terminal';
+            status: 'supported' | 'unsupported';
+            unavailableReason?: string;
+            link?: string;
+            fields?: Array<{
+                name: string;
+                label?: string;
+                secret: boolean;
+                optional: boolean;
+            }>;
+        }>;
+        configurationTarget: {
+            namespace: string;
+            resourceId: string;
+        };
+        createdAt: number;
+        updatedAt: number;
+    } | null;
+};
+
+export type GetChatSessionsBySessionIdAuthRecoveryResponse = GetChatSessionsBySessionIdAuthRecoveryResponses[keyof GetChatSessionsBySessionIdAuthRecoveryResponses];
+
+export type PostChatSessionsBySessionIdAuthRecoveryRetryData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/auth-recovery/retry';
+};
+
+export type PostChatSessionsBySessionIdAuthRecoveryRetryResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+        queueItemId: string;
+    };
+};
+
+export type PostChatSessionsBySessionIdAuthRecoveryRetryResponse = PostChatSessionsBySessionIdAuthRecoveryRetryResponses[keyof PostChatSessionsBySessionIdAuthRecoveryRetryResponses];
+
+export type PutChatSessionsBySessionIdRuntimeModeData = {
+    body: {
+        modeId: string;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-mode';
+};
+
+export type PutChatSessionsBySessionIdRuntimeModeResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type PutChatSessionsBySessionIdRuntimeModeResponse = PutChatSessionsBySessionIdRuntimeModeResponses[keyof PutChatSessionsBySessionIdRuntimeModeResponses];
+
 export type PostChatSessionsBySessionIdToolApprovalByRequestIdData = {
     body: {
         approved: boolean;
         scope?: 'once' | 'always';
         reason?: string;
+        selectedOptionId?: string;
     };
     path: {
         sessionId: string;
@@ -22752,6 +23015,7 @@ export type PostChatSessionsBySessionIdToolApprovalByRequestIdResponses = {
         approved: boolean;
         scope?: 'once' | 'always';
         reason?: string;
+        selectedOptionId?: string;
     };
 };
 

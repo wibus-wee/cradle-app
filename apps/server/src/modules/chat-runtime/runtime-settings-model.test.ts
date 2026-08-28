@@ -20,6 +20,9 @@ describe('sessionRuntimeSettingsPatchSchema', () => {
       interactionMode: 'default',
       providerNativeFlag: true,
     })).toBe(true)
+    expect(Value.Check(sessionRuntimeSettingsPatchSchema, {
+      accessMode: 'approve-for-me',
+    })).toBe(true)
   })
 
   it('accepts null runtime setting patch values', () => {

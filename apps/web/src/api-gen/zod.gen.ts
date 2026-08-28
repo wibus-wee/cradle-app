@@ -1379,7 +1379,11 @@ export const zPostSessionsBody = z.object({
             'bypassPermissions',
             'plan'
         ]).nullish(),
-        accessMode: z.enum(['approval-required', 'full-access']).nullish(),
+        accessMode: z.enum([
+            'approval-required',
+            'approve-for-me',
+            'full-access'
+        ]).nullish(),
         interactionMode: z.enum(['default', 'plan']).nullish(),
         claudeAgent: z.object({
             modelAliases: z.object({
@@ -1662,7 +1666,11 @@ export const zPostWorksBody = z.object({
             'bypassPermissions',
             'plan'
         ]).nullish(),
-        accessMode: z.enum(['approval-required', 'full-access']).nullish(),
+        accessMode: z.enum([
+            'approval-required',
+            'approve-for-me',
+            'full-access'
+        ]).nullish(),
         interactionMode: z.enum(['default', 'plan']).nullish(),
         claudeAgent: z.object({
             modelAliases: z.object({
@@ -3002,6 +3010,15 @@ export const zPostAcpAgentsBody = z.object({
     version: z.string().min(1).optional()
 });
 
+export const zPostAcpAgentsRemoteBody = z.object({
+    id: z.string().min(1).optional(),
+    name: z.string().min(1),
+    connectionType: z.enum(['http', 'websocket']),
+    endpointUrl: z.string().min(1),
+    headerSecretRefs: z.record(z.string(), z.unknown()).optional(),
+    version: z.string().min(1).optional()
+});
+
 export const zDeleteAcpAgentsByAgentIdPath = z.object({
     agentId: z.string().min(1)
 });
@@ -3047,12 +3064,29 @@ export const zPatchAcpAgentsByAgentIdLaunchConfigPath = z.object({
     agentId: z.string().min(1)
 });
 
+export const zPatchAcpAgentsByAgentIdRemoteConfigBody = z.object({
+    name: z.string().min(1).optional(),
+    connectionType: z.enum(['http', 'websocket']).optional(),
+    endpointUrl: z.string().min(1).optional(),
+    headerSecretRefs: z.record(z.string(), z.unknown()).optional(),
+    version: z.string().min(1).optional()
+});
+
+export const zPatchAcpAgentsByAgentIdRemoteConfigPath = z.object({
+    agentId: z.string().min(1)
+});
+
 export const zPostAcpAgentsByAgentIdDraftSessionBody = z.object({
     workspaceId: z.string().min(1).optional()
 });
 
 export const zPostAcpAgentsByAgentIdDraftSessionPath = z.object({
     agentId: z.string().min(1)
+});
+
+export const zDeleteAcpAgentsByAgentIdDraftSessionBySessionIdPath = z.object({
+    agentId: z.string().min(1),
+    sessionId: z.string().min(1)
 });
 
 export const zDeleteAcpAgentsByAgentIdInstallationPath = z.object({
@@ -3618,7 +3652,11 @@ export const zPatchChatSessionsBySessionIdRuntimeSettingsBody = z.object({
         'bypassPermissions',
         'plan'
     ]).nullish(),
-    accessMode: z.enum(['approval-required', 'full-access']).nullish(),
+    accessMode: z.enum([
+        'approval-required',
+        'approve-for-me',
+        'full-access'
+    ]).nullish(),
     interactionMode: z.enum(['default', 'plan']).nullish(),
     claudeAgent: z.object({
         modelAliases: z.object({
@@ -3922,10 +3960,31 @@ export const zPostChatSessionsBySessionIdUserInputByRequestIdPath = z.object({
     requestId: z.string().min(1)
 });
 
+export const zDeleteChatSessionsBySessionIdAuthRecoveryPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zGetChatSessionsBySessionIdAuthRecoveryPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdAuthRecoveryRetryPath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPutChatSessionsBySessionIdRuntimeModeBody = z.object({
+    modeId: z.string().min(1)
+});
+
+export const zPutChatSessionsBySessionIdRuntimeModePath = z.object({
+    sessionId: z.string().min(1)
+});
+
 export const zPostChatSessionsBySessionIdToolApprovalByRequestIdBody = z.object({
     approved: z.boolean(),
     scope: z.enum(['once', 'always']).optional(),
-    reason: z.string().optional()
+    reason: z.string().optional(),
+    selectedOptionId: z.string().min(1).optional()
 });
 
 export const zPostChatSessionsBySessionIdToolApprovalByRequestIdPath = z.object({

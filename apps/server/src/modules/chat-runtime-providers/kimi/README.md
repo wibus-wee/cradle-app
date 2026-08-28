@@ -2,6 +2,10 @@
 
 This namespace owns the native Kimi Web adapter for Chat Runtime. `provider.ts` maps Kimi sessions, prompts, native steer/cancel, approvals, questions, background terminals, thread history, runtime settings, and Kimi state into Cradle's runtime contracts and UI slots.
 
+## Approval Modes
+
+The access control maps directly to Kimi's native permission contract: `approval-required` to `manual`, `approve-for-me` to `auto`, and `full-access` to `yolo`. Plan mode remains independent. Settings are applied through the typed session profile endpoint when a session starts and whenever live runtime settings change.
+
 ## Protocol Generation
 
 `protocol/` is the committed, generated contract boundary for the locally installed `kimi` executable:

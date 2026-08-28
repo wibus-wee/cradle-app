@@ -4,22 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '~/components/ui/button'
 import { buildAvatarUrl } from '~/features/agent-runtime/avatar-url'
 import type { Agent } from '~/features/agent-runtime/use-agents'
-import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
-/**
- * Cross-link from the Runtimes page into Agent Management: records the pending
- * create-agent intent (runtime kind + optional ACP binding) and switches the
- * settings overlay to the Agents section, where `agent-list.tsx` consumes it.
- */
-export function useCreateAgentCrossLink() {
-  const setAgentCreateIntent = useSettingsOverlayStore(state => state.setAgentCreateIntent)
-  const setSettingsSection = useSettingsOverlayStore(state => state.setSettingsSection)
-
-  return (runtimeKind: string, acpAgentId?: string) => {
-    setAgentCreateIntent({ runtimeKind, acpAgentId })
-    setSettingsSection('agents')
-  }
-}
+import { useCreateAgentCrossLink } from './use-create-agent-cross-link'
 
 export function UsedBySection({ agents }: { agents: Agent[] }) {
   const { t } = useTranslation('runtimes')

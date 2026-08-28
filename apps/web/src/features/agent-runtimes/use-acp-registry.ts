@@ -8,6 +8,8 @@ import { acpRegistryApi } from './api/acp-registry'
 
 export const ACP_DISTRIBUTION_TYPES = ['npx', 'uvx', 'binary'] as const
 export type AcpDistributionType = (typeof ACP_DISTRIBUTION_TYPES)[number]
+export const ACP_LOCAL_DISTRIBUTION_TYPES = ['command', 'npx', 'uvx'] as const
+export type AcpLocalDistributionType = (typeof ACP_LOCAL_DISTRIBUTION_TYPES)[number]
 
 const AcpRegistryAgentSchema = z.object({
   id: z.string().min(1),
@@ -30,12 +32,22 @@ const AcpInstalledAgentSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   version: z.string().nullable(),
+  source: z.enum(['registry', 'local', 'remote']),
   distributionType: z.string().min(1),
   installPath: z.string().nullable(),
   cmd: z.string().nullable(),
   args: z.string().nullable(),
   env: z.string().nullable(),
+  overrideCmd: z.string().nullable(),
+  overrideArgs: z.string().nullable(),
+  overrideEnv: z.string().nullable(),
+  authMethodId: z.string().nullable(),
+  connectionType: z.enum(['stdio', 'http', 'websocket']),
+  endpointUrl: z.string().nullable(),
+  remoteHeadersSecretRefs: z.record(z.string(), z.string()),
   status: z.enum(['installing', 'installed', 'failed']),
+  createdAt: z.number(),
+  updatedAt: z.number(),
 })
 
 export type AcpRegistryAgent = z.infer<typeof AcpRegistryAgentSchema>
@@ -50,6 +62,20 @@ export const ACP_AGENTS_QUERY_KEY = acpRegistryApi.agentsQueryKey()
 /** Distribution types this registry entry can be installed with, preferred first. */
 export function listAcpDistributionTypes(agent: AcpRegistryAgent): AcpDistributionType[] {
   return ACP_DISTRIBUTION_TYPES.filter(type => agent.distribution[type] != null)
+}
+
+export function useAcpDistributionTypes(agent: AcpRegistryAgent) {
+  const query = useQuery({
+    ...acpRegistryApi.distributionTypesOptions({ path: { agentId: agent.id } }),
+    staleTime: 5 * 60_000,
+  })
+  const serverTypes = (query.data?.types ?? []).filter(
+    (type): type is AcpDistributionType => ACP_DISTRIBUTION_TYPES.includes(type as AcpDistributionType),
+  )
+  return {
+    ...query,
+    distributionTypes: query.isSuccess ? serverTypes : listAcpDistributionTypes(agent),
+  }
 }
 
 export function useAcpRegistry() {
@@ -99,7 +125,31 @@ export function useAcpAgentMutations() {
     onSettled: invalidate,
   })
 
+  const createLocalAgent = useMutation({
+    ...acpRegistryApi.createLocalMutation(),
+    onSettled: invalidate,
+  })
+
+  const createRemoteAgent = useMutation({
+    ...acpRegistryApi.createRemoteMutation(),
+    onSettled: invalidate,
+  })
+
+  const updateLaunchConfig = useMutation({
+    ...acpRegistryApi.updateLaunchConfigMutation(),
+    onSettled: invalidate,
+  })
+
+  const updateRemoteConfig = useMutation({
+    ...acpRegistryApi.updateRemoteConfigMutation(),
+    onSettled: invalidate,
+  })
+
   return {
+    createLocalAgent,
+    createRemoteAgent,
+    updateLaunchConfig,
+    updateRemoteConfig,
     installAgent,
     cancelInstall,
     uninstallAgent,

@@ -19,6 +19,11 @@ export const acpAgents = sqliteTable('acp_agents', {
   overrideEnv: text('override_env'),
   authMethodId: text('auth_method_id'),
   authSecretRefsJson: text('auth_secret_refs_json').notNull().default('{}'),
+  connectionType: text('connection_type', {
+    enum: ['stdio', 'http', 'websocket'],
+  }).notNull().default('stdio'),
+  endpointUrl: text('endpoint_url'),
+  remoteHeadersSecretRefsJson: text('remote_headers_secret_refs_json').notNull().default('{}'),
   status: text('status').notNull().default('installing'),
   ...timestamps(),
 })

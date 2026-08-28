@@ -5,6 +5,7 @@ import { createDedupeKey, OBSERVABILITY_CODES } from '../../observability/contra
 import * as Observability from '../../observability/service'
 import { readDurableProviderRuntimeBinding } from '../../provider-runtime/service'
 import { recordRuntimeUsageEvent } from '../../usage/ingest'
+import { recordRuntimeAuthRecovery } from '../auth-recovery'
 import { truncateSnapshotPayload } from '../message-snapshot-compaction'
 import { publishProviderThreadEvent } from '../provider-threads/live-streams'
 import type { ActiveRun } from '../run-registry'
@@ -423,6 +424,14 @@ async function pumpRuntimeStream(
       finalChunk = { type: 'abort', reason: 'user' }
     }
  else {
+      recordRuntimeAuthRecovery({
+        error,
+        sessionId: activeRun.sessionId,
+        queueItemId: activeRun.queueItemId,
+        runId: activeRun.runId,
+        providerTargetId: activeRun.providerTargetId,
+        runtimeKind: activeRun.runtimeSession.runtimeKind,
+      })
       const serializedError = serializeChatError(error)
       failurePayload = serializedError.payload
       finalChunk = { type: 'error', errorText: serializedError.text }

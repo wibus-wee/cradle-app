@@ -36,7 +36,6 @@ import type {
   UpdateRuntimeSettingsInput,
 } from '../../chat-runtime/runtime-provider-types'
 import { ProviderErrors, ProviderRuntimeError, requireRuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
-import { readCodexLikeRuntimeSettings } from '../../chat-runtime/runtime-settings'
 import { lookupModelRaw } from '../../model-registry/model-info-registry'
 import { extractProviderInputText } from '../kit/input-projector'
 import { requestProviderToolApproval } from '../kit/permission-bridge'
@@ -71,6 +70,7 @@ import {
   submitPrompt,
 } from './protocol/rest/sdk.gen'
 import type { GetApiV1SessionsBySessionIdQuestionsResponses } from './protocol/rest/types.gen'
+import { projectKimiRuntimeSettings } from './runtime-settings'
 import type { KimiTranscriptAgentMetadata, KimiTranscriptData, KimiTranscriptTurn } from './transcript-projector'
 import {
   findKimiPhaseTranscriptTurn,
@@ -669,14 +669,14 @@ path: { session_id: sessionId },
     sessionId: string
     settings: RuntimeSettings | null | undefined
   }): Promise<void> {
-    const settings = readCodexLikeRuntimeSettings(input.settings)
+    const settings = projectKimiRuntimeSettings(input.settings)
     await input.lease.resource.http.request(postApiV1SessionsBySessionIdProfile({
       client: input.lease.resource.http.client,
       path: { session_id: input.sessionId },
       body: {
         agent_config: {
-          permission_mode: settings.accessMode === 'full-access' ? 'yolo' : 'manual',
-          plan_mode: settings.interactionMode === 'plan',
+          permission_mode: settings.permissionMode,
+          plan_mode: settings.planMode,
         },
       },
     }))

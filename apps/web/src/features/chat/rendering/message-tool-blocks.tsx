@@ -24,6 +24,7 @@ export type MessageToolApprovalHandler = (response: {
   messageId: string
   approvalId: string
   approved: boolean
+  selectedOptionId?: string
 }) => void
 
 export function ToolCallBlockFromPart({
@@ -68,6 +69,7 @@ export function ToolCallBlockFromPart({
                 messageId,
                 approvalId: approvalResponse.id,
                 approved: approvalResponse.approved,
+                selectedOptionId: approvalResponse.selectedOptionId,
               })
           : undefined
       }

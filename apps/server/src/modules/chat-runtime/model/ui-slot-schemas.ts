@@ -158,6 +158,19 @@ export const runtimeModelUiSlotStateSchema = t.Object({
   updatedAt: t.Number(),
 })
 
+export const runtimeModeUiSlotStateSchema = t.Object({
+  kind: t.Literal('mode'),
+  slotId: t.String(),
+  threadId: t.String(),
+  currentModeId: t.String(),
+  modes: t.Array(t.Object({
+    id: t.String(),
+    name: t.String(),
+    description: t.String(),
+  })),
+  updatedAt: t.Number(),
+})
+
 export const runtimeReasoningUiSlotStateSchema = t.Object({
   kind: t.Literal('reasoning'),
   slotId: t.String(),
@@ -232,6 +245,7 @@ export const runtimeUserInputQuestionSchema = t.Object({
       t.Object({
         label: t.String(),
         description: t.String(),
+        url: t.Optional(t.String()),
       }),
     ),
     t.Null(),
@@ -596,6 +610,7 @@ export const runtimeUiSlotStateSchema = t.Union([
   runtimeCompactUiSlotStateSchema,
   runtimeStatusUiSlotStateSchema,
   runtimeModelUiSlotStateSchema,
+  runtimeModeUiSlotStateSchema,
   runtimeReasoningUiSlotStateSchema,
   runtimePlanUiSlotStateSchema,
   runtimeProgressUiSlotStateSchema,

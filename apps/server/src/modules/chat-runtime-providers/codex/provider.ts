@@ -357,6 +357,7 @@ export class CodexProvider implements ChatRuntime {
         cwd: runtimeContext.cwd,
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
         approvalPolicy: config.approvalPolicy,
+        approvalsReviewer: 'user',
         sandbox: config.sandboxMode,
         config: threadCodexConfig,
       })
@@ -366,6 +367,7 @@ export class CodexProvider implements ChatRuntime {
         cwd: runtimeContext.cwd,
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
         approvalPolicy: config.approvalPolicy,
+        approvalsReviewer: 'user',
         sandbox: config.sandboxMode,
         config: threadCodexConfig,
         model: effectiveModel ?? null,
@@ -485,6 +487,7 @@ export class CodexProvider implements ChatRuntime {
           cwd: runtimeContext.cwd,
           runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
           approvalPolicy: config.approvalPolicy,
+          approvalsReviewer: 'user',
           sandbox: config.sandboxMode,
           config: threadCodexConfig,
           model: effectiveModel ?? null,
@@ -516,6 +519,7 @@ export class CodexProvider implements ChatRuntime {
           cwd: runtimeContext.cwd,
           runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
           approvalPolicy: config.approvalPolicy,
+          approvalsReviewer: 'user',
           sandboxPolicy: toSandboxPolicy(config.sandboxMode, runtimeContext.runtimeWorkspaceRoots, config.additionalDirectories),
           model: effectiveModel,
           effort: null,
@@ -650,6 +654,7 @@ export class CodexProvider implements ChatRuntime {
         cwd: runtimeContext.cwd,
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
         approvalPolicy: config.approvalPolicy,
+        approvalsReviewer: 'user',
         sandbox: config.sandboxMode,
         config: threadCodexConfig,
       })
@@ -938,6 +943,7 @@ export class CodexProvider implements ChatRuntime {
         cwd: runtimeContext.cwd,
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
         approvalPolicy: config.approvalPolicy,
+        approvalsReviewer: 'user',
         sandbox: config.sandboxMode,
         config: threadCodexConfig,
       })
@@ -1003,6 +1009,7 @@ export class CodexProvider implements ChatRuntime {
         cwd: runtimeContext.cwd,
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
         approvalPolicy: config.approvalPolicy,
+        approvalsReviewer: 'user',
         sandbox: config.sandboxMode,
         config: threadCodexConfig,
       })
@@ -1162,6 +1169,7 @@ export class CodexProvider implements ChatRuntime {
           cwd: context.runtimeContext.cwd,
           runtimeWorkspaceRoots: context.runtimeContext.runtimeWorkspaceRoots,
           approvalPolicy: context.runtimeAccess?.approvalPolicy ?? context.config.approvalPolicy,
+          approvalsReviewer: context.runtimeAccess?.approvalsReviewer ?? 'user',
           sandbox: context.runtimeAccess?.sandbox ?? context.config.sandboxMode,
           config: context.codexConfig,
           developerInstructions: context.systemPrompt,
@@ -1316,6 +1324,7 @@ export class CodexProvider implements ChatRuntime {
       cwd: context.runtimeContext.cwd,
       runtimeWorkspaceRoots: context.runtimeContext.runtimeWorkspaceRoots,
       approvalPolicy: context.runtimeAccess?.approvalPolicy ?? context.config.approvalPolicy,
+      approvalsReviewer: context.runtimeAccess?.approvalsReviewer ?? 'user',
       sandboxPolicy: context.runtimeAccess?.sandboxPolicy ?? toSandboxPolicy(
         context.config.sandboxMode,
         context.runtimeContext.runtimeWorkspaceRoots,
@@ -1625,6 +1634,7 @@ export class CodexProvider implements ChatRuntime {
     await entry.client.request('thread/settings/update', {
       threadId: entry.threadId,
       approvalPolicy: access.approvalPolicy,
+      approvalsReviewer: access.approvalsReviewer,
       sandboxPolicy: access.sandboxPolicy,
       ...(serviceTier ? { serviceTier } : {}),
       ...(collaborationModeModel
@@ -1883,6 +1893,7 @@ export class CodexProvider implements ChatRuntime {
         cwd: runtimeContext.cwd,
         runtimeWorkspaceRoots: runtimeContext.runtimeWorkspaceRoots,
         approvalPolicy: config.approvalPolicy,
+        approvalsReviewer: 'user',
         sandbox: config.sandboxMode,
         config: codexConfig,
       })

@@ -52,4 +52,18 @@ describe('projectAcpAuthMethods', () => {
     })
     expect(JSON.stringify(methods)).not.toContain('secret')
   })
+
+  it('marks environment authentication unavailable for remote transports', () => {
+    expect(projectAcpAuthMethods([{
+      id: 'api-key',
+      name: 'API key',
+      type: 'env_var',
+      vars: [{ name: 'API_KEY' }],
+    }], { supportsEnvironmentAuth: false })).toEqual([expect.objectContaining({
+      id: 'api-key',
+      kind: 'env_var',
+      status: 'unsupported',
+      unavailableReason: 'Environment-variable authentication requires a local ACP process.',
+    })])
+  })
 })

@@ -14,6 +14,11 @@ import {
 } from '../provider-runtime/service'
 import { releaseSideConversationsByParentSessionId } from '../provider-runtime/side-conversation-registry'
 import * as SessionService from '../session/service'
+import {
+  cancelRuntimeAuthRecovery as cancelRuntimeAuthRecoveryFromService,
+  readPendingRuntimeAuthRecovery,
+  retryRuntimeAuthRecovery as retryRuntimeAuthRecoveryFromService,
+} from './auth-recovery'
 import { getRuntimeRegistry } from './chat-runtime-provider-registry'
 import { invokeCodexAppServer } from './codex/host'
 import type { ChatContextPart } from './context-parts'
@@ -618,6 +623,24 @@ export async function enqueueSessionQueueItem(
   return enqueueSessionQueueItemFromQueueApi(input, {
     scheduleSessionQueueDrain: sessionId => scheduleSessionQueueDrain(sessionId, queueDrainDeps),
   })
+}
+
+export function getRuntimeAuthRecovery(sessionId: string) {
+  assertStoredSession(sessionId)
+  return readPendingRuntimeAuthRecovery(sessionId)
+}
+
+export async function retryRuntimeAuthRecovery(sessionId: string) {
+  assertStoredSession(sessionId)
+  return retryRuntimeAuthRecoveryFromService(
+    sessionId,
+    targetSessionId => scheduleSessionQueueDrain(targetSessionId, queueDrainDeps),
+  )
+}
+
+export function cancelRuntimeAuthRecovery(sessionId: string) {
+  assertStoredSession(sessionId)
+  return cancelRuntimeAuthRecoveryFromService(sessionId)
 }
 
 export async function submitSessionSteerTurn(

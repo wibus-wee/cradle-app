@@ -3026,7 +3026,7 @@ describe('codexProvider app-server integration', () => {
         pendingCount: 0,
         approvedCount: 1,
         deniedCount: 0,
-        recentItems: [expect.objectContaining({ id: 'approval-1', status: 'approved', label: 'Command' })],
+        recentItems: [expect.objectContaining({ id: 'approval-1', status: 'approved', label: 'Auto review · Command' })],
       }),
     ]))
   })
@@ -4410,7 +4410,7 @@ describe('codexProvider app-server integration', () => {
       providerOptions: {
         thinkingEffort: 'medium',
         runtimeSettings: {
-          accessMode: 'approval-required',
+          accessMode: 'approve-for-me',
           interactionMode: 'plan',
           serviceTier: 'fast',
         },
@@ -4431,6 +4431,7 @@ describe('codexProvider app-server integration', () => {
       method: 'thread/start',
       params: expect.objectContaining({
         approvalPolicy: 'on-request',
+        approvalsReviewer: 'auto_review',
         sandbox: 'workspace-write',
         serviceTier: 'fast',
         config: expect.objectContaining({
@@ -4443,6 +4444,7 @@ describe('codexProvider app-server integration', () => {
       method: 'turn/start',
       params: expect.objectContaining({
         approvalPolicy: 'on-request',
+        approvalsReviewer: 'auto_review',
         sandboxPolicy: expect.objectContaining({ type: 'workspaceWrite' }),
         serviceTier: 'fast',
         collaborationMode: {
@@ -4471,6 +4473,7 @@ describe('codexProvider app-server integration', () => {
       params: {
         threadId: 'codex-thread-1',
         approvalPolicy: 'never',
+        approvalsReviewer: 'user',
         sandboxPolicy: { type: 'dangerFullAccess' },
         serviceTier: 'fast',
         collaborationMode: {

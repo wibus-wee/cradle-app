@@ -1,4 +1,5 @@
 import {
+  AddLine as PlusIcon,
   CloseLine as XIcon,
   SearchLine as SearchIcon,
 } from '@mingcute/react'
@@ -26,6 +27,8 @@ import type { AcpInstalledAgent, AcpRegistryAgent } from './use-acp-registry'
 export type RuntimeSelection
   = | { type: 'builtin', runtimeKind: string }
     | { type: 'acp', agentId: string }
+    | { type: 'acp-local-new' }
+    | { type: 'acp-remote-new' }
 
 export interface AcpListEntry {
   agent: AcpRegistryAgent
@@ -60,11 +63,19 @@ function matchesQuery(query: string, fields: Array<string | null | undefined>): 
 }
 
 function selectionKey(selection: RuntimeSelection): string {
-  return selection.type === 'builtin' ? `builtin:${selection.runtimeKind}` : `acp:${selection.agentId}`
+  if (selection.type === 'builtin') {
+    return `builtin:${selection.runtimeKind}`
+  }
+  if (selection.type === 'acp') {
+    return `acp:${selection.agentId}`
+  }
+  return selection.type
 }
 
 export function RuntimeListPane({
   builtinRuntimes,
+  localAgents,
+  remoteAgents,
   acpEntries,
   isAcpLoading,
   selection,
@@ -73,8 +84,12 @@ export function RuntimeListPane({
   onSearchChange,
   acpFilter,
   onAcpFilterChange,
+  onCreateLocal,
+  onCreateRemote,
 }: {
   builtinRuntimes: RuntimeCatalogItem[]
+  localAgents: AcpInstalledAgent[]
+  remoteAgents: AcpInstalledAgent[]
   acpEntries: AcpListEntry[]
   isAcpLoading: boolean
   selection: RuntimeSelection | null
@@ -83,6 +98,8 @@ export function RuntimeListPane({
   onSearchChange: (value: string) => void
   acpFilter: AcpListFilter
   onAcpFilterChange: (filter: AcpListFilter) => void
+  onCreateLocal: () => void
+  onCreateRemote: () => void
 }) {
   const { t } = useTranslation('runtimes')
   const rowElementsRef = useRef(new Map<string, HTMLButtonElement>())
@@ -105,10 +122,26 @@ export function RuntimeListPane({
     })
   }, [acpEntries, acpFilter, search])
 
+  const visibleLocal = useMemo(() => {
+    if (acpFilter === 'updates') {
+      return []
+    }
+    return localAgents.filter(agent => matchesQuery(search, [agent.name, agent.id, agent.cmd]))
+  }, [localAgents, acpFilter, search])
+
+  const visibleRemote = useMemo(() => {
+    if (acpFilter === 'updates') {
+      return []
+    }
+    return remoteAgents.filter(agent => matchesQuery(search, [agent.name, agent.id, agent.endpointUrl]))
+  }, [remoteAgents, acpFilter, search])
+
   const flatSelections = useMemo<RuntimeSelection[]>(() => [
     ...visibleBuiltin.map(runtime => ({ type: 'builtin', runtimeKind: runtime.runtimeKind }) as const),
+    ...visibleLocal.map(agent => ({ type: 'acp', agentId: agent.id }) as const),
+    ...visibleRemote.map(agent => ({ type: 'acp', agentId: agent.id }) as const),
     ...visibleAcp.map(entry => ({ type: 'acp', agentId: entry.agent.id }) as const),
-  ], [visibleBuiltin, visibleAcp])
+  ], [visibleBuiltin, visibleLocal, visibleRemote, visibleAcp])
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
@@ -133,7 +166,12 @@ export function RuntimeListPane({
   }
 
   const searchActive = search.trim().length > 0
-  const noMatches = !isAcpLoading && searchActive && visibleBuiltin.length === 0 && visibleAcp.length === 0
+  const noMatches = !isAcpLoading
+    && searchActive
+    && visibleBuiltin.length === 0
+    && visibleRemote.length === 0
+    && visibleLocal.length === 0
+    && visibleAcp.length === 0
 
   let rowIndex = 0
 
@@ -185,6 +223,17 @@ export function RuntimeListPane({
             {t('filter.updates')}
           </ToggleGroupItem>
         </ToggleGroup>
+
+        <div className="grid gap-2">
+          <Button size="sm" variant="outline" onClick={onCreateLocal} data-testid="acp-local-add">
+            <PlusIcon />
+            {t('local.action.add')}
+          </Button>
+          <Button size="sm" variant="outline" onClick={onCreateRemote} data-testid="acp-remote-add">
+            <PlusIcon />
+            {t('remote.action.add')}
+          </Button>
+        </div>
       </div>
 
       {/* List */}
@@ -242,6 +291,81 @@ export function RuntimeListPane({
                           {runtime.label}
                         </span>
                         {runtime.stability === 'experimental' && <ExperimentalChip />}
+                      </m.button>
+                    )
+                  })}
+
+                  {visibleLocal.length > 0 && (
+                    <GroupHeader label={t('group.acpLocal')} className="mt-2" />
+                  )}
+                  {visibleLocal.map((agent) => {
+                    const index = rowIndex++
+                    const key = `acp:${agent.id}`
+                    const selected = selection?.type === 'acp' && selection.agentId === agent.id
+                    return (
+                      <m.button
+                        key={key}
+                        ref={(node: HTMLButtonElement | null) => {
+                          if (node) { rowElementsRef.current.set(key, node) }
+                          else { rowElementsRef.current.delete(key) }
+                        }}
+                        type="button"
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 600,
+                          damping: 40,
+                          delay: Math.min(index, STAGGER_CAP) * 0.05,
+                        }}
+                        onClick={() => onSelect({ type: 'acp', agentId: agent.id })}
+                        data-testid={`acp-local-row-${agent.id}`}
+                        className={cn(
+                          'flex min-h-10 w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none',
+                          'focus-visible:ring-2 focus-visible:ring-ring/50',
+                          selected ? 'bg-fill' : 'hover:bg-fill/60',
+                        )}
+                      >
+                        <AcpAgentIcon className="size-8" />
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+                          {agent.name}
+                        </span>
+                        <span className="shrink-0 font-mono text-[11px] text-text-tertiary">
+                          {agent.distributionType}
+                        </span>
+                      </m.button>
+                    )
+                  })}
+
+                  {visibleRemote.length > 0 && (
+                    <GroupHeader label={t('group.acpRemote')} className="mt-2" />
+                  )}
+                  {visibleRemote.map((agent) => {
+                    const index = rowIndex++
+                    const key = `acp:${agent.id}`
+                    const selected = selection?.type === 'acp' && selection.agentId === agent.id
+                    return (
+                      <m.button
+                        key={key}
+                        ref={(node: HTMLButtonElement | null) => {
+                          if (node) { rowElementsRef.current.set(key, node) }
+                          else { rowElementsRef.current.delete(key) }
+                        }}
+                        type="button"
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ type: 'spring', stiffness: 600, damping: 40, delay: Math.min(index, STAGGER_CAP) * 0.05 }}
+                        onClick={() => onSelect({ type: 'acp', agentId: agent.id })}
+                        data-testid={`acp-remote-row-${agent.id}`}
+                        className={cn(
+                          'flex min-h-10 w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left outline-none',
+                          'focus-visible:ring-2 focus-visible:ring-ring/50',
+                          selected ? 'bg-fill' : 'hover:bg-fill/60',
+                        )}
+                      >
+                        <AcpAgentIcon className="size-8" />
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{agent.name}</span>
+                        <span className="shrink-0 font-mono text-[11px] text-text-tertiary">{agent.connectionType}</span>
                       </m.button>
                     )
                   })}

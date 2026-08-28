@@ -160,12 +160,15 @@ export function formatRuntimeSettingsSummary(
   return parts.length > 0 ? parts.join(' / ') : t('runtimeSettings.summary.empty')
 }
 
-export function readRuntimeSettingsIconKey(settings: RuntimeSettings): 'plan' | 'approval' | 'full-access' {
+export function readRuntimeSettingsIconKey(settings: RuntimeSettings): 'plan' | 'approval' | 'auto-approval' | 'full-access' {
   const permissionMode = settings.permissionMode
   if (permissionMode === 'plan') {
     return 'plan'
   }
   const accessMode = settings.accessMode
+  if (accessMode === 'approve-for-me') {
+    return 'auto-approval'
+  }
   if (accessMode === 'approval-required' || permissionMode === 'default') {
     return 'approval'
   }

@@ -33,6 +33,7 @@ export interface ToolApprovalResponseInput {
   approvalId: string
   approved: boolean
   reason?: string
+  selectedOptionId?: string
 }
 
 export interface RuntimeUserInputSubmitInput {
@@ -271,6 +272,7 @@ export function readRuntimeToolApprovalRequest(
     !apiName
     || (
       inputPayload?.identifier !== 'claude-code'
+      && inputPayload?.identifier !== 'acp'
       && !RUNTIME_TOOL_APPROVAL_API_NAMES.has(apiName)
     )
   ) {

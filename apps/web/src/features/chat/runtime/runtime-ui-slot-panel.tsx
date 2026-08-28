@@ -108,6 +108,7 @@ const KIND_GROUPS: Partial<Record<ChatRuntimeUiSlotState['kind'], SlotGroupKey>>
   filesystem: 'activity',
   mcp: 'environment',
   model: 'environment',
+  mode: 'environment',
   plugin: 'environment',
   progress: 'activity',
   reasoning: 'environment',
@@ -127,6 +128,7 @@ const STATE_ORDER: Record<ChatRuntimeUiSlotState['kind'], number> = {
   compact: 30,
   status: 100,
   model: 110,
+  mode: 115,
   reasoning: 120,
   config: 130,
   usage: 140,
@@ -329,6 +331,7 @@ function KeyValueLine({ line }: { line: SlotCardLine }) {
     <div className="flex min-w-0 items-center gap-2 text-[10px]">
       <span className="shrink-0 text-muted-foreground">{line.label}</span>
       <span
+        title={line.value}
         className={cn(
           'min-w-0 flex-1 truncate text-right tabular-nums',
           readToneTextClassName(line.tone ?? 'neutral'),
@@ -557,6 +560,17 @@ function readStateView(
           },
         ],
       }
+    case 'mode':
+      return {
+        tone: 'neutral',
+        summary: state.modes.find(mode => mode.id === state.currentModeId)?.name ?? state.currentModeId,
+        meta: `${state.modes.length} modes`,
+        progress: null,
+        lines: state.modes.map(mode => ({
+          label: mode.id === state.currentModeId ? 'Active' : 'Available',
+          value: mode.name,
+        })),
+      }
     case 'reasoning':
       return {
         tone: state.effort ? 'neutral' : 'muted',
@@ -627,7 +641,11 @@ function readStateView(
         progress: null,
         lines: state.recentItems.slice(0, 4).map(item => ({
           label: formatStatusLike(item.status),
-          value: item.label,
+          value: [
+            item.label,
+            item.riskLevel ? `${formatStatusLike(item.riskLevel)} risk` : null,
+            item.rationale,
+          ].filter((value): value is string => Boolean(value)).join(' · '),
           tone: readApprovalTone(item.status),
         })),
       }
@@ -828,6 +846,8 @@ function readSlotIcon(iconKey?: ChatRuntimeUiSlotIconKey, kind?: ChatRuntimeUiSl
       return Code2Icon
     case 'mcp':
       return ServerIcon
+    case 'mode':
+      return Settings2Icon
     case 'model':
       return CpuIcon
     case 'personality':
