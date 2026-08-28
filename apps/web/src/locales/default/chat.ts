@@ -1,4 +1,11 @@
 export default {
+  'authRecovery.action.dismiss': 'Dismiss',
+  'authRecovery.action.dismissing': 'Dismissing…',
+  'authRecovery.action.retry': 'Retry message',
+  'authRecovery.action.retrying': 'Retrying…',
+  'authRecovery.description': 'Configure authentication, then retry the exact message that failed.',
+  'authRecovery.title': 'Authentication required',
+  'authRecovery.unsupportedTarget': 'Open runtime settings to configure this provider, then retry the message.',
   'await.action.view': 'View',
   'await.source.event': 'event',
   'await.waitingFor': 'Waiting for {{source}}...',

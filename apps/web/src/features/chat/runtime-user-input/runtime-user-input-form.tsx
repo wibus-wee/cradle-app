@@ -1,3 +1,4 @@
+import { ExternalLinkLine as ExternalLinkIcon } from '@mingcute/react'
 import { useState } from 'react'
 
 import { Button } from '~/components/ui/button'
@@ -10,6 +11,7 @@ import { cn } from '~/lib/cn'
 export interface RuntimeUserInputOption {
   label: string
   description: string
+  url?: string
 }
 
 export interface RuntimeUserInputQuestion {
@@ -242,6 +244,18 @@ export function RuntimeUserInputForm({
                               {option.description}
                             </span>
                           )}
+                          {readSafeExternalUrl(option.url) && (
+                            <a
+                              href={readSafeExternalUrl(option.url)!}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                              onClick={event => event.stopPropagation()}
+                            >
+                              Open link
+                              <ExternalLinkIcon className="size-3" aria-hidden="true" />
+                            </a>
+                          )}
                         </span>
                       </label>
                     )
@@ -293,6 +307,18 @@ export function RuntimeUserInputForm({
                           <span className="text-[11px] leading-snug text-muted-foreground">
                             {option.description}
                           </span>
+                        )}
+                        {readSafeExternalUrl(option.url) && (
+                          <a
+                            href={readSafeExternalUrl(option.url)!}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                            onClick={event => event.stopPropagation()}
+                          >
+                            Open link
+                            <ExternalLinkIcon className="size-3" aria-hidden="true" />
+                          </a>
                         )}
                       </span>
                     </label>
@@ -392,4 +418,17 @@ export function RuntimeUserInputForm({
       </div>
     </div>
   )
+}
+
+function readSafeExternalUrl(value: string | undefined): string | null {
+  if (!value) {
+    return null
+  }
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : null
+  }
+  catch {
+    return null
+  }
 }

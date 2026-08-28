@@ -22,6 +22,8 @@ export const STOP_RECOVERY_RESPONSE = '停止后新一轮成功完成'
 export const ERROR_RECOVERY_RESPONSE = '错误后新一轮成功完成'
 export const QUEUED_RESPONSE = '持久化队列跟进已完成'
 const QUEUED_PROMPT = '这是需要持久化的跟进'
+const CLAUDE_TITLE_PROMPT = 'You are naming a Claude Agent task session'
+const QUEUE_SCENARIO_TITLE = '队列持久化测试'
 export const EDITED_QUEUE_PROMPT = '已编辑的队列跟进'
 export const EDITED_QUEUE_RESPONSE = '已编辑的队列跟进已完成'
 export const WORK_FAILURE_RECOVERY_RESPONSE = 'Work 失败后的重试已完成'
@@ -133,6 +135,7 @@ export async function configureStoppableClaudeAgentSimulator(world: CradleWorld)
 
 export async function configureDurableQueueClaudeAgentSimulator(world: CradleWorld): Promise<void> {
   await configureSlowGatedClaudeAgentSimulator(world)
+  enqueueQueueScenarioTitle(world)
   world.remember('simulator.reply-on-release', {
     text: QUEUED_RESPONSE,
     bodyTextIncludes: QUEUED_PROMPT,
@@ -141,6 +144,7 @@ export async function configureDurableQueueClaudeAgentSimulator(world: CradleWor
 
 export async function configureManagedQueueClaudeAgentSimulator(world: CradleWorld): Promise<void> {
   await configureSlowGatedClaudeAgentSimulator(world)
+  enqueueQueueScenarioTitle(world)
   world.remember('simulator.reply-on-release', {
     text: EDITED_QUEUE_RESPONSE,
     bodyTextIncludes: EDITED_QUEUE_PROMPT,
@@ -409,6 +413,11 @@ export async function releaseSlowStreamGate(world: CradleWorld): Promise<void> {
   const simulator = requireSimulator(world)
   const reply = world.maybeRecall<{ text: string, bodyTextIncludes: string }>('simulator.reply-on-release')
   if (reply) {
+    await simulator.waitForRequest({
+      method: 'POST',
+      path: '/v1/messages',
+      bodyTextIncludes: CLAUDE_TITLE_PROMPT,
+    })
     world.enqueue(anthropicScenario([
       anthropicTextExchange({
         label: `after-gate-${Date.now()}`,
@@ -420,6 +429,16 @@ export async function releaseSlowStreamGate(world: CradleWorld): Promise<void> {
   }
   await simulator.waitForGate(gate)
   simulator.release(gate)
+}
+
+function enqueueQueueScenarioTitle(world: CradleWorld): void {
+  world.enqueue(anthropicScenario([
+    anthropicTextExchange({
+      label: 'queue-scenario-title',
+      text: QUEUE_SCENARIO_TITLE,
+      bodyTextIncludes: CLAUDE_TITLE_PROMPT,
+    }),
+  ]))
 }
 
 export async function waitForSlowStreamGate(world: CradleWorld): Promise<void> {

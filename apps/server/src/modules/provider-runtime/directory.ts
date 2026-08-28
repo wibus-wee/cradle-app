@@ -110,10 +110,6 @@ export function isResumableProviderRuntimeBinding(binding: BackendSessionBinding
 
 export function deleteProviderRuntimeBinding(chatSessionId: string): void {
   const database = db()
-  const absentSessionIds = absentBindingIdsFor(database)
-  if (absentSessionIds.has(chatSessionId)) {
-    return
-  }
   database
     .delete(backendSessionBindings)
     .where(eq(backendSessionBindings.chatSessionId, chatSessionId))

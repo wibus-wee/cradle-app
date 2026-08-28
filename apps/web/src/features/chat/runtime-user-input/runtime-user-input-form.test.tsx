@@ -40,6 +40,18 @@ function isDisabled(el: HTMLElement): boolean {
 }
 
 describe('runtimeUserInputForm - skip', () => {
+  it('renders only HTTP(S) elicitation links as external links', () => {
+    const question = optionsQuestion('question-1')
+    question.options = [
+      { label: 'Browser auth', description: 'Continue in browser', url: 'https://example.test/auth' },
+      { label: 'Unsafe', description: 'Blocked scheme', url: 'javascript:alert(1)' },
+    ]
+    render(<RuntimeUserInputForm questions={[question]} onSubmit={vi.fn()} />)
+
+    expect(screen.getByRole('link', { name: 'Open link' }).getAttribute('href')).toBe('https://example.test/auth')
+    expect(screen.getAllByText('Open link')).toHaveLength(1)
+  })
+
   it('enables Skip and disables Next/Preview when a question is unanswered', () => {
     render(<RuntimeUserInputForm questions={[optionsQuestion('question-1')]} onSubmit={vi.fn()} />)
 

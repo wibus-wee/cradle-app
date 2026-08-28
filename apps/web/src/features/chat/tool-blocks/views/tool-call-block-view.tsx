@@ -699,7 +699,24 @@ export function ToolCallBlockView({
             <div className="min-w-0 text-xs leading-snug text-muted-foreground">
               {approvalReason ?? 'Approval required'}
             </div>
-            <div className="flex shrink-0 items-center justify-end gap-1.5">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+              {approval.options?.map(option => (
+                <Button
+                  key={option.optionId}
+                  type="button"
+                  variant={option.kind.startsWith('reject_') ? 'ghost' : 'default'}
+                  size="xs"
+                  onClick={() => onApprovalResponse({
+                    id: approval.id,
+                    approved: option.kind.startsWith('allow_'),
+                    selectedOptionId: option.optionId,
+                  })}
+                >
+                  {option.label}
+                </Button>
+              ))}
+              {!approval.options?.length && (
+                <>
               <Button
                 type="button"
                 variant="ghost"
@@ -717,6 +734,8 @@ export function ToolCallBlockView({
               >
                 {planImplementationApproval ? 'Yes, implement this plan' : 'Approve'}
               </Button>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -382,6 +382,7 @@ export function useChatActions(input: UseChatActionsInput) {
         requestId: runtimeToolApprovalRequest.requestId,
         approved: response.approved,
         reason: response.reason,
+        selectedOptionId: response.selectedOptionId,
       })
       scheduleSnapshotRefresh(0)
       void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(chatSessionId) })

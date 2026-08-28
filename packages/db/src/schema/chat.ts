@@ -225,6 +225,32 @@ export const chatSessionQueueItems = sqliteTable('chat_session_queue_items', {
   byStartedRun: index('chat_session_queue_items_started_run_id_idx').on(table.startedRunId),
 }))
 
+export const chatRuntimeAuthRecoveries = sqliteTable('chat_runtime_auth_recoveries', {
+  queueItemId: text('queue_item_id')
+    .primaryKey()
+    .references(() => chatSessionQueueItems.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id')
+    .notNull()
+    .references(() => sessions.id, { onDelete: 'cascade' }),
+  runId: text('run_id'),
+  providerTargetId: text('provider_target_id')
+    .references(() => providerTargets.id, { onDelete: 'set null' }),
+  runtimeKind: text('runtime_kind').notNull(),
+  provider: text('provider').notNull(),
+  methodsJson: text('methods_json').notNull(),
+  configurationNamespace: text('configuration_namespace').notNull(),
+  configurationResourceId: text('configuration_resource_id').notNull(),
+  status: text('status', {
+    enum: ['pending', 'retrying', 'resolved', 'cancelled'],
+  }).notNull().default('pending'),
+  retryQueueItemId: text('retry_queue_item_id')
+    .references(() => chatSessionQueueItems.id, { onDelete: 'set null' }),
+  ...timestamps(),
+}, table => ({
+  bySessionStatus: index('chat_runtime_auth_recoveries_session_status_idx')
+    .on(table.sessionId, table.status),
+}))
+
 export const composerDrafts = sqliteTable('composer_drafts', {
   surfaceId: text('surface_id').primaryKey(),
   draftJson: text('draft_json').notNull().default('{}'),

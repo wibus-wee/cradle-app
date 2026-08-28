@@ -24,8 +24,9 @@ const installAbortControllers = new Map<string, AbortController>()
 const registry = new AcpRegistry()
 const installer = new AcpInstaller()
 
-export type AcpAgentSource = 'registry' | 'local'
+export type AcpAgentSource = 'registry' | 'local' | 'remote'
 export type LocalDistributionType = 'command' | 'npx' | 'uvx'
+export type RemoteConnectionType = 'http' | 'websocket'
 
 export interface AcpDownloadCenter extends AcpArtifactDownloadCenter {
   list: (filters: {
@@ -45,11 +46,21 @@ const AuditInputSchema = z.object({
 
 const AGENT_ID_RE = /^[a-z][a-z0-9-]*$/
 const AuthSecretRefsSchema = z.record(z.string().min(1), z.string().trim().min(1))
+const REMOTE_RESERVED_HEADERS = new Set([
+  'acp-connection-id',
+  'acp-session-id',
+  'connection',
+  'content-length',
+  'cookie',
+  'host',
+])
 
 export interface AcpAgentAuthConfig {
   methodId: string | null
   secretRefs: Record<string, string>
 }
+
+export type AcpAgentView = AcpAgent & { remoteHeadersSecretRefs: Record<string, string> }
 
 // ── helpers ──
 
@@ -286,12 +297,20 @@ export async function getDistributionTypes(agentId: string): Promise<{ agentId: 
   return { agentId, types: registry.getSupportedDistributionTypes(agent) }
 }
 
-export function listInstalled(): AcpAgent[] {
-  return listInstalledFromDb()
+export function listInstalled(): AcpAgentView[] {
+  return listInstalledFromDb().map(projectAgent)
 }
 
-export function getInstalled(agentId: string): AcpAgent | null {
-  return getInstalledFromDb(agentId) ?? null
+export function getInstalled(agentId: string): AcpAgentView | null {
+  const record = getInstalledFromDb(agentId)
+  return record ? projectAgent(record) : null
+}
+
+function projectAgent(record: AcpAgent): AcpAgentView {
+  return {
+    ...record,
+    remoteHeadersSecretRefs: AuthSecretRefsSchema.parse(JSON.parse(record.remoteHeadersSecretRefsJson)),
+  }
 }
 
 export function readAgentAuthConfig(agentId: string): AcpAgentAuthConfig {
@@ -415,7 +434,7 @@ export interface CreateLocalAgentInput {
   version?: string
 }
 
-export function createLocalAgent(input: CreateLocalAgentInput): AcpAgent {
+export function createLocalAgent(input: CreateLocalAgentInput): AcpAgentView {
   const name = input.name.trim()
   if (!name) {
     throw new AppError({
@@ -478,6 +497,9 @@ export function createLocalAgent(input: CreateLocalAgentInput): AcpAgent {
     overrideCmd: null,
     overrideArgs: null,
     overrideEnv: null,
+    connectionType: 'stdio',
+    endpointUrl: null,
+    remoteHeadersSecretRefsJson: '{}',
     status: 'installed',
     updatedAt: now,
   }).run()
@@ -493,7 +515,178 @@ export function createLocalAgent(input: CreateLocalAgentInput): AcpAgent {
     },
   })
 
-  return getInstalledFromDb(id)!
+  return projectAgent(getInstalledFromDb(id)!)
+}
+
+export interface CreateRemoteAgentInput {
+  id?: string
+  name: string
+  connectionType: RemoteConnectionType
+  endpointUrl: string
+  headerSecretRefs?: Record<string, string>
+  version?: string
+}
+
+export function createRemoteAgent(
+  input: CreateRemoteAgentInput,
+  availableSecretIds: ReadonlySet<string>,
+): AcpAgentView {
+  const name = requireNonBlank(input.name, 'name')
+  const endpointUrl = normalizeRemoteEndpoint(input.connectionType, input.endpointUrl)
+  const headerSecretRefs = validateRemoteHeaderSecretRefs(input.headerSecretRefs ?? {}, availableSecretIds)
+  let id = input.id?.trim()
+  if (id) {
+    assertValidAgentId(id)
+  }
+  else {
+    id = generateLocalAgentId(name)
+  }
+  if (getInstalledFromDb(id)) {
+    throw new AppError({
+      code: 'acp_agent_id_conflict',
+      status: 409,
+      message: 'ACP agent id already exists',
+      details: { agentId: id },
+    })
+  }
+
+  db().insert(acpAgents).values({
+    id,
+    name,
+    version: input.version?.trim() || 'remote',
+    source: 'remote',
+    distributionType: 'remote',
+    installPath: null,
+    cmd: null,
+    args: '[]',
+    env: '{}',
+    overrideCmd: null,
+    overrideArgs: null,
+    overrideEnv: null,
+    connectionType: input.connectionType,
+    endpointUrl,
+    remoteHeadersSecretRefsJson: JSON.stringify(headerSecretRefs),
+    status: 'installed',
+    updatedAt: currentUnixSeconds(),
+  }).run()
+  recordAudit({
+    agentId: id,
+    action: 'remote_register',
+    path: null,
+    details: {
+      connectionType: input.connectionType,
+      endpointOrigin: new URL(endpointUrl).origin,
+      headerNames: Object.keys(headerSecretRefs),
+    },
+  })
+  return projectAgent(getInstalledFromDb(id)!)
+}
+
+export function updateRemoteConfig(
+  agentId: string,
+  patch: Partial<CreateRemoteAgentInput>,
+  availableSecretIds: ReadonlySet<string>,
+): AcpAgentView {
+  const record = requireInstalledAgent(agentId)
+  if (record.source !== 'remote') {
+    throw new AppError({
+      code: 'acp_remote_config_not_available',
+      status: 409,
+      message: 'Remote connection settings are available only for remote ACP agents',
+      details: { agentId },
+    })
+  }
+  const connectionType = patch.connectionType ?? record.connectionType
+  if (connectionType !== 'http' && connectionType !== 'websocket') {
+    throw new AppError({ code: 'invalid_acp_input', status: 400, message: 'Remote ACP connectionType must be http or websocket' })
+  }
+  const endpointUrl = normalizeRemoteEndpoint(connectionType, patch.endpointUrl ?? record.endpointUrl ?? '')
+  const set: Partial<typeof acpAgents.$inferInsert> = {
+    connectionType,
+    endpointUrl,
+    updatedAt: currentUnixSeconds(),
+  }
+  if (patch.name !== undefined) { set.name = requireNonBlank(patch.name, 'name') }
+  if (patch.version !== undefined) { set.version = requireNonBlank(patch.version, 'version') }
+  if (patch.headerSecretRefs !== undefined) {
+    set.remoteHeadersSecretRefsJson = JSON.stringify(
+      validateRemoteHeaderSecretRefs(patch.headerSecretRefs, availableSecretIds),
+    )
+  }
+  db().update(acpAgents).set(set).where(eq(acpAgents.id, agentId)).run()
+  recordAudit({
+    agentId,
+    action: 'remote_config_update',
+    path: null,
+    details: {
+      connectionType,
+      endpointOrigin: new URL(endpointUrl).origin,
+      fields: Object.keys(patch),
+      headerNames: patch.headerSecretRefs ? Object.keys(patch.headerSecretRefs) : undefined,
+    },
+  })
+  return projectAgent(getInstalledFromDb(agentId)!)
+}
+
+function requireNonBlank(value: string, field: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    throw new AppError({ code: 'invalid_acp_input', status: 400, message: `${field} is required` })
+  }
+  return trimmed
+}
+
+function normalizeRemoteEndpoint(connectionType: RemoteConnectionType, value: string): string {
+  let url: URL
+  try {
+    url = new URL(value.trim())
+  }
+  catch {
+    throw new AppError({ code: 'invalid_acp_endpoint', status: 400, message: 'ACP remote endpoint must be a valid URL' })
+  }
+  const expectedProtocols = connectionType === 'http' ? new Set(['http:', 'https:']) : new Set(['ws:', 'wss:'])
+  if (!expectedProtocols.has(url.protocol)) {
+    throw new AppError({
+      code: 'invalid_acp_endpoint',
+      status: 400,
+      message: `${connectionType} ACP endpoints require ${connectionType === 'http' ? 'http(s)' : 'ws(s)'} URLs`,
+    })
+  }
+  const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1'
+  if ((url.protocol === 'http:' || url.protocol === 'ws:') && !loopback) {
+    throw new AppError({
+      code: 'insecure_acp_endpoint',
+      status: 400,
+      message: 'Remote ACP endpoints must use TLS unless they are loopback URLs',
+    })
+  }
+  url.hash = ''
+  return url.toString()
+}
+
+function validateRemoteHeaderSecretRefs(
+  input: Record<string, string>,
+  availableSecretIds: ReadonlySet<string>,
+): Record<string, string> {
+  const refs = AuthSecretRefsSchema.parse(input)
+  for (const [rawName, secretRef] of Object.entries(refs)) {
+    const name = rawName.trim()
+    if (!name || name !== rawName || !/^[!#$%&'*+.^`|~\w-]+$/.test(name)) {
+      throw new AppError({ code: 'invalid_acp_header', status: 400, message: `Invalid ACP remote header name: ${rawName}` })
+    }
+    if (REMOTE_RESERVED_HEADERS.has(name.toLowerCase())) {
+      throw new AppError({ code: 'invalid_acp_header', status: 400, message: `ACP transport owns the ${name} header` })
+    }
+    if (!availableSecretIds.has(secretRef)) {
+      throw new AppError({
+        code: 'acp_remote_secret_ref_not_found',
+        status: 400,
+        message: 'ACP remote headers must reference existing Secrets credentials',
+        details: { headerName: name },
+      })
+    }
+  }
+  return refs
 }
 
 export interface UpdateLaunchConfigInput {
@@ -510,7 +703,7 @@ export interface UpdateLaunchConfigInput {
   version?: string
 }
 
-export function updateLaunchConfig(agentId: string, patch: UpdateLaunchConfigInput): AcpAgent {
+export function updateLaunchConfig(agentId: string, patch: UpdateLaunchConfigInput): AcpAgentView {
   const record = getInstalledFromDb(agentId)
   if (!record) {
     throw new AppError({
@@ -595,7 +788,7 @@ export function updateLaunchConfig(agentId: string, patch: UpdateLaunchConfigInp
         envKeys: patch.env ? envKeysOnly(patch.env) : undefined,
       },
     })
-    return getInstalledFromDb(agentId)!
+    return projectAgent(getInstalledFromDb(agentId)!)
   }
 
   // registry
@@ -669,16 +862,16 @@ export function updateLaunchConfig(agentId: string, patch: UpdateLaunchConfigInp
       envKeys: patch.overrideEnv ? envKeysOnly(patch.overrideEnv) : undefined,
     },
   })
-  return getInstalledFromDb(agentId)!
+  return projectAgent(getInstalledFromDb(agentId)!)
 }
 
 export async function install(
   agentId: string,
   distributionType: AcpDistributionType,
   downloadCenter: AcpDownloadCenter,
-): Promise<AcpAgent> {
+): Promise<AcpAgentView> {
   const existing = getInstalledFromDb(agentId)
-  if (existing?.source === 'local') {
+  if (existing?.source === 'local' || existing?.source === 'remote') {
     throw new AppError({
       code: 'acp_local_not_installable',
       status: 409,
@@ -770,7 +963,7 @@ export async function install(
       path: result.installPath,
       details: { distributionType, cmd: result.cmd, args: result.args },
     })
-    return getInstalledFromDb(agentId)!
+    return projectAgent(getInstalledFromDb(agentId)!)
   }
   catch (error) {
     markFailed(agentId)

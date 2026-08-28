@@ -113,7 +113,7 @@ export interface MessageBubbleViewProps {
   isStreaming: boolean
   executionDetailsDefaultOpen?: boolean
   presentation?: 'thread' | 'export'
-  onToolApprovalResponse?: (response: { messageId: string, approvalId: string, approved: boolean }) => void
+  onToolApprovalResponse?: (response: { messageId: string, approvalId: string, approved: boolean, selectedOptionId?: string }) => void
   onCopy?: (text: string) => void | Promise<void>
   runTelemetryCaption?: ReactNode
 }
@@ -208,7 +208,7 @@ export function MessageBubbleView({
             autoOpenArtifact={isStreaming}
             blobSessionId={sessionId}
             onApprovalResponse={approval && onToolApprovalResponse
-              ? response => onToolApprovalResponse({ messageId: message.id, approvalId: response.id, approved: response.approved })
+              ? response => onToolApprovalResponse({ messageId: message.id, approvalId: response.id, approved: response.approved, selectedOptionId: response.selectedOptionId })
               : undefined}
           />
         )

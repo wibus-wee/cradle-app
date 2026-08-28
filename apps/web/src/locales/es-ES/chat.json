@@ -1,4 +1,11 @@
 {
+  "authRecovery.action.dismiss": "Descartar",
+  "authRecovery.action.dismissing": "Descartando…",
+  "authRecovery.action.retry": "Reintentar mensaje",
+  "authRecovery.action.retrying": "Reintentando…",
+  "authRecovery.description": "Configura la autenticación y vuelve a intentar exactamente el mensaje que falló.",
+  "authRecovery.title": "Se requiere autenticación",
+  "authRecovery.unsupportedTarget": "Configura este proveedor en los ajustes del runtime y vuelve a intentar el mensaje.",
   "await.action.view": "Ver",
   "await.source.event": "evento",
   "await.waitingFor": "Esperando {{source}}...",

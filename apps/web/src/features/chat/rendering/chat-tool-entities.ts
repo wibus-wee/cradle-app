@@ -16,6 +16,13 @@ export interface BuiltinToolCallIdentity {
 export interface BuiltinToolCallInputPayload extends BuiltinToolCallIdentity {
   type: typeof BUILTIN_TOOL_CALL_INPUT_PAYLOAD_TYPE
   args: unknown
+  approvalOptions?: RuntimeToolApprovalOption[]
+}
+
+export interface RuntimeToolApprovalOption {
+  optionId: string
+  label: string
+  kind: 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always'
 }
 
 export interface BuiltinToolCallResultPayload extends BuiltinToolCallIdentity {
@@ -71,7 +78,24 @@ export function readBuiltinToolCallInputPayload(value: unknown): BuiltinToolCall
     apiName: value.apiName,
     kind: readCradleToolKind(value.kind),
     args: value.args,
+    ...(readRuntimeToolApprovalOptions(value.approvalOptions) ?? {}),
   }
+}
+
+function readRuntimeToolApprovalOptions(value: unknown): { approvalOptions: RuntimeToolApprovalOption[] } | null {
+  if (!Array.isArray(value)) {
+    return null
+  }
+  const approvalOptions = value.filter((option): option is RuntimeToolApprovalOption => (
+    isRecord(option)
+    && typeof option.optionId === 'string'
+    && typeof option.label === 'string'
+    && (option.kind === 'allow_once'
+      || option.kind === 'allow_always'
+      || option.kind === 'reject_once'
+      || option.kind === 'reject_always')
+  ))
+  return approvalOptions.length === value.length ? { approvalOptions } : null
 }
 
 export function readBuiltinToolCallResultPayload(value: unknown): BuiltinToolCallResultPayload | null {

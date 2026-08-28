@@ -32,7 +32,7 @@ const AcpInstalledAgentSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   version: z.string().nullable(),
-  source: z.enum(['registry', 'local']),
+  source: z.enum(['registry', 'local', 'remote']),
   distributionType: z.string().min(1),
   installPath: z.string().nullable(),
   cmd: z.string().nullable(),
@@ -42,6 +42,9 @@ const AcpInstalledAgentSchema = z.object({
   overrideArgs: z.string().nullable(),
   overrideEnv: z.string().nullable(),
   authMethodId: z.string().nullable(),
+  connectionType: z.enum(['stdio', 'http', 'websocket']),
+  endpointUrl: z.string().nullable(),
+  remoteHeadersSecretRefs: z.record(z.string(), z.string()),
   status: z.enum(['installing', 'installed', 'failed']),
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -59,6 +62,20 @@ export const ACP_AGENTS_QUERY_KEY = acpRegistryApi.agentsQueryKey()
 /** Distribution types this registry entry can be installed with, preferred first. */
 export function listAcpDistributionTypes(agent: AcpRegistryAgent): AcpDistributionType[] {
   return ACP_DISTRIBUTION_TYPES.filter(type => agent.distribution[type] != null)
+}
+
+export function useAcpDistributionTypes(agent: AcpRegistryAgent) {
+  const query = useQuery({
+    ...acpRegistryApi.distributionTypesOptions({ path: { agentId: agent.id } }),
+    staleTime: 5 * 60_000,
+  })
+  const serverTypes = (query.data?.types ?? []).filter(
+    (type): type is AcpDistributionType => ACP_DISTRIBUTION_TYPES.includes(type as AcpDistributionType),
+  )
+  return {
+    ...query,
+    distributionTypes: query.isSuccess ? serverTypes : listAcpDistributionTypes(agent),
+  }
 }
 
 export function useAcpRegistry() {
@@ -113,14 +130,26 @@ export function useAcpAgentMutations() {
     onSettled: invalidate,
   })
 
+  const createRemoteAgent = useMutation({
+    ...acpRegistryApi.createRemoteMutation(),
+    onSettled: invalidate,
+  })
+
   const updateLaunchConfig = useMutation({
     ...acpRegistryApi.updateLaunchConfigMutation(),
     onSettled: invalidate,
   })
 
+  const updateRemoteConfig = useMutation({
+    ...acpRegistryApi.updateRemoteConfigMutation(),
+    onSettled: invalidate,
+  })
+
   return {
     createLocalAgent,
+    createRemoteAgent,
     updateLaunchConfig,
+    updateRemoteConfig,
     installAgent,
     cancelInstall,
     uninstallAgent,

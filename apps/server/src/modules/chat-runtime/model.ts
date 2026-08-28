@@ -137,6 +137,44 @@ export const ChatRuntimeModel = {
     requestId: t.String({ minLength: 1 }),
   }),
 
+  authRecoveryResponse: t.Union([
+    t.Object({
+      sessionId: t.String(),
+      queueItemId: t.String(),
+      runId: t.Nullable(t.String()),
+      providerTargetId: t.Nullable(t.String()),
+      runtimeKind: runtimeKindSchema,
+      provider: t.String(),
+      methods: t.Array(t.Object({
+        id: t.String(),
+        name: t.String(),
+        description: t.Optional(t.String()),
+        kind: t.Union([t.Literal('agent'), t.Literal('env_var'), t.Literal('terminal')]),
+        status: t.Union([t.Literal('supported'), t.Literal('unsupported')]),
+        unavailableReason: t.Optional(t.String()),
+        link: t.Optional(t.String()),
+        fields: t.Optional(t.Array(t.Object({
+          name: t.String(),
+          label: t.Optional(t.String()),
+          secret: t.Boolean(),
+          optional: t.Boolean(),
+        }))),
+      })),
+      configurationTarget: t.Object({
+        namespace: t.String(),
+        resourceId: t.String(),
+      }),
+      createdAt: t.Number(),
+      updatedAt: t.Number(),
+    }),
+    t.Null(),
+  ]),
+
+  authRecoveryRetryResponse: t.Object({
+    ok: t.Literal(true),
+    queueItemId: t.String(),
+  }),
+
   toolApprovalParams: t.Object({
     sessionId: t.String({ minLength: 1 }),
     requestId: t.String({ minLength: 1 }),
@@ -279,10 +317,15 @@ export const ChatRuntimeModel = {
     answers: t.Record(t.String(), t.Array(t.String())),
   }),
 
+  runtimeModeBody: t.Object({
+    modeId: t.String({ minLength: 1 }),
+  }),
+
   toolApprovalBody: t.Object({
     approved: t.Boolean(),
     scope: t.Optional(t.Union([t.Literal('once'), t.Literal('always')])),
     reason: t.Optional(t.String()),
+    selectedOptionId: t.Optional(t.String({ minLength: 1 })),
   }),
 
   toolApprovalResponse: t.Object({
@@ -290,6 +333,7 @@ export const ChatRuntimeModel = {
     approved: t.Boolean(),
     scope: t.Optional(t.Union([t.Literal('once'), t.Literal('always')])),
     reason: t.Optional(t.String()),
+    selectedOptionId: t.Optional(t.String()),
   }),
 
   planImplementationApprovalBody: t.Object({

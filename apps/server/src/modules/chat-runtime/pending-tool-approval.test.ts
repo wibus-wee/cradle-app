@@ -36,6 +36,10 @@ describe('pending runtime tool approval', () => {
       runtimeKind: 'codex',
       providerMethod: 'applyPatchApproval',
       toolCallId: 'server-request-request-1',
+      options: [
+        { optionId: 'allow-always', label: 'Always allow', kind: 'allow_always' },
+        { optionId: 'reject-once', label: 'Deny', kind: 'reject_once' },
+      ],
       metadata: { files: ['README.md'] },
     })
 
@@ -44,17 +48,20 @@ describe('pending runtime tool approval', () => {
       requestId: 'request-1',
       approved: true,
       reason: 'User approved',
+      selectedOptionId: 'allow-always',
     })
 
     await expect(pending).resolves.toEqual({
       requestId: 'request-1',
       approved: true,
       reason: 'User approved',
+      selectedOptionId: 'allow-always',
     })
     expect(submitted).toEqual({
       requestId: 'request-1',
       approved: true,
       reason: 'User approved',
+      selectedOptionId: 'allow-always',
     })
     expect(recordedEvents).toMatchObject([
       {

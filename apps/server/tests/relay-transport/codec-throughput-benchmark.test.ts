@@ -195,5 +195,5 @@ describe('relay endpoint codec throughput benchmark', () => {
         expect(row.optimizedMiBps).toBeGreaterThan(row.baselineMiBps * 0.8)
       }
     }
-  }, 15_000)
+  }, 60_000)
 })

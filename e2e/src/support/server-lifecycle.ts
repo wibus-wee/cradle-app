@@ -230,6 +230,9 @@ BeforeAll({ timeout: 120_000 }, async () => {
         // repository identity through that parent path.
         GIT_CEILING_DIRECTORIES: serverHomeDir,
         CRADLE_DATA_DIR: dataDir,
+        // The managed data directory lives under the checkout cache. Prevent
+        // temporary workspace probes from inheriting the checkout repository.
+        GIT_CEILING_DIRECTORIES: dataDir,
         // Keep ad-hoc chat workspaces inside the per-run writable sandbox. The
         // production default (~/Documents/Cradle) may not exist or be writable
         // on a clean CI runner.

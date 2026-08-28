@@ -28,9 +28,11 @@ function openExternalLink(url: string) {
 export function AcpAuthSection({
   agentId,
   configuredMethodId,
+  onSaved,
 }: {
   agentId: string
   configuredMethodId: string | null
+  onSaved?: () => void
 }) {
   const { t } = useTranslation('runtimes')
   const queryClient = useQueryClient()
@@ -51,6 +53,7 @@ export function AcpAuthSection({
         : current)
       queryClient.invalidateQueries({ queryKey: ACP_AGENTS_QUERY_KEY })
       toastManager.add({ type: 'success', title: t('auth.toast.saved') })
+      onSaved?.()
     },
     onError: () => {
       toastManager.add({ type: 'error', title: t('auth.toast.saveError') })

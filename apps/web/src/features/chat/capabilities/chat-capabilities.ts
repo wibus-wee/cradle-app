@@ -182,6 +182,15 @@ export interface ChatRuntimeModelUiSlotState {
   updatedAt: number
 }
 
+export interface ChatRuntimeModeUiSlotState {
+  kind: 'mode'
+  slotId: string
+  threadId: string
+  currentModeId: string
+  modes: Array<{ id: string, name: string, description: string }>
+  updatedAt: number
+}
+
 export interface ChatRuntimeReasoningUiSlotState {
   kind: 'reasoning'
   slotId: string
@@ -528,6 +537,7 @@ export type ChatRuntimeUiSlotState
     | ChatRuntimeGoalUiSlotState
     | ChatRuntimeMcpUiSlotState
     | ChatRuntimeModelUiSlotState
+    | ChatRuntimeModeUiSlotState
     | ChatRuntimePlanUiSlotState
     | ChatRuntimeProgressUiSlotState
     | ChatRuntimePluginUiSlotState

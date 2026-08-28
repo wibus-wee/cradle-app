@@ -14,6 +14,7 @@ import {
 import { homedir, networkInterfaces } from 'node:os'
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 
+import type { AcpDevtoolEvent } from '@cradle/ipc'
 import { app, dialog } from 'electron'
 import getPort from 'get-port'
 import { z } from 'zod'
@@ -25,6 +26,7 @@ import {
   SERVER_BOOTSTRAP_PHASES,
 } from '../shared/server-runtime'
 import { getDesktopDataDirectoryState } from './data-directory'
+import { getIpcDevtoolStore } from './ipc-devtool'
 import type { ManagedChildProcess } from './managed-process'
 import { spawnManagedProcess } from './managed-process'
 import { resolveDesktopInstalledPluginsDir } from './plugin-install-links'
@@ -588,6 +590,8 @@ async function spawnServer(opts: {
   child.stdout?.on('data', chunk => recordServerOutput('stdout', chunk))
   child.stderr?.on('data', chunk => recordServerOutput('stderr', chunk))
   child.on('message', (message) => {
+    const acpEvent = readServerAcpDevtoolEvent(message)
+    if (acpEvent) { getIpcDevtoolStore().recordAcp(acpEvent) }
     const event = readServerBootstrapEvent(message)
     if (event) {
       opts.onBootstrapEvent?.(event)
@@ -1233,6 +1237,25 @@ export function readServerBootstrapEvent(message: unknown): ServerBootstrapEvent
       ? { error: targetMessage.error }
       : {}),
   }
+}
+
+export function readServerAcpDevtoolEvent(message: unknown): AcpDevtoolEvent | null {
+  if (
+    typeof message !== 'object'
+    || message === null
+    || !('type' in message)
+    || message.type !== 'target-message'
+    || !('message' in message)
+  ) { return null }
+  const target = message.message
+  if (
+    typeof target !== 'object'
+    || target === null
+    || !('type' in target)
+    || target.type !== 'cradle-acp-devtool-event'
+    || !('event' in target)
+  ) { return null }
+  return target.event as AcpDevtoolEvent
 }
 
 export interface ServerBootstrapWatchdog {

@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 
 import { releaseSideConversation } from '../../provider-runtime/side-conversation-registry'
+import { updateChatRuntimeMode } from '../interaction/runtime-mode'
 import { submitChatRuntimeUserInput } from '../interaction/user-input'
 import { ChatRuntimeModel } from '../model'
 import { submitRuntimeToolApproval } from '../pending-tool-approval'
@@ -155,6 +156,60 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       response: { 200: ChatRuntimeModel.userInputResponse },
     },
   )
+  .get(
+    '/sessions/:sessionId/auth-recovery',
+    async ({ params }) => {
+      const recovery = (await loadChatRuntime()).getRuntimeAuthRecovery(params.sessionId)
+      return new Response(JSON.stringify(recovery), {
+        headers: { 'content-type': 'application/json' },
+      })
+    },
+    {
+      detail: {
+        'summary': 'Get the pending runtime authentication recovery for a chat session',
+        'x-cradle-cli': { command: ['chat', 'auth-recovery', 'get'] },
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      response: { 200: ChatRuntimeModel.authRecoveryResponse },
+    },
+  )
+  .post(
+    '/sessions/:sessionId/auth-recovery/retry',
+    async ({ params }) => (await loadChatRuntime()).retryRuntimeAuthRecovery(params.sessionId),
+    {
+      detail: {
+        'summary': 'Retry the exact failed input after runtime authentication succeeds',
+        'x-cradle-cli': { command: ['chat', 'auth-recovery', 'retry'] },
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      response: { 200: ChatRuntimeModel.authRecoveryRetryResponse },
+    },
+  )
+  .delete(
+    '/sessions/:sessionId/auth-recovery',
+    async ({ params }) => (await loadChatRuntime()).cancelRuntimeAuthRecovery(params.sessionId),
+    {
+      detail: {
+        'summary': 'Dismiss a pending runtime authentication recovery',
+        'x-cradle-cli': { command: ['chat', 'auth-recovery', 'cancel'] },
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      response: { 200: ChatRuntimeModel.cancelResponse },
+    },
+  )
+  .put(
+    '/sessions/:sessionId/runtime-mode',
+    async ({ params, body }) => updateChatRuntimeMode({
+      sessionId: params.sessionId,
+      modeId: body.modeId,
+    }),
+    {
+      detail: { summary: 'Set the provider-native mode for a chat runtime session' },
+      params: ChatRuntimeModel.sessionIdParams,
+      body: ChatRuntimeModel.runtimeModeBody,
+      response: { 200: ChatRuntimeModel.cancelResponse },
+    },
+  )
   // POST /chat/sessions/:sessionId/tool-approval/:requestId -> resolve a provider pending tool approval request
   .post(
     '/sessions/:sessionId/tool-approval/:requestId',
@@ -165,6 +220,7 @@ export const chatRuntimeInteractionRoutes = new Elysia({
         approved: body.approved,
         scope: body.scope,
         reason: body.reason,
+        selectedOptionId: body.selectedOptionId,
       })
     },
     {

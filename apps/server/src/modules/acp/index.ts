@@ -84,6 +84,26 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     body: AcpModel.createLocalAgentBody,
     response: { 200: AcpModel.acpAgent },
   })
+  .post('/agents/remote', ({ body }) => {
+    const availableSecretIds = new Set(Secrets.listSecrets().map(secret => secret.id))
+    return Acp.createRemoteAgent({
+      id: body.id,
+      name: body.name,
+      connectionType: body.connectionType,
+      endpointUrl: body.endpointUrl,
+      headerSecretRefs: body.headerSecretRefs,
+      version: body.version,
+    }, availableSecretIds)
+  }, {
+    detail: {
+      'summary': 'Register a remote ACP agent endpoint',
+      'x-cradle-cli': {
+        command: ['acp', 'agent', 'create-remote'],
+      },
+    },
+    body: AcpModel.createRemoteAgentBody,
+    response: { 200: AcpModel.acpAgent },
+  })
   .get('/agents/:agentId', ({ params }) => {
     const agent = Acp.getInstalled(requireNonBlankString(params.agentId, 'agentId'))
     if (!agent) {
@@ -182,6 +202,29 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     body: AcpModel.launchConfigBody,
     response: { 200: AcpModel.acpAgent },
   })
+  .patch('/agents/:agentId/remote-config', async ({ params, body }) => {
+    const agentId = requireNonBlankString(params.agentId, 'agentId')
+    const availableSecretIds = new Set(Secrets.listSecrets().map(secret => secret.id))
+    const agent = Acp.updateRemoteConfig(agentId, {
+      name: body.name,
+      connectionType: body.connectionType,
+      endpointUrl: body.endpointUrl,
+      headerSecretRefs: body.headerSecretRefs,
+      version: body.version,
+    }, availableSecretIds)
+    await requireAcpRuntime().disconnectAgent(agentId)
+    return agent
+  }, {
+    detail: {
+      'summary': 'Update a remote ACP agent endpoint',
+      'x-cradle-cli': {
+        command: ['acp', 'agent', 'remote-config'],
+      },
+    },
+    params: AcpModel.agentIdParams,
+    body: AcpModel.remoteConfigBody,
+    response: { 200: AcpModel.acpAgent },
+  })
   .post('/agents/:agentId/draft-session', ({ params, body }) => {
     const agentId = requireNonBlankString(params.agentId, 'agentId')
     const agent = Acp.getInstalled(agentId)
@@ -204,6 +247,17 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     params: AcpModel.agentIdParams,
     body: AcpModel.draftSessionBody,
     response: { 200: AcpModel.draftSessionResult },
+  })
+  .delete('/agents/:agentId/draft-session/:sessionId', async ({ params }) => {
+    await requireAcpRuntime().closeDraftSession({
+      agentId: requireNonBlankString(params.agentId, 'agentId'),
+      sessionId: requireNonBlankString(params.sessionId, 'sessionId'),
+    })
+    return { ok: true as const }
+  }, {
+    detail: { summary: 'Close an abandoned ACP draft session' },
+    params: AcpModel.draftSessionParams,
+    response: { 200: t.Object({ ok: t.Literal(true) }) },
   })
   .put('/agents/:agentId/installation', ({ params, body }) => {
     return Acp.install(

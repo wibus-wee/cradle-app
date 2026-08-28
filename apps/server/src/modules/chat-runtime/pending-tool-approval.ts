@@ -86,6 +86,7 @@ export async function submitRuntimeToolApproval(input: {
   approved: boolean
   scope?: 'once' | 'always'
   reason?: string
+  selectedOptionId?: string
 }): Promise<RuntimeToolApprovalResolution> {
   const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
   if (submitted) {
@@ -106,6 +107,7 @@ export function submitRuntimeToolApprovalIfPending(input: {
   approved: boolean
   scope?: 'once' | 'always'
   reason?: string
+  selectedOptionId?: string
 }): RuntimeToolApprovalResolution | null {
   const submitted = submitRuntimeToolApprovalIfPendingWithEvent(input)
   if (!submitted) {
@@ -120,6 +122,7 @@ function submitRuntimeToolApprovalIfPendingWithEvent(input: {
   approved: boolean
   scope?: 'once' | 'always'
   reason?: string
+  selectedOptionId?: string
 }): RuntimeToolApprovalResolution | null {
   const pendingKey = readPendingKey(input.sessionId, input.requestId)
   const pending = pendingToolApprovalById.get(pendingKey)
@@ -133,6 +136,7 @@ function submitRuntimeToolApprovalIfPendingWithEvent(input: {
     approved: input.approved,
     ...(input.scope ? { scope: input.scope } : {}),
     ...(input.reason ? { reason: input.reason } : {}),
+    ...(input.selectedOptionId ? { selectedOptionId: input.selectedOptionId } : {}),
   }
   pending.resolve(resolution)
   void recordRuntimeToolApprovalInteraction(() => recordRuntimeInteractionResolved({

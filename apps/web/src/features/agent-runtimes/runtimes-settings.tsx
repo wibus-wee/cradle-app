@@ -13,6 +13,7 @@ import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { SettingsMasterDetail } from '../settings/settings-container'
 import { AcpLocalAgentDetail } from './acp-local-agent-detail'
 import { AcpRegistryDetail } from './acp-registry-detail'
+import { AcpRemoteAgentDetail } from './acp-remote-agent-detail'
 import { BuiltinRuntimeDetail } from './builtin-runtime-detail'
 import type { AcpListEntry, AcpListFilter, RuntimeSelection } from './runtime-list-pane'
 import { RuntimeListPane } from './runtime-list-pane'
@@ -32,7 +33,7 @@ function selectionKey(selection: RuntimeSelection | null): string {
   if (selection.type === 'builtin') {
     return `builtin:${selection.runtimeKind}`
   }
-  return selection.type === 'acp' ? `acp:${selection.agentId}` : 'acp-local-new'
+  return selection.type === 'acp' ? `acp:${selection.agentId}` : selection.type
 }
 
 export function RuntimesSettings() {
@@ -79,6 +80,13 @@ export function RuntimesSettings() {
     [installedQuery.installedAgents],
   )
 
+  const remoteAgents = useMemo(
+    () => installedQuery.installedAgents
+      .filter(agent => agent.source === 'remote')
+      .sort((left, right) => left.name.localeCompare(right.name)),
+    [installedQuery.installedAgents],
+  )
+
   const selectedBuiltin = selection?.type === 'builtin'
     ? builtinRuntimes.find(runtime => runtime.runtimeKind === selection.runtimeKind)
     : undefined
@@ -87,6 +95,9 @@ export function RuntimesSettings() {
     : undefined
   const selectedLocalAgent = selection?.type === 'acp'
     ? localAgents.find(agent => agent.id === selection.agentId)
+    : undefined
+  const selectedRemoteAgent = selection?.type === 'acp'
+    ? remoteAgents.find(agent => agent.id === selection.agentId)
     : undefined
 
   const acpUsedByAgents = useMemo(() => {
@@ -114,6 +125,27 @@ export function RuntimesSettings() {
     detailContent = (
       <AcpLocalAgentDetail
         usedByAgents={[]}
+        onCreated={agentId => setSelection({ type: 'acp', agentId })}
+        onDeleted={() => setSelection(null)}
+        onCancel={() => setSelection(null)}
+      />
+    )
+  }
+  else if (selection?.type === 'acp-remote-new') {
+    detailContent = (
+      <AcpRemoteAgentDetail
+        usedByAgents={[]}
+        onCreated={agentId => setSelection({ type: 'acp', agentId })}
+        onDeleted={() => setSelection(null)}
+        onCancel={() => setSelection(null)}
+      />
+    )
+  }
+  else if (selectedRemoteAgent) {
+    detailContent = (
+      <AcpRemoteAgentDetail
+        agent={selectedRemoteAgent}
+        usedByAgents={acpUsedByAgents}
         onCreated={agentId => setSelection({ type: 'acp', agentId })}
         onDeleted={() => setSelection(null)}
         onCancel={() => setSelection(null)}
@@ -179,6 +211,7 @@ export function RuntimesSettings() {
         <RuntimeListPane
           builtinRuntimes={builtinRuntimes}
           localAgents={localAgents}
+          remoteAgents={remoteAgents}
           acpEntries={acpEntries}
           isAcpLoading={isAcpLoading}
           selection={selection}
@@ -188,6 +221,7 @@ export function RuntimesSettings() {
           acpFilter={acpFilter}
           onAcpFilterChange={setAcpFilter}
           onCreateLocal={() => setSelection({ type: 'acp-local-new' })}
+          onCreateRemote={() => setSelection({ type: 'acp-remote-new' })}
         />
       )}
       detail={(

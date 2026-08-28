@@ -1,5 +1,8 @@
 import type { Command } from 'commander'
 
+import { register as registerChatAuthRecoveryCancel } from '../chat/auth-recovery/cancel'
+import { register as registerChatAuthRecoveryGet } from '../chat/auth-recovery/get'
+import { register as registerChatAuthRecoveryRetry } from '../chat/auth-recovery/retry'
 import { register as registerChatCancel } from '../chat/cancel'
 import { register as registerChatHandoffCreate } from '../chat/handoff/create'
 import { register as registerChatHandoffGet } from '../chat/handoff/get'
@@ -22,6 +25,9 @@ import { register as registerChatTraceRun } from '../chat/trace/run'
 import { register as registerChatTraceSession } from '../chat/trace/session'
 
 export function registerGeneratedCommands(program: Command): void {
+  registerChatAuthRecoveryCancel(program)
+  registerChatAuthRecoveryGet(program)
+  registerChatAuthRecoveryRetry(program)
   registerChatCancel(program)
   registerChatHandoffCreate(program)
   registerChatHandoffGet(program)
