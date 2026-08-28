@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Streaming markdown renderer — CPS smoothing, block FSM, animated reveal",
+  "scripts": {
+    "benchmark": "node ./benchmark/run.mjs",
+    "benchmark:typecheck": "tsc --noEmit -p ./benchmark/tsconfig.json"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./styles": "./src/styles/animations.css",
@@ -31,5 +35,11 @@
     "shiki": "^3.0.0",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.1",
+    "@vitejs/plugin-react": "5.2.0",
+    "markstream-react": "2.0.6",
+    "vite": "8.0.11"
   }
 }
