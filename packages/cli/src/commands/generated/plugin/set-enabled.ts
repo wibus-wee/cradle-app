@@ -28,6 +28,12 @@ const spec = {
       "required": false,
       "target": "body.reason",
       "type": "string"
+    },
+    {
+      "name": "grantedPermissions",
+      "required": false,
+      "target": "body.grantedPermissions",
+      "type": "string[]"
     }
   ],
   "method": "patch",

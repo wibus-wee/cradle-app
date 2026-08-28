@@ -571,10 +571,12 @@ export async function deactivateOneDesktopPlugin(
 export async function discoverAndActivateDesktopPluginSource(
   source: DesktopPluginSource,
   pluginIdentities?: ReadonlySet<string>,
+  grantedPermissionsByPlugin?: ReadonlyMap<string, string[]>,
 ): Promise<void> {
   const { manifests, descriptors } = await discoverDesktopPlugins([source])
   for (const descriptor of descriptors) {
     if (pluginIdentities && !pluginIdentities.has(descriptor.identity)) { continue }
+    descriptor.source.grantedPermissions = grantedPermissionsByPlugin?.get(descriptor.identity) ?? []
     registerDesktopPluginDescriptor(descriptor)
   }
 

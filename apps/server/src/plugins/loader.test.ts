@@ -22,7 +22,7 @@ import { getRegisteredMcpServers } from './mcp-registry'
 import { calculatePluginPackageChecksum } from './package-checksum'
 import { listPluginDescriptors } from './runtime-registry'
 import { addPluginSource, deletePluginSource } from './source-registry'
-import { deletePluginTrustGrantsForPlugin, grantPluginTrust } from './trust-grants'
+import { deletePluginTrustGrantsForPlugin, grantPluginPermissions, grantPluginTrust, readGrantedPluginPermissions } from './trust-grants'
 
 let tempPluginsDir: string | undefined
 
@@ -410,14 +410,24 @@ describe('server plugin loader lifecycle', () => {
     })
     process.env.CRADLE_PLUGINS_DIR = tempPluginsDir
     process.env.CRADLE_PLUGINS_SOURCE_KIND = 'externalLocal'
-    process.env.CRADLE_PLUGIN_ALLOWED_LOADER_CLEANUP_PERMISSIONS = 'test.permission'
-    await grantLoaderCleanupPluginTrust(tempPluginsDir)
+    const checksum = await grantLoaderCleanupPluginTrust(tempPluginsDir)
+    grantPluginPermissions('@cradle/loader-cleanup', checksum, ['test.permission'], 'test permission grant')
 
     await activateServerPlugins(new Elysia())
 
     const descriptor = listPluginDescriptors().find(plugin => plugin.identity === '@cradle/loader-cleanup')
+    expect(descriptor?.source.grantedPermissions).toEqual(['test.permission'])
     expect(descriptor?.layers.server.status).toBe('active')
     expect(getRegisteredMcpServers()).toHaveProperty('loader-cleanup')
+  })
+
+  it('replaces permission grants for the same plugin checksum', () => {
+    const checksum = 'sha256:permission-replacement'
+    grantPluginPermissions('@cradle/loader-cleanup', checksum, ['workspace.read', 'workspace.write'])
+
+    grantPluginPermissions('@cradle/loader-cleanup', checksum, ['workspace.read'])
+
+    expect(readGrantedPluginPermissions('@cradle/loader-cleanup', checksum)).toEqual(['workspace.read'])
   })
 
   it('records an operator trust grant when enabling an external local plugin', async () => {
@@ -486,7 +496,7 @@ describe('server plugin loader lifecycle', () => {
 
     const descriptor = listPluginDescriptors().find(plugin => plugin.identity === '@cradle/loader-cleanup')
     expect(descriptor?.source.provenance?.grantedPermissions).toEqual(['test.permission'])
-    expect(descriptor?.source.grantedPermissions).toBeUndefined()
+    expect(descriptor?.source.grantedPermissions).toEqual([])
     expect(descriptor?.layers.server.status).toBe('disabled')
     expect(descriptor?.layers.server.error).toContain('Missing required plugin permission grants: test.permission')
     expect(getRegisteredMcpServers()).not.toHaveProperty('loader-cleanup')
@@ -852,9 +862,9 @@ describe('server plugin loader lifecycle', () => {
           id: 'mcp.live-source',
           type: 'mcp-server',
           layer: 'server',
-          permissions: [],
+          permissions: ['workspace.read'],
         }],
-        permissions: [],
+        permissions: [{ id: 'workspace.read', required: true }],
       },
       serverSource: [
         'export function activate(ctx) {',
@@ -886,10 +896,11 @@ describe('server plugin loader lifecycle', () => {
     expect(descriptor?.layers.server.status).toBe('disabled')
     expect(getRegisteredMcpServers()).not.toHaveProperty('live-source')
 
-    const enabled = await enablePlugin('@acme/live-source')
+    const enabled = await enablePlugin('@acme/live-source', ['workspace.read'])
 
     expect(enabled.layers.server.status).toBe('active')
     expect(enabled.source.trusted).toBe(true)
+    expect(enabled.source.grantedPermissions).toEqual(['workspace.read'])
     expect(getRegisteredMcpServers()).toHaveProperty('live-source')
 
     await removeDiscoveredSource(source.id)

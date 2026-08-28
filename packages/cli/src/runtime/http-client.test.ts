@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { requestJson } from './http-client'
+import { CliHttpError, requestJson } from './http-client'
 
 describe('requestJson', () => {
   beforeEach(() => {
@@ -102,5 +102,32 @@ describe('requestJson', () => {
         'content-type': 'application/json',
       },
     }))
+  })
+
+  it('preserves structured server error details', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      code: 'personal_plugin_update_failed',
+      message: 'Plugin build failed.',
+      details: { previousSnapshotPreserved: true },
+    }), {
+      status: 409,
+      headers: { 'content-type': 'application/json' },
+    }))
+
+    const request = requestJson({
+      method: 'post',
+      path: { sourceId: 'source-1' },
+      query: {},
+      serverUrl: 'http://localhost:21423',
+      template: '/plugins/personal/{sourceId}',
+      body: { packageDir: '/tmp/plugin' },
+    })
+
+    await expect(request).rejects.toBeInstanceOf(CliHttpError)
+    await expect(request).rejects.toMatchObject({
+      status: 409,
+      code: 'personal_plugin_update_failed',
+      details: { previousSnapshotPreserved: true },
+    })
   })
 })

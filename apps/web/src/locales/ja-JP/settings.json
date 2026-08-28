@@ -1060,6 +1060,9 @@
   "plugins.trust.noPermissions": "このプラグインは権限を宣言していません。",
   "plugins.trust.permissions": "要求される権限",
   "plugins.trust.title": "有効化する前に信頼",
+  "plugins.chatReview.action": "確認して有効化",
+  "plugins.chatReview.description": "エージェントがこの会話用の不変プラグインスナップショットをインストールしました。有効化する前に権限とランタイムレイヤーを確認してください。",
+  "plugins.chatReview.title": "プラグインを確認できます",
   "plugins.uninstall": "アンインストール",
   "plugins.uninstallConfirmBody": "{{source}} から {{count}} 個のプラグインを削除します。",
   "plugins.uninstallConfirmTitle": "プラグインをアンインストール"

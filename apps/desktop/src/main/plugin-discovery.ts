@@ -23,6 +23,7 @@ export interface DesktopPluginSource {
   trusted: boolean
   reason?: string
   trustMarketplaceGrants?: boolean
+  grantedPermissions?: string[]
 }
 
 export interface DesktopPluginDiscoveryResult {
@@ -69,7 +70,8 @@ function createSourceDescriptor(
     trusted: source.trusted,
     reason: source.reason,
     provenance,
-    grantedPermissions: source.trustMarketplaceGrants ? provenance?.grantedPermissions : undefined,
+    grantedPermissions: source.grantedPermissions
+      ?? (source.trustMarketplaceGrants ? provenance?.grantedPermissions : undefined),
   }
 }
 

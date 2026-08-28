@@ -49,7 +49,7 @@ import {
 } from './source-installer'
 import { listPluginSources, readPluginSource } from './source-registry'
 import { createPluginStaticServer, rewritePluginWebBundleImports } from './static-server'
-import { grantPluginTrust } from './trust-grants'
+import { grantPluginPermissions, grantPluginTrust } from './trust-grants'
 import { evaluatePluginSourceTrust, isExternalLocalCodeSource, readFabricNodeExposure } from './trust-policy'
 import {
   executePluginUninstall,
@@ -869,15 +869,19 @@ export async function disablePlugin(pluginName: string, reason?: string): Promis
   return requirePluginDescriptor(descriptor.identity)
 }
 
-export async function enablePlugin(pluginName: string): Promise<PluginDescriptor> {
+export async function enablePlugin(pluginName: string, grantedPermissions?: string[]): Promise<PluginDescriptor> {
   const descriptor = requirePluginDescriptor(pluginName)
   const manifest = requirePluginManifest(descriptor.identity)
   if (isExternalLocalCodeSource(descriptor.source)) {
     const checksum = await calculatePluginPackageChecksum(manifest.packageDir)
+    const effectivePermissions = grantedPermissions ?? descriptor.source.grantedPermissions ?? []
     grantPluginTrust(descriptor.identity, checksum, 'Enabled by operator.')
+    grantPluginPermissions(descriptor.identity, checksum, effectivePermissions, 'Enabled by operator.')
     setPluginSourceDescriptor(descriptor.identity, {
       ...descriptor.source,
       checksum,
+      trusted: true,
+      grantedPermissions: effectivePermissions,
     })
   }
   const policy = setPluginActivationPolicy(descriptor.identity, {

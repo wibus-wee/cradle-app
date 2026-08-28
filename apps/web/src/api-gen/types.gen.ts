@@ -12677,7 +12677,7 @@ export type GetPluginsSourcesResponses = {
      */
     200: Array<{
         id: string;
-        kind: 'localPath' | 'git' | 'npm';
+        kind: 'localPath' | 'personal' | 'git' | 'npm';
         location: string;
         ref: string | null;
         subPath: string | null;
@@ -12799,7 +12799,7 @@ export type PostPluginsSourcesResponses = {
     200: {
         source: {
             id: string;
-            kind: 'localPath' | 'git' | 'npm';
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
             location: string;
             ref: string | null;
             subPath: string | null;
@@ -12982,6 +12982,14 @@ export type PostPluginsSourcesResponses = {
             webEntry: string | null;
             desktopEntry: string | null;
         }>;
+        operation: {
+            action: 'install' | 'update' | 'refresh';
+            status: 'success' | 'failed';
+            error: string | null;
+            reviewRequired: boolean;
+            reviewPath: string | null;
+            previousSnapshotPreserved: boolean;
+        };
     };
 };
 
@@ -13163,211 +13171,152 @@ export type GetPluginsDevSessionsEventsData = {
     url: '/plugins/dev-sessions/events';
 };
 
-export type PostPluginsSourcesPreviewData = {
-    body: {
-        kind: 'git' | 'npm';
-        location: string;
-        ref?: string | null;
-        subPath?: string | null;
-    };
+export type GetPluginsEventsData = {
+    body?: never;
     path?: never;
     query?: never;
-    url: '/plugins/sources/preview';
+    url: '/plugins/events';
 };
 
-export type PostPluginsSourcesPreviewResponses = {
+export type GetPluginsReviewsData = {
+    body?: never;
+    path?: never;
+    query: {
+        chatSessionId: string;
+    };
+    url: '/plugins/reviews';
+};
+
+export type GetPluginsReviewsResponses = {
     /**
      * Response for status 200
      */
-    200: {
+    200: Array<{
+        sourceId: string;
+        createdAt: number;
         source: {
-            kind: 'git' | 'npm';
+            id: string;
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
             location: string;
             ref: string | null;
             subPath: string | null;
+            label: string | null;
+            addedReason: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedDirectory: string | null;
+            error: string | null;
+            plugins: Array<{
+                identity: string;
+                routeSegment: string;
+                name: string;
+                version: string;
+                displayName: string;
+                description: string | null;
+                iconUrl: string | null;
+                source: {
+                    kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                    packageDir: string;
+                    trusted: boolean;
+                    reason: string | null;
+                    checksum: string | null;
+                    grantedPermissions: Array<string>;
+                };
+                activation: {
+                    enabled: boolean;
+                    source: 'default' | 'user';
+                    reason: string | null;
+                    updatedAt: number | null;
+                };
+                layers: {
+                    server: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    web: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    desktop: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                };
+                declaredCapabilities: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop' | null;
+                    label: string | null;
+                    description: string | null;
+                    permissions: Array<string>;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                declaredPermissions: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    label: string | null;
+                    description: string | null;
+                    required: boolean;
+                }>;
+                capabilities: Array<{
+                    id: string;
+                    owner: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'registered' | 'failed' | 'unsupported';
+                    label: string | null;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                warnings: Array<string>;
+                active: boolean;
+                hasWeb: boolean;
+                hasServer: boolean;
+                hasDesktop: boolean;
+                serverEntry: string | null;
+                webEntry: string | null;
+                desktopEntry: string | null;
+            }>;
         };
-        plugins: Array<{
-            name: string;
-            version: string;
-            displayName: string;
-            description: string | null;
-            iconAvailable: boolean;
-            trusted: boolean;
-            trustReason: string | null;
-            declaredPermissions: Array<{
-                id: string;
-                owner: string;
-                localId: string;
-                label: string | null;
-                description: string | null;
-                required: boolean;
-            }>;
-            warnings: Array<string>;
-            hasWeb: boolean;
-            hasServer: boolean;
-            hasDesktop: boolean;
-        }>;
-        warnings: Array<string>;
-    };
+    }>;
 };
 
-export type PostPluginsSourcesPreviewResponse = PostPluginsSourcesPreviewResponses[keyof PostPluginsSourcesPreviewResponses];
+export type GetPluginsReviewsResponse = GetPluginsReviewsResponses[keyof GetPluginsReviewsResponses];
 
-export type DeletePluginsSourcesByIdData = {
+export type PostPluginsPersonalData = {
     body: {
-        confirmationToken: string;
+        packageDir: string;
+        label?: string | null;
+        addedReason?: string | null;
     };
-    path: {
-        id: string;
-    };
+    path?: never;
     query?: never;
-    url: '/plugins/sources/{id}';
+    url: '/plugins/personal';
 };
 
-export type DeletePluginsSourcesByIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        removed: boolean;
-    };
-};
-
-export type DeletePluginsSourcesByIdResponse = DeletePluginsSourcesByIdResponses[keyof DeletePluginsSourcesByIdResponses];
-
-export type GetPluginsSourcesByIdData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/plugins/sources/{id}';
-};
-
-export type GetPluginsSourcesByIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        kind: 'localPath' | 'git' | 'npm';
-        location: string;
-        ref: string | null;
-        subPath: string | null;
-        label: string | null;
-        addedReason: string;
-        createdAt: number;
-        updatedAt: number;
-        resolvedDirectory: string | null;
-        error: string | null;
-        plugins: Array<{
-            identity: string;
-            routeSegment: string;
-            name: string;
-            version: string;
-            displayName: string;
-            description: string | null;
-            iconUrl: string | null;
-            source: {
-                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
-                packageDir: string;
-                trusted: boolean;
-                reason: string | null;
-                checksum: string | null;
-                grantedPermissions: Array<string>;
-            };
-            activation: {
-                enabled: boolean;
-                source: 'default' | 'user';
-                reason: string | null;
-                updatedAt: number | null;
-            };
-            layers: {
-                server: {
-                    layer: 'server' | 'web' | 'desktop';
-                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
-                    entry: string | null;
-                    error: string | null;
-                    activatedAt: string | null;
-                };
-                web: {
-                    layer: 'server' | 'web' | 'desktop';
-                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
-                    entry: string | null;
-                    error: string | null;
-                    activatedAt: string | null;
-                };
-                desktop: {
-                    layer: 'server' | 'web' | 'desktop';
-                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
-                    entry: string | null;
-                    error: string | null;
-                    activatedAt: string | null;
-                };
-            };
-            declaredCapabilities: Array<{
-                id: string;
-                owner: string;
-                localId: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop' | null;
-                label: string | null;
-                description: string | null;
-                permissions: Array<string>;
-                metadata: {
-                    [key: string]: unknown;
-                };
-            }>;
-            declaredPermissions: Array<{
-                id: string;
-                owner: string;
-                localId: string;
-                label: string | null;
-                description: string | null;
-                required: boolean;
-            }>;
-            capabilities: Array<{
-                id: string;
-                owner: string;
-                type: string;
-                layer: 'server' | 'web' | 'desktop';
-                status: 'registered' | 'failed' | 'unsupported';
-                label: string | null;
-                metadata: {
-                    [key: string]: unknown;
-                };
-            }>;
-            warnings: Array<string>;
-            active: boolean;
-            hasWeb: boolean;
-            hasServer: boolean;
-            hasDesktop: boolean;
-            serverEntry: string | null;
-            webEntry: string | null;
-            desktopEntry: string | null;
-        }>;
-    };
-};
-
-export type GetPluginsSourcesByIdResponse = GetPluginsSourcesByIdResponses[keyof GetPluginsSourcesByIdResponses];
-
-export type PostPluginsSourcesByIdRefreshData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/plugins/sources/{id}/refresh';
-};
-
-export type PostPluginsSourcesByIdRefreshResponses = {
+export type PostPluginsPersonalResponses = {
     /**
      * Response for status 200
      */
     200: {
         source: {
             id: string;
-            kind: 'localPath' | 'git' | 'npm';
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
             location: string;
             ref: string | null;
             subPath: string | null;
@@ -13550,6 +13499,628 @@ export type PostPluginsSourcesByIdRefreshResponses = {
             webEntry: string | null;
             desktopEntry: string | null;
         }>;
+        operation: {
+            action: 'install' | 'update' | 'refresh';
+            status: 'success' | 'failed';
+            error: string | null;
+            reviewRequired: boolean;
+            reviewPath: string | null;
+            previousSnapshotPreserved: boolean;
+        };
+    };
+};
+
+export type PostPluginsPersonalResponse = PostPluginsPersonalResponses[keyof PostPluginsPersonalResponses];
+
+export type PostPluginsPersonalBySourceIdData = {
+    body: {
+        packageDir: string;
+    };
+    path: {
+        sourceId: string;
+    };
+    query?: never;
+    url: '/plugins/personal/{sourceId}';
+};
+
+export type PostPluginsPersonalBySourceIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: {
+            id: string;
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+            label: string | null;
+            addedReason: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedDirectory: string | null;
+            error: string | null;
+            plugins: Array<{
+                identity: string;
+                routeSegment: string;
+                name: string;
+                version: string;
+                displayName: string;
+                description: string | null;
+                iconUrl: string | null;
+                source: {
+                    kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                    packageDir: string;
+                    trusted: boolean;
+                    reason: string | null;
+                    checksum: string | null;
+                    grantedPermissions: Array<string>;
+                };
+                activation: {
+                    enabled: boolean;
+                    source: 'default' | 'user';
+                    reason: string | null;
+                    updatedAt: number | null;
+                };
+                layers: {
+                    server: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    web: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    desktop: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                };
+                declaredCapabilities: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop' | null;
+                    label: string | null;
+                    description: string | null;
+                    permissions: Array<string>;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                declaredPermissions: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    label: string | null;
+                    description: string | null;
+                    required: boolean;
+                }>;
+                capabilities: Array<{
+                    id: string;
+                    owner: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'registered' | 'failed' | 'unsupported';
+                    label: string | null;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                warnings: Array<string>;
+                active: boolean;
+                hasWeb: boolean;
+                hasServer: boolean;
+                hasDesktop: boolean;
+                serverEntry: string | null;
+                webEntry: string | null;
+                desktopEntry: string | null;
+            }>;
+        };
+        discoveredPlugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+                grantedPermissions: Array<string>;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop' | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+        operation: {
+            action: 'install' | 'update' | 'refresh';
+            status: 'success' | 'failed';
+            error: string | null;
+            reviewRequired: boolean;
+            reviewPath: string | null;
+            previousSnapshotPreserved: boolean;
+        };
+    };
+};
+
+export type PostPluginsPersonalBySourceIdResponse = PostPluginsPersonalBySourceIdResponses[keyof PostPluginsPersonalBySourceIdResponses];
+
+export type PostPluginsSourcesPreviewData = {
+    body: {
+        kind: 'git' | 'npm';
+        location: string;
+        ref?: string | null;
+        subPath?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/plugins/sources/preview';
+};
+
+export type PostPluginsSourcesPreviewResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: {
+            kind: 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+        };
+        plugins: Array<{
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconAvailable: boolean;
+            trusted: boolean;
+            trustReason: string | null;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            warnings: Array<string>;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+        }>;
+        warnings: Array<string>;
+    };
+};
+
+export type PostPluginsSourcesPreviewResponse = PostPluginsSourcesPreviewResponses[keyof PostPluginsSourcesPreviewResponses];
+
+export type DeletePluginsSourcesByIdData = {
+    body: {
+        confirmationToken: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/plugins/sources/{id}';
+};
+
+export type DeletePluginsSourcesByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        removed: boolean;
+    };
+};
+
+export type DeletePluginsSourcesByIdResponse = DeletePluginsSourcesByIdResponses[keyof DeletePluginsSourcesByIdResponses];
+
+export type GetPluginsSourcesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/plugins/sources/{id}';
+};
+
+export type GetPluginsSourcesByIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        kind: 'localPath' | 'personal' | 'git' | 'npm';
+        location: string;
+        ref: string | null;
+        subPath: string | null;
+        label: string | null;
+        addedReason: string;
+        createdAt: number;
+        updatedAt: number;
+        resolvedDirectory: string | null;
+        error: string | null;
+        plugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+                grantedPermissions: Array<string>;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop' | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+    };
+};
+
+export type GetPluginsSourcesByIdResponse = GetPluginsSourcesByIdResponses[keyof GetPluginsSourcesByIdResponses];
+
+export type PostPluginsSourcesByIdRefreshData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/plugins/sources/{id}/refresh';
+};
+
+export type PostPluginsSourcesByIdRefreshResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: {
+            id: string;
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+            label: string | null;
+            addedReason: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedDirectory: string | null;
+            error: string | null;
+            plugins: Array<{
+                identity: string;
+                routeSegment: string;
+                name: string;
+                version: string;
+                displayName: string;
+                description: string | null;
+                iconUrl: string | null;
+                source: {
+                    kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                    packageDir: string;
+                    trusted: boolean;
+                    reason: string | null;
+                    checksum: string | null;
+                    grantedPermissions: Array<string>;
+                };
+                activation: {
+                    enabled: boolean;
+                    source: 'default' | 'user';
+                    reason: string | null;
+                    updatedAt: number | null;
+                };
+                layers: {
+                    server: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    web: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    desktop: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                };
+                declaredCapabilities: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop' | null;
+                    label: string | null;
+                    description: string | null;
+                    permissions: Array<string>;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                declaredPermissions: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    label: string | null;
+                    description: string | null;
+                    required: boolean;
+                }>;
+                capabilities: Array<{
+                    id: string;
+                    owner: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'registered' | 'failed' | 'unsupported';
+                    label: string | null;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                warnings: Array<string>;
+                active: boolean;
+                hasWeb: boolean;
+                hasServer: boolean;
+                hasDesktop: boolean;
+                serverEntry: string | null;
+                webEntry: string | null;
+                desktopEntry: string | null;
+            }>;
+        };
+        discoveredPlugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+                grantedPermissions: Array<string>;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop' | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+        operation: {
+            action: 'install' | 'update' | 'refresh';
+            status: 'success' | 'failed';
+            error: string | null;
+            reviewRequired: boolean;
+            reviewPath: string | null;
+            previousSnapshotPreserved: boolean;
+        };
     };
 };
 
@@ -13747,6 +14318,7 @@ export type PatchPluginsByRouteSegmentEnabledData = {
     body: {
         enabled: boolean;
         reason?: string | null;
+        grantedPermissions?: Array<string>;
     };
     path: {
         routeSegment: string;
@@ -19024,6 +19596,7 @@ export type GetAcpAgentsResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19066,6 +19639,7 @@ export type PostAcpAgentsResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19120,6 +19694,7 @@ export type GetAcpAgentsByAgentIdResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19127,6 +19702,86 @@ export type GetAcpAgentsByAgentIdResponses = {
 };
 
 export type GetAcpAgentsByAgentIdResponse = GetAcpAgentsByAgentIdResponses[keyof GetAcpAgentsByAgentIdResponses];
+
+export type GetAcpAgentsByAgentIdAuthMethodsData = {
+    body?: never;
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth-methods';
+};
+
+export type GetAcpAgentsByAgentIdAuthMethodsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        methods: Array<{
+            id: string;
+            name: string;
+            description?: string;
+            kind: 'agent' | 'env_var' | 'terminal';
+            status: 'supported' | 'unsupported';
+            unavailableReason?: string;
+            link?: string;
+            fields?: Array<{
+                name: string;
+                label?: string;
+                secret: boolean;
+                optional: boolean;
+            }>;
+        }>;
+        selectedMethodId: string | null;
+    };
+};
+
+export type GetAcpAgentsByAgentIdAuthMethodsResponse = GetAcpAgentsByAgentIdAuthMethodsResponses[keyof GetAcpAgentsByAgentIdAuthMethodsResponses];
+
+export type DeleteAcpAgentsByAgentIdAuthData = {
+    body?: never;
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth';
+};
+
+export type DeleteAcpAgentsByAgentIdAuthResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        selectedMethodId: string | null;
+    };
+};
+
+export type DeleteAcpAgentsByAgentIdAuthResponse = DeleteAcpAgentsByAgentIdAuthResponses[keyof DeleteAcpAgentsByAgentIdAuthResponses];
+
+export type PutAcpAgentsByAgentIdAuthData = {
+    body: {
+        methodId: string;
+        secretRefs?: {
+            [key: string]: unknown;
+        };
+    };
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth';
+};
+
+export type PutAcpAgentsByAgentIdAuthResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        selectedMethodId: string | null;
+    };
+};
+
+export type PutAcpAgentsByAgentIdAuthResponse = PutAcpAgentsByAgentIdAuthResponses[keyof PutAcpAgentsByAgentIdAuthResponses];
 
 export type PatchAcpAgentsByAgentIdLaunchConfigData = {
     body: {
@@ -19168,6 +19823,7 @@ export type PatchAcpAgentsByAgentIdLaunchConfigResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19251,6 +19907,7 @@ export type PutAcpAgentsByAgentIdInstallationResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
         status: string;
         createdAt: number;
         updatedAt: number;

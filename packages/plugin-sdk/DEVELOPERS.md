@@ -193,8 +193,13 @@ exits. Cradle retains the authoring directory only as the source for future
 updates; runtime loading never follows later edits in that directory.
 
 The Plugin remains inactive until the user reviews its identity, layers,
-permissions, and installed checksum. After explicit approval, activate the
-route segment printed by the install command:
+permissions, and installed checksum. When an Agent runs the command from a
+Cradle Chat Session, Cradle places a native **Review & activate** handoff above
+that session's composer. The handoff shows every runtime layer and declared
+permission, then activates every Plugin from the installed source in one
+explicit user action. Installs outside a Chat Session remain available for
+review in Plugin Center; an operator can also activate one route segment from
+the CLI:
 
 ```bash
 cradle plugin set-enabled my-plugin --enabled true
@@ -214,9 +219,10 @@ cradle plugin update <source-id> --package-dir "$PWD/plugins/my-plugin"
 
 The command builds and validates in staging before atomically replacing the
 runtime snapshot. Build, pack, or validation failure preserves the installed
-revision. A successful update changes the checksum and invalidates its previous
-trust grant, so obtain explicit user approval before activating the new
-revision.
+revision. A successful update changes the checksum and invalidates package
+trust plus every permission grant from the previous revision. Web, Server, and
+Desktop reconcile the new snapshot automatically after approval; no dev
+process or manual Desktop sync is required.
 
 ### Explicit development mode
 

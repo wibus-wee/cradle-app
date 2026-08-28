@@ -36,6 +36,7 @@ import {
 import type { AddPluginSourceInput } from '../../plugins/source-registry'
 import { addPluginSource, deletePluginSource, listPluginSources, readPluginSource, touchPluginSource } from '../../plugins/source-registry'
 import { evaluatePluginSourceTrust, readFabricNodeExposure } from '../../plugins/trust-policy'
+import { pluginLifecycle } from './lifecycle-service'
 
 export interface PluginMentionCapability {
   id: string
@@ -157,6 +158,63 @@ export interface PluginSourceRegistryEntryView {
 export interface AddPluginSourceResult {
   source: PluginSourceRegistryEntryView
   discoveredPlugins: PluginDescriptorView[]
+  operation: PluginSourceOperationView
+}
+
+export interface PluginSourceOperationView {
+  action: 'install' | 'update' | 'refresh'
+  status: 'success' | 'failed'
+  error: string | null
+  reviewRequired: boolean
+  reviewPath: string | null
+  previousSnapshotPreserved: boolean
+}
+
+export interface PluginOperationContext {
+  chatSessionId?: string | null
+}
+
+export interface PendingPluginReviewView {
+  sourceId: string
+  createdAt: number
+  source: PluginSourceRegistryEntryView
+}
+
+function sourceOperation(
+  action: PluginSourceOperationView['action'],
+  plugins: PluginDescriptor[],
+  previousSnapshotPreserved: boolean,
+  error: string | null = null,
+): PluginSourceOperationView {
+  const reviewRequired = plugins.some(plugin => plugin.source.kind === 'externalLocal' && !plugin.source.trusted)
+  return {
+    action,
+    status: error ? 'failed' : 'success',
+    error,
+    reviewRequired,
+    reviewPath: reviewRequired ? '/plugins' : null,
+    previousSnapshotPreserved,
+  }
+}
+
+function publishSourceLifecycle(
+  type: 'source-installed' | 'source-updated' | 'source-refreshed',
+  sourceId: string,
+  plugins: PluginDescriptor[],
+  context: PluginOperationContext,
+  previousPluginIdentities: string[] = [],
+): void {
+  pluginLifecycle.publish({
+    type,
+    sourceId,
+    pluginIdentities: [
+      ...previousPluginIdentities,
+      ...plugins.map(plugin => plugin.identity),
+    ],
+    chatSessionId: plugins.some(plugin => plugin.source.kind === 'externalLocal' && !plugin.source.trusted)
+      ? context.chatSessionId ?? null
+      : null,
+  })
 }
 
 export type PluginSourceRemovalPlanView = Awaited<ReturnType<typeof inspectDiscoveredSourceRemoval>> & {
@@ -466,19 +524,24 @@ export async function getSource(sourceId: string): Promise<PluginSourceRegistryE
 export async function createSource(
   input: AddPluginSourceInput,
   options: PluginSourceInstallerOptions = {},
+  context: PluginOperationContext = {},
 ): Promise<AddPluginSourceResult> {
   const source = addPluginSource(input)
   try {
     const discovered = await discoverAndActivateSource(source.id, options)
-    return {
+    const result = {
       source: await toPluginSourceRegistryEntryView(source),
       discoveredPlugins: discovered.map(toPluginDescriptorView),
+      operation: sourceOperation('install', discovered, false),
     }
+    publishSourceLifecycle('source-installed', source.id, discovered, context)
+    return result
   }
-  catch {
+  catch (error) {
     return {
       source: await toPluginSourceRegistryEntryView(source),
       discoveredPlugins: [],
+      operation: sourceOperation('install', [], false, error instanceof Error ? error.message : String(error)),
     }
   }
 }
@@ -498,6 +561,7 @@ function requireAbsolutePackageDir(packageDir: string): string {
 export async function installPersonalPlugin(
   input: { packageDir: string, label?: string | null, addedReason?: string | null },
   options: PluginSourceInstallerOptions = {},
+  context: PluginOperationContext = {},
 ): Promise<AddPluginSourceResult> {
   const packageDir = requireAbsolutePackageDir(input.packageDir)
   const duplicate = listPluginSources().find(source => source.kind === 'personal' && source.location === packageDir)
@@ -519,10 +583,13 @@ export async function installPersonalPlugin(
   try {
     await refreshPluginSourceDirectory(source, options)
     const discovered = await discoverAndActivateSource(source.id, options)
-    return {
+    const result = {
       source: await toPluginSourceRegistryEntryView(source),
       discoveredPlugins: discovered.map(toPluginDescriptorView),
+      operation: sourceOperation('install', discovered, false),
     }
+    publishSourceLifecycle('source-installed', source.id, discovered, context)
+    return result
   }
   catch (error) {
     await deletePluginSourceCache(source).catch(() => undefined)
@@ -535,6 +602,7 @@ export async function updatePersonalPlugin(
   sourceId: string,
   input: { packageDir: string },
   options: PluginSourceInstallerOptions = {},
+  context: PluginOperationContext = {},
 ): Promise<AddPluginSourceResult> {
   const source = readPluginSource(sourceId)
   if (!source || source.kind !== 'personal') {
@@ -555,14 +623,46 @@ export async function updatePersonalPlugin(
     })
   }
 
-  await refreshPluginSourceDirectory(source, options)
-  const discovered = await rediscoverAndActivateSource(source.id, options)
+  const previousPluginIdentities = (await toPluginSourceRegistryEntryView(source)).plugins.map(plugin => plugin.identity)
+  let discovered: PluginDescriptor[]
+  try {
+    await refreshPluginSourceDirectory(source, options)
+  }
+  catch (error) {
+    throw new AppError({
+      code: 'personal_plugin_update_failed',
+      status: error instanceof AppError ? error.status : 500,
+      message: error instanceof Error ? error.message : 'Personal plugin update failed.',
+      details: { sourceId, previousSnapshotPreserved: true },
+    })
+  }
+  try {
+    discovered = await rediscoverAndActivateSource(source.id, options)
+  }
+  catch (error) {
+    pluginLifecycle.clearPendingReview(sourceId)
+    pluginLifecycle.publish({
+      type: 'source-updated',
+      sourceId,
+      pluginIdentities: previousPluginIdentities,
+      chatSessionId: null,
+    })
+    throw new AppError({
+      code: 'personal_plugin_activation_failed',
+      status: error instanceof AppError ? error.status : 500,
+      message: error instanceof Error ? error.message : 'Personal plugin activation failed.',
+      details: { sourceId, previousSnapshotPreserved: false },
+    })
+  }
   touchPluginSource(source.id)
   const updatedSource = readPluginSource(source.id)!
-  return {
+  const result = {
     source: await toPluginSourceRegistryEntryView(updatedSource),
     discoveredPlugins: discovered.map(toPluginDescriptorView),
+    operation: sourceOperation('update', discovered, false),
   }
+  publishSourceLifecycle('source-updated', source.id, discovered, context, previousPluginIdentities)
+  return result
 }
 
 /**
@@ -663,6 +763,7 @@ export async function previewSource(
 export async function refreshSource(
   sourceId: string,
   options: PluginSourceInstallerOptions = {},
+  context: PluginOperationContext = {},
 ): Promise<AddPluginSourceResult> {
   const source = readPluginSource(sourceId)
   if (!source) {
@@ -674,22 +775,44 @@ export async function refreshSource(
     })
   }
 
+  const previousPluginIdentities = (await toPluginSourceRegistryEntryView(source)).plugins.map(plugin => plugin.identity)
   try {
     await refreshPluginSourceDirectory(source, options)
-    const discovered = await rediscoverAndActivateSource(source.id, options)
-    touchPluginSource(source.id)
-    const updatedSource = readPluginSource(source.id)!
-    return {
-      source: await toPluginSourceRegistryEntryView(updatedSource),
-      discoveredPlugins: discovered.map(toPluginDescriptorView),
-    }
   }
-  catch {
+  catch (error) {
     return {
       source: await toPluginSourceRegistryEntryView(source),
       discoveredPlugins: [],
+      operation: sourceOperation('refresh', [], true, error instanceof Error ? error.message : String(error)),
     }
   }
+  let discovered: PluginDescriptor[]
+  try {
+    discovered = await rediscoverAndActivateSource(source.id, options)
+  }
+  catch (error) {
+    pluginLifecycle.clearPendingReview(sourceId)
+    pluginLifecycle.publish({
+      type: 'source-refreshed',
+      sourceId,
+      pluginIdentities: previousPluginIdentities,
+      chatSessionId: null,
+    })
+    return {
+      source: await toPluginSourceRegistryEntryView(source),
+      discoveredPlugins: [],
+      operation: sourceOperation('refresh', [], false, error instanceof Error ? error.message : String(error)),
+    }
+  }
+  touchPluginSource(source.id)
+  const updatedSource = readPluginSource(source.id)!
+  const result = {
+    source: await toPluginSourceRegistryEntryView(updatedSource),
+    discoveredPlugins: discovered.map(toPluginDescriptorView),
+    operation: sourceOperation('refresh', discovered, false),
+  }
+  publishSourceLifecycle('source-refreshed', source.id, discovered, context, previousPluginIdentities)
+  return result
 }
 
 export async function inspectSourceRemoval(sourceId: string): Promise<PluginSourceRemovalPlanView> {
@@ -772,8 +895,15 @@ export async function removeSource(
         details: { plan: currentPlan },
       })
     }
+    const removedIdentities = currentPlan.plugins.map(plugin => plugin.identity)
     await removeDiscoveredSource(source.id)
     deletePluginSource(source.id)
+    pluginLifecycle.publish({
+      type: 'source-removed',
+      sourceId: source.id,
+      pluginIdentities: removedIdentities,
+      chatSessionId: null,
+    })
     return { removed: true }
   }
   finally {
@@ -796,7 +926,7 @@ export function getPlugin(routeSegment: string): PluginDescriptorView {
 
 export async function setPluginEnabled(
   routeSegment: string,
-  input: { enabled: boolean, reason?: string | null },
+  input: { enabled: boolean, reason?: string | null, grantedPermissions?: string[] },
 ): Promise<PluginDescriptorView> {
   const descriptor = getPluginDescriptorByRouteSegment(routeSegment)
   if (!descriptor) {
@@ -808,10 +938,77 @@ export async function setPluginEnabled(
     })
   }
 
+  const grantedPermissions = input.grantedPermissions === undefined
+    ? undefined
+    : [...new Set(input.grantedPermissions)].sort()
+  const declaredPermissionIds = new Set([
+    ...descriptor.declaredPermissions.map(permission => permission.localId),
+    ...descriptor.declaredCapabilities.flatMap(capability => capability.permissions),
+  ])
+  const invalidPermissions = (grantedPermissions ?? []).filter(permission => !declaredPermissionIds.has(permission))
+  if (invalidPermissions.length > 0) {
+    throw new AppError({
+      code: 'plugin_permission_not_declared',
+      status: 400,
+      message: 'One or more granted permissions are not declared by this plugin.',
+      details: { invalidPermissions },
+    })
+  }
+  const requiredPermissionIds = new Set([
+    ...descriptor.declaredPermissions
+      .filter(permission => permission.required)
+      .map(permission => permission.localId),
+    ...descriptor.declaredCapabilities.flatMap(capability => capability.permissions),
+  ])
+  const effectiveGrantedPermissions = grantedPermissions ?? descriptor.source.grantedPermissions ?? []
+  const missingRequiredPermissions = descriptor.source.kind === 'externalLocal' && input.enabled
+    ? [...requiredPermissionIds].filter(permission => !effectiveGrantedPermissions.includes(permission)).sort()
+    : []
+  if (missingRequiredPermissions.length > 0) {
+    throw new AppError({
+      code: 'plugin_permission_grant_required',
+      status: 400,
+      message: 'Required plugin permissions must be reviewed and granted before activation.',
+      details: { missingRequiredPermissions },
+    })
+  }
+
   const updated = input.enabled
-    ? await enablePlugin(descriptor.identity)
+    ? await enablePlugin(descriptor.identity, grantedPermissions)
     : await disablePlugin(descriptor.identity, input.reason ?? undefined)
+  const source = (await listSources()).find(entry => entry.plugins.some(plugin => plugin.identity === descriptor.identity))
+  pluginLifecycle.publish({
+    type: 'activation-changed',
+    sourceId: source?.id ?? null,
+    pluginIdentities: [descriptor.identity],
+    chatSessionId: null,
+  })
+  if (input.enabled && source?.plugins.every(plugin => plugin.identity === descriptor.identity
+    ? updated.activation.enabled && updated.source.trusted
+    : plugin.activation.enabled && plugin.source.trusted)) {
+    pluginLifecycle.publish({
+      type: 'review-completed',
+      sourceId: source.id,
+      pluginIdentities: source.plugins.map(plugin => plugin.identity),
+      chatSessionId: null,
+    })
+  }
   return toPluginDescriptorView(updated)
+}
+
+export async function listPendingReviews(chatSessionId: string): Promise<PendingPluginReviewView[]> {
+  const reviews = pluginLifecycle.listPendingReviews(chatSessionId)
+  const result: PendingPluginReviewView[] = []
+  for (const review of reviews) {
+    const source = readPluginSource(review.sourceId)
+    if (!source) { continue }
+    result.push({
+      sourceId: review.sourceId,
+      createdAt: review.createdAt,
+      source: await toPluginSourceRegistryEntryView(source),
+    })
+  }
+  return result
 }
 
 export async function readPluginIcon(routeSegment: string): Promise<PluginIconAsset> {

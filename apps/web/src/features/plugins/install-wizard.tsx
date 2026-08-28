@@ -71,18 +71,6 @@ type Step = 'paste' | 'previewing' | 'review' | 'installing' | 'done' | 'error'
 
 type InstalledDescriptor = PostPluginsSourcesResponse['discoveredPlugins'][number]
 
-function syncDesktopSource(sourceId: string, onSyncFailed: () => void): void {
-  void window.cradle?.plugins?.syncSource(sourceId).catch(onSyncFailed)
-}
-
-function unsyncDesktopPlugins(plugins: Array<{ identity: string, hasDesktop: boolean }>, onSyncFailed: () => void): void {
-  for (const plugin of plugins) {
-    if (plugin.hasDesktop) {
-      void window.cradle?.plugins?.unsyncSource(plugin.identity).catch(onSyncFailed)
-    }
-  }
-}
-
 function extractError(error: unknown): { status?: number, message: string } {
   if (typeof error === 'string') {
     return { message: error }
@@ -184,11 +172,6 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
     onMutate: () => setStep('installing'),
     onSuccess: (data) => {
       setInstallResult(data)
-      if (data?.source.id) {
-        syncDesktopSource(data.source.id, () => {
-          toastManager.add({ type: 'warning', title: t('plugins.sources.toast.desktopSyncFailed') })
-        })
-      }
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'list'] })
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'sources'] })
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'marketplace'] })
@@ -202,10 +185,10 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
   })
 
   const enableMutation = useMutation({
-    mutationFn: async (routeSegment: string) => {
+    mutationFn: async ({ routeSegment, grantedPermissions }: { routeSegment: string, grantedPermissions?: string[] }) => {
       const { error } = await patchPluginsByRouteSegmentEnabled({
         path: { routeSegment },
-        body: { enabled: true },
+        body: { enabled: true, grantedPermissions },
       })
       if (error) {
         throw error
@@ -238,11 +221,6 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
       }
     },
     onSuccess: () => {
-      if (installResult?.discoveredPlugins) {
-        unsyncDesktopPlugins(installResult.discoveredPlugins, () => {
-          toastManager.add({ type: 'warning', title: t('plugins.sources.toast.desktopUnsyncFailed') })
-        })
-      }
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'list'] })
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'sources'] })
       void queryClient.invalidateQueries({ queryKey: ['plugins', 'marketplace'] })
@@ -275,7 +253,7 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
       setTrustTarget(plugin.routeSegment)
       return
     }
-    enableMutation.mutate(plugin.routeSegment)
+    enableMutation.mutate({ routeSegment: plugin.routeSegment })
   }
 
   const toggleSelected = (index: number) => {
@@ -341,7 +319,7 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
         <PluginInstallDoneView
           result={installResult}
           serverUrl={getServerUrl()}
-          enablingRouteSegment={enableMutation.isPending ? enableMutation.variables ?? null : null}
+          enablingRouteSegment={enableMutation.isPending ? enableMutation.variables?.routeSegment ?? null : null}
           onEnable={handleEnable}
           onUndo={() => setUndoConfirmOpen(true)}
           undoing={undoMutation.isPending}
@@ -394,7 +372,7 @@ export function InstallWizard({ initialSource, sourceLabel, mode, onDismiss }: I
 
       <TrustConsentDialog
         routeSegment={trustTarget}
-        onConfirm={() => trustTarget && enableMutation.mutate(trustTarget)}
+        onConfirm={grantedPermissions => trustTarget && enableMutation.mutate({ routeSegment: trustTarget, grantedPermissions })}
         onCancel={() => setTrustTarget(null)}
         confirmPending={enableMutation.isPending}
       />

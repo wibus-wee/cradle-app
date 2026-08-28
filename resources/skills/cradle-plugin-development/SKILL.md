@@ -83,11 +83,13 @@ installs an immutable Cradle-owned snapshot, prints its source id, and exits.
 The authoring directory remains available for later edits but is never the
 runtime directory.
 
-Installation does not authorize arbitrary local code. Before calling
-`cradle plugin set-enabled`, show the user the Plugin identity, layers,
-declared permissions, retained source location, and installed checksum, then
-obtain explicit approval. Enabling records an operator trust grant for that
-exact revision.
+Installation does not authorize arbitrary local code. The install command
+returns each Plugin's runtime-layer status. When invoked from Cradle Chat, a
+native review handoff appears in that originating conversation; let the user
+review identity, layers, declared permissions, retained source location, and
+installed checksum there. Outside Chat, direct the user to Plugin Center.
+Approval records package trust and the reviewed permission grants for that
+exact checksum; never attempt to approve the Plugin on the user's behalf.
 
 For an installed personal Plugin, edit and verify its retained source first,
 then use the source id returned by installation:
@@ -97,10 +99,11 @@ cradle plugin update <source-id> --package-dir <absolute-package-dir>
 ```
 
 Build, pack, or validation failure preserves the installed snapshot. A
-successful update produces a new checksum and invalidates the previous trust
-grant. Obtain explicit approval before enabling the new revision. Never weaken
-this boundary by editing trust storage, install receipts, or Cradle registry
-files.
+successful update produces a new checksum and invalidates the previous package
+and permission grants. Web, Server, and Desktop reconcile automatically after
+the user approves the new revision. Never launch a dev process or manually
+sync a runtime for an ordinary personal install, and never weaken the trust
+boundary by editing trust storage, install receipts, or Cradle registry files.
 
 ## Explicit Developer Mode
 

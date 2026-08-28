@@ -9,6 +9,7 @@ import pc from 'picocolors'
 import { z } from 'zod'
 
 import { getCommandContext } from '../runtime/context'
+import { CliHttpError } from '../runtime/http-client'
 
 interface PluginInstallOptions {
   packageDir?: string
@@ -27,7 +28,23 @@ const PersonalPluginResultSchema = z.object({
   discoveredPlugins: z.array(z.object({
     routeSegment: z.string().min(1),
     displayName: z.string().min(1),
+    hasServer: z.boolean(),
+    hasWeb: z.boolean(),
+    hasDesktop: z.boolean(),
+    layers: z.object({
+      server: z.object({ status: z.string(), error: z.string().nullable() }),
+      web: z.object({ status: z.string(), error: z.string().nullable() }),
+      desktop: z.object({ status: z.string(), error: z.string().nullable() }),
+    }),
   })),
+  operation: z.object({
+    action: z.enum(['install', 'update', 'refresh']),
+    status: z.literal('success'),
+    error: z.null(),
+    reviewRequired: z.boolean(),
+    reviewPath: z.string().nullable(),
+    previousSnapshotPreserved: z.boolean(),
+  }),
 })
 
 function findChild(parent: Command, name: string): Command | undefined {
@@ -75,11 +92,27 @@ async function warnForMissingReadme(packageDir: string): Promise<void> {
 
 function printResult(action: 'Installed' | 'Updated', value: unknown): void {
   const result = PersonalPluginResultSchema.parse(value)
-  const plugin = result.discoveredPlugins[0]
-  log.success(`${action} ${pc.bold(plugin?.displayName ?? 'personal plugin')} as an immutable Cradle snapshot.`)
+  const firstPlugin = result.discoveredPlugins[0]
+  log.success(`${action} ${pc.bold(firstPlugin?.displayName ?? 'personal plugin')} as an immutable Cradle snapshot.`)
   log.info(`Source ID: ${pc.bold(result.source.id)}`)
-  if (plugin) {
-    log.info(`Activation requires user approval: ${pc.cyan(`cradle plugin set-enabled ${plugin.routeSegment} --enabled true`)}`)
+  for (const plugin of result.discoveredPlugins) {
+    const runtimeStates = [
+      plugin.hasServer ? `server=${plugin.layers.server.status}` : null,
+      plugin.hasWeb ? `web=${plugin.layers.web.status}` : null,
+      plugin.hasDesktop ? `desktop=${plugin.layers.desktop.status}` : null,
+    ].filter((state): state is string => state !== null)
+    log.info(`${pc.bold(plugin.displayName)}: ${runtimeStates.join(', ') || 'no runtime layers'}`)
+    for (const layer of ['server', 'web', 'desktop'] as const) {
+      const error = plugin.layers[layer].error
+      if (error) {
+        log.warn(`${plugin.displayName} ${layer}: ${error}`)
+      }
+    }
+  }
+  if (result.operation.reviewRequired) {
+    log.info(process.env.CRADLE_CHAT_SESSION_ID
+      ? 'Review and activation are waiting in the originating Cradle chat.'
+      : `Activation requires user review in Cradle Plugin Center. Source: ${pc.cyan(result.source.id)}`)
   }
 }
 
@@ -128,7 +161,11 @@ async function buildAndUpdate(command: Command, sourceId: string, options: Plugi
     printResult('Updated', result)
   }
   catch (error) {
-    progress.error('Plugin update failed; the previous snapshot remains installed')
+    const previousSnapshotPreserved = error instanceof CliHttpError
+      && error.details?.previousSnapshotPreserved === true
+    progress.error(previousSnapshotPreserved
+      ? 'Plugin update failed; the previous snapshot remains installed'
+      : 'Plugin update failed')
     throw error
   }
 }

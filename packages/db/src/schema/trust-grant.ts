@@ -13,8 +13,8 @@ import { textPk, timestamps } from './shared'
 export const trustGrants = sqliteTable('trust_grants', {
   id: textPk(),
   /** Discriminates the kind of trust subject. */
-  subjectType: text('subject_type', { enum: ['plugin_package', 'worktree_setup_hook'] }).notNull(),
-  /** Identifier meaningful to the subject type — plugin name or workspace id. */
+  subjectType: text('subject_type', { enum: ['plugin_package', 'plugin_permission', 'worktree_setup_hook'] }).notNull(),
+  /** Identifier meaningful to the subject type: plugin name, encoded plugin permission, or workspace id. */
   subjectKey: text('subject_key').notNull(),
   /**
    * Package checksum for `plugin_package`; `'*'` sentinel for
