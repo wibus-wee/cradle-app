@@ -258,23 +258,7 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     }
 
     hydrateGenerationRef.current += 1
-    const runState = chatSelectors.sessionRunState(chatSessionId)(useChatStore.getState())
     const store = useChatStore.getState()
-    const projection = deriveSessionSnapshotProjection({
-      rows: snapshotRows,
-      runState,
-      existingMessages: store.messagesMap.get(chatSessionId) ?? [],
-      runtimeStatusKnown,
-      runtimeIdle,
-      runtimeActiveRunMessageId,
-    })
-    if (!projection) {
-      return
-    }
-
-    // Snapshot rows already carry full message payloads — commit synchronously.
-    applyProjectedMessages(chatSessionId, projection, scheduleSnapshotRefresh)
-
     const pendingPassiveStreamLeaseRelease = pendingPassiveStreamLeaseReleaseRef.current
     if (
       pendingPassiveStreamLeaseRelease
@@ -285,12 +269,27 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       )
     ) {
       pendingPassiveStreamLeaseReleaseRef.current = null
-      const state = useChatStore.getState()
-      if (state.streamLeaseMap.get(pendingPassiveStreamLeaseRelease.messageId)?.sessionId === chatSessionId) {
-        state.releaseStreamLease(pendingPassiveStreamLeaseRelease.messageId)
+      if (store.streamLeaseMap.get(pendingPassiveStreamLeaseRelease.messageId)?.sessionId === chatSessionId) {
+        store.releaseStreamLease(pendingPassiveStreamLeaseRelease.messageId)
         refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
       }
     }
+
+    const runState = chatSelectors.sessionRunState(chatSessionId)(useChatStore.getState())
+    const projection = deriveSessionSnapshotProjection({
+      rows: snapshotRows,
+      runState,
+      existingMessages: useChatStore.getState().messagesMap.get(chatSessionId) ?? [],
+      runtimeStatusKnown,
+      runtimeIdle,
+      runtimeActiveRunMessageId,
+    })
+    if (!projection) {
+      return
+    }
+
+    // Snapshot rows already carry full message payloads — commit synchronously.
+    applyProjectedMessages(chatSessionId, projection, scheduleSnapshotRefresh)
   }, [chatSessionId, driverEnabled, refreshQueue, runtimeActiveRunMessageId, runtimeIdle, runtimeStatusKnown, scheduleSnapshotRefresh, snapshotRows, snapshotRowsQuery.dataUpdatedAt, snapshotRowsQuery.isFetching])
 
   useEffect(() => {

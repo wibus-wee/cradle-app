@@ -197,6 +197,8 @@ describe('useChatSessionDriver', () => {
     })
     const passiveStreamInput = vi.mocked(openPassiveSessionStream).mock.calls[0]?.[0]
     expect(passiveStreamInput).toBeDefined()
+    mocks.store.setMessages.mockClear()
+    mocks.store.releaseStreamLease.mockClear()
 
     act(() => {
       mocks.store.streamLeaseMap.set('assistant-1', { sessionId: 'new-session' })
@@ -210,5 +212,8 @@ describe('useChatSessionDriver', () => {
     })
 
     expect(mocks.store.releaseStreamLease).toHaveBeenCalledWith('assistant-1')
+    expect(mocks.store.releaseStreamLease.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.store.setMessages.mock.invocationCallOrder[0]!,
+    )
   })
 })
