@@ -19,7 +19,8 @@ const CLAUDE_AGENT_PERMISSION_MODES = [
 
 export type ClaudeAgentPermissionMode = typeof CLAUDE_AGENT_PERMISSION_MODES[number]
 
-const CODEX_ACCESS_MODES = ['approval-required', 'full-access'] as const
+const REVIEWED_ACCESS_MODES = ['approval-required', 'approve-for-me', 'full-access'] as const
+const OPENCODE_ACCESS_MODES = ['approval-required', 'full-access'] as const
 const CODEX_INTERACTION_MODES = ['default', 'plan'] as const
 const CODEX_SERVICE_TIERS = ['fast'] as const
 
@@ -43,7 +44,7 @@ const CODEX_RUNTIME_SETTINGS_SCHEMA: RuntimeSettingsSchemaLike = {
     accessMode: {
       type: 'string',
       title: 'Access',
-      enum: [...CODEX_ACCESS_MODES],
+      enum: [...REVIEWED_ACCESS_MODES],
       default: 'full-access',
     },
     interactionMode: {
@@ -55,7 +56,24 @@ const CODEX_RUNTIME_SETTINGS_SCHEMA: RuntimeSettingsSchemaLike = {
   },
 }
 
-const OPENCODE_RUNTIME_SETTINGS_SCHEMA = CODEX_RUNTIME_SETTINGS_SCHEMA
+const OPENCODE_RUNTIME_SETTINGS_SCHEMA: RuntimeSettingsSchemaLike = {
+  type: 'object',
+  required: ['accessMode', 'interactionMode'],
+  properties: {
+    accessMode: {
+      type: 'string',
+      title: 'Access',
+      enum: [...OPENCODE_ACCESS_MODES],
+      default: 'full-access',
+    },
+    interactionMode: {
+      type: 'string',
+      title: 'Interaction',
+      enum: [...CODEX_INTERACTION_MODES],
+      default: 'default',
+    },
+  },
+}
 
 const CLAUDE_AGENT_DEFAULTS: RuntimeSettings = {
   permissionMode: 'bypassPermissions',
@@ -134,7 +152,7 @@ const RUNTIME_SETTINGS_REGISTRY: Partial<Record<RuntimeKind, RuntimeSettingsRegi
     schema: CODEX_RUNTIME_SETTINGS_SCHEMA,
     defaults: CODEX_DEFAULTS,
     fields: [
-      { key: 'accessMode', allowed: CODEX_ACCESS_MODES },
+      { key: 'accessMode', allowed: REVIEWED_ACCESS_MODES },
       { key: 'interactionMode', allowed: CODEX_INTERACTION_MODES },
       { key: 'serviceTier', allowed: CODEX_SERVICE_TIERS },
     ],
@@ -143,7 +161,7 @@ const RUNTIME_SETTINGS_REGISTRY: Partial<Record<RuntimeKind, RuntimeSettingsRegi
     schema: CODEX_RUNTIME_SETTINGS_SCHEMA,
     defaults: CODEX_DEFAULTS,
     fields: [
-      { key: 'accessMode', allowed: CODEX_ACCESS_MODES },
+      { key: 'accessMode', allowed: REVIEWED_ACCESS_MODES },
       { key: 'interactionMode', allowed: CODEX_INTERACTION_MODES },
     ],
   }),
@@ -151,7 +169,7 @@ const RUNTIME_SETTINGS_REGISTRY: Partial<Record<RuntimeKind, RuntimeSettingsRegi
     schema: OPENCODE_RUNTIME_SETTINGS_SCHEMA,
     defaults: CODEX_DEFAULTS,
     fields: [
-      { key: 'accessMode', allowed: CODEX_ACCESS_MODES },
+      { key: 'accessMode', allowed: OPENCODE_ACCESS_MODES },
       { key: 'interactionMode', allowed: CODEX_INTERACTION_MODES },
     ],
   }),
@@ -222,11 +240,13 @@ export function resolveRunRuntimeSettings(
 export function readCodexLikeRuntimeSettings(
   settings: RuntimeSettings | null | undefined,
 ): {
-  accessMode: 'approval-required' | 'full-access'
+  accessMode: 'approval-required' | 'approve-for-me' | 'full-access'
   interactionMode: 'default' | 'plan'
   serviceTier: 'fast' | null
 } {
-  const accessMode = settings?.accessMode === 'approval-required' ? 'approval-required' : 'full-access'
+  const accessMode = settings?.accessMode === 'approval-required' || settings?.accessMode === 'approve-for-me'
+    ? settings.accessMode
+    : 'full-access'
   const interactionMode = settings?.interactionMode === 'plan' ? 'plan' : 'default'
   const serviceTier = settings?.serviceTier === 'fast' ? 'fast' : null
   return { accessMode, interactionMode, serviceTier }

@@ -2,7 +2,7 @@
 
 This file records native Codex app-server capabilities that Cradle either has not projected yet or intentionally leaves provider-native. Prefer documenting here over advertising unsupported behavior.
 
-Protocol baseline for this note: Codex CLI / app-server **0.146.0** (PR #106 protocol refresh), on top of the earlier 0.145 adaptations from PR #98.
+Protocol baseline for this note: Codex CLI / app-server **0.148.0**, matching [`app-server-protocol/MANIFEST.json`](./app-server-protocol/MANIFEST.json).
 
 ## Classification key
 
@@ -14,6 +14,7 @@ Protocol baseline for this note: Codex CLI / app-server **0.146.0** (PR #106 pro
 
 | Native fact | Class | Notes |
 |---|---|---|
+| `approvalsReviewer: auto_review` + Guardian review events | **Projected** | `approve-for-me` keeps on-request approvals and the workspace-write sandbox, projects reviewer settings across thread/turn/live updates, and exposes review risk/rationale in the approval slot. |
 | `Thread.isPinned` + list/filter + metadata patch | Follow up | Cradle sidebar pins *workspaces*, not Codex threads. Do not invent a second pin store without an ownership decision. |
 | `SkillInterface.iconSmallUrl` / `iconLargeUrl` | **Projected** | Skills UI slot `items[]` carries `iconUrl` / `brandColor` / `displayName`. |
 | `commandExecution.pluginId` / `scriptPath` | **Projected** | Tool input args include plugin provenance for command executions. |

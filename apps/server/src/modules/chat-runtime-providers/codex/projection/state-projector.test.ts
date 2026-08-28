@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import type { RuntimeSession } from '../../../chat-runtime/runtime-provider-types'
 import { decodeCodexDurableCheckpoint } from '../state/durable-checkpoint'
+import { projectCodexProviderStateSnapshot, readCodexProviderSnapshot } from './state-projector'
 
 function legacySnapshot(turns: unknown[]): string {
   return JSON.stringify({
@@ -46,5 +48,44 @@ describe('decodeCodexDurableCheckpoint', () => {
 
     expect(second.didNormalize).toBe(false)
     expect(second.serialized).toBe(first.serialized)
+  })
+})
+
+describe('codex automatic approval review projection', () => {
+  it('preserves the reviewer label, risk, and rationale for the UI slot', () => {
+    const runtimeSession: RuntimeSession = {
+      id: 'runtime-session-1',
+      chatSessionId: 'chat-session-1',
+      runtimeKind: 'codex',
+      providerTargetId: 'target-1',
+      providerSessionId: 'thread-1',
+      providerStateSnapshot: null,
+    }
+
+    projectCodexProviderStateSnapshot(runtimeSession, {
+      method: 'item/autoApprovalReview/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        reviewId: 'review-1',
+        targetItemId: 'command-1',
+        action: { type: 'command' },
+        review: {
+          status: 'approved',
+          riskLevel: 'medium',
+          rationale: 'Command is limited to the workspace.',
+        },
+      },
+    }, 'thread-1')
+
+    expect(readCodexProviderSnapshot(runtimeSession.providerStateSnapshot).codex?.approvals?.items).toEqual([
+      expect.objectContaining({
+        id: 'review-1',
+        label: 'Auto review · Command',
+        status: 'approved',
+        riskLevel: 'medium',
+        rationale: 'Command is limited to the workspace.',
+      }),
+    ])
   })
 })

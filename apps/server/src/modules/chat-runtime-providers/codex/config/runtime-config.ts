@@ -190,29 +190,32 @@ export function buildCodexConfig(
 }
 
 export function projectCodexRuntimeAccessMode(
-  accessMode: 'approval-required' | 'full-access',
+  accessMode: 'approval-required' | 'approve-for-me' | 'full-access',
   input: {
     writableRoots: string[]
     additionalDirectories: string[]
   },
 ): {
   approvalPolicy: CodexConfig['approvalPolicy']
+  approvalsReviewer: NonNullable<ThreadForkParams['approvalsReviewer']>
   sandbox: CodexConfig['sandboxMode']
   sandboxPolicy: SandboxPolicy
 } {
-  if (accessMode === 'approval-required') {
+  if (accessMode !== 'full-access') {
     // Codex ≥0.147 dropped `untrusted`. "Approval required" now maps to the
     // supported strictest combo: workspace-write sandbox with on-request
     // approvals — escalations (e.g. writes outside the workspace) surface as
     // real approval requests instead of failing thread/start.
     return {
       approvalPolicy: 'on-request',
+      approvalsReviewer: accessMode === 'approve-for-me' ? 'auto_review' : 'user',
       sandbox: 'workspace-write',
       sandboxPolicy: toSandboxPolicy('workspace-write', input.writableRoots, input.additionalDirectories),
     }
   }
   return {
     approvalPolicy: 'never',
+    approvalsReviewer: 'user',
     sandbox: 'danger-full-access',
     sandboxPolicy: toSandboxPolicy('danger-full-access', input.writableRoots, input.additionalDirectories),
   }

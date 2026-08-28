@@ -37,6 +37,7 @@ const spec = {
       "type": "string",
       "values": [
         "approval-required",
+        "approve-for-me",
         "full-access"
       ]
     },
