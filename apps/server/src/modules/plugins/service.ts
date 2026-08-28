@@ -22,17 +22,19 @@ import {
   discoverAndActivateSource,
   enablePlugin,
   inspectDiscoveredSourceRemoval,
+  rediscoverAndActivateSource,
   removeDiscoveredSource,
 } from '../../plugins/loader'
 import { classifyPluginSource, createPluginDescriptor, getPluginDescriptorByRouteSegment, listPluginDescriptors } from '../../plugins/runtime-registry'
 import type { PluginSourceInstallerOptions } from '../../plugins/source-installer'
 import {
+  deletePluginSourceCache,
   inspectPluginSourceDirectory,
   refreshPluginSourceDirectory,
   resolvePluginSourceDirectory,
 } from '../../plugins/source-installer'
 import type { AddPluginSourceInput } from '../../plugins/source-registry'
-import { addPluginSource, deletePluginSource, listPluginSources, readPluginSource } from '../../plugins/source-registry'
+import { addPluginSource, deletePluginSource, listPluginSources, readPluginSource, touchPluginSource } from '../../plugins/source-registry'
 import { evaluatePluginSourceTrust, readFabricNodeExposure } from '../../plugins/trust-policy'
 
 export interface PluginMentionCapability {
@@ -481,6 +483,88 @@ export async function createSource(
   }
 }
 
+function requireAbsolutePackageDir(packageDir: string): string {
+  const absolutePackageDir = resolve(packageDir)
+  if (absolutePackageDir !== packageDir) {
+    throw new AppError({
+      code: 'plugin_package_dir_not_absolute',
+      status: 400,
+      message: 'Personal plugin packageDir must be an absolute path.',
+    })
+  }
+  return absolutePackageDir
+}
+
+export async function installPersonalPlugin(
+  input: { packageDir: string, label?: string | null, addedReason?: string | null },
+  options: PluginSourceInstallerOptions = {},
+): Promise<AddPluginSourceResult> {
+  const packageDir = requireAbsolutePackageDir(input.packageDir)
+  const duplicate = listPluginSources().find(source => source.kind === 'personal' && source.location === packageDir)
+  if (duplicate) {
+    throw new AppError({
+      code: 'personal_plugin_already_installed',
+      status: 409,
+      message: 'This personal plugin source is already installed. Update its existing source instead.',
+      details: { sourceId: duplicate.id },
+    })
+  }
+
+  const source = addPluginSource({
+    kind: 'personal',
+    location: packageDir,
+    label: input.label,
+    addedReason: input.addedReason ?? 'Built and installed as a personal plugin.',
+  })
+  try {
+    await refreshPluginSourceDirectory(source, options)
+    const discovered = await discoverAndActivateSource(source.id, options)
+    return {
+      source: await toPluginSourceRegistryEntryView(source),
+      discoveredPlugins: discovered.map(toPluginDescriptorView),
+    }
+  }
+  catch (error) {
+    await deletePluginSourceCache(source).catch(() => undefined)
+    deletePluginSource(source.id)
+    throw error
+  }
+}
+
+export async function updatePersonalPlugin(
+  sourceId: string,
+  input: { packageDir: string },
+  options: PluginSourceInstallerOptions = {},
+): Promise<AddPluginSourceResult> {
+  const source = readPluginSource(sourceId)
+  if (!source || source.kind !== 'personal') {
+    throw new AppError({
+      code: 'personal_plugin_source_not_found',
+      status: 404,
+      message: 'Personal plugin source not found.',
+      details: { sourceId },
+    })
+  }
+  const packageDir = requireAbsolutePackageDir(input.packageDir)
+  if (packageDir !== source.location) {
+    throw new AppError({
+      code: 'personal_plugin_source_mismatch',
+      status: 409,
+      message: 'Update packageDir must match the retained source directory used during installation.',
+      details: { sourceId, expectedPackageDir: source.location },
+    })
+  }
+
+  await refreshPluginSourceDirectory(source, options)
+  const discovered = await rediscoverAndActivateSource(source.id, options)
+  touchPluginSource(source.id)
+  const updatedSource = readPluginSource(source.id)!
+  return {
+    source: await toPluginSourceRegistryEntryView(updatedSource),
+    discoveredPlugins: discovered.map(toPluginDescriptorView),
+  }
+}
+
 /**
  * Stateless preview of a plugin source: download to the hash-keyed cache,
  * discover packages, evaluate trust, and return - **no DB row, no runtime
@@ -592,9 +676,11 @@ export async function refreshSource(
 
   try {
     await refreshPluginSourceDirectory(source, options)
-    const discovered = await discoverAndActivateSource(source.id, options)
+    const discovered = await rediscoverAndActivateSource(source.id, options)
+    touchPluginSource(source.id)
+    const updatedSource = readPluginSource(source.id)!
     return {
-      source: await toPluginSourceRegistryEntryView(source),
+      source: await toPluginSourceRegistryEntryView(updatedSource),
       discoveredPlugins: discovered.map(toPluginDescriptorView),
     }
   }

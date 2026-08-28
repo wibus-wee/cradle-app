@@ -4,16 +4,23 @@ Cradle-owned plugin APIs live in this module. The module reads the runtime plugi
 
 This module owns host activation APIs. Host activation means Cradle decides whether a plugin package is active at all. It is separate from plugin-owned settings stored in the plugin's own namespace. A plugin setting can change behavior inside an active plugin; host activation decides whether Cradle imports the server entry, serves the web bundle, exposes plugin routes, and registers runtime capabilities.
 
-## Routes
+## Route map
 
-- `GET /plugins` lists host plugin descriptors for management surfaces, the web plugin host, and generated SDK/CLI usage. Descriptors include activation state, layer state, source trust and granted permissions, declared capabilities, runtime capabilities, warnings, and an `active` projection.
-- `GET /plugins/:routeSegment` reads one host plugin descriptor by route segment. The route segment is the URL-safe identifier from the descriptor, not the package identity.
-- `PATCH /plugins/:routeSegment/enabled` updates Cradle's activation policy for one plugin and returns the updated descriptor. The request body is `{ enabled: boolean, reason?: string | null }`.
-- `GET /plugins/mentions` lists plugin mention candidates for the chat composer. It reads plugin descriptors and capabilities from Cradle's plugin registry; it does not read from or write to MCP registry state.
-- `GET /plugins/:routeSegment/icon` reads a plugin-owned package-relative icon declared by `cradle.icon`.
-- `GET /plugins/sources` and `GET /plugins/sources/:id` project persisted plugin sources from the local cache only. A missing cache is reported as unresolved; reads never download, run npm, extract, or publish a source cache.
-- `POST /plugins/sources/preview`, `POST /plugins/sources`, and `POST /plugins/sources/:id/refresh` are the resolving commands. GitHub archives are downloaded through the server Download Center; the plugin host owns extraction, package discovery, trust evaluation, and cache publication. Concurrent operations for the same `{ kind, location, ref, subPath }` share one cache-keyed operation.
-- `GET|POST /plugins/dev-sessions`, `POST /plugins/dev-sessions/:id/reload`, `POST /plugins/dev-sessions/:id/heartbeat`, `DELETE /plugins/dev-sessions/:id`, and `GET /plugins/dev-sessions/events` own temporary local development lifecycles. Sessions are memory-only, accept explicit Vite output entries below an absolute plugin package directory, version layer reloads, and expire after 45 seconds without a CLI heartbeat. They never write plugin source or trust records.
+| Surface | Routes | Responsibility |
+| --- | --- | --- |
+| Descriptor management | `GET /plugins`, `GET /plugins/:routeSegment`, `PATCH /plugins/:routeSegment/enabled` | Projects runtime, activation, trust, permission, and capability state; activation records checksum-bound operator trust. |
+| Composer and assets | `GET /plugins/mentions`, `GET /plugins/:routeSegment/icon` | Projects mention candidates and validated package-relative icons without owning Plugin behavior. |
+| Persistent sources | `GET|POST /plugins/sources`, `GET /plugins/sources/:id`, `POST /plugins/sources/preview`, `POST /plugins/sources/:id/refresh` | Resolves local, Git, and npm sources and projects their cached packages. Read routes never download, pack, extract, or publish. |
+| Personal Plugins | `POST /plugins/personal`, `POST /plugins/personal/:sourceId` | Packs a retained authoring directory into a validated Cradle-owned snapshot. Update publishes through staging so build or validation failure preserves the prior snapshot. |
+| Uninstall | `GET /plugins/sources/:id/uninstall-plan`, `DELETE /plugins/sources/:id` | Inspects and confirms Plugin cleanup before deleting records and Cradle-owned snapshots. Personal authoring directories are retained. |
+| Development sessions | `GET|POST /plugins/dev-sessions`, `POST /plugins/dev-sessions/:id/reload`, `POST /plugins/dev-sessions/:id/heartbeat`, `DELETE /plugins/dev-sessions/:id`, `GET /plugins/dev-sessions/events` | Owns attached, memory-only watch sessions that expire after 45 seconds without a CLI heartbeat and never write persistent source or trust records. |
+
+GitHub archives are downloaded through the server Download Center; the Plugin
+host owns extraction, package discovery, trust evaluation, and cache
+publication. Concurrent operations for the same
+`{ kind, location, ref, subPath }` share one cache-keyed operation. Personal
+Plugin snapshots instead use the package's standard `npm pack` boundary after
+the CLI completes its package-owned build.
 
 Enabling an `externalLocal` plugin also records an operator trust grant for the currently discovered package checksum. The grant is host policy, not plugin-owned settings. If the package contents change, the checksum changes and Cradle disables the plugin until the operator enables that exact package revision again. External local plugins remain blocked while the server is enrolled as a Fabric node.
 

@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { access, mkdir, readdir, rename, rm } from 'node:fs/promises'
+import { access, mkdir, readdir, readFile, rename, rm } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
 import type { PluginSource } from '@cradle/db'
 import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
+import { parseCradlePluginPackageJsonText } from '@cradle/plugin-sdk/manifest'
 import * as tar from 'tar'
 
 import { getServerConfig } from '../infra'
@@ -73,11 +74,26 @@ function validateNpmPackageName(packageName: string): void {
   }
 }
 
-function packageDirectoryName(source: PluginSource): string {
-  return source.location
-    .replace(/^@/, '')
-    .replace(/\//g, '-')
-    .replace(/[^\w.-]/g, '-')
+function packageDirectoryName(source: PluginSource, revision?: string): string {
+  let name: string
+  if (source.kind === 'personal') {
+    name = basename(source.location)
+  }
+  else {
+    name = source.location
+      .replace(/^@/, '')
+      .replace(/\//g, '-')
+      .replace(/[^\w.-]/g, '-')
+  }
+  return revision ? `${name}-${revision.slice(0, 12)}` : name
+}
+
+function requireAbsolutePersonalSource(source: PluginSource): string {
+  const packageDir = resolve(source.location)
+  if (packageDir !== source.location) {
+    throw new Error('Personal plugin source location must be an absolute path.')
+  }
+  return packageDir
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -118,13 +134,17 @@ async function publishCache(stagingDir: string, cacheDir: string): Promise<void>
   }
 }
 
-async function normalizeDiscoveryRoot(contentDir: string, source: PluginSource): Promise<string> {
+async function normalizeDiscoveryRoot(
+  contentDir: string,
+  source: PluginSource,
+  revision?: string,
+): Promise<string> {
   if (!await pathExists(resolve(contentDir, 'package.json'))) {
     return contentDir
   }
 
   const packagesDir = resolve(dirname(contentDir), 'packages')
-  const packageDir = resolve(packagesDir, packageDirectoryName(source))
+  const packageDir = resolve(packagesDir, packageDirectoryName(source, revision))
   await mkdir(packagesDir, { recursive: true })
   await rm(packageDir, { recursive: true, force: true })
   await rename(contentDir, packageDir)
@@ -215,7 +235,45 @@ async function packNpmSource(source: PluginSource, archiveDir: string): Promise<
   return resolve(archiveDir, basename(packedFile))
 }
 
-async function installGitOrNpmSource(source: PluginSource, options: PluginSourceInstallerOptions): Promise<string> {
+async function packPersonalSource(source: PluginSource, archiveDir: string): Promise<string> {
+  const packageDir = requireAbsolutePersonalSource(source)
+  if (!await pathExists(resolve(packageDir, 'package.json'))) {
+    throw new Error(`Personal plugin package is missing package.json: ${packageDir}`)
+  }
+  const { stdout } = await execFileAsync('npm', [
+    'pack',
+    packageDir,
+    '--ignore-scripts',
+    '--pack-destination',
+    archiveDir,
+  ])
+  const packedFile = stdout
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .at(-1)
+  if (!packedFile) {
+    throw new Error(`npm pack did not produce an archive for ${packageDir}.`)
+  }
+  return resolve(archiveDir, basename(packedFile))
+}
+
+async function validatePersonalPackage(packageDir: string): Promise<void> {
+  const parsed = parseCradlePluginPackageJsonText(await readFile(resolve(packageDir, 'package.json'), 'utf8'))
+  const entries = [parsed.cradle.server, parsed.cradle.web, parsed.cradle.desktop].filter(
+    (entry): entry is string => !!entry,
+  )
+  if (entries.length === 0) {
+    throw new Error('Personal plugin package must declare at least one production entry.')
+  }
+  for (const entry of entries) {
+    if (!await pathExists(resolve(packageDir, entry))) {
+      throw new Error(`Personal plugin production entry is missing from the packed package: ${entry}`)
+    }
+  }
+}
+
+async function installCachedSource(source: PluginSource, options: PluginSourceInstallerOptions): Promise<string> {
   const cacheDir = cacheDirForSource(source)
   const stagingDir = resolve(cacheRoot(), `${source.id}.staging-${process.pid}-${Date.now()}`)
   const contentDir = resolve(stagingDir, 'content')
@@ -225,25 +283,43 @@ async function installGitOrNpmSource(source: PluginSource, options: PluginSource
   await mkdir(archiveDir, { recursive: true })
 
   try {
+    let revision: string
     if (source.kind === 'git') {
       const artifact = await downloadGitHubTarball(source, options)
       try {
+        revision = createHash('sha256').update(await readFile(artifact.filePath)).digest('hex')
         await extractGitSource(source, artifact.filePath, contentDir)
       }
       finally {
         await options.downloadCenter!.release(artifact.taskId)
       }
     }
-    else {
+    else if (source.kind === 'npm') {
       const archivePath = await packNpmSource(source, archiveDir)
+      revision = createHash('sha256').update(await readFile(archivePath)).digest('hex')
       await tar.x({
         file: archivePath,
         cwd: contentDir,
         strip: 1,
       })
     }
+    else if (source.kind === 'personal') {
+      const archivePath = await packPersonalSource(source, archiveDir)
+      revision = createHash('sha256').update(await readFile(archivePath)).digest('hex')
+      await tar.x({
+        file: archivePath,
+        cwd: contentDir,
+        strip: 1,
+      })
+      await validatePersonalPackage(contentDir)
+    }
+    else {
+      throw new Error(`Plugin source kind does not use the managed cache: ${source.kind}`)
+    }
 
-    const discoveryRoot = await normalizeDiscoveryRoot(contentDir, source)
+    // Entry paths include the packed revision so Node and Electron cannot reuse
+    // an older ESM module after the source cache is atomically replaced.
+    const discoveryRoot = await normalizeDiscoveryRoot(contentDir, source, revision)
     const discoveryRootName = basename(discoveryRoot)
     await publishCache(stagingDir, cacheDir)
     return resolve(cacheDir, discoveryRootName)
@@ -307,7 +383,7 @@ export async function resolvePluginSourceDirectory(
 
   return withSourceOperation(source, async () => {
     const cached = await inspectPluginSourceDirectory(source)
-    return cached ?? installGitOrNpmSource(source, options)
+    return cached ?? installCachedSource(source, options)
   })
 }
 
@@ -319,8 +395,7 @@ export async function refreshPluginSourceDirectory(
     return resolvePluginSourceDirectory(source, options)
   }
   return withSourceOperation(source, async () => {
-    await rm(cacheDirForSource(source), { recursive: true, force: true })
-    return installGitOrNpmSource(source, options)
+    return installCachedSource(source, options)
   })
 }
 

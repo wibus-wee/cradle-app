@@ -34,6 +34,12 @@ Use `cradle plugin docs all` only when the task genuinely spans the complete
 Plugin system. Use `cradle man plugin` for the current management command
 contract.
 
+For exact signatures, generics, or optional fields, inspect the declarations
+installed with the SDK at
+`node_modules/@cradleapp/plugin-sdk/dist/*.d.ts`. In the Cradle monorepo, inspect
+`packages/plugin-sdk/src/*.ts`. Never invent a Plugin API or duplicate those
+contracts into package documentation.
+
 ## Choose The Correct Surface
 
 - Use an Artifact for a session-bound interactive result that needs no host
@@ -54,41 +60,55 @@ contract.
    Import SDK contracts from their owning package instead of recreating types.
 3. Declare every capability and permission in `package.json`. Keep production
    entries separate from `cradle.dev` source entries.
-4. Run the package's focused typecheck and build. Fix manifest and build errors
-   before loading the Plugin.
-5. Preview with `cradle plugin dev --package-dir <absolute-package-dir>`. Keep
-   the process attached while iterating; successful builds reload only their
-   affected runtime layer.
-6. Verify the Plugin descriptor, contribution registration, and the behavior
-   requested by the user. Do not treat a successful build as runtime proof.
+4. Create or update `README.md`. Document the Plugin's purpose, user-facing
+   capabilities, declared permissions, configuration, build and verification
+   commands, and known constraints. Link to the canonical guide for SDK
+   semantics instead of copying it.
+5. Give the package an explicit finite `build` script. Run its focused
+   typecheck, tests where warranted, and build; fix all manifest and production
+   entry failures before installation.
+6. Verify the Plugin descriptor, contribution registration, and requested
+   behavior. Do not treat a successful build as runtime proof.
 
 ## Persistent Installation And Updates
 
-Use Cradle commands rather than direct HTTP or registry edits:
+The default Agent path is a finite install transaction:
 
 ```bash
-cradle plugin source add \
-  --kind localPath \
-  --location <absolute-package-dir> \
-  --label <display-label> \
-  --added-reason <reason>
+cradle plugin install --package-dir <absolute-package-dir>
 ```
 
-Adding a source discovers the package but does not authorize arbitrary local
-code. Before calling `cradle plugin set-enabled`, show the user the Plugin
-identity, layers, declared permissions, and source location, then obtain their
-explicit approval. Enabling an external local Plugin records an operator trust
-grant for that exact package checksum.
+The CLI runs the package build, validates the npm-packed production package,
+installs an immutable Cradle-owned snapshot, prints its source id, and exits.
+The authoring directory remains available for later edits but is never the
+runtime directory.
 
-For an installed local source, edit and verify the package first, then run:
+Installation does not authorize arbitrary local code. Before calling
+`cradle plugin set-enabled`, show the user the Plugin identity, layers,
+declared permissions, retained source location, and installed checksum, then
+obtain explicit approval. Enabling records an operator trust grant for that
+exact revision.
+
+For an installed personal Plugin, edit and verify its retained source first,
+then use the source id returned by installation:
 
 ```bash
-cradle plugin source refresh <source-id>
+cradle plugin update <source-id> --package-dir <absolute-package-dir>
 ```
 
-A code change produces a new checksum and invalidates the previous trust grant.
-Obtain explicit approval before enabling the new revision. Never weaken this
-boundary by editing trust storage, install receipts, or Cradle registry files.
+Build, pack, or validation failure preserves the installed snapshot. A
+successful update produces a new checksum and invalidates the previous trust
+grant. Obtain explicit approval before enabling the new revision. Never weaken
+this boundary by editing trust storage, install receipts, or Cradle registry
+files.
+
+## Explicit Developer Mode
+
+Use `cradle plugin dev --package-dir <absolute-package-dir>` only when the user
+explicitly requests watch mode, hot reload, interactive debugging, or Plugin
+development. Keep the process attached while iterating and stop it when the
+development session ends. Do not launch it as a background process or use it
+for ordinary personal installation.
 
 For uninstall, inspect the Cradle-owned uninstall plan and present its retained
 data, managed resources, and blockers before confirmation. Do not delete the

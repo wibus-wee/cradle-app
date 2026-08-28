@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
 
@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { PluginSourceDownloadCenter } from './source-installer'
 import {
+  deletePluginSourceCache,
   inspectPluginSourceDirectory,
   refreshPluginSourceDirectory,
   resolvePluginSourceDirectory,
@@ -120,6 +121,96 @@ describe('plugin source installer', () => {
     }))).resolves.toBe(root)
   })
 
+  it('runs personal plugins from an immutable npm package snapshot', async () => {
+    const dataDir = await tempRoot('cradle-source-data-')
+    const packageRoot = await tempRoot('cradle-source-personal-')
+    process.env.CRADLE_DATA_DIR = dataDir
+    delete process.env.CRADLE_DB_PATH
+    const packageDir = await writePluginPackage(packageRoot, '.', '@acme/personal-plugin')
+    const pluginSource = source({ id: 'personal-source', kind: 'personal', location: packageDir })
+
+    const discoveryDir = await resolvePluginSourceDirectory(pluginSource)
+    const snapshotEntries = await readdir(discoveryDir)
+    const snapshotDir = resolve(discoveryDir, snapshotEntries[0]!)
+    await writeFile(resolve(packageDir, 'server.mjs'), 'export function activate() { return "changed" }\n', 'utf8')
+
+    expect(snapshotDir).not.toBe(packageDir)
+    await expect(readFile(resolve(snapshotDir, 'server.mjs'), 'utf8')).resolves.toBe('export function activate() {}\n')
+  })
+
+  it('packs personal plugins without executing npm lifecycle scripts in the server', async () => {
+    const dataDir = await tempRoot('cradle-source-data-')
+    const packageRoot = await tempRoot('cradle-source-personal-')
+    process.env.CRADLE_DATA_DIR = dataDir
+    delete process.env.CRADLE_DB_PATH
+    const packageDir = await writePluginPackage(packageRoot, '.', '@acme/personal-plugin')
+    const packageJsonPath = resolve(packageDir, 'package.json')
+    const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8'))
+    packageJson.scripts = {
+      prepack: 'node -e "require(\'fs\').writeFileSync(\'prepack-ran\', \'yes\')"',
+    }
+    await writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8')
+
+    await resolvePluginSourceDirectory(source({
+      id: 'personal-source',
+      kind: 'personal',
+      location: packageDir,
+    }))
+
+    await expect(readFile(resolve(packageDir, 'prepack-ran'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('preserves the previous personal plugin snapshot when refresh validation fails', async () => {
+    const dataDir = await tempRoot('cradle-source-data-')
+    const packageRoot = await tempRoot('cradle-source-personal-')
+    process.env.CRADLE_DATA_DIR = dataDir
+    delete process.env.CRADLE_DB_PATH
+    const packageDir = await writePluginPackage(packageRoot, '.', '@acme/personal-plugin')
+    const pluginSource = source({ id: 'personal-source', kind: 'personal', location: packageDir })
+    const discoveryDir = await resolvePluginSourceDirectory(pluginSource)
+    const [snapshotName] = await readdir(discoveryDir)
+    const snapshotEntry = resolve(discoveryDir, snapshotName!, 'server.mjs')
+
+    await rm(resolve(packageDir, 'server.mjs'))
+    await expect(refreshPluginSourceDirectory(pluginSource)).rejects.toThrow(
+      'Personal plugin production entry is missing from the packed package: server.mjs',
+    )
+    await expect(readFile(snapshotEntry, 'utf8')).resolves.toBe('export function activate() {}\n')
+  })
+
+  it('publishes changed personal plugin code under a new revision directory', async () => {
+    const dataDir = await tempRoot('cradle-source-data-')
+    const packageRoot = await tempRoot('cradle-source-personal-')
+    process.env.CRADLE_DATA_DIR = dataDir
+    delete process.env.CRADLE_DB_PATH
+    const packageDir = await writePluginPackage(packageRoot, '.', '@acme/personal-plugin')
+    const pluginSource = source({ id: 'personal-source', kind: 'personal', location: packageDir })
+    const discoveryDir = await resolvePluginSourceDirectory(pluginSource)
+    const [firstRevision] = await readdir(discoveryDir)
+
+    await writeFile(resolve(packageDir, 'server.mjs'), 'export function activate() { return "updated" }\n', 'utf8')
+    await refreshPluginSourceDirectory(pluginSource)
+    const [secondRevision] = await readdir(discoveryDir)
+
+    expect(secondRevision).not.toBe(firstRevision)
+    await expect(readFile(resolve(discoveryDir, secondRevision!, 'server.mjs'), 'utf8')).resolves.toContain('updated')
+  })
+
+  it('removes a personal snapshot without deleting the retained authoring source', async () => {
+    const dataDir = await tempRoot('cradle-source-data-')
+    const packageRoot = await tempRoot('cradle-source-personal-')
+    process.env.CRADLE_DATA_DIR = dataDir
+    delete process.env.CRADLE_DB_PATH
+    const packageDir = await writePluginPackage(packageRoot, '.', '@acme/personal-plugin')
+    const pluginSource = source({ id: 'personal-source', kind: 'personal', location: packageDir })
+    await resolvePluginSourceDirectory(pluginSource)
+
+    await deletePluginSourceCache(pluginSource)
+
+    await expect(inspectPluginSourceDirectory(pluginSource)).resolves.toBeNull()
+    await expect(readFile(resolve(packageDir, 'package.json'), 'utf8')).resolves.toContain('@acme/personal-plugin')
+  })
+
   it('downloads GitHub tarballs through the Download Center with a compressed byte limit', async () => {
     const dataDir = await tempRoot('cradle-source-data-')
     const archiveRoot = await tempRoot('cradle-source-git-')
@@ -151,7 +242,8 @@ describe('plugin source installer', () => {
       })],
     }))
     expect(downloadCenter.release).toHaveBeenCalledWith('download-task')
-    const entries = await readFile(resolve(discoveryDir, 'acme-plugin-pack', 'package.json'), 'utf8')
+    const [packageName] = await readdir(discoveryDir)
+    const entries = await readFile(resolve(discoveryDir, packageName!, 'package.json'), 'utf8')
     expect(JSON.parse(entries)).toMatchObject({ name: '@acme/git-plugin' })
   })
 
@@ -236,7 +328,8 @@ describe('plugin source installer', () => {
     const [, refreshedDirectory] = await Promise.all([resolving, refreshing])
 
     expect(executions).toBe(2)
-    expect(JSON.parse(await readFile(resolve(refreshedDirectory, 'acme-plugin-pack', 'package.json'), 'utf8'))).toMatchObject({
+    const [refreshedPackageName] = await readdir(refreshedDirectory)
+    expect(JSON.parse(await readFile(resolve(refreshedDirectory, refreshedPackageName!, 'package.json'), 'utf8'))).toMatchObject({
       version: '2.0.0',
     })
   })
@@ -286,7 +379,8 @@ describe('plugin source installer', () => {
       ref: '1.0.0',
     }))
 
-    const rawPackageJson = await readFile(resolve(discoveryDir, 'acme-npm-plugin', 'package.json'), 'utf8')
+    const [packageName] = await readdir(discoveryDir)
+    const rawPackageJson = await readFile(resolve(discoveryDir, packageName!, 'package.json'), 'utf8')
     expect(JSON.parse(rawPackageJson)).toMatchObject({ name: '@acme/npm-plugin' })
   })
 })

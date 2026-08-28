@@ -26,7 +26,7 @@ export const pluginActivationPolicies = sqliteTable('plugin_activation_policies'
 
 export const pluginSources = sqliteTable('plugin_sources', {
   id: textPk(),
-  kind: text('kind', { enum: ['localPath', 'git', 'npm'] }).notNull(),
+  kind: text('kind', { enum: ['localPath', 'personal', 'git', 'npm'] }).notNull(),
   location: text('location').notNull(),
   ref: text('ref'),
   subPath: text('sub_path'),

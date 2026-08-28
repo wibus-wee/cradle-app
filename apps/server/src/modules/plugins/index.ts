@@ -80,6 +80,17 @@ export function createPluginsModule(options: PluginSourceInstallerOptions = {}) 
     body: PluginsModel.addPluginSourceBody,
     response: { 200: PluginsModel.addPluginSourceResult },
   })
+  .post('/personal', ({ body }) => Plugins.installPersonalPlugin(body, options), {
+    detail: { summary: 'Build snapshot installation for a personal plugin' },
+    body: PluginsModel.installPersonalPluginBody,
+    response: { 200: PluginsModel.addPluginSourceResult },
+  })
+  .post('/personal/:sourceId', ({ body, params }) => Plugins.updatePersonalPlugin(params.sourceId, body, options), {
+    detail: { summary: 'Replace a personal plugin with a newly built snapshot' },
+    params: t.Object({ sourceId: t.String({ minLength: 1 }) }),
+    body: PluginsModel.updatePersonalPluginBody,
+    response: { 200: PluginsModel.addPluginSourceResult },
+  })
   .post('/sources/preview', ({ body }) => Plugins.previewSource(body, options), {
     detail: {
       summary: 'Preview plugin source (no install)',

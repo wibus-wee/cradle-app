@@ -676,6 +676,19 @@ export async function discoverAndActivateSource(
     .filter((descriptor): descriptor is PluginDescriptor => !!descriptor)
 }
 
+export async function rediscoverAndActivateSource(
+  sourceId: string,
+  options: PluginSourceInstallerOptions = {},
+): Promise<PluginDescriptor[]> {
+  const descriptors = await sourceDescriptors(sourceId)
+  for (const descriptor of descriptors) {
+    await deactivatePluginServerLayer(descriptor.identity)
+    discoveredPluginManifests.delete(descriptor.identity)
+    unregisterPluginDescriptor(descriptor.identity)
+  }
+  return discoverAndActivateSource(sourceId, options)
+}
+
 export interface PluginSourceRemovalPluginPlan {
   identity: string
   displayName: string
