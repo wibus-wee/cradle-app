@@ -100,10 +100,9 @@ async function startApp(): Promise<void> {
         reactDiagnostics.initializeReactDiagnostics()
         rendererDiagnostics.installRendererDiagnostics()
         await pluginHost.loadWebPlugins()
-        pluginHost.startPluginLifecycleWatcher(() => {
+        await pluginHost.startPluginWatcher(() => {
           void queryClient.invalidateQueries({ queryKey: ['plugins'] })
         })
-        await pluginHost.startPluginDevSessionWatcher()
       })
       .catch((error) => {
         console.error('[bootstrap] post-render startup failed:', error)

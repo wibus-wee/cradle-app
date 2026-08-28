@@ -83,6 +83,11 @@ const PluginLifecycleEventSchema = z.object({
   pluginIdentities: z.array(z.string().min(1)),
 })
 
+const PluginEventSchema = z.discriminatedUnion('scope', [
+  z.object({ scope: z.literal('lifecycle'), event: PluginLifecycleEventSchema }),
+  z.object({ scope: z.literal('dev-session'), event: PluginDevSessionEventSchema }),
+])
+
 type PluginDevSession = z.infer<typeof PluginDevSessionSchema>
 
 interface WebRuntimeCapabilityRegistration {
@@ -367,29 +372,6 @@ async function reconcilePersistedWebPlugins(pluginIdentities: string[]): Promise
   )
 }
 
-export function startPluginLifecycleWatcher(onReconciled?: () => void): () => void {
-  const eventsUrl = new URL('/plugins/events', getServerUrl()).toString()
-  const source = openServerEventSource(eventsUrl)
-  let reconcileQueue = Promise.resolve()
-  source.onmessage = (message) => {
-    reconcileQueue = reconcileQueue
-      .then(() => {
-        const event = PluginLifecycleEventSchema.parse(JSON.parse(message.data))
-        return event.type === 'review-completed'
-          ? undefined
-          : reconcilePersistedWebPlugins(event.pluginIdentities)
-      })
-      .then(() => onReconciled?.())
-      .catch((error: unknown) => {
-        console.error('[plugin-host] persisted plugin reconciliation failed:', error)
-      })
-  }
-  source.onerror = () => {
-    console.warn('[plugin-host] persisted plugin event stream disconnected; fetch SSE will retry')
-  }
-  return () => source.close()
-}
-
 async function readPluginDescriptors(): Promise<PluginDescriptor[]> {
   const { data } = await getPlugins({ throwOnError: true })
   return data
@@ -413,16 +395,15 @@ async function reloadDevelopmentWebPlugin(session: PluginDevSession): Promise<vo
   console.log(`[plugin-host] development web reloaded: ${session.pluginName}@${session.revisions.web}`)
 }
 
-export async function startPluginDevSessionWatcher(): Promise<() => void> {
-  let source: ServerEventSource | null = null
-  let disposed = false
+export async function startPluginWatcher(onPersistedPluginsReconciled?: () => void): Promise<() => void> {
   const appliedRevisions = new Map<string, number>()
-  let reconcileQueue = Promise.resolve()
+  let persistedReconcileQueue = Promise.resolve()
+  let devSessionReconcileQueue = Promise.resolve()
 
-  const reconcile = (session: PluginDevSession): void => {
+  const reconcileDevSession = (session: PluginDevSession): void => {
     if (!session.entries.web || appliedRevisions.get(session.id) === session.revisions.web) { return }
     appliedRevisions.set(session.id, session.revisions.web)
-    reconcileQueue = reconcileQueue
+    devSessionReconcileQueue = devSessionReconcileQueue
       .then(() => reloadDevelopmentWebPlugin(session))
       .catch((error: unknown) => {
         appliedRevisions.delete(session.id)
@@ -433,7 +414,7 @@ export async function startPluginDevSessionWatcher(): Promise<() => void> {
 
   try {
     const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
-    for (const session of sessions) { reconcile(session) }
+    for (const session of sessions) { reconcileDevSession(session) }
   }
   catch (error) {
     // Development sessions are optional and the event stream below reconnects.
@@ -442,26 +423,37 @@ export async function startPluginDevSessionWatcher(): Promise<() => void> {
     console.warn('[plugin-host] initial development session read failed; continuing with event stream', error)
   }
 
-  if (disposed) { return () => undefined }
-  const eventsUrl = new URL('/plugins/dev-sessions/events', getServerUrl()).toString()
-  source = openServerEventSource(eventsUrl)
+  const eventsUrl = new URL('/plugins/events', getServerUrl()).toString()
+  const source: ServerEventSource = openServerEventSource(eventsUrl)
   source.onmessage = (message) => {
-    const event = PluginDevSessionEventSchema.parse(JSON.parse(message.data))
-    if (event.type === 'stopped') {
-      appliedRevisions.delete(event.session.id)
-      void deactivateWebPlugin(event.session.pluginName)
+    const pluginEvent = PluginEventSchema.parse(JSON.parse(message.data))
+    if (pluginEvent.scope === 'lifecycle') {
+      persistedReconcileQueue = persistedReconcileQueue
+        .then(() => pluginEvent.event.type === 'review-completed'
+          ? undefined
+          : reconcilePersistedWebPlugins(pluginEvent.event.pluginIdentities))
+        .then(() => onPersistedPluginsReconciled?.())
+        .catch((error: unknown) => {
+          console.error('[plugin-host] persisted plugin reconciliation failed:', error)
+        })
       return
     }
-    if (event.type === 'started' || event.layer === 'web') {
-      reconcile(event.session)
+
+    const devSessionEvent = pluginEvent.event
+    if (devSessionEvent.type === 'stopped') {
+      appliedRevisions.delete(devSessionEvent.session.id)
+      void deactivateWebPlugin(devSessionEvent.session.pluginName)
+      return
+    }
+    if (devSessionEvent.type === 'started' || devSessionEvent.layer === 'web') {
+      reconcileDevSession(devSessionEvent.session)
     }
   }
   source.onerror = () => {
-    console.warn('[plugin-host] plugin development event stream disconnected; fetch SSE will retry')
+    console.warn('[plugin-host] plugin event stream disconnected; fetch SSE will retry')
   }
 
   return () => {
-    disposed = true
-    source?.close()
+    source.close()
   }
 }

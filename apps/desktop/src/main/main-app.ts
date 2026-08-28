@@ -78,8 +78,7 @@ import { resolveDesktopPrimaryPluginsDir } from './plugin-paths'
 import {
   registerPluginSourceSyncIpcHandlers,
   setPluginSourceSyncServerUrl,
-  startPluginDevSessionSync,
-  startPluginSourceLifecycleSync,
+  startPluginSync,
 } from './plugin-source-sync'
 import { QuitGuard } from './quit-guard'
 import { DesktopServerFetchBroker } from './server-fetch-broker'
@@ -99,8 +98,7 @@ let desktopAppBadgeManager: DesktopAppBadgeManager | null = null
 let macBridgeManager: MacBridgeManager | null = null
 let chatStreamBroker: ChatStreamBroker | null = null
 let chatEventTailBroker: ChatEventTailBroker | null = null
-let stopPluginDevSessionSync: (() => void) | null = null
-let stopPluginSourceLifecycleSync: (() => void) | null = null
+let stopPluginSync: (() => void) | null = null
 let desktopServerGeneration = 0
 
 let notificationCenterManager: NotificationCenterManager | null = null
@@ -507,10 +505,8 @@ async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): 
   chatStreamBroker = null
   chatEventTailBroker?.stop()
   chatEventTailBroker = null
-  stopPluginDevSessionSync?.()
-  stopPluginDevSessionSync = null
-  stopPluginSourceLifecycleSync?.()
-  stopPluginSourceLifecycleSync = null
+  stopPluginSync?.()
+  stopPluginSync = null
   trayManager?.destroy()
   trayManager = null
   desktopAppBadgeManager?.destroy()
@@ -685,10 +681,8 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
   void syncDesktopPreferencesFromServer(serverUrl).then(() => {
     updateManager?.startBackgroundChecks()
   })
-  stopPluginSourceLifecycleSync?.()
-  stopPluginSourceLifecycleSync = startPluginSourceLifecycleSync()
-  stopPluginDevSessionSync?.()
-  stopPluginDevSessionSync = startPluginDevSessionSync()
+  stopPluginSync?.()
+  stopPluginSync = startPluginSync()
 }
 
 async function initializeDesktopUpdateManager(): Promise<void> {

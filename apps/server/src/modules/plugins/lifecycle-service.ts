@@ -1,7 +1,5 @@
 import { randomUUID } from 'node:crypto'
 
-import { openSseEventStream } from '../../infra/sse-event-stream'
-
 export type PluginLifecycleEventType
   = | 'source-installed'
     | 'source-updated'
@@ -62,17 +60,9 @@ class PluginLifecycleService {
     this.pendingReviews.delete(sourceId)
   }
 
-  stream(signal: AbortSignal): ReadableStream<Uint8Array> {
-    return openSseEventStream({
-      signal,
-      overflow: 'drop-oldest',
-      source: {
-        subscribe: (listener) => {
-          this.listeners.add(listener)
-          return () => this.listeners.delete(listener)
-        },
-      },
-    })
+  subscribe(listener: (event: PluginLifecycleEvent) => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
   }
 }
 

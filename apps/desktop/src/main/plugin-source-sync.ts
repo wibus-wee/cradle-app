@@ -59,6 +59,10 @@ const PluginDevSessionEventSchema = z.object({
   layer: z.enum(['server', 'web', 'desktop']).nullable(),
   session: PluginDevSessionSchema,
 })
+const PluginEventSchema = z.discriminatedUnion('scope', [
+  z.object({ scope: z.literal('lifecycle'), event: PluginLifecycleEventSchema }),
+  z.object({ scope: z.literal('dev-session'), event: PluginDevSessionEventSchema }),
+])
 
 type PluginSourceView = z.infer<typeof PluginSourceSchema>
 
@@ -140,16 +144,64 @@ export async function syncAllDesktopLayerSources(): Promise<void> {
   }
 }
 
-export function startPluginSourceLifecycleSync(): () => void {
+export function startPluginSync(): () => void {
+  const appliedDevSessions = new Map<string, { pluginName: string, revision: number }>()
   const abortController = new AbortController()
   let disposed = false
+
+  const applyDevSession = async (session: z.infer<typeof PluginDevSessionSchema>): Promise<void> => {
+    if (!session.entries.desktop || session.revisions.desktop === 0) { return }
+    if (appliedDevSessions.get(session.id)?.revision === session.revisions.desktop) { return }
+    await activateDevelopmentDesktopPlugin({
+      packageDir: session.packageDir,
+      desktopEntry: session.entries.desktop,
+      revision: session.revisions.desktop,
+    })
+    appliedDevSessions.set(session.id, {
+      pluginName: session.pluginName,
+      revision: session.revisions.desktop,
+    })
+  }
+
+  const removeDevSession = async (sessionId: string, pluginName: string): Promise<void> => {
+    if (!appliedDevSessions.delete(sessionId)) { return }
+    await deactivateDevelopmentDesktopPlugin(pluginName)
+  }
+
+  const reconcileDevSessions = async (): Promise<void> => {
+    const sessions = await fetchJson('/plugins/dev-sessions', PluginDevSessionsSchema)
+    const activeIds = new Set(sessions.map(session => session.id))
+    for (const [sessionId, state] of [...appliedDevSessions]) {
+      if (activeIds.has(sessionId)) { continue }
+      await removeDevSession(sessionId, state.pluginName)
+    }
+    for (const session of sessions) {
+      await applyDevSession(session)
+    }
+  }
+
+  const handleEvent = async (pluginEvent: z.infer<typeof PluginEventSchema>): Promise<void> => {
+    if (pluginEvent.scope === 'lifecycle') {
+      if (pluginEvent.event.type !== 'review-completed') {
+        await syncAllDesktopLayerSources()
+      }
+      return
+    }
+    const event = pluginEvent.event
+    if (event.type === 'stopped') {
+      await removeDevSession(event.session.id, event.session.pluginName)
+    }
+    else if (event.type === 'started' || event.layer === 'desktop') {
+      await applyDevSession(event.session)
+    }
+  }
 
   const consumeEvents = async (): Promise<void> => {
     const response = await fetch(new URL('/plugins/events', requireServerUrl()), {
       signal: abortController.signal,
     })
     if (!response.ok || !response.body) {
-      throw new Error(`Plugin lifecycle event stream failed with status ${response.status}.`)
+      throw new Error(`Plugin event stream failed with status ${response.status}.`)
     }
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
@@ -169,10 +221,7 @@ export function startPluginSourceLifecycleSync(): () => void {
           .map(line => line.slice('data:'.length).trimStart())
           .join('\n')
         if (!data) { continue }
-        const event = PluginLifecycleEventSchema.parse(JSON.parse(data))
-        if (event.type !== 'review-completed') {
-          await syncAllDesktopLayerSources()
-        }
+        await handleEvent(PluginEventSchema.parse(JSON.parse(data)))
       }
     }
   }
@@ -182,11 +231,12 @@ export function startPluginSourceLifecycleSync(): () => void {
       if (disposed) { return }
       try {
         await syncAllDesktopLayerSources()
+        await reconcileDevSessions()
         await consumeEvents()
       }
       catch (error) {
         if (disposed) { return }
-        console.error('[plugins] persisted desktop source sync failed:', error)
+        console.error('[plugins] desktop plugin sync failed:', error)
         await new Promise(resolvePromise => setTimeout(resolvePromise, 1_000))
       }
     }
@@ -200,100 +250,6 @@ export function startPluginSourceLifecycleSync(): () => void {
 
 export async function unsyncDesktopLayerForSource(pluginName: string): Promise<void> {
   await deactivateOneDesktopPlugin(pluginName)
-}
-
-export function startPluginDevSessionSync(): () => void {
-  const applied = new Map<string, { pluginName: string, revision: number }>()
-  const abortController = new AbortController()
-  let disposed = false
-
-  const applySession = async (session: z.infer<typeof PluginDevSessionSchema>): Promise<void> => {
-    if (!session.entries.desktop || session.revisions.desktop === 0) { return }
-    if (applied.get(session.id)?.revision === session.revisions.desktop) { return }
-    await activateDevelopmentDesktopPlugin({
-      packageDir: session.packageDir,
-      desktopEntry: session.entries.desktop,
-      revision: session.revisions.desktop,
-    })
-    applied.set(session.id, {
-      pluginName: session.pluginName,
-      revision: session.revisions.desktop,
-    })
-  }
-
-  const removeSession = async (sessionId: string, pluginName: string): Promise<void> => {
-    if (!applied.delete(sessionId)) { return }
-    await deactivateDevelopmentDesktopPlugin(pluginName)
-  }
-
-  const reconcileSnapshot = async (): Promise<void> => {
-    const sessions = await fetchJson('/plugins/dev-sessions', PluginDevSessionsSchema)
-    const activeIds = new Set(sessions.map(session => session.id))
-    for (const [sessionId, state] of [...applied]) {
-      if (activeIds.has(sessionId)) { continue }
-      await removeSession(sessionId, state.pluginName)
-    }
-    for (const session of sessions) {
-      await applySession(session)
-    }
-  }
-
-  const consumeEvents = async (): Promise<void> => {
-    const response = await fetch(new URL('/plugins/dev-sessions/events', requireServerUrl()), {
-      signal: abortController.signal,
-    })
-    if (!response.ok || !response.body) {
-      throw new Error(`Plugin development event stream failed with status ${response.status}.`)
-    }
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    for (;;) {
-      if (disposed) { return }
-      const result = await reader.read()
-      if (result.done) { return }
-      buffer += decoder.decode(result.value, { stream: true })
-      for (;;) {
-        const boundary = buffer.indexOf('\n\n')
-        if (boundary < 0) { break }
-        const frame = buffer.slice(0, boundary)
-        buffer = buffer.slice(boundary + 2)
-        const data = frame.split('\n')
-          .filter(line => line.startsWith('data:'))
-          .map(line => line.slice('data:'.length).trimStart())
-          .join('\n')
-        if (data) {
-          const event = PluginDevSessionEventSchema.parse(JSON.parse(data))
-          if (event.type === 'stopped') {
-            await removeSession(event.session.id, event.session.pluginName)
-          }
-          else if (event.type === 'started' || event.layer === 'desktop') {
-            await applySession(event.session)
-          }
-        }
-      }
-    }
-  }
-
-  void (async () => {
-    for (;;) {
-      if (disposed) { return }
-      try {
-        await reconcileSnapshot()
-        await consumeEvents()
-      }
-      catch (error) {
-        if (disposed) { return }
-        console.error('[plugins] desktop development session sync failed:', error)
-        await new Promise(resolvePromise => setTimeout(resolvePromise, 1_000))
-      }
-    }
-  })()
-
-  return () => {
-    disposed = true
-    abortController.abort()
-  }
 }
 
 export function registerPluginSourceSyncIpcHandlers(): void {

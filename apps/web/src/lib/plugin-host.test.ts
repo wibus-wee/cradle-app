@@ -5,8 +5,7 @@ import {
   deactivateWebPlugin,
   isWebLayerLoadable,
   loadWebPlugins,
-  startPluginDevSessionWatcher,
-  startPluginLifecycleWatcher,
+  startPluginWatcher,
 } from './plugin-host'
 
 const mocks = vi.hoisted(() => ({
@@ -107,7 +106,7 @@ describe('plugin host web layer filtering', () => {
       onmessage: null,
     })
 
-    const dispose = await startPluginDevSessionWatcher()
+    const dispose = await startPluginWatcher()
 
     expect(mocks.openServerEventSource).toHaveBeenCalledOnce()
     dispose()
@@ -126,11 +125,15 @@ describe('plugin host web layer filtering', () => {
       onerror: null,
       onmessage: null as ((event: MessageEvent<string>) => void) | null,
     }
+    mocks.readPluginDevSessions.mockResolvedValueOnce([])
     mocks.openServerEventSource.mockReturnValueOnce(source)
 
-    const dispose = startPluginLifecycleWatcher()
+    const dispose = await startPluginWatcher()
     source.onmessage?.(new MessageEvent('message', {
-      data: JSON.stringify({ type: 'source-removed', pluginIdentities: ['@personal/removed'] }),
+      data: JSON.stringify({
+        scope: 'lifecycle',
+        event: { type: 'source-removed', pluginIdentities: ['@personal/removed'] },
+      }),
     }))
     await vi.waitFor(() => expect(deactivate).toHaveBeenCalledOnce())
 

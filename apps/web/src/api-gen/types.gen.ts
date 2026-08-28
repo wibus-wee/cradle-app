@@ -13164,13 +13164,6 @@ export type DeletePluginsDevSessionsByIdResponses = {
 
 export type DeletePluginsDevSessionsByIdResponse = DeletePluginsDevSessionsByIdResponses[keyof DeletePluginsDevSessionsByIdResponses];
 
-export type GetPluginsDevSessionsEventsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/plugins/dev-sessions/events';
-};
-
 export type GetPluginsEventsData = {
     body?: never;
     path?: never;
