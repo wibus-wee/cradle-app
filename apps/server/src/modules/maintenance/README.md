@@ -2,7 +2,7 @@
 
 # Maintenance Module
 
-The maintenance module owns process-local scheduling mechanics for bounded server maintenance. It registers each task in Background Activity, applies stable per-task jitter, starts tasks once or on an interval, preserves single-flight execution, supplies a deadline, and stops timers during server shutdown.
+The maintenance module owns process-local scheduling mechanics for bounded server maintenance. It registers each task in Background Activity, applies stable per-task jitter, starts tasks once or on an interval, preserves single-flight execution, supplies a deadline and the optional footer presentation reporter, and stops timers during server shutdown.
 
 It does not import product schemas, select cleanup candidates, define retention periods, or compact the database by itself. Each owning module registers a callback and keeps its Drizzle transaction and deletion semantics local. Database-only cleanup commits one bounded batch at a time. Cross-resource cleanup such as Turn Checkpoint Git refs requires an owner-owned durable recovery lifecycle.
 
