@@ -145,6 +145,7 @@ export function ChatView({
     enabled: chatActive && !!sessionId,
     staleTime: 5_000,
   })
+
   const pluginReviewsQuery = useQuery({
     queryKey: ['plugins', 'reviews', sessionId],
     enabled: chatActive && !!sessionId,

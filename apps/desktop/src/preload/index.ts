@@ -54,6 +54,8 @@ const BROWSER_STATE_CHANNEL = 'desktop:browser-state'
 const BROWSER_PROMPT_REQUESTED_CHANNEL = 'desktop:browser-prompt-requested'
 const BROWSER_ANNOTATION_RUNTIME_EVENTED_CHANNEL = 'desktop:browser-annotation-runtime-evented'
 const DOWNLOAD_CENTER_TASK_CHANGED_CHANNEL = 'download-center:task-changed'
+const TEAROFF_SURFACE_BOUND_CHANNEL = 'window:tearoff-surface-bound'
+const TEAROFF_RENDERER_READY_CHANNEL = 'window:tearoff-renderer-ready'
 
 const IPC_DEVTOOL_EVENT_CHANNEL = 'ipc-devtool:event'
 const IPC_DEVTOOL_ACP_EVENT_CHANNEL = 'ipc-devtool:acp-event'
@@ -121,6 +123,13 @@ const cradleElectron = {
         ipcRenderer.removeListener('window:pointer-outside-window', listener)
       }
     },
+  },
+
+  /** Warm tear-off renderer lifecycle and dynamic surface binding. */
+  tearoff: {
+    notifyRendererReady: () => ipcRenderer.send(TEAROFF_RENDERER_READY_CHANNEL),
+    onSurfaceBound: (handler: (binding: unknown) => void) =>
+      subscribeIpc(TEAROFF_SURFACE_BOUND_CHANNEL, handler),
   },
 
   /** Desktop update status events pushed by the main process */

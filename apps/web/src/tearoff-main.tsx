@@ -1,23 +1,16 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import * as React from 'react'
 import * as ReactDOMClient from 'react-dom/client'
 
 import { AppErrorBoundary } from '~/components/common/app-error-boundary'
 import { resolveInitialLocale } from '~/i18n/browser-locale'
 import { I18nProvider } from '~/i18n/client'
+import { queryClient } from '~/lib/query-client'
 import { waitForServer } from '~/lib/server-readiness'
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: 1,
-    },
-  },
-})
 
 const initialLocale = resolveInitialLocale()
 const applicationPromise = import('~/app').then(module => module.App)
+const chatViewPromise = import('~/features/chat/chat-view')
 const stylesheetPromise = import('./styles.css')
 const root = ReactDOMClient.createRoot(document.getElementById('app')!)
 
@@ -53,6 +46,7 @@ async function showBootstrapError(error: unknown): Promise<void> {
 async function startTearoffApp(): Promise<void> {
   const [App] = await Promise.all([
     applicationPromise,
+    chatViewPromise,
     waitForServer(),
     stylesheetPromise,
   ])
@@ -67,6 +61,12 @@ async function startTearoffApp(): Promise<void> {
       </AppErrorBoundary>
     </React.StrictMode>,
   )
+
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      window.cradle?.tearoff?.notifyRendererReady()
+    })
+  })
 
   queueMicrotask(() => {
     void import('~/lib/perf-monitor').then(({ initPerfMonitor }) => {

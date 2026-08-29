@@ -3,6 +3,7 @@ import { isElectron, isTearoffWindow, nativeIpc, subscribeTearoffSurfaceClosed }
 import { closeSurfaceById, navigateToSurface } from './navigation-commands'
 import type { AppSurface } from './surface-identity'
 import { chatSurfaceId } from './surface-identity'
+import { createTearoffBootstrap } from './tearoff-bootstrap'
 
 /**
  * Registry of surfaces currently living in their own tear-off window.
@@ -30,6 +31,8 @@ interface OpenTearoffOptions {
   screenY?: number
   /** Close the surface in the main window after tearing it off. */
   detachSurface?: boolean
+  /** Continue the currently held pointer as an OS-native window drag. */
+  continuePointerDrag?: boolean
 }
 
 /**
@@ -53,7 +56,16 @@ export async function openTearoffSurfaceWindow(
   }
 
   try {
-    await nativeIpc.window.tearOffSurface(surface.id, surface.route, screenX, screenY)
+    await nativeIpc.window.tearOffSurface(
+      surface.id,
+      surface.route,
+      screenX,
+      screenY,
+      {
+        bootstrap: createTearoffBootstrap(surface),
+        continuePointerDrag: options.continuePointerDrag === true,
+      },
+    )
     if (options.detachSurface && !isTearoffWindow) {
       closeSurfaceById(surface.id)
     }

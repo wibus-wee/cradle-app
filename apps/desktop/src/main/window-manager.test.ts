@@ -16,11 +16,13 @@ const electronMocks = vi.hoisted(() => {
   class FakeBrowserWindow {
     static instances: FakeBrowserWindow[] = []
     static loadURLImpl: (url: string) => Promise<void> = () => Promise.resolve()
+    static nextWebContentsId = 1
 
     readonly options: Record<string, unknown>
     readonly handlers = new Map<string, Listener[]>()
     readonly onceHandlers = new Map<string, Listener[]>()
     readonly webContents = {
+      id: FakeBrowserWindow.nextWebContentsId++,
       getURL: vi.fn(() => 'http://127.0.0.1:5174/'),
       on: vi.fn(),
       send: vi.fn(),
@@ -30,11 +32,18 @@ const electronMocks = vi.hoisted(() => {
     destroyed = false
     focused = false
     shown = false
+    bounds: { x: number, y: number, width: number, height: number }
     loadURL = vi.fn((url: string) => FakeBrowserWindow.loadURLImpl(url))
     loadFile = vi.fn(() => Promise.resolve())
 
     constructor(options: Record<string, unknown>) {
       this.options = options
+      this.bounds = {
+        x: Number(options.x ?? 0),
+        y: Number(options.y ?? 0),
+        width: Number(options.width ?? 720),
+        height: Number(options.height ?? 640),
+      }
       FakeBrowserWindow.instances.push(this)
     }
 
@@ -61,11 +70,12 @@ const electronMocks = vi.hoisted(() => {
       }
     }
 
-    getBounds(): { width: number, height: number } {
-      return {
-        width: Number(this.options.width ?? 720),
-        height: Number(this.options.height ?? 640),
-      }
+    getBounds(): { x: number, y: number, width: number, height: number } {
+      return this.bounds
+    }
+
+    setBounds(bounds: { x: number, y: number, width: number, height: number }): void {
+      this.bounds = bounds
     }
 
     isDestroyed(): boolean {
@@ -83,6 +93,10 @@ const electronMocks = vi.hoisted(() => {
 
     show(): void {
       this.shown = true
+    }
+
+    isVisible(): boolean {
+      return this.shown
     }
 
     destroy(): void {
@@ -108,6 +122,7 @@ const electronMocks = vi.hoisted(() => {
       shouldUseDarkColors: false,
     },
     screen: {
+      getCursorScreenPoint: vi.fn(() => ({ x: 100, y: 100 })),
       getDisplayNearestPoint: vi.fn(() => ({
         workArea: { x: 0, y: 0, width: 1440, height: 900 },
       })),
@@ -144,6 +159,7 @@ const tempRoots: string[] = []
 
 afterEach(() => {
   electronMocks.BrowserWindow.instances.length = 0
+  electronMocks.BrowserWindow.nextWebContentsId = 1
   electronMocks.BrowserWindow.loadURLImpl = () => Promise.resolve()
   vi.clearAllMocks()
 
@@ -160,11 +176,55 @@ afterEach(() => {
 })
 
 describe('windowManager tear-off windows', () => {
+  it('claims one painted warm renderer and replenishes exactly one spare', async () => {
+    process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
+    const { WindowManager } = await import('./window-manager')
+    const manager = new WindowManager('http://localhost:3010')
+    const mainWindow = new electronMocks.BrowserWindow({})
+
+    manager.setMainWindow(mainWindow as never)
+    const warmWindow = electronMocks.BrowserWindow.instances[1]!
+    manager.markTearoffRendererReady(warmWindow.webContents.id)
+
+    const opened = await manager.openSurfaceWindow(
+      'chat:session-1',
+      CHAT_SURFACE_ROUTE,
+      1200,
+      40,
+      { bootstrap: { queries: [] }, continuePointerDrag: true },
+    )
+
+    expect(opened).toBe(warmWindow)
+    expect(warmWindow.shown).toBe(true)
+    expect(warmWindow.webContents.send).toHaveBeenCalledWith(
+      'window:tearoff-surface-bound',
+      {
+        surfaceId: 'chat:session-1',
+        route: CHAT_SURFACE_ROUTE,
+        bootstrap: { queries: [] },
+      },
+    )
+    // main + claimed window + one newly warming spare
+    expect(electronMocks.BrowserWindow.instances).toHaveLength(3)
+  })
+
+  it('reveals a cold tear-off immediately while its renderer boots', async () => {
+    process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
+    const { WindowManager } = await import('./window-manager')
+    const manager = new WindowManager('http://localhost:3010', { warmSurfaceWindows: false })
+
+    const opened = await manager.openSurfaceWindow('chat:session-1', CHAT_SURFACE_ROUTE, 1200, 40)
+    expect(electronMocks.BrowserWindow.instances[0]?.shown).toBe(true)
+
+    manager.markTearoffRendererReady(opened.webContents.id)
+    expect(electronMocks.BrowserWindow.instances[0]?.shown).toBe(true)
+  })
+
   it('subscribes the devtool window after its renderer has loaded', async () => {
     process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
 
     const { WindowManager } = await import('./window-manager')
-    const manager = new WindowManager('http://localhost:3010')
+    const manager = new WindowManager('http://localhost:3010', { warmSurfaceWindows: false })
 
     const devtoolWindow = await manager.openDevtoolWindow()
 
@@ -179,16 +239,13 @@ describe('windowManager tear-off windows', () => {
     process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
 
     const { WindowManager } = await import('./window-manager')
-    const manager = new WindowManager('http://localhost:3010')
+    const manager = new WindowManager('http://localhost:3010', { warmSurfaceWindows: false })
     const mainWindow = new electronMocks.BrowserWindow({})
 
     manager.setMainWindow(mainWindow as never)
     expect(manager.getLastFocusedAppshotWindow()).toBe(mainWindow)
 
     const tearoffWindow = await manager.openSurfaceWindow('chat:session-1', CHAT_SURFACE_ROUTE, 1200, 40)
-    expect(manager.getLastFocusedAppshotWindow()).toBe(mainWindow)
-
-    tearoffWindow.focus()
     expect(manager.getLastFocusedAppshotWindow()).toBe(tearoffWindow)
 
     mainWindow.focus()
@@ -211,7 +268,7 @@ describe('windowManager tear-off windows', () => {
     })
 
     const { WindowManager } = await import('./window-manager')
-    const manager = new WindowManager('http://localhost:3010')
+    const manager = new WindowManager('http://localhost:3010', { warmSurfaceWindows: false })
 
     const firstOpen = manager.openSurfaceWindow('chat:session-1', CHAT_SURFACE_ROUTE, 1200, 40)
     const secondOpen = manager.openSurfaceWindow('chat:session-1', CHAT_SURFACE_ROUTE, 1204, 44)
@@ -234,7 +291,7 @@ describe('windowManager tear-off windows', () => {
     electronMocks.BrowserWindow.loadURLImpl = () => Promise.reject(new Error('load failed'))
 
     const { WindowManager } = await import('./window-manager')
-    const manager = new WindowManager('http://localhost:3010')
+    const manager = new WindowManager('http://localhost:3010', { warmSurfaceWindows: false })
 
     await expect(manager.openSurfaceWindow('chat:session-1', CHAT_SURFACE_ROUTE, 1200, 40)).rejects.toThrow('load failed')
 

@@ -7,11 +7,17 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { getSessionsByIdWorkOptions } from '~/api-gen/@tanstack/react-query.gen'
 import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import { writeSurfaceRouteDrag } from '~/features/split-view/dnd/split-drag-payload'
 import type { WorkSummary } from '~/features/work/use-work'
 import type { Workspace } from '~/features/workspace/types'
-import { isElectron } from '~/lib/electron'
+import {
+  isElectron,
+  nativeIpc,
+  subscribePointerOutsideWindow,
+} from '~/lib/electron'
+import { queryClient } from '~/lib/query-client'
 import { useIsActiveSurfaceId } from '~/navigation/active-surface'
 import {
   openChatSession,
@@ -190,10 +196,18 @@ export const WorkspaceSessionItem = memo(
       dragWasTornOffRef.current = true
       dragCleanupRef.current?.()
       dragCleanupRef.current = null
+      // Sidebar rows already know that draggable sessions are not owned by a
+      // Work. Seed that route gate synchronously so the warm renderer never
+      // waits on a redundant resolution request before its first frame.
+      queryClient.setQueryData(
+        getSessionsByIdWorkOptions({ path: { id: session.id } }).queryKey,
+        { work: null },
+      )
       void openTearoffChatSessionWindow(session.id, {
         screenX: pointer.screenX,
         screenY: pointer.screenY,
         detachSurface: true,
+        continuePointerDrag: true,
       }).then((opened) => {
         if (!opened) {
           dragWasTornOffRef.current = false
@@ -211,6 +225,7 @@ export const WorkspaceSessionItem = memo(
       // still reads the plain id above.
       writeSurfaceRouteDrag(event.dataTransfer, { to: '/chat/$sessionId', params: { sessionId: session.id } })
       event.dataTransfer.effectAllowed = 'move'
+      prefetchSession()
       recordDragPosition(event.nativeEvent)
       dragWasTornOffRef.current = false
       dragCleanupRef.current?.()
@@ -220,24 +235,35 @@ export const WorkspaceSessionItem = memo(
           | MouseEvent
           | PointerEvent
           | TouchEvent,
-      ) => recordDragPosition(moveEvent)
+      ) => {
+        recordDragPosition(moveEvent)
+        checkSessionTearOff()
+      }
       window.addEventListener('dragover', handleDragMove, true)
       window.addEventListener('mousemove', handleDragMove, true)
       window.addEventListener('pointermove', handleDragMove, true)
       window.addEventListener('touchmove', handleDragMove, true)
+      const unsubscribePointerOutsideWindow = subscribePointerOutsideWindow((screenX, screenY) => {
+        dragScreenPointerRef.current = { screenX, screenY }
+        checkSessionTearOff()
+      })
+      void nativeIpc?.window.startPointerMonitor().catch(() => {})
       dragCleanupRef.current = () => {
         window.removeEventListener('dragover', handleDragMove, true)
         window.removeEventListener('mousemove', handleDragMove, true)
         window.removeEventListener('pointermove', handleDragMove, true)
         window.removeEventListener('touchmove', handleDragMove, true)
+        unsubscribePointerOutsideWindow()
+        void nativeIpc?.window.stopPointerMonitor().catch(() => {})
       }
-    }, [recordDragPosition, session.id])
+    }, [checkSessionTearOff, prefetchSession, recordDragPosition, session.id])
 
     const handleDrag = useCallback((
       event: ReactDragEvent<HTMLDivElement>,
     ) => {
       recordDragPosition(event.nativeEvent)
-    }, [recordDragPosition])
+      checkSessionTearOff()
+    }, [checkSessionTearOff, recordDragPosition])
 
     const handleDragEnd = useCallback((
       event: ReactDragEvent<HTMLDivElement>,
