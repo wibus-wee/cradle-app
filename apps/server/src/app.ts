@@ -48,6 +48,7 @@ import { createChronicleModule } from './modules/chronicle'
 import { createChronicleManagedResourceAdapter } from './modules/chronicle/managed-resource-adapter'
 import { codeActivity } from './modules/code-activity'
 import { codexAppServer } from './modules/codex-app-server'
+import { registerCodexResetWatchMaintenance } from './modules/codex-reset-watch/service'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
 import { diffReview } from './modules/diff-review'
@@ -414,6 +415,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     registerMessageBlobBackfillMaintenance()
     registerMessageSteerSplitBackfillMaintenance()
     registerWorkspaceGitIdentityBackfillMaintenance()
+    registerCodexResetWatchMaintenance()
     Maintenance.registerTask({
       ownerNamespace: 'logging',
       key: 'rotate-server-log',

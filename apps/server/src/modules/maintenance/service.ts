@@ -9,6 +9,7 @@ export interface MaintenanceRunContext {
   deadline: number
   source: BackgroundActivity.BackgroundActivityRunSource
   report: (progress: BackgroundActivityProgress | null) => void
+  presentInFooter: BackgroundActivity.BackgroundActivityReporter['presentInFooter']
 }
 
 export type MaintenanceResult = BackgroundActivityProgress
@@ -58,6 +59,7 @@ function registerActivity(descriptor: MaintenanceTaskDescriptor): void {
         deadline: now + (descriptor.maxRunMs ?? DEFAULT_MAX_RUN_MS),
         source: activityContext.source,
         report: reporter.report,
+        presentInFooter: reporter.presentInFooter,
       })
       reporter.report({ ...result, completed: true })
     },
