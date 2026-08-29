@@ -443,7 +443,6 @@ export class CodexProvider implements ChatRuntime {
     // transcript below, but it must not initialize tool or skill surfaces.
     const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     codexConfig.mcp = false
-    codexConfig.computer_use = false
     codexConfig.use_bash = false
     delete codexConfig.mcp_servers
 
@@ -867,9 +866,25 @@ export class CodexProvider implements ChatRuntime {
 
     const context = await this.createProviderThreadClient(input)
     try {
-      const response = await context.client.request('thread/rollback', {
+      const turnsResponse = await context.client.request('thread/turns/list', {
         threadId: providerSessionId,
-        numTurns: input.numTurns,
+        cursor: null,
+        limit: input.numTurns,
+        sortDirection: 'desc',
+        itemsView: 'summary',
+      }) as ThreadTurnsListResponse
+      const turns = turnsResponse.data ?? []
+      const oldestTargetedTurn = turns[input.numTurns - 1]
+      if (!oldestTargetedTurn) {
+        throw new ProviderRuntimeError(ProviderErrors.requestFailed(
+          this.runtimeKind,
+          'rollbackLastTurn',
+          `Codex returned ${turns.length} turn(s), fewer than the requested ${input.numTurns}`,
+        ))
+      }
+      const response = await context.client.request('thread/revert', {
+        threadId: providerSessionId,
+        beforeTurnId: oldestTargetedTurn.id,
       })
       return {
         runtimeKind: this.runtimeKind,
@@ -1053,6 +1068,7 @@ export class CodexProvider implements ChatRuntime {
           updateSecretValue: this.deps.updateSecret,
         })
         handler.readThreadId = () => input.runtimeSession.providerSessionId
+        handler.ownsInteractiveRequests = true
         return handler
       },
     })
