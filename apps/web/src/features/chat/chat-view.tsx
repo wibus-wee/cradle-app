@@ -25,7 +25,6 @@ import {
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
-import { notifyTearoffSurfaceContentReady } from '~/navigation/tearoff-binding'
 import { useChatStore } from '~/store/chat'
 import type { ComposerDraft } from '~/store/composer-draft'
 
@@ -147,11 +146,6 @@ export function ChatView({
     staleTime: 5_000,
   })
 
-  useEffect(() => {
-    if (chatActive && isReady && sessionId) {
-      notifyTearoffSurfaceContentReady()
-    }
-  }, [chatActive, isReady, sessionId])
   const pluginReviewsQuery = useQuery({
     queryKey: ['plugins', 'reviews', sessionId],
     enabled: chatActive && !!sessionId,

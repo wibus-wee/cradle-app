@@ -112,7 +112,6 @@ interface Window {
     }
       tearoff?: {
         notifyRendererReady: () => void
-        notifySurfacePresented: (surfaceId: string) => void
         onSurfaceBound: (handler: (binding: unknown) => void) => () => void
       }
     desktopUpdate: {

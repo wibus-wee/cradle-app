@@ -195,8 +195,6 @@ describe('windowManager tear-off windows', () => {
     )
 
     expect(opened).toBe(warmWindow)
-    expect(warmWindow.shown).toBe(false)
-    manager.markTearoffSurfacePresented(warmWindow.webContents.id, 'chat:session-1')
     expect(warmWindow.shown).toBe(true)
     expect(warmWindow.webContents.send).toHaveBeenCalledWith(
       'window:tearoff-surface-bound',
@@ -219,8 +217,6 @@ describe('windowManager tear-off windows', () => {
     expect(electronMocks.BrowserWindow.instances[0]?.shown).toBe(false)
 
     manager.markTearoffRendererReady(opened.webContents.id)
-    expect(electronMocks.BrowserWindow.instances[0]?.shown).toBe(false)
-    manager.markTearoffSurfacePresented(opened.webContents.id, 'chat:session-1')
     expect(electronMocks.BrowserWindow.instances[0]?.shown).toBe(true)
   })
 

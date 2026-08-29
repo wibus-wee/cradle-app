@@ -10,6 +10,7 @@ import { waitForServer } from '~/lib/server-readiness'
 
 const initialLocale = resolveInitialLocale()
 const applicationPromise = import('~/app').then(module => module.App)
+const chatViewPromise = import('~/features/chat/chat-view')
 const stylesheetPromise = import('./styles.css')
 const root = ReactDOMClient.createRoot(document.getElementById('app')!)
 
@@ -45,6 +46,7 @@ async function showBootstrapError(error: unknown): Promise<void> {
 async function startTearoffApp(): Promise<void> {
   const [App] = await Promise.all([
     applicationPromise,
+    chatViewPromise,
     waitForServer(),
     stylesheetPromise,
   ])

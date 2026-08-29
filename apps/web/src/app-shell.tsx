@@ -7,6 +7,7 @@ import { AppLayout } from '~/components/layout/app-layout'
 import { AppSidebar, AppSidebarSheet } from '~/components/layout/app-sidebar'
 import { useSidebarSheetMode } from '~/components/layout/layout-responsive'
 import { useSyncLayoutSlotScope } from '~/components/layout/use-layout-slots'
+import { RouteLoadingFallback } from '~/components/ui/route-loading-fallback'
 import { useSuppressNativeBrowserSurface } from '~/features/browser/native-surface-suppression'
 import { WhatsNewContainer } from '~/features/changelog/whats-new-container'
 import { WhatsNewPopup } from '~/features/changelog/whats-new-popup'
@@ -28,7 +29,7 @@ import type { SurfaceRoute } from '~/navigation/surface-identity'
 import { layoutSlotIdForRoute, layoutSlotIdForSurface } from '~/navigation/surface-identity'
 import { installSurfaceResourceLifecycle } from '~/navigation/surface-resource-lifecycle'
 import { useSurfaceStore } from '~/navigation/surface-store'
-import { notifyTearoffSurfaceContentReady, useTearoffSurfaceBinding } from '~/navigation/tearoff-binding'
+import { useTearoffSurfaceBinding } from '~/navigation/tearoff-binding'
 import { installTearoffSurfaceRestore } from '~/navigation/tearoff-surfaces'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
@@ -182,25 +183,8 @@ function TearoffAppRuntime() {
     if (!surfaceRoute) {
       return
     }
-    let canceled = false
     void navigate({ ...surfaceRoute, replace: true } as Parameters<typeof navigate>[0])
-      .then(() => {
-        // Chat owns a stronger readiness signal: its lazy view and hydrated
-        // transcript must both be ready. Showing on route completion would
-        // expose React's pending/loading frame.
-        if (surfaceRoute.to === '/chat/$sessionId') {
-          return
-        }
-        window.requestAnimationFrame(() => {
-          if (!canceled) {
-            notifyTearoffSurfaceContentReady()
-          }
-        })
-      })
-    return () => {
-      canceled = true
-    }
-  }, [binding, navigate, surfaceRoute])
+  }, [navigate, surfaceRoute])
 
   useEffect(() => {
     return installSurfaceResourceLifecycle()
@@ -209,7 +193,9 @@ function TearoffAppRuntime() {
   if (!surfaceRoute) {
     return (
       <div className="flex h-screen w-screen overflow-hidden bg-sidebar">
-        <div className="h-full w-full bg-background" />
+        <div className="h-full w-full bg-background">
+          <RouteLoadingFallback />
+        </div>
       </div>
     )
   }

@@ -164,6 +164,7 @@ export class WindowManager {
     try {
       if (warmWindow) {
         this.bindSurfaceWindow(win)
+        this.presentSurfaceWindow(win)
       }
       else {
         await this.loadSurfaceRenderer(win, { surfaceId, route })
@@ -184,20 +185,14 @@ export class WindowManager {
 
   /** Renderer announces that the static app shell and shared chunks are painted. */
   markTearoffRendererReady(webContentsId: number): void {
-    const win = this.warmingSurfaceWindow?.webContents.id === webContentsId
-      ? this.warmingSurfaceWindow
-      : null
+    const win = [this.warmingSurfaceWindow, ...this.surfaceBindings.keys()]
+      .find(candidate => candidate?.webContents.id === webContentsId)
     if (!win || win.isDestroyed()) {
       return
     }
-    this.warmingSurfaceWindow = null
-    this.warmSurfaceWindow = win
-  }
-
-  /** Renderer announces that a bound surface route has committed its first frame. */
-  markTearoffSurfacePresented(webContentsId: number, surfaceId: string): void {
-    const win = this.surfaceWindows.get(surfaceId)
-    if (!win || win.isDestroyed() || win.webContents.id !== webContentsId) {
+    if (this.warmingSurfaceWindow === win) {
+      this.warmingSurfaceWindow = null
+      this.warmSurfaceWindow = win
       return
     }
     this.presentSurfaceWindow(win)

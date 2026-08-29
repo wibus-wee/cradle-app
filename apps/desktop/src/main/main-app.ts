@@ -712,9 +712,6 @@ export async function startDesktopApp(): Promise<void> {
   ipcMain.on('window:tearoff-renderer-ready', (event) => {
     windowManager?.markTearoffRendererReady(event.sender.id)
   })
-  ipcMain.on('window:tearoff-surface-presented', (event, surfaceId: string) => {
-    windowManager?.markTearoffSurfacePresented(event.sender.id, surfaceId)
-  })
   serverFetchBroker.register(ipcMain)
   initializeIpcDevtool()
   browserManager.subscribe((state) => {
