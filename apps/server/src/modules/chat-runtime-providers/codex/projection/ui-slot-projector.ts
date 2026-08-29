@@ -393,7 +393,7 @@ const CODEX_UI_SLOT_DEFINITIONS: CodexUiSlotDefinition[] = [
     },
     requiresSession: true,
     surfaces: ['slashCommand'],
-    requiredMethods: ['model/list', 'thread/settings/update'],
+    requiredMethods: ['thread/settings/update'],
   },
   {
     id: 'codex:model',
