@@ -49,6 +49,7 @@ export interface CodexAppServerClientLike {
 export interface CodexAppServerResourceRequestHandler {
   (request: CodexAppServerServerRequest): Promise<unknown> | unknown
   readThreadId?: () => string | null
+  ownsInteractiveRequests?: boolean
 }
 
 export interface CodexAppServerNotificationSubscriber {

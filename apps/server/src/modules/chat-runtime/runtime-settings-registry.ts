@@ -22,7 +22,7 @@ export type ClaudeAgentPermissionMode = typeof CLAUDE_AGENT_PERMISSION_MODES[num
 const REVIEWED_ACCESS_MODES = ['approval-required', 'approve-for-me', 'full-access'] as const
 const OPENCODE_ACCESS_MODES = ['approval-required', 'full-access'] as const
 const CODEX_INTERACTION_MODES = ['default', 'plan'] as const
-const CODEX_SERVICE_TIERS = ['fast'] as const
+const CODEX_SERVICE_TIERS = ['priority'] as const
 
 const CLAUDE_AGENT_SETTINGS_SCHEMA: RuntimeSettingsSchemaLike = {
   type: 'object',
@@ -242,13 +242,13 @@ export function readCodexLikeRuntimeSettings(
 ): {
   accessMode: 'approval-required' | 'approve-for-me' | 'full-access'
   interactionMode: 'default' | 'plan'
-  serviceTier: 'fast' | null
+  serviceTier: 'priority' | null
 } {
   const accessMode = settings?.accessMode === 'approval-required' || settings?.accessMode === 'approve-for-me'
     ? settings.accessMode
     : 'full-access'
   const interactionMode = settings?.interactionMode === 'plan' ? 'plan' : 'default'
-  const serviceTier = settings?.serviceTier === 'fast' ? 'fast' : null
+  const serviceTier = settings?.serviceTier === 'priority' ? 'priority' : null
   return { accessMode, interactionMode, serviceTier }
 }
 
