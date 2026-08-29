@@ -9,6 +9,7 @@ import {
   readFile,
   rename,
   rm,
+  rmdir,
   stat,
   writeFile,
 } from 'node:fs/promises'
@@ -257,7 +258,7 @@ export async function runPendingDesktopDataMigration(
       if ((await readdir(migration.targetRoot)).length > 0) {
         throw new Error('The selected data directory is no longer empty')
       }
-      await rm(migration.targetRoot, { recursive: false })
+      await rmdir(migration.targetRoot)
     }
     await rename(migration.stagingRoot, migration.targetRoot)
 
