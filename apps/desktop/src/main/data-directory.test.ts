@@ -166,6 +166,23 @@ describe('desktop data directory migration', () => {
     expect(existsSync(targetRoot)).toBe(true)
   })
 
+  it('promotes staged data when the target directory already exists and is empty', async () => {
+    const { fixture, bootstrapRoot, installDirectory } = createFixture()
+    const sourceRoot = join(bootstrapRoot, 'data')
+    const targetRoot = join(fixture, 'moved-data')
+    mkdirSync(targetRoot)
+    writeFileSync(join(sourceRoot, 'cradle.db'), 'database')
+    await initializeDesktopDataDirectory({ bootstrapRoot, installDirectory })
+
+    const migration = await scheduleDesktopDataDirectoryMigration(targetRoot)
+    await expect(runPendingDesktopDataMigration()).resolves.toEqual({ migrated: true, failed: false })
+
+    expect(readFileSync(join(targetRoot, 'cradle.db'), 'utf8')).toBe('database')
+    expect(existsSync(sourceRoot)).toBe(true)
+    expect(existsSync(migration.stagingRoot)).toBe(false)
+    expect(getDesktopDataDirectoryState()).toMatchObject({ serverDataRoot: targetRoot, source: 'custom' })
+  })
+
   it('restores the old pointer and leaves both roots intact when new-root health fails', async () => {
     const { fixture, bootstrapRoot, installDirectory } = createFixture()
     const sourceRoot = join(bootstrapRoot, 'data')
