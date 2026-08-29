@@ -28,7 +28,7 @@ import type { SurfaceRoute } from '~/navigation/surface-identity'
 import { layoutSlotIdForRoute, layoutSlotIdForSurface } from '~/navigation/surface-identity'
 import { installSurfaceResourceLifecycle } from '~/navigation/surface-resource-lifecycle'
 import { useSurfaceStore } from '~/navigation/surface-store'
-import { useTearoffSurfaceBinding } from '~/navigation/tearoff-binding'
+import { notifyTearoffSurfaceContentReady, useTearoffSurfaceBinding } from '~/navigation/tearoff-binding'
 import { installTearoffSurfaceRestore } from '~/navigation/tearoff-surfaces'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
@@ -185,9 +185,15 @@ function TearoffAppRuntime() {
     let canceled = false
     void navigate({ ...surfaceRoute, replace: true } as Parameters<typeof navigate>[0])
       .then(() => {
+        // Chat owns a stronger readiness signal: its lazy view and hydrated
+        // transcript must both be ready. Showing on route completion would
+        // expose React's pending/loading frame.
+        if (surfaceRoute.to === '/chat/$sessionId') {
+          return
+        }
         window.requestAnimationFrame(() => {
-          if (!canceled && binding) {
-            window.cradle?.tearoff?.notifySurfacePresented(binding.surfaceId)
+          if (!canceled) {
+            notifyTearoffSurfaceContentReady()
           }
         })
       })

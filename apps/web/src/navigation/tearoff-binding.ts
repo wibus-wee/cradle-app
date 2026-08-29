@@ -36,6 +36,17 @@ export function readTearoffSurfaceBinding(): TearoffSurfaceBinding | null {
   return binding
 }
 
+/**
+ * Present the hidden native window only after the bound React surface reports
+ * its own data-ready state. Route navigation alone is not a content-ready
+ * signal: lazy chunks and query hydration may still be rendering a fallback.
+ */
+export function notifyTearoffSurfaceContentReady(): void {
+  if (binding) {
+    window.cradle?.tearoff?.notifySurfacePresented(binding.surfaceId)
+  }
+}
+
 export function useTearoffSurfaceBinding(): TearoffSurfaceBinding | null {
   return useSyncExternalStore(
     (listener) => {
