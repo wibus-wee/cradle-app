@@ -297,8 +297,28 @@ Napi::Boolean SetButtons(const Napi::CallbackInfo& info) {
   return Napi::Boolean::New(env, true);
 }
 
+Napi::Boolean BeginWindowDrag(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  HWND hwnd = nullptr;
+  if (!ReadHandleBuffer(info[0], &hwnd) || (GetAsyncKeyState(VK_LBUTTON) & 0x8000) == 0) {
+    return Napi::Boolean::New(env, false);
+  }
+  POINT cursor{};
+  if (!GetCursorPos(&cursor)) {
+    return Napi::Boolean::New(env, false);
+  }
+
+  ShowWindow(hwnd, SW_SHOWNORMAL);
+  SetForegroundWindow(hwnd);
+  ReleaseCapture();
+  const LPARAM cursorPosition = MAKELPARAM(cursor.x, cursor.y);
+  const bool posted = PostMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, cursorPosition) != FALSE;
+  return Napi::Boolean::New(env, posted);
+}
+
 Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
   exports.Set("attach", Napi::Function::New(env, Attach));
+  exports.Set("beginWindowDrag", Napi::Function::New(env, BeginWindowDrag));
   exports.Set("detach", Napi::Function::New(env, Detach));
   exports.Set("setButtons", Napi::Function::New(env, SetButtons));
   return exports;

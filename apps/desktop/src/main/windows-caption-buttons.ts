@@ -25,6 +25,7 @@ export interface CaptionButtonHoverEvent {
 
 interface CaptionButtonsAddon {
   attach: (handle: Buffer, onHover: (event: { button: string, phase: string }) => void) => boolean
+  beginWindowDrag: (handle: Buffer) => boolean
   detach: (handle: Buffer) => boolean
   setButtons: (handle: Buffer, buttons: CaptionButtonRectsInput) => boolean
 }
@@ -114,6 +115,16 @@ export function installWindowsCaptionButtons(win: BrowserWindow): void {
   win.once('closed', () => {
     addon.detach(handle)
   })
+}
+
+/** Continue the currently held left button as a native non-client window drag. */
+export function beginWindowsWindowDrag(win: BrowserWindow): boolean {
+  if (process.platform !== 'win32') {
+    return false
+  }
+  const addon = loadCaptionButtonsAddon()
+  const handle = readWindowHandle(win)
+  return addon && handle ? addon.beginWindowDrag(handle) : false
 }
 
 /**
