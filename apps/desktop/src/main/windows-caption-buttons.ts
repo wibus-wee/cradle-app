@@ -1,9 +1,11 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 
 import type { BrowserWindow } from 'electron'
 import { app } from 'electron'
+
+import { resolveStagedNativeAddonPath } from './native-addon-paths'
 
 export interface CaptionButtonRect {
   x: number
@@ -35,12 +37,12 @@ const require = createRequire(import.meta.url)
 let cachedAddon: CaptionButtonsAddon | null | undefined
 
 function resolveAddonCandidates(): string[] {
+  const appPath = app.getAppPath()
   const candidates: string[] = []
-  const packedPath = __dirname.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
-  candidates.push(join(packedPath, 'native', 'caption-buttons.node'))
+  candidates.push(resolveStagedNativeAddonPath(appPath, 'caption-buttons.node'))
   if (!app.isPackaged) {
     candidates.push(
-      resolve(__dirname, '..', '..', 'native', 'windows', 'caption-buttons', 'build', 'Release', 'caption_buttons.node'),
+      join(appPath, 'native', 'windows', 'caption-buttons', 'build', 'Release', 'caption_buttons.node'),
     )
   }
   return candidates

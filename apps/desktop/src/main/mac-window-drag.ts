@@ -1,9 +1,11 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 
 import type { BrowserWindow } from 'electron'
 import { app } from 'electron'
+
+import { resolveStagedNativeAddonPath } from './native-addon-paths'
 
 interface MacWindowDragAddon {
   install: (handle: Buffer) => boolean
@@ -17,11 +19,11 @@ function loadAddon(): MacWindowDragAddon | null {
   if (cachedAddon !== undefined) {
     return cachedAddon
   }
-  const packedPath = __dirname.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
+  const appPath = app.getAppPath()
   const candidates = [
-    join(packedPath, 'native', 'window-drag.node'),
+    resolveStagedNativeAddonPath(appPath, 'window-drag.node'),
     ...(!app.isPackaged
-      ? [resolve(__dirname, '..', '..', 'native', 'macos', 'window-drag', 'build', 'Release', 'window_drag.node')]
+      ? [join(appPath, 'native', 'macos', 'window-drag', 'build', 'Release', 'window_drag.node')]
       : []),
   ]
   for (const candidate of candidates) {
@@ -34,6 +36,9 @@ function loadAddon(): MacWindowDragAddon | null {
     catch (error) {
       console.warn(`[desktop] failed to load macOS window-drag addon at ${candidate}:`, error)
     }
+  }
+  if (process.platform === 'darwin') {
+    console.warn('[desktop] macOS window-drag addon unavailable; held-pointer tear-off cannot continue')
   }
   cachedAddon = null
   return null

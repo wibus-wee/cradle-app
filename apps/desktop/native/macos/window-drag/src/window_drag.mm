@@ -4,9 +4,6 @@
 
 namespace {
 
-id local_event_monitor = nil;
-NSEvent* last_left_mouse_down = nil;
-
 NSView* ReadView(const Napi::Value& value) {
   if (!value.IsBuffer()) {
     return nil;
@@ -20,21 +17,8 @@ NSView* ReadView(const Napi::Value& value) {
   return (__bridge NSView*)pointer;
 }
 
-void EnsureMouseDownMonitor() {
-  if (local_event_monitor != nil) {
-    return;
-  }
-  local_event_monitor = [NSEvent
-    addLocalMonitorForEventsMatchingMask:NSEventMaskLeftMouseDown
-    handler:^NSEvent* _Nullable(NSEvent* _Nonnull event) {
-      last_left_mouse_down = event;
-      return event;
-    }];
-}
-
 Napi::Value Install(const Napi::CallbackInfo& info) {
   @autoreleasepool {
-    EnsureMouseDownMonitor();
     return Napi::Boolean::New(info.Env(), true);
   }
 }
@@ -51,27 +35,22 @@ Napi::Value Begin(const Napi::CallbackInfo& info) {
       return Napi::Boolean::New(env, false);
     }
 
-    EnsureMouseDownMonitor();
-    NSEvent* source = last_left_mouse_down;
-    if (source == nil) {
-      return Napi::Boolean::New(env, false);
-    }
-
     // performDrag(with:) expects a mouse-down in the target window's coordinate
-    // space. Preserve the physical button-down gesture while rebasing its
-    // location to the newly claimed tear-off window.
+    // space. Synthesize it at the live cursor rather than reusing Chromium's
+    // original event: by tear-off time that event belongs to the source window
+    // and may already be part of an HTML drag session.
     const NSPoint screen_location = [NSEvent mouseLocation];
     const NSPoint window_location = [window convertPointFromScreen:screen_location];
     NSEvent* target_event = [NSEvent
       mouseEventWithType:NSEventTypeLeftMouseDown
       location:window_location
-      modifierFlags:source.modifierFlags
-      timestamp:source.timestamp
+      modifierFlags:[NSEvent modifierFlags]
+      timestamp:[NSProcessInfo processInfo].systemUptime
       windowNumber:window.windowNumber
       context:nil
-      eventNumber:source.eventNumber
-      clickCount:source.clickCount
-      pressure:source.pressure];
+      eventNumber:0
+      clickCount:1
+      pressure:1.0];
     if (target_event == nil) {
       return Napi::Boolean::New(env, false);
     }

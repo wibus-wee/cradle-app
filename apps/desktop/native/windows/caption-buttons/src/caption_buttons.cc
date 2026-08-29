@@ -312,8 +312,11 @@ Napi::Boolean BeginWindowDrag(const Napi::CallbackInfo& info) {
   SetForegroundWindow(hwnd);
   ReleaseCapture();
   const LPARAM cursorPosition = MAKELPARAM(cursor.x, cursor.y);
-  const bool posted = PostMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, cursorPosition) != FALSE;
-  return Napi::Boolean::New(env, posted);
+  // Enter the system move loop synchronously. PostMessage can run only after
+  // the originating HTML drag has released the button, which turns a tear-off
+  // into a stationary pop-up instead of a held window drag.
+  SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, cursorPosition);
+  return Napi::Boolean::New(env, true);
 }
 
 Napi::Object InitModule(Napi::Env env, Napi::Object exports) {
