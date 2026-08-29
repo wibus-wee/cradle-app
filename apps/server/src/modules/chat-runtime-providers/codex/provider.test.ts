@@ -122,7 +122,7 @@ class FakeCodexAppServerClient {
               { reasoningEffort: 'high', description: 'High' },
             ],
             serviceTiers: [
-              { id: 'fast', name: 'Fast', description: 'Fast responses' },
+              { id: 'priority', name: 'Fast', description: 'Fast responses' },
             ],
           },
         ],
@@ -2726,7 +2726,7 @@ describe('codexProvider app-server integration', () => {
         modelLabel: 'GPT-5 Codex',
         modelProvider: 'openai',
         serviceTier: 'priority',
-        serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Fast responses' }],
+        serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Fast responses' }],
         supportsImages: true,
         supportsWebSearch: true,
         supportsNamespaceTools: true,
@@ -4430,7 +4430,7 @@ describe('codexProvider app-server integration', () => {
         runtimeSettings: {
           accessMode: 'approve-for-me',
           interactionMode: 'plan',
-          serviceTier: 'fast',
+          serviceTier: 'priority',
         },
       },
     })
@@ -4451,7 +4451,7 @@ describe('codexProvider app-server integration', () => {
         approvalPolicy: 'on-request',
         approvalsReviewer: 'auto_review',
         sandbox: 'workspace-write',
-        serviceTier: 'fast',
+        serviceTier: 'priority',
         config: expect.objectContaining({
           approval_policy: 'on-request',
           sandbox_mode: 'workspace-write',
@@ -4464,7 +4464,7 @@ describe('codexProvider app-server integration', () => {
         approvalPolicy: 'on-request',
         approvalsReviewer: 'auto_review',
         sandboxPolicy: expect.objectContaining({ type: 'workspaceWrite' }),
-        serviceTier: 'fast',
+        serviceTier: 'priority',
         collaborationMode: {
           mode: 'plan',
           settings: {
@@ -4482,7 +4482,7 @@ describe('codexProvider app-server integration', () => {
       settings: {
         accessMode: 'full-access',
         interactionMode: 'default',
-        serviceTier: 'fast',
+        serviceTier: 'priority',
       },
     })
 
@@ -4493,7 +4493,7 @@ describe('codexProvider app-server integration', () => {
         approvalPolicy: 'never',
         approvalsReviewer: 'user',
         sandboxPolicy: { type: 'dangerFullAccess' },
-        serviceTier: 'fast',
+        serviceTier: 'priority',
         collaborationMode: {
           mode: 'default',
           settings: {

@@ -211,6 +211,10 @@ export function ChatView({
   const composerRuntime = useChatComposerRuntime({
     active: chatActive,
     sessionId,
+    runtimeServiceTier:
+      runtimeSettings.applied && runtimeSettings.settings.serviceTier === 'priority'
+        ? 'priority'
+        : null,
     isStreaming,
     canStop,
     isReady,
@@ -636,7 +640,7 @@ export function ChatView({
       }
       if (command.action.actionId === RUNTIME_FAST_SERVICE_TIER_COMMAND_ACTION_ID) {
         try {
-          await runtimeSettings.update({ serviceTier: 'fast' })
+          await runtimeSettings.update({ serviceTier: 'priority' })
           return { insertText: '' }
         }
         catch (error) {
