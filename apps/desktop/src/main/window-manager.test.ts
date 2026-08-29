@@ -208,13 +208,13 @@ describe('windowManager tear-off windows', () => {
     expect(electronMocks.BrowserWindow.instances).toHaveLength(3)
   })
 
-  it('keeps a cold tear-off hidden until its renderer reports a painted shell', async () => {
+  it('reveals a cold tear-off immediately while its renderer boots', async () => {
     process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
     const { WindowManager } = await import('./window-manager')
     const manager = new WindowManager('http://localhost:3010', { warmSurfaceWindows: false })
 
     const opened = await manager.openSurfaceWindow('chat:session-1', CHAT_SURFACE_ROUTE, 1200, 40)
-    expect(electronMocks.BrowserWindow.instances[0]?.shown).toBe(false)
+    expect(electronMocks.BrowserWindow.instances[0]?.shown).toBe(true)
 
     manager.markTearoffRendererReady(opened.webContents.id)
     expect(electronMocks.BrowserWindow.instances[0]?.shown).toBe(true)
@@ -246,9 +246,6 @@ describe('windowManager tear-off windows', () => {
     expect(manager.getLastFocusedAppshotWindow()).toBe(mainWindow)
 
     const tearoffWindow = await manager.openSurfaceWindow('chat:session-1', CHAT_SURFACE_ROUTE, 1200, 40)
-    expect(manager.getLastFocusedAppshotWindow()).toBe(mainWindow)
-
-    tearoffWindow.focus()
     expect(manager.getLastFocusedAppshotWindow()).toBe(tearoffWindow)
 
     mainWindow.focus()

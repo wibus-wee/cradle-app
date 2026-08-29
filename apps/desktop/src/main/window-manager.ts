@@ -167,6 +167,11 @@ export class WindowManager {
         this.presentSurfaceWindow(win)
       }
       else {
+        // A replacement warm renderer may still be booting during rapid,
+        // repeated tear-offs. Reveal the native window immediately so the
+        // held-pointer handoff never moves an invisible window; BrowserWindow's
+        // themed background and tearoff.html bootstrap shell cover React load.
+        this.presentSurfaceWindow(win)
         await this.loadSurfaceRenderer(win, { surfaceId, route })
       }
     }
@@ -185,17 +190,12 @@ export class WindowManager {
 
   /** Renderer announces that the static app shell and shared chunks are painted. */
   markTearoffRendererReady(webContentsId: number): void {
-    const win = [this.warmingSurfaceWindow, ...this.surfaceBindings.keys()]
-      .find(candidate => candidate?.webContents.id === webContentsId)
-    if (!win || win.isDestroyed()) {
+    const win = this.warmingSurfaceWindow
+    if (!win || win.isDestroyed() || win.webContents.id !== webContentsId) {
       return
     }
-    if (this.warmingSurfaceWindow === win) {
-      this.warmingSurfaceWindow = null
-      this.warmSurfaceWindow = win
-      return
-    }
-    this.presentSurfaceWindow(win)
+    this.warmingSurfaceWindow = null
+    this.warmSurfaceWindow = win
   }
 
   private createSurfaceBrowserWindow(
