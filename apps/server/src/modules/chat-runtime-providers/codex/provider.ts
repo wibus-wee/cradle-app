@@ -443,7 +443,6 @@ export class CodexProvider implements ChatRuntime {
     // transcript below, but it must not initialize tool or skill surfaces.
     const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     codexConfig.mcp = false
-    codexConfig.computer_use = false
     codexConfig.use_bash = false
     delete codexConfig.mcp_servers
 

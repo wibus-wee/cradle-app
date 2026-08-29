@@ -3691,11 +3691,11 @@ describe('codexProvider app-server integration', () => {
       params: expect.objectContaining({
         config: expect.objectContaining({
           mcp: false,
-          computer_use: false,
           use_bash: false,
         }),
       }),
     }))
+    expect((client.requests[0]?.params as { config?: Record<string, unknown> }).config).not.toHaveProperty('computer_use')
     expect((client.requests[0]?.params as { config?: Record<string, unknown> }).config).not.toHaveProperty('mcp_servers')
     expect(client.requests[1]).toEqual({
       method: 'thread/inject_items',
