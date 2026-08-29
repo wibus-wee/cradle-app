@@ -415,6 +415,7 @@ async function reloadDevelopmentWebPlugin(session: PluginDevSession): Promise<vo
 
 export async function startPluginDevSessionWatcher(): Promise<() => void> {
   let source: ServerEventSource | null = null
+  let discoveryTimer: ReturnType<typeof setTimeout> | null = null
   let disposed = false
   const appliedRevisions = new Map<string, number>()
   let reconcileQueue = Promise.resolve()
@@ -431,37 +432,53 @@ export async function startPluginDevSessionWatcher(): Promise<() => void> {
       })
   }
 
-  try {
-    const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
-    for (const session of sessions) { reconcile(session) }
-  }
-  catch (error) {
-    // Development sessions are optional and the event stream below reconnects.
-    // A transient localhost reset during packaged startup must not abort the
-    // entire post-render bootstrap or prevent the main application from loading.
-    console.warn('[plugin-host] initial development session read failed; continuing with event stream', error)
+  const openEventStream = (): void => {
+    if (disposed || source) { return }
+    const eventsUrl = new URL('/plugins/dev-sessions/events', getServerUrl()).toString()
+    source = openServerEventSource(eventsUrl)
+    source.onmessage = (message) => {
+      const event = PluginDevSessionEventSchema.parse(JSON.parse(message.data))
+      if (event.type === 'stopped') {
+        appliedRevisions.delete(event.session.id)
+        void deactivateWebPlugin(event.session.pluginName)
+        return
+      }
+      if (event.type === 'started' || event.layer === 'web') {
+        reconcile(event.session)
+      }
+    }
+    source.onerror = () => {
+      console.warn('[plugin-host] plugin development event stream disconnected; fetch SSE will retry')
+    }
   }
 
-  if (disposed) { return () => undefined }
-  const eventsUrl = new URL('/plugins/dev-sessions/events', getServerUrl()).toString()
-  source = openServerEventSource(eventsUrl)
-  source.onmessage = (message) => {
-    const event = PluginDevSessionEventSchema.parse(JSON.parse(message.data))
-    if (event.type === 'stopped') {
-      appliedRevisions.delete(event.session.id)
-      void deactivateWebPlugin(event.session.pluginName)
+  const discoverSessions = async (): Promise<void> => {
+    try {
+      const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
+      for (const session of sessions) { reconcile(session) }
+      if (sessions.length > 0) {
+        openEventStream()
+        return
+      }
+    }
+    catch (error) {
+      // A transient snapshot failure should not disable development reloads.
+      // The event stream reconnects and supplies the authoritative state.
+      console.warn('[plugin-host] initial development session read failed; continuing with event stream', error)
+      openEventStream()
       return
     }
-    if (event.type === 'started' || event.layer === 'web') {
-      reconcile(event.session)
+
+    if (!disposed) {
+      discoveryTimer = setTimeout(() => void discoverSessions(), 2_000)
     }
   }
-  source.onerror = () => {
-    console.warn('[plugin-host] plugin development event stream disconnected; fetch SSE will retry')
-  }
+
+  await discoverSessions()
 
   return () => {
     disposed = true
+    if (discoveryTimer) { clearTimeout(discoveryTimer) }
     source?.close()
   }
 }
