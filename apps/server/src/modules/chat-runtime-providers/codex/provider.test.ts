@@ -312,7 +312,7 @@ class FakeCodexAppServerClient {
         reasoningEffort: 'high',
       }
     }
-    if (method === 'thread/rollback') {
+    if (method === 'thread/revert') {
       return { ok: true }
     }
     if (method === 'thread/list') {
@@ -968,6 +968,11 @@ describe('codexProvider app-server integration', () => {
 
   it('rolls back multiple Codex thread turns without forking', async () => {
     const client = new FakeCodexAppServerClient({})
+    client.threadTurnsListData = [
+      { id: 'turn-3' },
+      { id: 'turn-2' },
+      { id: 'turn-1' },
+    ]
     const provider = createProvider(client)
 
     await expect(provider.rollbackLastTurn({
@@ -983,17 +988,30 @@ describe('codexProvider app-server integration', () => {
       fileChangesReverted: false,
     })
 
-    expect(client.requests.map(request => request.method)).toEqual(['thread/resume', 'thread/rollback'])
+    expect(client.requests.map(request => request.method)).toEqual(['thread/resume', 'thread/turns/list', 'thread/revert'])
     expect(client.requests[1]).toEqual(
       {
-        method: 'thread/rollback',
+        method: 'thread/turns/list',
         params: {
           threadId: 'codex-thread-1',
-          numTurns: 3,
+          cursor: null,
+          limit: 3,
+          sortDirection: 'desc',
+          itemsView: 'summary',
+        },
+      },
+    )
+    expect(client.requests[2]).toEqual(
+      {
+        method: 'thread/revert',
+        params: {
+          threadId: 'codex-thread-1',
+          beforeTurnId: 'turn-1',
         },
       },
     )
     expect(client.requests.some(request => request.method === 'thread/fork')).toBe(false)
+    expect(client.requests.some(request => request.method === 'thread/rollback')).toBe(false)
   })
 
   it('rejects unrelated Codex provider threads', async () => {
