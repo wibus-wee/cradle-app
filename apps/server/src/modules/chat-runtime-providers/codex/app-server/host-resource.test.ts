@@ -196,4 +196,33 @@ describe('codex provider app-server host routing', () => {
 
     await disposeCodexAppServerHostResource(resource)
   })
+
+  it('prefers the active interactive owner over passive handlers for the same thread', async () => {
+    const fake = new FakeHostClient()
+    const resource = createResource(fake)
+    const passive = vi.fn(async () => 'passive')
+    const interactive = vi.fn(async () => 'interactive')
+    addCodexAppServerHostRequestHandler(
+      resource,
+      Object.assign(passive, { readThreadId: () => 'thread-a' }),
+    )
+    addCodexAppServerHostRequestHandler(
+      resource,
+      Object.assign(interactive, {
+        readThreadId: () => 'thread-a',
+        ownsInteractiveRequests: true,
+      }),
+    )
+
+    const request = {
+      id: 1,
+      method: 'item/commandExecution/requestApproval',
+      params: { threadId: 'thread-a' },
+    } as CodexAppServerServerRequest
+    await expect(dispatchCodexAppServerHostRequest(resource, request)).resolves.toBe('interactive')
+    expect(passive).not.toHaveBeenCalled()
+    expect(interactive).toHaveBeenCalledOnce()
+
+    await disposeCodexAppServerHostResource(resource)
+  })
 })

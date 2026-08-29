@@ -88,7 +88,9 @@ function selectCodexAppServerHostRequestHandlers(
   if (!threadId) {
     return handlers
   }
-  return handlers.filter(handler => handler.readThreadId?.() === threadId)
+  const threadHandlers = handlers.filter(handler => handler.readThreadId?.() === threadId)
+  const interactiveOwners = threadHandlers.filter(handler => handler.ownsInteractiveRequests)
+  return interactiveOwners.length > 0 ? interactiveOwners : threadHandlers
 }
 
 function readCodexAppServerRequestThreadId(request: CodexAppServerServerRequest): string | null {
