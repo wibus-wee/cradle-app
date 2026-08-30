@@ -62,3 +62,4 @@ Chronological index of independently shipped product improvements.
 23. [Explain blocked Work delivery on Mobile](./2026-08-31-23-explain-mobile-work-delivery-blockers.md)
 24. [Place server copy with its Mobile setting](./2026-08-31-24-place-mobile-server-copy-action.md)
 25. [Share the Mobile server address](./2026-08-31-25-share-mobile-server-address.md)
+26. [Show workspace branch context on Mobile](./2026-08-31-26-show-mobile-workspace-branches.md)

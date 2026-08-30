@@ -119,6 +119,9 @@ export function ProjectsView({
             media={workspace.availability === 'missing'
               ? <FolderX color={theme.destructive} size={22} strokeWidth={1.7} />
               : <Folder color={theme.mutedForeground} size={22} strokeWidth={1.7} />}
+            description={workspace.availability === 'missing'
+              ? 'Unavailable on server'
+              : workspace.gitIdentity.branch ?? 'No Git branch'}
             onPress={() => onOpenProject(workspace.id)}
             title={workspace.name}
           />
