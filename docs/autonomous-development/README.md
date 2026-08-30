@@ -65,3 +65,4 @@ Chronological index of independently shipped product improvements.
 26. [Show workspace branch context on Mobile](./2026-08-31-26-show-mobile-workspace-branches.md)
 27. [Attribute Mobile Usage to providers](./2026-08-31-27-mobile-provider-usage.md)
 28. [Expand pull request history on Mobile](./2026-08-31-28-expand-mobile-pull-request-history.md)
+29. [Jump to the latest Mobile chat message](./2026-08-31-29-jump-to-latest-mobile-chat.md)

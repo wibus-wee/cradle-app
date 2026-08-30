@@ -1,7 +1,7 @@
 import type { UIMessage } from 'ai'
-import { Square } from 'lucide-react-native'
-import { useMemo, useRef } from 'react'
-import type { NativeSyntheticEvent, NativeTouchEvent } from 'react-native'
+import { ArrowDown, Square } from 'lucide-react-native'
+import { useMemo, useRef, useState } from 'react'
+import type { NativeScrollEvent, NativeSyntheticEvent, NativeTouchEvent } from 'react-native'
 import {
   ActivityIndicator,
   Animated,
@@ -105,6 +105,8 @@ export function ChatView({
   })
   const listTouchStartRef = useRef({ pageX: 0, pageY: 0 })
   const listTouchMovedRef = useRef(false)
+  const listRef = useRef<FlatList<TranscriptItem>>(null)
+  const [isAwayFromLatest, setIsAwayFromLatest] = useState(false)
   const items = useMemo<TranscriptItem[]>(() => {
     const durableIds = new Set(messages.map(row => row.messageId))
     const showPendingUser = pendingUser && (!pendingUser.id || !durableIds.has(pendingUser.id))
@@ -171,6 +173,10 @@ export function ChatView({
     }
     listTouchMovedRef.current = false
   }
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const next = event.nativeEvent.contentOffset.y > 160
+    setIsAwayFromLatest(current => current === next ? current : next)
+  }
 
   return (
     <SafeAreaView edges={['bottom']} style={[styles.safeArea, { backgroundColor: theme.chrome }]}>
@@ -212,6 +218,7 @@ export function ChatView({
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.2}
+            onScroll={handleScroll}
             onTouchEnd={handleListTouchEnd}
             onTouchMove={handleListTouchMove}
             onTouchStart={handleListTouchStart}
@@ -244,6 +251,7 @@ export function ChatView({
                 />
               )
             }}
+            ref={listRef}
             scrollEventThrottle={32}
           />
 
@@ -265,6 +273,20 @@ export function ChatView({
               },
             ]}
           >
+            {isAwayFromLatest && (
+              <PressableScale
+                accessibilityLabel="Jump to latest message"
+                accessibilityRole="button"
+                haptic
+                onPress={() => listRef.current?.scrollToOffset({ animated: true, offset: 0 })}
+                style={[
+                  styles.jumpButton,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                <ArrowDown color={theme.foreground} size={18} />
+              </PressableScale>
+            )}
             {isStreaming && (
               <View style={styles.runStatus}>
                 <View style={[styles.progressDot, { backgroundColor: theme.success }]} />
@@ -345,6 +367,18 @@ const styles = StyleSheet.create({
   },
   keyboardSpacer: {
     width: '100%',
+  },
+  jumpButton: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 36,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: spacing.md,
+    top: -44,
+    width: 36,
+    zIndex: 1,
   },
   messages: {
     flexGrow: 1,
