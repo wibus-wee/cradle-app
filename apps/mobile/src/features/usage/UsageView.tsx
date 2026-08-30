@@ -1,4 +1,6 @@
 import { SegmentedControl } from '@expo/ui/community/segmented-control'
+import { ChevronDown, ChevronUp } from 'lucide-react-native'
+import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
 import type {
@@ -6,6 +8,7 @@ import type {
   GetUsageStatsResponse,
   GetUsageSummaryResponse,
 } from '@/api-gen'
+import { Button } from '@/components/ui/button'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { EmptyState } from '@/components/ui/states'
@@ -63,10 +66,11 @@ export function UsageView({
   summary,
 }: UsageViewProps) {
   const theme = useTheme()
+  const [showAllModels, setShowAllModels] = useState(false)
   const recentDays = denseRecentDays(daily)
   const maxDailyTokens = Math.max(...recentDays.map(day => day.totalTokens), 1)
   const maxModelTokens = Math.max(...summary.byModel.map(model => model.totalTokens), 1)
-  const models = summary.byModel.slice(0, 5)
+  const models = showAllModels ? summary.byModel : summary.byModel.slice(0, 5)
   const selectedIndex = usageRanges.findIndex(option => option.key === range)
 
   return (
@@ -203,6 +207,15 @@ export function UsageView({
                   </View>
                 </View>
               ))}
+          {summary.byModel.length > 5 && (
+            <Button
+              icon={showAllModels ? ChevronUp : ChevronDown}
+              label={showAllModels ? 'Show top 5' : `Show all ${summary.byModel.length}`}
+              onPress={() => setShowAllModels(current => !current)}
+              style={styles.modelToggle}
+              variant="secondary"
+            />
+          )}
         </View>
       </View>
     </Screen>
@@ -275,6 +288,9 @@ const styles = StyleSheet.create({
   modelValue: {
     fontSize: 12,
     fontVariant: ['tabular-nums'],
+  },
+  modelToggle: {
+    marginTop: spacing.sm,
   },
   page: {
     paddingTop: spacing.sm,
