@@ -1,5 +1,5 @@
-import { Info } from 'lucide-react-native'
-import { useRef } from 'react'
+import { Info, Search } from 'lucide-react-native'
+import { useRef, useState } from 'react'
 import { Keyboard, SectionList, StyleSheet, Text, View } from 'react-native'
 
 import type { GetWorkspacesResponse, GetWorksResponse, PostWorksData } from '@/api-gen'
@@ -7,6 +7,7 @@ import type { AppSection } from '@/components/common/app-menu-button'
 import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
 import { IconButton } from '@/components/ui/icon-button'
+import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -64,8 +65,20 @@ export function WorkListView({
 }: WorkListViewProps) {
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
+  const [search, setSearch] = useState('')
+  const normalizedSearch = search.trim().toLocaleLowerCase()
+  const filteredWorks = normalizedSearch
+    ? works.filter((work) => {
+        const workspaceName = workspaces.find(workspace => workspace.id === work.workspaceId)?.name
+        return [work.title, work.objective, workspaceName]
+          .some(value => value?.toLocaleLowerCase().includes(normalizedSearch))
+      })
+    : works
   const groups = ['Today', 'This week', 'Older']
-    .map(title => ({ title, works: works.filter(work => workGroup(work.updatedAt) === title) }))
+    .map(title => ({
+      title,
+      works: filteredWorks.filter(work => workGroup(work.updatedAt) === title),
+    }))
     .filter(group => group.works.length > 0)
 
   return (
@@ -89,13 +102,27 @@ export function WorkListView({
       scroll={false}
       title="Work"
     >
+      <View style={styles.search}>
+        <InputGroup
+          addon={<Search color={theme.mutedForeground} size={17} />}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          onChangeText={setSearch}
+          placeholder="Search Work"
+          returnKeyType="search"
+          value={search}
+        />
+      </View>
       <SectionList
-        contentContainerStyle={works.length === 0 ? styles.emptyList : undefined}
+        contentContainerStyle={filteredWorks.length === 0 ? styles.emptyList : undefined}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={(
           <EmptyState
-            description="Create an isolated Work to let an agent build against a project."
-            title="No active Work"
+            description={normalizedSearch
+              ? 'Try a different title, objective, or workspace.'
+              : 'Create an isolated Work to let an agent build against a project.'}
+            title={normalizedSearch ? 'No matching Work' : 'No active Work'}
           />
         )}
         onRefresh={onRefresh}
@@ -142,6 +169,9 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
+    marginBottom: spacing.md,
+  },
+  search: {
     marginBottom: spacing.md,
   },
   time: {

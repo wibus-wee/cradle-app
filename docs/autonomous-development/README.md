@@ -34,3 +34,7 @@ Chronological index of independently shipped product improvements.
 28. [Show session note save status](./2026-08-29-28-session-note-save-status.md)
 29. [Preserve notes typed during autosave](./2026-08-29-29-preserve-notes-during-save.md)
 30. [Add projects from empty New Work](./2026-08-29-30-new-work-add-project.md)
+
+## 2026-08-31
+
+1. [Search active Work on Mobile](./2026-08-31-01-search-mobile-work.md)
