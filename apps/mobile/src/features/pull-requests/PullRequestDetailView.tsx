@@ -155,12 +155,14 @@ export function PullRequestDetailView({
         {detail.files.map(file => (
           <Item
             actions={(
-              <>
+              <View style={styles.fileActions}>
                 <Text style={[styles.fileStats, { color: theme.success }]}>{`+${file.additions}`}</Text>
                 <Text style={[styles.fileStats, { color: theme.destructive }]}>{`-${file.deletions}`}</Text>
-              </>
+                <ExternalLink color={theme.dimForeground} size={15} />
+              </View>
             )}
             key={file.sha + file.filename}
+            onPress={() => void openExternal(file.blobUrl, 'Could not open changed file')}
             size="sm"
             title={file.filename}
           />
@@ -257,6 +259,11 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
     fontVariant: ['tabular-nums'],
+  },
+  fileActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   headerActions: {
     alignItems: 'center',
