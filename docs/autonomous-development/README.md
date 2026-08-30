@@ -48,3 +48,4 @@ Chronological index of independently shipped product improvements.
 9. [Copy full commit SHAs from Git history](./2026-08-31-09-copy-commit-sha.md)
 10. [Preview workspace files on mobile](./2026-08-31-10-mobile-file-preview.md)
 11. [Retry Git panel load failures](./2026-08-31-11-retry-git-panels.md)
+12. [Copy the active workspace path from the command palette](./2026-08-31-12-copy-workspace-path-command.md)

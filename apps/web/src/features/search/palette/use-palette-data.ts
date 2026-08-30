@@ -1,4 +1,5 @@
 import {
+  Copy2Line as CopyIcon,
   DotCircleLine as CircleDotIcon,
   HistoryAnticlockwiseLine as HistoryIcon,
   Message1Line as MessageSquareIcon,
@@ -18,6 +19,7 @@ import {
   getKanbanBoardsOptions,
   getSessionsByIdOptions,
   getSessionsOptions,
+  getWorkspacesByWorkspaceIdOptions,
   getWorkspacesOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { useLayoutSlotsCtx } from '~/components/layout/use-layout-slots'
@@ -143,12 +145,17 @@ function useActiveFileSearchWorkspaceId(enabled: boolean): {
   }
 }
 
-function useCommands(close: () => void): CommandAction[] {
+function useCommands(close: () => void, workspaceId: string | null): CommandAction[] {
   const { t } = useTranslation('search')
   const setSettingsSection = useSettingsOverlayStore(s => s.setSettingsSection)
   const toggleSidebar = useLayoutStore(s => s.toggleSidebar)
   const pluginCommands = usePluginStore(s => s.commands)
   const lastClosedSurface = useSurfaceStore(s => s.lastClosedSurface)
+  const { data: workspace } = useQuery({
+    ...getWorkspacesByWorkspaceIdOptions({ path: { workspaceId: workspaceId ?? '' } }),
+    enabled: Boolean(workspaceId),
+    staleTime: 60_000,
+  })
 
   return useMemo<CommandAction[]>(() => {
     const appCommands: CommandAction[] = [
@@ -174,6 +181,32 @@ function useCommands(close: () => void): CommandAction[] {
           openNewWork()
         },
       },
+      ...(workspace
+        ? [{
+            id: 'copy-workspace-path',
+            label: t('command.copyWorkspacePath.label'),
+            description: getWorkspaceLocationLabel(workspace),
+            keywords: t('command.copyWorkspacePath.keywords'),
+            icon: CopyIcon,
+            source: 'app' as const,
+            handler: async () => {
+              close()
+              try {
+                await navigator.clipboard.writeText(getWorkspaceLocationLabel(workspace))
+                toastManager.add({
+                  type: 'success',
+                  title: t('command.copyWorkspacePath.success'),
+                })
+              }
+              catch {
+                toastManager.add({
+                  type: 'error',
+                  title: t('command.copyWorkspacePath.error'),
+                })
+              }
+            },
+          }]
+        : []),
       {
         id: 'open-settings',
         label: t('command.openSettings.label'),
@@ -258,7 +291,7 @@ function useCommands(close: () => void): CommandAction[] {
     }))
 
     return [...appCommands, ...contributedCommands]
-  }, [t, setSettingsSection, toggleSidebar, pluginCommands, lastClosedSurface, close])
+  }, [t, setSettingsSection, toggleSidebar, pluginCommands, lastClosedSurface, workspace, close])
 }
 
 function useFileSearch(query: string, enabled: boolean, workspaceId: string | null | undefined) {
@@ -402,7 +435,7 @@ export function usePaletteData(params: {
 }): PaletteData {
   const { mode, query, close } = params
   const fileSearchWorkspace = useActiveFileSearchWorkspaceId(true)
-  const commands = useCommands(close)
+  const commands = useCommands(close, fileSearchWorkspace.workspaceId)
 
   const hasQuery = query.length > 0
   const searchCommands = mode === 'commands'

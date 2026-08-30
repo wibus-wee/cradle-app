@@ -13,6 +13,9 @@ files, conversations, issues, and workspaces.
   surface. The command is omitted when navigation has no recovery target.
 - Primary creation commands open New Chat and New Work through their existing
   navigation owners; workspace and issue selection remain on those surfaces.
+- Workspace-aware surfaces expose a Copy workspace path command. It uses the
+  workspace owner's canonical local or remote location label and reports
+  clipboard success or failure through app toasts.
 - `global-search-dialog-view.tsx` receives the current mode, query,
   owner-typed `PaletteData`, and callbacks. It owns only dialog focus, keyboard
   cycling, empty-query Backspace recovery to All, and presentation.
