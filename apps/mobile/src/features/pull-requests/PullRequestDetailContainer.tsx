@@ -100,6 +100,7 @@ export function PullRequestDetailContainer({
         }}
         onOpenCheck={url => openExternalUrl(url, 'Could not open check')}
         onOpenExternal={() => openExternalUrl(query.data.pullRequest.url, 'Could not open pull request')}
+        onOpenFile={url => openExternalUrl(url, 'Could not open changed file')}
         onRefresh={refresh}
         onReview={async (event, body) => {
           await action.mutateAsync({

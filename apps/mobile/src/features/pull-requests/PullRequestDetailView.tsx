@@ -24,6 +24,7 @@ export interface PullRequestDetailViewProps {
   onComment: (body: string) => Promise<void>
   onOpenCheck: (url: string) => void
   onOpenExternal: () => void
+  onOpenFile: (url: string) => void
   onRefresh?: () => void
   onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => Promise<void>
 }
@@ -35,6 +36,7 @@ export function PullRequestDetailView({
   onComment,
   onOpenCheck,
   onOpenExternal,
+  onOpenFile,
   onRefresh,
   onReview,
 }: PullRequestDetailViewProps) {
@@ -147,9 +149,11 @@ export function PullRequestDetailView({
               <>
                 <Text style={[styles.fileStats, { color: theme.success }]}>{`+${file.additions}`}</Text>
                 <Text style={[styles.fileStats, { color: theme.destructive }]}>{`-${file.deletions}`}</Text>
+                <ExternalLink color={theme.dimForeground} size={14} />
               </>
             )}
             key={file.sha + file.filename}
+            onPress={() => onOpenFile(file.blobUrl)}
             size="sm"
             title={file.filename}
           />

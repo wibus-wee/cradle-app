@@ -9,6 +9,8 @@ Pull request detail exposes its canonical GitHub URL through a native external
 link action for provider-specific review and full diff workflows.
 Check rows with provider URLs open their exact GitHub Actions or status page,
 while unlinked checks remain informational.
+Changed-file rows open their exact blob on GitHub for focused inspection without
+first navigating through the full pull request.
 Comment and review drafts clear only after a successful mutation; failures show
 their server message and leave the draft ready to retry.
 Initial data-load failures expose an in-place Retry action across Projects,
