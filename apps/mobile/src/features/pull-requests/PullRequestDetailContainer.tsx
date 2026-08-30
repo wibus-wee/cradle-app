@@ -1,5 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
+import { useState } from 'react'
+import { Alert } from 'react-native'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -23,6 +25,7 @@ export function PullRequestDetailContainer({
 }: PullRequestDetailContainerProps) {
   const { connection } = useConnection()
   const isRouteActive = useRouteIsActive()
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const path = `/pull-requests/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(number)}`
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
@@ -43,6 +46,22 @@ export function PullRequestDetailContainer({
     onSuccess: () => void query.refetch(),
   })
 
+  const refresh = () => {
+    if (!connection) {
+      return
+    }
+    setIsRefreshing(true)
+    void cradleRequest(connection, `${path}/refresh`, {
+      method: 'POST',
+      body: { force: true },
+    })
+      .then(() => query.refetch())
+      .catch((error: Error) => {
+        Alert.alert('Could not refresh pull request', errorMessage(error))
+      })
+      .finally(() => setIsRefreshing(false))
+  }
+
   if (query.isPending) {
     return <LoadingState />
   }
@@ -57,7 +76,9 @@ export function PullRequestDetailContainer({
       <PullRequestDetailView
         detail={query.data}
         isMutating={action.isPending}
+        isRefreshing={isRefreshing}
         onComment={body => action.mutate({ endpoint: 'comment', body: { body } })}
+        onRefresh={refresh}
         onReview={(event, body) =>
           action.mutate({
             endpoint: 'review',

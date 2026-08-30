@@ -19,14 +19,18 @@ type Detail = GetPullRequestsByOwnerByRepoByNumberDetailResponse
 export interface PullRequestDetailViewProps {
   detail: Detail
   isMutating?: boolean
+  isRefreshing?: boolean
   onComment: (body: string) => void
+  onRefresh?: () => void
   onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => void
 }
 
 export function PullRequestDetailView({
   detail,
   isMutating = false,
+  isRefreshing = false,
   onComment,
+  onRefresh,
   onReview,
 }: PullRequestDetailViewProps) {
   const theme = useTheme()
@@ -44,6 +48,8 @@ export function PullRequestDetailView({
     <Screen
       action={<StatusPill label={pullRequest.isDraft ? 'draft' : pullRequest.state} tone={pullRequest.state === 'open' ? 'success' : 'neutral'} />}
       insetTop={false}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}
       subtitle={`${pullRequest.owner}/${pullRequest.repo} #${pullRequest.number}`}
       title={pullRequest.title}
     >
