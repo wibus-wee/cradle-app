@@ -44,3 +44,4 @@ Chronological index of independently shipped product improvements.
 5. [Refresh pull request detail on mobile](./2026-08-31-05-mobile-pr-detail-refresh.md)
 6. [Force-refresh mobile pull request feeds](./2026-08-31-06-mobile-pr-feed-refresh.md)
 7. [Show average download throughput](./2026-08-31-07-download-throughput.md)
+8. [Retry mobile load failures in place](./2026-08-31-08-mobile-error-retry.md)

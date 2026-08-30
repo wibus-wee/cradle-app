@@ -5,6 +5,8 @@ supports server onboarding, project workspaces, live chat sessions, Work
 containers, and pull request review while away from the desktop.
 Pull request lists and details support pull-to-refresh; both force an upstream
 GitHub update before reloading their Cradle projections.
+Initial data-load failures expose an in-place Retry action across Projects,
+Work, Usage, pull requests, and conversations.
 
 ## Run
 

@@ -67,7 +67,12 @@ export function PullRequestDetailContainer({
   }
   if (query.error) {
     return (
-      <ErrorState title="Could not open pull request" description={errorMessage(query.error)} />
+      <ErrorState
+        title="Could not open pull request"
+        description={errorMessage(query.error)}
+        onRetry={() => void query.refetch()}
+        retrying={query.isFetching}
+      />
     )
   }
   return (

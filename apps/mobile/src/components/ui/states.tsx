@@ -1,17 +1,21 @@
 import type { LucideIcon } from 'lucide-react-native'
-import { AlertCircle, Inbox } from 'lucide-react-native'
+import { AlertCircle, Inbox, RefreshCw } from 'lucide-react-native'
+import type { ReactNode } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
+import { Button } from './button'
+
 interface StateProps {
   title: string
   description?: string
   icon?: LucideIcon
+  action?: ReactNode
 }
 
-export function EmptyState({ title, description, icon: Icon = Inbox }: StateProps) {
+export function EmptyState({ title, description, icon: Icon = Inbox, action }: StateProps) {
   const theme = useTheme()
   return (
     <View style={styles.state}>
@@ -22,12 +26,35 @@ export function EmptyState({ title, description, icon: Icon = Inbox }: StateProp
         <Text style={[styles.title, { color: theme.foreground }]}>{title}</Text>
         {description && <Text style={[styles.description, { color: theme.mutedForeground }]}>{description}</Text>}
       </View>
+      {action}
     </View>
   )
 }
 
-export function ErrorState({ title, description }: StateProps) {
-  return <EmptyState icon={AlertCircle} title={title} description={description} />
+interface ErrorStateProps extends Omit<StateProps, 'action' | 'icon'> {
+  onRetry?: () => void
+  retrying?: boolean
+}
+
+export function ErrorState({ title, description, onRetry, retrying = false }: ErrorStateProps) {
+  return (
+    <EmptyState
+      action={onRetry
+        ? (
+            <Button
+              icon={RefreshCw}
+              label="Retry"
+              loading={retrying}
+              onPress={onRetry}
+              variant="secondary"
+            />
+          )
+        : undefined}
+      icon={AlertCircle}
+      title={title}
+      description={description}
+    />
+  )
 }
 
 export function LoadingState() {

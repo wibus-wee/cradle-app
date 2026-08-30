@@ -351,7 +351,14 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
 
   const error = sessionQuery.error ?? (!historyData ? historyQuery.error : null)
   if (error) {
-    return <ErrorState title="Could not open conversation" description={errorMessage(error)} />
+    return (
+      <ErrorState
+        title="Could not open conversation"
+        description={errorMessage(error)}
+        onRetry={() => void Promise.all([sessionQuery.refetch(), historyQuery.refetch()])}
+        retrying={sessionQuery.isFetching || historyQuery.isFetching}
+      />
+    )
   }
   if (sessionQuery.isPending || (!historyData && historyQuery.isPending)) {
     return <LoadingState />
