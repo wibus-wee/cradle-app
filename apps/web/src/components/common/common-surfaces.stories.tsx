@@ -69,10 +69,13 @@ function CommonSurfacesGallery() {
             message="Failed to load workspace metadata: connection closed before a response was received."
             retryLabel="Retry"
             homeLabel="Back to home"
+            copyLabel="Copy error"
+            copiedLabel="Copied"
             detailsLabel="Technical details"
             details="Error: workspace query failed\n    at loadWorkspace (workspace-route.tsx:42:11)"
             onRetry={() => setActivity('Retry selected')}
             onHome={() => setActivity('Home selected')}
+            onCopy={async () => setActivity('Error copied')}
           />
         </section>
         <div className="text-xs text-muted-foreground" role="status">{activity}</div>

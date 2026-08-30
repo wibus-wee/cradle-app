@@ -44,8 +44,14 @@ export function RouteErrorFallback({
       details={import.meta.env.DEV && error instanceof Error ? error.stack : null}
       retryLabel={t('action.retry')}
       homeLabel={t('action.backToHome')}
+      copyLabel={t('action.copyError')}
+      copiedLabel={t('action.copied')}
       onRetry={retryRoute}
       onHome={navigateHome}
+      onCopy={() => navigator.clipboard.writeText([
+        message,
+        import.meta.env.DEV && error instanceof Error ? error.stack : null,
+      ].filter(Boolean).join('\n\n'))}
     />
   )
 }

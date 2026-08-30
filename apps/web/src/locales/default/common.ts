@@ -4,6 +4,8 @@ export default {
   'action.cancel': 'Cancel',
   'action.close': 'Close',
   'action.continue': 'Continue',
+  'action.copied': 'Copied',
+  'action.copyError': 'Copy error',
   'action.reload': 'Reload',
   'action.refresh': 'Refresh',
   'action.retry': 'Retry',
