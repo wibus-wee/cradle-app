@@ -117,6 +117,8 @@
   "filter.all": "すべて",
   "filter.installed": "インストール済み",
   "filter.updates": "アップデート",
+  "filter.updatesEmpty": "管理対象の Runtime はすべて最新です。",
+  "filter.installedEmpty": "管理対象の ACP Runtime は未インストールです。",
   "group.acpRegistry": "ACP レジストリ",
   "group.acpLocal": "ローカル ACP",
   "group.builtin": "組み込み",

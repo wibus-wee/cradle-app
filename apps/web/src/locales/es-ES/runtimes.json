@@ -117,6 +117,8 @@
   "filter.all": "Todos",
   "filter.installed": "Instalados",
   "filter.updates": "Actualizaciones",
+  "filter.updatesEmpty": "Todos los runtimes gestionados están actualizados.",
+  "filter.installedEmpty": "No hay runtimes ACP gestionados instalados.",
   "group.acpRegistry": "ACP Registry",
   "group.acpLocal": "ACP local",
   "group.builtin": "Integrados",

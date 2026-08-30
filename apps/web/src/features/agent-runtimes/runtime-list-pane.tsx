@@ -246,6 +246,11 @@ export function RuntimeListPane({
             <span className="ml-1 tabular-nums text-muted-foreground/70">{updateCount}</span>
           </ToggleGroupItem>
         </ToggleGroup>
+        {acpFilter === 'updates' && updateCount === 0
+          ? <p className="px-1 text-[11px] text-muted-foreground">{t('filter.updatesEmpty')}</p>
+          : acpFilter === 'installed' && installedCount === 0
+            ? <p className="px-1 text-[11px] text-muted-foreground">{t('filter.installedEmpty')}</p>
+            : null}
 
         <div className="grid gap-2">
           <Button size="sm" variant="outline" onClick={onCreateLocal} data-testid="acp-local-add">
