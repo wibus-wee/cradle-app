@@ -4,7 +4,7 @@ import {
   SearchLine as SearchIcon,
 } from '@mingcute/react'
 import { m } from 'motion/react'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { RuntimeIcon } from '~/components/common/provider-icons'
@@ -103,6 +103,22 @@ export function RuntimeListPane({
 }) {
   const { t } = useTranslation('runtimes')
   const rowElementsRef = useRef(new Map<string, HTMLButtonElement>())
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const typing = target?.tagName === 'INPUT'
+        || target?.tagName === 'TEXTAREA'
+        || target?.isContentEditable
+      if (event.key === '/' && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', focusSearch)
+    return () => window.removeEventListener('keydown', focusSearch)
+  }, [])
 
   const visibleBuiltin = useMemo(
     () => builtinRuntimes.filter(runtime =>
@@ -184,6 +200,7 @@ export function RuntimeListPane({
             <SearchIcon className="size-3.5" />
           </InputGroupAddon>
           <InputGroupInput
+            ref={searchInputRef}
             value={search}
             onChange={event => onSearchChange(event.target.value)}
             placeholder={t('search.placeholder')}

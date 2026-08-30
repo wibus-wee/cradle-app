@@ -14,3 +14,4 @@ Chronological index of independently shipped product improvements.
 8. [Submit server recovery with Enter](./2026-08-29-08-server-recovery-enter.md)
 9. [Resume recent chats from New Chat](./2026-08-29-09-new-chat-recents.md)
 10. [Copy pull request links](./2026-08-29-10-copy-pull-request-link.md)
+11. [Quick-focus Runtime search](./2026-08-29-11-runtime-search-shortcut.md)
