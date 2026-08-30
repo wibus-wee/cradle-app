@@ -33,3 +33,4 @@ Chronological index of independently shipped product improvements.
 27. [Navigate PR detail tabs by keyboard](./2026-08-29-27-pr-detail-tab-keyboard.md)
 28. [Show session note save status](./2026-08-29-28-session-note-save-status.md)
 29. [Preserve notes typed during autosave](./2026-08-29-29-preserve-notes-during-save.md)
+30. [Add projects from empty New Work](./2026-08-29-30-new-work-add-project.md)

@@ -134,6 +134,7 @@ function NewWorkPageStoryScene({ state }: { state: NewWorkStoryState }) {
         composer={<ComposerView {...composerProps} />}
         workspaceCount={workspaces.length}
         loadingWorkspaces={state === 'loading-workspaces'}
+        addingWorkspace={state === 'adding-workspace'}
         failureKind={failureKind}
         failureMessage={
           failureKind === 'generic'
@@ -142,6 +143,7 @@ function NewWorkPageStoryScene({ state }: { state: NewWorkStoryState }) {
         }
         canOpenChanges={failureKind === 'dirty-source'}
         onOpenChanges={() => setActivity('Open Changes selected')}
+        onAddWorkspace={() => setActivity('Add project selected')}
         onDismissFailure={() => setFailureDismissed(true)}
       />
       <span className="sr-only" role="status">{activity}</span>
