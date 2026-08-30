@@ -42,6 +42,7 @@ export interface WorkspaceViewProps {
   isCreating?: boolean
   isRefreshing?: boolean
   onCreate: (input: PostWorksData['body']) => void
+  onOpenFile: (entry: FileEntry) => void
   onOpenSession: (sessionId: string) => void
   onOpenWork: (sessionId: string) => void
   onOpenWorkInfo: (workId: string) => void
@@ -63,6 +64,7 @@ export function WorkspaceView({
   isCreating = false,
   isRefreshing = false,
   onCreate,
+  onOpenFile,
   onOpenSession,
   onOpenWork,
   onOpenWorkInfo,
@@ -172,6 +174,7 @@ export function WorkspaceView({
               media={entry.type === 'directory'
                 ? <Folder color={theme.tertiaryForeground} size={15} />
                 : <File color={theme.tertiaryForeground} size={15} />}
+              onPress={() => onOpenFile(entry)}
               size="sm"
               title={entry.name}
             />

@@ -42,3 +42,4 @@ Chronological index of independently shipped product improvements.
 3. [Show live server health on Mobile](./2026-08-31-03-mobile-connection-health.md)
 4. [Search the Mobile pull request inbox](./2026-08-31-04-search-mobile-pull-requests.md)
 5. [Copy the Mobile server address](./2026-08-31-05-copy-mobile-server-address.md)
+6. [Browse workspace files on Mobile](./2026-08-31-06-mobile-workspace-file-browser.md)
