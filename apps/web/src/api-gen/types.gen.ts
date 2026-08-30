@@ -14792,6 +14792,7 @@ export type GetStorageOverviewResponses = {
             active: boolean;
             messageCount: number;
             localBytes: number;
+            runtimeBytes: number;
             attachmentBytes: number;
             artifactBytes: number;
             terminalBytes: number;
@@ -14856,6 +14857,7 @@ export type PostStorageSessionsPurgeTranscriptsResponses = {
                 active: boolean;
                 messageCount: number;
                 localBytes: number;
+                runtimeBytes: number;
                 attachmentBytes: number;
                 artifactBytes: number;
                 terminalBytes: number;
@@ -14921,6 +14923,7 @@ export type PostStorageSessionsDeleteResponses = {
                 active: boolean;
                 messageCount: number;
                 localBytes: number;
+                runtimeBytes: number;
                 attachmentBytes: number;
                 artifactBytes: number;
                 terminalBytes: number;

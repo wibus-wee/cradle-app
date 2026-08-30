@@ -1045,6 +1045,7 @@
   "storage.part.artifacts": "Artifacts",
   "storage.part.attachments": "Files",
   "storage.part.local": "Local",
+  "storage.part.runtime": "Runtime",
   "storage.part.terminal": "Terminal",
   "storage.search": "Search sessions",
   "storage.selectAll": "Select all",

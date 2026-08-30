@@ -33,6 +33,7 @@ const storageSession = t.Object({
   active: t.Boolean(),
   messageCount: t.Number(),
   localBytes: t.Number(),
+  runtimeBytes: t.Number(),
   attachmentBytes: t.Number(),
   artifactBytes: t.Number(),
   terminalBytes: t.Number(),

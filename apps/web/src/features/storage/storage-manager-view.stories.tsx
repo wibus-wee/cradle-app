@@ -30,6 +30,7 @@ const copy: StorageManagerCopy = {
   archived: 'Archived',
   messages: count => `${count} messages`,
   localData: 'Local',
+  runtimeData: 'Runtime',
   attachments: 'Files',
   artifacts: 'Artifacts',
   terminal: 'Terminal',
@@ -56,10 +57,10 @@ const overview = {
     { id: 'other' as const, bytes: 42 * MB, fileCount: 121 },
   ],
   sessions: [
-    { id: '1', title: 'Plan the storage manager architecture', workspaceName: 'cradle-app', runtimeKind: 'codex', updatedAt: 1_788_000_000, archivedAt: null, pinned: true, active: false, messageCount: 186, localBytes: 74 * MB, attachmentBytes: 42 * MB, artifactBytes: 18 * MB, terminalBytes: 3 * MB, reclaimableBytes: 137 * MB },
-    { id: '2', title: 'Investigate Claude transcript reconciliation', workspaceName: 'cradle-app', runtimeKind: 'claude-agent', updatedAt: 1_787_900_000, archivedAt: 1_787_950_000, pinned: false, active: false, messageCount: 92, localBytes: 48 * MB, attachmentBytes: 9 * MB, artifactBytes: 0, terminalBytes: 2 * MB, reclaimableBytes: 59 * MB },
-    { id: '3', title: 'Fix provider reconnect state', workspaceName: 'runtime-lab', runtimeKind: 'kimi', updatedAt: 1_787_800_000, archivedAt: null, pinned: false, active: true, messageCount: 41, localBytes: 21 * MB, attachmentBytes: 4 * MB, artifactBytes: 6 * MB, terminalBytes: 0, reclaimableBytes: 31 * MB },
-    { id: '4', title: 'Review plugin marketplace changes', workspaceName: 'cradle-app', runtimeKind: 'opencode', updatedAt: 1_787_600_000, archivedAt: null, pinned: false, active: false, messageCount: 38, localBytes: 12 * MB, attachmentBytes: 0, artifactBytes: 2 * MB, terminalBytes: 1 * MB, reclaimableBytes: 15 * MB },
+    { id: '1', title: 'Plan the storage manager architecture', workspaceName: 'cradle-app', runtimeKind: 'codex', updatedAt: 1_788_000_000, archivedAt: null, pinned: true, active: false, messageCount: 186, localBytes: 74 * MB, runtimeBytes: 0, attachmentBytes: 42 * MB, artifactBytes: 18 * MB, terminalBytes: 3 * MB, reclaimableBytes: 137 * MB },
+    { id: '2', title: 'Investigate Claude transcript reconciliation', workspaceName: 'cradle-app', runtimeKind: 'claude-agent', updatedAt: 1_787_900_000, archivedAt: 1_787_950_000, pinned: false, active: false, messageCount: 92, localBytes: 48 * MB, runtimeBytes: 0, attachmentBytes: 9 * MB, artifactBytes: 0, terminalBytes: 2 * MB, reclaimableBytes: 59 * MB },
+    { id: '3', title: 'Fix provider reconnect state', workspaceName: 'runtime-lab', runtimeKind: 'kimi', updatedAt: 1_787_800_000, archivedAt: null, pinned: false, active: true, messageCount: 41, localBytes: 21 * MB, runtimeBytes: 28 * MB, attachmentBytes: 4 * MB, artifactBytes: 6 * MB, terminalBytes: 0, reclaimableBytes: 59 * MB },
+    { id: '4', title: 'Review plugin marketplace changes', workspaceName: 'cradle-app', runtimeKind: 'opencode', updatedAt: 1_787_600_000, archivedAt: null, pinned: false, active: false, messageCount: 38, localBytes: 12 * MB, runtimeBytes: 0, attachmentBytes: 0, artifactBytes: 2 * MB, terminalBytes: 1 * MB, reclaimableBytes: 15 * MB },
   ],
 }
 

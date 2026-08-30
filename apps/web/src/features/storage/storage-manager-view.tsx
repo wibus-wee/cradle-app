@@ -61,6 +61,7 @@ export interface StorageManagerCopy {
   archived: string
   messages: (count: number) => string
   localData: string
+  runtimeData: string
   attachments: string
   artifacts: string
   terminal: string
@@ -390,6 +391,7 @@ function SessionStorageRow({ session, copy, selected, disabled, onSelectedChange
           <span>{session.runtimeKind}</span>
           <span className="tabular-nums">{copy.messages(session.messageCount)}</span>
           <StoragePart label={copy.localData} bytes={session.localBytes} />
+          <StoragePart label={copy.runtimeData} bytes={session.runtimeBytes} />
           <StoragePart label={copy.attachments} bytes={session.attachmentBytes} />
           <StoragePart label={copy.artifacts} bytes={session.artifactBytes} />
           <StoragePart label={copy.terminal} bytes={session.terminalBytes} />

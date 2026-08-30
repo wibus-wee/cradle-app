@@ -9,6 +9,13 @@ transcript deletion delegates to Chat Runtime, attachment collection delegates
 to Blob Store, and provider-native deletion delegates to the runtime contract.
 Provider data outside Cradle-owned paths is never scanned or removed.
 
+Kimi runtime bytes are measured per session through the
+[Kimi session-storage contract](../chat-runtime-providers/kimi/README.md#session-storage).
+A startup and hourly Maintenance task removes native artifacts whose provider
+session has no surviving database binding. The task is visible and manually
+runnable through Background Activity. It skips running provider targets and
+preserves every bound session even when its native state is damaged.
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/storage/overview` | Measure categories and session estimates. |

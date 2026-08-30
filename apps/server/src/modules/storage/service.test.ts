@@ -1,19 +1,23 @@
 import { randomUUID } from 'node:crypto'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  backendSessionBindings,
   chatMessageBlobRefs,
   chatMessagePayloads,
   messages,
+  providerTargets,
   sessions,
 } from '@cradle/db'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { currentUnixSeconds } from '../../helpers/time'
 import { db, shutdownInfra } from '../../infra'
 import { putBlob } from '../blob-store/service'
+import { resolveKimiProviderHome } from '../chat-runtime-providers/kimi/runtime-home'
 import { getStorageOverview } from './service'
 
 const previousDataDir = process.env.CRADLE_DATA_DIR
@@ -60,6 +64,35 @@ describe('storage service', () => {
     expect(first?.attachmentBytes).toBe(uniqueBlob.byteSize)
     expect(second?.attachmentBytes).toBe(0)
     expect(overview.categories.reduce((sum, category) => sum + category.bytes, 0)).toBe(overview.totalBytes)
+  })
+
+  it('attributes Kimi native session bytes to the bound Cradle session', () => {
+    db().insert(providerTargets).values({
+      id: 'kimi-target',
+      kind: 'manual',
+      providerKind: 'openai-compatible',
+      displayName: 'Kimi',
+    }).run()
+    const sessionId = randomUUID()
+    seedSession(sessionId, 'Kimi storage')
+    db().update(sessions).set({ providerTargetId: 'kimi-target', runtimeKind: 'kimi' }).where(eq(sessions.id, sessionId)).run()
+    db().insert(backendSessionBindings).values({
+      id: randomUUID(),
+      chatSessionId: sessionId,
+      providerTargetId: 'kimi-target',
+      runtimeKind: 'kimi',
+      backendSessionId: 'session_native',
+    }).run()
+    const home = resolveKimiProviderHome('kimi-target')
+    mkdirSync(join(home, 'sessions', 'workspace', 'session_native'), { recursive: true })
+    mkdirSync(join(home, 'server', 'events'), { recursive: true })
+    writeFileSync(join(home, 'sessions', 'workspace', 'session_native', 'state.json'), 'native state')
+    writeFileSync(join(home, 'server', 'events', 'session_native.jsonl'), 'native event')
+
+    const stored = getStorageOverview().sessions.find(session => session.id === sessionId)
+
+    expect(stored?.runtimeBytes).toBe(Buffer.byteLength('native state') + Buffer.byteLength('native event'))
+    expect(stored?.reclaimableBytes).toBe((stored?.localBytes ?? 0) + (stored?.runtimeBytes ?? 0))
   })
 })
 

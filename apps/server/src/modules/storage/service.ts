@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 import {
+  backendSessionBindings,
   blobs,
   chatMessageBlobRefs,
   chatMessagePayloads,
@@ -19,6 +20,7 @@ import {
   claimSessionStorageMaintenance,
   purgeClaimedSessionTranscript,
 } from '../chat-runtime/session-storage'
+import { measureKimiSessionStorage } from '../chat-runtime-providers/kimi/session-storage'
 import * as Session from '../session/service'
 import type {
   StorageCleanupResult,
@@ -157,6 +159,7 @@ function listSessionStorage(dataDirectory: string): StorageOverview['sessions'] 
   const payloads = aggregatePayloadStorage()
   const events = aggregateEventStorage()
   const blobStorage = aggregateBlobStorage()
+  const runtimeStorage = aggregateRuntimeStorage()
   return rows.map((row) => {
     const payload = payloads.get(row.id) ?? { bytes: 0, count: 0 }
     const eventBytes = events.get(row.id)?.bytes ?? 0
@@ -164,18 +167,45 @@ function listSessionStorage(dataDirectory: string): StorageOverview['sessions'] 
     const artifactBytes = measurePath(join(dataDirectory, 'chat-artifacts', row.id)).bytes
     const terminalBytes = measurePath(join(dataDirectory, 'terminal-history', `${safeFileId(row.id)}.json`)).bytes
     const localBytes = payload.bytes + eventBytes
+    const runtimeBytes = runtimeStorage.get(row.id)?.bytes ?? 0
     return {
       ...row,
       pinned: Boolean(row.pinned),
       active: runRegistry.hasActiveRunForSession(row.id) || runRegistry.hasPendingRun(row.id),
       messageCount: payload.count ?? 0,
       localBytes,
+      runtimeBytes,
       attachmentBytes,
       artifactBytes,
       terminalBytes,
-      reclaimableBytes: localBytes + attachmentBytes + artifactBytes + terminalBytes,
+      reclaimableBytes: localBytes + runtimeBytes + attachmentBytes + artifactBytes + terminalBytes,
     }
   })
+}
+
+function aggregateRuntimeStorage(): Map<string, SessionAggregate> {
+  const bindings = db()
+    .select({
+      sessionId: backendSessionBindings.chatSessionId,
+      providerTargetId: backendSessionBindings.providerTargetId,
+      providerSessionId: backendSessionBindings.backendSessionId,
+    })
+    .from(backendSessionBindings)
+    .where(eq(backendSessionBindings.runtimeKind, 'kimi'))
+    .all()
+
+  const storage = new Map<string, SessionAggregate>()
+  for (const binding of bindings) {
+    if (!binding.providerTargetId || !binding.providerSessionId) {
+      continue
+    }
+    const measurement = measureKimiSessionStorage({
+      providerTargetId: binding.providerTargetId,
+      providerSessionId: binding.providerSessionId,
+    })
+    storage.set(binding.sessionId, { sessionId: binding.sessionId, bytes: measurement.bytes })
+  }
+  return storage
 }
 
 function aggregatePayloadStorage(): Map<string, SessionAggregate> {

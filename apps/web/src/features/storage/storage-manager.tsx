@@ -55,6 +55,7 @@ export function StorageManager() {
     archived: t('storage.status.archived'),
     messages: count => t('storage.messages', { count }),
     localData: t('storage.part.local'),
+    runtimeData: t('storage.part.runtime'),
     attachments: t('storage.part.attachments'),
     artifacts: t('storage.part.artifacts'),
     terminal: t('storage.part.terminal'),

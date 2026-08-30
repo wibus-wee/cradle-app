@@ -120,6 +120,7 @@ export default {
   'storage.messages_one': '{{count}} message',
   'storage.messages_other': '{{count}} messages',
   'storage.part.local': 'Local',
+  'storage.part.runtime': 'Runtime',
   'storage.part.attachments': 'Files',
   'storage.part.artifacts': 'Artifacts',
   'storage.part.terminal': 'Terminal',
