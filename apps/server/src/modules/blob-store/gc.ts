@@ -1,7 +1,7 @@
 import { rm } from 'node:fs/promises'
 
 import { blobs, chatMessageBlobRefs, messages } from '@cradle/db'
-import { and, eq, isNull, lt } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt } from 'drizzle-orm'
 
 import { readPositiveIntegerEnv } from '../../helpers/env'
 import { currentUnixSeconds } from '../../helpers/time'
@@ -94,6 +94,35 @@ export async function collectUnreferencedBlobs(): Promise<MaintenanceResult> {
   }
 
   return { refsDropped, blobsCollected, blobsSkipped, bytesFreed }
+}
+
+export async function collectUnreferencedBlobIds(blobIds: string[]): Promise<MaintenanceResult> {
+  if (blobIds.length === 0) {
+    return { refsDropped: 0, blobsCollected: 0, blobsSkipped: 0, bytesFreed: 0 }
+  }
+  let blobsCollected = 0
+  let blobsSkipped = 0
+  let bytesFreed = 0
+  const candidates = db()
+    .select({ id: blobs.id, storagePath: blobs.storagePath, byteSize: blobs.byteSize })
+    .from(blobs)
+    .leftJoin(chatMessageBlobRefs, eq(chatMessageBlobRefs.blobId, blobs.id))
+    .where(and(inArray(blobs.id, blobIds), isNull(chatMessageBlobRefs.id)))
+    .all()
+
+  for (const blob of candidates) {
+    try {
+      db().delete(blobs).where(eq(blobs.id, blob.id)).run()
+    }
+    catch {
+      blobsSkipped += 1
+      continue
+    }
+    await rm(resolveBlobStorePath(blob.storagePath), { force: true })
+    blobsCollected += 1
+    bytesFreed += blob.byteSize
+  }
+  return { refsDropped: 0, blobsCollected, blobsSkipped, bytesFreed }
 }
 
 export function registerBlobStoreMaintenance(): void {

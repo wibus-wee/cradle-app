@@ -2596,6 +2596,14 @@ export const zPostSkillsCancelFetchBody = z.object({
     sessionId: z.string().min(1).regex(/.*\S.*/)
 });
 
+export const zPostStorageSessionsPurgeTranscriptsBody = z.object({
+    sessionIds: z.array(z.string().min(1)).min(1).max(100)
+});
+
+export const zPostStorageSessionsDeleteBody = z.object({
+    sessionIds: z.array(z.string().min(1)).min(1).max(100)
+});
+
 export const zGetWorkflowRulesByWorkspaceIdListPath = z.object({
     workspaceId: z.string().min(1)
 });
