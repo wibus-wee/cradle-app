@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 
 import {
+  claudeRuntimeUsageFixture,
   compactContextUsageFixture,
   contextUsageFixture,
   contextUsageNearLimitFixture,
@@ -11,16 +12,18 @@ import { ContextUsageDetailPanelView } from '../views/context-usage-detail-panel
 import { ContextWindowViewerView } from '../views/context-window-viewer-view'
 
 interface ContextUsageStorySceneProps {
-  state: 'detailed' | 'near-limit' | 'provider-usage' | 'compact' | 'loading' | 'error'
+  state: 'detailed' | 'near-limit' | 'provider-usage' | 'claude-cost' | 'compact' | 'loading' | 'error'
 }
 
 function ContextUsageStoryScene({ state }: ContextUsageStorySceneProps) {
   const [lastAction, setLastAction] = useState('No action yet')
   const usage = state === 'near-limit'
     ? contextUsageNearLimitFixture
-    : state === 'detailed' || state === 'provider-usage' ? contextUsageFixture : null
+    : state === 'detailed' || state === 'provider-usage' || state === 'claude-cost' ? contextUsageFixture : null
   const compactState = state === 'compact' ? compactContextUsageFixture : undefined
-  const runtimeUsageState = state === 'provider-usage' ? runtimeUsageFixture : undefined
+  const runtimeUsageState = state === 'provider-usage'
+    ? runtimeUsageFixture
+    : state === 'claude-cost' ? claudeRuntimeUsageFixture : undefined
   const loadState = state === 'loading' ? 'loading' : state === 'error' ? 'error' : 'ready'
 
   return (
@@ -69,6 +72,7 @@ type Story = StoryObj<typeof meta>
 export const Detailed: Story = {}
 export const NearLimit: Story = { args: { state: 'near-limit' } }
 export const ProviderUsage: Story = { args: { state: 'provider-usage' } }
+export const ClaudeCost: Story = { args: { state: 'claude-cost' } }
 export const CompactFallback: Story = { args: { state: 'compact' } }
 export const Loading: Story = { args: { state: 'loading' } }
 export const Error: Story = { args: { state: 'error' } }

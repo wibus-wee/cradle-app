@@ -37,6 +37,8 @@ describe('kimi web host smoke', () => {
     })
     resources.push(resource)
 
+    const initialConfig = await resource.http.request(getApiV1Config({ client: resource.http.client }))
+    expect(initialConfig.default_model).toBe('cradle-smoke-target/smoke-model')
     const auth = await resource.http.request(getApiV1Auth({ client: resource.http.client }))
     expect(auth.models_ready).toBe(true)
     expect(auth.providers_count).toBeGreaterThan(0)
@@ -53,8 +55,8 @@ describe('kimi web host smoke', () => {
         },
       },
     }))
-    const config = await resource.http.request(getApiV1Config({ client: resource.http.client }))
-    expect(config.default_model).toBe('cradle-smoke-target/smoke-model')
+    const updatedConfig = await resource.http.request(getApiV1Config({ client: resource.http.client }))
+    expect(updatedConfig.default_model).toBe('cradle-smoke-target/smoke-model')
     const session = await resource.http.request(postApiV1Sessions({
       client: resource.http.client,
       body: { metadata: { cwd: process.cwd() } },

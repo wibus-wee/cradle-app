@@ -210,7 +210,7 @@ class KimiProvider implements ChatRuntime {
         totalTokens: status.context_tokens,
         maxTokens,
         rawMaxTokens: maxTokens,
-        percentage: maxTokens ? status.context_usage ?? null : null,
+        percentage: maxTokens ? (status.context_usage ?? null) : null,
         sections: [],
         messageBreakdown: null,
         apiUsage: null,

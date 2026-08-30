@@ -50,6 +50,56 @@ export const runtimeUsageFixture: ChatRuntimeUsageUiSlotState = {
   updatedAt: 1_725_000_000,
 }
 
+export const claudeRuntimeUsageFixture: ChatRuntimeUsageUiSlotState = {
+  kind: 'usage',
+  slotId: 'claude-usage-fixture',
+  threadId: 'thread-claude-fixture',
+  limitName: null,
+  usedPercent: null,
+  primaryWindowDurationMins: null,
+  primaryResetsAt: null,
+  secondaryUsedPercent: null,
+  secondaryWindowDurationMins: null,
+  secondaryResetsAt: null,
+  creditsBalance: null,
+  hasCredits: null,
+  rateLimitReachedType: null,
+  planType: 'team',
+  estimatedCostUsd: 0.1876,
+  queuedTurnCount: 2,
+  resultMessageId: 'result-claude-fixture',
+  correlatedUserMessageId: 'user-claude-fixture',
+  modelCosts: [
+    {
+      modelId: 'sonnet',
+      canonicalModelId: 'claude-sonnet-4-6',
+      provider: 'anthropic',
+      costUsd: 0.1424,
+      costBasis: 'list',
+    },
+    {
+      modelId: 'opus',
+      canonicalModelId: 'claude-opus-4-6',
+      provider: 'bedrock',
+      costUsd: 0.0452,
+      costBasis: 'managed',
+    },
+  ],
+  lastModelSwitch: {
+    fromModelId: 'claude-sonnet-4-6',
+    toModelId: 'claude-opus-4-6',
+    requestedModelId: 'opus',
+    source: 'sdk',
+    contextTokens: 42_000,
+    promptCacheWarm: true,
+    cacheTtl: '1h',
+    estimatedCacheWriteUsd: 0.0432,
+    pricing: 'configured',
+    updatedAt: 1_725_000_100,
+  },
+  updatedAt: 1_725_000_100,
+}
+
 export const compactContextUsageFixture: ChatRuntimeCompactUiSlotState = {
   kind: 'compact',
   slotId: 'compact-context-fixture',

@@ -51,7 +51,7 @@ function ModelSwitchCostSummary({
 }) {
   const label = `Last switch: ${formatEstimatedCost(modelSwitch.estimatedCacheWriteUsd)} cache estimate · ${modelSwitch.cacheTtl} TTL · ${modelSwitch.pricing} pricing`
   return (
-    <div className="min-w-0 truncate text-muted-foreground">
+    <div className="min-w-0 text-pretty leading-4 text-muted-foreground">
       {label}
     </div>
   )
@@ -67,14 +67,14 @@ function UsageCostSummary({ state }: { state: ChatRuntimeUsageUiSlotState }) {
   const modelCount = state.modelCosts?.length ?? 0
   const costLabel = `${formatEstimatedCost(state.estimatedCostUsd ?? 0)} estimated`
   const pricingSummary = `${pricingLabel}${modelCount > 0 ? ` · ${modelCount} model${modelCount === 1 ? '' : 's'}` : ''}`
-  const queuedLabel = `· ${state.queuedTurnCount} queued`
+  const queuedLabel = `${state.queuedTurnCount} queued`
   return (
-    <div className="flex min-w-0 items-baseline gap-1.5 text-muted-foreground">
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-pretty leading-4 text-muted-foreground">
       <span className="shrink-0 font-mono tabular-nums text-foreground/80">
         {costLabel}
       </span>
       <span aria-hidden="true">·</span>
-      <span className="min-w-0 truncate">
+      <span className="min-w-0">
         {pricingSummary}
       </span>
       {(state.queuedTurnCount ?? 0) > 0 && (
