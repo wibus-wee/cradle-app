@@ -25,6 +25,7 @@
   "download.action.viewAll": "ダウンロードセンターを開く",
   "download.empty": "ダウンロードはまだありません",
   "download.error.last": "直近のエラー:",
+  "download.eta.remaining": "残り約 {{duration}}",
   "download.rate.average": "平均 {{rate}}/秒",
   "download.recent": "最近",
   "download.scope.desktop": "デスクトップ",

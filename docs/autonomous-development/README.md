@@ -52,3 +52,4 @@ Chronological index of independently shipped product improvements.
 13. [Share mobile workspace file previews](./2026-08-31-13-mobile-share-file-preview.md)
 14. [Refresh mobile Work detail on demand](./2026-08-31-14-mobile-work-detail-refresh.md)
 15. [Browse workspace directories on mobile](./2026-08-31-15-mobile-directory-browser.md)
+16. [Estimate active download completion](./2026-08-31-16-download-eta.md)

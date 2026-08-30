@@ -25,6 +25,7 @@
   "download.action.viewAll": "Abrir centro de descargas",
   "download.empty": "Todavía no hay descargas",
   "download.error.last": "Último error:",
+  "download.eta.remaining": "~{{duration}} restantes",
   "download.rate.average": "Prom. {{rate}}/s",
   "download.recent": "Recientes",
   "download.scope.desktop": "Escritorio",

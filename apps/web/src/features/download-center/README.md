@@ -8,7 +8,7 @@ Download Center projects server and Desktop download transports into Settings > 
 
 - **download-task-row-view.tsx**: Props-only task lifecycle row for queued, downloading, verifying, completed, failed, and cancelled states.
 - **fixtures/download-tasks.ts**: Stable shared-contract fixtures for every task status.
-- **presentation.ts**: Pure status, average transfer-rate, error, and retry-destination projection helpers.
+- **presentation.ts**: Pure status, average transfer-rate, linear remaining-time estimate, error, and retry-destination projection helpers. ETA is omitted unless total size and a valid lifetime rate are available.
 - **transport.ts**: Desktop/server host transport adapters.
 - **types.ts**: Renderer aliases for shared download contracts and projection helpers.
 - **use-download-center.ts**: External-store subscription and owner/task projections.

@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
-import { formatCompactBytes } from '~/lib/number-format'
+import { formatCompactBytes, formatElapsedSeconds } from '~/lib/number-format'
 
-import { averageTransferRateBytesPerSecond, downloadStatusKey, retryDestination } from './presentation'
+import { averageTransferRateBytesPerSecond, downloadStatusKey, estimatedRemainingSeconds, retryDestination } from './presentation'
 import type { DownloadTask } from './types'
 import { isActiveDownload } from './types'
 
@@ -38,6 +38,7 @@ export function DownloadTaskRowView({
   const active = isActiveDownload(task)
   const retryTarget = retryDestination(task)
   const averageRate = task.status === 'downloading' ? averageTransferRateBytesPerSecond(task) : null
+  const remainingSeconds = task.status === 'downloading' ? estimatedRemainingSeconds(task) : null
   const percent = task.totalBytes && task.totalBytes > 0
     ? Math.min(100, Math.round((task.transferredBytes / task.totalBytes) * 100))
     : null
@@ -91,6 +92,9 @@ export function DownloadTaskRowView({
             {averageRate === null
               ? null
               : ` · ${t('download.rate.average', { rate: formatCompactBytes(averageRate) })}`}
+            {remainingSeconds === null
+              ? null
+              : ` · ${t('download.eta.remaining', { duration: formatElapsedSeconds(remainingSeconds) })}`}
           </p>
         </div>
       )}

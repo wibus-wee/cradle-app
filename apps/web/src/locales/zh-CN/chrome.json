@@ -25,6 +25,7 @@
   "download.action.viewAll": "打开下载中心",
   "download.empty": "暂无下载任务",
   "download.error.last": "最近错误：",
+  "download.eta.remaining": "约剩 {{duration}}",
   "download.rate.average": "平均 {{rate}}/秒",
   "download.recent": "最近任务",
   "download.scope.desktop": "桌面端",
