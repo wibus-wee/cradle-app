@@ -7,6 +7,8 @@ Pull request lists and details support pull-to-refresh; both force an upstream
 GitHub update before reloading their Cradle projections.
 Initial data-load failures expose an in-place Retry action across Projects,
 Work, Usage, pull requests, and conversations.
+Workspace detail file rows open a refreshable, read-only mobile preview for
+text and Markdown files; unsupported binary formats are identified explicitly.
 
 ## Run
 
@@ -45,6 +47,8 @@ Settings.
 - `src/features/*/*Container.tsx` owns API, persistence, and route dependencies.
 - `src/features/*/*View.tsx` is fixture-renderable and receives typed props and
   callbacks.
+- `src/features/projects/FilePreviewContainer.tsx` reads workspace-owned file
+  metadata before requesting text content; its View never reads routes or API state.
 - Root destinations use an anchored navigation menu; detail surfaces use Expo
   Router's native Stack navigation and back gestures.
 - `src/api-gen/` is generated from the authoritative server OpenAPI document.
