@@ -2,7 +2,7 @@
 
 # Features/Git
 
-Git integration feature: repository discovery, branch status, working-tree changes, commit graph with full-SHA copy actions, branch switching, and fetch.
+Git integration feature: repository discovery, branch status, working-tree changes, commit graph with full-SHA copy actions, branch switching, fetch, and explicit recovery from repository or graph load failures.
 The `GitPanelContainer` renders in the right aside "Git" tab; `ChangesPanelContainer` renders in the right aside "Changes" tab; `GitBranchControl` renders in the AppHeader breadcrumb.
 All git operations go through the server Git module under `/workspaces/:id/git/*`, which owns repository discovery and repository-scoped `simple-git` orchestration.
 The first real UI-driven E2E coverage enters this feature from `new-chat` → chat route surface, then drives the header branch control and right-aside Git panel without seeding app-owned state directly.
@@ -33,6 +33,11 @@ git/
 `containers` directories are the only places in these panel surfaces allowed to
 read queries, invalidate caches, access BrowserPanel, or call Electron. Every
 Storybook story mounts a View with fixtures from its own surface.
+
+Repository discovery and commit graph queries do not retry automatically because
+Git failures can be persistent or require user intervention. Their error Views
+therefore expose an explicit Retry action, with containers owning the refetch and
+in-progress state.
 
 `branch/branch-picker.tsx` and `branch/git-branch-control.tsx` remain runtime
 adapters because branch selection, creation, and fetch are application actions.

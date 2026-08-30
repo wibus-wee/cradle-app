@@ -1,4 +1,5 @@
 {
+  "action.retry": "重试",
   "branch.checkout.error": "切换分支失败",
   "branch.create.cancel": "取消创建分支",
   "branch.create.creating": "创建中...",

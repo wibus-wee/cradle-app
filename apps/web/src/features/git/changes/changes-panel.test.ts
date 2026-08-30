@@ -152,6 +152,25 @@ describe('groupGitFileStatuses', () => {
 })
 
 describe('changesPanel type interactions', () => {
+  it('retries repository discovery from the error state', () => {
+    const refetch = vi.fn()
+    gitQueryMocks.useGitRepositories.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      isFetching: false,
+      refetch,
+    })
+
+    renderWithQueryClient(createElement(ChangesPanelContainer, {
+      workspaceId: 'workspace-1',
+    }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'action.retry' }))
+
+    expect(refetch).toHaveBeenCalledOnce()
+  })
+
   it('opens the All Changes browser panel tab for clicked files', () => {
     gitQueryMocks.useGitRepositories.mockReturnValue({
       data: [createGitRepository([

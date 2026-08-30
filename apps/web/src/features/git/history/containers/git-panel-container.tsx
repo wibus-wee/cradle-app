@@ -18,6 +18,8 @@ export function GitPanelContainer({
     data: repositories,
     isLoading,
     isError,
+    isFetching,
+    refetch,
   } = useGitRepositories(workspaceId, sessionId)
 
   const renderRepository = (
@@ -49,6 +51,8 @@ export function GitPanelContainer({
               : 'ready'
       }
       repositories={repositories ?? []}
+      retrying={isFetching}
+      onRetry={() => void refetch()}
       renderRepository={renderRepository}
     />
   )

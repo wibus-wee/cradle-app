@@ -1,4 +1,5 @@
 {
+  "action.retry": "再試行",
   "branch.checkout.error": "ブランチの切り替えに失敗しました",
   "branch.create.cancel": "ブランチ作成をキャンセル",
   "branch.create.creating": "作成中...",

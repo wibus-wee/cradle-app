@@ -36,6 +36,7 @@ export function GitRepositoryPanelSectionContainer({
     isLoading: graphLoading,
     isFetching: graphFetching,
     isError: graphError,
+    refetch: refetchGraph,
   } = useGitGraph(workspaceId, limit, repository.path)
   const queryClient = useQueryClient()
   const fetchMutation = useMutation({
@@ -103,6 +104,7 @@ export function GitRepositoryPanelSectionContainer({
       onFetch={() => {
         void handleFetch()
       }}
+      onRetry={() => void refetchGraph()}
       onLoadMore={
         graphFetching
           ? undefined

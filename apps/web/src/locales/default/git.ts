@@ -1,4 +1,5 @@
 export default {
+  'action.retry': 'Retry',
   'branch.create.cancel': 'Cancel branch creation',
   'branch.create.description': 'Based on {{branch}}, create and switch to the new branch. Press Enter to confirm.',
   'branch.create.creating': 'Creating...',

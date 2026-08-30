@@ -23,6 +23,7 @@ interface GitHistoryStorySceneProps {
 const handleFetch = fn()
 const handleLoadMore = fn()
 const handleCopyCommit = fn()
+const handleRetry = fn()
 
 function GitHistoryStoryScene({
   panelState = 'ready',
@@ -46,6 +47,8 @@ function GitHistoryStoryScene({
       <GitPanelView
         status={panelState}
         repositories={repositories}
+        retrying={false}
+        onRetry={handleRetry}
         renderRepository={(repository, showRepositoryHeader) => (
           <GitRepositoryPanelSectionView
             repository={repository}
@@ -57,6 +60,7 @@ function GitHistoryStoryScene({
             renderBranchPicker={trigger => trigger}
             onCopyCommit={handleCopyCommit}
             onFetch={handleFetch}
+            onRetry={handleRetry}
             onLoadMore={handleLoadMore}
           />
         )}

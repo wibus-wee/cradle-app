@@ -29,6 +29,8 @@ export function ChangesPanelContainer({
     data: repositories,
     isLoading,
     isError,
+    isFetching,
+    refetch,
   } = useGitRepositories(workspaceId, sessionId)
   const gitRepositories = repositories ?? []
   const openWorkspaceDiffTab = useBrowserPanelStore(state => state.openWorkspaceDiffTab)
@@ -96,6 +98,8 @@ export function ChangesPanelContainer({
               : 'ready'
       }
       repositories={gitRepositories}
+      retrying={isFetching}
+      onRetry={() => void refetch()}
       onReviewRepository={handleReviewRepository}
       renderRepositoryChanges={renderRepositoryChanges}
     />

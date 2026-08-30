@@ -1,4 +1,5 @@
 {
+  "action.retry": "Reintentar",
   "branch.checkout.error": "Error al cambiar de rama",
   "branch.create.cancel": "Cancelar creación de rama",
   "branch.create.creating": "Creando...",

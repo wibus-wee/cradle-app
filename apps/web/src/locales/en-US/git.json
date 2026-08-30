@@ -1,4 +1,5 @@
 {
+  "action.retry": "Retry",
   "branch.checkout.error": "Failed to switch branch",
   "branch.create.cancel": "Cancel branch creation",
   "branch.create.creating": "Creating...",
