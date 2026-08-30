@@ -2,6 +2,7 @@ import { DownloadLine as DownloadIcon } from '@mingcute/react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import {
   Empty,
   EmptyHeader,
@@ -108,6 +109,21 @@ export function ManagedResourceActivityView({
               <EmptyHeader>
                 <EmptyMedia variant="icon"><DownloadIcon /></EmptyMedia>
                 <EmptyTitle>{t('empty.transfers')}</EmptyTitle>
+                {tasks.length > 0
+                  ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setScope('all')
+                          setStatus('all')
+                        }}
+                      >
+                        {t('action.clearFilters')}
+                      </Button>
+                    )
+                  : null}
               </EmptyHeader>
             </Empty>
           )

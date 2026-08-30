@@ -4,6 +4,7 @@
   "action.install": "Install",
   "action.installManaged": "Install managed",
   "action.retry": "Try again",
+  "action.clearFilters": "Clear filters",
   "action.uninstall": "Uninstall",
   "action.update": "Update",
   "description": "Install optional runtimes and models, then watch the transfers that deliver them — on this server or on the desktop app.",
