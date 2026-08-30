@@ -114,14 +114,28 @@ When('我在新建聊天中提及文件{string}并输入{string}', async functio
   await editor.pressSequentially(` ${prompt}`)
 })
 
-Then('Simulator 请求应包含文件内容{string}', function (this: CradleWorld, content: string) {
-  const requests = this.simulator?.requests() ?? []
-  expect(JSON.stringify(requests)).toContain(content)
+Then('Simulator 请求应包含文件内容{string}', async function (this: CradleWorld, content: string) {
+  const simulator = this.simulator
+  if (!simulator) {
+    throw new Error('Expected simulator to be configured')
+  }
+  await simulator.waitForRequest({
+    method: 'POST',
+    path: '/v1/messages',
+    bodyTextIncludes: content,
+  })
 })
 
-Then('Simulator 请求应包含{string}', function (this: CradleWorld, content: string) {
-  const requests = this.simulator?.requests() ?? []
-  expect(JSON.stringify(requests)).toContain(content)
+Then('Simulator 请求应包含{string}', async function (this: CradleWorld, content: string) {
+  const simulator = this.simulator
+  if (!simulator) {
+    throw new Error('Expected simulator to be configured')
+  }
+  await simulator.waitForRequest({
+    method: 'POST',
+    path: '/v1/responses',
+    bodyTextIncludes: content,
+  })
 })
 
 Given('我已配置 Codex 多轮 Simulator', async function (this: CradleWorld) {

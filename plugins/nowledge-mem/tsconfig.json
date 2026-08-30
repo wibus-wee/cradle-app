@@ -2,14 +2,13 @@
   "extends": "../../apps/web/tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
-    "baseUrl": "../../apps/web",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "~/*": ["src/*"],
-      "react": ["./node_modules/@types/react/index.d.ts"],
-      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"],
-      "react/jsx-dev-runtime": ["./node_modules/@types/react/jsx-dev-runtime.d.ts"]
+      "~/*": ["../../apps/web/src/*"],
+      "react": ["../../apps/web/node_modules/@types/react/index.d.ts"],
+      "react/jsx-runtime": ["../../apps/web/node_modules/@types/react/jsx-runtime.d.ts"],
+      "react/jsx-dev-runtime": ["../../apps/web/node_modules/@types/react/jsx-dev-runtime.d.ts"]
     },
     "types": ["node", "vite/client", "vitest"]
   },

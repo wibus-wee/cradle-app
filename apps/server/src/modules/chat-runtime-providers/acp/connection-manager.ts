@@ -246,7 +246,7 @@ export class AcpConnectionManager {
     private readonly terminalHost = new AcpTerminalHost(),
   ) {
     this.readSecret = options.readSecret ?? (() => {
-      throw new Error('ACP authentication requires a Secrets-owned credential resolver')
+      throw new Error('ACP remote headers require a Secrets-owned credential resolver')
     })
     this.requestTimeouts = {
       ...DEFAULT_REQUEST_TIMEOUTS,
@@ -316,9 +316,7 @@ export class AcpConnectionManager {
 
   getAuthMethods(agentId: string): ProviderAuthMethod[] {
     const conn = this.getConnection(agentId)
-    return projectAcpAuthMethods(conn.initResult?.authMethods ?? [], {
-      supportsEnvironmentAuth: conn.connectionType === 'stdio',
-    })
+    return projectAcpAuthMethods(conn.initResult?.authMethods ?? [])
   }
 
   async loadSession(agentId: string, sessionId: string, cwd: string, chatSessionId?: string): Promise<LoadSessionResponse & AcpSessionState> {
@@ -672,30 +670,11 @@ export class AcpConnectionManager {
   }
 
   private async openConnection(agentId: string, record: AcpConnectionRecord): Promise<InitializeResponse> {
-    const authSecretRefs = record.authSecretRefs ?? {}
-    let entry = await this.openInitializedConnection(
-      agentId,
-      record,
-      {},
-      Object.keys(authSecretRefs),
-    )
+    const entry = await this.openInitializedConnection(agentId, record)
     try {
       const selectedMethodId = record.authMethodId
       if (selectedMethodId) {
-        const selected = this.requireSelectedAuthMethod(entry, selectedMethodId, authSecretRefs)
-        if (selected.kind === 'env_var') {
-          await this.closeUnpublishedConnection(entry)
-          const authEnv = this.resolveAuthEnvironment(authSecretRefs)
-          entry = await this.openInitializedConnection(agentId, record, authEnv)
-          const restartedMethod = this.requireSelectedAuthMethod(entry, selectedMethodId, authSecretRefs)
-          if (restartedMethod.kind !== 'env_var') {
-            throw new ProviderRuntimeError(ProviderErrors.authRequired(
-              ACP_RUNTIME_KIND,
-              this.projectAuthMethods(entry),
-              entry.configurationTarget,
-            ))
-          }
-        }
+        this.requireSelectedAuthMethod(entry, selectedMethodId)
 
         try {
           await this.requestWithDeadline({
@@ -728,8 +707,6 @@ export class AcpConnectionManager {
   private async openInitializedConnection(
     agentId: string,
     record: AcpConnectionRecord,
-    authEnv: Record<string, string>,
-    excludedEnvNames: readonly string[] = [],
   ): Promise<ConnectionEntry> {
     let connection: ClientConnection | null = null
     try {
@@ -772,25 +749,17 @@ export class AcpConnectionManager {
       if (record.connectionType === 'stdio') {
         const args = JSON.parse(record.args) as string[]
         const env = JSON.parse(record.env) as Record<string, string>
-        const excludedEnv = new Set(excludedEnvNames)
-        const launchEnv = Object.fromEntries(
-          Object.entries(env).filter(([name]) => !excludedEnv.has(name)),
-        )
         const procEntry = this.processManager.spawn({
           agentId,
           cmd: record.cmd,
           args,
-          env: { ...launchEnv, ...authEnv },
-          sensitiveEnvNames: Object.keys(authEnv),
+          env,
           distributionType: record.distributionType,
           installPath: record.installPath,
         })
         connection = clientApp.connect(ndJsonStream(procEntry.stdinWeb, procEntry.stdoutWeb))
       }
       else {
-        if (Object.keys(authEnv).length > 0) {
-          throw new ProviderRuntimeError(ProviderErrors.authFailed(ACP_RUNTIME_KIND))
-        }
         const headers = this.resolveRemoteHeaders(record.headerSecretRefs)
         const cookieStore = this.remoteCookieStores.get(agentId) ?? new MemoryAcpCookieStore()
         this.remoteCookieStores.set(agentId, cookieStore)
@@ -872,13 +841,10 @@ export class AcpConnectionManager {
   private requireSelectedAuthMethod(
     entry: ConnectionEntry,
     methodId: string,
-    secretRefs: Record<string, string>,
   ): ProviderAuthMethod {
     const advertisedMethods = this.projectAuthMethods(entry)
     const method = advertisedMethods.find(candidate => candidate.id === methodId)
-    const invalid = !method
-      || method.status !== 'supported'
-      || (method.kind !== 'env_var' && Object.keys(secretRefs).length > 0)
+    const invalid = !method || method.status !== 'supported'
 
     if (invalid || !method) {
       throw new ProviderRuntimeError(ProviderErrors.authRequired(
@@ -888,30 +854,7 @@ export class AcpConnectionManager {
       ))
     }
 
-    if (method.kind === 'env_var') {
-      const fields = method.fields ?? []
-      const advertisedNames = new Set(fields.map(field => field.name))
-      const hasUnknownRef = Object.keys(secretRefs).some(name => !advertisedNames.has(name))
-      const hasMissingRef = fields.some(field => !field.optional && !secretRefs[field.name])
-      if (hasUnknownRef || hasMissingRef) {
-        throw new ProviderRuntimeError(ProviderErrors.authRequired(
-          ACP_RUNTIME_KIND,
-          advertisedMethods,
-          entry.configurationTarget,
-        ))
-      }
-    }
-
     return method
-  }
-
-  private resolveAuthEnvironment(secretRefs: Record<string, string>): Record<string, string> {
-    try {
-      return Object.fromEntries(Object.entries(secretRefs).map(([name, ref]) => [name, this.readSecret(ref)]))
-    }
-    catch (error) {
-      throw new ProviderRuntimeError(ProviderErrors.authFailed(ACP_RUNTIME_KIND), { cause: error })
-    }
   }
 
   private resolveRemoteHeaders(secretRefs: Record<string, string>): Record<string, string> {
@@ -924,9 +867,7 @@ export class AcpConnectionManager {
   }
 
   private projectAuthMethods(entry: ConnectionEntry): ProviderAuthMethod[] {
-    return projectAcpAuthMethods(entry.initResult?.authMethods ?? [], {
-      supportsEnvironmentAuth: entry.connectionType === 'stdio',
-    })
+    return projectAcpAuthMethods(entry.initResult?.authMethods ?? [])
   }
 
   private async closeUnpublishedConnection(entry: ConnectionEntry): Promise<void> {

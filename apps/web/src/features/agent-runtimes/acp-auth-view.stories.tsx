@@ -13,17 +13,6 @@ const methods: AcpAuthMethod[] = [
     status: 'supported',
   },
   {
-    id: 'api-key',
-    name: 'API key',
-    description: 'Use credentials already stored in Cradle Secrets.',
-    kind: 'env_var',
-    status: 'supported',
-    fields: [
-      { name: 'API_KEY', label: 'API key', secret: true, optional: false },
-      { name: 'API_HOST', label: 'API host', secret: false, optional: true },
-    ],
-  },
-  {
     id: 'terminal-login',
     name: 'Terminal login',
     kind: 'terminal',
@@ -46,16 +35,9 @@ const labels: AcpAuthViewLabels = {
   clearing: 'Clearing…',
   methodLabel: 'Method',
   agentKind: 'Agent sign-in',
-  envVarKind: 'Secrets',
   terminalKind: 'Terminal',
   unsupported: 'Unsupported',
-  optional: 'Optional',
-  secretPlaceholder: 'Select a Secret',
-  secretNotSet: 'Not set',
-  noSecrets: 'No Secrets are available.',
-  secretLoadError: 'Could not load Secrets.',
   cancel: 'Cancel',
-  save: 'Save',
   authenticate: 'Authenticate',
   saving: 'Saving…',
 }
@@ -68,18 +50,11 @@ const meta = {
   args: {
     methods,
     selectedMethodId: null,
-    secrets: [
-      { id: 'secret-primary', label: 'Production API key', maskedSecret: '********4f2a' },
-      { id: 'secret-staging', label: 'Staging API key', maskedSecret: '********91bc' },
-    ],
     isLoading: false,
-    isSecretsLoading: false,
     loadError: false,
-    secretsError: false,
     pendingAction: null,
     labels,
     onRetry: fn(),
-    onRetrySecrets: fn(),
     onSave: fn(),
     onClear: fn(),
     onOpenLink: fn(),
@@ -93,7 +68,7 @@ type Story = StoryObj<typeof meta>
 export const Configure: Story = {}
 
 export const Configured: Story = {
-  args: { selectedMethodId: 'api-key' },
+  args: { selectedMethodId: 'browser-login' },
 }
 
 export const Loading: Story = {

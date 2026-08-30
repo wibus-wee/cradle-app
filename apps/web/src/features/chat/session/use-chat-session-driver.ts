@@ -87,6 +87,7 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
   const snapshotDataUpdatedAtRef = useRef(snapshotRowsQuery.dataUpdatedAt)
   const authoritativeSnapshotObservedRef = useRef(false)
   const runtimeActiveRun = runtimeStatus?.activeRun ?? null
+  const runtimeActiveRunId = runtimeActiveRun?.runId ?? null
   const runtimeActiveRunMessageId = runtimeStatus?.activeRun?.messageId ?? null
   const runtimeStatusKnown = Boolean(runtimeStatus)
   const runtimeIdle = Boolean(
@@ -248,6 +249,7 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       enabled: false,
       sessionId: chatSessionId,
       locallyDriven: false,
+      runtimeActiveRunId: null,
       runtimeActiveRunMessageId: null,
     })
   }, [chatSessionId, driverEnabled])
@@ -272,10 +274,8 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       return
     }
 
-    // Snapshot rows already carry full message payloads — commit synchronously.
-    applyProjectedMessages(chatSessionId, projection, scheduleSnapshotRefresh)
-
     const pendingPassiveStreamLeaseRelease = pendingPassiveStreamLeaseReleaseRef.current
+    let releasedPassiveStreamLease = false
     if (
       pendingPassiveStreamLeaseRelease
       && !snapshotRowsQuery.isFetching
@@ -288,8 +288,15 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       const state = useChatStore.getState()
       if (state.streamLeaseMap.get(pendingPassiveStreamLeaseRelease.messageId)?.sessionId === chatSessionId) {
         state.releaseStreamLease(pendingPassiveStreamLeaseRelease.messageId)
-        refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
+        releasedPassiveStreamLease = true
       }
+    }
+
+    // A terminal snapshot must replace the stream-owned copy. Releasing the
+    // settled lease first keeps setMessages from preserving stale replay data.
+    applyProjectedMessages(chatSessionId, projection, scheduleSnapshotRefresh)
+    if (releasedPassiveStreamLease) {
+      refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
     }
   }, [chatSessionId, driverEnabled, refreshQueue, runtimeActiveRunMessageId, runtimeIdle, runtimeStatusKnown, scheduleSnapshotRefresh, snapshotRows, snapshotRowsQuery.dataUpdatedAt, snapshotRowsQuery.isFetching])
 
@@ -378,7 +385,8 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       enabled: driverEnabled,
       sessionId: chatSessionId,
       locallyDriven: projection.locallyDriven,
+      runtimeActiveRunId: runtimeStatusFreshForSubscription ? runtimeActiveRunId : null,
       runtimeActiveRunMessageId: runtimeStatusFreshForSubscription ? runtimeActiveRunMessageId : null,
     })
-  }, [chatSessionId, driverEnabled, runtimeActiveRunMessageId, runtimeStatus, runtimeStatusFreshForSubscription, snapshotRevision])
+  }, [chatSessionId, driverEnabled, runtimeActiveRunId, runtimeActiveRunMessageId, runtimeStatus, runtimeStatusFreshForSubscription, snapshotRevision])
 }

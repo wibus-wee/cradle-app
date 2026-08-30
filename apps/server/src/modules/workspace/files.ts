@@ -157,7 +157,10 @@ export async function searchWorkspaceFiles(input: {
 
   const indexedEntries = result.value.items
     .map(item => workspaceFileEntryFromMixedItem(item))
-    .filter((entry): entry is WorkspaceFileEntry => entry !== null && isVisibleWorkspaceFileEntry(entry, ignoreContext))
+    .filter((entry): entry is WorkspaceFileEntry =>
+      entry !== null
+      && isVisibleWorkspaceFileEntry(entry, ignoreContext)
+      && (entry.type === 'file' || isWorkspaceFileSearchMatch(entry, query)))
 
   const supplementalEntries = (await collectWorkspaceSupplementalEntries(input.workspacePath, ignoreContext))
     .filter(entry => isWorkspaceFileSearchMatch(entry, query))

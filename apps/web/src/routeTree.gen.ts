@@ -9,54 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UsageRouteImport } from './routes/usage'
-import { Route as PullRequestsRouteImport } from './routes/pull-requests'
-import { Route as OnboardingRouteImport } from './routes/onboarding'
-import { Route as DiffRouteImport } from './routes/diff'
-import { Route as DevtoolRouteImport } from './routes/devtool'
-import { Route as AwaitsRouteImport } from './routes/awaits'
-import { Route as AutomationRouteImport } from './routes/automation'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
-import { Route as WorkspacesWorkspaceIdRouteImport } from './routes/workspaces/$workspaceId'
-import { Route as WorkNewRouteImport } from './routes/work/new'
-import { Route as WorkWorkIdRouteImport } from './routes/work/$workId'
-import { Route as SettingsSectionRouteImport } from './routes/settings/$section'
-import { Route as KanbanBoardIdRouteImport } from './routes/kanban/$boardId'
-import { Route as ChatNewRouteImport } from './routes/chat/new'
+import { Route as AutomationRouteImport } from './routes/automation'
+import { Route as AwaitsRouteImport } from './routes/awaits'
+import { Route as DevtoolRouteImport } from './routes/devtool'
+import { Route as DiffRouteImport } from './routes/diff'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as PullRequestsRouteImport } from './routes/pull-requests'
+import { Route as UsageRouteImport } from './routes/usage'
 import { Route as ChatSessionIdRouteImport } from './routes/chat/$sessionId'
+import { Route as ChatNewRouteImport } from './routes/chat/new'
+import { Route as KanbanBoardIdRouteImport } from './routes/kanban/$boardId'
+import { Route as PluginsIndexRouteImport } from './routes/plugins/index'
+import { Route as SettingsSectionRouteImport } from './routes/settings/$section'
+import { Route as WorkWorkIdRouteImport } from './routes/work/$workId'
+import { Route as WorkNewRouteImport } from './routes/work/new'
+import { Route as WorkspacesWorkspaceIdRouteImport } from './routes/workspaces/$workspaceId'
+import { Route as PluginsRouteSegmentLocalIdRouteImport } from './routes/plugins/$routeSegment/$localId'
 import { Route as WorkspacesWorkspaceIdIndexRouteImport } from './routes/workspaces/$workspaceId/index'
 import { Route as WorkspacesWorkspaceIdDiffsRouteImport } from './routes/workspaces/$workspaceId/diffs'
-import { Route as PluginsRouteSegmentLocalIdRouteImport } from './routes/plugins/$routeSegment/$localId'
 
-const UsageRoute = UsageRouteImport.update({
-  id: '/usage',
-  path: '/usage',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PullRequestsRoute = PullRequestsRouteImport.update({
-  id: '/pull-requests',
-  path: '/pull-requests',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const OnboardingRoute = OnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiffRoute = DiffRouteImport.update({
-  id: '/diff',
-  path: '/diff',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DevtoolRoute = DevtoolRouteImport.update({
-  id: '/devtool',
-  path: '/devtool',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AwaitsRoute = AwaitsRouteImport.update({
-  id: '/awaits',
-  path: '/awaits',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AutomationRoute = AutomationRouteImport.update({
@@ -64,44 +39,34 @@ const AutomationRoute = AutomationRouteImport.update({
   path: '/automation',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AwaitsRoute = AwaitsRouteImport.update({
+  id: '/awaits',
+  path: '/awaits',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PluginsIndexRoute = PluginsIndexRouteImport.update({
-  id: '/plugins/',
-  path: '/plugins/',
+const DevtoolRoute = DevtoolRouteImport.update({
+  id: '/devtool',
+  path: '/devtool',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WorkspacesWorkspaceIdRoute = WorkspacesWorkspaceIdRouteImport.update({
-  id: '/workspaces/$workspaceId',
-  path: '/workspaces/$workspaceId',
+const DiffRoute = DiffRouteImport.update({
+  id: '/diff',
+  path: '/diff',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WorkNewRoute = WorkNewRouteImport.update({
-  id: '/work/new',
-  path: '/work/new',
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WorkWorkIdRoute = WorkWorkIdRouteImport.update({
-  id: '/work/$workId',
-  path: '/work/$workId',
+const PullRequestsRoute = PullRequestsRouteImport.update({
+  id: '/pull-requests',
+  path: '/pull-requests',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsSectionRoute = SettingsSectionRouteImport.update({
-  id: '/settings/$section',
-  path: '/settings/$section',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KanbanBoardIdRoute = KanbanBoardIdRouteImport.update({
-  id: '/kanban/$boardId',
-  path: '/kanban/$boardId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChatNewRoute = ChatNewRouteImport.update({
-  id: '/chat/new',
-  path: '/chat/new',
+const UsageRoute = UsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatSessionIdRoute = ChatSessionIdRouteImport.update({
@@ -109,6 +74,47 @@ const ChatSessionIdRoute = ChatSessionIdRouteImport.update({
   path: '/chat/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChatNewRoute = ChatNewRouteImport.update({
+  id: '/chat/new',
+  path: '/chat/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KanbanBoardIdRoute = KanbanBoardIdRouteImport.update({
+  id: '/kanban/$boardId',
+  path: '/kanban/$boardId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PluginsIndexRoute = PluginsIndexRouteImport.update({
+  id: '/plugins/',
+  path: '/plugins/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsSectionRoute = SettingsSectionRouteImport.update({
+  id: '/settings/$section',
+  path: '/settings/$section',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkWorkIdRoute = WorkWorkIdRouteImport.update({
+  id: '/work/$workId',
+  path: '/work/$workId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkNewRoute = WorkNewRouteImport.update({
+  id: '/work/new',
+  path: '/work/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkspacesWorkspaceIdRoute = WorkspacesWorkspaceIdRouteImport.update({
+  id: '/workspaces/$workspaceId',
+  path: '/workspaces/$workspaceId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PluginsRouteSegmentLocalIdRoute =
+  PluginsRouteSegmentLocalIdRouteImport.update({
+    id: '/plugins/$routeSegment/$localId',
+    path: '/plugins/$routeSegment/$localId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const WorkspacesWorkspaceIdIndexRoute =
   WorkspacesWorkspaceIdIndexRouteImport.update({
     id: '/',
@@ -120,12 +126,6 @@ const WorkspacesWorkspaceIdDiffsRoute =
     id: '/diffs',
     path: '/diffs',
     getParentRoute: () => WorkspacesWorkspaceIdRoute,
-  } as any)
-const PluginsRouteSegmentLocalIdRoute =
-  PluginsRouteSegmentLocalIdRouteImport.update({
-    id: '/plugins/$routeSegment/$localId',
-    path: '/plugins/$routeSegment/$localId',
-    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -278,46 +278,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/usage': {
-      id: '/usage'
-      path: '/usage'
-      fullPath: '/usage'
-      preLoaderRoute: typeof UsageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pull-requests': {
-      id: '/pull-requests'
-      path: '/pull-requests'
-      fullPath: '/pull-requests'
-      preLoaderRoute: typeof PullRequestsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/onboarding': {
-      id: '/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof OnboardingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/diff': {
-      id: '/diff'
-      path: '/diff'
-      fullPath: '/diff'
-      preLoaderRoute: typeof DiffRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/devtool': {
-      id: '/devtool'
-      path: '/devtool'
-      fullPath: '/devtool'
-      preLoaderRoute: typeof DevtoolRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/awaits': {
-      id: '/awaits'
-      path: '/awaits'
-      fullPath: '/awaits'
-      preLoaderRoute: typeof AwaitsRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/automation': {
@@ -327,53 +292,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AutomationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/awaits': {
+      id: '/awaits'
+      path: '/awaits'
+      fullPath: '/awaits'
+      preLoaderRoute: typeof AwaitsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/plugins/': {
-      id: '/plugins/'
-      path: '/plugins'
-      fullPath: '/plugins/'
-      preLoaderRoute: typeof PluginsIndexRouteImport
+    '/devtool': {
+      id: '/devtool'
+      path: '/devtool'
+      fullPath: '/devtool'
+      preLoaderRoute: typeof DevtoolRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/workspaces/$workspaceId': {
-      id: '/workspaces/$workspaceId'
-      path: '/workspaces/$workspaceId'
-      fullPath: '/workspaces/$workspaceId'
-      preLoaderRoute: typeof WorkspacesWorkspaceIdRouteImport
+    '/diff': {
+      id: '/diff'
+      path: '/diff'
+      fullPath: '/diff'
+      preLoaderRoute: typeof DiffRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/work/new': {
-      id: '/work/new'
-      path: '/work/new'
-      fullPath: '/work/new'
-      preLoaderRoute: typeof WorkNewRouteImport
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/work/$workId': {
-      id: '/work/$workId'
-      path: '/work/$workId'
-      fullPath: '/work/$workId'
-      preLoaderRoute: typeof WorkWorkIdRouteImport
+    '/pull-requests': {
+      id: '/pull-requests'
+      path: '/pull-requests'
+      fullPath: '/pull-requests'
+      preLoaderRoute: typeof PullRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/$section': {
-      id: '/settings/$section'
-      path: '/settings/$section'
-      fullPath: '/settings/$section'
-      preLoaderRoute: typeof SettingsSectionRouteImport
+    '/usage': {
+      id: '/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof UsageRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/kanban/$boardId': {
-      id: '/kanban/$boardId'
-      path: '/kanban/$boardId'
-      fullPath: '/kanban/$boardId'
-      preLoaderRoute: typeof KanbanBoardIdRouteImport
+    '/chat/$sessionId': {
+      id: '/chat/$sessionId'
+      path: '/chat/$sessionId'
+      fullPath: '/chat/$sessionId'
+      preLoaderRoute: typeof ChatSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chat/new': {
@@ -383,11 +348,53 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatNewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/chat/$sessionId': {
-      id: '/chat/$sessionId'
-      path: '/chat/$sessionId'
-      fullPath: '/chat/$sessionId'
-      preLoaderRoute: typeof ChatSessionIdRouteImport
+    '/kanban/$boardId': {
+      id: '/kanban/$boardId'
+      path: '/kanban/$boardId'
+      fullPath: '/kanban/$boardId'
+      preLoaderRoute: typeof KanbanBoardIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plugins/': {
+      id: '/plugins/'
+      path: '/plugins'
+      fullPath: '/plugins/'
+      preLoaderRoute: typeof PluginsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/$section': {
+      id: '/settings/$section'
+      path: '/settings/$section'
+      fullPath: '/settings/$section'
+      preLoaderRoute: typeof SettingsSectionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/work/$workId': {
+      id: '/work/$workId'
+      path: '/work/$workId'
+      fullPath: '/work/$workId'
+      preLoaderRoute: typeof WorkWorkIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/work/new': {
+      id: '/work/new'
+      path: '/work/new'
+      fullPath: '/work/new'
+      preLoaderRoute: typeof WorkNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workspaces/$workspaceId': {
+      id: '/workspaces/$workspaceId'
+      path: '/workspaces/$workspaceId'
+      fullPath: '/workspaces/$workspaceId'
+      preLoaderRoute: typeof WorkspacesWorkspaceIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plugins/$routeSegment/$localId': {
+      id: '/plugins/$routeSegment/$localId'
+      path: '/plugins/$routeSegment/$localId'
+      fullPath: '/plugins/$routeSegment/$localId'
+      preLoaderRoute: typeof PluginsRouteSegmentLocalIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workspaces/$workspaceId/': {
@@ -403,13 +410,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/workspaces/$workspaceId/diffs'
       preLoaderRoute: typeof WorkspacesWorkspaceIdDiffsRouteImport
       parentRoute: typeof WorkspacesWorkspaceIdRoute
-    }
-    '/plugins/$routeSegment/$localId': {
-      id: '/plugins/$routeSegment/$localId'
-      path: '/plugins/$routeSegment/$localId'
-      fullPath: '/plugins/$routeSegment/$localId'
-      preLoaderRoute: typeof PluginsRouteSegmentLocalIdRouteImport
-      parentRoute: typeof rootRouteImport
     }
   }
 }

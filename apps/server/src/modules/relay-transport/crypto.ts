@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 
-import { xchacha20poly1305 } from '@noble/ciphers/chacha'
-import { x25519 } from '@noble/curves/ed25519'
+import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { x25519 } from '@noble/curves/ed25519.js'
 import { hkdf } from '@noble/hashes/hkdf.js'
 import { hmac } from '@noble/hashes/hmac.js'
 import { sha512 } from '@noble/hashes/sha2.js'
@@ -46,7 +46,7 @@ export interface FabricSessionKeyPair {
 }
 
 export function generateFabricSessionKeyPair(): FabricSessionKeyPair {
-  const privateKey = x25519.utils.randomPrivateKey()
+  const privateKey = x25519.utils.randomSecretKey()
   const publicKey = x25519.scalarMultBase(privateKey)
   return {
     privateKeyBase64: bytesToBase64(privateKey),

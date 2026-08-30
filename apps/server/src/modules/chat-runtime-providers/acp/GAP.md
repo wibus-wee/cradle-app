@@ -4,7 +4,7 @@ This file records ACP behavior that the Cradle Chat Runtime deliberately does no
 
 | Surface | Status | Reason and user effect |
 | --- | --- | --- |
-| Last-turn rollback | Unsupported | ACP 1.2.1 has no rollback method. Chat Runtime does not advertise rollback for ACP sessions. |
+| Last-turn rollback | Unsupported | ACP 1.4 has no rollback method. Chat Runtime does not advertise rollback for ACP sessions. |
 | Arbitrary runtime settings | Unsupported | Native config options have provider-specific semantics. Model and mode changes have typed projections; other options are not normalized into the shared runtime-settings contract. |
 | Live steering | Queue fallback | ACP has cancellation but no native steer request. Guidance submitted during a turn is queued by the Chat Runtime owner. |
 | Disconnected native deletion | Best effort | Native delete/close requires an owning live agent connection. Cradle removes its durable session normally, but cannot prove cleanup inside a process that has already exited. |
@@ -14,6 +14,6 @@ This file records ACP behavior that the Cradle Chat Runtime deliberately does no
 
 Two concerns remain outside this runtime module:
 
-- Legacy launch `env` and `overrideEnv` values in `modules/acp` are stored in the installed-agent row. Authentication fields already use Secrets-owned references, but migrating arbitrary launch environment values requires a dedicated `modules/acp` data contract and migration.
+- Legacy launch `env` and `overrideEnv` values in `modules/acp` are stored in the installed-agent row. Remote transport headers use Secrets-owned references, but migrating arbitrary launch environment values requires a dedicated `modules/acp` data contract and migration.
 
 These limits are explicit so metadata and UI surfaces do not imply behavior the owning contracts cannot support.

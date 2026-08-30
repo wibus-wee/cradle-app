@@ -23,12 +23,6 @@ const spec = {
       "required": true,
       "target": "body.methodId",
       "type": "string"
-    },
-    {
-      "name": "secretRefs",
-      "required": false,
-      "target": "body.secretRefs",
-      "type": "json"
     }
   ],
   "method": "put",

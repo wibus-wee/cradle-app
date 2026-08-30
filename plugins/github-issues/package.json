@@ -35,9 +35,9 @@
   },
   "devDependencies": {
     "@cradle/plugin-sdk": "workspace:*",
-    "@types/node": "^22.19.1",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.0",
-    "vitest": "^4.1.4"
+    "@types/node": "^22.20.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }

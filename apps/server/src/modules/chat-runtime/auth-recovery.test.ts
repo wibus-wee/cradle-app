@@ -80,7 +80,7 @@ function authRequiredError(): ProviderRuntimeError {
   return new ProviderRuntimeError({
     _tag: 'auth_required',
     provider: 'acp',
-    methods: [{ id: 'token', name: 'API token', kind: 'env_var', status: 'supported' }],
+    methods: [{ id: 'login', name: 'Provider login', kind: 'agent', status: 'supported' }],
     configurationTarget: { namespace: 'acp', resourceId: 'remote-agent' },
   })
 }

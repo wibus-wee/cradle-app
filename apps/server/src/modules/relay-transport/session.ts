@@ -1,4 +1,4 @@
-import { x25519 } from '@noble/curves/ed25519'
+import { x25519 } from '@noble/curves/ed25519.js'
 
 import { AppError } from '../../errors/app-error'
 import type { RelayCompressionKind } from './compression'

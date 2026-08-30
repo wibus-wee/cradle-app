@@ -1057,16 +1057,10 @@ export interface ProviderAuthMethod {
   id: string
   name: string
   description?: string
-  kind: 'agent' | 'env_var' | 'terminal'
+  kind: 'agent' | 'terminal'
   status: 'supported' | 'unsupported'
   unavailableReason?: string
   link?: string
-  fields?: Array<{
-    name: string
-    label?: string
-    secret: boolean
-    optional: boolean
-  }>
 }
 
 export interface ProviderConfigurationTarget {

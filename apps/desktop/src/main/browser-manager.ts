@@ -8,6 +8,7 @@ import * as Crypto from 'node:crypto'
 import type { BrowserWindow, WebContents } from 'electron'
 import {
   clipboard,
+  ClipboardItem,
   nativeImage,
   shell,
   webContents as electronWebContents,
@@ -1717,7 +1718,11 @@ export class DesktopBrowserManager {
     if (image.isEmpty()) {
       throw new Error('Couldn\'t copy a browser screenshot to the clipboard.')
     }
-    clipboard.writeImage(image)
+    await clipboard.write([
+      new ClipboardItem({
+        'image/png': new Blob([Uint8Array.from(pngBytes)], { type: 'image/png' }),
+      }),
+    ])
   }
 
   // Runs a Chrome DevTools Protocol command against the requested tab so higher-level

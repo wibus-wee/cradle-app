@@ -5,6 +5,7 @@ import {
 } from '@mingcute/react'
 import { useMemo, useState } from 'react'
 
+import type { GetSecretsResponse } from '~/api-gen/types.gen'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +24,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 
 import { AcpAgentIcon } from './acp-agent-icon'
-import type { AcpAuthSecret } from './acp-auth-view'
+
+type AcpRemoteSecret = Pick<GetSecretsResponse[number], 'id' | 'label' | 'maskedSecret'>
 
 export interface AcpRemoteHeaderDraft {
   id: string
@@ -105,7 +107,7 @@ export function AcpRemoteAgentView({
   mode: 'create' | 'edit'
   agentId?: string
   initialDraft: AcpRemoteAgentDraft
-  secrets: AcpAuthSecret[]
+  secrets: AcpRemoteSecret[]
   isSecretsLoading: boolean
   labels: AcpRemoteAgentViewLabels
   isSaving: boolean

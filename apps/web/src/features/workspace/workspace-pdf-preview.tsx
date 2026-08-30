@@ -1,4 +1,4 @@
-import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist'
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { useEffect, useRef, useState } from 'react'
@@ -19,7 +19,7 @@ export function WorkspacePdfPreview({ url, title }: WorkspacePdfPreviewProps) {
 
   useEffect(() => {
     let cancelled = false
-    let loadedPdf: PDFDocumentProxy | null = null
+    let loadingTask: PDFDocumentLoadingTask | null = null
     setDocumentProxy(null)
     setErrorText(null)
 
@@ -30,15 +30,13 @@ export function WorkspacePdfPreview({ url, title }: WorkspacePdfPreviewProps) {
         throw new Error(readServerErrorMessage(text) ?? `PDF preview failed with status ${response.status}.`)
       }
       const bytes = new Uint8Array(await response.arrayBuffer())
-      const task = getDocument({ data: bytes })
-      const pdf = await task.promise
-      loadedPdf = pdf
-      if (!cancelled) {
-        setDocumentProxy(pdf)
+      loadingTask = getDocument({ data: bytes })
+      const pdf = await loadingTask.promise
+      if (cancelled) {
+        await loadingTask.destroy()
+        return
       }
-      else {
-        await pdf.destroy()
-      }
+      setDocumentProxy(pdf)
     }
 
     loadPdf().catch((error) => {
@@ -49,7 +47,7 @@ export function WorkspacePdfPreview({ url, title }: WorkspacePdfPreviewProps) {
 
     return () => {
       cancelled = true
-      void loadedPdf?.destroy()
+      void loadingTask?.destroy()
     }
   }, [url])
 

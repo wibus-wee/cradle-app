@@ -108,6 +108,28 @@ describe('sync run chunk adapter', () => {
     })
   })
 
+  it('rejects replay from a different run before exposing its chunks', async () => {
+    const result = await subscribeSyncSessionRunChunks({
+      sessionId: 'session-1',
+      expectedRunId: 'run-current',
+    })
+    const read = result.stream.getReader().read()
+    syncClient.handler?.({
+      subId: 'sub-1',
+      kind: 'chunk',
+      runId: 'run-stale',
+      cursor: 0,
+      chunk: { type: 'start', messageId: 'message-stale' },
+      terminal: false,
+      replay: true,
+    })
+
+    await expect(read).rejects.toMatchObject({
+      name: 'SyncRunStreamError',
+      code: 'snapshot-required',
+    })
+  })
+
   it('fails visibly when a cursor moves backwards', async () => {
     const result = await subscribeSyncSessionRunChunks({ sessionId: 'session-1' })
     const reader = result.stream.getReader()

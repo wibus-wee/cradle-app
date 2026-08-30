@@ -239,7 +239,15 @@ describe('openAI official SDK conformance', () => {
           steps: [
             {
               kind: 'event',
-              event: { type: 'response.created', sequence_number: 0, response: responseFixture },
+              event: {
+                type: 'response.created',
+                sequence_number: 0,
+                response: {
+                  ...responseFixture,
+                  status: 'in_progress',
+                  output: [],
+                },
+              },
             },
             {
               kind: 'event',
@@ -290,7 +298,16 @@ describe('openAI official SDK conformance', () => {
             },
             {
               kind: 'event',
-              event: { type: 'response.completed', sequence_number: 5, response: functionResponse },
+              event: {
+                type: 'response.output_item.done',
+                sequence_number: 5,
+                output_index: 0,
+                item: functionResponse.output[0]!,
+              },
+            },
+            {
+              kind: 'event',
+              event: { type: 'response.completed', sequence_number: 6, response: functionResponse },
             },
             { kind: 'close' },
           ],

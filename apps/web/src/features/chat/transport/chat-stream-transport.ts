@@ -41,6 +41,7 @@ interface StartChatResponseStreamArgs {
 
 interface SubscribeChatSessionStreamArgs {
   sessionId: string
+  expectedRunId?: string
   signal?: AbortSignal
 }
 
@@ -84,7 +85,11 @@ export async function subscribeChatSessionStreamForSession(
     return await subscribeDesktopChatSessionStream(bridge, args)
   }
   if (isSyncSocketEnabled()) {
-    return await subscribeSyncSessionRunChunks(args)
+    return await subscribeSyncSessionRunChunks({
+      sessionId: args.sessionId,
+      expectedRunId: args.expectedRunId,
+      signal: args.signal,
+    })
   }
   return await subscribeHttpChatSessionStream(args)
 }
