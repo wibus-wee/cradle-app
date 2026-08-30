@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { getApiV1Auth, postApiV1Config, postApiV1Sessions } from './protocol/rest/sdk.gen'
+import { getApiV1Config, postApiV1Config, postApiV1Sessions } from './protocol/rest/sdk.gen'
 import type { KimiWebHostResource } from './web-host'
 import { createKimiWebHostResource } from './web-host'
 
@@ -37,8 +37,8 @@ describe('kimi web host smoke', () => {
     })
     resources.push(resource)
 
-    const auth = await resource.http.request(getApiV1Auth({ client: resource.http.client }))
-    expect(auth.default_model).toBe('cradle-smoke-target/smoke-model')
+    const config = await resource.http.request(getApiV1Config({ client: resource.http.client }))
+    expect(config.default_model).toBe('cradle-smoke-target/smoke-model')
     await resource.http.request(postApiV1Config({
       client: resource.http.client,
       body: {
