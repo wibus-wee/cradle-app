@@ -58,15 +58,18 @@ export function PullRequestDetailContainer({
       <PullRequestDetailView
         detail={query.data}
         isMutating={action.isPending}
-        onComment={body => action.mutate({ endpoint: 'comment', body: { body } })}
+        onComment={async (body) => {
+          await action.mutateAsync({ endpoint: 'comment', body: { body } })
+        }}
         onOpenExternal={async () => {
           await Linking.openURL(query.data.pullRequest.url)
         }}
-        onReview={(event, body) =>
-          action.mutate({
+        onReview={async (event, body) => {
+          await action.mutateAsync({
             endpoint: 'review',
             body: { event, ...(body ? { body } : {}) },
-          })}
+          })
+        }}
       />
     </>
   )

@@ -20,9 +20,9 @@ type Detail = GetPullRequestsByOwnerByRepoByNumberDetailResponse
 export interface PullRequestDetailViewProps {
   detail: Detail
   isMutating?: boolean
-  onComment: (body: string) => void
+  onComment: (body: string) => Promise<void>
   onOpenExternal: () => Promise<void>
-  onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => void
+  onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => Promise<void>
 }
 
 export function PullRequestDetailView({
@@ -34,6 +34,7 @@ export function PullRequestDetailView({
 }: PullRequestDetailViewProps) {
   const theme = useTheme()
   const [comment, setComment] = useState('')
+  const [submissionError, setSubmissionError] = useState<string | null>(null)
   const { pullRequest } = detail
 
   const openExternal = async () => {
@@ -45,11 +46,30 @@ export function PullRequestDetailView({
     }
   }
 
-  const submitComment = () => {
+  const submitComment = async () => {
     const body = comment.trim()
     if (!body) { return }
-    onComment(body)
-    setComment('')
+    setSubmissionError(null)
+    try {
+      await onComment(body)
+      setComment(current => current.trim() === body ? '' : current)
+    }
+    catch {
+      setSubmissionError('Could not add comment. Your text has been preserved.')
+    }
+  }
+
+  const submitReview = async (event: 'APPROVE' | 'REQUEST_CHANGES') => {
+    const body = comment.trim()
+    if (!body) { return }
+    setSubmissionError(null)
+    try {
+      await onReview(event, body)
+      setComment(current => current.trim() === body ? '' : current)
+    }
+    catch {
+      setSubmissionError('Could not submit review. Your text has been preserved.')
+    }
   }
 
   return (
@@ -161,12 +181,17 @@ export function PullRequestDetailView({
           placeholder="Add a comment or review note..."
           value={comment}
         />
+        {submissionError && (
+          <Text style={[styles.submissionError, { color: theme.destructive }]}>
+            {submissionError}
+          </Text>
+        )}
         <Button
           disabled={!comment.trim()}
           icon={Send}
           label="Comment"
           loading={isMutating}
-          onPress={submitComment}
+          onPress={() => void submitComment()}
           variant="secondary"
         />
         <View style={styles.reviewActions}>
@@ -174,7 +199,7 @@ export function PullRequestDetailView({
             disabled={!comment.trim()}
             label="Request changes"
             loading={isMutating}
-            onPress={() => onReview('REQUEST_CHANGES', comment.trim())}
+            onPress={() => void submitReview('REQUEST_CHANGES')}
             style={styles.reviewButton}
             role="destructive"
             variant="outlined"
@@ -182,7 +207,7 @@ export function PullRequestDetailView({
           <NativeAction
             label="Approve"
             loading={isMutating}
-            onPress={() => onReview('APPROVE', comment.trim())}
+            onPress={() => void submitReview('APPROVE')}
             style={styles.reviewButton}
           />
         </View>
@@ -251,6 +276,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
+  },
+  submissionError: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   timeline: {
     borderBottomWidth: StyleSheet.hairlineWidth,

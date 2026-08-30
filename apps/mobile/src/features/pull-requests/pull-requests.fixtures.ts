@@ -67,7 +67,7 @@ export const pullRequestDetailFixture: PullRequestDetailViewProps = {
     files: [],
     timeline: [],
   },
-  onComment: () => {},
+  onComment: async () => {},
   onOpenExternal: async () => {},
-  onReview: () => {},
+  onReview: async () => {},
 }
