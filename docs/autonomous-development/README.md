@@ -62,3 +62,4 @@ Chronological index of independently shipped product improvements.
 23. [Show every mobile root file entry](./2026-08-31-23-mobile-root-files.md)
 24. [Surface mobile Work creation failures](./2026-08-31-24-mobile-work-create-errors.md)
 25. [Search workspace files on mobile](./2026-08-31-25-mobile-file-search.md)
+26. [Make the mobile Work base truthful](./2026-08-31-26-mobile-work-base.md)

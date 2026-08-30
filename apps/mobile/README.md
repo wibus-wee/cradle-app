@@ -28,6 +28,8 @@ The virtualized workspace overview renders every top-level entry returned by the
 server, so root files and directories are never hidden behind a client-only cap.
 Workspace detail also opens a debounced, server-ranked file search; results can
 continue into directory browsing or the existing file preview.
+The Work composer labels its isolation base as the current checkout, matching
+the create API instead of presenting an unsupported base-strategy choice.
 
 ## Run
 
