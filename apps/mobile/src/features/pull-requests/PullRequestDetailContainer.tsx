@@ -61,8 +61,8 @@ export function PullRequestDetailContainer({
         onComment={async (body) => {
           await action.mutateAsync({ endpoint: 'comment', body: { body } })
         }}
-        onOpenExternal={async () => {
-          await Linking.openURL(query.data.pullRequest.url)
+        onOpenExternal={async (url) => {
+          await Linking.openURL(url)
         }}
         onReview={async (event, body) => {
           await action.mutateAsync({

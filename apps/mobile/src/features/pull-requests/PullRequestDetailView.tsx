@@ -21,7 +21,7 @@ export interface PullRequestDetailViewProps {
   detail: Detail
   isMutating?: boolean
   onComment: (body: string) => Promise<void>
-  onOpenExternal: () => Promise<void>
+  onOpenExternal: (url: string) => Promise<void>
   onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => Promise<void>
 }
 
@@ -37,12 +37,12 @@ export function PullRequestDetailView({
   const [submissionError, setSubmissionError] = useState<string | null>(null)
   const { pullRequest } = detail
 
-  const openExternal = async () => {
+  const openExternal = async (url: string, failureMessage: string) => {
     try {
-      await onOpenExternal()
+      await onOpenExternal(url)
     }
     catch {
-      Alert.alert('Could not open pull request on GitHub')
+      Alert.alert(failureMessage)
     }
   }
 
@@ -80,7 +80,10 @@ export function PullRequestDetailView({
           <IconButton
             accessibilityLabel="Open pull request on GitHub"
             icon={ExternalLink}
-            onPress={() => void openExternal()}
+            onPress={() => void openExternal(
+              pullRequest.url,
+              'Could not open pull request on GitHub',
+            )}
           />
         </View>
       )}
@@ -124,9 +127,12 @@ export function PullRequestDetailView({
           : pullRequest.checks.map(check => (
               <Item
                 actions={(
-                  <Text style={[styles.checkStatus, { color: theme.mutedForeground }]}>
-                    {check.conclusion ?? check.status}
-                  </Text>
+                  <View style={styles.checkActions}>
+                    <Text style={[styles.checkStatus, { color: theme.mutedForeground }]}>
+                      {check.conclusion ?? check.status}
+                    </Text>
+                    {check.url && <ExternalLink color={theme.dimForeground} size={15} />}
+                  </View>
                 )}
                 key={check.id}
                 media={check.conclusion === 'success'
@@ -136,6 +142,9 @@ export function PullRequestDetailView({
                     : <GitCommit color={theme.warning} size={17} />}
                 size="sm"
                 title={check.name}
+                onPress={check.url
+                  ? () => void openExternal(check.url!, 'Could not open check details')
+                  : undefined}
                 variant="muted"
               />
             ))}
@@ -230,6 +239,11 @@ const styles = StyleSheet.create({
   checkStatus: {
 
     fontSize: 12,
+  },
+  checkActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   comment: {
     gap: spacing.md,
