@@ -12,7 +12,7 @@ import { NativeAction } from '@/components/ui/native-action'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { StatusPill } from '@/components/ui/status-pill'
-import { spacing } from '@/theme/tokens'
+import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 type Detail = GetPullRequestsByOwnerByRepoByNumberDetailResponse
@@ -119,6 +119,29 @@ export function PullRequestDetailView({
           <Markdown style={{ body: { color: theme.foreground, fontSize: 14, lineHeight: 21 } }}>
             {pullRequest.body}
           </Markdown>
+        </View>
+      )}
+
+      {pullRequest.labels.length > 0 && (
+        <View style={styles.section}>
+          <SectionHeading meta={`${pullRequest.labels.length}`} title="Labels" />
+          <View style={styles.labels}>
+            {pullRequest.labels.map(label => (
+              <View
+                key={label.name}
+                style={[styles.label, { borderColor: theme.input }]}
+              >
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[styles.labelDot, { backgroundColor: `#${label.color}` }]}
+                />
+                <Text style={[styles.labelText, { color: theme.foreground }]}>
+                  {label.name}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
@@ -295,6 +318,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  label: {
+    alignItems: 'center',
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  labelDot: {
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  labels: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  labelText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   reviewActions: {
     gap: spacing.sm,
