@@ -45,3 +45,4 @@ Chronological index of independently shipped product improvements.
 6. [Browse workspace files on Mobile](./2026-08-31-06-mobile-workspace-file-browser.md)
 7. [Search workspace files on Mobile](./2026-08-31-07-mobile-workspace-file-search.md)
 8. [Identify the Mobile pull request account](./2026-08-31-08-mobile-pull-request-account.md)
+9. [Open Mobile pull requests on GitHub](./2026-08-31-09-open-mobile-pull-request-on-github.md)

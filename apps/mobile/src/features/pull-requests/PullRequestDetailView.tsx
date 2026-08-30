@@ -1,10 +1,11 @@
-import { Check, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
+import { Check, ExternalLink, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Alert, StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { NativeAction } from '@/components/ui/native-action'
@@ -20,6 +21,7 @@ export interface PullRequestDetailViewProps {
   detail: Detail
   isMutating?: boolean
   onComment: (body: string) => void
+  onOpenExternal: () => Promise<void>
   onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => void
 }
 
@@ -27,11 +29,21 @@ export function PullRequestDetailView({
   detail,
   isMutating = false,
   onComment,
+  onOpenExternal,
   onReview,
 }: PullRequestDetailViewProps) {
   const theme = useTheme()
   const [comment, setComment] = useState('')
   const { pullRequest } = detail
+
+  const openExternal = async () => {
+    try {
+      await onOpenExternal()
+    }
+    catch {
+      Alert.alert('Could not open pull request on GitHub')
+    }
+  }
 
   const submitComment = () => {
     const body = comment.trim()
@@ -42,7 +54,16 @@ export function PullRequestDetailView({
 
   return (
     <Screen
-      action={<StatusPill label={pullRequest.isDraft ? 'draft' : pullRequest.state} tone={pullRequest.state === 'open' ? 'success' : 'neutral'} />}
+      action={(
+        <View style={styles.headerActions}>
+          <StatusPill label={pullRequest.isDraft ? 'draft' : pullRequest.state} tone={pullRequest.state === 'open' ? 'success' : 'neutral'} />
+          <IconButton
+            accessibilityLabel="Open pull request on GitHub"
+            icon={ExternalLink}
+            onPress={() => void openExternal()}
+          />
+        </View>
+      )}
       insetTop={false}
       subtitle={`${pullRequest.owner}/${pullRequest.repo} #${pullRequest.number}`}
       title={pullRequest.title}
@@ -197,6 +218,11 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
     fontVariant: ['tabular-nums'],
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   reviewActions: {
     gap: spacing.sm,

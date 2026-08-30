@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
+import * as Linking from 'expo-linking'
 import { Stack } from 'expo-router'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
@@ -58,6 +59,9 @@ export function PullRequestDetailContainer({
         detail={query.data}
         isMutating={action.isPending}
         onComment={body => action.mutate({ endpoint: 'comment', body: { body } })}
+        onOpenExternal={async () => {
+          await Linking.openURL(query.data.pullRequest.url)
+        }}
         onReview={(event, body) =>
           action.mutate({
             endpoint: 'review',
