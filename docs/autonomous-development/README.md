@@ -32,3 +32,4 @@ Chronological index of independently shipped product improvements.
 26. [Recover from empty plugin filters](./2026-08-29-26-clear-plugin-filters.md)
 27. [Navigate PR detail tabs by keyboard](./2026-08-29-27-pr-detail-tab-keyboard.md)
 28. [Show session note save status](./2026-08-29-28-session-note-save-status.md)
+29. [Preserve notes typed during autosave](./2026-08-29-29-preserve-notes-during-save.md)

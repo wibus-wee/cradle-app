@@ -11,7 +11,7 @@ import {
   TargetLine as TargetIcon,
 } from '@mingcute/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -36,6 +36,7 @@ import { openWorkspaceDiffs } from '~/navigation/navigation-commands'
 
 import { PullRequestTabLink } from '../pull-requests/pull-request-tab-link'
 import { sessionEnvironmentApi } from './api/session-environment'
+import { reconcileSessionNotesDraft } from './session-notes-state'
 import type { SessionNotesStatus } from './session-notes-view'
 import { SessionNotesView } from './session-notes-view'
 
@@ -68,11 +69,15 @@ export function SessionEnvironmentPanel({
   const createReview = useMutation(sessionEnvironmentApi.createReviewMutation())
   const localServers = useLocalServers(true)
   const [notesDraft, setNotesDraft] = useState('')
+  const notesServerSnapshotRef = useRef({ sessionId, notes: '' })
   const [rewindCheckpointId, setRewindCheckpointId] = useState<string | null>(null)
   const environment = environmentQuery.data
 
   useEffect(() => {
-    setNotesDraft(environment?.notes ?? '')
+    const nextServer = { sessionId, notes: environment?.notes ?? '' }
+    const previousServer = notesServerSnapshotRef.current
+    notesServerSnapshotRef.current = nextServer
+    setNotesDraft(current => reconcileSessionNotesDraft(current, previousServer, nextServer))
   }, [environment?.notes, sessionId])
 
   useEffect(() => {
