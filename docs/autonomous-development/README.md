@@ -60,3 +60,4 @@ Chronological index of independently shipped product improvements.
 21. [Open pull request files on Mobile](./2026-08-31-21-open-mobile-pull-request-files.md)
 22. [Open pull request conversations on Mobile](./2026-08-31-22-open-mobile-pull-request-conversations.md)
 23. [Explain blocked Work delivery on Mobile](./2026-08-31-23-explain-mobile-work-delivery-blockers.md)
+24. [Place server copy with its Mobile setting](./2026-08-31-24-place-mobile-server-copy-action.md)

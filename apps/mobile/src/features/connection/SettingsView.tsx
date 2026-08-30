@@ -76,17 +76,7 @@ export function SettingsView({
         <View style={styles.section}>
           <SectionHeading title="Activity" />
           <Item
-            actions={(
-              <View style={styles.serverActions}>
-                <IconButton
-                  accessibilityLabel="Copy server address"
-                  icon={Copy}
-                  onPress={() => void copyServer()}
-                  stopPropagation
-                />
-                {disclosure}
-              </View>
-            )}
+            actions={disclosure}
             media={<ChartNoAxesColumn color={theme.tertiaryForeground} size={19} />}
             onPress={onOpenUsage}
             title="Usage"
@@ -126,7 +116,17 @@ export function SettingsView({
             title="Connection status"
           />
           <Item
-            actions={disclosure}
+            actions={(
+              <View style={styles.serverActions}>
+                <IconButton
+                  accessibilityLabel="Copy server address"
+                  icon={Copy}
+                  onPress={() => void copyServer()}
+                  stopPropagation
+                />
+                {disclosure}
+              </View>
+            )}
             description={serverUrl}
             media={<Link2 color={theme.tertiaryForeground} size={19} />}
             onPress={onEditServer}
