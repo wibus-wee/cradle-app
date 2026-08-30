@@ -6,6 +6,8 @@
   "code.patchUnavailable": "GitHub 没有为这个文件提供文本 Patch。",
   "detail.close": "关闭 Pull request 详情",
   "detail.openGithub": "在 GitHub 中打开",
+  "detail.copyLink": "复制 Pull request 链接",
+  "detail.copiedLink": "已复制 Pull request 链接",
   "detail.openWork": "打开 Work",
   "detail.refresh": "刷新 Pull request 详情",
   "detail.tab.code": "Code",

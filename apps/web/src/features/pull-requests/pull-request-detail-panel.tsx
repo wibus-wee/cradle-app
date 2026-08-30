@@ -177,6 +177,7 @@ export function PullRequestDetailPanel({
         isFetching={detailQuery.isFetching || refreshMutation.isPending}
         errorKind={resolvePullRequestErrorKind(detailQuery.error)}
         onRefresh={() => refreshMutation.mutate({ path, body: { force: true } })}
+        onCopyLink={url => navigator.clipboard.writeText(url)}
         onOpenWork={workId ? () => openWork(workId) : undefined}
       />
     )
@@ -192,6 +193,7 @@ export function PullRequestDetailPanel({
       isFetching={detailQuery.isFetching || refreshMutation.isPending}
       errorKind={null}
       onRefresh={() => refreshMutation.mutate({ path, body: { force: true } })}
+      onCopyLink={url => navigator.clipboard.writeText(url)}
       onOpenWork={workId ? () => openWork(workId) : undefined}
       actions={detailQuery.data
         ? {

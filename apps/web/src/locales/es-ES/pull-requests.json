@@ -6,6 +6,8 @@
   "code.patchUnavailable": "GitHub no proporciona un Patch de texto para este archivo.",
   "detail.close": "Cerrar detalles del Pull request",
   "detail.openGithub": "Abrir en GitHub",
+  "detail.copyLink": "Copiar enlace del Pull request",
+  "detail.copiedLink": "Enlace del Pull request copiado",
   "detail.openWork": "Abrir Work",
   "detail.refresh": "Actualizar detalles del Pull request",
   "detail.tab.code": "Code",

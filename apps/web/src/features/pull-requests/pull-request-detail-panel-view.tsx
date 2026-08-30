@@ -1,4 +1,6 @@
 import {
+  CheckLine as CheckIcon,
+  Copy2Line as CopyIcon,
   ExternalLinkLine as ExternalLinkIcon,
   Refresh1Line as RefreshIcon,
 } from '@mingcute/react'
@@ -31,6 +33,7 @@ export interface PullRequestDetailPanelViewProps {
   initialTab?: PullRequestDetailTab
   now?: number
   onRefresh: () => void
+  onCopyLink: (url: string) => Promise<void>
   onOpenWork?: () => void
   actions?: PullRequestActionsViewProps
 }
@@ -46,11 +49,13 @@ export function PullRequestDetailPanelView({
   initialTab = 'summary',
   now = Date.now(),
   onRefresh,
+  onCopyLink,
   onOpenWork,
   actions,
 }: PullRequestDetailPanelViewProps) {
   const { t } = useTranslation('pull-requests')
   const [activeTab, setActiveTab] = useState<PullRequestDetailTab>(initialTab)
+  const [copied, setCopied] = useState(false)
 
   if (errorKind) {
     return (
@@ -130,6 +135,20 @@ export function PullRequestDetailPanelView({
                 </Button>
               )
             : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => {
+              void onCopyLink(detail.pullRequest.url).then(() => setCopied(true))
+            }}
+            aria-label={copied ? t('detail.copiedLink') : t('detail.copyLink')}
+            title={copied ? t('detail.copiedLink') : t('detail.copyLink')}
+          >
+            {copied
+              ? <CheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              : <CopyIcon className="size-3.5" aria-hidden />}
+          </Button>
           <Button variant="outline" size="icon-xs" asChild aria-label={t('detail.openGithub')}>
             <a href={detail.pullRequest.url} target="_blank" rel="noreferrer">
               <ExternalLinkIcon className="size-3.5" />

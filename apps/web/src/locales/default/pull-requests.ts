@@ -63,6 +63,8 @@ export default {
   'detail.updated': 'Updated {{ago}} ago',
   'detail.close': 'Close pull request details',
   'detail.openGithub': 'Open on GitHub',
+  'detail.copyLink': 'Copy pull request link',
+  'detail.copiedLink': 'Pull request link copied',
   'detail.openWork': 'Open Work',
   'detail.refresh': 'Refresh pull request details',
   'detail.tab.summary': 'Summary',

@@ -6,6 +6,8 @@
   "code.patchUnavailable": "GitHub はこのファイルのテキスト Patch を提供していません。",
   "detail.close": "Pull request の詳細を閉じる",
   "detail.openGithub": "GitHub で開く",
+  "detail.copyLink": "Pull request のリンクをコピー",
+  "detail.copiedLink": "Pull request のリンクをコピーしました",
   "detail.openWork": "Work を開く",
   "detail.refresh": "Pull request の詳細を更新",
   "detail.tab.code": "Code",
