@@ -24,6 +24,7 @@ import { toastManager } from '~/components/ui/toast'
 import { useThreadSearch } from '~/features/search/use-thread-search'
 import { getWorkspaceLocationLabel } from '~/features/workspace/types'
 import { useWorkspaceFiles } from '~/features/workspace/use-workspace-files'
+import { platform } from '~/lib/electron'
 import { rankFuzzyItems } from '~/lib/fuzzy-rank'
 import type { WebCommandRegistration } from '~/lib/plugin-store'
 import { usePluginStore } from '~/lib/plugin-store'
@@ -54,6 +55,9 @@ import { useDebouncedValue } from './use-debounced-value'
 const ISSUE_DEBOUNCE_MS = 150
 const COMMAND_HISTORY_KEY = 'cradle.commandPalette.recentCommands'
 const COMMAND_HISTORY_LIMIT = 12
+const SETTINGS_SHORTCUT = platform === 'darwin' ? '⌘,' : 'Ctrl+,'
+const REOPEN_SURFACE_SHORTCUT = platform === 'darwin' ? '⇧⌘T' : 'Ctrl+Shift+T'
+const SIDEBAR_SHORTCUT = platform === 'darwin' ? '⌘B' : 'Ctrl+B'
 
 const SessionWorkspaceSchema = z
   .object({
@@ -162,7 +166,7 @@ function useCommands(close: () => void): CommandAction[] {
         label: t('command.openSettings.label'),
         keywords: t('command.openSettings.keywords'),
         icon: SettingsIcon,
-        shortcut: '⌘,',
+        shortcut: SETTINGS_SHORTCUT,
         source: 'app',
         handler: () => {
           close()
@@ -177,7 +181,7 @@ function useCommands(close: () => void): CommandAction[] {
             description: lastClosedSurface.title,
             keywords: t('command.reopenClosed.keywords'),
             icon: HistoryIcon,
-            shortcut: '⇧⌘T',
+            shortcut: REOPEN_SURFACE_SHORTCUT,
             source: 'app' as const,
             handler: () => {
               close()
@@ -190,7 +194,7 @@ function useCommands(close: () => void): CommandAction[] {
         label: t('command.toggleSidebar.label'),
         keywords: t('command.toggleSidebar.keywords'),
         icon: TerminalIcon,
-        shortcut: '⌘B',
+        shortcut: SIDEBAR_SHORTCUT,
         source: 'app',
         handler: () => {
           close()

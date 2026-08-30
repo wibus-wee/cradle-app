@@ -130,7 +130,7 @@ function useAppSidebarContentController() {
     openSettingsSection(section, { replace: isSettings })
   }, [isSettings, setSettingsSection])
 
-  useShortcut('toggle-settings', { meta: true, key: ',', allowInEditable: true }, handleToggleSettings)
+  useShortcut('toggle-settings', { mod: true, key: ',', allowInEditable: true }, handleToggleSettings)
   useShortcut('exit-settings', { meta: true, key: 'Escape', allowInEditable: true }, closeSettings, isSettings)
 
   return {
@@ -155,7 +155,7 @@ export function AppSidebar() {
   } = useAppSidebarContentController()
   const [dragWidth, setDragWidth] = useState<number | null>(null)
 
-  useShortcut('toggle-sidebar', { meta: true, key: 'b', allowInEditable: true }, toggleSidebar)
+  useShortcut('toggle-sidebar', { mod: true, key: 'b', allowInEditable: true }, toggleSidebar)
 
   // Settings drill-in forces sidebar open; main mode respects user's collapse preference.
   const collapsed = sidebarCollapsed && !isSettings
@@ -223,7 +223,7 @@ export function AppSidebarSheet({ open, onOpenChange }: AppSidebarSheetProps) {
     onOpenChange(!open)
   }, [onOpenChange, open])
 
-  useShortcut('toggle-sidebar', { meta: true, key: 'b', allowInEditable: true }, toggleSidebarSheet)
+  useShortcut('toggle-sidebar', { mod: true, key: 'b', allowInEditable: true }, toggleSidebarSheet)
 
   return (
     <ChromeSideSheet

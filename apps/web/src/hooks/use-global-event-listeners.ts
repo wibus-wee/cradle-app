@@ -75,7 +75,7 @@ export function useGlobalEventListeners(
   )
   useShortcut(
     'layout.toggle-aside',
-    { meta: true, alt: true, key: 'b', allowInEditable: true },
+    { mod: true, alt: true, key: 'b', allowInEditable: true },
     toggleAside,
   )
   useShortcut(
@@ -98,7 +98,7 @@ export function useGlobalEventListeners(
   )
   useShortcut(
     'surface.close',
-    { meta: true, key: 'w', allowInEditable: true },
+    { mod: true, key: 'w', allowInEditable: true },
     useCallback(() => {
       const browserPanelState = useBrowserPanelStore.getState()
       if (closeActiveBrowserPanelTab({
@@ -123,7 +123,7 @@ export function useGlobalEventListeners(
   )
   useShortcut(
     'chat.new',
-    { meta: true, key: 't', allowInEditable: true },
+    { mod: true, key: 't', allowInEditable: true },
     openNewChat,
     !isTearoffWindow,
   )
