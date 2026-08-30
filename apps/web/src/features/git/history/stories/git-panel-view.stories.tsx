@@ -22,6 +22,7 @@ interface GitHistoryStorySceneProps {
 
 const handleFetch = fn()
 const handleLoadMore = fn()
+const handleCopyCommit = fn()
 
 function GitHistoryStoryScene({
   panelState = 'ready',
@@ -54,6 +55,7 @@ function GitHistoryStoryScene({
             graphFetching={graphFetching}
             fetchPending={fetchPending}
             renderBranchPicker={trigger => trigger}
+            onCopyCommit={handleCopyCommit}
             onFetch={handleFetch}
             onLoadMore={handleLoadMore}
           />

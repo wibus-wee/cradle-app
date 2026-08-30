@@ -1,3 +1,6 @@
+import { Copy2Line as CopyIcon } from '@mingcute/react'
+
+import { Button } from '~/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import { getI18n } from '~/i18n/instance'
 import { cn } from '~/lib/cn'
@@ -44,9 +47,10 @@ function relativeTime(timestamp: number): string {
 
 export interface GitGraphRowViewProps {
   commit: LayoutCommit
+  onCopySha: (sha: string) => void
 }
 
-export function GitGraphRowView({ commit }: GitGraphRowViewProps) {
+export function GitGraphRowView({ commit, onCopySha }: GitGraphRowViewProps) {
   const laneCount = Math.max(commit.visibleLaneCount, commit.lane + 1)
   const svgWidth = laneCount * LANE_WIDTH
   const centerX = commit.lane * LANE_WIDTH + LANE_WIDTH / 2
@@ -180,6 +184,17 @@ export function GitGraphRowView({ commit }: GitGraphRowViewProps) {
       </Tooltip>
 
       <div className="flex shrink-0 items-center gap-1.5 pr-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="size-6 text-muted-foreground hover:text-foreground"
+          aria-label={getI18n().t('git:graphRow.copySha')}
+          title={getI18n().t('git:graphRow.copySha')}
+          onClick={() => onCopySha(commit.sha)}
+        >
+          <CopyIcon className="size-3" aria-hidden />
+        </Button>
         <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
           {commit.shortSha}
         </span>

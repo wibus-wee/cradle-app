@@ -28,6 +28,7 @@ export interface GitRepositoryPanelSectionViewProps {
   graphFetching: boolean
   fetchPending: boolean
   renderBranchPicker: (trigger: ReactNode) => ReactNode
+  onCopyCommit: (sha: string) => void
   onFetch: () => void
   onLoadMore?: () => void
 }
@@ -40,6 +41,7 @@ export function GitRepositoryPanelSectionView({
   graphFetching,
   fetchPending,
   renderBranchPicker,
+  onCopyCommit,
   onFetch,
   onLoadMore,
 }: GitRepositoryPanelSectionViewProps) {
@@ -158,7 +160,11 @@ export function GitRepositoryPanelSectionView({
                       onScroll={handleRangeChange}
                     >
                       {commits.map(commit => (
-                        <GitGraphRowView key={commit.sha} commit={commit} />
+                        <GitGraphRowView
+                          key={commit.sha}
+                          commit={commit}
+                          onCopySha={onCopyCommit}
+                        />
                       ))}
                     </VList>
                   </div>

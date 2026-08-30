@@ -2,7 +2,7 @@
 
 # Features/Git
 
-Git integration feature: repository discovery, branch status, working-tree changes, commit graph, branch switching, and fetch.
+Git integration feature: repository discovery, branch status, working-tree changes, commit graph with full-SHA copy actions, branch switching, and fetch.
 The `GitPanelContainer` renders in the right aside "Git" tab; `ChangesPanelContainer` renders in the right aside "Changes" tab; `GitBranchControl` renders in the AppHeader breadcrumb.
 All git operations go through the server Git module under `/workspaces/:id/git/*`, which owns repository discovery and repository-scoped `simple-git` orchestration.
 The first real UI-driven E2E coverage enters this feature from `new-chat` → chat route surface, then drives the header branch control and right-aside Git panel without seeding app-owned state directly.
@@ -21,7 +21,7 @@ git/
 │   └── changes-panel.test.ts
 ├── history/
 │   ├── containers/         # Repository/graph query, pagination, and fetch adapters
-│   ├── views/              # Props-only panel, repository section, row, and author Views
+│   ├── views/              # Props-only panel, repository section, row, and author Views with focused row interaction coverage
 │   ├── fixtures/           # Owner-typed graph data and golden captures
 │   └── stories/            # Fixture-driven History stories
 ├── shared/                 # Generated owner types, query hooks, graph layout, tree events

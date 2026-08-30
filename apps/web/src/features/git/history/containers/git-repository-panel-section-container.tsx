@@ -1,8 +1,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { postWorkspacesByWorkspaceIdGitFetchMutation } from '~/api-gen/@tanstack/react-query.gen'
+import { toastManager } from '~/components/ui/toast'
 
 import { BranchPicker } from '../../branch/branch-picker'
 import { computeGraphLayout } from '../../shared/graph-layout'
@@ -27,6 +29,7 @@ export function GitRepositoryPanelSectionContainer({
   repository,
   showRepositoryHeader,
 }: GitRepositoryPanelSectionContainerProps) {
+  const { t } = useTranslation('git')
   const [limit, setLimit] = useState(100)
   const {
     data: commits,
@@ -63,6 +66,20 @@ export function GitRepositoryPanelSectionContainer({
     })
   }
 
+  const handleCopyCommit = async (sha: string) => {
+    try {
+      await navigator.clipboard.writeText(sha)
+      toastManager.add({
+        type: 'success',
+        title: t('graphRow.copySuccess'),
+        description: sha,
+      })
+    }
+    catch {
+      toastManager.add({ type: 'error', title: t('graphRow.copyError') })
+    }
+  }
+
   const renderBranchPicker = (trigger: ReactNode) => (
     <BranchPicker
       workspaceId={workspaceId}
@@ -82,6 +99,7 @@ export function GitRepositoryPanelSectionContainer({
       graphFetching={graphFetching}
       fetchPending={fetchMutation.isPending}
       renderBranchPicker={renderBranchPicker}
+      onCopyCommit={sha => void handleCopyCommit(sha)}
       onFetch={() => {
         void handleFetch()
       }}
