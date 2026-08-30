@@ -3,7 +3,7 @@ import { MenuView } from '@expo/ui/community/menu'
 import type { FileUIPart } from 'ai'
 import * as ImagePicker from 'expo-image-picker'
 import { Plus, Send, X } from 'lucide-react-native'
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Image,
@@ -33,26 +33,40 @@ export interface ChatSubmitInput {
   text: string
 }
 
+export interface ChatComposerDraft {
+  files: FileUIPart[]
+  text: string
+}
+
 export interface ChatComposerProps {
   capabilities?: Capabilities
+  clearDraftSignal: number
+  initialDraft: ChatComposerDraft
   isSending: boolean
   isStreaming: boolean
   onModeChange: (mode: 'build' | 'plan') => void
+  onDraftChange: (draft: ChatComposerDraft) => void
   onSend: (input: ChatSubmitInput) => void
   runtimeSettings?: RuntimeSettings
 }
 
 function ChatComposerContent({
   capabilities,
+  clearDraftSignal,
+  initialDraft,
   isSending,
   isStreaming,
   onModeChange,
+  onDraftChange,
   onSend,
   runtimeSettings,
 }: ChatComposerProps) {
   const theme = useTheme()
-  const [text, setText] = useState('')
-  const [files, setFiles] = useState<FileUIPart[]>([])
+  const [text, setText] = useState(initialDraft.text)
+  const [files, setFiles] = useState<FileUIPart[]>(initialDraft.files)
+  const textRef = useRef(initialDraft.text)
+  const filesRef = useRef<FileUIPart[]>(initialDraft.files)
+  const clearDraftSignalRef = useRef(clearDraftSignal)
   const [continuationMode, setContinuationMode] = useState<'queue' | 'steer'>('queue')
   const [isPicking, setIsPicking] = useState(false)
   const interactionMode
@@ -96,14 +110,35 @@ function ChatComposerContent({
   )
   const suggestionsVisible = slashCommands.length > 0 || skills.length > 0
 
+  useEffect(() => {
+    if (clearDraftSignalRef.current === clearDraftSignal) {
+      return
+    }
+    clearDraftSignalRef.current = clearDraftSignal
+    textRef.current = ''
+    filesRef.current = []
+    setText('')
+    setFiles([])
+  }, [clearDraftSignal])
+
+  const updateText = (nextText: string) => {
+    textRef.current = nextText
+    setText(nextText)
+    onDraftChange({ files: filesRef.current, text: nextText })
+  }
+
+  const updateFiles = (nextFiles: FileUIPart[]) => {
+    filesRef.current = nextFiles
+    setFiles(nextFiles)
+    onDraftChange({ files: nextFiles, text: textRef.current })
+  }
+
   const submit = () => {
     const nextText = text.trim()
     if ((!nextText && files.length === 0) || isSending) {
       return
     }
     onSend({ continuationMode, files, text: nextText })
-    setText('')
-    setFiles([])
     Keyboard.dismiss()
   }
 
@@ -136,7 +171,7 @@ function ChatComposerContent({
           },
         ]
       })
-      setFiles(current => [...current, ...nextFiles])
+      updateFiles([...filesRef.current, ...nextFiles])
     }
     finally {
       setIsPicking(false)
@@ -145,7 +180,7 @@ function ChatComposerContent({
 
   const insertSuggestion = (value: string, kind: 'mention' | 'slash') => {
     const pattern = kind === 'slash' ? /\/([\w-]*)$/ : /@([\w-]*)$/
-    setText(current => current.replace(pattern, `${kind === 'slash' ? '/' : '@'}${value} `))
+    updateText(textRef.current.replace(pattern, `${kind === 'slash' ? '/' : '@'}${value} `))
   }
 
   return (
@@ -234,7 +269,7 @@ function ChatComposerContent({
                 accessibilityLabel={`Remove ${file.filename ?? 'photo'}`}
                 accessibilityRole="button"
                 onPress={() =>
-                  setFiles(current => current.filter(item => item.url !== file.url))}
+                  updateFiles(filesRef.current.filter(item => item.url !== file.url))}
                 style={[styles.removeAttachment, { backgroundColor: theme.overlay }]}
               >
                 <X color="#fff" size={12} />
@@ -296,7 +331,7 @@ function ChatComposerContent({
           blurOnSubmit={false}
           maxLength={12_000}
           multiline
-          onChangeText={setText}
+          onChangeText={updateText}
           onSubmitEditing={submit}
           placeholder={
             isStreaming

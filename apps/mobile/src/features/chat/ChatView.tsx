@@ -26,7 +26,7 @@ import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 import { ChatActivitySheet } from './ChatActivitySheet'
-import type { ChatSubmitInput } from './ChatComposer'
+import type { ChatComposerDraft, ChatSubmitInput } from './ChatComposer'
 import { ChatComposer } from './ChatComposer'
 import { ChatMessage } from './ChatMessage'
 
@@ -39,6 +39,9 @@ type TranscriptItem = MessageItem | PendingItem | LiveItem
 
 export interface ChatViewProps {
   capabilities?: GetChatSessionsBySessionIdCapabilitiesResponse
+  clearComposerDraftSignal: number
+  composerDraft: ChatComposerDraft
+  composerDraftKey: string
   messages: MessageRow[]
   activeRun?: ActiveRun
   hasEarlier: boolean
@@ -55,6 +58,7 @@ export interface ChatViewProps {
   queuedCount?: number
   sendError?: string | null
   onCancel: () => void
+  onComposerDraftChange: (draft: ChatComposerDraft) => void
   onLoadEarlier: () => void
   onModeChange: (mode: 'build' | 'plan') => void
   onRequestMessageDetail: (messageId: string | null) => void
@@ -64,6 +68,9 @@ export interface ChatViewProps {
 
 export function ChatView({
   capabilities,
+  clearComposerDraftSignal,
+  composerDraft,
+  composerDraftKey,
   messages,
   activeRun,
   hasEarlier,
@@ -80,6 +87,7 @@ export function ChatView({
   queuedCount = 0,
   sendError = null,
   onCancel,
+  onComposerDraftChange,
   onLoadEarlier,
   onModeChange,
   onRequestMessageDetail,
@@ -291,8 +299,12 @@ export function ChatView({
 
             <ChatComposer
               capabilities={capabilities}
+              clearDraftSignal={clearComposerDraftSignal}
+              initialDraft={composerDraft}
               isSending={isSending}
               isStreaming={isStreaming}
+              key={composerDraftKey}
+              onDraftChange={onComposerDraftChange}
               onModeChange={onModeChange}
               onSend={onSend}
               runtimeSettings={runtimeSettings}

@@ -22,6 +22,7 @@ import { readChatHistoryCache, writeChatHistoryCache } from './chat-history-cach
 import { consumeChatMessageStream } from './chat-stream'
 import type { ChatSubmitInput } from './ChatComposer'
 import { ChatView } from './ChatView'
+import { useComposerDraft } from './use-composer-draft'
 
 export function ChatContainer({ sessionId }: { sessionId: string }) {
   const { connection } = useConnection()
@@ -38,6 +39,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
     GetChatSessionsBySessionIdMessagePreviewsResponse,
     string | null
   > | null>(null)
+  const composerDraft = useComposerDraft(connection, sessionId, isRouteActive)
   routeActiveRef.current = isRouteActive
   const historyQueryKey = useMemo(
     () => ['chat-message-previews', connection?.url, sessionId] as const,
@@ -235,6 +237,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
             signal: controller.signal,
           },
         )
+        composerDraft.clearDraft()
         const assistantMessageId
           = response.headers.get('x-cradle-assistant-message-id') ?? `assistant-${sessionId}`
         setPendingUser({
@@ -279,6 +282,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       }),
     onError: error => setSendError(errorMessage(error)),
     onSuccess: () => {
+      composerDraft.clearDraft()
       void refetchRuntimeStatus()
       void refetchHistory()
     },
@@ -292,6 +296,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       }),
     onError: error => setSendError(errorMessage(error)),
     onSuccess: () => {
+      composerDraft.clearDraft()
       void refetchRuntimeStatus()
       void refetchHistory()
     },
@@ -353,7 +358,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   if (error) {
     return <ErrorState title="Could not open conversation" description={errorMessage(error)} />
   }
-  if (sessionQuery.isPending || (!historyData && historyQuery.isPending)) {
+  if (sessionQuery.isPending || (!historyData && historyQuery.isPending) || composerDraft.isPending) {
     return <LoadingState />
   }
   if (!sessionQuery.data) {
@@ -368,6 +373,9 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       <Stack.Screen options={{ title: sessionQuery.data.title ?? 'Conversation' }} />
       <ChatView
         activeRun={activeRun}
+        clearComposerDraftSignal={composerDraft.clearSignal}
+        composerDraft={composerDraft.initialDraft}
+        composerDraftKey={`chat:${sessionId}`}
         isCancelling={cancel.isPending}
         capabilities={capabilitiesQuery.data}
         isSending={send.isPending || queue.isPending || steer.isPending}
@@ -375,6 +383,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         liveMessage={liveMessage}
         messages={messages}
         onCancel={handleCancel}
+        onComposerDraftChange={composerDraft.scheduleSave}
         onModeChange={handleModeChange}
         onSend={handleSend}
         pendingUser={pendingUser}
