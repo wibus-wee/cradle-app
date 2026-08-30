@@ -29,7 +29,7 @@ const methods: ProviderAuthMethod[] = [{
   unavailableReason: 'Terminal auth is unavailable',
 }]
 
-describe('ACP auth persistence', () => {
+describe('acp auth persistence', () => {
   const previousDataDir = process.env.CRADLE_DATA_DIR
 
   afterEach(() => {
