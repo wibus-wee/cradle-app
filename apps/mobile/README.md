@@ -7,6 +7,8 @@ Pull request lists and details support pull-to-refresh; both force an upstream
 GitHub update before reloading their Cradle projections.
 Pull request detail exposes its canonical GitHub URL through a native external
 link action for provider-specific review and full diff workflows.
+Comment and review drafts clear only after a successful mutation; failures show
+their server message and leave the draft ready to retry.
 Initial data-load failures expose an in-place Retry action across Projects,
 Work, Usage, pull requests, and conversations.
 Work detail supports pull-to-refresh for readiness and pull-request state even
@@ -64,7 +66,8 @@ Settings.
 - Work detail query and mutation state remain in `WorkDetailContainer`; the
   fixture-driven View owns handoff draft interaction and native refresh presentation.
 - Pull request detail keeps native linking and alerts in its Container; the
-  owner-typed View fixture receives only an external-open callback.
+  owner-typed View fixture receives callbacks for external open and async review
+  actions, retaining local draft text until those actions resolve successfully.
 - Usage range persistence is owned by `features/usage/usage-range-storage.ts`;
   invalid or unavailable storage falls back to the 30-day product default.
 - Root destinations use an anchored navigation menu; detail surfaces use Expo

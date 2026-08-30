@@ -44,6 +44,12 @@ export function PullRequestDetailContainer({
     mutationFn: ({ endpoint, body }: { endpoint: string, body: object }) =>
       cradleRequest(connection!, `${path}/${endpoint}`, { method: 'POST', body }),
     onSuccess: () => void query.refetch(),
+    onError: (error, variables) => {
+      Alert.alert(
+        variables.endpoint === 'comment' ? 'Could not post comment' : 'Could not submit review',
+        errorMessage(error),
+      )
+    },
   })
 
   const refresh = () => {
@@ -82,18 +88,21 @@ export function PullRequestDetailContainer({
         detail={query.data}
         isMutating={action.isPending}
         isRefreshing={isRefreshing}
-        onComment={body => action.mutate({ endpoint: 'comment', body: { body } })}
+        onComment={async (body) => {
+          await action.mutateAsync({ endpoint: 'comment', body: { body } })
+        }}
         onOpenExternal={() => {
           void Linking.openURL(query.data.pullRequest.url).catch(() => {
             Alert.alert('Could not open pull request', 'The GitHub link could not be opened on this device.')
           })
         }}
         onRefresh={refresh}
-        onReview={(event, body) =>
-          action.mutate({
+        onReview={async (event, body) => {
+          await action.mutateAsync({
             endpoint: 'review',
             body: { event, ...(body ? { body } : {}) },
-          })}
+          })
+        }}
       />
     </>
   )

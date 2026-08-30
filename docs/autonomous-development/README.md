@@ -56,3 +56,4 @@ Chronological index of independently shipped product improvements.
 17. [Remember the mobile Usage range](./2026-08-31-17-mobile-usage-range.md)
 18. [Retry context usage in place](./2026-08-31-18-context-usage-retry.md)
 19. [Open mobile pull requests in GitHub](./2026-08-31-19-mobile-open-pr-github.md)
+20. [Preserve failed mobile review drafts](./2026-08-31-20-mobile-review-draft-failures.md)

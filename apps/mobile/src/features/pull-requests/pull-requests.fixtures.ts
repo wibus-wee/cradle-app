@@ -85,8 +85,8 @@ export const pullRequestDetailFixture: PullRequestDetailViewProps = {
       rawUrl: 'https://github.com/cradle/cradle/raw/abc123/apps/mobile/src/features/projects/ProjectsView.tsx',
     }],
   },
-  onComment: () => {},
+  onComment: async () => {},
   onOpenExternal: () => {},
   onRefresh: () => {},
-  onReview: () => {},
+  onReview: async () => {},
 }

@@ -21,10 +21,10 @@ export interface PullRequestDetailViewProps {
   detail: Detail
   isMutating?: boolean
   isRefreshing?: boolean
-  onComment: (body: string) => void
+  onComment: (body: string) => Promise<void>
   onOpenExternal: () => void
   onRefresh?: () => void
-  onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => void
+  onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => Promise<void>
 }
 
 export function PullRequestDetailView({
@@ -40,11 +40,26 @@ export function PullRequestDetailView({
   const [comment, setComment] = useState('')
   const { pullRequest } = detail
 
-  const submitComment = () => {
+  const submitComment = async () => {
     const body = comment.trim()
     if (!body) { return }
-    onComment(body)
-    setComment('')
+    try {
+      await onComment(body)
+      setComment('')
+    }
+    catch {
+      // The Container reports the failure; keep the draft available for retry.
+    }
+  }
+
+  const submitReview = async (event: 'APPROVE' | 'REQUEST_CHANGES') => {
+    try {
+      await onReview(event, comment.trim())
+      setComment('')
+    }
+    catch {
+      // The Container reports the failure; keep the draft available for retry.
+    }
   }
 
   return (
@@ -163,7 +178,7 @@ export function PullRequestDetailView({
           icon={Send}
           label="Comment"
           loading={isMutating}
-          onPress={submitComment}
+          onPress={() => void submitComment()}
           variant="secondary"
         />
         <View style={styles.reviewActions}>
@@ -171,7 +186,7 @@ export function PullRequestDetailView({
             disabled={!comment.trim()}
             label="Request changes"
             loading={isMutating}
-            onPress={() => onReview('REQUEST_CHANGES', comment.trim())}
+            onPress={() => void submitReview('REQUEST_CHANGES')}
             style={styles.reviewButton}
             role="destructive"
             variant="outlined"
@@ -179,7 +194,7 @@ export function PullRequestDetailView({
           <NativeAction
             label="Approve"
             loading={isMutating}
-            onPress={() => onReview('APPROVE', comment.trim())}
+            onPress={() => void submitReview('APPROVE')}
             style={styles.reviewButton}
           />
         </View>
