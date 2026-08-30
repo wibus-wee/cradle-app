@@ -119,7 +119,11 @@ export function GlobalSearchDialogView({
     }
     const input = event.currentTarget
     const position = input.selectionStart ?? 0
-    if (event.key === 'ArrowLeft' && position === 0) {
+    if (event.key === 'Backspace' && input.value.length === 0 && mode !== 'all') {
+      event.preventDefault()
+      onModeChange('all')
+    }
+    else if (event.key === 'ArrowLeft' && position === 0) {
       event.preventDefault()
       cycleMode(-1)
     }
@@ -127,7 +131,7 @@ export function GlobalSearchDialogView({
       event.preventDefault()
       cycleMode(1)
     }
-  }, [cycleMode])
+  }, [cycleMode, mode, onModeChange])
 
   const counts = useMemo<Partial<Record<PaletteModeId, number>>>(() => ({
     commands: data.filteredCommands.length || data.suggestedCommands.length,
