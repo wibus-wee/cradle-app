@@ -29,6 +29,13 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1_048_576).toFixed(1)} MB`
 }
 
+function formatModifiedAt(timestamp: number): string {
+  return new Date(timestamp).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
 export function FilePreviewView({
   file,
   content,
@@ -46,6 +53,9 @@ export function FilePreviewView({
           <Text selectable style={[styles.path, { color: theme.foreground }]}>{file.path}</Text>
           <Text style={[styles.details, { color: theme.mutedForeground }]}>
             {`${formatFileSize(file.size)} · ${file.mimeType}`}
+          </Text>
+          <Text style={[styles.details, { color: theme.mutedForeground }]}>
+            {`Modified ${formatModifiedAt(file.modifiedAt)}`}
           </Text>
         </View>
         {supported && (

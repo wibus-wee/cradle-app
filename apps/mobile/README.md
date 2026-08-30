@@ -22,6 +22,8 @@ device and validates the stored preference before issuing dashboard requests.
 Workspace detail file rows open a refreshable, read-only mobile preview for
 text and Markdown files; previews can be handed to other apps through the
 system share sheet, while unsupported binary formats are identified explicitly.
+Preview metadata includes the local modification time so users can judge whether
+the content is current.
 Directory rows open a path-scoped, refreshable child listing; deeper directories
 stack naturally and files continue into the same preview route.
 The virtualized workspace overview renders every top-level entry returned by the
