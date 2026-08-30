@@ -15,6 +15,7 @@
   "detail.updated": "{{ago}}前更新",
   "empty.description": "你创建或被邀请审查的 GitHub Pull request 会显示在这里。",
   "empty.filteredDescription": "换个搜索词或筛选条件试试。",
+  "empty.clearFilters": "清除筛选条件",
   "empty.filteredTitle": "没有匹配的 Pull request",
   "empty.title": "暂无 Pull request",
   "auth.emptyDescription": "请安装 GitHub CLI，并运行 `gh auth login` 登录后加载你的 Pull request。",

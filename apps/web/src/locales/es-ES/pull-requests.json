@@ -15,6 +15,7 @@
   "detail.updated": "Actualizado hace {{ago}}",
   "empty.description": "Los Pull requests que crees o te pidan revisar en GitHub aparecerán aquí.",
   "empty.filteredDescription": "Prueba otra búsqueda o filtro.",
+  "empty.clearFilters": "Borrar filtros",
   "empty.filteredTitle": "No hay Pull requests coincidentes",
   "empty.title": "Todavía no hay Pull requests",
   "auth.emptyDescription": "Instala GitHub CLI y ejecuta `gh auth login` para cargar tus Pull requests.",

@@ -62,6 +62,7 @@
   "detail.tab.timeline": "Timeline",
   "detail.title": "Pull request",
   "detail.updated": "Updated {{ago}} ago",
+  "empty.clearFilters": "Clear filters",
   "empty.description": "Pull requests you author or are asked to review on GitHub will show up here.",
   "empty.filteredDescription": "Try another search or filter.",
   "empty.filteredTitle": "No matching pull requests",

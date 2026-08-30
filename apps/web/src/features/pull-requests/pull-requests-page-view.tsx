@@ -285,6 +285,23 @@ export function PullRequestsPageView({
                         : t('empty.filteredDescription')}
                     </EmptyDescription>
                   </EmptyHeader>
+                  {entries.length > 0
+                    ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearch('')
+                            setFilter('all')
+                            setStateFilter('all')
+                            setRepository(null)
+                          }}
+                        >
+                          {t('empty.clearFilters')}
+                        </Button>
+                      )
+                    : null}
                 </Empty>
               )}
       </div>

@@ -15,6 +15,7 @@
   "detail.updated": "{{ago}}前に更新",
   "empty.description": "あなたが作成した、またはレビューを依頼された GitHub の Pull request がここに表示されます。",
   "empty.filteredDescription": "別のキーワードやフィルターを試してください。",
+  "empty.clearFilters": "フィルターをクリア",
   "empty.filteredTitle": "一致する Pull request はありません",
   "empty.title": "Pull request はまだありません",
   "auth.emptyDescription": "GitHub CLI をインストールし、`gh auth login` を実行して Pull request を読み込みます。",

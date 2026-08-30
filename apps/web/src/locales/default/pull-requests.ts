@@ -32,6 +32,7 @@ export default {
   'empty.description': 'Pull requests you author or are asked to review on GitHub will show up here.',
   'empty.filteredTitle': 'No matching pull requests',
   'empty.filteredDescription': 'Try another search or filter.',
+  'empty.clearFilters': 'Clear filters',
   'auth.emptyTitle': 'Connect GitHub to view pull requests',
   'auth.emptyDescription': 'Install the GitHub CLI and run `gh auth login` to load your pull requests.',
   'auth.install': 'Install GitHub CLI',
