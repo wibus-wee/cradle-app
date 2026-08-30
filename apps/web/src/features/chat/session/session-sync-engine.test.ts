@@ -276,24 +276,28 @@ describe('sessionSyncEngine', () => {
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: false,
+      runtimeActiveRunId: 'run-1',
       runtimeActiveRunMessageId: 'assistant-1',
     })
     engine.updatePassiveStream({
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: false,
+      runtimeActiveRunId: 'run-1',
       runtimeActiveRunMessageId: 'assistant-1',
     })
     engine.updatePassiveStream({
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: false,
+      runtimeActiveRunId: 'run-2',
       runtimeActiveRunMessageId: 'assistant-2',
     })
     engine.updatePassiveStream({
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: true,
+      runtimeActiveRunId: 'run-2',
       runtimeActiveRunMessageId: 'assistant-2',
     })
 
@@ -305,6 +309,7 @@ describe('sessionSyncEngine', () => {
       enabled: true,
       sessionId: 'session-1',
       locallyDriven: false,
+      runtimeActiveRunId: null,
       runtimeActiveRunMessageId: null,
     })
 
@@ -336,6 +341,7 @@ describe('sessionSyncEngine', () => {
         enabled: true,
         sessionId: 'session-1',
         locallyDriven: false,
+        runtimeActiveRunId: 'run-1',
         runtimeActiveRunMessageId: 'assistant-1',
       })
     }
