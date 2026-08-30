@@ -1,3 +1,4 @@
+import { SegmentedControl } from '@expo/ui/community/segmented-control'
 import { Info, Search } from 'lucide-react-native'
 import { useRef, useState } from 'react'
 import { Keyboard, SectionList, StyleSheet, Text, View } from 'react-native'
@@ -66,14 +67,20 @@ export function WorkListView({
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
   const [search, setSearch] = useState('')
+  const [mode, setMode] = useState<'all' | 'running' | 'attention'>('all')
   const normalizedSearch = search.trim().toLocaleLowerCase()
-  const filteredWorks = normalizedSearch
+  const searchedWorks = normalizedSearch
     ? works.filter((work) => {
         const workspaceName = workspaces.find(workspace => workspace.id === work.workspaceId)?.name
         return [work.title, work.objective, workspaceName]
           .some(value => value?.toLocaleLowerCase().includes(normalizedSearch))
       })
     : works
+  const filteredWorks = searchedWorks.filter((work) => {
+    if (mode === 'running') { return work.activity === 'running' }
+    if (mode === 'attention') { return work.activity === 'waiting' || work.activity === 'blocked' }
+    return true
+  })
   const groups = ['Today', 'This week', 'Older']
     .map(title => ({
       title,
@@ -102,6 +109,15 @@ export function WorkListView({
       scroll={false}
       title="Work"
     >
+      <SegmentedControl
+        appearance={theme.isDark ? 'dark' : 'light'}
+        onValueChange={(value) => {
+          setMode(value === 'Running' ? 'running' : value === 'Attention' ? 'attention' : 'all')
+        }}
+        selectedIndex={mode === 'all' ? 0 : mode === 'running' ? 1 : 2}
+        style={styles.segmented}
+        values={['All', 'Running', 'Attention']}
+      />
       <View style={styles.search}>
         <InputGroup
           addon={<Search color={theme.mutedForeground} size={17} />}
@@ -121,8 +137,18 @@ export function WorkListView({
           <EmptyState
             description={normalizedSearch
               ? 'Try a different title, objective, or workspace.'
-              : 'Create an isolated Work to let an agent build against a project.'}
-            title={normalizedSearch ? 'No matching Work' : 'No active Work'}
+              : mode === 'running'
+                ? 'Active runs will appear here.'
+                : mode === 'attention'
+                  ? 'Waiting and blocked Work will appear here.'
+                  : 'Create an isolated Work to let an agent build against a project.'}
+            title={normalizedSearch
+              ? 'No matching Work'
+              : mode === 'running'
+                ? 'Nothing running'
+                : mode === 'attention'
+                  ? 'Nothing needs attention'
+                  : 'No active Work'}
           />
         )}
         onRefresh={onRefresh}
@@ -173,6 +199,10 @@ const styles = StyleSheet.create({
   },
   search: {
     marginBottom: spacing.md,
+  },
+  segmented: {
+    marginBottom: spacing.sm,
+    minHeight: 36,
   },
   time: {
     fontSize: 12,

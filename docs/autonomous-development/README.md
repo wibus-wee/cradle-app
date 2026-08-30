@@ -38,3 +38,4 @@ Chronological index of independently shipped product improvements.
 ## 2026-08-31
 
 1. [Search active Work on Mobile](./2026-08-31-01-search-mobile-work.md)
+2. [Focus Mobile Work by activity](./2026-08-31-02-filter-mobile-work-activity.md)
