@@ -36,6 +36,8 @@ import { openWorkspaceDiffs } from '~/navigation/navigation-commands'
 
 import { PullRequestTabLink } from '../pull-requests/pull-request-tab-link'
 import { sessionEnvironmentApi } from './api/session-environment'
+import type { SessionNotesStatus } from './session-notes-view'
+import { SessionNotesView } from './session-notes-view'
 
 type IconType = React.ComponentType<React.SVGProps<SVGSVGElement>>
 
@@ -92,6 +94,13 @@ export function SessionEnvironmentPanel({
   const rewindTurnCount = rewindCheckpointId
     ? environment.checkpoints.findIndex(checkpoint => checkpoint.id === rewindCheckpointId)
     : 0
+  const notesStatus: SessionNotesStatus = notesDraft === environment.notes
+    ? 'saved'
+    : notesMutation.isPending
+      ? 'saving'
+      : notesMutation.isError
+        ? 'error'
+        : 'unsaved'
 
   return (
     <>
@@ -205,10 +214,19 @@ Review
           <ChecklistSection icon={BookmarkIcon} label="Markers" items={environment.markers.map(marker => ({ id: marker.id, targetMessageId: marker.messageId, label: marker.label ?? marker.selectedText, done: marker.done }))} onDone={(id, done) => void markerPatch.mutateAsync({ path: { id: sessionId, markerId: id }, body: { done } }).then(refresh)} onRemove={id => void markerDelete.mutateAsync({ path: { id: sessionId, markerId: id } }).then(refresh)} />
         )}
 
-        <section className="space-y-2">
-          <SectionHeader icon={NotesIcon} label="Notes" />
-          <textarea value={notesDraft} onChange={event => setNotesDraft(event.target.value)} placeholder={t('aside.notes.placeholder')} className="min-h-28 w-full resize-y rounded-lg bg-fill/35 px-2.5 py-2 text-[12px] leading-5 outline-none shadow-[0_0_0_1px_rgba(127,127,127,0.14)] transition-[box-shadow] focus:shadow-[0_0_0_1px_var(--color-ring)]" />
-        </section>
+        <SessionNotesView
+          label={t('aside.notes.label')}
+          value={notesDraft}
+          placeholder={t('aside.notes.placeholder')}
+          status={notesStatus}
+          statusLabels={{
+            saved: t('aside.notes.saved'),
+            unsaved: t('aside.notes.unsaved'),
+            saving: t('aside.notes.saving'),
+            error: t('aside.notes.error'),
+          }}
+          onChange={setNotesDraft}
+        />
 
         {environment.automationRuns.length > 0 && (
           <section className="space-y-2">
