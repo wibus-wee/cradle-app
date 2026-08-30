@@ -149,16 +149,10 @@ export const ChatRuntimeModel = {
         id: t.String(),
         name: t.String(),
         description: t.Optional(t.String()),
-        kind: t.Union([t.Literal('agent'), t.Literal('env_var'), t.Literal('terminal')]),
+        kind: t.Union([t.Literal('agent'), t.Literal('terminal')]),
         status: t.Union([t.Literal('supported'), t.Literal('unsupported')]),
         unavailableReason: t.Optional(t.String()),
         link: t.Optional(t.String()),
-        fields: t.Optional(t.Array(t.Object({
-          name: t.String(),
-          label: t.Optional(t.String()),
-          secret: t.Boolean(),
-          optional: t.Boolean(),
-        }))),
       })),
       configurationTarget: t.Object({
         namespace: t.String(),

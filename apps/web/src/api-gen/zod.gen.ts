@@ -3036,8 +3036,7 @@ export const zDeleteAcpAgentsByAgentIdAuthPath = z.object({
 });
 
 export const zPutAcpAgentsByAgentIdAuthBody = z.object({
-    methodId: z.string().min(1),
-    secretRefs: z.record(z.string(), z.unknown()).optional()
+    methodId: z.string().min(1)
 });
 
 export const zPutAcpAgentsByAgentIdAuthPath = z.object({

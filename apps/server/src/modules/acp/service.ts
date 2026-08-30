@@ -57,7 +57,6 @@ const REMOTE_RESERVED_HEADERS = new Set([
 
 export interface AcpAgentAuthConfig {
   methodId: string | null
-  secretRefs: Record<string, string>
 }
 
 export type AcpAgentView = AcpAgent & { remoteHeadersSecretRefs: Record<string, string> }
@@ -317,15 +316,13 @@ export function readAgentAuthConfig(agentId: string): AcpAgentAuthConfig {
   const record = requireInstalledAgent(agentId)
   return {
     methodId: record.authMethodId,
-    secretRefs: AuthSecretRefsSchema.parse(JSON.parse(record.authSecretRefsJson)),
   }
 }
 
 export function setAgentAuthSelection(
   agentId: string,
-  input: { methodId: string, secretRefs?: Record<string, string> },
+  input: { methodId: string },
   methods: readonly ProviderAuthMethod[],
-  availableSecretIds: ReadonlySet<string>,
 ): AcpAgentAuthConfig {
   requireInstalledAgent(agentId)
   const method = methods.find(candidate => candidate.id === input.methodId)
@@ -346,54 +343,9 @@ export function setAgentAuthSelection(
     })
   }
 
-  const secretRefs = AuthSecretRefsSchema.parse(input.secretRefs ?? {})
-  const missingSecretRefNames = Object.entries(secretRefs)
-    .filter(([, secretRef]) => !availableSecretIds.has(secretRef))
-    .map(([name]) => name)
-  if (missingSecretRefNames.length > 0) {
-    throw new AppError({
-      code: 'acp_auth_secret_ref_not_found',
-      status: 400,
-      message: 'ACP authentication variables must reference existing Secrets credentials',
-      details: { variableNames: missingSecretRefNames },
-    })
-  }
-  const fields = method.fields ?? []
-  if (method.kind !== 'env_var' && Object.keys(secretRefs).length > 0) {
-    throw new AppError({
-      code: 'acp_auth_secret_refs_not_allowed',
-      status: 400,
-      message: 'Secret references are valid only for ACP env-var authentication',
-      details: { agentId, methodId: method.id },
-    })
-  }
-
-  const advertisedNames = new Set(fields.map(field => field.name))
-  const unknownNames = Object.keys(secretRefs).filter(name => !advertisedNames.has(name))
-  if (unknownNames.length > 0) {
-    throw new AppError({
-      code: 'acp_auth_unknown_variables',
-      status: 400,
-      message: 'Secret references contain variables not advertised by the selected ACP auth method',
-      details: { agentId, methodId: method.id, variableNames: unknownNames },
-    })
-  }
-
-  const missingNames = fields
-    .filter(field => !field.optional && !secretRefs[field.name])
-    .map(field => field.name)
-  if (missingNames.length > 0) {
-    throw new AppError({
-      code: 'acp_auth_missing_variables',
-      status: 400,
-      message: 'Required ACP authentication variables are missing secret references',
-      details: { agentId, methodId: method.id, variableNames: missingNames },
-    })
-  }
-
   db().update(acpAgents).set({
     authMethodId: method.id,
-    authSecretRefsJson: JSON.stringify(secretRefs),
+    authSecretRefsJson: '{}',
     updatedAt: currentUnixSeconds(),
   }).where(eq(acpAgents.id, agentId)).run()
   recordAudit({
@@ -403,10 +355,9 @@ export function setAgentAuthSelection(
     details: {
       methodId: method.id,
       kind: method.kind,
-      variableNames: Object.keys(secretRefs),
     },
   })
-  return { methodId: method.id, secretRefs }
+  return { methodId: method.id }
 }
 
 export function clearAgentAuthSelection(agentId: string): void {

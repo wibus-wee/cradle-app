@@ -30,7 +30,6 @@ export interface AcpProcessSpawnOptions {
   cmd: string
   args: string[]
   env: Record<string, string>
-  sensitiveEnvNames?: string[]
   cwd?: string
   distributionType: AcpLaunchDistributionType
   installPath?: string | null
@@ -98,11 +97,8 @@ export class AcpProcessManager implements AcpProcessHost {
     })
 
     const stderrBuf: string[] = []
-    const sensitiveValues = (opts.sensitiveEnvNames ?? [])
-      .map(name => opts.env[name])
-      .filter((value): value is string => typeof value === 'string' && value.length > 0)
     const stderrCollector = createLineCollector((line) => {
-      pushStderr(stderrBuf, redactSensitiveValues(line, sensitiveValues))
+      pushStderr(stderrBuf, line)
       this.lastDiagnostics.set(opts.agentId, [...stderrBuf])
     })
 
@@ -114,7 +110,7 @@ export class AcpProcessManager implements AcpProcessHost {
         pid: proc.targetPid ?? proc.pid ?? null,
         kind: 'output',
         stream: 'stderr',
-        text: redactSensitiveValues(chunk, sensitiveValues),
+        text: chunk,
         command: null,
         args: null,
         cwd: null,
@@ -268,13 +264,6 @@ function pushStderr(buf: string[], line: string): void {
   if (buf.length > STDERR_MAX) {
     buf.shift()
   }
-}
-
-function redactSensitiveValues(line: string, sensitiveValues: readonly string[]): string {
-  return sensitiveValues.reduce(
-    (redacted, value) => redacted.replaceAll(value, '[REDACTED]'),
-    line,
-  )
 }
 
 function createLineCollector(onLine: (line: string) => void): LineCollector {

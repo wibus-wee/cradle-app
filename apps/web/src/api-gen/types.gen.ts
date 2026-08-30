@@ -19803,16 +19803,10 @@ export type GetAcpAgentsByAgentIdAuthMethodsResponses = {
             id: string;
             name: string;
             description?: string;
-            kind: 'agent' | 'env_var' | 'terminal';
+            kind: 'agent' | 'terminal';
             status: 'supported' | 'unsupported';
             unavailableReason?: string;
             link?: string;
-            fields?: Array<{
-                name: string;
-                label?: string;
-                secret: boolean;
-                optional: boolean;
-            }>;
         }>;
         selectedMethodId: string | null;
     };
@@ -19843,9 +19837,6 @@ export type DeleteAcpAgentsByAgentIdAuthResponse = DeleteAcpAgentsByAgentIdAuthR
 export type PutAcpAgentsByAgentIdAuthData = {
     body: {
         methodId: string;
-        secretRefs?: {
-            [key: string]: unknown;
-        };
     };
     path: {
         agentId: string;
@@ -22946,16 +22937,10 @@ export type GetChatSessionsBySessionIdAuthRecoveryResponses = {
             id: string;
             name: string;
             description?: string;
-            kind: 'agent' | 'env_var' | 'terminal';
+            kind: 'agent' | 'terminal';
             status: 'supported' | 'unsupported';
             unavailableReason?: string;
             link?: string;
-            fields?: Array<{
-                name: string;
-                label?: string;
-                secret: boolean;
-                optional: boolean;
-            }>;
         }>;
         configurationTarget: {
             namespace: string;

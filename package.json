@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "packageManager": "pnpm@11.24.0",
   "engines": {
-    "node": "^22.18.0 || >=24.11.0"
+    "node": "^22.19.0 || >=24.11.0"
   },
   "description": "Cradle - AI agent management platform",
   "author": "example.com",
@@ -47,7 +47,7 @@
     "e2e:fabric": "node --import tsx node_modules/@playwright/test/cli.js test --config e2e/playwright.fabric.config.ts"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.2.1",
+    "@agentclientprotocol/sdk": "1.4.0",
     "@ai-sdk/openai": "^3.0.53",
     "@base-ui/react": "^1.7.0",
     "@cradle/cli": "link:packages/cli",
@@ -65,7 +65,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-devtools": "^0.10.12",
     "@tanstack/react-query": "^5.102.8",
-    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-table": "^9.2.4",
     "@tiptap/extension-code-block-lowlight": "^3.30.5",
     "@tiptap/extension-image": "^3.30.5",
     "@tiptap/extension-link": "^3.30.5",

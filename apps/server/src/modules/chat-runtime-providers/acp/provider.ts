@@ -82,7 +82,6 @@ export class AcpChatProvider implements ChatRuntime {
       await this.deps.runtime.connect(connectionKey, {
         ...record,
         authMethodId: null,
-        authSecretRefs: {},
       })
     }
     return this.deps.runtime.getAuthMethods(connectionKey)

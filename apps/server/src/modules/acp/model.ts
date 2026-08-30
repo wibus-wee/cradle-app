@@ -6,7 +6,6 @@ const authMethod = t.Object({
   description: t.Optional(t.String()),
   kind: t.Union([
     t.Literal('agent'),
-    t.Literal('env_var'),
     t.Literal('terminal'),
   ]),
   status: t.Union([
@@ -15,12 +14,6 @@ const authMethod = t.Object({
   ]),
   unavailableReason: t.Optional(t.String()),
   link: t.Optional(t.String()),
-  fields: t.Optional(t.Array(t.Object({
-    name: t.String(),
-    label: t.Optional(t.String()),
-    secret: t.Boolean(),
-    optional: t.Boolean(),
-  }))),
 })
 
 export const AcpModel = {
@@ -108,10 +101,6 @@ export const AcpModel = {
 
   authSelectionBody: t.Object({
     methodId: t.String({ minLength: 1 }),
-    secretRefs: t.Optional(t.Record(
-      t.String({ minLength: 1 }),
-      t.String({ minLength: 1 }),
-    )),
   }),
 
   authSelectionResult: t.Object({
