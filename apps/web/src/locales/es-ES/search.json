@@ -25,6 +25,8 @@
   "command.openUsage.label": "Estadísticas de uso",
   "command.reopenClosed.keywords": "reopen restore closed surface tab reabrir restaurar superficie cerrada",
   "command.reopenClosed.label": "Reabrir superficie cerrada",
+  "command.reviewWorkspaceChanges.keywords": "review workspace git diff changes working tree revisar espacio trabajo cambios árbol",
+  "command.reviewWorkspaceChanges.label": "Revisar cambios del workspace",
   "command.recent": "reciente",
   "command.toggleSidebar.keywords": "sidebar toggle barra lateral alternar",
   "command.toggleSidebar.label": "Alternar barra lateral",

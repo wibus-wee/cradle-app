@@ -58,3 +58,4 @@ Chronological index of independently shipped product improvements.
 19. [Open mobile pull requests in GitHub](./2026-08-31-19-mobile-open-pr-github.md)
 20. [Preserve failed mobile review drafts](./2026-08-31-20-mobile-review-draft-failures.md)
 21. [Surface mobile Work handoff failures](./2026-08-31-21-mobile-work-handoff-errors.md)
+22. [Review workspace changes from the command palette](./2026-08-31-22-review-workspace-command.md)

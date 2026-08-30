@@ -16,6 +16,8 @@ files, conversations, issues, and workspaces.
 - Workspace-aware surfaces expose a Copy workspace path command. It uses the
   workspace owner's canonical local or remote location label and reports
   clipboard success or failure through app toasts.
+- Eligible active workspaces expose a Review workspace changes command that
+  opens the existing Cradle Diffs surface without routing through the aside.
 - `global-search-dialog-view.tsx` receives the current mode, query,
   owner-typed `PaletteData`, and callbacks. It owns only dialog focus, keyboard
   cycling, empty-query Backspace recovery to All, and presentation.

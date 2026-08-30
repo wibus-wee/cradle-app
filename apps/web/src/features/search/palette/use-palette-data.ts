@@ -1,6 +1,7 @@
 import {
   Copy2Line as CopyIcon,
   DotCircleLine as CircleDotIcon,
+  GitCompareLine as GitCompareIcon,
   HistoryAnticlockwiseLine as HistoryIcon,
   Message1Line as MessageSquareIcon,
   Plugin2Line,
@@ -25,7 +26,7 @@ import {
 import { useLayoutSlotsCtx } from '~/components/layout/use-layout-slots'
 import { toastManager } from '~/components/ui/toast'
 import { useThreadSearch } from '~/features/search/use-thread-search'
-import { getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { getWorkspaceLocationLabel, isWorkEligibleWorkspace } from '~/features/workspace/types'
 import { useWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { platform } from '~/lib/electron'
 import { rankFuzzyItems } from '~/lib/fuzzy-rank'
@@ -37,6 +38,7 @@ import {
   openNewWork,
   openSettingsSection,
   openUsage,
+  openWorkspaceDiffs,
   reopenLastClosedSurface,
 } from '~/navigation/navigation-commands'
 import { chatSessionIdForSurface, workspaceIdForSurface } from '~/navigation/surface-identity'
@@ -204,6 +206,20 @@ function useCommands(close: () => void, workspaceId: string | null): CommandActi
                   title: t('command.copyWorkspacePath.error'),
                 })
               }
+            },
+          }]
+        : []),
+      ...(workspace && isWorkEligibleWorkspace(workspace)
+        ? [{
+            id: 'review-workspace-changes',
+            label: t('command.reviewWorkspaceChanges.label'),
+            description: workspace.name,
+            keywords: t('command.reviewWorkspaceChanges.keywords'),
+            icon: GitCompareIcon,
+            source: 'app' as const,
+            handler: () => {
+              close()
+              openWorkspaceDiffs({ workspaceId: workspace.id })
             },
           }]
         : []),

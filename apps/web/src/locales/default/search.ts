@@ -25,6 +25,8 @@ export default {
   'command.openUsage.label': 'Usage statistics',
   'command.reopenClosed.keywords': 'reopen restore closed surface tab',
   'command.reopenClosed.label': 'Reopen closed surface',
+  'command.reviewWorkspaceChanges.keywords': 'review workspace git diff changes working tree',
+  'command.reviewWorkspaceChanges.label': 'Review workspace changes',
   'command.usage.label': 'Usage',
   'command.recent': 'recent',
   'command.toggleSidebar.keywords': 'sidebar toggle',
