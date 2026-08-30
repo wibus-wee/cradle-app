@@ -27,3 +27,4 @@ Chronological index of independently shipped product improvements.
 21. [Clear global search in place](./2026-08-29-21-clear-global-search.md)
 22. [Quick-focus Kanban search](./2026-08-29-22-kanban-search-shortcut.md)
 23. [Clear review file filters](./2026-08-29-23-clear-review-file-filter.md)
+24. [Confirm model mapping deletion](./2026-08-29-24-confirm-model-mapping-delete.md)

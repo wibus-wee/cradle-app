@@ -849,6 +849,8 @@
   "registry.action.save": "Save",
   "registry.action.saveAlias": "Save alias",
   "registry.action.saveManual": "Save manual",
+  "registry.delete.description": "Delete the mapping for {{modelId}}? Agents will fall back to automatic model matching.",
+  "registry.delete.title": "Delete model mapping?",
   "registry.add.description": "Map a provider model ID to a models.dev model ID, or attach a manual registry entry when models.dev has no match.",
   "registry.add.label": "Add mapping",
   "registry.add.tabAlias": "Alias",

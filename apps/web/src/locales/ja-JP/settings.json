@@ -699,6 +699,8 @@
   "registry.action.save": "保存",
   "registry.action.saveAlias": "alias を保存",
   "registry.action.saveManual": "manual を保存",
+  "registry.delete.description": "{{modelId}} のマッピングを削除しますか？エージェントは自動モデル照合に戻ります。",
+  "registry.delete.title": "モデルマッピングを削除しますか？",
   "registry.add.description": "provider model ID を models.dev model ID へマップします。models.dev に一致がない場合は manual registry entry も追加できます。",
   "registry.add.label": "マッピングを追加",
   "registry.add.tabAlias": "Alias",

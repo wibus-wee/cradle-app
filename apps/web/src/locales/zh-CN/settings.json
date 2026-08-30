@@ -844,6 +844,8 @@
   "registry.action.save": "保存",
   "registry.action.saveAlias": "保存 alias",
   "registry.action.saveManual": "保存 manual",
+  "registry.delete.description": "删除 {{modelId}} 的映射？代理将回退到自动模型匹配。",
+  "registry.delete.title": "删除模型映射？",
   "registry.add.description": "将 provider model ID 映射到 models.dev model ID；如果 models.dev 没有匹配项，也可以附加手动 registry entry。",
   "registry.add.label": "添加映射",
   "registry.add.tabAlias": "Alias",

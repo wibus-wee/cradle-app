@@ -699,6 +699,8 @@
   "registry.action.save": "Guardar",
   "registry.action.saveAlias": "Guardar alias",
   "registry.action.saveManual": "Guardar manual",
+  "registry.delete.description": "¿Eliminar el mapeo de {{modelId}}? Los agentes volverán al mapeo automático de modelos.",
+  "registry.delete.title": "¿Eliminar el mapeo de modelo?",
   "registry.add.description": "Mapea un ID de modelo del proveedor a un ID de models.dev, o adjunta una entrada manual cuando models.dev no tenga coincidencia.",
   "registry.add.label": "Añadir mapeo",
   "registry.add.tabAlias": "Alias",
