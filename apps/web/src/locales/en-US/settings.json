@@ -781,6 +781,7 @@
   "plugins.error": "Failed to load plugins. Make sure the Cradle server is reachable and try again.",
   "plugins.filter.all": "All",
   "plugins.filter.disabled": "Off",
+  "plugins.filter.clear": "Clear filters",
   "plugins.filter.enabled": "On",
   "plugins.marketplace.author": "Author",
   "plugins.marketplace.bundled": "Built-in",

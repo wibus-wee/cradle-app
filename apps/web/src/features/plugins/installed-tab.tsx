@@ -6,7 +6,7 @@
  * external goes through TrustConsentDialog; uninstalling a source that fans out
  * to >1 plugin asks for confirmation. No footer telemetry strip.
  */
-import { DeleteLine as TrashIcon, PuzzledLine as PuzzleIcon, Refresh2Line as RefreshIcon, SearchLine as SearchIcon, WarningLine as WarningIcon } from '@mingcute/react'
+import { CloseLine as XIcon, DeleteLine as TrashIcon, PuzzledLine as PuzzleIcon, Refresh2Line as RefreshIcon, SearchLine as SearchIcon, WarningLine as WarningIcon } from '@mingcute/react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -249,8 +249,18 @@ export function InstalledTab({ onBrowseMarketplace, onImportSource }: { onBrowse
             value={query}
             onChange={event => setQuery(event.target.value)}
             placeholder={t('plugins.search.placeholder')}
-            className="h-8 w-full rounded-md border border-border/60 bg-card pl-8 pr-3 text-[12.5px] text-foreground outline-none transition focus:border-foreground/30 placeholder:text-muted-foreground/70"
+            className="h-8 w-full rounded-md border border-border/60 bg-card pl-8 pr-8 text-[12.5px] text-foreground outline-none transition focus:border-foreground/30 placeholder:text-muted-foreground/70"
           />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label={t('plugins.filter.clear')}
+              className="absolute right-2 top-1/2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-fill hover:text-foreground"
+            >
+              <XIcon className="size-3" aria-hidden="true" />
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-px rounded-md border border-border/60 bg-card p-0.5">
           {(['all', 'enabled', 'disabled'] as const).map(value => (
@@ -311,7 +321,14 @@ export function InstalledTab({ onBrowseMarketplace, onImportSource }: { onBrowse
                 )
               : visiblePlugins.length === 0
                 ? (
-                    <EmptyState title={t('plugins.empty.noMatches')} description={t('plugins.empty.noMatchesHint')} />
+                  <EmptyState
+                    title={t('plugins.empty.noMatches')}
+                    description={t('plugins.empty.noMatchesHint')}
+                    onReset={() => {
+                      setQuery('')
+                      setFilter('all')
+                    }}
+                  />
                   )
                 : (
                     <ul className="flex flex-col gap-2">
@@ -525,15 +542,32 @@ function PluginAvatar({ iconUrl, name }: { iconUrl: string | null, name: string 
   )
 }
 
-function EmptyState({ title, description, onBrowseMarketplace, onImportSource }: { title: string, description: string, onBrowseMarketplace?: () => void, onImportSource?: () => void }) {
+function EmptyState({
+  title,
+  description,
+  onBrowseMarketplace,
+  onImportSource,
+  onReset,
+}: {
+  title: string
+  description: string
+  onBrowseMarketplace?: () => void
+  onImportSource?: () => void
+  onReset?: () => void
+}) {
   const { t } = useTranslation('settings')
   return (
     <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-foreground/10 bg-muted/20 px-6 py-12 text-center">
       <PuzzleIcon className="size-5 text-muted-foreground/60" aria-hidden="true" />
       <h3 className="text-[13px] font-medium text-foreground">{title}</h3>
       <p className="max-w-sm text-[12px] leading-relaxed text-muted-foreground">{description}</p>
-      {(onBrowseMarketplace || onImportSource) && (
+      {(onBrowseMarketplace || onImportSource || onReset) && (
         <div className="mt-2 flex items-center gap-2">
+          {onReset && (
+            <Button variant="outline" size="sm" onClick={onReset}>
+              {t('plugins.filter.clear')}
+            </Button>
+          )}
           {onBrowseMarketplace && (
             <Button variant="outline" size="sm" onClick={onBrowseMarketplace}>
               {t('plugins.empty.browseMarketplace')}

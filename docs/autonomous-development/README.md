@@ -29,3 +29,4 @@ Chronological index of independently shipped product improvements.
 23. [Clear review file filters](./2026-08-29-23-clear-review-file-filter.md)
 24. [Confirm model mapping deletion](./2026-08-29-24-confirm-model-mapping-delete.md)
 25. [Retry unavailable Awaits](./2026-08-29-25-retry-awaits.md)
+26. [Recover from empty plugin filters](./2026-08-29-26-clear-plugin-filters.md)

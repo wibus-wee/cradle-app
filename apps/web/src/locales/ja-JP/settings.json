@@ -678,6 +678,7 @@
   "plugins.error": "プラグインを読み込めませんでした。Cradleサーバーに接続できることを確認して再試行してください。",
   "plugins.filter.all": "すべて",
   "plugins.filter.disabled": "オフ",
+  "plugins.filter.clear": "フィルターを解除",
   "plugins.filter.enabled": "オン",
   "plugins.noDescription": "説明はありません。",
   "plugins.page.description": "Cradle拡張プラグインのオン / オフを切り替えます。オフにすると、そのプラグインのプライベートルート、パネル、コマンドが取り除かれ、再度オンにすると復元されます。",

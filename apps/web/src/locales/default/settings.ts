@@ -749,6 +749,7 @@ export default {
   'plugins.filter.all': 'All',
   'plugins.filter.enabled': 'On',
   'plugins.filter.disabled': 'Off',
+  'plugins.filter.clear': 'Clear filters',
   'plugins.action.refresh': 'Refresh',
   'plugins.activation.failed': 'Activation failed',
   'plugins.toggleAria': 'Toggle {{name}}',

@@ -774,6 +774,7 @@
   "plugins.error": "加载插件失败。请确认 Cradle 后端可访问后再试。",
   "plugins.filter.all": "全部",
   "plugins.filter.disabled": "已关闭",
+  "plugins.filter.clear": "清除筛选",
   "plugins.filter.enabled": "已开启",
   "plugins.marketplace.author": "作者",
   "plugins.marketplace.bundled": "内置",

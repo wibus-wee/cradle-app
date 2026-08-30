@@ -678,6 +678,7 @@
   "plugins.error": "No se pudieron cargar los plugins. Verifica que el servidor Cradle sea alcanzable e inténtalo de nuevo.",
   "plugins.filter.all": "Todos",
   "plugins.filter.disabled": "Inactivos",
+  "plugins.filter.clear": "Limpiar filtros",
   "plugins.filter.enabled": "Activos",
   "plugins.noDescription": "Sin descripción.",
   "plugins.page.description": "Activa o desactiva extensiones de Cradle. Al desactivar un plugin se eliminan sus rutas privadas, paneles y comandos hasta que lo vuelvas a encender.",
