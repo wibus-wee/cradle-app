@@ -38,11 +38,14 @@ export function SessionNotesView({
           className={cn('ml-auto text-[10px]', statusColor[status])}
           role="status"
           aria-live="polite"
+          data-testid="session-notes-status"
+          data-status={status}
         >
           {statusLabels[status]}
         </span>
       </div>
       <textarea
+        data-testid="session-notes-editor"
         value={value}
         onChange={event => onChange(event.target.value)}
         placeholder={placeholder}

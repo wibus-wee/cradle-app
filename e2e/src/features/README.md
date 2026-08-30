@@ -4,7 +4,7 @@
 
 This directory owns the executable user-journey inventory. The broader module and state-combination audit lives in [`../../COVERAGE.md`](../../COVERAGE.md). Retired scenarios live in `e2e/_archive/features/` and are not part of the active suite.
 
-The active suite contains 62 scenarios: 20 `@P0` smoke journeys and 42 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, and one stable `@CRADLE-*` ID.
+The active suite contains 63 scenarios: 20 `@P0` smoke journeys and 43 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, and one stable `@CRADLE-*` ID.
 
 | Feature | Stable IDs | Journey boundary |
 | --- | --- | --- |
@@ -23,11 +23,12 @@ The active suite contains 62 scenarios: 20 `@P0` smoke journeys and 42 `@P1` dee
 | `issue-agent.feature` | `CRADLE-ISSUE-AGENT-001`–`004` | Delegation completion/rerun, active-run cancellation, isolated Work, and retained cancellation audit state |
 | `provider.feature` | `CRADLE-PROVIDER-001`–`003` | Anthropic profile create, use, disable, and delete, including active-run cancellation and queued continuation removal |
 | `search.feature` | `CRADLE-SEARCH-001`, `003` | Session result navigation and command execution |
+| `session-environment.feature` | `CRADLE-ENV-001` | Session notes autosave ordering, continued typing, and reload persistence |
 | `settings.feature` | `CRADLE-SETTINGS-001` | Theme mutation and reload persistence |
 | `stream-vocabulary.feature` | `CRADLE-CHAT-011`–`013` | Stream wire vocabulary: parallel tool_use blocks, chunked tool input, redacted thinking + ping, mid-stream disconnect |
 | `tabs.feature` | `CRADLE-TAB-001` | Two live chats switch, reload, and close without content bleed |
 | `terminal.feature` | `CRADLE-PTY-001`, `002` | Workspace PTY and multi-session input routing |
-| `usage.feature` | `CRADLE-USAGE-001` | Exact usage aggregation after a real Agent run |
+| `usage.feature` | `CRADLE-USAGE-001` | Exact usage aggregation, remembered range, CSV export, and reload after a real Agent run |
 | `work.feature` | `CRADLE-WORK-001`–`003`, `CRADLE-WS-004`–`005` | Isolated Work, managed worktree, provider failure/stop recovery, real file mutation, persisted primary thread, and destructive Workspace cleanup |
 | `workspace-kanban.feature` | `CRADLE-WS-001`–`003`, `CRADLE-KANBAN-001`–`003`, `CRADLE-CHAT-008` | Workspace directory flow, overview, lifecycle, board, issue, and search |
 

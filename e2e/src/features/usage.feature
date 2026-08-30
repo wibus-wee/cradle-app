@@ -17,6 +17,11 @@
     而且 聊天流应结束于空闲状态
     当 我打开 Usage
     那么 Usage 应显示精确的 4 tokens 与 1 turn
+    当 我将 Usage 时间范围切换为"90d"
+    那么 Usage 时间范围"90d"应被选中
+    当 我导出 Usage CSV
+    那么 Usage CSV 应包含精确的 4 tokens 与 1 turn
     当 我重新加载当前页面
     那么 Usage 应显示精确的 4 tokens 与 1 turn
+    而且 Usage 时间范围"90d"应被选中
     而且 Simulator 脚本化交换应全部耗尽

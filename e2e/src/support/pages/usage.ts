@@ -3,6 +3,8 @@ import { expect } from '@playwright/test'
 
 const TIMEOUT = 30_000
 
+export type UsageRangeKey = '7d' | '30d' | '90d' | '1y'
+
 export class UsagePage {
   constructor(private readonly page: Page) {}
 
@@ -22,5 +24,35 @@ export class UsagePage {
       .toHaveText(String(tokens), { timeout: TIMEOUT })
     await expect(this.page.locator('[data-testid="usage-hero-turns"]'))
       .toContainText(String(turns), { timeout: TIMEOUT })
+  }
+
+  async selectRange(range: UsageRangeKey): Promise<void> {
+    const control = this.page.locator(`[data-testid="usage-range-${range}"]`)
+    await expect(control).toBeVisible({ timeout: TIMEOUT })
+    await control.click()
+    await this.expectRange(range)
+  }
+
+  async expectRange(range: UsageRangeKey): Promise<void> {
+    await expect(this.page.locator(`[data-testid="usage-range-${range}"]`))
+      .toHaveAttribute('data-state', 'on', { timeout: TIMEOUT })
+  }
+
+  async exportCsv(): Promise<{ fileName: string, content: string }> {
+    const downloadPromise = this.page.waitForEvent('download')
+    await this.page.locator('[data-testid="usage-export-csv"]').click()
+    const download = await downloadPromise
+    const stream = await download.createReadStream()
+    if (!stream) {
+      throw new Error('Usage CSV download did not expose a readable stream')
+    }
+    const chunks: Buffer[] = []
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+    }
+    return {
+      fileName: download.suggestedFilename(),
+      content: Buffer.concat(chunks).toString('utf8'),
+    }
   }
 }

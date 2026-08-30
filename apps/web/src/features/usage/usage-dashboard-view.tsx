@@ -121,7 +121,14 @@ export function UsageDashboardView({
               >
                 <RefreshIcon className={cn('size-3.5', refreshing && 'animate-spin')} aria-hidden />
               </Button>
-              <Button type="button" variant="outline" size="sm" onClick={onExport} className="h-7 gap-1.5 px-2.5 text-xs">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onExport}
+                className="h-7 gap-1.5 px-2.5 text-xs"
+                data-testid="usage-export-csv"
+              >
                 <DownloadIcon className="size-3.5" aria-hidden />
                 {t('action.exportCsv')}
               </Button>
@@ -136,7 +143,12 @@ export function UsageDashboardView({
                 className="h-7 shrink-0 gap-px rounded-md"
               >
                 {USAGE_RANGE_OPTIONS.map(option => (
-                  <ToggleGroupItem key={option.key} value={option.key} className="h-7 px-2.5 text-xs tabular-nums">
+                  <ToggleGroupItem
+                    key={option.key}
+                    value={option.key}
+                    className="h-7 px-2.5 text-xs tabular-nums"
+                    data-testid={`usage-range-${option.key}`}
+                  >
                     {option.label}
                   </ToggleGroupItem>
                 ))}
