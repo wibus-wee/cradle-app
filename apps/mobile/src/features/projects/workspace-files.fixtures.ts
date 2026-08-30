@@ -9,4 +9,6 @@ export const workspaceFilesFixture: WorkspaceFilesViewProps = {
   onBack: () => {},
   onOpenDirectory: () => {},
   onOpenFile: () => {},
+  onSearchChange: () => {},
+  search: '',
 }

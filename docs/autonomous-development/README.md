@@ -43,3 +43,4 @@ Chronological index of independently shipped product improvements.
 4. [Search the Mobile pull request inbox](./2026-08-31-04-search-mobile-pull-requests.md)
 5. [Copy the Mobile server address](./2026-08-31-05-copy-mobile-server-address.md)
 6. [Browse workspace files on Mobile](./2026-08-31-06-mobile-workspace-file-browser.md)
+7. [Search workspace files on Mobile](./2026-08-31-07-mobile-workspace-file-search.md)

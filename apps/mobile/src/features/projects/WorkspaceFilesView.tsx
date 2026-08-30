@@ -1,11 +1,12 @@
-import { ArrowLeft, ChevronRight, FileText, Folder } from 'lucide-react-native'
-import { FlatList, StyleSheet, Text } from 'react-native'
+import { ArrowLeft, ChevronRight, FileText, Folder, Search } from 'lucide-react-native'
+import { FlatList, StyleSheet, Text, View } from 'react-native'
 
 import type {
   GetWorkspacesByWorkspaceIdFilesChildrenResponse,
   GetWorkspacesByWorkspaceIdFilesInfoResponse,
 } from '@/api-gen'
 import { IconButton } from '@/components/ui/icon-button'
+import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { EmptyState } from '@/components/ui/states'
@@ -27,6 +28,8 @@ export interface WorkspaceFilesViewProps {
   onOpenDirectory: (path: string) => void
   onOpenFile: (path: string) => void
   onRefresh?: () => void
+  onSearchChange: (query: string) => void
+  search: string
 }
 
 function pathName(path: string): string {
@@ -48,6 +51,8 @@ export function WorkspaceFilesView({
   onOpenDirectory,
   onOpenFile,
   onRefresh,
+  onSearchChange,
+  search,
 }: WorkspaceFilesViewProps) {
   const theme = useTheme()
   const backAction = (
@@ -100,11 +105,30 @@ export function WorkspaceFilesView({
       subtitle={currentPath || 'Workspace root'}
       title={pathName(currentPath)}
     >
+      <View style={styles.search}>
+        <InputGroup
+          addon={<Search color={theme.mutedForeground} size={17} />}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          onChangeText={onSearchChange}
+          placeholder="Search workspace files"
+          returnKeyType="search"
+          value={search}
+        />
+      </View>
       <FlatList<FileEntry>
         contentContainerStyle={entries.length === 0 ? styles.emptyList : undefined}
         data={entries}
         keyExtractor={entry => entry.path}
-        ListEmptyComponent={<EmptyState description="This directory has no files." title="Empty directory" />}
+        ListEmptyComponent={(
+          <EmptyState
+            description={search
+              ? 'Try a different file or directory name.'
+              : 'This directory has no files.'}
+            title={search ? 'No matching files' : 'Empty directory'}
+          />
+        )}
         onRefresh={onRefresh}
         refreshing={isRefreshing}
         renderItem={({ item: entry }) => (
@@ -115,6 +139,8 @@ export function WorkspaceFilesView({
             media={entry.type === 'directory'
               ? <Folder color={theme.workspace} size={18} />
               : <FileText color={theme.tertiaryForeground} size={18} />}
+            description={search ? entry.path : undefined}
+            monospaceDescription={Boolean(search)}
             onPress={() => entry.type === 'directory'
               ? onOpenDirectory(entry.path)
               : onOpenFile(entry.path)}
@@ -140,5 +166,8 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
+  },
+  search: {
+    marginBottom: spacing.md,
   },
 })

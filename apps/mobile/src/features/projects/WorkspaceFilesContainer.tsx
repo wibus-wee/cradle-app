@@ -6,6 +6,7 @@ import type {
   GetWorkspacesByWorkspaceIdFilesChildrenResponse,
   GetWorkspacesByWorkspaceIdFilesContentResponse,
   GetWorkspacesByWorkspaceIdFilesInfoResponse,
+  GetWorkspacesByWorkspaceIdFilesSearchResponse,
 } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
@@ -39,13 +40,25 @@ export function WorkspaceFilesContainer({
     () => initialFile ? parentPath(initialFile) : initialPath,
   )
   const [selectedFile, setSelectedFile] = useState<string | null>(initialFile ?? null)
+  const [search, setSearch] = useState('')
+  const normalizedSearch = search.trim()
   const directoryQuery = useQuery({
-    enabled: Boolean(connection) && isRouteActive && !selectedFile,
+    enabled: Boolean(connection) && isRouteActive && !selectedFile && !normalizedSearch,
     queryKey: ['workspace-files', connection?.url, workspaceId, currentPath],
     queryFn: ({ signal }) =>
       cradleRequest<GetWorkspacesByWorkspaceIdFilesChildrenResponse>(
         connection!,
         `/workspaces/${encodeURIComponent(workspaceId)}/files/children?path=${encodeURIComponent(currentPath)}`,
+        { signal },
+      ),
+  })
+  const searchQuery = useQuery({
+    enabled: Boolean(connection) && isRouteActive && !selectedFile && Boolean(normalizedSearch),
+    queryKey: ['workspace-file-search', connection?.url, workspaceId, normalizedSearch],
+    queryFn: ({ signal }) =>
+      cradleRequest<GetWorkspacesByWorkspaceIdFilesSearchResponse>(
+        connection!,
+        `/workspaces/${encodeURIComponent(workspaceId)}/files/search?q=${encodeURIComponent(normalizedSearch)}&limit=100`,
         { signal },
       ),
   })
@@ -78,6 +91,10 @@ export function WorkspaceFilesContainer({
   const goBack = () => {
     if (selectedFile) {
       setSelectedFile(null)
+      return
+    }
+    if (normalizedSearch) {
+      setSearch('')
       return
     }
     if (currentPath) {
@@ -118,17 +135,23 @@ export function WorkspaceFilesContainer({
           onBack={goBack}
           onOpenDirectory={setCurrentPath}
           onOpenFile={setSelectedFile}
+          onSearchChange={setSearch}
+          search={search}
         />
       </>
     )
   }
 
-  if (directoryQuery.isPending) {
+  const activeEntriesQuery = normalizedSearch ? searchQuery : directoryQuery
+  if (activeEntriesQuery.isPending) {
     return <LoadingState />
   }
-  if (directoryQuery.error) {
+  if (activeEntriesQuery.error) {
     return (
-      <ErrorState title="Could not browse files" description={errorMessage(directoryQuery.error)} />
+      <ErrorState
+        title={normalizedSearch ? 'Could not search files' : 'Could not browse files'}
+        description={errorMessage(activeEntriesQuery.error)}
+      />
     )
   }
   return (
@@ -136,12 +159,17 @@ export function WorkspaceFilesContainer({
       <Stack.Screen options={{ title: currentPath || 'Files' }} />
       <WorkspaceFilesView
         currentPath={currentPath}
-        entries={directoryQuery.data}
-        isRefreshing={directoryQuery.isRefetching}
+        entries={activeEntriesQuery.data}
+        isRefreshing={activeEntriesQuery.isRefetching}
         onBack={goBack}
-        onOpenDirectory={setCurrentPath}
+        onOpenDirectory={(path) => {
+          setSearch('')
+          setCurrentPath(path)
+        }}
         onOpenFile={setSelectedFile}
-        onRefresh={() => void directoryQuery.refetch()}
+        onRefresh={() => void activeEntriesQuery.refetch()}
+        onSearchChange={setSearch}
+        search={search}
       />
     </>
   )
