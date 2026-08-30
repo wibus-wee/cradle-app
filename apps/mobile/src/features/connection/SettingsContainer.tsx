@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import * as Clipboard from 'expo-clipboard'
 import Constants from 'expo-constants'
 import { Redirect, router } from 'expo-router'
 
@@ -34,6 +35,9 @@ export function SettingsContainer() {
           : 'connected'}
       hasServerToken={Boolean(connection.token)}
       onCheckConnection={() => void healthQuery.refetch()}
+      onCopyServer={async () => {
+        await Clipboard.setStringAsync(connection.url)
+      }}
       onDisconnect={() => {
         queryClient.clear()
         void disconnect().then(() => router.replace('/'))

@@ -6,6 +6,7 @@ export const settingsFixture: SettingsViewProps = {
   connectionStatus: 'connected',
   hasServerToken: true,
   onCheckConnection: () => {},
+  onCopyServer: async () => {},
   onDisconnect: () => {},
   onEditServer: () => {},
   onEditToken: () => {},

@@ -1,6 +1,7 @@
 import {
   ChartNoAxesColumn,
   ChevronRight,
+  Copy,
   Link2,
   LockKeyhole,
   LogOut,
@@ -25,6 +26,7 @@ export interface SettingsViewProps {
   connectionStatus: 'checking' | 'connected' | 'unavailable'
   hasServerToken: boolean
   onCheckConnection: () => void
+  onCopyServer: () => Promise<void>
   onDisconnect: () => void
   onEditServer: () => void
   onEditToken: () => void
@@ -38,6 +40,7 @@ export function SettingsView({
   connectionStatus,
   hasServerToken,
   onCheckConnection,
+  onCopyServer,
   onDisconnect,
   onEditServer,
   onEditToken,
@@ -52,6 +55,15 @@ export function SettingsView({
       { onPress: onDisconnect, style: 'destructive', text: 'Disconnect' },
     ])
   }
+  const copyServer = async () => {
+    try {
+      await onCopyServer()
+      Alert.alert('Server address copied')
+    }
+    catch {
+      Alert.alert('Could not copy server address')
+    }
+  }
   const disclosure = <ChevronRight color={theme.dimForeground} size={18} />
 
   return (
@@ -64,7 +76,17 @@ export function SettingsView({
         <View style={styles.section}>
           <SectionHeading title="Activity" />
           <Item
-            actions={disclosure}
+            actions={(
+              <View style={styles.serverActions}>
+                <IconButton
+                  accessibilityLabel="Copy server address"
+                  icon={Copy}
+                  onPress={() => void copyServer()}
+                  stopPropagation
+                />
+                {disclosure}
+              </View>
+            )}
             media={<ChartNoAxesColumn color={theme.tertiaryForeground} size={19} />}
             onPress={onOpenUsage}
             title="Usage"
@@ -147,6 +169,11 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: spacing.lg,
+  },
+  serverActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   version: {
     fontFamily: 'GeistMono_400Regular',

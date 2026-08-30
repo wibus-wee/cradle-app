@@ -41,3 +41,4 @@ Chronological index of independently shipped product improvements.
 2. [Focus Mobile Work by activity](./2026-08-31-02-filter-mobile-work-activity.md)
 3. [Show live server health on Mobile](./2026-08-31-03-mobile-connection-health.md)
 4. [Search the Mobile pull request inbox](./2026-08-31-04-search-mobile-pull-requests.md)
+5. [Copy the Mobile server address](./2026-08-31-05-copy-mobile-server-address.md)
