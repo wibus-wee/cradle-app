@@ -30,9 +30,11 @@ Creating a projection:
 
 Mounted Workspace reconciliation reads both active and archived Session pages
 from the authoritative Node. It creates missing projections, updates remote
-metadata, and removes local projections whose authority no longer exists. A
-failed page read aborts before removal, so a disconnected Node cannot be
-mistaken for an empty Workspace.
+metadata and user/assistant activity clocks, and removes local projections
+whose authority no longer exists. The cached remote user clock is used by the
+controller's Session pagination and sidebar ordering; messages themselves stay
+on the Node. A failed page read aborts before removal, so a disconnected Node
+cannot be mistaken for an empty Workspace.
 
 `node_session_links.projectionKind` preserves deletion ownership:
 

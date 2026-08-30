@@ -67,6 +67,7 @@ describe('fetch-backed SSE adapter', () => {
 
   it('aborts and does not reconnect after close', async () => {
     let pullCount = 0
+    const cancel = vi.fn()
     const fetchMock = vi.fn(async () => {
       pullCount += 1
       // Keep the body open so close() aborts mid-stream (no natural end reconnect race).
@@ -74,6 +75,7 @@ describe('fetch-backed SSE adapter', () => {
         start() {
           // never enqueues; aborted by signal
         },
+        cancel,
       }), {
         status: 200,
         headers: { 'content-type': 'text/event-stream' },
@@ -89,5 +91,31 @@ describe('fetch-backed SSE adapter', () => {
     source.close()
     await new Promise(resolve => setTimeout(resolve, 40))
     expect(pullCount).toBe(1)
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
+  it('cancels and releases the reader after natural EOF', async () => {
+    const response = sseResponse(['data: done\n\n'])
+    const body = response.body!
+    const originalGetReader = body.getReader.bind(body)
+    let cancel: ReturnType<typeof vi.spyOn> | null = null
+    let releaseLock: ReturnType<typeof vi.spyOn> | null = null
+    vi.spyOn(body, 'getReader').mockImplementation(() => {
+      const reader = originalGetReader()
+      cancel = vi.spyOn(reader, 'cancel')
+      releaseLock = vi.spyOn(reader, 'releaseLock')
+      return reader
+    })
+    const source = openServerEventSource('http://server.test/events', {
+      fetch: async () => response,
+      shouldReconnect: () => false,
+    })
+
+    await vi.waitFor(() => expect(source.readyState).toBe(2))
+
+    expect(cancel).not.toBeNull()
+    expect(cancel!).toHaveBeenCalledOnce()
+    expect(releaseLock).not.toBeNull()
+    expect(releaseLock!).toHaveBeenCalledOnce()
   })
 })

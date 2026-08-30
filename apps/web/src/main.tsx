@@ -9,6 +9,7 @@ import { AppErrorBoundary } from './components/common/app-error-boundary'
 import { resolveInitialLocale } from './i18n/browser-locale'
 import { I18nProvider } from './i18n/client'
 import { queryClient } from './lib/query-client'
+import { createBootstrapDisposerRegistry } from './lib/bootstrap-disposer'
 import { waitForServer } from './lib/server-readiness'
 
 // Expose shared React modules for plugin runtime
@@ -32,6 +33,13 @@ const applicationPromise: Promise<React.ComponentType> = isDevtoolWindow
   : import('./app').then(module => module.App)
 const stylesheetPromise = import('./styles.css')
 const root = ReactDOMClient.createRoot(document.getElementById('app')!)
+const postRenderDisposers = createBootstrapDisposerRegistry()
+const disposeRendererDocument = (): void => postRenderDisposers.dispose()
+window.addEventListener('pagehide', disposeRendererDocument)
+import.meta.hot?.dispose(() => {
+  window.removeEventListener('pagehide', disposeRendererDocument)
+  disposeRendererDocument()
+})
 
 function renderBootstrapFallback(error: unknown): void {
   const message = document.querySelector<HTMLElement>('[data-bootstrap-message]')
@@ -95,7 +103,7 @@ async function startApp(): Promise<void> {
         pluginHost.startPluginLifecycleWatcher(() => {
           void queryClient.invalidateQueries({ queryKey: ['plugins'] })
         })
-        await pluginHost.startPluginDevSessionWatcher()
+        postRenderDisposers.add(await pluginHost.startPluginDevSessionWatcher())
       })
       .catch((error) => {
         console.error('[bootstrap] post-render startup failed:', error)

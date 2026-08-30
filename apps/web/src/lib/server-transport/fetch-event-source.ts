@@ -82,13 +82,26 @@ class FetchEventSource implements ServerEventSource {
   private attempt = 0
   private closed = false
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private connectionGeneration = 0
+  private currentReader: ReadableStreamDefaultReader<Uint8Array> | null = null
+  private readonly readerCleanup = new WeakMap<
+    ReadableStreamDefaultReader<Uint8Array>,
+    Promise<void>
+  >()
+
+  private readonly handleExternalAbort = (): void => this.close()
 
   constructor(input: RequestInfo | URL, options: OpenServerEventSourceOptions) {
     this.initialInput = input
     this.options = options
     this.urlValue = resolveInputUrl(input)
     this.retryDelayMs = options.reconnectDelayMs ?? DEFAULT_RECONNECT_DELAY_MS
-    options.signal?.addEventListener('abort', () => this.close(), { once: true })
+    if (options.signal?.aborted) {
+      this.close()
+    }
+    else {
+      options.signal?.addEventListener('abort', this.handleExternalAbort, { once: true })
+    }
     void this.connect()
   }
 
@@ -121,12 +134,17 @@ class FetchEventSource implements ServerEventSource {
       return
     }
     this.closed = true
+    this.connectionGeneration += 1
     this.readyStateValue = CLOSED
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null
     }
     this.abortController.abort()
+    this.options.signal?.removeEventListener('abort', this.handleExternalAbort)
+    if (this.currentReader) {
+      void this.cleanupReader(this.currentReader)
+    }
   }
 
   private async connect(): Promise<void> {
@@ -134,6 +152,7 @@ class FetchEventSource implements ServerEventSource {
       return
     }
 
+    const connectionGeneration = ++this.connectionGeneration
     this.readyStateValue = CONNECTING
     const fetchImpl = this.options.fetch ?? cradleFetch
     const requestInput = this.options.buildRequest?.({
@@ -148,13 +167,15 @@ class FetchEventSource implements ServerEventSource {
       headers.set('last-event-id', this.lastEventId)
     }
 
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
     try {
       const response = await fetchImpl(requestInput, {
         headers,
         signal: this.abortController.signal,
         cache: 'no-store',
       })
-      if (this.closed) {
+      if (this.closed || connectionGeneration !== this.connectionGeneration) {
+        await response.body?.cancel().catch(() => {})
         return
       }
       if (!response.ok) {
@@ -176,9 +197,10 @@ class FetchEventSource implements ServerEventSource {
         },
       })
 
-      const reader = response.body.getReader()
+      reader = response.body.getReader()
+      this.currentReader = reader
       const decoder = new TextDecoder()
-      while (!this.closed) {
+      while (!this.closed && connectionGeneration === this.connectionGeneration) {
         const { done, value } = await reader.read()
         if (done) {
           break
@@ -186,15 +208,24 @@ class FetchEventSource implements ServerEventSource {
         parser.feed(decoder.decode(value, { stream: true }))
       }
       parser.reset({ consume: true })
-      if (!this.closed) {
+      if (!this.closed && connectionGeneration === this.connectionGeneration) {
         this.scheduleReconnect(new Error('SSE stream ended'))
       }
     }
     catch (error) {
-      if (this.closed || this.abortController.signal.aborted) {
+      if (
+        this.closed
+        || this.abortController.signal.aborted
+        || connectionGeneration !== this.connectionGeneration
+      ) {
         return
       }
       this.scheduleReconnect(error)
+    }
+    finally {
+      if (reader) {
+        await this.cleanupReader(reader)
+      }
     }
   }
 
@@ -248,6 +279,34 @@ class FetchEventSource implements ServerEventSource {
     for (const listener of set) {
       listener(event)
     }
+  }
+
+  private cleanupReader(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+    const existing = this.readerCleanup.get(reader)
+    if (existing) {
+      return existing
+    }
+    if (this.currentReader === reader) {
+      this.currentReader = null
+    }
+    const cleanup = (async () => {
+      try {
+        await reader.cancel()
+      }
+      catch {
+        // Cancellation is best effort; releasing the lock is still required.
+      }
+      finally {
+        try {
+          reader.releaseLock()
+        }
+        catch {
+          // A concurrently completed read may already have released the lock.
+        }
+      }
+    })()
+    this.readerCleanup.set(reader, cleanup)
+    return cleanup
   }
 }
 

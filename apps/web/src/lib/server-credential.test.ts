@@ -8,7 +8,10 @@ import {
   applyDesktopServerReadyEndpoint,
   resetServerTransportBaseUrlStateForTests,
 } from './server-transport/base-url'
-import { resetDesktopIpcFetchForTests } from './server-transport/desktop-ipc-fetch'
+import {
+  disposeDesktopIpcFetchDocument,
+  resetDesktopIpcFetchForTests,
+} from './server-transport/desktop-ipc-fetch'
 
 afterEach(() => {
   resetDesktopIpcFetchForTests()
@@ -123,5 +126,84 @@ describe('cradleFetch transport selection', () => {
     expect(new Headers(request.headers).has('authorization')).toBe(false)
     expect(new TextDecoder().decode(request.body!)).toBe('{"name":"ipc"}')
     expect(credit).toHaveBeenCalledTimes(2)
+  })
+
+  it('cancels an IPC request whose headers are pending when the document is discarded', async () => {
+    applyDesktopServerReadyEndpoint({
+      serverUrl: 'http://127.0.0.1:21423',
+      connection: {
+        kind: 'owned-ipc',
+        serverUrl: 'http://127.0.0.1:21423',
+        rendererBaseUrl: 'http://127.0.0.1:21423',
+        generation: 1,
+      },
+    })
+    let resolveOpen!: (value: { requestId: string, cancelled: true }) => void
+    const open = vi.fn((_request: { requestId: string }) => new Promise<{
+      requestId: string
+      cancelled: true
+    }>((resolve) => {
+      resolveOpen = resolve
+    }))
+    const cancel = vi.fn()
+    window.cradle = {
+      serverFetch: {
+        open,
+        credit: vi.fn(),
+        cancel,
+        onChunk: () => () => {},
+        onClosed: () => () => {},
+        onError: () => () => {},
+      },
+    } as unknown as typeof window.cradle
+
+    const fetching = cradleFetch('http://127.0.0.1:21423/slow-headers')
+    await vi.waitFor(() => expect(open).toHaveBeenCalledOnce())
+    const requestId = open.mock.calls[0]![0].requestId
+
+    disposeDesktopIpcFetchDocument()
+
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(cancel).toHaveBeenCalledWith(requestId)
+    resolveOpen({ requestId, cancelled: true })
+    await expect(fetching).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('cancels an unread IPC response body when the document is discarded', async () => {
+    applyDesktopServerReadyEndpoint({
+      serverUrl: 'http://127.0.0.1:21423',
+      connection: {
+        kind: 'owned-ipc',
+        serverUrl: 'http://127.0.0.1:21423',
+        rendererBaseUrl: 'http://127.0.0.1:21423',
+        generation: 1,
+      },
+    })
+    const cancel = vi.fn()
+    const open = vi.fn(async (request: { requestId: string }) => ({
+      requestId: request.requestId,
+      status: 200,
+      statusText: 'OK',
+      headers: [['content-type', 'application/json']] as Array<[string, string]>,
+      url: 'http://127.0.0.1:21423/large',
+    }))
+    window.cradle = {
+      serverFetch: {
+        open,
+        credit: vi.fn(),
+        cancel,
+        onChunk: () => () => {},
+        onClosed: () => () => {},
+        onError: () => () => {},
+      },
+    } as unknown as typeof window.cradle
+    const response = await cradleFetch('http://127.0.0.1:21423/large')
+    const requestId = open.mock.calls[0]![0].requestId
+
+    disposeDesktopIpcFetchDocument()
+
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(cancel).toHaveBeenCalledWith(requestId)
+    await expect(response.text()).rejects.toMatchObject({ name: 'AbortError' })
   })
 })

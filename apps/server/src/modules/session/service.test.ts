@@ -1,4 +1,4 @@
-import { backendRuns, backendSessionBindings, messages, sessions, workspaces } from '@cradle/db'
+import { backendRuns, backendSessionBindings, messages, nodeSessionLinks, sessions, workspaces } from '@cradle/db'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { insertMessageFixtures } from '../../../tests/helpers/message-fixture'
@@ -123,6 +123,43 @@ describe('session list activity and status projection', () => {
     expect(rows[1]?.latestUserMessageAt).toBe(100)
     expect(rows[1]?.latestAssistantMessageAt).toBe(110)
     expect(rows.every(row => row.id !== 'sess-other-workspace')).toBe(true)
+  })
+
+  it('orders node projections by their reconciled remote user activity', () => {
+    db().insert(workspaces).values({
+      id: 'ws-node',
+      name: 'Node',
+      locatorJson: JSON.stringify({ nodeId: 'node-1', path: '/tmp/node' }),
+    }).run()
+    db().insert(sessions).values([
+      { id: 'node-older', workspaceId: 'ws-node', title: 'Older', createdAt: 900, updatedAt: 999 },
+      { id: 'node-newer', workspaceId: 'ws-node', title: 'Newer', createdAt: 100, updatedAt: 100 },
+    ]).run()
+    db().insert(nodeSessionLinks).values([
+      {
+        localSessionId: 'node-older',
+        nodeId: 'node-1',
+        remoteSessionId: 'remote-older',
+        remoteWorkspaceId: 'remote-ws',
+        latestUserMessageAt: 200,
+      },
+      {
+        localSessionId: 'node-newer',
+        nodeId: 'node-1',
+        remoteSessionId: 'remote-newer',
+        remoteWorkspaceId: 'remote-ws',
+        latestUserMessageAt: 800,
+        latestAssistantMessageAt: 810,
+      },
+    ]).run()
+
+    const rows = list({ workspaceId: 'ws-node' }).items
+
+    expect(rows.map(row => row.id)).toEqual(['node-newer', 'node-older'])
+    expect(rows[0]).toMatchObject({
+      latestUserMessageAt: 800,
+      latestAssistantMessageAt: 810,
+    })
   })
 
   it('projects status from the latest backend run per session only', () => {

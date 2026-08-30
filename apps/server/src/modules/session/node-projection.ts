@@ -33,6 +33,11 @@ export type SessionExecutionTarget
   = | { kind: 'local' }
     | { kind: 'node', nodeId: string, remoteSessionId: string }
 
+export interface NodeSessionActivity {
+  latestUserMessageAt: number | null
+  latestAssistantMessageAt: number | null
+}
+
 export function getNodeSessionLink(localSessionId: string): NodeSessionLinkView | null {
   const row = db()
     .select()
@@ -103,6 +108,28 @@ export function readSessionExecutionTargets(
   }))
 }
 
+/** Read cached remote activity clocks for a bounded Session projection page. */
+export function readNodeSessionActivities(
+  localSessionIds: readonly string[],
+): Map<string, NodeSessionActivity> {
+  if (localSessionIds.length === 0) {
+    return new Map()
+  }
+  const links = db()
+    .select({
+      localSessionId: nodeSessionLinks.localSessionId,
+      latestUserMessageAt: nodeSessionLinks.latestUserMessageAt,
+      latestAssistantMessageAt: nodeSessionLinks.latestAssistantMessageAt,
+    })
+    .from(nodeSessionLinks)
+    .where(inArray(nodeSessionLinks.localSessionId, [...localSessionIds]))
+    .all()
+  return new Map(links.map(link => [link.localSessionId, {
+    latestUserMessageAt: link.latestUserMessageAt,
+    latestAssistantMessageAt: link.latestAssistantMessageAt,
+  }]))
+}
+
 function readNodeWorkspaceLocator(workspaceId: string) {
   const workspace = Workspace.get(workspaceId)
   if (!workspace) {
@@ -160,6 +187,8 @@ export interface ExistingNodeSessionProjectionInput {
     archivedAt: number | null
     createdAt: number
     updatedAt: number
+    latestUserMessageAt?: number | null
+    latestAssistantMessageAt?: number | null
   }
   projectionKind: NodeSessionLinkView['projectionKind']
 }
@@ -208,6 +237,8 @@ export function attachExistingNodeSessionProjection(
         remoteSessionId: remote.id,
         remoteWorkspaceId: input.remoteWorkspaceId,
         projectionKind: input.projectionKind,
+        latestUserMessageAt: remote.latestUserMessageAt ?? null,
+        latestAssistantMessageAt: remote.latestAssistantMessageAt ?? null,
       })
       .run()
   })
@@ -290,6 +321,8 @@ export async function createNodeProjectedSession(input: {
         archivedAt: null,
         createdAt: currentUnixSeconds(),
         updatedAt: currentUnixSeconds(),
+        latestUserMessageAt: null,
+        latestAssistantMessageAt: null,
       },
       projectionKind: 'controller-created',
     })
@@ -354,6 +387,8 @@ interface RemoteSessionSummary {
   archivedAt: number | null
   createdAt: number
   updatedAt: number
+  latestUserMessageAt: number | null
+  latestAssistantMessageAt: number | null
 }
 
 interface RemoteSessionPage {
@@ -428,6 +463,8 @@ export async function reconcileNodeSessionsForWorkspace(
         localSessionId: nodeSessionLinks.localSessionId,
         title: sessions.title,
         updatedAt: sessions.updatedAt,
+        latestUserMessageAt: nodeSessionLinks.latestUserMessageAt,
+        latestAssistantMessageAt: nodeSessionLinks.latestAssistantMessageAt,
       })
       .from(nodeSessionLinks)
       .innerJoin(sessions, eq(sessions.id, nodeSessionLinks.localSessionId))
@@ -439,7 +476,12 @@ export async function reconcileNodeSessionsForWorkspace(
 
     if (existing) {
       const title = remote.title ?? existing.title
-      if (existing.title !== title || existing.updatedAt < remote.updatedAt) {
+      if (
+        existing.title !== title
+        || existing.updatedAt < remote.updatedAt
+        || existing.latestUserMessageAt !== remote.latestUserMessageAt
+        || existing.latestAssistantMessageAt !== remote.latestAssistantMessageAt
+      ) {
         db().update(sessions).set({
           title,
           origin: remote.origin,
@@ -448,6 +490,10 @@ export async function reconcileNodeSessionsForWorkspace(
           archivedAt: remote.archivedAt,
           updatedAt: remote.updatedAt,
         }).where(eq(sessions.id, existing.localSessionId)).run()
+        db().update(nodeSessionLinks).set({
+          latestUserMessageAt: remote.latestUserMessageAt,
+          latestAssistantMessageAt: remote.latestAssistantMessageAt,
+        }).where(eq(nodeSessionLinks.localSessionId, existing.localSessionId)).run()
         updated += 1
       }
       continue
@@ -475,6 +521,8 @@ export async function reconcileNodeSessionsForWorkspace(
         remoteSessionId: remote.id,
         remoteWorkspaceId,
         projectionKind: 'discovered',
+        latestUserMessageAt: remote.latestUserMessageAt,
+        latestAssistantMessageAt: remote.latestAssistantMessageAt,
         createdAt: now,
         updatedAt: now,
       }).run()

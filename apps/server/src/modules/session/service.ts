@@ -67,6 +67,7 @@ import type { SessionExecutionTarget } from './node-projection'
 import {
   createNodeProjectedSession,
   isNodeProjectedSession,
+  readNodeSessionActivities,
   readSessionExecutionTarget,
   readSessionExecutionTargets,
   removeNodeProjectedSession,
@@ -436,9 +437,11 @@ export function projectSessionRows(
   const statusesBySessionId = listStatusesBySessionIds(sessionIds)
   const isolationsBySessionId = readSessionIsolations(sessionRows)
   const executionBySessionId = readSessionExecutionTargets(sessionIds)
+  const sessionIdsWithoutActivity = sessionIds.filter(sessionId => !activityBySessionId.has(sessionId))
+  const remoteActivityBySessionId = readNodeSessionActivities(sessionIdsWithoutActivity)
 
   return sessionRows.map((session) => {
-    const activity = activityBySessionId.get(session.id)
+    const activity = activityBySessionId.get(session.id) ?? remoteActivityBySessionId.get(session.id)
     return buildSessionView({
       session,
       modelId: modelsBySessionId.get(session.id) ?? null,
@@ -494,7 +497,16 @@ function listRowsByActivity(input: SessionListInput): {
     WHERE session_user_messages.session_id = ${sessions.id}
       AND session_user_messages.role = 'user'
   )`
-  const activityAtExpression = sql<number>`COALESCE(${latestUserMessageAtExpression}, ${sessions.createdAt})`
+  const remoteLatestUserMessageAtExpression = sql<number | null>`(
+    SELECT node_session_links.latest_user_message_at
+    FROM node_session_links
+    WHERE node_session_links.local_session_id = ${sessions.id}
+  )`
+  const activityAtExpression = sql<number>`COALESCE(
+    ${latestUserMessageAtExpression},
+    ${remoteLatestUserMessageAtExpression},
+    ${sessions.createdAt}
+  )`
   const predicates = [
     input.workspaceId ? eq(sessions.workspaceId, input.workspaceId) : undefined,
     input.origin ? eq(sessions.origin, input.origin) : undefined,
@@ -558,12 +570,19 @@ function listRowsByActivity(input: SessionListInput): {
   const latestAssistantBySessionId = new Map(
     latestAssistantRows.map(row => [row.sessionId, row.latestAssistantMessageAt ?? null]),
   )
+  const remoteActivityBySessionId = readNodeSessionActivities(sessionIds)
   const last = pageRows.at(-1)
   return {
     rows: pageRows.map(row => ({
       ...row,
-      latestUserMessageAt: latestUserBySessionId.get(row.session.id) ?? null,
-      latestAssistantMessageAt: latestAssistantBySessionId.get(row.session.id) ?? null,
+      latestUserMessageAt:
+        latestUserBySessionId.get(row.session.id)
+        ?? remoteActivityBySessionId.get(row.session.id)?.latestUserMessageAt
+        ?? null,
+      latestAssistantMessageAt:
+        latestAssistantBySessionId.get(row.session.id)
+        ?? remoteActivityBySessionId.get(row.session.id)?.latestAssistantMessageAt
+        ?? null,
     })),
     nextCursor: hasNextPage && last
       ? encodeSessionListCursor({
