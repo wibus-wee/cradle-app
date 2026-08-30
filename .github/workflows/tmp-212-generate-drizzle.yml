@@ -30,4 +30,5 @@ jobs:
           git add packages/db/drizzle
           git diff --cached --exit-code && { echo 'Drizzle produced no changes'; exit 1; }
           git commit -m 'chore(db): generate ACP auth persistence cleanup migration'
+          git pull --rebase origin chore/212-drop-acp-auth-secret-refs
           git push origin HEAD:chore/212-drop-acp-auth-secret-refs
