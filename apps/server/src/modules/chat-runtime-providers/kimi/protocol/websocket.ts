@@ -652,6 +652,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
               oneOf: [
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     cause: {
                       $ref: '#/definitions/__schema0',
                     },
@@ -800,11 +803,15 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     'message',
                     'retryable',
                     'type',
+                    'agentId',
                   ],
                   type: 'object',
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     code: {
                       type: 'string',
                     },
@@ -818,12 +825,16 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'message',
                   ],
                   type: 'object',
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     contextTokens: {
                       type: 'number',
                     },
@@ -1114,6 +1125,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     thinkingEffort: {
                       type: 'string',
                     },
+                    towerMode: {
+                      type: 'boolean',
+                    },
                     type: {
                       const: 'agent.status.updated',
                       type: 'string',
@@ -1201,6 +1215,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                   ],
                   type: 'object',
                 },
@@ -1302,6 +1317,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                 type: 'string',
                               },
                               type: 'array',
+                            },
+                            tower_mode: {
+                              type: 'boolean',
                             },
                           },
                           required: [
@@ -1484,10 +1502,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             'output_tokens',
                             'cache_read_tokens',
                             'cache_creation_tokens',
-                            'total_cost_usd',
                             'context_tokens',
-                            'context_limit',
-                            'turn_count',
                           ],
                           type: 'object',
                         },
@@ -1520,6 +1535,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   required: [
                     'type',
                     'session',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    type: {
+                      const: 'event.session.archived',
+                      type: 'string',
+                    },
+                    workspace_id: {
+                      minLength: 1,
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                    'workspace_id',
                   ],
                   type: 'object',
                 },
@@ -1720,6 +1752,229 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    changedFields: {
+                      items: {
+                        minLength: 1,
+                        type: 'string',
+                      },
+                      type: 'array',
+                    },
+                    config: {
+                      additionalProperties: {},
+                      properties: {
+                        background: {},
+                        default_model: {
+                          type: 'string',
+                        },
+                        default_permission_mode: {
+                          type: 'string',
+                        },
+                        default_plan_mode: {
+                          type: 'boolean',
+                        },
+                        default_provider: {
+                          type: 'string',
+                        },
+                        experimental: {
+                          additionalProperties: {
+                            type: 'boolean',
+                          },
+                          propertyNames: {
+                            type: 'string',
+                          },
+                          type: 'object',
+                        },
+                        extra_skill_dirs: {
+                          items: {
+                            type: 'string',
+                          },
+                          type: 'array',
+                        },
+                        hooks: {
+                          items: {},
+                          type: 'array',
+                        },
+                        loop_control: {},
+                        merge_all_available_skills: {
+                          type: 'boolean',
+                        },
+                        models: {
+                          additionalProperties: {},
+                          propertyNames: {
+                            type: 'string',
+                          },
+                          type: 'object',
+                        },
+                        permission: {},
+                        plan_mode: {
+                          type: 'boolean',
+                        },
+                        providers: {
+                          additionalProperties: {
+                            properties: {
+                              base_url: {
+                                type: 'string',
+                              },
+                              default_model: {
+                                type: 'string',
+                              },
+                              has_api_key: {
+                                type: 'boolean',
+                              },
+                              type: {
+                                type: 'string',
+                              },
+                            },
+                            required: [
+                              'type',
+                              'has_api_key',
+                            ],
+                            type: 'object',
+                          },
+                          default: {},
+                          propertyNames: {
+                            type: 'string',
+                          },
+                          type: 'object',
+                        },
+                        raw: {
+                          additionalProperties: {},
+                          propertyNames: {
+                            type: 'string',
+                          },
+                          type: 'object',
+                        },
+                        secondary_model: {},
+                        services: {},
+                        subagent: {},
+                        telemetry: {
+                          type: 'boolean',
+                        },
+                        thinking: {},
+                        yolo: {
+                          type: 'boolean',
+                        },
+                      },
+                      type: 'object',
+                    },
+                    type: {
+                      const: 'event.config.changed',
+                      type: 'string',
+                    },
+                  },
+                  required: [
+                    'type',
+                    'changedFields',
+                    'config',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    type: {
+                      const: 'event.config.warning',
+                      type: 'string',
+                    },
+                    warnings: {
+                      items: {
+                        properties: {
+                          domain: {
+                            type: 'string',
+                          },
+                          message: {
+                            type: 'string',
+                          },
+                        },
+                        required: [
+                          'message',
+                        ],
+                        type: 'object',
+                      },
+                      type: 'array',
+                    },
+                  },
+                  required: [
+                    'type',
+                    'warnings',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
+                    changed: {
+                      items: {
+                        properties: {
+                          added: {
+                            maximum: 9007199254740991,
+                            minimum: 0,
+                            type: 'integer',
+                          },
+                          provider_id: {
+                            minLength: 1,
+                            type: 'string',
+                          },
+                          provider_name: {
+                            minLength: 1,
+                            type: 'string',
+                          },
+                          removed: {
+                            maximum: 9007199254740991,
+                            minimum: 0,
+                            type: 'integer',
+                          },
+                        },
+                        required: [
+                          'provider_id',
+                          'provider_name',
+                          'added',
+                          'removed',
+                        ],
+                        type: 'object',
+                      },
+                      type: 'array',
+                    },
+                    failed: {
+                      items: {
+                        properties: {
+                          provider: {
+                            minLength: 1,
+                            type: 'string',
+                          },
+                          reason: {
+                            minLength: 1,
+                            type: 'string',
+                          },
+                        },
+                        required: [
+                          'provider',
+                          'reason',
+                        ],
+                        type: 'object',
+                      },
+                      type: 'array',
+                    },
+                    type: {
+                      const: 'event.model_catalog.changed',
+                      type: 'string',
+                    },
+                    unchanged: {
+                      items: {
+                        minLength: 1,
+                        type: 'string',
+                      },
+                      type: 'array',
+                    },
+                  },
+                  required: [
+                    'type',
+                    'changed',
+                    'unchanged',
+                    'failed',
+                  ],
+                  type: 'object',
+                },
+                {
+                  properties: {
                     error: {
                       type: 'string',
                     },
@@ -1808,6 +2063,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     change: {
                       properties: {
                         actor: {
@@ -2010,6 +2268,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'snapshot',
                   ],
                   type: 'object',
@@ -2017,6 +2276,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 {
                   properties: {
                     activationId: {
+                      type: 'string',
+                    },
+                    agentId: {
                       type: 'string',
                     },
                     skillArgs: {
@@ -2052,6 +2314,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'activationId',
                     'skillName',
                     'trigger',
@@ -2061,6 +2324,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 {
                   properties: {
                     activationId: {
+                      type: 'string',
+                    },
+                    agentId: {
                       type: 'string',
                     },
                     commandArgs: {
@@ -2083,6 +2349,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'activationId',
                     'pluginId',
                     'commandName',
@@ -2092,6 +2359,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     origin: {
                       oneOf: [
                         {
@@ -2439,6 +2709,61 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     prompt: {
                       type: 'string',
                     },
+                    promptAttachments: {
+                      items: {
+                        anyOf: [
+                          {
+                            properties: {
+                              fileId: {
+                                type: 'string',
+                              },
+                              kind: {
+                                enum: [
+                                  'image',
+                                  'video',
+                                  'audio',
+                                ],
+                                type: 'string',
+                              },
+                            },
+                            required: [
+                              'kind',
+                              'fileId',
+                            ],
+                            type: 'object',
+                          },
+                          {
+                            properties: {
+                              kind: {
+                                const: 'file',
+                                type: 'string',
+                              },
+                              mediaType: {
+                                type: 'string',
+                              },
+                              name: {
+                                type: 'string',
+                              },
+                              path: {
+                                type: 'string',
+                              },
+                              size: {
+                                type: 'number',
+                              },
+                            },
+                            required: [
+                              'kind',
+                              'name',
+                              'mediaType',
+                              'size',
+                              'path',
+                            ],
+                            type: 'object',
+                          },
+                        ],
+                      },
+                      type: 'array',
+                    },
                     promptId: {
                       type: 'string',
                     },
@@ -2452,6 +2777,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'origin',
                   ],
@@ -2459,6 +2785,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     durationMs: {
                       type: 'number',
                     },
@@ -2643,6 +2972,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'reason',
                   ],
@@ -2650,6 +2980,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     step: {
                       type: 'number',
                     },
@@ -2666,6 +2999,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'step',
                   ],
@@ -2673,6 +3007,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     finishReason: {
                       type: 'string',
                     },
@@ -2747,6 +3084,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'step',
                   ],
@@ -2754,6 +3092,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     delayMs: {
                       type: 'number',
                     },
@@ -2791,6 +3132,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'step',
                     'failedAttempt',
@@ -2804,6 +3146,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     message: {
                       type: 'string',
                     },
@@ -2826,6 +3171,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'step',
                     'reason',
@@ -2834,6 +3180,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     delta: {
                       type: 'string',
                     },
@@ -2847,6 +3196,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'delta',
                   ],
@@ -2854,6 +3204,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     blocked: {
                       type: 'boolean',
                     },
@@ -2873,6 +3226,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'hookEvent',
                     'content',
                   ],
@@ -2880,6 +3234,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     delta: {
                       type: 'string',
                     },
@@ -2893,6 +3250,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'delta',
                   ],
@@ -2900,6 +3258,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     argumentsPart: {
                       type: 'string',
                     },
@@ -2919,6 +3280,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'toolCallId',
                   ],
@@ -2926,6 +3288,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     args: {},
                     description: {
                       type: 'string',
@@ -3282,6 +3647,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'toolCallId',
                     'name',
@@ -3291,6 +3657,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     toolCallId: {
                       type: 'string',
                     },
@@ -3320,6 +3689,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         percent: {
                           type: 'number',
                         },
+                        replace: {
+                          type: 'boolean',
+                        },
                         text: {
                           type: 'string',
                         },
@@ -3332,6 +3704,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'toolCallId',
                     'update',
@@ -3340,6 +3713,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     commandId: {
                       type: 'string',
                     },
@@ -3369,6 +3745,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                         percent: {
                           type: 'number',
                         },
+                        replace: {
+                          type: 'boolean',
+                        },
                         text: {
                           type: 'string',
                         },
@@ -3381,6 +3760,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'commandId',
                     'update',
                   ],
@@ -3388,6 +3768,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     commandId: {
                       type: 'string',
                     },
@@ -3401,6 +3784,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'commandId',
                     'taskId',
                   ],
@@ -3408,6 +3792,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     commandId: {
                       type: 'string',
                     },
@@ -3424,6 +3811,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'commandId',
                     'isError',
                   ],
@@ -3431,6 +3819,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     isError: {
                       type: 'boolean',
                     },
@@ -3451,6 +3842,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'turnId',
                     'toolCallId',
                     'output',
@@ -3459,6 +3851,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     reason: {
                       enum: [
                         'mcp.connected',
@@ -3477,6 +3872,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'reason',
                     'serverName',
                   ],
@@ -3484,6 +3880,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     server: {
                       properties: {
                         error: {
@@ -3529,6 +3928,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'server',
                   ],
                   type: 'object',
@@ -3564,6 +3964,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                     },
                     swarmIndex: {
                       type: 'number',
+                    },
+                    taskId: {
+                      type: 'string',
                     },
                     thinkingEffort: {
                       type: 'string',
@@ -3686,6 +4089,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     instruction: {
                       type: 'string',
                     },
@@ -3703,12 +4109,16 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'trigger',
                   ],
                   type: 'object',
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     turnId: {
                       type: 'number',
                     },
@@ -3719,11 +4129,15 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                   ],
                   type: 'object',
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     type: {
                       const: 'compaction.cancelled',
                       type: 'string',
@@ -3731,11 +4145,15 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                   ],
                   type: 'object',
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     result: {
                       properties: {
                         compactedCount: {
@@ -3775,12 +4193,16 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'result',
                   ],
                   type: 'object',
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     info: {
                       oneOf: [
                         {
@@ -4007,12 +4429,16 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'info',
                   ],
                   type: 'object',
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     info: {
                       oneOf: [
                         {
@@ -4239,6 +4665,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'info',
                   ],
                   type: 'object',
@@ -4904,6 +5331,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                     ],
                                     type: 'object',
                                   },
+                                  {
+                                    properties: {
+                                      kind: {
+                                        const: 'path',
+                                        type: 'string',
+                                      },
+                                      path: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
+                                    },
+                                    required: [
+                                      'kind',
+                                      'path',
+                                    ],
+                                    type: 'object',
+                                  },
                                 ],
                               },
                               type: {
@@ -4998,6 +5442,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                     ],
                                     type: 'object',
                                   },
+                                  {
+                                    properties: {
+                                      kind: {
+                                        const: 'path',
+                                        type: 'string',
+                                      },
+                                      path: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
+                                    },
+                                    required: [
+                                      'kind',
+                                      'path',
+                                    ],
+                                    type: 'object',
+                                  },
                                 ],
                               },
                               type: {
@@ -5024,6 +5485,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                               name: {
                                 type: 'string',
                               },
+                              path: {
+                                minLength: 1,
+                                type: 'string',
+                              },
                               size: {
                                 maximum: 9007199254740991,
                                 minimum: 0,
@@ -5036,10 +5501,6 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             },
                             required: [
                               'type',
-                              'file_id',
-                              'name',
-                              'media_type',
-                              'size',
                             ],
                             type: 'object',
                           },
@@ -5100,6 +5561,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 },
                 {
                   properties: {
+                    agentId: {
+                      type: 'string',
+                    },
                     finishedAt: {
                       type: 'string',
                     },
@@ -5121,6 +5585,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'promptId',
                     'finishedAt',
                   ],
@@ -5129,6 +5594,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 {
                   properties: {
                     abortedAt: {
+                      type: 'string',
+                    },
+                    agentId: {
                       type: 'string',
                     },
                     promptId: {
@@ -5141,6 +5609,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'promptId',
                     'abortedAt',
                   ],
@@ -5149,6 +5618,9 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                 {
                   properties: {
                     activePromptId: {
+                      type: 'string',
+                    },
+                    agentId: {
                       type: 'string',
                     },
                     content: {
@@ -5297,6 +5769,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                     ],
                                     type: 'object',
                                   },
+                                  {
+                                    properties: {
+                                      kind: {
+                                        const: 'path',
+                                        type: 'string',
+                                      },
+                                      path: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
+                                    },
+                                    required: [
+                                      'kind',
+                                      'path',
+                                    ],
+                                    type: 'object',
+                                  },
                                 ],
                               },
                               type: {
@@ -5391,6 +5880,23 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                                     ],
                                     type: 'object',
                                   },
+                                  {
+                                    properties: {
+                                      kind: {
+                                        const: 'path',
+                                        type: 'string',
+                                      },
+                                      path: {
+                                        minLength: 1,
+                                        type: 'string',
+                                      },
+                                    },
+                                    required: [
+                                      'kind',
+                                      'path',
+                                    ],
+                                    type: 'object',
+                                  },
                                 ],
                               },
                               type: {
@@ -5417,6 +5923,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                               name: {
                                 type: 'string',
                               },
+                              path: {
+                                minLength: 1,
+                                type: 'string',
+                              },
                               size: {
                                 maximum: 9007199254740991,
                                 minimum: 0,
@@ -5429,10 +5939,6 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                             },
                             required: [
                               'type',
-                              'file_id',
-                              'name',
-                              'media_type',
-                              'size',
                             ],
                             type: 'object',
                           },
@@ -5475,6 +5981,7 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                   },
                   required: [
                     'type',
+                    'agentId',
                     'activePromptId',
                     'promptIds',
                     'content',
