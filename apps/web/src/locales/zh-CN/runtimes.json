@@ -117,6 +117,8 @@
   "filter.all": "全部",
   "filter.installed": "已安装",
   "filter.updates": "可更新",
+  "filter.updatesEmpty": "所有托管 Runtime 均为最新版本。",
+  "filter.installedEmpty": "尚未安装托管 ACP Runtime。",
   "group.acpRegistry": "ACP Registry",
   "group.acpLocal": "本地 ACP",
   "group.builtin": "内置",

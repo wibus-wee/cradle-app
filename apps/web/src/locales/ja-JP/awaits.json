@@ -3,6 +3,7 @@
   "empty.description": "CI、レビュー、時間指定の待機がここに表示されます。",
   "empty.title": "保留中の待機はありません",
   "error.description": "デスクトップの待機データを読み込めませんでした。",
+  "error.retry": "再試行",
   "error.title": "待機データを利用できません",
   "overview.description": "外部シグナルを待っているセッション",
   "overview.title": "待機",

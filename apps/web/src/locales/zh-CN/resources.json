@@ -4,6 +4,7 @@
   "action.install": "安装",
   "action.installManaged": "安装托管版本",
   "action.retry": "重试",
+  "action.clearFilters": "清除筛选条件",
   "action.uninstall": "卸载",
   "action.update": "更新",
   "description": "安装可选运行时与模型，并查看由服务器或桌面端完成的传输。",

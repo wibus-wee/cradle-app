@@ -10,6 +10,7 @@ import {
   SelectorHorizontalLine as SlidersHorizontalIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Checkbox } from '~/components/ui/checkbox'
@@ -216,6 +217,25 @@ function LayoutButton({
 
 function SearchField({ value, onChange }: { value: string, onChange: (value: string) => void }) {
   const { t } = useTranslation('kanban')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const typing = target?.tagName === 'INPUT'
+        || target?.tagName === 'TEXTAREA'
+        || target?.tagName === 'SELECT'
+        || target?.isContentEditable
+
+      if (event.key === '/' && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault()
+        inputRef.current?.focus()
+      }
+    }
+
+    window.addEventListener('keydown', focusSearch)
+    return () => window.removeEventListener('keydown', focusSearch)
+  }, [])
 
   return (
     <div
@@ -226,6 +246,7 @@ function SearchField({ value, onChange }: { value: string, onChange: (value: str
     >
       <SearchIcon className="size-3.5 shrink-0 !text-muted-foreground" aria-hidden="true" />
       <input
+        ref={inputRef}
         value={value}
         onChange={event => onChange(event.target.value)}
         onKeyDown={(event) => {

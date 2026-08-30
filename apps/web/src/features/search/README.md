@@ -11,7 +11,7 @@ files, conversations, issues, and workspaces.
   actions, command history, and application navigation.
 - `global-search-dialog-view.tsx` receives the current mode, query,
   owner-typed `PaletteData`, and callbacks. It owns only dialog focus, keyboard
-  cycling, and presentation.
+  cycling, empty-query Backspace recovery to All, and presentation.
 - Each palette result semantic component lives in its own file under
   `palette/`.
 - `fixtures/global-search.ts` and

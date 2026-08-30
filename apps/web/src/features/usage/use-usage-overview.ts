@@ -104,6 +104,18 @@ export function useUsageOverview(range: UsageRangeKey) {
     toolsQuery,
     costEfficiencyQuery,
     performanceQuery,
+    refetch: () => Promise.all([
+      dailyQuery.refetch(),
+      dailyByModelQuery.refetch(),
+      hourlyQuery.refetch(),
+      summaryQuery.refetch(),
+      statsQuery.refetch(),
+      costSummaryQuery.refetch(),
+      dailyCostQuery.refetch(),
+      toolsQuery.refetch(),
+      costEfficiencyQuery.refetch(),
+      performanceQuery.refetch(),
+    ]),
     daily: dailyQuery.data ?? EMPTY_DAILY_USAGE,
     // Model breakdown is a drill-down enhancement for tooltips, not core
     // dashboard data — deliberately excluded from `usageReady` below so a

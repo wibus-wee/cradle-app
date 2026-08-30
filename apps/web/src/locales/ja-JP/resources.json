@@ -4,6 +4,7 @@
   "action.install": "インストール",
   "action.installManaged": "管理版をインストール",
   "action.retry": "再試行",
+  "action.clearFilters": "フィルターをクリア",
   "action.uninstall": "アンインストール",
   "action.update": "更新",
   "description": "オプションのランタイムとモデルをインストールし、サーバーまたはデスクトップでの転送を確認します。",

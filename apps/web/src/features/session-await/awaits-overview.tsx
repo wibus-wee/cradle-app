@@ -29,6 +29,8 @@ export function AwaitsOverview() {
       awaits={awaitsQuery.data ?? []}
       isReady={awaitsQuery.isSuccess}
       hasError={awaitsQuery.isError}
+      retrying={awaitsQuery.isFetching}
+      onRetry={() => void awaitsQuery.refetch()}
       onOpenChat={openChat}
       onPreloadChat={preloadChatSession}
     />

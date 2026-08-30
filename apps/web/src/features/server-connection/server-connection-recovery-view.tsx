@@ -86,7 +86,20 @@ export function ServerConnectionRecoveryView({
             </p>
           </div>
 
-          <div className="mt-6 flex flex-col gap-4">
+          <form
+            className="mt-6 flex flex-col gap-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (canConfigureEndpoint) {
+                if (!checking && draftEndpoint.trim().length > 0) {
+                  onConnect()
+                }
+              }
+              else if (!retrying) {
+                onRetry()
+              }
+            }}
+          >
             {canConfigureEndpoint
               ? (
                   <div className="flex flex-col gap-2">
@@ -142,7 +155,7 @@ export function ServerConnectionRecoveryView({
               {canConfigureEndpoint
                 ? (
                     <Button
-                      type="button"
+                      type="submit"
                       size="lg"
                       className="h-10"
                       disabled={checking || draftEndpoint.trim().length === 0}
@@ -152,7 +165,7 @@ export function ServerConnectionRecoveryView({
                     </Button>
                   )
                 : (
-                    <Button type="button" size="lg" className="h-10" disabled={retrying} onClick={onRetry}>
+                    <Button type="submit" size="lg" className="h-10" disabled={retrying}>
                       <RetryIcon data-icon="inline-start" className={cn(retrying && 'animate-spin')} aria-hidden="true" />
                       {retrying ? labels.retrying : labels.retry}
                     </Button>
@@ -183,7 +196,7 @@ export function ServerConnectionRecoveryView({
                   )
                 : null}
             </div>
-          </div>
+          </form>
 
           {canConfigureEndpoint
             ? (

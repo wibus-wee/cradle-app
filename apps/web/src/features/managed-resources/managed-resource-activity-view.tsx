@@ -2,6 +2,7 @@ import { DownloadLine as DownloadIcon } from '@mingcute/react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import {
   Empty,
   EmptyHeader,
@@ -25,6 +26,13 @@ const STATUS_FILTERS: TransferStatusFilter[] = [
   'cancelled',
 ]
 
+function matchesTransferStatus(task: DownloadTask, status: TransferStatusFilter): boolean {
+  if (status === 'all') {
+    return true
+  }
+  return status === 'active' ? isActiveDownload(task) : task.status === status
+}
+
 export interface ManagedResourceActivityViewProps {
   tasks: readonly DownloadTask[]
   onCancel: (task: DownloadTask) => void
@@ -42,21 +50,17 @@ export function ManagedResourceActivityView({
   const visibleTasks = useMemo(
     () => tasks
       .filter(task => scope === 'all' || task.scope === scope)
-      .filter((task) => {
-        if (status === 'all') {
-          return true
-        }
-        if (status === 'active') {
-          return isActiveDownload(task)
-        }
-        return task.status === status
-      })
+      .filter(task => matchesTransferStatus(task, status))
       .toSorted(
         (left, right) => Number(isActiveDownload(right)) - Number(isActiveDownload(left))
           || Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
       ),
     [scope, status, tasks],
   )
+  const countForScope = (value: TransferScopeFilter) => tasks.filter(task =>
+    (value === 'all' || task.scope === value) && matchesTransferStatus(task, status)).length
+  const countForStatus = (value: TransferStatusFilter) => tasks.filter(task =>
+    (scope === 'all' || task.scope === scope) && matchesTransferStatus(task, value)).length
 
   return (
     <div>
@@ -79,6 +83,7 @@ export function ManagedResourceActivityView({
                 )}
               >
                 {t(`filter.scope.${value}`)}
+                <span className="ml-1 tabular-nums opacity-65">{countForScope(value)}</span>
               </button>
             ))}
           </div>
@@ -97,6 +102,7 @@ export function ManagedResourceActivityView({
               )}
             >
               {t(`filter.status.${value}`)}
+              <span className="ml-1 tabular-nums opacity-65">{countForStatus(value)}</span>
             </button>
           ))}
         </div>
@@ -108,6 +114,21 @@ export function ManagedResourceActivityView({
               <EmptyHeader>
                 <EmptyMedia variant="icon"><DownloadIcon /></EmptyMedia>
                 <EmptyTitle>{t('empty.transfers')}</EmptyTitle>
+                {tasks.length > 0
+                  ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setScope('all')
+                          setStatus('all')
+                        }}
+                      >
+                        {t('action.clearFilters')}
+                      </Button>
+                    )
+                  : null}
               </EmptyHeader>
             </Empty>
           )

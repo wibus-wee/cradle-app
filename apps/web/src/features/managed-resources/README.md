@@ -7,7 +7,7 @@ runtimes and models.
 
 - `managed-resources-page.tsx` is the dependency-owning Container. It reads
   the generated resource query, the shared Download Center projection, and
-  the generic resource-action mutation.
+  the generic resource-action mutation, and restores the last selected face.
 - `managed-resources-page-view.tsx` is the fixture-driven page View. It owns
   local Library/Activity navigation and summary presentation.
 - `managed-resource-library-view.tsx`,

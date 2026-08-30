@@ -1,8 +1,10 @@
 import {
+  Copy2Line as CopyIcon,
   Home4Line as HomeIcon,
   RefreshAnticlockwise1Line as RefreshIcon,
   WarningLine as WarningIcon,
 } from '@mingcute/react'
+import { useState } from 'react'
 
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
@@ -14,8 +16,11 @@ export interface RouteErrorViewProps {
   message: string
   retryLabel: string
   homeLabel: string
+  copyLabel: string
+  copiedLabel: string
   onRetry: () => void
   onHome: () => void
+  onCopy: () => Promise<void>
   detailsLabel?: string
   details?: string | null
   className?: string
@@ -29,12 +34,17 @@ export function RouteErrorView({
   message,
   retryLabel,
   homeLabel,
+  copyLabel,
+  copiedLabel,
   onRetry,
   onHome,
+  onCopy,
   detailsLabel,
   details,
   className,
 }: RouteErrorViewProps) {
+  const [copied, setCopied] = useState(false)
+
   return (
     <div className={cn('flex h-full min-h-0 w-full items-center justify-center bg-background p-4 text-foreground', className)}>
       <section
@@ -84,6 +94,17 @@ export function RouteErrorView({
               <Button type="button" variant="outline" size="sm" onClick={onHome}>
                 <HomeIcon className="size-3.5" aria-hidden="true" />
                 {homeLabel}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  void onCopy().then(() => setCopied(true))
+                }}
+              >
+                <CopyIcon className="size-3.5" aria-hidden="true" />
+                {copied ? copiedLabel : copyLabel}
               </Button>
             </div>
           </div>

@@ -1,8 +1,11 @@
 import {
+  CheckLine as CheckIcon,
+  Copy2Line as CopyIcon,
   ExternalLinkLine as ExternalLinkIcon,
   Refresh1Line as RefreshIcon,
 } from '@mingcute/react'
 import { m } from 'motion/react'
+import type { KeyboardEvent } from 'react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -31,6 +34,7 @@ export interface PullRequestDetailPanelViewProps {
   initialTab?: PullRequestDetailTab
   now?: number
   onRefresh: () => void
+  onCopyLink: (url: string) => Promise<void>
   onOpenWork?: () => void
   actions?: PullRequestActionsViewProps
 }
@@ -46,11 +50,13 @@ export function PullRequestDetailPanelView({
   initialTab = 'summary',
   now = Date.now(),
   onRefresh,
+  onCopyLink,
   onOpenWork,
   actions,
 }: PullRequestDetailPanelViewProps) {
   const { t } = useTranslation('pull-requests')
   const [activeTab, setActiveTab] = useState<PullRequestDetailTab>(initialTab)
+  const [copied, setCopied] = useState(false)
 
   if (errorKind) {
     return (
@@ -77,6 +83,32 @@ export function PullRequestDetailPanelView({
     { id: 'code', label: t('detail.tab.code') },
   ]
 
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex: number | null = null
+    if (event.key === 'ArrowRight') {
+      nextIndex = (index + 1) % tabs.length
+    }
+    else if (event.key === 'ArrowLeft') {
+      nextIndex = (index - 1 + tabs.length) % tabs.length
+    }
+    else if (event.key === 'Home') {
+      nextIndex = 0
+    }
+    else if (event.key === 'End') {
+      nextIndex = tabs.length - 1
+    }
+
+    if (nextIndex === null) {
+      return
+    }
+
+    event.preventDefault()
+    const nextTab = tabs[nextIndex]
+    setActiveTab(nextTab.id)
+    const tabButtons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+    tabButtons?.[nextIndex]?.focus()
+  }
+
   return (
     <div
       className="absolute inset-0 flex min-h-0 flex-col overflow-hidden bg-background"
@@ -89,8 +121,12 @@ export function PullRequestDetailPanelView({
               key={tab.id}
               type="button"
               role="tab"
+              id={`pr-detail-tab-${tab.id}`}
+              aria-controls={`pr-detail-panel-${tab.id}`}
               aria-selected={activeTab === tab.id}
+              tabIndex={activeTab === tab.id ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
+              onKeyDown={event => handleTabKeyDown(event, tabs.indexOf(tab))}
               className={cn(
                 'relative z-10 flex h-7 items-center gap-1.5 rounded-md px-2 text-[11px] whitespace-nowrap transition-colors select-none',
                 activeTab === tab.id
@@ -130,6 +166,20 @@ export function PullRequestDetailPanelView({
                 </Button>
               )
             : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => {
+              void onCopyLink(detail.pullRequest.url).then(() => setCopied(true))
+            }}
+            aria-label={copied ? t('detail.copiedLink') : t('detail.copyLink')}
+            title={copied ? t('detail.copiedLink') : t('detail.copyLink')}
+          >
+            {copied
+              ? <CheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              : <CopyIcon className="size-3.5" aria-hidden />}
+          </Button>
           <Button variant="outline" size="icon-xs" asChild aria-label={t('detail.openGithub')}>
             <a href={detail.pullRequest.url} target="_blank" rel="noreferrer">
               <ExternalLinkIcon className="size-3.5" />
@@ -140,13 +190,28 @@ export function PullRequestDetailPanelView({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-6 pb-6">
-          <div className={activeTab === 'summary' ? undefined : 'hidden'}>
+          <div
+            id="pr-detail-panel-summary"
+            role="tabpanel"
+            aria-labelledby="pr-detail-tab-summary"
+            className={activeTab === 'summary' ? undefined : 'hidden'}
+          >
             <PullRequestSummaryView detail={detail} now={now} locale={locale} actions={actions} />
           </div>
-          <div className={activeTab === 'timeline' ? undefined : 'hidden'}>
+          <div
+            id="pr-detail-panel-timeline"
+            role="tabpanel"
+            aria-labelledby="pr-detail-tab-timeline"
+            className={activeTab === 'timeline' ? undefined : 'hidden'}
+          >
             <PullRequestTimelineView detail={detail} locale={locale} />
           </div>
-          <div className={activeTab === 'code' ? undefined : 'hidden'}>
+          <div
+            id="pr-detail-panel-code"
+            role="tabpanel"
+            aria-labelledby="pr-detail-tab-code"
+            className={activeTab === 'code' ? undefined : 'hidden'}
+          >
             <PullRequestCodeView files={detail.files} />
           </div>
         </div>

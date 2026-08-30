@@ -4,6 +4,8 @@
   "action.cancel": "Cancelar",
   "action.close": "Cerrar",
   "action.continue": "Continuar",
+  "action.copied": "Copiado",
+  "action.copyError": "Copiar error",
   "action.refresh": "Actualizar",
   "action.reload": "Recargar",
   "action.retry": "Reintentar",

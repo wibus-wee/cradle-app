@@ -4,6 +4,7 @@
   "action.install": "Instalar",
   "action.installManaged": "Instalar versión gestionada",
   "action.retry": "Reintentar",
+  "action.clearFilters": "Borrar filtros",
   "action.uninstall": "Desinstalar",
   "action.update": "Actualizar",
   "description": "Instala runtimes y modelos opcionales, y observa las transferencias en el servidor o en el escritorio.",

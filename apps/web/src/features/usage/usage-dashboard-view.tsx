@@ -1,5 +1,7 @@
+import { DownloadLine as DownloadIcon, Refresh1Line as RefreshIcon } from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import { Skeleton } from '~/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { cn } from '~/lib/cn'
@@ -47,6 +49,9 @@ export interface UsageDashboardViewProps {
   usageReady: boolean
   range: UsageRangeKey
   onRangeChange: (range: UsageRangeKey) => void
+  onExport: () => void
+  refreshing: boolean
+  onRefresh: () => void
   themeMode: 'light' | 'dark'
 }
 
@@ -65,6 +70,9 @@ export function UsageDashboardView({
   usageReady,
   range,
   onRangeChange,
+  onExport,
+  refreshing,
+  onRefresh,
   themeMode,
 }: UsageDashboardViewProps) {
   const { t } = useTranslation('usage')
@@ -101,22 +109,51 @@ export function UsageDashboardView({
             <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
           </div>
           {hasData && (
-            <ToggleGroup
-              type="single"
-              value={range}
-              onValueChange={(value) => {
-                if (value) { onRangeChange(value as UsageRangeKey) }
-              }}
-              variant="outline"
-              size="sm"
-              className="h-7 shrink-0 gap-px rounded-md"
-            >
-              {USAGE_RANGE_OPTIONS.map(option => (
-                <ToggleGroupItem key={option.key} value={option.key} className="h-7 px-2.5 text-xs tabular-nums">
-                  {option.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={onRefresh}
+                disabled={refreshing}
+                aria-label={t('action.refresh')}
+                title={t('action.refresh')}
+              >
+                <RefreshIcon className={cn('size-3.5', refreshing && 'animate-spin')} aria-hidden />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onExport}
+                className="h-7 gap-1.5 px-2.5 text-xs"
+                data-testid="usage-export-csv"
+              >
+                <DownloadIcon className="size-3.5" aria-hidden />
+                {t('action.exportCsv')}
+              </Button>
+              <ToggleGroup
+                type="single"
+                value={range}
+                onValueChange={(value) => {
+                  if (value) { onRangeChange(value as UsageRangeKey) }
+                }}
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 gap-px rounded-md"
+              >
+                {USAGE_RANGE_OPTIONS.map(option => (
+                  <ToggleGroupItem
+                    key={option.key}
+                    value={option.key}
+                    className="h-7 px-2.5 text-xs tabular-nums"
+                    data-testid={`usage-range-${option.key}`}
+                  >
+                    {option.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
           )}
         </div>
 

@@ -9,6 +9,8 @@ export default {
   'filter.all': 'All',
   'filter.installed': 'Installed',
   'filter.updates': 'Updates',
+  'filter.updatesEmpty': 'All managed runtimes are up to date.',
+  'filter.installedEmpty': 'No managed ACP runtimes are installed.',
   'group.builtin': 'Built-in',
   'group.acpLocal': 'Local ACP',
   'group.acpRemote': 'Remote ACP',

@@ -49,6 +49,7 @@ const meta = {
     isFetching: false,
     now: pullRequestFixtureNow,
     onRefresh: () => {},
+    onCopyLink: async () => {},
     onOpenWork: () => {},
     actions: actionsFixture,
   },

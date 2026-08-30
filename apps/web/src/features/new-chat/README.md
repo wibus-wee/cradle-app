@@ -15,8 +15,8 @@ User-facing composer placeholders, quick prompt labels, readiness notices, works
 
 - **new-chat-home.tsx**: NewChatHome component — full-page launcher with composer, Agent/Profile/model/workspace selection, and shared persisted new-chat preference state
 - **new-chat-page.tsx**: Thin `/chat/new` route adapter. It reads route search and active-surface state, then mounts `NewChatEntryPoint`.
-- **new-chat-entry-point.tsx**: Runtime owner for no-project and workspace-bound session creation, isolation, cached session promotion, runtime catalog selection, and first-turn optimistic handoff. It derives props and callbacks for the New Chat Views instead of owning their visual implementation.
-- **new-chat-surface-view.tsx**: Props-only full-page New Chat shell with composer, quick-action, layout-slot, and dialog render slots plus neutral/plan decoration.
+- **new-chat-entry-point.tsx**: Runtime owner for no-project and workspace-bound session creation, isolation, cached session promotion, runtime catalog selection, recent-session projection, and first-turn optimistic handoff. It derives props and callbacks for the New Chat Views instead of owning their visual implementation.
+- **new-chat-surface-view.tsx**: Props-only full-page New Chat shell with composer, quick-action, recent-session, layout-slot, and dialog render slots plus neutral/plan decoration.
 - **new-chat-workspace-selector-view.tsx**: Props-only workspace menu driven by workspace options and selection/add callbacks.
 - **new-chat-quick-actions-view.tsx**: Props-only quick prompt row.
 - **new-chat-recent-sessions-view.tsx**: Props-only recent-session grid with caller-provided relative-time labels.

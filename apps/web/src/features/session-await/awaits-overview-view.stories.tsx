@@ -14,6 +14,7 @@ function AwaitsOverviewCatalog() {
         isReady
         hasError={false}
         now={awaitsFixtureNow}
+        onRetry={() => {}}
         onOpenChat={sessionId => setActivity(`Open ${sessionId}`)}
         onPreloadChat={sessionId => setActivity(`Preload ${sessionId}`)}
       />
@@ -43,6 +44,7 @@ export const Empty: Story = {
         awaits={[]}
         isReady
         hasError={false}
+        onRetry={() => {}}
         onOpenChat={() => {}}
         onPreloadChat={() => {}}
       />
@@ -57,6 +59,7 @@ export const Error: Story = {
         awaits={[]}
         isReady={false}
         hasError
+        onRetry={() => {}}
         onOpenChat={() => {}}
         onPreloadChat={() => {}}
       />

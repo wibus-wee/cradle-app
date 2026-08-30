@@ -521,6 +521,9 @@ export const populatedUsageDashboardFixture: UsageDashboardViewProps = {
   usageReady: true,
   range: '30d',
   onRangeChange: () => {},
+  onExport: () => {},
+  refreshing: false,
+  onRefresh: () => {},
   themeMode: 'light',
 }
 
@@ -569,5 +572,8 @@ export const emptyUsageDashboardFixture: UsageDashboardViewProps = {
   usageReady: true,
   range: '30d',
   onRangeChange: () => {},
+  onExport: () => {},
+  refreshing: false,
+  onRefresh: () => {},
   themeMode: 'light',
 }
