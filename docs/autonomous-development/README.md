@@ -12,3 +12,4 @@ Chronological index of independently shipped product improvements.
 6. [Refresh local and fleet Usage](./2026-08-29-06-refresh-usage.md)
 7. [Copy route failure diagnostics](./2026-08-29-07-copy-route-error.md)
 8. [Submit server recovery with Enter](./2026-08-29-08-server-recovery-enter.md)
+9. [Resume recent chats from New Chat](./2026-08-29-09-new-chat-recents.md)

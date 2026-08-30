@@ -9,6 +9,7 @@ export interface NewChatSurfaceViewProps {
   planMode: boolean
   composer: ReactNode
   quickActions?: ReactNode
+  recentSessions?: ReactNode
   layoutSlots?: ReactNode
   dialog?: ReactNode
   dataTestId?: string
@@ -21,6 +22,7 @@ export function NewChatSurfaceView({
   planMode,
   composer,
   quickActions,
+  recentSessions,
   layoutSlots,
   dialog,
   dataTestId = 'new-chat-page',
@@ -58,6 +60,7 @@ export function NewChatSurfaceView({
           {quickActions}
         </m.div>
       </div>
+      {recentSessions}
       {dialog}
     </div>
   )
