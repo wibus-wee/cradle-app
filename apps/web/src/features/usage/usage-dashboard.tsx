@@ -1,16 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import { useResolvedThemeMode } from '~/store/theme'
 
 import { UsageDashboardView } from './usage-dashboard-view'
-import type { UsageRangeKey } from './usage-time-range'
+import { useUsagePreferencesStore } from './usage-preferences-store'
 import { useFleetUsage } from './use-fleet-usage'
 import { useUsageOverview } from './use-usage-overview'
 
 export function UsageDashboard() {
   // Range lives here (not in the View) because the tools query is
   // server-aggregated per range — see useUsageOverview.
-  const [range, setRange] = useState<UsageRangeKey>('30d')
+  const range = useUsagePreferencesStore(state => state.range)
+  const setRange = useUsagePreferencesStore(state => state.setRange)
   const usage = useUsageOverview(range)
   const themeMode = useResolvedThemeMode()
 
