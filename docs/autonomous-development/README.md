@@ -56,3 +56,4 @@ Chronological index of independently shipped product improvements.
 17. [Copy Mobile chat messages](./2026-08-31-17-copy-mobile-chat-messages.md)
 18. [Discover the Mobile file browser](./2026-08-31-18-discover-mobile-file-browser.md)
 19. [Open pull request checks on Mobile](./2026-08-31-19-open-mobile-pull-request-checks.md)
+20. [Browse archived Work on Mobile](./2026-08-31-20-browse-mobile-archived-work.md)

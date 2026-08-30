@@ -2,6 +2,7 @@ import type { WorkListViewProps } from './WorkListView'
 
 export const workListFixture: WorkListViewProps = {
   works: [],
+  archivedWorks: [],
   workspaces: [{
     id: 'workspace-1',
     name: 'Cradle',

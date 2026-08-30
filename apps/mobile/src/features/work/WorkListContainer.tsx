@@ -22,12 +22,14 @@ export function WorkListContainer() {
     enabled: Boolean(connection) && isRouteActive,
     queryKey: ['works', connection?.url],
     queryFn: async ({ signal }) => {
-      const [works, workspaces] = await Promise.all([
+      const [works, archivedWorks, workspaces] = await Promise.all([
         cradleRequest<GetWorksResponse>(connection!, '/works?archived=false&limit=200', { signal }),
+        cradleRequest<GetWorksResponse>(connection!, '/works?archived=true&limit=200', { signal }),
         cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
       ])
       return {
         works: works.items.sort((a, b) => b.updatedAt - a.updatedAt),
+        archivedWorks: archivedWorks.items.sort((a, b) => b.updatedAt - a.updatedAt),
         workspaces: workspaces.filter(
           workspace =>
             workspace.availability === 'available' && workspace.locator.kind !== 'managed-worktree',

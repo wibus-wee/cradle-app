@@ -26,6 +26,7 @@ type Workspace = GetWorkspacesResponse[number]
 
 export interface WorkListViewProps {
   works: Work[]
+  archivedWorks: Work[]
   workspaces: Workspace[]
   isCreating?: boolean
   isRefreshing?: boolean
@@ -54,6 +55,7 @@ function workGroup(updatedAt: number) {
 
 export function WorkListView({
   works,
+  archivedWorks,
   workspaces,
   isCreating = false,
   isRefreshing = false,
@@ -67,16 +69,19 @@ export function WorkListView({
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
   const [search, setSearch] = useState('')
+  const [lifecycle, setLifecycle] = useState<'active' | 'archived'>('active')
   const [mode, setMode] = useState<'all' | 'running' | 'attention'>('all')
   const normalizedSearch = search.trim().toLocaleLowerCase()
+  const visibleWorks = lifecycle === 'active' ? works : archivedWorks
   const searchedWorks = normalizedSearch
-    ? works.filter((work) => {
+    ? visibleWorks.filter((work) => {
         const workspaceName = workspaces.find(workspace => workspace.id === work.workspaceId)?.name
         return [work.title, work.objective, workspaceName]
           .some(value => value?.toLocaleLowerCase().includes(normalizedSearch))
       })
-    : works
+    : visibleWorks
   const filteredWorks = searchedWorks.filter((work) => {
+    if (lifecycle === 'archived') { return true }
     if (mode === 'running') { return work.activity === 'running' }
     if (mode === 'attention') { return work.activity === 'waiting' || work.activity === 'blocked' }
     return true
@@ -92,15 +97,17 @@ export function WorkListView({
     <Screen
       avoidKeyboard
       action={<AppMenuButton current="work" onSelect={onNavigate} />}
-      footer={(
-        <WorkComposer
-          isCreating={isCreating}
-          onCreate={onCreate}
-          ref={composerRef}
-          showWorkType
-          workspaces={workspaces}
-        />
-      )}
+      footer={lifecycle === 'active'
+        ? (
+            <WorkComposer
+              isCreating={isCreating}
+              onCreate={onCreate}
+              ref={composerRef}
+              showWorkType
+              workspaces={workspaces}
+            />
+          )
+        : undefined}
       leading={<CradleIconButton onPress={onOpenUsage} />}
       onPressBackground={() => {
         composerRef.current?.collapse()
@@ -111,13 +118,22 @@ export function WorkListView({
     >
       <SegmentedControl
         appearance={theme.isDark ? 'dark' : 'light'}
-        onValueChange={(value) => {
-          setMode(value === 'Running' ? 'running' : value === 'Attention' ? 'attention' : 'all')
-        }}
-        selectedIndex={mode === 'all' ? 0 : mode === 'running' ? 1 : 2}
+        onValueChange={value => setLifecycle(value === 'Archived' ? 'archived' : 'active')}
+        selectedIndex={lifecycle === 'active' ? 0 : 1}
         style={styles.segmented}
-        values={['All', 'Running', 'Attention']}
+        values={['Active', 'Archived']}
       />
+      {lifecycle === 'active' && (
+        <SegmentedControl
+          appearance={theme.isDark ? 'dark' : 'light'}
+          onValueChange={(value) => {
+            setMode(value === 'Running' ? 'running' : value === 'Attention' ? 'attention' : 'all')
+          }}
+          selectedIndex={mode === 'all' ? 0 : mode === 'running' ? 1 : 2}
+          style={styles.segmented}
+          values={['All', 'Running', 'Attention']}
+        />
+      )}
       <View style={styles.search}>
         <InputGroup
           addon={<Search color={theme.mutedForeground} size={17} />}
@@ -137,14 +153,18 @@ export function WorkListView({
           <EmptyState
             description={normalizedSearch
               ? 'Try a different title, objective, or workspace.'
-              : mode === 'running'
+              : lifecycle === 'archived'
+                ? 'Archived Work will appear here.'
+                : mode === 'running'
                 ? 'Active runs will appear here.'
                 : mode === 'attention'
                   ? 'Waiting and blocked Work will appear here.'
                   : 'Create an isolated Work to let an agent build against a project.'}
             title={normalizedSearch
               ? 'No matching Work'
-              : mode === 'running'
+              : lifecycle === 'archived'
+                ? 'No archived Work'
+                : mode === 'running'
                 ? 'Nothing running'
                 : mode === 'attention'
                   ? 'Nothing needs attention'
@@ -159,7 +179,10 @@ export function WorkListView({
             description={work.objective}
             footer={(
               <View style={styles.meta}>
-                <StatusPill label={work.activity} tone={activityTone(work.activity)} />
+                <StatusPill
+                  label={lifecycle === 'archived' ? 'archived' : work.activity}
+                  tone={lifecycle === 'archived' ? 'neutral' : activityTone(work.activity)}
+                />
                 <Text style={[styles.time, { color: theme.mutedForeground }]}>{relativeTime(work.updatedAt)}</Text>
               </View>
             )}
