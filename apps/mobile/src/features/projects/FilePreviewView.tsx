@@ -1,8 +1,9 @@
-import { FileQuestion } from 'lucide-react-native'
+import { FileQuestion, Share2 } from 'lucide-react-native'
 import { StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
 
 import type { GetWorkspacesByWorkspaceIdFilesInfoResponse } from '@/api-gen'
+import { IconButton } from '@/components/ui/icon-button'
 import { Screen } from '@/components/ui/screen'
 import { EmptyState } from '@/components/ui/states'
 import { radius, spacing } from '@/theme/tokens'
@@ -15,6 +16,7 @@ export interface FilePreviewViewProps {
   content: string | null
   isRefreshing?: boolean
   onRefresh?: () => void
+  onShare: () => void
 }
 
 function formatFileSize(bytes: number): string {
@@ -32,6 +34,7 @@ export function FilePreviewView({
   content,
   isRefreshing = false,
   onRefresh,
+  onShare,
 }: FilePreviewViewProps) {
   const theme = useTheme()
   const supported = file.previewKind === 'text' || file.previewKind === 'markdown'
@@ -39,10 +42,19 @@ export function FilePreviewView({
   return (
     <Screen insetTop={false} onRefresh={onRefresh} refreshing={isRefreshing}>
       <View style={[styles.metadata, { borderBottomColor: theme.border }]}>
-        <Text selectable style={[styles.path, { color: theme.foreground }]}>{file.path}</Text>
-        <Text style={[styles.details, { color: theme.mutedForeground }]}>
-          {`${formatFileSize(file.size)} · ${file.mimeType}`}
-        </Text>
+        <View style={styles.metadataText}>
+          <Text selectable style={[styles.path, { color: theme.foreground }]}>{file.path}</Text>
+          <Text style={[styles.details, { color: theme.mutedForeground }]}>
+            {`${formatFileSize(file.size)} · ${file.mimeType}`}
+          </Text>
+        </View>
+        {supported && (
+          <IconButton
+            accessibilityLabel="Share file"
+            icon={Share2}
+            onPress={onShare}
+          />
+        )}
       </View>
 
       {!supported
@@ -96,10 +108,16 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   metadata: {
+    alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
     gap: spacing.xs,
     marginBottom: spacing.md,
     paddingBottom: spacing.md,
+  },
+  metadataText: {
+    flex: 1,
+    gap: spacing.xs,
   },
   path: {
     fontFamily: 'GeistMono_400Regular',

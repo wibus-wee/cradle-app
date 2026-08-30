@@ -8,7 +8,8 @@ GitHub update before reloading their Cradle projections.
 Initial data-load failures expose an in-place Retry action across Projects,
 Work, Usage, pull requests, and conversations.
 Workspace detail file rows open a refreshable, read-only mobile preview for
-text and Markdown files; unsupported binary formats are identified explicitly.
+text and Markdown files; previews can be handed to other apps through the
+system share sheet, while unsupported binary formats are identified explicitly.
 
 ## Run
 
@@ -48,7 +49,8 @@ Settings.
 - `src/features/*/*View.tsx` is fixture-renderable and receives typed props and
   callbacks.
 - `src/features/projects/FilePreviewContainer.tsx` reads workspace-owned file
-  metadata before requesting text content; its View never reads routes or API state.
+  metadata before requesting text content and owns the native share handoff;
+  its View never reads routes, native APIs, or API state.
 - Root destinations use an anchored navigation menu; detail surfaces use Expo
   Router's native Stack navigation and back gestures.
 - `src/api-gen/` is generated from the authoritative server OpenAPI document.

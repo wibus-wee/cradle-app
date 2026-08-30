@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
+import { Alert, Share } from 'react-native'
 
 import type {
   GetWorkspacesByWorkspaceIdFilesContentResponse,
@@ -59,13 +60,31 @@ export function FilePreviewContainer({ workspaceId, path }: FilePreviewContainer
       />
     )
   }
+  const preview = query.data
+
+  const handleShare = async () => {
+    if (preview.content === null) {
+      return
+    }
+    try {
+      await Share.share({
+        title: preview.file.name,
+        message: `${preview.file.path}\n\n${preview.content}`,
+      })
+    }
+    catch {
+      Alert.alert('Could not share file', 'The system share sheet could not be opened.')
+    }
+  }
+
   return (
     <>
-      <Stack.Screen options={{ title: query.data.file.name }} />
+      <Stack.Screen options={{ title: preview.file.name }} />
       <FilePreviewView
-        {...query.data}
+        {...preview}
         isRefreshing={query.isRefetching}
         onRefresh={() => void query.refetch()}
+        onShare={() => void handleShare()}
       />
     </>
   )

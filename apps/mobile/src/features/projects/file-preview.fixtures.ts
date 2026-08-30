@@ -11,6 +11,7 @@ export const markdownFilePreviewFixture: FilePreviewViewProps = {
     previewKind: 'markdown',
   },
   content: '# Cradle\n\nRun the workspace from the repository root.',
+  onShare: () => {},
 }
 
 export const unsupportedFilePreviewFixture: FilePreviewViewProps = {
@@ -24,4 +25,5 @@ export const unsupportedFilePreviewFixture: FilePreviewViewProps = {
     previewKind: 'pdf',
   },
   content: null,
+  onShare: () => {},
 }
