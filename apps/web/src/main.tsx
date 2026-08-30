@@ -8,8 +8,8 @@ import * as ReactDOMClient from 'react-dom/client'
 import { AppErrorBoundary } from './components/common/app-error-boundary'
 import { resolveInitialLocale } from './i18n/browser-locale'
 import { I18nProvider } from './i18n/client'
-import { queryClient } from './lib/query-client'
 import { createBootstrapDisposerRegistry } from './lib/bootstrap-disposer'
+import { queryClient } from './lib/query-client'
 import { waitForServer } from './lib/server-readiness'
 
 // Expose shared React modules for plugin runtime
