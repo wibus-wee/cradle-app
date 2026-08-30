@@ -6,6 +6,7 @@ import {
   LockKeyhole,
   LogOut,
   RefreshCw,
+  Share2,
   Wifi,
 } from 'lucide-react-native'
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
@@ -32,6 +33,7 @@ export interface SettingsViewProps {
   onEditToken: () => void
   onNavigate: (section: AppSection) => void
   onOpenUsage: () => void
+  onShareServer: () => Promise<void>
   serverUrl: string
 }
 
@@ -46,6 +48,7 @@ export function SettingsView({
   onEditToken,
   onNavigate,
   onOpenUsage,
+  onShareServer,
   serverUrl,
 }: SettingsViewProps) {
   const theme = useTheme()
@@ -62,6 +65,14 @@ export function SettingsView({
     }
     catch {
       Alert.alert('Could not copy server address')
+    }
+  }
+  const shareServer = async () => {
+    try {
+      await onShareServer()
+    }
+    catch {
+      Alert.alert('Could not share server address')
     }
   }
   const disclosure = <ChevronRight color={theme.dimForeground} size={18} />
@@ -122,6 +133,12 @@ export function SettingsView({
                   accessibilityLabel="Copy server address"
                   icon={Copy}
                   onPress={() => void copyServer()}
+                  stopPropagation
+                />
+                <IconButton
+                  accessibilityLabel="Share server address"
+                  icon={Share2}
+                  onPress={() => void shareServer()}
                   stopPropagation
                 />
                 {disclosure}

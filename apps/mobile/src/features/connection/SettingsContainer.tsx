@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as Clipboard from 'expo-clipboard'
 import Constants from 'expo-constants'
 import { Redirect, router } from 'expo-router'
+import { Share } from 'react-native'
 
 import type { GetHealthResponse } from '@/api-gen'
 import { cradleRequest } from '@/lib/api'
@@ -46,6 +47,12 @@ export function SettingsContainer() {
       onEditToken={() => router.push('/connection/token')}
       onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onOpenUsage={() => router.push('/usage')}
+      onShareServer={async () => {
+        await Share.share({
+          message: connection.url,
+          title: 'Cradle server address',
+        })
+      }}
       serverUrl={connection.url}
     />
   )
