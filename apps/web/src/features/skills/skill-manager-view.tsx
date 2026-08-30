@@ -5,6 +5,7 @@ import {
   UploadLine as UploadIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import {
@@ -71,6 +72,8 @@ export function SkillManagerView({
   onDelete,
   onDetailOpenChange,
 }: SkillManagerViewProps) {
+  const { t } = useTranslation('skills')
+
   return (
     <div
       className="flex flex-col gap-1"
@@ -93,11 +96,11 @@ export function SkillManagerView({
               className="text-muted-foreground hover:text-foreground"
             >
               <UploadIcon className="size-3.5" />
-              Import
+              {t('manager.import')}
             </Button>
             <Button size="sm" onClick={onNew} data-testid="new-skill-btn">
               <PlusIcon className="size-3.5" />
-              New
+              {t('manager.new')}
             </Button>
           </div>
         )}
@@ -112,10 +115,10 @@ export function SkillManagerView({
           <SearchIcon className="absolute top-1/2 left-2.5 size-3 -translate-y-1/2 !text-muted-foreground/50" />
           <input
             type="text"
-            aria-label="Search skills"
+            aria-label={t('manager.searchLabel')}
             value={searchQuery}
             onChange={event => onSearchQueryChange(event.target.value)}
-            placeholder="Search skills..."
+            placeholder={t('manager.searchPlaceholder')}
             className="w-full rounded-md bg-foreground/4 py-1.5 pr-3 pl-8 text-xs text-foreground outline-none placeholder:text-muted-foreground/40"
           />
         </div>
@@ -132,7 +135,7 @@ export function SkillManagerView({
                   : 'text-muted-foreground/50 hover:text-muted-foreground',
               )}
             >
-              {scope === 'all' ? 'All' : skillScopeLabels[scope]}
+              {scope === 'all' ? t('manager.filterAll') : skillScopeLabels[scope]}
             </button>
           ))}
         </div>
@@ -147,7 +150,7 @@ export function SkillManagerView({
         : inventory.length === 0
           ? (
               <div className="py-12 text-center text-xs text-muted-foreground">
-                {searchQuery.trim() ? 'No matching skills' : 'No skills yet'}
+                {searchQuery.trim() ? t('manager.empty.noMatches') : t('manager.empty.noSkills')}
               </div>
             )
           : (
@@ -163,7 +166,7 @@ export function SkillManagerView({
                     >
                       <button
                         type="button"
-                        aria-label={`Open ${entry.name} details`}
+                        aria-label={t('manager.openDetails', { name: entry.name })}
                         onClick={() => onOpenDetail(entry)}
                         className="flex min-w-0 flex-1 items-center gap-3 py-3 text-left"
                       >
@@ -195,7 +198,7 @@ export function SkillManagerView({
                           variant="ghost"
                           size="icon-xs"
                           className="shrink-0 text-muted-foreground/40 opacity-0 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
-                          aria-label={`Delete ${entry.name} from list`}
+                          aria-label={t('manager.delete', { name: entry.name })}
                           onClick={() => onDelete(entry)}
                         >
                           <Trash2Icon aria-hidden="true" />
@@ -210,7 +213,7 @@ export function SkillManagerView({
       <Dialog open={detailOpen} onOpenChange={onDetailOpenChange}>
         <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-xl" showCloseButton>
           <DialogHeader>
-            <DialogTitle>Skill Detail</DialogTitle>
+            <DialogTitle>{t('manager.detailTitle')}</DialogTitle>
           </DialogHeader>
           {detail}
         </DialogContent>
