@@ -1,4 +1,5 @@
 {
+  "action.clearSearch": "検索をクリア",
   "aria.dialog": "コマンドパレット",
   "aria.input": "グローバル検索",
   "badge.all": "すべて",

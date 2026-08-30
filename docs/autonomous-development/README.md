@@ -24,3 +24,4 @@ Chronological index of independently shipped product improvements.
 18. [Show transfer filter counts](./2026-08-29-18-transfer-filter-counts.md)
 19. [Remember the Download Center face](./2026-08-29-19-remember-download-center-face.md)
 20. [Back out of palette modes](./2026-08-29-20-palette-backspace-all.md)
+21. [Clear global search in place](./2026-08-29-21-clear-global-search.md)

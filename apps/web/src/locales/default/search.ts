@@ -1,4 +1,5 @@
 export default {
+  'action.clearSearch': 'Clear search',
   'aria.dialog': 'Command Palette',
   'aria.input': 'Global search',
   'badge.all': 'All',
