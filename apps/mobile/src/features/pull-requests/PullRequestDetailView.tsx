@@ -1,10 +1,11 @@
-import { Check, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
+import { Check, ExternalLink, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { NativeAction } from '@/components/ui/native-action'
@@ -21,6 +22,7 @@ export interface PullRequestDetailViewProps {
   isMutating?: boolean
   isRefreshing?: boolean
   onComment: (body: string) => void
+  onOpenExternal: () => void
   onRefresh?: () => void
   onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => void
 }
@@ -30,6 +32,7 @@ export function PullRequestDetailView({
   isMutating = false,
   isRefreshing = false,
   onComment,
+  onOpenExternal,
   onRefresh,
   onReview,
 }: PullRequestDetailViewProps) {
@@ -46,7 +49,16 @@ export function PullRequestDetailView({
 
   return (
     <Screen
-      action={<StatusPill label={pullRequest.isDraft ? 'draft' : pullRequest.state} tone={pullRequest.state === 'open' ? 'success' : 'neutral'} />}
+      action={(
+        <View style={styles.headerActions}>
+          <IconButton
+            accessibilityLabel="Open pull request in GitHub"
+            icon={ExternalLink}
+            onPress={onOpenExternal}
+          />
+          <StatusPill label={pullRequest.isDraft ? 'draft' : pullRequest.state} tone={pullRequest.state === 'open' ? 'success' : 'neutral'} />
+        </View>
+      )}
       insetTop={false}
       onRefresh={onRefresh}
       refreshing={isRefreshing}
@@ -203,6 +215,11 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
     fontVariant: ['tabular-nums'],
+  },
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   reviewActions: {
     gap: spacing.sm,

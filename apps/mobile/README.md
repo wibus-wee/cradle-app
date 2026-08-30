@@ -5,6 +5,8 @@ supports server onboarding, project workspaces, live chat sessions, Work
 containers, and pull request review while away from the desktop.
 Pull request lists and details support pull-to-refresh; both force an upstream
 GitHub update before reloading their Cradle projections.
+Pull request detail exposes its canonical GitHub URL through a native external
+link action for provider-specific review and full diff workflows.
 Initial data-load failures expose an in-place Retry action across Projects,
 Work, Usage, pull requests, and conversations.
 Work detail supports pull-to-refresh for readiness and pull-request state even
@@ -61,6 +63,8 @@ Settings.
   navigation; `WorkspaceDirectoryView` renders owner-typed entry fixtures.
 - Work detail query and mutation state remain in `WorkDetailContainer`; the
   fixture-driven View owns handoff draft interaction and native refresh presentation.
+- Pull request detail keeps native linking and alerts in its Container; the
+  owner-typed View fixture receives only an external-open callback.
 - Usage range persistence is owned by `features/usage/usage-range-storage.ts`;
   invalid or unavailable storage falls back to the 30-day product default.
 - Root destinations use an anchored navigation menu; detail surfaces use Expo

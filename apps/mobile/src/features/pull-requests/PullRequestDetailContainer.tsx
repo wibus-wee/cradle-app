@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { useState } from 'react'
-import { Alert } from 'react-native'
+import { Alert, Linking } from 'react-native'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -83,6 +83,11 @@ export function PullRequestDetailContainer({
         isMutating={action.isPending}
         isRefreshing={isRefreshing}
         onComment={body => action.mutate({ endpoint: 'comment', body: { body } })}
+        onOpenExternal={() => {
+          void Linking.openURL(query.data.pullRequest.url).catch(() => {
+            Alert.alert('Could not open pull request', 'The GitHub link could not be opened on this device.')
+          })
+        }}
         onRefresh={refresh}
         onReview={(event, body) =>
           action.mutate({
