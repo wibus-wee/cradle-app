@@ -51,3 +51,4 @@ Chronological index of independently shipped product improvements.
 12. [Search Mobile workspaces](./2026-08-31-12-search-mobile-workspaces.md)
 13. [Recover Mobile chat drafts](./2026-08-31-13-mobile-chat-draft-recovery.md)
 14. [Remember the Mobile Usage range](./2026-08-31-14-remember-mobile-usage-range.md)
+15. [Break down Mobile token usage](./2026-08-31-15-mobile-token-breakdown.md)

@@ -102,6 +102,25 @@ export function UsageView({
           </Text>
         </View>
 
+        <View style={[styles.tokenBreakdown, { borderBottomColor: theme.border }]}>
+          <View style={styles.tokenType}>
+            <Text style={[styles.tokenTypeValue, { color: theme.foreground }]}>
+              {formatNumber(summary.totalPromptTokens)}
+            </Text>
+            <Text style={[styles.tokenTypeLabel, { color: theme.mutedForeground }]}>
+              Input tokens
+            </Text>
+          </View>
+          <View style={styles.tokenType}>
+            <Text style={[styles.tokenTypeValue, { color: theme.foreground }]}>
+              {formatNumber(summary.totalCompletionTokens)}
+            </Text>
+            <Text style={[styles.tokenTypeLabel, { color: theme.mutedForeground }]}>
+              Output tokens
+            </Text>
+          </View>
+        </View>
+
         <View style={[styles.stats, { borderBottomColor: theme.border }]}>
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: theme.foreground }]}>
@@ -292,5 +311,24 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     height: 4,
     overflow: 'hidden',
+  },
+  tokenBreakdown: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  tokenType: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  tokenTypeLabel: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  tokenTypeValue: {
+    fontSize: 17,
+    fontVariant: ['tabular-nums'],
+    lineHeight: 22,
   },
 })
