@@ -54,3 +54,4 @@ Chronological index of independently shipped product improvements.
 15. [Break down Mobile token usage](./2026-08-31-15-mobile-token-breakdown.md)
 16. [Expand Mobile model usage](./2026-08-31-16-expand-mobile-model-usage.md)
 17. [Copy Mobile chat messages](./2026-08-31-17-copy-mobile-chat-messages.md)
+18. [Discover the Mobile file browser](./2026-08-31-18-discover-mobile-file-browser.md)

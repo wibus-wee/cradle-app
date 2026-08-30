@@ -87,6 +87,7 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
         isCreating={create.isPending}
         isRefreshing={isRefreshing}
         onCreate={input => create.mutate(input)}
+        onBrowseFiles={() => router.push(`/workspace/${workspaceId}/files`)}
         onOpenSession={sessionId => router.push(`/session/${sessionId}`)}
         onOpenFile={(entry) => {
           router.push({

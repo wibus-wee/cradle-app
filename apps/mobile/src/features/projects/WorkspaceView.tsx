@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder, GitBranch, Info, MessageSquareText } from 'lucide-react-native'
+import { ChevronRight, File, Folder, FolderSearch, GitBranch, Info, MessageSquareText } from 'lucide-react-native'
 import type { ReactElement } from 'react'
 import { useRef } from 'react'
 import { FlatList, Keyboard, StyleSheet, View } from 'react-native'
@@ -30,6 +30,7 @@ type WorkspaceRow
   = | { key: string, kind: 'heading', title: string, meta: string }
     | { key: string, kind: 'work', work: Work }
     | { key: string, kind: 'session', session: Session }
+    | { key: string, kind: 'browse-files' }
     | { key: string, kind: 'file', entry: FileEntry }
     | { key: string, kind: 'empty', node: ReactElement }
 
@@ -41,6 +42,7 @@ export interface WorkspaceViewProps {
   files: FileEntry[]
   isCreating?: boolean
   isRefreshing?: boolean
+  onBrowseFiles: () => void
   onCreate: (input: PostWorksData['body']) => void
   onOpenFile: (entry: FileEntry) => void
   onOpenSession: (sessionId: string) => void
@@ -63,6 +65,7 @@ export function WorkspaceView({
   files,
   isCreating = false,
   isRefreshing = false,
+  onBrowseFiles,
   onCreate,
   onOpenFile,
   onOpenSession,
@@ -91,6 +94,7 @@ export function WorkspaceView({
   }
   if (files.length > 0) {
     rows.push({ key: 'heading-files', kind: 'heading', meta: `${files.length} top-level`, title: 'Files' })
+    rows.push({ key: 'browse-files', kind: 'browse-files' })
     rows.push(...files.slice(0, 12).map(entry => ({ key: `file-${entry.path}`, entry, kind: 'file' as const })))
   }
   return (
@@ -163,6 +167,18 @@ export function WorkspaceView({
                 media={<MessageSquareText color={theme.session} size={16} />}
                 onPress={() => onOpenSession(session.id)}
                 title={session.title ?? 'Untitled conversation'}
+                variant="muted"
+              />
+            )
+          }
+          if (item.kind === 'browse-files') {
+            return (
+              <Item
+                actions={<ChevronRight color={theme.dimForeground} size={14} />}
+                description={`${files.length} top-level entries`}
+                media={<FolderSearch color={theme.workspace} size={16} />}
+                onPress={onBrowseFiles}
+                title="Browse all files"
                 variant="muted"
               />
             )
