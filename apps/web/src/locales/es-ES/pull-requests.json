@@ -60,6 +60,7 @@
   "group.today": "Hoy",
   "group.yesterday": "Ayer",
   "page.description": "Revisa y sigue el trabajo en GitHub como {{login}}.",
+  "page.filteredCount": "{{visible}} de {{total}}",
   "page.loadMore": "Cargar más",
   "page.loadingMore": "Cargando…",
   "page.searchPlaceholder": "Buscar Pull requests",

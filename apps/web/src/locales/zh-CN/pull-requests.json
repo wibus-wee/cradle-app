@@ -60,6 +60,7 @@
   "group.today": "今天",
   "group.yesterday": "昨天",
   "page.description": "以 {{login}} 身份审查并跟踪 GitHub 上的工作。",
+  "page.filteredCount": "{{visible}} / {{total}}",
   "page.loadMore": "加载更多",
   "page.loadingMore": "加载中…",
   "page.searchPlaceholder": "搜索 Pull request",

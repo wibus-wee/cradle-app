@@ -106,6 +106,7 @@
   "group.today": "Today",
   "group.yesterday": "Yesterday",
   "page.description": "Review and track work on GitHub as {{login}}.",
+  "page.filteredCount": "{{visible}} of {{total}}",
   "page.loadingMore": "Loading…",
   "page.loadMore": "Load more",
   "page.refresh": "Refresh pull requests from GitHub",

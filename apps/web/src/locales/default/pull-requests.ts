@@ -2,6 +2,7 @@ export default {
   'surface.title': 'Pull requests',
   'page.title': 'Pull request',
   'page.description': 'Review and track work on GitHub as {{login}}.',
+  'page.filteredCount': '{{visible}} of {{total}}',
   'page.searchPlaceholder': 'Search pull requests',
   'page.clearSearch': 'Clear pull request search',
   'page.refresh': 'Refresh pull requests from GitHub',

@@ -128,6 +128,10 @@ export function PullRequestsPageView({
     () => groupPullRequestsByRecency(visiblePullRequests, now),
     [now, visiblePullRequests],
   )
+  const hasActiveFilter = search.trim().length > 0
+    || filter !== 'all'
+    || stateFilter !== 'all'
+    || repository !== null
   const activeFeeds = filter === 'authored'
     ? [authoredFeed]
     : filter === 'reviewing'
@@ -168,7 +172,12 @@ export function PullRequestsPageView({
           <div className="flex items-baseline gap-2">
             <h1 className="text-lg font-semibold text-foreground">{t('page.title')}</h1>
             <span className="text-[12px] tabular-nums text-muted-foreground">
-              {entries.length}
+              {hasActiveFilter
+                ? t('page.filteredCount', {
+                    visible: visiblePullRequests.length,
+                    total: entries.length,
+                  })
+                : entries.length}
             </span>
           </div>
           {viewer
