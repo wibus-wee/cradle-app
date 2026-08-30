@@ -53,3 +53,4 @@ Chronological index of independently shipped product improvements.
 14. [Remember the Mobile Usage range](./2026-08-31-14-remember-mobile-usage-range.md)
 15. [Break down Mobile token usage](./2026-08-31-15-mobile-token-breakdown.md)
 16. [Expand Mobile model usage](./2026-08-31-16-expand-mobile-model-usage.md)
+17. [Copy Mobile chat messages](./2026-08-31-17-copy-mobile-chat-messages.md)

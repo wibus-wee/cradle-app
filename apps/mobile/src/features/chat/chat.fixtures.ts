@@ -8,6 +8,7 @@ export const chatFixture: ChatViewProps = {
   messages: [],
   onCancel: () => {},
   onComposerDraftChange: () => {},
+  onCopyMessage: async () => {},
   onLoadEarlier: () => {},
   onModeChange: () => {},
   onRequestMessageDetail: () => {},

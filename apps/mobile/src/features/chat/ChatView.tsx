@@ -59,6 +59,7 @@ export interface ChatViewProps {
   sendError?: string | null
   onCancel: () => void
   onComposerDraftChange: (draft: ChatComposerDraft) => void
+  onCopyMessage: (text: string) => Promise<void>
   onLoadEarlier: () => void
   onModeChange: (mode: 'build' | 'plan') => void
   onRequestMessageDetail: (messageId: string | null) => void
@@ -88,6 +89,7 @@ export function ChatView({
   sendError = null,
   onCancel,
   onComposerDraftChange,
+  onCopyMessage,
   onLoadEarlier,
   onModeChange,
   onRequestMessageDetail,
@@ -226,6 +228,7 @@ export function ChatView({
                     errorText={item.row.errorText}
                     message={message}
                     onActivityPress={onRequestMessageDetail}
+                    onCopy={onCopyMessage}
                     status={liveMessage?.id === item.row.messageId ? 'streaming' : item.row.status}
                   />
                 )
@@ -234,6 +237,7 @@ export function ChatView({
                 <ChatMessage
                   message={item.message}
                   onActivityPress={item.kind === 'live' ? onRequestMessageDetail : undefined}
+                  onCopy={onCopyMessage}
                   status={
                     item.kind === 'live' ? (isStreaming ? 'streaming' : 'complete') : undefined
                   }

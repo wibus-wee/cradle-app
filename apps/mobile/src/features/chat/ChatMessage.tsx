@@ -1,9 +1,9 @@
 import type { UIMessage } from 'ai'
 /* eslint-disable react/no-array-index-key -- AI SDK text parts have no protocol id and their position is stable. */
 import { isReasoningUIPart, isTextUIPart, isToolUIPart } from 'ai'
-import { Check, CircleAlert, Wrench } from 'lucide-react-native'
-import { memo } from 'react'
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native'
+import { Check, CircleAlert, Copy, Wrench } from 'lucide-react-native'
+import { memo, useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
 
 import { NativeMarkdown } from '@/components/ui/native-markdown'
@@ -15,27 +15,85 @@ interface ChatMessageProps {
   errorText?: string | null
   message: UIMessage
   onActivityPress?: (messageId: string) => void
+  onCopy?: (text: string) => Promise<void>
   status?: 'streaming' | 'complete' | 'aborted' | 'failed'
+}
+
+function CopyAction({
+  align = 'start',
+  text,
+  onCopy,
+}: {
+  align?: 'start' | 'end'
+  text: string
+  onCopy: (text: string) => Promise<void>
+}) {
+  const theme = useTheme()
+  const [copied, setCopied] = useState(false)
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current)
+    }
+  }, [])
+
+  const copy = async () => {
+    try {
+      await onCopy(text)
+      setCopied(true)
+      if (resetTimerRef.current) {
+        clearTimeout(resetTimerRef.current)
+      }
+      resetTimerRef.current = setTimeout(setCopied, 1_500, false)
+    }
+    catch {
+      Alert.alert('Could not copy message')
+    }
+  }
+
+  return (
+    <PressableScale
+      accessibilityLabel={copied ? 'Message copied' : 'Copy message'}
+      accessibilityRole="button"
+      haptic
+      onPress={() => void copy()}
+      style={[
+        styles.copyAction,
+        align === 'end' && styles.copyActionEnd,
+        { backgroundColor: theme.surfaceInset },
+      ]}
+    >
+      {copied
+        ? <Check color={theme.success} size={14} />
+        : <Copy color={theme.mutedForeground} size={14} />}
+    </PressableScale>
+  )
 }
 
 function ChatMessageContent({
   errorText = null,
   message,
   onActivityPress,
+  onCopy,
   status = 'complete',
 }: ChatMessageProps) {
   const theme = useTheme()
+  const copyText = message.parts
+    .filter(isTextUIPart)
+    .map(part => part.text)
+    .join('\n')
+    .trim()
 
   if (message.role === 'user') {
-    const text = message.parts
-      .filter(isTextUIPart)
-      .map(part => part.text)
-      .join('')
     return (
-      <View style={[styles.userBubble, { backgroundColor: theme.muted }]}>
-        <Text selectable style={[styles.userText, { color: theme.foreground }]}>
-          {text}
-        </Text>
+      <View style={styles.userMessage}>
+        <View style={[styles.userBubble, { backgroundColor: theme.muted }]}>
+          <Text selectable style={[styles.userText, { color: theme.foreground }]}>
+            {copyText}
+          </Text>
+        </View>
+        {copyText && onCopy && <CopyAction align="end" onCopy={onCopy} text={copyText} />}
       </View>
     )
   }
@@ -198,6 +256,7 @@ function ChatMessageContent({
       {status === 'failed' && errorText && (
         <Text style={[styles.terminalStatus, { color: theme.destructive }]}>{errorText}</Text>
       )}
+      {copyText && onCopy && <CopyAction onCopy={onCopy} text={copyText} />}
     </View>
   )
 }
@@ -236,6 +295,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16,
   },
+  copyAction: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  copyActionEnd: {
+    alignSelf: 'flex-end',
+  },
   terminalStatus: {
     fontSize: 12,
     lineHeight: 18,
@@ -251,6 +321,11 @@ const styles = StyleSheet.create({
     maxWidth: '84%',
     paddingHorizontal: 12,
     paddingVertical: spacing.sm,
+  },
+  userMessage: {
+    alignItems: 'flex-end',
+    alignSelf: 'stretch',
+    gap: spacing.xs,
   },
   userText: {
     fontSize: 14,

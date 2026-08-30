@@ -1,6 +1,7 @@
 import type { InfiniteData } from '@tanstack/react-query'
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
 import type { UIMessage } from 'ai'
+import * as Clipboard from 'expo-clipboard'
 import { Stack } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -384,6 +385,9 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         messages={messages}
         onCancel={handleCancel}
         onComposerDraftChange={composerDraft.scheduleSave}
+        onCopyMessage={async (text) => {
+          await Clipboard.setStringAsync(text)
+        }}
         onModeChange={handleModeChange}
         onSend={handleSend}
         pendingUser={pendingUser}
