@@ -51,6 +51,7 @@ function pullRequestGroup(updatedAt: number) {
 export function PullRequestListView({
   authored,
   reviewing,
+  login,
   isRefreshing = false,
   onNavigate,
   onOpen,
@@ -80,6 +81,7 @@ export function PullRequestListView({
       leading={<CradleIconButton onPress={onOpenUsage} />}
       onRefresh={onRefresh}
       refreshing={isRefreshing}
+      subtitle={`@${login}`}
       title="Pull requests"
     >
       <SegmentedControl
