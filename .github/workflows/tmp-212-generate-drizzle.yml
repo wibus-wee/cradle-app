@@ -1,0 +1,33 @@
+name: Temporary ACP Drizzle generation
+
+on:
+  push:
+    branches:
+      - chore/212-drop-acp-auth-secret-refs
+    paths:
+      - '.github/workflows/tmp-212-generate-drizzle.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chore/212-drop-acp-auth-secret-refs
+      - uses: ./.github/actions/setup
+      - name: Generate reviewed Drizzle migration artifacts
+        run: pnpm --filter @cradle/db exec drizzle-kit generate --name drop_acp_auth_secret_refs
+      - name: Commit generated migration artifacts
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packages/db/drizzle
+          git diff --cached --exit-code && { echo 'Drizzle produced no changes'; exit 1; }
+          git commit -m 'chore(db): generate ACP auth persistence cleanup migration'
+          git push origin HEAD:chore/212-drop-acp-auth-secret-refs
