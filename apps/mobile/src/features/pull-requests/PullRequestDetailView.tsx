@@ -1,6 +1,6 @@
 import { Check, ExternalLink, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
 import { useState } from 'react'
-import { Alert, StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
@@ -172,16 +172,29 @@ export function PullRequestDetailView({
       <View style={styles.section}>
         <SectionHeading meta={`${detail.timeline.length} events`} title="Conversation" />
         {detail.timeline.slice(-20).map(item => (
-          <View key={item.id} style={[styles.timeline, { borderBottomColor: theme.border }]}>
+          <Pressable
+            accessibilityRole={item.url ? 'link' : undefined}
+            disabled={!item.url}
+            key={item.id}
+            onPress={item.url
+              ? () => void openExternal(item.url!, 'Could not open conversation event')
+              : undefined}
+            style={({ pressed }) => [
+              styles.timeline,
+              { borderBottomColor: theme.border },
+              pressed && styles.timelinePressed,
+            ]}
+          >
             <View style={styles.timelineHeader}>
               <MessageSquare color={theme.mutedForeground} size={16} />
               <Text style={[styles.author, { color: theme.foreground }]}>
                 {item.author?.login ?? 'Unknown'}
               </Text>
               {item.state && <StatusPill label={item.state.toLowerCase()} />}
+              {item.url && <ExternalLink color={theme.dimForeground} size={15} />}
             </View>
             {item.body && <Text style={[styles.timelineBody, { color: theme.foreground }]}>{item.body}</Text>}
-          </View>
+          </Pressable>
         ))}
       </View>
 
@@ -316,5 +329,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  timelinePressed: {
+    opacity: 0.65,
   },
 })
