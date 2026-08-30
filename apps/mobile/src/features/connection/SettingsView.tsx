@@ -4,21 +4,27 @@ import {
   Link2,
   LockKeyhole,
   LogOut,
+  RefreshCw,
+  Wifi,
 } from 'lucide-react-native'
-import { Alert, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
 
 import type { AppSection } from '@/components/common/app-menu-button'
 import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { StatusPill } from '@/components/ui/status-pill'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 export interface SettingsViewProps {
   appVersion: string
+  connectionStatus: 'checking' | 'connected' | 'unavailable'
   hasServerToken: boolean
+  onCheckConnection: () => void
   onDisconnect: () => void
   onEditServer: () => void
   onEditToken: () => void
@@ -29,7 +35,9 @@ export interface SettingsViewProps {
 
 export function SettingsView({
   appVersion,
+  connectionStatus,
   hasServerToken,
+  onCheckConnection,
   onDisconnect,
   onEditServer,
   onEditToken,
@@ -66,6 +74,36 @@ export function SettingsView({
         <View style={styles.section}>
           <SectionHeading title="Connection" />
           <Item
+            actions={(
+              <View style={styles.connectionActions}>
+                <StatusPill
+                  label={connectionStatus}
+                  tone={connectionStatus === 'connected'
+                    ? 'success'
+                    : connectionStatus === 'unavailable'
+                      ? 'danger'
+                      : 'neutral'}
+                />
+                {connectionStatus === 'checking'
+                  ? <ActivityIndicator color={theme.mutedForeground} size="small" />
+                  : (
+                      <IconButton
+                        accessibilityLabel="Check server connection"
+                        icon={RefreshCw}
+                        onPress={onCheckConnection}
+                      />
+                    )}
+              </View>
+            )}
+            description={connectionStatus === 'connected'
+              ? 'Server is responding'
+              : connectionStatus === 'unavailable'
+                ? 'Server could not be reached'
+                : 'Contacting server'}
+            media={<Wifi color={connectionStatus === 'connected' ? theme.success : theme.tertiaryForeground} size={19} />}
+            title="Connection status"
+          />
+          <Item
             actions={disclosure}
             description={serverUrl}
             media={<Link2 color={theme.tertiaryForeground} size={19} />}
@@ -99,6 +137,11 @@ export function SettingsView({
 }
 
 const styles = StyleSheet.create({
+  connectionActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   page: {
     flex: 1,
   },

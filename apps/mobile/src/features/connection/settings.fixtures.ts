@@ -3,7 +3,9 @@ import type { SettingsViewProps } from './SettingsView'
 
 export const settingsFixture: SettingsViewProps = {
   appVersion: '0.1.0',
+  connectionStatus: 'connected',
   hasServerToken: true,
+  onCheckConnection: () => {},
   onDisconnect: () => {},
   onEditServer: () => {},
   onEditToken: () => {},
