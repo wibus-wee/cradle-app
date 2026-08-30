@@ -1,4 +1,6 @@
 {
+  "action.exportCsv": "Export CSV",
+  "action.refresh": "Refresh usage data",
   "breakdown.description": "Token and cost share by model, agent, and provider target.",
   "breakdown.dimension.agents": "Agents",
   "breakdown.dimension.models": "Models",
@@ -21,8 +23,6 @@
   "chart.dailyCostLast30Days": "Daily cost (last 30 days)",
   "chart.last30Days": "Last 30 days",
   "description": "Token consumption over the past year",
-  "action.exportCsv": "Export CSV",
-  "action.refresh": "Refresh usage data",
   "device.activeDays": "{{count}} active days",
   "device.description": "Token and cost share across devices in your Fabric.",
   "device.status.offline": "Offline",

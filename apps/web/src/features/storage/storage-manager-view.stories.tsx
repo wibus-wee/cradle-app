@@ -1,39 +1,72 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 
-import type { StorageManagerCopy } from './storage-manager-view'
+import type { StorageManagerCopy, StorageQuickAction } from './storage-manager-view'
 import { StorageManagerView } from './storage-manager-view'
 
 const MB = 1024 * 1024
+
 const copy: StorageManagerCopy = {
   title: 'Storage',
   description: 'Review disk usage and remove data you no longer need.',
   totalUsed: 'Cradle data',
+  reclaimableTotal: 'Reclaimable',
   measuredNow: 'Measured now',
+  measuredAt: time => `Measured ${time}`,
+  dataDirectory: 'Data directory',
   refresh: 'Refresh storage',
-  categories: { database: 'Database', runtime: 'Runtime data', attachments: 'Attachments', artifacts: 'Artifacts', terminal: 'Terminal history', diagnostics: 'Logs & diagnostics', other: 'Other' },
+  actionCopyPath: 'Copy path',
+  actionCopied: 'Copied',
+  actionRetry: 'Retry',
+  actionCancel: 'Cancel',
+  categories: {
+    database: 'Database',
+    runtime: 'Runtime data',
+    attachments: 'Attachments',
+    artifacts: 'Artifacts',
+    terminal: 'Terminal history',
+    diagnostics: 'Logs & diagnostics',
+    other: 'Other',
+  },
   categoryFiles: count => `${count} files`,
+  parts: {
+    local: 'Local',
+    runtime: 'Runtime',
+    attachments: 'Files',
+    artifacts: 'Artifacts',
+    terminal: 'Terminal',
+  },
   sessionsTitle: 'Sessions',
   sessionsCount: count => `${count} sessions`,
   searchPlaceholder: 'Search sessions',
-  largestFirst: 'Largest',
-  recentFirst: 'Recent',
+  searchShortcut: 'Press / to search',
+  sortLabels: {
+    reclaimable: 'Reclaimable',
+    total: 'Total size',
+    recent: 'Recent',
+    name: 'Name',
+  },
+  filterAll: 'All',
   selectAll: 'Select all',
   clearTranscript: 'Clear transcript',
   deleteSession: 'Delete session',
   selected: count => `${count} selected`,
+  selectionFreeable: size => `Free ${size}`,
   clearSelected: 'Clear transcripts',
   deleteSelected: 'Delete',
   empty: 'No sessions are using local storage.',
+  emptyCategory: 'No sessions use this category.',
   noMatches: 'No sessions match this search.',
   error: 'Storage usage could not be measured.',
   active: 'Active',
   archived: 'Archived',
   messages: count => `${count} messages`,
-  localData: 'Local',
-  runtimeData: 'Runtime',
-  attachments: 'Files',
-  artifacts: 'Artifacts',
-  terminal: 'Terminal',
+  quickCleanTitle: 'Quick clean',
+  quickCleanArchivedClearDescription: (count, size) => `Clear transcripts from ${count} archived sessions and free ${size}.`,
+  quickCleanArchivedDeleteDescription: (count, size) => `Delete ${count} archived sessions and free ${size}.`,
+  quickCleanTopClearDescription: (count, size) => `Clear the top ${count} sessions to free ${size}.`,
+  quickCleanClearArchived: 'Clear archived transcripts',
+  quickCleanDeleteArchived: 'Delete archived sessions',
+  quickCleanClearTop: 'Clear top sessions',
   confirmClearTitle: count => count === 1 ? 'Clear this transcript?' : `Clear ${count} transcripts?`,
   confirmClearDescription: 'Messages, run history, attachments, and supported provider-native sessions are removed. Session titles and workspace links remain.',
   confirmDeleteTitle: count => count === 1 ? 'Delete this session?' : `Delete ${count} sessions?`,
@@ -64,6 +97,33 @@ const overview = {
   ],
 }
 
+const quickActions: StorageQuickAction[] = [
+  {
+    id: 'clear-archived',
+    action: 'purge-transcripts',
+    sessionIds: ['2'],
+    reclaimableBytes: 59 * MB,
+    title: 'Clear archived transcripts',
+    description: 'Clear transcripts from 1 archived session and free 59 MB.',
+  },
+  {
+    id: 'delete-archived',
+    action: 'delete-sessions',
+    sessionIds: ['2'],
+    reclaimableBytes: 59 * MB,
+    title: 'Delete archived sessions',
+    description: 'Delete 1 archived session and free 59 MB.',
+  },
+  {
+    id: 'clear-top',
+    action: 'purge-transcripts',
+    sessionIds: ['1', '2', '4'],
+    reclaimableBytes: 211 * MB,
+    title: 'Clear top sessions',
+    description: 'Clear the top 3 sessions to free 211 MB.',
+  },
+]
+
 const meta = {
   title: 'Settings/Storage Manager',
   component: StorageManagerView,
@@ -71,6 +131,7 @@ const meta = {
   args: {
     overview,
     copy,
+    quickActions,
     loading: false,
     error: false,
     busy: false,
@@ -84,4 +145,18 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const Default: Story = {}
-export const Loading: Story = { args: { loading: true } }
+
+export const Loading: Story = { args: { loading: true, quickActions: [] } }
+
+export const ErrorState: Story = { args: { error: true, quickActions: [] } }
+
+export const Empty: Story = {
+  args: {
+    overview: { ...overview, totalBytes: 0, categories: overview.categories.map(category => ({ ...category, bytes: 0, fileCount: 0 })), sessions: [] },
+    quickActions: [],
+  },
+}
+
+export const NoQuickActions: Story = {
+  args: { quickActions: [] },
+}
