@@ -14,8 +14,6 @@ runs:
   steps:
     - name: Setup pnpm
       uses: pnpm/action-setup@v4
-      with:
-        version: 11.2.2
 
     - name: Setup Node.js
       if: runner.os != 'Windows'
