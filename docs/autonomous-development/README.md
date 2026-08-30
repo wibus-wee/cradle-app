@@ -26,3 +26,4 @@ Chronological index of independently shipped product improvements.
 20. [Back out of palette modes](./2026-08-29-20-palette-backspace-all.md)
 21. [Clear global search in place](./2026-08-29-21-clear-global-search.md)
 22. [Quick-focus Kanban search](./2026-08-29-22-kanban-search-shortcut.md)
+23. [Clear review file filters](./2026-08-29-23-clear-review-file-filter.md)
