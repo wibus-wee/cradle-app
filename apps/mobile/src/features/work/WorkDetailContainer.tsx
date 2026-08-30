@@ -60,8 +60,12 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
         isSubmitting={submit.isPending}
         onOpenPullRequest={(owner, repo, number) =>
           router.push(`/pull-request/${owner}/${repo}/${number}`)}
-        onPrepare={handoff => prepare.mutate(handoff)}
-        onSubmit={handoff => submit.mutate(handoff)}
+        onPrepare={async (handoff) => {
+          await prepare.mutateAsync(handoff)
+        }}
+        onSubmit={async (handoff) => {
+          await submit.mutateAsync(handoff)
+        }}
       />
     </>
   )

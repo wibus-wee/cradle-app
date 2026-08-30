@@ -24,8 +24,8 @@ export interface WorkDetailViewProps {
   isPreparing?: boolean
   isSubmitting?: boolean
   onOpenPullRequest: (owner: string, repo: string, number: number) => void
-  onPrepare: (handoff: WorkHandoff) => void
-  onSubmit: (handoff: WorkHandoff) => void
+  onPrepare: (handoff: WorkHandoff) => Promise<void>
+  onSubmit: (handoff: WorkHandoff) => Promise<void>
 }
 
 export function WorkDetailView({
@@ -42,7 +42,33 @@ export function WorkDetailView({
     summary: detail.work.handoffSummary ?? '',
     testPlan: detail.work.handoffTestPlan ?? '',
   })
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error', text: string } | null>(null)
   const canHandoff = handoff.title.trim() && handoff.summary.trim() && handoff.testPlan.trim()
+
+  const saveHandoff = async () => {
+    setFeedback(null)
+    try {
+      await onPrepare(handoff)
+      setFeedback({ text: 'Handoff saved', tone: 'success' })
+    }
+    catch {
+      setFeedback({ text: 'Could not save handoff. Your text has been preserved.', tone: 'error' })
+    }
+  }
+
+  const submitHandoff = async () => {
+    setFeedback(null)
+    try {
+      await onSubmit(handoff)
+      setFeedback({
+        text: detail.pullRequest ? 'Pull request updated' : 'Draft pull request created',
+        tone: 'success',
+      })
+    }
+    catch {
+      setFeedback({ text: 'Could not submit handoff. Your text has been preserved.', tone: 'error' })
+    }
+  }
 
   return (
     <Screen
@@ -76,36 +102,57 @@ export function WorkDetailView({
       <View style={styles.handoff}>
         <SectionHeading meta="Draft metadata" title="Pull request handoff" />
         <InputGroup
-          onChangeText={title => setHandoff(current => ({ ...current, title }))}
+          editable={!isPreparing && !isSubmitting}
+          onChangeText={(title) => {
+            setFeedback(null)
+            setHandoff(current => ({ ...current, title }))
+          }}
           placeholder="Pull request title"
           value={handoff.title}
         />
         <InputGroup
+          editable={!isPreparing && !isSubmitting}
           multiline
-          onChangeText={summary => setHandoff(current => ({ ...current, summary }))}
+          onChangeText={(summary) => {
+            setFeedback(null)
+            setHandoff(current => ({ ...current, summary }))
+          }}
           placeholder="What changed and why"
           value={handoff.summary}
         />
         <InputGroup
+          editable={!isPreparing && !isSubmitting}
           multiline
-          onChangeText={testPlan => setHandoff(current => ({ ...current, testPlan }))}
+          onChangeText={(testPlan) => {
+            setFeedback(null)
+            setHandoff(current => ({ ...current, testPlan }))
+          }}
           placeholder="Verification performed"
           value={handoff.testPlan}
         />
+        {feedback && (
+          <Text style={[
+            styles.feedback,
+            { color: feedback.tone === 'success' ? theme.success : theme.destructive },
+          ]}
+          >
+            {feedback.text}
+          </Text>
+        )}
         <View style={styles.actions}>
           <Button
-            disabled={!canHandoff}
+            disabled={!canHandoff || isPreparing || isSubmitting}
             label="Save handoff"
             loading={isPreparing}
-            onPress={() => onPrepare(handoff)}
+            onPress={() => void saveHandoff()}
             style={styles.action}
             variant="secondary"
           />
           <NativeAction
-            disabled={!canHandoff || !detail.readiness.clean || detail.readiness.commitsAhead === 0}
+            disabled={!canHandoff || isPreparing || isSubmitting || !detail.readiness.clean || detail.readiness.commitsAhead === 0}
             label={detail.pullRequest ? 'Update PR' : 'Create draft PR'}
             loading={isSubmitting}
-            onPress={() => onSubmit(handoff)}
+            onPress={() => void submitHandoff()}
             style={styles.action}
           />
         </View>
@@ -138,6 +185,10 @@ const styles = StyleSheet.create({
   handoff: {
     gap: spacing.md,
     marginTop: spacing.xl,
+  },
+  feedback: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   objective: {
     gap: spacing.sm,

@@ -47,3 +47,4 @@ Chronological index of independently shipped product improvements.
 8. [Identify the Mobile pull request account](./2026-08-31-08-mobile-pull-request-account.md)
 9. [Open Mobile pull requests on GitHub](./2026-08-31-09-open-mobile-pull-request-on-github.md)
 10. [Preserve failed Mobile review drafts](./2026-08-31-10-preserve-mobile-review-drafts.md)
+11. [Confirm Mobile Work handoffs](./2026-08-31-11-mobile-work-handoff-feedback.md)
