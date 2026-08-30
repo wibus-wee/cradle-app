@@ -64,3 +64,4 @@ Chronological index of independently shipped product improvements.
 25. [Share the Mobile server address](./2026-08-31-25-share-mobile-server-address.md)
 26. [Show workspace branch context on Mobile](./2026-08-31-26-show-mobile-workspace-branches.md)
 27. [Attribute Mobile Usage to providers](./2026-08-31-27-mobile-provider-usage.md)
+28. [Expand pull request history on Mobile](./2026-08-31-28-expand-mobile-pull-request-history.md)

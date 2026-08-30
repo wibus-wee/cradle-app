@@ -1,4 +1,4 @@
-import { Check, ExternalLink, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronUp, ExternalLink, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
 import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
@@ -34,8 +34,10 @@ export function PullRequestDetailView({
 }: PullRequestDetailViewProps) {
   const theme = useTheme()
   const [comment, setComment] = useState('')
+  const [showAllTimeline, setShowAllTimeline] = useState(false)
   const [submissionError, setSubmissionError] = useState<string | null>(null)
   const { pullRequest } = detail
+  const visibleTimeline = showAllTimeline ? detail.timeline : detail.timeline.slice(-20)
 
   const openExternal = async (url: string, failureMessage: string) => {
     try {
@@ -171,7 +173,18 @@ export function PullRequestDetailView({
 
       <View style={styles.section}>
         <SectionHeading meta={`${detail.timeline.length} events`} title="Conversation" />
-        {detail.timeline.slice(-20).map(item => (
+        {detail.timeline.length > 20 && (
+          <Button
+            icon={showAllTimeline ? ChevronDown : ChevronUp}
+            label={showAllTimeline
+              ? 'Show latest 20'
+              : `Show ${detail.timeline.length - 20} earlier events`}
+            onPress={() => setShowAllTimeline(current => !current)}
+            style={styles.timelineToggle}
+            variant="secondary"
+          />
+        )}
+        {visibleTimeline.map(item => (
           <Pressable
             accessibilityRole={item.url ? 'link' : undefined}
             disabled={!item.url}
@@ -332,5 +345,8 @@ const styles = StyleSheet.create({
   },
   timelinePressed: {
     opacity: 0.65,
+  },
+  timelineToggle: {
+    marginTop: spacing.sm,
   },
 })
