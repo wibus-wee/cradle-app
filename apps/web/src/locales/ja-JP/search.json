@@ -17,6 +17,8 @@
   "command.openSettings.label": "設定を開く",
   "command.openUsage.keywords": "usage cost token 使用量 コスト",
   "command.openUsage.label": "使用量統計",
+  "command.reopenClosed.keywords": "reopen restore closed surface tab 再度 開く 復元",
+  "command.reopenClosed.label": "閉じた Surface を再度開く",
   "command.recent": "最近",
   "command.toggleSidebar.keywords": "sidebar toggle サイドバー 切り替え",
   "command.toggleSidebar.label": "サイドバーを切り替え",

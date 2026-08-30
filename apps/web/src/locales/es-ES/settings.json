@@ -804,6 +804,8 @@
   "shortcut.builtIn.chatSend.label": "Enviar mensaje",
   "shortcut.builtIn.closeSurface.description": "Cierra la superficie activa.",
   "shortcut.builtIn.closeSurface.label": "Cerrar superficie",
+  "shortcut.builtIn.reopenSurface.description": "Restaura la superficie cerrada más recientemente.",
+  "shortcut.builtIn.reopenSurface.label": "Reabrir superficie cerrada",
   "shortcut.builtIn.commandPalette.description": "Abre comandos de la app directamente.",
   "shortcut.builtIn.commandPalette.label": "Paleta de comandos",
   "shortcut.builtIn.contextual.description": "Atajos que se aplican dentro de un editor, panel o lista específicos.",

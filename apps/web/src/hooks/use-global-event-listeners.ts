@@ -21,6 +21,7 @@ import {
   activateAdjacentSurface,
   closeActiveSurface,
   openNewChat,
+  reopenLastClosedSurface,
 } from '~/navigation/navigation-commands'
 import { chatSessionIdForSurface, HOME_SURFACE_ID } from '~/navigation/surface-identity'
 import { useSurfaceStore } from '~/navigation/surface-store'
@@ -124,6 +125,12 @@ export function useGlobalEventListeners(
     'chat.new',
     { meta: true, key: 't', allowInEditable: true },
     openNewChat,
+    !isTearoffWindow,
+  )
+  useShortcut(
+    'surface.reopen-closed',
+    { mod: true, shift: true, key: 't', allowInEditable: true },
+    reopenLastClosedSurface,
     !isTearoffWindow,
   )
   useShortcut(

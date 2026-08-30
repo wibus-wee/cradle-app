@@ -1,5 +1,6 @@
 import {
   DotCircleLine as CircleDotIcon,
+  HistoryAnticlockwiseLine as HistoryIcon,
   Message1Line as MessageSquareIcon,
   Plugin2Line,
   Settings2Line as SettingsIcon,
@@ -27,8 +28,14 @@ import { rankFuzzyItems } from '~/lib/fuzzy-rank'
 import type { WebCommandRegistration } from '~/lib/plugin-store'
 import { usePluginStore } from '~/lib/plugin-store'
 import { useActiveSurface } from '~/navigation/active-surface'
-import { openNewChat, openSettingsSection, openUsage } from '~/navigation/navigation-commands'
+import {
+  openNewChat,
+  openSettingsSection,
+  openUsage,
+  reopenLastClosedSurface,
+} from '~/navigation/navigation-commands'
 import { chatSessionIdForSurface, workspaceIdForSurface } from '~/navigation/surface-identity'
+import { useSurfaceStore } from '~/navigation/surface-store'
 import { useLayoutStore } from '~/store/layout'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
@@ -135,6 +142,7 @@ function useCommands(close: () => void): CommandAction[] {
   const setSettingsSection = useSettingsOverlayStore(s => s.setSettingsSection)
   const toggleSidebar = useLayoutStore(s => s.toggleSidebar)
   const pluginCommands = usePluginStore(s => s.commands)
+  const lastClosedSurface = useSurfaceStore(s => s.lastClosedSurface)
 
   return useMemo<CommandAction[]>(() => {
     const appCommands: CommandAction[] = [
@@ -162,6 +170,21 @@ function useCommands(close: () => void): CommandAction[] {
           openSettingsSection('appearance')
         },
       },
+      ...(lastClosedSurface
+        ? [{
+            id: 'reopen-closed-surface',
+            label: t('command.reopenClosed.label'),
+            description: lastClosedSurface.title,
+            keywords: t('command.reopenClosed.keywords'),
+            icon: HistoryIcon,
+            shortcut: '⇧⌘T',
+            source: 'app' as const,
+            handler: () => {
+              close()
+              reopenLastClosedSurface()
+            },
+          }]
+        : []),
       {
         id: 'toggle-sidebar',
         label: t('command.toggleSidebar.label'),
@@ -218,7 +241,7 @@ function useCommands(close: () => void): CommandAction[] {
     }))
 
     return [...appCommands, ...contributedCommands]
-  }, [t, setSettingsSection, toggleSidebar, pluginCommands, close])
+  }, [t, setSettingsSection, toggleSidebar, pluginCommands, lastClosedSurface, close])
 }
 
 function useFileSearch(query: string, enabled: boolean, workspaceId: string | null | undefined) {

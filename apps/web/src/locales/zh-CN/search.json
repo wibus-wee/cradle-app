@@ -17,6 +17,8 @@
   "command.openSettings.label": "打开设置",
   "command.openUsage.keywords": "usage cost token 用量 费用",
   "command.openUsage.label": "用量统计",
+  "command.reopenClosed.keywords": "reopen restore closed surface tab 重新打开 恢复 已关闭",
+  "command.reopenClosed.label": "重新打开已关闭的 Surface",
   "command.recent": "最近",
   "command.toggleSidebar.keywords": "sidebar toggle 侧栏 切换",
   "command.toggleSidebar.label": "切换侧栏",

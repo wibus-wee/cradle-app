@@ -65,6 +65,11 @@ export const BUILT_IN_SHORTCUT_GROUPS: readonly BuiltInShortcutGroup[] = [
         keys: ['⌘W'],
       },
       {
+        labelKey: 'shortcut.builtIn.reopenSurface.label',
+        descriptionKey: 'shortcut.builtIn.reopenSurface.description',
+        keys: ['⇧⌘T', 'Ctrl ⇧T'],
+      },
+      {
         labelKey: 'shortcut.builtIn.switchSurface.label',
         descriptionKey: 'shortcut.builtIn.switchSurface.description',
         keys: ['⌘1-⌘9'],

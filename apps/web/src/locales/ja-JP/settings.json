@@ -804,6 +804,8 @@
   "shortcut.builtIn.chatSend.label": "メッセージを送信",
   "shortcut.builtIn.closeSurface.description": "アクティブな Surface を閉じます。",
   "shortcut.builtIn.closeSurface.label": "Surface を閉じる",
+  "shortcut.builtIn.reopenSurface.description": "最後に閉じた Surface を復元します。",
+  "shortcut.builtIn.reopenSurface.label": "閉じた Surface を再度開く",
   "shortcut.builtIn.commandPalette.description": "アプリのコマンドを直接開きます。",
   "shortcut.builtIn.commandPalette.label": "コマンドパレット",
   "shortcut.builtIn.contextual.description": "特定のエディタ、パネル、リスト内でのみ有効なショートカットです。",

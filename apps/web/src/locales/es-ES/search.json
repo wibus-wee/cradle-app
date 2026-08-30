@@ -17,6 +17,8 @@
   "command.openSettings.label": "Abrir configuración",
   "command.openUsage.keywords": "usage cost token uso coste",
   "command.openUsage.label": "Estadísticas de uso",
+  "command.reopenClosed.keywords": "reopen restore closed surface tab reabrir restaurar superficie cerrada",
+  "command.reopenClosed.label": "Reabrir superficie cerrada",
   "command.recent": "reciente",
   "command.toggleSidebar.keywords": "sidebar toggle barra lateral alternar",
   "command.toggleSidebar.label": "Alternar barra lateral",

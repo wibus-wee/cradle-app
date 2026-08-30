@@ -496,6 +496,8 @@ export default {
   'shortcut.builtIn.newChat.description': 'Open a new chat surface.',
   'shortcut.builtIn.closeSurface.label': 'Close surface',
   'shortcut.builtIn.closeSurface.description': 'Close the active surface.',
+  'shortcut.builtIn.reopenSurface.label': 'Reopen closed surface',
+  'shortcut.builtIn.reopenSurface.description': 'Restore the most recently closed surface.',
   'shortcut.builtIn.switchSurface.label': 'Switch surface',
   'shortcut.builtIn.switchSurface.description': 'Jump to a numbered surface.',
   'shortcut.builtIn.cycleSurface.label': 'Cycle surfaces',

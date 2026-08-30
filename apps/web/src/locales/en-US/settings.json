@@ -954,6 +954,8 @@
   "shortcut.builtIn.chatSend.label": "Send message",
   "shortcut.builtIn.closeSurface.description": "Close the active surface.",
   "shortcut.builtIn.closeSurface.label": "Close surface",
+  "shortcut.builtIn.reopenSurface.description": "Restore the most recently closed surface.",
+  "shortcut.builtIn.reopenSurface.label": "Reopen closed surface",
   "shortcut.builtIn.commandPalette.description": "Open app commands directly.",
   "shortcut.builtIn.commandPalette.label": "Command palette",
   "shortcut.builtIn.contextual.description": "Shortcuts that apply inside a specific editor, panel, or list.",

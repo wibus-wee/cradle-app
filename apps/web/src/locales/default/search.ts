@@ -17,6 +17,8 @@ export default {
   'command.openSettings.label': 'Open settings',
   'command.openUsage.keywords': 'usage cost token',
   'command.openUsage.label': 'Usage statistics',
+  'command.reopenClosed.keywords': 'reopen restore closed surface tab',
+  'command.reopenClosed.label': 'Reopen closed surface',
   'command.usage.label': 'Usage',
   'command.recent': 'recent',
   'command.toggleSidebar.keywords': 'sidebar toggle',
