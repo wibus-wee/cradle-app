@@ -11,6 +11,8 @@
   "command.kanban.label": "かんばん",
   "command.newChat.keywords": "new chat session create 新規 チャット 会話",
   "command.newChat.label": "新しい会話",
+  "command.newWork.keywords": "new work task branch create 新規 作業 タスク ブランチ 作成",
+  "command.newWork.label": "新しい Work",
   "command.openProfile.keywords": "profile user activity streak tokens プロフィール アクティビティ",
   "command.openProfile.label": "Profile を開く",
   "command.openSettings.keywords": "settings preferences 設定",

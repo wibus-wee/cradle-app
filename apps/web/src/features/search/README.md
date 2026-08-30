@@ -11,6 +11,8 @@ files, conversations, issues, and workspaces.
   actions, command history, and application navigation.
 - App commands include one-shot recovery for the most recently user-closed
   surface. The command is omitted when navigation has no recovery target.
+- Primary creation commands open New Chat and New Work through their existing
+  navigation owners; workspace and issue selection remain on those surfaces.
 - `global-search-dialog-view.tsx` receives the current mode, query,
   owner-typed `PaletteData`, and callbacks. It owns only dialog focus, keyboard
   cycling, empty-query Backspace recovery to All, and presentation.

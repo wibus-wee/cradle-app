@@ -11,6 +11,8 @@
   "command.kanban.label": "Kanban",
   "command.newChat.keywords": "new chat session create nuevo chat conversación",
   "command.newChat.label": "Nueva conversación",
+  "command.newWork.keywords": "new work task branch create nuevo trabajo tarea rama crear",
+  "command.newWork.label": "Nuevo Work",
   "command.openProfile.keywords": "profile user activity streak tokens perfil actividad",
   "command.openProfile.label": "Abrir profile",
   "command.openSettings.keywords": "settings preferences configuración preferencias",

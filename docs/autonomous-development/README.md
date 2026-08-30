@@ -40,3 +40,4 @@ Chronological index of independently shipped product improvements.
 1. [Reveal exported backups](./2026-08-31-01-reveal-exported-backup.md)
 2. [Reopen the last closed surface](./2026-08-31-02-reopen-closed-surface.md)
 3. [Make global shortcuts cross-platform](./2026-08-31-03-cross-platform-global-shortcuts.md)
+4. [Start New Work from the command palette](./2026-08-31-04-new-work-command.md)

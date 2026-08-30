@@ -11,6 +11,8 @@
   "command.kanban.label": "看板",
   "command.newChat.keywords": "new chat session 新建 聊天 对话",
   "command.newChat.label": "新建对话",
+  "command.newWork.keywords": "new work task branch create 新建 工作 任务 分支",
+  "command.newWork.label": "新建 Work",
   "command.openProfile.keywords": "profile user activity streak tokens 个人 活动 连续",
   "command.openProfile.label": "打开 Profile",
   "command.openSettings.keywords": "settings preferences 设置 偏好",

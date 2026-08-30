@@ -10,6 +10,8 @@ export default {
   'badge.workspaces': 'Workspaces',
   'command.newChat.keywords': 'new chat session create',
   'command.newChat.label': 'New conversation',
+  'command.newWork.keywords': 'new work task branch create',
+  'command.newWork.label': 'New Work',
   'command.kanban.label': 'Kanban',
   'command.openProfile.keywords': 'profile user activity streak tokens',
   'command.openProfile.label': 'Open profile',

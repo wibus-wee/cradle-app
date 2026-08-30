@@ -4,6 +4,7 @@ import {
   Message1Line as MessageSquareIcon,
   Plugin2Line,
   Settings2Line as SettingsIcon,
+  Task2Line as WorkIcon,
   TerminalLine as TerminalIcon,
 } from '@mingcute/react'
 import { useQuery } from '@tanstack/react-query'
@@ -31,6 +32,7 @@ import { usePluginStore } from '~/lib/plugin-store'
 import { useActiveSurface } from '~/navigation/active-surface'
 import {
   openNewChat,
+  openNewWork,
   openSettingsSection,
   openUsage,
   reopenLastClosedSurface,
@@ -159,6 +161,17 @@ function useCommands(close: () => void): CommandAction[] {
         handler: () => {
           close()
           openNewChat()
+        },
+      },
+      {
+        id: 'new-work',
+        label: t('command.newWork.label'),
+        keywords: t('command.newWork.keywords'),
+        icon: WorkIcon,
+        source: 'app',
+        handler: () => {
+          close()
+          openNewWork()
         },
       },
       {
