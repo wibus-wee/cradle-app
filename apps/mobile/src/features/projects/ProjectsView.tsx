@@ -1,16 +1,18 @@
-import { ChevronRight, Folder, FolderX } from 'lucide-react-native'
-import { useRef } from 'react'
+import { ChevronRight, Folder, FolderX, Search } from 'lucide-react-native'
+import { useRef, useState } from 'react'
 import { FlatList, Keyboard, StyleSheet, Text, View } from 'react-native'
 
 import type { GetSessionsResponse, GetWorkspacesResponse, PostWorksData } from '@/api-gen'
 import type { AppSection } from '@/components/common/app-menu-button'
 import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { EmptyState } from '@/components/ui/states'
 import type { WorkComposerHandle } from '@/features/work/WorkComposer'
 import { WorkComposer } from '@/features/work/WorkComposer'
+import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 type Workspace = GetWorkspacesResponse[number]
@@ -44,6 +46,15 @@ export function ProjectsView({
 }: ProjectsViewProps) {
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
+  const [search, setSearch] = useState('')
+  const normalizedSearch = search.trim().toLocaleLowerCase()
+  const filteredProjects = normalizedSearch
+    ? projects.filter(({ workspace }) => [
+        workspace.name,
+        workspace.identifier,
+        workspace.gitIdentity.branch,
+      ].some(value => value?.toLocaleLowerCase().includes(normalizedSearch)))
+    : projects
   const workspaces = projects
     .map(project => project.workspace)
     .filter(workspace => workspace.availability === 'available')
@@ -70,15 +81,29 @@ export function ProjectsView({
       scroll={false}
       title="Workspaces"
     >
+      <View style={styles.search}>
+        <InputGroup
+          addon={<Search color={theme.mutedForeground} size={17} />}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          onChangeText={setSearch}
+          placeholder="Search workspaces"
+          returnKeyType="search"
+          value={search}
+        />
+      </View>
       <FlatList
-        contentContainerStyle={projects.length === 0 ? styles.emptyList : styles.list}
-        data={projects}
+        contentContainerStyle={filteredProjects.length === 0 ? styles.emptyList : styles.list}
+        data={filteredProjects}
         keyExtractor={({ workspace }) => workspace.id}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={(
           <EmptyState
-            description="Add a Workspace from Cradle Desktop, then refresh this page."
-            title="No projects yet"
+            description={normalizedSearch
+              ? 'Try a different workspace name, identifier, or branch.'
+              : 'Add a Workspace from Cradle Desktop, then refresh this page.'}
+            title={normalizedSearch ? 'No matching workspaces' : 'No projects yet'}
           />
         )}
         onRefresh={onRefresh}
@@ -120,6 +145,9 @@ const styles = StyleSheet.create({
   },
   list: {
     marginTop: 8,
+  },
+  search: {
+    marginBottom: spacing.sm,
   },
   virtualList: {
     flex: 1,
