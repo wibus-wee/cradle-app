@@ -56,6 +56,7 @@ export default function RootLayout() {
               <Stack.Screen name="workspace/[workspaceId]" options={{ title: 'Project' }} />
               <Stack.Screen name="workspace-directory" options={{ title: 'Directory' }} />
               <Stack.Screen name="workspace-file" options={{ title: 'File' }} />
+              <Stack.Screen name="workspace-search" options={{ title: 'Search files' }} />
               <Stack.Screen
                 name="work/[workId]"
                 options={{ presentation: 'modal', title: 'Work info' }}

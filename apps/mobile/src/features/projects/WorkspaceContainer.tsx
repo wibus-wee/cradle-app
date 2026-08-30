@@ -100,6 +100,7 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
         onOpenWork={sessionId => router.push(`/session/${sessionId}`)}
         onOpenWorkInfo={workId => router.push(`/work/${workId}`)}
         onRefresh={() => void refresh()}
+        onSearchFiles={() => router.push({ pathname: '/workspace-search', params: { workspaceId } })}
       />
     </>
   )

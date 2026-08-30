@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder, GitBranch, Info, MessageSquareText } from 'lucide-react-native'
+import { ChevronRight, File, Folder, GitBranch, Info, MessageSquareText, Search } from 'lucide-react-native'
 import type { ReactElement } from 'react'
 import { useRef } from 'react'
 import { FlatList, Keyboard, StyleSheet, View } from 'react-native'
@@ -48,6 +48,7 @@ export interface WorkspaceViewProps {
   onOpenWork: (sessionId: string) => void
   onOpenWorkInfo: (workId: string) => void
   onRefresh?: () => void
+  onSearchFiles: () => void
 }
 
 function sessionTone(status: Session['status']) {
@@ -71,6 +72,7 @@ export function WorkspaceView({
   onOpenWork,
   onOpenWorkInfo,
   onRefresh,
+  onSearchFiles,
 }: WorkspaceViewProps) {
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
@@ -97,6 +99,13 @@ export function WorkspaceView({
   }
   return (
     <Screen
+      action={(
+        <IconButton
+          accessibilityLabel="Search workspace files"
+          icon={Search}
+          onPress={onSearchFiles}
+        />
+      )}
       avoidKeyboard={canCreateWork}
       footer={canCreateWork
         ? (

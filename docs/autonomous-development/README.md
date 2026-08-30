@@ -61,3 +61,4 @@ Chronological index of independently shipped product improvements.
 22. [Review workspace changes from the command palette](./2026-08-31-22-review-workspace-command.md)
 23. [Show every mobile root file entry](./2026-08-31-23-mobile-root-files.md)
 24. [Surface mobile Work creation failures](./2026-08-31-24-mobile-work-create-errors.md)
+25. [Search workspace files on mobile](./2026-08-31-25-mobile-file-search.md)

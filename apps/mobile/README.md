@@ -26,6 +26,8 @@ Directory rows open a path-scoped, refreshable child listing; deeper directories
 stack naturally and files continue into the same preview route.
 The virtualized workspace overview renders every top-level entry returned by the
 server, so root files and directories are never hidden behind a client-only cap.
+Workspace detail also opens a debounced, server-ranked file search; results can
+continue into directory browsing or the existing file preview.
 
 ## Run
 
@@ -69,6 +71,8 @@ Settings.
   its View never reads routes, native APIs, or API state.
 - `WorkspaceDirectoryContainer` owns path-scoped child queries and recursive
   navigation; `WorkspaceDirectoryView` renders owner-typed entry fixtures.
+- `WorkspaceSearchContainer` owns debounced server search and result navigation;
+  `WorkspaceSearchView` owns input and fixture-renderable result states.
 - Work detail query and mutation state remain in `WorkDetailContainer`; the
   fixture-driven View owns handoff draft interaction and native refresh presentation.
 - Pull request detail keeps native linking and alerts in its Container; the
