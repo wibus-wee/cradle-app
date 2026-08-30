@@ -82,6 +82,20 @@ describe('remote ACP agent configuration', () => {
     })
   })
 
+  it('persists transport header Secret references independently from ACP auth', async () => {
+    await withTempDataDir(() => {
+      const agent = createRemoteAgent({
+        id: 'remote-headers',
+        name: 'Remote headers',
+        connectionType: 'http',
+        endpointUrl: 'https://agent.example.com/acp',
+        headerSecretRefs: { Authorization: 'secret-token' },
+      }, new Set(['secret-token']))
+
+      expect(agent.remoteHeadersSecretRefs).toEqual({ Authorization: 'secret-token' })
+    })
+  })
+
   it('audits header names without Secret references or credential values', async () => {
     await withTempDataDir(() => {
       createRemoteAgent({
