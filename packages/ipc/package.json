@@ -13,9 +13,9 @@
     "electron": ">=28.0.0"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
-    "electron": "^39.2.6"
+    "electron": "^44.0.0"
   }
 }

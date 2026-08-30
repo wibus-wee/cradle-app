@@ -5,13 +5,18 @@ import type { MacCaptureFrontmostWindowResult } from './mac-bridge-protocol'
 import { macScreenshotSinkInternals, runMacScreenshotSink } from './mac-screenshot-sinks'
 
 const electronMocks = vi.hoisted(() => {
+  class ClipboardItem {
+    constructor(readonly items: Record<string, Blob>) {}
+  }
   const image = {
     isEmpty: vi.fn(() => false),
+    toPNG: vi.fn(() => Buffer.from('png')),
   }
   return {
     clipboard: {
-      writeImage: vi.fn(),
+      write: vi.fn(() => Promise.resolve()),
     },
+    ClipboardItem,
     nativeImage: {
       createFromPath: vi.fn(() => image),
     },
@@ -42,7 +47,7 @@ function capture(filePath = '/tmp/Cradle Capture 1.png'): MacCaptureFrontmostWin
 
 describe('runMacScreenshotSink', () => {
   beforeEach(() => {
-    electronMocks.clipboard.writeImage.mockClear()
+    electronMocks.clipboard.write.mockClear()
     electronMocks.nativeImage.createFromPath.mockClear()
     electronMocks.shell.openExternal.mockClear()
     electronMocks.image.isEmpty.mockReturnValue(false)
@@ -62,7 +67,9 @@ describe('runMacScreenshotSink', () => {
 
     expect(result).toEqual({ sink: 'clipboard', ok: true, message: null })
     expect(electronMocks.nativeImage.createFromPath).toHaveBeenCalledWith('/tmp/Cradle Capture 1.png')
-    expect(electronMocks.clipboard.writeImage).toHaveBeenCalledWith(electronMocks.image)
+    expect(electronMocks.clipboard.write).toHaveBeenCalledWith([
+      expect.objectContaining({ items: { 'image/png': expect.any(Blob) } }),
+    ])
   })
 
   it('opens CleanShot annotate URL without requiring CleanShot for capture', async () => {

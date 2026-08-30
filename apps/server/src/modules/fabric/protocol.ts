@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 
-import { ed25519, x25519 } from '@noble/curves/ed25519'
+import { ed25519, x25519 } from '@noble/curves/ed25519.js'
 
 import { AppError } from '../../errors/app-error'
 
@@ -81,12 +81,12 @@ export interface FabricKeyPair {
 export interface FabricEncryptionKeyPair extends FabricKeyPair {}
 
 export function generateFabricSigningKeyPair(): FabricKeyPair {
-  const privateKey = ed25519.utils.randomPrivateKey()
+  const privateKey = ed25519.utils.randomSecretKey()
   return { privateKeyBase64: toBase64(privateKey), publicKeyBase64: toBase64(ed25519.getPublicKey(privateKey)) }
 }
 
 export function generateFabricEncryptionKeyPair(): FabricEncryptionKeyPair {
-  const privateKey = x25519.utils.randomPrivateKey()
+  const privateKey = x25519.utils.randomSecretKey()
   return { privateKeyBase64: toBase64(privateKey), publicKeyBase64: toBase64(x25519.scalarMultBase(privateKey)) }
 }
 

@@ -139,8 +139,11 @@ const electronMocks = vi.hoisted(() => {
     },
     BrowserWindow: FakeBrowserWindow,
     WebContentsView: FakeWebContentsView,
+    ClipboardItem: class ClipboardItem {
+      constructor(readonly items: Record<string, Blob>) {}
+    },
     clipboard: {
-      writeImage: vi.fn(),
+      write: vi.fn(() => Promise.resolve()),
     },
     nativeImage: {
       createFromBuffer: vi.fn(() => ({ isEmpty: () => false })),

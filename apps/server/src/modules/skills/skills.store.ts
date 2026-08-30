@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import { cp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import yaml from 'js-yaml'
+import { dump, load } from 'js-yaml'
 import { z } from 'zod'
 
 import type { SkillContext, SkillScope } from './skills-paths'
@@ -400,7 +400,7 @@ function parseSkillDocument(content: string): ParsedSkillDocument {
     throw new Error('SKILL.md is missing YAML frontmatter')
   }
 
-  const frontmatter = SkillFrontmatterSchema.parse(yaml.load(match[1]))
+  const frontmatter = SkillFrontmatterSchema.parse(load(match[1]))
 
   return {
     frontmatter,
@@ -411,7 +411,7 @@ function parseSkillDocument(content: string): ParsedSkillDocument {
 }
 
 function serializeSkillDocument(frontmatter: Record<string, unknown>, body: string): string {
-  const yamlBlock = yaml.dump(frontmatter, { lineWidth: -1, noRefs: true, sortKeys: false }).trimEnd()
+  const yamlBlock = dump(frontmatter, { lineWidth: -1, noRefs: true, sortKeys: false }).trimEnd()
   return `---\n${yamlBlock}\n---\n\n${body}`
 }
 

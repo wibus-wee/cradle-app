@@ -6,6 +6,7 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import type { Asset } from '@cradle/db'
 import { assets, workspaces } from '@cradle/db'
 import { eq } from 'drizzle-orm'
+import type { Sharp } from 'sharp'
 import sharp from 'sharp'
 
 import { AppError } from '../../errors/app-error'
@@ -203,7 +204,7 @@ async function prepareImage(input: Buffer): Promise<PreparedAssetFile> {
   }
 }
 
-async function encodeOriginalFormat(image: sharp.Sharp, format: SupportedSharpFormat): Promise<Buffer> {
+async function encodeOriginalFormat(image: Sharp, format: SupportedSharpFormat): Promise<Buffer> {
   if (format === 'jpeg') {
     return image.jpeg({ quality: 90 }).toBuffer()
   }

@@ -3,7 +3,6 @@
     "composite": true,
     "target": "ESNext",
     "lib": ["ESNext", "DOM"],
-    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {},

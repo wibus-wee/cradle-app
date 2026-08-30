@@ -16,7 +16,7 @@ packageExtensions:
   # Electron runtime into the virtual package so this works with GVS enabled.
   electron-vite:
     dependencies:
-      electron: 42.4.1
+      electron: 44.0.0
 allowBuilds:
   '@google/genai': true
   '@swc/core': true
