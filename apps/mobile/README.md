@@ -9,6 +9,8 @@ Initial data-load failures expose an in-place Retry action across Projects,
 Work, Usage, pull requests, and conversations.
 Work detail supports pull-to-refresh for readiness and pull-request state even
 after active Work polling has stopped, without replacing handoff edits in progress.
+Usage remembers the selected 7-day, 30-day, 90-day, or one-year range on the
+device and validates the stored preference before issuing dashboard requests.
 Workspace detail file rows open a refreshable, read-only mobile preview for
 text and Markdown files; previews can be handed to other apps through the
 system share sheet, while unsupported binary formats are identified explicitly.
@@ -59,6 +61,8 @@ Settings.
   navigation; `WorkspaceDirectoryView` renders owner-typed entry fixtures.
 - Work detail query and mutation state remain in `WorkDetailContainer`; the
   fixture-driven View owns handoff draft interaction and native refresh presentation.
+- Usage range persistence is owned by `features/usage/usage-range-storage.ts`;
+  invalid or unavailable storage falls back to the 30-day product default.
 - Root destinations use an anchored navigation menu; detail surfaces use Expo
   Router's native Stack navigation and back gestures.
 - `src/api-gen/` is generated from the authoritative server OpenAPI document.

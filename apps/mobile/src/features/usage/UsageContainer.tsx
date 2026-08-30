@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type {
   GetUsageDailyResponse,
@@ -13,21 +13,22 @@ import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
 import type { UsageRange } from './usage-range'
-import { usageRangeDays } from './usage-range'
+import { DEFAULT_USAGE_RANGE, usageRangeDays } from './usage-range'
+import { loadUsageRange, persistUsageRange } from './usage-range-storage'
 import { UsageView } from './UsageView'
 
 export function UsageContainer() {
   const { connection } = useConnection()
   const isRouteActive = useRouteIsActive()
-  const [range, setRange] = useState<UsageRange>('30d')
-  const days = usageRangeDays(range)
+  const [range, setRange] = useState<UsageRange | null>(null)
+  const days = usageRangeDays(range ?? DEFAULT_USAGE_RANGE)
   const rangeFrom = useMemo(() => {
     const date = new Date()
     date.setDate(date.getDate() - days)
     return date.toISOString().slice(0, 10)
   }, [days])
   const query = useQuery({
-    enabled: Boolean(connection) && isRouteActive,
+    enabled: Boolean(connection && range) && isRouteActive,
     queryKey: ['usage', connection?.url, range],
     queryFn: async ({ signal }) => {
       const [daily, summary, stats] = await Promise.all([
@@ -41,7 +42,24 @@ export function UsageContainer() {
     },
   })
 
-  if (query.isPending) {
+  useEffect(() => {
+    let active = true
+    void loadUsageRange().then((storedRange) => {
+      if (active) {
+        setRange(storedRange)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const handleRangeChange = (nextRange: UsageRange) => {
+    setRange(nextRange)
+    void persistUsageRange(nextRange)
+  }
+
+  if (range === null || query.isPending) {
     return <LoadingState />
   }
   if (query.error) {
@@ -58,7 +76,7 @@ export function UsageContainer() {
     <UsageView
       {...query.data}
       isRefreshing={query.isRefetching}
-      onRangeChange={setRange}
+      onRangeChange={handleRangeChange}
       onRefresh={() => void query.refetch()}
       range={range}
     />
