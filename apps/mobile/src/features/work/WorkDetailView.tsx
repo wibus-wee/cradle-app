@@ -22,18 +22,22 @@ export interface WorkHandoff {
 export interface WorkDetailViewProps {
   detail: GetWorksByIdResponse
   isPreparing?: boolean
+  isRefreshing?: boolean
   isSubmitting?: boolean
   onOpenPullRequest: (owner: string, repo: string, number: number) => void
   onPrepare: (handoff: WorkHandoff) => void
+  onRefresh?: () => void
   onSubmit: (handoff: WorkHandoff) => void
 }
 
 export function WorkDetailView({
   detail,
   isPreparing = false,
+  isRefreshing = false,
   isSubmitting = false,
   onOpenPullRequest,
   onPrepare,
+  onRefresh,
   onSubmit,
 }: WorkDetailViewProps) {
   const theme = useTheme()
@@ -48,6 +52,8 @@ export function WorkDetailView({
     <Screen
       action={<StatusPill label={detail.activity} tone={detail.activity === 'running' ? 'success' : 'neutral'} />}
       insetTop={false}
+      onRefresh={onRefresh}
+      refreshing={isRefreshing}
       subtitle={detail.execution.worktreeBranch ?? 'Preparing isolated checkout'}
       title={detail.work.title}
     >

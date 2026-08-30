@@ -64,10 +64,12 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
       <WorkDetailView
         detail={query.data}
         isPreparing={prepare.isPending}
+        isRefreshing={query.isRefetching}
         isSubmitting={submit.isPending}
         onOpenPullRequest={(owner, repo, number) =>
           router.push(`/pull-request/${owner}/${repo}/${number}`)}
         onPrepare={handoff => prepare.mutate(handoff)}
+        onRefresh={() => void query.refetch()}
         onSubmit={handoff => submit.mutate(handoff)}
       />
     </>

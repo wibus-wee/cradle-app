@@ -7,6 +7,8 @@ Pull request lists and details support pull-to-refresh; both force an upstream
 GitHub update before reloading their Cradle projections.
 Initial data-load failures expose an in-place Retry action across Projects,
 Work, Usage, pull requests, and conversations.
+Work detail supports pull-to-refresh for readiness and pull-request state even
+after active Work polling has stopped, without replacing handoff edits in progress.
 Workspace detail file rows open a refreshable, read-only mobile preview for
 text and Markdown files; previews can be handed to other apps through the
 system share sheet, while unsupported binary formats are identified explicitly.
@@ -51,6 +53,8 @@ Settings.
 - `src/features/projects/FilePreviewContainer.tsx` reads workspace-owned file
   metadata before requesting text content and owns the native share handoff;
   its View never reads routes, native APIs, or API state.
+- Work detail query and mutation state remain in `WorkDetailContainer`; the
+  fixture-driven View owns handoff draft interaction and native refresh presentation.
 - Root destinations use an anchored navigation menu; detail surfaces use Expo
   Router's native Stack navigation and back gestures.
 - `src/api-gen/` is generated from the authoritative server OpenAPI document.
