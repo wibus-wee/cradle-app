@@ -748,6 +748,9 @@
                   "oneOf": [
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "cause": {
                           "$ref": "#/definitions/__schema0"
                         },
@@ -895,12 +898,16 @@
                         "code",
                         "message",
                         "retryable",
-                        "type"
+                        "type",
+                        "agentId"
                       ],
                       "type": "object"
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "code": {
                           "type": "string"
                         },
@@ -914,12 +921,16 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "message"
                       ],
                       "type": "object"
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "contextTokens": {
                           "type": "number"
                         },
@@ -1210,6 +1221,9 @@
                         "thinkingEffort": {
                           "type": "string"
                         },
+                        "towerMode": {
+                          "type": "boolean"
+                        },
                         "type": {
                           "const": "agent.status.updated",
                           "type": "string"
@@ -1296,7 +1310,8 @@
                         }
                       },
                       "required": [
-                        "type"
+                        "type",
+                        "agentId"
                       ],
                       "type": "object"
                     },
@@ -1398,6 +1413,9 @@
                                     "type": "string"
                                   },
                                   "type": "array"
+                                },
+                                "tower_mode": {
+                                  "type": "boolean"
                                 }
                               },
                               "required": [
@@ -1580,10 +1598,7 @@
                                 "output_tokens",
                                 "cache_read_tokens",
                                 "cache_creation_tokens",
-                                "total_cost_usd",
-                                "context_tokens",
-                                "context_limit",
-                                "turn_count"
+                                "context_tokens"
                               ],
                               "type": "object"
                             },
@@ -1616,6 +1631,23 @@
                       "required": [
                         "type",
                         "session"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "event.session.archived",
+                          "type": "string"
+                        },
+                        "workspace_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "workspace_id"
                       ],
                       "type": "object"
                     },
@@ -1816,6 +1848,229 @@
                     },
                     {
                       "properties": {
+                        "changedFields": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "config": {
+                          "additionalProperties": {},
+                          "properties": {
+                            "background": {},
+                            "default_model": {
+                              "type": "string"
+                            },
+                            "default_permission_mode": {
+                              "type": "string"
+                            },
+                            "default_plan_mode": {
+                              "type": "boolean"
+                            },
+                            "default_provider": {
+                              "type": "string"
+                            },
+                            "experimental": {
+                              "additionalProperties": {
+                                "type": "boolean"
+                              },
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "extra_skill_dirs": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "hooks": {
+                              "items": {},
+                              "type": "array"
+                            },
+                            "loop_control": {},
+                            "merge_all_available_skills": {
+                              "type": "boolean"
+                            },
+                            "models": {
+                              "additionalProperties": {},
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "permission": {},
+                            "plan_mode": {
+                              "type": "boolean"
+                            },
+                            "providers": {
+                              "additionalProperties": {
+                                "properties": {
+                                  "base_url": {
+                                    "type": "string"
+                                  },
+                                  "default_model": {
+                                    "type": "string"
+                                  },
+                                  "has_api_key": {
+                                    "type": "boolean"
+                                  },
+                                  "type": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "type",
+                                  "has_api_key"
+                                ],
+                                "type": "object"
+                              },
+                              "default": {},
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "raw": {
+                              "additionalProperties": {},
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "type": "object"
+                            },
+                            "secondary_model": {},
+                            "services": {},
+                            "subagent": {},
+                            "telemetry": {
+                              "type": "boolean"
+                            },
+                            "thinking": {},
+                            "yolo": {
+                              "type": "boolean"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "type": {
+                          "const": "event.config.changed",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "changedFields",
+                        "config"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "type": {
+                          "const": "event.config.warning",
+                          "type": "string"
+                        },
+                        "warnings": {
+                          "items": {
+                            "properties": {
+                              "domain": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "message"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "warnings"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
+                        "changed": {
+                          "items": {
+                            "properties": {
+                              "added": {
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "provider_id": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "provider_name": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "removed": {
+                                "maximum": 9007199254740991,
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "provider_id",
+                              "provider_name",
+                              "added",
+                              "removed"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "failed": {
+                          "items": {
+                            "properties": {
+                              "provider": {
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "reason": {
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "provider",
+                              "reason"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "type": {
+                          "const": "event.model_catalog.changed",
+                          "type": "string"
+                        },
+                        "unchanged": {
+                          "items": {
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "changed",
+                        "unchanged",
+                        "failed"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "properties": {
                         "error": {
                           "type": "string"
                         },
@@ -1904,6 +2159,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "change": {
                           "properties": {
                             "actor": {
@@ -2106,6 +2364,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "snapshot"
                       ],
                       "type": "object"
@@ -2113,6 +2372,9 @@
                     {
                       "properties": {
                         "activationId": {
+                          "type": "string"
+                        },
+                        "agentId": {
                           "type": "string"
                         },
                         "skillArgs": {
@@ -2148,6 +2410,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "activationId",
                         "skillName",
                         "trigger"
@@ -2157,6 +2420,9 @@
                     {
                       "properties": {
                         "activationId": {
+                          "type": "string"
+                        },
+                        "agentId": {
                           "type": "string"
                         },
                         "commandArgs": {
@@ -2179,6 +2445,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "activationId",
                         "pluginId",
                         "commandName",
@@ -2188,6 +2455,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "origin": {
                           "oneOf": [
                             {
@@ -2535,6 +2805,61 @@
                         "prompt": {
                           "type": "string"
                         },
+                        "promptAttachments": {
+                          "items": {
+                            "anyOf": [
+                              {
+                                "properties": {
+                                  "fileId": {
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "enum": [
+                                      "image",
+                                      "video",
+                                      "audio"
+                                    ],
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "fileId"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "properties": {
+                                  "kind": {
+                                    "const": "file",
+                                    "type": "string"
+                                  },
+                                  "mediaType": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "path": {
+                                    "type": "string"
+                                  },
+                                  "size": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "name",
+                                  "mediaType",
+                                  "size",
+                                  "path"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          },
+                          "type": "array"
+                        },
                         "promptId": {
                           "type": "string"
                         },
@@ -2548,6 +2873,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "origin"
                       ],
@@ -2555,6 +2881,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "durationMs": {
                           "type": "number"
                         },
@@ -2739,6 +3068,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "reason"
                       ],
@@ -2746,6 +3076,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "step": {
                           "type": "number"
                         },
@@ -2762,6 +3095,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "step"
                       ],
@@ -2769,6 +3103,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "finishReason": {
                           "type": "string"
                         },
@@ -2843,6 +3180,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "step"
                       ],
@@ -2850,6 +3188,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "delayMs": {
                           "type": "number"
                         },
@@ -2887,6 +3228,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "step",
                         "failedAttempt",
@@ -2900,6 +3242,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "message": {
                           "type": "string"
                         },
@@ -2922,6 +3267,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "step",
                         "reason"
@@ -2930,6 +3276,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "delta": {
                           "type": "string"
                         },
@@ -2943,6 +3292,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "delta"
                       ],
@@ -2950,6 +3300,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "blocked": {
                           "type": "boolean"
                         },
@@ -2969,6 +3322,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "hookEvent",
                         "content"
                       ],
@@ -2976,6 +3330,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "delta": {
                           "type": "string"
                         },
@@ -2989,6 +3346,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "delta"
                       ],
@@ -2996,6 +3354,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "argumentsPart": {
                           "type": "string"
                         },
@@ -3015,6 +3376,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "toolCallId"
                       ],
@@ -3022,6 +3384,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "args": {},
                         "description": {
                           "type": "string"
@@ -3378,6 +3743,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "toolCallId",
                         "name",
@@ -3387,6 +3753,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "toolCallId": {
                           "type": "string"
                         },
@@ -3416,6 +3785,9 @@
                             "percent": {
                               "type": "number"
                             },
+                            "replace": {
+                              "type": "boolean"
+                            },
                             "text": {
                               "type": "string"
                             }
@@ -3428,6 +3800,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "toolCallId",
                         "update"
@@ -3436,6 +3809,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "commandId": {
                           "type": "string"
                         },
@@ -3465,6 +3841,9 @@
                             "percent": {
                               "type": "number"
                             },
+                            "replace": {
+                              "type": "boolean"
+                            },
                             "text": {
                               "type": "string"
                             }
@@ -3477,6 +3856,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "commandId",
                         "update"
                       ],
@@ -3484,6 +3864,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "commandId": {
                           "type": "string"
                         },
@@ -3497,6 +3880,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "commandId",
                         "taskId"
                       ],
@@ -3504,6 +3888,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "commandId": {
                           "type": "string"
                         },
@@ -3520,6 +3907,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "commandId",
                         "isError"
                       ],
@@ -3527,6 +3915,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "isError": {
                           "type": "boolean"
                         },
@@ -3547,6 +3938,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "turnId",
                         "toolCallId",
                         "output"
@@ -3555,6 +3947,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "reason": {
                           "enum": [
                             "mcp.connected",
@@ -3573,6 +3968,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "reason",
                         "serverName"
                       ],
@@ -3580,6 +3976,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "server": {
                           "properties": {
                             "error": {
@@ -3625,6 +4024,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "server"
                       ],
                       "type": "object"
@@ -3660,6 +4060,9 @@
                         },
                         "swarmIndex": {
                           "type": "number"
+                        },
+                        "taskId": {
+                          "type": "string"
                         },
                         "thinkingEffort": {
                           "type": "string"
@@ -3782,6 +4185,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "instruction": {
                           "type": "string"
                         },
@@ -3799,12 +4205,16 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "trigger"
                       ],
                       "type": "object"
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "turnId": {
                           "type": "number"
                         },
@@ -3814,24 +4224,32 @@
                         }
                       },
                       "required": [
-                        "type"
+                        "type",
+                        "agentId"
                       ],
                       "type": "object"
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "type": {
                           "const": "compaction.cancelled",
                           "type": "string"
                         }
                       },
                       "required": [
-                        "type"
+                        "type",
+                        "agentId"
                       ],
                       "type": "object"
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "result": {
                           "properties": {
                             "compactedCount": {
@@ -3871,12 +4289,16 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "result"
                       ],
                       "type": "object"
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "info": {
                           "oneOf": [
                             {
@@ -4103,12 +4525,16 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "info"
                       ],
                       "type": "object"
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "info": {
                           "oneOf": [
                             {
@@ -4335,6 +4761,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "info"
                       ],
                       "type": "object"
@@ -4999,6 +5426,23 @@
                                           "file_id"
                                         ],
                                         "type": "object"
+                                      },
+                                      {
+                                        "properties": {
+                                          "kind": {
+                                            "const": "path",
+                                            "type": "string"
+                                          },
+                                          "path": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "path"
+                                        ],
+                                        "type": "object"
                                       }
                                     ]
                                   },
@@ -5093,6 +5537,23 @@
                                           "file_id"
                                         ],
                                         "type": "object"
+                                      },
+                                      {
+                                        "properties": {
+                                          "kind": {
+                                            "const": "path",
+                                            "type": "string"
+                                          },
+                                          "path": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "path"
+                                        ],
+                                        "type": "object"
                                       }
                                     ]
                                   },
@@ -5120,6 +5581,10 @@
                                   "name": {
                                     "type": "string"
                                   },
+                                  "path": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
                                   "size": {
                                     "maximum": 9007199254740991,
                                     "minimum": 0,
@@ -5131,11 +5596,7 @@
                                   }
                                 },
                                 "required": [
-                                  "type",
-                                  "file_id",
-                                  "name",
-                                  "media_type",
-                                  "size"
+                                  "type"
                                 ],
                                 "type": "object"
                               },
@@ -5196,6 +5657,9 @@
                     },
                     {
                       "properties": {
+                        "agentId": {
+                          "type": "string"
+                        },
                         "finishedAt": {
                           "type": "string"
                         },
@@ -5217,6 +5681,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "promptId",
                         "finishedAt"
                       ],
@@ -5225,6 +5690,9 @@
                     {
                       "properties": {
                         "abortedAt": {
+                          "type": "string"
+                        },
+                        "agentId": {
                           "type": "string"
                         },
                         "promptId": {
@@ -5237,6 +5705,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "promptId",
                         "abortedAt"
                       ],
@@ -5245,6 +5714,9 @@
                     {
                       "properties": {
                         "activePromptId": {
+                          "type": "string"
+                        },
+                        "agentId": {
                           "type": "string"
                         },
                         "content": {
@@ -5392,6 +5864,23 @@
                                           "file_id"
                                         ],
                                         "type": "object"
+                                      },
+                                      {
+                                        "properties": {
+                                          "kind": {
+                                            "const": "path",
+                                            "type": "string"
+                                          },
+                                          "path": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "path"
+                                        ],
+                                        "type": "object"
                                       }
                                     ]
                                   },
@@ -5486,6 +5975,23 @@
                                           "file_id"
                                         ],
                                         "type": "object"
+                                      },
+                                      {
+                                        "properties": {
+                                          "kind": {
+                                            "const": "path",
+                                            "type": "string"
+                                          },
+                                          "path": {
+                                            "minLength": 1,
+                                            "type": "string"
+                                          }
+                                        },
+                                        "required": [
+                                          "kind",
+                                          "path"
+                                        ],
+                                        "type": "object"
                                       }
                                     ]
                                   },
@@ -5513,6 +6019,10 @@
                                   "name": {
                                     "type": "string"
                                   },
+                                  "path": {
+                                    "minLength": 1,
+                                    "type": "string"
+                                  },
                                   "size": {
                                     "maximum": 9007199254740991,
                                     "minimum": 0,
@@ -5524,11 +6034,7 @@
                                   }
                                 },
                                 "required": [
-                                  "type",
-                                  "file_id",
-                                  "name",
-                                  "media_type",
-                                  "size"
+                                  "type"
                                 ],
                                 "type": "object"
                               },
@@ -5571,6 +6077,7 @@
                       },
                       "required": [
                         "type",
+                        "agentId",
                         "activePromptId",
                         "promptIds",
                         "content",
@@ -6849,7 +7356,7 @@
   "info": {
     "description": "WebSocket protocol for Kimi Code daemon control frames, acknowledgements, system frames, and session event streaming.",
     "title": "Kimi Code WebSocket API",
-    "version": "0.37.2"
+    "version": "0.39.1"
   },
   "operations": {
     "receiveClientMessages": {

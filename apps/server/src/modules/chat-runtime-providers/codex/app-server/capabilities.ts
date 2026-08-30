@@ -25,8 +25,8 @@ export interface CodexAppServerCapabilityManifest {
 }
 
 const CODEX_APP_SERVER_PROTOCOL = 'codex-app-server'
-const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.148.0'
-const CODEX_APP_SERVER_GENERATED_DATE = '2026-08-20'
+const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.151.0'
+const CODEX_APP_SERVER_GENERATED_DATE = '2026-08-30'
 
 export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'initialize', paramsType: 'InitializeParams', category: 'initialize', operation: 'initialize', interaction: 'request' },
@@ -64,6 +64,13 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'thread/rollback', paramsType: 'ThreadRollbackParams', category: 'thread', operation: 'rollback', interaction: 'request' },
   { method: 'thread/revert', paramsType: 'ThreadRevertParams', category: 'thread', operation: 'revert', interaction: 'request' },
   { method: 'thread/list', paramsType: 'ThreadListParams', category: 'thread', operation: 'list', interaction: 'request' },
+  { method: 'project/list', paramsType: 'ProjectListParams', category: 'project', operation: 'list', interaction: 'request' },
+  { method: 'project/read', paramsType: 'ProjectReadParams', category: 'project', operation: 'read', interaction: 'request' },
+  { method: 'project/create', paramsType: 'ProjectCreateParams', category: 'project', operation: 'create', interaction: 'request' },
+  { method: 'project/import', paramsType: 'ProjectImportParams', category: 'project', operation: 'import', interaction: 'request' },
+  { method: 'project/update', paramsType: 'ProjectUpdateParams', category: 'project', operation: 'update', interaction: 'request' },
+  { method: 'project/move', paramsType: 'ProjectMoveParams', category: 'project', operation: 'move', interaction: 'request' },
+  { method: 'project/delete', paramsType: 'ProjectDeleteParams', category: 'project', operation: 'delete', interaction: 'request' },
   { method: 'threadSection/list', paramsType: 'ThreadSectionListParams', category: 'thread-section', operation: 'list', interaction: 'request' },
   { method: 'threadSection/create', paramsType: 'ThreadSectionCreateParams', category: 'thread-section', operation: 'create', interaction: 'request' },
   { method: 'threadSection/update', paramsType: 'ThreadSectionUpdateParams', category: 'thread-section', operation: 'update', interaction: 'request' },
@@ -107,6 +114,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'plugin/install', paramsType: 'PluginInstallParams', category: 'plugin', operation: 'install', interaction: 'request' },
   { method: 'plugin/uninstall', paramsType: 'PluginUninstallParams', category: 'plugin', operation: 'uninstall', interaction: 'request' },
   { method: 'turn/start', paramsType: 'TurnStartParams', category: 'turn', operation: 'start', interaction: 'stream' },
+  { method: 'turn/settings/update', paramsType: 'TurnSettingsUpdateParams', category: 'turn', operation: 'settings/update', interaction: 'request' },
   { method: 'turn/steer', paramsType: 'TurnSteerParams', category: 'turn', operation: 'steer', interaction: 'request' },
   { method: 'turn/interrupt', paramsType: 'TurnInterruptParams', category: 'turn', operation: 'interrupt', interaction: 'request' },
   { method: 'thread/realtime/start', paramsType: 'ThreadRealtimeStartParams', category: 'thread', operation: 'realtime/start', interaction: 'stream' },
@@ -114,6 +122,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'thread/realtime/appendText', paramsType: 'ThreadRealtimeAppendTextParams', category: 'thread', operation: 'realtime/appendText', interaction: 'stream' },
   { method: 'thread/realtime/appendSpeech', paramsType: 'ThreadRealtimeAppendSpeechParams', category: 'thread', operation: 'realtime/appendSpeech', interaction: 'request' },
   { method: 'thread/realtime/stop', paramsType: 'ThreadRealtimeStopParams', category: 'thread', operation: 'realtime/stop', interaction: 'stream' },
+  { method: 'thread/timeline/list', paramsType: 'ThreadTimelineListParams', category: 'thread', operation: 'timeline/list', interaction: 'request' },
   { method: 'thread/realtime/listVoices', paramsType: 'ThreadRealtimeListVoicesParams', category: 'thread', operation: 'realtime/listVoices', interaction: 'request' },
   { method: 'review/start', paramsType: 'ReviewStartParams', category: 'review', operation: 'start', interaction: 'request' },
   { method: 'model/list', paramsType: 'ModelListParams', category: 'model', operation: 'list', interaction: 'request' },
@@ -137,10 +146,14 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'config/mcpServer/reload', paramsType: null, category: 'config', operation: 'mcpServer/reload', interaction: 'request' },
   { method: 'mcpServerStatus/list', paramsType: 'ListMcpServerStatusParams', category: 'mcp-server-status', operation: 'list', interaction: 'request' },
   { method: 'mcpServer/resource/read', paramsType: 'McpResourceReadParams', category: 'mcp-server', operation: 'resource/read', interaction: 'request' },
+  { method: 'mcpServer/event/stream/start', paramsType: 'McpServerEventStreamStartParams', category: 'mcp-server', operation: 'event/stream/start', interaction: 'request' },
+  { method: 'mcpServer/event/stream/stop', paramsType: 'McpServerEventStreamStopParams', category: 'mcp-server', operation: 'event/stream/stop', interaction: 'request' },
   { method: 'mcpServer/tool/call', paramsType: 'McpServerToolCallParams', category: 'mcp-server', operation: 'tool/call', interaction: 'request' },
   { method: 'windowsSandbox/setupStart', paramsType: 'WindowsSandboxSetupStartParams', category: 'windows-sandbox', operation: 'setupStart', interaction: 'stream' },
   { method: 'windowsSandbox/readiness', paramsType: null, category: 'windows-sandbox', operation: 'readiness', interaction: 'request' },
   { method: 'account/login/start', paramsType: 'LoginAccountParams', category: 'account', operation: 'login/start', interaction: 'stream' },
+  { method: 'account/bedrock/discover', paramsType: 'BedrockDiscoverParams', category: 'account', operation: 'bedrock/discover', interaction: 'request' },
+  { method: 'account/bedrock/setup', paramsType: 'BedrockSetupParams', category: 'account', operation: 'bedrock/setup', interaction: 'request' },
   { method: 'account/login/cancel', paramsType: 'CancelLoginAccountParams', category: 'account', operation: 'login/cancel', interaction: 'request' },
   { method: 'account/logout', paramsType: null, category: 'account', operation: 'logout', interaction: 'request' },
   { method: 'account/rateLimits/read', paramsType: null, category: 'account', operation: 'rateLimits/read', interaction: 'request' },
@@ -203,6 +216,8 @@ export const CODEX_APP_SERVER_SERVER_NOTIFICATIONS = [
   { method: 'thread/goal/updated', paramsType: 'ThreadGoalUpdatedNotification', category: 'thread' },
   { method: 'thread/goal/cleared', paramsType: 'ThreadGoalClearedNotification', category: 'thread' },
   { method: 'thread/queue/changed', paramsType: 'ThreadQueueChangedNotification', category: 'thread' },
+  { method: 'project/changed', paramsType: 'ProjectChangedNotification', category: 'project' },
+  { method: 'thread/project/updated', paramsType: 'ThreadProjectUpdatedNotification', category: 'thread' },
   { method: 'thread/environment/connected', paramsType: 'EnvironmentConnectionNotification', category: 'thread' },
   { method: 'thread/environment/disconnected', paramsType: 'EnvironmentConnectionNotification', category: 'thread' },
   { method: 'thread/settings/updated', paramsType: 'ThreadSettingsUpdatedNotification', category: 'thread' },
@@ -216,6 +231,7 @@ export const CODEX_APP_SERVER_SERVER_NOTIFICATIONS = [
   { method: 'item/started', paramsType: 'ItemStartedNotification', category: 'item' },
   { method: 'item/autoApprovalReview/started', paramsType: 'ItemGuardianApprovalReviewStartedNotification', category: 'item' },
   { method: 'item/autoApprovalReview/completed', paramsType: 'ItemGuardianApprovalReviewCompletedNotification', category: 'item' },
+  { method: 'autoApprovalReview/strictReviewRequired', paramsType: 'StrictReviewRequiredNotification', category: 'auto-approval-review' },
   { method: 'item/completed', paramsType: 'ItemCompletedNotification', category: 'item' },
   { method: 'rawResponseItem/completed', paramsType: 'RawResponseItemCompletedNotification', category: 'raw-response-item' },
   { method: 'rawResponse/completed', paramsType: 'RawResponseCompletedNotification', category: 'raw-response' },
@@ -232,6 +248,7 @@ export const CODEX_APP_SERVER_SERVER_NOTIFICATIONS = [
   { method: 'item/mcpToolCall/progress', paramsType: 'McpToolCallProgressNotification', category: 'item' },
   { method: 'mcpServer/oauthLogin/completed', paramsType: 'McpServerOauthLoginCompletedNotification', category: 'mcp-server' },
   { method: 'mcpServer/startupStatus/updated', paramsType: 'McpServerStatusUpdatedNotification', category: 'mcp-server' },
+  { method: 'mcpServer/event/stream/notification', paramsType: 'McpServerEventStreamNotification', category: 'mcp-server' },
   { method: 'account/updated', paramsType: 'AccountUpdatedNotification', category: 'account' },
   { method: 'account/rateLimits/updated', paramsType: 'AccountRateLimitsUpdatedNotification', category: 'account' },
   { method: 'app/list/updated', paramsType: 'AppListUpdatedNotification', category: 'app' },
@@ -255,6 +272,9 @@ export const CODEX_APP_SERVER_SERVER_NOTIFICATIONS = [
   { method: 'fuzzyFileSearch/sessionCompleted', paramsType: 'FuzzyFileSearchSessionCompletedNotification', category: 'fuzzy-file-search' },
   { method: 'thread/realtime/started', paramsType: 'ThreadRealtimeStartedNotification', category: 'thread' },
   { method: 'thread/realtime/itemAdded', paramsType: 'ThreadRealtimeItemAddedNotification', category: 'thread' },
+  { method: 'thread/realtime/item/started', paramsType: 'ThreadRealtimeItemStartedNotification', category: 'thread' },
+  { method: 'thread/realtime/item/transcript/delta', paramsType: 'ThreadRealtimeItemTranscriptDeltaNotification', category: 'thread' },
+  { method: 'thread/realtime/item/completed', paramsType: 'ThreadRealtimeItemCompletedNotification', category: 'thread' },
   { method: 'thread/realtime/transcript/delta', paramsType: 'ThreadRealtimeTranscriptDeltaNotification', category: 'thread' },
   { method: 'thread/realtime/transcript/done', paramsType: 'ThreadRealtimeTranscriptDoneNotification', category: 'thread' },
   { method: 'thread/realtime/outputAudio/delta', paramsType: 'ThreadRealtimeOutputAudioDeltaNotification', category: 'thread' },
