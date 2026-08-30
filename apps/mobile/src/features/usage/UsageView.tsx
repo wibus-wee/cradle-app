@@ -70,6 +70,10 @@ export function UsageView({
   const recentDays = denseRecentDays(daily)
   const maxDailyTokens = Math.max(...recentDays.map(day => day.totalTokens), 1)
   const maxModelTokens = Math.max(...summary.byModel.map(model => model.totalTokens), 1)
+  const maxProviderTokens = Math.max(
+    ...summary.byProviderTarget.map(provider => provider.totalTokens),
+    1,
+  )
   const models = showAllModels ? summary.byModel : summary.byModel.slice(0, 5)
   const selectedIndex = usageRanges.findIndex(option => option.key === range)
 
@@ -217,6 +221,35 @@ export function UsageView({
             />
           )}
         </View>
+
+        {summary.byProviderTarget.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeading meta={`${summary.byProviderTarget.length}`} title="Providers" />
+            {summary.byProviderTarget.map(provider => (
+              <View key={provider.providerTargetId} style={styles.modelRow}>
+                <View style={styles.modelMeta}>
+                  <Text numberOfLines={1} style={[styles.modelName, { color: theme.foreground }]}>
+                    {provider.providerTargetName ?? provider.providerTargetId}
+                  </Text>
+                  <Text style={[styles.modelValue, { color: theme.mutedForeground }]}>
+                    {formatNumber(provider.totalTokens)}
+                  </Text>
+                </View>
+                <View style={[styles.track, { backgroundColor: theme.muted }]}>
+                  <View
+                    style={[
+                      styles.fill,
+                      {
+                        backgroundColor: theme.foreground,
+                        width: `${Math.max(3, provider.totalTokens / maxProviderTokens * 100)}%`,
+                      },
+                    ]}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </Screen>
   )
