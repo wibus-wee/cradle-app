@@ -1,4 +1,5 @@
 import {
+  CloseLine as CloseIcon,
   DeleteLine as Trash2Icon,
   PlusLine as PlusIcon,
   SearchLine as SearchIcon,
@@ -119,8 +120,22 @@ export function SkillManagerView({
             value={searchQuery}
             onChange={event => onSearchQueryChange(event.target.value)}
             placeholder={t('manager.searchPlaceholder')}
-            className="w-full rounded-md bg-foreground/4 py-1.5 pr-3 pl-8 text-xs text-foreground outline-none placeholder:text-muted-foreground/40"
+            className="w-full rounded-md bg-foreground/4 py-1.5 pr-8 pl-8 text-xs text-foreground outline-none placeholder:text-muted-foreground/40"
           />
+          {searchQuery
+            ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => onSearchQueryChange('')}
+                  aria-label={t('manager.clearSearch')}
+                  className="absolute top-1/2 right-1 -translate-y-1/2 text-muted-foreground"
+                >
+                  <CloseIcon className="size-3" aria-hidden />
+                </Button>
+              )
+            : null}
         </div>
         <div className="flex items-center gap-0.5">
           {(['all' as const, ...scopes] as const).map(scope => (

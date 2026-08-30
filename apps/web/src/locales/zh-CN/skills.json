@@ -3,6 +3,7 @@
   "manager.new": "新建",
   "manager.searchLabel": "搜索技能",
   "manager.searchPlaceholder": "搜索技能…",
+  "manager.clearSearch": "清除技能搜索",
   "manager.filterAll": "全部",
   "manager.empty.noMatches": "没有匹配的技能",
   "manager.empty.noSkills": "暂无技能",

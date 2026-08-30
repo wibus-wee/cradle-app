@@ -3,6 +3,7 @@
   "manager.new": "Nuevo",
   "manager.searchLabel": "Buscar skills",
   "manager.searchPlaceholder": "Buscar skills…",
+  "manager.clearSearch": "Borrar búsqueda de skills",
   "manager.filterAll": "Todos",
   "manager.empty.noMatches": "No hay skills coincidentes",
   "manager.empty.noSkills": "Todavía no hay skills",

@@ -3,6 +3,7 @@
   "manager.new": "新規",
   "manager.searchLabel": "スキルを検索",
   "manager.searchPlaceholder": "スキルを検索…",
+  "manager.clearSearch": "スキル検索をクリア",
   "manager.filterAll": "すべて",
   "manager.empty.noMatches": "一致するスキルはありません",
   "manager.empty.noSkills": "スキルはまだありません",
