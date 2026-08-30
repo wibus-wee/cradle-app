@@ -1,4 +1,5 @@
 import {
+  CloseLine as CloseIcon,
   GitPullRequestLine as PullRequestIcon,
   Refresh1Line as RefreshIcon,
   Search2Line as SearchIcon,
@@ -214,7 +215,22 @@ export function PullRequestsPageView({
                     ⌘K
                   </kbd>
                 )
-              : null}
+              : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => {
+                      setSearch('')
+                      searchInputRef.current?.focus()
+                    }}
+                    aria-label={t('page.clearSearch')}
+                    title={t('page.clearSearch')}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <CloseIcon className="size-3.5" aria-hidden />
+                  </Button>
+                )}
           </div>
         </div>
       </header>

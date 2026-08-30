@@ -3,6 +3,7 @@ export default {
   'page.title': 'Pull request',
   'page.description': 'Review and track work on GitHub as {{login}}.',
   'page.searchPlaceholder': 'Search pull requests',
+  'page.clearSearch': 'Clear pull request search',
   'page.refresh': 'Refresh pull requests from GitHub',
   'page.refreshError': 'Could not refresh pull requests',
   'page.loadMore': 'Load more',
