@@ -151,6 +151,10 @@ export function RuntimeListPane({
     }
     return remoteAgents.filter(agent => matchesQuery(search, [agent.name, agent.id, agent.endpointUrl]))
   }, [remoteAgents, acpFilter, search])
+  const installedCount = localAgents.length
+    + remoteAgents.length
+    + acpEntries.filter(entry => entry.installed).length
+  const updateCount = acpEntries.filter(entry => entry.updateAvailable).length
 
   const flatSelections = useMemo<RuntimeSelection[]>(() => [
     ...visibleBuiltin.map(runtime => ({ type: 'builtin', runtimeKind: runtime.runtimeKind }) as const),
@@ -235,9 +239,11 @@ export function RuntimeListPane({
           </ToggleGroupItem>
           <ToggleGroupItem value="installed" className="h-6 flex-1 rounded-md px-2 text-[11px]">
             {t('filter.installed')}
+            <span className="ml-1 tabular-nums text-muted-foreground/70">{installedCount}</span>
           </ToggleGroupItem>
           <ToggleGroupItem value="updates" className="h-6 flex-1 rounded-md px-2 text-[11px]">
             {t('filter.updates')}
+            <span className="ml-1 tabular-nums text-muted-foreground/70">{updateCount}</span>
           </ToggleGroupItem>
         </ToggleGroup>
 
