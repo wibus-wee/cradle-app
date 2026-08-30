@@ -64,3 +64,4 @@ Chronological index of independently shipped product improvements.
 25. [Search workspace files on mobile](./2026-08-31-25-mobile-file-search.md)
 26. [Make the mobile Work base truthful](./2026-08-31-26-mobile-work-base.md)
 27. [Show file freshness in mobile previews](./2026-08-31-27-mobile-file-modified-time.md)
+28. [Open pull request checks from mobile](./2026-08-31-28-mobile-open-pr-check.md)

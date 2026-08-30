@@ -81,6 +81,13 @@ export function PullRequestDetailContainer({
       />
     )
   }
+
+  const openExternalUrl = (url: string, title: string) => {
+    void Linking.openURL(url).catch(() => {
+      Alert.alert(title, 'The GitHub link could not be opened on this device.')
+    })
+  }
+
   return (
     <>
       <Stack.Screen options={{ title: `#${query.data.pullRequest.number}` }} />
@@ -91,11 +98,8 @@ export function PullRequestDetailContainer({
         onComment={async (body) => {
           await action.mutateAsync({ endpoint: 'comment', body: { body } })
         }}
-        onOpenExternal={() => {
-          void Linking.openURL(query.data.pullRequest.url).catch(() => {
-            Alert.alert('Could not open pull request', 'The GitHub link could not be opened on this device.')
-          })
-        }}
+        onOpenCheck={url => openExternalUrl(url, 'Could not open check')}
+        onOpenExternal={() => openExternalUrl(query.data.pullRequest.url, 'Could not open pull request')}
         onRefresh={refresh}
         onReview={async (event, body) => {
           await action.mutateAsync({

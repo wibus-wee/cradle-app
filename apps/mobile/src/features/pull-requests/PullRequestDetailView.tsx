@@ -22,6 +22,7 @@ export interface PullRequestDetailViewProps {
   isMutating?: boolean
   isRefreshing?: boolean
   onComment: (body: string) => Promise<void>
+  onOpenCheck: (url: string) => void
   onOpenExternal: () => void
   onRefresh?: () => void
   onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => Promise<void>
@@ -32,6 +33,7 @@ export function PullRequestDetailView({
   isMutating = false,
   isRefreshing = false,
   onComment,
+  onOpenCheck,
   onOpenExternal,
   onRefresh,
   onReview,
@@ -116,9 +118,12 @@ export function PullRequestDetailView({
           : pullRequest.checks.map(check => (
               <Item
                 actions={(
-                  <Text style={[styles.checkStatus, { color: theme.mutedForeground }]}>
-                    {check.conclusion ?? check.status}
-                  </Text>
+                  <>
+                    <Text style={[styles.checkStatus, { color: theme.mutedForeground }]}>
+                      {check.conclusion ?? check.status}
+                    </Text>
+                    {check.url && <ExternalLink color={theme.dimForeground} size={14} />}
+                  </>
                 )}
                 key={check.id}
                 media={check.conclusion === 'success'
@@ -126,6 +131,7 @@ export function PullRequestDetailView({
                   : check.conclusion === 'failure'
                     ? <X color={theme.destructive} size={17} />
                     : <GitCommit color={theme.warning} size={17} />}
+                onPress={check.url ? () => onOpenCheck(check.url!) : undefined}
                 size="sm"
                 title={check.name}
                 variant="muted"

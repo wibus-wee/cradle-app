@@ -86,6 +86,7 @@ export const pullRequestDetailFixture: PullRequestDetailViewProps = {
     }],
   },
   onComment: async () => {},
+  onOpenCheck: () => {},
   onOpenExternal: () => {},
   onRefresh: () => {},
   onReview: async () => {},
