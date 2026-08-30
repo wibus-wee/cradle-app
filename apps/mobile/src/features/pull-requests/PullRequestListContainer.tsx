@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { router } from 'expo-router'
 import { useState } from 'react'
+import { Alert } from 'react-native'
 
 import type {
   GetPullRequestsAuthoredResponse,
@@ -45,14 +46,20 @@ export function PullRequestListContainer() {
     },
   })
 
-  const refresh = async () => {
+  const refresh = () => {
+    if (!connection || !query.data) {
+      return
+    }
     setIsRefreshing(true)
-    try {
-      await query.refetch()
-    }
-    finally {
-      setIsRefreshing(false)
-    }
+    void cradleRequest(connection, '/pull-requests/refresh', {
+      method: 'POST',
+      body: { login: query.data.login },
+    })
+      .then(() => query.refetch())
+      .catch((error: Error) => {
+        Alert.alert('Could not refresh pull requests', errorMessage(error))
+      })
+      .finally(() => setIsRefreshing(false))
   }
 
   if (query.isPending) {
@@ -74,7 +81,7 @@ export function PullRequestListContainer() {
       onOpen={pullRequest =>
         router.push(`/pull-request/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`)}
       onOpenUsage={() => router.push('/usage')}
-      onRefresh={() => void refresh()}
+      onRefresh={refresh}
     />
   )
 }

@@ -3,8 +3,8 @@
 Cradle Mobile is the focused React Native controller for a Cradle Server. It
 supports server onboarding, project workspaces, live chat sessions, Work
 containers, and pull request review while away from the desktop.
-Pull request lists and details support pull-to-refresh; detail refresh forces
-an upstream GitHub update before reloading the review surface.
+Pull request lists and details support pull-to-refresh; both force an upstream
+GitHub update before reloading their Cradle projections.
 
 ## Run
 
