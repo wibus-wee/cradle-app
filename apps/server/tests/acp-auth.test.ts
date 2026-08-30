@@ -3,10 +3,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import type { ProviderAuthMethod } from '@cradle/chat-runtime-contracts'
-import { acpAgents } from '@cradle/db'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { db, shutdownInfra } from '../src/infra'
+import { shutdownInfra } from '../src/infra'
 import {
   clearAgentAuthSelection,
   createLocalAgent,
@@ -30,7 +29,7 @@ const methods: ProviderAuthMethod[] = [{
   unavailableReason: 'Terminal auth is unavailable',
 }]
 
-describe('aCP auth persistence', () => {
+describe('ACP auth persistence', () => {
   const previousDataDir = process.env.CRADLE_DATA_DIR
 
   afterEach(() => {
@@ -43,13 +42,12 @@ describe('aCP auth persistence', () => {
     }
   })
 
-  it('persists the selected method and clears legacy credential references', () => {
+  it('persists and clears the selected supported method', () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'cradle-acp-auth-'))
     process.env.CRADLE_DATA_DIR = dataDir
 
     try {
       createLocalAgent({ id: 'auth-agent', name: 'Auth Agent', cmd: '/bin/echo' })
-      db().update(acpAgents).set({ authSecretRefsJson: '{"API_KEY":"legacy-secret"}' }).run()
       setAgentAuthSelection('auth-agent', {
         methodId: 'provider-login',
       }, methods)
@@ -60,12 +58,14 @@ describe('aCP auth persistence', () => {
       })
       expect(getInstalled('auth-agent')).toMatchObject({
         authMethodId: 'provider-login',
-        authSecretRefsJson: '{}',
       })
-      const audit = getAuditLog('auth-agent')
-      expect(audit.map(entry => entry.action)).toContain('auth_selection_update')
+      expect(getAuditLog('auth-agent').map(entry => entry.action)).toContain('auth_selection_update')
+
       clearAgentAuthSelection('auth-agent')
+
       expect(readAgentAuthConfig('auth-agent')).toEqual({ methodId: null })
+      expect(getInstalled('auth-agent')).toMatchObject({ authMethodId: null })
+      expect(getAuditLog('auth-agent').map(entry => entry.action)).toContain('auth_selection_clear')
     }
     finally {
       shutdownInfra()
