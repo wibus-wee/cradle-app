@@ -154,6 +154,7 @@
   "backup.restore.description": "恢复 .cradle-backup 文件。Cradle 会逐文件校验、重启，并保留当前数据目录作为回滚副本。",
   "backup.restore.label": "恢复 Cradle 数据",
   "backup.status.exported": "备份已成功导出到 {{path}}。",
+  "backup.status.showExport": "在文件夹中显示",
   "backup.status.failed": "备份操作失败：{{message}}",
   "backup.status.pending": "备份操作已安排，Cradle 将重启并完成操作。",
   "backup.status.restored": "备份已成功恢复。恢复前的数据保留在 {{backupPath}}。",

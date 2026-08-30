@@ -103,6 +103,7 @@ export default {
   'backup.unavailable': 'Backup and restore are available in the Cradle desktop app.',
   'backup.status.pending': 'The backup operation is scheduled. Cradle will restart to finish it.',
   'backup.status.exported': 'Backup exported successfully to {{path}}.',
+  'backup.status.showExport': 'Show in folder',
   'backup.status.restored': 'Backup restored successfully. The previous data remains at {{backupPath}}.',
   'backup.status.failed': 'Backup operation failed: {{message}}',
   'backup.status.unknownError': 'Unknown error',

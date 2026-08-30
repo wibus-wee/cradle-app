@@ -130,6 +130,7 @@
   "backup.restore.description": "Restore a .cradle-backup file. Cradle verifies every file, restarts, and keeps the current data directory as a rollback copy.",
   "backup.restore.label": "Restore Cradle data",
   "backup.status.exported": "Backup exported successfully to {{path}}.",
+  "backup.status.showExport": "Show in folder",
   "backup.status.failed": "Backup operation failed: {{message}}",
   "backup.status.pending": "The backup operation is scheduled. Cradle will restart to finish it.",
   "backup.status.restored": "Backup restored successfully. The previous data remains at {{backupPath}}.",
