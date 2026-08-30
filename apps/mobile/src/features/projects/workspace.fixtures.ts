@@ -34,6 +34,7 @@ export const workspaceFixture: WorkspaceViewProps = {
     { type: 'file', name: 'README.md', path: 'README.md' },
   ],
   onCreate: () => {},
+  onOpenDirectory: () => {},
   onOpenFile: () => {},
   onOpenSession: () => {},
   onOpenWork: () => {},

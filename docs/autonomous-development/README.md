@@ -51,3 +51,4 @@ Chronological index of independently shipped product improvements.
 12. [Copy the active workspace path from the command palette](./2026-08-31-12-copy-workspace-path-command.md)
 13. [Share mobile workspace file previews](./2026-08-31-13-mobile-share-file-preview.md)
 14. [Refresh mobile Work detail on demand](./2026-08-31-14-mobile-work-detail-refresh.md)
+15. [Browse workspace directories on mobile](./2026-08-31-15-mobile-directory-browser.md)

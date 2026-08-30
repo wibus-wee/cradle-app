@@ -12,6 +12,8 @@ after active Work polling has stopped, without replacing handoff edits in progre
 Workspace detail file rows open a refreshable, read-only mobile preview for
 text and Markdown files; previews can be handed to other apps through the
 system share sheet, while unsupported binary formats are identified explicitly.
+Directory rows open a path-scoped, refreshable child listing; deeper directories
+stack naturally and files continue into the same preview route.
 
 ## Run
 
@@ -53,6 +55,8 @@ Settings.
 - `src/features/projects/FilePreviewContainer.tsx` reads workspace-owned file
   metadata before requesting text content and owns the native share handoff;
   its View never reads routes, native APIs, or API state.
+- `WorkspaceDirectoryContainer` owns path-scoped child queries and recursive
+  navigation; `WorkspaceDirectoryView` renders owner-typed entry fixtures.
 - Work detail query and mutation state remain in `WorkDetailContainer`; the
   fixture-driven View owns handoff draft interaction and native refresh presentation.
 - Root destinations use an anchored navigation menu; detail surfaces use Expo
