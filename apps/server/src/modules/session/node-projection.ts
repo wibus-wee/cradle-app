@@ -458,6 +458,8 @@ export async function reconcileNodeSessionsForWorkspace(
   let discovered = 0
   let updated = 0
   for (const remote of remoteSessionsById.values()) {
+    const latestUserMessageAt = remote.latestUserMessageAt ?? null
+    const latestAssistantMessageAt = remote.latestAssistantMessageAt ?? null
     const existing = db()
       .select({
         localSessionId: nodeSessionLinks.localSessionId,
@@ -479,8 +481,8 @@ export async function reconcileNodeSessionsForWorkspace(
       if (
         existing.title !== title
         || existing.updatedAt < remote.updatedAt
-        || existing.latestUserMessageAt !== remote.latestUserMessageAt
-        || existing.latestAssistantMessageAt !== remote.latestAssistantMessageAt
+        || existing.latestUserMessageAt !== latestUserMessageAt
+        || existing.latestAssistantMessageAt !== latestAssistantMessageAt
       ) {
         db().update(sessions).set({
           title,
@@ -491,8 +493,8 @@ export async function reconcileNodeSessionsForWorkspace(
           updatedAt: remote.updatedAt,
         }).where(eq(sessions.id, existing.localSessionId)).run()
         db().update(nodeSessionLinks).set({
-          latestUserMessageAt: remote.latestUserMessageAt,
-          latestAssistantMessageAt: remote.latestAssistantMessageAt,
+          latestUserMessageAt,
+          latestAssistantMessageAt,
         }).where(eq(nodeSessionLinks.localSessionId, existing.localSessionId)).run()
         updated += 1
       }
@@ -521,8 +523,8 @@ export async function reconcileNodeSessionsForWorkspace(
         remoteSessionId: remote.id,
         remoteWorkspaceId,
         projectionKind: 'discovered',
-        latestUserMessageAt: remote.latestUserMessageAt,
-        latestAssistantMessageAt: remote.latestAssistantMessageAt,
+        latestUserMessageAt,
+        latestAssistantMessageAt,
         createdAt: now,
         updatedAt: now,
       }).run()
