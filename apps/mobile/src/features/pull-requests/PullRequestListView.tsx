@@ -1,5 +1,5 @@
 import { SegmentedControl } from '@expo/ui/community/segmented-control'
-import { CheckCircle2, CircleDot, XCircle } from 'lucide-react-native'
+import { CheckCircle2, CircleDot, Search, XCircle } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
@@ -10,6 +10,7 @@ import type {
 import type { AppSection } from '@/components/common/app-menu-button'
 import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -58,7 +59,17 @@ export function PullRequestListView({
 }: PullRequestListViewProps) {
   const theme = useTheme()
   const [mode, setMode] = useState<'authored' | 'reviewing'>('authored')
-  const items = mode === 'authored' ? authored : reviewing
+  const [search, setSearch] = useState('')
+  const normalizedSearch = search.trim().toLocaleLowerCase()
+  const sourceItems = mode === 'authored' ? authored : reviewing
+  const items = normalizedSearch
+    ? sourceItems.filter(pullRequest => [
+        pullRequest.title,
+        pullRequest.owner,
+        pullRequest.repo,
+        `#${pullRequest.number}`,
+      ].some(value => value.toLocaleLowerCase().includes(normalizedSearch)))
+    : sourceItems
   const groups = ['Today', 'This week', 'Older']
     .map(title => ({ title, items: items.filter(item => pullRequestGroup(item.updatedAt) === title) }))
     .filter(group => group.items.length > 0)
@@ -79,11 +90,28 @@ export function PullRequestListView({
         values={['Authored', 'Review requests']}
       />
 
+      <View style={styles.search}>
+        <InputGroup
+          addon={<Search color={theme.mutedForeground} size={17} />}
+          autoCapitalize="none"
+          autoCorrect={false}
+          clearButtonMode="while-editing"
+          onChangeText={setSearch}
+          placeholder="Search pull requests"
+          returnKeyType="search"
+          value={search}
+        />
+      </View>
+
       {items.length === 0
         ? (
             <EmptyState
-              description={mode === 'authored' ? 'Your open pull requests will appear here.' : 'You have no pending review requests.'}
-              title="Inbox clear"
+              description={normalizedSearch
+                ? 'Try a different title, repository, owner, or number.'
+                : mode === 'authored'
+                  ? 'Your open pull requests will appear here.'
+                  : 'You have no pending review requests.'}
+              title={normalizedSearch ? 'No matching pull requests' : 'Inbox clear'}
             />
           )
         : (
@@ -137,8 +165,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   segmented: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
     minHeight: 36,
+  },
+  search: {
+    marginBottom: spacing.lg,
   },
   time: {
 
