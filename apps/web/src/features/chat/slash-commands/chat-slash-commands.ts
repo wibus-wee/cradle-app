@@ -524,6 +524,9 @@ function readUsageCommandState(
       tone: state.usedPercent >= 90 ? 'warning' : 'neutral',
     }
   }
+  if (state.estimatedCostUsd !== undefined && state.estimatedCostUsd !== null) {
+    return { label: `$${state.estimatedCostUsd.toFixed(2)} estimated`, tone: 'neutral' }
+  }
   return state.creditsBalance
     ? { label: state.creditsBalance, tone: state.hasCredits === false ? 'danger' : 'neutral' }
     : null

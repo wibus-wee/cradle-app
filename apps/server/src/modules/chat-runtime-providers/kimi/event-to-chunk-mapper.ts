@@ -63,6 +63,16 @@ export class KimiEventToChunkMapper {
           message: `Kimi could not refresh models for ${failure.provider}.`,
           additionalDetails: failure.reason,
         }))
+      case 'mcp.server.status':
+        if (payload.server.status !== 'failed' && payload.server.status !== 'needs-auth') {
+          return []
+        }
+        return [providerChunk.runtimeWarning({
+          message: payload.server.status === 'needs-auth'
+            ? `Kimi MCP server ${payload.server.name} needs authentication.`
+            : `Kimi MCP server ${payload.server.name} failed to connect.`,
+          additionalDetails: `Transport: ${payload.server.transport}; tools: ${payload.server.toolCount}`,
+        })]
       default:
         return []
     }

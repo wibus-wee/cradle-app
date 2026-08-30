@@ -64,6 +64,7 @@ class FakeCodexAppServerClient {
   terminatedBackgroundProcesses: string[] = []
   hangingMethods = new Set<string>()
   unsupportedMethods = new Set<string>()
+  turnSettingsUpdateStatus: 'applied' | 'targetUnavailable' = 'applied'
 
   private readonly notifications: CodexAppServerMessage[] = []
   private notificationWaiter: ((message: CodexAppServerMessage | null) => void) | null = null
@@ -457,6 +458,9 @@ class FakeCodexAppServerClient {
         return { turn: { id: 'codex-title-turn-1', status: 'inProgress' } }
       }
       return { turn: { id: 'codex-turn-1', status: 'inProgress' } }
+    }
+    if (method === 'turn/settings/update') {
+      return { status: this.turnSettingsUpdateStatus }
     }
     if (method === 'review/start') {
       return {
@@ -4524,6 +4528,43 @@ describe('codexProvider app-server integration', () => {
         },
       },
     })
+    expect(client.requests[3]).toEqual({
+      method: 'turn/settings/update',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        serviceTier: 'priority',
+      },
+    })
+
+    await expect(provider.updateRuntimeTurnSettings({
+      runtimeSession,
+      profile: createProfile({ model: 'gpt-test', reasoningEffort: 'low' }),
+      settings: {
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+        summary: 'concise',
+        serviceTier: 'priority',
+      },
+    })).resolves.toEqual({ status: 'applied' })
+    expect(client.requests[4]).toEqual({
+      method: 'turn/settings/update',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+        summary: 'concise',
+        serviceTier: 'priority',
+      },
+    })
+
+    client.turnSettingsUpdateStatus = 'targetUnavailable'
+    await expect(provider.updateRuntimeTurnSettings({
+      runtimeSession,
+      profile: createProfile(),
+      settings: { summary: 'detailed' },
+    })).resolves.toEqual({ status: 'targetUnavailable' })
 
     client.pushNotification({
       method: 'item/agentMessage/delta',

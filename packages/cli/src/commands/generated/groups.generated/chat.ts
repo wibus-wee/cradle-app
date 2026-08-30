@@ -14,6 +14,7 @@ import { register as registerChatQueueReorder } from '../chat/queue/reorder'
 import { register as registerChatQueueUpdate } from '../chat/queue/update'
 import { register as registerChatRuntimeSettingsGet } from '../chat/runtime-settings/get'
 import { register as registerChatRuntimeSettingsSet } from '../chat/runtime-settings/set'
+import { register as registerChatRuntimeTurnSettingsSet } from '../chat/runtime-turn-settings/set'
 import { register as registerChatSessionCheckpointList } from '../chat/session/checkpoint/list'
 import { register as registerChatSessionCheckpointRestore } from '../chat/session/checkpoint/restore'
 import { register as registerChatSessionCheckpointRewind } from '../chat/session/checkpoint/rewind'
@@ -39,6 +40,7 @@ export function registerGeneratedCommands(program: Command): void {
   registerChatQueueUpdate(program)
   registerChatRuntimeSettingsGet(program)
   registerChatRuntimeSettingsSet(program)
+  registerChatRuntimeTurnSettingsSet(program)
   registerChatSessionCheckpointList(program)
   registerChatSessionCheckpointRestore(program)
   registerChatSessionCheckpointRewind(program)

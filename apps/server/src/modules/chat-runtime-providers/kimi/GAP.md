@@ -67,5 +67,9 @@ Kimi transcript steps additionally expose request-build, server-decode, stream-d
 | `/api/v1/fs:mkdir` | Leave native | Writes stay on agent tools or Cradle workspace FS. |
 | Payload `agentId` on live turn/tool/status events | **Projected** | Non-main output is isolated in per-agent mappers and published through provider-thread events. |
 | `event.config.warning` / failed `event.model_catalog.changed` entries | **Projected** | Warning and failure facts enter the runtime warning stream; neutral changes do not. |
+| Turn prompt attachments | **Projected** | Text, native skills, image/video base64 and URLs, local image/video paths, and local files are submitted through typed prompt content. Unsupported remote non-media files fail explicitly instead of being dropped. |
+| `mcp.server.status` | **Projected** | Failed and needs-auth server states enter runtime warnings for the owning agent/session. Healthy status remains provider-native noise. |
 | `event.config.changed` / successful catalog refresh | Leave native | Cradle has no actionable turn-level meaning for neutral host configuration refreshes. |
-| `event.session.archived` | Follow up | Provider-thread state already reads archive status; live archive invalidation needs a shared thread-list refresh owner. |
+| `tower_mode` | Protocol only | The field exists, but Cradle has no captured trace that establishes its lifecycle semantics. It is not mapped to swarm/crew heuristically. |
+| `event.session.archived` | Protocol only | The event carries a workspace id but no unambiguous session id. Provider-thread listing still reads archive status; live invalidation would be unsafe. |
+| MCP server CRUD/OAuth management | Leave native | Kimi owns its registry and OAuth lifecycle. Cradle displays status without copying or dual-writing that registry. |

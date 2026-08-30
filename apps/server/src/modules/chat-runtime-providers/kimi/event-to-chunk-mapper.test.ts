@@ -4,6 +4,22 @@ import { KimiEventToChunkMapper } from './event-to-chunk-mapper'
 import type { KimiTranscriptTurn } from './transcript-projector'
 
 describe('kimi event to chunk mapper', () => {
+  it('projects failed and needs-auth MCP status as runtime warnings', () => {
+    const mapper = new KimiEventToChunkMapper()
+
+    expect(mapper.map(event({
+      type: 'mcp.server.status',
+      agentId: 'main',
+      server: { name: 'docs', transport: 'http', status: 'needs-auth', toolCount: 0 },
+    }))).toMatchObject([{
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Kimi MCP server docs needs authentication.',
+        additionalDetails: 'Transport: http; tools: 0',
+      },
+    }])
+  })
+
   it('projects streamed text, thinking, tools, and a terminal turn', () => {
     const mapper = new KimiEventToChunkMapper()
     const text = mapper.map(event({ type: 'assistant.delta', turnId: 7, delta: 'Hello' }))

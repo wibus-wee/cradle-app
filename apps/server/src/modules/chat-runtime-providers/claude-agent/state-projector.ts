@@ -1,4 +1,4 @@
-import type { AccountInfo, SDKAuthStatusMessage, SDKRateLimitInfo } from '@anthropic-ai/claude-agent-sdk'
+import type { AccountInfo, PostModelSwitchHookInput, SDKAuthStatusMessage, SDKRateLimitInfo, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk'
 
 import { readObjectRecord as readRecord } from '../../../helpers/json-record'
 import type { RuntimeCrewAgentItem, RuntimeCrewCallItem, RuntimeCrewUiSlotState, RuntimePlanStepStatus, RuntimePlanUiSlotState, RuntimeProgressUiSlotState, RuntimeSession, RuntimeToolActivityItem, RuntimeToolActivityUiSlotState, RuntimeUsageUiSlotState } from '../../chat-runtime/runtime-provider-types'
@@ -50,6 +50,18 @@ interface ClaudeAgentRateLimitSnapshot {
   info: SDKRateLimitInfo
   updatedAt: number
 }
+
+interface ClaudeAgentResultSnapshot {
+  threadId: string
+  resultMessageId: string
+  userMessageUuid: string | null
+  queuedTurnCount: number | null
+  totalCostUsd: number
+  modelCosts: NonNullable<RuntimeUsageUiSlotState['modelCosts']>
+  updatedAt: number
+}
+
+type ClaudeAgentModelSwitchSnapshot = NonNullable<RuntimeUsageUiSlotState['lastModelSwitch']>
 
 const CLAUDE_AGENT_RECENT_CREW_CALL_LIMIT = 24
 const CLAUDE_AGENT_RECENT_WORKFLOW_EXECUTION_LIMIT = 12
@@ -315,12 +327,78 @@ export function writeClaudeAgentRateLimitSnapshot(
   })
 }
 
+export function writeClaudeAgentResultSnapshot(
+  runtimeSession: RuntimeSession,
+  result: SDKResultMessage,
+  updatedAt: number = Date.now(),
+): void {
+  if (
+    !result.uuid
+    || typeof result.total_cost_usd !== 'number'
+    || !result.modelUsage
+  ) {
+    return
+  }
+  const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
+  const claudeAgentState = {
+    ...readRecord(snapshot.claudeAgent),
+    result: {
+      threadId: runtimeSession.chatSessionId,
+      resultMessageId: result.uuid,
+      userMessageUuid: result.user_message_uuid ?? null,
+      queuedTurnCount: result.queued_turn_count ?? null,
+      totalCostUsd: result.total_cost_usd,
+      modelCosts: Object.entries(result.modelUsage).map(([modelId, usage]) => ({
+        modelId,
+        canonicalModelId: usage.canonicalModel ?? null,
+        provider: usage.provider ?? null,
+        costUsd: usage.costUSD,
+        costBasis: usage.costBasis ?? 'unknown',
+      })),
+      updatedAt,
+    } satisfies ClaudeAgentResultSnapshot,
+  }
+  writeClaudeAgentProviderSnapshot(runtimeSession, {
+    ...snapshot,
+    claudeAgent: claudeAgentState,
+  })
+}
+
+export function writeClaudeAgentModelSwitchSnapshot(
+  runtimeSession: RuntimeSession,
+  modelSwitch: PostModelSwitchHookInput,
+  updatedAt: number = Date.now(),
+): void {
+  const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
+  const claudeAgentState = {
+    ...readRecord(snapshot.claudeAgent),
+    modelSwitch: {
+      fromModelId: modelSwitch.from_model,
+      toModelId: modelSwitch.to_model,
+      requestedModelId: modelSwitch.requested_model,
+      source: modelSwitch.source,
+      contextTokens: modelSwitch.context_tokens,
+      promptCacheWarm: modelSwitch.prompt_cache_warm,
+      cacheTtl: modelSwitch.cache_ttl,
+      estimatedCacheWriteUsd: modelSwitch.estimated_cache_write_usd,
+      pricing: modelSwitch.pricing,
+      updatedAt,
+    } satisfies ClaudeAgentModelSwitchSnapshot,
+  }
+  writeClaudeAgentProviderSnapshot(runtimeSession, {
+    ...snapshot,
+    claudeAgent: claudeAgentState,
+  })
+}
+
 export function projectClaudeAgentUsageUiSlotState(runtimeSession: RuntimeSession): RuntimeUsageUiSlotState | null {
   const snapshot = readWorkspaceProviderStateSnapshot(runtimeSession.providerStateSnapshot)
   const claudeAgentState = readRecord(snapshot.claudeAgent)
   const account = readClaudeAgentAccountSnapshot(claudeAgentState.account)
   const rateLimit = readClaudeAgentRateLimitSnapshot(claudeAgentState.rateLimit)
-  if (!account && !rateLimit) {
+  const result = readClaudeAgentResultSnapshot(claudeAgentState.result)
+  const modelSwitch = readClaudeAgentModelSwitchSnapshot(claudeAgentState.modelSwitch)
+  if (!account && !rateLimit && !result && !modelSwitch) {
     return null
   }
   const info = rateLimit?.info
@@ -341,8 +419,95 @@ export function projectClaudeAgentUsageUiSlotState(runtimeSession: RuntimeSessio
       ? info.errorCode ?? info.rateLimitType ?? info.status
       : null,
     planType: account?.subscriptionType ?? null,
-    updatedAt: Math.max(account?.updatedAt ?? 0, rateLimit?.updatedAt ?? 0),
+    estimatedCostUsd: result?.totalCostUsd ?? null,
+    queuedTurnCount: result?.queuedTurnCount ?? null,
+    resultMessageId: result?.resultMessageId ?? null,
+    correlatedUserMessageId: result?.userMessageUuid ?? null,
+    modelCosts: result?.modelCosts ?? [],
+    lastModelSwitch: modelSwitch,
+    updatedAt: Math.max(
+      account?.updatedAt ?? 0,
+      rateLimit?.updatedAt ?? 0,
+      result?.updatedAt ?? 0,
+      modelSwitch?.updatedAt ?? 0,
+    ),
   }
+}
+
+function readClaudeAgentModelSwitchSnapshot(value: unknown): ClaudeAgentModelSwitchSnapshot | null {
+  const modelSwitch = readRecord(value)
+  if (
+    typeof modelSwitch.fromModelId !== 'string'
+    || typeof modelSwitch.toModelId !== 'string'
+    || typeof modelSwitch.source !== 'string'
+    || typeof modelSwitch.contextTokens !== 'number'
+    || typeof modelSwitch.promptCacheWarm !== 'boolean'
+    || (modelSwitch.cacheTtl !== '5m' && modelSwitch.cacheTtl !== '1h')
+    || typeof modelSwitch.estimatedCacheWriteUsd !== 'number'
+    || (modelSwitch.pricing !== 'configured' && modelSwitch.pricing !== 'catalog' && modelSwitch.pricing !== 'default')
+    || typeof modelSwitch.updatedAt !== 'number'
+  ) {
+    return null
+  }
+  return {
+    fromModelId: modelSwitch.fromModelId,
+    toModelId: modelSwitch.toModelId,
+    requestedModelId: typeof modelSwitch.requestedModelId === 'string' ? modelSwitch.requestedModelId : null,
+    source: modelSwitch.source,
+    contextTokens: modelSwitch.contextTokens,
+    promptCacheWarm: modelSwitch.promptCacheWarm,
+    cacheTtl: modelSwitch.cacheTtl,
+    estimatedCacheWriteUsd: modelSwitch.estimatedCacheWriteUsd,
+    pricing: modelSwitch.pricing,
+    updatedAt: modelSwitch.updatedAt,
+  }
+}
+
+function readClaudeAgentResultSnapshot(value: unknown): ClaudeAgentResultSnapshot | null {
+  const result = readRecord(value)
+  const threadId = typeof result.threadId === 'string' ? result.threadId : ''
+  const resultMessageId = typeof result.resultMessageId === 'string' ? result.resultMessageId : ''
+  const updatedAt = typeof result.updatedAt === 'number' ? result.updatedAt : 0
+  if (
+    !threadId
+    || !resultMessageId
+    || updatedAt <= 0
+    || typeof result.totalCostUsd !== 'number'
+  ) {
+    return null
+  }
+  return {
+    threadId,
+    resultMessageId,
+    userMessageUuid: typeof result.userMessageUuid === 'string' ? result.userMessageUuid : null,
+    queuedTurnCount: typeof result.queuedTurnCount === 'number' ? result.queuedTurnCount : null,
+    totalCostUsd: result.totalCostUsd,
+    modelCosts: readClaudeAgentModelCosts(result.modelCosts),
+    updatedAt,
+  }
+}
+
+function readClaudeAgentModelCosts(value: unknown): NonNullable<RuntimeUsageUiSlotState['modelCosts']> {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.flatMap((item): NonNullable<RuntimeUsageUiSlotState['modelCosts']> => {
+    const cost = readRecord(item)
+    if (
+      typeof cost.modelId !== 'string'
+      || typeof cost.costUsd !== 'number'
+      || (cost.costBasis !== 'list' && cost.costBasis !== 'managed' && cost.costBasis !== 'unknown')
+    ) {
+      return []
+    }
+    return [{
+      modelId: cost.modelId,
+      canonicalModelId: typeof cost.canonicalModelId === 'string' ? cost.canonicalModelId : null,
+      provider: typeof cost.provider === 'string' ? cost.provider : null,
+      costUsd: cost.costUsd,
+      costBasis: cost.costBasis,
+    }]
+  })
 }
 
 function readClaudeAgentPlanSnapshot(snapshot: WorkspaceProviderStateSnapshot): ClaudeAgentPlanSnapshot | null {

@@ -505,9 +505,11 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
           ANTHROPIC_API_KEY: 'sk-ant-test',
           CLAUDE_CONFIG_DIR: join(process.env.CRADLE_DATA_DIR!, 'runtimes', 'claude-agent'),
         }),
-        hooks: {
+        hooks: expect.objectContaining({
           PreToolUse: [{ hooks: [expect.any(Function)] }],
-        },
+          PreModelSwitch: [{ hooks: [expect.any(Function)] }],
+          PostModelSwitch: [{ hooks: [expect.any(Function)] }],
+        }),
       }),
     )
     expect(readQueryOptions(0).maxTurns).toBeUndefined()

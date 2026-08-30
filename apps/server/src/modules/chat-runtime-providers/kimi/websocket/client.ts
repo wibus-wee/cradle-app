@@ -130,6 +130,16 @@ export type KimiSessionEventPayload = { agentId?: string } & (
     unchanged: string[]
     failed: Array<{ provider: string, reason: string }>
   }
+  | {
+    type: 'mcp.server.status'
+    agentId: string
+    server: {
+      name: string
+      transport: 'stdio' | 'http'
+      status: 'pending' | 'connected' | 'failed' | 'disabled' | 'needs-auth' | 'removed'
+      toolCount: number
+    }
+  }
 )
 
 export interface KimiNativeUsage {

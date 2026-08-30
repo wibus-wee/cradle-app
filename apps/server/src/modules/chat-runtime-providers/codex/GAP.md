@@ -7,6 +7,7 @@ Protocol baseline for this note: Codex CLI / app-server **0.151.0**, matching [`
 ## Classification key
 
 - **Projected** — Cradle owns a Chat Runtime seam and UI/path for this fact.
+- **Protocol only** — Cradle preserves or displays the provider fact, but the protocol does not expose a direct host control.
 - **Follow up** — Sound Cradle owner exists or can be designed; not shipped yet.
 - **Leave native** — No sound Cradle contract, or ownership would collide with Cradle namespaces.
 
@@ -32,8 +33,10 @@ Protocol baseline for this note: Codex CLI / app-server **0.151.0**, matching [`
 | Interrupted/completed collaboration lifecycle | **Projected** | Interrupted collaboration calls and subagent activities fail their tool activity/output; completed subagent activity remains successful. |
 | `RawResponseCompletedNotification.usageMetadata.amount` | Leave native | Shared runtime usage has token/cache counters but no provider-priced amount field. Do not reinterpret an amount as token usage or add Codex billing semantics to the shared contract. |
 | `AgentMessage.delivery: async` | Leave native | Cradle has no shared message-delivery presentation owner; message content remains projected without inventing asynchronous scheduling semantics. |
-| `turn/settings/update` | Leave native | Thread settings already own ongoing and future state. Turn-only overrides need an explicit product contract before they can be represented without overwriting thread configuration. |
-| MCP event subscriptions and direct tool/resource calls | Follow up | Current Chat Runtime owns MCP status and turn tool calls, not a general provider-native MCP console. |
+| `turn/settings/update` | **Projected** | `PATCH /chat/sessions/:sessionId/runtime-turn-settings` forwards model, effort, summary, and service tier to the active native turn and preserves `applied` / `targetUnavailable`. Composer model and effort changes update both the active turn and future session preference. |
+| `sendMessage`, `followupTask`, `interruptAgent`, `listAgents` collaboration tools | Protocol only | These are `CollabAgentTool` values emitted as `collabAgentToolCall` items, not app-server client RPCs. Cradle projects their call target, lifecycle, and interrupted/completed status into crew/tool state; it does not advertise direct control buttons. |
+| MCP startup/connection status | **Projected** | `mcpServer/startupStatus/updated` and status reads feed MCP rows and runtime diagnostics. |
+| MCP event subscriptions and direct tool/resource calls | Leave native | `mcpServer/subscribe` subscribes to arbitrary server events; it is not a connection-status stream. Chat Runtime does not duplicate a provider-native MCP console. |
 | Projects, realtime timeline/voice, and Bedrock setup | Leave native | These need product owners beyond a turn/session projection; Bedrock authentication remains provider-target configuration. |
 
 ## Large unused protocol surface (historical)

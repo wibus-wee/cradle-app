@@ -15,6 +15,7 @@ import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { isTearoffWindow } from '~/lib/electron'
 
 import type { ChatViewProps } from './chat-view'
+import { updateRuntimeTurnSettings } from './commands/chat-response-command'
 import { searchSessionPluginMentions } from './mentions/plugin-mentions'
 import type { SkillMentionItem } from './mentions/skill-mention-panel'
 import { useProviderClaudeAgentModelAliases } from './runtime/claude-session-model-matrix-control'
@@ -193,6 +194,12 @@ export function ChatRuntimeView({
     setModelId: (id: string | null, profileId?: string | null) => {
       composerState.setModelId(id, profileId)
       setPendingProviderTargetId(null)
+      if (runtimeKind === 'codex') {
+        void updateRuntimeTurnSettings({
+          sessionId,
+          settings: { model: id },
+        }).catch(() => {})
+      }
       const resolvedProfileId = profileId ?? composerState.selection.profileId
       void (resolvedProfileId
         ? persistSessionProviderModel({ providerTargetId: resolvedProfileId, modelId: id })
@@ -200,6 +207,12 @@ export function ChatRuntimeView({
     },
     setThinkingEffort: (effort) => {
       composerState.setThinkingEffort(effort)
+      if (runtimeKind === 'codex') {
+        void updateRuntimeTurnSettings({
+          sessionId,
+          settings: { effort },
+        }).catch(() => {})
+      }
       void persistSessionProviderModel({ thinkingEffort: effort })
     },
   })

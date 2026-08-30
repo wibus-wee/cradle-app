@@ -37,7 +37,6 @@ import type {
 } from '../../chat-runtime/runtime-provider-types'
 import { ProviderErrors, ProviderRuntimeError, requireRuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
 import { lookupModelRaw } from '../../model-registry/model-info-registry'
-import { extractProviderInputText } from '../kit/input-projector'
 import { requestProviderToolApproval } from '../kit/permission-bridge'
 import { readProviderStateSnapshot } from '../kit/state-snapshot'
 import { projectKimiProviderConfig, resolveKimiModelReference } from './config'
@@ -46,6 +45,7 @@ import type { KimiWebHostLease } from './host-lease'
 import { acquireKimiWebHostLease } from './host-lease'
 import { KIMI_RUNTIME_CAPABILITIES, KIMI_RUNTIME_KIND, KIMI_RUNTIME_METADATA } from './metadata'
 import { createKimiRuntimePresentation } from './presentation'
+import { projectKimiPrompt } from './prompt-content'
 import {
   closeTerminal,
   getApiV1McpServers,
@@ -420,11 +420,12 @@ updatedAt,
         input.modelId ?? snapshot.models.currentModelId,
       )
       await this.applyRuntimeSettings({ lease, sessionId, settings: input.providerOptions?.runtimeSettings })
+      const promptProjection = projectKimiPrompt(input.message)
       const prompt = await lease.resource.http.request(submitPrompt({
         client: lease.resource.http.client,
         path: { session_id: sessionId },
         body: {
-          content: [{ type: 'text', text: extractProviderInputText(input.message) }],
+          ...promptProjection,
           model: resolveKimiModelReference(providerConfig, input.modelId ?? snapshot.models.currentModelId),
         },
       }))
@@ -461,6 +462,12 @@ updatedAt,
           continue
         }
         if (!isKimiSessionEvent(item.event)) {
+          continue
+        }
+        if (item.event.payload.type === 'mcp.server.status') {
+          for (const chunk of mapper.map(item.event)) {
+            yield chunk
+          }
           continue
         }
         if (item.event.payload.type === 'agent.status.updated' && item.event.payload.phase?.kind === 'awaiting_approval') {
@@ -506,7 +513,11 @@ updatedAt,
     if (!sessionId) { throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId)) }
     const lease = await this.acquire(profile)
     try {
-      const prompt = await lease.resource.http.request(submitPrompt({ client: lease.resource.http.client, path: { session_id: sessionId }, body: { content: [{ type: 'text', text: extractProviderInputText(input.message) }] } }))
+      const prompt = await lease.resource.http.request(submitPrompt({
+        client: lease.resource.http.client,
+        path: { session_id: sessionId },
+        body: projectKimiPrompt(input.message),
+      }))
       if (!prompt || !('prompt_id' in prompt)) { throw new ProviderRuntimeError(ProviderErrors.requestFailed(this.runtimeKind, 'prompt.steer.submit', 'Kimi did not accept the steering prompt.')) }
       await lease.resource.http.request(steerPrompts({ client: lease.resource.http.client, path: { session_id: sessionId }, body: { prompt_ids: [prompt.prompt_id] } }))
     }

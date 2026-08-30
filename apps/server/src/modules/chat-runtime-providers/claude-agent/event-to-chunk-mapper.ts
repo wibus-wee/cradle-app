@@ -1174,12 +1174,33 @@ function mapResult(msg: SDKResultMessage, state: ClaudeAgentChunkMapperState): C
       }
     : null
 
+  const messageMetadata = msg.uuid && typeof msg.total_cost_usd === 'number'
+    ? {
+        claudeAgent: {
+          results: [{
+            resultMessageId: msg.uuid,
+            userMessageUuid: msg.user_message_uuid ?? null,
+            queuedTurnCount: msg.queued_turn_count ?? null,
+            totalEstimatedCostUsd: msg.total_cost_usd,
+          }],
+        },
+      }
+    : null
+  const failed = isFailedClaudeResult(msg)
+  const terminalChunk: UIMessageChunk = failed
+    ? { type: 'error', errorText: msg.errors[0] ?? 'Claude turn failed.' }
+    : {
+        ...providerChunk.finish('stop'),
+        ...(messageMetadata ? { messageMetadata } : {}),
+      }
+
   return {
     chunks: [
       ...finishOpenTextBlocks(state),
-      isFailedClaudeResult(msg)
-        ? { type: 'error', errorText: msg.errors[0] ?? 'Claude turn failed.' }
-        : providerChunk.finish('stop'),
+      ...(failed && messageMetadata
+        ? [{ type: 'message-metadata' as const, messageMetadata }]
+        : []),
+      terminalChunk,
     ],
     sessionId: msg.session_id,
     usage,

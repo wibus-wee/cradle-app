@@ -134,6 +134,35 @@ describe('mapClaudeAgentMessageToChunks', () => {
     ])
   })
 
+  it('preserves result correlation, native queue count, and estimated cost metadata', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const result = await mapClaudeAgentMessageToChunks({
+      type: 'result',
+      subtype: 'success',
+      uuid: 'result-1',
+      user_message_uuid: 'user-message-1',
+      queued_turn_count: 2,
+      total_cost_usd: 0.125,
+      session_id: 'claude-session-1',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    } as unknown as SDKMessage, state)
+
+    expect(result.chunks[0]).toEqual({
+      type: 'finish',
+      finishReason: 'stop',
+      messageMetadata: {
+        claudeAgent: {
+          results: [{
+            resultMessageId: 'result-1',
+            userMessageUuid: 'user-message-1',
+            queuedTurnCount: 2,
+            totalEstimatedCostUsd: 0.125,
+          }],
+        },
+      },
+    })
+  })
+
   it('maps an unsuccessful result to its native error', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
     const message = {
