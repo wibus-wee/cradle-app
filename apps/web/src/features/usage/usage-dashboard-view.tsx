@@ -1,4 +1,4 @@
-import { DownloadLine as DownloadIcon } from '@mingcute/react'
+import { DownloadLine as DownloadIcon, Refresh1Line as RefreshIcon } from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
@@ -50,6 +50,8 @@ export interface UsageDashboardViewProps {
   range: UsageRangeKey
   onRangeChange: (range: UsageRangeKey) => void
   onExport: () => void
+  refreshing: boolean
+  onRefresh: () => void
   themeMode: 'light' | 'dark'
 }
 
@@ -69,6 +71,8 @@ export function UsageDashboardView({
   range,
   onRangeChange,
   onExport,
+  refreshing,
+  onRefresh,
   themeMode,
 }: UsageDashboardViewProps) {
   const { t } = useTranslation('usage')
@@ -106,6 +110,17 @@ export function UsageDashboardView({
           </div>
           {hasData && (
             <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={onRefresh}
+                disabled={refreshing}
+                aria-label={t('action.refresh')}
+                title={t('action.refresh')}
+              >
+                <RefreshIcon className={cn('size-3.5', refreshing && 'animate-spin')} aria-hidden />
+              </Button>
               <Button type="button" variant="outline" size="sm" onClick={onExport} className="h-7 gap-1.5 px-2.5 text-xs">
                 <DownloadIcon className="size-3.5" aria-hidden />
                 {t('action.exportCsv')}

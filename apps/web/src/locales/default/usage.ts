@@ -2,6 +2,7 @@ export default {
   'title': 'Usage',
   'description': 'Token consumption over the past year',
   'action.exportCsv': 'Export CSV',
+  'action.refresh': 'Refresh usage data',
   'streak.day': 'day streak',
   'pill.totalCost': 'Total Cost',
   'pill.today': 'Today',

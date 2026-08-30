@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 
 import { useResolvedThemeMode } from '~/store/theme'
 
@@ -14,6 +15,8 @@ export function UsageDashboard() {
   const range = useUsagePreferencesStore(state => state.range)
   const setRange = useUsagePreferencesStore(state => state.setRange)
   const usage = useUsageOverview(range)
+  const queryClient = useQueryClient()
+  const [refreshing, setRefreshing] = useState(false)
   const themeMode = useResolvedThemeMode()
 
   const localSeries = useMemo(() => ({
@@ -61,6 +64,17 @@ export function UsageDashboard() {
       range={range}
       onRangeChange={setRange}
       onExport={() => downloadUsageCsv(buildUsageCsv(dashboardDaily, dashboardDailyCost, range), range)}
+      refreshing={refreshing}
+      onRefresh={() => {
+        setRefreshing(true)
+        void Promise.all([
+          usage.refetch(),
+          queryClient.invalidateQueries({
+            predicate: query => query.queryKey[0] === 'node-upstream'
+              && query.queryKey[2] === 'usage-fleet',
+          }),
+        ]).finally(() => setRefreshing(false))
+      }}
       themeMode={themeMode}
     />
   )

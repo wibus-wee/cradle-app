@@ -22,6 +22,7 @@
   "chart.last30Days": "Last 30 days",
   "description": "Token consumption over the past year",
   "action.exportCsv": "Export CSV",
+  "action.refresh": "Refresh usage data",
   "device.activeDays": "{{count}} active days",
   "device.description": "Token and cost share across devices in your Fabric.",
   "device.status.offline": "Offline",
