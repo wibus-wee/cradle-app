@@ -2,7 +2,7 @@
 
 This file records native Codex app-server capabilities that Cradle either has not projected yet or intentionally leaves provider-native. Prefer documenting here over advertising unsupported behavior.
 
-Protocol baseline for this note: Codex CLI / app-server **0.148.0**, matching [`app-server-protocol/MANIFEST.json`](./app-server-protocol/MANIFEST.json).
+Protocol baseline for this note: Codex CLI / app-server **0.151.0**, matching [`app-server-protocol/MANIFEST.json`](./app-server-protocol/MANIFEST.json).
 
 ## Classification key
 
@@ -10,7 +10,7 @@ Protocol baseline for this note: Codex CLI / app-server **0.148.0**, matching [`
 - **Follow up** — Sound Cradle owner exists or can be designed; not shipped yet.
 - **Leave native** — No sound Cradle contract, or ownership would collide with Cradle namespaces.
 
-## PR #106 deltas
+## Protocol capability status
 
 | Native fact | Class | Notes |
 |---|---|---|
@@ -25,6 +25,16 @@ Protocol baseline for this note: Codex CLI / app-server **0.148.0**, matching [`
 | `AppToolSummary.isEnabled` / `disabledReason` / `isReadOnly` | Follow up | Needs `app/read` depth beyond current `app/list` counts. |
 | `PlanType: ent26` | **Projected** | Known plan-type set includes `ent26`; account/usage continue to pass plan strings through. |
 | `plugin/list.forceRefetch` | Follow up | Needs an explicit plugin-catalog refresh action. |
+| Command approval `kind: writeStdin` | **Projected** | Approval state and tool metadata preserve the native kind and label terminal input separately from command execution. |
+| `autoApprovalReview/strictReviewRequired` | **Projected** | Emits an inline warning; the notification has no approval ID, so Cradle does not fabricate an actionable approval row. |
+| MCP `runtimeStatus` | **Projected** | MCP UI rows no longer assume ready: connected, starting, failed, and cancelled map directly; auth-required uses auth state, and unsupported disabled/unavailable states map to unknown. |
+| `CodexErrorInfo: rateLimitExceeded` | **Projected** | The existing typed error diagnostics preserve it as the provider error classification. |
+| Interrupted/completed collaboration lifecycle | **Projected** | Interrupted collaboration calls and subagent activities fail their tool activity/output; completed subagent activity remains successful. |
+| `RawResponseCompletedNotification.usageMetadata.amount` | Leave native | Shared runtime usage has token/cache counters but no provider-priced amount field. Do not reinterpret an amount as token usage or add Codex billing semantics to the shared contract. |
+| `AgentMessage.delivery: async` | Leave native | Cradle has no shared message-delivery presentation owner; message content remains projected without inventing asynchronous scheduling semantics. |
+| `turn/settings/update` | Leave native | Thread settings already own ongoing and future state. Turn-only overrides need an explicit product contract before they can be represented without overwriting thread configuration. |
+| MCP event subscriptions and direct tool/resource calls | Follow up | Current Chat Runtime owns MCP status and turn tool calls, not a general provider-native MCP console. |
+| Projects, realtime timeline/voice, and Bedrock setup | Leave native | These need product owners beyond a turn/session projection; Bedrock authentication remains provider-target configuration. |
 
 ## Large unused protocol surface (historical)
 

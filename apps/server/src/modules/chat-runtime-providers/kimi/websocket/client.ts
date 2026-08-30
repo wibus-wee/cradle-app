@@ -70,14 +70,14 @@ export type KimiWebSocketEvent
     | KimiTranscriptResetEvent
     | KimiTranscriptSubscriptionReadyEvent
 
-export type KimiSessionEventPayload
-  = | { type: 'assistant.delta', turnId: number, delta: string }
-    | { type: 'thinking.delta', turnId: number, delta: string }
-    | { type: 'tool.call.delta', turnId: number, toolCallId: string, name?: string, argumentsPart?: string }
-    | { type: 'tool.call.started', turnId: number, toolCallId: string, name: string, args: unknown, description?: string }
-    | { type: 'tool.result', turnId: number, toolCallId: string, output: unknown, isError?: boolean }
-    | { type: 'tool.progress', turnId: number, toolCallId: string, update: { kind: 'stdout' | 'stderr' | 'progress' | 'status' | 'custom', text?: string, percent?: number } }
-    | {
+export type KimiSessionEventPayload = { agentId?: string } & (
+  | { type: 'assistant.delta', turnId: number, delta: string }
+  | { type: 'thinking.delta', turnId: number, delta: string }
+  | { type: 'tool.call.delta', turnId: number, toolCallId: string, name?: string, argumentsPart?: string }
+  | { type: 'tool.call.started', turnId: number, toolCallId: string, name: string, args: unknown, description?: string }
+  | { type: 'tool.result', turnId: number, toolCallId: string, output: unknown, isError?: boolean }
+  | { type: 'tool.progress', turnId: number, toolCallId: string, update: { kind: 'stdout' | 'stderr' | 'progress' | 'status' | 'custom', text?: string, percent?: number } }
+  | {
       type: 'turn.ended'
       turnId: number
       reason: 'completed' | 'cancelled' | 'failed' | 'blocked'
@@ -123,6 +123,14 @@ export type KimiSessionEventPayload
     current_prompt_id?: string
   }
   | { type: 'goal.updated', goal?: { objective: string, status: 'active' | 'paused' | 'blocked' | 'complete', tokensUsed: number, budget: { tokenBudget: number | null } } | null }
+  | { type: 'event.config.warning', warnings: Array<{ domain?: string, message: string }> }
+  | {
+    type: 'event.model_catalog.changed'
+    changed: Array<{ provider_id: string, provider_name: string, added: number, removed: number }>
+    unchanged: string[]
+    failed: Array<{ provider: string, reason: string }>
+  }
+)
 
 export interface KimiNativeUsage {
   inputOther: number

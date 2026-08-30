@@ -53,6 +53,16 @@ export class KimiEventToChunkMapper {
           durationMs: payload.durationMs,
           error: payload.error,
         })
+      case 'event.config.warning':
+        return payload.warnings.map(warning => providerChunk.runtimeWarning({
+          message: warning.message,
+          additionalDetails: warning.domain ? `Kimi config domain: ${warning.domain}` : null,
+        }))
+      case 'event.model_catalog.changed':
+        return payload.failed.map(failure => providerChunk.runtimeWarning({
+          message: `Kimi could not refresh models for ${failure.provider}.`,
+          additionalDetails: failure.reason,
+        }))
       default:
         return []
     }

@@ -54,7 +54,7 @@ The Usage module now owns canonical cross-runtime P50/P95 time-to-first-token an
 
 Kimi transcript steps additionally expose request-build, server-decode, stream-duration, and client-consume timing fields. Those detailed phases remain native transcript facts until Cradle defines a shared phase taxonomy; they should not be projected into misleading Kimi-only Usage metrics.
 
-## PR #106 / Kimi 0.31.1 protocol deltas
+## Protocol capability status
 
 | Native fact | Class | Notes |
 |---|---|---|
@@ -65,3 +65,7 @@ Kimi transcript steps additionally expose request-build, server-decode, stream-d
 | `/api/v1/search`, `/api/v1/workspace/fs:search` | Follow up | Needs a shared runtime reference/search kit (also noted in OpenCode GAP). |
 | workspace `trust` / `untrust` | Leave native / Follow up | Ownership clash with Cradle workspace trust; do not dual-write. |
 | `/api/v1/fs:mkdir` | Leave native | Writes stay on agent tools or Cradle workspace FS. |
+| Payload `agentId` on live turn/tool/status events | **Projected** | Non-main output is isolated in per-agent mappers and published through provider-thread events. |
+| `event.config.warning` / failed `event.model_catalog.changed` entries | **Projected** | Warning and failure facts enter the runtime warning stream; neutral changes do not. |
+| `event.config.changed` / successful catalog refresh | Leave native | Cradle has no actionable turn-level meaning for neutral host configuration refreshes. |
+| `event.session.archived` | Follow up | Provider-thread state already reads archive status; live archive invalidation needs a shared thread-list refresh owner. |

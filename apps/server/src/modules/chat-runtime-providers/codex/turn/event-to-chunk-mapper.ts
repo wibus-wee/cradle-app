@@ -157,6 +157,7 @@ export function mapCodexAppServerNotificationToChunks(
     case 'configWarning':
     case 'deprecationNotice':
     case 'windows/worldWritableWarning':
+    case 'autoApprovalReview/strictReviewRequired':
       return mapRuntimeWarning(notification, state)
     default:
       return []

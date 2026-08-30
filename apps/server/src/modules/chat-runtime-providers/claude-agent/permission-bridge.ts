@@ -219,6 +219,8 @@ async function handleClaudeAgentToolPermissionRequest(input: {
         displayName: input.options.displayName,
         description: input.options.description,
         agentID: input.options.agentID,
+        requestId: input.options.requestId,
+        matchedAskRule: input.options.matchedAskRule,
       },
     },
     policy: {

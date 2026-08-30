@@ -1995,6 +1995,12 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
           { command: 'pwd' },
           canUseToolOptions({
             toolUseID: 'toolu_reused_requires_approval',
+            requestId: 'request-reused-approval',
+            matchedAskRule: {
+              source: 'projectSettings',
+              toolName: 'Bash',
+              ruleContent: 'Bash(*)',
+            },
           }),
         ),
       ).resolves.toEqual({
@@ -2002,6 +2008,18 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         updatedInput: { command: 'pwd' },
       })
       expect(requestToolApproval).toHaveBeenCalledOnce()
+      expect(requestToolApproval).toHaveBeenCalledWith(expect.objectContaining({
+        metadata: expect.objectContaining({
+          permission: expect.objectContaining({
+            requestId: 'request-reused-approval',
+            matchedAskRule: {
+              source: 'projectSettings',
+              toolName: 'Bash',
+              ruleContent: 'Bash(*)',
+            },
+          }),
+        }),
+      }))
       expect(prompts).toEqual(['Start with full access', 'Now require approval'])
     }
  finally {

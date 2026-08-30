@@ -202,6 +202,33 @@ describe('kimi event to chunk mapper', () => {
       },
     ])
   })
+
+  it('projects native config and model refresh failures as runtime warnings', () => {
+    const mapper = new KimiEventToChunkMapper()
+
+    expect(mapper.map(event({
+      type: 'event.config.warning',
+      warnings: [{ domain: 'providers', message: 'Provider credentials are incomplete.' }],
+    }))).toEqual([{
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Provider credentials are incomplete.',
+        additionalDetails: 'Kimi config domain: providers',
+      },
+    }])
+    expect(mapper.map(event({
+      type: 'event.model_catalog.changed',
+      changed: [{ provider_id: 'openai', provider_name: 'OpenAI', added: 1, removed: 0 }],
+      unchanged: [],
+      failed: [{ provider: 'target', reason: 'Authentication failed' }],
+    }))).toEqual([{
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Kimi could not refresh models for target.',
+        additionalDetails: 'Authentication failed',
+      },
+    }])
+  })
 })
 
 function event(payload: Parameters<KimiEventToChunkMapper['map']>[0]['payload']): Parameters<KimiEventToChunkMapper['map']>[0] {

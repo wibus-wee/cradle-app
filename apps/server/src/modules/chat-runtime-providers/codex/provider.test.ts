@@ -134,6 +134,7 @@ class FakeCodexAppServerClient {
         data: [
           {
             name: 'github',
+            runtimeStatus: 'connected',
             tools: { search: {}, read_issue: {} },
             resources: [{ uri: 'repo://cradle' }],
             resourceTemplates: [{ uriTemplate: 'repo://{owner}/{repo}' }],
@@ -141,10 +142,27 @@ class FakeCodexAppServerClient {
           },
           {
             name: 'linear',
+            runtimeStatus: 'authenticationRequired',
             tools: { issue_search: {} },
             resources: [],
             resourceTemplates: [],
             authStatus: 'notLoggedIn',
+          },
+          {
+            name: 'slack',
+            runtimeStatus: 'starting',
+            tools: {},
+            resources: [],
+            resourceTemplates: [],
+            authStatus: 'unsupported',
+          },
+          {
+            name: 'disabled-server',
+            runtimeStatus: 'disabled',
+            tools: {},
+            resources: [],
+            resourceTemplates: [],
+            authStatus: 'unsupported',
           },
         ],
         nextCursor: null,
@@ -2890,7 +2908,7 @@ describe('codexProvider app-server integration', () => {
         kind: 'mcp',
         slotId: 'codex:mcp',
         threadId: 'codex-thread-1',
-        serverCount: 3,
+        serverCount: 5,
         readyCount: 1,
         failedCount: 2,
         needsLoginCount: 1,
@@ -2898,6 +2916,8 @@ describe('codexProvider app-server integration', () => {
         servers: expect.arrayContaining([
           expect.objectContaining({ name: 'github', status: 'ready', authStatus: 'oAuth', toolCount: 2, resourceCount: 2 }),
           expect.objectContaining({ name: 'linear', status: 'failed', authStatus: 'notLoggedIn', error: 'Denied' }),
+          expect.objectContaining({ name: 'slack', status: 'starting', authStatus: 'unsupported' }),
+          expect.objectContaining({ name: 'disabled-server', status: 'unknown', authStatus: 'unsupported' }),
           expect.objectContaining({ name: 'local-dev', status: 'failed', error: 'Missing command' }),
         ]),
       }),

@@ -60,6 +60,31 @@ describe('mapClaudeAgentMessageToChunks', () => {
     })
   })
 
+  it('preserves native user-message correlation without changing turn ownership', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const result = await mapClaudeAgentMessageToChunks({
+      type: 'assistant',
+      session_id: 'claude-session-1',
+      user_message_uuid: 'user-message-1',
+      message: {
+        id: 'message-1',
+        content: [{ type: 'text', text: 'Correlated' }],
+      },
+    } as unknown as SDKMessage, state)
+
+    expect(result.chunks[0]).toEqual({
+      type: 'message-metadata',
+      messageMetadata: {
+        claudeAgent: {
+          userMessageCorrelations: [{
+            assistantMessageId: 'message-1',
+            userMessageUuid: 'user-message-1',
+          }],
+        },
+      },
+    })
+  })
+
   it('extracts usage from message_delta stream event', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
     const message = {

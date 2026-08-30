@@ -70,6 +70,7 @@ import {
   submitPrompt,
 } from './protocol/rest/sdk.gen'
 import type { GetApiV1SessionsBySessionIdQuestionsResponses } from './protocol/rest/types.gen'
+import { getKimiEventAgentId, KimiProviderThreadEventProjector } from './provider-thread-event-projector'
 import { projectKimiRuntimeSettings } from './runtime-settings'
 import type { KimiTranscriptAgentMetadata, KimiTranscriptData, KimiTranscriptTurn } from './transcript-projector'
 import {
@@ -209,7 +210,7 @@ class KimiProvider implements ChatRuntime {
         totalTokens: status.context_tokens,
         maxTokens,
         rawMaxTokens: maxTokens,
-        percentage: maxTokens ? status.context_usage : null,
+        percentage: maxTokens ? status.context_usage ?? null : null,
         sections: [],
         messageBreakdown: null,
         apiUsage: null,
@@ -401,6 +402,7 @@ updatedAt,
     if (!sessionId) { throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId)) }
     const lease = await this.acquire(profile)
     const mapper = new KimiEventToChunkMapper()
+    const providerThreadProjector = new KimiProviderThreadEventProjector()
     const queue: KimiStreamItem[] = []
     const bridgedApprovalIds = new Set<string>()
     const bridgedQuestionIds = new Set<string>()
@@ -461,10 +463,6 @@ updatedAt,
         if (!isKimiSessionEvent(item.event)) {
           continue
         }
-        const usageEvent = usageProjector.project(item.event)
-        if (usageEvent) {
-          await input.onUsageEvent?.(usageEvent)
-        }
         if (item.event.payload.type === 'agent.status.updated' && item.event.payload.phase?.kind === 'awaiting_approval') {
           await this.resolvePendingApprovals({ lease, sessionId, runId: input.runId, profile, handledIds: bridgedApprovalIds })
         }
@@ -473,6 +471,23 @@ updatedAt,
           || (item.event.payload.type === 'event.session.status_changed' && item.event.payload.status === 'awaiting_question')
         ) {
           await this.resolvePendingQuestions({ lease, sessionId, input, handledIds: bridgedQuestionIds })
+        }
+        const eventAgentId = getKimiEventAgentId(item.event)
+        if (eventAgentId && eventAgentId !== 'main') {
+          const providerThreadEvent = providerThreadProjector.project(item.event)
+          if (providerThreadEvent) {
+            try {
+              input.onProviderThreadEvent?.(providerThreadEvent)
+            }
+            catch {
+              // Child-thread subscribers must not affect the parent turn stream.
+            }
+          }
+          continue
+        }
+        const usageEvent = usageProjector.project(item.event)
+        if (usageEvent) {
+          await input.onUsageEvent?.(usageEvent)
         }
         const chunks = mapper.map(item.event)
         for (const chunk of chunks) { yield chunk }

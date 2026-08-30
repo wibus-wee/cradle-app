@@ -663,15 +663,27 @@ function mapAssistant(msg: SDKAssistantMessage, state: ClaudeAgentChunkMapperSta
   const capturedTodos: ClaudeAgentCapturedTodos[] = []
   const capturedInteractionModes: ClaudeAgentCapturedInteractionMode[] = []
   const capturedCrewCalls: ClaudeAgentCapturedCrewCall[] = []
-  if (msg.timestamp) {
+  if (msg.timestamp || msg.user_message_uuid) {
     chunks.push({
       type: 'message-metadata',
       messageMetadata: {
         claudeAgent: {
-          assistantTimestamps: [{
-            messageId: msg.message.id,
-            timestamp: msg.timestamp,
-          }],
+          ...(msg.timestamp
+            ? {
+                assistantTimestamps: [{
+                  messageId: msg.message.id,
+                  timestamp: msg.timestamp,
+                }],
+              }
+            : {}),
+          ...(msg.user_message_uuid
+            ? {
+                userMessageCorrelations: [{
+                  assistantMessageId: msg.message.id,
+                  userMessageUuid: msg.user_message_uuid,
+                }],
+              }
+            : {}),
         },
       },
     })

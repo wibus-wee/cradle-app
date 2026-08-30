@@ -88,4 +88,82 @@ describe('codex automatic approval review projection', () => {
       }),
     ])
   })
+
+  it('labels stdin writes distinctly from command execution approvals', () => {
+    const runtimeSession: RuntimeSession = {
+      id: 'runtime-session-1',
+      chatSessionId: 'chat-session-1',
+      runtimeKind: 'codex',
+      providerTargetId: 'target-1',
+      providerSessionId: 'thread-1',
+      providerStateSnapshot: null,
+    }
+
+    projectCodexProviderStateSnapshot(runtimeSession, {
+      method: 'serverRequest/pending',
+      params: {
+        id: 9,
+        method: 'item/commandExecution/requestApproval',
+        params: {
+          kind: 'writeStdin',
+          threadId: 'thread-1',
+          turnId: 'turn-1',
+          itemId: 'command-1',
+        },
+      },
+    }, 'thread-1')
+
+    expect(readCodexProviderSnapshot(runtimeSession.providerStateSnapshot).codex?.approvals?.items).toEqual([
+      expect.objectContaining({
+        id: 'server-request-9',
+        label: 'Write to terminal',
+        status: 'pending',
+      }),
+    ])
+  })
+})
+
+describe('codex collaboration activity projection', () => {
+  it('projects interrupted collaboration lifecycle facts as failed activities', () => {
+    const runtimeSession: RuntimeSession = {
+      id: 'runtime-session-1',
+      chatSessionId: 'chat-session-1',
+      runtimeKind: 'codex',
+      providerTargetId: 'target-1',
+      providerSessionId: 'thread-1',
+      providerStateSnapshot: null,
+    }
+
+    for (const item of [
+      {
+        id: 'crew-interrupted',
+        type: 'collabAgentToolCall',
+        tool: 'wait',
+        status: 'interrupted',
+      },
+      {
+        id: 'activity-interrupted',
+        type: 'subAgentActivity',
+        kind: 'interrupted',
+        agentPath: 'agents/reviewer',
+      },
+      {
+        id: 'activity-completed',
+        type: 'subAgentActivity',
+        kind: 'completed',
+        agentPath: 'agents/reviewer',
+      },
+    ]) {
+      projectCodexProviderStateSnapshot(runtimeSession, {
+        method: 'item/completed',
+        params: { threadId: 'thread-1', turnId: 'turn-1', item },
+      }, 'thread-1')
+    }
+
+    expect(readCodexProviderSnapshot(runtimeSession.providerStateSnapshot).codex?.toolActivity?.items).toEqual([
+      expect.objectContaining({ id: 'activity-completed', status: 'completed' }),
+      expect.objectContaining({ id: 'activity-interrupted', status: 'failed' }),
+      expect.objectContaining({ id: 'crew-interrupted', status: 'failed' }),
+    ])
+  })
 })
