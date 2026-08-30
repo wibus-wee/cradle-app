@@ -13,6 +13,8 @@ Initial data-load failures expose an in-place Retry action across Projects,
 Work, Usage, pull requests, and conversations.
 Work detail supports pull-to-refresh for readiness and pull-request state even
 after active Work polling has stopped, without replacing handoff edits in progress.
+Failed Work handoff saves and submissions show their server error while keeping
+the locally edited handoff available.
 Usage remembers the selected 7-day, 30-day, 90-day, or one-year range on the
 device and validates the stored preference before issuing dashboard requests.
 Workspace detail file rows open a refreshable, read-only mobile preview for

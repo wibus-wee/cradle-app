@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router, Stack } from 'expo-router'
+import { Alert } from 'react-native'
 
 import type { GetWorksByIdResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -31,8 +32,9 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
         connection!,
         `/works/${encodeURIComponent(workId)}/prepare`,
         { method: 'POST', body: handoff },
-      ),
+    ),
     onSuccess: data => queryClient.setQueryData(['work', connection?.url, workId], data),
+    onError: error => Alert.alert('Could not save handoff', errorMessage(error)),
   })
 
   const submit = useMutation({
@@ -41,8 +43,9 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
         connection!,
         `/works/${encodeURIComponent(workId)}/submit`,
         { method: 'POST', body: handoff },
-      ),
+    ),
     onSuccess: data => queryClient.setQueryData(['work', connection?.url, workId], data),
+    onError: error => Alert.alert('Could not submit Work', errorMessage(error)),
   })
 
   if (query.isPending) {
