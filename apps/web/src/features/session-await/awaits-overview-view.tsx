@@ -1,6 +1,7 @@
-import { DotCircleLine as CircleDotIcon } from '@mingcute/react'
+import { DotCircleLine as CircleDotIcon, Refresh2Line as RetryIcon } from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import {
   Empty,
   EmptyDescription,
@@ -17,6 +18,8 @@ export interface AwaitsOverviewViewProps {
   awaits: readonly DesktopAwaitItem[]
   isReady: boolean
   hasError: boolean
+  retrying?: boolean
+  onRetry: () => void
   onOpenChat: (sessionId: string) => void
   onPreloadChat: (sessionId: string) => void
   now?: number
@@ -26,6 +29,8 @@ export function AwaitsOverviewView({
   awaits,
   isReady,
   hasError,
+  retrying = false,
+  onRetry,
   onOpenChat,
   onPreloadChat,
   now,
@@ -55,6 +60,12 @@ export function AwaitsOverviewView({
                   {hasError ? t('error.description') : t('empty.description')}
                 </EmptyDescription>
               </EmptyHeader>
+              {hasError && (
+                <Button type="button" variant="outline" size="sm" onClick={onRetry} disabled={retrying}>
+                  <RetryIcon className={cn('size-3.5', retrying && 'animate-spin')} aria-hidden="true" />
+                  {t('error.retry')}
+                </Button>
+              )}
             </Empty>
           )
         : (
