@@ -67,6 +67,17 @@ export const zFsMkdirBody = z.object({
     path: z.string().min(1)
 });
 
+export const zFsSuggestBody = z.object({
+    exclude_globs: z.array(z.string()).optional(),
+    follow_gitignore: z.boolean().optional().default(true),
+    include_globs: z.array(z.string()).optional(),
+    limit: z.int().gte(1).lte(200).optional().default(50),
+    query: z.string(),
+    roots: z.array(z.string().min(1)).min(1).max(32),
+    runtime_id: z.string().min(1).optional(),
+    show_hidden: z.boolean().optional().default(false)
+});
+
 export const zGetApiV1GuiStoreGetItemQuery = z.object({
     key: z.string().min(1).max(256)
 });
@@ -97,7 +108,8 @@ export const zGetApiV1OauthLoginQuery = z.object({
 });
 
 export const zPostApiV1OauthLoginBody = z.object({
-    provider: z.string().min(1).optional()
+    provider: z.string().min(1).optional(),
+    region: z.enum(['mainland-cn', 'global']).optional()
 });
 
 export const zPostApiV1OauthLogoutBody = z.object({
@@ -250,7 +262,8 @@ export const zPostApiV1SessionsBody = z.object({
         swarm_mode: z.boolean().optional(),
         system_prompt: z.string().optional(),
         thinking: z.string().min(1).optional(),
-        tools: z.array(z.string()).optional()
+        tools: z.array(z.string()).optional(),
+        tower_mode: z.boolean().optional()
     }).optional(),
     metadata: z.object({
         cwd: z.string().min(1)
@@ -493,7 +506,8 @@ export const zPostApiV1SessionsBySessionIdProfileBody = z.object({
         swarm_mode: z.boolean().optional(),
         system_prompt: z.string().optional(),
         thinking: z.string().min(1).optional(),
-        tools: z.array(z.string()).optional()
+        tools: z.array(z.string()).optional(),
+        tower_mode: z.boolean().optional()
     }).optional(),
     metadata: z.object({
         cwd: z.string().min(1).optional()
@@ -563,6 +577,10 @@ export const zSubmitPromptBody = z.object({
                 z.object({
                     file_id: z.string().min(1),
                     kind: z.enum(['session_media'])
+                }),
+                z.object({
+                    kind: z.enum(['path']),
+                    path: z.string().min(1)
                 })
             ]),
             type: z.enum(['image'])
@@ -586,15 +604,20 @@ export const zSubmitPromptBody = z.object({
                 z.object({
                     file_id: z.string().min(1),
                     kind: z.enum(['session_media'])
+                }),
+                z.object({
+                    kind: z.enum(['path']),
+                    path: z.string().min(1)
                 })
             ]),
             type: z.enum(['video'])
         }),
         z.object({
-            file_id: z.string().min(1),
-            media_type: z.string().min(1),
-            name: z.string(),
-            size: z.int().gte(0).lte(9007199254740991),
+            file_id: z.string().min(1).optional(),
+            media_type: z.string().min(1).optional(),
+            name: z.string().optional(),
+            path: z.string().min(1).optional(),
+            size: z.int().gte(0).lte(9007199254740991).optional(),
             type: z.enum(['file'])
         }),
         z.object({
@@ -728,6 +751,10 @@ export const zActivateSkillBody = z.object({
                 z.object({
                     file_id: z.string().min(1),
                     kind: z.enum(['session_media'])
+                }),
+                z.object({
+                    kind: z.enum(['path']),
+                    path: z.string().min(1)
                 })
             ]),
             type: z.enum(['image'])
@@ -751,15 +778,20 @@ export const zActivateSkillBody = z.object({
                 z.object({
                     file_id: z.string().min(1),
                     kind: z.enum(['session_media'])
+                }),
+                z.object({
+                    kind: z.enum(['path']),
+                    path: z.string().min(1)
                 })
             ]),
             type: z.enum(['video'])
         }),
         z.object({
-            file_id: z.string().min(1),
-            media_type: z.string().min(1),
-            name: z.string(),
-            size: z.int().gte(0).lte(9007199254740991),
+            file_id: z.string().min(1).optional(),
+            media_type: z.string().min(1).optional(),
+            name: z.string().optional(),
+            path: z.string().min(1).optional(),
+            size: z.int().gte(0).lte(9007199254740991).optional(),
             type: z.enum(['file'])
         })
     ])).optional()
@@ -791,7 +823,7 @@ export const zGetApiV1SessionsBySessionIdTasksQuery = z.object({
     ]).optional()
 });
 
-export const zCancelTaskPath = z.object({
+export const zRunTaskActionPath = z.object({
     session_id: z.string(),
     tail: z.string()
 });
@@ -944,6 +976,229 @@ export const zPostApiV1WorkspacesByWorkspaceIdUntrustPath = z.object({
     workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
 });
 
+export const zGetApiV2McpAuthStatusesQuery = z.object({
+    cwd: z.string().min(1).optional(),
+    verify: z.enum(['true', 'false']).optional()
+});
+
+export const zPostApiV2McpAuthBeginBody = z.union([
+    z.object({
+        name: z.string().min(1),
+        source: z.enum(['global'])
+    }),
+    z.object({
+        pluginId: z.string().min(1),
+        serverName: z.string().min(1),
+        source: z.enum(['plugin'])
+    })
+]);
+
+export const zPostApiV2McpAuthBeginQuery = z.object({
+    cwd: z.string().min(1).optional()
+});
+
+export const zPostApiV2McpAuthCancelBody = z.object({
+    flowId: z.string().min(1)
+});
+
+export const zPostApiV2McpAuthCompleteBody = z.object({
+    flowId: z.string().min(1),
+    timeoutMs: z.int().gte(1).lte(2147483647).optional()
+});
+
+export const zPostApiV2McpAuthResetBody = z.union([
+    z.object({
+        name: z.string().min(1),
+        source: z.enum(['global'])
+    }),
+    z.object({
+        pluginId: z.string().min(1),
+        serverName: z.string().min(1),
+        source: z.enum(['plugin'])
+    })
+]);
+
+export const zPostApiV2McpAuthResetQuery = z.object({
+    cwd: z.string().min(1).optional()
+});
+
+export const zGetApiV2McpServersQuery = z.object({
+    cwd: z.string().min(1).optional()
+});
+
+export const zPostApiV2McpServersBody = z.union([
+    z.object({
+        args: z.array(z.string()).optional(),
+        command: z.string().min(1),
+        cwd: z.string().optional(),
+        disabledTools: z.array(z.string()).optional(),
+        enabled: z.boolean().optional(),
+        enabledTools: z.array(z.string()).optional(),
+        env: z.record(z.string(), z.string()).optional(),
+        executor: z.enum(['local', 'kaos']).optional(),
+        name: z.string().min(1),
+        runtime_id: z.string().min(1).optional(),
+        startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        transport: z.enum(['stdio'])
+    }),
+    z.object({
+        auth: z.enum(['oauth']).optional(),
+        bearerTokenEnvVar: z.string().min(1).optional(),
+        disabledTools: z.array(z.string()).optional(),
+        enabled: z.boolean().optional(),
+        enabledTools: z.array(z.string()).optional(),
+        headers: z.record(z.string(), z.string()).optional(),
+        name: z.string().min(1),
+        startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        transport: z.enum(['http']),
+        url: z.url()
+    }),
+    z.object({
+        auth: z.enum(['oauth']).optional(),
+        bearerTokenEnvVar: z.string().min(1).optional(),
+        disabledTools: z.array(z.string()).optional(),
+        enabled: z.boolean().optional(),
+        enabledTools: z.array(z.string()).optional(),
+        headers: z.record(z.string(), z.string()).optional(),
+        name: z.string().min(1),
+        startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        transport: z.enum(['sse']),
+        url: z.url()
+    })
+]);
+
+export const zPostApiV2McpServersQuery = z.object({
+    cwd: z.string().min(1).optional()
+});
+
+export const zPostApiV2McpServersInspectBody = z.object({
+    cwd: z.string().min(1).optional(),
+    targets: z.array(z.union([z.object({
+            name: z.string().min(1),
+            source: z.enum(['global'])
+        }), z.object({
+            pluginId: z.string().min(1),
+            serverName: z.string().min(1),
+            source: z.enum(['plugin'])
+        })])).optional()
+});
+
+export const zPostApiV2McpServersTestBody = z.object({
+    cwd: z.string().min(1).optional(),
+    name: z.string().min(1).optional(),
+    server: z.union([
+        z.object({
+            args: z.array(z.string()).optional(),
+            command: z.string().min(1),
+            cwd: z.string().optional(),
+            disabledTools: z.array(z.string()).optional(),
+            enabled: z.boolean().optional(),
+            enabledTools: z.array(z.string()).optional(),
+            env: z.record(z.string(), z.string()).optional(),
+            executor: z.enum(['local', 'kaos']).optional(),
+            name: z.string().min(1),
+            runtime_id: z.string().min(1).optional(),
+            startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+            toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+            transport: z.enum(['stdio'])
+        }),
+        z.object({
+            auth: z.enum(['oauth']).optional(),
+            bearerTokenEnvVar: z.string().min(1).optional(),
+            disabledTools: z.array(z.string()).optional(),
+            enabled: z.boolean().optional(),
+            enabledTools: z.array(z.string()).optional(),
+            headers: z.record(z.string(), z.string()).optional(),
+            name: z.string().min(1),
+            startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+            toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+            transport: z.enum(['http']),
+            url: z.url()
+        }),
+        z.object({
+            auth: z.enum(['oauth']).optional(),
+            bearerTokenEnvVar: z.string().min(1).optional(),
+            disabledTools: z.array(z.string()).optional(),
+            enabled: z.boolean().optional(),
+            enabledTools: z.array(z.string()).optional(),
+            headers: z.record(z.string(), z.string()).optional(),
+            name: z.string().min(1),
+            startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+            toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+            transport: z.enum(['sse']),
+            url: z.url()
+        })
+    ]).optional()
+});
+
+export const zDeleteApiV2McpServersByNamePath = z.object({
+    name: z.string().min(1)
+});
+
+export const zDeleteApiV2McpServersByNameQuery = z.object({
+    cwd: z.string().min(1).optional()
+});
+
+export const zGetApiV2McpServersByNamePath = z.object({
+    name: z.string().min(1)
+});
+
+export const zGetApiV2McpServersByNameQuery = z.object({
+    cwd: z.string().min(1).optional()
+});
+
+export const zPutApiV2McpServersByNameBody = z.union([
+    z.object({
+        args: z.array(z.string()).optional(),
+        command: z.string().min(1),
+        cwd: z.string().optional(),
+        disabledTools: z.array(z.string()).optional(),
+        enabled: z.boolean().optional(),
+        enabledTools: z.array(z.string()).optional(),
+        env: z.record(z.string(), z.string()).optional(),
+        executor: z.enum(['local', 'kaos']).optional(),
+        runtime_id: z.string().min(1).optional(),
+        startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        transport: z.enum(['stdio'])
+    }),
+    z.object({
+        auth: z.enum(['oauth']).optional(),
+        bearerTokenEnvVar: z.string().min(1).optional(),
+        disabledTools: z.array(z.string()).optional(),
+        enabled: z.boolean().optional(),
+        enabledTools: z.array(z.string()).optional(),
+        headers: z.record(z.string(), z.string()).optional(),
+        startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        transport: z.enum(['http']),
+        url: z.url()
+    }),
+    z.object({
+        auth: z.enum(['oauth']).optional(),
+        bearerTokenEnvVar: z.string().min(1).optional(),
+        disabledTools: z.array(z.string()).optional(),
+        enabled: z.boolean().optional(),
+        enabledTools: z.array(z.string()).optional(),
+        headers: z.record(z.string(), z.string()).optional(),
+        startupTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        toolTimeoutMs: z.int().gte(1).lte(2147483647).optional(),
+        transport: z.enum(['sse']),
+        url: z.url()
+    })
+]);
+
+export const zPutApiV2McpServersByNamePath = z.object({
+    name: z.string().min(1)
+});
+
+export const zPutApiV2McpServersByNameQuery = z.object({
+    cwd: z.string().min(1).optional()
+});
+
 export const zGetApiV2SessionsQuery = z.object({
     'workspace.id': z.union([
         z.string().min(1),
@@ -972,6 +1227,9 @@ export const zGetApiV2SessionsQuery = z.object({
         'false',
         'all'
     ]).optional(),
+    'meta.has_prompt': z.enum(['true', 'false']).optional(),
+    view: z.enum(['flat', 'by_workspace']).optional(),
+    'group.page_size': z.int().gte(1).lte(10000).optional(),
     sort: z.enum([
         'meta.updated_at_desc',
         'meta.updated_at_asc',
