@@ -44,6 +44,13 @@ export function WorkDetailView({
   })
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error', text: string } | null>(null)
   const canHandoff = handoff.title.trim() && handoff.summary.trim() && handoff.testPlan.trim()
+  const submissionBlocker = !detail.readiness.isolated
+    ? 'A healthy isolated checkout is required before delivery.'
+    : !detail.readiness.clean
+      ? `Commit or discard ${detail.readiness.changedFiles} changed ${detail.readiness.changedFiles === 1 ? 'file' : 'files'} before delivery.`
+      : detail.readiness.commitsAhead === 0
+        ? `Commit at least one change ahead of ${detail.readiness.baseRef ?? 'the base branch'} before delivery.`
+        : null
 
   const saveHandoff = async () => {
     setFeedback(null)
@@ -149,13 +156,18 @@ export function WorkDetailView({
             variant="secondary"
           />
           <NativeAction
-            disabled={!canHandoff || isPreparing || isSubmitting || !detail.readiness.clean || detail.readiness.commitsAhead === 0}
+            disabled={!canHandoff || isPreparing || isSubmitting || submissionBlocker !== null}
             label={detail.pullRequest ? 'Update PR' : 'Create draft PR'}
             loading={isSubmitting}
             onPress={() => void submitHandoff()}
             style={styles.action}
           />
         </View>
+        {submissionBlocker && (
+          <Text style={[styles.blocker, { color: theme.warning }]}>
+            {submissionBlocker}
+          </Text>
+        )}
       </View>
 
       {detail.pullRequest && (
@@ -181,6 +193,10 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: spacing.sm,
+  },
+  blocker: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   handoff: {
     gap: spacing.md,
