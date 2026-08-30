@@ -21,3 +21,4 @@ Chronological index of independently shipped product improvements.
 15. [Clear Skill search in place](./2026-08-29-15-clear-skill-search.md)
 16. [Quick-focus Skill search](./2026-08-29-16-skill-search-shortcut.md)
 17. [Recover from empty transfer filters](./2026-08-29-17-clear-transfer-filters.md)
+18. [Show transfer filter counts](./2026-08-29-18-transfer-filter-counts.md)
