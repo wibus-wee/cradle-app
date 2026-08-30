@@ -1,5 +1,7 @@
+import { DownloadLine as DownloadIcon } from '@mingcute/react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import { Skeleton } from '~/components/ui/skeleton'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
 import { cn } from '~/lib/cn'
@@ -47,6 +49,7 @@ export interface UsageDashboardViewProps {
   usageReady: boolean
   range: UsageRangeKey
   onRangeChange: (range: UsageRangeKey) => void
+  onExport: () => void
   themeMode: 'light' | 'dark'
 }
 
@@ -65,6 +68,7 @@ export function UsageDashboardView({
   usageReady,
   range,
   onRangeChange,
+  onExport,
   themeMode,
 }: UsageDashboardViewProps) {
   const { t } = useTranslation('usage')
@@ -101,22 +105,28 @@ export function UsageDashboardView({
             <p className="mt-1 text-sm text-muted-foreground">{t('description')}</p>
           </div>
           {hasData && (
-            <ToggleGroup
-              type="single"
-              value={range}
-              onValueChange={(value) => {
-                if (value) { onRangeChange(value as UsageRangeKey) }
-              }}
-              variant="outline"
-              size="sm"
-              className="h-7 shrink-0 gap-px rounded-md"
-            >
-              {USAGE_RANGE_OPTIONS.map(option => (
-                <ToggleGroupItem key={option.key} value={option.key} className="h-7 px-2.5 text-xs tabular-nums">
-                  {option.label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={onExport} className="h-7 gap-1.5 px-2.5 text-xs">
+                <DownloadIcon className="size-3.5" aria-hidden />
+                {t('action.exportCsv')}
+              </Button>
+              <ToggleGroup
+                type="single"
+                value={range}
+                onValueChange={(value) => {
+                  if (value) { onRangeChange(value as UsageRangeKey) }
+                }}
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 gap-px rounded-md"
+              >
+                {USAGE_RANGE_OPTIONS.map(option => (
+                  <ToggleGroupItem key={option.key} value={option.key} className="h-7 px-2.5 text-xs tabular-nums">
+                    {option.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
           )}
         </div>
 

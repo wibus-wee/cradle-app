@@ -8,3 +8,4 @@ Chronological index of independently shipped product improvements.
 2. [Clear pull request search in place](./2026-08-29-02-clear-pull-request-search.md)
 3. [Show filtered pull request counts](./2026-08-29-03-filtered-pull-request-count.md)
 4. [Remember the Usage time range](./2026-08-29-04-remember-usage-range.md)
+5. [Export the visible Usage range](./2026-08-29-05-export-usage-csv.md)

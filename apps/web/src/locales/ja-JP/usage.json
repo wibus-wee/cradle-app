@@ -2,6 +2,7 @@
   "chart.dailyCostLast30Days": "日別コスト（直近 30 日）",
   "chart.last30Days": "直近 30 日",
   "description": "過去 1 年の token 消費",
+  "action.exportCsv": "CSV をエクスポート",
   "device.activeDays": "アクティブ {{count}} 日",
   "device.description": "Fabric 内の各デバイスの token とコストの内訳。",
   "device.status.offline": "オフライン",

@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { useResolvedThemeMode } from '~/store/theme'
 
 import { UsageDashboardView } from './usage-dashboard-view'
+import { buildUsageCsv, downloadUsageCsv } from './usage-export'
 import { useUsagePreferencesStore } from './usage-preferences-store'
 import { useFleetUsage } from './use-fleet-usage'
 import { useUsageOverview } from './use-usage-overview'
@@ -40,16 +41,18 @@ export function UsageDashboard() {
   // With a Fabric fleet every surface shows fleet-wide merged data; without
   // one the View receives this device's local data untouched.
   const merged = fleet?.merged ?? null
+  const dashboardDaily = merged?.daily ?? usage.daily
+  const dashboardDailyCost = merged?.dailyCost ?? usage.dailyCost
 
   return (
     <UsageDashboardView
-      daily={merged?.daily ?? usage.daily}
+      daily={dashboardDaily}
       dailyByModel={merged?.dailyByModel ?? usage.dailyByModel}
       hourly={merged?.hourly ?? usage.hourly}
       summary={merged?.summary ?? usage.summary}
       stats={merged?.stats ?? usage.stats}
       costSummary={merged?.costSummary ?? usage.costSummary}
-      dailyCost={merged?.dailyCost ?? usage.dailyCost}
+      dailyCost={dashboardDailyCost}
       tools={merged?.tools ?? usage.tools}
       costEfficiency={merged?.costEfficiency ?? usage.costEfficiency}
       performance={merged?.performance ?? usage.performance}
@@ -57,6 +60,7 @@ export function UsageDashboard() {
       usageReady={usage.usageReady}
       range={range}
       onRangeChange={setRange}
+      onExport={() => downloadUsageCsv(buildUsageCsv(dashboardDaily, dashboardDailyCost, range), range)}
       themeMode={themeMode}
     />
   )

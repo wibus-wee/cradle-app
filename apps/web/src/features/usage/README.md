@@ -12,6 +12,8 @@ Dashboard headings, stat labels, chart labels, and empty states are owned by the
 
 - **usage-dashboard.tsx**: Query/theme container that translates Usage API state into the dashboard View contract.
 - **usage-preferences-store.ts**: Safely persisted dashboard preferences, currently the selected time range, with validation for stale storage.
+- **usage-export.ts**: Selected-range daily CSV projection and browser download handoff, including per-model cost aggregation.
+- **usage-export.test.ts**: Verifies range filtering and per-day cost aggregation in exported data.
 - **usage-dashboard-view.tsx**: Fixture-driven dashboard surface with loading, empty, populated, range-selection, heatmap, stats, and ranking states. Token/USD display is owned by renderer `~/lib/number-format`.
 - **usage-dashboard-view.stories.tsx**: Populated, empty, loading, and dark Storybook scenes backed by Usage-owned response fixtures.
 - **usage-hero-cards.tsx**: Range-aware headline KPIs (cost/tokens/turns) with vs-previous-period deltas; streak remains all-history.

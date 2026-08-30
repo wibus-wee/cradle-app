@@ -2,6 +2,7 @@
   "chart.dailyCostLast30Days": "每日成本（最近 30 天）",
   "chart.last30Days": "最近 30 天",
   "description": "过去一年的 token 消耗",
+  "action.exportCsv": "导出 CSV",
   "device.activeDays": "{{count}} 天活跃",
   "device.description": "Fabric 内各设备的 token 与成本占比。",
   "device.status.offline": "离线",
