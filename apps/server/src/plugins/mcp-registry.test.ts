@@ -22,15 +22,21 @@ describe('custom MCP server registry projection', () => {
       command: 'node',
       args: ['built-in.mjs'],
       env: {},
+      timeout: 15,
     })
     replaceCustomMcpServers([{
       transport: 'streamable-http',
       name: 'remote',
       url: 'https://mcp.example.test/mcp',
       headers: { Authorization: 'Bearer secret' },
+      timeout: 30,
     }])
 
     expect(Object.keys(getRegisteredMcpServers()).sort()).toEqual(['built-in', 'remote'])
+    expect(getRegisteredMcpServers()).toMatchObject({
+      'built-in': { timeout: 15 },
+      'remote': { timeout: 30 },
+    })
     expect(Object.keys(getRegisteredStdioMcpServers())).toEqual(['built-in'])
   })
 

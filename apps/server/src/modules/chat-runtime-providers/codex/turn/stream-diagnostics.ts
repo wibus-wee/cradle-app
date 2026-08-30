@@ -216,6 +216,10 @@ export function readCodexAppServerRuntimeWarning(
       ? `${samplePaths}${samplePaths && extraCount > 0 ? '\n' : ''}${extraCount > 0 ? `and ${extraCount} more path${extraCount === 1 ? '' : 's'}.` : ''}`
       : null
   }
+  else if (notification.method === 'autoApprovalReview/strictReviewRequired') {
+    message = 'Codex requires explicit review before continuing.'
+    additionalDetails = null
+  }
   else {
     return null
   }

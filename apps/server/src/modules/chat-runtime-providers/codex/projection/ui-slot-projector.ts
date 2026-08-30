@@ -1595,7 +1595,7 @@ function projectMcpServersFromList(
     return [
       {
         name: server.name,
-        status: 'ready',
+        status: normalizeListedMcpServerStatus(server.runtimeStatus),
         authStatus: normalizeMcpAuthStatus(server.authStatus),
         toolCount: server.tools ? Object.keys(server.tools).length : 0,
         resourceCount: (server.resources?.length ?? 0) + (server.resourceTemplates?.length ?? 0),
@@ -1603,4 +1603,19 @@ function projectMcpServersFromList(
       },
     ]
   })
+}
+
+function normalizeListedMcpServerStatus(value: string | null | undefined): CodexMcpServerSnapshot['status'] {
+  switch (value) {
+    case 'starting':
+      return 'starting'
+    case 'connected':
+      return 'ready'
+    case 'failed':
+      return 'failed'
+    case 'cancelled':
+      return 'cancelled'
+    default:
+      return 'unknown'
+  }
 }

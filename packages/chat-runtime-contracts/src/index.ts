@@ -727,6 +727,33 @@ export interface RuntimeUsageUiSlotState {
   hasCredits: boolean | null
   rateLimitReachedType: string | null
   planType: string | null
+  estimatedCostUsd?: number | null
+  queuedTurnCount?: number | null
+  resultMessageId?: string | null
+  correlatedUserMessageId?: string | null
+  modelCosts?: RuntimeUsageModelCost[]
+  lastModelSwitch?: RuntimeModelSwitchCost | null
+  updatedAt: number
+}
+
+export interface RuntimeUsageModelCost {
+  modelId: string
+  canonicalModelId: string | null
+  provider: string | null
+  costUsd: number
+  costBasis: 'list' | 'managed' | 'unknown'
+}
+
+export interface RuntimeModelSwitchCost {
+  fromModelId: string
+  toModelId: string
+  requestedModelId: string | null
+  source: string
+  contextTokens: number
+  promptCacheWarm: boolean
+  cacheTtl: '5m' | '1h'
+  estimatedCacheWriteUsd: number
+  pricing: 'configured' | 'catalog' | 'default'
   updatedAt: number
 }
 
@@ -1559,6 +1586,23 @@ export interface UpdateRuntimeSettingsInput {
   settings: RuntimeSettings
 }
 
+export interface RuntimeTurnSettingsPatch {
+  model?: string | null
+  effort?: ChatThinkingEffort | null
+  summary?: 'auto' | 'concise' | 'detailed' | 'none' | null
+  serviceTier?: string | null
+}
+
+export interface UpdateRuntimeTurnSettingsInput {
+  runtimeSession: RuntimeSession
+  profile: RuntimeProviderTargetProfile | null
+  settings: RuntimeTurnSettingsPatch
+}
+
+export interface UpdateRuntimeTurnSettingsResult {
+  status: 'applied' | 'targetUnavailable'
+}
+
 export interface UpdateRuntimeModeInput extends GetCapabilitiesInput {
   modeId: string
 }
@@ -1663,6 +1707,9 @@ export interface ChatRuntime {
   cancelTurn: (input: CancelTurnInput) => Promise<void>
   listModels?: (input: ListRuntimeModelsInput) => Promise<RuntimeModelCatalog>
   updateRuntimeSettings?: (input: UpdateRuntimeSettingsInput) => Promise<void>
+  updateRuntimeTurnSettings?: (
+    input: UpdateRuntimeTurnSettingsInput,
+  ) => Promise<UpdateRuntimeTurnSettingsResult>
   updateRuntimeMode?: (input: UpdateRuntimeModeInput) => Promise<void>
   healthCheck?: () => Promise<ProviderHealthStatus>
   dispose?: () => Promise<void>

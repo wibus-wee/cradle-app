@@ -7,6 +7,7 @@ import {
   deleteChatSideConversationsBySideConversationId,
   getChatSessionsBySessionIdQueue,
   patchChatSessionsBySessionIdQueueByQueueItemId,
+  patchChatSessionsBySessionIdRuntimeTurnSettings,
   postChatSessionsBySessionIdBangCommand,
   postChatSessionsBySessionIdBangTranscript,
   postChatSessionsBySessionIdCancel,
@@ -51,6 +52,13 @@ export type RuntimeSettings = Record<string, RuntimeSettingsValue>
 export type RuntimeSettingsPatchValue = RuntimeSettingsValue | null
 export type RuntimeSettingsPatch = Record<string, RuntimeSettingsPatchValue | undefined>
 export type RuntimeSettingsPayload = Record<string, RuntimeSettingsPatchValue>
+
+export interface RuntimeTurnSettingsPatch {
+  model?: string | null
+  effort?: ChatThinkingEffort | null
+  summary?: 'auto' | 'concise' | 'detailed' | 'none' | null
+  serviceTier?: string | null
+}
 
 export interface ChatQueueItem {
   id: string
@@ -538,6 +546,22 @@ export async function updateRuntimeMode(args: {
     signal: args.signal,
   })
   readSdkData(result, 'Failed to update runtime mode')
+}
+
+export async function updateRuntimeTurnSettings(args: {
+  sessionId: string
+  settings: RuntimeTurnSettingsPatch
+  signal?: AbortSignal
+}): Promise<'applied' | 'targetUnavailable'> {
+  const result = await patchChatSessionsBySessionIdRuntimeTurnSettings({
+    path: { sessionId: args.sessionId },
+    body: args.settings,
+    signal: args.signal,
+  })
+  const data = readSdkData(result, 'Failed to update active runtime turn settings') as {
+    status: 'applied' | 'targetUnavailable'
+  }
+  return data.status
 }
 
 export async function submitRuntimeToolApproval(args: {

@@ -4,6 +4,22 @@ import { KimiEventToChunkMapper } from './event-to-chunk-mapper'
 import type { KimiTranscriptTurn } from './transcript-projector'
 
 describe('kimi event to chunk mapper', () => {
+  it('projects failed and needs-auth MCP status as runtime warnings', () => {
+    const mapper = new KimiEventToChunkMapper()
+
+    expect(mapper.map(event({
+      type: 'mcp.server.status',
+      agentId: 'main',
+      server: { name: 'docs', transport: 'http', status: 'needs-auth', toolCount: 0 },
+    }))).toMatchObject([{
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Kimi MCP server docs needs authentication.',
+        additionalDetails: 'Transport: http; tools: 0',
+      },
+    }])
+  })
+
   it('projects streamed text, thinking, tools, and a terminal turn', () => {
     const mapper = new KimiEventToChunkMapper()
     const text = mapper.map(event({ type: 'assistant.delta', turnId: 7, delta: 'Hello' }))
@@ -201,6 +217,33 @@ describe('kimi event to chunk mapper', () => {
         },
       },
     ])
+  })
+
+  it('projects native config and model refresh failures as runtime warnings', () => {
+    const mapper = new KimiEventToChunkMapper()
+
+    expect(mapper.map(event({
+      type: 'event.config.warning',
+      warnings: [{ domain: 'providers', message: 'Provider credentials are incomplete.' }],
+    }))).toEqual([{
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Provider credentials are incomplete.',
+        additionalDetails: 'Kimi config domain: providers',
+      },
+    }])
+    expect(mapper.map(event({
+      type: 'event.model_catalog.changed',
+      changed: [{ provider_id: 'openai', provider_name: 'OpenAI', added: 1, removed: 0 }],
+      unchanged: [],
+      failed: [{ provider: 'target', reason: 'Authentication failed' }],
+    }))).toEqual([{
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Kimi could not refresh models for target.',
+        additionalDetails: 'Authentication failed',
+      },
+    }])
   })
 })
 

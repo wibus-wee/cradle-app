@@ -3979,6 +3979,31 @@ export const zPutChatSessionsBySessionIdRuntimeModePath = z.object({
     sessionId: z.string().min(1)
 });
 
+export const zPatchChatSessionsBySessionIdRuntimeTurnSettingsBody = z.object({
+    model: z.string().min(1).nullish(),
+    effort: z.enum([
+        'none',
+        'minimal',
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max',
+        'ultra'
+    ]).nullish(),
+    summary: z.enum([
+        'auto',
+        'concise',
+        'detailed',
+        'none'
+    ]).nullish(),
+    serviceTier: z.string().min(1).nullish()
+});
+
+export const zPatchChatSessionsBySessionIdRuntimeTurnSettingsPath = z.object({
+    sessionId: z.string().min(1)
+});
+
 export const zPostChatSessionsBySessionIdToolApprovalByRequestIdBody = z.object({
     approved: z.boolean(),
     scope: z.enum(['once', 'always']).optional(),

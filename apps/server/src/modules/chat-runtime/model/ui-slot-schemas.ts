@@ -554,6 +554,32 @@ export const runtimeUsageUiSlotStateSchema = t.Object({
   hasCredits: t.Union([t.Boolean(), t.Null()]),
   rateLimitReachedType: t.Union([t.String(), t.Null()]),
   planType: t.Union([t.String(), t.Null()]),
+  estimatedCostUsd: t.Optional(t.Union([t.Number(), t.Null()])),
+  queuedTurnCount: t.Optional(t.Union([t.Number(), t.Null()])),
+  resultMessageId: t.Optional(t.Union([t.String(), t.Null()])),
+  correlatedUserMessageId: t.Optional(t.Union([t.String(), t.Null()])),
+  modelCosts: t.Optional(t.Array(t.Object({
+    modelId: t.String(),
+    canonicalModelId: t.Union([t.String(), t.Null()]),
+    provider: t.Union([t.String(), t.Null()]),
+    costUsd: t.Number(),
+    costBasis: t.Union([t.Literal('list'), t.Literal('managed'), t.Literal('unknown')]),
+  }))),
+  lastModelSwitch: t.Optional(t.Union([
+    t.Object({
+      fromModelId: t.String(),
+      toModelId: t.String(),
+      requestedModelId: t.Union([t.String(), t.Null()]),
+      source: t.String(),
+      contextTokens: t.Number(),
+      promptCacheWarm: t.Boolean(),
+      cacheTtl: t.Union([t.Literal('5m'), t.Literal('1h')]),
+      estimatedCacheWriteUsd: t.Number(),
+      pricing: t.Union([t.Literal('configured'), t.Literal('catalog'), t.Literal('default')]),
+      updatedAt: t.Number(),
+    }),
+    t.Null(),
+  ])),
   updatedAt: t.Number(),
 })
 

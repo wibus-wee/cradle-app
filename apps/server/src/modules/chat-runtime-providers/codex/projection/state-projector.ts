@@ -850,7 +850,7 @@ function projectCodexApprovalsSnapshot(
         id: `server-request-${params.id}`,
         targetItemId: readString(requestParams.itemId),
         status: 'pending',
-        label: readServerRequestApprovalLabel(params.method),
+        label: readServerRequestApprovalLabel(params.method, requestParams),
         riskLevel: null,
         rationale: readString(requestParams.reason),
         startedAt: readNumber(requestParams.startedAtMs),
@@ -1104,6 +1104,8 @@ function readApprovalActionLabel(action: GuardianApprovalReviewNotificationParam
       return 'Command'
     case 'execve':
       return 'Process'
+    case 'writeStdin':
+      return 'Write to terminal'
     case 'applyPatch':
       return 'File change'
     case 'networkAccess':
@@ -1117,9 +1119,10 @@ function readApprovalActionLabel(action: GuardianApprovalReviewNotificationParam
   }
 }
 
-function readServerRequestApprovalLabel(method: string): string {
+function readServerRequestApprovalLabel(method: string, params: Record<string, unknown>): string {
   switch (method) {
     case 'item/commandExecution/requestApproval':
+      return params.kind === 'writeStdin' ? 'Write to terminal' : 'Command'
     case 'execCommandApproval':
       return 'Command'
     case 'item/fileChange/requestApproval':
@@ -1189,6 +1192,12 @@ function isToolActivityItem(type: string): boolean {
 
 function readToolActivityCompletionStatus(item: CodexThreadItem): RuntimeToolActivityStatus {
   if (readCodexItemError(item)) {
+    return 'failed'
+  }
+  if (item.type === 'collabAgentToolCall' && item.status === 'interrupted') {
+    return 'failed'
+  }
+  if (item.type === 'subAgentActivity' && item.kind === 'interrupted') {
     return 'failed'
   }
   if (item.status === 'failed') {

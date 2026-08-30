@@ -64,6 +64,7 @@ class FakeCodexAppServerClient {
   terminatedBackgroundProcesses: string[] = []
   hangingMethods = new Set<string>()
   unsupportedMethods = new Set<string>()
+  turnSettingsUpdateStatus: 'applied' | 'targetUnavailable' = 'applied'
 
   private readonly notifications: CodexAppServerMessage[] = []
   private notificationWaiter: ((message: CodexAppServerMessage | null) => void) | null = null
@@ -134,6 +135,7 @@ class FakeCodexAppServerClient {
         data: [
           {
             name: 'github',
+            runtimeStatus: 'connected',
             tools: { search: {}, read_issue: {} },
             resources: [{ uri: 'repo://cradle' }],
             resourceTemplates: [{ uriTemplate: 'repo://{owner}/{repo}' }],
@@ -141,10 +143,27 @@ class FakeCodexAppServerClient {
           },
           {
             name: 'linear',
+            runtimeStatus: 'authenticationRequired',
             tools: { issue_search: {} },
             resources: [],
             resourceTemplates: [],
             authStatus: 'notLoggedIn',
+          },
+          {
+            name: 'slack',
+            runtimeStatus: 'starting',
+            tools: {},
+            resources: [],
+            resourceTemplates: [],
+            authStatus: 'unsupported',
+          },
+          {
+            name: 'disabled-server',
+            runtimeStatus: 'disabled',
+            tools: {},
+            resources: [],
+            resourceTemplates: [],
+            authStatus: 'unsupported',
           },
         ],
         nextCursor: null,
@@ -439,6 +458,9 @@ class FakeCodexAppServerClient {
         return { turn: { id: 'codex-title-turn-1', status: 'inProgress' } }
       }
       return { turn: { id: 'codex-turn-1', status: 'inProgress' } }
+    }
+    if (method === 'turn/settings/update') {
+      return { status: this.turnSettingsUpdateStatus }
     }
     if (method === 'review/start') {
       return {
@@ -2890,7 +2912,7 @@ describe('codexProvider app-server integration', () => {
         kind: 'mcp',
         slotId: 'codex:mcp',
         threadId: 'codex-thread-1',
-        serverCount: 3,
+        serverCount: 5,
         readyCount: 1,
         failedCount: 2,
         needsLoginCount: 1,
@@ -2898,6 +2920,8 @@ describe('codexProvider app-server integration', () => {
         servers: expect.arrayContaining([
           expect.objectContaining({ name: 'github', status: 'ready', authStatus: 'oAuth', toolCount: 2, resourceCount: 2 }),
           expect.objectContaining({ name: 'linear', status: 'failed', authStatus: 'notLoggedIn', error: 'Denied' }),
+          expect.objectContaining({ name: 'slack', status: 'starting', authStatus: 'unsupported' }),
+          expect.objectContaining({ name: 'disabled-server', status: 'unknown', authStatus: 'unsupported' }),
           expect.objectContaining({ name: 'local-dev', status: 'failed', error: 'Missing command' }),
         ]),
       }),
@@ -4504,6 +4528,43 @@ describe('codexProvider app-server integration', () => {
         },
       },
     })
+    expect(client.requests[3]).toEqual({
+      method: 'turn/settings/update',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        serviceTier: 'priority',
+      },
+    })
+
+    await expect(provider.updateRuntimeTurnSettings({
+      runtimeSession,
+      profile: createProfile({ model: 'gpt-test', reasoningEffort: 'low' }),
+      settings: {
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+        summary: 'concise',
+        serviceTier: 'priority',
+      },
+    })).resolves.toEqual({ status: 'applied' })
+    expect(client.requests[4]).toEqual({
+      method: 'turn/settings/update',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+        summary: 'concise',
+        serviceTier: 'priority',
+      },
+    })
+
+    client.turnSettingsUpdateStatus = 'targetUnavailable'
+    await expect(provider.updateRuntimeTurnSettings({
+      runtimeSession,
+      profile: createProfile(),
+      settings: { summary: 'detailed' },
+    })).resolves.toEqual({ status: 'targetUnavailable' })
 
     client.pushNotification({
       method: 'item/agentMessage/delta',

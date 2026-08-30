@@ -12,6 +12,7 @@ const StdioMcpServerConfigSchema = z.object({
   command: z.string().trim().min(1),
   args: z.array(z.string()),
   env: z.record(z.string(), z.string()).default({}),
+  timeout: z.number().positive().optional(),
   scope: z.enum(['global', 'chat-session']).default('global'),
   when: z.function().optional(),
 })
@@ -21,6 +22,7 @@ const StreamableHttpMcpServerConfigSchema = z.object({
   name: McpServerNameSchema,
   url: z.string().trim().url(),
   headers: z.record(z.string(), z.string()).default({}),
+  timeout: z.number().positive().optional(),
   scope: z.enum(['global', 'chat-session']).default('global'),
   when: z.function().optional(),
 })
@@ -39,6 +41,7 @@ export interface RegisteredStdioMcpServer {
   command: string
   args: string[]
   env: Record<string, string>
+  timeout?: number
 }
 
 export interface RegisteredStreamableHttpMcpServer {
@@ -46,6 +49,7 @@ export interface RegisteredStreamableHttpMcpServer {
   name: string
   url: string
   headers: Record<string, string>
+  timeout?: number
 }
 
 export type RegisteredMcpServer = RegisteredStdioMcpServer | RegisteredStreamableHttpMcpServer
@@ -159,6 +163,7 @@ function projectRuntimeConfig(
     transport: 'streamable-http',
     name: config.name,
     url: config.url,
+    ...(config.timeout !== undefined ? { timeout: config.timeout } : {}),
     headers: config.scope === 'chat-session' && context
       ? { ...config.headers, 'x-cradle-chat-session-id': context.chatSessionId }
       : config.headers,
@@ -177,6 +182,7 @@ function projectStdioRuntimeConfig(
     env: config.scope === 'chat-session' && context
       ? { ...config.env, CRADLE_CHAT_SESSION_ID: context.chatSessionId }
       : config.env,
+    ...(config.timeout !== undefined ? { timeout: config.timeout } : {}),
   }
 }
 
@@ -187,6 +193,7 @@ function projectCapabilityMetadata(config: RegisteredMcpServerConfig): Record<st
       command: config.command,
       args: config.args,
       hasEnv: Object.keys(config.env).length > 0,
+      timeout: config.timeout ?? null,
       scope: config.scope,
     }
   }
@@ -197,6 +204,7 @@ function projectCapabilityMetadata(config: RegisteredMcpServerConfig): Record<st
     urlOrigin: url.origin,
     urlPathname: url.pathname,
     hasHeaders: Object.keys(config.headers).length > 0,
+    timeout: config.timeout ?? null,
     scope: config.scope,
   }
 }

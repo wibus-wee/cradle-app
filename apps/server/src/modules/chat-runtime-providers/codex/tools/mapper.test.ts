@@ -4,6 +4,7 @@ import {
   buildCodexToolInput,
   buildCodexToolOutput,
   classifyCodexToolKind,
+  readCodexToolError,
   readCodexToolName,
 } from './mapper'
 
@@ -98,5 +99,25 @@ describe('buildCodexToolInput/output for collabAgentToolCall', () => {
         receiverThreadIds: ['subagent-thread'],
       }))
     }
+  })
+
+  it('treats interrupted collaboration and subagent activity as failed output', () => {
+    expect(readCodexToolError({
+      type: 'collabAgentToolCall',
+      id: 'crew-interrupted',
+      status: 'interrupted',
+    })).toBe('Collaboration tool call interrupted')
+
+    expect(readCodexToolError({
+      type: 'subAgentActivity',
+      id: 'activity-interrupted',
+      kind: 'interrupted',
+    })).toBe('Subagent activity interrupted')
+
+    expect(readCodexToolError({
+      type: 'subAgentActivity',
+      id: 'activity-completed',
+      kind: 'completed',
+    })).toBeNull()
   })
 })

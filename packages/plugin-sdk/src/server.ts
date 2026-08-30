@@ -278,6 +278,8 @@ export interface StdioMcpServerConfig {
   args: string[]
   /** Environment variables for the process */
   env?: Record<string, string>
+  /** Provider connection timeout in seconds when the target runtime supports it. */
+  timeout?: number
   /** Lifecycle scope. Chat-session servers are projected only with an immutable session binding. */
   scope?: 'global' | 'chat-session'
   /** Predicate — if returns false, server is not registered */
@@ -293,6 +295,8 @@ export interface StreamableHttpMcpServerConfig {
   url: string
   /** Optional HTTP headers for the runtime MCP client. May contain secrets. */
   headers?: Record<string, string>
+  /** Provider connection timeout in seconds when the target runtime supports it. */
+  timeout?: number
   /** Lifecycle scope. Chat-session servers are projected only with an immutable session binding. */
   scope?: 'global' | 'chat-session'
   /** Predicate — if returns false, server is not registered */
