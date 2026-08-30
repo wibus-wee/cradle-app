@@ -104,7 +104,13 @@ export class WindowManager {
       return existing
     }
 
-    const releasePoint = resolveTearoffReleasePoint(x, y)
+    // DOM drag events can report physical-pixel screen coordinates on Retina
+    // while Electron's screen/BrowserWindow APIs use DIP. For a live native
+    // handoff, the browser process owns the authoritative cursor position and
+    // guarantees that the new window is created underneath the held pointer.
+    const releasePoint = options.continuePointerDrag
+      ? screen.getCursorScreenPoint()
+      : resolveTearoffReleasePoint(x, y)
     const targetDisplay = screen.getDisplayNearestPoint(releasePoint)
     const targetSize = resolveWindowSize(
       readStoredWindowSize(join(app.getPath('userData'), TEAROFF_WINDOW_SIZE_FILE)),
