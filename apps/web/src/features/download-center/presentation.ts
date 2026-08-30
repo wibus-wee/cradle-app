@@ -2,6 +2,18 @@ import type { DownloadTask } from './types'
 
 export type DownloadRetryDestination = 'downloads' | 'desktop'
 
+/** Average throughput across the task's reported transfer interval. */
+export function averageTransferRateBytesPerSecond(task: DownloadTask): number | null {
+  if (!task.startedAt || task.transferredBytes <= 0) {
+    return null
+  }
+  const elapsedMs = Date.parse(task.updatedAt) - Date.parse(task.startedAt)
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) {
+    return null
+  }
+  return task.transferredBytes / (elapsedMs / 1_000)
+}
+
 /** Failed downloads return to their exact owning flow; the Download Center never retries itself. */
 export function retryDestination(task: DownloadTask): DownloadRetryDestination | null {
   if (

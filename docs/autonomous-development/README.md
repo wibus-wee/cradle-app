@@ -43,3 +43,4 @@ Chronological index of independently shipped product improvements.
 4. [Start New Work from the command palette](./2026-08-31-04-new-work-command.md)
 5. [Refresh pull request detail on mobile](./2026-08-31-05-mobile-pr-detail-refresh.md)
 6. [Force-refresh mobile pull request feeds](./2026-08-31-06-mobile-pr-feed-refresh.md)
+7. [Show average download throughput](./2026-08-31-07-download-throughput.md)
