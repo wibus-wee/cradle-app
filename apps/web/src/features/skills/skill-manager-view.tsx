@@ -6,6 +6,7 @@ import {
   UploadLine as UploadIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
@@ -74,6 +75,22 @@ export function SkillManagerView({
   onDetailOpenChange,
 }: SkillManagerViewProps) {
   const { t } = useTranslation('skills')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const typing = target?.tagName === 'INPUT'
+        || target?.tagName === 'TEXTAREA'
+        || target?.isContentEditable
+      if (event.key === '/' && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault()
+        searchInputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', focusSearch)
+    return () => window.removeEventListener('keydown', focusSearch)
+  }, [])
 
   return (
     <div
@@ -115,6 +132,7 @@ export function SkillManagerView({
         <div className="relative flex-1">
           <SearchIcon className="absolute top-1/2 left-2.5 size-3 -translate-y-1/2 !text-muted-foreground/50" />
           <input
+            ref={searchInputRef}
             type="text"
             aria-label={t('manager.searchLabel')}
             value={searchQuery}

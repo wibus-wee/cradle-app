@@ -19,3 +19,4 @@ Chronological index of independently shipped product improvements.
 13. [Explain empty Runtime filters](./2026-08-29-13-runtime-filter-empty-feedback.md)
 14. [Localize Skill management](./2026-08-29-14-localize-skill-manager.md)
 15. [Clear Skill search in place](./2026-08-29-15-clear-skill-search.md)
+16. [Quick-focus Skill search](./2026-08-29-16-skill-search-shortcut.md)
