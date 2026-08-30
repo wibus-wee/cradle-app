@@ -66,3 +66,4 @@ Chronological index of independently shipped product improvements.
 27. [Show file freshness in mobile previews](./2026-08-31-27-mobile-file-modified-time.md)
 28. [Open pull request checks from mobile](./2026-08-31-28-mobile-open-pr-check.md)
 29. [Open changed pull request files from mobile](./2026-08-31-29-mobile-open-pr-file.md)
+30. [Carry workspace context into palette creation](./2026-08-31-30-palette-create-workspace-context.md)

@@ -12,7 +12,8 @@ files, conversations, issues, and workspaces.
 - App commands include one-shot recovery for the most recently user-closed
   surface. The command is omitted when navigation has no recovery target.
 - Primary creation commands open New Chat and New Work through their existing
-  navigation owners; workspace and issue selection remain on those surfaces.
+  navigation owners. When the active surface resolves to a workspace, both
+  commands carry that context forward and show its name in the palette row.
 - Workspace-aware surfaces expose a Copy workspace path command. It uses the
   workspace owner's canonical local or remote location label and reports
   clipboard success or failure through app toasts.

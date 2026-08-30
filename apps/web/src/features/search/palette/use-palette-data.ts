@@ -164,23 +164,25 @@ function useCommands(close: () => void, workspaceId: string | null): CommandActi
       {
         id: 'new-chat',
         label: t('command.newChat.label'),
+        description: workspace?.name,
         keywords: t('command.newChat.keywords'),
         icon: MessageSquareIcon,
         source: 'app',
         handler: () => {
           close()
-          openNewChat()
+          openNewChat(workspaceId ? { workspaceId } : {})
         },
       },
       {
         id: 'new-work',
         label: t('command.newWork.label'),
+        description: workspace?.name,
         keywords: t('command.newWork.keywords'),
         icon: WorkIcon,
         source: 'app',
         handler: () => {
           close()
-          openNewWork()
+          openNewWork(workspaceId ? { workspaceId } : {})
         },
       },
       ...(workspace
@@ -307,7 +309,7 @@ function useCommands(close: () => void, workspaceId: string | null): CommandActi
     }))
 
     return [...appCommands, ...contributedCommands]
-  }, [t, setSettingsSection, toggleSidebar, pluginCommands, lastClosedSurface, workspace, close])
+  }, [t, setSettingsSection, toggleSidebar, pluginCommands, lastClosedSurface, workspace, workspaceId, close])
 }
 
 function useFileSearch(query: string, enabled: boolean, workspaceId: string | null | undefined) {
