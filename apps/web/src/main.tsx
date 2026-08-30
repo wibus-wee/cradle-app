@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import * as React from 'react'
 import * as ReactJSXDevRuntime from 'react/jsx-dev-runtime'
 import * as ReactJSXRuntime from 'react/jsx-runtime'
@@ -8,6 +8,7 @@ import * as ReactDOMClient from 'react-dom/client'
 import { AppErrorBoundary } from './components/common/app-error-boundary'
 import { resolveInitialLocale } from './i18n/browser-locale'
 import { I18nProvider } from './i18n/client'
+import { queryClient } from './lib/query-client'
 import { waitForServer } from './lib/server-readiness'
 
 // Expose shared React modules for plugin runtime
@@ -20,15 +21,6 @@ Object.defineProperty(window, Symbol.for('cradle:modules'), {
     'react-dom/client': ReactDOMClient,
     'react/jsx-dev-runtime': ReactJSXDevRuntime,
     'react/jsx-runtime': ReactJSXRuntime,
-  },
-})
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: 1,
-    },
   },
 })
 

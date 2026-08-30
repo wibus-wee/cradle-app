@@ -30,7 +30,7 @@ import { useSurfaceStore } from './surface-store'
 import { openTearoffSurfaceWindow } from './tearoff-surfaces'
 
 const META_TAB_HINT_DELAY_MS = 200
-const TEAR_OFF_RELEASE_DISTANCE_PX = 48
+const TEAR_OFF_ACTIVATION_DISTANCE_PX = 12
 
 type SurfaceDragOutcome = 'tear-off'
 
@@ -292,6 +292,7 @@ const SurfaceBarInner = memo(({
   const dragReleasePointerRef = useRef<ScreenCoordinates | null>(null)
   const dragReleaseClientPointerRef = useRef<ClientCoordinates | null>(null)
   const dragCleanupRef = useRef<(() => void) | null>(null)
+  const dragTearOffSurfaceIdRef = useRef<string | null>(null)
   const [showMetaTabHints, setShowMetaTabHints] = useState(false)
   surfacesRef.current = surfaces
 
@@ -327,6 +328,7 @@ const SurfaceBarInner = memo(({
     dragStartPointerRef.current = null
     dragReleasePointerRef.current = null
     dragReleaseClientPointerRef.current = null
+    dragTearOffSurfaceIdRef.current = null
     publishSurfaceDrag({ clientX: null, clientY: null, route: null })
   }, [])
 
@@ -411,7 +413,7 @@ const SurfaceBarInner = memo(({
     const releasePointer = dragReleasePointerRef.current
     const startPointer = dragStartPointerRef.current
 
-    if (getDragDistance(startPointer, releasePointer) <= TEAR_OFF_RELEASE_DISTANCE_PX) {
+    if (getDragDistance(startPointer, releasePointer) <= TEAR_OFF_ACTIVATION_DISTANCE_PX) {
       return null
     }
 
@@ -427,8 +429,10 @@ const SurfaceBarInner = memo(({
   }, [sessionScoped])
 
   const checkTearOff = useCallback((surfaceId: string | number): boolean => {
-    dragCleanupRef.current?.()
-    dragCleanupRef.current = null
+    const normalizedSurfaceId = String(surfaceId)
+    if (dragTearOffSurfaceIdRef.current === normalizedSurfaceId) {
+      return true
+    }
 
     if (resolveDragOutcome() !== 'tear-off') {
       return false
@@ -442,10 +446,18 @@ const SurfaceBarInner = memo(({
       return false
     }
 
+    dragTearOffSurfaceIdRef.current = normalizedSurfaceId
+    dragCleanupRef.current?.()
+    dragCleanupRef.current = null
     void openTearoffSurfaceWindow(surface, {
       screenX: releasePointer.screenX,
       screenY: releasePointer.screenY,
       detachSurface: true,
+      continuePointerDrag: true,
+    }).then((opened) => {
+      if (!opened && dragTearOffSurfaceIdRef.current === normalizedSurfaceId) {
+        dragTearOffSurfaceIdRef.current = null
+      }
     })
     return true
   }, [resolveDragOutcome])
@@ -457,6 +469,7 @@ const SurfaceBarInner = memo(({
     dragStartPointerRef.current = startPointer
     dragReleasePointerRef.current = startPointer
     dragReleaseClientPointerRef.current = startClientPointer
+    dragTearOffSurfaceIdRef.current = null
     dragCleanupRef.current?.()
 
     const draggedSurface = event.operation.source
@@ -488,6 +501,9 @@ const SurfaceBarInner = memo(({
     const unsubscribePointerOutsideWindow = subscribePointerOutsideWindow((screenX, screenY) => {
       dragReleasePointerRef.current = { screenX, screenY }
       dragReleaseClientPointerRef.current = null
+      if (draggedSurface) {
+        checkTearOff(draggedSurface.id)
+      }
     })
     void nativeIpc?.window.startPointerMonitor().catch(() => {})
     dragCleanupRef.current = () => {
@@ -500,13 +516,17 @@ const SurfaceBarInner = memo(({
       unsubscribePointerOutsideWindow()
       void nativeIpc?.window.stopPointerMonitor().catch(() => {})
     }
-  }, [resolveDragOutcome])
+  }, [checkTearOff, previewCard])
 
   useEffect(() => releaseCurrentDrag, [releaseCurrentDrag])
 
   const handleDragEnd = useCallback((event: { operation: { source: { id: string | number } | null, target: { id: string | number } | null }, canceled: boolean }) => {
     const { operation, canceled } = event
     const { source, target } = operation
+    if (source && dragTearOffSurfaceIdRef.current === String(source.id)) {
+      releaseCurrentDrag()
+      return
+    }
     if (canceled) {
       if (source) {
         checkTearOff(source.id)

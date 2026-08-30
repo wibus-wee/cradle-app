@@ -13,8 +13,22 @@ export interface BackgroundActivityProgress {
   [key: string]: BackgroundActivityProgressValue
 }
 
+export interface BackgroundActivityFooterPresentation {
+  id: string
+  title: string
+  description: string | null
+  actionLabel: string | null
+  actionUrl: string | null
+  expiresAt: number | null
+}
+
+export interface BackgroundActivityPresentation {
+  footer: BackgroundActivityFooterPresentation | null
+}
+
 export interface BackgroundActivityReporter {
   report: (progress: BackgroundActivityProgress | null) => void
+  presentInFooter: (presentation: BackgroundActivityFooterPresentation | null) => void
 }
 
 export type BackgroundActivityRunSource = 'automatic' | 'manual'
@@ -45,6 +59,7 @@ export interface BackgroundActivitySnapshot {
   manuallyRunnable: boolean
   status: BackgroundActivityStatus
   progress: BackgroundActivityProgress | null
+  presentation: BackgroundActivityPresentation
   lastError: string | null
   createdAt: number
   updatedAt: number
@@ -56,6 +71,7 @@ interface ActivityRecord {
   descriptor: BackgroundActivityDescriptor
   status: BackgroundActivityStatus
   progress: BackgroundActivityProgress | null
+  presentation: BackgroundActivityPresentation
   lastError: string | null
   createdAt: number
   updatedAt: number
@@ -71,6 +87,12 @@ function storageKey(ownerNamespace: string, key: string): string {
 }
 
 function snapshot(record: ActivityRecord): BackgroundActivitySnapshot {
+  const footer = record.presentation.footer
+  const isFooterExpired = footer?.expiresAt !== null
+    && footer?.expiresAt !== undefined
+    && footer.expiresAt <= Date.now()
+  const visibleFooter = isFooterExpired ? null : footer
+
   return {
     ownerNamespace: record.descriptor.ownerNamespace,
     key: record.descriptor.key,
@@ -80,6 +102,7 @@ function snapshot(record: ActivityRecord): BackgroundActivitySnapshot {
     manuallyRunnable: record.descriptor.manuallyRunnable,
     status: record.status,
     progress: record.progress,
+    presentation: { footer: visibleFooter },
     lastError: record.lastError,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
@@ -148,6 +171,13 @@ function run(
       record.progress = progress
       record.updatedAt = Date.now()
     },
+    presentInFooter(presentation) {
+      if (!isCurrent(record) || record.status !== 'running') {
+        return
+      }
+      record.presentation = { footer: presentation }
+      record.updatedAt = Date.now()
+    },
   }
 
   const promise = Promise.resolve()
@@ -200,6 +230,7 @@ export function register(descriptor: BackgroundActivityDescriptor): BackgroundAc
     descriptor,
     status: 'idle',
     progress: null,
+    presentation: { footer: null },
     lastError: null,
     createdAt: now,
     updatedAt: now,

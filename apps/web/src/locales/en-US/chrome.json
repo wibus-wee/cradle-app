@@ -1,6 +1,12 @@
 {
   "aside.localServers.scanning": "Scanning localhost…",
   "aside.notes.placeholder": "Keep session notes here…",
+  "backgroundActivityFooter.dismiss": "OK",
+  "backgroundActivityFooter.dismissAll": "Dismiss all",
+  "backgroundActivityFooter.noticeCount_one": "{{count}} notice",
+  "backgroundActivityFooter.noticeCount_other": "{{count}} notices",
+  "backgroundActivityFooter.open": "Open background activity",
+  "backgroundActivityFooter.title": "Background activity",
   "browser.annotation.cancel": "Cancel annotation",
   "browser.annotation.comment": "Comment",
   "browser.annotation.toggleTitle": "Toggle browser comments (Command/Ctrl Shift F)",

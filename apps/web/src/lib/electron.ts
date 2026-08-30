@@ -387,7 +387,13 @@ export interface DesktopPreferences {
 }
 
 interface WindowServiceMethods {
-  tearOffSurface: (surfaceId: string, route: SurfaceRoute, screenX: number, screenY: number) => Promise<void>
+  tearOffSurface: (
+    surfaceId: string,
+    route: SurfaceRoute,
+    screenX: number,
+    screenY: number,
+    options?: { bootstrap?: unknown, continuePointerDrag?: boolean },
+  ) => Promise<void>
   focusSurface: (surfaceId: string) => Promise<boolean>
   closeSurface: (surfaceId: string) => Promise<void>
   getOpenSurfaces: () => Promise<string[]>

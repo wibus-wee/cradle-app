@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { getSkills } from '~/api-gen/sdk.gen'
+import { RouteLoadingFallback } from '~/components/ui/route-loading-fallback'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import {
   runtimeComposerUsesAliasMatrixModelSelection,
@@ -11,6 +12,7 @@ import type { MentionItem } from '~/features/chat'
 import { ComposerToolbar, useComposerState } from '~/features/composer-toolbar'
 import type { SkillInventoryEntry } from '~/features/skills/types'
 import { searchWorkspaceFiles } from '~/features/workspace/use-workspace-files'
+import { isTearoffWindow } from '~/lib/electron'
 
 import type { ChatViewProps } from './chat-view'
 import { searchSessionPluginMentions } from './mentions/plugin-mentions'
@@ -230,7 +232,7 @@ export function ChatRuntimeView({
   )
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={isTearoffWindow ? <RouteLoadingFallback /> : null}>
       <ChatView
         active={active}
         sessionId={sessionId}

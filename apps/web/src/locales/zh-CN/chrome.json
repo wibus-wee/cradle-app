@@ -1,4 +1,10 @@
 {
+  "backgroundActivityFooter.dismiss": "知道了",
+  "backgroundActivityFooter.dismissAll": "全部忽略",
+  "backgroundActivityFooter.noticeCount_one": "{{count}} 条提示",
+  "backgroundActivityFooter.noticeCount_other": "{{count}} 条提示",
+  "backgroundActivityFooter.open": "打开后台活动提示",
+  "backgroundActivityFooter.title": "后台活动",
   "browser.annotation.cancel": "Cancel annotation",
   "browser.annotation.comment": "Comment",
   "browser.annotation.toggleTitle": "Toggle browser comments (Command/Ctrl Shift F)",

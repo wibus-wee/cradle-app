@@ -1,4 +1,10 @@
 {
+  "backgroundActivityFooter.dismiss": "Aceptar",
+  "backgroundActivityFooter.dismissAll": "Descartar todo",
+  "backgroundActivityFooter.noticeCount_one": "{{count}} aviso",
+  "backgroundActivityFooter.noticeCount_other": "{{count}} avisos",
+  "backgroundActivityFooter.open": "Abrir actividad en segundo plano",
+  "backgroundActivityFooter.title": "Actividad en segundo plano",
   "browser.annotation.cancel": "Cancel annotation",
   "browser.annotation.comment": "Comment",
   "browser.annotation.toggleTitle": "Toggle browser comments (Command/Ctrl Shift F)",

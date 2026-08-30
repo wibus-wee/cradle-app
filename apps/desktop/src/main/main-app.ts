@@ -709,6 +709,9 @@ export async function startDesktopApp(): Promise<void> {
   registerProcessShutdownHandlers()
   registerPluginInstallProtocol()
   registerBrowserIpcHandlers(ipcMain, browserManager)
+  ipcMain.on('window:tearoff-renderer-ready', (event) => {
+    windowManager?.markTearoffRendererReady(event.sender.id)
+  })
   serverFetchBroker.register(ipcMain)
   initializeIpcDevtool()
   browserManager.subscribe((state) => {

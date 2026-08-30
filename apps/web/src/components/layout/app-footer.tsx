@@ -3,6 +3,7 @@ import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useLayoutGeometry } from '~/components/layout/layout-geometry-context'
+import { BackgroundActivityFooter } from '~/features/background-activity/background-activity-footer'
 import { JarvisHistoryPicker } from '~/features/system-agent/jarvis-history-picker'
 import { JarvisPopover } from '~/features/system-agent/jarvis-popover'
 import { useJarvisUiStore } from '~/features/system-agent/jarvis-ui-store'
@@ -31,6 +32,8 @@ export function AppFooter({ className }: { className?: string }) {
       ref={registerFooter}
       className={cn('relative flex h-9 shrink-0 items-center bg-sidebar px-1', className)}
     >
+      <BackgroundActivityFooter />
+
       {/* Spacer */}
       <div className="flex-1 min-w-0" />
 

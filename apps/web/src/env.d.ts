@@ -110,6 +110,10 @@ interface Window {
       onTearoffSurfaceClosed: (handler: (surfaceId: string) => void) => () => void
       onPointerOutsideWindow: (handler: (screenX: number, screenY: number) => void) => () => void
     }
+      tearoff?: {
+        notifyRendererReady: () => void
+        onSurfaceBound: (handler: (binding: unknown) => void) => () => void
+      }
     desktopUpdate: {
       onStatusChanged: (handler: (status: unknown) => void) => () => void
     }

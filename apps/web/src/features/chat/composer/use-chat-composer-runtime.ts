@@ -78,6 +78,7 @@ export interface ChatComposerRuntime {
 interface UseChatComposerRuntimeOptions {
   active?: boolean
   sessionId: string | null
+  runtimeServiceTier?: string | null
   isStreaming: boolean
   canStop: boolean
   isReady: boolean
@@ -136,6 +137,7 @@ function readRuntimeCodeReviewAvailability({
 export function useChatComposerRuntime({
   active = true,
   sessionId,
+  runtimeServiceTier,
   isStreaming,
   canStop,
   isReady,
@@ -270,16 +272,9 @@ export function useChatComposerRuntime({
         const modelState = runtimeUiSlotStates?.states.find(
           (state): state is ChatRuntimeModelUiSlotState => state.kind === 'model',
         )
-        const supportsFast = modelState?.serviceTiers.some(tier => tier.id === 'fast') ?? false
-        const availableCommand = withSlashCommandAvailability(
-          command,
-          supportsFast
-            ? undefined
-            : { enabled: false, reason: 'Fast service tier is unavailable for the active model.' },
-        )
         return {
-          ...availableCommand,
-          ...(supportsFast && modelState?.serviceTier === 'fast'
+          ...withSlashCommandAvailability(command, undefined),
+          ...(runtimeServiceTier === 'priority' || modelState?.serviceTier === 'priority'
             ? {
                 stateLabel: 'Active',
                 stateTone: 'success' as const,
@@ -295,6 +290,7 @@ export function useChatComposerRuntime({
       gitRepositoriesQuery.isLoading,
       gitRepositoriesQuery.isSuccess,
       runtimeUiSlotStates?.states,
+      runtimeServiceTier,
       workspaceId,
     ],
   )

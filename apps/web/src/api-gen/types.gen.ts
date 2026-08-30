@@ -7019,6 +7019,16 @@ export type GetBackgroundActivitiesResponses = {
         manuallyRunnable: boolean;
         status: 'idle' | 'running' | 'succeeded' | 'failed';
         progress: unknown;
+        presentation: {
+            footer: {
+                id: string;
+                title: string;
+                description: string | null;
+                actionLabel: string | null;
+                actionUrl: string | null;
+                expiresAt: number | null;
+            } | null;
+        };
         lastError: string | null;
         createdAt: number;
         updatedAt: number;
@@ -7052,6 +7062,16 @@ export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses = {
         manuallyRunnable: boolean;
         status: 'idle' | 'running' | 'succeeded' | 'failed';
         progress: unknown;
+        presentation: {
+            footer: {
+                id: string;
+                title: string;
+                description: string | null;
+                actionLabel: string | null;
+                actionUrl: string | null;
+                expiresAt: number | null;
+            } | null;
+        };
         lastError: string | null;
         createdAt: number;
         updatedAt: number;

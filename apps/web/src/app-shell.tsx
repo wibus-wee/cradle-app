@@ -7,6 +7,7 @@ import { AppLayout } from '~/components/layout/app-layout'
 import { AppSidebar, AppSidebarSheet } from '~/components/layout/app-sidebar'
 import { useSidebarSheetMode } from '~/components/layout/layout-responsive'
 import { useSyncLayoutSlotScope } from '~/components/layout/use-layout-slots'
+import { RouteLoadingFallback } from '~/components/ui/route-loading-fallback'
 import { useSuppressNativeBrowserSurface } from '~/features/browser/native-surface-suppression'
 import { WhatsNewContainer } from '~/features/changelog/whats-new-container'
 import { WhatsNewPopup } from '~/features/changelog/whats-new-popup'
@@ -20,13 +21,15 @@ import { SplitSurface } from '~/features/split-view/split-surface'
 import { useFocusedSplitPane, useSplitPaneRoutes } from '~/features/split-view/store/split-workspace-store'
 import { useUnreadSessionIds } from '~/features/workspace/use-session'
 import { isWorkspaceFileShortcutScopeEvent } from '~/features/workspace/workspace-file-shortcuts'
-import { isTearoffWindow, tearoffSurfaceRoute } from '~/lib/electron'
+import { isTearoffWindow } from '~/lib/electron'
 import { surfaceDraftFromRouterState, useActiveSurface } from '~/navigation/active-surface'
 import { createRouteSurfaceSyncRouteKey, isRouteSurfaceSyncSuppressed } from '~/navigation/route-surface-sync-key'
 import { SurfaceActivityProvider } from '~/navigation/surface-activity-context'
+import type { SurfaceRoute } from '~/navigation/surface-identity'
 import { layoutSlotIdForRoute, layoutSlotIdForSurface } from '~/navigation/surface-identity'
 import { installSurfaceResourceLifecycle } from '~/navigation/surface-resource-lifecycle'
 import { useSurfaceStore } from '~/navigation/surface-store'
+import { useTearoffSurfaceBinding } from '~/navigation/tearoff-binding'
 import { installTearoffSurfaceRestore } from '~/navigation/tearoff-surfaces'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
@@ -168,7 +171,8 @@ export function AppRouteRoot() {
 function TearoffAppRuntime() {
   'use no memo'
 
-  const surfaceRoute = tearoffSurfaceRoute
+  const binding = useTearoffSurfaceBinding()
+  const surfaceRoute = binding?.route ?? null
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -189,7 +193,9 @@ function TearoffAppRuntime() {
   if (!surfaceRoute) {
     return (
       <div className="flex h-screen w-screen overflow-hidden bg-sidebar">
-        <div className="h-full w-full bg-background" />
+        <div className="h-full w-full bg-background">
+          <RouteLoadingFallback />
+        </div>
       </div>
     )
   }
@@ -197,7 +203,7 @@ function TearoffAppRuntime() {
   return (
     <>
       <RouteSurfaceSync />
-      <TearoffLayoutScope>
+      <TearoffLayoutScope surfaceRoute={surfaceRoute}>
         <div className="flex h-screen w-screen overflow-hidden bg-sidebar">
           <AppLayout sessionScoped showFooter={false}>
             <SurfaceActivityProvider active>
@@ -210,12 +216,15 @@ function TearoffAppRuntime() {
   )
 }
 
-function TearoffLayoutScope({ children }: { children: React.ReactNode }) {
+function TearoffLayoutScope({ children, surfaceRoute }: {
+  children: React.ReactNode
+  surfaceRoute: SurfaceRoute
+}) {
   // The tear-off window renders a single surface; scope layout slots to that
   // surface so its aside/panel chrome resolves correctly. The slot id is
   // derived from the surface route (the tear-off window's surface store is
   // intentionally empty — it only renders the one torn-off surface).
-  const slotId = layoutSlotIdForRoute(tearoffSurfaceRoute)
+  const slotId = layoutSlotIdForRoute(surfaceRoute)
   useSyncLayoutSlotScope(slotId, slotId ? [slotId] : [])
   return children
 }
