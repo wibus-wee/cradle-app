@@ -93,7 +93,7 @@ export function WorkspaceView({
   }
   if (files.length > 0) {
     rows.push({ key: 'heading-files', kind: 'heading', meta: `${files.length} top-level`, title: 'Files' })
-    rows.push(...files.slice(0, 12).map(entry => ({ key: `file-${entry.path}`, entry, kind: 'file' as const })))
+    rows.push(...files.map(entry => ({ key: `file-${entry.path}`, entry, kind: 'file' as const })))
   }
   return (
     <Screen

@@ -22,6 +22,8 @@ text and Markdown files; previews can be handed to other apps through the
 system share sheet, while unsupported binary formats are identified explicitly.
 Directory rows open a path-scoped, refreshable child listing; deeper directories
 stack naturally and files continue into the same preview route.
+The virtualized workspace overview renders every top-level entry returned by the
+server, so root files and directories are never hidden behind a client-only cap.
 
 ## Run
 
