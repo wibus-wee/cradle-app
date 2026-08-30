@@ -196,6 +196,9 @@ describe('windowManager tear-off windows', () => {
 
     expect(opened).toBe(warmWindow)
     expect(warmWindow.shown).toBe(true)
+    // The renderer supplied x=1200, but a held native drag must anchor to the
+    // browser process's live DIP cursor (mocked at x=100) instead.
+    expect(warmWindow.bounds).toMatchObject({ x: 0, y: 60 })
     expect(warmWindow.webContents.send).toHaveBeenCalledWith(
       'window:tearoff-surface-bound',
       {
