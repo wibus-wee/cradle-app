@@ -76,3 +76,4 @@ Chronological index of independently shipped product improvements.
 37. [Edit connections with native iOS fields](./2026-08-31-37-mobile-native-connection-editor.md)
 38. [Share chat messages from Mobile](./2026-08-31-38-mobile-share-chat-messages.md)
 39. [Choose repositories in a native iOS sheet](./2026-08-31-39-mobile-native-repository-sheet.md)
+40. [Prepare Work handoffs in a native iOS form](./2026-08-31-40-mobile-native-work-handoff.md)

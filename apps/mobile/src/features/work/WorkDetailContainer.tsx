@@ -8,7 +8,7 @@ import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
-import type { WorkHandoff } from './WorkDetailView'
+import type { WorkHandoff } from './work-detail-view-contract'
 import { WorkDetailView } from './WorkDetailView'
 
 export function WorkDetailContainer({ workId }: { workId: string }) {

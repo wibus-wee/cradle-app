@@ -2,7 +2,6 @@ import { GitPullRequest } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
-import type { GetWorksByIdResponse } from '@/api-gen'
 import { Button } from '@/components/ui/button'
 import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
@@ -13,20 +12,14 @@ import { StatusPill } from '@/components/ui/status-pill'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-export interface WorkHandoff {
-  title: string
-  summary: string
-  testPlan: string
-}
+import {
+  hasCompleteWorkHandoff,
+  initialWorkHandoff,
+  workSubmissionBlocker,
+} from './work-detail-model'
+import type { WorkDetailViewProps, WorkHandoff } from './work-detail-view-contract'
 
-export interface WorkDetailViewProps {
-  detail: GetWorksByIdResponse
-  isPreparing?: boolean
-  isSubmitting?: boolean
-  onOpenPullRequest: (owner: string, repo: string, number: number) => void
-  onPrepare: (handoff: WorkHandoff) => Promise<void>
-  onSubmit: (handoff: WorkHandoff) => Promise<void>
-}
+export type { WorkDetailViewProps, WorkHandoff } from './work-detail-view-contract'
 
 export function WorkDetailView({
   detail,
@@ -37,20 +30,10 @@ export function WorkDetailView({
   onSubmit,
 }: WorkDetailViewProps) {
   const theme = useTheme()
-  const [handoff, setHandoff] = useState<WorkHandoff>({
-    title: detail.work.handoffTitle ?? detail.work.title,
-    summary: detail.work.handoffSummary ?? '',
-    testPlan: detail.work.handoffTestPlan ?? '',
-  })
+  const [handoff, setHandoff] = useState<WorkHandoff>(() => initialWorkHandoff(detail))
   const [feedback, setFeedback] = useState<{ tone: 'success' | 'error', text: string } | null>(null)
-  const canHandoff = handoff.title.trim() && handoff.summary.trim() && handoff.testPlan.trim()
-  const submissionBlocker = !detail.readiness.isolated
-    ? 'A healthy isolated checkout is required before delivery.'
-    : !detail.readiness.clean
-      ? `Commit or discard ${detail.readiness.changedFiles} changed ${detail.readiness.changedFiles === 1 ? 'file' : 'files'} before delivery.`
-      : detail.readiness.commitsAhead === 0
-        ? `Commit at least one change ahead of ${detail.readiness.baseRef ?? 'the base branch'} before delivery.`
-        : null
+  const canHandoff = hasCompleteWorkHandoff(handoff)
+  const submissionBlocker = workSubmissionBlocker(detail)
 
   const saveHandoff = async () => {
     setFeedback(null)

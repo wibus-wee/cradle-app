@@ -1,4 +1,4 @@
-import type { WorkDetailViewProps } from './WorkDetailView'
+import type { WorkDetailViewProps } from './work-detail-view-contract'
 
 export const workDetailFixture: WorkDetailViewProps = {
   detail: {
