@@ -1,15 +1,10 @@
-import type { LucideIcon } from 'lucide-react-native'
 import { AlertCircle, Inbox } from 'lucide-react-native'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-interface StateProps {
-  title: string
-  description?: string
-  icon?: LucideIcon
-}
+import type { StateProps } from './states-contract'
 
 export function EmptyState({ title, description, icon: Icon = Inbox }: StateProps) {
   const theme = useTheme()
