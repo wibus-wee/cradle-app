@@ -61,6 +61,38 @@ function checkPresentation(conclusion: string | null, status: string) {
   return { color: 'secondary' as const, label: conclusion ?? status, symbol: 'minus.circle' as const }
 }
 
+function mergePresentation(pullRequest: PullRequestDetailViewProps['detail']['pullRequest']) {
+  if (pullRequest.merged) {
+    return { color: 'purple' as const, label: 'Merged', symbol: 'arrow.triangle.merge' as const }
+  }
+  if (pullRequest.state === 'closed') {
+    return { color: 'secondary' as const, label: 'Closed', symbol: 'xmark.circle.fill' as const }
+  }
+  if (pullRequest.canMerge) {
+    return { color: 'green' as const, label: 'Ready', symbol: 'checkmark.circle.fill' as const }
+  }
+  if (pullRequest.mergeable === false) {
+    return { color: 'red' as const, label: 'Conflicts', symbol: 'exclamationmark.triangle.fill' as const }
+  }
+  if (pullRequest.isDraft) {
+    return { color: 'orange' as const, label: 'Draft', symbol: 'doc.badge.clock' as const }
+  }
+  return { color: 'orange' as const, label: 'Blocked', symbol: 'exclamationmark.circle.fill' as const }
+}
+
+function checksSummaryPresentation(state: PullRequestDetailViewProps['detail']['pullRequest']['checksState']) {
+  if (state === 'success') {
+    return { color: 'green' as const, label: 'Passed', symbol: 'checkmark.circle.fill' as const }
+  }
+  if (state === 'failure') {
+    return { color: 'red' as const, label: 'Failing', symbol: 'xmark.circle.fill' as const }
+  }
+  if (state === 'pending') {
+    return { color: 'orange' as const, label: 'Pending', symbol: 'clock.fill' as const }
+  }
+  return { color: 'secondary' as const, label: 'No checks', symbol: 'minus.circle' as const }
+}
+
 export function PullRequestDetailView({
   detail,
   isMutating = false,
@@ -71,6 +103,8 @@ export function PullRequestDetailView({
   const [showAllTimeline, setShowAllTimeline] = useState(false)
   const { pullRequest } = detail
   const status = pullRequestPresentation(pullRequest)
+  const merge = mergePresentation(pullRequest)
+  const checksSummary = checksSummaryPresentation(pullRequest.checksState)
   const visibleTimeline = showAllTimeline ? detail.timeline : detail.timeline.slice(-20)
 
   const openExternal = async (url: string, failureMessage: string) => {
@@ -130,6 +164,27 @@ export function PullRequestDetailView({
           <LabeledContent label="Commits">
             <Text modifiers={[tabularNumber]}>{pullRequest.commits.toString()}</Text>
           </LabeledContent>
+        </Section>
+
+        <Section title="Readiness">
+          <LabeledContent label="Merge">
+            <HStack spacing={6}>
+              <Image color={merge.color} size={15} systemName={merge.symbol} />
+              <Text modifiers={[foregroundStyle(merge.color)]}>{merge.label}</Text>
+            </HStack>
+          </LabeledContent>
+          <LabeledContent label="Checks">
+            <HStack spacing={6}>
+              <Image color={checksSummary.color} size={15} systemName={checksSummary.symbol} />
+              <Text modifiers={[foregroundStyle(checksSummary.color)]}>{checksSummary.label}</Text>
+            </HStack>
+          </LabeledContent>
+          {pullRequest.mergeBlockers.map(blocker => (
+            <HStack key={blocker} spacing={10}>
+              <Image color="orange" size={16} systemName="exclamationmark.circle.fill" />
+              <Text>{blocker}</Text>
+            </HStack>
+          ))}
         </Section>
 
         {pullRequest.body && (

@@ -95,3 +95,4 @@ Chronological index of independently shipped product improvements.
 56. [Share workspace files from iOS](./2026-08-31-56-mobile-share-workspace-files.md)
 57. [Surface unread Mobile conversations](./2026-08-31-57-mobile-unread-conversations.md)
 58. [Give Mobile chat controls 44-point targets](./2026-08-31-58-mobile-chat-touch-targets.md)
+59. [Explain pull request readiness on iOS](./2026-08-31-59-mobile-pull-request-readiness.md)
