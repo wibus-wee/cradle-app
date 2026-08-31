@@ -1,11 +1,14 @@
 import type { MenuAction } from '@expo/ui/community/menu'
 import { MenuView } from '@expo/ui/community/menu'
 import type { FileUIPart } from 'ai'
+import * as DocumentPicker from 'expo-document-picker'
+import { File as FileSystemFile } from 'expo-file-system'
 import * as ImagePicker from 'expo-image-picker'
-import { Plus, Send, X } from 'lucide-react-native'
+import { FileText, Plus, Send, X } from 'lucide-react-native'
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Keyboard,
   ScrollView,
@@ -26,6 +29,8 @@ import { useTheme } from '@/theme/use-theme'
 
 type Capabilities = GetChatSessionsBySessionIdCapabilitiesResponse
 type RuntimeSettings = GetChatSessionsBySessionIdRuntimeSettingsResponse
+
+const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024
 
 export interface ChatSubmitInput {
   continuationMode: 'queue' | 'steer'
@@ -73,6 +78,7 @@ function ChatComposerContent({
     = runtimeSettings?.runtimeSettings.interactionMode === 'plan' ? 'plan' : 'build'
   const composerMenuActions: MenuAction[] = [
     { id: 'photo', image: 'photo.on.rectangle', title: 'Add photo' },
+    { id: 'file', image: 'doc', title: 'Add file' },
     {
       id: 'build',
       image: 'hammer',
@@ -178,6 +184,55 @@ function ChatComposerContent({
     }
   }
 
+  const pickFile = async () => {
+    if (isPicking) {
+      return
+    }
+    setIsPicking(true)
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        base64: true,
+        copyToCacheDirectory: true,
+        multiple: false,
+        type: '*/*',
+      })
+      if (result.canceled) {
+        return
+      }
+      const [asset] = result.assets
+      if (!asset) {
+        Alert.alert('Could not add file', 'The document picker did not return a file.')
+        return
+      }
+      const selectedFile = asset.base64 === undefined ? new FileSystemFile(asset.uri) : null
+      const size = asset.size ?? selectedFile?.size ?? null
+      if (size !== null && size > MAX_DOCUMENT_BYTES) {
+        Alert.alert(
+          'File is too large',
+          'Choose a file smaller than 10 MB. Attachments are stored and sent from this device.',
+        )
+        return
+      }
+      const mediaType = asset.mimeType || selectedFile?.type || 'application/octet-stream'
+      const base64 = asset.base64 ?? await selectedFile!.base64()
+      updateFiles([
+        ...filesRef.current,
+        {
+          filename: asset.name,
+          mediaType,
+          type: 'file',
+          url: `data:${mediaType};base64,${base64}`,
+        },
+      ])
+    }
+    catch {
+      Alert.alert('Could not add file', 'The selected file could not be read on this device.')
+    }
+    finally {
+      setIsPicking(false)
+    }
+  }
+
   const insertSuggestion = (value: string, kind: 'mention' | 'slash') => {
     const pattern = kind === 'slash' ? /\/([\w-]*)$/ : /@([\w-]*)$/
     updateText(textRef.current.replace(pattern, `${kind === 'slash' ? '/' : '@'}${value} `))
@@ -263,11 +318,31 @@ function ChatComposerContent({
           showsHorizontalScrollIndicator={false}
         >
           {files.map(file => (
-            <View key={file.url} style={[styles.attachment, { backgroundColor: theme.surface }]}>
-              <Image source={{ uri: file.url }} style={styles.attachmentImage} />
+            <View
+              key={file.url}
+              style={[
+                styles.attachment,
+                !file.mediaType.startsWith('image/') && styles.documentAttachment,
+                { backgroundColor: theme.surface },
+              ]}
+            >
+              {file.mediaType.startsWith('image/')
+                ? <Image source={{ uri: file.url }} style={styles.attachmentImage} />
+                : (
+                    <View style={styles.documentContent}>
+                      <FileText color={theme.tertiaryForeground} size={22} />
+                      <Text
+                        numberOfLines={2}
+                        style={[styles.documentName, { color: theme.foreground }]}
+                      >
+                        {file.filename ?? 'Attachment'}
+                      </Text>
+                    </View>
+                  )}
               <PressableScale
                 accessibilityLabel={`Remove ${file.filename ?? 'photo'}`}
                 accessibilityRole="button"
+                hitSlop={6}
                 onPress={() =>
                   updateFiles(filesRef.current.filter(item => item.url !== file.url))}
                 style={[styles.removeAttachment, { backgroundColor: theme.overlay }]}
@@ -301,6 +376,9 @@ function ChatComposerContent({
           onPressAction={({ nativeEvent }) => {
             if (nativeEvent.event === 'photo') {
               void pickPhoto()
+            }
+            else if (nativeEvent.event === 'file') {
+              void pickFile()
             }
             else if (nativeEvent.event === 'build') {
               onModeChange('build')
@@ -392,10 +470,10 @@ const styles = StyleSheet.create({
   attachment: {
     borderRadius: radius.md,
     height: 64,
-    overflow: 'hidden',
     width: 64,
   },
   attachmentImage: {
+    borderRadius: radius.md,
     height: '100%',
     width: '100%',
   },
@@ -434,6 +512,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  documentAttachment: {
+    width: 176,
+  },
+  documentContent: {
+    alignItems: 'center',
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingRight: 38,
+  },
+  documentName: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 16,
+  },
   frame: {
     gap: spacing.sm,
   },
@@ -448,13 +542,13 @@ const styles = StyleSheet.create({
   },
   removeAttachment: {
     alignItems: 'center',
-    borderRadius: 11,
-    height: 22,
+    borderRadius: 16,
+    height: 32,
     justifyContent: 'center',
     position: 'absolute',
-    right: 3,
-    top: 3,
-    width: 22,
+    right: 2,
+    top: 2,
+    width: 32,
   },
   sendButton: {
     alignItems: 'center',

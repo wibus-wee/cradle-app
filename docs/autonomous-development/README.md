@@ -87,3 +87,4 @@ Chronological index of independently shipped product improvements.
 48. [Browse workspaces in a native iOS list](./2026-08-31-48-mobile-native-workspace-list.md)
 49. [Operate Work from a native iOS list](./2026-08-31-49-mobile-native-work-list.md)
 50. [Understand a workspace from a native iOS dashboard](./2026-08-31-50-mobile-native-workspace-dashboard.md)
+51. [Attach files from the Mobile chat composer](./2026-08-31-51-mobile-chat-file-attachments.md)
