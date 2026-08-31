@@ -190,7 +190,9 @@ function main(): void {
     run('xcrun', ['simctl', 'bootstatus', simulatorUdid, '-b'])
 
     if (!providedAppPath) {
-      run('pod', ['install', '--deployment'], {
+      // Expo's dynamic podspec checksum changes with precompiled module availability.
+      // A clean CI runner must install the locked versions without deployment checksum enforcement.
+      run('pod', ['install'], {
         cwd: join(ROOT, 'apps', 'mobile', 'ios'),
         env: commandEnv,
       })
