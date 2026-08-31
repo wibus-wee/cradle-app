@@ -2,7 +2,6 @@ import { ChevronRight, Folder, FolderX, Search } from 'lucide-react-native'
 import { useRef } from 'react'
 import { FlatList, Keyboard, StyleSheet, Text, View } from 'react-native'
 
-import type { GetSessionsResponse, GetWorkspacesResponse, PostWorksData } from '@/api-gen'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
 import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
@@ -13,26 +12,10 @@ import { WorkComposer } from '@/features/work/WorkComposer'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-type Workspace = GetWorkspacesResponse[number]
-type Session = GetSessionsResponse['items'][number]
+import type { ProjectsViewProps } from './projects-view-contract'
+import { workspaceMatchesSearch } from './projects-view-model'
 
-export interface WorkspaceSummary {
-  workspace: Workspace
-  sessions: Session[]
-}
-
-export interface ProjectsViewProps {
-  projects: WorkspaceSummary[]
-  isCreating?: boolean
-  isRefreshing?: boolean
-  onCreate: (input: PostWorksData['body']) => void
-  onOpenUsage: () => void
-  onOpenProject: (workspaceId: string) => void
-  onRefresh?: () => void
-  onSearchQueryChange: (query: string) => void
-  searchQuery: string
-  showsInlineSearch?: boolean
-}
+export type { ProjectsViewProps, WorkspaceSummary } from './projects-view-contract'
 
 export function ProjectsView({
   projects,
@@ -50,11 +33,7 @@ export function ProjectsView({
   const composerRef = useRef<WorkComposerHandle>(null)
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
   const filteredProjects = normalizedSearch
-    ? projects.filter(({ workspace }) => [
-        workspace.name,
-        workspace.identifier,
-        workspace.gitIdentity.branch,
-      ].some(value => value?.toLocaleLowerCase().includes(normalizedSearch)))
+    ? projects.filter(project => workspaceMatchesSearch(project, normalizedSearch))
     : projects
   const workspaces = projects
     .map(project => project.workspace)

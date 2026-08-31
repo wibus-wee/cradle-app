@@ -1,0 +1,12 @@
+# Browse workspaces in a native iOS list
+
+- **Date:** 2026-08-31
+- **Problem:** The Workspaces tab already used native navigation and search, but its rows, refresh behavior, empty state, availability iconography, and conversation counts remained a custom React Native list on iOS.
+- **Motivation:** Workspaces are the Mobile app's main entry point. Native list rows improve touch feedback, Dynamic Type, disclosure behavior, status clarity, and refresh while exposing the existing pinned state that previously affected sorting without any visible explanation.
+- **Product behavior:** iOS now renders Workspaces in an inset-grouped SwiftUI List with 44-point rows, folder SF Symbols, branch or unavailable context, conversation counts, disclosure indicators, and a pin for pinned workspaces. Native header search still matches name, identifier, and branch; empty search and empty workspace states use ContentUnavailableView, and pull-to-refresh waits for the real refetch. The existing Work Composer stays in the bottom surface and collapses before workspace navigation. Android and Web retain the existing list.
+- **Implementation:** `ProjectsView.ios.tsx` combines a native fixture-driven list with the existing feature-owned Work Composer. The shared View contract and search helper keep both platform Views aligned. `Screen` gained an opt-in `fullBleed` content mode so system lists own their inset without changing any existing caller; composer padding and keyboard movement remain unchanged.
+- **Systems affected:** Mobile Workspaces platform Views, shared Projects View contract/model, Projects Container refresh callback, projects fixtures, and the opt-in Screen layout primitive.
+- **Validation:** Mobile TypeScript and ESLint passed; Expo production exports passed for iOS, Android, and Web.
+- **Tradeoffs:** The Work Composer remains React Native because it is a distinct creation workflow with its own gesture and repository sheet lifecycle. The native list and composer therefore coexist at an intentional feature seam rather than forcing a speculative rewrite.
+- **Follow-up ideas:** Dogfood long workspace names and the list/composer boundary on compact devices; evaluate a native composer redesign separately based on creation workflow friction.
+- **Out of scope:** Work creation redesign, workspace pin mutation, sorting controls, server discovery, workspace detail changes, and Android list migration.

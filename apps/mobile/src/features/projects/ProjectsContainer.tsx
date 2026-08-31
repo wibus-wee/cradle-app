@@ -76,7 +76,7 @@ export function ProjectsContainer({
       onCreate={input => create.mutate(input)}
       onOpenUsage={() => router.push('/usage')}
       onOpenProject={workspaceId => router.push(`/workspace/${workspaceId}`)}
-      onRefresh={() => void refresh()}
+      onRefresh={refresh}
       onSearchQueryChange={onSearchQueryChange}
       projects={query.data}
       searchQuery={searchQuery}

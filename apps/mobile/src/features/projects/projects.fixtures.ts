@@ -1,4 +1,4 @@
-import type { ProjectsViewProps } from './ProjectsView'
+import type { ProjectsViewProps } from './projects-view-contract'
 
 export const projectsFixture: ProjectsViewProps = {
   projects: [

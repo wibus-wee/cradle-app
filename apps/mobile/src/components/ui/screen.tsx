@@ -23,6 +23,7 @@ interface ScreenProps extends PropsWithChildren {
   action?: ReactNode
   leading?: ReactNode
   footer?: ReactNode
+  fullBleed?: boolean
   nativeHeader?: boolean
   refreshing?: boolean
   onRefresh?: () => void
@@ -38,6 +39,7 @@ export function Screen({
   action,
   leading,
   footer,
+  fullBleed = false,
   children,
   nativeHeader = false,
   refreshing = false,
@@ -100,7 +102,7 @@ export function Screen({
       {scroll
         ? (
             <ScrollView
-              contentContainerStyle={styles.content}
+              contentContainerStyle={[styles.content, fullBleed && styles.fullBleedContent]}
               contentInsetAdjustmentBehavior="automatic"
               keyboardDismissMode="none"
               keyboardShouldPersistTaps="handled"
@@ -112,7 +114,16 @@ export function Screen({
               {dismissibleContent}
             </ScrollView>
           )
-        : <View style={[styles.content, styles.staticContent]}>{dismissibleContent}</View>}
+        : (
+            <View style={[
+              styles.content,
+              styles.staticContent,
+              fullBleed && styles.fullBleedContent,
+            ]}
+            >
+              {dismissibleContent}
+            </View>
+          )}
       {footer && (
         <Animated.View
           style={[
@@ -153,6 +164,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
     zIndex: 2,
+  },
+  fullBleedContent: {
+    paddingHorizontal: 0,
   },
   safeArea: {
     flex: 1,
