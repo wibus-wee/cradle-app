@@ -1,56 +1,46 @@
-import { ChevronRight, Folder, FolderX } from 'lucide-react-native'
+import { ChevronRight, Folder, FolderX, Search } from 'lucide-react-native'
 import { useRef } from 'react'
 import { FlatList, Keyboard, StyleSheet, Text, View } from 'react-native'
 
-import type { GetSessionsResponse, GetWorkspacesResponse, PostWorksData } from '@/api-gen'
-import type { AppSection } from '@/components/common/app-menu-button'
-import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { EmptyState } from '@/components/ui/states'
 import type { WorkComposerHandle } from '@/features/work/WorkComposer'
 import { WorkComposer } from '@/features/work/WorkComposer'
+import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-type Workspace = GetWorkspacesResponse[number]
-type Session = GetSessionsResponse['items'][number]
+import type { ProjectsViewProps } from './projects-view-contract'
+import { workspaceMatchesSearch } from './projects-view-model'
 
-export interface WorkspaceSummary {
-  workspace: Workspace
-  sessions: Session[]
-}
-
-export interface ProjectsViewProps {
-  projects: WorkspaceSummary[]
-  isCreating?: boolean
-  isRefreshing?: boolean
-  onCreate: (input: PostWorksData['body']) => void
-  onNavigate: (section: AppSection) => void
-  onOpenUsage: () => void
-  onOpenProject: (workspaceId: string) => void
-  onRefresh?: () => void
-}
+export type { ProjectsViewProps, WorkspaceSummary } from './projects-view-contract'
 
 export function ProjectsView({
   projects,
   isCreating = false,
   isRefreshing = false,
   onCreate,
-  onNavigate,
   onOpenUsage,
   onOpenProject,
   onRefresh,
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch = true,
 }: ProjectsViewProps) {
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
+  const filteredProjects = normalizedSearch
+    ? projects.filter(project => workspaceMatchesSearch(project, normalizedSearch))
+    : projects
   const workspaces = projects
     .map(project => project.workspace)
     .filter(workspace => workspace.availability === 'available')
   return (
     <Screen
       avoidKeyboard={workspaces.length > 0}
-      action={<AppMenuButton current="projects" onSelect={onNavigate} />}
       footer={workspaces.length > 0
         ? (
             <WorkComposer
@@ -63,6 +53,7 @@ export function ProjectsView({
           )
         : undefined}
       leading={<CradleIconButton onPress={onOpenUsage} />}
+      nativeHeader
       onPressBackground={() => {
         composerRef.current?.collapse()
         Keyboard.dismiss()
@@ -70,15 +61,32 @@ export function ProjectsView({
       scroll={false}
       title="Workspaces"
     >
+      {showsInlineSearch && (
+        <View style={styles.search}>
+          <InputGroup
+            addon={<Search color={theme.mutedForeground} size={17} />}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            onChangeText={onSearchQueryChange}
+            placeholder="Search workspaces"
+            returnKeyType="search"
+            value={searchQuery}
+          />
+        </View>
+      )}
       <FlatList
-        contentContainerStyle={projects.length === 0 ? styles.emptyList : styles.list}
-        data={projects}
+        contentContainerStyle={filteredProjects.length === 0 ? styles.emptyList : styles.list}
+        contentInsetAdjustmentBehavior="automatic"
+        data={filteredProjects}
         keyExtractor={({ workspace }) => workspace.id}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={(
           <EmptyState
-            description="Add a Workspace from Cradle Desktop, then refresh this page."
-            title="No projects yet"
+            description={normalizedSearch
+              ? 'Try a different workspace name, identifier, or branch.'
+              : 'Add a Workspace from Cradle Desktop, then refresh this page.'}
+            title={normalizedSearch ? 'No matching workspaces' : 'No projects yet'}
           />
         )}
         onRefresh={onRefresh}
@@ -94,6 +102,9 @@ export function ProjectsView({
             media={workspace.availability === 'missing'
               ? <FolderX color={theme.destructive} size={22} strokeWidth={1.7} />
               : <Folder color={theme.mutedForeground} size={22} strokeWidth={1.7} />}
+            description={workspace.availability === 'missing'
+              ? 'Unavailable on server'
+              : workspace.gitIdentity.branch ?? 'No Git branch'}
             onPress={() => onOpenProject(workspace.id)}
             title={workspace.name}
           />
@@ -120,6 +131,9 @@ const styles = StyleSheet.create({
   },
   list: {
     marginTop: 8,
+  },
+  search: {
+    marginBottom: spacing.sm,
   },
   virtualList: {
     flex: 1,

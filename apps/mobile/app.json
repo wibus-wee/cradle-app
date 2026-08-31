@@ -11,6 +11,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "app.cradle.mobile",
       "infoPlist": {
+        "NSCameraUsageDescription": "Cradle needs camera access so you can take a photo and attach it to a chat.",
         "NSLocalNetworkUsageDescription": "Cradle connects to your Cradle Server on the local network.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
@@ -41,6 +42,8 @@
       [
         "expo-image-picker",
         {
+          "cameraPermission": "Cradle needs camera access so you can take a photo and attach it to a chat.",
+          "microphonePermission": false,
           "photosPermission": "Cradle needs access to your photos so you can attach them to a chat."
         }
       ],
@@ -51,7 +54,7 @@
             "usesCleartextTraffic": true
           },
           "ios": {
-            "deploymentTarget": "16.4"
+            "deploymentTarget": "26.0"
           }
         }
       ],

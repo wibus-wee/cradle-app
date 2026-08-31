@@ -9,11 +9,20 @@ import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
-import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 
 import { ProjectsView } from './ProjectsView'
 
-export function ProjectsContainer() {
+interface ProjectsContainerProps {
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch: boolean
+}
+
+export function ProjectsContainer({
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch,
+}: ProjectsContainerProps) {
   const { connection } = useConnection()
   const create = useCreateWork()
   const isRouteActive = useRouteIsActive()
@@ -38,8 +47,6 @@ export function ProjectsContainer() {
         )
     },
   })
-  useSessionSummaryEvents(connection, isRouteActive, () => { void query.refetch() })
-
   const refresh = async () => {
     setIsRefreshing(true)
     try {
@@ -57,18 +64,28 @@ export function ProjectsContainer() {
     return <LoadingState />
   }
   if (query.error) {
-    return <ErrorState title="Could not load projects" description={errorMessage(query.error)} />
+    return (
+      <ErrorState
+        title="Could not load projects"
+        description={errorMessage(query.error)}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
+      />
+    )
   }
   return (
     <ProjectsView
       isCreating={create.isPending}
       isRefreshing={isRefreshing}
       onCreate={input => create.mutate(input)}
-      onNavigate={section => router.replace(`/(tabs)/${section}`)}
+      onOpenFiles={workspaceId => router.push(`/workspace/${workspaceId}/files`)}
       onOpenUsage={() => router.push('/usage')}
       onOpenProject={workspaceId => router.push(`/workspace/${workspaceId}`)}
-      onRefresh={() => void refresh()}
+      onRefresh={refresh}
+      onSearchQueryChange={onSearchQueryChange}
       projects={query.data}
+      searchQuery={searchQuery}
+      showsInlineSearch={showsInlineSearch}
     />
   )
 }

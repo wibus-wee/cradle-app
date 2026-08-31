@@ -1,7 +1,15 @@
 import * as Haptics from 'expo-haptics'
 import type { PropsWithChildren } from 'react'
-import { useRef, useState } from 'react'
-import { Animated, Pressable, type PressableProps, type StyleProp, type ViewStyle } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Animated,
+  Pressable,
+  type PressableProps,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native'
+
+import { useReduceMotion } from '@/lib/motion-preference-context'
 
 interface PressableScaleProps extends PressableProps {
   style?: StyleProp<ViewStyle>
@@ -19,7 +27,21 @@ export function PressableScale({
 }: PropsWithChildren<PressableScaleProps>) {
   const scale = useRef(new Animated.Value(1)).current
   const [pressed, setPressed] = useState(false)
+  const reduceMotion = useReduceMotion()
+
+  useEffect(() => {
+    if (reduceMotion) {
+      scale.stopAnimation()
+      scale.setValue(1)
+    }
+  }, [reduceMotion, scale])
+
   const springTo = (value: number) => {
+    if (reduceMotion) {
+      scale.stopAnimation()
+      scale.setValue(1)
+      return
+    }
     Animated.spring(scale, {
       damping: 40,
       mass: 1,

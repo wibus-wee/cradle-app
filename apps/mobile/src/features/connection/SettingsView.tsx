@@ -1,40 +1,40 @@
 import {
   ChartNoAxesColumn,
   ChevronRight,
+  Copy,
   Link2,
   LockKeyhole,
   LogOut,
+  RefreshCw,
+  Share2,
+  Wifi,
 } from 'lucide-react-native'
-import { Alert, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
 
-import type { AppSection } from '@/components/common/app-menu-button'
-import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { StatusPill } from '@/components/ui/status-pill'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-export interface SettingsViewProps {
-  appVersion: string
-  hasServerToken: boolean
-  onDisconnect: () => void
-  onEditServer: () => void
-  onEditToken: () => void
-  onNavigate: (section: AppSection) => void
-  onOpenUsage: () => void
-  serverUrl: string
-}
+import type { SettingsViewProps } from './settings-view-contract'
+
+export type { SettingsViewProps } from './settings-view-contract'
 
 export function SettingsView({
   appVersion,
+  connectionStatus,
   hasServerToken,
+  onCheckConnection,
+  onCopyServer,
   onDisconnect,
   onEditServer,
   onEditToken,
-  onNavigate,
   onOpenUsage,
+  onShareServer,
   serverUrl,
 }: SettingsViewProps) {
   const theme = useTheme()
@@ -44,12 +44,29 @@ export function SettingsView({
       { onPress: onDisconnect, style: 'destructive', text: 'Disconnect' },
     ])
   }
+  const copyServer = async () => {
+    try {
+      await onCopyServer()
+      Alert.alert('Server address copied')
+    }
+    catch {
+      Alert.alert('Could not copy server address')
+    }
+  }
+  const shareServer = async () => {
+    try {
+      await onShareServer()
+    }
+    catch {
+      Alert.alert('Could not share server address')
+    }
+  }
   const disclosure = <ChevronRight color={theme.dimForeground} size={18} />
 
   return (
     <Screen
-      action={<AppMenuButton current="settings" onSelect={onNavigate} />}
       leading={<CradleIconButton onPress={onOpenUsage} />}
+      nativeHeader
       title="Settings"
     >
       <View style={styles.page}>
@@ -66,7 +83,53 @@ export function SettingsView({
         <View style={styles.section}>
           <SectionHeading title="Connection" />
           <Item
-            actions={disclosure}
+            actions={(
+              <View style={styles.connectionActions}>
+                <StatusPill
+                  label={connectionStatus}
+                  tone={connectionStatus === 'connected'
+                    ? 'success'
+                    : connectionStatus === 'unavailable'
+                      ? 'danger'
+                      : 'neutral'}
+                />
+                {connectionStatus === 'checking'
+                  ? <ActivityIndicator color={theme.mutedForeground} size="small" />
+                  : (
+                      <IconButton
+                        accessibilityLabel="Check server connection"
+                        icon={RefreshCw}
+                        onPress={onCheckConnection}
+                      />
+                    )}
+              </View>
+            )}
+            description={connectionStatus === 'connected'
+              ? 'Server is responding'
+              : connectionStatus === 'unavailable'
+                ? 'Server could not be reached'
+                : 'Contacting server'}
+            media={<Wifi color={connectionStatus === 'connected' ? theme.success : theme.tertiaryForeground} size={19} />}
+            title="Connection status"
+          />
+          <Item
+            actions={(
+              <View style={styles.serverActions}>
+                <IconButton
+                  accessibilityLabel="Copy server address"
+                  icon={Copy}
+                  onPress={() => void copyServer()}
+                  stopPropagation
+                />
+                <IconButton
+                  accessibilityLabel="Share server address"
+                  icon={Share2}
+                  onPress={() => void shareServer()}
+                  stopPropagation
+                />
+                {disclosure}
+              </View>
+            )}
             description={serverUrl}
             media={<Link2 color={theme.tertiaryForeground} size={19} />}
             onPress={onEditServer}
@@ -99,11 +162,21 @@ export function SettingsView({
 }
 
 const styles = StyleSheet.create({
+  connectionActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   page: {
     flex: 1,
   },
   section: {
     marginBottom: spacing.lg,
+  },
+  serverActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   version: {
     fontFamily: 'GeistMono_400Regular',

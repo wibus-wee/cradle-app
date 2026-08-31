@@ -1,4 +1,4 @@
-import type { OnboardingViewProps } from './OnboardingView'
+import type { OnboardingViewProps } from './onboarding-view-contract'
 
 export const onboardingFixture: OnboardingViewProps = {
   defaultUrl: 'http://192.168.1.20:21423',

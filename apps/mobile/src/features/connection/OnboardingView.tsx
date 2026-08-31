@@ -14,12 +14,9 @@ import { NativeAction } from '@/components/ui/native-action'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-export interface OnboardingViewProps {
-  defaultUrl?: string
-  error?: string | null
-  isConnecting?: boolean
-  onConnect: (url: string, token: string) => void
-}
+import type { OnboardingViewProps } from './onboarding-view-contract'
+
+export type { OnboardingViewProps } from './onboarding-view-contract'
 
 export function OnboardingView({
   defaultUrl = '',

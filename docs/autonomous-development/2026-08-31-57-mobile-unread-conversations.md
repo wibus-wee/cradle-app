@@ -1,0 +1,12 @@
+# Surface unread Mobile conversations
+
+- **Date:** 2026-08-31
+- **Problem:** The server calculated durable unread state for sessions, but Mobile neither surfaced it nor acknowledged a conversation when opened. Users had to inspect workspace conversations individually to discover new assistant responses.
+- **Motivation:** Unread state is most useful before navigation. Exposing existing information at the native tab and row levels makes asynchronous agent work easier to monitor without adding notifications or a new inbox.
+- **Product behavior:** The native Workspaces tab now carries a system badge with the number of unread active workspace conversations. Workspace conversation rows identify unread items with a blue marker on iOS and an info status on other Mobile platforms. Opening a conversation marks the current transcript read; if a visible streaming response finishes and advances the transcript revision, it is acknowledged again so work the user watched does not reappear as unread.
+- **Implementation:** The native tabs layout owns a bounded active-session query and renders `NativeTabs.Trigger.Badge`. A single app-active session summary event subscription now invalidates Projects, Workspace, and Work queries instead of each focused feature opening a duplicate stream. The Web tabs layout owns the equivalent invalidation subscription without a native badge. Chat uses the existing session read endpoint and synchronizes the returned session across chat, tab, workspace, and project caches.
+- **Systems affected:** Mobile native tab navigation, tab-level session synchronization, Chat Container, workspace conversation Views and fixture, and autonomous development journal.
+- **Validation:** Mobile ESLint and TypeScript passed, and Expo production exports completed for iOS, Android, and Web.
+- **Tradeoffs:** The badge counts the API's maximum page of 200 active sessions and excludes sessions without a workspace because the Workspaces tab cannot lead users to them. Read acknowledgement is intentionally best-effort; a later route activation retries it if a transient request fails.
+- **Follow-up ideas:** Add a global conversation inbox if non-workspace sessions become a common Mobile workflow, and evaluate push notifications separately from in-app unread state.
+- **Out of scope:** Push notifications, background badges on the app icon, manual Mark Unread, archived sessions, a new global inbox, and server/API changes.

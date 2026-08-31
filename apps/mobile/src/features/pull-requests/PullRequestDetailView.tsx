@@ -1,49 +1,69 @@
-import { Check, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronUp, ExternalLink, GitCommit, MessageSquare, X } from 'lucide-react-native'
 import { useState } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
 
-import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { Button } from '@/components/ui/button'
-import { InputGroup } from '@/components/ui/input-group'
+import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
-import { NativeAction } from '@/components/ui/native-action'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { StatusPill } from '@/components/ui/status-pill'
-import { spacing } from '@/theme/tokens'
+import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-type Detail = GetPullRequestsByOwnerByRepoByNumberDetailResponse
+import type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
+import { PullRequestReviewComposer } from './PullRequestReviewComposer'
 
-export interface PullRequestDetailViewProps {
-  detail: Detail
-  isMutating?: boolean
-  onComment: (body: string) => void
-  onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => void
-}
+export type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
 
 export function PullRequestDetailView({
   detail,
   isMutating = false,
+  nativeHeader = false,
   onComment,
+  onOpenExternal,
   onReview,
 }: PullRequestDetailViewProps) {
   const theme = useTheme()
-  const [comment, setComment] = useState('')
+  const [showAllTimeline, setShowAllTimeline] = useState(false)
   const { pullRequest } = detail
+  const visibleTimeline = showAllTimeline ? detail.timeline : detail.timeline.slice(-20)
+  const status = (
+    <StatusPill
+      label={pullRequest.isDraft ? 'draft' : pullRequest.state}
+      tone={pullRequest.state === 'open' ? 'success' : 'neutral'}
+    />
+  )
 
-  const submitComment = () => {
-    const body = comment.trim()
-    if (!body) { return }
-    onComment(body)
-    setComment('')
+  const openExternal = async (url: string, failureMessage: string) => {
+    try {
+      await onOpenExternal(url)
+    }
+    catch {
+      Alert.alert(failureMessage)
+    }
   }
 
   return (
     <Screen
-      action={<StatusPill label={pullRequest.isDraft ? 'draft' : pullRequest.state} tone={pullRequest.state === 'open' ? 'success' : 'neutral'} />}
+      action={nativeHeader
+        ? status
+        : (
+            <View style={styles.headerActions}>
+              {status}
+              <IconButton
+                accessibilityLabel="Open pull request on GitHub"
+                icon={ExternalLink}
+                onPress={() => void openExternal(
+                  pullRequest.url,
+                  'Could not open pull request on GitHub',
+                )}
+              />
+            </View>
+          )}
       insetTop={false}
+      nativeHeader={nativeHeader}
       subtitle={`${pullRequest.owner}/${pullRequest.repo} #${pullRequest.number}`}
       title={pullRequest.title}
     >
@@ -76,6 +96,29 @@ export function PullRequestDetailView({
         </View>
       )}
 
+      {pullRequest.labels.length > 0 && (
+        <View style={styles.section}>
+          <SectionHeading meta={`${pullRequest.labels.length}`} title="Labels" />
+          <View style={styles.labels}>
+            {pullRequest.labels.map(label => (
+              <View
+                key={label.name}
+                style={[styles.label, { borderColor: theme.input }]}
+              >
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[styles.labelDot, { backgroundColor: `#${label.color}` }]}
+                />
+                <Text style={[styles.labelText, { color: theme.foreground }]}>
+                  {label.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
       <View style={styles.section}>
         <SectionHeading meta={`${pullRequest.checks.length}`} title="Checks" />
         {pullRequest.checks.length === 0
@@ -83,9 +126,12 @@ export function PullRequestDetailView({
           : pullRequest.checks.map(check => (
               <Item
                 actions={(
-                  <Text style={[styles.checkStatus, { color: theme.mutedForeground }]}>
-                    {check.conclusion ?? check.status}
-                  </Text>
+                  <View style={styles.checkActions}>
+                    <Text style={[styles.checkStatus, { color: theme.mutedForeground }]}>
+                      {check.conclusion ?? check.status}
+                    </Text>
+                    {check.url && <ExternalLink color={theme.dimForeground} size={15} />}
+                  </View>
                 )}
                 key={check.id}
                 media={check.conclusion === 'success'
@@ -95,6 +141,9 @@ export function PullRequestDetailView({
                     : <GitCommit color={theme.warning} size={17} />}
                 size="sm"
                 title={check.name}
+                onPress={check.url
+                  ? () => void openExternal(check.url!, 'Could not open check details')
+                  : undefined}
                 variant="muted"
               />
             ))}
@@ -105,12 +154,14 @@ export function PullRequestDetailView({
         {detail.files.map(file => (
           <Item
             actions={(
-              <>
+              <View style={styles.fileActions}>
                 <Text style={[styles.fileStats, { color: theme.success }]}>{`+${file.additions}`}</Text>
                 <Text style={[styles.fileStats, { color: theme.destructive }]}>{`-${file.deletions}`}</Text>
-              </>
+                <ExternalLink color={theme.dimForeground} size={15} />
+              </View>
             )}
             key={file.sha + file.filename}
+            onPress={() => void openExternal(file.blobUrl, 'Could not open changed file')}
             size="sm"
             title={file.filename}
           />
@@ -119,53 +170,49 @@ export function PullRequestDetailView({
 
       <View style={styles.section}>
         <SectionHeading meta={`${detail.timeline.length} events`} title="Conversation" />
-        {detail.timeline.slice(-20).map(item => (
-          <View key={item.id} style={[styles.timeline, { borderBottomColor: theme.border }]}>
+        {detail.timeline.length > 20 && (
+          <Button
+            icon={showAllTimeline ? ChevronDown : ChevronUp}
+            label={showAllTimeline
+              ? 'Show latest 20'
+              : `Show ${detail.timeline.length - 20} earlier events`}
+            onPress={() => setShowAllTimeline(current => !current)}
+            style={styles.timelineToggle}
+            variant="secondary"
+          />
+        )}
+        {visibleTimeline.map(item => (
+          <Pressable
+            accessibilityRole={item.url ? 'link' : undefined}
+            disabled={!item.url}
+            key={item.id}
+            onPress={item.url
+              ? () => void openExternal(item.url!, 'Could not open conversation event')
+              : undefined}
+            style={({ pressed }) => [
+              styles.timeline,
+              { borderBottomColor: theme.border },
+              pressed && styles.timelinePressed,
+            ]}
+          >
             <View style={styles.timelineHeader}>
               <MessageSquare color={theme.mutedForeground} size={16} />
               <Text style={[styles.author, { color: theme.foreground }]}>
                 {item.author?.login ?? 'Unknown'}
               </Text>
               {item.state && <StatusPill label={item.state.toLowerCase()} />}
+              {item.url && <ExternalLink color={theme.dimForeground} size={15} />}
             </View>
             {item.body && <Text style={[styles.timelineBody, { color: theme.foreground }]}>{item.body}</Text>}
-          </View>
+          </Pressable>
         ))}
       </View>
 
-      <View style={styles.comment}>
-        <InputGroup
-          multiline
-          onChangeText={setComment}
-          placeholder="Add a comment or review note..."
-          value={comment}
-        />
-        <Button
-          disabled={!comment.trim()}
-          icon={Send}
-          label="Comment"
-          loading={isMutating}
-          onPress={submitComment}
-          variant="secondary"
-        />
-        <View style={styles.reviewActions}>
-          <NativeAction
-            disabled={!comment.trim()}
-            label="Request changes"
-            loading={isMutating}
-            onPress={() => onReview('REQUEST_CHANGES', comment.trim())}
-            style={styles.reviewButton}
-            role="destructive"
-            variant="outlined"
-          />
-          <NativeAction
-            label="Approve"
-            loading={isMutating}
-            onPress={() => onReview('APPROVE', comment.trim())}
-            style={styles.reviewButton}
-          />
-        </View>
-      </View>
+      <PullRequestReviewComposer
+        isMutating={isMutating}
+        onComment={onComment}
+        onReview={onReview}
+      />
     </Screen>
   )
 }
@@ -185,9 +232,10 @@ const styles = StyleSheet.create({
 
     fontSize: 12,
   },
-  comment: {
-    gap: spacing.md,
-    marginTop: spacing.xl,
+  checkActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   emptyText: {
 
@@ -198,11 +246,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontVariant: ['tabular-nums'],
   },
-  reviewActions: {
+  fileActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
     gap: spacing.sm,
   },
-  reviewButton: {
-    flex: 1,
+  headerActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  label: {
+    alignItems: 'center',
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  labelDot: {
+    borderRadius: 4,
+    height: 8,
+    width: 8,
+  },
+  labels: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  labelText: {
+    fontSize: 12,
+    lineHeight: 16,
   },
   section: {
     marginTop: spacing.xl,
@@ -240,5 +316,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  timelinePressed: {
+    opacity: 0.65,
+  },
+  timelineToggle: {
+    marginTop: spacing.sm,
   },
 })
