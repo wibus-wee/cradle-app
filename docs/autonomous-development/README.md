@@ -104,3 +104,4 @@ Chronological index of independently shipped product improvements.
 65. [Share pull requests from a native iOS menu](./2026-08-31-65-mobile-native-pull-request-menu.md)
 66. [Make the Chat composer interactive Liquid Glass](./2026-08-31-66-mobile-interactive-liquid-glass-composer.md)
 67. [Make the Work composer interactive Liquid Glass](./2026-08-31-67-mobile-interactive-work-glass.md)
+68. [Share conversation exports from native iOS actions](./2026-08-31-68-mobile-native-conversation-export.md)

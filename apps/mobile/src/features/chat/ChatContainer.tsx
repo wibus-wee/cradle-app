@@ -2,6 +2,7 @@ import type { InfiniteData } from '@tanstack/react-query'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UIMessage } from 'ai'
 import * as Clipboard from 'expo-clipboard'
+import { Directory, File, Paths } from 'expo-file-system'
 import { Stack } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Platform, Share } from 'react-native'
@@ -12,6 +13,7 @@ import type {
   GetChatSessionsBySessionIdMessagesByMessageIdResponse,
   GetChatSessionsBySessionIdRuntimeSettingsResponse,
   GetChatSessionsBySessionIdRuntimeStatusResponse,
+  GetSessionsByIdExportMarkdownResponse,
   GetSessionsByIdResponse,
 } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -38,6 +40,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   const [pendingUser, setPendingUser] = useState<{ id: string | null, text: string } | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
   const [detailMessageId, setDetailMessageId] = useState<string | null>(null)
+  const [conversationExport, setConversationExport] = useState<'markdown' | 'zip' | null>(null)
   const [cachedHistory, setCachedHistory] = useState<InfiniteData<
     GetChatSessionsBySessionIdMessagePreviewsResponse,
     string | null
@@ -376,6 +379,49 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       || sessionStatus === 'streaming'
       || sessionStatus === 'waitingForUserInput'
       || sessionStatus === 'waitingForToolApproval'
+  const shareConversationExport = async (format: 'markdown' | 'zip') => {
+    if (!connection || conversationExport || runtimeIsActive) { return }
+    setConversationExport(format)
+    try {
+      const shareDirectory = new Directory(Paths.cache, 'cradle-shares')
+      shareDirectory.create({ idempotent: true, intermediates: true })
+      const destination = new File(shareDirectory, `cradle-conversation.${format === 'markdown' ? 'md' : 'zip'}`)
+
+      if (format === 'markdown') {
+        const exportResponse = await cradleRequest<GetSessionsByIdExportMarkdownResponse>(
+          connection,
+          `/sessions/${encodeURIComponent(sessionId)}/export/markdown`,
+        )
+        destination.write(exportResponse.markdown)
+      }
+      else {
+        await File.downloadFileAsync(
+          `${connection.url}/sessions/${encodeURIComponent(sessionId)}/export/zip`,
+          destination,
+          {
+            headers: connection.token
+              ? { authorization: `Bearer ${connection.token}` }
+              : undefined,
+            idempotent: true,
+          },
+        )
+      }
+
+      await Share.share({
+        title: sessionQuery.data?.title ?? 'Cradle conversation',
+        url: destination.uri,
+      })
+    }
+    catch {
+      Alert.alert(
+        'Could not export conversation',
+        'The conversation export could not be prepared on this device.',
+      )
+    }
+    finally {
+      setConversationExport(null)
+    }
+  }
   const handleCancel = useCallback(() => cancelRun(), [cancelRun])
   const handleModeChange = useCallback(
     (mode: 'build' | 'plan') => updateInteractionMode(mode === 'plan' ? 'plan' : 'default'),
@@ -447,6 +493,33 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
               {sessionQuery.data.pinned > 0 ? 'Unpin' : 'Pin'}
             </Stack.Toolbar.Label>
           </Stack.Toolbar.Button>
+          <Stack.Toolbar.Menu
+            accessibilityHint="Shows sharing and export actions for this conversation"
+            accessibilityLabel="Conversation actions"
+            disabled={conversationExport !== null}
+            icon="ellipsis.circle"
+          >
+            <Stack.Toolbar.MenuAction
+              disabled={runtimeIsActive}
+              icon="doc.plaintext"
+              onPress={() => { void shareConversationExport('markdown') }}
+              subtitle={runtimeIsActive
+                ? 'Available after the current response finishes'
+                : 'Markdown transcript'}
+            >
+              {conversationExport === 'markdown' ? 'Preparing Transcript…' : 'Share Transcript'}
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              disabled={runtimeIsActive}
+              icon="archivebox"
+              onPress={() => { void shareConversationExport('zip') }}
+              subtitle={runtimeIsActive
+                ? 'Available after the current response finishes'
+                : 'Transcript and session metadata'}
+            >
+              {conversationExport === 'zip' ? 'Preparing Archive…' : 'Export Archive'}
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
         </Stack.Toolbar>
       )}
       <ChatView
