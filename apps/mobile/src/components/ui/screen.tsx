@@ -2,6 +2,7 @@ import type { PropsWithChildren, ReactNode } from 'react'
 import {
   Animated,
   Keyboard,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,6 +23,8 @@ interface ScreenProps extends PropsWithChildren {
   action?: ReactNode
   leading?: ReactNode
   footer?: ReactNode
+  fullBleed?: boolean
+  nativeHeader?: boolean
   refreshing?: boolean
   onRefresh?: () => void
   onPressBackground?: () => void
@@ -36,7 +39,9 @@ export function Screen({
   action,
   leading,
   footer,
+  fullBleed = false,
   children,
+  nativeHeader = false,
   refreshing = false,
   onRefresh,
   onPressBackground,
@@ -45,9 +50,10 @@ export function Screen({
 }: ScreenProps) {
   const theme = useTheme()
   const keyboardOffset = useKeyboardOffset(avoidKeyboard)
+  const usesNativeHeader = nativeHeader && Platform.OS !== 'web'
   const content = (
     <>
-      {(title || action) && (
+      {!usesNativeHeader && (title || action) && (
         <View style={styles.header}>
           {insetTop && (
             <View style={styles.toolbar}>
@@ -64,6 +70,16 @@ export function Screen({
             </View>
             {!insetTop && action}
           </View>
+        </View>
+      )}
+      {usesNativeHeader && (subtitle || action) && (
+        <View style={styles.nativeHeaderContext}>
+          {subtitle && (
+            <Text style={[styles.nativeSubtitle, { color: theme.mutedForeground }]}>
+              {subtitle}
+            </Text>
+          )}
+          {action}
         </View>
       )}
       {children}
@@ -86,7 +102,7 @@ export function Screen({
       {scroll
         ? (
             <ScrollView
-              contentContainerStyle={styles.content}
+              contentContainerStyle={[styles.content, fullBleed && styles.fullBleedContent]}
               contentInsetAdjustmentBehavior="automatic"
               keyboardDismissMode="none"
               keyboardShouldPersistTaps="handled"
@@ -98,7 +114,16 @@ export function Screen({
               {dismissibleContent}
             </ScrollView>
           )
-        : <View style={[styles.content, styles.staticContent]}>{dismissibleContent}</View>}
+        : (
+            <View style={[
+              styles.content,
+              styles.staticContent,
+              fullBleed && styles.fullBleedContent,
+            ]}
+            >
+              {dismissibleContent}
+            </View>
+          )}
       {footer && (
         <Animated.View
           style={[
@@ -115,7 +140,11 @@ export function Screen({
   )
 
   return (
-    <SafeAreaView edges={insetTop ? ['top', 'bottom'] : ['bottom']} style={[styles.safeArea, { backgroundColor: theme.surface }]}>
+    <SafeAreaView
+      collapsable={false}
+      edges={insetTop && !usesNativeHeader ? ['top', 'bottom'] : ['bottom']}
+      style={[styles.safeArea, { backgroundColor: theme.surface }]}
+    >
       <View style={styles.page}>{page}</View>
     </SafeAreaView>
   )
@@ -136,6 +165,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     zIndex: 2,
   },
+  fullBleedContent: {
+    paddingHorizontal: 0,
+  },
   safeArea: {
     flex: 1,
   },
@@ -148,6 +180,18 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xs,
     paddingRight: spacing.md,
+  },
+  nativeHeaderContext: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  nativeSubtitle: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 19,
   },
   title: {
 

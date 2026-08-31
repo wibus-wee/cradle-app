@@ -48,6 +48,27 @@ export async function cradleRequest<T>(
   return await response.json() as T
 }
 
+export async function cradleRequestBytes(
+  connection: CradleConnection,
+  path: string,
+  options: RequestOptions = {},
+): Promise<Uint8Array> {
+  const response = await connection.transport.request(path, requestInit({
+    ...options,
+    headers: {
+      accept: 'application/octet-stream',
+      ...Object.fromEntries(new Headers(options.headers)),
+    },
+  }))
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null) as { message?: string } | null
+    throw new CradleApiError(body?.message ?? `${response.status} ${response.statusText}`, response.status)
+  }
+
+  return new Uint8Array(await response.arrayBuffer())
+}
+
 export async function cradleStreamResponse(
   connection: CradleConnection,
   path: string,

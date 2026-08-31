@@ -45,6 +45,8 @@
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Cradle needs camera access so you can take a photo and attach it to a chat.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Cradle connects to your Cradle Server on the local network.</string>
 	<key>NSUserActivityTypes</key>
@@ -76,8 +78,6 @@
 	<array>
 		<string>arm64</string>
 	</array>
-	<key>UIRequiresFullScreen</key>
-	<false/>
 	<key>UIStatusBarStyle</key>
 	<string>UIStatusBarStyleDefault</string>
 	<key>UISupportedInterfaceOrientations</key>

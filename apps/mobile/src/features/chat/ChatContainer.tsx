@@ -1,8 +1,11 @@
 import type { InfiniteData } from '@tanstack/react-query'
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
-import type { UIMessage } from 'ai'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { FileUIPart, UIMessage } from 'ai'
+import * as Clipboard from 'expo-clipboard'
+import { Directory, File, Paths } from 'expo-file-system'
 import { Stack } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Platform, Share } from 'react-native'
 
 import type {
   GetChatSessionsBySessionIdCapabilitiesResponse,
@@ -10,21 +13,51 @@ import type {
   GetChatSessionsBySessionIdMessagesByMessageIdResponse,
   GetChatSessionsBySessionIdRuntimeSettingsResponse,
   GetChatSessionsBySessionIdRuntimeStatusResponse,
+  GetSessionsByIdExportMarkdownResponse,
   GetSessionsByIdResponse,
 } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
-import { cradleRequest, cradleStreamResponse } from '@/lib/api'
+import { cradleRequest, cradleRequestBytes, cradleStreamResponse } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
+import { openQuickLook } from '@/native/quick-look'
 
 import { readChatHistoryCache, writeChatHistoryCache } from './chat-history-cache'
 import { consumeChatMessageStream } from './chat-stream'
 import type { ChatSubmitInput } from './ChatComposer'
 import { ChatView } from './ChatView'
+import { useComposerDraft } from './use-composer-draft'
+
+async function previewDraftAttachment(file: FileUIPart): Promise<void> {
+  const separator = file.url.indexOf(',')
+  const metadata = separator >= 0 ? file.url.slice(0, separator) : ''
+  if (!metadata.startsWith('data:') || !metadata.endsWith(';base64')) {
+    throw new Error('Draft attachment is not base64 data.')
+  }
+
+  const previewDirectory = new Directory(Paths.cache, 'cradle-draft-previews')
+  previewDirectory.create({ idempotent: true, intermediates: true })
+  const filename = encodeURIComponent(file.filename ?? 'attachment')
+  const destination = new File(previewDirectory, `${Date.now()}-${filename}`)
+  destination.write(file.url.slice(separator + 1), { encoding: 'base64' })
+
+  try {
+    await openQuickLook(destination.uri)
+  }
+  finally {
+    try {
+      destination.delete()
+    }
+    catch {
+      // Cache cleanup must not turn a successful preview into a user-facing error.
+    }
+  }
+}
 
 export function ChatContainer({ sessionId }: { sessionId: string }) {
   const { connection } = useConnection()
+  const queryClient = useQueryClient()
   const isRouteActive = useRouteIsActive()
   const activeStreamRef = useRef<AbortController | null>(null)
   const routeActiveRef = useRef(isRouteActive)
@@ -34,10 +67,12 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   const [pendingUser, setPendingUser] = useState<{ id: string | null, text: string } | null>(null)
   const [sendError, setSendError] = useState<string | null>(null)
   const [detailMessageId, setDetailMessageId] = useState<string | null>(null)
+  const [conversationExport, setConversationExport] = useState<'markdown' | 'zip' | null>(null)
   const [cachedHistory, setCachedHistory] = useState<InfiniteData<
     GetChatSessionsBySessionIdMessagePreviewsResponse,
     string | null
   > | null>(null)
+  const composerDraft = useComposerDraft(connection, sessionId, isRouteActive)
   routeActiveRef.current = isRouteActive
   const historyQueryKey = useMemo(
     () => ['chat-message-previews', connection?.resourceId, sessionId] as const,
@@ -100,6 +135,37 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         { signal },
       ),
   })
+  const updatePin = useMutation({
+    mutationFn: (pinned: boolean) =>
+      cradleRequest<GetSessionsByIdResponse>(
+        connection!,
+        `/sessions/${encodeURIComponent(sessionId)}`,
+        { body: { pinned }, method: 'PATCH' },
+      ),
+    onError: () => {
+      Alert.alert('Could not update conversation', 'Your pin setting was not changed.')
+    },
+    onSuccess: (session) => {
+      queryClient.setQueryData(['chat-session', connection?.resourceId, sessionId], session)
+      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.resourceId] })
+    },
+  })
+  const markRead = useMutation({
+    mutationFn: () =>
+      cradleRequest<GetSessionsByIdResponse>(
+        connection!,
+        `/sessions/${encodeURIComponent(sessionId)}/read`,
+        { method: 'POST' },
+      ),
+    onSuccess: (session) => {
+      queryClient.setQueryData(['chat-session', connection?.resourceId, sessionId], session)
+      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.resourceId] })
+    },
+  })
   const detailQuery = useQuery({
     enabled: Boolean(connection && detailMessageId) && isRouteActive,
     queryKey: ['chat-message-detail', connection?.resourceId, sessionId, detailMessageId],
@@ -110,6 +176,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         { signal },
       ),
   })
+  const markSessionRead = markRead.mutate
   const refetchHistory = historyQuery.refetch
   const refetchRuntimeStatus = runtimeStatusQuery.refetch
 
@@ -142,6 +209,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
     | InfiniteData<GetChatSessionsBySessionIdMessagePreviewsResponse, string | null>
     | undefined
   const historyData = queryHistoryData ?? cachedHistory
+  const transcriptRevision = historyData?.pages[0]?.revision
   const messages = useMemo(
     () => [...(historyData?.pages ?? [])].reverse().flatMap(page => page.rows),
     [historyData],
@@ -151,6 +219,12 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
     = messages.findLast(row => row.role === 'assistant' && row.status === 'streaming')?.messageId
       ?? null
   streamingMessageIdRef.current = streamingMessageId
+
+  useEffect(() => {
+    if (isRouteActive && transcriptRevision !== undefined) {
+      markSessionRead()
+    }
+  }, [isRouteActive, markSessionRead, transcriptRevision])
 
   useEffect(
     () => () => {
@@ -235,6 +309,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
             signal: controller.signal,
           },
         )
+        composerDraft.clearDraft()
         const assistantMessageId
           = response.headers.get('x-cradle-assistant-message-id') ?? `assistant-${sessionId}`
         setPendingUser({
@@ -279,6 +354,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       }),
     onError: error => setSendError(errorMessage(error)),
     onSuccess: () => {
+      composerDraft.clearDraft()
       void refetchRuntimeStatus()
       void refetchHistory()
     },
@@ -292,6 +368,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       }),
     onError: error => setSendError(errorMessage(error)),
     onSuccess: () => {
+      composerDraft.clearDraft()
       void refetchRuntimeStatus()
       void refetchHistory()
     },
@@ -329,6 +406,45 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       || sessionStatus === 'streaming'
       || sessionStatus === 'waitingForUserInput'
       || sessionStatus === 'waitingForToolApproval'
+  const shareConversationExport = async (format: 'markdown' | 'zip') => {
+    if (!connection || conversationExport || runtimeIsActive) { return }
+    setConversationExport(format)
+    try {
+      const shareDirectory = new Directory(Paths.cache, 'cradle-shares')
+      shareDirectory.create({ idempotent: true, intermediates: true })
+      const destination = new File(shareDirectory, `cradle-conversation.${format === 'markdown' ? 'md' : 'zip'}`)
+
+      if (format === 'markdown') {
+        const exportResponse = await cradleRequest<GetSessionsByIdExportMarkdownResponse>(
+          connection,
+          `/sessions/${encodeURIComponent(sessionId)}/export/markdown`,
+        )
+        destination.write(exportResponse.markdown)
+      }
+      else {
+        const zip = await cradleRequestBytes(
+          connection,
+          `/sessions/${encodeURIComponent(sessionId)}/export/zip`,
+        )
+        destination.create({ intermediates: true, overwrite: true })
+        destination.write(zip)
+      }
+
+      await Share.share({
+        title: sessionQuery.data?.title ?? 'Cradle conversation',
+        url: destination.uri,
+      })
+    }
+    catch {
+      Alert.alert(
+        'Could not export conversation',
+        'The conversation export could not be prepared on this device.',
+      )
+    }
+    finally {
+      setConversationExport(null)
+    }
+  }
   const handleCancel = useCallback(() => cancelRun(), [cancelRun])
   const handleModeChange = useCallback(
     (mode: 'build' | 'plan') => updateInteractionMode(mode === 'plan' ? 'plan' : 'default'),
@@ -351,13 +467,29 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
 
   const error = sessionQuery.error ?? (!historyData ? historyQuery.error : null)
   if (error) {
-    return <ErrorState title="Could not open conversation" description={errorMessage(error)} />
+    return (
+      <ErrorState
+        title="Could not open conversation"
+        description={errorMessage(error)}
+        isActionPending={sessionQuery.isFetching || historyQuery.isFetching}
+        onAction={() => {
+          void sessionQuery.refetch()
+          void historyQuery.refetch()
+        }}
+      />
+    )
   }
-  if (sessionQuery.isPending || (!historyData && historyQuery.isPending)) {
+  if (sessionQuery.isPending || (!historyData && historyQuery.isPending) || composerDraft.isPending) {
     return <LoadingState />
   }
   if (!sessionQuery.data) {
-    return <ErrorState title="Conversation not found" />
+    return (
+      <ErrorState
+        title="Conversation not found"
+        isActionPending={sessionQuery.isFetching}
+        onAction={() => { void sessionQuery.refetch() }}
+      />
+    )
   }
   const activeRun = runtimeStatusQuery.data?.activeRun ?? undefined
   const hasEarlier = Boolean(historyQuery.hasNextPage ?? historyData?.pages.at(-1)?.nextCursor)
@@ -366,8 +498,58 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   return (
     <>
       <Stack.Screen options={{ title: sessionQuery.data.title ?? 'Conversation' }} />
+      {Platform.OS === 'ios' && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            accessibilityHint={sessionQuery.data.pinned > 0
+              ? 'Removes this conversation from your pinned conversations'
+              : 'Keeps this conversation easy to find in its workspace'}
+            accessibilityLabel={sessionQuery.data.pinned > 0
+              ? 'Unpin conversation'
+              : 'Pin conversation'}
+            disabled={updatePin.isPending}
+            onPress={() => updatePin.mutate(sessionQuery.data.pinned === 0)}
+            selected={sessionQuery.data.pinned > 0}
+          >
+            <Stack.Toolbar.Icon sf={sessionQuery.data.pinned > 0 ? 'pin.fill' : 'pin'} />
+            <Stack.Toolbar.Label>
+              {sessionQuery.data.pinned > 0 ? 'Unpin' : 'Pin'}
+            </Stack.Toolbar.Label>
+          </Stack.Toolbar.Button>
+          <Stack.Toolbar.Menu
+            accessibilityHint="Shows sharing and export actions for this conversation"
+            accessibilityLabel="Conversation actions"
+            disabled={conversationExport !== null}
+            icon="ellipsis.circle"
+          >
+            <Stack.Toolbar.MenuAction
+              disabled={runtimeIsActive}
+              icon="doc.plaintext"
+              onPress={() => { void shareConversationExport('markdown') }}
+              subtitle={runtimeIsActive
+                ? 'Available after the current response finishes'
+                : 'Markdown transcript'}
+            >
+              {conversationExport === 'markdown' ? 'Preparing Transcript…' : 'Share Transcript'}
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              disabled={runtimeIsActive}
+              icon="archivebox"
+              onPress={() => { void shareConversationExport('zip') }}
+              subtitle={runtimeIsActive
+                ? 'Available after the current response finishes'
+                : 'Transcript and session metadata'}
+            >
+              {conversationExport === 'zip' ? 'Preparing Archive…' : 'Export Archive'}
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        </Stack.Toolbar>
+      )}
       <ChatView
         activeRun={activeRun}
+        clearComposerDraftSignal={composerDraft.clearSignal}
+        composerDraft={composerDraft.initialDraft}
+        composerDraftKey={`chat:${sessionId}`}
         isCancelling={cancel.isPending}
         capabilities={capabilitiesQuery.data}
         isSending={send.isPending || queue.isPending || steer.isPending}
@@ -375,7 +557,12 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         liveMessage={liveMessage}
         messages={messages}
         onCancel={handleCancel}
+        onComposerDraftChange={composerDraft.scheduleSave}
+        onCopyMessage={async (text) => {
+          await Clipboard.setStringAsync(text)
+        }}
         onModeChange={handleModeChange}
+        onPreviewAttachment={Platform.OS === 'ios' ? previewDraftAttachment : undefined}
         onSend={handleSend}
         pendingUser={pendingUser}
         queuedCount={queuedCount}
@@ -393,6 +580,9 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
           }
         }}
         onRequestMessageDetail={setDetailMessageId}
+        onShareMessage={async (text) => {
+          await Share.share({ message: text })
+        }}
       />
     </>
   )

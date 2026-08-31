@@ -33,6 +33,8 @@ PODS:
     - ExpoModulesCore
   - ExpoCrypto (57.0.2):
     - ExpoModulesCore
+  - ExpoDocumentPicker (57.0.1):
+    - ExpoModulesCore
   - ExpoDomWebView (57.0.1):
     - ExpoModulesCore
   - ExpoFileSystem (57.0.6):
@@ -2326,6 +2328,7 @@ DEPENDENCIES:
   - "ExpoAsset (from `../../../node_modules/.pnpm/expo-asset@57.0.15_expo@57.0.18_react-native@0.86.3_@babel+core@7.29.7_supports-color@1_3224c663e7c430875479538f5c440dd3/node_modules/expo-asset/ios`)"
   - "ExpoClipboard (from `../../../node_modules/.pnpm/expo-clipboard@57.0.1_expo@57.0.18_react-native@0.86.3_@babel+core@7.29.7_supports-colo_e3cc9f7e0cd4b9eee94db45ae19f5a64/node_modules/expo-clipboard/ios`)"
   - "ExpoCrypto (from `../../../node_modules/.pnpm/expo-crypto@57.0.2_expo@57.0.18/node_modules/expo-crypto/ios`)"
+  - "ExpoDocumentPicker (from `../../../node_modules/.pnpm/expo-document-picker@57.0.1_expo@57.0.18/node_modules/expo-document-picker/ios`)"
   - "ExpoDomWebView (from `../../../node_modules/.pnpm/@expo+dom-webview@57.0.1_expo@57.0.18_react-native@0.86.3_@babel+core@7.29.7_supports-c_7e918a15c668b8701c6a1eee7a7fd100/node_modules/@expo/dom-webview/ios`)"
   - "ExpoFileSystem (from `../../../node_modules/.pnpm/expo-file-system@57.0.6_expo@57.0.18_react-native@0.86.3_@babel+core@7.29.7_supports-co_4efb54d2a9089c7d0bcdda2f1951be34/node_modules/expo-file-system/ios/ExpoFileSystem.podspec`)"
   - "ExpoFont (from `../../../node_modules/.pnpm/expo-font@57.0.2_expo@57.0.18_react-native@0.86.3_@babel+core@7.29.7_supports-color@11._12227c661ce874bcd179157d87c37094/node_modules/expo-font/ios/ExpoFont.podspec`)"
@@ -2439,6 +2442,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/.pnpm/expo-clipboard@57.0.1_expo@57.0.18_react-native@0.86.3_@babel+core@7.29.7_supports-colo_e3cc9f7e0cd4b9eee94db45ae19f5a64/node_modules/expo-clipboard/ios"
   ExpoCrypto:
     :path: "../../../node_modules/.pnpm/expo-crypto@57.0.2_expo@57.0.18/node_modules/expo-crypto/ios"
+  ExpoDocumentPicker:
+    :path: "../../../node_modules/.pnpm/expo-document-picker@57.0.1_expo@57.0.18/node_modules/expo-document-picker/ios"
   ExpoDomWebView:
     :path: "../../../node_modules/.pnpm/@expo+dom-webview@57.0.1_expo@57.0.18_react-native@0.86.3_@babel+core@7.29.7_supports-c_7e918a15c668b8701c6a1eee7a7fd100/node_modules/@expo/dom-webview/ios"
   ExpoFileSystem:
@@ -2647,6 +2652,7 @@ SPEC CHECKSUMS:
   ExpoAsset: ff225ee16cea2409800b20fe4945a7c720a24cee
   ExpoClipboard: 95055b11758f339b61d4d8064dd799df1cf03b7f
   ExpoCrypto: f392e5f076a4c11dbfa1a6046449747acec82711
+  ExpoDocumentPicker: 6fb67a6f39ba9beb53a4b4a3f2949e0b5e9bc3bf
   ExpoDomWebView: beaec034e51bd028428b98bb1f2633ab79c6d095
   ExpoFileSystem: cc500f33804065aacc7b3366007267b84deca8c8
   ExpoFont: 02ab7433c23831e76b98aa1e2de67b404eeebc4a
@@ -2748,6 +2754,6 @@ SPEC CHECKSUMS:
   RNWorklets: 5f6979679eb3a36c7cb3e0b2ef977de9d097f35c
   Yoga: 18b74b3ade30bebc1904004dfaceae1dd02a330a
 
-PODFILE CHECKSUM: b4f951df4d0f954b1c69f4ccc18f1629dbe7ac90
+PODFILE CHECKSUM: a70daacf137b154eff8243a922d5dbfc4d327ba0
 
 COCOAPODS: 1.17.0

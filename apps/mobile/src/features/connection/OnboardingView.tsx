@@ -9,24 +9,12 @@ import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { NativeAction } from '@/components/ui/native-action'
 import { StatusPill } from '@/components/ui/status-pill'
-import type { FabricEnrollmentStatus, FabricMembershipStatus } from '@/features/fabric/fabric-context'
-import type { MobileFabricMembership, PendingFabricControllerEnrollment } from '@/features/fabric/fabric-types'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-export interface OnboardingViewProps {
-  membership: MobileFabricMembership | null
-  pendingEnrollment: PendingFabricControllerEnrollment | null
-  enrollmentStatus: FabricEnrollmentStatus
-  membershipStatus: FabricMembershipStatus
-  error?: string | null
-  onJoinFabric: (code: string) => void
-  onCancelEnrollment: () => void
-  onRefreshDirectory: () => void
-  onSelectNode: (nodeId: string) => void
-  onUseDirectServer: () => void
-  onLeaveFabric: () => void
-}
+import type { OnboardingViewProps } from './onboarding-view-contract'
+
+export type { OnboardingViewProps } from './onboarding-view-contract'
 
 export function OnboardingView({
   membership,

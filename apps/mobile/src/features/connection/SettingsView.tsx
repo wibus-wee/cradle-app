@@ -2,18 +2,20 @@ import {
   ChartNoAxesColumn,
   Check,
   ChevronRight,
+  Copy,
   Link2,
   LockKeyhole,
   LogOut,
   Monitor,
   Network,
   RefreshCw,
+  Share2,
+  Wifi,
 } from 'lucide-react-native'
-import { Alert, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
 
-import type { AppSection } from '@/components/common/app-menu-button'
-import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -22,22 +24,9 @@ import type { FabricTransportStatus } from '@/lib/transport/fabric-http-transpor
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-interface FabricSettingsNode {
-  nodeId: string
-  displayName: string
-  status: 'online' | 'offline'
-}
+import type { SettingsViewProps } from './settings-view-contract'
 
-type SettingsConnection
-  = | { kind: 'direct', serverUrl: string, hasServerToken: boolean }
-    | {
-      kind: 'fabric'
-      fabricId: string
-      relayUrl: string
-      selectedNodeId: string | null
-      nodes: FabricSettingsNode[]
-      status: FabricTransportStatus
-    }
+export type { SettingsViewProps } from './settings-view-contract'
 
 const TRANSPORT_STATUS_LABEL: Record<FabricTransportStatus, string> = {
   'access-denied': 'Refreshing access',
@@ -57,32 +46,11 @@ const TRANSPORT_STATUS_TONE: Record<FabricTransportStatus, 'neutral' | 'success'
   'suspended': 'neutral',
 }
 
-export interface SettingsViewProps {
-  appVersion: string
-  connection: SettingsConnection
-  onDisconnect: () => void
-  onEditServer?: () => void
-  onEditToken?: () => void
-  onNavigate: (section: AppSection) => void
-  onOpenUsage: () => void
-  onRefreshNodes?: () => void
-  onSelectNode?: (nodeId: string) => void
-}
-
-export function SettingsView({
-  appVersion,
-  connection,
-  onDisconnect,
-  onEditServer,
-  onEditToken,
-  onNavigate,
-  onOpenUsage,
-  onRefreshNodes,
-  onSelectNode,
-}: SettingsViewProps) {
+export function SettingsView(props: SettingsViewProps) {
+  const { appVersion, onDisconnect, onOpenUsage } = props
   const theme = useTheme()
   const disconnect = () => {
-    const isFabric = connection.kind === 'fabric'
+    const isFabric = props.kind === 'fabric'
     Alert.alert(isFabric ? 'Leave Fabric?' : 'Disconnect from server?', isFabric
       ? 'This Controller identity and its private keys will be removed from this device.'
       : 'The saved address and token will be removed from this device.', [
@@ -90,12 +58,35 @@ export function SettingsView({
       { onPress: onDisconnect, style: 'destructive', text: isFabric ? 'Leave' : 'Disconnect' },
     ])
   }
+  const copyServer = async () => {
+    if (props.kind !== 'direct') {
+      return
+    }
+    try {
+      await props.onCopyServer()
+      Alert.alert('Server address copied')
+    }
+    catch {
+      Alert.alert('Could not copy server address')
+    }
+  }
+  const shareServer = async () => {
+    if (props.kind !== 'direct') {
+      return
+    }
+    try {
+      await props.onShareServer()
+    }
+    catch {
+      Alert.alert('Could not share server address')
+    }
+  }
   const disclosure = <ChevronRight color={theme.dimForeground} size={18} />
 
   return (
     <Screen
-      action={<AppMenuButton current="settings" onSelect={onNavigate} />}
       leading={<CradleIconButton onPress={onOpenUsage} />}
+      nativeHeader
       title="Settings"
     >
       <View style={styles.page}>
@@ -111,21 +102,67 @@ export function SettingsView({
 
         <View style={styles.section}>
           <SectionHeading title="Connection" />
-          {connection.kind === 'direct'
+          {props.kind === 'direct'
             ? (
                 <>
                   <Item
-                    actions={disclosure}
-                    description={connection.serverUrl}
+                    actions={(
+                      <View style={styles.connectionActions}>
+                        <StatusPill
+                          label={props.connection.status}
+                          tone={props.connection.status === 'connected'
+                            ? 'success'
+                            : props.connection.status === 'unavailable'
+                              ? 'danger'
+                              : 'neutral'}
+                        />
+                        {props.connection.status === 'checking'
+                          ? <ActivityIndicator color={theme.mutedForeground} size="small" />
+                          : (
+                              <IconButton
+                                accessibilityLabel="Check server connection"
+                                icon={RefreshCw}
+                                onPress={props.onCheckConnection}
+                              />
+                            )}
+                      </View>
+                    )}
+                    description={props.connection.status === 'connected'
+                      ? 'Server is responding'
+                      : props.connection.status === 'unavailable'
+                        ? 'Server could not be reached'
+                        : 'Contacting server'}
+                    media={<Wifi color={props.connection.status === 'connected' ? theme.success : theme.tertiaryForeground} size={19} />}
+                    title="Connection status"
+                  />
+                  <Item
+                    actions={(
+                      <View style={styles.serverActions}>
+                        <IconButton
+                          accessibilityLabel="Copy server address"
+                          icon={Copy}
+                          onPress={() => void copyServer()}
+                          stopPropagation
+                        />
+                        <IconButton
+                          accessibilityLabel="Share server address"
+                          icon={Share2}
+                          onPress={() => void shareServer()}
+                          stopPropagation
+                        />
+                        {disclosure}
+                      </View>
+                    )}
+                    description={props.connection.serverUrl}
                     media={<Link2 color={theme.tertiaryForeground} size={19} />}
-                    onPress={onEditServer}
-                    title="Development server"
+                    onPress={props.onEditServer}
+                    title="Server"
                   />
                   <Item
                     actions={disclosure}
-                    description={connection.hasServerToken ? 'Configured' : 'Not configured'}
+                    description={props.connection.hasServerToken ? 'Configured' : 'Not configured'}
                     media={<LockKeyhole color={theme.tertiaryForeground} size={19} />}
-                    onPress={onEditToken}
+                    onPress={props.onEditToken}
                     title="Authentication"
                   />
                 </>
@@ -135,16 +172,16 @@ export function SettingsView({
                   <Item
                     actions={(
                       <StatusPill
-                        label={TRANSPORT_STATUS_LABEL[connection.status]}
-                        tone={TRANSPORT_STATUS_TONE[connection.status]}
+                        label={TRANSPORT_STATUS_LABEL[props.connection.status]}
+                        tone={TRANSPORT_STATUS_TONE[props.connection.status]}
                       />
                     )}
-                    description={connection.relayUrl}
+                    description={props.connection.relayUrl}
                     media={<Network color={theme.tertiaryForeground} size={19} />}
                     title="Fabric Relay"
                   />
                   <Item
-                    description={connection.fabricId}
+                    description={props.connection.fabricId}
                     media={<LockKeyhole color={theme.tertiaryForeground} size={19} />}
                     title="End-to-end encrypted"
                   />
@@ -152,25 +189,25 @@ export function SettingsView({
               )}
         </View>
 
-        {connection.kind === 'fabric' && (
+        {props.kind === 'fabric' && (
           <View style={styles.section}>
             <SectionHeading title="Computers" />
-            {connection.nodes.map(node => (
+            {props.connection.nodes.map(node => (
               <Item
-                actions={node.nodeId === connection.selectedNodeId
+                actions={node.nodeId === props.connection.selectedNodeId
                   ? <Check color={theme.foreground} size={19} />
                   : undefined}
                 description={node.status === 'online' ? 'Online' : 'Offline'}
                 key={node.nodeId}
                 media={<Monitor color={theme.tertiaryForeground} size={19} />}
-                onPress={() => onSelectNode?.(node.nodeId)}
+                onPress={() => props.onSelectNode(node.nodeId)}
                 testID={`settings-node-${node.nodeId}`}
                 title={node.displayName}
               />
             ))}
             <Item
               media={<RefreshCw color={theme.tertiaryForeground} size={19} />}
-              onPress={onRefreshNodes}
+              onPress={props.onRefreshNodes}
               title="Refresh computers"
             />
           </View>
@@ -181,7 +218,7 @@ export function SettingsView({
           <Item
             media={<LogOut color={theme.tertiaryForeground} size={19} />}
             onPress={disconnect}
-            title={connection.kind === 'fabric' ? 'Leave Fabric' : 'Disconnect'}
+            title={props.kind === 'fabric' ? 'Leave Fabric' : 'Disconnect'}
           />
         </View>
 
@@ -194,11 +231,21 @@ export function SettingsView({
 }
 
 const styles = StyleSheet.create({
+  connectionActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
   page: {
     flex: 1,
   },
   section: {
     marginBottom: spacing.lg,
+  },
+  serverActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   version: {
     fontFamily: 'GeistMono_400Regular',

@@ -1,15 +1,10 @@
 import { SegmentedControl } from '@expo/ui/community/segmented-control'
-import { CheckCircle2, CircleDot, XCircle } from 'lucide-react-native'
+import { CheckCircle2, CircleDot, Search, XCircle } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
-import type {
-  GetPullRequestsAuthoredResponse,
-  GetPullRequestsReviewingResponse,
-} from '@/api-gen'
-import type { AppSection } from '@/components/common/app-menu-button'
-import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -19,56 +14,55 @@ import { relativeTime } from '@/lib/format'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-type PullRequest = GetPullRequestsAuthoredResponse['items'][number]
+import {
+  pullRequestGroup,
+  pullRequestGroupTitles,
+  pullRequestMatchesSearch,
+} from './pull-request-list-model'
+import type {
+  PullRequestListItem,
+  PullRequestListViewProps,
+} from './pull-request-list-view-contract'
 
-export interface PullRequestListViewProps {
-  authored: GetPullRequestsAuthoredResponse['items']
-  reviewing: GetPullRequestsReviewingResponse['items']
-  login: string
-  isRefreshing?: boolean
-  onNavigate: (section: AppSection) => void
-  onOpen: (pullRequest: PullRequest) => void
-  onOpenUsage: () => void
-  onRefresh?: () => void
-}
+export type { PullRequestListViewProps } from './pull-request-list-view-contract'
 
-function ChecksIcon({ state }: { state: PullRequest['checksState'] }) {
+function ChecksIcon({ state }: { state: PullRequestListItem['checksState'] }) {
   const theme = useTheme()
   if (state === 'success') { return <CheckCircle2 color={theme.success} size={17} /> }
   if (state === 'failure') { return <XCircle color={theme.destructive} size={17} /> }
   return <CircleDot color={state === 'pending' ? theme.warning : theme.mutedForeground} size={17} />
 }
 
-function pullRequestGroup(updatedAt: number) {
-  const timestamp = updatedAt < 10_000_000_000 ? updatedAt * 1_000 : updatedAt
-  const age = Date.now() - timestamp
-  if (age < 86_400_000) { return 'Today' }
-  if (age < 604_800_000) { return 'This week' }
-  return 'Older'
-}
-
 export function PullRequestListView({
   authored,
   reviewing,
+  login,
   isRefreshing = false,
-  onNavigate,
   onOpen,
   onOpenUsage,
   onRefresh,
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch = true,
 }: PullRequestListViewProps) {
   const theme = useTheme()
   const [mode, setMode] = useState<'authored' | 'reviewing'>('authored')
-  const items = mode === 'authored' ? authored : reviewing
-  const groups = ['Today', 'This week', 'Older']
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
+  const sourceItems = mode === 'authored' ? authored : reviewing
+  const items = normalizedSearch
+    ? sourceItems.filter(pullRequest => pullRequestMatchesSearch(pullRequest, normalizedSearch))
+    : sourceItems
+  const groups = pullRequestGroupTitles
     .map(title => ({ title, items: items.filter(item => pullRequestGroup(item.updatedAt) === title) }))
     .filter(group => group.items.length > 0)
 
   return (
     <Screen
-      action={<AppMenuButton current="pull-requests" onSelect={onNavigate} />}
       leading={<CradleIconButton onPress={onOpenUsage} />}
+      nativeHeader
       onRefresh={onRefresh}
       refreshing={isRefreshing}
+      subtitle={`@${login}`}
       title="Pull requests"
     >
       <SegmentedControl
@@ -79,11 +73,30 @@ export function PullRequestListView({
         values={['Authored', 'Review requests']}
       />
 
+      {showsInlineSearch && (
+        <View style={styles.search}>
+          <InputGroup
+            addon={<Search color={theme.mutedForeground} size={17} />}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            onChangeText={onSearchQueryChange}
+            placeholder="Search pull requests"
+            returnKeyType="search"
+            value={searchQuery}
+          />
+        </View>
+      )}
+
       {items.length === 0
         ? (
             <EmptyState
-              description={mode === 'authored' ? 'Your open pull requests will appear here.' : 'You have no pending review requests.'}
-              title="Inbox clear"
+              description={normalizedSearch
+                ? 'Try a different title, repository, owner, or number.'
+                : mode === 'authored'
+                  ? 'Your open pull requests will appear here.'
+                  : 'You have no pending review requests.'}
+              title={normalizedSearch ? 'No matching pull requests' : 'Inbox clear'}
             />
           )
         : (
@@ -137,8 +150,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   segmented: {
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
     minHeight: 36,
+  },
+  search: {
+    marginBottom: spacing.lg,
   },
   time: {
 
