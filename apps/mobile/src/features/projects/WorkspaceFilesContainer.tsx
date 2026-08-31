@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import { Directory, File, Paths } from 'expo-file-system'
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
-import { Platform } from 'react-native'
+import { Alert, Platform, Share } from 'react-native'
 
 import type {
   GetWorkspacesByWorkspaceIdFilesChildrenResponse,
@@ -42,6 +43,7 @@ export function WorkspaceFilesContainer({
   )
   const [selectedFile, setSelectedFile] = useState<string | null>(initialFile ?? null)
   const [search, setSearch] = useState('')
+  const [isSharing, setIsSharing] = useState(false)
   const normalizedSearch = search.trim()
   const showsInlineSearch = Platform.OS === 'web'
   const directoryQuery = useQuery({
@@ -120,6 +122,29 @@ export function WorkspaceFilesContainer({
       )
     : null
 
+  const shareFile = async (name: string) => {
+    if (!connection || !selectedFile || isSharing) { return }
+    setIsSharing(true)
+    try {
+      const shareDirectory = new Directory(Paths.cache, 'cradle-shares')
+      shareDirectory.create({ idempotent: true, intermediates: true })
+      const destination = new File(shareDirectory, name)
+      const rawUrl
+        = `${connection.url}/workspaces/${encodeURIComponent(workspaceId)}/files/raw?path=${encodeURIComponent(selectedFile)}`
+      const downloaded = await File.downloadFileAsync(rawUrl, destination, {
+        headers: connection.token ? { authorization: `Bearer ${connection.token}` } : undefined,
+        idempotent: true,
+      })
+      await Share.share({ title: name, url: downloaded.uri })
+    }
+    catch {
+      Alert.alert('Could not share file', 'The file could not be downloaded to this device.')
+    }
+    finally {
+      setIsSharing(false)
+    }
+  }
+
   if (selectedFile) {
     const fileError = infoQuery.error ?? contentQuery.error
     if (infoQuery.isPending || (canPreview && contentQuery.isPending)) {
@@ -145,6 +170,19 @@ export function WorkspaceFilesContainer({
     return (
       <>
         <Stack.Screen options={{ title: fileInfo.name }} />
+        {Platform.OS === 'ios' && (
+          <Stack.Toolbar placement="right">
+            <Stack.Toolbar.Button
+              accessibilityHint="Downloads the original file and opens the system share sheet"
+              accessibilityLabel={`Share ${fileInfo.name}`}
+              disabled={isSharing}
+              onPress={() => { void shareFile(fileInfo.name) }}
+            >
+              <Stack.Toolbar.Icon sf="square.and.arrow.up" />
+              <Stack.Toolbar.Label>{isSharing ? 'Sharing…' : 'Share'}</Stack.Toolbar.Label>
+            </Stack.Toolbar.Button>
+          </Stack.Toolbar>
+        )}
         <WorkspaceFilesView
           currentPath={currentPath}
           entries={[]}
