@@ -1,4 +1,4 @@
-import type { WorkspaceViewProps } from './WorkspaceView'
+import type { WorkspaceViewProps } from './workspace-view-contract'
 
 export const workspaceFixture: WorkspaceViewProps = {
   workspace: {

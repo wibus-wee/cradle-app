@@ -3,13 +3,6 @@ import type { ReactElement } from 'react'
 import { useRef } from 'react'
 import { FlatList, Keyboard, StyleSheet, View } from 'react-native'
 
-import type {
-  GetSessionsResponse,
-  GetWorkspacesByWorkspaceIdFilesChildrenResponse,
-  GetWorkspacesResponse,
-  GetWorksResponse,
-  PostWorksData,
-} from '@/api-gen'
 import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
@@ -22,36 +15,24 @@ import { relativeTime } from '@/lib/format'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-type Workspace = GetWorkspacesResponse[number]
-type Session = GetSessionsResponse['items'][number]
-type Work = GetWorksResponse['items'][number]
-type FileEntry = GetWorkspacesByWorkspaceIdFilesChildrenResponse[number]
+import type {
+  WorkspaceFile,
+  WorkspaceSession,
+  WorkspaceViewProps,
+  WorkspaceWork,
+} from './workspace-view-contract'
+
+export type { WorkspaceViewProps } from './workspace-view-contract'
+
 type WorkspaceRow
   = | { key: string, kind: 'heading', title: string, meta: string }
-    | { key: string, kind: 'work', work: Work }
-    | { key: string, kind: 'session', session: Session }
+    | { key: string, kind: 'work', work: WorkspaceWork }
+    | { key: string, kind: 'session', session: WorkspaceSession }
     | { key: string, kind: 'browse-files' }
-    | { key: string, kind: 'file', entry: FileEntry }
+    | { key: string, kind: 'file', entry: WorkspaceFile }
     | { key: string, kind: 'empty', node: ReactElement }
 
-export interface WorkspaceViewProps {
-  workspace: Workspace
-  workspaces: Workspace[]
-  sessions: Session[]
-  works: Work[]
-  files: FileEntry[]
-  isCreating?: boolean
-  isRefreshing?: boolean
-  onBrowseFiles: () => void
-  onCreate: (input: PostWorksData['body']) => void
-  onOpenFile: (entry: FileEntry) => void
-  onOpenSession: (sessionId: string) => void
-  onOpenWork: (sessionId: string) => void
-  onOpenWorkInfo: (workId: string) => void
-  onRefresh?: () => void
-}
-
-function sessionTone(status: Session['status']) {
+function sessionTone(status: WorkspaceSession['status']) {
   if (status === 'streaming') { return 'success' as const }
   if (status === 'error') { return 'danger' as const }
   return 'neutral' as const

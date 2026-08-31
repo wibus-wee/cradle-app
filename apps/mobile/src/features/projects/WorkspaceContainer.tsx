@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
+import { Platform } from 'react-native'
 
 import type {
   GetSessionsResponse,
@@ -81,7 +82,7 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
   }
   return (
     <>
-      <Stack.Screen options={{ title: '' }} />
+      <Stack.Screen options={{ title: Platform.OS === 'ios' ? query.data.workspace.name : '' }} />
       <WorkspaceView
         {...query.data}
         isCreating={create.isPending}
@@ -99,7 +100,7 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
         }}
         onOpenWork={sessionId => router.push(`/session/${sessionId}`)}
         onOpenWorkInfo={workId => router.push(`/work/${workId}`)}
-        onRefresh={() => void refresh()}
+        onRefresh={refresh}
       />
     </>
   )
