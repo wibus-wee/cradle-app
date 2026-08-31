@@ -1,9 +1,10 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
-import { Platform } from 'react-native'
+import { Alert, Platform } from 'react-native'
 
 import type {
+  GetSessionsByIdResponse,
   GetSessionsResponse,
   GetWorkspacesByWorkspaceIdFilesChildrenResponse,
   GetWorkspacesResponse,
@@ -22,6 +23,7 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
   const { connection } = useConnection()
   const create = useCreateWork()
   const isRouteActive = useRouteIsActive()
+  const queryClient = useQueryClient()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
@@ -70,6 +72,23 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
       setIsRefreshing(false)
     }
   }
+  const updateSessionPin = useMutation({
+    mutationFn: ({ sessionId, pinned }: { sessionId: string, pinned: boolean }) =>
+      cradleRequest<GetSessionsByIdResponse>(
+        connection!,
+        `/sessions/${encodeURIComponent(sessionId)}`,
+        { body: { pinned }, method: 'PATCH' },
+      ),
+    onError: () => {
+      Alert.alert('Could not update conversation', 'Your pin setting was not changed.')
+    },
+    onSuccess: async (session, { sessionId }) => {
+      queryClient.setQueryData(['chat-session', connection?.url, sessionId], session)
+      await query.refetch()
+      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.url] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
+    },
+  })
 
   if (query.isPending) {
     return <LoadingState />
@@ -105,6 +124,8 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
         onOpenWork={sessionId => router.push(`/session/${sessionId}`)}
         onOpenWorkInfo={workId => router.push(`/work/${workId}`)}
         onRefresh={refresh}
+        onSetSessionPinned={(sessionId, pinned) => updateSessionPin.mutate({ sessionId, pinned })}
+        updatingSessionPinId={updateSessionPin.isPending ? updateSessionPin.variables?.sessionId : undefined}
       />
     </>
   )

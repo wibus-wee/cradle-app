@@ -6,18 +6,21 @@ import {
   List,
   Section,
   Spacer,
+  SwipeActions,
   Text,
   VStack,
 } from '@expo/ui/swift-ui'
 import {
   accessibilityLabel,
   buttonStyle,
+  disabled,
   font,
   foregroundStyle,
   frame,
   listStyle,
   monospacedDigit,
   refreshable,
+  tint,
 } from '@expo/ui/swift-ui/modifiers'
 import { useRef } from 'react'
 import { Keyboard } from 'react-native'
@@ -78,6 +81,8 @@ export function WorkspaceView({
   onOpenWork,
   onOpenWorkInfo,
   onRefresh,
+  onSetSessionPinned,
+  updatingSessionPinId,
 }: WorkspaceViewProps) {
   const composerRef = useRef<WorkComposerHandle>(null)
   const canCreateWork = workspaces.some(candidate => candidate.id === workspace.id)
@@ -237,64 +242,76 @@ export function WorkspaceView({
               : sortedSessions.map((session) => {
                   const status = sessionPresentation(session.status)
                   return (
-                    <Button
-                      key={session.id}
-                      modifiers={[plainButton]}
-                      onPress={() => {
-                        dismissComposer()
-                        onOpenSession(session.id)
-                      }}
-                    >
-                      <HStack modifiers={[fullWidth]} spacing={12}>
-                        <Image color={status.color} size={18} systemName={status.symbol} />
-                        <VStack alignment="leading" spacing={4}>
-                          <HStack spacing={6}>
-                            <Text>{session.title ?? 'Untitled conversation'}</Text>
-                            {session.pinned > 0 && (
-                              <Image color="orange" size={12} systemName="pin.fill" />
-                            )}
-                          </HStack>
-                          <HStack spacing={7}>
-                            <Text
-                              modifiers={[
-                                font({ textStyle: 'caption' }),
-                                foregroundStyle(status.color),
-                              ]}
-                            >
-                              {status.label}
-                            </Text>
-                            <Text
-                              modifiers={[
-                                font({ textStyle: 'caption' }),
-                                secondaryForeground,
-                                tabularNumber,
-                              ]}
-                            >
-                              {relativeTime(
-                                session.latestAssistantMessageAt
-                                ?? session.latestUserMessageAt
-                                ?? session.updatedAt,
+                    <SwipeActions key={session.id}>
+                      <Button
+                        modifiers={[plainButton]}
+                        onPress={() => {
+                          dismissComposer()
+                          onOpenSession(session.id)
+                        }}
+                      >
+                        <HStack modifiers={[fullWidth]} spacing={12}>
+                          <Image color={status.color} size={18} systemName={status.symbol} />
+                          <VStack alignment="leading" spacing={4}>
+                            <HStack spacing={6}>
+                              <Text>{session.title ?? 'Untitled conversation'}</Text>
+                              {session.pinned > 0 && (
+                                <Image color="orange" size={12} systemName="pin.fill" />
                               )}
-                            </Text>
-                            {session.unread && (
-                              <HStack spacing={4}>
-                                <Image color="blue" size={7} systemName="circle.fill" />
-                                <Text
-                                  modifiers={[
-                                    font({ textStyle: 'caption' }),
-                                    foregroundStyle('blue'),
-                                  ]}
-                                >
-                                  Unread
-                                </Text>
-                              </HStack>
-                            )}
-                          </HStack>
-                        </VStack>
-                        <Spacer />
-                        <Image color="secondary" size={14} systemName="chevron.forward" />
-                      </HStack>
-                    </Button>
+                            </HStack>
+                            <HStack spacing={7}>
+                              <Text
+                                modifiers={[
+                                  font({ textStyle: 'caption' }),
+                                  foregroundStyle(status.color),
+                                ]}
+                              >
+                                {status.label}
+                              </Text>
+                              <Text
+                                modifiers={[
+                                  font({ textStyle: 'caption' }),
+                                  secondaryForeground,
+                                  tabularNumber,
+                                ]}
+                              >
+                                {relativeTime(
+                                  session.latestAssistantMessageAt
+                                  ?? session.latestUserMessageAt
+                                  ?? session.updatedAt,
+                                )}
+                              </Text>
+                              {session.unread && (
+                                <HStack spacing={4}>
+                                  <Image color="blue" size={7} systemName="circle.fill" />
+                                  <Text
+                                    modifiers={[
+                                      font({ textStyle: 'caption' }),
+                                      foregroundStyle('blue'),
+                                    ]}
+                                  >
+                                    Unread
+                                  </Text>
+                                </HStack>
+                              )}
+                            </HStack>
+                          </VStack>
+                          <Spacer />
+                          <Image color="secondary" size={14} systemName="chevron.forward" />
+                        </HStack>
+                      </Button>
+                      <SwipeActions.Actions allowsFullSwipe={false}>
+                        <Button
+                          label={session.pinned > 0 ? 'Unpin' : 'Pin'}
+                          modifiers={[
+                            tint(session.pinned > 0 ? 'orange' : 'blue'),
+                            disabled(updatingSessionPinId !== undefined),
+                          ]}
+                          onPress={() => onSetSessionPinned(session.id, session.pinned === 0)}
+                          systemImage={session.pinned > 0 ? 'pin.slash' : 'pin'}
+                        />
+                      </SwipeActions.Actions>
+                    </SwipeActions>
                   )
                 })}
           </Section>

@@ -26,4 +26,6 @@ export interface WorkspaceViewProps {
   onOpenWork: (sessionId: string) => void
   onOpenWorkInfo: (workId: string) => void
   onRefresh?: () => Promise<void> | void
+  onSetSessionPinned: (sessionId: string, pinned: boolean) => void
+  updatingSessionPinId?: string
 }
