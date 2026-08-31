@@ -1,4 +1,4 @@
-import type { WorkListViewProps } from './WorkListView'
+import type { WorkListViewProps } from './work-list-view-contract'
 
 export const workListFixture: WorkListViewProps = {
   works: [],

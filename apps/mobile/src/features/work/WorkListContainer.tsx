@@ -73,7 +73,7 @@ export function WorkListContainer({
       onOpen={sessionId => router.push(`/session/${sessionId}`)}
       onOpenInfo={workId => router.push(`/work/${workId}`)}
       onOpenUsage={() => router.push('/usage')}
-      onRefresh={() => void refresh()}
+      onRefresh={refresh}
       onSearchQueryChange={onSearchQueryChange}
       searchQuery={searchQuery}
       showsInlineSearch={showsInlineSearch}

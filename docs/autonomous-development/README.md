@@ -85,3 +85,4 @@ Chronological index of independently shipped product improvements.
 46. [Understand Usage with a native iOS dashboard](./2026-08-31-46-mobile-native-usage-dashboard.md)
 47. [Triage pull requests in a native iOS inbox](./2026-08-31-47-mobile-native-pull-request-inbox.md)
 48. [Browse workspaces in a native iOS list](./2026-08-31-48-mobile-native-workspace-list.md)
+49. [Operate Work from a native iOS list](./2026-08-31-49-mobile-native-work-list.md)

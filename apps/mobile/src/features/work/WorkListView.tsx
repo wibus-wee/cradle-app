@@ -3,7 +3,6 @@ import { Info, Search } from 'lucide-react-native'
 import { useRef, useState } from 'react'
 import { Keyboard, SectionList, StyleSheet, Text, View } from 'react-native'
 
-import type { GetWorkspacesResponse, GetWorksResponse, PostWorksData } from '@/api-gen'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
 import { IconButton } from '@/components/ui/icon-button'
 import { InputGroup } from '@/components/ui/input-group'
@@ -16,42 +15,12 @@ import { relativeTime } from '@/lib/format'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
+import { activityTone, workGroup, workGroupTitles, workMatchesSearch } from './work-list-model'
+import type { WorkListViewProps } from './work-list-view-contract'
 import type { WorkComposerHandle } from './WorkComposer'
 import { WorkComposer } from './WorkComposer'
 
-type Work = GetWorksResponse['items'][number]
-type Workspace = GetWorkspacesResponse[number]
-
-export interface WorkListViewProps {
-  works: Work[]
-  archivedWorks: Work[]
-  workspaces: Workspace[]
-  isCreating?: boolean
-  isRefreshing?: boolean
-  onCreate: (input: PostWorksData['body']) => void
-  onOpen: (sessionId: string) => void
-  onOpenInfo: (workId: string) => void
-  onOpenUsage: () => void
-  onRefresh?: () => void
-  onSearchQueryChange: (query: string) => void
-  searchQuery: string
-  showsInlineSearch?: boolean
-}
-
-function activityTone(activity: Work['activity']) {
-  if (activity === 'running') { return 'success' as const }
-  if (activity === 'waiting') { return 'warning' as const }
-  if (activity === 'blocked') { return 'danger' as const }
-  return 'neutral' as const
-}
-
-function workGroup(updatedAt: number) {
-  const timestamp = updatedAt < 10_000_000_000 ? updatedAt * 1_000 : updatedAt
-  const age = Date.now() - timestamp
-  if (age < 86_400_000) { return 'Today' }
-  if (age < 604_800_000) { return 'This week' }
-  return 'Older'
-}
+export type { WorkListViewProps } from './work-list-view-contract'
 
 export function WorkListView({
   works,
@@ -75,11 +44,7 @@ export function WorkListView({
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
   const visibleWorks = lifecycle === 'active' ? works : archivedWorks
   const searchedWorks = normalizedSearch
-    ? visibleWorks.filter((work) => {
-        const workspaceName = workspaces.find(workspace => workspace.id === work.workspaceId)?.name
-        return [work.title, work.objective, workspaceName]
-          .some(value => value?.toLocaleLowerCase().includes(normalizedSearch))
-      })
+    ? visibleWorks.filter(work => workMatchesSearch(work, workspaces, normalizedSearch))
     : visibleWorks
   const filteredWorks = searchedWorks.filter((work) => {
     if (lifecycle === 'archived') { return true }
@@ -87,7 +52,7 @@ export function WorkListView({
     if (mode === 'attention') { return work.activity === 'waiting' || work.activity === 'blocked' }
     return true
   })
-  const groups = ['Today', 'This week', 'Older']
+  const groups = workGroupTitles
     .map(title => ({
       title,
       works: filteredWorks.filter(work => workGroup(work.updatedAt) === title),
