@@ -1,6 +1,7 @@
 import {
   Button,
   ContentUnavailableView,
+  ContextMenu,
   Host,
   HStack,
   Image,
@@ -159,69 +160,91 @@ export function WorkListView({
                 const workspaceName = workspaces.find(workspace => workspace.id === work.workspaceId)?.name
                 const updated = relativeTime(work.updatedAt)
                 return (
-                  <HStack key={work.id} modifiers={[fullWidth]} spacing={4}>
-                    <Button
-                      modifiers={[
-                        plainButton,
-                        fullWidth,
-                        accessibilityLabel(work.title),
-                        accessibilityValue([
-                          work.objective,
-                          activity.label,
-                          ...(workspaceName ? [workspaceName] : []),
-                          `updated ${updated}`,
-                        ].join(', ')),
-                        accessibilityHint('Opens conversation'),
-                      ]}
-                      onPress={() => {
-                        dismissComposer()
-                        onOpen(work.primarySessionId)
-                      }}
-                    >
-                      <HStack modifiers={[fullWidth]} spacing={12}>
-                        <Image color={activity.color} size={18} systemName={activity.symbol} />
-                        <VStack alignment="leading" spacing={4}>
-                          <Text>{work.title}</Text>
-                          <Text modifiers={[font({ textStyle: 'caption' }), secondaryForeground]}>
-                            {work.objective}
-                          </Text>
-                          <HStack spacing={7}>
-                            <Text modifiers={[font({ textStyle: 'caption' }), foregroundStyle(activity.color)]}>
-                              {activity.label}
-                            </Text>
-                            {workspaceName && (
+                  <ContextMenu key={work.id}>
+                    <ContextMenu.Trigger>
+                      <HStack modifiers={[fullWidth]} spacing={4}>
+                        <Button
+                          modifiers={[
+                            plainButton,
+                            fullWidth,
+                            accessibilityLabel(work.title),
+                            accessibilityValue([
+                              work.objective,
+                              activity.label,
+                              ...(workspaceName ? [workspaceName] : []),
+                              `updated ${updated}`,
+                            ].join(', ')),
+                            accessibilityHint('Opens conversation'),
+                          ]}
+                          onPress={() => {
+                            dismissComposer()
+                            onOpen(work.primarySessionId)
+                          }}
+                        >
+                          <HStack modifiers={[fullWidth]} spacing={12}>
+                            <Image color={activity.color} size={18} systemName={activity.symbol} />
+                            <VStack alignment="leading" spacing={4}>
+                              <Text>{work.title}</Text>
                               <Text modifiers={[font({ textStyle: 'caption' }), secondaryForeground]}>
-                                {workspaceName}
+                                {work.objective}
                               </Text>
-                            )}
-                            <Text
-                              modifiers={[
-                                font({ textStyle: 'caption' }),
-                                secondaryForeground,
-                                tabularNumber,
-                              ]}
-                            >
-                              {updated}
-                            </Text>
+                              <HStack spacing={7}>
+                                <Text modifiers={[font({ textStyle: 'caption' }), foregroundStyle(activity.color)]}>
+                                  {activity.label}
+                                </Text>
+                                {workspaceName && (
+                                  <Text modifiers={[font({ textStyle: 'caption' }), secondaryForeground]}>
+                                    {workspaceName}
+                                  </Text>
+                                )}
+                                <Text
+                                  modifiers={[
+                                    font({ textStyle: 'caption' }),
+                                    secondaryForeground,
+                                    tabularNumber,
+                                  ]}
+                                >
+                                  {updated}
+                                </Text>
+                              </HStack>
+                            </VStack>
+                            <Spacer />
                           </HStack>
-                        </VStack>
-                        <Spacer />
+                        </Button>
+                        <Button
+                          modifiers={[
+                            plainButton,
+                            infoTarget,
+                            accessibilityLabel(`Open info for ${work.title}`),
+                          ]}
+                          onPress={() => {
+                            dismissComposer()
+                            onOpenInfo(work.id)
+                          }}
+                        >
+                          <Image color="secondary" size={18} systemName="info.circle" />
+                        </Button>
                       </HStack>
-                    </Button>
-                    <Button
-                      modifiers={[
-                        plainButton,
-                        infoTarget,
-                        accessibilityLabel(`Open info for ${work.title}`),
-                      ]}
-                      onPress={() => {
-                        dismissComposer()
-                        onOpenInfo(work.id)
-                      }}
-                    >
-                      <Image color="secondary" size={18} systemName="info.circle" />
-                    </Button>
-                  </HStack>
+                    </ContextMenu.Trigger>
+                    <ContextMenu.Items>
+                      <Button
+                        label="Open Conversation"
+                        onPress={() => {
+                          dismissComposer()
+                          onOpen(work.primarySessionId)
+                        }}
+                        systemImage="message"
+                      />
+                      <Button
+                        label="View Work Info"
+                        onPress={() => {
+                          dismissComposer()
+                          onOpenInfo(work.id)
+                        }}
+                        systemImage="info.circle"
+                      />
+                    </ContextMenu.Items>
+                  </ContextMenu>
                 )
               })}
             </Section>
