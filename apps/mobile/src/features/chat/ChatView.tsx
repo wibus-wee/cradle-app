@@ -7,6 +7,7 @@ import {
   Animated,
   FlatList,
   Keyboard,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -191,7 +192,7 @@ export function ChatView({
             ]}
             data={displayItems}
             inverted
-            keyboardDismissMode="none"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
             keyboardShouldPersistTaps="always"
             ListHeaderComponent={(
               <Animated.View
