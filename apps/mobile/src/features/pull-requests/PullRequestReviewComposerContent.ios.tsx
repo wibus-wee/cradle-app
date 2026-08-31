@@ -1,5 +1,6 @@
 import {
   Button,
+  ConfirmationDialog,
   HStack,
   Image,
   ProgressView,
@@ -115,30 +116,65 @@ export function PullRequestReviewComposerContent({
           <Spacer />
         </HStack>
       </Button>
-      <Button
-        modifiers={[buttonStyle('bordered'), disabled(!body || busy)]}
-        onPress={() => void submitReview('REQUEST_CHANGES')}
+      <ConfirmationDialog
+        title="Request changes?"
+        titleVisibility="visible"
       >
-        <HStack modifiers={[fullWidth]} spacing={10}>
-          {pendingAction === 'REQUEST_CHANGES'
-            ? <ProgressView />
-            : <Image color="red" size={16} systemName="xmark.circle" />}
-          <Text modifiers={[foregroundStyle('red')]}>Request Changes</Text>
-          <Spacer />
-        </HStack>
-      </Button>
-      <Button
-        modifiers={[buttonStyle('borderedProminent'), disabled(busy)]}
-        onPress={() => void submitReview('APPROVE')}
+        <ConfirmationDialog.Trigger>
+          <Button modifiers={[buttonStyle('bordered'), disabled(!body || busy)]}>
+            <HStack modifiers={[fullWidth]} spacing={10}>
+              {pendingAction === 'REQUEST_CHANGES'
+                ? <ProgressView />
+                : <Image color="red" size={16} systemName="xmark.circle" />}
+              <Text modifiers={[foregroundStyle('red')]}>Request Changes</Text>
+              <Spacer />
+            </HStack>
+          </Button>
+        </ConfirmationDialog.Trigger>
+        <ConfirmationDialog.Actions>
+          <Button
+            label="Request Changes"
+            onPress={() => void submitReview('REQUEST_CHANGES')}
+            role="destructive"
+            systemImage="xmark.circle"
+          />
+          <Button label="Cancel" role="cancel" />
+        </ConfirmationDialog.Actions>
+        <ConfirmationDialog.Message>
+          <Text>Your note will be published and the pull request will require changes before approval.</Text>
+        </ConfirmationDialog.Message>
+      </ConfirmationDialog>
+      <ConfirmationDialog
+        title="Approve pull request?"
+        titleVisibility="visible"
       >
-        <HStack modifiers={[fullWidth]} spacing={10}>
-          {pendingAction === 'APPROVE'
-            ? <ProgressView />
-            : <Image size={16} systemName="checkmark.circle" />}
-          <Text>Approve</Text>
-          <Spacer />
-        </HStack>
-      </Button>
+        <ConfirmationDialog.Trigger>
+          <Button modifiers={[buttonStyle('borderedProminent'), disabled(busy)]}>
+            <HStack modifiers={[fullWidth]} spacing={10}>
+              {pendingAction === 'APPROVE'
+                ? <ProgressView />
+                : <Image size={16} systemName="checkmark.circle" />}
+              <Text>Approve</Text>
+              <Spacer />
+            </HStack>
+          </Button>
+        </ConfirmationDialog.Trigger>
+        <ConfirmationDialog.Actions>
+          <Button
+            label="Approve"
+            onPress={() => void submitReview('APPROVE')}
+            systemImage="checkmark.circle"
+          />
+          <Button label="Cancel" role="cancel" />
+        </ConfirmationDialog.Actions>
+        <ConfirmationDialog.Message>
+          <Text>
+            {body
+              ? 'Your note will be published with an approving review.'
+              : 'This will publish an approving review without a note.'}
+          </Text>
+        </ConfirmationDialog.Message>
+      </ConfirmationDialog>
     </VStack>
   )
 }

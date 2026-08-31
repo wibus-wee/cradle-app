@@ -111,3 +111,4 @@ Chronological index of independently shipped product improvements.
 72. [Preview workspace files with iOS Quick Look](./2026-08-31-72-mobile-native-quick-look.md)
 73. [Reach workspace files from a native context menu](./2026-08-31-73-mobile-workspace-context-menu.md)
 74. [Confirm server address copies without interrupting Settings](./2026-08-31-74-mobile-inline-copy-feedback.md)
+75. [Confirm externally visible pull request reviews on iOS](./2026-08-31-75-mobile-native-review-confirmation.md)
