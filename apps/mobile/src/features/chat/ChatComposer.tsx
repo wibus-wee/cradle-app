@@ -54,6 +54,7 @@ export interface ChatComposerProps {
   isStreaming: boolean
   onModeChange: (mode: 'build' | 'plan') => void
   onDraftChange: (draft: ChatComposerDraft) => void
+  onPreviewAttachment?: (file: FileUIPart) => Promise<void>
   onSend: (input: ChatSubmitInput) => void
   runtimeSettings?: RuntimeSettings
 }
@@ -66,6 +67,7 @@ function ChatComposerContent({
   isStreaming,
   onModeChange,
   onDraftChange,
+  onPreviewAttachment,
   onSend,
   runtimeSettings,
 }: ChatComposerProps) {
@@ -77,6 +79,7 @@ function ChatComposerContent({
   const clearDraftSignalRef = useRef(clearDraftSignal)
   const [continuationMode, setContinuationMode] = useState<'queue' | 'steer'>('queue')
   const [isPicking, setIsPicking] = useState(false)
+  const [previewingAttachment, setPreviewingAttachment] = useState<string | null>(null)
   const interactionMode
     = runtimeSettings?.runtimeSettings.interactionMode === 'plan' ? 'plan' : 'build'
   const cameraMenuActions: MenuAction[] = Platform.OS === 'ios'
@@ -325,6 +328,25 @@ function ChatComposerContent({
     }
   }
 
+  const previewAttachment = async (file: FileUIPart) => {
+    if (!onPreviewAttachment || previewingAttachment !== null) {
+      return
+    }
+    setPreviewingAttachment(file.url)
+    try {
+      await onPreviewAttachment(file)
+    }
+    catch {
+      Alert.alert(
+        'Could not preview attachment',
+        'This attachment is not supported by iOS Quick Look.',
+      )
+    }
+    finally {
+      setPreviewingAttachment(null)
+    }
+  }
+
   const insertSuggestion = (value: string, kind: 'mention' | 'slash') => {
     const pattern = kind === 'slash' ? /\/([\w-]*)$/ : /@([\w-]*)$/
     updateText(textRef.current.replace(pattern, `${kind === 'slash' ? '/' : '@'}${value} `))
@@ -410,8 +432,15 @@ function ChatComposerContent({
           showsHorizontalScrollIndicator={false}
         >
           {files.map(file => (
-            <View
+            <PressableScale
+              accessibilityHint={onPreviewAttachment ? 'Opens in iOS Quick Look' : undefined}
+              accessibilityLabel={onPreviewAttachment
+                ? `Preview ${file.filename ?? 'attachment'}`
+                : undefined}
+              accessibilityRole={onPreviewAttachment ? 'button' : undefined}
+              disabled={!onPreviewAttachment || previewingAttachment !== null}
               key={file.url}
+              onPress={() => { void previewAttachment(file) }}
               style={[
                 styles.attachment,
                 !file.mediaType.startsWith('image/') && styles.documentAttachment,
@@ -431,6 +460,11 @@ function ChatComposerContent({
                       </Text>
                     </View>
                   )}
+              {previewingAttachment === file.url && (
+                <View style={[styles.previewStatus, { backgroundColor: theme.overlay }]}>
+                  <ActivityIndicator color="#fff" size="small" />
+                </View>
+              )}
               <PressableScale
                 accessibilityLabel={`Remove ${file.filename ?? 'photo'}`}
                 accessibilityRole="button"
@@ -441,7 +475,7 @@ function ChatComposerContent({
               >
                 <X color="#fff" size={12} />
               </PressableScale>
-            </View>
+            </PressableScale>
           ))}
         </ScrollView>
       )}
@@ -643,6 +677,16 @@ const styles = StyleSheet.create({
     right: 2,
     top: 2,
     width: 32,
+  },
+  previewStatus: {
+    alignItems: 'center',
+    borderRadius: radius.md,
+    bottom: 0,
+    justifyContent: 'center',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
   },
   sendButton: {
     alignItems: 'center',

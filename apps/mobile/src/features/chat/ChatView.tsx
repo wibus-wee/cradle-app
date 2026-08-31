@@ -1,4 +1,4 @@
-import type { UIMessage } from 'ai'
+import type { FileUIPart, UIMessage } from 'ai'
 import { ArrowDown, Square } from 'lucide-react-native'
 import { useMemo, useRef, useState } from 'react'
 import type { NativeScrollEvent, NativeSyntheticEvent, NativeTouchEvent } from 'react-native'
@@ -63,6 +63,7 @@ export interface ChatViewProps {
   onCopyMessage: (text: string) => Promise<void>
   onLoadEarlier: () => void
   onModeChange: (mode: 'build' | 'plan') => void
+  onPreviewAttachment?: (file: FileUIPart) => Promise<void>
   onRequestMessageDetail: (messageId: string | null) => void
   onSend: (input: ChatSubmitInput) => void
   onShareMessage: (text: string) => Promise<void>
@@ -94,6 +95,7 @@ export function ChatView({
   onCopyMessage,
   onLoadEarlier,
   onModeChange,
+  onPreviewAttachment,
   onRequestMessageDetail,
   onSend,
   onShareMessage,
@@ -337,6 +339,7 @@ export function ChatView({
               key={composerDraftKey}
               onDraftChange={onComposerDraftChange}
               onModeChange={onModeChange}
+              onPreviewAttachment={onPreviewAttachment}
               onSend={onSend}
               runtimeSettings={runtimeSettings}
             />

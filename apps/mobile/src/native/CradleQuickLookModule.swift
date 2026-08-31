@@ -46,25 +46,39 @@ private final class CradleQuickLookPresenterUnavailableException: Exception, @un
   }
 }
 
+private final class CradleQuickLookBusyException: Exception, @unchecked Sendable {
+  override var reason: String {
+    "A Quick Look preview is already open."
+  }
+}
+
 final class CradleQuickLookModule: Module {
   private var previewDataSource: CradleQuickLookDataSource?
 
   func definition() -> ModuleDefinition {
     Name("CradleQuickLook")
 
-    AsyncFunction("preview") { [weak self] (fileURL: URL) in
+    AsyncFunction("preview") { [weak self] (fileURL: URL, promise: Promise) in
       guard fileURL.isFileURL, FileManager.default.fileExists(atPath: fileURL.path) else {
-        throw CradleQuickLookFileUnavailableException()
+        promise.reject(CradleQuickLookFileUnavailableException())
+        return
       }
       guard QLPreviewController.canPreview(fileURL as NSURL) else {
-        throw CradleQuickLookUnsupportedFileException()
+        promise.reject(CradleQuickLookUnsupportedFileException())
+        return
+      }
+      guard self?.previewDataSource == nil else {
+        promise.reject(CradleQuickLookBusyException())
+        return
       }
       guard let presenter = self?.appContext?.utilities?.currentViewController() else {
-        throw CradleQuickLookPresenterUnavailableException()
+        promise.reject(CradleQuickLookPresenterUnavailableException())
+        return
       }
 
       let dataSource = CradleQuickLookDataSource(fileURL: fileURL)
       dataSource.onDismiss = { [weak self] in
+        promise.resolve()
         self?.previewDataSource = nil
       }
       self?.previewDataSource = dataSource

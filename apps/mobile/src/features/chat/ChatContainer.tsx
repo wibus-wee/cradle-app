@@ -1,6 +1,6 @@
 import type { InfiniteData } from '@tanstack/react-query'
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { UIMessage } from 'ai'
+import type { FileUIPart, UIMessage } from 'ai'
 import * as Clipboard from 'expo-clipboard'
 import { Directory, File, Paths } from 'expo-file-system'
 import { Stack } from 'expo-router'
@@ -21,12 +21,39 @@ import { useConnection } from '@/features/connection/connection-context'
 import { cradleRequest, cradleStreamResponse } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
+import { openQuickLook } from '@/native/quick-look'
 
 import { readChatHistoryCache, writeChatHistoryCache } from './chat-history-cache'
 import { consumeChatMessageStream } from './chat-stream'
 import type { ChatSubmitInput } from './ChatComposer'
 import { ChatView } from './ChatView'
 import { useComposerDraft } from './use-composer-draft'
+
+async function previewDraftAttachment(file: FileUIPart): Promise<void> {
+  const separator = file.url.indexOf(',')
+  const metadata = separator >= 0 ? file.url.slice(0, separator) : ''
+  if (!metadata.startsWith('data:') || !metadata.endsWith(';base64')) {
+    throw new Error('Draft attachment is not base64 data.')
+  }
+
+  const previewDirectory = new Directory(Paths.cache, 'cradle-draft-previews')
+  previewDirectory.create({ idempotent: true, intermediates: true })
+  const filename = encodeURIComponent(file.filename ?? 'attachment')
+  const destination = new File(previewDirectory, `${Date.now()}-${filename}`)
+  destination.write(file.url.slice(separator + 1), { encoding: 'base64' })
+
+  try {
+    await openQuickLook(destination.uri)
+  }
+  finally {
+    try {
+      destination.delete()
+    }
+    catch {
+      // Cache cleanup must not turn a successful preview into a user-facing error.
+    }
+  }
+}
 
 export function ChatContainer({ sessionId }: { sessionId: string }) {
   const { connection } = useConnection()
@@ -539,6 +566,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
           await Clipboard.setStringAsync(text)
         }}
         onModeChange={handleModeChange}
+        onPreviewAttachment={Platform.OS === 'ios' ? previewDraftAttachment : undefined}
         onSend={handleSend}
         pendingUser={pendingUser}
         queuedCount={queuedCount}
