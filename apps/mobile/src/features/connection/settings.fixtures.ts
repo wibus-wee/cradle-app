@@ -1,4 +1,4 @@
-import type { ConnectionSettingsViewProps } from './ConnectionSettingsView'
+import type { ConnectionSettingsViewProps } from './connection-settings-view-contract'
 import type { SettingsViewProps } from './settings-view-contract'
 
 export const settingsFixture: SettingsViewProps = {
@@ -17,6 +17,7 @@ export const settingsFixture: SettingsViewProps = {
 
 export const connectionSettingsFixture: ConnectionSettingsViewProps = {
   onChangeValue: () => {},
+  onSubmit: () => {},
   setting: 'server',
   value: 'http://192.168.1.20:21423',
 }

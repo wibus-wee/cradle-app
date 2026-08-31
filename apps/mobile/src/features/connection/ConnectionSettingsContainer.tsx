@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Redirect, router, Stack } from 'expo-router'
 import { Check } from 'lucide-react-native'
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native'
+import { ActivityIndicator, Platform, Pressable, StyleSheet } from 'react-native'
 
 import type { ServerConnection } from '@/lib/api'
 import { testServerConnection } from '@/lib/api'
@@ -10,8 +10,8 @@ import { errorMessage } from '@/lib/errors'
 import { useTheme } from '@/theme/use-theme'
 
 import { useConnection } from './connection-context'
+import type { ConnectionSetting } from './connection-settings-view-contract'
 import { normalizeServerUrl } from './connection-utils'
-import type { ConnectionSetting } from './ConnectionSettingsView'
 import { ConnectionSettingsView } from './ConnectionSettingsView'
 
 interface ConnectionSettingsContainerProps {
@@ -57,6 +57,11 @@ export function ConnectionSettingsContainer({ setting }: ConnectionSettingsConta
       })
   }, [connection, queryClient, saveConnection, setting, value])
   const saveDisabled = isSaving || (setting === 'server' && !value.trim())
+  const submit = () => {
+    if (!saveDisabled) {
+      save()
+    }
+  }
 
   if (!connection) {
     return <Redirect href="/" />
@@ -64,31 +69,48 @@ export function ConnectionSettingsContainer({ setting }: ConnectionSettingsConta
 
   return (
     <>
-      <Stack.Screen
-        options={{
-          headerRight: () => isSaving
-            ? <ActivityIndicator color={theme.foreground} style={styles.headerAction} />
-            : (
-                <Pressable
-                  accessibilityLabel="Save"
-                  accessibilityRole="button"
-                  disabled={saveDisabled}
-                  hitSlop={8}
-                  onPress={save}
-                  style={styles.headerAction}
-                >
-                  <Check
-                    color={saveDisabled ? theme.dimForeground : theme.foreground}
-                    size={22}
-                    strokeWidth={2.2}
-                  />
-                </Pressable>
-              ),
-        }}
-      />
+      {Platform.OS === 'ios'
+        ? (
+            <Stack.Toolbar placement="right">
+              <Stack.Toolbar.Button
+                accessibilityHint="Checks and saves this connection setting"
+                accessibilityLabel="Save connection setting"
+                disabled={saveDisabled}
+                onPress={submit}
+                variant="done"
+              >
+                {isSaving ? 'Saving…' : 'Save'}
+              </Stack.Toolbar.Button>
+            </Stack.Toolbar>
+          )
+        : (
+            <Stack.Screen
+              options={{
+                headerRight: () => isSaving
+                  ? <ActivityIndicator color={theme.foreground} style={styles.headerAction} />
+                  : (
+                      <Pressable
+                        accessibilityLabel="Save"
+                        accessibilityRole="button"
+                        disabled={saveDisabled}
+                        hitSlop={8}
+                        onPress={save}
+                        style={styles.headerAction}
+                      >
+                        <Check
+                          color={saveDisabled ? theme.dimForeground : theme.foreground}
+                          size={22}
+                          strokeWidth={2.2}
+                        />
+                      </Pressable>
+                    ),
+              }}
+            />
+          )}
       <ConnectionSettingsView
         error={error}
         onChangeValue={setValue}
+        onSubmit={submit}
         setting={setting}
         value={value}
       />
