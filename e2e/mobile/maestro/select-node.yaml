@@ -1,0 +1,18 @@
+appId: app.cradle.mobile
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: fabric-node-picker
+    timeout: 45000
+- assertVisible:
+    id: fabric-node-${NODE_ID}
+- tapOn:
+    id: fabric-node-${NODE_ID}
+- extendedWaitUntil:
+    visible: Workspaces
+    timeout: 45000
+- assertVisible:
+    id: workspace-${WORKSPACE_ID}
+- assertNotVisible:
+    id: workspace-${OTHER_WORKSPACE_ID}

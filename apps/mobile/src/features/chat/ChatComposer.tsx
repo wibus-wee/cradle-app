@@ -308,6 +308,7 @@ function ChatComposerContent({
           placeholderTextColor={theme.mutedForeground}
           selectionColor={theme.info}
           style={[styles.input, { color: theme.foreground }]}
+          testID="chat-message-input"
           value={text}
         />
         <PressableScale
@@ -316,6 +317,7 @@ function ChatComposerContent({
           disabled={(!text.trim() && files.length === 0) || isSending}
           haptic
           onPress={submit}
+          testID="chat-send-message"
           style={[
             styles.sendButton,
             { backgroundColor: text.trim() || files.length > 0 ? theme.primary : theme.muted },

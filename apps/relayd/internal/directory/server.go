@@ -103,6 +103,7 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/join-requests", s.listJoinRequests)
 	mux.HandleFunc("DELETE /v1/fabrics/{fabricId}/join-requests/{requestId}", s.rejectJoinRequest)
 	mux.HandleFunc("POST /v1/fabrics/{fabricId}/controllers", s.registerController)
+	mux.HandleFunc("DELETE /v1/fabrics/{fabricId}/controllers/{controllerId}", s.revokeController)
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/nodes", s.listNodes)
 	mux.HandleFunc("GET /v1/fabrics/{fabricId}/events", s.events)
 	mux.HandleFunc("POST /v1/nodes/{nodeId}/links", s.openLink)
@@ -111,6 +112,36 @@ func (s *Server) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /v1/nodes/{nodeId}/grants/{grantId}", s.revokeGrant)
 	mux.HandleFunc("GET /v1/ws/nodes", s.nodeWebSocket)
 	mux.HandleFunc("GET /v1/ws/controllers/{linkId}", s.controllerWebSocket)
+}
+
+func (s *Server) revokeController(w http.ResponseWriter, r *http.Request) {
+	fabricID := r.PathValue("fabricId")
+	controllerID := r.PathValue("controllerId")
+	record, err := s.store.GetFabric(r.Context(), fabricID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if err := s.requireOwner(r, record); err != nil {
+		writeMembershipError(w, err)
+		return
+	}
+	nodeIDs, revision, err := s.store.RevokeController(r.Context(), fabricID, controllerID, "owner_revoked")
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	if s.links != nil {
+		s.links.RevokeController(fabricID, controllerID)
+	}
+	for _, nodeID := range nodeIDs {
+		node, getErr := s.store.GetNode(r.Context(), fabricID, nodeID)
+		if getErr == nil {
+			node.Revision = revision
+			s.broker.publish(fabricID, event{Type: "controller.revoked", Revision: revision, Node: &node})
+		}
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) createFabric(w http.ResponseWriter, r *http.Request) {
@@ -271,12 +302,12 @@ func (s *Server) approveJoinRequest(w http.ResponseWriter, r *http.Request) {
 			writeMembershipError(w, err)
 			return
 		}
-		if certificate.NodeID == "" || membership.HasAnyScope(certificate.Scopes, membership.ScopeAdmin) {
-			writeError(w, http.StatusForbidden, "Controller enrollment must be restricted to one Node without admin scope")
+		if certificate.NodeID != "" || membership.HasAnyScope(certificate.Scopes, membership.ScopeAdmin) {
+			writeError(w, http.StatusForbidden, "Controller enrollment must use grant-scoped access without admin scope")
 			return
 		}
 		for _, grant := range request.Grants {
-			if grant.FabricID != certificate.FabricID || grant.ControllerID != certificate.SubjectID || grant.NodeID != certificate.NodeID || grant.Scope == membership.ScopeAdmin || !membership.HasAnyScope(certificate.Scopes, grant.Scope) {
+			if grant.FabricID != certificate.FabricID || grant.ControllerID != certificate.SubjectID || grant.Scope == membership.ScopeAdmin || !membership.HasAnyScope(certificate.Scopes, grant.Scope) {
 				writeError(w, http.StatusForbidden, "Controller certificate does not authorize this grant")
 				return
 			}
@@ -314,9 +345,8 @@ func (s *Server) registerController(w http.ResponseWriter, r *http.Request) {
 		writeMembershipError(w, err)
 		return
 	}
-	nodeRestriction := controllerNodeRestriction(request.Certificate)
 	for _, grant := range request.Grants {
-		if (nodeRestriction != "" && grant.NodeID != nodeRestriction) || !membership.HasAnyScope(request.Certificate.Scopes, grant.Scope, membership.ScopeAdmin) {
+		if !membership.HasAnyScope(request.Certificate.Scopes, grant.Scope, membership.ScopeAdmin) {
 			writeError(w, http.StatusForbidden, "controller certificate does not authorize this grant")
 			return
 		}
@@ -346,7 +376,7 @@ func (s *Server) listNodes(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "nodes": restrictNodes(nodes, controllerNodeRestriction(controller))})
+	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "nodes": nodes})
 }
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
@@ -376,8 +406,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	nodeRestriction := controllerNodeRestriction(controller)
-	if !writeSSE(w, "snapshot", map[string]any{"revision": revision, "nodes": restrictNodes(nodes, nodeRestriction)}) {
+	if !writeSSE(w, "snapshot", map[string]any{"revision": revision, "nodes": nodes}) {
 		return
 	}
 	flusher.Flush()
@@ -389,9 +418,6 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 			return
 		case update := <-updates:
 			if update.Node != nil && !admin {
-				if nodeRestriction != "" && update.Node.NodeID != nodeRestriction {
-					continue
-				}
 				if update.Type == "node.removed" {
 					authorized := false
 					for _, controllerID := range update.AuthorizedControllerIDs {
@@ -600,27 +626,6 @@ func (s *Server) controllerWebSocket(w http.ResponseWriter, r *http.Request) {
 	_ = s.links.HandleController(r.Context(), linkID, controller.SubjectID, ws)
 }
 
-// Admin controllers are scoped by durable grants. Earlier device certificates
-// carried a node ID, which must not hide other nodes subsequently granted to them.
-func controllerNodeRestriction(certificate membership.Certificate) string {
-	if membership.HasAnyScope(certificate.Scopes, membership.ScopeAdmin) {
-		return ""
-	}
-	return certificate.NodeID
-}
-
-func restrictNodes(nodes []fabric.NodeSummary, nodeID string) []fabric.NodeSummary {
-	if nodeID == "" {
-		return nodes
-	}
-	for _, node := range nodes {
-		if node.NodeID == nodeID {
-			return []fabric.NodeSummary{node}
-		}
-	}
-	return []fabric.NodeSummary{}
-}
-
 // MarkNodePresence is called by the Node socket owner in Milestone 2. It is
 // already independent of the room relay and therefore safe to exercise in
 // Milestone 1 store/integration tests.
@@ -696,8 +701,10 @@ func writeError(w http.ResponseWriter, status int, message string) {
 
 func writeMembershipError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, fabric.ErrFabricNotFound), errors.Is(err, fabric.ErrAccessDenied), errors.Is(err, membership.ErrWrongFabric):
+	case errors.Is(err, fabric.ErrFabricNotFound), errors.Is(err, membership.ErrWrongFabric):
 		writeError(w, http.StatusNotFound, "fabric node not found")
+	case errors.Is(err, fabric.ErrAccessDenied):
+		writeError(w, http.StatusForbidden, "fabric access denied")
 	case errors.Is(err, membership.ErrExpired), errors.Is(err, membership.ErrReplayedNonce), errors.Is(err, membership.ErrInvalidDocument):
 		writeError(w, http.StatusUnauthorized, "invalid fabric membership")
 	default:

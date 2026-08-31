@@ -4,9 +4,10 @@ import { Check } from 'lucide-react-native'
 import { useCallback, useState } from 'react'
 import { ActivityIndicator, Pressable, StyleSheet } from 'react-native'
 
-import type { ServerConnection } from '@/lib/api'
+import type { DirectServerConfig } from '@/lib/api'
 import { testServerConnection } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
+import { createDirectServerConnection } from '@/lib/transport/direct-server-transport'
 import { useTheme } from '@/theme/use-theme'
 
 import { useConnection } from './connection-context'
@@ -20,30 +21,31 @@ interface ConnectionSettingsContainerProps {
 
 export function ConnectionSettingsContainer({ setting }: ConnectionSettingsContainerProps) {
   const { connection, saveConnection } = useConnection()
+  const directConnection = connection?.kind === 'direct' ? connection : null
   const queryClient = useQueryClient()
   const theme = useTheme()
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [value, setValue] = useState(
-    setting === 'server' ? connection?.url ?? '' : connection?.token ?? '',
+    setting === 'server' ? directConnection?.url ?? '' : directConnection?.token ?? '',
   )
 
   const save = useCallback(() => {
-    if (!connection) { return }
+    if (!directConnection) { return }
     setError(null)
     setIsSaving(true)
-    let nextConnection: ServerConnection
+    let nextConnection: DirectServerConfig
     try {
       nextConnection = setting === 'server'
-        ? { url: normalizeServerUrl(value), token: connection.token }
-        : { url: connection.url, token: value.trim() || null }
+        ? { url: normalizeServerUrl(value), token: directConnection.token }
+        : { url: directConnection.url, token: value.trim() || null }
     }
     catch {
       setError('Enter a valid Server URL.')
       setIsSaving(false)
       return
     }
-    void testServerConnection(nextConnection)
+    void testServerConnection(createDirectServerConnection(nextConnection))
       .then(async () => {
         queryClient.clear()
         await saveConnection(nextConnection)
@@ -55,10 +57,10 @@ export function ConnectionSettingsContainer({ setting }: ConnectionSettingsConta
       .finally(() => {
         setIsSaving(false)
       })
-  }, [connection, queryClient, saveConnection, setting, value])
+  }, [directConnection, queryClient, saveConnection, setting, value])
   const saveDisabled = isSaving || (setting === 'server' && !value.trim())
 
-  if (!connection) {
+  if (!directConnection) {
     return <Redirect href="/" />
   }
 

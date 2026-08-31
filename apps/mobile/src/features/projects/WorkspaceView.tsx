@@ -160,6 +160,7 @@ export function WorkspaceView({
                 description={relativeTime(session.latestAssistantMessageAt ?? session.latestUserMessageAt ?? session.updatedAt)}
                 media={<MessageSquareText color={theme.session} size={16} />}
                 onPress={() => onOpenSession(session.id)}
+                testID={`session-${session.id}`}
                 title={session.title ?? 'Untitled conversation'}
                 variant="muted"
               />

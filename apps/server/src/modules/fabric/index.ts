@@ -70,7 +70,7 @@ export const fabric = new Elysia({ prefix: '/fabric', detail: { tags: ['fabric']
     response: { 200: t.Array(FabricModel.pendingControllerRequest) },
   })
   .post('/controller-invitations/requests/:requestId/approve', ({ params, body }) => Fabric.approvePendingControllerRequest(params.requestId, body), {
-    detail: { summary: 'Approve a Controller for one Node with explicit scopes (owner only)' },
+    detail: { summary: 'Approve a Controller with explicit per-Node grants (owner only)' },
     params: FabricModel.requestIdParams,
     body: FabricModel.approveControllerRequest,
     response: { 200: FabricModel.controllerApproval },
@@ -81,6 +81,14 @@ export const fabric = new Elysia({ prefix: '/fabric', detail: { tags: ['fabric']
   }, {
     detail: { summary: 'Reject a pending Controller enrollment request (owner only)' },
     params: FabricModel.requestIdParams,
+    response: { 204: t.Void() },
+  })
+  .delete('/controllers/:controllerId', async ({ params, set }) => {
+    await Fabric.revokeFabricController(params.controllerId)
+    set.status = 204
+  }, {
+    detail: { summary: 'Permanently revoke a Controller and all grants (owner only)' },
+    params: FabricModel.controllerIdParams,
     response: { 204: t.Void() },
   })
 

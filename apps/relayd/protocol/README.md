@@ -44,12 +44,14 @@ The request `subjectKind` determines approval:
 | `node` | `nodeCertificate` plus a companion `controllerCertificate` | Node principal, Controller principal, Node directory record, and personal-device grants. |
 | `controller` | One `controllerCertificate` plus at least one explicit Node grant | Controller principal and only the submitted grants; no Node record is created. |
 
-For a Controller-only device, the certificate `nodeId` must identify the one
-Node authorized during enrollment. The owner may grant only `view`, `control`,
-or `approve`; Controller-only enrollment rejects `admin`. Relayd verifies that
-every grant matches the certificate Fabric, Controller, required Node
-restriction, and scopes before committing the certificate and grants
-atomically.
+For a Controller-only device, the certificate omits `nodeId`: it identifies a
+Controller in the Fabric rather than binding that identity to one Node. The
+owner submits one or more per-Node grants using only `view`, `control`, or
+`approve`; at least one grant must include `control`, and Controller-only
+enrollment rejects `admin`. Certificate scopes must equal the union of the
+submitted grant scopes. Relayd verifies that every target Node exists in the
+same Fabric, rejects duplicate grants, and commits the certificate and all
+grants atomically.
 
 The joining device polls `GET /v1/join-requests/{requestId}?secret=...`.
 Pending and rejected responses disclose no certificate. An approved Node gets
@@ -57,6 +59,12 @@ both certificates; an approved Controller gets only `controllerCertificate`.
 Repeating an identical approval or polling after a lost response is
 idempotent. Reusing the request id with different signed content or approving
 it with different certificate keys fails closed.
+
+An owner may revoke a non-admin Controller with `DELETE
+/v1/fabrics/{fabricId}/controllers/{controllerId}`. Relayd durably rejects that
+principal, revokes all of its Node grants in the same transaction, and closes
+every live link for it. Repeating the same revocation is idempotent. Admin
+companion Controllers are removed only with their Node lifecycle.
 
 ## Request authentication
 

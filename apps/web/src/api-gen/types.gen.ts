@@ -3232,8 +3232,10 @@ export type GetFabricControllerInvitationsRequestsResponse = GetFabricController
 
 export type PostFabricControllerInvitationsRequestsByRequestIdApproveData = {
     body: {
-        nodeId: string;
-        scopes: Array<'view' | 'control' | 'approve'>;
+        grants: Array<{
+            nodeId: string;
+            scopes: Array<'view' | 'control' | 'approve'>;
+        }>;
     };
     path: {
         requestId: string;
@@ -3264,6 +3266,22 @@ export type DeleteFabricControllerInvitationsRequestsByRequestIdData = {
 };
 
 export type DeleteFabricControllerInvitationsRequestsByRequestIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
+export type DeleteFabricControllersByControllerIdData = {
+    body?: never;
+    path: {
+        controllerId: string;
+    };
+    query?: never;
+    url: '/fabric/controllers/{controllerId}';
+};
+
+export type DeleteFabricControllersByControllerIdResponses = {
     /**
      * Response for status 204
      */
@@ -3359,6 +3377,7 @@ export type GetNodesByNodeIdGrantsResponses = {
         grantId: string;
         fabricId: string;
         controllerId: string;
+        controllerDisplayName?: string;
         nodeId: string;
         scope: 'view' | 'control' | 'approve' | 'admin';
         revokedAt?: string;

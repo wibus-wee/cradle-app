@@ -6,18 +6,18 @@ import type { GetChatSessionsBySessionIdMessagePreviewsResponse } from '@/api-ge
 type ChatHistoryPage = GetChatSessionsBySessionIdMessagePreviewsResponse
 export type ChatHistoryCacheData = InfiniteData<ChatHistoryPage, string | null>
 
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
 const CACHE_PREFIX = '@cradle/mobile/chat-history'
 
-function cacheKey(connectionUrl: string, sessionId: string): string {
-  return `${CACHE_PREFIX}/${connectionUrl}/${sessionId}`
+function cacheKey(resourceId: string, sessionId: string): string {
+  return `${CACHE_PREFIX}/${resourceId}/${sessionId}`
 }
 
 export async function readChatHistoryCache(
-  connectionUrl: string,
+  resourceId: string,
   sessionId: string,
 ): Promise<ChatHistoryCacheData | null> {
-  const raw = await AsyncStorage.getItem(cacheKey(connectionUrl, sessionId))
+  const raw = await AsyncStorage.getItem(cacheKey(resourceId, sessionId))
   if (!raw) {
     return null
   }
@@ -46,7 +46,7 @@ export async function readChatHistoryCache(
 }
 
 export async function writeChatHistoryCache(
-  connectionUrl: string,
+  resourceId: string,
   sessionId: string,
   data: ChatHistoryCacheData,
 ): Promise<void> {
@@ -54,7 +54,7 @@ export async function writeChatHistoryCache(
   if (!latestPage) {
     return
   }
-  await AsyncStorage.setItem(cacheKey(connectionUrl, sessionId), JSON.stringify({
+  await AsyncStorage.setItem(cacheKey(resourceId, sessionId), JSON.stringify({
     data: {
       pageParams: [null],
       pages: [latestPage],

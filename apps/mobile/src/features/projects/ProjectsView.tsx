@@ -95,6 +95,7 @@ export function ProjectsView({
               ? <FolderX color={theme.destructive} size={22} strokeWidth={1.7} />
               : <Folder color={theme.mutedForeground} size={22} strokeWidth={1.7} />}
             onPress={() => onOpenProject(workspace.id)}
+            testID={`workspace-${workspace.id}`}
             title={workspace.name}
           />
         )}

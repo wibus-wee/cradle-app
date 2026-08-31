@@ -1,120 +1,62 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 
-import { ed25519, x25519 } from '@noble/curves/ed25519.js'
+import type {
+  FabricJoinRequest,
+  FabricKeyPair,
+  FabricRequestProof,
+  FabricSubjectKind,
+  MembershipCertificate,
+} from '@cradle/fabric-protocol'
+import {
+  createFabricAuthHeaderValues,
+  generateFabricEncryptionKeyPair as generateEncryptionKeyPair,
+  generateFabricSigningKeyPair as generateSigningKeyPair,
+  publicFabricSigningKey,
+  randomFabricSecret as createRandomFabricSecret,
+  signFabricCertificate as signCertificate,
+  signFabricCreateRequest as signCreateRequest,
+  signFabricJoinRequest as signJoinRequest,
+  signFabricRequestProof as signRequestProof,
+  verifyFabricCertificate,
+} from '@cradle/fabric-protocol'
 
 import { AppError } from '../../errors/app-error'
 
-export type FabricScope = 'view' | 'control' | 'approve' | 'admin'
-export type FabricSubjectKind = 'node' | 'controller'
+export type {
+  FabricJoinRequest,
+  FabricKeyPair,
+  FabricNodeGrant,
+  FabricRequestProof,
+  FabricScope,
+  FabricSubjectKind,
+  MembershipCertificate,
+  NodeSummary,
+} from '@cradle/fabric-protocol'
 
-export interface MembershipCertificate {
-  version: 1
-  fabricId: string
-  subjectKind: FabricSubjectKind
-  subjectId: string
-  identityPubkey: string
-  encryptionPubkey: string
-  nodeId?: string
-  scopes: FabricScope[]
-  issuedAt: number
-  expiresAt?: number
-  nonce: string
-  issuerPubkey: string
-  signature: string
-}
-
-export interface FabricRequestProof {
-  pubkey: string
-  method: string
-  path: string
-  issuedAt: number
-  nonce: string
-  signature: string
-}
-
-export interface NodeSummary {
-  nodeId: string
-  fabricId: string
-  displayName: string
-  platform: string
-  version: string
-  capabilities: string[]
-  status: 'online' | 'offline'
-  lastSeenAt: string
-  revision: number
-  /** This Controller's active grant scopes over the Node (directory listings only). */
-  scopes?: FabricScope[]
-}
-
-/** One Controller grant over a Node, as recorded by the relayd directory. */
-export interface FabricNodeGrant {
-  grantId: string
-  fabricId: string
-  controllerId: string
-  nodeId: string
-  scope: FabricScope
-  revokedAt?: string
-}
-
-export interface FabricJoinRequest {
-  requestId: string
-  fabricId: string
-  subjectKind: FabricSubjectKind
-  subjectId: string
-  identityPubkey: string
-  encryptionPubkey: string
-  displayName: string
-  platform: string
-  version: string
-  capabilities: string[]
-  deliverySecretHash: string
-  issuedAt: number
-  expiresAt: number
-  signature: string
-}
-
-export interface FabricKeyPair {
-  privateKeyBase64: string
-  publicKeyBase64: string
+const runtime = {
+  nowSeconds: () => Math.floor(Date.now() / 1000),
+  randomBytes: (length: number) => new Uint8Array(randomBytes(length)),
+  randomId: randomUUID,
 }
 
 export interface FabricEncryptionKeyPair extends FabricKeyPair {}
 
 export function generateFabricSigningKeyPair(): FabricKeyPair {
-  const privateKey = ed25519.utils.randomSecretKey()
-  return { privateKeyBase64: toBase64(privateKey), publicKeyBase64: toBase64(ed25519.getPublicKey(privateKey)) }
+  return generateSigningKeyPair(runtime.randomBytes)
 }
 
 export function generateFabricEncryptionKeyPair(): FabricEncryptionKeyPair {
-  const privateKey = x25519.utils.randomSecretKey()
-  return { privateKeyBase64: toBase64(privateKey), publicKeyBase64: toBase64(x25519.scalarMultBase(privateKey)) }
+  return generateEncryptionKeyPair(runtime.randomBytes)
 }
 
-export function publicFabricSigningKey(privateKeyBase64: string): string {
-  return toBase64(ed25519.getPublicKey(fromBase64(privateKeyBase64)))
-}
+export { publicFabricSigningKey }
 
 export function signFabricCertificate(
   ownerPrivateKeyBase64: string,
   input: Omit<MembershipCertificate, 'version' | 'issuedAt' | 'nonce' | 'issuerPubkey' | 'signature'>
     & Partial<Pick<MembershipCertificate, 'issuedAt' | 'nonce'>>,
 ): MembershipCertificate {
-  const certificate: MembershipCertificate = {
-    version: 1,
-    fabricId: input.fabricId,
-    subjectKind: input.subjectKind,
-    subjectId: input.subjectId,
-    identityPubkey: input.identityPubkey,
-    encryptionPubkey: input.encryptionPubkey,
-    ...(input.nodeId ? { nodeId: input.nodeId } : {}),
-    scopes: canonicalStrings([...new Set(input.scopes)]),
-    issuedAt: input.issuedAt ?? unixSeconds(),
-    ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
-    nonce: input.nonce ?? randomUUID(),
-    issuerPubkey: publicFabricSigningKey(ownerPrivateKeyBase64),
-    signature: '',
-  }
-  return { ...certificate, signature: sign(ownerPrivateKeyBase64, certificatePayload(certificate)) }
+  return signCertificate(ownerPrivateKeyBase64, input, runtime)
 }
 
 export function signFabricRequestProof(
@@ -122,30 +64,11 @@ export function signFabricRequestProof(
   method: string,
   path: string,
 ): FabricRequestProof {
-  const proof = {
-    pubkey: publicFabricSigningKey(privateKeyBase64),
-    method,
-    path,
-    issuedAt: unixSeconds(),
-    nonce: randomUUID(),
-  }
-  return { ...proof, signature: sign(privateKeyBase64, proof) }
+  return signRequestProof(privateKeyBase64, method, path, runtime)
 }
 
-export function signFabricCreateRequest(ownerPrivateKeyBase64: string): {
-  ownerPubkey: string
-  requestId: string
-  issuedAt: number
-  nonce: string
-  signature: string
-} {
-  const request = {
-    ownerPubkey: publicFabricSigningKey(ownerPrivateKeyBase64),
-    requestId: randomUUID(),
-    issuedAt: unixSeconds(),
-    nonce: randomUUID(),
-  }
-  return { ...request, signature: sign(ownerPrivateKeyBase64, request) }
+export function signFabricCreateRequest(ownerPrivateKeyBase64: string) {
+  return signCreateRequest(ownerPrivateKeyBase64, runtime)
 }
 
 export function signFabricJoinRequest(input: {
@@ -160,34 +83,35 @@ export function signFabricJoinRequest(input: {
   capabilities: string[]
   deliverySecret: string
 }): FabricJoinRequest {
-  const request = {
-    requestId: `join_${randomUUID()}`,
-    fabricId: input.fabricId,
-    subjectKind: input.subjectKind ?? 'node',
-    subjectId: input.subjectId,
-    identityPubkey: publicFabricSigningKey(input.identityPrivateKeyBase64),
-    encryptionPubkey: input.encryptionPubkey,
-    displayName: input.displayName,
-    platform: input.platform,
-    version: input.version,
-    capabilities: canonicalStrings([...new Set(input.capabilities)]),
-    deliverySecretHash: createHash('sha256').update(input.deliverySecret).digest('base64url'),
-    issuedAt: unixSeconds(),
-    expiresAt: unixSeconds() + 15 * 60,
-  }
-  return { ...request, signature: sign(input.identityPrivateKeyBase64, request) }
+  return signJoinRequest(input, runtime)
 }
 
-export function fabricAuthHeaders(certificate: MembershipCertificate, identityPrivateKeyBase64: string, method: string, path: string): Headers {
-  const headers = new Headers()
-  headers.set('x-cradle-fabric-certificate', toRawBase64(new TextEncoder().encode(JSON.stringify(certificate))))
-  headers.set('x-cradle-fabric-proof', toRawBase64(new TextEncoder().encode(JSON.stringify(signFabricRequestProof(identityPrivateKeyBase64, method, path)))))
-  return headers
+export function fabricAuthHeaders(
+  certificate: MembershipCertificate,
+  identityPrivateKeyBase64: string,
+  method: string,
+  path: string,
+): Headers {
+  return new Headers(createFabricAuthHeaderValues(
+    certificate,
+    identityPrivateKeyBase64,
+    method,
+    path,
+    runtime,
+  ))
 }
 
-export function ownerProofHeaders(ownerPrivateKeyBase64: string, method: string, path: string): Headers {
+export function ownerProofHeaders(
+  ownerPrivateKeyBase64: string,
+  method: string,
+  path: string,
+): Headers {
   const headers = new Headers()
-  headers.set('x-cradle-fabric-proof', toRawBase64(new TextEncoder().encode(JSON.stringify(signFabricRequestProof(ownerPrivateKeyBase64, method, path)))))
+  const proof = signFabricRequestProof(ownerPrivateKeyBase64, method, path)
+  headers.set(
+    'x-cradle-fabric-proof',
+    Buffer.from(JSON.stringify(proof), 'utf8').toString('base64').replace(/=+$/u, ''),
+  )
   return headers
 }
 
@@ -197,44 +121,23 @@ export function fabricHeadersRecord(headers: Headers): Record<string, string> {
   return record
 }
 
-export function assertFabricCertificate(certificate: MembershipCertificate, ownerPubkey: string, fabricId: string): void {
-  if (certificate.version !== 1 || certificate.fabricId !== fabricId || certificate.issuerPubkey !== ownerPubkey || (certificate.expiresAt && certificate.expiresAt <= unixSeconds())) {
-    throw new AppError({ code: 'fabric_membership_invalid', status: 401, message: 'Fabric membership certificate is invalid.' })
+export function assertFabricCertificate(
+  certificate: MembershipCertificate,
+  ownerPubkey: string,
+  fabricId: string,
+): void {
+  try {
+    verifyFabricCertificate(certificate, ownerPubkey, fabricId, runtime.nowSeconds())
   }
-  const valid = ed25519.verify(fromBase64(certificate.signature), new TextEncoder().encode(JSON.stringify(certificatePayload(certificate))), fromBase64(ownerPubkey))
-  if (!valid) {
-    throw new AppError({ code: 'fabric_membership_invalid', status: 401, message: 'Fabric membership signature is invalid.' })
-  }
-}
-
-export function randomFabricSecret(): string { return randomBytes(32).toString('base64url') }
-
-function certificatePayload(certificate: MembershipCertificate): Record<string, unknown> {
-  return {
-    version: certificate.version,
-    fabricId: certificate.fabricId,
-    subjectKind: certificate.subjectKind,
-    subjectId: certificate.subjectId,
-    identityPubkey: certificate.identityPubkey,
-    encryptionPubkey: certificate.encryptionPubkey,
-    ...(certificate.nodeId ? { nodeId: certificate.nodeId } : {}),
-    scopes: canonicalStrings(certificate.scopes),
-    issuedAt: certificate.issuedAt,
-    ...(certificate.expiresAt ? { expiresAt: certificate.expiresAt } : {}),
-    nonce: certificate.nonce,
-    issuerPubkey: certificate.issuerPubkey,
+  catch (error) {
+    throw new AppError({
+      code: 'fabric_membership_invalid',
+      status: 401,
+      message: error instanceof Error ? error.message : 'Fabric membership certificate is invalid.',
+    })
   }
 }
 
-function sign(privateKeyBase64: string, payload: Record<string, unknown>): string {
-  return toBase64(ed25519.sign(new TextEncoder().encode(JSON.stringify(payload)), fromBase64(privateKeyBase64)))
+export function randomFabricSecret(): string {
+  return createRandomFabricSecret(runtime)
 }
-
-function canonicalStrings<T extends string>(values: T[]): T[] {
-  return [...values].sort((left, right) => Buffer.compare(Buffer.from(left, 'utf8'), Buffer.from(right, 'utf8')))
-}
-
-function unixSeconds(): number { return Math.floor(Date.now() / 1000) }
-function toBase64(value: Uint8Array): string { return Buffer.from(value).toString('base64') }
-function toRawBase64(value: Uint8Array): string { return Buffer.from(value).toString('base64').replace(/=+$/u, '') }
-function fromBase64(value: string): Uint8Array { return new Uint8Array(Buffer.from(value, 'base64')) }

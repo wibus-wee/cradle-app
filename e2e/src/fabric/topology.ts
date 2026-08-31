@@ -245,9 +245,9 @@ relayDatabasePath,
     }
     const webDistDir = join(rootDir, 'web-dist')
     await runLoggedProcess({
-      command: process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-      args: ['--filter', '@cradle/plugin-sdk', 'build'],
-      cwd: ROOT,
+      command: join(ROOT, 'node_modules', '.bin', process.platform === 'win32' ? 'tsc.cmd' : 'tsc'),
+      args: ['-p', 'tsconfig.json'],
+      cwd: join(ROOT, 'packages', 'plugin-sdk'),
       env: webEnv,
       logPath: webLogPath,
       label: 'Plugin SDK build for Fabric E2E',

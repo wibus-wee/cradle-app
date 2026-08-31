@@ -1,0 +1,41 @@
+appId: app.cradle.mobile
+---
+- launchApp
+- extendedWaitUntil:
+    visible: Workspaces
+    timeout: 30000
+- tapOn: Open navigation
+- tapOn: Settings
+- extendedWaitUntil:
+    visible: Settings
+    timeout: 15000
+- tapOn:
+    id: settings-node-${NODE_ID}
+- tapOn: Open navigation
+- tapOn: Workspaces
+- extendedWaitUntil:
+    visible:
+      id: workspace-${WORKSPACE_ID}
+    timeout: 45000
+- assertNotVisible:
+    id: workspace-${OTHER_WORKSPACE_ID}
+- tapOn:
+    id: workspace-${WORKSPACE_ID}
+- extendedWaitUntil:
+    visible:
+      id: session-${SESSION_ID}
+    timeout: 45000
+- tapOn:
+    id: session-${SESSION_ID}
+- extendedWaitUntil:
+    visible:
+      id: chat-message-input
+    timeout: 45000
+- tapOn:
+    id: chat-message-input
+- inputText: ${CHAT_PROMPT}
+- tapOn:
+    id: chat-send-message
+- extendedWaitUntil:
+    visible: ${CHAT_RESPONSE}
+    timeout: 60000

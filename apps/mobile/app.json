@@ -10,6 +10,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.cradle.mobile",
+      "entitlements": {
+        "keychain-access-groups": [
+          "$(AppIdentifierPrefix)$(CFBundleIdentifier)"
+        ]
+      },
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "Cradle connects to your Cradle Server on the local network.",
         "NSAppTransportSecurity": {

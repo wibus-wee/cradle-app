@@ -3,6 +3,7 @@ import { t } from 'elysia'
 const nonBlankString = t.String({ minLength: 1, pattern: '.*\\S.*' })
 
 const fabricScope = t.Union([t.Literal('view'), t.Literal('control'), t.Literal('approve'), t.Literal('admin')])
+const controllerGrantScope = t.Union([t.Literal('view'), t.Literal('control'), t.Literal('approve')])
 const relayAccessMode = t.Union([t.Literal('local'), t.Literal('network'), t.Literal('external')])
 
 const nodeSummary = t.Object(
@@ -26,6 +27,7 @@ const nodeGrant = t.Object(
     grantId: t.String(),
     fabricId: t.String(),
     controllerId: t.String(),
+    controllerDisplayName: t.Optional(t.String()),
     nodeId: t.String(),
     scope: fabricScope,
     revokedAt: t.Optional(t.String()),
@@ -114,8 +116,13 @@ export const FabricModel = {
   ),
   approveControllerRequest: t.Object(
     {
-      nodeId: nonBlankString,
-      scopes: t.Array(t.Union([t.Literal('view'), t.Literal('control'), t.Literal('approve')]), { minItems: 1, uniqueItems: true }),
+      grants: t.Array(t.Object(
+        {
+          nodeId: nonBlankString,
+          scopes: t.Array(controllerGrantScope, { minItems: 1, uniqueItems: true }),
+        },
+        { additionalProperties: false },
+      ), { minItems: 1 }),
     },
     { additionalProperties: false },
   ),
@@ -124,6 +131,7 @@ export const FabricModel = {
     { additionalProperties: false },
   ),
   requestIdParams: t.Object({ requestId: nonBlankString }, { additionalProperties: false }),
+  controllerIdParams: t.Object({ controllerId: nonBlankString }, { additionalProperties: false }),
   nodeIdParams: t.Object({ nodeId: nonBlankString }, { additionalProperties: false }),
   nodeGrantParams: t.Object({ nodeId: nonBlankString, grantId: nonBlankString }, { additionalProperties: false }),
   nodeGrant,

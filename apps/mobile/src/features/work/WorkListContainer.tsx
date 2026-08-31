@@ -20,7 +20,7 @@ export function WorkListContainer() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['works', connection?.url],
+    queryKey: ['works', connection?.resourceId],
     queryFn: async ({ signal }) => {
       const [works, workspaces] = await Promise.all([
         cradleRequest<GetWorksResponse>(connection!, '/works?archived=false&limit=200', { signal }),

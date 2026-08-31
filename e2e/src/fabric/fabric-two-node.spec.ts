@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
@@ -38,6 +38,19 @@ interface FabricMembership {
   fabricId: string
 }
 
+interface PendingControllerRequest {
+  requestId: string
+  subjectId: string
+  displayName: string
+}
+
+interface NodeGrant {
+  grantId: string
+  controllerId: string
+  scope: 'view' | 'control' | 'approve' | 'admin'
+  revokedAt?: string | null
+}
+
 interface SessionSummary {
   id: string
   title: string | null
@@ -69,6 +82,8 @@ let desktopPage: Page
 let macbookPage: Page
 let desktopSimulator: E2ESimulator
 let macbookSimulator: E2ESimulator
+
+const mobileIosEnabled = process.env.CRADLE_E2E_MOBILE_IOS === '1'
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -235,6 +250,80 @@ async function pairNodesThroughUi(): Promise<{
   return { desktopMembership: desktopMembership!, macbookMembership: macbookMembership! }
 }
 
+async function ensurePairedNodes(): Promise<{
+  desktopMembership: FabricMembership
+  macbookMembership: FabricMembership
+}> {
+  const [desktopMembership, macbookMembership] = await Promise.all([
+    json<FabricMembership | null>(`${topology.desktop.serverUrl}/fabric`),
+    json<FabricMembership | null>(`${topology.macbook.serverUrl}/fabric`),
+  ])
+  if (desktopMembership && macbookMembership) {
+    return { desktopMembership, macbookMembership }
+  }
+  expect(desktopMembership).toBeNull()
+  expect(macbookMembership).toBeNull()
+  return await pairNodesThroughUi()
+}
+
+async function runMaestroFlow(flowName: string, variables: Record<string, string>): Promise<void> {
+  const maestroPath = process.env.MAESTRO_CLI_PATH?.trim()
+  const simulatorUdid = process.env.CRADLE_E2E_IOS_UDID?.trim()
+  const artifactsRoot = process.env.CRADLE_E2E_MOBILE_ARTIFACTS_DIR?.trim()
+  if (!maestroPath || !simulatorUdid || !artifactsRoot) {
+    throw new Error('Mobile Fabric E2E requires MAESTRO_CLI_PATH, CRADLE_E2E_IOS_UDID, and CRADLE_E2E_MOBILE_ARTIFACTS_DIR.')
+  }
+
+  const flowPath = join(import.meta.dirname, '..', '..', 'mobile', 'maestro', `${flowName}.yaml`)
+  const outputDir = join(artifactsRoot, flowName)
+  mkdirSync(outputDir, { recursive: true })
+  const variableArgs = Object.entries(variables).flatMap(([key, value]) => ['-e', `${key}=${value}`])
+  const child = spawn(maestroPath, [
+    'test',
+    '--udid',
+    simulatorUdid,
+    '--no-ansi',
+    '--debug-output',
+    join(outputDir, 'debug'),
+    '--test-output-dir',
+    join(outputDir, 'tests'),
+    '--format',
+    'JUNIT',
+    '--output',
+    join(outputDir, 'junit.xml'),
+    ...variableArgs,
+    flowPath,
+  ], {
+    cwd: join(import.meta.dirname, '..', '..', '..'),
+    env: {
+      ...process.env,
+      MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true',
+      MAESTRO_CLI_NO_ANALYTICS: '1',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let output = ''
+  child.stdout.setEncoding('utf8')
+  child.stderr.setEncoding('utf8')
+  child.stdout.on('data', chunk => output += chunk)
+  child.stderr.on('data', chunk => output += chunk)
+  let status: number | null
+  try {
+    status = await new Promise<number | null>((resolve, reject) => {
+      child.once('error', reject)
+      child.once('close', resolve)
+    })
+  }
+  catch (cause) {
+    writeFileSync(join(outputDir, 'maestro.log'), output)
+    throw cause
+  }
+  writeFileSync(join(outputDir, 'maestro.log'), output)
+  if (status !== 0) {
+    throw new Error(`Maestro flow ${flowName} failed (${status ?? 'signal'}).\n${output}`)
+  }
+}
+
 async function rejoinMacbookThroughUi(previousNodeId: string): Promise<FabricMembership> {
   const leave = await fetch(`${topology.macbook.serverUrl}/fabric`, { method: 'DELETE' })
   expect(leave.status).toBe(204)
@@ -272,7 +361,6 @@ async function rejoinMacbookThroughUi(previousNodeId: string): Promise<FabricMem
 async function mountRemoteWorkspace(input: {
   page: Page
   controller: FabricNodeProcess
-  authority: FabricNodeProcess
   targetNodeId: string
   remoteWorkspace: WorkspaceSummary
 }): Promise<WorkspaceSummary> {
@@ -524,6 +612,20 @@ test.describe('Fabric two-node user journey', () => {
         await testInfo.attach(name, { body: readFileSync(path), contentType: 'text/plain' })
       }
     }
+    const simulatorUdid = process.env.CRADLE_E2E_IOS_UDID?.trim()
+    if (simulatorUdid) {
+      const screenshotPath = join(topology.rootDir, 'mobile-simulator.png')
+      try {
+        execFileSync('xcrun', ['simctl', 'io', simulatorUdid, 'screenshot', screenshotPath])
+        await testInfo.attach('mobile-simulator.png', {
+          body: readFileSync(screenshotPath),
+          contentType: 'image/png',
+        })
+      }
+      catch {
+        // Maestro's own debug bundle remains available when simctl cannot capture the screen.
+      }
+    }
   })
 
   test('[CRADLE-FABRIC-001] pairs, mounts, runs Work, approves tools, and reconnects both ways', async () => {
@@ -752,6 +854,133 @@ test.describe('Fabric two-node user journey', () => {
         [desktopMembership.localNodeId, macbookMembership.localNodeId].sort(),
         [desktopMembership.localNodeId, macbookMembership.localNodeId].sort(),
       ])
+    })
+  })
+
+  test('[CRADLE-FABRIC-002] enrolls Mobile, switches Nodes, streams Chat, and enforces revocation', async () => {
+    test.skip(!mobileIosEnabled, 'Run pnpm e2e:fabric:mobile:ios on macOS to exercise the native app.')
+    test.setTimeout(480_000)
+
+    let desktopLocal!: WorkspaceSummary
+    let macbookLocal!: WorkspaceSummary
+    let desktopMembership!: FabricMembership
+    let macbookMembership!: FabricMembership
+    let macbookSessionId!: string
+    let mobileControllerId!: string
+
+    await test.step('pair two Nodes and create distinct local Workspaces', async () => {
+      ;({ desktopMembership, macbookMembership } = await ensurePairedNodes())
+      const desktopWorkspacePath = mkdtempSync(join(topology.desktop.homeDir, 'mobile-workspace-'))
+      const macbookWorkspacePath = mkdtempSync(join(topology.macbook.homeDir, 'mobile-workspace-'))
+      initializeGitWorkspace(desktopWorkspacePath, 'mobile-desktop-marker.txt', 'visible only on Desktop\n')
+      initializeGitWorkspace(macbookWorkspacePath, 'mobile-macbook-marker.txt', 'visible only on MacBook\n')
+      ;[desktopLocal, macbookLocal] = await Promise.all([
+        addLocalWorkspace(desktopPage, topology.desktop, desktopWorkspacePath),
+        addLocalWorkspace(macbookPage, topology.macbook, macbookWorkspacePath),
+      ])
+    })
+
+    await test.step('seed a MacBook conversation and request Mobile Controller access', async () => {
+      macbookSessionId = await sendChat({
+        page: macbookPage,
+        workspaceId: macbookLocal.id,
+        prompt: 'Seed the Mobile Fabric conversation',
+        response: 'MacBook seeded the Mobile conversation.',
+        targetSimulator: macbookSimulator,
+      })
+
+      await openNodeSettings(desktopPage)
+      const controllerCode = desktopPage.locator('[data-testid="fabric-controller-code"]')
+      await expect(controllerCode).toBeVisible()
+      const code = (await controllerCode.textContent())?.trim()
+      expect(code).toBeTruthy()
+      await runMaestroFlow('enroll-controller', { FABRIC_CODE: code! })
+
+      let request: PendingControllerRequest | undefined
+      await expect.poll(async () => {
+        const requests = await json<PendingControllerRequest[]>(
+          `${topology.desktop.serverUrl}/fabric/controller-invitations/requests`,
+        )
+        request = requests.at(0)
+        return request?.requestId ?? null
+      }, { timeout: 45_000 }).not.toBeNull()
+      mobileControllerId = request!.subjectId
+
+      await expect(desktopPage.locator(`[data-testid="controller-pending-request-${request!.requestId}"]`)).toBeVisible({ timeout: 10_000 })
+      await desktopPage.locator(`[data-testid="controller-pending-review-${request!.requestId}"]`).click()
+      await desktopPage.locator(`[data-testid="controller-grant-${desktopMembership.localNodeId}-control"]`).click()
+      await desktopPage.locator(`[data-testid="controller-grant-${macbookMembership.localNodeId}-control"]`).click()
+      await desktopPage.locator('[data-testid="controller-approval-submit"]').click()
+      await expect(desktopPage.locator(`[data-testid="controller-pending-request-${request!.requestId}"]`)).toHaveCount(0)
+    })
+
+    await test.step('select Desktop and keep Node-scoped Workspace caches isolated', async () => {
+      await runMaestroFlow('select-node', {
+        NODE_ID: desktopMembership.localNodeId,
+        OTHER_WORKSPACE_ID: macbookLocal.id,
+        WORKSPACE_ID: desktopLocal.id,
+      })
+    })
+
+    await test.step('switch to MacBook and stream a Chat continuation through Fabric', async () => {
+      const prompt = 'Continue this from the native Mobile controller'
+      const response = 'MacBook streamed this reply through Fabric to Mobile.'
+      macbookSimulator.enqueue(openAiScenario([
+        openAiTextExchange({
+          label: 'mobile-fabric-follow-up',
+          text: response,
+          bodyTextIncludes: prompt,
+          bodyTextExcludes: 'You are naming a Codex task thread.',
+        }),
+      ]))
+      await runMaestroFlow('switch-node-and-chat', {
+        CHAT_PROMPT: prompt,
+        CHAT_RESPONSE: response,
+        NODE_ID: macbookMembership.localNodeId,
+        OTHER_WORKSPACE_ID: desktopLocal.id,
+        SESSION_ID: macbookSessionId,
+        WORKSPACE_ID: macbookLocal.id,
+      })
+      macbookSimulator.assertExhausted()
+    })
+
+    await test.step('revoke only MacBook control and remove it from the Mobile picker', async () => {
+      const grants = await json<NodeGrant[]>(
+        `${topology.desktop.serverUrl}/nodes/${macbookMembership.localNodeId}/grants`,
+      )
+      const controlGrant = grants.find(grant =>
+        grant.controllerId === mobileControllerId && grant.scope === 'control' && !grant.revokedAt)
+      expect(controlGrant).toBeTruthy()
+
+      await openNodeSettings(desktopPage)
+      await desktopPage.locator(`[data-testid="manage-access-${macbookMembership.localNodeId}"]`).click()
+      await desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`).click()
+      await desktopPage.locator('[data-testid="revoke-grant-confirm"]').click()
+      await expect(desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`)).toHaveCount(0)
+
+      await runMaestroFlow('grant-revoked', {
+        REMAINING_NODE_ID: desktopMembership.localNodeId,
+        REVOKED_NODE_ID: macbookMembership.localNodeId,
+      })
+    })
+
+    await test.step('revoke the Controller everywhere and surface the terminal state on Mobile', async () => {
+      const grants = await json<NodeGrant[]>(
+        `${topology.desktop.serverUrl}/nodes/${desktopMembership.localNodeId}/grants`,
+      )
+      const controlGrant = grants.find(grant =>
+        grant.controllerId === mobileControllerId && grant.scope === 'control' && !grant.revokedAt)
+      expect(controlGrant).toBeTruthy()
+
+      await desktopPage.keyboard.press('Escape')
+      await expect(desktopPage.getByRole('dialog')).toBeHidden()
+      await desktopPage.locator(`[data-testid="manage-access-${desktopMembership.localNodeId}"]`).click()
+      await desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`).click()
+      await desktopPage.locator('[data-testid="revoke-controller-choice"]').click()
+      await desktopPage.locator('[data-testid="revoke-controller-confirm"]').click()
+      await expect(desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`)).toHaveCount(0)
+
+      await runMaestroFlow('controller-revoked', {})
     })
   })
 })

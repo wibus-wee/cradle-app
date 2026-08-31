@@ -71,6 +71,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Provider profile × Agent selection × disable | `CRADLE-PROVIDER-001` | A UI-created provider can run and later become unavailable |
 | Provider disable/delete × two active sessions × queued continuation × runtime cancellation | `CRADLE-PROVIDER-002`, `003` | Disabling or deleting a UI-created provider cancels every in-flight run and prevents a queued continuation in another session from executing |
 | Fabric pairing × two databases × bidirectional Workspace/Chat/Work × Node-owned worktrees × remote tool approval × Session discovery × relay/server restart | `CRADLE-FABRIC-001` | Two real Nodes enroll through the UI, create Work and managed worktrees on the selected authority in both directions, continue each Work conversation, approve a remote Claude Agent tool request from each controller, discover conversations created by the other controller, and recover mounted routing without re-pairing |
+| Native Mobile Controller × two Node grants × cache isolation × Chat SSE × grant/principal revocation | `CRADLE-FABRIC-002` | A signed Release iOS app enrolls through the real owner UI, selects both Nodes without Server credentials, keeps Workspace state Node-scoped, continues a real Codex conversation over Fabric streaming, preserves one Node after a grant removal, and fails closed after Controller revocation |
 
 ## Web Feature Namespace Disposition
 

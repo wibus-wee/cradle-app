@@ -40,12 +40,12 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   > | null>(null)
   routeActiveRef.current = isRouteActive
   const historyQueryKey = useMemo(
-    () => ['chat-message-previews', connection?.url, sessionId] as const,
-    [connection?.url, sessionId],
+    () => ['chat-message-previews', connection?.resourceId, sessionId] as const,
+    [connection?.resourceId, sessionId],
   )
   const sessionQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['chat-session', connection?.url, sessionId],
+    queryKey: ['chat-session', connection?.resourceId, sessionId],
     queryFn: ({ signal }) =>
       cradleRequest<GetSessionsByIdResponse>(
         connection!,
@@ -71,7 +71,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   })
   const runtimeStatusQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['chat-runtime-status', connection?.url, sessionId],
+    queryKey: ['chat-runtime-status', connection?.resourceId, sessionId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatSessionsBySessionIdRuntimeStatusResponse>(
         connection!,
@@ -82,7 +82,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   })
   const capabilitiesQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['chat-capabilities', connection?.url, sessionId],
+    queryKey: ['chat-capabilities', connection?.resourceId, sessionId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatSessionsBySessionIdCapabilitiesResponse>(
         connection!,
@@ -92,7 +92,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   })
   const runtimeSettingsQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['chat-runtime-settings', connection?.url, sessionId],
+    queryKey: ['chat-runtime-settings', connection?.resourceId, sessionId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatSessionsBySessionIdRuntimeSettingsResponse>(
         connection!,
@@ -102,7 +102,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   })
   const detailQuery = useQuery({
     enabled: Boolean(connection && detailMessageId) && isRouteActive,
-    queryKey: ['chat-message-detail', connection?.url, sessionId, detailMessageId],
+    queryKey: ['chat-message-detail', connection?.resourceId, sessionId, detailMessageId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatSessionsBySessionIdMessagesByMessageIdResponse>(
         connection!,
@@ -119,7 +119,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       return
     }
     let active = true
-    void readChatHistoryCache(connection.url, sessionId).then((data) => {
+    void readChatHistoryCache(connection.resourceId, sessionId).then((data) => {
       if (active) {
         setCachedHistory(data)
       }
@@ -134,7 +134,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       | InfiniteData<GetChatSessionsBySessionIdMessagePreviewsResponse, string | null>
       | undefined
     if (connection && queryHistoryData) {
-      void writeChatHistoryCache(connection.url, sessionId, queryHistoryData)
+      void writeChatHistoryCache(connection.resourceId, sessionId, queryHistoryData)
     }
   }, [connection, historyQuery.data, sessionId])
 

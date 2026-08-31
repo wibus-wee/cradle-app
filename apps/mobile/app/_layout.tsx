@@ -8,6 +8,7 @@ import { useColorScheme } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { ConnectionProvider } from '@/features/connection/connection-store'
+import { FabricProvider } from '@/features/fabric/fabric-provider'
 import { AppLifecycleProvider } from '@/lib/app-lifecycle-provider'
 import { useTheme } from '@/theme/use-theme'
 
@@ -37,10 +38,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AppLifecycleProvider queryClient={queryClient}>
-          <ConnectionProvider>
-            <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-            <Stack
-              screenOptions={{
+          <FabricProvider>
+            <ConnectionProvider>
+              <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+              <Stack
+                screenOptions={{
                 contentStyle: { backgroundColor: theme.surface },
                 freezeOnBlur: true,
                 headerBackButtonDisplayMode: 'minimal',
@@ -48,24 +50,25 @@ export default function RootLayout() {
                 headerStyle: { backgroundColor: theme.surface },
                 headerTintColor: theme.foreground,
               }}
-            >
-              <Stack.Screen name="index" options={{ headerShown: false }} />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="connection/server" options={{ title: 'Server' }} />
-              <Stack.Screen name="connection/token" options={{ title: 'Authentication' }} />
-              <Stack.Screen name="workspace/[workspaceId]" options={{ title: 'Project' }} />
-              <Stack.Screen
-                name="work/[workId]"
-                options={{ presentation: 'modal', title: 'Work info' }}
-              />
-              <Stack.Screen name="session/[sessionId]" options={{ title: 'Conversation' }} />
-              <Stack.Screen name="usage" options={{ title: 'Usage' }} />
-              <Stack.Screen
-                name="pull-request/[owner]/[repo]/[number]"
-                options={{ title: 'Pull request' }}
-              />
-            </Stack>
-          </ConnectionProvider>
+              >
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="connection/server" options={{ title: 'Server' }} />
+                <Stack.Screen name="connection/token" options={{ title: 'Authentication' }} />
+                <Stack.Screen name="workspace/[workspaceId]" options={{ title: 'Project' }} />
+                <Stack.Screen
+                  name="work/[workId]"
+                  options={{ presentation: 'modal', title: 'Work info' }}
+                />
+                <Stack.Screen name="session/[sessionId]" options={{ title: 'Conversation' }} />
+                <Stack.Screen name="usage" options={{ title: 'Usage' }} />
+                <Stack.Screen
+                  name="pull-request/[owner]/[repo]/[number]"
+                  options={{ title: 'Pull request' }}
+                />
+              </Stack>
+            </ConnectionProvider>
+          </FabricProvider>
         </AppLifecycleProvider>
       </QueryClientProvider>
     </SafeAreaProvider>
