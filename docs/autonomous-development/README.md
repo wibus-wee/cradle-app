@@ -72,3 +72,4 @@ Chronological index of independently shipped product improvements.
 33. [Search Mobile lists with the native header](./2026-08-31-33-mobile-native-search.md)
 34. [Respect the system Reduce Motion setting](./2026-08-31-34-mobile-reduce-motion.md)
 35. [Open GitHub from the native pull request toolbar](./2026-08-31-35-mobile-native-pull-request-toolbar.md)
+36. [Use a native iOS Settings form](./2026-08-31-36-mobile-native-settings-form.md)

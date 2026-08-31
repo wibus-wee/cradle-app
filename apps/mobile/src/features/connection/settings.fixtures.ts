@@ -1,5 +1,5 @@
 import type { ConnectionSettingsViewProps } from './ConnectionSettingsView'
-import type { SettingsViewProps } from './SettingsView'
+import type { SettingsViewProps } from './settings-view-contract'
 
 export const settingsFixture: SettingsViewProps = {
   appVersion: '0.1.0',

@@ -20,19 +20,9 @@ import { StatusPill } from '@/components/ui/status-pill'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-export interface SettingsViewProps {
-  appVersion: string
-  connectionStatus: 'checking' | 'connected' | 'unavailable'
-  hasServerToken: boolean
-  onCheckConnection: () => void
-  onCopyServer: () => Promise<void>
-  onDisconnect: () => void
-  onEditServer: () => void
-  onEditToken: () => void
-  onOpenUsage: () => void
-  onShareServer: () => Promise<void>
-  serverUrl: string
-}
+import type { SettingsViewProps } from './settings-view-contract'
+
+export type { SettingsViewProps } from './settings-view-contract'
 
 export function SettingsView({
   appVersion,
