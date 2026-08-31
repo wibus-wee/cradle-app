@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import * as Linking from 'expo-linking'
 import { router } from 'expo-router'
 import { useState } from 'react'
+import { Alert, Share } from 'react-native'
 
 import type {
   GetPullRequestsAuthoredResponse,
@@ -84,9 +86,29 @@ export function PullRequestListContainer({
       isRefreshing={isRefreshing}
       onOpen={pullRequest =>
         router.push(`/pull-request/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`)}
+      onOpenExternal={async (pullRequest) => {
+        try {
+          await Linking.openURL(pullRequest.url)
+        }
+        catch {
+          Alert.alert('Could not open pull request on GitHub')
+        }
+      }}
       onOpenUsage={() => router.push('/usage')}
       onRefresh={refresh}
       onSearchQueryChange={onSearchQueryChange}
+      onShare={async (pullRequest) => {
+        try {
+          await Share.share({
+            message: pullRequest.title,
+            title: pullRequest.title,
+            url: pullRequest.url,
+          })
+        }
+        catch {
+          Alert.alert('Could not share pull request')
+        }
+      }}
       searchQuery={searchQuery}
       showsInlineSearch={showsInlineSearch}
     />

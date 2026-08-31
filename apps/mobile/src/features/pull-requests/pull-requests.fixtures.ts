@@ -26,8 +26,10 @@ export const pullRequestListFixture: PullRequestListViewProps = {
   reviewing: [],
   login: 'demo',
   onOpen: () => {},
+  onOpenExternal: () => {},
   onOpenUsage: () => {},
   onSearchQueryChange: () => {},
+  onShare: () => {},
   searchQuery: '',
 }
 

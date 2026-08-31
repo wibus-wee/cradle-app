@@ -1,6 +1,7 @@
 import {
   Button,
   ContentUnavailableView,
+  ContextMenu,
   Host,
   HStack,
   Image,
@@ -65,7 +66,9 @@ export function PullRequestListView({
   authored,
   login,
   onOpen,
+  onOpenExternal,
   onRefresh,
+  onShare,
   reviewing,
   searchQuery,
 }: PullRequestListViewProps) {
@@ -103,60 +106,82 @@ export function PullRequestListView({
               const checks = checkPresentation(pullRequest.checksState)
               const updated = relativeTime(pullRequest.updatedAt)
               return (
-                <Button
+                <ContextMenu
                   key={`${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`}
-                  modifiers={[
-                    plainButton,
-                    accessibilityLabel(pullRequest.title),
-                    accessibilityValue([
-                      `${pullRequest.owner}/${pullRequest.repo}, pull request ${pullRequest.number}`,
-                      pullRequest.isDraft ? 'Draft' : pullRequest.state,
-                      `Checks ${checks.label}`,
-                      `updated ${updated}`,
-                    ].join(', ')),
-                    accessibilityHint('Opens pull request details'),
-                  ]}
-                  onPress={() => onOpen(pullRequest)}
                 >
-                  <HStack modifiers={[fullWidth]} spacing={12}>
-                    <Image color={checks.color} size={18} systemName={checks.symbol} />
-                    <VStack alignment="leading" spacing={4}>
-                      <Text>{pullRequest.title}</Text>
-                      <Text
-                        modifiers={[
-                          font({ design: 'monospaced', textStyle: 'caption' }),
-                          secondaryForeground,
-                        ]}
-                      >
-                        {`${pullRequest.owner}/${pullRequest.repo} #${pullRequest.number}`}
-                      </Text>
-                      <HStack spacing={7}>
-                        <Text
-                          modifiers={[
-                            font({ textStyle: 'caption' }),
-                            foregroundStyle(pullRequest.isDraft ? 'orange' : 'secondary'),
-                          ]}
-                        >
-                          {pullRequest.isDraft ? 'Draft' : pullRequest.state}
-                        </Text>
-                        <Text modifiers={[font({ textStyle: 'caption' }), secondaryForeground]}>
-                          {checks.label}
-                        </Text>
-                        <Text
-                          modifiers={[
-                            font({ textStyle: 'caption' }),
-                            secondaryForeground,
-                            tabularNumber,
-                          ]}
-                        >
-                          {updated}
-                        </Text>
+                  <ContextMenu.Trigger>
+                    <Button
+                      modifiers={[
+                        plainButton,
+                        accessibilityLabel(pullRequest.title),
+                        accessibilityValue([
+                          `${pullRequest.owner}/${pullRequest.repo}, pull request ${pullRequest.number}`,
+                          pullRequest.isDraft ? 'Draft' : pullRequest.state,
+                          `Checks ${checks.label}`,
+                          `updated ${updated}`,
+                        ].join(', ')),
+                        accessibilityHint('Opens pull request details'),
+                      ]}
+                      onPress={() => onOpen(pullRequest)}
+                    >
+                      <HStack modifiers={[fullWidth]} spacing={12}>
+                        <Image color={checks.color} size={18} systemName={checks.symbol} />
+                        <VStack alignment="leading" spacing={4}>
+                          <Text>{pullRequest.title}</Text>
+                          <Text
+                            modifiers={[
+                              font({ design: 'monospaced', textStyle: 'caption' }),
+                              secondaryForeground,
+                            ]}
+                          >
+                            {`${pullRequest.owner}/${pullRequest.repo} #${pullRequest.number}`}
+                          </Text>
+                          <HStack spacing={7}>
+                            <Text
+                              modifiers={[
+                                font({ textStyle: 'caption' }),
+                                foregroundStyle(pullRequest.isDraft ? 'orange' : 'secondary'),
+                              ]}
+                            >
+                              {pullRequest.isDraft ? 'Draft' : pullRequest.state}
+                            </Text>
+                            <Text modifiers={[font({ textStyle: 'caption' }), secondaryForeground]}>
+                              {checks.label}
+                            </Text>
+                            <Text
+                              modifiers={[
+                                font({ textStyle: 'caption' }),
+                                secondaryForeground,
+                                tabularNumber,
+                              ]}
+                            >
+                              {updated}
+                            </Text>
+                          </HStack>
+                        </VStack>
+                        <Spacer />
+                        <Image color="secondary" size={14} systemName="chevron.forward" />
                       </HStack>
-                    </VStack>
-                    <Spacer />
-                    <Image color="secondary" size={14} systemName="chevron.forward" />
-                  </HStack>
-                </Button>
+                    </Button>
+                  </ContextMenu.Trigger>
+                  <ContextMenu.Items>
+                    <Button
+                      label="Open Pull Request"
+                      onPress={() => onOpen(pullRequest)}
+                      systemImage="arrow.right"
+                    />
+                    <Button
+                      label="Open in GitHub"
+                      onPress={() => { void onOpenExternal(pullRequest) }}
+                      systemImage="safari"
+                    />
+                    <Button
+                      label="Share Pull Request"
+                      onPress={() => { void onShare(pullRequest) }}
+                      systemImage="square.and.arrow.up"
+                    />
+                  </ContextMenu.Items>
+                </ContextMenu>
               )
             })}
           </Section>

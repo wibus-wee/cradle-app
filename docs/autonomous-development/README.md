@@ -106,3 +106,4 @@ Chronological index of independently shipped product improvements.
 67. [Make the Work composer interactive Liquid Glass](./2026-08-31-67-mobile-interactive-work-glass.md)
 68. [Share conversation exports from native iOS actions](./2026-08-31-68-mobile-native-conversation-export.md)
 69. [Adapt Mobile navigation to an iPad sidebar](./2026-08-31-69-mobile-ipad-native-sidebar.md)
+70. [Act on pull requests from a native context menu](./2026-08-31-70-mobile-pull-request-context-menu.md)
