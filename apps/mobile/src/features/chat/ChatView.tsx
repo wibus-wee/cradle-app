@@ -64,6 +64,7 @@ export interface ChatViewProps {
   onModeChange: (mode: 'build' | 'plan') => void
   onRequestMessageDetail: (messageId: string | null) => void
   onSend: (input: ChatSubmitInput) => void
+  onShareMessage: (text: string) => Promise<void>
   runtimeSettings?: GetChatSessionsBySessionIdRuntimeSettingsResponse
 }
 
@@ -94,6 +95,7 @@ export function ChatView({
   onModeChange,
   onRequestMessageDetail,
   onSend,
+  onShareMessage,
   runtimeSettings,
 }: ChatViewProps) {
   const theme = useTheme()
@@ -236,6 +238,7 @@ export function ChatView({
                     message={message}
                     onActivityPress={onRequestMessageDetail}
                     onCopy={onCopyMessage}
+                    onShare={onShareMessage}
                     status={liveMessage?.id === item.row.messageId ? 'streaming' : item.row.status}
                   />
                 )
@@ -245,6 +248,7 @@ export function ChatView({
                   message={item.message}
                   onActivityPress={item.kind === 'live' ? onRequestMessageDetail : undefined}
                   onCopy={onCopyMessage}
+                  onShare={onShareMessage}
                   status={
                     item.kind === 'live' ? (isStreaming ? 'streaming' : 'complete') : undefined
                   }

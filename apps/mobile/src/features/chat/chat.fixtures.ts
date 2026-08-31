@@ -13,4 +13,5 @@ export const chatFixture: ChatViewProps = {
   onModeChange: () => {},
   onRequestMessageDetail: () => {},
   onSend: () => {},
+  onShareMessage: async () => {},
 }

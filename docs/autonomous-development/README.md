@@ -74,3 +74,4 @@ Chronological index of independently shipped product improvements.
 35. [Open GitHub from the native pull request toolbar](./2026-08-31-35-mobile-native-pull-request-toolbar.md)
 36. [Use a native iOS Settings form](./2026-08-31-36-mobile-native-settings-form.md)
 37. [Edit connections with native iOS fields](./2026-08-31-37-mobile-native-connection-editor.md)
+38. [Share chat messages from Mobile](./2026-08-31-38-mobile-share-chat-messages.md)

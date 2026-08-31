@@ -4,6 +4,7 @@ import type { UIMessage } from 'ai'
 import * as Clipboard from 'expo-clipboard'
 import { Stack } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Share } from 'react-native'
 
 import type {
   GetChatSessionsBySessionIdCapabilitiesResponse,
@@ -406,6 +407,9 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
           }
         }}
         onRequestMessageDetail={setDetailMessageId}
+        onShareMessage={async (text) => {
+          await Share.share({ message: text })
+        }}
       />
     </>
   )
