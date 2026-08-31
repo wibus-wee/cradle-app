@@ -70,8 +70,15 @@ export function Screen({
           </View>
         </View>
       )}
-      {usesNativeHeader && subtitle && (
-        <Text style={[styles.nativeSubtitle, { color: theme.mutedForeground }]}>{subtitle}</Text>
+      {usesNativeHeader && (subtitle || action) && (
+        <View style={styles.nativeHeaderContext}>
+          {subtitle && (
+            <Text style={[styles.nativeSubtitle, { color: theme.mutedForeground }]}>
+              {subtitle}
+            </Text>
+          )}
+          {action}
+        </View>
       )}
       {children}
     </>
@@ -160,10 +167,17 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     paddingRight: spacing.md,
   },
+  nativeHeaderContext: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
   nativeSubtitle: {
+    flex: 1,
     fontSize: 14,
     lineHeight: 19,
-    marginBottom: spacing.md,
   },
   title: {
 

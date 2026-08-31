@@ -20,6 +20,7 @@ type Detail = GetPullRequestsByOwnerByRepoByNumberDetailResponse
 export interface PullRequestDetailViewProps {
   detail: Detail
   isMutating?: boolean
+  nativeHeader?: boolean
   onComment: (body: string) => Promise<void>
   onOpenExternal: (url: string) => Promise<void>
   onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => Promise<void>
@@ -28,6 +29,7 @@ export interface PullRequestDetailViewProps {
 export function PullRequestDetailView({
   detail,
   isMutating = false,
+  nativeHeader = false,
   onComment,
   onOpenExternal,
   onReview,
@@ -38,6 +40,12 @@ export function PullRequestDetailView({
   const [submissionError, setSubmissionError] = useState<string | null>(null)
   const { pullRequest } = detail
   const visibleTimeline = showAllTimeline ? detail.timeline : detail.timeline.slice(-20)
+  const status = (
+    <StatusPill
+      label={pullRequest.isDraft ? 'draft' : pullRequest.state}
+      tone={pullRequest.state === 'open' ? 'success' : 'neutral'}
+    />
+  )
 
   const openExternal = async (url: string, failureMessage: string) => {
     try {
@@ -76,20 +84,23 @@ export function PullRequestDetailView({
 
   return (
     <Screen
-      action={(
-        <View style={styles.headerActions}>
-          <StatusPill label={pullRequest.isDraft ? 'draft' : pullRequest.state} tone={pullRequest.state === 'open' ? 'success' : 'neutral'} />
-          <IconButton
-            accessibilityLabel="Open pull request on GitHub"
-            icon={ExternalLink}
-            onPress={() => void openExternal(
-              pullRequest.url,
-              'Could not open pull request on GitHub',
-            )}
-          />
-        </View>
-      )}
+      action={nativeHeader
+        ? status
+        : (
+            <View style={styles.headerActions}>
+              {status}
+              <IconButton
+                accessibilityLabel="Open pull request on GitHub"
+                icon={ExternalLink}
+                onPress={() => void openExternal(
+                  pullRequest.url,
+                  'Could not open pull request on GitHub',
+                )}
+              />
+            </View>
+          )}
       insetTop={false}
+      nativeHeader={nativeHeader}
       subtitle={`${pullRequest.owner}/${pullRequest.repo} #${pullRequest.number}`}
       title={pullRequest.title}
     >

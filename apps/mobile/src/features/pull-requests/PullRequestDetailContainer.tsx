@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import * as Linking from 'expo-linking'
 import { Stack } from 'expo-router'
+import { Alert, Platform } from 'react-native'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -52,12 +53,36 @@ export function PullRequestDetailContainer({
       <ErrorState title="Could not open pull request" description={errorMessage(query.error)} />
     )
   }
+  const nativeHeader = Platform.OS !== 'web'
   return (
     <>
       <Stack.Screen options={{ title: `#${query.data.pullRequest.number}` }} />
+      {nativeHeader && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            accessibilityHint="Opens this pull request on GitHub"
+            accessibilityLabel="Open on GitHub"
+            onPress={() => {
+              void Linking.openURL(query.data.pullRequest.url).catch(() => {
+                Alert.alert('Could not open pull request on GitHub')
+              })
+            }}
+          >
+            {Platform.OS === 'ios'
+              ? (
+                  <>
+                    <Stack.Toolbar.Icon sf="safari" />
+                    <Stack.Toolbar.Label>GitHub</Stack.Toolbar.Label>
+                  </>
+                )
+              : 'GitHub'}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      )}
       <PullRequestDetailView
         detail={query.data}
         isMutating={action.isPending}
+        nativeHeader={nativeHeader}
         onComment={async (body) => {
           await action.mutateAsync({ endpoint: 'comment', body: { body } })
         }}
