@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     flexDirection: 'row',
     gap: spacing.xs,
-    minHeight: 32,
+    minHeight: 44,
     paddingHorizontal: spacing.sm,
   },
   cursor: {

@@ -458,14 +458,14 @@ export const ChatComposer = memo(ChatComposerContent)
 const styles = StyleSheet.create({
   addButton: {
     alignItems: 'center',
-    borderRadius: 18,
-    height: 36,
+    borderRadius: 22,
+    height: 44,
     justifyContent: 'center',
-    width: 36,
+    width: 44,
   },
   addMenu: {
-    height: 36,
-    width: 36,
+    height: 44,
+    width: 44,
   },
   attachment: {
     borderRadius: radius.md,
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     gap: spacing.xs,
-    minHeight: 50,
+    minHeight: 56,
     overflow: 'hidden',
     padding: 5,
     shadowOffset: { height: 1, width: 0 },
@@ -503,6 +503,8 @@ const styles = StyleSheet.create({
   },
   continuationOption: {
     borderRadius: radius.md,
+    justifyContent: 'center',
+    minHeight: 44,
     minWidth: 50,
     paddingHorizontal: spacing.sm,
     paddingVertical: 6,
@@ -536,7 +538,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
     maxHeight: 132,
-    minHeight: 38,
+    minHeight: 44,
     paddingBottom: 8,
     paddingTop: 8,
   },
@@ -552,16 +554,16 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignItems: 'center',
-    borderRadius: 19,
-    height: 38,
+    borderRadius: 22,
+    height: 44,
     justifyContent: 'center',
-    width: 38,
+    width: 44,
   },
   suggestion: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-    minHeight: 40,
+    minHeight: 44,
     paddingHorizontal: spacing.sm,
   },
   suggestionDescription: {

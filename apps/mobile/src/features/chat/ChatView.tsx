@@ -374,14 +374,14 @@ const styles = StyleSheet.create({
   },
   jumpButton: {
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
-    height: 36,
+    height: 44,
     justifyContent: 'center',
     position: 'absolute',
     right: spacing.md,
-    top: -44,
-    width: 36,
+    top: -52,
+    width: 44,
     zIndex: 1,
   },
   messages: {
@@ -410,7 +410,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-    minHeight: 32,
+    minHeight: 44,
   },
   safeArea: {
     flex: 1,
@@ -422,10 +422,10 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     alignItems: 'center',
-    borderRadius: 16,
-    height: 32,
+    borderRadius: 22,
+    height: 44,
     justifyContent: 'center',
-    width: 32,
+    width: 44,
   },
   surface: {
     flex: 1,
