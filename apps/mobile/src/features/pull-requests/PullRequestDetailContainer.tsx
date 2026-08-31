@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import * as Linking from 'expo-linking'
 import { Stack } from 'expo-router'
-import { Alert, Platform } from 'react-native'
+import { Alert, Platform, Share } from 'react-native'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -59,29 +59,49 @@ export function PullRequestDetailContainer({
     )
   }
   const nativeHeader = Platform.OS !== 'web'
+  const openOnGitHub = () => {
+    void Linking.openURL(query.data.pullRequest.url).catch(() => {
+      Alert.alert('Could not open pull request on GitHub')
+    })
+  }
+  const sharePullRequest = () => {
+    void Share.share({
+      message: query.data.pullRequest.title,
+      title: query.data.pullRequest.title,
+      url: query.data.pullRequest.url,
+    }).catch(() => {
+      Alert.alert('Could not share pull request')
+    })
+  }
   return (
     <>
       <Stack.Screen options={{ title: `#${query.data.pullRequest.number}` }} />
       {nativeHeader && (
         <Stack.Toolbar placement="right">
-          <Stack.Toolbar.Button
-            accessibilityHint="Opens this pull request on GitHub"
-            accessibilityLabel="Open on GitHub"
-            onPress={() => {
-              void Linking.openURL(query.data.pullRequest.url).catch(() => {
-                Alert.alert('Could not open pull request on GitHub')
-              })
-            }}
-          >
-            {Platform.OS === 'ios'
-              ? (
-                  <>
-                    <Stack.Toolbar.Icon sf="safari" />
-                    <Stack.Toolbar.Label>GitHub</Stack.Toolbar.Label>
-                  </>
-                )
-              : 'GitHub'}
-          </Stack.Toolbar.Button>
+          {Platform.OS === 'ios'
+            ? (
+                <Stack.Toolbar.Menu
+                  accessibilityHint="Shows actions for this pull request"
+                  accessibilityLabel="Pull request actions"
+                  icon="ellipsis.circle"
+                >
+                  <Stack.Toolbar.MenuAction icon="safari" onPress={openOnGitHub}>
+                    Open in GitHub
+                  </Stack.Toolbar.MenuAction>
+                  <Stack.Toolbar.MenuAction icon="square.and.arrow.up" onPress={sharePullRequest}>
+                    Share Pull Request
+                  </Stack.Toolbar.MenuAction>
+                </Stack.Toolbar.Menu>
+              )
+            : (
+                <Stack.Toolbar.Button
+                  accessibilityHint="Opens this pull request on GitHub"
+                  accessibilityLabel="Open on GitHub"
+                  onPress={openOnGitHub}
+                >
+                  GitHub
+                </Stack.Toolbar.Button>
+              )}
         </Stack.Toolbar>
       )}
       <PullRequestDetailView
