@@ -3,6 +3,7 @@ import type { NativeTabsProps } from 'expo-router/unstable-native-tabs'
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
 import type { PropsWithChildren } from 'react'
 import { createElement, useContext } from 'react'
+import { Platform } from 'react-native'
 
 import type { GetSessionsResponse } from '@/api-gen'
 import { useConnection } from '@/features/connection/connection-context'
@@ -42,20 +43,23 @@ export default function NativeTabsLayout() {
   const unreadCount
     = sessionsQuery.data?.items.filter(session => session.unread && session.workspaceId !== null).length
       ?? 0
+  const tabBarAppearance = Platform.OS === 'ios'
+    ? { minimizeBehavior: 'onScrollDown' as const }
+    : {
+        backgroundColor: theme.chrome,
+        iconColor: { default: theme.mutedForeground, selected: theme.info },
+        indicatorColor: theme.muted,
+        labelStyle: {
+          default: { color: theme.mutedForeground },
+          selected: { color: theme.info },
+        },
+        rippleColor: theme.info,
+        tintColor: theme.info,
+      }
 
   return (
     <NativeTabNavigator
-      backgroundColor={theme.chrome}
-      blurEffect="systemChromeMaterial"
-      disableTransparentOnScrollEdge
-      iconColor={{ default: theme.mutedForeground, selected: theme.info }}
-      indicatorColor={theme.muted}
-      labelStyle={{
-        default: { color: theme.mutedForeground },
-        selected: { color: theme.info },
-      }}
-      rippleColor={theme.info}
-      tintColor={theme.info}
+      {...tabBarAppearance}
     >
       <NativeTabs.Trigger name="projects">
         <NativeTabs.Trigger.Icon
