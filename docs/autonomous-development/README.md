@@ -110,3 +110,4 @@ Chronological index of independently shipped product improvements.
 71. [Act on Work from a native context menu](./2026-08-31-71-mobile-work-context-menu.md)
 72. [Preview workspace files with iOS Quick Look](./2026-08-31-72-mobile-native-quick-look.md)
 73. [Reach workspace files from a native context menu](./2026-08-31-73-mobile-workspace-context-menu.md)
+74. [Confirm server address copies without interrupting Settings](./2026-08-31-74-mobile-inline-copy-feedback.md)

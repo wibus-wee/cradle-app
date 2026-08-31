@@ -8,16 +8,21 @@ import {
   Section,
   Spacer,
   Text,
+  useNativeState,
   VStack,
 } from '@expo/ui/swift-ui'
 import {
+  accessibilityLabel,
   buttonStyle,
   font,
   foregroundStyle,
   frame,
   listStyle,
+  symbolEffect,
 } from '@expo/ui/swift-ui/modifiers'
-import { Alert } from 'react-native'
+import * as Haptics from 'expo-haptics'
+import { useEffect, useRef, useState } from 'react'
+import { AccessibilityInfo, Alert } from 'react-native'
 
 import type { SettingsViewProps } from './settings-view-contract'
 
@@ -55,6 +60,17 @@ export function SettingsView({
   onShareServer,
   serverUrl,
 }: SettingsViewProps) {
+  const [copiedServer, setCopiedServer] = useState(false)
+  const copySymbolTrigger = useNativeState(0)
+  const copySequenceRef = useRef(0)
+  const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    if (copyResetTimerRef.current) {
+      clearTimeout(copyResetTimerRef.current)
+    }
+  }, [])
+
   const disconnect = () => {
     Alert.alert('Disconnect from server?', 'The saved address and token will be removed from this device.', [
       { style: 'cancel', text: 'Cancel' },
@@ -64,7 +80,15 @@ export function SettingsView({
   const copyServer = async () => {
     try {
       await onCopyServer()
-      Alert.alert('Server address copied')
+      setCopiedServer(true)
+      copySequenceRef.current += 1
+      copySymbolTrigger.set(copySequenceRef.current)
+      void Haptics.selectionAsync()
+      AccessibilityInfo.announceForAccessibility('Server address copied')
+      if (copyResetTimerRef.current) {
+        clearTimeout(copyResetTimerRef.current)
+      }
+      copyResetTimerRef.current = setTimeout(setCopiedServer, 1_500, false)
     }
     catch {
       Alert.alert('Could not copy server address')
@@ -140,7 +164,31 @@ export function SettingsView({
             </HStack>
           </Button>
 
-          <Button label="Copy Server Address" modifiers={[plainButton]} onPress={() => void copyServer()} systemImage="doc.on.doc" />
+          <Button
+            modifiers={[
+              plainButton,
+              accessibilityLabel(copiedServer ? 'Server address copied' : 'Copy server address'),
+            ]}
+            onPress={() => void copyServer()}
+          >
+            <HStack modifiers={[fullWidthRow]} spacing={12}>
+              <Image
+                color={copiedServer ? 'green' : 'secondary'}
+                modifiers={[
+                  symbolEffect(
+                    { direction: 'up', effect: 'bounce' },
+                    { value: copySymbolTrigger },
+                  ),
+                ]}
+                size={18}
+                systemName={copiedServer ? 'checkmark.circle.fill' : 'doc.on.doc'}
+              />
+              <Text modifiers={copiedServer ? [foregroundStyle('green')] : []}>
+                {copiedServer ? 'Server Address Copied' : 'Copy Server Address'}
+              </Text>
+              <Spacer />
+            </HStack>
+          </Button>
           <Button label="Share Server Address" modifiers={[plainButton]} onPress={() => void shareServer()} systemImage="square.and.arrow.up" />
 
           <Button modifiers={[plainButton]} onPress={onEditToken}>
