@@ -1,4 +1,15 @@
+import type { ChatActivitySheetProps } from './chat-activity-sheet-contract'
 import type { ChatViewProps } from './ChatView'
+
+export const chatActivitySheetFixture: ChatActivitySheetProps = {
+  message: {
+    id: 'assistant-activity-1',
+    parts: [{ type: 'reasoning', text: 'Inspect the Mobile surface before making a focused change.' }],
+    role: 'assistant',
+  },
+  onClose: () => {},
+  visible: true,
+}
 
 export const chatFixture: ChatViewProps = {
   clearComposerDraftSignal: 0,
