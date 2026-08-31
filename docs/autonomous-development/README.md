@@ -78,3 +78,4 @@ Chronological index of independently shipped product improvements.
 39. [Choose repositories in a native iOS sheet](./2026-08-31-39-mobile-native-repository-sheet.md)
 40. [Prepare Work handoffs in a native iOS form](./2026-08-31-40-mobile-native-work-handoff.md)
 41. [Inspect chat activity in a native iOS sheet](./2026-08-31-41-mobile-native-chat-activity-sheet.md)
+42. [Search workspace files from the native header](./2026-08-31-42-mobile-native-file-search.md)

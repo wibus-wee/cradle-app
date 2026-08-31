@@ -30,6 +30,7 @@ export interface WorkspaceFilesViewProps {
   onRefresh?: () => void
   onSearchChange: (query: string) => void
   search: string
+  showsInlineSearch?: boolean
 }
 
 function pathName(path: string): string {
@@ -53,6 +54,7 @@ export function WorkspaceFilesView({
   onRefresh,
   onSearchChange,
   search,
+  showsInlineSearch = true,
 }: WorkspaceFilesViewProps) {
   const theme = useTheme()
   const backAction = (
@@ -105,18 +107,20 @@ export function WorkspaceFilesView({
       subtitle={currentPath || 'Workspace root'}
       title={pathName(currentPath)}
     >
-      <View style={styles.search}>
-        <InputGroup
-          addon={<Search color={theme.mutedForeground} size={17} />}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          onChangeText={onSearchChange}
-          placeholder="Search workspace files"
-          returnKeyType="search"
-          value={search}
-        />
-      </View>
+      {showsInlineSearch && (
+        <View style={styles.search}>
+          <InputGroup
+            addon={<Search color={theme.mutedForeground} size={17} />}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            onChangeText={onSearchChange}
+            placeholder="Search workspace files"
+            returnKeyType="search"
+            value={search}
+          />
+        </View>
+      )}
       <FlatList<FileEntry>
         contentContainerStyle={entries.length === 0 ? styles.emptyList : undefined}
         data={entries}

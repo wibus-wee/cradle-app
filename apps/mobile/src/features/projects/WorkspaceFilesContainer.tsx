@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { router, Stack } from 'expo-router'
 import { useState } from 'react'
+import { Platform } from 'react-native'
 
 import type {
   GetWorkspacesByWorkspaceIdFilesChildrenResponse,
@@ -42,6 +43,7 @@ export function WorkspaceFilesContainer({
   const [selectedFile, setSelectedFile] = useState<string | null>(initialFile ?? null)
   const [search, setSearch] = useState('')
   const normalizedSearch = search.trim()
+  const showsInlineSearch = Platform.OS === 'web'
   const directoryQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive && !selectedFile && !normalizedSearch,
     queryKey: ['workspace-files', connection?.url, workspaceId, currentPath],
@@ -104,6 +106,20 @@ export function WorkspaceFilesContainer({
     router.back()
   }
 
+  const searchBar = !selectedFile && !showsInlineSearch
+    ? (
+        <Stack.SearchBar
+          autoCapitalize="none"
+          hideWhenScrolling
+          onCancelButtonPress={() => setSearch('')}
+          onChangeText={event => setSearch(event.nativeEvent.text)}
+          onClose={() => setSearch('')}
+          placeholder="Search workspace files"
+          placement="stacked"
+        />
+      )
+    : null
+
   if (selectedFile) {
     const fileError = infoQuery.error ?? contentQuery.error
     if (infoQuery.isPending || (canPreview && contentQuery.isPending)) {
@@ -144,19 +160,28 @@ export function WorkspaceFilesContainer({
 
   const activeEntriesQuery = normalizedSearch ? searchQuery : directoryQuery
   if (activeEntriesQuery.isPending) {
-    return <LoadingState />
+    return (
+      <>
+        {searchBar}
+        <LoadingState />
+      </>
+    )
   }
   if (activeEntriesQuery.error) {
     return (
-      <ErrorState
-        title={normalizedSearch ? 'Could not search files' : 'Could not browse files'}
-        description={errorMessage(activeEntriesQuery.error)}
-      />
+      <>
+        {searchBar}
+        <ErrorState
+          title={normalizedSearch ? 'Could not search files' : 'Could not browse files'}
+          description={errorMessage(activeEntriesQuery.error)}
+        />
+      </>
     )
   }
   return (
     <>
       <Stack.Screen options={{ title: currentPath || 'Files' }} />
+      {searchBar}
       <WorkspaceFilesView
         currentPath={currentPath}
         entries={activeEntriesQuery.data}
@@ -170,6 +195,7 @@ export function WorkspaceFilesContainer({
         onRefresh={() => void activeEntriesQuery.refetch()}
         onSearchChange={setSearch}
         search={search}
+        showsInlineSearch={showsInlineSearch}
       />
     </>
   )
