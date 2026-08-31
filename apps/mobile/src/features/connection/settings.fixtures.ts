@@ -12,6 +12,8 @@ export const settingsFixture: SettingsViewProps = {
   onEditToken: () => {},
   onOpenUsage: () => {},
   onShareServer: async () => {},
+  serverLatencyMs: 18,
+  serverUptimeSeconds: 176_520,
   serverUrl: 'http://192.168.1.20:21423',
 }
 

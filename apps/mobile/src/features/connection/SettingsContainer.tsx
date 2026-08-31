@@ -18,8 +18,14 @@ export function SettingsContainer() {
   const healthQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
     queryKey: ['connection-health', connection?.url],
-    queryFn: ({ signal }) =>
-      cradleRequest<GetHealthResponse>(connection!, '/health', { signal }),
+    queryFn: async ({ signal }) => {
+      const startedAt = performance.now()
+      const health = await cradleRequest<GetHealthResponse>(connection!, '/health', { signal })
+      return {
+        health,
+        latencyMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      }
+    },
   })
 
   if (!connection) {
@@ -52,6 +58,8 @@ export function SettingsContainer() {
           title: 'Cradle server address',
         })
       }}
+      serverLatencyMs={healthQuery.data?.latencyMs}
+      serverUptimeSeconds={healthQuery.data?.health.uptime}
       serverUrl={connection.url}
     />
   )

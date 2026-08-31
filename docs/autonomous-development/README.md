@@ -123,3 +123,4 @@ Chronological index of independently shipped product improvements.
 84. [Synchronize the GitHub inbox on Mobile refresh](./2026-08-31-84-mobile-pull-request-inbox-refresh.md)
 85. [Share a Usage snapshot from iOS](./2026-08-31-85-mobile-share-usage-snapshot.md)
 86. [Attribute Usage to agents on iOS](./2026-08-31-86-mobile-agent-usage.md)
+87. [Show connection latency and uptime on iOS](./2026-08-31-87-mobile-connection-diagnostics.md)

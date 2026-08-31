@@ -9,5 +9,7 @@ export interface SettingsViewProps {
   onEditToken: () => void
   onOpenUsage: () => void
   onShareServer: () => Promise<void>
+  serverLatencyMs?: number | null
+  serverUptimeSeconds?: number | null
   serverUrl: string
 }

@@ -58,6 +58,8 @@ export function SettingsView({
   onEditToken,
   onOpenUsage,
   onShareServer,
+  serverLatencyMs = null,
+  serverUptimeSeconds = null,
   serverUrl,
 }: SettingsViewProps) {
   const [copiedServer, setCopiedServer] = useState(false)
@@ -103,6 +105,18 @@ export function SettingsView({
     }
   }
   const status = statusCopy[connectionStatus]
+  const uptimeLabel = serverUptimeSeconds === null
+    ? null
+    : serverUptimeSeconds < 60
+      ? `${serverUptimeSeconds}s`
+      : serverUptimeSeconds < 3_600
+        ? `${Math.floor(serverUptimeSeconds / 60)}m`
+        : serverUptimeSeconds < 86_400
+          ? `${Math.floor(serverUptimeSeconds / 3_600)}h ${Math.floor(serverUptimeSeconds % 3_600 / 60)}m`
+          : `${Math.floor(serverUptimeSeconds / 86_400)}d ${Math.floor(serverUptimeSeconds % 86_400 / 3_600)}h`
+  const statusDescription = connectionStatus === 'connected' && serverLatencyMs !== null
+    ? `${status.description} · ${serverLatencyMs} ms`
+    : status.description
 
   return (
     <Host style={{ flex: 1 }} useViewportSizeMeasurement>
@@ -119,7 +133,15 @@ export function SettingsView({
         </Section>
 
         <Section
-          footer={<Text>{connectionStatus === 'checking' ? 'Checking the server now.' : 'Tap the status row to check again.'}</Text>}
+          footer={(
+            <Text>
+              {connectionStatus === 'checking'
+                ? 'Checking the server now.'
+                : uptimeLabel
+                  ? `Server uptime ${uptimeLabel}. Tap the status row to check again.`
+                  : 'Tap the status row to check again.'}
+            </Text>
+          )}
           title="Connection"
         >
           <Button modifiers={[plainButton]} onPress={onCheckConnection}>
@@ -136,7 +158,7 @@ export function SettingsView({
               <VStack alignment="leading" spacing={2}>
                 <Text>Connection Status</Text>
                 <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
-                  {status.description}
+                  {statusDescription}
                 </Text>
               </VStack>
               <Spacer />
