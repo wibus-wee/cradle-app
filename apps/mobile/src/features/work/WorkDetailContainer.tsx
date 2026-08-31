@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { router, Stack } from 'expo-router'
+import { Platform } from 'react-native'
 
 import type { GetWorksByIdResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -61,6 +62,18 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
   return (
     <>
       <Stack.Screen options={{ title: 'Work info' }} />
+      {Platform.OS === 'ios' && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            accessibilityHint="Opens the primary conversation for this Work"
+            accessibilityLabel="Open Work conversation"
+            onPress={() => router.push(`/session/${query.data.primaryThread.id}`)}
+          >
+            <Stack.Toolbar.Icon sf="message" />
+            <Stack.Toolbar.Label>Conversation</Stack.Toolbar.Label>
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      )}
       <WorkDetailView
         detail={query.data}
         isPreparing={prepare.isPending}

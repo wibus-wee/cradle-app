@@ -118,3 +118,4 @@ Chronological index of independently shipped product improvements.
 79. [Scan multi-page documents into Chat on iOS](./2026-08-31-79-mobile-document-scanner.md)
 80. [Preview Chat draft attachments with iOS Quick Look](./2026-08-31-80-mobile-draft-attachment-preview.md)
 81. [Review pull request patches in a native iOS sheet](./2026-08-31-81-mobile-native-pull-request-diff.md)
+82. [Open a Work conversation from its iOS toolbar](./2026-08-31-82-mobile-work-conversation-toolbar.md)
