@@ -530,6 +530,9 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           node-version: 22
+          # CocoaPods records dependency paths in Podfile.lock. Keep those
+          # paths repo-local so deployment mode is portable across runners.
+          enable-global-virtual-store: 'false'
 
       - uses: actions/setup-go@v5
         with:
