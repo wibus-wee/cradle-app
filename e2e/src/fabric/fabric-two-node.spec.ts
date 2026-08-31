@@ -943,6 +943,7 @@ test.describe('Fabric two-node user journey', () => {
         CHAT_PROMPT: prompt,
         CHAT_RESPONSE: response,
         NODE_ID: macbookMembership.localNodeId,
+        NODE_NAME: topology.macbook.name,
         OTHER_WORKSPACE_NAME: desktopLocal.name,
         SESSION_TITLE: macbookSessionTitle,
         WORKSPACE_NAME: macbookLocal.name,
