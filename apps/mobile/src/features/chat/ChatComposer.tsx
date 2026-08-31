@@ -11,6 +11,8 @@ import {
   Alert,
   Image,
   Keyboard,
+  Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -76,7 +78,11 @@ function ChatComposerContent({
   const [isPicking, setIsPicking] = useState(false)
   const interactionMode
     = runtimeSettings?.runtimeSettings.interactionMode === 'plan' ? 'plan' : 'build'
+  const cameraMenuActions: MenuAction[] = Platform.OS === 'ios'
+    ? [{ id: 'camera', image: 'camera', title: 'Take photo' }]
+    : []
   const composerMenuActions: MenuAction[] = [
+    ...cameraMenuActions,
     { id: 'photo', image: 'photo.on.rectangle', title: 'Add photo' },
     { id: 'file', image: 'doc', title: 'Add file' },
     {
@@ -139,6 +145,24 @@ function ChatComposerContent({
     onDraftChange({ files: nextFiles, text: textRef.current })
   }
 
+  const attachImages = (assets: ImagePicker.ImagePickerAsset[]) => {
+    const nextFiles = assets.flatMap((asset) => {
+      if (!asset.base64) {
+        return []
+      }
+      const mediaType = asset.mimeType ?? 'image/jpeg'
+      return [
+        {
+          filename: asset.fileName ?? `photo-${Date.now()}.jpg`,
+          mediaType,
+          type: 'file' as const,
+          url: `data:${mediaType};base64,${asset.base64}`,
+        },
+      ]
+    })
+    updateFiles([...filesRef.current, ...nextFiles])
+  }
+
   const submit = () => {
     const nextText = text.trim()
     if ((!nextText && files.length === 0) || isSending) {
@@ -163,21 +187,46 @@ function ChatComposerContent({
       if (result.canceled) {
         return
       }
-      const nextFiles = result.assets.flatMap((asset) => {
-        if (!asset.base64) {
-          return []
-        }
-        const mediaType = asset.mimeType ?? 'image/jpeg'
-        return [
-          {
-            filename: asset.fileName ?? `photo-${Date.now()}.jpg`,
-            mediaType,
-            type: 'file' as const,
-            url: `data:${mediaType};base64,${asset.base64}`,
-          },
-        ]
+      attachImages(result.assets)
+    }
+    catch {
+      Alert.alert('Could not add photo', 'The selected photo could not be read on this device.')
+    }
+    finally {
+      setIsPicking(false)
+    }
+  }
+
+  const takePhoto = async () => {
+    if (isPicking) {
+      return
+    }
+    setIsPicking(true)
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert(
+          'Camera Access Needed',
+          'Allow camera access in Settings to take a photo for this chat.',
+          [
+            { style: 'cancel', text: 'Not Now' },
+            { onPress: () => void Linking.openSettings(), text: 'Open Settings' },
+          ],
+        )
+        return
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        base64: true,
+        mediaTypes: ['images'],
+        quality: 0.9,
       })
-      updateFiles([...filesRef.current, ...nextFiles])
+      if (result.canceled) {
+        return
+      }
+      attachImages(result.assets)
+    }
+    catch {
+      Alert.alert('Could not take photo', 'The camera could not add a photo to this chat.')
     }
     finally {
       setIsPicking(false)
@@ -371,7 +420,10 @@ function ChatComposerContent({
         <MenuView
           actions={composerMenuActions}
           onPressAction={({ nativeEvent }) => {
-            if (nativeEvent.event === 'photo') {
+            if (nativeEvent.event === 'camera') {
+              void takePhoto()
+            }
+            else if (nativeEvent.event === 'photo') {
               void pickPhoto()
             }
             else if (nativeEvent.event === 'file') {
