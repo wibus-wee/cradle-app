@@ -1,6 +1,5 @@
 import {
   Button,
-  ContentUnavailableView,
   Host,
   HStack,
   Image,
@@ -27,6 +26,7 @@ import { useRef, useState } from 'react'
 import { Keyboard } from 'react-native'
 
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
+import { NativeUnavailableView } from '@/components/ui/native-unavailable-view.ios'
 import { Screen } from '@/components/ui/screen'
 import { relativeTime } from '@/lib/format'
 
@@ -214,7 +214,7 @@ export function WorkListView({
           ))}
 
           {filteredWorks.length === 0 && (
-            <ContentUnavailableView
+            <NativeUnavailableView
               description={normalizedSearch
                 ? 'Try a different title, objective, or workspace.'
                 : lifecycle === 'archived'

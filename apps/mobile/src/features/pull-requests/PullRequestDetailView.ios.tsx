@@ -1,6 +1,5 @@
 import {
   Button,
-  ContentUnavailableView,
   Host,
   HStack,
   Image,
@@ -23,6 +22,7 @@ import {
 import { useState } from 'react'
 import { Alert } from 'react-native'
 
+import { NativeUnavailableView } from '@/components/ui/native-unavailable-view.ios'
 import { relativeTime } from '@/lib/format'
 
 import type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
@@ -323,7 +323,7 @@ export function PullRequestDetailView({
               : <VStack key={item.id}>{content}</VStack>
           })}
           {detail.timeline.length === 0 && (
-            <ContentUnavailableView
+            <NativeUnavailableView
               description="Comments and reviews will appear here."
               systemImage="bubble.left.and.bubble.right"
               title="No Conversation Yet"

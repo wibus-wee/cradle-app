@@ -1,6 +1,5 @@
 import {
   Button,
-  ContentUnavailableView,
   Host,
   HStack,
   Image,
@@ -19,6 +18,8 @@ import {
   refreshable,
   textSelection,
 } from '@expo/ui/swift-ui/modifiers'
+
+import { NativeUnavailableView } from '@/components/ui/native-unavailable-view.ios'
 
 import {
   workspaceFilePreviewUnavailableDescription,
@@ -81,7 +82,7 @@ export function WorkspaceFilesView({
                   </Text>
                 )
               : (
-                  <ContentUnavailableView
+                  <NativeUnavailableView
                     description={previewUnavailable}
                     systemImage="doc.questionmark"
                     title="Preview Unavailable"
@@ -150,7 +151,7 @@ export function WorkspaceFilesView({
           ))}
 
           {entries.length === 0 && (
-            <ContentUnavailableView
+            <NativeUnavailableView
               description={search
                 ? 'Try a different file or directory name.'
                 : 'This directory has no files.'}

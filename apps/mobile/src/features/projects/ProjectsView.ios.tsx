@@ -1,6 +1,5 @@
 import {
   Button,
-  ContentUnavailableView,
   Host,
   HStack,
   Image,
@@ -22,6 +21,7 @@ import {
 import { useRef } from 'react'
 import { Keyboard } from 'react-native'
 
+import { NativeUnavailableView } from '@/components/ui/native-unavailable-view.ios'
 import { Screen } from '@/components/ui/screen'
 import type { WorkComposerHandle } from '@/features/work/WorkComposer'
 import { WorkComposer } from '@/features/work/WorkComposer'
@@ -131,7 +131,7 @@ export function ProjectsView({
           </Section>
 
           {filteredProjects.length === 0 && (
-            <ContentUnavailableView
+            <NativeUnavailableView
               description={normalizedSearch
                 ? 'Try a different workspace name, identifier, or branch.'
                 : 'Add a Workspace from Cradle Desktop, then refresh this page.'}

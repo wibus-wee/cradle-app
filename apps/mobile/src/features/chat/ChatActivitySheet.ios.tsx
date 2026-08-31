@@ -1,7 +1,6 @@
 import { BottomSheet } from '@expo/ui/community/bottom-sheet'
 import {
   Button,
-  ContentUnavailableView,
   Form,
   Host,
   HStack,
@@ -21,6 +20,8 @@ import {
   textSelection,
 } from '@expo/ui/swift-ui/modifiers'
 import { getToolName, isReasoningUIPart } from 'ai'
+
+import { NativeUnavailableView } from '@/components/ui/native-unavailable-view.ios'
 
 import { chatActivityParts, serializeChatActivity } from './chat-activity-model'
 import type { ChatActivitySheetProps } from './chat-activity-sheet-contract'
@@ -140,7 +141,7 @@ export function ChatActivitySheet({
           )}
 
           {!isLoading && !error && activities.length === 0 && (
-            <ContentUnavailableView
+            <NativeUnavailableView
               description="This message has no tool calls or reasoning details."
               systemImage="list.bullet.rectangle"
               title="No Activity"
