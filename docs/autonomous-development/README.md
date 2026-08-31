@@ -121,3 +121,4 @@ Chronological index of independently shipped product improvements.
 82. [Open a Work conversation from its iOS toolbar](./2026-08-31-82-mobile-work-conversation-toolbar.md)
 83. [Force-refresh pull request details from iOS](./2026-08-31-83-mobile-pull-request-detail-refresh.md)
 84. [Synchronize the GitHub inbox on Mobile refresh](./2026-08-31-84-mobile-pull-request-inbox-refresh.md)
+85. [Share a Usage snapshot from iOS](./2026-08-31-85-mobile-share-usage-snapshot.md)

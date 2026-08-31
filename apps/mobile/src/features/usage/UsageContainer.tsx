@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
+import { Stack } from 'expo-router'
 import { useEffect, useMemo, useState } from 'react'
+import { Alert, Platform, Share } from 'react-native'
 
 import type {
   GetUsageDailyResponse,
@@ -15,12 +17,14 @@ import { errorMessage } from '@/lib/errors'
 import type { UsageRange } from './usage-range'
 import { usageRangeDays } from './usage-range'
 import { loadUsageRange, persistUsageRange } from './usage-range-storage'
+import { createUsageReport } from './usage-view-model'
 import { UsageView } from './UsageView'
 
 export function UsageContainer() {
   const { connection } = useConnection()
   const isRouteActive = useRouteIsActive()
   const [range, setRange] = useState<UsageRange | null>(null)
+  const [isSharing, setIsSharing] = useState(false)
   const days = usageRangeDays(range ?? '30d')
   const rangeFrom = useMemo(() => {
     const date = new Date()
@@ -66,16 +70,51 @@ export function UsageContainer() {
       />
     )
   }
+  const shareUsage = async () => {
+    if (isSharing) {
+      return
+    }
+    setIsSharing(true)
+    try {
+      await Share.share({
+        message: createUsageReport(range, query.data.summary, query.data.stats),
+        title: 'Cradle Usage',
+      })
+    }
+    catch {
+      Alert.alert('Could not share Usage', 'The Usage snapshot could not be shared from this device.')
+    }
+    finally {
+      setIsSharing(false)
+    }
+  }
+
   return (
-    <UsageView
-      {...query.data}
-      isRefreshing={query.isRefetching}
-      onRangeChange={(nextRange) => {
-        setRange(nextRange)
-        void persistUsageRange(nextRange)
-      }}
-      onRefresh={async () => { await query.refetch() }}
-      range={range}
-    />
+    <>
+      <Stack.Screen options={{ title: 'Usage' }} />
+      {Platform.OS === 'ios' && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            accessibilityHint="Opens the system share sheet with the selected Usage range"
+            accessibilityLabel="Share Usage snapshot"
+            disabled={isSharing}
+            onPress={() => { void shareUsage() }}
+          >
+            <Stack.Toolbar.Icon sf="square.and.arrow.up" />
+            <Stack.Toolbar.Label>{isSharing ? 'Preparing…' : 'Share'}</Stack.Toolbar.Label>
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      )}
+      <UsageView
+        {...query.data}
+        isRefreshing={query.isRefetching}
+        onRangeChange={(nextRange) => {
+          setRange(nextRange)
+          void persistUsageRange(nextRange)
+        }}
+        onRefresh={async () => { await query.refetch() }}
+        range={range}
+      />
+    </>
   )
 }
