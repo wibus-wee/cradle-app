@@ -81,6 +81,7 @@ export function WorkspaceView({
 }: WorkspaceViewProps) {
   const composerRef = useRef<WorkComposerHandle>(null)
   const canCreateWork = workspaces.some(candidate => candidate.id === workspace.id)
+  const sortedSessions = [...sessions].sort((left, right) => right.pinned - left.pinned)
   const listModifiers = [
     listStyle('insetGrouped'),
     ...(onRefresh ? [refreshable(async () => { await onRefresh() })] : []),
@@ -233,7 +234,7 @@ export function WorkspaceView({
                     </VStack>
                   </HStack>
                 )
-              : sessions.map((session) => {
+              : sortedSessions.map((session) => {
                   const status = sessionPresentation(session.status)
                   return (
                     <Button
@@ -247,7 +248,12 @@ export function WorkspaceView({
                       <HStack modifiers={[fullWidth]} spacing={12}>
                         <Image color={status.color} size={18} systemName={status.symbol} />
                         <VStack alignment="leading" spacing={4}>
-                          <Text>{session.title ?? 'Untitled conversation'}</Text>
+                          <HStack spacing={6}>
+                            <Text>{session.title ?? 'Untitled conversation'}</Text>
+                            {session.pinned > 0 && (
+                              <Image color="orange" size={12} systemName="pin.fill" />
+                            )}
+                          </HStack>
                           <HStack spacing={7}>
                             <Text
                               modifiers={[

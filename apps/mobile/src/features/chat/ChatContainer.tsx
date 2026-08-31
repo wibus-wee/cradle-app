@@ -1,10 +1,10 @@
 import type { InfiniteData } from '@tanstack/react-query'
-import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { UIMessage } from 'ai'
 import * as Clipboard from 'expo-clipboard'
 import { Stack } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Share } from 'react-native'
+import { Alert, Platform, Share } from 'react-native'
 
 import type {
   GetChatSessionsBySessionIdCapabilitiesResponse,
@@ -28,6 +28,7 @@ import { useComposerDraft } from './use-composer-draft'
 
 export function ChatContainer({ sessionId }: { sessionId: string }) {
   const { connection } = useConnection()
+  const queryClient = useQueryClient()
   const isRouteActive = useRouteIsActive()
   const activeStreamRef = useRef<AbortController | null>(null)
   const routeActiveRef = useRef(isRouteActive)
@@ -103,6 +104,22 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         `/chat/sessions/${encodeURIComponent(sessionId)}/runtime-settings`,
         { signal },
       ),
+  })
+  const updatePin = useMutation({
+    mutationFn: (pinned: boolean) =>
+      cradleRequest<GetSessionsByIdResponse>(
+        connection!,
+        `/sessions/${encodeURIComponent(sessionId)}`,
+        { body: { pinned }, method: 'PATCH' },
+      ),
+    onError: () => {
+      Alert.alert('Could not update conversation', 'Your pin setting was not changed.')
+    },
+    onSuccess: (session) => {
+      queryClient.setQueryData(['chat-session', connection?.url, sessionId], session)
+      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.url] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
+    },
   })
   const detailQuery = useQuery({
     enabled: Boolean(connection && detailMessageId) && isRouteActive,
@@ -373,6 +390,26 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   return (
     <>
       <Stack.Screen options={{ title: sessionQuery.data.title ?? 'Conversation' }} />
+      {Platform.OS === 'ios' && (
+        <Stack.Toolbar placement="right">
+          <Stack.Toolbar.Button
+            accessibilityHint={sessionQuery.data.pinned > 0
+              ? 'Removes this conversation from your pinned conversations'
+              : 'Keeps this conversation easy to find in its workspace'}
+            accessibilityLabel={sessionQuery.data.pinned > 0
+              ? 'Unpin conversation'
+              : 'Pin conversation'}
+            disabled={updatePin.isPending}
+            onPress={() => updatePin.mutate(sessionQuery.data.pinned === 0)}
+            selected={sessionQuery.data.pinned > 0}
+          >
+            <Stack.Toolbar.Icon sf={sessionQuery.data.pinned > 0 ? 'pin.fill' : 'pin'} />
+            <Stack.Toolbar.Label>
+              {sessionQuery.data.pinned > 0 ? 'Unpin' : 'Pin'}
+            </Stack.Toolbar.Label>
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      )}
       <ChatView
         activeRun={activeRun}
         clearComposerDraftSignal={composerDraft.clearSignal}
