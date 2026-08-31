@@ -33,9 +33,16 @@ appId: app.cradle.mobile
       notVisible: Open navigation
     commands:
       - extendedWaitUntil:
-          visible: ${NODE_NAME}, Online
+          visible:
+            id: settings-node-${NODE_ID}
           timeout: 45000
-      - tapOn: ${NODE_NAME}, Online
+      - tapOn:
+          id: settings-node-${NODE_ID}
+      - extendedWaitUntil:
+          visible:
+            id: settings-node-${NODE_ID}
+            selected: true
+          timeout: 45000
 - runFlow:
     when:
       visible: Open navigation

@@ -14,10 +14,12 @@ import {
 import {
   accessibilityLabel,
   buttonStyle,
+  contentShape,
   font,
   foregroundStyle,
   frame,
   listStyle,
+  shapes,
   symbolEffect,
 } from '@expo/ui/swift-ui/modifiers'
 import * as Haptics from 'expo-haptics'
@@ -286,8 +288,9 @@ export function SettingsView(props: SettingsViewProps) {
                       key={node.nodeId}
                       modifiers={[plainButton]}
                       onPress={() => props.onSelectNode(node.nodeId)}
+                      testID={`settings-node-${node.nodeId}`}
                     >
-                      <HStack modifiers={[fullWidthRow]} spacing={12}>
+                      <HStack modifiers={[fullWidthRow, contentShape(shapes.rectangle())]} spacing={12}>
                         <Image color="secondary" size={18} systemName="desktopcomputer" />
                         <VStack alignment="leading" spacing={2}>
                           <Text>{node.displayName}</Text>
