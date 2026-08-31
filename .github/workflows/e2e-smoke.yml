@@ -518,6 +518,10 @@ jobs:
     needs: gate
     if: ${{ needs.gate.result == 'success' }}
     timeout-minutes: 60
+    # CocoaPods records dependency paths in Podfile.lock. Keep every pnpm
+    # command on the repo-local virtual store so those paths stay portable.
+    env:
+      pnpm_config_enable_global_virtual_store: 'false'
 
     steps:
       - name: Checkout Cradle source
@@ -530,9 +534,6 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           node-version: 22
-          # CocoaPods records dependency paths in Podfile.lock. Keep those
-          # paths repo-local so deployment mode is portable across runners.
-          enable-global-virtual-store: 'false'
 
       - uses: actions/setup-go@v5
         with:
