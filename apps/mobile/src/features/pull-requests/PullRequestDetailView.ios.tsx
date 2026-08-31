@@ -95,8 +95,10 @@ function checksSummaryPresentation(state: PullRequestDetailViewProps['detail']['
 
 export function PullRequestDetailView({
   detail,
+  initialDraft,
   isMutating = false,
   onComment,
+  onDraftChange,
   onOpenExternal,
   onReview,
 }: PullRequestDetailViewProps) {
@@ -340,8 +342,10 @@ export function PullRequestDetailView({
           title="Review"
         >
           <PullRequestReviewComposerContent
+            initialDraft={initialDraft}
             isMutating={isMutating}
             onComment={onComment}
+            onDraftChange={onDraftChange}
             onReview={onReview}
           />
         </Section>

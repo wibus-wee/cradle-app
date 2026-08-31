@@ -11,6 +11,7 @@ import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
 import { PullRequestDetailView } from './PullRequestDetailView'
+import { usePullRequestReviewDraft } from './use-pull-request-review-draft'
 
 interface PullRequestDetailContainerProps {
   owner: string
@@ -26,6 +27,7 @@ export function PullRequestDetailContainer({
   const { connection } = useConnection()
   const isRouteActive = useRouteIsActive()
   const path = `/pull-requests/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(number)}`
+  const reviewDraft = usePullRequestReviewDraft(connection?.url, owner, repo, number)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
     queryKey: ['pull-request', connection?.url, owner, repo, number],
@@ -45,7 +47,7 @@ export function PullRequestDetailContainer({
     onSuccess: () => void query.refetch(),
   })
 
-  if (query.isPending) {
+  if (query.isPending || reviewDraft.isPending) {
     return <LoadingState />
   }
   if (query.error) {
@@ -106,11 +108,13 @@ export function PullRequestDetailContainer({
       )}
       <PullRequestDetailView
         detail={query.data}
+        initialDraft={reviewDraft.initialDraft}
         isMutating={action.isPending}
         nativeHeader={nativeHeader}
         onComment={async (body) => {
           await action.mutateAsync({ endpoint: 'comment', body: { body } })
         }}
+        onDraftChange={reviewDraft.scheduleSave}
         onOpenExternal={async (url) => {
           await Linking.openURL(url)
         }}

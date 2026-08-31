@@ -112,3 +112,4 @@ Chronological index of independently shipped product improvements.
 73. [Reach workspace files from a native context menu](./2026-08-31-73-mobile-workspace-context-menu.md)
 74. [Confirm server address copies without interrupting Settings](./2026-08-31-74-mobile-inline-copy-feedback.md)
 75. [Confirm externally visible pull request reviews on iOS](./2026-08-31-75-mobile-native-review-confirmation.md)
+76. [Restore unfinished pull request review notes on iOS](./2026-08-31-76-mobile-review-draft-recovery.md)

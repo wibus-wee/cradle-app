@@ -29,12 +29,14 @@ import type {
 const fullWidth = frame({ maxWidth: Infinity, minHeight: 44, alignment: 'leading' })
 
 export function PullRequestReviewComposerContent({
+  initialDraft = '',
   isMutating = false,
   onComment,
+  onDraftChange,
   onReview,
 }: PullRequestReviewComposerProps) {
-  const text = useNativeState('')
-  const [comment, setComment] = useState('')
+  const text = useNativeState(initialDraft)
+  const [comment, setComment] = useState(initialDraft)
   const [pendingAction, setPendingAction] = useState<'comment' | PullRequestReviewEvent | null>(null)
   const [submissionError, setSubmissionError] = useState<string | null>(null)
   const body = comment.trim()
@@ -44,6 +46,7 @@ export function PullRequestReviewComposerContent({
     setComment((current) => {
       if (current.trim() !== submittedBody) { return current }
       text.set('')
+      onDraftChange?.('')
       return ''
     })
   }
@@ -90,6 +93,7 @@ export function PullRequestReviewComposerContent({
         onTextChange={(value) => {
           setSubmissionError(null)
           setComment(value)
+          onDraftChange?.(value)
         }}
         placeholder="Review note"
         text={text}
