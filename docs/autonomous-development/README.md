@@ -122,3 +122,4 @@ Chronological index of independently shipped product improvements.
 83. [Force-refresh pull request details from iOS](./2026-08-31-83-mobile-pull-request-detail-refresh.md)
 84. [Synchronize the GitHub inbox on Mobile refresh](./2026-08-31-84-mobile-pull-request-inbox-refresh.md)
 85. [Share a Usage snapshot from iOS](./2026-08-31-85-mobile-share-usage-snapshot.md)
+86. [Attribute Usage to agents on iOS](./2026-08-31-86-mobile-agent-usage.md)

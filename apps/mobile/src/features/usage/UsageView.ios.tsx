@@ -46,9 +46,12 @@ export function UsageView({
   stats,
   summary,
 }: UsageViewProps) {
+  const [showAllAgents, setShowAllAgents] = useState(false)
   const [showAllModels, setShowAllModels] = useState(false)
   const recentDays = denseRecentUsageDays(daily)
+  const agents = showAllAgents ? summary.byAgent : summary.byAgent.slice(0, 5)
   const models = showAllModels ? summary.byModel : summary.byModel.slice(0, 5)
+  const maxAgentTokens = Math.max(...summary.byAgent.map(agent => agent.totalTokens), 1)
   const maxModelTokens = Math.max(...summary.byModel.map(model => model.totalTokens), 1)
   const maxProviderTokens = Math.max(
     ...summary.byProviderTarget.map(provider => provider.totalTokens),
@@ -118,6 +121,41 @@ export function UsageView({
             <Text modifiers={[tabularNumber]}>{`${stats.currentStreak} days`}</Text>
           </LabeledContent>
         </Section>
+
+        {summary.byAgent.length > 0 && (
+          <Section title="Agents">
+            {agents.map(agent => (
+              <VStack alignment="leading" key={agent.agentId} spacing={7}>
+                <HStack modifiers={[fullWidth]} spacing={12}>
+                  <Text>{agent.agentName}</Text>
+                  <Spacer />
+                  <Text modifiers={[secondaryForeground, tabularNumber]}>
+                    {formatUsageNumber(agent.totalTokens)}
+                  </Text>
+                </HStack>
+                <ProgressView value={agent.totalTokens / maxAgentTokens} />
+              </VStack>
+            ))}
+            {summary.byAgent.length > 5 && (
+              <Button
+                modifiers={[buttonStyle('plain')]}
+                onPress={() => setShowAllAgents(current => !current)}
+              >
+                <HStack modifiers={[fullWidth]} spacing={10}>
+                  <Image
+                    color="blue"
+                    size={15}
+                    systemName={showAllAgents ? 'chevron.up' : 'chevron.down'}
+                  />
+                  <Text modifiers={[foregroundStyle('blue')]}>
+                    {showAllAgents ? 'Show Top 5' : `Show All ${summary.byAgent.length}`}
+                  </Text>
+                  <Spacer />
+                </HStack>
+              </Button>
+            )}
+          </Section>
+        )}
 
         <Section title="Models">
           {models.map(model => (
