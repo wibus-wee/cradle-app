@@ -12,9 +12,11 @@ import type {
 } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
+import type { ServerConnection } from '@/lib/api'
 import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
+import { openQuickLook } from '@/native/quick-look'
 
 import { WorkspaceFilesView } from './WorkspaceFilesView'
 
@@ -23,6 +25,23 @@ const MAX_TEXT_PREVIEW_BYTES = 128 * 1024
 function parentPath(path: string): string {
   const separator = path.lastIndexOf('/')
   return separator < 0 ? '' : path.slice(0, separator)
+}
+
+async function downloadWorkspaceFile(
+  connection: ServerConnection,
+  workspaceId: string,
+  path: string,
+  name: string,
+): Promise<File> {
+  const cacheDirectory = new Directory(Paths.cache, 'cradle-files')
+  cacheDirectory.create({ idempotent: true, intermediates: true })
+  const destination = new File(cacheDirectory, name)
+  const rawUrl
+    = `${connection.url}/workspaces/${encodeURIComponent(workspaceId)}/files/raw?path=${encodeURIComponent(path)}`
+  return File.downloadFileAsync(rawUrl, destination, {
+    headers: connection.token ? { authorization: `Bearer ${connection.token}` } : undefined,
+    idempotent: true,
+  })
 }
 
 interface WorkspaceFilesContainerProps {
@@ -43,7 +62,7 @@ export function WorkspaceFilesContainer({
   )
   const [selectedFile, setSelectedFile] = useState<string | null>(initialFile ?? null)
   const [search, setSearch] = useState('')
-  const [isSharing, setIsSharing] = useState(false)
+  const [fileAction, setFileAction] = useState<'preview' | 'share' | null>(null)
   const normalizedSearch = search.trim()
   const showsInlineSearch = Platform.OS === 'web'
   const directoryQuery = useQuery({
@@ -123,25 +142,35 @@ export function WorkspaceFilesContainer({
     : null
 
   const shareFile = async (name: string) => {
-    if (!connection || !selectedFile || isSharing) { return }
-    setIsSharing(true)
+    if (!connection || !selectedFile || fileAction) { return }
+    setFileAction('share')
     try {
-      const shareDirectory = new Directory(Paths.cache, 'cradle-shares')
-      shareDirectory.create({ idempotent: true, intermediates: true })
-      const destination = new File(shareDirectory, name)
-      const rawUrl
-        = `${connection.url}/workspaces/${encodeURIComponent(workspaceId)}/files/raw?path=${encodeURIComponent(selectedFile)}`
-      const downloaded = await File.downloadFileAsync(rawUrl, destination, {
-        headers: connection.token ? { authorization: `Bearer ${connection.token}` } : undefined,
-        idempotent: true,
-      })
+      const downloaded = await downloadWorkspaceFile(connection, workspaceId, selectedFile, name)
       await Share.share({ title: name, url: downloaded.uri })
     }
     catch {
       Alert.alert('Could not share file', 'The file could not be downloaded to this device.')
     }
     finally {
-      setIsSharing(false)
+      setFileAction(null)
+    }
+  }
+
+  const previewFile = async (name: string) => {
+    if (!connection || !selectedFile || fileAction) { return }
+    setFileAction('preview')
+    try {
+      const downloaded = await downloadWorkspaceFile(connection, workspaceId, selectedFile, name)
+      await openQuickLook(downloaded.uri)
+    }
+    catch {
+      Alert.alert(
+        'Could not preview file',
+        'The file could not be downloaded or is not supported by iOS Quick Look.',
+      )
+    }
+    finally {
+      setFileAction(null)
     }
   }
 
@@ -173,13 +202,26 @@ export function WorkspaceFilesContainer({
         {Platform.OS === 'ios' && (
           <Stack.Toolbar placement="right">
             <Stack.Toolbar.Button
+              accessibilityHint="Downloads the original file and opens it in iOS Quick Look"
+              accessibilityLabel={`Preview ${fileInfo.name}`}
+              disabled={fileAction !== null}
+              onPress={() => { void previewFile(fileInfo.name) }}
+            >
+              <Stack.Toolbar.Icon sf="eye" />
+              <Stack.Toolbar.Label>
+                {fileAction === 'preview' ? 'Opening…' : 'Quick Look'}
+              </Stack.Toolbar.Label>
+            </Stack.Toolbar.Button>
+            <Stack.Toolbar.Button
               accessibilityHint="Downloads the original file and opens the system share sheet"
               accessibilityLabel={`Share ${fileInfo.name}`}
-              disabled={isSharing}
+              disabled={fileAction !== null}
               onPress={() => { void shareFile(fileInfo.name) }}
             >
               <Stack.Toolbar.Icon sf="square.and.arrow.up" />
-              <Stack.Toolbar.Label>{isSharing ? 'Sharing…' : 'Share'}</Stack.Toolbar.Label>
+              <Stack.Toolbar.Label>
+                {fileAction === 'share' ? 'Sharing…' : 'Share'}
+              </Stack.Toolbar.Label>
             </Stack.Toolbar.Button>
           </Stack.Toolbar>
         )}

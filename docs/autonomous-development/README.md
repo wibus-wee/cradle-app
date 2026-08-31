@@ -108,3 +108,4 @@ Chronological index of independently shipped product improvements.
 69. [Adapt Mobile navigation to an iPad sidebar](./2026-08-31-69-mobile-ipad-native-sidebar.md)
 70. [Act on pull requests from a native context menu](./2026-08-31-70-mobile-pull-request-context-menu.md)
 71. [Act on Work from a native context menu](./2026-08-31-71-mobile-work-context-menu.md)
+72. [Preview workspace files with iOS Quick Look](./2026-08-31-72-mobile-native-quick-look.md)
