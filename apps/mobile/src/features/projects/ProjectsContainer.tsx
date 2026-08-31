@@ -67,7 +67,14 @@ export function ProjectsContainer({
     return <LoadingState />
   }
   if (query.error) {
-    return <ErrorState title="Could not load projects" description={errorMessage(query.error)} />
+    return (
+      <ErrorState
+        title="Could not load projects"
+        description={errorMessage(query.error)}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
+      />
+    )
   }
   return (
     <ProjectsView

@@ -49,7 +49,14 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
     return <LoadingState />
   }
   if (query.error) {
-    return <ErrorState title="Could not open Work" description={errorMessage(query.error)} />
+    return (
+      <ErrorState
+        title="Could not open Work"
+        description={errorMessage(query.error)}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
+      />
+    )
   }
   return (
     <>

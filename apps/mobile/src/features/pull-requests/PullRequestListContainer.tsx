@@ -73,6 +73,8 @@ export function PullRequestListContainer({
       <ErrorState
         title="GitHub is not available"
         description={`${errorMessage(query.error)} Configure GitHub access on Cradle Desktop.`}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
       />
     )
   }

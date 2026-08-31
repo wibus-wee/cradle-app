@@ -129,6 +129,11 @@ export function WorkspaceFilesContainer({
       return (
         <ErrorState
           description={errorMessage(fileError)}
+          isActionPending={infoQuery.isFetching || (canPreview && contentQuery.isFetching)}
+          onAction={() => {
+            void infoQuery.refetch()
+            if (canPreview) { void contentQuery.refetch() }
+          }}
           title="Could not open file"
         />
       )
@@ -174,6 +179,8 @@ export function WorkspaceFilesContainer({
         <ErrorState
           title={normalizedSearch ? 'Could not search files' : 'Could not browse files'}
           description={errorMessage(activeEntriesQuery.error)}
+          isActionPending={activeEntriesQuery.isFetching}
+          onAction={() => { void activeEntriesQuery.refetch() }}
         />
       </>
     )

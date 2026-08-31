@@ -78,7 +78,14 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
     return <LoadingState />
   }
   if (query.error) {
-    return <ErrorState title="Could not open project" description={errorMessage(query.error)} />
+    return (
+      <ErrorState
+        title="Could not open project"
+        description={errorMessage(query.error)}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
+      />
+    )
   }
   return (
     <>

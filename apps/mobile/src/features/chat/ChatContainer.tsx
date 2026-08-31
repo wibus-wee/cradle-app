@@ -375,13 +375,29 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
 
   const error = sessionQuery.error ?? (!historyData ? historyQuery.error : null)
   if (error) {
-    return <ErrorState title="Could not open conversation" description={errorMessage(error)} />
+    return (
+      <ErrorState
+        title="Could not open conversation"
+        description={errorMessage(error)}
+        isActionPending={sessionQuery.isFetching || historyQuery.isFetching}
+        onAction={() => {
+          void sessionQuery.refetch()
+          void historyQuery.refetch()
+        }}
+      />
+    )
   }
   if (sessionQuery.isPending || (!historyData && historyQuery.isPending) || composerDraft.isPending) {
     return <LoadingState />
   }
   if (!sessionQuery.data) {
-    return <ErrorState title="Conversation not found" />
+    return (
+      <ErrorState
+        title="Conversation not found"
+        isActionPending={sessionQuery.isFetching}
+        onAction={() => { void sessionQuery.refetch() }}
+      />
+    )
   }
   const activeRun = runtimeStatusQuery.data?.activeRun ?? undefined
   const hasEarlier = Boolean(historyQuery.hasNextPage ?? historyData?.pages.at(-1)?.nextCursor)

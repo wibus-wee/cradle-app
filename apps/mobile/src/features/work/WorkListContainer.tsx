@@ -63,7 +63,14 @@ export function WorkListContainer({
     return <LoadingState />
   }
   if (query.error) {
-    return <ErrorState title="Could not load Work" description={errorMessage(query.error)} />
+    return (
+      <ErrorState
+        title="Could not load Work"
+        description={errorMessage(query.error)}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
+      />
+    )
   }
   return (
     <WorkListView

@@ -1,5 +1,7 @@
 import {
+  Button,
   Host,
+  HStack,
   Image,
   ProgressView,
   Text,
@@ -7,6 +9,8 @@ import {
 } from '@expo/ui/swift-ui'
 import {
   accessibilityHidden,
+  buttonStyle,
+  disabled,
   font,
   foregroundStyle,
   frame,
@@ -23,7 +27,10 @@ const horizontalPadding = padding({ horizontal: 32 })
 const secondaryForeground = foregroundStyle({ type: 'hierarchical', style: 'secondary' })
 
 function NativeState({
+  actionLabel = 'Try Again',
   description,
+  isActionPending = false,
+  onAction,
   symbol,
   symbolColor,
   title,
@@ -56,15 +63,39 @@ function NativeState({
             {description}
           </Text>
         )}
+        {onAction && (
+          <Button
+            modifiers={[
+              buttonStyle('borderedProminent'),
+              disabled(isActionPending),
+              frame({ minHeight: 44 }),
+            ]}
+            onPress={onAction}
+          >
+            <HStack spacing={8}>
+              {isActionPending && <ProgressView />}
+              <Text>{actionLabel}</Text>
+            </HStack>
+          </Button>
+        )}
       </VStack>
     </Host>
   )
 }
 
-export function EmptyState({ title, description }: StateProps) {
+export function EmptyState({
+  actionLabel,
+  description,
+  isActionPending,
+  onAction,
+  title,
+}: StateProps) {
   return (
     <NativeState
+      actionLabel={actionLabel}
       description={description}
+      isActionPending={isActionPending}
+      onAction={onAction}
       symbol="tray.fill"
       symbolColor="secondary"
       title={title}
@@ -72,10 +103,19 @@ export function EmptyState({ title, description }: StateProps) {
   )
 }
 
-export function ErrorState({ title, description }: StateProps) {
+export function ErrorState({
+  actionLabel,
+  description,
+  isActionPending,
+  onAction,
+  title,
+}: StateProps) {
   return (
     <NativeState
+      actionLabel={actionLabel}
       description={description}
+      isActionPending={isActionPending}
+      onAction={onAction}
       symbol="exclamationmark.triangle.fill"
       symbolColor="red"
       title={title}

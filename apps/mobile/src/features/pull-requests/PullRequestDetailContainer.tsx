@@ -50,7 +50,12 @@ export function PullRequestDetailContainer({
   }
   if (query.error) {
     return (
-      <ErrorState title="Could not open pull request" description={errorMessage(query.error)} />
+      <ErrorState
+        title="Could not open pull request"
+        description={errorMessage(query.error)}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
+      />
     )
   }
   const nativeHeader = Platform.OS !== 'web'

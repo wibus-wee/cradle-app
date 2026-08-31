@@ -91,3 +91,4 @@ Chronological index of independently shipped product improvements.
 52. [Inspect pull requests in a native iOS detail view](./2026-08-31-52-mobile-native-pull-request-detail.md)
 53. [Pin important Mobile conversations](./2026-08-31-53-mobile-pin-conversations.md)
 54. [Use native iOS loading and error states](./2026-08-31-54-mobile-native-route-states.md)
+55. [Retry failed Mobile routes in place](./2026-08-31-55-mobile-route-retry.md)
