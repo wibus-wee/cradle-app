@@ -44,7 +44,10 @@ export default function NativeTabsLayout() {
     = sessionsQuery.data?.items.filter(session => session.unread && session.workspaceId !== null).length
       ?? 0
   const tabBarAppearance = Platform.OS === 'ios'
-    ? { minimizeBehavior: 'onScrollDown' as const }
+    ? {
+        minimizeBehavior: 'onScrollDown' as const,
+        sidebarAdaptable: true,
+      }
     : {
         backgroundColor: theme.chrome,
         iconColor: { default: theme.mutedForeground, selected: theme.info },
