@@ -60,7 +60,20 @@ export function PullRequestListContainer({
   const refresh = async () => {
     setIsRefreshing(true)
     try {
-      await query.refetch()
+      const login = query.data?.login
+      if (login) {
+        await cradleRequest(connection!, '/pull-requests/refresh', {
+          body: { login },
+          method: 'POST',
+        })
+      }
+      await query.refetch({ throwOnError: true })
+    }
+    catch {
+      Alert.alert(
+        'Could not refresh pull requests',
+        'Cradle could not sync the latest GitHub inbox.',
+      )
     }
     finally {
       setIsRefreshing(false)
