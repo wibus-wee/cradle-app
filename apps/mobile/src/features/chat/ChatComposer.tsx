@@ -354,7 +354,9 @@ function ChatComposerContent({
         </ScrollView>
       )}
 
-      <View
+      <NativeMaterialView
+        glassStyle="regular"
+        isInteractive
         style={[
           styles.composer,
           {
@@ -364,13 +366,8 @@ function ChatComposerContent({
             shadowOpacity: theme.shadowOpacity,
           },
         ]}
+        tintColor={theme.glassTint}
       >
-        <NativeMaterialView
-          glassStyle="regular"
-          pointerEvents="none"
-          style={styles.glass}
-          tintColor={theme.glassTint}
-        />
         <MenuView
           actions={composerMenuActions}
           onPressAction={({ nativeEvent }) => {
@@ -448,7 +445,7 @@ function ChatComposerContent({
             />
           )}
         </PressableScale>
-      </View>
+      </NativeMaterialView>
     </View>
   )
 }
@@ -492,9 +489,6 @@ const styles = StyleSheet.create({
     padding: 5,
     shadowOffset: { height: 1, width: 0 },
     shadowRadius: 6,
-  },
-  glass: {
-    ...StyleSheet.absoluteFill,
   },
   continuation: {
     borderRadius: radius.lg,
