@@ -14,19 +14,14 @@ appId: app.cradle.mobile
 - tapOn: Open navigation
 - tapOn: Workspaces
 - extendedWaitUntil:
-    visible:
-      id: workspace-${WORKSPACE_ID}
+    visible: ${WORKSPACE_NAME}.*
     timeout: 45000
-- assertNotVisible:
-    id: workspace-${OTHER_WORKSPACE_ID}
-- tapOn:
-    id: workspace-${WORKSPACE_ID}
+- assertNotVisible: ${OTHER_WORKSPACE_NAME}.*
+- tapOn: ${WORKSPACE_NAME}.*
 - extendedWaitUntil:
-    visible:
-      id: session-${SESSION_ID}
+    visible: ${SESSION_TITLE}.*
     timeout: 45000
-- tapOn:
-    id: session-${SESSION_ID}
+- tapOn: ${SESSION_TITLE}.*
 - extendedWaitUntil:
     visible:
       id: chat-message-input

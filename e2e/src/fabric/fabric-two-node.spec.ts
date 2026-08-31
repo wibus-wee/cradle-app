@@ -867,6 +867,7 @@ test.describe('Fabric two-node user journey', () => {
     let macbookMembership!: FabricMembership
     let macbookSessionId!: string
     let mobileControllerId!: string
+    const macbookSessionTitle = 'Mobile Fabric seeded conversation'
 
     await test.step('pair two Nodes and create distinct local Workspaces', async () => {
       ;({ desktopMembership, macbookMembership } = await ensurePairedNodes())
@@ -887,6 +888,11 @@ test.describe('Fabric two-node user journey', () => {
         prompt: 'Seed the Mobile Fabric conversation',
         response: 'MacBook seeded the Mobile conversation.',
         targetSimulator: macbookSimulator,
+      })
+      await json<SessionSummary>(`${topology.macbook.serverUrl}/sessions/${macbookSessionId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: macbookSessionTitle }),
       })
 
       await openNodeSettings(desktopPage)
@@ -917,8 +923,8 @@ test.describe('Fabric two-node user journey', () => {
     await test.step('select Desktop and keep Node-scoped Workspace caches isolated', async () => {
       await runMaestroFlow('select-node', {
         NODE_ID: desktopMembership.localNodeId,
-        OTHER_WORKSPACE_ID: macbookLocal.id,
-        WORKSPACE_ID: desktopLocal.id,
+        OTHER_WORKSPACE_NAME: macbookLocal.name,
+        WORKSPACE_NAME: desktopLocal.name,
       })
     })
 
@@ -937,9 +943,9 @@ test.describe('Fabric two-node user journey', () => {
         CHAT_PROMPT: prompt,
         CHAT_RESPONSE: response,
         NODE_ID: macbookMembership.localNodeId,
-        OTHER_WORKSPACE_ID: desktopLocal.id,
-        SESSION_ID: macbookSessionId,
-        WORKSPACE_ID: macbookLocal.id,
+        OTHER_WORKSPACE_NAME: desktopLocal.name,
+        SESSION_TITLE: macbookSessionTitle,
+        WORKSPACE_NAME: macbookLocal.name,
       })
       macbookSimulator.assertExhausted()
     })
