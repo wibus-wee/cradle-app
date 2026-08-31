@@ -59,7 +59,6 @@ export function WorkListContainer() {
     <WorkListView
       isCreating={create.isPending}
       isRefreshing={isRefreshing}
-      onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onCreate={input => create.mutate(input)}
       onOpen={sessionId => router.push(`/session/${sessionId}`)}
       onOpenInfo={workId => router.push(`/work/${workId}`)}

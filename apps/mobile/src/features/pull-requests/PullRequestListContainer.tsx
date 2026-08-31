@@ -70,7 +70,6 @@ export function PullRequestListContainer() {
     <PullRequestListView
       {...query.data}
       isRefreshing={isRefreshing}
-      onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onOpen={pullRequest =>
         router.push(`/pull-request/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`)}
       onOpenUsage={() => router.push('/usage')}

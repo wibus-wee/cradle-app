@@ -45,7 +45,6 @@ export function SettingsContainer() {
       }}
       onEditServer={() => router.push('/connection/server')}
       onEditToken={() => router.push('/connection/token')}
-      onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onOpenUsage={() => router.push('/usage')}
       onShareServer={async () => {
         await Share.share({

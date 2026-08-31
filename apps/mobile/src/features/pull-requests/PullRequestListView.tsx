@@ -7,8 +7,6 @@ import type {
   GetPullRequestsAuthoredResponse,
   GetPullRequestsReviewingResponse,
 } from '@/api-gen'
-import type { AppSection } from '@/components/common/app-menu-button'
-import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
 import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
@@ -27,7 +25,6 @@ export interface PullRequestListViewProps {
   reviewing: GetPullRequestsReviewingResponse['items']
   login: string
   isRefreshing?: boolean
-  onNavigate: (section: AppSection) => void
   onOpen: (pullRequest: PullRequest) => void
   onOpenUsage: () => void
   onRefresh?: () => void
@@ -53,7 +50,6 @@ export function PullRequestListView({
   reviewing,
   login,
   isRefreshing = false,
-  onNavigate,
   onOpen,
   onOpenUsage,
   onRefresh,
@@ -77,7 +73,6 @@ export function PullRequestListView({
 
   return (
     <Screen
-      action={<AppMenuButton current="pull-requests" onSelect={onNavigate} />}
       leading={<CradleIconButton onPress={onOpenUsage} />}
       onRefresh={onRefresh}
       refreshing={isRefreshing}

@@ -16,7 +16,6 @@ export const workListFixture: WorkListViewProps = {
     updatedAt: 1_750_000_000,
   }],
   onCreate: () => {},
-  onNavigate: () => {},
   onOpen: () => {},
   onOpenInfo: () => {},
   onOpenUsage: () => {},

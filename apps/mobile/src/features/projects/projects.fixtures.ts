@@ -19,7 +19,6 @@ export const projectsFixture: ProjectsViewProps = {
     },
   ],
   onCreate: () => {},
-  onNavigate: () => {},
   onOpenUsage: () => {},
   onOpenProject: () => {},
 }

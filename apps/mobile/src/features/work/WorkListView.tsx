@@ -4,8 +4,6 @@ import { useRef, useState } from 'react'
 import { Keyboard, SectionList, StyleSheet, Text, View } from 'react-native'
 
 import type { GetWorkspacesResponse, GetWorksResponse, PostWorksData } from '@/api-gen'
-import type { AppSection } from '@/components/common/app-menu-button'
-import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
 import { IconButton } from '@/components/ui/icon-button'
 import { InputGroup } from '@/components/ui/input-group'
@@ -31,7 +29,6 @@ export interface WorkListViewProps {
   isCreating?: boolean
   isRefreshing?: boolean
   onCreate: (input: PostWorksData['body']) => void
-  onNavigate: (section: AppSection) => void
   onOpen: (sessionId: string) => void
   onOpenInfo: (workId: string) => void
   onOpenUsage: () => void
@@ -60,7 +57,6 @@ export function WorkListView({
   isCreating = false,
   isRefreshing = false,
   onCreate,
-  onNavigate,
   onOpen,
   onOpenInfo,
   onOpenUsage,
@@ -96,7 +92,6 @@ export function WorkListView({
   return (
     <Screen
       avoidKeyboard
-      action={<AppMenuButton current="work" onSelect={onNavigate} />}
       footer={lifecycle === 'active'
         ? (
             <WorkComposer

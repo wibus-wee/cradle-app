@@ -10,7 +10,6 @@ export const settingsFixture: SettingsViewProps = {
   onDisconnect: () => {},
   onEditServer: () => {},
   onEditToken: () => {},
-  onNavigate: () => {},
   onOpenUsage: () => {},
   onShareServer: async () => {},
   serverUrl: 'http://192.168.1.20:21423',

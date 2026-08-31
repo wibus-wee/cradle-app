@@ -11,8 +11,6 @@ import {
 } from 'lucide-react-native'
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
 
-import type { AppSection } from '@/components/common/app-menu-button'
-import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
@@ -31,7 +29,6 @@ export interface SettingsViewProps {
   onDisconnect: () => void
   onEditServer: () => void
   onEditToken: () => void
-  onNavigate: (section: AppSection) => void
   onOpenUsage: () => void
   onShareServer: () => Promise<void>
   serverUrl: string
@@ -46,7 +43,6 @@ export function SettingsView({
   onDisconnect,
   onEditServer,
   onEditToken,
-  onNavigate,
   onOpenUsage,
   onShareServer,
   serverUrl,
@@ -79,7 +75,6 @@ export function SettingsView({
 
   return (
     <Screen
-      action={<AppMenuButton current="settings" onSelect={onNavigate} />}
       leading={<CradleIconButton onPress={onOpenUsage} />}
       title="Settings"
     >

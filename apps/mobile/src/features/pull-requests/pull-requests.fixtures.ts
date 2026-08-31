@@ -24,7 +24,6 @@ export const pullRequestListFixture: PullRequestListViewProps = {
   authored: [pullRequest],
   reviewing: [],
   login: 'demo',
-  onNavigate: () => {},
   onOpen: () => {},
   onOpenUsage: () => {},
 }

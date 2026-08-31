@@ -3,8 +3,6 @@ import { useRef, useState } from 'react'
 import { FlatList, Keyboard, StyleSheet, Text, View } from 'react-native'
 
 import type { GetSessionsResponse, GetWorkspacesResponse, PostWorksData } from '@/api-gen'
-import type { AppSection } from '@/components/common/app-menu-button'
-import { AppMenuButton } from '@/components/common/app-menu-button'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
 import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
@@ -28,7 +26,6 @@ export interface ProjectsViewProps {
   isCreating?: boolean
   isRefreshing?: boolean
   onCreate: (input: PostWorksData['body']) => void
-  onNavigate: (section: AppSection) => void
   onOpenUsage: () => void
   onOpenProject: (workspaceId: string) => void
   onRefresh?: () => void
@@ -39,7 +36,6 @@ export function ProjectsView({
   isCreating = false,
   isRefreshing = false,
   onCreate,
-  onNavigate,
   onOpenUsage,
   onOpenProject,
   onRefresh,
@@ -61,7 +57,6 @@ export function ProjectsView({
   return (
     <Screen
       avoidKeyboard={workspaces.length > 0}
-      action={<AppMenuButton current="projects" onSelect={onNavigate} />}
       footer={workspaces.length > 0
         ? (
             <WorkComposer
