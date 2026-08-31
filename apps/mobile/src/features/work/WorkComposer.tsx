@@ -289,10 +289,10 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
         >
           <NativeMaterialView
             glassStyle="regular"
-            pointerEvents="none"
+            isInteractive
             style={styles.glass}
             tintColor={theme.glassTint}
-          />
+          >
 
           <Animated.View
             pointerEvents={expanded ? 'none' : 'auto'}
@@ -497,6 +497,7 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
               </PressableScale>
             </Animated.View>
           </View>
+          </NativeMaterialView>
         </Animated.View>
       </Animated.View>
       <WorkspacePickerSheet
