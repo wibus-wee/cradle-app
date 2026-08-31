@@ -514,7 +514,7 @@ jobs:
 
   fabric-mobile-ios:
     name: Fabric Mobile iOS E2E
-    runs-on: macos-15
+    runs-on: macos-26
     needs: gate
     if: ${{ needs.gate.result == 'success' }}
     timeout-minutes: 60

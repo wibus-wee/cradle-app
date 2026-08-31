@@ -221,20 +221,6 @@ export function createToolUseExchange(input: {
   ])
 }
 
-export function createContextUsageProbeExchanges(): SimulatorExchange[] {
-  return [
-    tokenCountExchange('context-count-base'),
-    tokenCountExchange('context-count-agent'),
-    tokenCountExchange('context-count-read-only'),
-    tokenCountExchange('context-count-write-tools'),
-    createCurrentModeContextUsageProbeExchange(),
-  ]
-}
-
-export function createCurrentModeContextUsageProbeExchange(): SimulatorExchange {
-  return tokenCountExchange('context-count-current-mode')
-}
-
 export function readTextChunks(chunks: UIMessageChunk[]): string {
   return chunks
     .filter((chunk): chunk is Extract<UIMessageChunk, { type: 'text-delta' }> => chunk.type === 'text-delta')
@@ -347,17 +333,6 @@ function streamExchange(label: string, steps: StreamStep[]): SimulatorExchange {
       bodyFields: { '/stream': true },
     },
     response: { kind: 'stream', steps },
-  }
-}
-
-function tokenCountExchange(label: string): SimulatorExchange {
-  return {
-    label,
-    request: { method: 'POST', path: '/v1/messages/count_tokens' },
-    response: {
-      kind: 'json',
-      body: { context_management: null, input_tokens: 1 },
-    },
   }
 }
 

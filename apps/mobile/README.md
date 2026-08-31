@@ -65,11 +65,11 @@ Run the production Release bundle against a real two-Node local Fabric:
 pnpm e2e:fabric:mobile:ios
 ```
 
-The runner requires macOS, Xcode with an iOS Simulator runtime, CocoaPods, and
-Java 17. It downloads the pinned Maestro CLI from its official release URL,
-verifies the archive checksum, creates and later deletes one ephemeral
-Simulator, installs the signed Release app, and starts the existing relayd,
-two-Server, and Web topology.
+The runner requires macOS, Xcode 26 or newer with an iOS 26 Simulator runtime,
+CocoaPods, and Java 17. It downloads the pinned Maestro CLI from its official
+release URL, verifies the archive checksum, creates and later deletes one
+ephemeral Simulator, installs the signed Release app, and starts the existing
+relayd, two-Server, and Web topology.
 
 `CRADLE-FABRIC-002` drives the native app with Maestro and the owner UI with
 Playwright. It enrolls one Controller, approves two Node grants, proves
