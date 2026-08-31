@@ -33,6 +33,9 @@ export interface WorkListViewProps {
   onOpenInfo: (workId: string) => void
   onOpenUsage: () => void
   onRefresh?: () => void
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch?: boolean
 }
 
 function activityTone(activity: Work['activity']) {
@@ -61,13 +64,15 @@ export function WorkListView({
   onOpenInfo,
   onOpenUsage,
   onRefresh,
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch = true,
 }: WorkListViewProps) {
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
-  const [search, setSearch] = useState('')
   const [lifecycle, setLifecycle] = useState<'active' | 'archived'>('active')
   const [mode, setMode] = useState<'all' | 'running' | 'attention'>('all')
-  const normalizedSearch = search.trim().toLocaleLowerCase()
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
   const visibleWorks = lifecycle === 'active' ? works : archivedWorks
   const searchedWorks = normalizedSearch
     ? visibleWorks.filter((work) => {
@@ -130,18 +135,20 @@ export function WorkListView({
           values={['All', 'Running', 'Attention']}
         />
       )}
-      <View style={styles.search}>
-        <InputGroup
-          addon={<Search color={theme.mutedForeground} size={17} />}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          onChangeText={setSearch}
-          placeholder="Search Work"
-          returnKeyType="search"
-          value={search}
-        />
-      </View>
+      {showsInlineSearch && (
+        <View style={styles.search}>
+          <InputGroup
+            addon={<Search color={theme.mutedForeground} size={17} />}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            onChangeText={onSearchQueryChange}
+            placeholder="Search Work"
+            returnKeyType="search"
+            value={searchQuery}
+          />
+        </View>
+      )}
       <SectionList
         contentContainerStyle={filteredWorks.length === 0 ? styles.emptyList : undefined}
         contentInsetAdjustmentBehavior="automatic"

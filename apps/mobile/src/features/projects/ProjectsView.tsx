@@ -1,5 +1,5 @@
 import { ChevronRight, Folder, FolderX, Search } from 'lucide-react-native'
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { FlatList, Keyboard, StyleSheet, Text, View } from 'react-native'
 
 import type { GetSessionsResponse, GetWorkspacesResponse, PostWorksData } from '@/api-gen'
@@ -29,6 +29,9 @@ export interface ProjectsViewProps {
   onOpenUsage: () => void
   onOpenProject: (workspaceId: string) => void
   onRefresh?: () => void
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch?: boolean
 }
 
 export function ProjectsView({
@@ -39,11 +42,13 @@ export function ProjectsView({
   onOpenUsage,
   onOpenProject,
   onRefresh,
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch = true,
 }: ProjectsViewProps) {
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
-  const [search, setSearch] = useState('')
-  const normalizedSearch = search.trim().toLocaleLowerCase()
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
   const filteredProjects = normalizedSearch
     ? projects.filter(({ workspace }) => [
         workspace.name,
@@ -77,18 +82,20 @@ export function ProjectsView({
       scroll={false}
       title="Workspaces"
     >
-      <View style={styles.search}>
-        <InputGroup
-          addon={<Search color={theme.mutedForeground} size={17} />}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          onChangeText={setSearch}
-          placeholder="Search workspaces"
-          returnKeyType="search"
-          value={search}
-        />
-      </View>
+      {showsInlineSearch && (
+        <View style={styles.search}>
+          <InputGroup
+            addon={<Search color={theme.mutedForeground} size={17} />}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            onChangeText={onSearchQueryChange}
+            placeholder="Search workspaces"
+            returnKeyType="search"
+            value={searchQuery}
+          />
+        </View>
+      )}
       <FlatList
         contentContainerStyle={filteredProjects.length === 0 ? styles.emptyList : styles.list}
         contentInsetAdjustmentBehavior="automatic"

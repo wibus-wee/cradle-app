@@ -21,4 +21,6 @@ export const projectsFixture: ProjectsViewProps = {
   onCreate: () => {},
   onOpenUsage: () => {},
   onOpenProject: () => {},
+  onSearchQueryChange: () => {},
+  searchQuery: '',
 }

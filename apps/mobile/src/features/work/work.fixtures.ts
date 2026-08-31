@@ -19,4 +19,6 @@ export const workListFixture: WorkListViewProps = {
   onOpen: () => {},
   onOpenInfo: () => {},
   onOpenUsage: () => {},
+  onSearchQueryChange: () => {},
+  searchQuery: '',
 }

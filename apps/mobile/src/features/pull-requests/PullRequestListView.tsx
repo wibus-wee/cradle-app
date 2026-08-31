@@ -28,6 +28,9 @@ export interface PullRequestListViewProps {
   onOpen: (pullRequest: PullRequest) => void
   onOpenUsage: () => void
   onRefresh?: () => void
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch?: boolean
 }
 
 function ChecksIcon({ state }: { state: PullRequest['checksState'] }) {
@@ -53,11 +56,13 @@ export function PullRequestListView({
   onOpen,
   onOpenUsage,
   onRefresh,
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch = true,
 }: PullRequestListViewProps) {
   const theme = useTheme()
   const [mode, setMode] = useState<'authored' | 'reviewing'>('authored')
-  const [search, setSearch] = useState('')
-  const normalizedSearch = search.trim().toLocaleLowerCase()
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
   const sourceItems = mode === 'authored' ? authored : reviewing
   const items = normalizedSearch
     ? sourceItems.filter(pullRequest => [
@@ -88,18 +93,20 @@ export function PullRequestListView({
         values={['Authored', 'Review requests']}
       />
 
-      <View style={styles.search}>
-        <InputGroup
-          addon={<Search color={theme.mutedForeground} size={17} />}
-          autoCapitalize="none"
-          autoCorrect={false}
-          clearButtonMode="while-editing"
-          onChangeText={setSearch}
-          placeholder="Search pull requests"
-          returnKeyType="search"
-          value={search}
-        />
-      </View>
+      {showsInlineSearch && (
+        <View style={styles.search}>
+          <InputGroup
+            addon={<Search color={theme.mutedForeground} size={17} />}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            onChangeText={onSearchQueryChange}
+            placeholder="Search pull requests"
+            returnKeyType="search"
+            value={searchQuery}
+          />
+        </View>
+      )}
 
       {items.length === 0
         ? (

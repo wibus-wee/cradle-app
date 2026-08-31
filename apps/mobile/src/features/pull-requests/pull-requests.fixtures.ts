@@ -26,6 +26,8 @@ export const pullRequestListFixture: PullRequestListViewProps = {
   login: 'demo',
   onOpen: () => {},
   onOpenUsage: () => {},
+  onSearchQueryChange: () => {},
+  searchQuery: '',
 }
 
 export const pullRequestDetailFixture: PullRequestDetailViewProps = {

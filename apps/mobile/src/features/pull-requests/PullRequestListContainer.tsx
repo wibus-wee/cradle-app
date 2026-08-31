@@ -15,7 +15,17 @@ import { errorMessage } from '@/lib/errors'
 
 import { PullRequestListView } from './PullRequestListView'
 
-export function PullRequestListContainer() {
+interface PullRequestListContainerProps {
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch: boolean
+}
+
+export function PullRequestListContainer({
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch,
+}: PullRequestListContainerProps) {
   const { connection } = useConnection()
   const isRouteActive = useRouteIsActive()
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -74,6 +84,9 @@ export function PullRequestListContainer() {
         router.push(`/pull-request/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`)}
       onOpenUsage={() => router.push('/usage')}
       onRefresh={() => void refresh()}
+      onSearchQueryChange={onSearchQueryChange}
+      searchQuery={searchQuery}
+      showsInlineSearch={showsInlineSearch}
     />
   )
 }

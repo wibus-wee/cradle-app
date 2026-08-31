@@ -13,7 +13,17 @@ import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 import { useCreateWork } from './use-create-work'
 import { WorkListView } from './WorkListView'
 
-export function WorkListContainer() {
+interface WorkListContainerProps {
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch: boolean
+}
+
+export function WorkListContainer({
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch,
+}: WorkListContainerProps) {
   const { connection } = useConnection()
   const create = useCreateWork()
   const isRouteActive = useRouteIsActive()
@@ -64,6 +74,9 @@ export function WorkListContainer() {
       onOpenInfo={workId => router.push(`/work/${workId}`)}
       onOpenUsage={() => router.push('/usage')}
       onRefresh={() => void refresh()}
+      onSearchQueryChange={onSearchQueryChange}
+      searchQuery={searchQuery}
+      showsInlineSearch={showsInlineSearch}
       {...query.data}
     />
   )

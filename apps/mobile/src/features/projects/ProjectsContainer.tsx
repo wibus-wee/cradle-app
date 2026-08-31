@@ -13,7 +13,17 @@ import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 
 import { ProjectsView } from './ProjectsView'
 
-export function ProjectsContainer() {
+interface ProjectsContainerProps {
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch: boolean
+}
+
+export function ProjectsContainer({
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch,
+}: ProjectsContainerProps) {
   const { connection } = useConnection()
   const create = useCreateWork()
   const isRouteActive = useRouteIsActive()
@@ -67,7 +77,10 @@ export function ProjectsContainer() {
       onOpenUsage={() => router.push('/usage')}
       onOpenProject={workspaceId => router.push(`/workspace/${workspaceId}`)}
       onRefresh={() => void refresh()}
+      onSearchQueryChange={onSearchQueryChange}
       projects={query.data}
+      searchQuery={searchQuery}
+      showsInlineSearch={showsInlineSearch}
     />
   )
 }

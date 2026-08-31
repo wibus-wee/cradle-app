@@ -1,10 +1,10 @@
-import { TopLevelTabPage } from '@/components/common/top-level-tab-page'
+import { SearchableTopLevelTabPage } from '@/components/common/searchable-top-level-tab-page'
 import { WorkListContainer } from '@/features/work/WorkListContainer'
 
 export default function WorkRoute() {
   return (
-    <TopLevelTabPage>
-      <WorkListContainer />
-    </TopLevelTabPage>
+    <SearchableTopLevelTabPage placeholder="Search Work">
+      {search => <WorkListContainer {...search} />}
+    </SearchableTopLevelTabPage>
   )
 }

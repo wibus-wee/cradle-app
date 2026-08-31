@@ -1,10 +1,10 @@
-import { TopLevelTabPage } from '@/components/common/top-level-tab-page'
+import { SearchableTopLevelTabPage } from '@/components/common/searchable-top-level-tab-page'
 import { ProjectsContainer } from '@/features/projects/ProjectsContainer'
 
 export default function ProjectsRoute() {
   return (
-    <TopLevelTabPage>
-      <ProjectsContainer />
-    </TopLevelTabPage>
+    <SearchableTopLevelTabPage placeholder="Search workspaces">
+      {search => <ProjectsContainer {...search} />}
+    </SearchableTopLevelTabPage>
   )
 }
