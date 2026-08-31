@@ -1,4 +1,4 @@
-import { Check, ChevronDown, ChevronUp, ExternalLink, GitCommit, MessageSquare, Send, X } from 'lucide-react-native'
+import { Check, ChevronDown, ChevronUp, ExternalLink, GitCommit, MessageSquare, X } from 'lucide-react-native'
 import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
@@ -6,24 +6,22 @@ import Markdown from 'react-native-markdown-display'
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
-import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
-import { NativeAction } from '@/components/ui/native-action'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
 import { StatusPill } from '@/components/ui/status-pill'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
+import type { PullRequestReviewComposerProps } from './pull-request-review-composer-contract'
+import { PullRequestReviewComposer } from './PullRequestReviewComposer'
+
 type Detail = GetPullRequestsByOwnerByRepoByNumberDetailResponse
 
-export interface PullRequestDetailViewProps {
+export interface PullRequestDetailViewProps extends PullRequestReviewComposerProps {
   detail: Detail
-  isMutating?: boolean
   nativeHeader?: boolean
-  onComment: (body: string) => Promise<void>
   onOpenExternal: (url: string) => Promise<void>
-  onReview: (event: 'APPROVE' | 'REQUEST_CHANGES', body: string) => Promise<void>
 }
 
 export function PullRequestDetailView({
@@ -35,9 +33,7 @@ export function PullRequestDetailView({
   onReview,
 }: PullRequestDetailViewProps) {
   const theme = useTheme()
-  const [comment, setComment] = useState('')
   const [showAllTimeline, setShowAllTimeline] = useState(false)
-  const [submissionError, setSubmissionError] = useState<string | null>(null)
   const { pullRequest } = detail
   const visibleTimeline = showAllTimeline ? detail.timeline : detail.timeline.slice(-20)
   const status = (
@@ -53,32 +49,6 @@ export function PullRequestDetailView({
     }
     catch {
       Alert.alert(failureMessage)
-    }
-  }
-
-  const submitComment = async () => {
-    const body = comment.trim()
-    if (!body) { return }
-    setSubmissionError(null)
-    try {
-      await onComment(body)
-      setComment(current => current.trim() === body ? '' : current)
-    }
-    catch {
-      setSubmissionError('Could not add comment. Your text has been preserved.')
-    }
-  }
-
-  const submitReview = async (event: 'APPROVE' | 'REQUEST_CHANGES') => {
-    const body = comment.trim()
-    if (!body) { return }
-    setSubmissionError(null)
-    try {
-      await onReview(event, body)
-      setComment(current => current.trim() === body ? '' : current)
-    }
-    catch {
-      setSubmissionError('Could not submit review. Your text has been preserved.')
     }
   }
 
@@ -245,44 +215,11 @@ export function PullRequestDetailView({
         ))}
       </View>
 
-      <View style={styles.comment}>
-        <InputGroup
-          multiline
-          onChangeText={setComment}
-          placeholder="Add a comment or review note..."
-          value={comment}
-        />
-        {submissionError && (
-          <Text style={[styles.submissionError, { color: theme.destructive }]}>
-            {submissionError}
-          </Text>
-        )}
-        <Button
-          disabled={!comment.trim()}
-          icon={Send}
-          label="Comment"
-          loading={isMutating}
-          onPress={() => void submitComment()}
-          variant="secondary"
-        />
-        <View style={styles.reviewActions}>
-          <NativeAction
-            disabled={!comment.trim()}
-            label="Request changes"
-            loading={isMutating}
-            onPress={() => void submitReview('REQUEST_CHANGES')}
-            style={styles.reviewButton}
-            role="destructive"
-            variant="outlined"
-          />
-          <NativeAction
-            label="Approve"
-            loading={isMutating}
-            onPress={() => void submitReview('APPROVE')}
-            style={styles.reviewButton}
-          />
-        </View>
-      </View>
+      <PullRequestReviewComposer
+        isMutating={isMutating}
+        onComment={onComment}
+        onReview={onReview}
+      />
     </Screen>
   )
 }
@@ -306,10 +243,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-  },
-  comment: {
-    gap: spacing.md,
-    marginTop: spacing.xl,
   },
   emptyText: {
 
@@ -354,12 +287,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
-  reviewActions: {
-    gap: spacing.sm,
-  },
-  reviewButton: {
-    flex: 1,
-  },
   section: {
     marginTop: spacing.xl,
   },
@@ -381,10 +308,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-  },
-  submissionError: {
-    fontSize: 12,
-    lineHeight: 17,
   },
   timeline: {
     borderBottomWidth: StyleSheet.hairlineWidth,

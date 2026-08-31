@@ -80,3 +80,4 @@ Chronological index of independently shipped product improvements.
 41. [Inspect chat activity in a native iOS sheet](./2026-08-31-41-mobile-native-chat-activity-sheet.md)
 42. [Search workspace files from the native header](./2026-08-31-42-mobile-native-file-search.md)
 43. [Browse workspace files in a native iOS list](./2026-08-31-43-mobile-native-file-browser.md)
+44. [Review pull requests with native iOS controls](./2026-08-31-44-mobile-native-pull-request-review.md)

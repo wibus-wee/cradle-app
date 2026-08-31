@@ -1,3 +1,4 @@
+import type { PullRequestReviewComposerProps } from './pull-request-review-composer-contract'
 import type { PullRequestDetailViewProps } from './PullRequestDetailView'
 import type { PullRequestListViewProps } from './PullRequestListView'
 
@@ -70,5 +71,10 @@ export const pullRequestDetailFixture: PullRequestDetailViewProps = {
   },
   onComment: async () => {},
   onOpenExternal: async () => {},
+  onReview: async () => {},
+}
+
+export const pullRequestReviewComposerFixture: PullRequestReviewComposerProps = {
+  onComment: async () => {},
   onReview: async () => {},
 }
