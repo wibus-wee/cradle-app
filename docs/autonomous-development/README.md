@@ -83,3 +83,4 @@ Chronological index of independently shipped product improvements.
 44. [Review pull requests with native iOS controls](./2026-08-31-44-mobile-native-pull-request-review.md)
 45. [Connect to Cradle with native iOS onboarding](./2026-08-31-45-mobile-native-onboarding.md)
 46. [Understand Usage with a native iOS dashboard](./2026-08-31-46-mobile-native-usage-dashboard.md)
+47. [Triage pull requests in a native iOS inbox](./2026-08-31-47-mobile-native-pull-request-inbox.md)

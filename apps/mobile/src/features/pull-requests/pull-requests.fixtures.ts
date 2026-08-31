@@ -1,6 +1,6 @@
+import type { PullRequestListViewProps } from './pull-request-list-view-contract'
 import type { PullRequestReviewComposerProps } from './pull-request-review-composer-contract'
 import type { PullRequestDetailViewProps } from './PullRequestDetailView'
-import type { PullRequestListViewProps } from './PullRequestListView'
 
 const pullRequest = {
   owner: 'cradle',

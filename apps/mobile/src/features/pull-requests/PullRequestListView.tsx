@@ -3,10 +3,6 @@ import { CheckCircle2, CircleDot, Search, XCircle } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
-import type {
-  GetPullRequestsAuthoredResponse,
-  GetPullRequestsReviewingResponse,
-} from '@/api-gen'
 import { CradleIconButton } from '@/components/common/cradle-icon-button'
 import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
@@ -18,34 +14,23 @@ import { relativeTime } from '@/lib/format'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-type PullRequest = GetPullRequestsAuthoredResponse['items'][number]
+import {
+  pullRequestGroup,
+  pullRequestGroupTitles,
+  pullRequestMatchesSearch,
+} from './pull-request-list-model'
+import type {
+  PullRequestListItem,
+  PullRequestListViewProps,
+} from './pull-request-list-view-contract'
 
-export interface PullRequestListViewProps {
-  authored: GetPullRequestsAuthoredResponse['items']
-  reviewing: GetPullRequestsReviewingResponse['items']
-  login: string
-  isRefreshing?: boolean
-  onOpen: (pullRequest: PullRequest) => void
-  onOpenUsage: () => void
-  onRefresh?: () => void
-  onSearchQueryChange: (query: string) => void
-  searchQuery: string
-  showsInlineSearch?: boolean
-}
+export type { PullRequestListViewProps } from './pull-request-list-view-contract'
 
-function ChecksIcon({ state }: { state: PullRequest['checksState'] }) {
+function ChecksIcon({ state }: { state: PullRequestListItem['checksState'] }) {
   const theme = useTheme()
   if (state === 'success') { return <CheckCircle2 color={theme.success} size={17} /> }
   if (state === 'failure') { return <XCircle color={theme.destructive} size={17} /> }
   return <CircleDot color={state === 'pending' ? theme.warning : theme.mutedForeground} size={17} />
-}
-
-function pullRequestGroup(updatedAt: number) {
-  const timestamp = updatedAt < 10_000_000_000 ? updatedAt * 1_000 : updatedAt
-  const age = Date.now() - timestamp
-  if (age < 86_400_000) { return 'Today' }
-  if (age < 604_800_000) { return 'This week' }
-  return 'Older'
 }
 
 export function PullRequestListView({
@@ -65,14 +50,9 @@ export function PullRequestListView({
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
   const sourceItems = mode === 'authored' ? authored : reviewing
   const items = normalizedSearch
-    ? sourceItems.filter(pullRequest => [
-        pullRequest.title,
-        pullRequest.owner,
-        pullRequest.repo,
-        `#${pullRequest.number}`,
-      ].some(value => value.toLocaleLowerCase().includes(normalizedSearch)))
+    ? sourceItems.filter(pullRequest => pullRequestMatchesSearch(pullRequest, normalizedSearch))
     : sourceItems
-  const groups = ['Today', 'This week', 'Older']
+  const groups = pullRequestGroupTitles
     .map(title => ({ title, items: items.filter(item => pullRequestGroup(item.updatedAt) === title) }))
     .filter(group => group.items.length > 0)
 

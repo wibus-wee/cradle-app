@@ -83,7 +83,7 @@ export function PullRequestListContainer({
       onOpen={pullRequest =>
         router.push(`/pull-request/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`)}
       onOpenUsage={() => router.push('/usage')}
-      onRefresh={() => void refresh()}
+      onRefresh={refresh}
       onSearchQueryChange={onSearchQueryChange}
       searchQuery={searchQuery}
       showsInlineSearch={showsInlineSearch}
