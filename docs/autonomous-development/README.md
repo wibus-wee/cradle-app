@@ -70,3 +70,4 @@ Chronological index of independently shipped product improvements.
 31. [Navigate Mobile with native tabs](./2026-08-31-31-mobile-native-tabs.md)
 32. [Orient Mobile with native large titles](./2026-08-31-32-mobile-native-large-titles.md)
 33. [Search Mobile lists with the native header](./2026-08-31-33-mobile-native-search.md)
+34. [Respect the system Reduce Motion setting](./2026-08-31-34-mobile-reduce-motion.md)
