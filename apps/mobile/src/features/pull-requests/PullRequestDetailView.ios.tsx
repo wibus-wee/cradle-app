@@ -26,6 +26,7 @@ import { Alert } from 'react-native'
 import { relativeTime } from '@/lib/format'
 
 import type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
+import { PullRequestFileDiffSheet } from './PullRequestFileDiffSheet.ios'
 import { PullRequestReviewComposerContent } from './PullRequestReviewComposerContent.ios'
 
 export type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
@@ -103,6 +104,7 @@ export function PullRequestDetailView({
   onReview,
 }: PullRequestDetailViewProps) {
   const [showAllTimeline, setShowAllTimeline] = useState(false)
+  const [selectedFile, setSelectedFile] = useState<PullRequestDetailViewProps['detail']['files'][number] | null>(null)
   const { pullRequest } = detail
   const status = pullRequestPresentation(pullRequest)
   const merge = mergePresentation(pullRequest)
@@ -119,8 +121,9 @@ export function PullRequestDetailView({
   }
 
   return (
-    <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-      <List modifiers={[listStyle('insetGrouped')]}>
+    <>
+      <Host style={{ flex: 1 }} useViewportSizeMeasurement>
+        <List modifiers={[listStyle('insetGrouped')]}>
         <Section
           footer={(
             <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
@@ -244,7 +247,13 @@ export function PullRequestDetailView({
             <Button
               key={file.sha + file.filename}
               modifiers={[plainButton]}
-              onPress={() => void openExternal(file.blobUrl, 'Could not open changed file')}
+              onPress={() => {
+                if (file.patch !== null) {
+                  setSelectedFile(file)
+                  return
+                }
+                void openExternal(file.blobUrl, 'Could not open changed file')
+              }}
             >
               <HStack modifiers={[fullWidth]} spacing={10}>
                 <Image color="secondary" size={17} systemName="doc.text" />
@@ -263,7 +272,11 @@ export function PullRequestDetailView({
                   </HStack>
                 </VStack>
                 <Spacer />
-                <Image color="secondary" size={14} systemName="arrow.up.right" />
+                <Image
+                  color="secondary"
+                  size={14}
+                  systemName={file.patch !== null ? 'chevron.forward' : 'arrow.up.right'}
+                />
               </HStack>
             </Button>
           ))}
@@ -349,7 +362,13 @@ export function PullRequestDetailView({
             onReview={onReview}
           />
         </Section>
-      </List>
-    </Host>
+        </List>
+      </Host>
+      <PullRequestFileDiffSheet
+        file={selectedFile}
+        onClose={() => setSelectedFile(null)}
+        onOpenExternal={url => void openExternal(url, 'Could not open changed file')}
+      />
+    </>
   )
 }
