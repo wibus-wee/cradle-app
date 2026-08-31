@@ -26,6 +26,7 @@ import type {
 } from '@/api-gen'
 import { NativeMaterialView } from '@/components/ui/native-material-view'
 import { PressableScale } from '@/components/ui/pressable-scale'
+import { scanDocument } from '@/native/document-scanner'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
@@ -79,7 +80,10 @@ function ChatComposerContent({
   const interactionMode
     = runtimeSettings?.runtimeSettings.interactionMode === 'plan' ? 'plan' : 'build'
   const cameraMenuActions: MenuAction[] = Platform.OS === 'ios'
-    ? [{ id: 'camera', image: 'camera', title: 'Take photo' }]
+    ? [
+        { id: 'camera', image: 'camera', title: 'Take photo' },
+        { id: 'scan', image: 'doc.viewfinder', title: 'Scan document' },
+      ]
     : []
   const composerMenuActions: MenuAction[] = [
     ...cameraMenuActions,
@@ -163,6 +167,22 @@ function ChatComposerContent({
     updateFiles([...filesRef.current, ...nextFiles])
   }
 
+  const requestCameraAccess = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync()
+    if (permission.granted) {
+      return true
+    }
+    Alert.alert(
+      'Camera Access Needed',
+      'Allow camera access in Settings to capture an image for this chat.',
+      [
+        { style: 'cancel', text: 'Not Now' },
+        { onPress: () => void Linking.openSettings(), text: 'Open Settings' },
+      ],
+    )
+    return false
+  }
+
   const submit = () => {
     const nextText = text.trim()
     if ((!nextText && files.length === 0) || isSending) {
@@ -203,16 +223,7 @@ function ChatComposerContent({
     }
     setIsPicking(true)
     try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync()
-      if (!permission.granted) {
-        Alert.alert(
-          'Camera Access Needed',
-          'Allow camera access in Settings to take a photo for this chat.',
-          [
-            { style: 'cancel', text: 'Not Now' },
-            { onPress: () => void Linking.openSettings(), text: 'Open Settings' },
-          ],
-        )
+      if (!await requestCameraAccess()) {
         return
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -227,6 +238,38 @@ function ChatComposerContent({
     }
     catch {
       Alert.alert('Could not take photo', 'The camera could not add a photo to this chat.')
+    }
+    finally {
+      setIsPicking(false)
+    }
+  }
+
+  const scanPages = async () => {
+    if (isPicking) {
+      return
+    }
+    setIsPicking(true)
+    try {
+      if (!await requestCameraAccess()) {
+        return
+      }
+      const pages = await scanDocument()
+      if (pages.length === 0) {
+        return
+      }
+      const capturedAt = Date.now()
+      updateFiles([
+        ...filesRef.current,
+        ...pages.map((base64, index) => ({
+          filename: `scan-${capturedAt}-page-${index + 1}.jpg`,
+          mediaType: 'image/jpeg',
+          type: 'file' as const,
+          url: `data:image/jpeg;base64,${base64}`,
+        })),
+      ])
+    }
+    catch {
+      Alert.alert('Could not scan document', 'The scanned pages could not be added to this chat.')
     }
     finally {
       setIsPicking(false)
@@ -422,6 +465,9 @@ function ChatComposerContent({
           onPressAction={({ nativeEvent }) => {
             if (nativeEvent.event === 'camera') {
               void takePhoto()
+            }
+            else if (nativeEvent.event === 'scan') {
+              void scanPages()
             }
             else if (nativeEvent.event === 'photo') {
               void pickPhoto()

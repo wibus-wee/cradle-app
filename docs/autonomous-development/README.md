@@ -115,3 +115,4 @@ Chronological index of independently shipped product improvements.
 76. [Restore unfinished pull request review notes on iOS](./2026-08-31-76-mobile-review-draft-recovery.md)
 77. [Dismiss the Chat keyboard interactively on iOS](./2026-08-31-77-mobile-interactive-keyboard-dismissal.md)
 78. [Attach Chat photos from the iOS camera](./2026-08-31-78-mobile-camera-attachment.md)
+79. [Scan multi-page documents into Chat on iOS](./2026-08-31-79-mobile-document-scanner.md)
