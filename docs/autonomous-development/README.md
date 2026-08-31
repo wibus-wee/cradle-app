@@ -99,3 +99,4 @@ Chronological index of independently shipped product improvements.
 60. [Keep native empty states visible on iOS 16](./2026-08-31-60-mobile-ios16-empty-states.md)
 61. [Pin conversations from the native workspace list](./2026-08-31-61-mobile-native-conversation-pin-swipe.md)
 62. [Give native Mobile lists clear VoiceOver semantics](./2026-08-31-62-mobile-native-list-voiceover.md)
+63. [Make iOS 26 the Mobile baseline](./2026-08-31-63-mobile-ios26-minimum.md)

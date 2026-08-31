@@ -1,6 +1,7 @@
 import {
   Button,
   Chart,
+  ContentUnavailableView,
   Form,
   Host,
   HStack,
@@ -25,8 +26,6 @@ import {
   tag,
 } from '@expo/ui/swift-ui/modifiers'
 import { useState } from 'react'
-
-import { NativeUnavailableView } from '@/components/ui/native-unavailable-view.ios'
 
 import type { UsageRange } from './usage-range'
 import { usageRanges } from './usage-range'
@@ -134,7 +133,7 @@ export function UsageView({
             </VStack>
           ))}
           {summary.byModel.length === 0 && (
-            <NativeUnavailableView
+            <ContentUnavailableView
               description="Model usage appears after a runtime reports token counts."
               systemImage="cpu"
               title="No Model Usage"

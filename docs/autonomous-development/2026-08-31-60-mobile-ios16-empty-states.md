@@ -1,5 +1,7 @@
 # Keep native empty states visible on iOS 16
 
+> Superseded by the iOS 26 minimum deployment target. The compatibility component documented here was removed in favor of Apple's system `ContentUnavailableView`.
+
 - **Date:** 2026-08-31
 - **Problem:** Expo UI's native `ContentUnavailableView` only renders on iOS 17 and later, while Cradle Mobile supports iOS 16.4. Empty native lists and unavailable content could therefore appear as an unexplained blank screen.
 - **Motivation:** An empty state should explain what happened and what the user can do next on every supported iPhone, not silently disappear on the oldest supported release.

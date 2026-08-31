@@ -51,7 +51,7 @@
             "usesCleartextTraffic": true
           },
           "ios": {
-            "deploymentTarget": "16.4"
+            "deploymentTarget": "26.0"
           }
         }
       ],

@@ -1,5 +1,6 @@
 import {
   Button,
+  ContentUnavailableView,
   Host,
   HStack,
   Image,
@@ -26,7 +27,6 @@ import {
 } from '@expo/ui/swift-ui/modifiers'
 import { useState } from 'react'
 
-import { NativeUnavailableView } from '@/components/ui/native-unavailable-view.ios'
 import { relativeTime } from '@/lib/format'
 
 import {
@@ -163,7 +163,7 @@ export function PullRequestListView({
         ))}
 
         {items.length === 0 && (
-          <NativeUnavailableView
+          <ContentUnavailableView
             description={normalizedSearch
               ? 'Try a different title, repository, owner, or number.'
               : mode === 'authored'

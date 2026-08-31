@@ -3,7 +3,7 @@
   "EX_DEV_CLIENT_NETWORK_INSPECTOR": "true",
   "expo.inlineModules.watchedDirectories": "[\"src\"]",
   "expo.inlineModules.xcodeProjectTargets": "{\"mainTarget\":\"Cradle\",\"targets\":[]}",
-  "ios.deploymentTarget": "16.4",
+  "ios.deploymentTarget": "26.0",
   "ios.forceStaticLinking": "[]",
   "apple.privacyManifestAggregationEnabled": "true",
   "EXPO_USE_PRECOMPILED_MODULES": "true"

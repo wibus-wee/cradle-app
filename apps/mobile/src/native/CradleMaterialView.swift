@@ -38,15 +38,11 @@ final class CradleMaterialView: ExpoView {
   }
 
   private func updateEffect() {
-    if #available(iOS 26.0, *) {
-      let style: UIGlassEffect.Style = glassStyle == "clear" ? .clear : .regular
-      let effect = UIGlassEffect(style: style)
-      effect.isInteractive = false
-      effect.tintColor = tint
-      effectView.effect = effect
-    } else {
-      effectView.effect = UIBlurEffect(style: .systemMaterial)
-    }
+    let style: UIGlassEffect.Style = glassStyle == "clear" ? .clear : .regular
+    let effect = UIGlassEffect(style: style)
+    effect.isInteractive = false
+    effect.tintColor = tint
+    effectView.effect = effect
     updateSheen()
   }
 
