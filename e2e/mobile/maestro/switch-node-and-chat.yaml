@@ -4,15 +4,33 @@ appId: app.cradle.mobile
 - extendedWaitUntil:
     visible: Workspaces
     timeout: 30000
-- tapOn: Open navigation
-- tapOn: Settings
+- runFlow:
+    when:
+      visible: Open navigation
+    commands:
+      - tapOn: Open navigation
+      - tapOn: Settings
+- runFlow:
+    when:
+      notVisible: Open navigation
+    commands:
+      - tapOn: Settings
 - extendedWaitUntil:
     visible: Settings
     timeout: 15000
 - tapOn:
     id: settings-node-${NODE_ID}
-- tapOn: Open navigation
-- tapOn: Workspaces
+- runFlow:
+    when:
+      visible: Open navigation
+    commands:
+      - tapOn: Open navigation
+      - tapOn: Workspaces
+- runFlow:
+    when:
+      notVisible: Open navigation
+    commands:
+      - tapOn: Workspaces
 - extendedWaitUntil:
     visible: ${WORKSPACE_NAME}.*
     timeout: 45000

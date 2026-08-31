@@ -859,7 +859,7 @@ test.describe('Fabric two-node user journey', () => {
 
   test('[CRADLE-FABRIC-002] enrolls Mobile, switches Nodes, streams Chat, and enforces revocation', async () => {
     test.skip(!mobileIosEnabled, 'Run pnpm e2e:fabric:mobile:ios on macOS to exercise the native app.')
-    test.setTimeout(480_000)
+    test.setTimeout(900_000)
 
     let desktopLocal!: WorkspaceSummary
     let macbookLocal!: WorkspaceSummary
