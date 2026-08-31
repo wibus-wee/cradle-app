@@ -98,3 +98,4 @@ Chronological index of independently shipped product improvements.
 59. [Explain pull request readiness on iOS](./2026-08-31-59-mobile-pull-request-readiness.md)
 60. [Keep native empty states visible on iOS 16](./2026-08-31-60-mobile-ios16-empty-states.md)
 61. [Pin conversations from the native workspace list](./2026-08-31-61-mobile-native-conversation-pin-swipe.md)
+62. [Give native Mobile lists clear VoiceOver semantics](./2026-08-31-62-mobile-native-list-voiceover.md)

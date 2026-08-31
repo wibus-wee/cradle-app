@@ -10,6 +10,9 @@ import {
   VStack,
 } from '@expo/ui/swift-ui'
 import {
+  accessibilityHint,
+  accessibilityLabel,
+  accessibilityValue,
   buttonStyle,
   font,
   foregroundStyle,
@@ -87,10 +90,20 @@ export function ProjectsView({
           >
             {filteredProjects.map(({ workspace, sessions }) => {
               const missing = workspace.availability === 'missing'
+              const conversationCount = sessions.length
               return (
                 <Button
                   key={workspace.id}
-                  modifiers={[plainButton]}
+                  modifiers={[
+                    plainButton,
+                    accessibilityLabel(workspace.name),
+                    accessibilityValue([
+                      missing ? 'Unavailable on server' : workspace.gitIdentity.branch ?? 'No Git branch',
+                      `${conversationCount} ${conversationCount === 1 ? 'conversation' : 'conversations'}`,
+                      ...(workspace.pinned > 0 ? ['Pinned'] : []),
+                    ].join(', ')),
+                    accessibilityHint('Opens workspace'),
+                  ]}
                   onPress={() => {
                     composerRef.current?.collapse()
                     Keyboard.dismiss()

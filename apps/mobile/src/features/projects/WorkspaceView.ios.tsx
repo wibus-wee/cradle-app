@@ -11,7 +11,9 @@ import {
   VStack,
 } from '@expo/ui/swift-ui'
 import {
+  accessibilityHint,
   accessibilityLabel,
+  accessibilityValue,
   buttonStyle,
   disabled,
   font,
@@ -168,10 +170,17 @@ export function WorkspaceView({
             >
               {works.map((work) => {
                 const activity = workPresentation(work.activity)
+                const updated = relativeTime(work.updatedAt)
                 return (
                   <HStack key={work.id} modifiers={[fullWidth]} spacing={4}>
                     <Button
-                      modifiers={[plainButton, fullWidth]}
+                      modifiers={[
+                        plainButton,
+                        fullWidth,
+                        accessibilityLabel(work.title),
+                        accessibilityValue(`${activity.label}, updated ${updated}`),
+                        accessibilityHint('Opens conversation'),
+                      ]}
                       onPress={() => {
                         dismissComposer()
                         onOpenWork(work.primarySessionId)
@@ -197,7 +206,7 @@ export function WorkspaceView({
                                 tabularNumber,
                               ]}
                             >
-                              {relativeTime(work.updatedAt)}
+                              {updated}
                             </Text>
                           </HStack>
                         </VStack>
@@ -241,10 +250,25 @@ export function WorkspaceView({
                 )
               : sortedSessions.map((session) => {
                   const status = sessionPresentation(session.status)
+                  const updated = relativeTime(
+                    session.latestAssistantMessageAt
+                    ?? session.latestUserMessageAt
+                    ?? session.updatedAt,
+                  )
                   return (
                     <SwipeActions key={session.id}>
                       <Button
-                        modifiers={[plainButton]}
+                        modifiers={[
+                          plainButton,
+                          accessibilityLabel(session.title ?? 'Untitled conversation'),
+                          accessibilityValue([
+                            status.label,
+                            `updated ${updated}`,
+                            ...(session.unread ? ['Unread'] : []),
+                            ...(session.pinned > 0 ? ['Pinned'] : []),
+                          ].join(', ')),
+                          accessibilityHint('Opens conversation'),
+                        ]}
                         onPress={() => {
                           dismissComposer()
                           onOpenSession(session.id)
@@ -275,11 +299,7 @@ export function WorkspaceView({
                                   tabularNumber,
                                 ]}
                               >
-                                {relativeTime(
-                                  session.latestAssistantMessageAt
-                                  ?? session.latestUserMessageAt
-                                  ?? session.updatedAt,
-                                )}
+                                {updated}
                               </Text>
                               {session.unread && (
                                 <HStack spacing={4}>
@@ -322,7 +342,12 @@ export function WorkspaceView({
               title="Files"
             >
               <Button
-                modifiers={[plainButton]}
+                modifiers={[
+                  plainButton,
+                  accessibilityLabel('Browse all files'),
+                  accessibilityValue(`${files.length} top-level entries`),
+                  accessibilityHint('Opens workspace file browser'),
+                ]}
                 onPress={() => {
                   dismissComposer()
                   onBrowseFiles()
@@ -338,7 +363,12 @@ export function WorkspaceView({
               {files.slice(0, 12).map(entry => (
                 <Button
                   key={entry.path}
-                  modifiers={[plainButton]}
+                  modifiers={[
+                    plainButton,
+                    accessibilityLabel(entry.name),
+                    accessibilityValue(entry.type === 'directory' ? 'Folder' : 'File'),
+                    accessibilityHint(entry.type === 'directory' ? 'Opens folder' : 'Opens file'),
+                  ]}
                   onPress={() => {
                     dismissComposer()
                     onOpenFile(entry)

@@ -11,7 +11,9 @@ import {
   VStack,
 } from '@expo/ui/swift-ui'
 import {
+  accessibilityHint,
   accessibilityLabel,
+  accessibilityValue,
   buttonStyle,
   font,
   foregroundStyle,
@@ -155,10 +157,22 @@ export function WorkListView({
               {group.works.map((work) => {
                 const activity = activityPresentation(work.activity, lifecycle === 'archived')
                 const workspaceName = workspaces.find(workspace => workspace.id === work.workspaceId)?.name
+                const updated = relativeTime(work.updatedAt)
                 return (
                   <HStack key={work.id} modifiers={[fullWidth]} spacing={4}>
                     <Button
-                      modifiers={[plainButton, fullWidth]}
+                      modifiers={[
+                        plainButton,
+                        fullWidth,
+                        accessibilityLabel(work.title),
+                        accessibilityValue([
+                          work.objective,
+                          activity.label,
+                          ...(workspaceName ? [workspaceName] : []),
+                          `updated ${updated}`,
+                        ].join(', ')),
+                        accessibilityHint('Opens conversation'),
+                      ]}
                       onPress={() => {
                         dismissComposer()
                         onOpen(work.primarySessionId)
@@ -187,7 +201,7 @@ export function WorkListView({
                                 tabularNumber,
                               ]}
                             >
-                              {relativeTime(work.updatedAt)}
+                              {updated}
                             </Text>
                           </HStack>
                         </VStack>

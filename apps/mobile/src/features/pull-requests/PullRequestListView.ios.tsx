@@ -11,6 +11,9 @@ import {
   VStack,
 } from '@expo/ui/swift-ui'
 import {
+  accessibilityHint,
+  accessibilityLabel,
+  accessibilityValue,
   buttonStyle,
   font,
   foregroundStyle,
@@ -98,10 +101,21 @@ export function PullRequestListView({
           <Section key={group.title} title={group.title}>
             {group.items.map((pullRequest) => {
               const checks = checkPresentation(pullRequest.checksState)
+              const updated = relativeTime(pullRequest.updatedAt)
               return (
                 <Button
                   key={`${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`}
-                  modifiers={[plainButton]}
+                  modifiers={[
+                    plainButton,
+                    accessibilityLabel(pullRequest.title),
+                    accessibilityValue([
+                      `${pullRequest.owner}/${pullRequest.repo}, pull request ${pullRequest.number}`,
+                      pullRequest.isDraft ? 'Draft' : pullRequest.state,
+                      `Checks ${checks.label}`,
+                      `updated ${updated}`,
+                    ].join(', ')),
+                    accessibilityHint('Opens pull request details'),
+                  ]}
                   onPress={() => onOpen(pullRequest)}
                 >
                   <HStack modifiers={[fullWidth]} spacing={12}>
@@ -135,7 +149,7 @@ export function PullRequestListView({
                             tabularNumber,
                           ]}
                         >
-                          {relativeTime(pullRequest.updatedAt)}
+                          {updated}
                         </Text>
                       </HStack>
                     </VStack>
