@@ -18,6 +18,7 @@ import {
   frame,
   listStyle,
   monospacedDigit,
+  refreshable,
   textSelection,
 } from '@expo/ui/swift-ui/modifiers'
 import { useState } from 'react'
@@ -101,6 +102,7 @@ export function PullRequestDetailView({
   onComment,
   onDraftChange,
   onOpenExternal,
+  onRefresh,
   onReview,
 }: PullRequestDetailViewProps) {
   const [showAllTimeline, setShowAllTimeline] = useState(false)
@@ -110,6 +112,24 @@ export function PullRequestDetailView({
   const merge = mergePresentation(pullRequest)
   const checksSummary = checksSummaryPresentation(pullRequest.checksState)
   const visibleTimeline = showAllTimeline ? detail.timeline : detail.timeline.slice(-20)
+  const listModifiers = [
+    listStyle('insetGrouped'),
+    ...(onRefresh
+      ? [
+          refreshable(async () => {
+            try {
+              await onRefresh()
+            }
+            catch {
+              Alert.alert(
+                'Could not refresh pull request',
+                'Cradle could not sync the latest GitHub details.',
+              )
+            }
+          }),
+        ]
+      : []),
+  ]
 
   const openExternal = async (url: string, failureMessage: string) => {
     try {
@@ -123,7 +143,7 @@ export function PullRequestDetailView({
   return (
     <>
       <Host style={{ flex: 1 }} useViewportSizeMeasurement>
-        <List modifiers={[listStyle('insetGrouped')]}>
+        <List modifiers={listModifiers}>
         <Section
           footer={(
             <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>

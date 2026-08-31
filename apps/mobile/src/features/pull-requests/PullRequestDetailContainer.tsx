@@ -118,6 +118,13 @@ export function PullRequestDetailContainer({
         onOpenExternal={async (url) => {
           await Linking.openURL(url)
         }}
+        onRefresh={async () => {
+          await cradleRequest(connection!, `${path}/refresh`, {
+            body: { force: true },
+            method: 'POST',
+          })
+          await query.refetch({ throwOnError: true })
+        }}
         onReview={async (event, body) => {
           await action.mutateAsync({
             endpoint: 'review',

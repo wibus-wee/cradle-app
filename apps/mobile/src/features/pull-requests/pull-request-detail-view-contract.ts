@@ -6,4 +6,5 @@ export interface PullRequestDetailViewProps extends PullRequestReviewComposerPro
   detail: GetPullRequestsByOwnerByRepoByNumberDetailResponse
   nativeHeader?: boolean
   onOpenExternal: (url: string) => Promise<void>
+  onRefresh?: () => Promise<void>
 }
