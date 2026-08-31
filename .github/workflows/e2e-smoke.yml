@@ -535,6 +535,14 @@ jobs:
         with:
           node-version: 22
 
+      - name: Set up Ruby for CocoaPods
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0.6'
+
+      - name: Install CocoaPods
+        run: gem install cocoapods --version 1.17.0 --no-document
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: apps/relayd/go.mod
