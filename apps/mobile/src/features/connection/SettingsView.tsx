@@ -76,6 +76,7 @@ export function SettingsView({
   return (
     <Screen
       leading={<CradleIconButton onPress={onOpenUsage} />}
+      nativeHeader
       title="Settings"
     >
       <View style={styles.page}>

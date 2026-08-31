@@ -104,6 +104,7 @@ export function WorkListView({
           )
         : undefined}
       leading={<CradleIconButton onPress={onOpenUsage} />}
+      nativeHeader
       onPressBackground={() => {
         composerRef.current?.collapse()
         Keyboard.dismiss()
@@ -143,6 +144,7 @@ export function WorkListView({
       </View>
       <SectionList
         contentContainerStyle={filteredWorks.length === 0 ? styles.emptyList : undefined}
+        contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={(
           <EmptyState

@@ -68,3 +68,4 @@ Chronological index of independently shipped product improvements.
 29. [Jump to the latest Mobile chat message](./2026-08-31-29-jump-to-latest-mobile-chat.md)
 30. [Show pull request labels on Mobile](./2026-08-31-30-show-mobile-pull-request-labels.md)
 31. [Navigate Mobile with native tabs](./2026-08-31-31-mobile-native-tabs.md)
+32. [Orient Mobile with native large titles](./2026-08-31-32-mobile-native-large-titles.md)

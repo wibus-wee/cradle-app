@@ -69,6 +69,7 @@ export function ProjectsView({
           )
         : undefined}
       leading={<CradleIconButton onPress={onOpenUsage} />}
+      nativeHeader
       onPressBackground={() => {
         composerRef.current?.collapse()
         Keyboard.dismiss()
@@ -90,6 +91,7 @@ export function ProjectsView({
       </View>
       <FlatList
         contentContainerStyle={filteredProjects.length === 0 ? styles.emptyList : styles.list}
+        contentInsetAdjustmentBehavior="automatic"
         data={filteredProjects}
         keyExtractor={({ workspace }) => workspace.id}
         keyboardShouldPersistTaps="handled"

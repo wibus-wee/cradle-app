@@ -74,6 +74,7 @@ export function PullRequestListView({
   return (
     <Screen
       leading={<CradleIconButton onPress={onOpenUsage} />}
+      nativeHeader
       onRefresh={onRefresh}
       refreshing={isRefreshing}
       subtitle={`@${login}`}

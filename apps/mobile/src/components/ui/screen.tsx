@@ -2,6 +2,7 @@ import type { PropsWithChildren, ReactNode } from 'react'
 import {
   Animated,
   Keyboard,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -22,6 +23,7 @@ interface ScreenProps extends PropsWithChildren {
   action?: ReactNode
   leading?: ReactNode
   footer?: ReactNode
+  nativeHeader?: boolean
   refreshing?: boolean
   onRefresh?: () => void
   onPressBackground?: () => void
@@ -37,6 +39,7 @@ export function Screen({
   leading,
   footer,
   children,
+  nativeHeader = false,
   refreshing = false,
   onRefresh,
   onPressBackground,
@@ -45,9 +48,10 @@ export function Screen({
 }: ScreenProps) {
   const theme = useTheme()
   const keyboardOffset = useKeyboardOffset(avoidKeyboard)
+  const usesNativeHeader = nativeHeader && Platform.OS !== 'web'
   const content = (
     <>
-      {(title || action) && (
+      {!usesNativeHeader && (title || action) && (
         <View style={styles.header}>
           {insetTop && (
             <View style={styles.toolbar}>
@@ -65,6 +69,9 @@ export function Screen({
             {!insetTop && action}
           </View>
         </View>
+      )}
+      {usesNativeHeader && subtitle && (
+        <Text style={[styles.nativeSubtitle, { color: theme.mutedForeground }]}>{subtitle}</Text>
       )}
       {children}
     </>
@@ -115,7 +122,11 @@ export function Screen({
   )
 
   return (
-    <SafeAreaView edges={insetTop ? ['top', 'bottom'] : ['bottom']} style={[styles.safeArea, { backgroundColor: theme.surface }]}>
+    <SafeAreaView
+      collapsable={false}
+      edges={insetTop && !usesNativeHeader ? ['top', 'bottom'] : ['bottom']}
+      style={[styles.safeArea, { backgroundColor: theme.surface }]}
+    >
       <View style={styles.page}>{page}</View>
     </SafeAreaView>
   )
@@ -148,6 +159,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xs,
     paddingRight: spacing.md,
+  },
+  nativeSubtitle: {
+    fontSize: 14,
+    lineHeight: 19,
+    marginBottom: spacing.md,
   },
   title: {
 
