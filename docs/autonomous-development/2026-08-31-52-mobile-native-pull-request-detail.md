@@ -1,0 +1,12 @@
+# Inspect pull requests in a native iOS detail view
+
+- **Date:** 2026-08-31
+- **Problem:** Opening a pull request from the native iOS inbox still landed on a long React Native information page. Its custom cards, headings, and rows did not inherit iOS list behavior, Dynamic Type layout, or the visual hierarchy established by the surrounding native navigation.
+- **Motivation:** Pull request review is a dense, high-frequency workflow. A single system-owned information surface makes status, code changes, checks, files, discussion, and review actions easier to scan without creating a parallel iOS workflow.
+- **Product behavior:** iOS now presents pull request details as an inset-grouped SwiftUI list. The overview exposes status, repository, branch direction, update time, additions, deletions, files, and commits; descriptions and conversation bodies support native Markdown and text selection. Checks, changed files, and linked discussion events remain actionable with 44-point rows and external-link affordances. Large conversations initially show the latest 20 events and can reveal earlier history. The existing native review editor is embedded as the final section so commenting, approving, and requesting changes remain in the same scroll surface.
+- **Implementation:** A shared typed View contract keeps the generated API response and callbacks owned by the existing Container. Platform resolution selects a new iOS-only SwiftUI View while Android and Web retain the established React Native surface. The native review fields and actions were extracted from their standalone `Host` wrapper into reusable SwiftUI content so they can be embedded without nesting native hosts.
+- **Systems affected:** Mobile pull request detail View, native review composer seam, pull request fixtures, and autonomous development journal.
+- **Validation:** Mobile ESLint and TypeScript passed, and Expo production exports completed for iOS, Android, and Web.
+- **Tradeoffs:** Conversation history keeps the existing latest-20 default to avoid an overly long first render. Checks and files continue to open GitHub rather than adding an in-app diff or log viewer.
+- **Follow-up ideas:** Add native reviewer and assignee sections, expose merge blockers more directly, and consider an in-app file diff after the server owns a compact diff contract.
+- **Out of scope:** Merge controls, server/API changes, an in-app GitHub browser, diff rendering, and changes to Android or Web presentation.

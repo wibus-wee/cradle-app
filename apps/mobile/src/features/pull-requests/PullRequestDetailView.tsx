@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native'
 import Markdown from 'react-native-markdown-display'
 
-import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
@@ -13,16 +12,10 @@ import { StatusPill } from '@/components/ui/status-pill'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-import type { PullRequestReviewComposerProps } from './pull-request-review-composer-contract'
+import type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
 import { PullRequestReviewComposer } from './PullRequestReviewComposer'
 
-type Detail = GetPullRequestsByOwnerByRepoByNumberDetailResponse
-
-export interface PullRequestDetailViewProps extends PullRequestReviewComposerProps {
-  detail: Detail
-  nativeHeader?: boolean
-  onOpenExternal: (url: string) => Promise<void>
-}
+export type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
 
 export function PullRequestDetailView({
   detail,
