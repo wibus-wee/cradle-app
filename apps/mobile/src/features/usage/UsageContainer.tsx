@@ -67,7 +67,7 @@ export function UsageContainer() {
         setRange(nextRange)
         void persistUsageRange(nextRange)
       }}
-      onRefresh={() => void query.refetch()}
+      onRefresh={async () => { await query.refetch() }}
       range={range}
     />
   )

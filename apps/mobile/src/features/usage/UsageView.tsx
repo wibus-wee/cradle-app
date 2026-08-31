@@ -3,11 +3,6 @@ import { ChevronDown, ChevronUp } from 'lucide-react-native'
 import { useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 
-import type {
-  GetUsageDailyResponse,
-  GetUsageStatsResponse,
-  GetUsageSummaryResponse,
-} from '@/api-gen'
 import { Button } from '@/components/ui/button'
 import { Screen } from '@/components/ui/screen'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -15,46 +10,11 @@ import { EmptyState } from '@/components/ui/states'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-import type { UsageRange } from './usage-range'
 import { usageRanges } from './usage-range'
+import type { UsageViewProps } from './usage-view-contract'
+import { denseRecentUsageDays, formatUsageNumber } from './usage-view-model'
 
-type DailyUsage = GetUsageDailyResponse[number]
-
-export interface UsageViewProps {
-  daily: GetUsageDailyResponse
-  isRefreshing?: boolean
-  onRangeChange: (range: UsageRange) => void
-  onRefresh?: () => void
-  range: UsageRange
-  stats: GetUsageStatsResponse
-  summary: GetUsageSummaryResponse
-}
-
-function formatNumber(value: number): string {
-  return value.toLocaleString()
-}
-
-function denseRecentDays(daily: GetUsageDailyResponse, length = 14): DailyUsage[] {
-  const byDate = new Map(daily.map(day => [day.date, day]))
-  const today = new Date()
-  today.setHours(12, 0, 0, 0)
-  return Array.from({ length }, (_, index) => {
-    const date = new Date(today)
-    date.setDate(today.getDate() - (length - index - 1))
-    const key = [
-      date.getFullYear(),
-      String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0'),
-    ].join('-')
-    return byDate.get(key) ?? {
-      completionTokens: 0,
-      count: 0,
-      date: key,
-      promptTokens: 0,
-      totalTokens: 0,
-    }
-  })
-}
+export type { UsageViewProps } from './usage-view-contract'
 
 export function UsageView({
   daily,
@@ -67,7 +27,7 @@ export function UsageView({
 }: UsageViewProps) {
   const theme = useTheme()
   const [showAllModels, setShowAllModels] = useState(false)
-  const recentDays = denseRecentDays(daily)
+  const recentDays = denseRecentUsageDays(daily)
   const maxDailyTokens = Math.max(...recentDays.map(day => day.totalTokens), 1)
   const maxModelTokens = Math.max(...summary.byModel.map(model => model.totalTokens), 1)
   const maxProviderTokens = Math.max(
@@ -103,17 +63,17 @@ export function UsageView({
             numberOfLines={1}
             style={[styles.heroValue, { color: theme.foreground }]}
           >
-            {formatNumber(summary.totalTokens)}
+            {formatUsageNumber(summary.totalTokens)}
           </Text>
           <Text style={[styles.heroMeta, { color: theme.mutedForeground }]}>
-            {`${formatNumber(summary.totalTurns)} turns in the selected range`}
+            {`${formatUsageNumber(summary.totalTurns)} turns in the selected range`}
           </Text>
         </View>
 
         <View style={[styles.tokenBreakdown, { borderBottomColor: theme.border }]}>
           <View style={styles.tokenType}>
             <Text style={[styles.tokenTypeValue, { color: theme.foreground }]}>
-              {formatNumber(summary.totalPromptTokens)}
+              {formatUsageNumber(summary.totalPromptTokens)}
             </Text>
             <Text style={[styles.tokenTypeLabel, { color: theme.mutedForeground }]}>
               Input tokens
@@ -121,7 +81,7 @@ export function UsageView({
           </View>
           <View style={styles.tokenType}>
             <Text style={[styles.tokenTypeValue, { color: theme.foreground }]}>
-              {formatNumber(summary.totalCompletionTokens)}
+              {formatUsageNumber(summary.totalCompletionTokens)}
             </Text>
             <Text style={[styles.tokenTypeLabel, { color: theme.mutedForeground }]}>
               Output tokens
@@ -132,13 +92,13 @@ export function UsageView({
         <View style={[styles.stats, { borderBottomColor: theme.border }]}>
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: theme.foreground }]}>
-              {formatNumber(stats.todayTokens)}
+              {formatUsageNumber(stats.todayTokens)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.mutedForeground }]}>Today</Text>
           </View>
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: theme.foreground }]}>
-              {formatNumber(stats.avgDailyTokens)}
+              {formatUsageNumber(stats.avgDailyTokens)}
             </Text>
             <Text style={[styles.statLabel, { color: theme.mutedForeground }]}>Daily average</Text>
           </View>
@@ -195,7 +155,7 @@ export function UsageView({
                       {model.modelId}
                     </Text>
                     <Text style={[styles.modelValue, { color: theme.mutedForeground }]}>
-                      {formatNumber(model.totalTokens)}
+                      {formatUsageNumber(model.totalTokens)}
                     </Text>
                   </View>
                   <View style={[styles.track, { backgroundColor: theme.muted }]}>
@@ -232,7 +192,7 @@ export function UsageView({
                     {provider.providerTargetName ?? provider.providerTargetId}
                   </Text>
                   <Text style={[styles.modelValue, { color: theme.mutedForeground }]}>
-                    {formatNumber(provider.totalTokens)}
+                    {formatUsageNumber(provider.totalTokens)}
                   </Text>
                 </View>
                 <View style={[styles.track, { backgroundColor: theme.muted }]}>

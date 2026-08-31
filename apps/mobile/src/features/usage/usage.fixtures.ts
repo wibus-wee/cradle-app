@@ -1,4 +1,4 @@
-import type { UsageViewProps } from './UsageView'
+import type { UsageViewProps } from './usage-view-contract'
 
 export const usageFixture: UsageViewProps = {
   daily: [
