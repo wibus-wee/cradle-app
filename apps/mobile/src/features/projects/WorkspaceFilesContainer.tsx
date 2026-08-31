@@ -192,7 +192,7 @@ export function WorkspaceFilesContainer({
           setCurrentPath(path)
         }}
         onOpenFile={setSelectedFile}
-        onRefresh={() => void activeEntriesQuery.refetch()}
+        onRefresh={async () => { await activeEntriesQuery.refetch() }}
         onSearchChange={setSearch}
         search={search}
         showsInlineSearch={showsInlineSearch}

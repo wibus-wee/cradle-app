@@ -79,3 +79,4 @@ Chronological index of independently shipped product improvements.
 40. [Prepare Work handoffs in a native iOS form](./2026-08-31-40-mobile-native-work-handoff.md)
 41. [Inspect chat activity in a native iOS sheet](./2026-08-31-41-mobile-native-chat-activity-sheet.md)
 42. [Search workspace files from the native header](./2026-08-31-42-mobile-native-file-search.md)
+43. [Browse workspace files in a native iOS list](./2026-08-31-43-mobile-native-file-browser.md)

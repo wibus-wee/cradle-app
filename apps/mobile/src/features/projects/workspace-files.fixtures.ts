@@ -1,4 +1,4 @@
-import type { WorkspaceFilesViewProps } from './WorkspaceFilesView'
+import type { WorkspaceFilesViewProps } from './workspace-files-view-contract'
 
 export const workspaceFilesFixture: WorkspaceFilesViewProps = {
   currentPath: 'apps/mobile/src',

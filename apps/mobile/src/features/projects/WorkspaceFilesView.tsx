@@ -1,10 +1,7 @@
 import { ArrowLeft, ChevronRight, FileText, Folder, Search } from 'lucide-react-native'
 import { FlatList, StyleSheet, Text, View } from 'react-native'
 
-import type {
-  GetWorkspacesByWorkspaceIdFilesChildrenResponse,
-  GetWorkspacesByWorkspaceIdFilesInfoResponse,
-} from '@/api-gen'
+import type { GetWorkspacesByWorkspaceIdFilesChildrenResponse } from '@/api-gen'
 import { IconButton } from '@/components/ui/icon-button'
 import { InputGroup } from '@/components/ui/input-group'
 import { Item } from '@/components/ui/item'
@@ -13,35 +10,16 @@ import { EmptyState } from '@/components/ui/states'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
+import {
+  workspaceFilePreviewUnavailableDescription,
+  workspaceFileSize,
+  workspacePathName,
+} from './workspace-files-model'
+import type { WorkspaceFilesViewProps } from './workspace-files-view-contract'
+
 type FileEntry = GetWorkspacesByWorkspaceIdFilesChildrenResponse[number]
 
-export interface WorkspaceFilesViewProps {
-  currentPath: string
-  entries: GetWorkspacesByWorkspaceIdFilesChildrenResponse
-  file?: {
-    content: string | null
-    info: GetWorkspacesByWorkspaceIdFilesInfoResponse
-    previewable: boolean
-  }
-  isRefreshing?: boolean
-  onBack: () => void
-  onOpenDirectory: (path: string) => void
-  onOpenFile: (path: string) => void
-  onRefresh?: () => void
-  onSearchChange: (query: string) => void
-  search: string
-  showsInlineSearch?: boolean
-}
-
-function pathName(path: string): string {
-  return path.split('/').filter(Boolean).at(-1) ?? 'Files'
-}
-
-function fileSize(bytes: number): string {
-  if (bytes < 1024) { return `${bytes} B` }
-  if (bytes < 1024 * 1024) { return `${Math.ceil(bytes / 1024)} KB` }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+export type { WorkspaceFilesViewProps } from './workspace-files-view-contract'
 
 export function WorkspaceFilesView({
   currentPath,
@@ -70,7 +48,7 @@ export function WorkspaceFilesView({
       <Screen
         action={backAction}
         insetTop={false}
-        subtitle={`${file.info.path} · ${fileSize(file.info.size)}`}
+        subtitle={`${file.info.path} · ${workspaceFileSize(file.info.size)}`}
         title={file.info.name}
       >
         {file.previewable && file.content !== null
@@ -87,11 +65,10 @@ export function WorkspaceFilesView({
             )
           : (
               <EmptyState
-                description={file.info.size > 128 * 1024
-                  ? 'Text previews are limited to 128 KB on Mobile.'
-                  : file.previewable
-                    ? 'Text content is unavailable.'
-                  : 'This file type does not have a Mobile preview.'}
+                description={workspaceFilePreviewUnavailableDescription(
+                  file.info.size,
+                  file.previewable,
+                )}
                 title="Preview unavailable"
               />
             )}
@@ -105,7 +82,7 @@ export function WorkspaceFilesView({
       insetTop={false}
       scroll={false}
       subtitle={currentPath || 'Workspace root'}
-      title={pathName(currentPath)}
+      title={workspacePathName(currentPath)}
     >
       {showsInlineSearch && (
         <View style={styles.search}>
