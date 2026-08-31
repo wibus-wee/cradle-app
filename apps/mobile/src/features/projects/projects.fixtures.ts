@@ -19,6 +19,7 @@ export const projectsFixture: ProjectsViewProps = {
     },
   ],
   onCreate: () => {},
+  onOpenFiles: () => {},
   onOpenUsage: () => {},
   onOpenProject: () => {},
   onSearchQueryChange: () => {},

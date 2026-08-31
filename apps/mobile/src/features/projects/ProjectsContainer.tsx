@@ -78,6 +78,7 @@ export function ProjectsContainer({
       isCreating={create.isPending}
       isRefreshing={isRefreshing}
       onCreate={input => create.mutate(input)}
+      onOpenFiles={workspaceId => router.push(`/workspace/${workspaceId}/files`)}
       onOpenUsage={() => router.push('/usage')}
       onOpenProject={workspaceId => router.push(`/workspace/${workspaceId}`)}
       onRefresh={refresh}

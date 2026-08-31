@@ -13,6 +13,7 @@ export interface ProjectsViewProps {
   isCreating?: boolean
   isRefreshing?: boolean
   onCreate: (input: PostWorksData['body']) => void
+  onOpenFiles: (workspaceId: string) => void
   onOpenUsage: () => void
   onOpenProject: (workspaceId: string) => void
   onRefresh?: () => Promise<void> | void

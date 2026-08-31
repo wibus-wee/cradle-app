@@ -1,6 +1,7 @@
 import {
   Button,
   ContentUnavailableView,
+  ContextMenu,
   Host,
   HStack,
   Image,
@@ -43,6 +44,7 @@ export function ProjectsView({
   projects,
   isCreating = false,
   onCreate,
+  onOpenFiles,
   onOpenProject,
   onRefresh,
   searchQuery,
@@ -59,6 +61,11 @@ export function ProjectsView({
     listStyle('insetGrouped'),
     ...(onRefresh ? [refreshable(async () => { await onRefresh() })] : []),
   ]
+
+  const dismissComposer = () => {
+    composerRef.current?.collapse()
+    Keyboard.dismiss()
+  }
 
   return (
     <Screen
@@ -91,7 +98,7 @@ export function ProjectsView({
             {filteredProjects.map(({ workspace, sessions }) => {
               const missing = workspace.availability === 'missing'
               const conversationCount = sessions.length
-              return (
+              const row = (
                 <Button
                   key={workspace.id}
                   modifiers={[
@@ -105,8 +112,7 @@ export function ProjectsView({
                     accessibilityHint('Opens workspace'),
                   ]}
                   onPress={() => {
-                    composerRef.current?.collapse()
-                    Keyboard.dismiss()
+                    dismissComposer()
                     onOpenProject(workspace.id)
                   }}
                 >
@@ -139,6 +145,32 @@ export function ProjectsView({
                     <Image color="secondary" size={14} systemName="chevron.forward" />
                   </HStack>
                 </Button>
+              )
+              if (missing) {
+                return row
+              }
+              return (
+                <ContextMenu key={workspace.id}>
+                  <ContextMenu.Trigger>{row}</ContextMenu.Trigger>
+                  <ContextMenu.Items>
+                    <Button
+                      label="Open Workspace"
+                      onPress={() => {
+                        dismissComposer()
+                        onOpenProject(workspace.id)
+                      }}
+                      systemImage="folder"
+                    />
+                    <Button
+                      label="Browse Files"
+                      onPress={() => {
+                        dismissComposer()
+                        onOpenFiles(workspace.id)
+                      }}
+                      systemImage="doc.text.magnifyingglass"
+                    />
+                  </ContextMenu.Items>
+                </ContextMenu>
               )
             })}
           </Section>
