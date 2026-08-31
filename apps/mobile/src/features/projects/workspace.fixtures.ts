@@ -50,7 +50,7 @@ export const workspaceFixture: WorkspaceViewProps = {
     updatedAt: 1_750_000_100,
     latestUserMessageAt: 1_750_000_050,
     latestAssistantMessageAt: 1_750_000_100,
-    unread: false,
+    unread: true,
     isIsolated: false,
     worktreeId: null,
     worktreeBranch: null,

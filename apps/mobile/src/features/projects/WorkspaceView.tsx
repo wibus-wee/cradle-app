@@ -143,7 +143,12 @@ export function WorkspaceView({
             const { session } = item
             return (
               <Item
-                actions={<StatusPill label={session.status} tone={sessionTone(session.status)} />}
+                actions={(
+                  <>
+                    <StatusPill label={session.status} tone={sessionTone(session.status)} />
+                    {session.unread && <StatusPill label="unread" tone="info" />}
+                  </>
+                )}
                 description={relativeTime(session.latestAssistantMessageAt ?? session.latestUserMessageAt ?? session.updatedAt)}
                 media={<MessageSquareText color={theme.session} size={16} />}
                 onPress={() => onOpenSession(session.id)}

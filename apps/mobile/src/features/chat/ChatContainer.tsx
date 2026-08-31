@@ -117,6 +117,21 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
     },
     onSuccess: (session) => {
       queryClient.setQueryData(['chat-session', connection?.url, sessionId], session)
+      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.url] })
+      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.url] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
+    },
+  })
+  const markRead = useMutation({
+    mutationFn: () =>
+      cradleRequest<GetSessionsByIdResponse>(
+        connection!,
+        `/sessions/${encodeURIComponent(sessionId)}/read`,
+        { method: 'POST' },
+      ),
+    onSuccess: (session) => {
+      queryClient.setQueryData(['chat-session', connection?.url, sessionId], session)
+      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.url] })
       void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.url] })
       void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
     },
@@ -131,6 +146,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         { signal },
       ),
   })
+  const markSessionRead = markRead.mutate
   const refetchHistory = historyQuery.refetch
   const refetchRuntimeStatus = runtimeStatusQuery.refetch
 
@@ -163,6 +179,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
     | InfiniteData<GetChatSessionsBySessionIdMessagePreviewsResponse, string | null>
     | undefined
   const historyData = queryHistoryData ?? cachedHistory
+  const transcriptRevision = historyData?.pages[0]?.revision
   const messages = useMemo(
     () => [...(historyData?.pages ?? [])].reverse().flatMap(page => page.rows),
     [historyData],
@@ -172,6 +189,12 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
     = messages.findLast(row => row.role === 'assistant' && row.status === 'streaming')?.messageId
       ?? null
   streamingMessageIdRef.current = streamingMessageId
+
+  useEffect(() => {
+    if (isRouteActive && transcriptRevision !== undefined) {
+      markSessionRead()
+    }
+  }, [isRouteActive, markSessionRead, transcriptRevision])
 
   useEffect(
     () => () => {

@@ -276,6 +276,19 @@ export function WorkspaceView({
                                 ?? session.updatedAt,
                               )}
                             </Text>
+                            {session.unread && (
+                              <HStack spacing={4}>
+                                <Image color="blue" size={7} systemName="circle.fill" />
+                                <Text
+                                  modifiers={[
+                                    font({ textStyle: 'caption' }),
+                                    foregroundStyle('blue'),
+                                  ]}
+                                >
+                                  Unread
+                                </Text>
+                              </HStack>
+                            )}
                           </HStack>
                         </VStack>
                         <Spacer />

@@ -8,7 +8,6 @@ import { useConnection } from '@/features/connection/connection-context'
 import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
-import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 
 import { useCreateWork } from './use-create-work'
 import { WorkListView } from './WorkListView'
@@ -47,8 +46,6 @@ export function WorkListContainer({
       }
     },
   })
-  useSessionSummaryEvents(connection, isRouteActive, () => { void query.refetch() })
-
   const refresh = async () => {
     setIsRefreshing(true)
     try {

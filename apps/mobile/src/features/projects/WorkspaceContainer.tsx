@@ -15,7 +15,6 @@ import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
-import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 
 import { WorkspaceView } from './WorkspaceView'
 
@@ -62,8 +61,6 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
       }
     },
   })
-  useSessionSummaryEvents(connection, isRouteActive, () => { void query.refetch() })
-
   const refresh = async () => {
     setIsRefreshing(true)
     try {
