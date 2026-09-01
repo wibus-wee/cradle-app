@@ -9,6 +9,8 @@ import {
 import type { UIMessage, UIMessageChunk } from 'ai'
 import { uiMessageChunkSchema } from 'ai'
 
+import type { CradleResponse } from '@/lib/transport/types'
+
 type UIMessageChunkValidationResult
   = | { success: true, value: UIMessageChunk }
     | { success: false, error: Error }
@@ -22,7 +24,7 @@ interface UIMessageChunkValidator {
 interface ConsumeChatMessageStreamOptions {
   messageId: string
   onMessage: (message: UIMessage) => void
-  response: Response
+  response: CradleResponse
 }
 
 const STREAM_RENDER_INTERVAL_MS = 125
@@ -113,7 +115,7 @@ function createStreamMessageEmitter(
   return { cancel, flush, request }
 }
 
-export function createUIMessageChunkStream(response: Response): ReadableStream<UIMessageChunk> {
+export function createUIMessageChunkStream(response: CradleResponse): ReadableStream<UIMessageChunk> {
   if (!response.body) {
     throw new Error('Chat stream has no response body.')
   }

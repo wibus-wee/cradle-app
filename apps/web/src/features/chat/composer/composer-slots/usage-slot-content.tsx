@@ -34,10 +34,64 @@ export function UsageSlotContent({
             layout={layout}
           />
         ))}
+        {state.estimatedCostUsd !== undefined && state.estimatedCostUsd !== null && (
+          <UsageCostSummary state={state} />
+        )}
+        {state.lastModelSwitch && <ModelSwitchCostSummary modelSwitch={state.lastModelSwitch} />}
       </div>
       {action}
     </div>
   )
+}
+
+function ModelSwitchCostSummary({
+  modelSwitch,
+}: {
+  modelSwitch: NonNullable<ChatRuntimeUsageUiSlotState['lastModelSwitch']>
+}) {
+  const label = `Last switch: ${formatEstimatedCost(modelSwitch.estimatedCacheWriteUsd)} cache estimate · ${modelSwitch.cacheTtl} TTL · ${modelSwitch.pricing} pricing`
+  return (
+    <div className="min-w-0 text-pretty leading-4 text-muted-foreground">
+      {label}
+    </div>
+  )
+}
+
+function UsageCostSummary({ state }: { state: ChatRuntimeUsageUiSlotState }) {
+  const costBases = [...new Set(state.modelCosts?.map(item => item.costBasis) ?? [])]
+  const pricingLabel = costBases.length === 1
+    ? `${costBases[0]} pricing`
+    : costBases.length > 1
+      ? 'mixed pricing'
+      : 'pricing unavailable'
+  const modelCount = state.modelCosts?.length ?? 0
+  const costLabel = `${formatEstimatedCost(state.estimatedCostUsd ?? 0)} estimated`
+  const pricingSummary = `${pricingLabel}${modelCount > 0 ? ` · ${modelCount} model${modelCount === 1 ? '' : 's'}` : ''}`
+  const queuedLabel = `${state.queuedTurnCount} queued`
+  return (
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-pretty leading-4 text-muted-foreground">
+      <span className="shrink-0 font-mono tabular-nums text-foreground/80">
+        {costLabel}
+      </span>
+      <span aria-hidden="true">·</span>
+      <span className="min-w-0">
+        {pricingSummary}
+      </span>
+      {(state.queuedTurnCount ?? 0) > 0 && (
+        <span className="shrink-0">{queuedLabel}</span>
+      )}
+    </div>
+  )
+}
+
+function formatEstimatedCost(costUsd: number): string {
+  if (costUsd >= 1) {
+    return `$${costUsd.toFixed(2)}`
+  }
+  if (costUsd >= 0.01) {
+    return `$${costUsd.toFixed(3)}`
+  }
+  return `$${costUsd.toFixed(4)}`
 }
 
 interface UsageWindowRowState {
@@ -109,14 +163,20 @@ function readUsageRows(state: ChatRuntimeUsageUiSlotState): UsageWindowRowState[
     state.secondaryWindowDurationMins,
     state.secondaryResetsAt,
   ].some(value => value !== null)
-  const rows: UsageWindowRowState[] = [
-    {
+  const hasPrimaryUsageWindow = [
+    state.limitName,
+    state.usedPercent,
+    state.primaryWindowDurationMins,
+    state.primaryResetsAt,
+  ].some(value => value !== null)
+  const rows: UsageWindowRowState[] = hasPrimaryUsageWindow
+    ? [{
       key: 'primary',
       label: formatWindowDuration(state.primaryWindowDurationMins) ?? state.limitName ?? 'limit',
       remainingPercent: formatRemainingValue(state.usedPercent),
       resetLabel: formatResetLabel(state.primaryResetsAt),
-    },
-  ]
+      }]
+    : []
 
   if (hasSecondaryUsageWindow) {
     rows.push({

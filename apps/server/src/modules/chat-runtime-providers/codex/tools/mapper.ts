@@ -395,6 +395,12 @@ export function readCodexToolError(item: CodexAppServerItem): string | null {
   if (item.type === 'dynamicToolCall' && item.status === 'failed') {
     return 'Dynamic tool call failed'
   }
+  if (item.type === 'collabAgentToolCall' && item.status === 'interrupted') {
+    return 'Collaboration tool call interrupted'
+  }
+  if (item.type === 'subAgentActivity' && item.kind === 'interrupted') {
+    return 'Subagent activity interrupted'
+  }
   return null
 }
 

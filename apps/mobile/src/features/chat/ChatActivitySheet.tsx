@@ -1,8 +1,6 @@
-import type { UIMessage } from 'ai'
 import {
   getToolName,
   isReasoningUIPart,
-  isToolUIPart,
 } from 'ai'
 import { Check, CircleAlert, LoaderCircle, Wrench, X } from 'lucide-react-native'
 import {
@@ -19,23 +17,10 @@ import { PressableScale } from '@/components/ui/pressable-scale'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-interface ChatActivitySheetProps {
-  error?: string | null
-  isLoading?: boolean
-  message?: UIMessage
-  onClose: () => void
-  visible: boolean
-}
+import { chatActivityParts, serializeChatActivity } from './chat-activity-model'
+import type { ChatActivitySheetProps } from './chat-activity-sheet-contract'
 
-function serialize(value: unknown): string | null {
-  try {
-    const text = JSON.stringify(value, null, 2)
-    return text ?? null
-  }
-  catch {
-    return String(value)
-  }
-}
+export type { ChatActivitySheetProps } from './chat-activity-sheet-contract'
 
 export function ChatActivitySheet({
   error = null,
@@ -45,7 +30,7 @@ export function ChatActivitySheet({
   visible,
 }: ChatActivitySheetProps) {
   const theme = useTheme()
-  const activities = message?.parts.filter(part => isReasoningUIPart(part) || isToolUIPart(part)) ?? []
+  const activities = chatActivityParts(message)
 
   return (
     <Modal
@@ -100,7 +85,7 @@ export function ChatActivitySheet({
               : 'input' in part
                 ? part.input
                 : undefined
-            const payloadText = payload === undefined ? null : serialize(payload)
+            const payloadText = payload === undefined ? null : serializeChatActivity(payload)
             return (
               <View key={part.toolCallId} style={[styles.tool, { backgroundColor: theme.surfaceInset }]}>
                 <View style={styles.activityHeading}>

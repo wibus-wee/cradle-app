@@ -11,10 +11,14 @@ import { PressableScale } from '@/components/ui/pressable-scale'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
+import { MessageActions } from './MessageActions'
+
 interface ChatMessageProps {
   errorText?: string | null
   message: UIMessage
   onActivityPress?: (messageId: string) => void
+  onCopy?: (text: string) => Promise<void>
+  onShare?: (text: string) => Promise<void>
   status?: 'streaming' | 'complete' | 'aborted' | 'failed'
 }
 
@@ -22,20 +26,28 @@ function ChatMessageContent({
   errorText = null,
   message,
   onActivityPress,
+  onCopy,
+  onShare,
   status = 'complete',
 }: ChatMessageProps) {
   const theme = useTheme()
+  const copyText = message.parts
+    .filter(isTextUIPart)
+    .map(part => part.text)
+    .join('\n')
+    .trim()
 
   if (message.role === 'user') {
-    const text = message.parts
-      .filter(isTextUIPart)
-      .map(part => part.text)
-      .join('')
     return (
-      <View style={[styles.userBubble, { backgroundColor: theme.muted }]}>
-        <Text selectable style={[styles.userText, { color: theme.foreground }]}>
-          {text}
-        </Text>
+      <View style={styles.userMessage}>
+        <View style={[styles.userBubble, { backgroundColor: theme.muted }]}>
+          <Text selectable style={[styles.userText, { color: theme.foreground }]}>
+            {copyText}
+          </Text>
+        </View>
+        {copyText && onCopy && onShare && (
+          <MessageActions align="end" onCopy={onCopy} onShare={onShare} text={copyText} />
+        )}
       </View>
     )
   }
@@ -198,6 +210,9 @@ function ChatMessageContent({
       {status === 'failed' && errorText && (
         <Text style={[styles.terminalStatus, { color: theme.destructive }]}>{errorText}</Text>
       )}
+      {copyText && onCopy && onShare && (
+        <MessageActions onCopy={onCopy} onShare={onShare} text={copyText} />
+      )}
     </View>
   )
 }
@@ -229,7 +244,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     flexDirection: 'row',
     gap: spacing.xs,
-    minHeight: 32,
+    minHeight: 44,
     paddingHorizontal: spacing.sm,
   },
   cursor: {
@@ -251,6 +266,11 @@ const styles = StyleSheet.create({
     maxWidth: '84%',
     paddingHorizontal: 12,
     paddingVertical: spacing.sm,
+  },
+  userMessage: {
+    alignItems: 'flex-end',
+    alignSelf: 'stretch',
+    gap: spacing.xs,
   },
   userText: {
     fontSize: 14,

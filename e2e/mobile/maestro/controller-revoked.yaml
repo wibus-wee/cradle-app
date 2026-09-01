@@ -1,0 +1,9 @@
+appId: app.cradle.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: fabric-membership-unavailable
+    timeout: 45000
+- assertVisible: Access revoked

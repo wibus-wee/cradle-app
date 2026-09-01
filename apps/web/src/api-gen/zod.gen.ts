@@ -599,12 +599,14 @@ export const zDeleteFabricNodeInvitationsRequestsByRequestIdPath = z.object({
 });
 
 export const zPostFabricControllerInvitationsRequestsByRequestIdApproveBody = z.object({
-    nodeId: z.string().min(1).regex(/.*\S.*/),
-    scopes: z.array(z.enum([
-        'view',
-        'control',
-        'approve'
-    ])).min(1)
+    grants: z.array(z.object({
+        nodeId: z.string().min(1).regex(/.*\S.*/),
+        scopes: z.array(z.enum([
+            'view',
+            'control',
+            'approve'
+        ])).min(1)
+    })).min(1)
 });
 
 export const zPostFabricControllerInvitationsRequestsByRequestIdApprovePath = z.object({
@@ -613,6 +615,10 @@ export const zPostFabricControllerInvitationsRequestsByRequestIdApprovePath = z.
 
 export const zDeleteFabricControllerInvitationsRequestsByRequestIdPath = z.object({
     requestId: z.string().min(1).regex(/.*\S.*/)
+});
+
+export const zDeleteFabricControllersByControllerIdPath = z.object({
+    controllerId: z.string().min(1).regex(/.*\S.*/)
 });
 
 export const zDeleteNodesByNodeIdPath = z.object({
@@ -3984,6 +3990,31 @@ export const zPutChatSessionsBySessionIdRuntimeModeBody = z.object({
 });
 
 export const zPutChatSessionsBySessionIdRuntimeModePath = z.object({
+    sessionId: z.string().min(1)
+});
+
+export const zPatchChatSessionsBySessionIdRuntimeTurnSettingsBody = z.object({
+    model: z.string().min(1).nullish(),
+    effort: z.enum([
+        'none',
+        'minimal',
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max',
+        'ultra'
+    ]).nullish(),
+    summary: z.enum([
+        'auto',
+        'concise',
+        'detailed',
+        'none'
+    ]).nullish(),
+    serviceTier: z.string().min(1).nullish()
+});
+
+export const zPatchChatSessionsBySessionIdRuntimeTurnSettingsPath = z.object({
     sessionId: z.string().min(1)
 });
 

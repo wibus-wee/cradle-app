@@ -30,6 +30,7 @@ interface FakeDirectoryState {
     grants?: Array<{ grantId: string, fabricId: string, controllerId: string, nodeId: string, scope: string }>
   }>
   rejectedRequests: string[]
+  revokedControllers: string[]
 }
 
 const pendingIdentity = generateFabricSigningKeyPair()
@@ -83,8 +84,8 @@ const offlineNodeSummary = {
 }
 
 const nodeAGrants = [
-  { grantId: 'grant-1', fabricId: 'fabric-1', controllerId: 'controller-a', nodeId: 'node-a', scope: 'view' },
-  { grantId: 'grant-2', fabricId: 'fabric-1', controllerId: 'controller-b', nodeId: 'node-a', scope: 'control', revokedAt: '2026-08-16T13:00:00.000Z' },
+  { grantId: 'grant-1', fabricId: 'fabric-1', controllerId: 'controller-a', controllerDisplayName: 'iPhone', nodeId: 'node-a', scope: 'view' },
+  { grantId: 'grant-2', fabricId: 'fabric-1', controllerId: 'controller-b', controllerDisplayName: 'iPad', nodeId: 'node-a', scope: 'control', revokedAt: '2026-08-16T13:00:00.000Z' },
 ]
 
 function startFakeDirectory(state: FakeDirectoryState): Promise<{ baseUrl: string, close: () => Promise<void> }> {
@@ -123,6 +124,13 @@ function startFakeDirectory(state: FakeDirectoryState): Promise<{ baseUrl: strin
     const rejectRequestMatch = /^\/v1\/fabrics\/fabric-1\/join-requests\/(?<requestId>[\w-]+)$/u.exec(url.pathname)
     if (rejectRequestMatch && request.method === 'DELETE') {
       state.rejectedRequests.push(rejectRequestMatch.groups!.requestId!)
+      response.writeHead(204)
+      response.end()
+      return
+    }
+    const revokeControllerMatch = /^\/v1\/fabrics\/fabric-1\/controllers\/(?<controllerId>[\w-]+)$/u.exec(url.pathname)
+    if (revokeControllerMatch && request.method === 'DELETE') {
+      state.revokedControllers.push(revokeControllerMatch.groups!.controllerId!)
       response.writeHead(204)
       response.end()
       return
@@ -198,7 +206,7 @@ function seedFabricMembership(relayUrl: string): void {
 describe('fabric node directory routes', () => {
   let dataDir = ''
   let directory: { baseUrl: string, close: () => Promise<void> } | undefined
-  const state: FakeDirectoryState = { requests: [], revokedGrants: [], removedNodes: [], approvedRequestBodies: [], rejectedRequests: [] }
+  const state: FakeDirectoryState = { requests: [], revokedGrants: [], removedNodes: [], approvedRequestBodies: [], rejectedRequests: [], revokedControllers: [] }
   const previousDataDir = process.env.CRADLE_DATA_DIR
   const previousCredentialSecret = process.env.CRADLE_CREDENTIAL_SECRET
   const previousRelaydAccessMode = process.env.CRADLE_RELAYD_ACCESS_MODE
@@ -236,6 +244,7 @@ describe('fabric node directory routes', () => {
     state.removedNodes = []
     state.approvedRequestBodies = []
     state.rejectedRequests = []
+    state.revokedControllers = []
     directory = await startFakeDirectory(state)
     const created = await createServerApp()
     seedFabricMembership(directory.baseUrl)
@@ -301,7 +310,7 @@ describe('fabric node directory routes', () => {
     expect(state.rejectedRequests).toEqual(['join-pending'])
   })
 
-  it('approves a Controller for one Node with explicit least-privilege grants', async () => {
+  it('approves a Fabric-level Controller with explicit grants for multiple Nodes', async () => {
     const server = await setup()
     const listed = await server.handle(new Request('http://localhost/fabric/controller-invitations/requests'))
     expect(listed.status).toBe(200)
@@ -315,7 +324,12 @@ describe('fabric node directory routes', () => {
     const approved = await server.handle(new Request('http://localhost/fabric/controller-invitations/requests/join-controller-pending/approve', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ nodeId: 'node-a', scopes: ['view', 'control', 'approve'] }),
+      body: JSON.stringify({
+        grants: [
+          { nodeId: 'node-a', scopes: ['view', 'control', 'approve'] },
+          { nodeId: 'node-b', scopes: ['view', 'control'] },
+        ],
+      }),
     }))
     expect(approved.status).toBe(200)
     expect(await approved.json()).toEqual({ fabricId: 'fabric-1', controllerId: 'controller-ios' })
@@ -324,14 +338,17 @@ describe('fabric node directory routes', () => {
     expect(body.controllerCertificate).toMatchObject({
       subjectKind: 'controller',
       subjectId: 'controller-ios',
-      nodeId: 'node-a',
       scopes: ['approve', 'control', 'view'],
     })
+    expect(body.controllerCertificate.nodeId).toBeUndefined()
     expect(body.grants).toEqual(expect.arrayContaining([
       expect.objectContaining({ controllerId: 'controller-ios', nodeId: 'node-a', scope: 'view' }),
       expect.objectContaining({ controllerId: 'controller-ios', nodeId: 'node-a', scope: 'control' }),
       expect.objectContaining({ controllerId: 'controller-ios', nodeId: 'node-a', scope: 'approve' }),
+      expect.objectContaining({ controllerId: 'controller-ios', nodeId: 'node-b', scope: 'view' }),
+      expect.objectContaining({ controllerId: 'controller-ios', nodeId: 'node-b', scope: 'control' }),
     ]))
+    expect(body.grants).toHaveLength(5)
   })
 
   it('rejects Nodes outside the caller grant filter', async () => {
@@ -348,6 +365,16 @@ describe('fabric node directory routes', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual(nodeAGrants)
     expect(state.requests).toContain('GET /v1/nodes/node-a/grants')
+  })
+
+  it('permanently revokes a Controller identity through the owner proof', async () => {
+    const server = await setup()
+    const response = await server.handle(new Request('http://localhost/fabric/controllers/controller-ios', {
+      method: 'DELETE',
+    }))
+    expect(response.status).toBe(204)
+    expect(state.revokedControllers).toEqual(['controller-ios'])
+    expect(state.requests).toContain('DELETE /v1/fabrics/fabric-1/controllers/controller-ios')
   })
 
   it('revokes the grant at the relay directory', async () => {

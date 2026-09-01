@@ -124,6 +124,8 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
           archivedAt: null,
           createdAt: 100 + index,
           updatedAt: 200 + index,
+          latestUserMessageAt: null,
+          latestAssistantMessageAt: null,
         }))
       writeJson(response, { items, nextCursor: null })
       return

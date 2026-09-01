@@ -25,6 +25,9 @@ export function NativeMarkdown({ markdown, streaming, style }: NativeMarkdownCom
 
   return (
     <NativeMarkdownView
+      accessibilityLabel={markdown}
+      accessibilityRole="text"
+      accessible
       markdown={markdown}
       onContentSizeChange={handleContentSizeChange}
       streaming={streaming}

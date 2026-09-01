@@ -26,6 +26,7 @@ import {
   writeClaudeAgentCapturedPlan,
   writeClaudeAgentCrewCall,
   writeClaudeAgentProgress,
+  writeClaudeAgentResultSnapshot,
   writeClaudeAgentTaskActivity,
   writeClaudeAgentWorkflowExecution,
 } from './state-projector'
@@ -111,6 +112,9 @@ export class ClaudeAgentMessageDispatch {
     }
 
     this.sessionArtifacts.projectClaudeAgentRuntimeState(entry.runtimeSession, message)
+    if (message.type === 'result' && !readClaudeMessageParentToolUseId(message)) {
+      writeClaudeAgentResultSnapshot(entry.runtimeSession, message)
+    }
     if (message.type === 'assistant' && message.context_usage) {
       this.context.captureContextUsage(entry.runtimeSession, message.session_id, message.context_usage)
     }

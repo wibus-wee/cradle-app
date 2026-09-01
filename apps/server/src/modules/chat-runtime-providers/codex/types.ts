@@ -542,6 +542,7 @@ export interface CodexListMcpServerStatusResponse {
     resources?: unknown[]
     resourceTemplates?: unknown[]
     authStatus?: string
+    runtimeStatus?: string | null
   }>
   nextCursor?: string | null
 }

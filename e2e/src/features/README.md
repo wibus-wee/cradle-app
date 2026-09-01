@@ -47,8 +47,10 @@ Feature prose describes observable user behavior. Provider scripts, exact reques
 | Suite | Stable IDs | Journey boundary | Command |
 | --- | --- | --- | --- |
 | [`fabric-two-node.spec.ts`](../fabric/fabric-two-node.spec.ts) | `CRADLE-FABRIC-001` | Real relayd, two independent Cradle Server databases, UI pairing, bidirectional Workspace, Chat, Node-owned Work/worktree routing, remote tool approval and continuation in both directions, cross-controller Session discovery, and reconnect recovery | `pnpm e2e:fabric` |
+| [`fabric-two-node.spec.ts`](../fabric/fabric-two-node.spec.ts) + [`mobile/maestro`](../../mobile/maestro) | `CRADLE-FABRIC-002` | Release iOS app enrollment, two-Node Controller grants, Node-scoped Workspace caches, native Node switching and Chat SSE, one-grant removal, and whole-Controller revocation | `pnpm e2e:fabric:mobile:ios` |
 
 Fabric uses a dedicated Playwright configuration because its acceptance
 boundary requires three long-lived backend processes and two browser contexts.
-It runs as a separate PR job rather than changing the Cucumber scenario count
-or priority tags above.
+The Mobile suite adds a signed Release app and an ephemeral iOS Simulator driven
+by Maestro. Both run as separate PR jobs rather than changing the Cucumber
+scenario count or priority tags above.

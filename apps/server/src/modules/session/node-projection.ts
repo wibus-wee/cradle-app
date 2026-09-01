@@ -387,8 +387,8 @@ interface RemoteSessionSummary {
   archivedAt: number | null
   createdAt: number
   updatedAt: number
-  latestUserMessageAt: number | null
-  latestAssistantMessageAt: number | null
+  latestUserMessageAt?: number | null
+  latestAssistantMessageAt?: number | null
 }
 
 interface RemoteSessionPage {
@@ -478,12 +478,17 @@ export async function reconcileNodeSessionsForWorkspace(
 
     if (existing) {
       const title = remote.title ?? existing.title
-      if (
+      const latestUserMessageAt = remote.latestUserMessageAt ?? null
+      const latestAssistantMessageAt = remote.latestAssistantMessageAt ?? null
+      const sessionChanged = (
         existing.title !== title
         || existing.updatedAt < remote.updatedAt
-        || existing.latestUserMessageAt !== latestUserMessageAt
+      )
+      const activityChanged = (
+        existing.latestUserMessageAt !== latestUserMessageAt
         || existing.latestAssistantMessageAt !== latestAssistantMessageAt
-      ) {
+      )
+      if (sessionChanged) {
         db().update(sessions).set({
           title,
           origin: remote.origin,
@@ -492,10 +497,14 @@ export async function reconcileNodeSessionsForWorkspace(
           archivedAt: remote.archivedAt,
           updatedAt: remote.updatedAt,
         }).where(eq(sessions.id, existing.localSessionId)).run()
+      }
+      if (activityChanged) {
         db().update(nodeSessionLinks).set({
           latestUserMessageAt,
           latestAssistantMessageAt,
         }).where(eq(nodeSessionLinks.localSessionId, existing.localSessionId)).run()
+      }
+      if (sessionChanged || activityChanged) {
         updated += 1
       }
       continue
@@ -523,8 +532,8 @@ export async function reconcileNodeSessionsForWorkspace(
         remoteSessionId: remote.id,
         remoteWorkspaceId,
         projectionKind: 'discovered',
-        latestUserMessageAt,
-        latestAssistantMessageAt,
+        latestUserMessageAt: remote.latestUserMessageAt ?? null,
+        latestAssistantMessageAt: remote.latestAssistantMessageAt ?? null,
         createdAt: now,
         updatedAt: now,
       }).run()

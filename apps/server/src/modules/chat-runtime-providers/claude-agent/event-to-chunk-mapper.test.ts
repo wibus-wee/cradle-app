@@ -60,6 +60,31 @@ describe('mapClaudeAgentMessageToChunks', () => {
     })
   })
 
+  it('preserves native user-message correlation without changing turn ownership', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const result = await mapClaudeAgentMessageToChunks({
+      type: 'assistant',
+      session_id: 'claude-session-1',
+      user_message_uuid: 'user-message-1',
+      message: {
+        id: 'message-1',
+        content: [{ type: 'text', text: 'Correlated' }],
+      },
+    } as unknown as SDKMessage, state)
+
+    expect(result.chunks[0]).toEqual({
+      type: 'message-metadata',
+      messageMetadata: {
+        claudeAgent: {
+          userMessageCorrelations: [{
+            assistantMessageId: 'message-1',
+            userMessageUuid: 'user-message-1',
+          }],
+        },
+      },
+    })
+  })
+
   it('extracts usage from message_delta stream event', async () => {
     const state = createClaudeAgentChunkMapperState('text-1')
     const message = {
@@ -107,6 +132,35 @@ describe('mapClaudeAgentMessageToChunks', () => {
     expect(result.chunks).toEqual([
       { type: 'finish', finishReason: 'stop' },
     ])
+  })
+
+  it('preserves result correlation, native queue count, and estimated cost metadata', async () => {
+    const state = createClaudeAgentChunkMapperState('text-1')
+    const result = await mapClaudeAgentMessageToChunks({
+      type: 'result',
+      subtype: 'success',
+      uuid: 'result-1',
+      user_message_uuid: 'user-message-1',
+      queued_turn_count: 2,
+      total_cost_usd: 0.125,
+      session_id: 'claude-session-1',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    } as unknown as SDKMessage, state)
+
+    expect(result.chunks[0]).toEqual({
+      type: 'finish',
+      finishReason: 'stop',
+      messageMetadata: {
+        claudeAgent: {
+          results: [{
+            resultMessageId: 'result-1',
+            userMessageUuid: 'user-message-1',
+            queuedTurnCount: 2,
+            totalEstimatedCostUsd: 0.125,
+          }],
+        },
+      },
+    })
   })
 
   it('maps an unsuccessful result to its native error', async () => {

@@ -1,4 +1,4 @@
-import type { UsageViewProps } from './UsageView'
+import type { UsageViewProps } from './usage-view-contract'
 
 export const usageFixture: UsageViewProps = {
   daily: [
@@ -17,7 +17,10 @@ export const usageFixture: UsageViewProps = {
     todayTokens: 44_000,
   },
   summary: {
-    byAgent: [],
+    byAgent: [
+      { agentId: 'agent-product', agentName: 'Product Engineer', count: 128, totalTokens: 1_460_000 },
+      { agentId: 'agent-review', agentName: 'Review Assistant', count: 72, totalTokens: 980_000 },
+    ],
     byModel: [
       { count: 114, modelId: 'claude-sonnet-4-5', totalTokens: 1_240_000 },
       { count: 86, modelId: 'gpt-5.2-codex', totalTokens: 820_000 },

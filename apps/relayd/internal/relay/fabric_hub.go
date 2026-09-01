@@ -213,6 +213,21 @@ func (h *FabricHub) RevokeControllerNode(fabricID, nodeID, controllerID string) 
 	}
 }
 
+// RevokeController terminates every live link owned by one Controller.
+func (h *FabricHub) RevokeController(fabricID, controllerID string) {
+	h.mu.RLock()
+	linkIDs := []string{}
+	for linkID, link := range h.links {
+		if link.fabricID == fabricID && link.controllerID == controllerID {
+			linkIDs = append(linkIDs, linkID)
+		}
+	}
+	h.mu.RUnlock()
+	for _, linkID := range linkIDs {
+		_ = h.RevokeLink(linkID)
+	}
+}
+
 // RemoveNode terminates the device's persistent socket and every live link in
 // which it participates as either the target Node or the Controller.
 func (h *FabricHub) RemoveNode(fabricID, nodeID string) {

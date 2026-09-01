@@ -1,4 +1,3 @@
-import { Check, FolderGit2, Search, X } from 'lucide-react-native'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Animated,
@@ -6,29 +5,18 @@ import {
   Modal,
   PanResponder,
   Pressable,
-  ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import type { GetWorkspacesResponse } from '@/api-gen'
-import { PressableScale } from '@/components/ui/pressable-scale'
 import { radius, spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-type Workspace = GetWorkspacesResponse[number]
+import type { WorkspacePickerSheetProps } from './workspace-picker-sheet-contract'
+import { WorkspacePickerContent } from './WorkspacePickerContent'
 
-interface WorkspacePickerSheetProps {
-  onClose: () => void
-  onDismissed?: () => void
-  onSelect: (workspaceId: string) => void
-  selectedWorkspaceId: string
-  visible: boolean
-  workspaces: Workspace[]
-}
+export type { WorkspacePickerSheetProps } from './workspace-picker-sheet-contract'
 
 const closedOffset = 640
 
@@ -47,7 +35,6 @@ export function WorkspacePickerSheet({
   const mountedRef = useRef(false)
   const onDismissedRef = useRef(onDismissed)
   const [mounted, setMounted] = useState(false)
-  const [query, setQuery] = useState('')
 
   onDismissedRef.current = onDismissed
 
@@ -72,7 +59,6 @@ export function WorkspacePickerSheet({
     if (visible) {
       mountedRef.current = true
       setMounted(true)
-      setQuery('')
       translateY.setValue(closedOffset)
       backdropOpacity.setValue(0)
       const frame = requestAnimationFrame(() => {
@@ -109,14 +95,6 @@ export function WorkspacePickerSheet({
       Animated.parallel([spring(0), fade(1)]).start()
     },
   }), [backdropOpacity, fade, onClose, spring, translateY])
-
-  const normalizedQuery = query.trim().toLowerCase()
-  const filteredWorkspaces = normalizedQuery
-    ? workspaces.filter(workspace =>
-        workspace.name.toLowerCase().includes(normalizedQuery)
-        || workspace.locator.path.toLowerCase().includes(normalizedQuery))
-    : workspaces
-  const showsSearch = workspaces.length > 5
 
   if (!mounted) { return null }
 
@@ -157,105 +135,24 @@ export function WorkspacePickerSheet({
             {
               backgroundColor: theme.surface,
               borderColor: theme.border,
-              paddingBottom: Math.max(insets.bottom, spacing.sm),
               shadowColor: theme.shadow,
               shadowOpacity: theme.isDark ? 0.38 : 0.16,
               transform: [{ translateY }],
             },
           ]}
         >
-          <View {...panResponder.panHandlers}>
-            <View style={styles.dragRegion}>
-              <View style={[styles.handle, { backgroundColor: theme.input }]} />
-            </View>
-
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: theme.foreground }]}>Repository</Text>
-              <PressableScale
-                accessibilityLabel="Close repository picker"
-                accessibilityRole="button"
-                onPress={onClose}
-                style={[styles.closeButton, { backgroundColor: theme.muted }]}
-              >
-                <X color={theme.tertiaryForeground} size={18} />
-              </PressableScale>
-            </View>
+          <View {...panResponder.panHandlers} style={styles.dragRegion}>
+            <View style={[styles.handle, { backgroundColor: theme.input }]} />
           </View>
-
-          {showsSearch && (
-            <View
-              style={[
-                styles.search,
-                {
-                  backgroundColor: theme.surfaceInset,
-                  borderColor: theme.input,
-                },
-              ]}
-            >
-              <Search color={theme.mutedForeground} size={16} />
-              <TextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                clearButtonMode="while-editing"
-                onChangeText={setQuery}
-                placeholder="Search repositories"
-                placeholderTextColor={theme.mutedForeground}
-                returnKeyType="search"
-                style={[styles.searchInput, { color: theme.foreground }]}
-                value={query}
-              />
-            </View>
-          )}
-
-          <ScrollView
-            contentContainerStyle={styles.listContent}
-            keyboardDismissMode="interactive"
-            keyboardShouldPersistTaps="handled"
-            style={styles.list}
-          >
-            {filteredWorkspaces.map((workspace) => {
-              const selected = workspace.id === selectedWorkspaceId
-              const branch = workspace.gitIdentity.branch
-              return (
-                <PressableScale
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  key={workspace.id}
-                  onPress={() => {
-                    onSelect(workspace.id)
-                    onClose()
-                  }}
-                  style={[
-                    styles.row,
-                    selected && { backgroundColor: theme.muted },
-                  ]}
-                >
-                  <View style={[styles.repositoryIcon, { backgroundColor: theme.surfaceInset }]}>
-                    <FolderGit2 color={theme.workspace} size={18} />
-                  </View>
-                  <View style={styles.rowText}>
-                    <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.foreground }]}>
-                      {workspace.name}
-                    </Text>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.rowDescription, { color: theme.mutedForeground }]}
-                    >
-                      {branch ? `${workspace.locator.path} / ${branch}` : workspace.locator.path}
-                    </Text>
-                  </View>
-                  <View style={styles.checkSlot}>
-                    {selected && <Check color={theme.workspace} size={18} strokeWidth={2.4} />}
-                  </View>
-                </PressableScale>
-              )
-            })}
-            {filteredWorkspaces.length === 0 && (
-              <Text style={[styles.empty, { color: theme.mutedForeground }]}>
-                No repositories found
-              </Text>
-            )}
-          </ScrollView>
+          <WorkspacePickerContent
+            bottomPadding={Math.max(insets.bottom, spacing.sm)}
+            onClose={onClose}
+            onDismissed={onDismissed}
+            onSelect={onSelect}
+            selectedWorkspaceId={selectedWorkspaceId}
+            visible={visible}
+            workspaces={workspaces}
+          />
         </Animated.View>
       </View>
     </Modal>
@@ -269,97 +166,19 @@ const styles = StyleSheet.create({
   backdropPressable: {
     ...StyleSheet.absoluteFill,
   },
-  checkSlot: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 24,
-  },
-  closeButton: {
-    alignItems: 'center',
-    borderRadius: 20,
-    height: 40,
-    justifyContent: 'center',
-    width: 40,
-  },
   dragRegion: {
     alignItems: 'center',
     height: 20,
     justifyContent: 'center',
-  },
-  empty: {
-    fontSize: 13,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xl,
-    textAlign: 'center',
   },
   handle: {
     borderRadius: 2,
     height: 4,
     width: 36,
   },
-  header: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  list: {
-    flexShrink: 1,
-  },
-  listContent: {
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
   modal: {
     flex: 1,
     justifyContent: 'flex-end',
-  },
-  repositoryIcon: {
-    alignItems: 'center',
-    borderRadius: radius.md,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  row: {
-    alignItems: 'center',
-    borderRadius: radius.xl,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    minHeight: 60,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  rowDescription: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  rowText: {
-    flex: 1,
-    gap: 2,
-    minWidth: 0,
-  },
-  rowTitle: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  search: {
-    alignItems: 'center',
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    flexDirection: 'row',
-    gap: spacing.sm,
-    height: 40,
-    marginBottom: spacing.sm,
-    marginHorizontal: spacing.md,
-    paddingHorizontal: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    height: 40,
-    paddingVertical: 0,
   },
   sheet: {
     borderTopLeftRadius: radius.xxl,
@@ -369,10 +188,5 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     shadowOffset: { height: -8, width: 0 },
     shadowRadius: 28,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 22,
   },
 })

@@ -3232,8 +3232,10 @@ export type GetFabricControllerInvitationsRequestsResponse = GetFabricController
 
 export type PostFabricControllerInvitationsRequestsByRequestIdApproveData = {
     body: {
-        nodeId: string;
-        scopes: Array<'view' | 'control' | 'approve'>;
+        grants: Array<{
+            nodeId: string;
+            scopes: Array<'view' | 'control' | 'approve'>;
+        }>;
     };
     path: {
         requestId: string;
@@ -3264,6 +3266,22 @@ export type DeleteFabricControllerInvitationsRequestsByRequestIdData = {
 };
 
 export type DeleteFabricControllerInvitationsRequestsByRequestIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
+export type DeleteFabricControllersByControllerIdData = {
+    body?: never;
+    path: {
+        controllerId: string;
+    };
+    query?: never;
+    url: '/fabric/controllers/{controllerId}';
+};
+
+export type DeleteFabricControllersByControllerIdResponses = {
     /**
      * Response for status 204
      */
@@ -3359,6 +3377,7 @@ export type GetNodesByNodeIdGrantsResponses = {
         grantId: string;
         fabricId: string;
         controllerId: string;
+        controllerDisplayName?: string;
         nodeId: string;
         scope: 'view' | 'control' | 'approve' | 'admin';
         revokedAt?: string;
@@ -21289,6 +21308,29 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             hasCredits: boolean | null;
             rateLimitReachedType: string | null;
             planType: string | null;
+            estimatedCostUsd?: number | null;
+            queuedTurnCount?: number | null;
+            resultMessageId?: string | null;
+            correlatedUserMessageId?: string | null;
+            modelCosts?: Array<{
+                modelId: string;
+                canonicalModelId: string | null;
+                provider: string | null;
+                costUsd: number;
+                costBasis: 'list' | 'managed' | 'unknown';
+            }>;
+            lastModelSwitch?: {
+                fromModelId: string;
+                toModelId: string;
+                requestedModelId: string | null;
+                source: string;
+                contextTokens: number;
+                promptCacheWarm: boolean;
+                cacheTtl: '5m' | '1h';
+                estimatedCacheWriteUsd: number;
+                pricing: 'configured' | 'catalog' | 'default';
+                updatedAt: number;
+            } | null;
             updatedAt: number;
         } | {
             kind: 'config';
@@ -23169,6 +23211,31 @@ export type PutChatSessionsBySessionIdRuntimeModeResponses = {
 };
 
 export type PutChatSessionsBySessionIdRuntimeModeResponse = PutChatSessionsBySessionIdRuntimeModeResponses[keyof PutChatSessionsBySessionIdRuntimeModeResponses];
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsData = {
+    body: {
+        model?: string | null;
+        effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
+        summary?: 'auto' | 'concise' | 'detailed' | 'none' | null;
+        serviceTier?: string | null;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-turn-settings';
+};
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        status: 'applied' | 'targetUnavailable';
+    };
+};
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsResponse = PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses[keyof PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses];
 
 export type PostChatSessionsBySessionIdToolApprovalByRequestIdData = {
     body: {

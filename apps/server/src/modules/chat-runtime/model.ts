@@ -315,6 +315,23 @@ export const ChatRuntimeModel = {
     modeId: t.String({ minLength: 1 }),
   }),
 
+  runtimeTurnSettingsBody: t.Object({
+    model: t.Optional(t.Union([t.String({ minLength: 1 }), t.Null()])),
+    effort: t.Optional(t.Union([thinkingEffortSchema, t.Null()])),
+    summary: t.Optional(t.Union([
+      t.Literal('auto'),
+      t.Literal('concise'),
+      t.Literal('detailed'),
+      t.Literal('none'),
+      t.Null(),
+    ])),
+    serviceTier: t.Optional(t.Union([t.String({ minLength: 1 }), t.Null()])),
+  }, { minProperties: 1, additionalProperties: false }),
+
+  runtimeTurnSettingsResponse: t.Object({
+    status: t.Union([t.Literal('applied'), t.Literal('targetUnavailable')]),
+  }),
+
   toolApprovalBody: t.Object({
     approved: t.Boolean(),
     scope: t.Optional(t.Union([t.Literal('once'), t.Literal('always')])),

@@ -50,6 +50,8 @@ import type {
   TerminateBackgroundTerminalInput,
   TokenUsage,
   UpdateRuntimeSettingsInput,
+  UpdateRuntimeTurnSettingsInput,
+  UpdateRuntimeTurnSettingsResult,
 } from '../../chat-runtime/runtime-provider-types'
 import {
   ProviderErrors,
@@ -99,6 +101,7 @@ import type { ThreadReadResponse } from './app-server-protocol/v2/ThreadReadResp
 import type { ThreadSourceKind } from './app-server-protocol/v2/ThreadSourceKind'
 import type { ThreadTurnsListResponse } from './app-server-protocol/v2/ThreadTurnsListResponse'
 import type { Turn } from './app-server-protocol/v2/Turn'
+import type { TurnSettingsUpdateResponse } from './app-server-protocol/v2/TurnSettingsUpdateResponse'
 import type { UserInput } from './app-server-protocol/v2/UserInput'
 import {
   bindCodexCradleMcpInvocation,
@@ -1679,6 +1682,36 @@ export class CodexProvider implements ChatRuntime {
           }
         : {}),
     })
+    if (entry.turnId) {
+      await entry.client.request('turn/settings/update', {
+        threadId: entry.threadId,
+        turnId: entry.turnId,
+        serviceTier,
+      })
+    }
+  }
+
+  async updateRuntimeTurnSettings(
+    input: UpdateRuntimeTurnSettingsInput,
+  ): Promise<UpdateRuntimeTurnSettingsResult> {
+    const entry = this.activeTurns.read(input.runtimeSession.chatSessionId)
+    if (!entry?.turnId) {
+      return { status: 'targetUnavailable' }
+    }
+    const response = await entry.client.request('turn/settings/update', {
+      threadId: entry.threadId,
+      turnId: entry.turnId,
+      ...input.settings,
+    }) as TurnSettingsUpdateResponse
+    if (response.status === 'applied') {
+      if (input.settings.model !== undefined && input.settings.model !== null) {
+        entry.modelId = input.settings.model
+      }
+      if (input.settings.effort !== undefined && input.settings.effort !== null) {
+        entry.reasoningEffort = input.settings.effort
+      }
+    }
+    return { status: response.status }
   }
 
   async cancelTurn(input: CancelTurnInput): Promise<void> {

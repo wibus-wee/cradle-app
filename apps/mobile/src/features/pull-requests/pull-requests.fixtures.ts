@@ -1,4 +1,6 @@
-import type { PullRequestListViewProps } from './PullRequestListView'
+import type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
+import type { PullRequestListViewProps } from './pull-request-list-view-contract'
+import type { PullRequestReviewComposerProps } from './pull-request-review-composer-contract'
 
 const pullRequest = {
   owner: 'cradle',
@@ -23,7 +25,58 @@ export const pullRequestListFixture: PullRequestListViewProps = {
   authored: [pullRequest],
   reviewing: [],
   login: 'demo',
-  onNavigate: () => {},
   onOpen: () => {},
+  onOpenExternal: () => {},
   onOpenUsage: () => {},
+  onSearchQueryChange: () => {},
+  onShare: () => {},
+  searchQuery: '',
+}
+
+export const pullRequestDetailFixture: PullRequestDetailViewProps = {
+  detail: {
+    pullRequest: {
+      ...pullRequest,
+      allowedMergeMethods: ['squash'],
+      assignees: [],
+      author: {
+        avatarUrl: 'https://github.com/demo.png',
+        login: 'demo',
+        url: 'https://github.com/demo',
+      },
+      baseRef: 'main',
+      body: 'Adds a focused controller workflow for Mobile.',
+      canMerge: false,
+      changedFiles: 7,
+      checks: [{
+        conclusion: null,
+        id: 'check-1',
+        name: 'Mobile',
+        status: 'in_progress',
+        url: null,
+      }],
+      closedAtIso: null,
+      comments: 1,
+      commits: 2,
+      createdAtIso: '2025-06-15T15:06:40.000Z',
+      labels: [{ color: '3b82f6', name: 'mobile' }],
+      mergeable: true,
+      mergeableState: 'clean',
+      mergeBlockers: ['Pull request is still a draft.'],
+      mergedAtIso: null,
+      reviewComments: 0,
+      reviewers: [],
+      updatedAtIso: '2025-06-15T15:08:20.000Z',
+    },
+    files: [],
+    timeline: [],
+  },
+  onComment: async () => {},
+  onOpenExternal: async () => {},
+  onReview: async () => {},
+}
+
+export const pullRequestReviewComposerFixture: PullRequestReviewComposerProps = {
+  onComment: async () => {},
+  onReview: async () => {},
 }

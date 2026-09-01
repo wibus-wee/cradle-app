@@ -45,7 +45,7 @@ const AuditInputSchema = z.object({
 })
 
 const AGENT_ID_RE = /^[a-z][a-z0-9-]*$/
-const AuthSecretRefsSchema = z.record(z.string().min(1), z.string().trim().min(1))
+const RemoteHeaderSecretRefsSchema = z.record(z.string().min(1), z.string().trim().min(1))
 const REMOTE_RESERVED_HEADERS = new Set([
   'acp-connection-id',
   'acp-session-id',
@@ -244,7 +244,6 @@ function markFailed(agentId: string): void {
     overrideArgs: existing?.overrideArgs ?? null,
     overrideEnv: existing?.overrideEnv ?? null,
     authMethodId: existing?.authMethodId ?? null,
-    authSecretRefsJson: existing?.authSecretRefsJson ?? '{}',
     status: 'failed',
     updatedAt: now,
   }).onConflictDoUpdate({
@@ -308,7 +307,7 @@ export function getInstalled(agentId: string): AcpAgentView | null {
 function projectAgent(record: AcpAgent): AcpAgentView {
   return {
     ...record,
-    remoteHeadersSecretRefs: AuthSecretRefsSchema.parse(JSON.parse(record.remoteHeadersSecretRefsJson)),
+    remoteHeadersSecretRefs: RemoteHeaderSecretRefsSchema.parse(JSON.parse(record.remoteHeadersSecretRefsJson)),
   }
 }
 
@@ -345,7 +344,6 @@ export function setAgentAuthSelection(
 
   db().update(acpAgents).set({
     authMethodId: method.id,
-    authSecretRefsJson: '{}',
     updatedAt: currentUnixSeconds(),
   }).where(eq(acpAgents.id, agentId)).run()
   recordAudit({
@@ -364,7 +362,6 @@ export function clearAgentAuthSelection(agentId: string): void {
   requireInstalledAgent(agentId)
   db().update(acpAgents).set({
     authMethodId: null,
-    authSecretRefsJson: '{}',
     updatedAt: currentUnixSeconds(),
   }).where(eq(acpAgents.id, agentId)).run()
   recordAudit({
@@ -619,7 +616,7 @@ function validateRemoteHeaderSecretRefs(
   input: Record<string, string>,
   availableSecretIds: ReadonlySet<string>,
 ): Record<string, string> {
-  const refs = AuthSecretRefsSchema.parse(input)
+  const refs = RemoteHeaderSecretRefsSchema.parse(input)
   for (const [rawName, secretRef] of Object.entries(refs)) {
     const name = rawName.trim()
     if (!name || name !== rawName || !/^[!#$%&'*+.^`|~\w-]+$/.test(name)) {

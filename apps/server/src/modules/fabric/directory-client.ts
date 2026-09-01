@@ -1,6 +1,7 @@
+import type { FabricCreateRequest, FabricJoinRequest, FabricNodeGrant, MembershipCertificate, NodeSummary } from '@cradle/fabric-protocol'
+
 import { AppError } from '../../errors/app-error'
 import { createChildLogger } from '../../logging/logger'
-import type { FabricJoinRequest, FabricNodeGrant, MembershipCertificate, NodeSummary } from './protocol'
 
 const logger = createChildLogger({ module: 'fabric-directory-client' })
 
@@ -42,7 +43,7 @@ export class FabricDirectoryClient {
     return await response.json() as T
   }
 
-  createFabric(request: Record<string, unknown>) {
+  createFabric(request: FabricCreateRequest) {
     return this.request<{ fabric: { fabricId: string, ownerPubkey: string } }>('/v1/fabrics', jsonRequest('POST', request))
   }
 
@@ -77,6 +78,10 @@ export class FabricDirectoryClient {
 
   registerController(fabricId: string, certificate: MembershipCertificate, grants: Array<{ grantId: string, fabricId: string, controllerId: string, nodeId: string, scope: string }>, headers: Headers) {
     return this.request<void>(`/v1/fabrics/${encodeURIComponent(fabricId)}/controllers`, jsonRequest('POST', { certificate, grants }, headers))
+  }
+
+  revokeController(fabricId: string, controllerId: string, headers: Headers) {
+    return this.request<void>(`/v1/fabrics/${encodeURIComponent(fabricId)}/controllers/${encodeURIComponent(controllerId)}`, { method: 'DELETE', headers })
   }
 
   listNodes(fabricId: string, headers: Headers) {
