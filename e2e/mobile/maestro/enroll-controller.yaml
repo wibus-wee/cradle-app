@@ -8,8 +8,7 @@ appId: app.cradle.mobile
     timeout: 30000
 - tapOn:
     id: fabric-code-input
-- setClipboard: ${FABRIC_CODE}
-- pasteText
+- inputText: ${FABRIC_CODE}
 - tapOn: Join your Fabric
 - tapOn:
     id: fabric-request-access
