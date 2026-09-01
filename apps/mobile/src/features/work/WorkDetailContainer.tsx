@@ -18,7 +18,7 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
   const queryClient = useQueryClient()
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['work', connection?.url, workId],
+    queryKey: ['work', connection?.resourceId, workId],
     queryFn: ({ signal }) =>
       cradleRequest<GetWorksByIdResponse>(connection!, `/works/${encodeURIComponent(workId)}`, {
         signal,
@@ -33,7 +33,7 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
         `/works/${encodeURIComponent(workId)}/prepare`,
         { method: 'POST', body: handoff },
       ),
-    onSuccess: data => queryClient.setQueryData(['work', connection?.url, workId], data),
+    onSuccess: data => queryClient.setQueryData(['work', connection?.resourceId, workId], data),
   })
 
   const submit = useMutation({
@@ -43,7 +43,7 @@ export function WorkDetailContainer({ workId }: { workId: string }) {
         `/works/${encodeURIComponent(workId)}/submit`,
         { method: 'POST', body: handoff },
       ),
-    onSuccess: data => queryClient.setQueryData(['work', connection?.url, workId], data),
+    onSuccess: data => queryClient.setQueryData(['work', connection?.resourceId, workId], data),
   })
 
   if (query.isPending) {

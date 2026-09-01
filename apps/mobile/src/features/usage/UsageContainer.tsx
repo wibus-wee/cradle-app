@@ -44,7 +44,7 @@ export function UsageContainer() {
   }, [])
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive && Boolean(range),
-    queryKey: ['usage', connection?.url, range],
+    queryKey: ['usage', connection?.resourceId, range],
     queryFn: async ({ signal }) => {
       const [daily, summary, stats] = await Promise.all([
         cradleRequest<GetUsageDailyResponse>(connection!, `/usage/daily?days=${days}`, { signal }),

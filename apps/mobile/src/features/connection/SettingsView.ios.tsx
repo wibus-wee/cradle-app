@@ -14,15 +14,19 @@ import {
 import {
   accessibilityLabel,
   buttonStyle,
+  contentShape,
   font,
   foregroundStyle,
   frame,
   listStyle,
+  shapes,
   symbolEffect,
 } from '@expo/ui/swift-ui/modifiers'
 import * as Haptics from 'expo-haptics'
 import { useEffect, useRef, useState } from 'react'
 import { AccessibilityInfo, Alert } from 'react-native'
+
+import type { FabricTransportStatus } from '@/lib/transport/fabric-http-transport'
 
 import type { SettingsViewProps } from './settings-view-contract'
 
@@ -32,7 +36,7 @@ const secondaryForeground = foregroundStyle({ type: 'hierarchical', style: 'seco
 const fullWidthRow = frame({ maxWidth: Infinity, alignment: 'leading' })
 const plainButton = buttonStyle('plain')
 
-const statusCopy = {
+const directStatusCopy = {
   checking: {
     description: 'Contacting server',
     label: 'Checking',
@@ -47,21 +51,16 @@ const statusCopy = {
   },
 } as const
 
-export function SettingsView({
-  appVersion,
-  connectionStatus,
-  hasServerToken,
-  onCheckConnection,
-  onCopyServer,
-  onDisconnect,
-  onEditServer,
-  onEditToken,
-  onOpenUsage,
-  onShareServer,
-  serverLatencyMs = null,
-  serverUptimeSeconds = null,
-  serverUrl,
-}: SettingsViewProps) {
+const fabricStatusCopy: Record<FabricTransportStatus, string> = {
+  'access-denied': 'Refreshing Access',
+  'connected': 'Connected',
+  'connecting': 'Connecting',
+  'idle': 'On Demand',
+  'offline': 'Offline',
+  'suspended': 'Suspended',
+}
+
+export function SettingsView(props: SettingsViewProps) {
   const [copiedServer, setCopiedServer] = useState(false)
   const copySymbolTrigger = useNativeState(0)
   const copySequenceRef = useRef(0)
@@ -74,14 +73,28 @@ export function SettingsView({
   }, [])
 
   const disconnect = () => {
-    Alert.alert('Disconnect from server?', 'The saved address and token will be removed from this device.', [
-      { style: 'cancel', text: 'Cancel' },
-      { onPress: onDisconnect, style: 'destructive', text: 'Disconnect' },
-    ])
+    const isFabric = props.kind === 'fabric'
+    Alert.alert(
+      isFabric ? 'Leave Fabric?' : 'Disconnect from server?',
+      isFabric
+        ? 'This Controller identity and its private keys will be removed from this device.'
+        : 'The saved address and token will be removed from this device.',
+      [
+        { style: 'cancel', text: 'Cancel' },
+        {
+          onPress: props.onDisconnect,
+          style: 'destructive',
+          text: isFabric ? 'Leave' : 'Disconnect',
+        },
+      ],
+    )
   }
   const copyServer = async () => {
+    if (props.kind !== 'direct') {
+      return
+    }
     try {
-      await onCopyServer()
+      await props.onCopyServer()
       setCopiedServer(true)
       copySequenceRef.current += 1
       copySymbolTrigger.set(copySequenceRef.current)
@@ -97,32 +110,41 @@ export function SettingsView({
     }
   }
   const shareServer = async () => {
+    if (props.kind !== 'direct') {
+      return
+    }
     try {
-      await onShareServer()
+      await props.onShareServer()
     }
     catch {
       Alert.alert('Could not share server address')
     }
   }
-  const status = statusCopy[connectionStatus]
-  const uptimeLabel = serverUptimeSeconds === null
-    ? null
-    : serverUptimeSeconds < 60
-      ? `${serverUptimeSeconds}s`
-      : serverUptimeSeconds < 3_600
-        ? `${Math.floor(serverUptimeSeconds / 60)}m`
-        : serverUptimeSeconds < 86_400
-          ? `${Math.floor(serverUptimeSeconds / 3_600)}h ${Math.floor(serverUptimeSeconds % 3_600 / 60)}m`
-          : `${Math.floor(serverUptimeSeconds / 86_400)}d ${Math.floor(serverUptimeSeconds % 86_400 / 3_600)}h`
-  const statusDescription = connectionStatus === 'connected' && serverLatencyMs !== null
-    ? `${status.description} · ${serverLatencyMs} ms`
-    : status.description
+
+  let directStatusDescription: string | null = null
+  let directUptimeLabel: string | null = null
+  if (props.kind === 'direct') {
+    const { latencyMs = null, status, uptimeSeconds = null } = props.connection
+    const statusCopy = directStatusCopy[status]
+    directUptimeLabel = uptimeSeconds === null
+      ? null
+      : uptimeSeconds < 60
+        ? `${uptimeSeconds}s`
+        : uptimeSeconds < 3_600
+          ? `${Math.floor(uptimeSeconds / 60)}m`
+          : uptimeSeconds < 86_400
+            ? `${Math.floor(uptimeSeconds / 3_600)}h ${Math.floor(uptimeSeconds % 3_600 / 60)}m`
+            : `${Math.floor(uptimeSeconds / 86_400)}d ${Math.floor(uptimeSeconds % 86_400 / 3_600)}h`
+    directStatusDescription = status === 'connected' && latencyMs !== null
+      ? `${statusCopy.description} · ${latencyMs} ms`
+      : statusCopy.description
+  }
 
   return (
     <Host style={{ flex: 1 }} useViewportSizeMeasurement>
       <Form modifiers={[listStyle('insetGrouped')]}>
         <Section title="Activity">
-          <Button modifiers={[plainButton]} onPress={onOpenUsage}>
+          <Button modifiers={[plainButton]} onPress={props.onOpenUsage}>
             <HStack modifiers={[fullWidthRow]} spacing={12}>
               <Image color="secondary" size={18} systemName="chart.bar.xaxis" />
               <Text>Usage</Text>
@@ -132,109 +154,176 @@ export function SettingsView({
           </Button>
         </Section>
 
-        <Section
-          footer={(
-            <Text>
-              {connectionStatus === 'checking'
-                ? 'Checking the server now.'
-                : uptimeLabel
-                  ? `Server uptime ${uptimeLabel}. Tap the status row to check again.`
-                  : 'Tap the status row to check again.'}
-            </Text>
-          )}
-          title="Connection"
-        >
-          <Button modifiers={[plainButton]} onPress={onCheckConnection}>
-            <HStack modifiers={[fullWidthRow]} spacing={12}>
-              <Image
-                color={connectionStatus === 'connected'
-                  ? 'green'
-                  : connectionStatus === 'unavailable'
-                    ? 'red'
-                    : 'secondary'}
-                size={18}
-                systemName="wifi"
-              />
-              <VStack alignment="leading" spacing={2}>
-                <Text>Connection Status</Text>
-                <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
-                  {statusDescription}
-                </Text>
-              </VStack>
-              <Spacer />
-              {connectionStatus === 'checking'
-                ? <ProgressView />
-                : (
-                    <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
-                      {status.label}
+        {props.kind === 'direct'
+          ? (
+              <Section
+                footer={(
+                  <Text>
+                    {props.connection.status === 'checking'
+                      ? 'Checking the server now.'
+                      : directUptimeLabel
+                        ? `Server uptime ${directUptimeLabel}. Tap the status row to check again.`
+                        : 'Tap the status row to check again.'}
+                  </Text>
+                )}
+                title="Connection"
+              >
+                <Button modifiers={[plainButton]} onPress={props.onCheckConnection}>
+                  <HStack modifiers={[fullWidthRow]} spacing={12}>
+                    <Image
+                      color={props.connection.status === 'connected'
+                        ? 'green'
+                        : props.connection.status === 'unavailable'
+                          ? 'red'
+                          : 'secondary'}
+                      size={18}
+                      systemName="wifi"
+                    />
+                    <VStack alignment="leading" spacing={2}>
+                      <Text>Connection Status</Text>
+                      <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                        {directStatusDescription}
+                      </Text>
+                    </VStack>
+                    <Spacer />
+                    {props.connection.status === 'checking'
+                      ? <ProgressView />
+                      : (
+                          <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                            {directStatusCopy[props.connection.status].label}
+                          </Text>
+                        )}
+                  </HStack>
+                </Button>
+
+                <Button modifiers={[plainButton]} onPress={props.onEditServer}>
+                  <HStack modifiers={[fullWidthRow]} spacing={12}>
+                    <Image color="secondary" size={18} systemName="link" />
+                    <VStack alignment="leading" spacing={2}>
+                      <Text>Server</Text>
+                      <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                        {props.connection.serverUrl}
+                      </Text>
+                    </VStack>
+                    <Spacer />
+                    <Image color="secondary" size={14} systemName="chevron.forward" />
+                  </HStack>
+                </Button>
+
+                <Button
+                  modifiers={[
+                    plainButton,
+                    accessibilityLabel(copiedServer ? 'Server address copied' : 'Copy server address'),
+                  ]}
+                  onPress={() => void copyServer()}
+                >
+                  <HStack modifiers={[fullWidthRow]} spacing={12}>
+                    <Image
+                      color={copiedServer ? 'green' : 'secondary'}
+                      modifiers={[
+                        symbolEffect(
+                          { direction: 'up', effect: 'bounce' },
+                          { value: copySymbolTrigger },
+                        ),
+                      ]}
+                      size={18}
+                      systemName={copiedServer ? 'checkmark.circle.fill' : 'doc.on.doc'}
+                    />
+                    <Text modifiers={copiedServer ? [foregroundStyle('green')] : []}>
+                      {copiedServer ? 'Server Address Copied' : 'Copy Server Address'}
                     </Text>
-                  )}
-            </HStack>
-          </Button>
+                    <Spacer />
+                  </HStack>
+                </Button>
+                <Button
+                  label="Share Server Address"
+                  modifiers={[plainButton]}
+                  onPress={() => void shareServer()}
+                  systemImage="square.and.arrow.up"
+                />
 
-          <Button modifiers={[plainButton]} onPress={onEditServer}>
-            <HStack modifiers={[fullWidthRow]} spacing={12}>
-              <Image color="secondary" size={18} systemName="link" />
-              <VStack alignment="leading" spacing={2}>
-                <Text>Server</Text>
-                <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
-                  {serverUrl}
-                </Text>
-              </VStack>
-              <Spacer />
-              <Image color="secondary" size={14} systemName="chevron.forward" />
-            </HStack>
-          </Button>
+                <Button modifiers={[plainButton]} onPress={props.onEditToken}>
+                  <HStack modifiers={[fullWidthRow]} spacing={12}>
+                    <Image color="secondary" size={18} systemName="lock" />
+                    <Text>Authentication</Text>
+                    <Spacer />
+                    <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                      {props.connection.hasServerToken ? 'Configured' : 'Not Configured'}
+                    </Text>
+                    <Image color="secondary" size={14} systemName="chevron.forward" />
+                  </HStack>
+                </Button>
+              </Section>
+            )
+          : (
+              <>
+                <Section title="Connection">
+                  <HStack modifiers={[fullWidthRow]} spacing={12}>
+                    <Image color="secondary" size={18} systemName="network" />
+                    <VStack alignment="leading" spacing={2}>
+                      <Text>Fabric Relay</Text>
+                      <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                        {props.connection.relayUrl}
+                      </Text>
+                    </VStack>
+                    <Spacer />
+                    <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                      {fabricStatusCopy[props.connection.status]}
+                    </Text>
+                  </HStack>
+                  <HStack modifiers={[fullWidthRow]} spacing={12}>
+                    <Image color="secondary" size={18} systemName="lock.shield" />
+                    <VStack alignment="leading" spacing={2}>
+                      <Text>End-to-End Encrypted</Text>
+                      <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                        {props.connection.fabricId}
+                      </Text>
+                    </VStack>
+                  </HStack>
+                </Section>
 
-          <Button
-            modifiers={[
-              plainButton,
-              accessibilityLabel(copiedServer ? 'Server address copied' : 'Copy server address'),
-            ]}
-            onPress={() => void copyServer()}
-          >
-            <HStack modifiers={[fullWidthRow]} spacing={12}>
-              <Image
-                color={copiedServer ? 'green' : 'secondary'}
-                modifiers={[
-                  symbolEffect(
-                    { direction: 'up', effect: 'bounce' },
-                    { value: copySymbolTrigger },
-                  ),
-                ]}
-                size={18}
-                systemName={copiedServer ? 'checkmark.circle.fill' : 'doc.on.doc'}
-              />
-              <Text modifiers={copiedServer ? [foregroundStyle('green')] : []}>
-                {copiedServer ? 'Server Address Copied' : 'Copy Server Address'}
-              </Text>
-              <Spacer />
-            </HStack>
-          </Button>
-          <Button label="Share Server Address" modifiers={[plainButton]} onPress={() => void shareServer()} systemImage="square.and.arrow.up" />
-
-          <Button modifiers={[plainButton]} onPress={onEditToken}>
-            <HStack modifiers={[fullWidthRow]} spacing={12}>
-              <Image color="secondary" size={18} systemName="lock" />
-              <Text>Authentication</Text>
-              <Spacer />
-              <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
-                {hasServerToken ? 'Configured' : 'Not Configured'}
-              </Text>
-              <Image color="secondary" size={14} systemName="chevron.forward" />
-            </HStack>
-          </Button>
-        </Section>
+                <Section title="Computers">
+                  {props.connection.nodes.map(node => (
+                    <Button
+                      key={node.nodeId}
+                      modifiers={[plainButton]}
+                      onPress={() => props.onSelectNode(node.nodeId)}
+                      testID={`settings-node-${node.nodeId}`}
+                    >
+                      <HStack modifiers={[fullWidthRow, contentShape(shapes.rectangle())]} spacing={12}>
+                        <Image color="secondary" size={18} systemName="desktopcomputer" />
+                        <VStack alignment="leading" spacing={2}>
+                          <Text>{node.displayName}</Text>
+                          <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                            {node.status === 'online' ? 'Online' : 'Offline'}
+                          </Text>
+                        </VStack>
+                        <Spacer />
+                        {node.nodeId === props.connection.selectedNodeId && (
+                          <Image color="blue" size={16} systemName="checkmark" />
+                        )}
+                      </HStack>
+                    </Button>
+                  ))}
+                  <Button
+                    label="Refresh Computers"
+                    modifiers={[plainButton]}
+                    onPress={props.onRefreshNodes}
+                    systemImage="arrow.clockwise"
+                  />
+                </Section>
+              </>
+            )}
 
         <Section
           footer={(
             <Text modifiers={[font({ textStyle: 'caption2' }), secondaryForeground]}>
-              {`Cradle Mobile ${appVersion}`}
+              {`Cradle Mobile ${props.appVersion}`}
             </Text>
           )}
         >
           <Button
-            label="Disconnect"
+            label={props.kind === 'fabric' ? 'Leave Fabric' : 'Disconnect'}
             modifiers={[plainButton]}
             onPress={disconnect}
             role="destructive"

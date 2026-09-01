@@ -25,7 +25,7 @@ export default function NativeTabsLayout() {
   const theme = useTheme()
   const sessionsQuery = useQuery({
     enabled: Boolean(connection) && isAppActive,
-    queryKey: ['mobile-tab-sessions', connection?.url],
+    queryKey: ['mobile-tab-sessions', connection?.resourceId],
     queryFn: ({ signal }) =>
       cradleRequest<GetSessionsResponse>(
         connection!,
@@ -36,9 +36,9 @@ export default function NativeTabsLayout() {
   })
   useSessionSummaryEvents(connection, isAppActive, () => {
     void sessionsQuery.refetch()
-    void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
-    void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.url] })
-    void queryClient.invalidateQueries({ queryKey: ['works', connection?.url] })
+    void queryClient.invalidateQueries({ queryKey: ['projects', connection?.resourceId] })
+    void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.resourceId] })
+    void queryClient.invalidateQueries({ queryKey: ['works', connection?.resourceId] })
   })
   const unreadCount
     = sessionsQuery.data?.items.filter(session => session.unread && session.workspaceId !== null).length

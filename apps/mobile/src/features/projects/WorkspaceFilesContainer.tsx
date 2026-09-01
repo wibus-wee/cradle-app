@@ -12,8 +12,8 @@ import type {
 } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
-import type { ServerConnection } from '@/lib/api'
-import { cradleRequest } from '@/lib/api'
+import type { CradleConnection } from '@/lib/api'
+import { cradleRequest, cradleRequestBytes } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 import { openQuickLook } from '@/native/quick-look'
@@ -28,7 +28,7 @@ function parentPath(path: string): string {
 }
 
 async function downloadWorkspaceFile(
-  connection: ServerConnection,
+  connection: CradleConnection,
   workspaceId: string,
   path: string,
   name: string,
@@ -36,12 +36,13 @@ async function downloadWorkspaceFile(
   const cacheDirectory = new Directory(Paths.cache, 'cradle-files')
   cacheDirectory.create({ idempotent: true, intermediates: true })
   const destination = new File(cacheDirectory, name)
-  const rawUrl
-    = `${connection.url}/workspaces/${encodeURIComponent(workspaceId)}/files/raw?path=${encodeURIComponent(path)}`
-  return File.downloadFileAsync(rawUrl, destination, {
-    headers: connection.token ? { authorization: `Bearer ${connection.token}` } : undefined,
-    idempotent: true,
-  })
+  const bytes = await cradleRequestBytes(
+    connection,
+    `/workspaces/${encodeURIComponent(workspaceId)}/files/raw?path=${encodeURIComponent(path)}`,
+  )
+  destination.create({ intermediates: true, overwrite: true })
+  destination.write(bytes)
+  return destination
 }
 
 interface WorkspaceFilesContainerProps {
@@ -67,7 +68,7 @@ export function WorkspaceFilesContainer({
   const showsInlineSearch = Platform.OS === 'web'
   const directoryQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive && !selectedFile && !normalizedSearch,
-    queryKey: ['workspace-files', connection?.url, workspaceId, currentPath],
+    queryKey: ['workspace-files', connection?.resourceId, workspaceId, currentPath],
     queryFn: ({ signal }) =>
       cradleRequest<GetWorkspacesByWorkspaceIdFilesChildrenResponse>(
         connection!,
@@ -77,7 +78,7 @@ export function WorkspaceFilesContainer({
   })
   const searchQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive && !selectedFile && Boolean(normalizedSearch),
-    queryKey: ['workspace-file-search', connection?.url, workspaceId, normalizedSearch],
+    queryKey: ['workspace-file-search', connection?.resourceId, workspaceId, normalizedSearch],
     queryFn: ({ signal }) =>
       cradleRequest<GetWorkspacesByWorkspaceIdFilesSearchResponse>(
         connection!,
@@ -87,7 +88,7 @@ export function WorkspaceFilesContainer({
   })
   const infoQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive && Boolean(selectedFile),
-    queryKey: ['workspace-file-info', connection?.url, workspaceId, selectedFile],
+    queryKey: ['workspace-file-info', connection?.resourceId, workspaceId, selectedFile],
     queryFn: ({ signal }) =>
       cradleRequest<GetWorkspacesByWorkspaceIdFilesInfoResponse>(
         connection!,
@@ -102,7 +103,7 @@ export function WorkspaceFilesContainer({
   )
   const contentQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive && Boolean(selectedFile) && canPreview,
-    queryKey: ['workspace-file-content', connection?.url, workspaceId, selectedFile],
+    queryKey: ['workspace-file-content', connection?.resourceId, workspaceId, selectedFile],
     queryFn: ({ signal }) =>
       cradleRequest<GetWorkspacesByWorkspaceIdFilesContentResponse>(
         connection!,

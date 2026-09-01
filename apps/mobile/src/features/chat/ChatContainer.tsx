@@ -18,7 +18,7 @@ import type {
 } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
 import { useConnection } from '@/features/connection/connection-context'
-import { cradleRequest, cradleStreamResponse } from '@/lib/api'
+import { cradleRequest, cradleRequestBytes, cradleStreamResponse } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 import { openQuickLook } from '@/native/quick-look'
@@ -75,12 +75,12 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   const composerDraft = useComposerDraft(connection, sessionId, isRouteActive)
   routeActiveRef.current = isRouteActive
   const historyQueryKey = useMemo(
-    () => ['chat-message-previews', connection?.url, sessionId] as const,
-    [connection?.url, sessionId],
+    () => ['chat-message-previews', connection?.resourceId, sessionId] as const,
+    [connection?.resourceId, sessionId],
   )
   const sessionQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['chat-session', connection?.url, sessionId],
+    queryKey: ['chat-session', connection?.resourceId, sessionId],
     queryFn: ({ signal }) =>
       cradleRequest<GetSessionsByIdResponse>(
         connection!,
@@ -106,7 +106,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   })
   const runtimeStatusQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['chat-runtime-status', connection?.url, sessionId],
+    queryKey: ['chat-runtime-status', connection?.resourceId, sessionId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatSessionsBySessionIdRuntimeStatusResponse>(
         connection!,
@@ -117,7 +117,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   })
   const capabilitiesQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['chat-capabilities', connection?.url, sessionId],
+    queryKey: ['chat-capabilities', connection?.resourceId, sessionId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatSessionsBySessionIdCapabilitiesResponse>(
         connection!,
@@ -127,7 +127,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
   })
   const runtimeSettingsQuery = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['chat-runtime-settings', connection?.url, sessionId],
+    queryKey: ['chat-runtime-settings', connection?.resourceId, sessionId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatSessionsBySessionIdRuntimeSettingsResponse>(
         connection!,
@@ -146,10 +146,10 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       Alert.alert('Could not update conversation', 'Your pin setting was not changed.')
     },
     onSuccess: (session) => {
-      queryClient.setQueryData(['chat-session', connection?.url, sessionId], session)
-      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.url] })
-      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.url] })
-      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
+      queryClient.setQueryData(['chat-session', connection?.resourceId, sessionId], session)
+      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.resourceId] })
     },
   })
   const markRead = useMutation({
@@ -160,15 +160,15 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         { method: 'POST' },
       ),
     onSuccess: (session) => {
-      queryClient.setQueryData(['chat-session', connection?.url, sessionId], session)
-      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.url] })
-      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.url] })
-      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
+      queryClient.setQueryData(['chat-session', connection?.resourceId, sessionId], session)
+      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.resourceId] })
     },
   })
   const detailQuery = useQuery({
     enabled: Boolean(connection && detailMessageId) && isRouteActive,
-    queryKey: ['chat-message-detail', connection?.url, sessionId, detailMessageId],
+    queryKey: ['chat-message-detail', connection?.resourceId, sessionId, detailMessageId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatSessionsBySessionIdMessagesByMessageIdResponse>(
         connection!,
@@ -186,7 +186,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       return
     }
     let active = true
-    void readChatHistoryCache(connection.url, sessionId).then((data) => {
+    void readChatHistoryCache(connection.resourceId, sessionId).then((data) => {
       if (active) {
         setCachedHistory(data)
       }
@@ -201,7 +201,7 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
       | InfiniteData<GetChatSessionsBySessionIdMessagePreviewsResponse, string | null>
       | undefined
     if (connection && queryHistoryData) {
-      void writeChatHistoryCache(connection.url, sessionId, queryHistoryData)
+      void writeChatHistoryCache(connection.resourceId, sessionId, queryHistoryData)
     }
   }, [connection, historyQuery.data, sessionId])
 
@@ -422,16 +422,12 @@ export function ChatContainer({ sessionId }: { sessionId: string }) {
         destination.write(exportResponse.markdown)
       }
       else {
-        await File.downloadFileAsync(
-          `${connection.url}/sessions/${encodeURIComponent(sessionId)}/export/zip`,
-          destination,
-          {
-            headers: connection.token
-              ? { authorization: `Bearer ${connection.token}` }
-              : undefined,
-            idempotent: true,
-          },
+        const zip = await cradleRequestBytes(
+          connection,
+          `/sessions/${encodeURIComponent(sessionId)}/export/zip`,
         )
+        destination.create({ intermediates: true, overwrite: true })
+        destination.write(zip)
       }
 
       await Share.share({

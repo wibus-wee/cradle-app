@@ -27,10 +27,10 @@ export function PullRequestDetailContainer({
   const { connection } = useConnection()
   const isRouteActive = useRouteIsActive()
   const path = `/pull-requests/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(number)}`
-  const reviewDraft = usePullRequestReviewDraft(connection?.url, owner, repo, number)
+  const reviewDraft = usePullRequestReviewDraft(connection?.resourceId, owner, repo, number)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['pull-request', connection?.url, owner, repo, number],
+    queryKey: ['pull-request', connection?.resourceId, owner, repo, number],
     queryFn: ({ signal }) =>
       cradleRequest<GetPullRequestsByOwnerByRepoByNumberDetailResponse>(
         connection!,

@@ -1,4 +1,5 @@
 import type {
+  GetFabricControllerInvitationsRequestsResponse,
   GetFabricNodeInvitationsPendingResponse,
   GetFabricNodeInvitationsRequestsResponse,
   GetFabricResponse,
@@ -21,6 +22,17 @@ export type PendingFabricEnrollment = NonNullable<GetFabricNodeInvitationsPendin
 /** One owner-visible Node enrollment request waiting for a decision. */
 export type PendingFabricNodeRequest = GetFabricNodeInvitationsRequestsResponse[number]
 
+/** One owner-visible Controller enrollment request waiting for scoped grants. */
+export type PendingFabricControllerRequest = GetFabricControllerInvitationsRequestsResponse[number]
+
+export const CONTROLLER_GRANT_SCOPES = ['view', 'control', 'approve'] as const
+export type ControllerGrantScope = (typeof CONTROLLER_GRANT_SCOPES)[number]
+
+export interface ControllerGrantSelection {
+  nodeId: string
+  scopes: ControllerGrantScope[]
+}
+
 /**
  * Fabric grant scopes, ordered from least to most privileged.
  * `control` does not imply `approve` (Plan 076, Decision Log).
@@ -36,6 +48,7 @@ export type NodeGrantScope = (typeof NODE_GRANT_SCOPES)[number]
  */
 export interface NodeGrant {
   grantId: string
+  controllerId: string
   controllerLabel: string
   scope: NodeGrantScope
   revokedAt: string | null

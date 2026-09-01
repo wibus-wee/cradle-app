@@ -11,9 +11,9 @@ export default function TabsLayout() {
   const isAppActive = useContext(AppActiveContext)
   const queryClient = useQueryClient()
   useSessionSummaryEvents(connection, isAppActive, () => {
-    void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
-    void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.url] })
-    void queryClient.invalidateQueries({ queryKey: ['works', connection?.url] })
+    void queryClient.invalidateQueries({ queryKey: ['projects', connection?.resourceId] })
+    void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.resourceId] })
+    void queryClient.invalidateQueries({ queryKey: ['works', connection?.resourceId] })
   })
 
   return <Stack screenOptions={{ freezeOnBlur: true, headerShown: false }} />

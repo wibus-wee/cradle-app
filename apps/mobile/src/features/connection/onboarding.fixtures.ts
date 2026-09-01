@@ -1,11 +1,19 @@
 import type { OnboardingViewProps } from './onboarding-view-contract'
 
 export const onboardingFixture: OnboardingViewProps = {
-  defaultUrl: 'http://192.168.1.20:21423',
-  onConnect: () => {},
+  membership: null,
+  pendingEnrollment: null,
+  enrollmentStatus: 'idle',
+  membershipStatus: 'none',
+  onJoinFabric: () => {},
+  onCancelEnrollment: () => {},
+  onRefreshDirectory: () => {},
+  onSelectNode: () => {},
+  onUseDirectServer: () => {},
+  onLeaveFabric: () => {},
 }
 
 export const onboardingErrorFixture: OnboardingViewProps = {
   ...onboardingFixture,
-  error: 'The server could not be reached from this device.',
+  error: 'The Fabric Relay could not be reached from this device.',
 }

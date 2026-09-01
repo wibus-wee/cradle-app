@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 
-import type { ServerConnection } from './api'
+import type { CradleConnection } from './api'
 import { cradleStreamResponse } from './api'
+import type { CradleResponse } from './transport/types'
 
 interface GlobalSessionEvent {
   scope?: string
@@ -29,7 +30,7 @@ function readSseLine(buffer: string, streamEnded: boolean): { line: string, rest
 
 /** Consume valid, increasing global session events from a fetch-backed SSE response. */
 export async function consumeSessionSummaryEventStream(
-  response: Response,
+  response: CradleResponse,
   afterSequenceId: number,
   onEvent: (event: GlobalSessionEvent & { scope: 'sessions', sequenceId: number }) => void,
 ): Promise<void> {
@@ -87,7 +88,7 @@ export async function consumeSessionSummaryEventStream(
 
 /** Refresh bounded mobile summary queries from the durable global event tail. */
 export function useSessionSummaryEvents(
-  connection: ServerConnection | null,
+  connection: CradleConnection | null,
   enabled: boolean,
   onChanged: () => void,
 ): void {

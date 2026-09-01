@@ -106,6 +106,7 @@ export function ProjectsView({
               ? 'Unavailable on server'
               : workspace.gitIdentity.branch ?? 'No Git branch'}
             onPress={() => onOpenProject(workspace.id)}
+            testID={`workspace-${workspace.id}`}
             title={workspace.name}
           />
         )}

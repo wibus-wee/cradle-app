@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Platform } from 'react-native'
 
-import type { ServerConnection } from '@/lib/api'
+import type { DirectServerConfig } from '@/lib/api'
 
 const SERVER_URL_KEY = 'cradle.mobile.server-url'
 const SERVER_TOKEN_KEY = 'cradle.mobile.server-token'
@@ -34,7 +34,7 @@ async function writeToken(token: string | null): Promise<void> {
   }
 }
 
-export async function loadStoredConnection(): Promise<ServerConnection | null> {
+export async function loadStoredConnection(): Promise<DirectServerConfig | null> {
   const [url, token] = await Promise.all([
     AsyncStorage.getItem(SERVER_URL_KEY),
     readToken(),
@@ -42,7 +42,7 @@ export async function loadStoredConnection(): Promise<ServerConnection | null> {
   return url ? { url, token } : null
 }
 
-export async function persistConnection(connection: ServerConnection): Promise<void> {
+export async function persistConnection(connection: DirectServerConfig): Promise<void> {
   await Promise.all([
     AsyncStorage.setItem(SERVER_URL_KEY, connection.url),
     writeToken(connection.token),

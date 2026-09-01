@@ -33,7 +33,7 @@ export function PullRequestListContainer({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['pull-requests', connection?.url],
+    queryKey: ['pull-requests', connection?.resourceId],
     queryFn: async ({ signal }) => {
       const viewer = await cradleRequest<GetPullRequestsViewerResponse>(
         connection!,

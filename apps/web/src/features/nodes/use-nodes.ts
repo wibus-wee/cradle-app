@@ -2,11 +2,15 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useCallback, useMemo } from 'react'
 
 import {
+  deleteFabricControllerInvitationsRequestsByRequestIdMutation,
+  deleteFabricControllersByControllerIdMutation,
   deleteFabricMutation,
   deleteFabricNodeInvitationsPendingMutation,
   deleteFabricNodeInvitationsRequestsByRequestIdMutation,
   deleteNodesByNodeIdGrantsByGrantIdMutation,
   deleteNodesByNodeIdMutation,
+  getFabricControllerInvitationsRequestsOptions,
+  getFabricControllerInvitationsRequestsQueryKey,
   getFabricManagedRelayOptions,
   getFabricNodeInvitationsPendingOptions,
   getFabricNodeInvitationsPendingQueryKey,
@@ -19,6 +23,7 @@ import {
   getNodesOptions,
   getNodesQueryKey,
   patchFabricRelayUrlMutation,
+  postFabricControllerInvitationsRequestsByRequestIdApproveMutation,
   postFabricMutation,
   postFabricNodeInvitationsApproveMutation,
   postFabricNodeInvitationsCompleteMutation,
@@ -61,6 +66,16 @@ export function usePendingFabricEnrollment() {
 export function usePendingFabricNodeRequests(enabled: boolean) {
   return useQuery({
     ...getFabricNodeInvitationsRequestsOptions(),
+    enabled,
+    retry: false,
+    refetchInterval: enabled ? 3_000 : false,
+  })
+}
+
+/** Owner inbox for pending Controller enrollment requests. */
+export function usePendingFabricControllerRequests(enabled: boolean) {
+  return useQuery({
+    ...getFabricControllerInvitationsRequestsOptions(),
     enabled,
     retry: false,
     refetchInterval: enabled ? 3_000 : false,
@@ -179,6 +194,27 @@ export function useRejectPendingFabricNodeRequest() {
   })
 }
 
+/** Owner-side: approve explicit per-Node grants for a pending Controller. */
+export function useApprovePendingFabricControllerRequest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...postFabricControllerInvitationsRequestsByRequestIdApproveMutation(),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: getFabricControllerInvitationsRequestsQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: getNodesQueryKey() }),
+    ]),
+  })
+}
+
+/** Owner-side: reject one pending Controller enrollment request. */
+export function useRejectPendingFabricControllerRequest() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...deleteFabricControllerInvitationsRequestsByRequestIdMutation(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: getFabricControllerInvitationsRequestsQueryKey() }),
+  })
+}
+
 /** Open (or reuse) an encrypted link to a Node. Idempotent. */
 export function useConnectNode() {
   return useMutation({ ...postNodesByNodeIdConnectMutation() })
@@ -208,6 +244,21 @@ export function useRevokeNodeGrant() {
         queryClient.invalidateQueries({
           queryKey: getNodesByNodeIdGrantsQueryKey({ path: { nodeId: variables.path.nodeId } }),
         }),
+      ]),
+  })
+}
+
+/** Permanently revoke a Controller principal and every grant it holds. */
+export function useRevokeFabricController(nodeIds: string[]) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    ...deleteFabricControllersByControllerIdMutation(),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: getNodesQueryKey() }),
+        ...nodeIds.map(nodeId => queryClient.invalidateQueries({
+          queryKey: getNodesByNodeIdGrantsQueryKey({ path: { nodeId } }),
+        })),
       ]),
   })
 }

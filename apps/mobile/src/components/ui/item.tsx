@@ -14,6 +14,7 @@ interface ItemProps {
   actions?: ReactNode
   footer?: ReactNode
   onPress?: () => void
+  testID?: string
   size?: 'default' | 'sm' | 'xs'
   variant?: 'default' | 'muted' | 'outline'
 }
@@ -26,6 +27,7 @@ export function Item({
   actions,
   footer,
   onPress,
+  testID,
   size = 'default',
 }: ItemProps) {
   const theme = useTheme()
@@ -36,6 +38,7 @@ export function Item({
       accessibilityRole={onPress ? 'button' : undefined}
       disabled={!onPress}
       onPress={onPress}
+      testID={testID}
       style={[
         styles.item,
         {

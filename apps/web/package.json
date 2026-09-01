@@ -28,6 +28,7 @@
     "@cradle/artifact": "workspace:*",
     "@cradle/chat-runtime-contracts": "workspace:*",
     "@cradle/download-center": "workspace:*",
+    "@cradle/fabric-protocol": "workspace:*",
     "@cradle/plugin-sdk": "workspace:*",
     "@cradle/streamdown": "workspace:*",
     "@cradleapp/ai-sdk": "workspace:*",

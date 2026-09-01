@@ -6,7 +6,7 @@ import type {
   GetChatComposerDraftsBySurfaceIdResponse,
   PutChatComposerDraftsBySurfaceIdResponse,
 } from '@/api-gen'
-import type { ServerConnection } from '@/lib/api'
+import type { CradleConnection } from '@/lib/api'
 import { cradleRequest } from '@/lib/api'
 
 import type { ChatComposerDraft } from './ChatComposer'
@@ -18,7 +18,7 @@ function hasContent(draft: ChatComposerDraft): boolean {
 }
 
 export function useComposerDraft(
-  connection: ServerConnection | null,
+  connection: CradleConnection | null,
   sessionId: string,
   enabled: boolean,
 ) {
@@ -29,7 +29,7 @@ export function useComposerDraft(
   const [clearSignal, setClearSignal] = useState(0)
   const query = useQuery({
     enabled: Boolean(connection) && enabled,
-    queryKey: ['composer-draft', connection?.url, surfaceId],
+    queryKey: ['composer-draft', connection?.resourceId, surfaceId],
     queryFn: ({ signal }) =>
       cradleRequest<GetChatComposerDraftsBySurfaceIdResponse>(
         connection!,

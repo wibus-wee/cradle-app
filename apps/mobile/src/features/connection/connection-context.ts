@@ -1,11 +1,11 @@
 import { createContext, useContext } from 'react'
 
-import type { ServerConnection } from '@/lib/api'
+import type { CradleConnection, DirectServerConfig } from '@/lib/api'
 
 export interface ConnectionContextValue {
-  connection: ServerConnection | null
+  connection: CradleConnection | null
   isRestoring: boolean
-  saveConnection: (connection: ServerConnection) => Promise<void>
+  saveConnection: (connection: DirectServerConfig) => Promise<void>
   disconnect: () => Promise<void>
 }
 

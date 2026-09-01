@@ -1,6 +1,19 @@
+import type { FabricEnrollmentStatus, FabricMembershipStatus } from '@/features/fabric/fabric-context'
+import type {
+  MobileFabricMembership,
+  PendingFabricControllerEnrollment,
+} from '@/features/fabric/fabric-types'
+
 export interface OnboardingViewProps {
-  defaultUrl?: string
+  membership: MobileFabricMembership | null
+  pendingEnrollment: PendingFabricControllerEnrollment | null
+  enrollmentStatus: FabricEnrollmentStatus
+  membershipStatus: FabricMembershipStatus
   error?: string | null
-  isConnecting?: boolean
-  onConnect: (url: string, token: string) => void
+  onJoinFabric: (code: string) => void
+  onCancelEnrollment: () => void
+  onRefreshDirectory: () => void
+  onSelectNode: (nodeId: string) => void
+  onUseDirectServer: () => void
+  onLeaveFabric: () => void
 }

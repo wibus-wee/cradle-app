@@ -81,7 +81,7 @@ Chronological index of independently shipped product improvements.
 42. [Search workspace files from the native header](./2026-08-31-42-mobile-native-file-search.md)
 43. [Browse workspace files in a native iOS list](./2026-08-31-43-mobile-native-file-browser.md)
 44. [Review pull requests with native iOS controls](./2026-08-31-44-mobile-native-pull-request-review.md)
-45. [Connect to Cradle with native iOS onboarding](./2026-08-31-45-mobile-native-onboarding.md)
+45. [Join Fabric from Mobile onboarding](./2026-08-31-45-mobile-native-onboarding.md)
 46. [Understand Usage with a native iOS dashboard](./2026-08-31-46-mobile-native-usage-dashboard.md)
 47. [Triage pull requests in a native iOS inbox](./2026-08-31-47-mobile-native-pull-request-inbox.md)
 48. [Browse workspaces in a native iOS list](./2026-08-31-48-mobile-native-workspace-list.md)

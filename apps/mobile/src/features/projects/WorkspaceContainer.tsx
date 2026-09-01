@@ -27,7 +27,7 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['workspace', connection?.url, workspaceId],
+    queryKey: ['workspace', connection?.resourceId, workspaceId],
     queryFn: async ({ signal }) => {
       const [workspaces, sessions, works, files] = await Promise.all([
         cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
@@ -83,10 +83,10 @@ export function WorkspaceContainer({ workspaceId }: { workspaceId: string }) {
       Alert.alert('Could not update conversation', 'Your pin setting was not changed.')
     },
     onSuccess: async (session, { sessionId }) => {
-      queryClient.setQueryData(['chat-session', connection?.url, sessionId], session)
+      queryClient.setQueryData(['chat-session', connection?.resourceId, sessionId], session)
       await query.refetch()
-      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.url] })
-      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.url] })
+      void queryClient.invalidateQueries({ queryKey: ['mobile-tab-sessions', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['projects', connection?.resourceId] })
     },
   })
 

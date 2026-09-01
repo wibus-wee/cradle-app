@@ -29,7 +29,7 @@ export function ProjectsContainer({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['projects', connection?.url],
+    queryKey: ['projects', connection?.resourceId],
     queryFn: async ({ signal }) => {
       const [workspaces, sessions] = await Promise.all([
         cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
