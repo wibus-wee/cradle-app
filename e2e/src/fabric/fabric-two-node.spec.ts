@@ -311,7 +311,11 @@ async function runMaestroFlow(flowName: string, variables: Record<string, string
   try {
     status = await new Promise<number | null>((resolve, reject) => {
       child.once('error', reject)
-      child.once('close', resolve)
+      // Maestro can leave a descendant holding one of the stdio pipes open
+      // after the flow has finished. Waiting for `close` would then keep the
+      // Playwright test alive until its 15-minute timeout. The child exit
+      // status is all we need to determine whether the flow passed.
+      child.once('exit', resolve)
     })
   }
   catch (cause) {
