@@ -300,22 +300,60 @@ async function runMaestroFlow(flowName: string, variables: Record<string, string
       MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true',
       MAESTRO_CLI_NO_ANALYTICS: '1',
     },
+    detached: process.platform !== 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
+  let flowCompleted = false
+  let completionTimer: ReturnType<typeof setTimeout> | undefined
+  let finishAfterReported: (() => void) | undefined
+  const terminateMaestro = () => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      return
+    }
+    if (child.pid && process.platform !== 'win32') {
+      try {
+        process.kill(-child.pid, 'SIGTERM')
+        return
+      }
+      catch {
+        // Fall back to terminating the Maestro process itself.
+      }
+    }
+    child.kill('SIGTERM')
+  }
+  const handleOutput = (chunk: string) => {
+    output += chunk
+    if (!flowCompleted && /Flow Passed in \d+(?:\.\d+)?s/u.test(output)) {
+      flowCompleted = true
+      // Maestro occasionally leaves its runner alive after reporting the
+      // final result. Give it a moment to flush artifacts, then clean up the
+      // process group so the Playwright test can continue.
+      completionTimer = setTimeout(() => {
+        terminateMaestro()
+        finishAfterReported?.()
+      }, 1_000)
+    }
+  }
   child.stdout.setEncoding('utf8')
   child.stderr.setEncoding('utf8')
-  child.stdout.on('data', chunk => output += chunk)
-  child.stderr.on('data', chunk => output += chunk)
+  child.stdout.on('data', handleOutput)
+  child.stderr.on('data', handleOutput)
   let status: number | null
   try {
     status = await new Promise<number | null>((resolve, reject) => {
+      finishAfterReported = () => resolve(0)
       child.once('error', reject)
+      child.once('exit', resolve)
+      child.once('exit', () => {
+        if (completionTimer) {
+          clearTimeout(completionTimer)
+        }
+      })
       // Maestro can leave a descendant holding one of the stdio pipes open
       // after the flow has finished. Waiting for `close` would then keep the
       // Playwright test alive until its 15-minute timeout. The child exit
       // status is all we need to determine whether the flow passed.
-      child.once('exit', resolve)
     })
   }
   catch (cause) {
