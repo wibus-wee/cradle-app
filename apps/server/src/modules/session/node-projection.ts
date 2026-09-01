@@ -458,8 +458,6 @@ export async function reconcileNodeSessionsForWorkspace(
   let discovered = 0
   let updated = 0
   for (const remote of remoteSessionsById.values()) {
-    const latestUserMessageAt = remote.latestUserMessageAt ?? null
-    const latestAssistantMessageAt = remote.latestAssistantMessageAt ?? null
     const existing = db()
       .select({
         localSessionId: nodeSessionLinks.localSessionId,
