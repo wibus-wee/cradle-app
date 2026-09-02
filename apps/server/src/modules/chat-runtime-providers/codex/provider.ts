@@ -1259,13 +1259,14 @@ export class CodexProvider implements ChatRuntime {
         return
       }
       const titleGeneration = this.resolveCodexThreadTitleGenerationConfig({
+        currentProviderTargetId: profile.providerTargetId,
         currentAuth: context.auth,
         currentCodexConfig: context.codexConfig,
         workspacePath: context.workspacePath,
         fallbackModel: threadContext.threadStart.modelId ?? context.effectiveModel ?? context.config.model ?? null,
       })
       this.generateCodexThreadTitleInBackground({
-        providerTargetId: profile.providerTargetId,
+        providerTargetId: titleGeneration.providerTargetId,
         apiKey: readCodexApiKeyAuth(titleGeneration.auth),
         chatgptAuth: readCodexChatgptAuth(titleGeneration.auth),
         codexConfig: titleGeneration.codexConfig,
@@ -1797,11 +1798,13 @@ export class CodexProvider implements ChatRuntime {
   }
 
   private resolveCodexThreadTitleGenerationConfig(input: {
+    currentProviderTargetId: string
     currentAuth: CodexAppServerAuthResolution
     currentCodexConfig: NonNullable<ThreadForkParams['config']>
     workspacePath: string
     fallbackModel: string | null
   }): {
+      providerTargetId: string
       auth: CodexAppServerAuthResolution
       codexConfig: NonNullable<ThreadForkParams['config']>
       model: string | null
@@ -1816,6 +1819,7 @@ export class CodexProvider implements ChatRuntime {
 
     if (!explicitProviderTargetId) {
       return {
+        providerTargetId: input.currentProviderTargetId,
         auth: input.currentAuth,
         codexConfig: input.currentCodexConfig,
         model: null,
@@ -1827,6 +1831,7 @@ export class CodexProvider implements ChatRuntime {
     const profile = this.deps.resolveProviderTargetProfile?.(explicitProviderTargetId)
     if (!profile) {
       return {
+        providerTargetId: input.currentProviderTargetId,
         auth: input.currentAuth,
         codexConfig: input.currentCodexConfig,
         model: explicitModelId,
@@ -1839,6 +1844,7 @@ export class CodexProvider implements ChatRuntime {
     const model = explicitModelId ?? config.model ?? null
     const auth = this.resolveAppServerAuth(profile, config)
     return {
+      providerTargetId: profile.providerTargetId,
       auth,
       codexConfig: buildCodexConfig(config, input.workspacePath, this.resolveSkillPaths, model, auth),
       model,
@@ -1968,6 +1974,7 @@ export class CodexProvider implements ChatRuntime {
       writeCodexThreadSnapshot(input.runtimeSession, threadStart)
 
       const titleGeneration = this.resolveCodexThreadTitleGenerationConfig({
+        currentProviderTargetId: profile.providerTargetId,
         currentAuth: auth,
         currentCodexConfig: codexConfig,
         workspacePath,
@@ -1977,7 +1984,7 @@ export class CodexProvider implements ChatRuntime {
       const titleCodexConfig = buildCodexTitleConfig(titleGeneration.codexConfig, titleModel)
       const titleChatgptAuth = readCodexChatgptAuth(titleGeneration.auth)
       titleHostLease = await this.acquireCodexAppServerHost({
-        providerTargetId: profile.providerTargetId,
+        providerTargetId: titleGeneration.providerTargetId,
         chatgptAuth: titleChatgptAuth,
         options: {
           apiKey: readCodexApiKeyAuth(titleGeneration.auth) ?? undefined,
