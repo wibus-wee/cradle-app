@@ -58,16 +58,18 @@ describe('codex reset watch footer projection', () => {
     expect(result.presentation.footer?.id).toBe(
       'codex-reset-watch:https://x.com/example/status/1',
     )
+    expect(result.presentation.footer?.description).toMatch(/^80% chance by /)
   })
 
-  it('projects a stable dismissible notice while a watch is active', () => {
+  it('projects a stable persistent notice while a watch is active', () => {
     expect(projectCodexResetFooterPresentation(
       status(),
       Date.parse('2026-08-29T06:00:00.000Z'),
+      'Asia/Singapore',
     )).toEqual({
       id: 'codex-reset-watch:https://x.com/example/status/1',
       title: 'Codex reset watch',
-      description: '80% chance by end of Saturday',
+      description: '80% chance by Aug 30, 3:00 PM GMT+8',
       actionLabel: 'View source',
       actionUrl: 'https://x.com/example/status/1',
       expiresAt: Date.parse('2026-08-30T07:00:00.000Z'),
@@ -82,7 +84,7 @@ describe('codex reset watch footer projection', () => {
     expect(result).toBeNull()
   })
 
-  it('stops presenting when the forecast expires', () => {
+  it('stops presenting when the watch expires', () => {
     const result = projectCodexResetFooterPresentation(
       status(),
       Date.parse('2026-08-30T07:00:00.000Z'),

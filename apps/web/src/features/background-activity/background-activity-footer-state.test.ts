@@ -50,15 +50,15 @@ describe('background activity footer item selection', () => {
       activity({ ownerNamespace: 'low', key: 'new', priority: 'low', updatedAt: 30, noticeId: 'low' }),
       activity({ ownerNamespace: 'high', key: 'old', priority: 'high', updatedAt: 10, noticeId: 'high' }),
       activity({ ownerNamespace: 'normal', key: 'newest', priority: 'normal', updatedAt: 40, noticeId: 'normal' }),
-    ], new Set(), 20)
+    ], 20)
 
     expect(items.map(item => item.title)).toEqual(['high', 'normal', 'low'])
   })
 
-  it('hides acknowledged and expired notice identities', () => {
-    const acknowledged = activity({
+  it('keeps active notices and hides only expired notices', () => {
+    const active = activity({
       ownerNamespace: 'owner',
-      key: 'acknowledged',
+      key: 'active',
       priority: 'normal',
       updatedAt: 20,
       noticeId: 'notice-1',
@@ -71,10 +71,8 @@ describe('background activity footer item selection', () => {
       noticeId: 'notice-2',
       expiresAt: 99,
     })
-    const dismissed = new Set([
-      backgroundActivityFooterIdentity(acknowledged, 'notice-1'),
+    expect(selectBackgroundActivityFooterItems([active, expired], 100).map(item => item.identity)).toEqual([
+      backgroundActivityFooterIdentity(active, 'notice-1'),
     ])
-
-    expect(selectBackgroundActivityFooterItems([acknowledged, expired], dismissed, 100)).toEqual([])
   })
 })

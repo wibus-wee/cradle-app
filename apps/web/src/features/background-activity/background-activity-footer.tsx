@@ -6,7 +6,6 @@ import { getBackgroundActivitiesOptions } from '~/api-gen/@tanstack/react-query.
 import { nativeIpc } from '~/lib/electron'
 
 import { selectBackgroundActivityFooterItems } from './background-activity-footer-state'
-import { useBackgroundActivityFooterDismissalStore } from './background-activity-footer-store'
 import { BackgroundActivityFooterView } from './background-activity-footer-view'
 
 const LOCAL_REFRESH_INTERVAL_MS = 60_000
@@ -26,18 +25,9 @@ export function BackgroundActivityFooter() {
     ...getBackgroundActivitiesOptions(),
     refetchInterval: LOCAL_REFRESH_INTERVAL_MS,
   })
-  const dismissedIdentities = useBackgroundActivityFooterDismissalStore(
-    state => state.dismissedIdentities,
-  )
-  const dismiss = useBackgroundActivityFooterDismissalStore(state => state.dismiss)
-  const dismissMany = useBackgroundActivityFooterDismissalStore(state => state.dismissMany)
-  const dismissedSet = useMemo(
-    () => new Set(dismissedIdentities),
-    [dismissedIdentities],
-  )
   const items = useMemo(
-    () => selectBackgroundActivityFooterItems(activities.data, dismissedSet),
-    [activities.data, dismissedSet],
+    () => selectBackgroundActivityFooterItems(activities.data),
+    [activities.data],
   )
 
   if (activities.isError || items.length === 0) {
@@ -50,12 +40,7 @@ export function BackgroundActivityFooter() {
       labels={{
         title: t('backgroundActivityFooter.title'),
         open: t('backgroundActivityFooter.open'),
-        dismiss: t('backgroundActivityFooter.dismiss'),
-        dismissAll: t('backgroundActivityFooter.dismissAll'),
-        noticeCount: count => t('backgroundActivityFooter.noticeCount', { count }),
       }}
-      onDismiss={dismiss}
-      onDismissAll={dismissMany}
       onOpenAction={openExternalUrl}
     />
   )

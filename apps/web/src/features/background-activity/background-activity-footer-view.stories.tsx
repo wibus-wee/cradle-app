@@ -9,12 +9,7 @@ const meta = {
     labels: {
       title: 'Background activity',
       open: 'Open background activity',
-      dismiss: 'OK',
-      dismissAll: 'Dismiss all',
-      noticeCount: count => `${count} notices`,
     },
-    onDismiss: () => {},
-    onDismissAll: () => {},
     onOpenAction: () => {},
   },
   decorators: [Story => <div className="flex h-9 w-[52rem] items-center bg-sidebar"><Story /></div>],
@@ -28,6 +23,7 @@ export const MultipleNotices: Story = {
     items: [
       {
         identity: 'codex-reset-watch\u0000refresh-status\u0000watch-1',
+        ownerNamespace: 'codex-reset-watch',
         priority: 'normal',
         title: 'Codex reset watch',
         description: '80% chance by end of Saturday',
@@ -38,6 +34,7 @@ export const MultipleNotices: Story = {
       },
       {
         identity: 'release\u0000check\u0000release-1',
+        ownerNamespace: 'release',
         priority: 'low',
         title: 'A runtime update is ready',
         description: 'Restart when your active sessions finish.',
