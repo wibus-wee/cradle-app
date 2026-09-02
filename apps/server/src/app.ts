@@ -503,6 +503,8 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     })
     await hydrateCustomMcpServers()
     reconcileExternalIssueSourceRegistrations()
+    const { resumePersistedSessionQueues } = await import('./modules/chat-runtime/runtime')
+    resumePersistedSessionQueues()
   })
 
   const runtimeResources = new RuntimeResourceRegistry()

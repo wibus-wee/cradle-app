@@ -15,6 +15,7 @@ import type { RuntimeSession } from '../runtime-provider-types'
 import { getDefaultRuntimeSettings } from '../runtime-settings'
 import { cancelSessionQueueItem, enqueueSessionQueueItem } from './api'
 import { scheduleSessionQueueDrain } from './drain'
+import { listPendingQueueSessionIds } from './session-queue'
 
 afterEach(() => {
   liveRuntimeSessionRegistry.clear()
@@ -63,6 +64,32 @@ function seedOpencodeSession(sessionId: string): void {
 }
 
 describe('enqueueSessionQueueItem', () => {
+  it('lists each session with pending durable work once for startup recovery', async () => {
+    await withTempDataDir(async () => {
+      seedOpencodeSession('session-queue-recovery-b')
+      seedOpencodeSession('session-queue-recovery-a')
+      const deps = { scheduleSessionQueueDrain: () => {} }
+
+      await enqueueSessionQueueItem({
+        sessionId: 'session-queue-recovery-b',
+        text: 'first pending continuation',
+      }, deps)
+      await enqueueSessionQueueItem({
+        sessionId: 'session-queue-recovery-a',
+        text: 'other session continuation',
+      }, deps)
+      await enqueueSessionQueueItem({
+        sessionId: 'session-queue-recovery-b',
+        text: 'second pending continuation',
+      }, deps)
+
+      expect(listPendingQueueSessionIds()).toEqual([
+        'session-queue-recovery-a',
+        'session-queue-recovery-b',
+      ])
+    })
+  })
+
   it('does not persist runtime-owned provider target ids into FK-backed queue rows', async () => {
     await withTempDataDir(async () => {
       const sessionId = 'session-opencode-runtime-owned-queue'
