@@ -13,6 +13,7 @@ import {
   collectKimiOrphanSessionStorage,
   registerStorageMaintenance,
 } from './maintenance'
+import { getStorageOverview } from './service'
 
 const previousDataDir = process.env.CRADLE_DATA_DIR
 let dataDir: string
@@ -81,13 +82,42 @@ describe('storage maintenance', () => {
     expect(existsSync(join(home, 'server', 'events', '__global__.jsonl'))).toBe(true)
   })
 
-  it('registers an observable and manually runnable Background Activity', () => {
+  it('registers storage measurement and cleanup as observable manual activities', () => {
     registerStorageMaintenance()
-    expect(BackgroundActivity.list()).toContainEqual(expect.objectContaining({
-      ownerNamespace: 'storage',
-      key: 'collect-kimi-orphan-sessions',
-      manuallyRunnable: true,
-    }))
+    expect(BackgroundActivity.list()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        ownerNamespace: 'storage',
+        key: 'measure-usage',
+        manuallyRunnable: true,
+      }),
+      expect.objectContaining({
+        ownerNamespace: 'storage',
+        key: 'collect-kimi-orphan-sessions',
+        manuallyRunnable: true,
+      }),
+    ]))
+  })
+
+  it('measures storage through Background Activity and publishes the snapshot', async () => {
+    writeFileSync(join(dataDir, 'stored.txt'), 'stored data')
+    registerStorageMaintenance()
+
+    await expect(BackgroundActivity.requestRun('storage', 'measure-usage')).resolves.toMatchObject({
+      status: 'succeeded',
+      progress: {
+        completed: true,
+        sessionsMeasured: 0,
+        totalBytes: expect.any(Number),
+      },
+    })
+
+    const snapshot = getStorageOverview()
+    expect(snapshot).toMatchObject({
+      dataDirectory: dataDir,
+      totalBytes: expect.any(Number),
+    })
+    writeFileSync(join(dataDir, 'added-after-measurement.txt'), 'not in the snapshot')
+    expect(getStorageOverview()).toBe(snapshot)
   })
 })
 

@@ -1,8 +1,11 @@
 # Storage
 
 Owns the user-facing inventory and cleanup orchestration for Cradle-owned disk
-usage. It measures top-level data-directory categories and estimates reclaimable
-bytes per session without adding a second storage index or database schema.
+usage. A Background Activity measures top-level data-directory categories and
+estimates reclaimable bytes per session without adding a second storage index
+or database schema. It runs at server startup, every 15 minutes, and on manual
+refresh; the HTTP endpoint reads the latest in-memory snapshot instead of
+starting a scan when the user opens Storage.
 
 Storage follows owner boundaries. Session deletion delegates to Session,
 transcript deletion delegates to Chat Runtime, attachment collection delegates
@@ -18,7 +21,7 @@ preserves every bound session even when its native state is damaged.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/storage/overview` | Measure categories and session estimates. |
+| `GET` | `/storage/overview` | Read the latest category and per-session measurement. |
 | `POST` | `/storage/sessions/purge-transcripts` | Keep session metadata, delete local transcript data, and start a fresh provider session next turn. |
 | `POST` | `/storage/sessions/delete` | Delete complete sessions through owner lifecycle hooks. |
 

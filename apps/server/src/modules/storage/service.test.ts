@@ -18,7 +18,7 @@ import { currentUnixSeconds } from '../../helpers/time'
 import { db, shutdownInfra } from '../../infra'
 import { putBlob } from '../blob-store/service'
 import { resolveKimiProviderHome } from '../chat-runtime-providers/kimi/runtime-home'
-import { getStorageOverview } from './service'
+import { measureStorageOverview } from './service'
 
 const previousDataDir = process.env.CRADLE_DATA_DIR
 const previousDbPath = process.env.CRADLE_DB_PATH
@@ -57,7 +57,7 @@ describe('storage service', () => {
     seedBlobRef({ sessionId: firstSessionId, messageId: sharedMessageId, blobId: sharedBlob.id, partPath: '/parts/0' })
     seedBlobRef({ sessionId: secondSessionId, messageId: secondMessageId, blobId: sharedBlob.id, partPath: '/parts/0' })
 
-    const overview = getStorageOverview()
+    const overview = measureStorageOverview()
     const first = overview.sessions.find(session => session.id === firstSessionId)
     const second = overview.sessions.find(session => session.id === secondSessionId)
 
@@ -89,7 +89,7 @@ describe('storage service', () => {
     writeFileSync(join(home, 'sessions', 'workspace', 'session_native', 'state.json'), 'native state')
     writeFileSync(join(home, 'server', 'events', 'session_native.jsonl'), 'native event')
 
-    const stored = getStorageOverview().sessions.find(session => session.id === sessionId)
+    const stored = measureStorageOverview().sessions.find(session => session.id === sessionId)
 
     expect(stored?.runtimeBytes).toBe(Buffer.byteLength('native state') + Buffer.byteLength('native event'))
     expect(stored?.reclaimableBytes).toBe((stored?.localBytes ?? 0) + (stored?.runtimeBytes ?? 0))

@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
+  getBackgroundActivitiesOptions,
   getStorageOverviewOptions,
   getStorageOverviewQueryKey,
+  postBackgroundActivitiesByOwnerNamespaceByKeyRunMutation,
   postStorageSessionsDeleteMutation,
   postStorageSessionsPurgeTranscriptsMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
@@ -14,13 +16,72 @@ import type { StorageManagerAction, StorageManagerCopy, StorageQuickAction } fro
 import { StorageManagerView } from './storage-manager-view'
 import { formatBytes } from './storage-visuals'
 
+const STORAGE_MEASUREMENT_ACTIVITY = {
+  ownerNamespace: 'storage',
+  key: 'measure-usage',
+} as const
+
 export function StorageManager() {
   const { t } = useTranslation('settings')
   const queryClient = useQueryClient()
+  const [refreshStartedAt, setRefreshStartedAt] = useState<number | null>(null)
   const overview = useQuery(getStorageOverviewOptions())
+  const activities = useQuery({
+    ...getBackgroundActivitiesOptions(),
+    enabled: refreshStartedAt !== null,
+    refetchInterval: refreshStartedAt === null ? false : 500,
+  })
+  const refresh = useMutation({
+    ...postBackgroundActivitiesByOwnerNamespaceByKeyRunMutation(),
+    onSuccess: (activity) => {
+      if (activity.startedAt !== null) {
+        setRefreshStartedAt(activity.startedAt)
+      }
+    },
+    onError: (error) => {
+      toastManager.add({
+        type: 'error',
+        title: t('storage.toast.failed'),
+        description: error instanceof Error ? error.message : String(error),
+      })
+    },
+  })
   const purge = useMutation(postStorageSessionsPurgeTranscriptsMutation())
   const remove = useMutation(postStorageSessionsDeleteMutation())
   const busy = purge.isPending || remove.isPending
+
+  useEffect(() => {
+    if (refreshStartedAt === null) {
+      return
+    }
+    if (activities.isError && !activities.isFetching) {
+      setRefreshStartedAt(null)
+      toastManager.add({
+        type: 'error',
+        title: t('storage.toast.failed'),
+      })
+      return
+    }
+    const activity = activities.data?.find(candidate => (
+      candidate.ownerNamespace === STORAGE_MEASUREMENT_ACTIVITY.ownerNamespace
+      && candidate.key === STORAGE_MEASUREMENT_ACTIVITY.key
+      && candidate.startedAt === refreshStartedAt
+    ))
+    if (!activity || activity.status === 'running') {
+      return
+    }
+
+    setRefreshStartedAt(null)
+    if (activity.status === 'succeeded') {
+      void queryClient.invalidateQueries({ queryKey: getStorageOverviewQueryKey() })
+      return
+    }
+    toastManager.add({
+      type: 'error',
+      title: t('storage.toast.failed'),
+      description: activity.lastError ?? undefined,
+    })
+  }, [activities.data, activities.isError, activities.isFetching, queryClient, refreshStartedAt, t])
 
   const copy = useMemo<StorageManagerCopy>(() => ({
     title: t('storage.page.title'),
@@ -164,10 +225,10 @@ export function StorageManager() {
       overview={overview.data ?? null}
       copy={copy}
       quickActions={quickActions}
-      loading={overview.isFetching}
+      loading={overview.isFetching || refresh.isPending || refreshStartedAt !== null}
       error={overview.isError}
       busy={busy}
-      onRefresh={() => void overview.refetch()}
+      onRefresh={() => refresh.mutate({ path: STORAGE_MEASUREMENT_ACTIVITY })}
       onAction={handleAction}
     />
   )

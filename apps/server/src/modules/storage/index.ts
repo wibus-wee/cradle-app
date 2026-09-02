@@ -8,7 +8,7 @@ export const storage = new Elysia({
   detail: { tags: ['storage'] },
 })
   .get('/overview', () => Storage.getStorageOverview(), {
-    detail: { summary: 'Measure Cradle-owned storage and per-session reclaimable data' },
+    detail: { summary: 'Read the latest Cradle-owned storage measurement' },
     response: { 200: StorageModel.overview },
   })
   .post('/sessions/purge-transcripts', async ({ body }) => {

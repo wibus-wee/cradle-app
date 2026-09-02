@@ -11,8 +11,10 @@ import {
   listKimiStoredSessionIds,
 } from '../chat-runtime-providers/kimi/session-storage'
 import * as Maintenance from '../maintenance/service'
+import { measureStorageOverview } from './service'
 
 const KIMI_ORPHAN_CLEANUP_INTERVAL_MS = 60 * 60 * 1000
+const STORAGE_MEASUREMENT_INTERVAL_MS = 15 * 60 * 1000
 
 export interface KimiOrphanStorageCleanupResult extends BackgroundActivityProgress {
   providerHomesScanned: number
@@ -103,5 +105,21 @@ export function registerStorageMaintenance(): void {
     runOnStart: true,
     manuallyRunnable: true,
     run: context => collectKimiOrphanSessionStorage({ deadline: context.deadline }),
+  })
+  Maintenance.registerTask({
+    ownerNamespace: 'storage',
+    key: 'measure-usage',
+    title: 'Measure storage usage',
+    intervalMs: STORAGE_MEASUREMENT_INTERVAL_MS,
+    runOnStart: true,
+    manuallyRunnable: true,
+    run: () => {
+      const overview = measureStorageOverview()
+      return {
+        measuredAt: overview.measuredAt,
+        totalBytes: overview.totalBytes,
+        sessionsMeasured: overview.sessions.length,
+      }
+    },
   })
 }

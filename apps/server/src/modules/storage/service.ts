@@ -39,9 +39,16 @@ interface SessionAggregate {
   count?: number
 }
 
-export function getStorageOverview(): StorageOverview {
+let overviewSnapshot: StorageOverview | null = null
+
+function resolveDataDirectory(): string {
   const config = getServerConfig()
-  const dataDirectory = resolve(config.dataDir ?? dirname(config.dbPath))
+  return resolve(config.dataDir ?? dirname(config.dbPath))
+}
+
+export function measureStorageOverview(): StorageOverview {
+  const config = getServerConfig()
+  const dataDirectory = resolveDataDirectory()
   const total = measurePath(dataDirectory)
   const database = measureDatabase(config.dbPath)
   const runtime = measurePath(join(dataDirectory, 'runtimes'))
@@ -65,7 +72,7 @@ export function getStorageOverview(): StorageOverview {
     + terminal.fileCount
     + diagnostics.fileCount
 
-  return {
+  const overview: StorageOverview = {
     measuredAt: Math.floor(Date.now() / 1000),
     dataDirectory,
     totalBytes: total.bytes,
@@ -84,6 +91,15 @@ export function getStorageOverview(): StorageOverview {
     ],
     sessions: listSessionStorage(dataDirectory),
   }
+  overviewSnapshot = overview
+  return overview
+}
+
+export function getStorageOverview(): StorageOverview {
+  if (overviewSnapshot?.dataDirectory === resolveDataDirectory()) {
+    return overviewSnapshot
+  }
+  return measureStorageOverview()
 }
 
 export async function purgeTranscripts(sessionIds: string[]) {
@@ -122,7 +138,7 @@ function finishMutation(cleanup: StorageCleanupResult[]) {
   const compaction: StorageCompaction = runRegistry.hasActiveOrPendingRuns()
     ? { status: 'skipped_active_runs' }
     : compactDatabase()
-  return { cleanup, compaction, overview: getStorageOverview() }
+  return { cleanup, compaction, overview: measureStorageOverview() }
 }
 
 function prepareMutation(sessionIds: string[]): string[] {
