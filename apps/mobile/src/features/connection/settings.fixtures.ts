@@ -24,6 +24,7 @@ export const fabricSettingsFixture: SettingsViewProps = {
   appVersion: '0.1.0',
   kind: 'fabric',
   connection: {
+    controllerId: 'controller_01JQ8W7ZJ3C57A2T5JYZ6MA1QK',
     fabricId: 'fabric_01JQ8W7ZJ3C57A2T5JYZ6MA1QK',
     nodes: [
       { displayName: 'Studio Mac', nodeId: 'node_studio', status: 'online' },

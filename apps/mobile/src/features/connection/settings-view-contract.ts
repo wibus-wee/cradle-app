@@ -31,6 +31,7 @@ export interface DirectSettingsViewProps extends CommonSettingsViewProps {
 export interface FabricSettingsViewProps extends CommonSettingsViewProps {
   kind: 'fabric'
   connection: {
+    controllerId: string
     fabricId: string
     nodes: FabricSettingsNode[]
     relayUrl: string

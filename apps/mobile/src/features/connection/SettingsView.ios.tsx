@@ -280,6 +280,15 @@ export function SettingsView(props: SettingsViewProps) {
                       </Text>
                     </VStack>
                   </HStack>
+                  <HStack modifiers={[fullWidthRow]} spacing={12}>
+                    <Image color="secondary" size={18} systemName="person.crop.circle.badge.checkmark" />
+                    <VStack alignment="leading" spacing={2}>
+                      <Text>Controller</Text>
+                      <Text modifiers={[font({ textStyle: 'footnote' }), secondaryForeground]}>
+                        {props.connection.controllerId}
+                      </Text>
+                    </VStack>
+                  </HStack>
                 </Section>
 
                 <Section title="Computers">

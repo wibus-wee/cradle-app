@@ -87,6 +87,7 @@ export function SettingsContainer() {
       appVersion={appVersion}
       kind="fabric"
       connection={{
+        controllerId: membership.controllerId,
         fabricId: membership.fabricId,
         nodes: membership.directory.nodes.map(node => ({
           displayName: node.displayName,

@@ -10,6 +10,7 @@ import {
   Network,
   RefreshCw,
   Share2,
+  ShieldCheck,
   Wifi,
 } from 'lucide-react-native'
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native'
@@ -184,6 +185,11 @@ export function SettingsView(props: SettingsViewProps) {
                     description={props.connection.fabricId}
                     media={<LockKeyhole color={theme.tertiaryForeground} size={19} />}
                     title="End-to-end encrypted"
+                  />
+                  <Item
+                    description={props.connection.controllerId}
+                    media={<ShieldCheck color={theme.tertiaryForeground} size={19} />}
+                    title="Controller"
                   />
                 </>
               )}
