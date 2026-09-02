@@ -25,6 +25,8 @@ the CLI completes its package-owned build.
 
 Enabling an `externalLocal` plugin records package trust plus one permission grant per reviewed manifest permission for the currently discovered package checksum. These grants are host policy, not plugin-owned settings. If the package contents change, the checksum changes and Cradle disables every runtime layer until the operator reviews that exact package revision again. External local plugins remain blocked while the server is enrolled as a Fabric node.
 
+The narrow exception is a Plugin whose manifest is both `deployments: ['desktop']` and renderer-only: it has a Web entry, no Server or Desktop-main entry, and no Server/Desktop capability declaration. The local Desktop may load that reviewed Web bundle even while its Server participates in Fabric; browser deployments filter it out. Adding a privileged layer returns the package to the Fabric block.
+
 Plugin-owned runtime routes are not stable host APIs. They are dispatched under `/api/plugins/:routeSegment/...` by the plugin host so web plugins can call their own server handlers through `ctx.routes`.
 
 ## Development mode

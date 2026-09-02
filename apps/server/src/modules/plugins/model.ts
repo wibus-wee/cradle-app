@@ -110,6 +110,10 @@ const pluginDescriptor = t.Object({
   displayName: t.String({ minLength: 1 }),
   description: t.Union([t.String(), t.Null()]),
   iconUrl: t.Union([t.String({ minLength: 1 }), t.Null()]),
+  deployments: t.Union([
+    t.Array(t.Union([t.Literal('desktop'), t.Literal('web')])),
+    t.Null(),
+  ]),
   source: pluginSource,
   activation: pluginActivationState,
   layers: t.Object({

@@ -16,7 +16,7 @@ import { toastManager } from '~/components/ui/toast'
 import { readPluginDevSessions } from '~/features/plugins/api/plugin-dev'
 
 import { getAuthenticatedServerResourceUrl } from './authenticated-server-url'
-import { getServerUrl } from './electron'
+import { getServerUrl, isElectron } from './electron'
 import { usePluginStore } from './plugin-store'
 import { cradleFetch } from './server-credential'
 import type { ServerEventSource } from './server-transport'
@@ -32,6 +32,7 @@ interface WebPluginDescriptor {
   hasWeb: boolean
   identity?: string
   routeSegment?: string
+  deployments?: Array<'desktop' | 'web'> | null
   layers?: { web: { status: PluginDescriptor['layers']['web']['status'] } }
 }
 
@@ -314,9 +315,17 @@ function getWebBundleRouteSegment(plugin: WebPluginDescriptor): string {
   return plugin.routeSegment ?? derivePluginRouteSegment(plugin.identity ?? plugin.name)
 }
 
-export function isWebLayerLoadable(plugin: WebPluginDescriptor): boolean {
+export function isWebLayerLoadable(
+  plugin: WebPluginDescriptor,
+  deployment: 'desktop' | 'web' = isElectron ? 'desktop' : 'web',
+): boolean {
   const status = plugin.layers?.web.status
-  return plugin.hasWeb && status !== 'invalid' && status !== 'disabled' && status !== 'failed'
+  const supportsDeployment = !plugin.deployments || plugin.deployments.includes(deployment)
+  return plugin.hasWeb
+    && supportsDeployment
+    && status !== 'invalid'
+    && status !== 'disabled'
+    && status !== 'failed'
 }
 
 /**
@@ -325,7 +334,7 @@ export function isWebLayerLoadable(plugin: WebPluginDescriptor): boolean {
  */
 export async function loadWebPlugins(): Promise<void> {
   const plugins = await readPluginDescriptors()
-  await activatePersistedWebPlugins(plugins.filter(isWebLayerLoadable))
+  await activatePersistedWebPlugins(plugins.filter(plugin => isWebLayerLoadable(plugin)))
 }
 
 async function activatePersistedWebPlugins(webPlugins: PluginDescriptor[]): Promise<void> {
