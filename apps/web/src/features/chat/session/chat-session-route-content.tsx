@@ -113,6 +113,13 @@ export function ChatSessionRouteContent({
         }
       })
       .catch(() => {})
+
+    return () => {
+      const activity = useSessionActivityStore.getState()
+      if (activity.visibleSessionId === sessionId) {
+        activity.setVisibleSession(null)
+      }
+    }
   }, [active, queryClient, sessionId])
 
   const { data: session } = useQuery({

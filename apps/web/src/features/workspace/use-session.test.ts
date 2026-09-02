@@ -31,6 +31,7 @@ function createSessionRow(overrides: Partial<SessionRow> & Pick<SessionRow, 'id'
     lastReadAt: null,
     createdAt: now,
     updatedAt: now,
+    activityAt: now,
     latestUserMessageAt: null,
     latestAssistantMessageAt: null,
     unread: false,
