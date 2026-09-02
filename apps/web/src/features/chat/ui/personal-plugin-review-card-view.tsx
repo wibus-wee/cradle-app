@@ -38,14 +38,20 @@ export function PersonalPluginReviewCardView({
   onActivate,
 }: PersonalPluginReviewCardViewProps) {
   return (
-    <div className="mb-2 border border-border/70 bg-background/95 px-3 py-2.5 shadow-sm">
+    <div className="pointer-events-auto mb-2 border border-border/70 bg-background/95 px-3 py-2.5 shadow-sm">
       <div className="flex items-start gap-2.5">
         <ShieldCheckIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-foreground">{title}</p>
           <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{description}</p>
         </div>
-        <Button type="button" size="sm" disabled={activating} onClick={onActivate} className="shrink-0 gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          disabled={activating}
+          onClick={onActivate}
+          className="min-h-10 shrink-0 gap-1.5 transition-transform active:scale-[0.96]"
+        >
           {activating && <Spinner className="size-3.5" />}
           {actionLabel}
         </Button>
