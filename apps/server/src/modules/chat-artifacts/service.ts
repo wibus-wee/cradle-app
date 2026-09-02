@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 
 import { AppError } from '../../errors/app-error'
@@ -194,3 +194,10 @@ function createArtifactId(title: string): string {
   const suffix = createHash('sha256').update(`${title}:${randomUUID()}`).digest('hex').slice(0, 8)
   return `${slug}-${suffix}`
 }
+
+export function removeSessionArtifacts(sessionId: string): void {
+  rmSync(sessionDir(sessionId), { recursive: true, force: true })
+}
+
+Session.onSessionCleanup(removeSessionArtifacts)
+Session.onSessionTranscriptCleanup(removeSessionArtifacts)

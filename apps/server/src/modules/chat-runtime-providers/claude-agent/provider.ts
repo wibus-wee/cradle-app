@@ -97,6 +97,7 @@ import {
 } from './runtime-context'
 import { readClaudeAgentPermissionMode } from './runtime-settings'
 import { ClaudeAgentSessionArtifacts } from './session-artifacts'
+import { deleteClaudeAgentSessionStorage } from './session-storage'
 import {
   CLAUDE_AGENT_RUNTIME_DEFAULT_MODEL_SWITCH_ID,
   clearClaudeAgentCapturedPlan,
@@ -753,6 +754,23 @@ export class ClaudeAgentProvider implements ChatRuntime {
     if (entry) {
       this.closeSessionQuery(sessionId, entry)
     }
+  }
+
+  async deleteSessionStorage(input: GetCapabilitiesInput) {
+    const providerSessionId = input.runtimeSession.providerSessionId
+    if (!providerSessionId) {
+      return { status: 'not_applicable' as const }
+    }
+    const deleted = deleteClaudeAgentSessionStorage(providerSessionId)
+    return deleted
+      ? {
+          status: 'partial' as const,
+          detail: 'Deleted the parent Claude transcript. Provider subagent files are shared and were preserved.',
+        }
+      : {
+          status: 'preserved' as const,
+          detail: 'No Cradle-owned Claude transcript file was found.',
+        }
   }
 
   async listProviderThreads(input: ProviderThreadListInput): Promise<ProviderThreadListResult> {

@@ -8,6 +8,10 @@ SessionService.onSessionCleanup((sessionId) => {
   engine.removeSessionFromIndex(sessionId)
 })
 
+SessionService.onSessionTranscriptCleanup((sessionId) => {
+  engine.removeSessionFromIndex(sessionId)
+})
+
 export function searchThreads(params: ThreadSearchParams) {
   return engine.search(params)
 }

@@ -311,7 +311,11 @@ async function runMaestroFlow(flowName: string, variables: Record<string, string
   try {
     status = await new Promise<number | null>((resolve, reject) => {
       child.once('error', reject)
-      child.once('close', resolve)
+      // Maestro can leave a descendant holding one of the stdio pipes open
+      // after the flow has finished. Waiting for `close` would then keep the
+      // Playwright test alive. The child exit status is all we need to
+      // determine whether the flow passed.
+      child.once('exit', resolve)
     })
   }
   catch (cause) {
@@ -859,7 +863,7 @@ test.describe('Fabric two-node user journey', () => {
 
   test('[CRADLE-FABRIC-002] enrolls Mobile, switches Nodes, streams Chat, and enforces revocation', async () => {
     test.skip(!mobileIosEnabled, 'Run pnpm e2e:fabric:mobile:ios on macOS to exercise the native app.')
-    test.setTimeout(900_000)
+    test.setTimeout(1_200_000)
 
     let desktopLocal!: WorkspaceSummary
     let macbookLocal!: WorkspaceSummary

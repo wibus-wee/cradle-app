@@ -792,6 +792,22 @@ function createForkedNonSubagentThreadRecord() {
 }
 
 describe('codexProvider app-server integration', () => {
+  it('deletes the parent Codex thread through app-server', async () => {
+    const client = new FakeCodexAppServerClient({})
+    const provider = createProvider(client)
+
+    await expect(provider.deleteSessionStorage({
+      runtimeSession: createRuntimeSession('codex-thread-1'),
+      profile: createProfile(),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/cradle-workspace',
+    })).resolves.toEqual({ status: 'deleted' })
+    expect(client.requests).toContainEqual({
+      method: 'thread/delete',
+      params: { threadId: 'codex-thread-1' },
+    })
+  })
+
   it('streams a Codex turn for a workspace-less Jarvis session', async () => {
     const client = new FakeCodexAppServerClient({})
     const resolveSkillPaths = vi.fn(() => ['/tmp/cradle-skill'])

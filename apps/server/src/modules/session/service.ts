@@ -1304,16 +1304,22 @@ export async function updateTitle(input: { id: string, title: string }): Promise
 }
 
 type CleanupHandler = (sessionId: string) => void
+type TranscriptCleanupHandler = (sessionId: string) => void
 type ArchiveHandler = (sessionId: string) => void
 type ArchivingHandler = (sessionId: string) => void | Promise<void>
 type DeletingHandler = (sessionId: string) => void | Promise<void>
 const cleanupHandlers: CleanupHandler[] = []
+const transcriptCleanupHandlers: TranscriptCleanupHandler[] = []
 const archiveHandlers: ArchiveHandler[] = []
 const archivingHandlers: ArchivingHandler[] = []
 let deletingHandler: DeletingHandler | null = null
 
 export function onSessionCleanup(handler: CleanupHandler): void {
   cleanupHandlers.push(handler)
+}
+
+export function onSessionTranscriptCleanup(handler: TranscriptCleanupHandler): void {
+  transcriptCleanupHandlers.push(handler)
 }
 
 export function onSessionArchived(handler: ArchiveHandler): void {
@@ -1352,6 +1358,17 @@ function cleanupSessionResources(id: string): void {
     }
  catch {
       // cleanup handlers must not break the delete flow
+    }
+  }
+}
+
+export function cleanupSessionTranscriptResources(id: string): void {
+  for (const handler of transcriptCleanupHandlers) {
+    try {
+      handler(id)
+    }
+    catch {
+      // Transcript cleanup has already committed; auxiliary owners reconcile later.
     }
   }
 }

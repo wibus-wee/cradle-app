@@ -143,6 +143,12 @@ SessionService.onSessionCleanup((sessionId) => {
   ptyRuntime.destroy(sessionId)
 })
 
+SessionService.onSessionTranscriptCleanup((sessionId) => {
+  cancelProviderSessionCapture(sessionId)
+  deleteTerminalHistory(sessionId)
+  ptyRuntime.destroy(sessionId)
+})
+
 SessionService.onSessionArchived((sessionId) => {
   destroyPtySession(sessionId)
   deleteTerminalHistory(sessionId)

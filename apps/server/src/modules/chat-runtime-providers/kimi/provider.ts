@@ -25,6 +25,7 @@ import type {
   RuntimeModelCatalog,
   RuntimeProgressItem,
   RuntimeSession,
+  RuntimeSessionStorageDeletionResult,
   RuntimeSettings,
   RuntimeUiSlotState,
   RuntimeUserInputResolution,
@@ -42,7 +43,7 @@ import { readProviderStateSnapshot } from '../kit/state-snapshot'
 import { projectKimiProviderConfig, resolveKimiModelReference } from './config'
 import { KimiEventToChunkMapper } from './event-to-chunk-mapper'
 import type { KimiWebHostLease } from './host-lease'
-import { acquireKimiWebHostLease } from './host-lease'
+import { acquireKimiWebHostLease, stopKimiWebHostForSessionStorage } from './host-lease'
 import { KIMI_RUNTIME_CAPABILITIES, KIMI_RUNTIME_KIND, KIMI_RUNTIME_METADATA } from './metadata'
 import { createKimiRuntimePresentation } from './presentation'
 import { projectKimiPrompt } from './prompt-content'
@@ -72,6 +73,7 @@ import {
 import type { GetApiV1SessionsBySessionIdQuestionsResponses } from './protocol/rest/types.gen'
 import { getKimiEventAgentId, KimiProviderThreadEventProjector } from './provider-thread-event-projector'
 import { projectKimiRuntimeSettings } from './runtime-settings'
+import { deleteKimiSessionStorage } from './session-storage'
 import type { KimiTranscriptAgentMetadata, KimiTranscriptData, KimiTranscriptTurn } from './transcript-projector'
 import {
   findKimiPhaseTranscriptTurn,
@@ -663,6 +665,33 @@ path: { session_id: sessionId },
       await lease.resource.http.request(promptAction({ client: lease.resource.http.client, path: { session_id: sessionId, tail: 'abort' } }))
     }
     finally { lease.release() }
+  }
+
+  async deleteSessionStorage(input: GetCapabilitiesInput): Promise<RuntimeSessionStorageDeletionResult> {
+    const providerSessionId = input.runtimeSession.providerSessionId
+    if (!providerSessionId) {
+      return { status: 'not_applicable' as const }
+    }
+    const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
+
+    const hostStatus = await stopKimiWebHostForSessionStorage(profile.providerTargetId)
+    if (hostStatus === 'busy') {
+      return {
+        status: 'preserved',
+        detail: 'Kimi storage cannot be deleted while another session is using the same provider target.',
+      }
+    }
+    input.runtimeSession.providerRuntimeLease?.release()
+
+    const result = deleteKimiSessionStorage({
+      providerTargetId: profile.providerTargetId,
+      providerSessionIds: [providerSessionId],
+      clearDerivedCache: true,
+    })
+    return {
+      status: 'deleted' as const,
+      detail: `Deleted ${result.bytes} bytes from Kimi session storage.`,
+    }
   }
 
   async updateRuntimeSettings(input: UpdateRuntimeSettingsInput): Promise<void> {

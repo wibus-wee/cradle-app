@@ -714,6 +714,24 @@ export class OpencodeProvider implements ChatRuntime {
     }
   }
 
+  async deleteSessionStorage(input: GetCapabilitiesInput) {
+    const providerSessionId = input.runtimeSession.providerSessionId
+    if (!providerSessionId) {
+      return { status: 'not_applicable' as const }
+    }
+    const handle = readOpencodeRuntimeHandle(this.runtimeKind, input.runtimeSession)
+    const result = await handle.client.session.delete({
+      path: { id: providerSessionId },
+      query: { directory: input.workspacePath },
+    })
+    if (result.error) {
+      throw new ProviderRuntimeError(
+        ProviderErrors.requestFailed(this.runtimeKind, 'session.delete', formatOpencodeError(result.error)),
+      )
+    }
+    return { status: 'deleted' as const }
+  }
+
   async updateRuntimeSettings(input: UpdateRuntimeSettingsInput): Promise<void> {
     const providerSessionId = input.runtimeSession.providerSessionId
     if (!providerSessionId) {

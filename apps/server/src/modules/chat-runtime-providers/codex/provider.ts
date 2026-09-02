@@ -828,6 +828,23 @@ export class CodexProvider implements ChatRuntime {
     }
   }
 
+  async deleteSessionStorage(input: GetCapabilitiesInput) {
+    const threadId = input.runtimeSession.providerSessionId
+    if (!threadId) {
+      return { status: 'not_applicable' as const }
+    }
+    const context = await this.createProviderThreadClient(input)
+    try {
+      await context.client.request('thread/delete', { threadId })
+      context.hostLease.resource.loadedThreadIds.delete(threadId)
+      context.hostLease.resource.uiSlotThreadFacts.delete(threadId)
+      return { status: 'deleted' as const }
+    }
+    finally {
+      context.hostLease.release()
+    }
+  }
+
   async listProviderThreadTurns(input: ProviderThreadTurnsInput): Promise<ProviderThreadTurnsResult> {
     const context = await this.createProviderThreadClient(input)
     try {

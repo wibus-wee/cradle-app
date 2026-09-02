@@ -8,11 +8,14 @@ import { shutdownInfra } from '../../infra'
 import {
   getArtifact,
   listArtifacts,
+  removeSessionArtifacts,
   upsertArtifact,
 } from './service'
 
 const sessionMock = vi.hoisted(() => ({
   get: vi.fn(),
+  onSessionCleanup: vi.fn(),
+  onSessionTranscriptCleanup: vi.fn(),
 }))
 
 vi.mock('../session/service', () => sessionMock)
@@ -148,6 +151,19 @@ export default function Demo() {
     })
 
     expect(listArtifacts(SESSION_ID).map(record => record.id)).toEqual(['newer', 'older'])
+  })
+
+  it('removes all artifacts owned by a session transcript', () => {
+    upsertArtifact({
+      sessionId: SESSION_ID,
+      artifactId: 'welcome-card',
+      title: 'Welcome',
+      source: VALID_SOURCE,
+    })
+
+    removeSessionArtifacts(SESSION_ID)
+
+    expect(listArtifacts(SESSION_ID)).toEqual([])
   })
 
   it('throws for an invalid artifact id', () => {
