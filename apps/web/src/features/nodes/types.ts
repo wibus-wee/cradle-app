@@ -50,8 +50,16 @@ export interface NodeGrant {
   grantId: string
   controllerId: string
   controllerLabel: string
+  nodeId: string
   scope: NodeGrantScope
   revokedAt: string | null
+}
+
+/** Approved Controller access grouped across the Fabric's Nodes. */
+export interface FabricControllerAccess {
+  controllerId: string
+  displayName: string
+  grants: NodeGrant[]
 }
 
 /** Access level this device holds over a Node, derived from grants. */

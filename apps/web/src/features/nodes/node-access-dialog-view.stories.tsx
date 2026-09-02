@@ -21,6 +21,7 @@ function grant(overrides: Partial<NodeGrant>): NodeGrant {
     grantId: 'grant-1',
     controllerId: 'controller-macbook',
     controllerLabel: 'Wibus’s MacBook Pro',
+    nodeId: 'node-devbox',
     scope: 'control',
     revokedAt: null,
     ...overrides,

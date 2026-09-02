@@ -27,6 +27,7 @@ import { CancelPendingEnrollmentDialog } from './cancel-pending-enrollment-dialo
 import { LeaveFabricDialog } from './leave-fabric-dialog'
 import { RemoveDeviceDialog } from './remove-device-dialog'
 import type {
+  FabricControllerAccess,
   FabricMembership,
   FabricNode,
   PendingFabricControllerRequest,
@@ -44,6 +45,9 @@ export interface NodesSettingsViewProps {
   nodes: FabricNode[]
   nodesLoading: boolean
   nodesError: boolean
+  controllers: FabricControllerAccess[]
+  controllersLoading: boolean
+  controllersError: boolean
   pendingRequests: PendingFabricNodeRequest[]
   pendingRequestsLoading: boolean
   pendingRequestsError: boolean
@@ -84,6 +88,9 @@ export function NodesSettingsView({
   nodes,
   nodesLoading,
   nodesError,
+  controllers,
+  controllersLoading,
+  controllersError,
   pendingRequests,
   pendingRequestsLoading,
   pendingRequestsError,
@@ -366,6 +373,36 @@ export function NodesSettingsView({
                   />
                 )))}
           </SettingsGroup>
+
+          {canManageAccess && (
+            <SettingsGroup
+              label={t('settings.controllers.title')}
+              description={t('settings.controllers.description')}
+            >
+              {controllersLoading && (
+                <div className="flex items-center gap-2 py-3 text-[12px] text-muted-foreground">
+                  <Spinner className="size-3.5" />
+                  {t('settings.controllers.loading')}
+                </div>
+              )}
+              {controllersError && !controllersLoading && (
+                <QueryErrorState label={t('settings.controllers.error')} onRetry={onRefreshNodes} />
+              )}
+              {!controllersLoading && !controllersError && controllers.length === 0 && (
+                <div className="py-3 text-[12px] text-muted-foreground">
+                  {t('settings.controllers.empty')}
+                </div>
+              )}
+              {!controllersLoading && !controllersError && controllers.map(controller => (
+                <ApprovedControllerRow
+                  key={controller.controllerId}
+                  controller={controller}
+                  nodes={nodes}
+                  onManageAccess={onManageAccess}
+                />
+              ))}
+            </SettingsGroup>
+          )}
         </>
       )}
 
@@ -397,6 +434,61 @@ export function NodesSettingsView({
         onConfirm={onRemoveNode}
       />
     </SettingsPage>
+  )
+}
+
+function ApprovedControllerRow({
+  controller,
+  nodes,
+  onManageAccess,
+}: {
+  controller: FabricControllerAccess
+  nodes: FabricNode[]
+  onManageAccess: (nodeId: string) => void
+}) {
+  const { t } = useTranslation('nodes')
+  const activeGrants = controller.grants.filter(grant => !grant.revokedAt)
+  const nodeIds = [...new Set(activeGrants.map(grant => grant.nodeId))]
+
+  return (
+    <div
+      className="flex flex-col gap-2 border-b border-border/60 py-3 last:border-b-0 sm:flex-row sm:items-center"
+      data-testid={`fabric-controller-${controller.controllerId}`}
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+        <ControllerIcon className="size-4" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium">{controller.displayName}</span>
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {nodeIds.map((nodeId) => {
+            const node = nodes.find(candidate => candidate.nodeId === nodeId)
+            const scopes = activeGrants.filter(grant => grant.nodeId === nodeId)
+            return (
+              <Badge key={nodeId} variant="secondary">
+                {node?.displayName ?? nodeId}
+                {' · '}
+                {scopes.map(grant => t(`scope.${grant.scope}`)).join(', ')}
+              </Badge>
+            )
+          })}
+        </div>
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {nodeIds.map(nodeId => (
+          <Button
+            key={nodeId}
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onManageAccess(nodeId)}
+          >
+            <SettingsIcon className="size-3.5" aria-hidden />
+            {t('action.manageAccess')}
+          </Button>
+        ))}
+      </div>
+    </div>
   )
 }
 

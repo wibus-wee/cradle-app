@@ -202,6 +202,7 @@ export function useApprovePendingFabricControllerRequest() {
     onSuccess: () => Promise.all([
       queryClient.invalidateQueries({ queryKey: getFabricControllerInvitationsRequestsQueryKey() }),
       queryClient.invalidateQueries({ queryKey: getNodesQueryKey() }),
+      queryClient.invalidateQueries({ queryKey: [{ _id: 'getNodesByNodeIdGrants' }] }),
     ]),
   })
 }
@@ -230,6 +231,24 @@ export function useNodeGrants(nodeId: string | null) {
   })
 }
 
+/** Owner-side grants for every visible Node, used to summarize Controllers. */
+export function useNodeGrantsForNodes(nodeIds: string[], enabled: boolean) {
+  const queries = useQueries({
+    queries: nodeIds.map(nodeId => ({
+      ...getNodesByNodeIdGrantsOptions({ path: { nodeId } }),
+      enabled,
+      retry: false,
+      staleTime: 15_000,
+    })),
+  })
+
+  return {
+    data: queries.flatMap(query => query.data ?? []),
+    isError: queries.some(query => query.isError),
+    isLoading: queries.some(query => query.isLoading),
+  }
+}
+
 /**
  * Revoke a Controller grant on a Node. relayd closes matching live links
  * immediately; the local caches refresh from the directory afterwards.
@@ -256,6 +275,7 @@ export function useRevokeFabricController(nodeIds: string[]) {
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: getNodesQueryKey() }),
+        queryClient.invalidateQueries({ queryKey: [{ _id: 'getNodesByNodeIdGrants' }] }),
         ...nodeIds.map(nodeId => queryClient.invalidateQueries({
           queryKey: getNodesByNodeIdGrantsQueryKey({ path: { nodeId } }),
         })),

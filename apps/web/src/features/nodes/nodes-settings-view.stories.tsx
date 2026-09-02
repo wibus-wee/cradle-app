@@ -17,6 +17,9 @@ const meta = {
     nodes: [],
     nodesLoading: false,
     nodesError: false,
+    controllers: [],
+    controllersLoading: false,
+    controllersError: false,
     pendingRequests: [],
     pendingRequestsLoading: false,
     pendingRequestsError: false,
@@ -129,6 +132,18 @@ export const OwnerWithPendingApproval: Story = {
       lastSeenAt: '2026-08-18T12:05:00.000Z',
       revision: 2,
       scopes: ['admin'],
+    }],
+    controllers: [{
+      controllerId: 'controller-subject-iphone',
+      displayName: 'Wibus’s iPhone',
+      grants: [{
+        grantId: 'grant-iphone-control',
+        controllerId: 'controller-subject-iphone',
+        controllerLabel: 'Wibus’s iPhone',
+        nodeId: 'node-owner',
+        scope: 'control',
+        revokedAt: null,
+      }],
     }],
   },
 }

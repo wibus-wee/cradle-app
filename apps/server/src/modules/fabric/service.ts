@@ -569,6 +569,11 @@ export async function rejectPendingNodeRequest(requestId: string): Promise<void>
   )
 }
 
+/** Owner-side: reject a pending Controller enrollment request. */
+export async function rejectPendingControllerRequest(requestId: string): Promise<void> {
+  await rejectPendingNodeRequest(requestId)
+}
+
 async function approveJoinRequest(request: FabricJoinRequest): Promise<NodeSummary> {
   const membership = requireFabricMembership()
   const ownerPrivateKey = requireOwnerKey()

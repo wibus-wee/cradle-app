@@ -76,7 +76,7 @@ export const fabric = new Elysia({ prefix: '/fabric', detail: { tags: ['fabric']
     response: { 200: FabricModel.controllerApproval },
   })
   .delete('/controller-invitations/requests/:requestId', async ({ params, set }) => {
-    await Fabric.rejectPendingNodeRequest(params.requestId)
+    await Fabric.rejectPendingControllerRequest(params.requestId)
     set.status = 204
   }, {
     detail: { summary: 'Reject a pending Controller enrollment request (owner only)' },

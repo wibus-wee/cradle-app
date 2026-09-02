@@ -6,6 +6,7 @@ import { toastManager } from '~/components/ui/toast'
 import { decodeInviteCode, encodeControllerPairingCode, encodeInviteCode } from './invite-code'
 import type {
   ControllerGrantSelection,
+  FabricControllerAccess,
   FabricNodeInvitation,
   NodeGrant,
   PendingFabricControllerRequest,
@@ -24,6 +25,7 @@ import {
   useLeaveFabric,
   useManagedRelay,
   useNodeGrants,
+  useNodeGrantsForNodes,
   useNodes,
   usePendingFabricControllerRequests,
   usePendingFabricEnrollment,
@@ -35,8 +37,51 @@ import {
   useRevokeNodeGrant,
 } from './use-nodes'
 
+interface ApiErrorPayload {
+  message?: unknown
+  body?: ApiErrorPayload
+  error?: ApiErrorPayload | string
+}
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const payload = error as ApiErrorPayload
+    if (typeof payload.message === 'string' && payload.message.length > 0) {
+      return payload.message
+    }
+    if (payload.body) {
+      const bodyMessage = errorMessage(payload.body)
+      if (bodyMessage !== '[object Object]') {
+        return bodyMessage
+      }
+    }
+      if (typeof payload.error === 'string' && payload.error.length > 0) {
+        return payload.error
+      }
+    if (payload.error) {
+      const nestedMessage = errorMessage(payload.error)
+      if (nestedMessage !== '[object Object]') {
+        return nestedMessage
+      }
+    }
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    try {
+      const serialized = JSON.stringify(error)
+      if (serialized) {
+        return serialized
+      }
+    }
+    catch {
+      // Fall through for cyclic values that cannot be serialized.
+    }
+  }
+  return String(error)
 }
 
 const APPROVAL_POLL_MS = 3000
@@ -51,6 +96,10 @@ export function useNodesController() {
   const managedRelay = managedRelayQuery.data ?? null
   const pendingEnrollment = pendingEnrollmentQuery.data ?? null
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
+  const controllerGrantsQuery = useNodeGrantsForNodes(
+    nodes.map(node => node.nodeId),
+    membership?.role === 'owner',
+  )
   const pendingRequestsQuery = usePendingFabricNodeRequests(membership?.role === 'owner')
   const pendingRequests = useMemo<PendingFabricNodeRequest[]>(
     () => pendingRequestsQuery.data ?? [],
@@ -102,11 +151,46 @@ export function useNodesController() {
           grant.controllerDisplayName
           ?? nodes.find(node => node.nodeId === grant.controllerId)?.displayName
           ?? grant.controllerId,
+        nodeId: grant.nodeId,
         scope: grant.scope,
         revokedAt: grant.revokedAt ?? null,
       })),
     [grantsQuery.data, nodes],
   )
+  const controllers = useMemo(() => {
+    const nodeIds = new Set(nodes.map(node => node.nodeId))
+    const grouped = new Map<string, FabricControllerAccess>()
+    for (const sourceGrant of controllerGrantsQuery.data) {
+      if (sourceGrant.revokedAt) {
+        continue
+      }
+      const grant: NodeGrant = {
+        grantId: sourceGrant.grantId,
+        controllerId: sourceGrant.controllerId,
+        controllerLabel: sourceGrant.controllerDisplayName ?? sourceGrant.controllerId,
+        nodeId: sourceGrant.nodeId,
+        scope: sourceGrant.scope,
+        revokedAt: sourceGrant.revokedAt ?? null,
+      }
+      // A computer's companion Controller is represented by the Node itself;
+      // only show separately enrolled Controllers in this summary.
+      if (nodeIds.has(grant.controllerId)) {
+        continue
+      }
+      const existing = grouped.get(grant.controllerId)
+      if (existing) {
+        existing.grants.push(grant)
+      }
+      else {
+        grouped.set(grant.controllerId, {
+          controllerId: grant.controllerId,
+          displayName: sourceGrant.controllerDisplayName ?? sourceGrant.controllerId,
+          grants: [grant],
+        })
+      }
+    }
+    return [...grouped.values()]
+  }, [controllerGrantsQuery.data, nodes])
 
   const networkCode = useMemo(
     () =>
@@ -444,6 +528,9 @@ export function useNodesController() {
     nodes,
     nodesLoading: nodesQuery.isLoading,
     nodesError: nodesQuery.isError,
+    controllers,
+    controllersLoading: controllerGrantsQuery.isLoading,
+    controllersError: controllerGrantsQuery.isError,
     refreshNodes: () => void nodesQuery.refetch(),
     pendingRequests,
     pendingRequestsLoading: pendingRequestsQuery.isLoading,

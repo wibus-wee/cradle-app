@@ -23,6 +23,9 @@ export function NodesSettings() {
         nodes={controller.nodes}
         nodesLoading={controller.nodesLoading}
         nodesError={controller.nodesError}
+        controllers={controller.controllers}
+        controllersLoading={controller.controllersLoading}
+        controllersError={controller.controllersError}
         pendingRequests={controller.pendingRequests}
         pendingRequestsLoading={controller.pendingRequestsLoading}
         pendingRequestsError={controller.pendingRequestsError}
