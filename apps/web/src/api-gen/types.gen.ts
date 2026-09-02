@@ -7292,6 +7292,7 @@ export type GetSessionsResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -7381,6 +7382,7 @@ export type PostSessionsResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7456,6 +7458,7 @@ export type GetSessionsByIdResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7518,6 +7521,7 @@ export type PatchSessionsByIdResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7600,6 +7604,7 @@ export type PostSessionsByIdArchiveResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7655,6 +7660,7 @@ export type PostSessionsByIdReadResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7710,6 +7716,7 @@ export type PostSessionsByIdUnreadResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -8436,6 +8443,7 @@ export type PostThreadHandoffsResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -8754,6 +8762,7 @@ export type PostWorksResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -8891,6 +8900,7 @@ export type GetWorksByIdResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9005,6 +9015,7 @@ export type PostWorksByIdArchiveResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9121,6 +9132,7 @@ export type PostWorksByIdPrepareResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9238,6 +9250,7 @@ export type PostWorksByIdSubmitResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9352,6 +9365,7 @@ export type PostWorksByIdBranchResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -11707,6 +11721,7 @@ export type GetIssuesByIdSessionsResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -12591,6 +12606,7 @@ export type GetPluginsResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -12734,6 +12750,7 @@ export type GetPluginsSourcesResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -12856,6 +12873,7 @@ export type PostPluginsSourcesResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -12943,6 +12961,7 @@ export type PostPluginsSourcesResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13253,6 +13272,7 @@ export type GetPluginsReviewsResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -13373,6 +13393,7 @@ export type PostPluginsPersonalResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -13460,6 +13481,7 @@ export type PostPluginsPersonalResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13587,6 +13609,7 @@ export type PostPluginsPersonalBySourceIdResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -13674,6 +13697,7 @@ export type PostPluginsPersonalBySourceIdResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13870,6 +13894,7 @@ export type GetPluginsSourcesByIdResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13987,6 +14012,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -14074,6 +14100,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -14271,6 +14298,7 @@ export type GetPluginsByRouteSegmentResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -14378,6 +14406,7 @@ export type PatchPluginsByRouteSegmentEnabledResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -22630,6 +22659,7 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
