@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-none
 功能: Agent Identity 精华旅程
   作为用户，我希望创建并删除一个独立 Agent
 

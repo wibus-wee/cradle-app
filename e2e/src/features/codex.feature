@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-codex @serial
 功能: 真实 Codex 精华旅程
   作为用户，我希望真实 Codex app-server 的上游 OpenAI Responses 走 model-api-simulator 完成一轮聊天
 
@@ -61,7 +61,7 @@
     而且 聊天流应结束于空闲状态
     而且 Simulator 脚本化交换应全部耗尽
 
-  @essence @P1 @CRADLE-CODEX-003
+  @essence @P0 @CRADLE-CODEX-003
   场景: Codex btw 快速提问复用上下文但不写入聊天历史
     假如 我已配置 Codex btw Simulator
     而且 我已添加了一个工作区
@@ -74,5 +74,37 @@
     当 我在聊天输入框中输入"/btw 请确认当前上下文"
     而且 我点击聊天发送按钮
     那么 Composer 的 btw 结果应包含"Codex btw 回复：上下文仍然可见"
+    而且 聊天中不应再出现用户消息"/btw 请确认当前上下文"
+    而且 聊天中不应再出现 AI 消息"Codex btw 回复：上下文仍然可见"
+    当 我重新加载当前页面
+    那么 Composer 中不应显示 btw 结果
+    而且 我应该看到用户消息"Codex 初始上下文消息"
+    而且 最后一条 AI 消息应包含"Codex 初始上下文已准备好"
+    而且 聊天中不应再出现用户消息"/btw 请确认当前上下文"
+    而且 聊天中不应再出现 AI 消息"Codex btw 回复：上下文仍然可见"
+    当 我在聊天输入框中输入"btw 后继续主对话"
+    而且 我点击聊天发送按钮
+    那么 最后一条 AI 消息应包含"Codex 主线程未被 btw 污染"
+    而且 聊天流应结束于空闲状态
     而且 聊天中不应出现错误提示
+    而且 Simulator 脚本化交换应全部耗尽
+
+  @essence @P0 @CRADLE-CODEX-009
+  场景: Codex 会话进行中可使用独立 Provider 自动生成并重新生成标题
+    假如 我已配置进行中标题生成 Codex Simulator
+    而且 我已添加了一个工作区
+    当 我点击"新建聊天"导航项
+    而且 我选择 Codex 运行时与 Simulator Provider
+    而且 我在新建聊天输入框中输入"进行中重新生成标题"
+    而且 我点击发送按钮
+    那么 应该跳转到聊天视图
+    而且 聊天流应处于进行中
+    而且 当前会话标题应为"Codex 自动标题"
+    当 我在当前会话菜单中重新生成标题
+    那么 当前会话标题应为"Codex 手动标题"
+    而且 聊天流应处于进行中
+    而且 聊天中不应出现错误提示
+    当 我释放 Codex 标题旅程流门控
+    那么 最后一条 AI 消息应包含"Codex 主回复已完成"
+    而且 聊天流应结束于空闲状态
     而且 Simulator 脚本化交换应全部耗尽

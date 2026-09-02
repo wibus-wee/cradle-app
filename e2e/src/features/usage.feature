@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: Usage 真实计量
   作为用户，我希望 Usage 显示真实 runtime 产生的 token，而不是只验证空仪表盘可见
 

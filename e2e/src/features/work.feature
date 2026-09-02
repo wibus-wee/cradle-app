@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: Work 主生命周期
   作为用户，我希望从 New Work 创建隔离执行，并确认 Agent 的改动真实落在受管 worktree 中
 

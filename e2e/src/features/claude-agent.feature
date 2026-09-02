@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 真实 Claude Agent 精华旅程
   作为用户，我希望 Claude Agent 走真实 SDK 与 Anthropic Messages 协议完成审批与工具展示
 

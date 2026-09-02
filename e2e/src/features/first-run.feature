@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 首次启动到第一条真实回复
   作为首次安装 Cradle 的用户，我希望不依赖 API 预置完成 Provider、工作区和第一次聊天
 

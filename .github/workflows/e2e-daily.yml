@@ -7,10 +7,12 @@ on:
   # Allow manual triggering
   workflow_dispatch:
     inputs:
-      tags:
-        description: 'Cucumber tags filter (default @P0 or @P1 = full active suite). Smoke subset: @P0.'
-        required: false
-        default: '@P0 or @P1'
+      suite:
+        description: E2E priority suite to execute in every runtime lane
+        required: true
+        type: choice
+        options: [full, smoke]
+        default: full
       source_ref:
         description: Git ref from wibus-wee/cradle-app to test
         required: false
@@ -30,9 +32,21 @@ concurrency:
 
 jobs:
   e2e:
-    name: Daily E2E (@P0 or @P1)
+    name: Daily E2E ${{ matrix.lane }} (${{ github.event.inputs.suite == 'smoke' && 'P0' || 'full' }})
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: claude-local
+            runtimeExpression: '@runtime-claude or @runtime-none'
+            parallel: '2'
+            provisionCodex: 'false'
+          - lane: codex
+            runtimeExpression: '@runtime-codex'
+            parallel: '1'
+            provisionCodex: 'true'
 
     steps:
       # ── Checkout & Setup ──────────────────────────────────────────────────
@@ -49,324 +63,39 @@ jobs:
 
       - name: Setup E2E runtime
         uses: ./.github/actions/e2e-setup
+        with:
+          provision-codex: ${{ matrix.provisionCodex }}
 
       - name: Run E2E tests
         id: e2e
         continue-on-error: true
         uses: ./.github/actions/e2e-run
         with:
-          tags: ${{ github.event.inputs.tags || '@P0 or @P1' }}
+          tags: ${{ format('({0}) and ({1})', github.event.inputs.suite == 'smoke' && '@P0' || '@P0 or @P1', matrix.runtimeExpression) }}
           log-sync: '1'
           fail-on-zero-scenarios: 'true'
+          parallel: ${{ matrix.parallel }}
 
       - name: Summarize E2E result
         if: always()
         env:
           E2E_OUTCOME: ${{ steps.e2e.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          TAGS_FILTER: ${{ github.event.inputs.tags || '@P0 or @P1' }}
-        run: |
-          node <<'NODE'
-          const fs = require('fs')
-          const path = require('path')
-
-          const artifactsDir = 'e2e/artifacts'
-          fs.mkdirSync(artifactsDir, { recursive: true })
-
-          const firstLine = (value) => String(value || '').split(/\r?\n/).find(Boolean) || ''
-          const normalizeStatus = (status) => String(status || '').toUpperCase()
-          const statusRank = { UNKNOWN: 0, PASSED: 1, SKIPPED: 2, PENDING: 3, UNDEFINED: 4, AMBIGUOUS: 5, FAILED: 6 }
-          const basename = (value) => path.basename(value || 'unknown.feature')
-
-          function collectScenarioNodes(children, uri, featureName, out) {
-            for (const child of children || []) {
-              if (child.scenario) {
-                const scenario = child.scenario
-                const tags = (scenario.tags || []).map((tag) => tag.name).join(' ')
-                for (const id of scenario.id ? [scenario.id] : []) {
-                  out.set(id, {
-                    feature: basename(uri),
-                    featureName,
-                    line: scenario.location?.line,
-                    name: scenario.name,
-                    tags,
-                  })
-                }
-              }
-              if (child.rule) collectScenarioNodes(child.rule.children, uri, featureName, out)
-            }
-          }
-
-          function parseMessages(file) {
-            if (!fs.existsSync(file)) return null
-
-            const envelopes = fs.readFileSync(file, 'utf8')
-              .split(/\r?\n/)
-              .map((line) => line.trim())
-              .filter(Boolean)
-              .map((line) => JSON.parse(line))
-
-            const scenarioByAstId = new Map()
-            const pickleById = new Map()
-            const testCaseById = new Map()
-            const startedById = new Map()
-            const resultByStartedId = new Map()
-
-            for (const envelope of envelopes) {
-              if (envelope.gherkinDocument) {
-                const doc = envelope.gherkinDocument
-                collectScenarioNodes(doc.feature?.children, doc.uri, doc.feature?.name || basename(doc.uri), scenarioByAstId)
-              }
-              if (envelope.pickle) pickleById.set(envelope.pickle.id, envelope.pickle)
-              if (envelope.testCase) testCaseById.set(envelope.testCase.id, envelope.testCase)
-              if (envelope.testCaseStarted) {
-                startedById.set(envelope.testCaseStarted.id, {
-                  testCaseId: envelope.testCaseStarted.testCaseId,
-                  attempt: envelope.testCaseStarted.attempt || 0,
-                })
-              }
-              if (envelope.testStepFinished) {
-                const finished = envelope.testStepFinished
-                const existing = resultByStartedId.get(finished.testCaseStartedId) || { status: 'PASSED', error: '' }
-                const status = normalizeStatus(finished.testStepResult?.status)
-                if ((statusRank[status] || 0) > (statusRank[existing.status] || 0)) {
-                  existing.status = status
-                }
-                if (!existing.error && status === 'FAILED') {
-                  existing.error = firstLine(finished.testStepResult?.message)
-                }
-                resultByStartedId.set(finished.testCaseStartedId, existing)
-              }
-            }
-
-            const latestByPickleId = new Map()
-            for (const [startedId, started] of startedById) {
-              const testCase = testCaseById.get(started.testCaseId)
-              if (!testCase) continue
-              const current = latestByPickleId.get(testCase.pickleId)
-              if (!current || started.attempt >= current.attempt) {
-                latestByPickleId.set(testCase.pickleId, {
-                  attempt: started.attempt,
-                  result: resultByStartedId.get(startedId) || { status: 'UNKNOWN', error: '' },
-                })
-              }
-            }
-
-            let executedPickleIds = [...latestByPickleId.keys()]
-            if (executedPickleIds.length === 0) {
-              executedPickleIds = [...new Set([...testCaseById.values()].map((testCase) => testCase.pickleId))]
-            }
-            if (executedPickleIds.length === 0) {
-              executedPickleIds = [...pickleById.keys()]
-            }
-
-            const scenarios = []
-            for (const pickleId of executedPickleIds) {
-              const pickle = pickleById.get(pickleId)
-              if (!pickle) continue
-              const ast = (pickle.astNodeIds || []).map((id) => scenarioByAstId.get(id)).find(Boolean)
-              const latest = latestByPickleId.get(pickleId)
-              const status = latest?.result?.status || 'UNKNOWN'
-              scenarios.push({
-                feature: ast?.feature || basename(pickle.uri),
-                line: ast?.line,
-                name: pickle.name,
-                tags: (pickle.tags || []).map((tag) => tag.name).join(' ') || ast?.tags || '',
-                status,
-                error: latest?.result?.error || '',
-              })
-            }
-
-            return scenarios
-          }
-
-          function parseLegacyJson(file) {
-            if (!fs.existsSync(file)) return null
-            const report = JSON.parse(fs.readFileSync(file, 'utf8'))
-            if (!Array.isArray(report)) return null
-
-            const scenarios = []
-            for (const feature of report) {
-              for (const element of feature.elements || []) {
-                if (element.type !== 'scenario') continue
-                const steps = element.steps || []
-                const failedStep = steps.find((step) => normalizeStatus(step.result?.status) === 'FAILED')
-                const status = failedStep
-                  ? 'FAILED'
-                  : normalizeStatus(steps.findLast?.((step) => step.result?.status)?.result?.status || 'PASSED')
-                scenarios.push({
-                  feature: basename(feature.uri),
-                  line: element.line,
-                  name: element.name,
-                  tags: (element.tags || []).map((tag) => tag.name).join(' '),
-                  status,
-                  error: firstLine(failedStep?.result?.error_message),
-                })
-              }
-            }
-            return scenarios
-          }
-
-          function decodeXml(value) {
-            return String(value || '')
-              .replace(/&quot;/g, '"')
-              .replace(/&apos;/g, "'")
-              .replace(/&lt;/g, '<')
-              .replace(/&gt;/g, '>')
-              .replace(/&amp;/g, '&')
-          }
-
-          function parseAttributes(value) {
-            const attrs = {}
-            for (const match of String(value || '').matchAll(/\s([A-Za-z_:][-A-Za-z0-9_:.]*)="([^"]*)"/g)) {
-              attrs[match[1]] = decodeXml(match[2])
-            }
-            return attrs
-          }
-
-          function stripCdata(value) {
-            return String(value || '').replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '')
-          }
-
-          function parseSummaryLocations(file) {
-            if (!fs.existsSync(file)) return new Map()
-            const locations = new Map()
-            const summary = fs.readFileSync(file, 'utf8')
-            for (const match of summary.matchAll(/^\d+\)\s+Scenario:\s+(.+?)\s+#\s+(.+?):(\d+)$/gm)) {
-              const name = match[1]
-              const entries = locations.get(name) || []
-              entries.push({ feature: basename(match[2]), line: Number(match[3]) })
-              locations.set(name, entries)
-            }
-            return locations
-          }
-
-          function parseJunit(file, summaryFile) {
-            if (!fs.existsSync(file)) return null
-            const xml = fs.readFileSync(file, 'utf8')
-            const locationByName = parseSummaryLocations(summaryFile)
-            const scenarios = []
-            const testcaseRe = /<testcase\b([^>]*)>([\s\S]*?)<\/testcase>|<testcase\b([^>]*)\/>/g
-            for (const match of xml.matchAll(testcaseRe)) {
-              const attrs = parseAttributes(match[1] || match[3] || '')
-              const body = match[2] || ''
-              const failure = body.match(/<failure\b([^>]*)>([\s\S]*?)<\/failure>/)
-              const skipped = /<skipped\b/.test(body)
-              const locationQueue = locationByName.get(attrs.name) || []
-              const location = locationQueue.shift()
-              const failureAttrs = failure ? parseAttributes(failure[1]) : {}
-              const failureText = failure ? stripCdata(failure[2]) : ''
-              const error = failure ? firstLine(failureAttrs.message || failureText) : ''
-              scenarios.push({
-                feature: location?.feature || attrs.classname || 'Cucumber',
-                line: location?.line,
-                name: attrs.name || 'Unnamed scenario',
-                tags: '',
-                status: failure ? 'FAILED' : (skipped ? 'SKIPPED' : 'PASSED'),
-                error,
-              })
-            }
-            return scenarios.length > 0 ? scenarios : null
-          }
-
-          let scenarios = null
-          const parseErrors = []
-          try {
-            scenarios = parseJunit(
-              path.join(artifactsDir, 'cucumber-junit.xml'),
-              path.join(artifactsDir, 'cucumber-summary.txt'),
-            )
-          } catch (error) {
-            parseErrors.push(`junit parse error: ${error.message}`)
-          }
-          if (!scenarios || scenarios.length === 0) {
-            try {
-              scenarios = parseMessages(path.join(artifactsDir, 'cucumber-messages.ndjson'))
-            } catch (error) {
-              parseErrors.push(`message parse error: ${error.message}`)
-            }
-          }
-          if (!scenarios || scenarios.length === 0) {
-            try {
-              scenarios = parseLegacyJson(path.join(artifactsDir, 'cucumber-report.json'))
-            } catch (error) {
-              parseErrors.push(`legacy json parse error: ${error.message}`)
-            }
-          }
-          scenarios ||= []
-
-          const failedScenarios = scenarios.filter((scenario) => scenario.status === 'FAILED')
-          const passedScenarios = scenarios.filter((scenario) => scenario.status === 'PASSED')
-          const nonPassedScenarios = scenarios.filter((scenario) => scenario.status !== 'PASSED')
-          const rawSummary = fs.existsSync(path.join(artifactsDir, 'cucumber-summary.txt'))
-            ? fs.readFileSync(path.join(artifactsDir, 'cucumber-summary.txt'), 'utf8').trim()
-            : ''
-          const outputTail = fs.existsSync(path.join(artifactsDir, 'cucumber-output.log'))
-            ? fs.readFileSync(path.join(artifactsDir, 'cucumber-output.log'), 'utf8').trim().split(/\r?\n/).slice(-80).join('\n')
-            : ''
-
-          const resultLine = `${failedScenarios.length} failed / ${scenarios.length} total (${passedScenarios.length} passed)`
-          const scenarioLines = nonPassedScenarios.slice(0, 30).map((scenario) => {
-            const location = scenario.line ? `${scenario.feature}:${scenario.line}` : scenario.feature
-            const tags = scenario.tags ? ` ${scenario.tags}` : ''
-            const error = scenario.error ? `\n  > ${scenario.error.slice(0, 300)}` : ''
-            return `- [ ] **${location}** - ${scenario.name}${tags ? `\n  > Tags: \`${tags.trim()}\`` : ''}${error}`
-          })
-
-          const fallback = process.env.E2E_OUTCOME === 'failure' && scenarios.length === 0
-            ? [
-                '- The Cucumber process failed before any scenario result could be parsed.',
-                rawSummary ? `\n\`\`\`text\n${rawSummary.slice(0, 4000)}\n\`\`\`` : '',
-                outputTail ? `\n<details><summary>Last 80 log lines</summary>\n\n\`\`\`text\n${outputTail.slice(-8000)}\n\`\`\`\n</details>` : '',
-              ].join('\n')
-            : ''
-
-          const markdown = [
-            '## E2E Result',
-            '',
-            `| Field | Value |`,
-            `|-------|-------|`,
-            `| Outcome | \`${process.env.E2E_OUTCOME}\` |`,
-            `| Tags filter | \`${process.env.TAGS_FILTER}\` |`,
-            `| Result | ${resultLine} |`,
-            `| Run | [View run](${process.env.RUN_URL}) |`,
-            '',
-            '## Failed Scenarios',
-            '',
-            scenarioLines.length > 0 ? scenarioLines.join('\n') : (fallback || '_No failed scenario details were parsed._'),
-            parseErrors.length > 0 ? `\n> Parser notes: ${parseErrors.join('; ')}` : '',
-          ].join('\n')
-
-          const summary = {
-            outcome: process.env.E2E_OUTCOME,
-            tagsFilter: process.env.TAGS_FILTER,
-            totalScenarios: scenarios.length,
-            passedScenarios: passedScenarios.length,
-            failedScenarios,
-            nonPassedScenarios,
-            resultLine,
-            markdown,
-            parseErrors,
-          }
-
-          fs.writeFileSync(path.join(artifactsDir, 'e2e-summary.json'), JSON.stringify(summary, null, 2))
-          fs.writeFileSync(path.join(artifactsDir, 'e2e-summary.md'), markdown)
-          if (process.env.GITHUB_STEP_SUMMARY) {
-            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`)
-          }
-          NODE
+          TAGS_FILTER: ${{ format('({0}) and ({1})', github.event.inputs.suite == 'smoke' && '@P0' || '@P0 or @P1', matrix.runtimeExpression) }}
+        run: node e2e/scripts/summarize-run.cjs
 
       # ── Upload Artifacts ──────────────────────────────────────────────────
       - name: Upload E2E artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-artifacts-${{ github.run_id }}
+          name: e2e-${{ matrix.lane }}-artifacts-${{ github.run_id }}
           path: |
             e2e/artifacts/ARTIFACTS.md
             e2e/artifacts/failure-index.json
             e2e/artifacts/cucumber-summary.txt
             e2e/artifacts/cucumber-output.log
+            e2e/artifacts/cucumber-messages.ndjson
             e2e/artifacts/cucumber-junit.xml
             e2e/artifacts/e2e-summary.json
             e2e/artifacts/e2e-summary.md
@@ -386,8 +115,10 @@ jobs:
           REPO: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ARTIFACTS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ARTIFACT_NAME: e2e-${{ matrix.lane }}-artifacts-${{ github.run_id }}
           BRANCH: ${{ github.ref_name }}
-          TAGS_FILTER: ${{ github.event.inputs.tags || '@P0 or @P1' }}
+          LANE: ${{ matrix.lane }}
+          TAGS_FILTER: ${{ format('({0}) and ({1})', github.event.inputs.suite == 'smoke' && '@P0' || '@P0 or @P1', matrix.runtimeExpression) }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -395,7 +126,9 @@ jobs:
 
             const runUrl = process.env.RUN_URL
             const artifactsUrl = process.env.ARTIFACTS_URL
+            const artifactName = process.env.ARTIFACT_NAME
             const branch = process.env.BRANCH
+            const lane = process.env.LANE
             const tagsFilter = process.env.TAGS_FILTER
             const today = new Date().toISOString().split('T')[0]
             const runId = process.env.RUN_ID
@@ -417,6 +150,7 @@ jobs:
               runId,
               runUrl,
               artifactsUrl,
+              artifactName,
               summary,
               failureIndex,
             })
@@ -428,7 +162,8 @@ jobs:
               labels: 'daily-e2e-failure',
             })
 
-            const todayIssue = existingIssues.data.find(i => i.title.includes(today))
+            const issueTitle = `❌ Daily E2E Failed [${lane}] — ${today}`
+            const todayIssue = existingIssues.data.find(i => i.title === issueTitle)
 
             if (todayIssue) {
               await github.rest.issues.createComment({
@@ -448,7 +183,7 @@ jobs:
               const { data: issue } = await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                title: `❌ Daily E2E Failed — ${today}`,
+                title: issueTitle,
                 body: cleanBody,
                 labels: ['daily-e2e-failure', 'bug'],
                 assignees: ['wibus-wee'],

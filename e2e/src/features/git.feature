@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 精华 Git 集成旅程
   作为在 Git 仓库中工作的用户，我希望通过真实聊天工作流查看当前分支并可打开 branch picker
 

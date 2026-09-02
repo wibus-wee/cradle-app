@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 精华全局搜索旅程
   作为用户，我希望通过全局搜索按标题定位会话并打开，且能用命令打开设置
 

@@ -17,6 +17,10 @@ inputs:
     description: Fail when Cucumber executes no scenarios
     required: false
     default: 'false'
+  parallel:
+    description: Number of isolated Cucumber workers for this runtime lane
+    required: false
+    default: '1'
 
 runs:
   using: composite
@@ -34,17 +38,28 @@ runs:
         CRADLE_LOG_SYNC: ${{ inputs.log-sync }}
         TAGS_FILTER: ${{ inputs.tags }}
         FAIL_ON_ZERO_SCENARIOS: ${{ inputs.fail-on-zero-scenarios }}
+        CRADLE_E2E_PARALLEL: ${{ inputs.parallel }}
       run: |
         set -o pipefail
         mkdir -p e2e/artifacts
+        node e2e/scripts/failure-index.mjs prepare
+
+        set +e
         pnpm exec cucumber-js --config e2e/cucumber-ci.mjs \
           --tags "$TAGS_FILTER" \
           --format summary \
           --format summary:e2e/artifacts/cucumber-summary.txt \
+          --format message:e2e/artifacts/cucumber-messages.ndjson \
           --format junit:e2e/artifacts/cucumber-junit.xml \
           2>&1 | tee e2e/artifacts/cucumber-output.log
+        cucumber_status=${PIPESTATUS[0]}
+        set -e
+
+        node e2e/scripts/failure-index.mjs merge
 
         if [ "$FAIL_ON_ZERO_SCENARIOS" = 'true' ] && grep -q '^0 scenarios' e2e/artifacts/cucumber-summary.txt; then
           echo '::error::Cucumber completed without executing any scenarios.'
-          exit 1
+          cucumber_status=1
         fi
+
+        exit "$cucumber_status"

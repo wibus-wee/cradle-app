@@ -43,7 +43,7 @@
     "gen:cli": "pnpm --filter @cradle/cli gen:cli",
     "knip": "knip",
     "db:studio": "pnpm --filter @cradle/db studio",
-    "e2e:check": "node --import tsx e2e/scripts/check-tool-coverage.mts && node e2e/scripts/check-suite.mjs",
+    "e2e:check": "node --test e2e/scripts/*.test.cjs && node --import tsx e2e/scripts/check-tool-coverage.mts && node e2e/scripts/check-suite.mjs",
     "e2e:fabric": "node --import tsx node_modules/@playwright/test/cli.js test --config e2e/playwright.fabric.config.ts",
     "e2e:fabric:mobile:ios": "node --import tsx e2e/scripts/run-mobile-fabric-ios.mts"
   },

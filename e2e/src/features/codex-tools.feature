@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-codex @serial
 功能: Codex 工具调用词汇表
   作为用户，我希望真实 Codex app-server 在上游 Responses 走 model-api-simulator 时，
   完成真实的本地工具执行（shell、计划、文件补丁、审批）并投影到聊天活动流

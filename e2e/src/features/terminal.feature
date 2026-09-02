@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 精华终端会话旅程
   作为用户，我希望在聊天页底部打开工作区终端，并看到真实命令输出
 

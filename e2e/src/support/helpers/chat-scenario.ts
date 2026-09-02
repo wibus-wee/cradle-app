@@ -1,6 +1,7 @@
 import type { DataTable } from '@cucumber/cucumber'
 import { expect } from '@playwright/test'
 
+import { configureCodexTitleGenerationSimulatorProvider } from '../providers'
 import {
   anthropicHttpErrorExchange,
   anthropicScenario,
@@ -33,6 +34,8 @@ export const WORK_STOP_RECOVERY_RESPONSE = 'Work 停止后的重试已完成'
 export const WORK_STOP_RECOVERY_FILE_NAME = 'e2e-work-stop-recovery.txt'
 export const WORK_STOP_RECOVERY_FILE_CONTENT = 'created after the initial Work was stopped\n'
 const SLOW_GATE = 'e2e-slow-stream'
+const CODEX_ACTIVE_TITLE_GATE = 'e2e-codex-active-title'
+const CODEX_TITLE_PROMPT = 'You are naming a Codex task thread'
 /**
  * Turn-settlement budget. Parallel workers share one machine, so provider round-trips
  * stretch with worker count (TTFT can go from ~0.3s serial to 9s+ at 3 workers);
@@ -96,6 +99,19 @@ export async function configureAwaitClaudeAgentSimulator(world: CradleWorld): Pr
   console.warn('[step] configure Await resume Claude Agent simulator')
   await world.configureClaudeAgentChat({ mode: 'text', text: 'Await 初始回复' })
   world.remember('simulator.next-replies', ['Await 恢复后的真实回复'])
+}
+
+export async function configureTerminalAwaitClaudeAgentSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure terminal Await Claude Agent simulator')
+  await world.configureClaudeAgentChat({ mode: 'text', text: 'Await 终态测试已就绪' })
+  world.enqueue(anthropicScenario([
+    anthropicTextExchange({
+      label: 'after-terminal-awaits',
+      text: 'Await 终态后的主对话仍可用',
+      bodyTextIncludes: 'Await 终态后继续主对话',
+      bodyTextExcludes: 'You are naming a Claude Agent task session',
+    }),
+  ]))
 }
 
 /** Provider + runtime only — no scripted conversation exchanges (Composer bang, etc.). */
@@ -199,11 +215,19 @@ export async function configureDefaultAiReply(world: CradleWorld): Promise<void>
 export async function configureCodexQuickQuestionSimulator(world: CradleWorld): Promise<void> {
   console.warn('[step] configure Codex quick-question simulator')
   await world.configureCodexChat({ texts: ['Codex 初始上下文已准备好'] })
-  world.enqueueOpenAi(openAiTextExchange({
-    label: 'codex-quick-question',
-    text: 'Codex btw 回复：上下文仍然可见',
-    bodyTextIncludes: '请确认当前上下文',
-  }))
+  world.enqueueOpenAi(
+    openAiTextExchange({
+      label: 'codex-quick-question',
+      text: 'Codex btw 回复：上下文仍然可见',
+      bodyTextIncludes: '请确认当前上下文',
+    }),
+    openAiTextExchange({
+      label: 'codex-main-after-quick-question',
+      text: 'Codex 主线程未被 btw 污染',
+      bodyTextIncludes: 'btw 后继续主对话',
+      bodyTextExcludes: ['请确认当前上下文', 'Codex btw 回复：上下文仍然可见'],
+    }),
+  )
 }
 
 export async function configureReadToolLoopSimulator(world: CradleWorld): Promise<void> {
@@ -367,6 +391,40 @@ export async function configureCodexMultiTurnSimulator(world: CradleWorld): Prom
   ])
 }
 
+export async function configureCodexActiveTitleGenerationSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure active Codex title-generation simulator')
+  await world.configureCodexChat()
+  const simulator = requireSimulator(world)
+  simulator.reset()
+  world.enqueueOpenAi(
+    openAiTextExchange({
+      label: 'codex-active-main-turn',
+      text: 'Codex 主回复已完成',
+      gateAfterCreated: CODEX_ACTIVE_TITLE_GATE,
+      bodyTextIncludes: '进行中重新生成标题',
+      bodyTextExcludes: CODEX_TITLE_PROMPT,
+    }),
+    openAiTextExchange({
+      label: 'codex-automatic-title',
+      text: 'Codex 自动标题',
+      bodyTextIncludes: CODEX_TITLE_PROMPT,
+    }),
+    openAiTextExchange({
+      label: 'codex-regenerated-title',
+      text: 'Codex 手动标题',
+      bodyTextIncludes: CODEX_TITLE_PROMPT,
+    }),
+  )
+  await configureCodexTitleGenerationSimulatorProvider({
+    serverUrl: world.params.serverUrl,
+    openaiBaseUrl: simulator.openaiBaseUrl,
+  })
+}
+
+export async function releaseCodexActiveTitleGate(world: CradleWorld): Promise<void> {
+  requireSimulator(world).release(CODEX_ACTIVE_TITLE_GATE)
+}
+
 export async function configureCodexRollbackSimulator(world: CradleWorld): Promise<void> {
   console.warn('[step] configure Codex last-turn rollback simulator')
   await world.configureCodexChat({
@@ -429,6 +487,25 @@ export async function releaseSlowStreamGate(world: CradleWorld): Promise<void> {
   }
   await simulator.waitForGate(gate)
   simulator.release(gate)
+}
+
+export async function prepareDurableQueueProcessRestart(world: CradleWorld): Promise<void> {
+  const simulator = requireSimulator(world)
+  const reply = world.recall<{ text: string, bodyTextIncludes: string }>('simulator.reply-on-release')
+  await simulator.waitForRequest({
+    method: 'POST',
+    path: '/v1/messages',
+    bodyTextIncludes: CLAUDE_TITLE_PROMPT,
+  })
+  await simulator.waitForGate(world.recall<string>('simulator.slow-gate'))
+  world.enqueue(anthropicScenario([
+    anthropicTextExchange({
+      label: 'after-process-restart',
+      text: reply.text,
+      bodyTextIncludes: reply.bodyTextIncludes,
+      bodyTextExcludes: CLAUDE_TITLE_PROMPT,
+    }),
+  ]))
 }
 
 function enqueueQueueScenarioTitle(world: CradleWorld): void {

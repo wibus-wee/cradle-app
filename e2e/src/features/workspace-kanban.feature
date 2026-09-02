@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-none
 功能: 精华工作区与看板旅程
   作为用户，我希望完成工作区入门与看板 Issue 创建的真实跨面操作
 

@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 会话环境备注持久化
   作为用户，我希望在会话环境中持续记录备注，即使保存响应交错也不会丢失较新的输入
 
