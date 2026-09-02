@@ -15,7 +15,7 @@ import {
 } from './desktop-assets'
 import { installExternalLinkPolicy } from './external-link-policy'
 import { subscribeAcpDevtool, subscribeIpcDevtool } from './ipc-devtool'
-import { beginMacWindowDrag, installMacWindowDragCapture } from './mac-window-drag'
+import { beginMacWindowDrag } from './mac-window-drag'
 import { readStoredWindowSize, resolveWindowBoundsNearPoint, resolveWindowSize, writeStoredWindowSize } from './window-state'
 import { beginWindowsWindowDrag, installWindowsCaptionButtons } from './windows-caption-buttons'
 
@@ -24,6 +24,12 @@ const TEAROFF_WINDOW_DEFAULT_HEIGHT = 640
 const TEAROFF_WINDOW_MIN_WIDTH = 520
 const TEAROFF_WINDOW_MIN_HEIGHT = 420
 const TEAROFF_WINDOW_SIZE_FILE = 'tearoff-window-size.json'
+const TEAROFF_WINDOW_BOUNDS_POLICY = {
+  defaultWidth: TEAROFF_WINDOW_DEFAULT_WIDTH,
+  defaultHeight: TEAROFF_WINDOW_DEFAULT_HEIGHT,
+  minWidth: TEAROFF_WINDOW_MIN_WIDTH,
+  minHeight: TEAROFF_WINDOW_MIN_HEIGHT,
+}
 
 /**
  * Serialised surface route passed from the renderer when tearing a surface off
@@ -67,7 +73,6 @@ export class WindowManager {
   setMainWindow(win: BrowserWindow): void {
     this.mainWindow = win
     this.trackAppshotCaptureWindow(win)
-    installMacWindowDragCapture(win)
     if (this.warmSurfaceWindows) {
       void this.primeSurfaceWindow()
     }
@@ -114,12 +119,7 @@ export class WindowManager {
     const targetDisplay = screen.getDisplayNearestPoint(releasePoint)
     const targetSize = resolveWindowSize(
       readStoredWindowSize(join(app.getPath('userData'), TEAROFF_WINDOW_SIZE_FILE)),
-      {
-        defaultWidth: TEAROFF_WINDOW_DEFAULT_WIDTH,
-        defaultHeight: TEAROFF_WINDOW_DEFAULT_HEIGHT,
-        minWidth: TEAROFF_WINDOW_MIN_WIDTH,
-        minHeight: TEAROFF_WINDOW_MIN_HEIGHT,
-      },
+      TEAROFF_WINDOW_BOUNDS_POLICY,
       targetDisplay.workArea,
     )
     const targetBounds = resolveWindowBoundsNearPoint(targetSize, releasePoint, targetDisplay.workArea)
@@ -245,7 +245,6 @@ export class WindowManager {
     })
     installExternalLinkPolicy(win.webContents)
     installWindowsCaptionButtons(win)
-    installMacWindowDragCapture(win)
     this.trackAppshotCaptureWindow(win)
     return win
   }
@@ -283,11 +282,19 @@ export class WindowManager {
     if (!this.surfaceBindings.has(win) || win.isDestroyed()) {
       return
     }
+    const continuePointerDrag = this.continuePointerDragWindows.delete(win)
+    if (continuePointerDrag) {
+      const pointer = screen.getCursorScreenPoint()
+      const display = screen.getDisplayNearestPoint(pointer)
+      const bounds = win.getBounds()
+      const size = resolveWindowSize(bounds, TEAROFF_WINDOW_BOUNDS_POLICY, display.workArea)
+      win.setBounds(resolveWindowBoundsNearPoint(size, pointer, display.workArea))
+    }
     if (!win.isVisible()) {
       win.show()
     }
     win.focus()
-    if (this.continuePointerDragWindows.delete(win)) {
+    if (continuePointerDrag) {
       if (!beginMacWindowDrag(win)) {
         beginWindowsWindowDrag(win)
       }
@@ -308,12 +315,7 @@ export class WindowManager {
       return
     }
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
-    const size = resolveWindowSize(null, {
-      defaultWidth: TEAROFF_WINDOW_DEFAULT_WIDTH,
-      defaultHeight: TEAROFF_WINDOW_DEFAULT_HEIGHT,
-      minWidth: TEAROFF_WINDOW_MIN_WIDTH,
-      minHeight: TEAROFF_WINDOW_MIN_HEIGHT,
-    }, display.workArea)
+    const size = resolveWindowSize(null, TEAROFF_WINDOW_BOUNDS_POLICY, display.workArea)
     const win = this.createSurfaceBrowserWindow({
       x: display.workArea.x,
       y: display.workArea.y,
