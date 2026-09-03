@@ -1,6 +1,12 @@
 import { Given, Then, When } from '@cucumber/cucumber'
 
-import { AUTOMATION_REPORT, AUTOMATION_SUMMARY, AutomationPage } from '../support/pages/automation'
+import {
+  AUTOMATION_REPORT,
+  AUTOMATION_SESSION_TITLE,
+  AUTOMATION_SUMMARY,
+  AutomationPage,
+} from '../support/pages/automation'
+import { anthropicTextExchange } from '../support/scenarios/anthropic'
 import type { CradleWorld } from '../support/world'
 
 function automation(world: CradleWorld): AutomationPage {
@@ -11,6 +17,11 @@ Given('我已配置 Automation 报告 Claude Agent Simulator', async function (t
   await this.configureClaudeAgentChat({
     text: `${AUTOMATION_REPORT}\n\nCRADLE_AUTOMATION_RESULT: findings | ${AUTOMATION_SUMMARY}`,
   })
+  this.enqueueAnthropic(anthropicTextExchange({
+    label: 'automation-session-title',
+    text: AUTOMATION_SESSION_TITLE,
+    bodyTextIncludes: 'You are naming a Claude Agent task session',
+  }))
 })
 
 Given('当前工作区已有一个 Automation 定义', async function (this: CradleWorld) {

@@ -7,6 +7,7 @@ import type { WorkspaceFixture } from './workspace'
 
 export const AUTOMATION_REPORT = '自动化审阅发现了一项需要处理的问题。'
 export const AUTOMATION_SUMMARY = '需要处理一项审阅问题'
+export const AUTOMATION_SESSION_TITLE = '自动化工作区审阅'
 
 const DEFINITION_TITLE = '每日工作区审阅'
 const ARTIFACT_NAME = 'automation-review.md'
@@ -178,7 +179,7 @@ export class AutomationPage {
   async openLinkedSession(): Promise<void> {
     const sessionId = this.owner.recall<string>(SESSION_ID_KEY)
     await expect(this.page.locator(`[data-testid="session-title-${sessionId}"]`))
-      .toHaveText(`Automation: ${DEFINITION_TITLE}`, { timeout: TIMEOUT })
+      .toHaveText(AUTOMATION_SESSION_TITLE, { timeout: TIMEOUT })
     await this.owner.chat.openSession(sessionId)
   }
 
