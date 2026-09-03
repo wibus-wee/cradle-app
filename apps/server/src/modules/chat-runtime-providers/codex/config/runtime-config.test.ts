@@ -65,6 +65,22 @@ describe('buildCodexConfig MCP projection', () => {
     })
   })
 
+  it('enables the native update_plan tool independently of Codex defaults', () => {
+    const config = buildCodexConfig(
+      createCodexConfig(),
+      '/tmp/cradle-workspace',
+      () => [],
+      'gpt-5-codex',
+      { kind: 'none' },
+    )
+
+    expect(config.tools).toEqual({
+      update_plan: {
+        enabled: true,
+      },
+    })
+  })
+
   it('binds the active invocation to session-scoped MCP servers', () => {
     addHostMcpServer({
       transport: 'stdio',
