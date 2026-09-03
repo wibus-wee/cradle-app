@@ -369,12 +369,17 @@ export function closeSurfaceById(surfaceId: string): void {
   }
 
   const previousSurfaces = useSurfaceStore.getState().surfaces
+  const closedSurface = readSurface(surfaceId)
   const activeSurfaceId = readActiveSurfaceId()
   if (activeSurfaceId === surfaceId) {
     suppressRouteSurfaceSync(surfaceId)
   }
 
-  useSurfaceStore.getState().closeSurface(surfaceId)
+  const surfaceStore = useSurfaceStore.getState()
+  if (closedSurface?.closable) {
+    surfaceStore.rememberClosedSurface(closedSurface)
+  }
+  surfaceStore.closeSurface(surfaceId)
 
   if (activeSurfaceId !== surfaceId) {
     return
@@ -402,6 +407,15 @@ export function closeActiveSurface(): boolean {
     return false
   }
   closeSurfaceById(activeSurfaceId)
+  return true
+}
+
+export function reopenLastClosedSurface(): boolean {
+  const surface = useSurfaceStore.getState().lastClosedSurface
+  if (!surface) {
+    return false
+  }
+  navigateToSurface(surface)
   return true
 }
 

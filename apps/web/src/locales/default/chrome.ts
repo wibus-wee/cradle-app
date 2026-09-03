@@ -30,6 +30,8 @@ export default {
   'download.action.openOwnerRetry': 'Open owner to retry',
   'download.action.viewAll': 'Open Download Center',
   'download.error.last': 'Last error:',
+  'download.eta.remaining': '~{{duration}} left',
+  'download.rate.average': 'Avg {{rate}}/s',
   'download.status.cancelled': 'Cancelled',
   'download.status.completed': 'Completed',
   'download.status.downloading': 'Downloading',

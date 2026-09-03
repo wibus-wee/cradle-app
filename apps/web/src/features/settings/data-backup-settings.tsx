@@ -66,6 +66,7 @@ export function DataBackupSettings() {
     restoreDescription: t('backup.restore.description'),
     restoreAction: t('backup.restore.action'),
     unavailable: t('backup.unavailable'),
+    showExport: t('backup.status.showExport'),
     confirmTitle: t('backup.restore.confirmTitle'),
     confirmDescription: t('backup.restore.confirmDescription', { path: pendingRestorePath ?? '' }),
     confirmCancel: t('backup.restore.cancel'),
@@ -75,6 +76,21 @@ export function DataBackupSettings() {
   const formattedStatus = localError
     ? { message: localError, tone: 'error' as const }
     : formatBackupStatus(status, t)
+  const exportedArchivePath
+    = status?.phase === 'completed' && status.kind === 'export' ? status.archivePath : null
+
+  const showExport = async () => {
+    if (!nativeIpc || !exportedArchivePath) {
+      return
+    }
+    setLocalError(null)
+    try {
+      await nativeIpc.native.showItemInFolder(exportedArchivePath)
+    }
+    catch (error) {
+      setLocalError(error instanceof Error ? error.message : String(error))
+    }
+  }
 
   const exportBackup = async () => {
     if (!nativeIpc) {
@@ -139,9 +155,11 @@ export function DataBackupSettings() {
       busy={busy}
       statusMessage={formattedStatus.message}
       statusTone={formattedStatus.tone}
+      exportedArchivePath={exportedArchivePath}
       pendingRestorePath={pendingRestorePath}
       onExport={() => void exportBackup()}
       onChooseRestore={() => void chooseRestore()}
+      onShowExport={() => void showExport()}
       onCancelRestore={() => setPendingRestorePath(null)}
       onConfirmRestore={() => void confirmRestore()}
     />

@@ -15,7 +15,7 @@ export function ContextWindowViewerContainer({
   compactState,
   className,
 }: ContextWindowViewerContainerProps) {
-  const { data, isError, isLoading } = useQuery({
+  const { data, isError, isFetching, isLoading, refetch } = useQuery({
     queryKey: ['chat', 'context-window-usage', sessionId ?? 'no-session'],
     queryFn: ({ signal }) => getChatRuntimeContextUsage(sessionId!, signal),
     enabled: Boolean(sessionId),
@@ -33,6 +33,8 @@ export function ContextWindowViewerContainer({
       usage={data?.usage ?? null}
       compactState={compactState}
       loadState={isLoading ? 'loading' : isError ? 'error' : 'ready'}
+      retrying={isFetching}
+      onRetry={() => void refetch()}
       className={className}
     />
   )

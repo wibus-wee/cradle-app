@@ -832,7 +832,7 @@ function AppLayoutContent({
 
   useShortcut(
     'toggle-zen-sidebars',
-    { meta: true, key: '.', allowInEditable: true },
+    { mod: true, key: '.', allowInEditable: true },
     handleToggleZenSidebars,
   )
 

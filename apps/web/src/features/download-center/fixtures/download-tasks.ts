@@ -45,6 +45,7 @@ export const queuedDownloadTask = task('queued', {
 export const activeDownloadTask = task('downloading', {
   transferredBytes: 728_000_000,
   startedAt: '2026-07-23T10:00:03.000Z',
+  updatedAt: '2026-07-23T10:02:03.000Z',
 })
 
 export const verifyingDownloadTask = task('verifying', {

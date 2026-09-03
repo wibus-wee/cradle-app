@@ -1,4 +1,5 @@
 export default {
+  'action.retry': 'Retry',
   'branch.create.cancel': 'Cancel branch creation',
   'branch.create.description': 'Based on {{branch}}, create and switch to the new branch. Press Enter to confirm.',
   'branch.create.creating': 'Creating...',
@@ -31,6 +32,9 @@ export default {
   'changes.viewMode.type': 'Type',
   'changes.viewMode.typeLabel': 'Show changes by type',
   'graphRow.justNow': 'Just now',
+  'graphRow.copyError': 'Could not copy commit SHA',
+  'graphRow.copySha': 'Copy full commit SHA',
+  'graphRow.copySuccess': 'Commit SHA copied',
   'graphRow.mergedFrom': 'Merged from {{sha}}',
   'panel.emptyWorkspace': 'Select a workspace first',
   'panel.error': 'Not a Git repository or permission denied',

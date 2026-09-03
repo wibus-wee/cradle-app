@@ -34,8 +34,10 @@ function ContextUsageStoryScene({ state }: ContextUsageStorySceneProps) {
           compactState={compactState}
           runtimeUsageState={runtimeUsageState}
           loadState={loadState}
+          retrying={false}
           onClose={() => setLastAction('Closed detail panel')}
           onOpenReport={() => setLastAction('Opened context report')}
+          onRetry={() => setLastAction('Retried context usage')}
         />
         <p className="text-xs text-muted-foreground" role="status">{lastAction}</p>
       </div>
@@ -44,6 +46,8 @@ function ContextUsageStoryScene({ state }: ContextUsageStorySceneProps) {
           usage={usage}
           compactState={compactState}
           loadState={loadState}
+          retrying={false}
+          onRetry={() => setLastAction('Retried context usage')}
         />
       </div>
     </main>

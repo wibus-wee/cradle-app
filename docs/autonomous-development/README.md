@@ -37,6 +37,23 @@ Chronological index of independently shipped product improvements.
 
 ## 2026-08-31
 
+### Desktop and web
+
+1. [Reveal exported backups](./2026-08-31-01-reveal-exported-backup.md)
+2. [Reopen the last closed surface](./2026-08-31-02-reopen-closed-surface.md)
+3. [Make global shortcuts cross-platform](./2026-08-31-03-cross-platform-global-shortcuts.md)
+4. [Start New Work from the command palette](./2026-08-31-04-new-work-command.md)
+5. [Show average download throughput](./2026-08-31-07-download-throughput.md)
+6. [Copy full commit SHAs from Git history](./2026-08-31-09-copy-commit-sha.md)
+7. [Retry Git panel load failures](./2026-08-31-11-retry-git-panels.md)
+8. [Copy the active workspace path from the command palette](./2026-08-31-12-copy-workspace-path-command.md)
+9. [Estimate active download completion](./2026-08-31-16-download-eta.md)
+10. [Retry context usage in place](./2026-08-31-18-context-usage-retry.md)
+11. [Review workspace changes from the command palette](./2026-08-31-22-review-workspace-command.md)
+12. [Carry workspace context into palette creation](./2026-08-31-30-palette-create-workspace-context.md)
+
+### Mobile
+
 1. [Search active Work on Mobile](./2026-08-31-01-search-mobile-work.md)
 2. [Focus Mobile Work by activity](./2026-08-31-02-filter-mobile-work-activity.md)
 3. [Show live server health on Mobile](./2026-08-31-03-mobile-connection-health.md)

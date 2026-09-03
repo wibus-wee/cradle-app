@@ -9,6 +9,16 @@ files, conversations, issues, and workspaces.
   prefetch.
 - `global-search-dialog-content.tsx` owns palette data hooks, browser-panel
   actions, command history, and application navigation.
+- App commands include one-shot recovery for the most recently user-closed
+  surface. The command is omitted when navigation has no recovery target.
+- Primary creation commands open New Chat and New Work through their existing
+  navigation owners. When the active surface resolves to a workspace, both
+  commands carry that context forward and show its name in the palette row.
+- Workspace-aware surfaces expose a Copy workspace path command. It uses the
+  workspace owner's canonical local or remote location label and reports
+  clipboard success or failure through app toasts.
+- Eligible active workspaces expose a Review workspace changes command that
+  opens the existing Cradle Diffs surface without routing through the aside.
 - `global-search-dialog-view.tsx` receives the current mode, query,
   owner-typed `PaletteData`, and callbacks. It owns only dialog focus, keyboard
   cycling, empty-query Backspace recovery to All, and presentation.

@@ -42,7 +42,7 @@ export const BUILT_IN_SHORTCUT_GROUPS: readonly BuiltInShortcutGroup[] = [
       {
         labelKey: 'shortcut.builtIn.settings.label',
         descriptionKey: 'shortcut.builtIn.settings.description',
-        keys: ['⌘,'],
+        keys: ['⌘,', 'Ctrl ,'],
       },
       {
         labelKey: 'shortcut.builtIn.commandPalette.label',
@@ -57,12 +57,17 @@ export const BUILT_IN_SHORTCUT_GROUPS: readonly BuiltInShortcutGroup[] = [
       {
         labelKey: 'shortcut.builtIn.newChat.label',
         descriptionKey: 'shortcut.builtIn.newChat.description',
-        keys: ['⌘T'],
+        keys: ['⌘T', 'Ctrl T'],
       },
       {
         labelKey: 'shortcut.builtIn.closeSurface.label',
         descriptionKey: 'shortcut.builtIn.closeSurface.description',
-        keys: ['⌘W'],
+        keys: ['⌘W', 'Ctrl W'],
+      },
+      {
+        labelKey: 'shortcut.builtIn.reopenSurface.label',
+        descriptionKey: 'shortcut.builtIn.reopenSurface.description',
+        keys: ['⇧⌘T', 'Ctrl ⇧T'],
       },
       {
         labelKey: 'shortcut.builtIn.switchSurface.label',
@@ -77,12 +82,12 @@ export const BUILT_IN_SHORTCUT_GROUPS: readonly BuiltInShortcutGroup[] = [
       {
         labelKey: 'shortcut.builtIn.sidebar.label',
         descriptionKey: 'shortcut.builtIn.sidebar.description',
-        keys: ['⌘B'],
+        keys: ['⌘B', 'Ctrl B'],
       },
       {
         labelKey: 'shortcut.builtIn.rightAside.label',
         descriptionKey: 'shortcut.builtIn.rightAside.description',
-        keys: ['⌘⌥B'],
+        keys: ['⌘⌥B', 'Ctrl Alt B'],
       },
       {
         labelKey: 'shortcut.builtIn.bottomPanel.label',
@@ -97,12 +102,12 @@ export const BUILT_IN_SHORTCUT_GROUPS: readonly BuiltInShortcutGroup[] = [
       {
         labelKey: 'shortcut.builtIn.jarvis.label',
         descriptionKey: 'shortcut.builtIn.jarvis.description',
-        keys: ['⌘J'],
+        keys: ['⌘J', 'Ctrl J'],
       },
       {
         labelKey: 'shortcut.builtIn.layoutFocus.label',
         descriptionKey: 'shortcut.builtIn.layoutFocus.description',
-        keys: ['⌘.'],
+        keys: ['⌘.', 'Ctrl .'],
       },
     ],
   },

@@ -1,6 +1,7 @@
-import { Dashboard2Line as GaugeIcon } from '@mingcute/react'
+import { Dashboard2Line as GaugeIcon, Refresh1Line as RefreshIcon } from '@mingcute/react'
 import { m } from 'motion/react'
 
+import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/cn'
 import { clampPercent, formatTokenCount } from '~/lib/number-format'
 
@@ -16,10 +17,12 @@ import {
   readContextUsageSections,
 } from '../lib/context-usage'
 
-interface ContextWindowViewerViewProps {
+export interface ContextWindowViewerViewProps {
   usage: ChatRuntimeContextUsage | null
   compactState?: ChatRuntimeCompactUiSlotState | null
   loadState: 'loading' | 'error' | 'ready'
+  retrying: boolean
+  onRetry: () => void
   className?: string
 }
 
@@ -42,6 +45,8 @@ export function ContextWindowViewerView({
   usage,
   compactState,
   loadState,
+  retrying,
+  onRetry,
   className,
 }: ContextWindowViewerViewProps) {
   const aggregate = readContextUsageAggregate(usage, compactState)
@@ -56,11 +61,26 @@ export function ContextWindowViewerView({
           <GaugeIcon className="size-3.5" aria-hidden="true" />
           <span>Context window</span>
         </div>
-        {aggregate && (
+        {loadState === 'error'
+          ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={onRetry}
+                disabled={retrying}
+                className="size-6 rounded-md text-(--color-neutral-6) hover:bg-(--color-neutral-3) hover:text-foreground"
+                aria-label="Retry context usage"
+                title="Retry context usage"
+              >
+                <RefreshIcon className={cn('size-3.5', retrying && 'animate-spin')} aria-hidden="true" />
+              </Button>
+            )
+          : aggregate && (
           <span className="shrink-0 rounded-md bg-(--color-neutral-3) px-1.5 py-0.5 text-[10px] tabular-nums text-(--color-neutral-6)">
             {aggregate.percentage === null ? 'unknown' : `${usagePercent}%`}
           </span>
-        )}
+          )}
       </div>
 
       <div className="space-y-2.5 rounded-lg bg-(--color-neutral-2) p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-1px_0_rgba(0,0,0,0.04)]">

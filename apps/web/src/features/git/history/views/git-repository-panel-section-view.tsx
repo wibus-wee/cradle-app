@@ -28,7 +28,9 @@ export interface GitRepositoryPanelSectionViewProps {
   graphFetching: boolean
   fetchPending: boolean
   renderBranchPicker: (trigger: ReactNode) => ReactNode
+  onCopyCommit: (sha: string) => void
   onFetch: () => void
+  onRetry: () => void
   onLoadMore?: () => void
 }
 
@@ -40,7 +42,9 @@ export function GitRepositoryPanelSectionView({
   graphFetching,
   fetchPending,
   renderBranchPicker,
+  onCopyCommit,
   onFetch,
+  onRetry,
   onLoadMore,
 }: GitRepositoryPanelSectionViewProps) {
   const { t } = useTranslation('git')
@@ -133,7 +137,19 @@ export function GitRepositoryPanelSectionView({
         : graphStatus === 'error'
           ? (
             <div className="flex flex-1 items-center justify-center p-4 text-center" data-testid="git-commit-graph-error">
-              <p className="text-xs text-muted-foreground">{t('panel.graphError')}</p>
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-xs text-muted-foreground">{t('panel.graphError')}</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onRetry}
+                  disabled={graphFetching}
+                >
+                  <RefreshCwIcon className={cn('size-3.5', graphFetching && 'animate-spin')} aria-hidden />
+                  {t('action.retry')}
+                </Button>
+              </div>
             </div>
             )
           : commits.length === 0
@@ -158,7 +174,11 @@ export function GitRepositoryPanelSectionView({
                       onScroll={handleRangeChange}
                     >
                       {commits.map(commit => (
-                        <GitGraphRowView key={commit.sha} commit={commit} />
+                        <GitGraphRowView
+                          key={commit.sha}
+                          commit={commit}
+                          onCopySha={onCopyCommit}
+                        />
                       ))}
                     </VList>
                   </div>

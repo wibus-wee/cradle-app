@@ -3,7 +3,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 
-import { downloadStatusKey, retryDestination } from './presentation'
+import { averageTransferRateBytesPerSecond, downloadStatusKey, estimatedRemainingSeconds, retryDestination } from './presentation'
 import type { DownloadTask } from './types'
 import { downloadTaskKey } from './types'
 import {
@@ -81,6 +81,36 @@ describe('download Center projection', () => {
       message: 'https://secret.example/path?token=nope',
       retryable: true,
     })
+  })
+
+  it('derives average transfer rate from reported progress timestamps', () => {
+    expect(averageTransferRateBytesPerSecond(task({
+      transferredBytes: 4_000_000,
+      startedAt: '2026-01-01T00:00:02.000Z',
+      updatedAt: '2026-01-01T00:00:04.000Z',
+    }))).toBe(2_000_000)
+    expect(averageTransferRateBytesPerSecond(task({ startedAt: null }))).toBeNull()
+    expect(averageTransferRateBytesPerSecond(task({
+      transferredBytes: 0,
+      startedAt: '2026-01-01T00:00:02.000Z',
+      updatedAt: '2026-01-01T00:00:04.000Z',
+    }))).toBeNull()
+  })
+
+  it('estimates remaining time only from complete transfer measurements', () => {
+    expect(estimatedRemainingSeconds(task({
+      transferredBytes: 4_000_000,
+      totalBytes: 10_000_000,
+      startedAt: '2026-01-01T00:00:02.000Z',
+      updatedAt: '2026-01-01T00:00:04.000Z',
+    }))).toBe(3)
+    expect(estimatedRemainingSeconds(task({ totalBytes: null }))).toBeNull()
+    expect(estimatedRemainingSeconds(task({
+      transferredBytes: 100,
+      totalBytes: 100,
+      startedAt: '2026-01-01T00:00:00.000Z',
+    }))).toBeNull()
+    expect(estimatedRemainingSeconds(task({ startedAt: null }))).toBeNull()
   })
 
   it('refreshes an owner selector on remount after it unsubscribed while a global subscriber remained', () => {

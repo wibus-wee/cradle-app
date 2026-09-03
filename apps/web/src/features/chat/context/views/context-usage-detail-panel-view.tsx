@@ -1,4 +1,4 @@
-import { CloseLine as XIcon } from '@mingcute/react'
+import { CloseLine as XIcon, Refresh1Line as RefreshIcon } from '@mingcute/react'
 import { AnimatePresence, m } from 'motion/react'
 
 import { Button } from '~/components/ui/button'
@@ -20,13 +20,15 @@ import {
   readContextUsageSectionShareTotal,
 } from '../lib/context-usage'
 
-interface ContextUsageDetailPanelViewProps {
+export interface ContextUsageDetailPanelViewProps {
   usage: ChatRuntimeContextUsage | null
   compactState?: ChatRuntimeCompactUiSlotState | null
   runtimeUsageState?: ChatRuntimeUsageUiSlotState | null
   loadState: 'loading' | 'error' | 'ready'
+  retrying: boolean
   onClose: () => void
   onOpenReport: () => void
+  onRetry: () => void
 }
 
 const sectionAccentClasses: Record<string, { dot: string, bar: string }> = {
@@ -49,8 +51,10 @@ export function ContextUsageDetailPanelView({
   compactState,
   runtimeUsageState,
   loadState,
+  retrying,
   onClose,
   onOpenReport,
+  onRetry,
 }: ContextUsageDetailPanelViewProps) {
   const aggregate = readContextUsageAggregate(usage, compactState)
   const sections = readContextUsageSections(usage)
@@ -76,6 +80,20 @@ export function ContextUsageDetailPanelView({
           <div className="text-[11px] leading-4 text-text-tertiary">{subtitle}</div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
+          {loadState === 'error' && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={onRetry}
+              disabled={retrying}
+              className="size-6 rounded-md text-text-tertiary hover:bg-muted hover:text-foreground"
+              aria-label="Retry context usage"
+              title="Retry context usage"
+            >
+              <RefreshIcon className={cn('size-3.5', retrying && 'animate-spin')} aria-hidden="true" />
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"

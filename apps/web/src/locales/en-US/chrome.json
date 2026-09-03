@@ -21,6 +21,8 @@
   "download.action.viewAll": "Open Download Center",
   "download.empty": "No downloads yet",
   "download.error.last": "Last error:",
+  "download.eta.remaining": "~{{duration}} left",
+  "download.rate.average": "Avg {{rate}}/s",
   "download.recent": "Recent",
   "download.scope.desktop": "Desktop",
   "download.scope.server": "Server",

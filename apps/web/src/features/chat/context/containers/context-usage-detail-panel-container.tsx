@@ -26,7 +26,7 @@ export function ContextUsageDetailPanelContainer({
     state => state.openContextUsageReportTab,
   )
   const browserPanelOwnerId = useBrowserPanelStore(state => state.activeOwnerId)
-  const { data, isError, isLoading } = useQuery({
+  const { data, isError, isFetching, isLoading, refetch } = useQuery({
     queryKey: ['chat', 'context-window-usage', sessionId ?? 'no-session'],
     queryFn: ({ signal }) => getChatRuntimeContextUsage(sessionId!, signal),
     enabled: Boolean(sessionId),
@@ -45,11 +45,13 @@ export function ContextUsageDetailPanelContainer({
       compactState={compactState}
       runtimeUsageState={runtimeUsageState}
       loadState={isLoading ? 'loading' : isError ? 'error' : 'ready'}
+      retrying={isFetching}
       onClose={onClose}
       onOpenReport={() => {
         openContextUsageReportTab({ sessionId, ownerId: browserPanelOwnerId })
         onClose()
       }}
+      onRetry={() => void refetch()}
     />
   )
 }
