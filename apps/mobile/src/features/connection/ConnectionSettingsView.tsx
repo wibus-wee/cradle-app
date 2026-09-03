@@ -7,18 +7,14 @@ import { SectionHeading } from '@/components/ui/section-heading'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-export type ConnectionSetting = 'server' | 'token'
+import type { ConnectionSettingsViewProps } from './connection-settings-view-contract'
 
-export interface ConnectionSettingsViewProps {
-  error?: string | null
-  onChangeValue: (value: string) => void
-  setting: ConnectionSetting
-  value: string
-}
+export type { ConnectionSetting, ConnectionSettingsViewProps } from './connection-settings-view-contract'
 
 export function ConnectionSettingsView({
   error = null,
   onChangeValue,
+  onSubmit,
   setting,
   value,
 }: ConnectionSettingsViewProps) {
@@ -48,6 +44,7 @@ export function ConnectionSettingsView({
               autoFocus
               keyboardType={isServer ? 'url' : 'default'}
               onChangeText={onChangeValue}
+              onSubmitEditing={onSubmit}
               placeholder={isServer
                 ? 'http://192.168.1.20:21423'
                 : 'Required for protected servers'}

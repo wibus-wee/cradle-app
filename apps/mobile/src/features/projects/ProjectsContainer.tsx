@@ -9,18 +9,27 @@ import { useCreateWork } from '@/features/work/use-create-work'
 import { cradleRequest } from '@/lib/api'
 import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
-import { useSessionSummaryEvents } from '@/lib/use-session-summary-events'
 
 import { ProjectsView } from './ProjectsView'
 
-export function ProjectsContainer() {
+interface ProjectsContainerProps {
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch: boolean
+}
+
+export function ProjectsContainer({
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch,
+}: ProjectsContainerProps) {
   const { connection } = useConnection()
   const create = useCreateWork()
   const isRouteActive = useRouteIsActive()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['projects', connection?.url],
+    queryKey: ['projects', connection?.resourceId],
     queryFn: async ({ signal }) => {
       const [workspaces, sessions] = await Promise.all([
         cradleRequest<GetWorkspacesResponse>(connection!, '/workspaces', { signal }),
@@ -38,8 +47,6 @@ export function ProjectsContainer() {
         )
     },
   })
-  useSessionSummaryEvents(connection, isRouteActive, () => { void query.refetch() })
-
   const refresh = async () => {
     setIsRefreshing(true)
     try {
@@ -61,8 +68,8 @@ export function ProjectsContainer() {
       <ErrorState
         title="Could not load projects"
         description={errorMessage(query.error)}
-        onRetry={() => void query.refetch()}
-        retrying={query.isFetching}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
       />
     )
   }
@@ -71,11 +78,14 @@ export function ProjectsContainer() {
       isCreating={create.isPending}
       isRefreshing={isRefreshing}
       onCreate={input => create.mutate(input)}
-      onNavigate={section => router.replace(`/(tabs)/${section}`)}
+      onOpenFiles={workspaceId => router.push(`/workspace/${workspaceId}/files`)}
       onOpenUsage={() => router.push('/usage')}
       onOpenProject={workspaceId => router.push(`/workspace/${workspaceId}`)}
-      onRefresh={() => void refresh()}
+      onRefresh={refresh}
+      onSearchQueryChange={onSearchQueryChange}
       projects={query.data}
+      searchQuery={searchQuery}
+      showsInlineSearch={showsInlineSearch}
     />
   )
 }

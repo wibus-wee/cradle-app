@@ -76,12 +76,13 @@ type JoinRequestResult struct {
 }
 
 type Grant struct {
-	ID           string           `json:"grantId"`
-	FabricID     string           `json:"fabricId"`
-	ControllerID string           `json:"controllerId"`
-	NodeID       string           `json:"nodeId"`
-	Scope        membership.Scope `json:"scope"`
-	RevokedAt    *time.Time       `json:"revokedAt,omitempty"`
+	ID                    string           `json:"grantId"`
+	FabricID              string           `json:"fabricId"`
+	ControllerID          string           `json:"controllerId"`
+	ControllerDisplayName string           `json:"controllerDisplayName,omitempty"`
+	NodeID                string           `json:"nodeId"`
+	Scope                 membership.Scope `json:"scope"`
+	RevokedAt             *time.Time       `json:"revokedAt,omitempty"`
 }
 
 func OpenStore(cfg StoreConfig) (*Store, error) {
@@ -470,7 +471,7 @@ func (s *Store) ApproveControllerJoinRequest(ctx context.Context, requestID stri
 }
 
 func validateControllerEnrollment(certificate membership.Certificate, grants []Grant) error {
-	if certificate.NodeID == "" || len(grants) == 0 {
+	if certificate.NodeID != "" || len(grants) == 0 {
 		return ErrAccessDenied
 	}
 	certificateScopes := make(map[membership.Scope]struct{}, len(certificate.Scopes))
@@ -480,13 +481,31 @@ func validateControllerEnrollment(certificate membership.Certificate, grants []G
 		}
 		certificateScopes[scope] = struct{}{}
 	}
+	grantScopes := make(map[membership.Scope]struct{}, len(grants))
+	grantIDs := make(map[string]struct{}, len(grants))
+	grantKeys := make(map[string]struct{}, len(grants))
+	hasControl := false
 	for _, grant := range grants {
-		if grant.ID == "" || grant.FabricID != certificate.FabricID || grant.ControllerID != certificate.SubjectID || grant.NodeID != certificate.NodeID || !isControllerEnrollmentScope(grant.Scope) {
+		if grant.ID == "" || grant.FabricID != certificate.FabricID || grant.ControllerID != certificate.SubjectID || grant.NodeID == "" || !isControllerEnrollmentScope(grant.Scope) {
 			return ErrAccessDenied
 		}
 		if _, authorized := certificateScopes[grant.Scope]; !authorized {
 			return ErrAccessDenied
 		}
+		if _, duplicate := grantIDs[grant.ID]; duplicate {
+			return ErrAccessDenied
+		}
+		grantKey := grant.NodeID + "\x00" + string(grant.Scope)
+		if _, duplicate := grantKeys[grantKey]; duplicate {
+			return ErrAccessDenied
+		}
+		grantIDs[grant.ID] = struct{}{}
+		grantKeys[grantKey] = struct{}{}
+		grantScopes[grant.Scope] = struct{}{}
+		hasControl = hasControl || grant.Scope == membership.ScopeControl
+	}
+	if !hasControl || len(grantScopes) != len(certificateScopes) {
+		return ErrAccessDenied
 	}
 	return nil
 }
@@ -508,7 +527,29 @@ func (s *Store) RegisterController(ctx context.Context, certificate membership.C
 }
 
 func registerControllerInTx(ctx context.Context, tx *sql.Tx, certificate membership.Certificate, grants []Grant, now int64) error {
-	_, err := tx.ExecContext(ctx, `
+	var revoked int
+	err := tx.QueryRowContext(ctx, `
+		SELECT 1 FROM revocations WHERE fabric_id = ? AND subject_id = ? LIMIT 1
+	`, certificate.FabricID, certificate.SubjectID).Scan(&revoked)
+	if err == nil {
+		return ErrAccessDenied
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("checking controller revocation: %w", err)
+	}
+	for _, grant := range grants {
+		if grant.ID == "" || grant.FabricID != certificate.FabricID || grant.ControllerID != certificate.SubjectID || grant.NodeID == "" || grant.Scope == "" {
+			return ErrAccessDenied
+		}
+		var exists int
+		if err := tx.QueryRowContext(ctx, `SELECT 1 FROM nodes WHERE fabric_id = ? AND node_id = ?`, certificate.FabricID, grant.NodeID).Scan(&exists); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrAccessDenied
+			}
+			return fmt.Errorf("validating grant node: %w", err)
+		}
+	}
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO principals (fabric_id, subject_id, subject_kind, identity_pubkey, encryption_pubkey, certificate_json, created_at)
 		VALUES (?, ?, 'controller', ?, ?, ?, ?)
 		ON CONFLICT(fabric_id, subject_id, subject_kind) DO UPDATE SET
@@ -520,9 +561,6 @@ func registerControllerInTx(ctx context.Context, tx *sql.Tx, certificate members
 		return fmt.Errorf("persisting controller: %w", err)
 	}
 	for _, grant := range grants {
-		if grant.ID == "" || grant.FabricID != certificate.FabricID || grant.ControllerID != certificate.SubjectID || grant.NodeID == "" || grant.Scope == "" {
-			return ErrAccessDenied
-		}
 		result, err := tx.ExecContext(ctx, `
 			INSERT INTO node_grants (grant_id, fabric_id, controller_id, node_id, scope, created_at)
 			VALUES (?, ?, ?, ?, ?, ?)
@@ -620,6 +658,10 @@ func (s *Store) ControllerExists(ctx context.Context, fabricID, controllerID, id
 	err := s.db.QueryRowContext(ctx, `
 		SELECT 1 FROM principals
 		WHERE fabric_id = ? AND subject_id = ? AND subject_kind = 'controller' AND identity_pubkey = ?
+		  AND NOT EXISTS (
+			SELECT 1 FROM revocations r
+			WHERE r.fabric_id = principals.fabric_id AND r.subject_id = principals.subject_id
+		  )
 		LIMIT 1
 	`, fabricID, controllerID, identityPubkey).Scan(&found)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -629,6 +671,91 @@ func (s *Store) ControllerExists(ctx context.Context, fabricID, controllerID, id
 		return false, fmt.Errorf("checking controller membership: %w", err)
 	}
 	return true, nil
+}
+
+// RevokeController permanently invalidates one non-admin Controller principal,
+// revokes all of its grants atomically, and advances the Fabric revision.
+func (s *Store) RevokeController(ctx context.Context, fabricID, controllerID, reason string) ([]string, int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
+	var certificateJSON string
+	if err := tx.QueryRowContext(ctx, `
+		SELECT certificate_json FROM principals
+		WHERE fabric_id = ? AND subject_id = ? AND subject_kind = 'controller'
+	`, fabricID, controllerID).Scan(&certificateJSON); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, 0, ErrAccessDenied
+		}
+		return nil, 0, err
+	}
+	var certificate membership.Certificate
+	if err := json.Unmarshal([]byte(certificateJSON), &certificate); err != nil {
+		return nil, 0, fmt.Errorf("decoding Controller certificate: %w", err)
+	}
+	if membership.HasAnyScope(certificate.Scopes, membership.ScopeAdmin) {
+		return nil, 0, ErrAccessDenied
+	}
+	var alreadyRevoked int
+	err = tx.QueryRowContext(ctx, `
+		SELECT 1 FROM revocations WHERE fabric_id = ? AND subject_id = ? LIMIT 1
+	`, fabricID, controllerID).Scan(&alreadyRevoked)
+	if err == nil {
+		var revision int64
+		if getErr := tx.QueryRowContext(ctx, `SELECT revision FROM fabrics WHERE fabric_id = ?`, fabricID).Scan(&revision); getErr != nil {
+			return nil, 0, getErr
+		}
+		return []string{}, revision, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return nil, 0, err
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT DISTINCT node_id FROM node_grants
+		WHERE fabric_id = ? AND controller_id = ? AND revoked_at IS NULL
+		ORDER BY node_id
+	`, fabricID, controllerID)
+	if err != nil {
+		return nil, 0, err
+	}
+	nodeIDs := []string{}
+	for rows.Next() {
+		var nodeID string
+		if err := rows.Scan(&nodeID); err != nil {
+			rows.Close()
+			return nil, 0, err
+		}
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, 0, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	revision, err := nextRevision(ctx, tx, fabricID)
+	if err != nil {
+		return nil, 0, err
+	}
+	now := s.now().UTC().UnixMilli()
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO revocations (fabric_id, subject_id, reason, revoked_at)
+		VALUES (?, ?, ?, ?)
+	`, fabricID, controllerID, reason, now); err != nil {
+		return nil, 0, fmt.Errorf("persisting Controller revocation: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		UPDATE node_grants SET revoked_at = ?
+		WHERE fabric_id = ? AND controller_id = ? AND revoked_at IS NULL
+	`, now, fabricID, controllerID); err != nil {
+		return nil, 0, fmt.Errorf("revoking Controller grants: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, 0, err
+	}
+	return nodeIDs, revision, nil
 }
 
 func (s *Store) NodeExists(ctx context.Context, fabricID, nodeID, identityPubkey string) (bool, error) {
@@ -794,9 +921,25 @@ func (s *Store) RemoveNode(ctx context.Context, fabricID, nodeID string) (NodeSu
 // rows, so an owner can audit and revoke access. Grants carry no secret data.
 func (s *Store) ListNodeGrants(ctx context.Context, fabricID, nodeID string) ([]Grant, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT grant_id, fabric_id, controller_id, node_id, scope, revoked_at FROM node_grants
-		WHERE fabric_id = ? AND node_id = ?
-		ORDER BY created_at, grant_id
+		SELECT
+			g.grant_id,
+			g.fabric_id,
+			g.controller_id,
+			(
+				SELECT j.display_name
+				FROM join_requests j
+				WHERE j.fabric_id = g.fabric_id
+					AND j.subject_id = g.controller_id
+					AND j.approved_at IS NOT NULL
+				ORDER BY j.approved_at DESC, j.created_at DESC
+				LIMIT 1
+			),
+			g.node_id,
+			g.scope,
+			g.revoked_at
+		FROM node_grants g
+		WHERE g.fabric_id = ? AND g.node_id = ?
+		ORDER BY g.created_at, g.grant_id
 	`, fabricID, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("listing node grants: %w", err)
@@ -805,9 +948,13 @@ func (s *Store) ListNodeGrants(ctx context.Context, fabricID, nodeID string) ([]
 	grants := []Grant{}
 	for rows.Next() {
 		var grant Grant
+		var controllerDisplayName sql.NullString
 		var revokedAt sql.NullInt64
-		if err := rows.Scan(&grant.ID, &grant.FabricID, &grant.ControllerID, &grant.NodeID, &grant.Scope, &revokedAt); err != nil {
+		if err := rows.Scan(&grant.ID, &grant.FabricID, &grant.ControllerID, &controllerDisplayName, &grant.NodeID, &grant.Scope, &revokedAt); err != nil {
 			return nil, err
+		}
+		if controllerDisplayName.Valid {
+			grant.ControllerDisplayName = controllerDisplayName.String
 		}
 		if revokedAt.Valid {
 			at := time.UnixMilli(revokedAt.Int64).UTC()

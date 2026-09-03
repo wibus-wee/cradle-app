@@ -6,6 +6,7 @@ import { isDesktopUpdateSupported } from './update-manager'
 export interface ApplicationMenuActions {
   checkForUpdates: () => void
   openSettings: () => void
+  quit: (triggeredByCommandQ: boolean) => void
 }
 
 /**
@@ -21,6 +22,7 @@ export function setupApplicationMenu(actions: ApplicationMenuActions): void {
   const zh = app.getLocale().startsWith('zh')
   const labels = {
     checkForUpdates: zh ? '检查更新…' : 'Check for Updates…',
+    quit: zh ? `退出 ${app.name}` : `Quit ${app.name}`,
     settings: zh ? '设置…' : 'Settings…',
   }
 
@@ -46,7 +48,11 @@ export function setupApplicationMenu(actions: ApplicationMenuActions): void {
         { role: 'hideOthers' },
         { role: 'unhide' },
         { type: 'separator' },
-        { role: 'quit' },
+        {
+          label: labels.quit,
+          accelerator: 'Command+Q',
+          click: (_menuItem, _window, event) => actions.quit(event.triggeredByAccelerator === true),
+        },
       ],
     },
     { role: 'editMenu' },

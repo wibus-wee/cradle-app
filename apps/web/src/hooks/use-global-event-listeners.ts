@@ -16,14 +16,13 @@ import { useGlobalSessionEventSync } from '~/features/workspace/use-global-sessi
 import { isSessionsQueryKey, updateSessionReadState } from '~/features/workspace/use-session'
 import { useShortcut } from '~/hooks/use-shortcut'
 import { isElectron, isTearoffWindow, nativeIpc, platform } from '~/lib/electron'
-import { useActiveSurface } from '~/navigation/active-surface'
 import {
   activateAdjacentSurface,
   closeActiveSurface,
   openNewChat,
   reopenLastClosedSurface,
 } from '~/navigation/navigation-commands'
-import { chatSessionIdForSurface, HOME_SURFACE_ID } from '~/navigation/surface-identity'
+import { HOME_SURFACE_ID } from '~/navigation/surface-identity'
 import { useSurfaceStore } from '~/navigation/surface-store'
 import {
   BROWSER_PANEL_WEBVIEW_TAB_SHORTCUT_CHANNEL,
@@ -62,7 +61,6 @@ export function useGlobalEventListeners(
   useGlobalSessionEventSync(queryClient)
   const toggleBottomPanel = useLayoutStore(s => s.toggleBottomPanel)
   const toggleAside = useLayoutStore(s => s.toggleAside)
-  const visibleSessionId = chatSessionIdForSurface(useActiveSurface())
   const workspacePath = options.workspacePath
 
   // Chrome layout chords must work from Composer (contenteditable) and the
@@ -176,21 +174,6 @@ export function useGlobalEventListeners(
       }) ?? (() => {})
     )
   }, [])
-
-  useEffect(() => {
-    useSessionActivityStore.getState().setVisibleSession(visibleSessionId)
-    if (!visibleSessionId) {
-      return
-    }
-
-    void postSessionsByIdRead({ path: { id: visibleSessionId } })
-      .then(({ data }) => {
-        if (data) {
-          updateSessionReadState(queryClient, data)
-        }
-      })
-      .catch(() => {})
-  }, [queryClient, visibleSessionId])
 
   useEffect(() => {
     return onChatRunSettled(({ chatSessionId }) => {

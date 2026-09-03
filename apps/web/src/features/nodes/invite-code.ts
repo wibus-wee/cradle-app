@@ -29,3 +29,17 @@ export function decodeInviteCode<T = unknown>(code: string): T | null {
     return null
   }
 }
+
+export interface ControllerPairingCode {
+  version: 1
+  relayUrl: string
+  fabricId: string
+  ownerPubkey: string
+}
+
+/** Encode the durable trust bootstrap shared with Controller-only clients. */
+export function encodeControllerPairingCode(
+  membership: Omit<ControllerPairingCode, 'version'>,
+): string {
+  return encodeInviteCode({ version: 1, ...membership })
+}

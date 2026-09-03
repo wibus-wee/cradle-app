@@ -27,6 +27,11 @@ function createSession(overrides: Partial<WorkspaceSession> & Pick<WorkspaceSess
     lastReadAt: null,
     createdAt: now,
     updatedAt: now,
+    activityAt: overrides.activityAt ?? Math.max(
+      overrides.createdAt ?? now,
+      overrides.latestUserMessageAt ?? 0,
+      overrides.latestAssistantMessageAt ?? 0,
+    ),
     latestUserMessageAt: null,
     latestAssistantMessageAt: null,
     unread: false,
@@ -181,6 +186,31 @@ describe('groupSidebarSessions', () => {
     })
 
     expect(section.entries.map(({ session }) => session.id)).toEqual(['pinned', 'new', 'old'])
+  })
+
+  it('uses completed assistant activity when ordering sessions', () => {
+    const [section] = groupSidebarSessions({
+      ...baseGroupingInput([
+        entry(createSession({
+          id: 'new-user-message',
+          latestUserMessageAt: NOW_SECONDS - 60,
+          activityAt: NOW_SECONDS - 60,
+        })),
+        entry(createSession({
+          id: 'new-assistant-reply',
+          latestUserMessageAt: NOW_SECONDS - 180,
+          latestAssistantMessageAt: NOW_SECONDS - 30,
+          activityAt: NOW_SECONDS - 30,
+        })),
+      ]),
+      grouping: 'updated',
+      now: NOW_MS,
+    })
+
+    expect(section.entries.map(({ session }) => session.id)).toEqual([
+      'new-assistant-reply',
+      'new-user-message',
+    ])
   })
 
   it('groups by environment with a local bucket and named Node buckets', () => {

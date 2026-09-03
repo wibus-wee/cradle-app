@@ -72,7 +72,7 @@ import type {
   SubmitSessionSteerTurnInput,
   UpdateSessionQueueItemInput,
 } from './queue/session-queue'
-import { listPendingQueueRows } from './queue/session-queue'
+import { listPendingQueueRows, listPendingQueueSessionIds } from './queue/session-queue'
 import { createActiveRunReleaseController } from './run/active-run-release'
 import {
   finalizeActiveRunSnapshot,
@@ -685,6 +685,18 @@ export async function recoverPersistedRunProjections(): Promise<ChatRuntimeRecov
   }
 
   return recovered
+}
+
+/** Resume durable continuations only after runtimes and plugins are ready to create runs. */
+export function resumePersistedSessionQueues(): number {
+  const sessionIds = listPendingQueueSessionIds()
+  for (const sessionId of sessionIds) {
+    scheduleSessionQueueDrain(sessionId, queueDrainDeps)
+  }
+  if (sessionIds.length > 0) {
+    chatLogger.warn('resumed persisted session queues', { sessionIds })
+  }
+  return sessionIds.length
 }
 
 async function completeTerminalPersistedActiveRunForSession(sessionId: string): Promise<boolean> {

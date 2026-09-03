@@ -1576,6 +1576,17 @@ export interface GetCapabilitiesInput {
 export interface GetUiSlotStatesInput extends GetCapabilitiesInput {}
 export interface GetContextUsageInput extends GetCapabilitiesInput {}
 
+export type RuntimeSessionStorageDeletionStatus
+  = | 'deleted'
+    | 'partial'
+    | 'preserved'
+    | 'not_applicable'
+
+export interface RuntimeSessionStorageDeletionResult {
+  status: RuntimeSessionStorageDeletionStatus
+  detail?: string
+}
+
 export interface GenerateSessionTitleInput extends GetCapabilitiesInput {
   promptText: string
 }
@@ -1684,6 +1695,13 @@ export interface ChatRuntime {
   getDynamicCapabilities?: (input: GetCapabilitiesInput) => Promise<ChatRuntimeCapabilities>
   getUiSlotStates?: (input: GetUiSlotStatesInput) => Promise<RuntimeUiSlotState[]>
   getContextUsage?: (input: GetContextUsageInput) => Promise<RuntimeContextUsage | null>
+  /**
+   * Delete provider-native data for the parent runtime session. Implementations
+   * must stay inside their owned namespace or use the provider's typed delete API.
+   */
+  deleteSessionStorage?: (
+    input: GetCapabilitiesInput,
+  ) => Promise<RuntimeSessionStorageDeletionResult>
   submitUserInput?: (input: SubmitRuntimeUserInputInput) => Promise<RuntimeUserInputResolution | null>
   listProviderThreads?: (input: ProviderThreadListInput) => Promise<ProviderThreadListResult>
   readProviderThread?: (input: ProviderThreadReadInput) => Promise<ProviderThreadReadResult>

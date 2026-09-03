@@ -1,14 +1,13 @@
-import { requireNativeViewManager } from 'expo-modules-core'
+import { GlassView } from 'expo-glass-effect'
 import type { StyleProp, ViewProps, ViewStyle } from 'react-native'
 
 interface NativeMaterialViewProps extends ViewProps {
   glassStyle?: 'clear' | 'regular'
+  isInteractive?: boolean
   style?: StyleProp<ViewStyle>
   tintColor?: string
 }
 
-const NativeMaterialViewComponent = requireNativeViewManager<NativeMaterialViewProps>('CradleMaterial')
-
-export function NativeMaterialView(props: NativeMaterialViewProps) {
-  return <NativeMaterialViewComponent {...props} />
+export function NativeMaterialView({ glassStyle = 'regular', ...props }: NativeMaterialViewProps) {
+  return <GlassView {...props} glassEffectStyle={glassStyle} />
 }

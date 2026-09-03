@@ -8,7 +8,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | --- | --- |
 | `hooks.ts` | Scenario launch, Playwright tracing, screenshots/video, console capture, and simulator request ledger |
 | `world.ts` | Cucumber World, browser/context/page, temporary workspaces, scenario memory, and runtime configuration |
-| `server-lifecycle.ts` | Managed server and production web preview without `CRADLE_MOCK_LLM_URL` |
+| `server-lifecycle.ts` | Managed server, crash/restart with preserved data and port, and production web preview without `CRADLE_MOCK_LLM_URL` |
 | `model-api-simulator.ts` | `@cradle/model-api-simulator` in `probes-only` auto-response mode |
 | `providers.ts` | Provider/profile/Agent prerequisites and workspace prerequisite |
 | `scenarios/` | Strict OpenAI Responses and Anthropic Messages exchanges |

@@ -1,0 +1,12 @@
+appId: app.cradle.mobile
+---
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: fabric-node-picker
+    timeout: 45000
+- assertVisible:
+    id: fabric-node-${REMAINING_NODE_ID}
+- assertNotVisible:
+    id: fabric-node-${REVOKED_NODE_ID}

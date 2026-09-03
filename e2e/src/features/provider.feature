@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: Provider 设置精华旅程
   作为用户，我希望通过设置 UI 创建指向 model-api-simulator 的 Claude Agent profile
 

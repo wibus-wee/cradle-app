@@ -78,7 +78,7 @@ export function WhatsNewDialog({
               </div>
 
               {/* icon png */}
-              <img src="/icon.png" alt="Cradle icon" className="h-8 w-8 opacity-70 mix-blend-lighten" />
+              <img src="./icon.png" alt="Cradle icon" className="h-8 w-8 opacity-70 mix-blend-lighten" />
             </div>
           </WhatsNewHero>
 

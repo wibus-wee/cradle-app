@@ -89,6 +89,7 @@ function normalizeArchivedSession(session: {
   archivedAt: number | unknown | null
   createdAt: number
   updatedAt: number
+  activityAt?: number
   latestUserMessageAt: number | unknown | null
   latestAssistantMessageAt?: number | unknown | null
   unread?: boolean | unknown
@@ -116,6 +117,12 @@ function normalizeArchivedSession(session: {
     archivedAt: typeof session.archivedAt === 'number' ? session.archivedAt : null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
+    activityAt: session.activityAt
+      ?? Math.max(
+          session.createdAt,
+          latestUserMessageAt ?? 0,
+          latestAssistantMessageAt ?? 0,
+        ),
     latestUserMessageAt,
     latestAssistantMessageAt,
     unread: session.unread === true,

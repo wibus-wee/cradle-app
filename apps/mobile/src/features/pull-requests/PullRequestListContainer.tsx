@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import * as Linking from 'expo-linking'
 import { router } from 'expo-router'
 import { useState } from 'react'
-import { Alert } from 'react-native'
+import { Alert, Share } from 'react-native'
 
 import type {
   GetPullRequestsAuthoredResponse,
@@ -16,13 +17,23 @@ import { errorMessage } from '@/lib/errors'
 
 import { PullRequestListView } from './PullRequestListView'
 
-export function PullRequestListContainer() {
+interface PullRequestListContainerProps {
+  onSearchQueryChange: (query: string) => void
+  searchQuery: string
+  showsInlineSearch: boolean
+}
+
+export function PullRequestListContainer({
+  onSearchQueryChange,
+  searchQuery,
+  showsInlineSearch,
+}: PullRequestListContainerProps) {
   const { connection } = useConnection()
   const isRouteActive = useRouteIsActive()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['pull-requests', connection?.url],
+    queryKey: ['pull-requests', connection?.resourceId],
     queryFn: async ({ signal }) => {
       const viewer = await cradleRequest<GetPullRequestsViewerResponse>(
         connection!,
@@ -46,20 +57,27 @@ export function PullRequestListContainer() {
     },
   })
 
-  const refresh = () => {
-    if (!connection || !query.data) {
-      return
-    }
+  const refresh = async () => {
     setIsRefreshing(true)
-    void cradleRequest(connection, '/pull-requests/refresh', {
-      method: 'POST',
-      body: { login: query.data.login },
-    })
-      .then(() => query.refetch())
-      .catch((error: Error) => {
-        Alert.alert('Could not refresh pull requests', errorMessage(error))
-      })
-      .finally(() => setIsRefreshing(false))
+    try {
+      const login = query.data?.login
+      if (login) {
+        await cradleRequest(connection!, '/pull-requests/refresh', {
+          body: { login },
+          method: 'POST',
+        })
+      }
+      await query.refetch({ throwOnError: true })
+    }
+    catch {
+      Alert.alert(
+        'Could not refresh pull requests',
+        'Cradle could not sync the latest GitHub inbox.',
+      )
+    }
+    finally {
+      setIsRefreshing(false)
+    }
   }
 
   if (query.isPending) {
@@ -70,8 +88,8 @@ export function PullRequestListContainer() {
       <ErrorState
         title="GitHub is not available"
         description={`${errorMessage(query.error)} Configure GitHub access on Cradle Desktop.`}
-        onRetry={() => void query.refetch()}
-        retrying={query.isFetching}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
       />
     )
   }
@@ -79,11 +97,33 @@ export function PullRequestListContainer() {
     <PullRequestListView
       {...query.data}
       isRefreshing={isRefreshing}
-      onNavigate={section => router.replace(`/(tabs)/${section}`)}
       onOpen={pullRequest =>
         router.push(`/pull-request/${pullRequest.owner}/${pullRequest.repo}/${pullRequest.number}`)}
+      onOpenExternal={async (pullRequest) => {
+        try {
+          await Linking.openURL(pullRequest.url)
+        }
+        catch {
+          Alert.alert('Could not open pull request on GitHub')
+        }
+      }}
       onOpenUsage={() => router.push('/usage')}
       onRefresh={refresh}
+      onSearchQueryChange={onSearchQueryChange}
+      onShare={async (pullRequest) => {
+        try {
+          await Share.share({
+            message: pullRequest.title,
+            title: pullRequest.title,
+            url: pullRequest.url,
+          })
+        }
+        catch {
+          Alert.alert('Could not share pull request')
+        }
+      }}
+      searchQuery={searchQuery}
+      showsInlineSearch={showsInlineSearch}
     />
   )
 }

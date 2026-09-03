@@ -1,15 +1,8 @@
-import { ChevronRight, File, Folder, GitBranch, Info, MessageSquareText, Search } from 'lucide-react-native'
+import { ChevronRight, File, Folder, FolderSearch, GitBranch, Info, MessageSquareText } from 'lucide-react-native'
 import type { ReactElement } from 'react'
 import { useRef } from 'react'
 import { FlatList, Keyboard, StyleSheet, View } from 'react-native'
 
-import type {
-  GetSessionsResponse,
-  GetWorkspacesByWorkspaceIdFilesChildrenResponse,
-  GetWorkspacesResponse,
-  GetWorksResponse,
-  PostWorksData,
-} from '@/api-gen'
 import { IconButton } from '@/components/ui/icon-button'
 import { Item } from '@/components/ui/item'
 import { Screen } from '@/components/ui/screen'
@@ -22,36 +15,24 @@ import { relativeTime } from '@/lib/format'
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-type Workspace = GetWorkspacesResponse[number]
-type Session = GetSessionsResponse['items'][number]
-type Work = GetWorksResponse['items'][number]
-type FileEntry = GetWorkspacesByWorkspaceIdFilesChildrenResponse[number]
+import type {
+  WorkspaceFile,
+  WorkspaceSession,
+  WorkspaceViewProps,
+  WorkspaceWork,
+} from './workspace-view-contract'
+
+export type { WorkspaceViewProps } from './workspace-view-contract'
+
 type WorkspaceRow
   = | { key: string, kind: 'heading', title: string, meta: string }
-    | { key: string, kind: 'work', work: Work }
-    | { key: string, kind: 'session', session: Session }
-    | { key: string, kind: 'file', entry: FileEntry }
+    | { key: string, kind: 'work', work: WorkspaceWork }
+    | { key: string, kind: 'session', session: WorkspaceSession }
+    | { key: string, kind: 'browse-files' }
+    | { key: string, kind: 'file', entry: WorkspaceFile }
     | { key: string, kind: 'empty', node: ReactElement }
 
-export interface WorkspaceViewProps {
-  workspace: Workspace
-  workspaces: Workspace[]
-  sessions: Session[]
-  works: Work[]
-  files: FileEntry[]
-  isCreating?: boolean
-  isRefreshing?: boolean
-  onCreate: (input: PostWorksData['body']) => void
-  onOpenDirectory: (path: string) => void
-  onOpenFile: (path: string) => void
-  onOpenSession: (sessionId: string) => void
-  onOpenWork: (sessionId: string) => void
-  onOpenWorkInfo: (workId: string) => void
-  onRefresh?: () => void
-  onSearchFiles: () => void
-}
-
-function sessionTone(status: Session['status']) {
+function sessionTone(status: WorkspaceSession['status']) {
   if (status === 'streaming') { return 'success' as const }
   if (status === 'error') { return 'danger' as const }
   return 'neutral' as const
@@ -65,14 +46,13 @@ export function WorkspaceView({
   files,
   isCreating = false,
   isRefreshing = false,
+  onBrowseFiles,
   onCreate,
-  onOpenDirectory,
   onOpenFile,
   onOpenSession,
   onOpenWork,
   onOpenWorkInfo,
   onRefresh,
-  onSearchFiles,
 }: WorkspaceViewProps) {
   const theme = useTheme()
   const composerRef = useRef<WorkComposerHandle>(null)
@@ -95,17 +75,11 @@ export function WorkspaceView({
   }
   if (files.length > 0) {
     rows.push({ key: 'heading-files', kind: 'heading', meta: `${files.length} top-level`, title: 'Files' })
-    rows.push(...files.map(entry => ({ key: `file-${entry.path}`, entry, kind: 'file' as const })))
+    rows.push({ key: 'browse-files', kind: 'browse-files' })
+    rows.push(...files.slice(0, 12).map(entry => ({ key: `file-${entry.path}`, entry, kind: 'file' as const })))
   }
   return (
     <Screen
-      action={(
-        <IconButton
-          accessibilityLabel="Search workspace files"
-          icon={Search}
-          onPress={onSearchFiles}
-        />
-      )}
       avoidKeyboard={canCreateWork}
       footer={canCreateWork
         ? (
@@ -169,11 +143,29 @@ export function WorkspaceView({
             const { session } = item
             return (
               <Item
-                actions={<StatusPill label={session.status} tone={sessionTone(session.status)} />}
+                actions={(
+                  <>
+                    <StatusPill label={session.status} tone={sessionTone(session.status)} />
+                    {session.unread && <StatusPill label="unread" tone="info" />}
+                  </>
+                )}
                 description={relativeTime(session.latestAssistantMessageAt ?? session.latestUserMessageAt ?? session.updatedAt)}
                 media={<MessageSquareText color={theme.session} size={16} />}
                 onPress={() => onOpenSession(session.id)}
+                testID={`session-${session.id}`}
                 title={session.title ?? 'Untitled conversation'}
+                variant="muted"
+              />
+            )
+          }
+          if (item.kind === 'browse-files') {
+            return (
+              <Item
+                actions={<ChevronRight color={theme.dimForeground} size={14} />}
+                description={`${files.length} top-level entries`}
+                media={<FolderSearch color={theme.workspace} size={16} />}
+                onPress={onBrowseFiles}
+                title="Browse all files"
                 variant="muted"
               />
             )
@@ -181,13 +173,11 @@ export function WorkspaceView({
           const { entry } = item
           return (
             <Item
-              actions={<ChevronRight color={theme.dimForeground} size={14} />}
+              actions={entry.type === 'directory' && <ChevronRight color={theme.dimForeground} size={14} />}
               media={entry.type === 'directory'
                 ? <Folder color={theme.tertiaryForeground} size={15} />
                 : <File color={theme.tertiaryForeground} size={15} />}
-              onPress={() => entry.type === 'directory'
-                ? onOpenDirectory(entry.path)
-                : onOpenFile(entry.path)}
+              onPress={() => onOpenFile(entry)}
               size="sm"
               title={entry.name}
             />

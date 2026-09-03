@@ -9,7 +9,7 @@ const SECTION_MAP: Record<string, ComponentType> = Object.fromEntries(
   Object.entries(settingsSectionLoaders).map(([section, loader]) => [section, lazy(loader)]),
 )
 
-const FIXED_HEIGHT_SECTIONS = new Set(['import', 'providers', 'agents', 'runtimes', 'integrations', 'downloads'])
+const FIXED_HEIGHT_SECTIONS = new Set(['import', 'providers', 'agents', 'runtimes', 'integrations', 'downloads', 'storage'])
 
 interface SettingsContentProps {
   section: string
@@ -19,7 +19,7 @@ export function SettingsContent({ section }: SettingsContentProps) {
   const activeSection = !import.meta.env.DEV && section === 'externalIssues' ? 'appearance' : section
   const ActiveSection = SECTION_MAP[activeSection] ?? SECTION_MAP.appearance
   const fixedHeight = FIXED_HEIGHT_SECTIONS.has(activeSection)
-  const fullBleed = activeSection === 'downloads'
+  const fullBleed = activeSection === 'downloads' || activeSection === 'storage'
 
   return (
     <div className="h-full min-h-0 w-full min-w-0 flex-1 overflow-hidden">

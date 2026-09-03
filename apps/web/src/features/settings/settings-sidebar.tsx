@@ -215,6 +215,16 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
       },
       { id: 'downloads', labelKey: 'nav.downloads', icon: DownloadIcon },
       {
+        id: 'storage',
+        labelKey: 'nav.storage',
+        icon: DatabaseIcon,
+        searchKeys: [
+          'storage.page.title',
+          'storage.sessions.title',
+          'storage.action.clearTranscript',
+        ],
+      },
+      {
         id: 'backup',
         labelKey: 'nav.backup',
         icon: ArchiveIcon,

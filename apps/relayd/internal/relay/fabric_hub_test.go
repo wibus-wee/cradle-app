@@ -93,6 +93,10 @@ func TestFabricHubMultiplexesIndependentControllerLinks(t *testing.T) {
 	if string(got.Payload) != "still-live" {
 		t.Fatalf("second controller was affected by revocation: %#v", got)
 	}
+	hub.RevokeController("fab-a", "controller-a")
+	if _, _, err := controllerTwo.Read(context.Background()); websocket.CloseStatus(err) != websocket.StatusPolicyViolation {
+		t.Fatalf("revoked Controller close = %v", err)
+	}
 }
 
 func TestFabricHubRemoveNodeClosesNodeAndBothLinkDirections(t *testing.T) {

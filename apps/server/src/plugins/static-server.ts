@@ -145,6 +145,7 @@ export function createPluginStaticServer(readManifests: () => PluginManifest[]) 
           const source = await evaluatePluginSourceTrust({
             pluginName: descriptor.identity,
             source: descriptor.source,
+            manifest,
           })
           setPluginSourceDescriptor(descriptor.identity, source)
           if (!source.trusted) {

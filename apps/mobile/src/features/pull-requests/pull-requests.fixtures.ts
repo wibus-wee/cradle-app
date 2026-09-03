@@ -1,5 +1,6 @@
-import type { PullRequestDetailViewProps } from './PullRequestDetailView'
-import type { PullRequestListViewProps } from './PullRequestListView'
+import type { PullRequestDetailViewProps } from './pull-request-detail-view-contract'
+import type { PullRequestListViewProps } from './pull-request-list-view-contract'
+import type { PullRequestReviewComposerProps } from './pull-request-review-composer-contract'
 
 const pullRequest = {
   owner: 'cradle',
@@ -24,71 +25,58 @@ export const pullRequestListFixture: PullRequestListViewProps = {
   authored: [pullRequest],
   reviewing: [],
   login: 'demo',
-  onNavigate: () => {},
   onOpen: () => {},
+  onOpenExternal: () => {},
   onOpenUsage: () => {},
+  onSearchQueryChange: () => {},
+  onShare: () => {},
+  searchQuery: '',
 }
 
 export const pullRequestDetailFixture: PullRequestDetailViewProps = {
   detail: {
     pullRequest: {
       ...pullRequest,
+      allowedMergeMethods: ['squash'],
+      assignees: [],
       author: {
+        avatarUrl: 'https://github.com/demo.png',
         login: 'demo',
-        avatarUrl: 'https://avatars.githubusercontent.com/u/1?v=4',
         url: 'https://github.com/demo',
       },
-      body: 'Adds a focused mobile controller for checking Work and pull requests away from the desktop.',
-      changedFiles: 8,
-      commits: 3,
-      comments: 2,
-      reviewComments: 1,
+      baseRef: 'main',
+      body: 'Adds a focused controller workflow for Mobile.',
+      canMerge: false,
+      changedFiles: 7,
+      checks: [{
+        conclusion: null,
+        id: 'check-1',
+        name: 'Mobile',
+        status: 'in_progress',
+        url: null,
+      }],
+      closedAtIso: null,
+      comments: 1,
+      commits: 2,
+      createdAtIso: '2025-06-15T15:06:40.000Z',
+      labels: [{ color: '3b82f6', name: 'mobile' }],
       mergeable: true,
       mergeableState: 'clean',
-      createdAtIso: '2026-07-20T10:00:00.000Z',
-      updatedAtIso: '2026-07-20T11:00:00.000Z',
-      closedAtIso: null,
+      mergeBlockers: ['Pull request is still a draft.'],
       mergedAtIso: null,
+      reviewComments: 0,
       reviewers: [],
-      assignees: [],
-      labels: [{ name: 'mobile', color: '0e8a16' }],
-      checks: [{
-        id: 'check-1',
-        name: 'Mobile typecheck',
-        status: 'completed',
-        conclusion: 'success',
-        url: 'https://github.com/cradle/cradle/actions/runs/1',
-      }],
-      allowedMergeMethods: ['squash'],
-      mergeBlockers: [],
-      canMerge: true,
+      updatedAtIso: '2025-06-15T15:08:20.000Z',
     },
-    timeline: [{
-      id: 'comment-1',
-      kind: 'comment',
-      author: { login: 'reviewer', avatarUrl: null, url: 'https://github.com/reviewer' },
-      body: 'The mobile flow is ready for another pass.',
-      state: null,
-      createdAt: '2026-07-20T10:30:00.000Z',
-      url: 'https://github.com/cradle/cradle/pull/42#issuecomment-1',
-    }],
-    files: [{
-      sha: 'abc123',
-      filename: 'apps/mobile/src/features/projects/ProjectsView.tsx',
-      previousFilename: null,
-      status: 'modified',
-      additions: 24,
-      deletions: 4,
-      changes: 28,
-      patch: '@@ -1,2 +1,4 @@',
-      blobUrl: 'https://github.com/cradle/cradle/blob/abc123/apps/mobile/src/features/projects/ProjectsView.tsx',
-      rawUrl: 'https://github.com/cradle/cradle/raw/abc123/apps/mobile/src/features/projects/ProjectsView.tsx',
-    }],
+    files: [],
+    timeline: [],
   },
   onComment: async () => {},
-  onOpenCheck: () => {},
-  onOpenExternal: () => {},
-  onOpenFile: () => {},
-  onRefresh: () => {},
+  onOpenExternal: async () => {},
+  onReview: async () => {},
+}
+
+export const pullRequestReviewComposerFixture: PullRequestReviewComposerProps = {
+  onComment: async () => {},
   onReview: async () => {},
 }

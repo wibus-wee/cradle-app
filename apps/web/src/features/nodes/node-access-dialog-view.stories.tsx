@@ -19,7 +19,9 @@ const node: FabricNode = {
 function grant(overrides: Partial<NodeGrant>): NodeGrant {
   return {
     grantId: 'grant-1',
+    controllerId: 'controller-macbook',
     controllerLabel: 'Wibus’s MacBook Pro',
+    nodeId: 'node-devbox',
     scope: 'control',
     revokedAt: null,
     ...overrides,
@@ -33,8 +35,10 @@ const meta = {
     open: true,
     node,
     revokingGrantId: null,
+    revokingControllerId: null,
     onOpenChange: fn(),
     onRevokeGrant: fn(),
+    onRevokeController: fn(),
   },
 } satisfies Meta<typeof NodeAccessDialogView>
 
@@ -49,8 +53,8 @@ export const WithGrants: Story = {
   args: {
     grants: [
       grant({}),
-      grant({ grantId: 'grant-2', controllerLabel: 'iPad', scope: 'view' }),
-      grant({ grantId: 'grant-3', controllerLabel: 'Old laptop', scope: 'admin', revokedAt: '2026-08-10T10:00:00.000Z' }),
+      grant({ grantId: 'grant-2', controllerId: 'controller-ipad', controllerLabel: 'iPad', scope: 'view' }),
+      grant({ grantId: 'grant-3', controllerId: 'controller-old-laptop', controllerLabel: 'Old laptop', scope: 'admin', revokedAt: '2026-08-10T10:00:00.000Z' }),
     ],
   },
 }

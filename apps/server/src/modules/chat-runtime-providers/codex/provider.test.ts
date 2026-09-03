@@ -792,6 +792,22 @@ function createForkedNonSubagentThreadRecord() {
 }
 
 describe('codexProvider app-server integration', () => {
+  it('deletes the parent Codex thread through app-server', async () => {
+    const client = new FakeCodexAppServerClient({})
+    const provider = createProvider(client)
+
+    await expect(provider.deleteSessionStorage({
+      runtimeSession: createRuntimeSession('codex-thread-1'),
+      profile: createProfile(),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/cradle-workspace',
+    })).resolves.toEqual({ status: 'deleted' })
+    expect(client.requests).toContainEqual({
+      method: 'thread/delete',
+      params: { threadId: 'codex-thread-1' },
+    })
+  })
+
   it('streams a Codex turn for a workspace-less Jarvis session', async () => {
     const client = new FakeCodexAppServerClient({})
     const resolveSkillPaths = vi.fn(() => ['/tmp/cradle-skill'])
@@ -3872,6 +3888,98 @@ describe('codexProvider app-server integration', () => {
         }),
       }),
     })
+  })
+
+  it('uses the configured title provider host while the session turn is active', async () => {
+    const mainClient = new FakeCodexAppServerClient({})
+    const titleClient = new FakeCodexAppServerClient({})
+    titleClient.generatedThreadTitle = 'Title from dedicated provider'
+    const mainProfile = createProfile({ apiKey: 'sk-main' })
+    const titleProfile = {
+      ...createProfile({ apiKey: 'sk-title', model: 'gpt-title' }),
+      id: 'profile-title',
+      name: 'Title provider',
+      providerTargetId: 'profile-title',
+    }
+    const provider = new CodexProvider({
+      readSecret: () => 'sk-secret',
+      resolveSkillPaths: () => ['/tmp/cradle-skill'],
+      recordObservability: vi.fn(),
+      readChatPreferences: () => ({
+        titleGeneration: {
+          providerTargetId: titleProfile.providerTargetId,
+          modelId: 'gpt-title',
+          thinkingEffort: 'minimal',
+        },
+      }),
+      resolveProviderTargetProfile: providerTargetId => (
+        providerTargetId === titleProfile.providerTargetId ? titleProfile : null
+      ),
+      createAppServerClient: options => (
+        options.apiKey === 'sk-title' ? titleClient : mainClient
+      ),
+    })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-codex-active-title-regeneration',
+      runtimeSession,
+      profile: mainProfile,
+      message: createUserMessage('Keep this turn active while regenerating the title'),
+      workspaceId: 'workspace-1',
+    })
+    const firstChunkPromise = stream.next()
+
+    await vi.waitFor(() => {
+      expect(mainClient.requests).toContainEqual({
+        method: 'turn/start',
+        params: expect.objectContaining({ threadId: 'codex-thread-1' }),
+      })
+    })
+
+    await expect(provider.generateSessionTitle({
+      runtimeSession,
+      profile: mainProfile,
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/cradle-workspace',
+      promptText: 'Keep this turn active while regenerating the title',
+    })).resolves.toBe('Title from dedicated provider')
+
+    expect(providerRuntimeHostManager.listHosts()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        hostId: 'codex:profile-codex:provider-host',
+        refCount: 1,
+      }),
+      expect.objectContaining({
+        hostId: 'codex:profile-title:provider-host',
+        refCount: 0,
+      }),
+    ]))
+    expect(titleClient.requests).toContainEqual({
+      method: 'turn/start',
+      params: expect.objectContaining({
+        threadId: 'codex-title-thread-1',
+        model: 'gpt-title',
+      }),
+    })
+
+    mainClient.pushNotification({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        itemId: 'assistant-message-1',
+        delta: 'Done',
+      },
+    })
+    await firstChunkPromise
+    mainClient.pushNotification({
+      method: 'turn/completed',
+      params: {
+        threadId: 'codex-thread-1',
+        turn: { id: 'codex-turn-1', status: 'completed' },
+      },
+    })
+    await drainStream(stream)
   })
 
   it('waits for explicit Codex title generation beyond 20 seconds', async () => {

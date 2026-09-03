@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-none
 功能: 设置精华旅程
   作为用户，我希望外观设置经过刷新后仍保持一致
 

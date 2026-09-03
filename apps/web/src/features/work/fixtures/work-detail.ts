@@ -37,6 +37,7 @@ export const workDetailFixture = {
     lastReadAt: null,
     createdAt: 1,
     updatedAt: 30,
+    activityAt: 29,
     latestUserMessageAt: 2,
     latestAssistantMessageAt: 29,
     unread: false,

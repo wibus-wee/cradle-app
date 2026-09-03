@@ -85,6 +85,7 @@ export type SessionView = Session & {
   modelId: string | null
   thinkingEffort: ChatThinkingEffort | null
   status: SessionStatus
+  activityAt: number
   latestUserMessageAt: number | null
   latestAssistantMessageAt: number | null
   unread: boolean
@@ -380,6 +381,7 @@ function toSessionView(
   status: SessionStatus,
   latestUserMessageAt: number | null = null,
   latestAssistantMessageAt: number | null = null,
+  activityAt?: number,
 ): SessionView {
   const isolation = readSessionIsolation(session)
   return buildSessionView({
@@ -388,6 +390,7 @@ function toSessionView(
     status,
     latestUserMessageAt,
     latestAssistantMessageAt,
+    activityAt,
     isolation,
     execution: readSessionExecutionTarget(session.id),
   })
@@ -399,6 +402,7 @@ function buildSessionView(input: {
   status: SessionStatus
   latestUserMessageAt: number | null
   latestAssistantMessageAt: number | null
+  activityAt?: number
   isolation: ReturnType<typeof readSessionIsolation>
   execution: SessionExecutionTarget
 }): SessionView {
@@ -410,6 +414,11 @@ function buildSessionView(input: {
     modelId: input.modelId,
     thinkingEffort: readSessionThinkingEffortPreference(session.configJson),
     status: input.status,
+    activityAt: input.activityAt ?? Math.max(
+      session.createdAt,
+      latestUserMessageAt ?? 0,
+      latestAssistantMessageAt ?? 0,
+    ),
     latestUserMessageAt,
     latestAssistantMessageAt,
     unread:
@@ -430,6 +439,7 @@ export function projectSessionRows(
   activityBySessionId: ReadonlyMap<string, {
     latestUserMessageAt: number | null
     latestAssistantMessageAt: number | null
+    activityAt?: number
   }> = new Map(),
 ): SessionView[] {
   const sessionIds = sessionRows.map(row => row.id)
@@ -441,13 +451,15 @@ export function projectSessionRows(
   const remoteActivityBySessionId = readNodeSessionActivities(sessionIdsWithoutActivity)
 
   return sessionRows.map((session) => {
-    const activity = activityBySessionId.get(session.id) ?? remoteActivityBySessionId.get(session.id)
+    const projectedActivity = activityBySessionId.get(session.id)
+    const activity = projectedActivity ?? remoteActivityBySessionId.get(session.id)
     return buildSessionView({
       session,
       modelId: modelsBySessionId.get(session.id) ?? null,
       status: statusesBySessionId.get(session.id) ?? 'idle',
       latestUserMessageAt: activity?.latestUserMessageAt ?? null,
       latestAssistantMessageAt: activity?.latestAssistantMessageAt ?? null,
+      activityAt: projectedActivity?.activityAt,
       isolation: isolationsBySessionId.get(session.id) ?? readSessionIsolation(session),
       execution: executionBySessionId.get(session.id) ?? { kind: 'local' },
     })
@@ -497,15 +509,29 @@ function listRowsByActivity(input: SessionListInput): {
     WHERE session_user_messages.session_id = ${sessions.id}
       AND session_user_messages.role = 'user'
   )`
+  const latestAssistantMessageAtExpression = sql<number | null>`(
+    SELECT MAX(session_assistant_messages.updated_at)
+    FROM messages AS session_assistant_messages
+    WHERE session_assistant_messages.session_id = ${sessions.id}
+      AND session_assistant_messages.role = 'assistant'
+      AND session_assistant_messages.status IN ('complete', 'aborted', 'failed')
+  )`
   const remoteLatestUserMessageAtExpression = sql<number | null>`(
     SELECT node_session_links.latest_user_message_at
     FROM node_session_links
     WHERE node_session_links.local_session_id = ${sessions.id}
   )`
-  const activityAtExpression = sql<number>`COALESCE(
-    ${latestUserMessageAtExpression},
-    ${remoteLatestUserMessageAtExpression},
-    ${sessions.createdAt}
+  const remoteLatestAssistantMessageAtExpression = sql<number | null>`(
+    SELECT node_session_links.latest_assistant_message_at
+    FROM node_session_links
+    WHERE node_session_links.local_session_id = ${sessions.id}
+  )`
+  const activityAtExpression = sql<number>`MAX(
+    ${sessions.createdAt},
+    COALESCE(${latestUserMessageAtExpression}, 0),
+    COALESCE(${latestAssistantMessageAtExpression}, 0),
+    COALESCE(${remoteLatestUserMessageAtExpression}, 0),
+    COALESCE(${remoteLatestAssistantMessageAtExpression}, 0)
   )`
   const predicates = [
     input.workspaceId ? eq(sessions.workspaceId, input.workspaceId) : undefined,
@@ -622,6 +648,47 @@ function readLatestAssistantMessageAt(sessionId: string): number | null {
   return row?.latestAssistantMessageAt ?? null
 }
 
+function readLatestAssistantActivityAt(sessionId: string): number | null {
+  const row = db()
+    .select({
+      latestAssistantActivityAt: max(messages.updatedAt),
+    })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.sessionId, sessionId),
+        eq(messages.role, 'assistant'),
+        inArray(messages.status, ['complete', 'aborted', 'failed']),
+      ),
+    )
+    .get()
+  return row?.latestAssistantActivityAt ?? null
+}
+
+function readSessionActivity(session: Session): {
+  latestUserMessageAt: number | null
+  latestAssistantMessageAt: number | null
+  activityAt: number
+} {
+  const localLatestUserMessageAt = readLatestUserMessageAt(session.id)
+  const localLatestAssistantMessageAt = readLatestAssistantMessageAt(session.id)
+  const remoteActivity = readNodeSessionActivities([session.id]).get(session.id)
+  const latestUserMessageAt
+    = localLatestUserMessageAt ?? remoteActivity?.latestUserMessageAt ?? null
+  const latestAssistantMessageAt
+    = localLatestAssistantMessageAt ?? remoteActivity?.latestAssistantMessageAt ?? null
+
+  return {
+    latestUserMessageAt,
+    latestAssistantMessageAt,
+    activityAt: Math.max(
+      session.createdAt,
+      latestUserMessageAt ?? 0,
+      readLatestAssistantActivityAt(session.id) ?? latestAssistantMessageAt ?? 0,
+    ),
+  }
+}
+
 function assertTargetCompatibleWithRuntime(input: {
   providerTargetId: string
   runtimeKind: RuntimeKind
@@ -673,6 +740,7 @@ export function list(input: SessionListInput = {}): SessionPage {
   const activityBySessionId = new Map(page.rows.map(row => [row.session.id, {
     latestUserMessageAt: row.latestUserMessageAt,
     latestAssistantMessageAt: row.latestAssistantMessageAt,
+    activityAt: row.activityAt,
   }]))
   return {
     items: projectSessionRows(page.rows.map(row => row.session), activityBySessionId),
@@ -733,12 +801,14 @@ export function get(id: string): SessionView | null {
       )
       .get() ?? null
 
+  const activity = readSessionActivity(row)
   return toSessionView(
     row,
     readSessionModelPreference(row.configJson) ?? binding?.requestedModelId ?? null,
     readSessionStatus(id),
-    readLatestUserMessageAt(id),
-    readLatestAssistantMessageAt(id),
+    activity.latestUserMessageAt,
+    activity.latestAssistantMessageAt,
+    activity.activityAt,
   )
 }
 
@@ -748,13 +818,11 @@ export function markRead(id: string): SessionView | null {
     return null
   }
 
-  const now = Math.floor(Date.now() / 1000)
-  const latestAssistantMessageAt = readLatestAssistantMessageAt(id)
+  const latestAssistantMessageAt = readSessionActivity(record).latestAssistantMessageAt
   db()
     .update(sessions)
     .set({
       lastReadAt: latestAssistantMessageAt ?? record.lastReadAt,
-      updatedAt: now,
     })
     .where(eq(sessions.id, id))
     .run()
@@ -768,13 +836,11 @@ export function markUnread(id: string): SessionView | null {
     return null
   }
 
-  const now = Math.floor(Date.now() / 1000)
-  const latestAssistantMessageAt = readLatestAssistantMessageAt(id)
+  const latestAssistantMessageAt = readSessionActivity(record).latestAssistantMessageAt
   db()
     .update(sessions)
     .set({
       lastReadAt: latestAssistantMessageAt !== null ? latestAssistantMessageAt - 1 : null,
-      updatedAt: now,
     })
     .where(eq(sessions.id, id))
     .run()
@@ -1304,16 +1370,22 @@ export async function updateTitle(input: { id: string, title: string }): Promise
 }
 
 type CleanupHandler = (sessionId: string) => void
+type TranscriptCleanupHandler = (sessionId: string) => void
 type ArchiveHandler = (sessionId: string) => void
 type ArchivingHandler = (sessionId: string) => void | Promise<void>
 type DeletingHandler = (sessionId: string) => void | Promise<void>
 const cleanupHandlers: CleanupHandler[] = []
+const transcriptCleanupHandlers: TranscriptCleanupHandler[] = []
 const archiveHandlers: ArchiveHandler[] = []
 const archivingHandlers: ArchivingHandler[] = []
 let deletingHandler: DeletingHandler | null = null
 
 export function onSessionCleanup(handler: CleanupHandler): void {
   cleanupHandlers.push(handler)
+}
+
+export function onSessionTranscriptCleanup(handler: TranscriptCleanupHandler): void {
+  transcriptCleanupHandlers.push(handler)
 }
 
 export function onSessionArchived(handler: ArchiveHandler): void {
@@ -1352,6 +1424,17 @@ function cleanupSessionResources(id: string): void {
     }
  catch {
       // cleanup handlers must not break the delete flow
+    }
+  }
+}
+
+export function cleanupSessionTranscriptResources(id: string): void {
+  for (const handler of transcriptCleanupHandlers) {
+    try {
+      handler(id)
+    }
+    catch {
+      // Transcript cleanup has already committed; auxiliary owners reconcile later.
     }
   }
 }

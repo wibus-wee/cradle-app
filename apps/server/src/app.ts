@@ -105,6 +105,8 @@ import { sessionAwait } from './modules/session-await'
 import { sessionEnvironment } from './modules/session-environment'
 import { sessionGroup } from './modules/session-group'
 import { skills } from './modules/skills'
+import { storage } from './modules/storage'
+import { registerStorageMaintenance } from './modules/storage/maintenance'
 import { registerSyncGatewayRoutes } from './modules/sync-gateway'
 import { testReset } from './modules/test-reset'
 import { threadHandoff } from './modules/thread-handoff'
@@ -292,6 +294,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(recall)
   app.use(createPluginsModule({ downloadCenter: downloadCenter.service }))
   app.use(skills)
+  app.use(storage)
   app.use(workflowRules)
   app.use(git)
   app.use(worktree)
@@ -412,6 +415,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     registerRunSnapshotMaintenance()
     TurnCheckpoint.registerTurnCheckpointMaintenance()
     registerBlobStoreMaintenance()
+    registerStorageMaintenance()
     registerMessageBlobBackfillMaintenance()
     registerMessageSteerSplitBackfillMaintenance()
     registerWorkspaceGitIdentityBackfillMaintenance()
@@ -499,6 +503,8 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     })
     await hydrateCustomMcpServers()
     reconcileExternalIssueSourceRegistrations()
+    const { resumePersistedSessionQueues } = await import('./modules/chat-runtime/runtime')
+    resumePersistedSessionQueues()
   })
 
   const runtimeResources = new RuntimeResourceRegistry()

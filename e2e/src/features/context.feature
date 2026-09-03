@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 文件上下文进入真实 Agent 请求
   作为用户，我希望在 Composer 中提及工作区文件后，文件内容确实进入 runtime，而不只是显示一个装饰性 token
 

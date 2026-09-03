@@ -29,6 +29,7 @@ let tempPluginsDir: string | undefined
 interface PluginPackageOptions {
   packageName?: string
   contributes?: Record<string, unknown>
+  deployments?: Array<'desktop' | 'web'>
   omitContributes?: boolean
   grantedPermissions?: string[]
   packageChecksum?: string
@@ -53,6 +54,7 @@ async function writePluginPackage(options: PluginPackageOptions = {}): Promise<s
       version: '1.0.0',
       cradle: {
         apiVersion: '1',
+        deployments: options.deployments,
         server: options.server === false ? undefined : 'server.mjs',
         web: options.web === true ? 'web.mjs' : undefined,
         ...(options.omitContributes
@@ -469,6 +471,43 @@ describe('server plugin loader lifecycle', () => {
     expect(descriptor?.source.reason).toContain('Fabric node')
     expect(descriptor?.layers.server.status).toBe('disabled')
     expect(getRegisteredMcpServers()).not.toHaveProperty('loader-cleanup')
+  })
+
+  it('allows a reviewed desktop-only renderer plugin while the server is enrolled in Fabric', async () => {
+    tempPluginsDir = await writePluginPackage({
+      deployments: ['desktop'],
+      server: false,
+      web: true,
+      contributes: {
+        capabilities: [{
+          id: 'panel.loader-cleanup',
+          type: 'web-panel',
+          layer: 'web',
+          permissions: [],
+        }],
+        permissions: [],
+      },
+    })
+    process.env.CRADLE_PLUGINS_DIR = tempPluginsDir
+    process.env.CRADLE_PLUGINS_SOURCE_KIND = 'externalLocal'
+    await grantLoaderCleanupPluginTrust(tempPluginsDir)
+    db().insert(fabricMembership).values({
+      fabricId: 'plugin-loader-fabric-fixture',
+      relayUrl: 'https://relay.example.test',
+      localNodeId: 'plugin-loader-node-fixture',
+      role: 'node',
+      identityKeySecretId: 'fabric-identity:plugin-loader-fabric-fixture',
+      encryptionKeySecretId: 'fabric-encryption:plugin-loader-fabric-fixture',
+      certificateJson: '{}',
+    }).run()
+
+    await activateServerPlugins(new Elysia())
+
+    const descriptor = listPluginDescriptors().find(plugin => plugin.identity === '@cradle/loader-cleanup')
+    expect(descriptor?.source.trusted).toBe(true)
+    expect(descriptor?.deployments).toEqual(['desktop'])
+    expect(descriptor?.layers.server.status).toBe('skipped')
+    expect(descriptor?.layers.web.status).toBe('discovered')
   })
 
   it('does not trust Marketplace receipt grants from ordinary external local directories', async () => {

@@ -150,6 +150,7 @@ function remoteWorkDetail(overrides: Partial<NodeWork.RemoteWorkDetail['work']> 
       ptyStartedAt: null,
       createdAt: 10,
       updatedAt: 10,
+      activityAt: 10,
       latestUserMessageAt: 10,
       latestAssistantMessageAt: null,
       unread: false,

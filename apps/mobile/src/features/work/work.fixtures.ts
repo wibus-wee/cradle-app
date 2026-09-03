@@ -1,7 +1,8 @@
-import type { WorkListViewProps } from './WorkListView'
+import type { WorkListViewProps } from './work-list-view-contract'
 
 export const workListFixture: WorkListViewProps = {
   works: [],
+  archivedWorks: [],
   workspaces: [{
     id: 'workspace-1',
     name: 'Cradle',
@@ -15,8 +16,9 @@ export const workListFixture: WorkListViewProps = {
     updatedAt: 1_750_000_000,
   }],
   onCreate: () => {},
-  onNavigate: () => {},
   onOpen: () => {},
   onOpenInfo: () => {},
   onOpenUsage: () => {},
+  onSearchQueryChange: () => {},
+  searchQuery: '',
 }

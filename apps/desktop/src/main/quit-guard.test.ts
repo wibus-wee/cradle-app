@@ -24,12 +24,6 @@ const electronMocks = vi.hoisted(() => {
 
 vi.mock('electron', () => electronMocks)
 
-function createBeforeQuitEvent() {
-  return {
-    preventDefault: vi.fn(),
-  } as unknown as Electron.Event & { preventDefault: ReturnType<typeof vi.fn> }
-}
-
 describe('quitGuard', () => {
   beforeEach(() => {
     vi.spyOn(Date, 'now').mockReturnValue(1_000)
@@ -43,32 +37,24 @@ describe('quitGuard', () => {
     vi.restoreAllMocks()
   })
 
-  it('arms the first quit request and broadcasts renderer feedback', async () => {
+  it('arms the first Command+Q and broadcasts renderer feedback', async () => {
     const { QuitGuard } = await import('./quit-guard')
     const guard = new QuitGuard()
-    const event = createBeforeQuitEvent()
 
-    expect(guard.handleBeforeQuit(event)).toBe(false)
+    guard.handleCommandQ()
 
-    expect(event.preventDefault).toHaveBeenCalled()
     expect(electronMocks.app.quit).not.toHaveBeenCalled()
     expect(electronMocks.webContents.send).toHaveBeenCalledWith('desktop:quit-guard-armed', {
       expiresAt: 3_000,
     })
   })
 
-  it('requires the second quit request inside the armed window to trigger app quit', async () => {
+  it('requires the second Command+Q inside the armed window to trigger app quit', async () => {
     const { QuitGuard } = await import('./quit-guard')
     const guard = new QuitGuard()
 
-    guard.handleBeforeQuit(createBeforeQuitEvent())
-    const secondEvent = createBeforeQuitEvent()
-    expect(guard.handleBeforeQuit(secondEvent)).toBe(false)
-
-    expect(secondEvent.preventDefault).toHaveBeenCalled()
-    expect(electronMocks.app.quit).not.toHaveBeenCalled()
-
-    await Promise.resolve()
+    guard.handleCommandQ()
+    guard.handleCommandQ()
 
     expect(electronMocks.app.quit).toHaveBeenCalledTimes(1)
   })
@@ -77,26 +63,22 @@ describe('quitGuard', () => {
     const { QuitGuard } = await import('./quit-guard')
     const guard = new QuitGuard()
     guard.updatePreferences({ requireDoubleCommandQToQuit: false })
-    const event = createBeforeQuitEvent()
 
-    expect(guard.handleBeforeQuit(event)).toBe(true)
+    guard.handleCommandQ()
 
-    expect(event.preventDefault).not.toHaveBeenCalled()
+    expect(electronMocks.app.quit).toHaveBeenCalledTimes(1)
     expect(electronMocks.webContents.send).not.toHaveBeenCalled()
   })
 
-  it('lets an explicit programmatic quit bypass the guard once', async () => {
+  it('requires a fresh pair after a completed Command+Q sequence', async () => {
     const { QuitGuard } = await import('./quit-guard')
     const guard = new QuitGuard()
-    const bypassedEvent = createBeforeQuitEvent()
-    const nextEvent = createBeforeQuitEvent()
 
-    guard.allowNextQuit()
+    guard.handleCommandQ()
+    guard.handleCommandQ()
+    guard.handleCommandQ()
 
-    expect(guard.handleBeforeQuit(bypassedEvent)).toBe(true)
-    expect(bypassedEvent.preventDefault).not.toHaveBeenCalled()
-
-    expect(guard.handleBeforeQuit(nextEvent)).toBe(false)
-    expect(nextEvent.preventDefault).toHaveBeenCalled()
+    expect(electronMocks.app.quit).toHaveBeenCalledTimes(1)
+    expect(electronMocks.webContents.send).toHaveBeenCalledTimes(2)
   })
 })

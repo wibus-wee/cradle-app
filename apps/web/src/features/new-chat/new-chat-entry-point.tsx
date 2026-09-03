@@ -233,7 +233,7 @@ function useNewChatPageOwner(
     .toSorted((left, right) => right.updatedAt - left.updatedAt)
     .slice(0, 3)
     .map((session) => {
-      const minutes = Math.max(0, Math.floor((now - session.updatedAt) / 60_000))
+      const minutes = Math.max(0, Math.floor((now / 1000 - session.updatedAt) / 60))
       const relativeTimeLabel = minutes < 1
         ? t('relative.justNow')
         : minutes < 60

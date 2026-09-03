@@ -188,6 +188,7 @@ async function discoverPackagesFromSources(
         trustedSource = await evaluatePluginSourceTrust({
           pluginName,
           source: baseSource,
+          manifest: pkg.manifest,
           fabricNodeExposed: options.fabricNodeExposed,
         })
       }
@@ -285,6 +286,7 @@ async function refreshPluginSourceTrust(manifest: PluginManifest): Promise<Plugi
     const source = await evaluatePluginSourceTrust({
       pluginName: descriptor.identity,
       source: descriptor.source,
+      manifest,
     })
     setPluginSourceDescriptor(descriptor.identity, source)
     return source

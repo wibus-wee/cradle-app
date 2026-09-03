@@ -31,6 +31,20 @@ Run `pnpm --filter @cradle/server generate:kimi-web-protocol-bindings` to rebuil
 - Therefore `N` provider targets use `N` isolated Kimi homes and hosts, while every Cradle session for one target shares its one Kimi host.
 - The host fingerprint includes the target's Kimi provider projection and a non-reversible credential fingerprint. Changing either replaces the host; raw credentials and Kimi's loopback bearer token are not persisted in Chat Runtime state.
 
+## Session Storage
+
+Kimi session state remains inside its provider target home. Storage cleanup
+removes the exact `sessions/<workspace>/<session-id>` directory, matching event
+journal, and `session_index.jsonl` entry, then invalidates the rebuildable query
+cache. It never scans or deletes `~/.kimi-code`. Explicit cleanup stops an idle
+target host first; a target shared by another active session is rejected.
+
+Storage Maintenance runs on startup and hourly. It deletes only native session
+artifacts whose `(provider target, session id)` pair has no surviving Cradle
+binding, and skips every running target. A bound directory with malformed state
+is preserved because corruption alone is not proof that the user no longer
+owns the session.
+
 ## Streaming Lifecycle
 
 The shared host WebSocket keeps the legacy session subscription for live turn events and adds `subscribe_v2` wildcard transcript subscriptions with per-agent sequence cursors. If the connection closes, the host-owned client reconnects, restores both subscriptions, and sends `transcript_since` cursors. Subscription acknowledgement and `resync_required` trigger authoritative REST transcript hydration: Cradle recovers missing text, thinking, and terminal tool state, resumes pending approval/question bridging, and terminates the stream when the submitted prompt is already completed, failed, aborted, or blocked. A failed bounded reconnect emits a terminal provider error instead of leaving the run active.

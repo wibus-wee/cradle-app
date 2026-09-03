@@ -3,6 +3,7 @@ import { E2E_OPENAI_MODEL } from './scenarios/openai'
 
 export const E2E_ANTHROPIC_PROFILE_ID = 'e2e-anthropic-simulator'
 export const E2E_CODEX_PROFILE_ID = 'e2e-codex-simulator'
+export const E2E_CODEX_TITLE_PROFILE_ID = 'e2e-codex-title-simulator'
 export const E2E_TITLE_SINK_PROFILE_ID = 'e2e-title-sink'
 export const E2E_CLAUDE_AGENT_NAME = 'E2E Claude Agent'
 export const E2E_CODEX_AGENT_NAME = 'E2E Codex'
@@ -107,6 +108,45 @@ export async function configureTitleGenerationSink(serverUrl: string): Promise<v
   })
   if (!prefs.ok) {
     throw new Error(`Failed to set chat preferences for title sink: ${prefs.status} ${await prefs.text()}`)
+  }
+}
+
+export async function configureCodexTitleGenerationSimulatorProvider(input: {
+  serverUrl: string
+  openaiBaseUrl: string
+}): Promise<void> {
+  const profile = await putJson(`${input.serverUrl}/profiles/${E2E_CODEX_TITLE_PROFILE_ID}`, {
+    name: 'E2E Codex Title',
+    providerKind: 'openai-compatible',
+    enabled: true,
+    config: {
+      baseUrl: input.openaiBaseUrl,
+      model: E2E_OPENAI_MODEL,
+      apiMode: 'responses',
+      apiKey: 'sk-e2e-codex-title-simulator',
+      authMode: 'apikey',
+      approvalPolicy: 'never',
+      sandboxMode: 'read-only',
+      reasoningEffort: 'minimal',
+    },
+    credentialRef: null,
+  })
+  if (!profile.ok) {
+    throw new Error(`Failed to upsert Codex title simulator profile: ${profile.status} ${await profile.text()}`)
+  }
+
+  const prefs = await putJson(`${input.serverUrl}/preferences/chat`, {
+    modelId: null,
+    configSelections: {},
+    continuationBehavior: 'queue',
+    titleGeneration: {
+      providerTargetId: E2E_CODEX_TITLE_PROFILE_ID,
+      modelId: E2E_OPENAI_MODEL,
+      thinkingEffort: 'minimal',
+    },
+  })
+  if (!prefs.ok) {
+    throw new Error(`Failed to configure Codex title simulator: ${prefs.status} ${await prefs.text()}`)
   }
 }
 

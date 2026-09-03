@@ -1,8 +1,4 @@
 {
-  "backgroundActivityFooter.dismiss": "OK",
-  "backgroundActivityFooter.dismissAll": "すべて閉じる",
-  "backgroundActivityFooter.noticeCount_one": "{{count}} 件のお知らせ",
-  "backgroundActivityFooter.noticeCount_other": "{{count}} 件のお知らせ",
   "backgroundActivityFooter.open": "バックグラウンドアクティビティを開く",
   "backgroundActivityFooter.title": "バックグラウンドアクティビティ",
   "browser.annotation.cancel": "Cancel annotation",

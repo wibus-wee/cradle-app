@@ -1,5 +1,5 @@
 import { fabricMembership } from '@cradle/db'
-import type { PluginSourceDescriptor } from '@cradle/plugin-sdk'
+import type { PluginManifest, PluginSourceDescriptor } from '@cradle/plugin-sdk'
 
 import { db } from '../infra'
 import { MARKETPLACE_INSTALL_RECEIPT_FILE } from './install-receipt'
@@ -10,6 +10,7 @@ import { validateMarketplacePackageIntegrity } from './validation'
 interface PluginTrustEvaluationInput {
   pluginName: string
   source: PluginSourceDescriptor
+  manifest?: PluginManifest
   fabricNodeExposed?: boolean
 }
 
@@ -27,6 +28,19 @@ export function readFabricNodeExposure(): boolean {
     .from(fabricMembership)
     .limit(1)
     .get() !== undefined
+}
+
+function isDesktopRendererOnlyPlugin(manifest: PluginManifest | undefined): boolean {
+  if (!manifest) {
+    return false
+  }
+  const { deployments, server, web, desktop, contributes } = manifest.cradle
+  return deployments?.length === 1
+    && deployments[0] === 'desktop'
+    && !!web
+    && !server
+    && !desktop
+    && contributes.capabilities.every(capability => capability.layer === 'web')
 }
 
 export async function evaluatePluginSourceTrust(
@@ -61,7 +75,10 @@ export async function evaluatePluginSourceTrust(
     }
   }
 
-  if (input.fabricNodeExposed ?? readFabricNodeExposure()) {
+  if (
+    (input.fabricNodeExposed ?? readFabricNodeExposure())
+    && !isDesktopRendererOnlyPlugin(input.manifest)
+  ) {
     return {
       ...input.source,
       checksum,

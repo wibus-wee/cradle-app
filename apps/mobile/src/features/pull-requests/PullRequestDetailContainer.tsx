@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
+import * as Linking from 'expo-linking'
 import { Stack } from 'expo-router'
-import { useState } from 'react'
-import { Alert, Linking } from 'react-native'
+import { Alert, Platform, Share } from 'react-native'
 
 import type { GetPullRequestsByOwnerByRepoByNumberDetailResponse } from '@/api-gen'
 import { ErrorState, LoadingState } from '@/components/ui/states'
@@ -11,6 +11,7 @@ import { useRouteIsActive } from '@/lib/app-lifecycle-context'
 import { errorMessage } from '@/lib/errors'
 
 import { PullRequestDetailView } from './PullRequestDetailView'
+import { usePullRequestReviewDraft } from './use-pull-request-review-draft'
 
 interface PullRequestDetailContainerProps {
   owner: string
@@ -25,11 +26,11 @@ export function PullRequestDetailContainer({
 }: PullRequestDetailContainerProps) {
   const { connection } = useConnection()
   const isRouteActive = useRouteIsActive()
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const path = `/pull-requests/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(number)}`
+  const reviewDraft = usePullRequestReviewDraft(connection?.resourceId, owner, repo, number)
   const query = useQuery({
     enabled: Boolean(connection) && isRouteActive,
-    queryKey: ['pull-request', connection?.url, owner, repo, number],
+    queryKey: ['pull-request', connection?.resourceId, owner, repo, number],
     queryFn: ({ signal }) =>
       cradleRequest<GetPullRequestsByOwnerByRepoByNumberDetailResponse>(
         connection!,
@@ -44,31 +45,9 @@ export function PullRequestDetailContainer({
     mutationFn: ({ endpoint, body }: { endpoint: string, body: object }) =>
       cradleRequest(connection!, `${path}/${endpoint}`, { method: 'POST', body }),
     onSuccess: () => void query.refetch(),
-    onError: (error, variables) => {
-      Alert.alert(
-        variables.endpoint === 'comment' ? 'Could not post comment' : 'Could not submit review',
-        errorMessage(error),
-      )
-    },
   })
 
-  const refresh = () => {
-    if (!connection) {
-      return
-    }
-    setIsRefreshing(true)
-    void cradleRequest(connection, `${path}/refresh`, {
-      method: 'POST',
-      body: { force: true },
-    })
-      .then(() => query.refetch())
-      .catch((error: Error) => {
-        Alert.alert('Could not refresh pull request', errorMessage(error))
-      })
-      .finally(() => setIsRefreshing(false))
-  }
-
-  if (query.isPending) {
+  if (query.isPending || reviewDraft.isPending) {
     return <LoadingState />
   }
   if (query.error) {
@@ -76,32 +55,76 @@ export function PullRequestDetailContainer({
       <ErrorState
         title="Could not open pull request"
         description={errorMessage(query.error)}
-        onRetry={() => void query.refetch()}
-        retrying={query.isFetching}
+        isActionPending={query.isFetching}
+        onAction={() => { void query.refetch() }}
       />
     )
   }
-
-  const openExternalUrl = (url: string, title: string) => {
-    void Linking.openURL(url).catch(() => {
-      Alert.alert(title, 'The GitHub link could not be opened on this device.')
+  const nativeHeader = Platform.OS !== 'web'
+  const openOnGitHub = () => {
+    void Linking.openURL(query.data.pullRequest.url).catch(() => {
+      Alert.alert('Could not open pull request on GitHub')
     })
   }
-
+  const sharePullRequest = () => {
+    void Share.share({
+      message: query.data.pullRequest.title,
+      title: query.data.pullRequest.title,
+      url: query.data.pullRequest.url,
+    }).catch(() => {
+      Alert.alert('Could not share pull request')
+    })
+  }
   return (
     <>
       <Stack.Screen options={{ title: `#${query.data.pullRequest.number}` }} />
+      {nativeHeader && (
+        <Stack.Toolbar placement="right">
+          {Platform.OS === 'ios'
+            ? (
+                <Stack.Toolbar.Menu
+                  accessibilityHint="Shows actions for this pull request"
+                  accessibilityLabel="Pull request actions"
+                  icon="ellipsis.circle"
+                >
+                  <Stack.Toolbar.MenuAction icon="safari" onPress={openOnGitHub}>
+                    Open in GitHub
+                  </Stack.Toolbar.MenuAction>
+                  <Stack.Toolbar.MenuAction icon="square.and.arrow.up" onPress={sharePullRequest}>
+                    Share Pull Request
+                  </Stack.Toolbar.MenuAction>
+                </Stack.Toolbar.Menu>
+              )
+            : (
+                <Stack.Toolbar.Button
+                  accessibilityHint="Opens this pull request on GitHub"
+                  accessibilityLabel="Open on GitHub"
+                  onPress={openOnGitHub}
+                >
+                  GitHub
+                </Stack.Toolbar.Button>
+              )}
+        </Stack.Toolbar>
+      )}
       <PullRequestDetailView
         detail={query.data}
+        initialDraft={reviewDraft.initialDraft}
         isMutating={action.isPending}
-        isRefreshing={isRefreshing}
+        nativeHeader={nativeHeader}
         onComment={async (body) => {
           await action.mutateAsync({ endpoint: 'comment', body: { body } })
         }}
-        onOpenCheck={url => openExternalUrl(url, 'Could not open check')}
-        onOpenExternal={() => openExternalUrl(query.data.pullRequest.url, 'Could not open pull request')}
-        onOpenFile={url => openExternalUrl(url, 'Could not open changed file')}
-        onRefresh={refresh}
+        onDraftChange={reviewDraft.scheduleSave}
+        onOpenExternal={async (url) => {
+          await Linking.openURL(url)
+        }}
+        onRefresh={async () => {
+          await cradleRequest(connection!, `${path}/refresh`, {
+            body: { force: true },
+            method: 'POST',
+          })
+          await query.refetch({ throwOnError: true })
+        }}
         onReview={async (event, body) => {
           await action.mutateAsync({
             endpoint: 'review',

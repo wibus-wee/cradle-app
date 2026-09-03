@@ -84,6 +84,11 @@ export interface PendingFabricControllerRequestView extends PendingFabricNodeReq
   encryptionPubkey: string
 }
 
+export interface FabricControllerGrantInput {
+  nodeId: string
+  scopes: FabricScope[]
+}
+
 type FabricMembershipChangedListener = () => void
 
 const fabricMembershipChangedListeners = new Set<FabricMembershipChangedListener>()
@@ -494,16 +499,31 @@ export async function listPendingControllerRequests(): Promise<PendingFabricCont
 
 export async function approvePendingControllerRequest(
   requestId: string,
-  input: { nodeId: string, scopes: FabricScope[] },
+  input: { grants: FabricControllerGrantInput[] },
 ): Promise<{ fabricId: string, controllerId: string }> {
   const membership = requireFabricMembership()
   const ownerPrivateKey = requireOwnerKey()
   const allowedScopes = new Set<FabricScope>(['view', 'control', 'approve'])
-  const scopes = [...new Set(input.scopes)]
-  if (scopes.length === 0 || scopes.some(scope => !allowedScopes.has(scope))) {
-    throw new AppError({ code: 'fabric_controller_scopes_invalid', status: 400, message: 'Controller enrollment requires view, control, or approve scopes.' })
+  const nodeIds = new Set<string>()
+  const normalizedGrants = input.grants.map((grant) => {
+    const scopes = [...new Set(grant.scopes)].sort()
+    if (nodeIds.has(grant.nodeId)) {
+      throw new AppError({ code: 'fabric_controller_grants_invalid', status: 400, message: 'Controller enrollment accepts one grant selection per Node.' })
+    }
+    if (scopes.length === 0 || scopes.some(scope => !allowedScopes.has(scope))) {
+      throw new AppError({ code: 'fabric_controller_scopes_invalid', status: 400, message: 'Controller enrollment requires view, control, or approve scopes.' })
+    }
+    nodeIds.add(grant.nodeId)
+    return { nodeId: grant.nodeId, scopes }
+  })
+  if (!normalizedGrants.some(grant => grant.scopes.includes('control'))) {
+    throw new AppError({ code: 'fabric_controller_control_required', status: 400, message: 'Controller enrollment requires control access to at least one Node.' })
   }
-  await getNode(input.nodeId)
+  const visibleNodeIds = new Set((await listNodes()).map(node => node.nodeId))
+  const missingNodeId = normalizedGrants.find(grant => !visibleNodeIds.has(grant.nodeId))?.nodeId
+  if (missingNodeId) {
+    throw new AppError({ code: 'fabric_node_not_found', status: 404, message: `Node ${missingNodeId} is not visible to this Fabric owner.` })
+  }
   const listPath = `/v1/fabrics/${membership.fabricId}/join-requests`
   const requests = await new FabricDirectoryClient(membership.relayUrl).listJoinRequests(
     membership.fabricId,
@@ -513,22 +533,22 @@ export async function approvePendingControllerRequest(
   if (!request) {
     throw new AppError({ code: 'fabric_join_request_not_found', status: 404, message: 'This Controller enrollment request is no longer pending.' })
   }
+  const certificateScopes = [...new Set(normalizedGrants.flatMap(grant => grant.scopes))].sort()
   const certificate = signFabricCertificate(ownerPrivateKey, {
     fabricId: membership.fabricId,
     subjectKind: 'controller',
     subjectId: request.subjectId,
     identityPubkey: request.identityPubkey,
     encryptionPubkey: request.encryptionPubkey,
-    nodeId: input.nodeId,
-    scopes,
+    scopes: certificateScopes,
   })
-  const grants: FabricNodeGrant[] = scopes.map(scope => ({
+  const grants: FabricNodeGrant[] = normalizedGrants.flatMap(grant => grant.scopes.map(scope => ({
     grantId: `grant_${randomUUID()}`,
     fabricId: membership.fabricId,
     controllerId: request.subjectId,
-    nodeId: input.nodeId,
+    nodeId: grant.nodeId,
     scope,
-  }))
+  })))
   const path = `/v1/join-requests/${request.requestId}/approve`
   return await new FabricDirectoryClient(membership.relayUrl).approveControllerJoinRequest(
     request.requestId,
@@ -547,6 +567,11 @@ export async function rejectPendingNodeRequest(requestId: string): Promise<void>
     requestId,
     ownerProofHeaders(ownerPrivateKey, 'DELETE', path),
   )
+}
+
+/** Owner-side: reject a pending Controller enrollment request. */
+export async function rejectPendingControllerRequest(requestId: string): Promise<void> {
+  await rejectPendingNodeRequest(requestId)
 }
 
 async function approveJoinRequest(request: FabricJoinRequest): Promise<NodeSummary> {
@@ -610,6 +635,18 @@ export async function revokeNodeGrant(nodeId: string, grantId: string): Promise<
   const ownerPrivateKey = requireOwnerKey()
   const path = `/v1/nodes/${nodeId}/grants/${grantId}`
   await new FabricDirectoryClient(membership.relayUrl).revokeNodeGrant(nodeId, grantId, ownerProofHeaders(ownerPrivateKey, 'DELETE', path))
+}
+
+/** Permanently revoke a non-admin Controller identity and all of its grants. */
+export async function revokeFabricController(controllerId: string): Promise<void> {
+  const membership = requireFabricMembership()
+  const ownerPrivateKey = requireOwnerKey()
+  const path = `/v1/fabrics/${membership.fabricId}/controllers/${encodeURIComponent(controllerId)}`
+  await new FabricDirectoryClient(membership.relayUrl).revokeController(
+    membership.fabricId,
+    controllerId,
+    ownerProofHeaders(ownerPrivateKey, 'DELETE', path),
+  )
 }
 
 /** Permanently remove a remote device and all of its Node/Controller access. */

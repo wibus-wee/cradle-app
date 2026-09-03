@@ -8,7 +8,6 @@ import { app } from 'electron'
 import { resolveStagedNativeAddonPath } from './native-addon-paths'
 
 interface MacWindowDragAddon {
-  install: (handle: Buffer) => boolean
   begin: (handle: Buffer) => boolean
 }
 
@@ -42,13 +41,6 @@ function loadAddon(): MacWindowDragAddon | null {
   }
   cachedAddon = null
   return null
-}
-
-export function installMacWindowDragCapture(win: BrowserWindow): boolean {
-  if (process.platform !== 'darwin' || win.isDestroyed()) {
-    return false
-  }
-  return loadAddon()?.install(win.getNativeWindowHandle()) ?? false
 }
 
 export function beginMacWindowDrag(win: BrowserWindow): boolean {

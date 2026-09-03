@@ -124,6 +124,7 @@ export interface PluginDescriptorView {
   displayName: string
   description: string | null
   iconUrl: string | null
+  deployments: Array<'desktop' | 'web'> | null
   source: PluginSourceView
   activation: PluginActivationView
   layers: Record<PluginLayer, PluginLayerView>
@@ -428,6 +429,7 @@ export function toPluginDescriptorView(descriptor: PluginDescriptor): PluginDesc
     displayName: descriptor.displayName,
     description: descriptor.description ?? null,
     iconUrl: pluginIconUrl(descriptor),
+    deployments: descriptor.deployments ?? null,
     source: {
       kind: descriptor.source.kind,
       packageDir: descriptor.source.packageDir,
@@ -720,6 +722,7 @@ export async function previewSource(
       trustedSource = await evaluatePluginSourceTrust({
         pluginName: manifest.name,
         source: baseSource,
+        manifest,
         fabricNodeExposed,
       })
     }

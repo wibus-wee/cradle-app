@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: Issue Agent 委派生命周期
   作为用户，我希望 Issue 委派、Agent Session、Chat 与取消状态始终一致，不会因刷新或重跑产生幽灵执行
 

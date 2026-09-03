@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: Claude Agent 流事件词汇表
   作为用户，我希望真实 Claude Agent SDK 正确投影 Anthropic Messages 流中的完整词汇：
   加密思考块、SSE ping、并行工具块、增量工具输入与中途断连

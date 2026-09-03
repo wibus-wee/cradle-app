@@ -22,18 +22,19 @@ certificates: a Node certificate for the persistent Node socket and a
 Controller certificate for directory and link operations.
 
 A Controller-only client submits the same self-signed join document with
-`subjectKind: controller`. The owner approves it for one Node and explicit
-`view`, `control`, or `approve` scopes. The resulting certificate is restricted
-to that Node and the approval creates no Node record. The complete cross-language
-contract is [`apps/relayd/protocol`](../../../../relayd/protocol/README.md).
+`subjectKind: controller`. The owner approves explicit `view`, `control`, or
+`approve` grants for one or more Nodes, including `control` on at least one
+Node. The resulting Fabric-level Controller certificate omits `nodeId`; active
+grants remain the only per-Node authorization boundary, and approval creates no
+Node record. The complete cross-language contract is
+[`apps/relayd/protocol`](../../../../relayd/protocol/README.md).
 
-Controller certificates identify a device but do not restrict it to that
-device's Node. Admin Controllers share one authoritative device directory;
-each Node summary reports the calling Controller's actual grant scopes. Relayd
-grants remain the per-Node link authorization boundary. Non-admin Controllers
-discover only granted Nodes. The target Node validates the owner signature,
-Fabric, scope, and any optional Node restriction again before accepting
-encrypted payloads.
+Controller certificates identify a device and its coarse Fabric capabilities.
+Admin Controllers share one authoritative device directory; each Node summary
+reports the calling Controller's actual grant scopes. Non-admin Controllers
+discover only granted Nodes, and link opening checks an active `control` grant.
+The target Node validates the owner signature, Fabric, and scope again before
+accepting encrypted payloads.
 
 Cancellation removes only the local pending membership and its Cradle-owned
 identity keys. Relayd retains the short-lived join request until expiry. A
@@ -45,6 +46,14 @@ An owner can permanently remove any remote device with `DELETE
 grant where it participates, and closes its live links. The route intentionally
 has no generated CLI command because device removal is a destructive UI flow
 with explicit confirmation.
+
+An owner can remove one Node permission with `DELETE
+/nodes/:nodeId/grants/:grantId`, or permanently revoke a non-admin Controller
+and all of its Fabric permissions with `DELETE
+/fabric/controllers/:controllerId`. Both operations close affected live links.
+The Web access dialog keeps these meanings separate with a second confirmation
+before whole-Controller revocation. Admin companion Controllers remain owned by
+their Node and cannot be revoked through the Controller route.
 
 ## Routing and recovery
 
@@ -78,3 +87,11 @@ restart. It also re-enrolls one device to create a stale directory record,
 asserts both admins see the same three Node IDs, removes the stale device
 through the owner UI, and asserts both directories converge to the same two
 Node IDs. Run it with `pnpm e2e:fabric`.
+
+The native Controller acceptance test is
+[`CRADLE-FABRIC-002`](../../../../../e2e/src/fabric/fabric-two-node.spec.ts).
+It installs the signed Release Mobile app on an ephemeral iOS Simulator, enrolls
+it through the owner UI, grants two Nodes, switches a real Workspace and Codex
+Chat stream between them, and verifies per-Node and whole-Controller revocation.
+Run it on macOS with `pnpm e2e:fabric:mobile:ios`; artifacts are retained under
+`e2e/artifacts/mobile-fabric/`.

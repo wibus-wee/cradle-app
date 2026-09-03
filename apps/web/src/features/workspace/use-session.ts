@@ -41,6 +41,7 @@ export interface WorkspaceSession {
   lastReadAt: number | null
   createdAt: number
   updatedAt: number
+  activityAt: number
   latestUserMessageAt: number | null
   latestAssistantMessageAt: number | null
   unread: boolean
@@ -65,9 +66,9 @@ export interface WorkspaceSession {
 }
 
 export function getSessionActivityAt(
-  session: Pick<WorkspaceSession, 'createdAt' | 'latestUserMessageAt'>,
+  session: Pick<WorkspaceSession, 'activityAt'>,
 ): number {
-  return session.latestUserMessageAt ?? session.createdAt
+  return session.activityAt
 }
 
 /**
@@ -198,6 +199,7 @@ function createSessionListRow(
     archivedAt: null,
     lastReadAt: null,
     createdAt: updatedAt,
+    activityAt: updatedAt,
     latestAssistantMessageAt: null,
     unread: false,
     ...existing,
@@ -301,6 +303,7 @@ function asWorkspaceSession(session: GetSessionsResponse['items'][number]): Work
     lastReadAt: typeof lastReadAt === 'number' ? lastReadAt : null,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
+    activityAt: session.activityAt,
     latestUserMessageAt: normalizedLatestUserMessageAt,
     latestAssistantMessageAt: normalizedLatestAssistantMessageAt,
     unread: session.unread === true,

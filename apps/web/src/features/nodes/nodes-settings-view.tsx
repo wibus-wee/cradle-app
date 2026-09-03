@@ -1,4 +1,5 @@
 import {
+  CellphoneLine as ControllerIcon,
   CheckLine as CheckIcon,
   CloseCircleLine as CancelIcon,
   CloseLine as RejectIcon,
@@ -25,7 +26,14 @@ import { cn } from '~/lib/cn'
 import { CancelPendingEnrollmentDialog } from './cancel-pending-enrollment-dialog'
 import { LeaveFabricDialog } from './leave-fabric-dialog'
 import { RemoveDeviceDialog } from './remove-device-dialog'
-import type { FabricMembership, FabricNode, PendingFabricEnrollment, PendingFabricNodeRequest } from './types'
+import type {
+  FabricControllerAccess,
+  FabricMembership,
+  FabricNode,
+  PendingFabricControllerRequest,
+  PendingFabricEnrollment,
+  PendingFabricNodeRequest,
+} from './types'
 
 export interface NodesSettingsViewProps {
   membership: FabricMembership | null
@@ -37,10 +45,17 @@ export interface NodesSettingsViewProps {
   nodes: FabricNode[]
   nodesLoading: boolean
   nodesError: boolean
+  controllers: FabricControllerAccess[]
+  controllersLoading: boolean
+  controllersError: boolean
   pendingRequests: PendingFabricNodeRequest[]
   pendingRequestsLoading: boolean
   pendingRequestsError: boolean
   pendingRequestAction: { requestId: string, kind: 'approve' | 'reject' } | null
+  pendingControllerRequests: PendingFabricControllerRequest[]
+  pendingControllerRequestsLoading: boolean
+  pendingControllerRequestsError: boolean
+  pendingControllerAction: { requestId: string, kind: 'approve' | 'reject' } | null
   networkCode: string | null
   canManageAccess: boolean
   reconnectingNodeId: string | null
@@ -56,6 +71,8 @@ export interface NodesSettingsViewProps {
   onRefreshPendingRequests: () => void
   onApprovePendingRequest: (requestId: string) => void
   onRejectPendingRequest: (requestId: string) => void
+  onReviewPendingController: (requestId: string) => void
+  onRejectPendingController: (requestId: string) => void
   onCancelPendingEnrollment: () => void
   onLeaveFabric: () => void
   fabricSettings: ReactNode
@@ -71,10 +88,17 @@ export function NodesSettingsView({
   nodes,
   nodesLoading,
   nodesError,
+  controllers,
+  controllersLoading,
+  controllersError,
   pendingRequests,
   pendingRequestsLoading,
   pendingRequestsError,
   pendingRequestAction,
+  pendingControllerRequests,
+  pendingControllerRequestsLoading,
+  pendingControllerRequestsError,
+  pendingControllerAction,
   networkCode,
   canManageAccess,
   reconnectingNodeId,
@@ -90,6 +114,8 @@ export function NodesSettingsView({
   onRefreshPendingRequests,
   onApprovePendingRequest,
   onRejectPendingRequest,
+  onReviewPendingController,
+  onRejectPendingController,
   onCancelPendingEnrollment,
   onLeaveFabric,
   fabricSettings,
@@ -265,21 +291,32 @@ export function NodesSettingsView({
               label={t('settings.approvals.title')}
               description={t('settings.approvals.description')}
             >
-              {pendingRequestsLoading && (
+              {(pendingRequestsLoading || pendingControllerRequestsLoading) && (
                 <div className="flex items-center gap-2 py-3 text-[12px] text-muted-foreground">
                   <Spinner className="size-3.5" />
                   {t('settings.approvals.loading')}
                 </div>
               )}
-              {pendingRequestsError && !pendingRequestsLoading && (
+              {(pendingRequestsError || pendingControllerRequestsError)
+                && !pendingRequestsLoading
+                && !pendingControllerRequestsLoading && (
                 <QueryErrorState label={t('settings.approvals.error')} onRetry={onRefreshPendingRequests} />
               )}
-              {!pendingRequestsLoading && !pendingRequestsError && pendingRequests.length === 0 && (
+              {!pendingRequestsLoading
+                && !pendingControllerRequestsLoading
+                && !pendingRequestsError
+                && !pendingControllerRequestsError
+                && pendingRequests.length === 0
+                && pendingControllerRequests.length === 0 && (
                 <div className="py-3 text-pretty text-[12px] text-muted-foreground">
                   {t('settings.approvals.empty')}
                 </div>
               )}
-              {!pendingRequestsLoading && !pendingRequestsError && pendingRequests.map(request => (
+              {!pendingRequestsLoading
+                && !pendingControllerRequestsLoading
+                && !pendingRequestsError
+                && !pendingControllerRequestsError
+                && pendingRequests.map(request => (
                 <PendingRequestRow
                   key={request.requestId}
                   request={request}
@@ -289,6 +326,20 @@ export function NodesSettingsView({
                   onReject={onRejectPendingRequest}
                 />
               ))}
+              {!pendingRequestsLoading
+                && !pendingControllerRequestsLoading
+                && !pendingRequestsError
+                && !pendingControllerRequestsError
+                && pendingControllerRequests.map(request => (
+                  <PendingControllerRequestRow
+                    key={request.requestId}
+                    request={request}
+                    action={pendingControllerAction?.requestId === request.requestId ? pendingControllerAction.kind : null}
+                    actionsDisabled={pendingControllerAction !== null}
+                    onReview={onReviewPendingController}
+                    onReject={onRejectPendingController}
+                  />
+                ))}
             </SettingsGroup>
           )}
 
@@ -322,6 +373,36 @@ export function NodesSettingsView({
                   />
                 )))}
           </SettingsGroup>
+
+          {canManageAccess && (
+            <SettingsGroup
+              label={t('settings.controllers.title')}
+              description={t('settings.controllers.description')}
+            >
+              {controllersLoading && (
+                <div className="flex items-center gap-2 py-3 text-[12px] text-muted-foreground">
+                  <Spinner className="size-3.5" />
+                  {t('settings.controllers.loading')}
+                </div>
+              )}
+              {controllersError && !controllersLoading && (
+                <QueryErrorState label={t('settings.controllers.error')} onRetry={onRefreshNodes} />
+              )}
+              {!controllersLoading && !controllersError && controllers.length === 0 && (
+                <div className="py-3 text-[12px] text-muted-foreground">
+                  {t('settings.controllers.empty')}
+                </div>
+              )}
+              {!controllersLoading && !controllersError && controllers.map(controller => (
+                <ApprovedControllerRow
+                  key={controller.controllerId}
+                  controller={controller}
+                  nodes={nodes}
+                  onManageAccess={onManageAccess}
+                />
+              ))}
+            </SettingsGroup>
+          )}
         </>
       )}
 
@@ -353,6 +434,61 @@ export function NodesSettingsView({
         onConfirm={onRemoveNode}
       />
     </SettingsPage>
+  )
+}
+
+function ApprovedControllerRow({
+  controller,
+  nodes,
+  onManageAccess,
+}: {
+  controller: FabricControllerAccess
+  nodes: FabricNode[]
+  onManageAccess: (nodeId: string) => void
+}) {
+  const { t } = useTranslation('nodes')
+  const activeGrants = controller.grants.filter(grant => !grant.revokedAt)
+  const nodeIds = [...new Set(activeGrants.map(grant => grant.nodeId))]
+
+  return (
+    <div
+      className="flex flex-col gap-2 border-b border-border/60 py-3 last:border-b-0 sm:flex-row sm:items-center"
+      data-testid={`fabric-controller-${controller.controllerId}`}
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+        <ControllerIcon className="size-4" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-medium">{controller.displayName}</span>
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {nodeIds.map((nodeId) => {
+            const node = nodes.find(candidate => candidate.nodeId === nodeId)
+            const scopes = activeGrants.filter(grant => grant.nodeId === nodeId)
+            return (
+              <Badge key={nodeId} variant="secondary">
+                {node?.displayName ?? nodeId}
+                {' · '}
+                {scopes.map(grant => t(`scope.${grant.scope}`)).join(', ')}
+              </Badge>
+            )
+          })}
+        </div>
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {nodeIds.map(nodeId => (
+          <Button
+            key={nodeId}
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onManageAccess(nodeId)}
+          >
+            <SettingsIcon className="size-3.5" aria-hidden />
+            {t('action.manageAccess')}
+          </Button>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -432,6 +568,70 @@ function PendingRequestRow({
   )
 }
 
+function PendingControllerRequestRow({
+  request,
+  action,
+  actionsDisabled,
+  onReview,
+  onReject,
+}: {
+  request: PendingFabricControllerRequest
+  action: 'approve' | 'reject' | null
+  actionsDisabled: boolean
+  onReview: (requestId: string) => void
+  onReject: (requestId: string) => void
+}) {
+  const { t } = useTranslation('nodes')
+  const requestedAt = new Date(request.requestedAt).toLocaleString()
+
+  return (
+    <div
+      className="flex flex-col gap-3 border-b border-border/60 py-3 last:border-b-0 sm:flex-row sm:items-center"
+      data-testid={`controller-pending-request-${request.requestId}`}
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <ControllerIcon className="size-4" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-[13px] font-medium">{request.displayName}</span>
+          <Badge variant="outline">{t('settings.status.controller')}</Badge>
+          <Badge variant="secondary">{t('settings.status.pending')}</Badge>
+        </div>
+        <p className="mt-1 text-pretty text-[12px] leading-relaxed text-muted-foreground">
+          {request.platform}
+          {' · '}
+          {t('popover.version', { version: request.version })}
+          {' · '}
+          <time dateTime={request.requestedAt}>{t('settings.approvals.requestedAt', { time: requestedAt })}</time>
+        </p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-10"
+          disabled={actionsDisabled}
+          onClick={() => onReject(request.requestId)}
+        >
+          {action === 'reject' ? <Spinner className="size-3.5" /> : <RejectIcon className="size-3.5" aria-hidden />}
+          {t('action.reject')}
+        </Button>
+        <Button
+          type="button"
+          className="h-10"
+          disabled={actionsDisabled}
+          onClick={() => onReview(request.requestId)}
+          data-testid={`controller-pending-review-${request.requestId}`}
+        >
+          {action === 'approve' ? <Spinner className="size-3.5" /> : <ApprovalIcon className="size-3.5" aria-hidden />}
+          {t('action.reviewAccess')}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function NetworkCode({ code }: { code: string }) {
   const { t } = useTranslation('nodes')
   const [copied, setCopied] = useState(false)
@@ -449,7 +649,10 @@ function NetworkCode({ code }: { code: string }) {
 
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <code className="min-w-0 flex-1 select-all truncate rounded-md border border-border bg-muted/50 px-3 py-2 font-mono text-[12px]">
+      <code
+        className="min-w-0 flex-1 select-all truncate rounded-md border border-border bg-muted/50 px-3 py-2 font-mono text-[12px]"
+        data-testid="fabric-controller-code"
+      >
         {code}
       </code>
       <Button type="button" variant="outline" size="sm" onClick={() => void handleCopy()}>
@@ -520,7 +723,13 @@ function DeviceSettingsRow({
           </Button>
         )}
         {canManageAccess && (
-          <Button type="button" variant="ghost" size="sm" onClick={() => onManageAccess(node.nodeId)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-testid={`manage-access-${node.nodeId}`}
+            onClick={() => onManageAccess(node.nodeId)}
+          >
             <SettingsIcon className="size-3.5" aria-hidden />
             {t('action.manageAccess')}
           </Button>

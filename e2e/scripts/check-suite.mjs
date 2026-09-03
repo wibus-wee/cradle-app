@@ -65,6 +65,7 @@ for (const filename of featureFiles) {
 }
 
 const stableIds = new Map()
+const p0StableIds = new Set()
 let p0Count = 0
 let p1Count = 0
 for (const pickle of pickles) {
@@ -87,6 +88,14 @@ for (const pickle of pickles) {
   if (priorities[0] === '@P0') { p0Count += 1 }
   if (priorities[0] === '@P1') { p1Count += 1 }
 
+  const runtimes = tags.filter(tag => tag === '@runtime-claude' || tag === '@runtime-codex' || tag === '@runtime-none')
+  if (runtimes.length !== 1) {
+    fail(`${location} ${pickle.name} must have exactly one runtime ownership tag`)
+  }
+  if (tags.includes('@serial') && runtimes[0] !== '@runtime-codex') {
+    fail(`${location} ${pickle.name} may use @serial only for the Codex runtime lane`)
+  }
+
   const ids = tags.filter(tag => /^@CRADLE-[A-Z0-9-]+-\d{3}$/.test(tag))
   if (ids.length !== 1) {
     fail(`${location} ${pickle.name} must have exactly one stable @CRADLE-*-NNN ID`)
@@ -98,6 +107,9 @@ for (const pickle of pickles) {
   }
   else {
     stableIds.set(ids[0], `${location} ${pickle.name}`)
+    if (priorities[0] === '@P0') {
+      p0StableIds.add(ids[0].slice(1))
+    }
   }
 }
 
@@ -149,6 +161,14 @@ function assertModuleDisposition(heading, directory) {
 
 assertModuleDisposition('Web Feature Namespace Disposition', join(root, 'apps/web/src/features'))
 assertModuleDisposition('Server Module Namespace Disposition', join(root, 'apps/server/src/modules'))
+
+const coverage = readFileSync(coveragePath, 'utf8')
+const stateFusionSection = coverage.split('## State-Fusion Matrix')[1]?.split('\n## ')[0] ?? ''
+for (const stableId of p0StableIds) {
+  if (!stateFusionSection.includes(`\`${stableId}\``)) {
+    fail(`e2e/COVERAGE.md State-Fusion Matrix does not cover P0 scenario ${stableId}`)
+  }
+}
 
 for (const markdownPath of [coveragePath, featureReadmePath, stepReadmePath, supportReadmePath]) {
   const markdown = readFileSync(markdownPath, 'utf8')

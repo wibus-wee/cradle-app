@@ -138,6 +138,10 @@ const ipcDevtoolMocks = vi.hoisted(() => ({
   subscribeIpcDevtool: vi.fn(() => vi.fn()),
 }))
 
+const macWindowDragMocks = vi.hoisted(() => ({
+  beginMacWindowDrag: vi.fn(() => true),
+}))
+
 vi.mock('electron', () => electronMocks)
 vi.mock('./desktop-assets', () => ({
   resolveDesktopBrowserPanelPreloadUrl: vi.fn(() => 'file:///tmp/browser-panel.js'),
@@ -152,6 +156,9 @@ vi.mock('./ipc-devtool', () => ({
   subscribeAcpDevtool: ipcDevtoolMocks.subscribeAcpDevtool,
   subscribeIpcDevtool: ipcDevtoolMocks.subscribeIpcDevtool,
 }))
+vi.mock('./mac-window-drag', () => ({
+  beginMacWindowDrag: macWindowDragMocks.beginMacWindowDrag,
+}))
 vi.mock('./server-process', () => ({}))
 
 const previousRendererUrl = process.env.ELECTRON_RENDERER_URL
@@ -161,6 +168,7 @@ afterEach(() => {
   electronMocks.BrowserWindow.instances.length = 0
   electronMocks.BrowserWindow.nextWebContentsId = 1
   electronMocks.BrowserWindow.loadURLImpl = () => Promise.resolve()
+  electronMocks.screen.getCursorScreenPoint.mockReturnValue({ x: 100, y: 100 })
   vi.clearAllMocks()
 
   if (previousRendererUrl === undefined) {
@@ -176,6 +184,28 @@ afterEach(() => {
 })
 
 describe('windowManager tear-off windows', () => {
+  it('anchors a held-pointer tear-off from the current main-process cursor point', async () => {
+    process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
+    electronMocks.screen.getCursorScreenPoint
+      .mockReturnValueOnce({ x: 1000, y: 200 })
+      .mockReturnValue({ x: 1200, y: 300 })
+    const { WindowManager } = await import('./window-manager')
+    const manager = new WindowManager('http://localhost:3010', { warmSurfaceWindows: false })
+
+    const opened = await manager.openSurfaceWindow(
+      'chat:session-1',
+      CHAT_SURFACE_ROUTE,
+      100,
+      100,
+      { continuePointerDrag: true },
+    )
+
+    expect(electronMocks.screen.getDisplayNearestPoint).toHaveBeenNthCalledWith(1, { x: 1000, y: 200 })
+    expect(electronMocks.screen.getDisplayNearestPoint).toHaveBeenNthCalledWith(2, { x: 1200, y: 300 })
+    expect(opened.getBounds()).toEqual({ x: 720, y: 260, width: 720, height: 640 })
+    expect(macWindowDragMocks.beginMacWindowDrag).toHaveBeenCalledWith(opened)
+  })
+
   it('claims one painted warm renderer and replenishes exactly one spare', async () => {
     process.env.ELECTRON_RENDERER_URL = 'http://localhost:5174'
     const { WindowManager } = await import('./window-manager')

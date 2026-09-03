@@ -87,6 +87,20 @@ describe('plugin host web layer filtering', () => {
     })).toBe(true)
   })
 
+  it('loads desktop-only web plugins only in the Desktop renderer', () => {
+    const plugin = {
+      name: 'runtime-radar',
+      version: '0.1.0',
+      displayName: 'Runtime Radar',
+      hasWeb: true,
+      deployments: ['desktop'] as Array<'desktop' | 'web'>,
+      layers: createLayers('discovered'),
+    }
+
+    expect(isWebLayerLoadable(plugin, 'desktop')).toBe(true)
+    expect(isWebLayerLoadable(plugin, 'web')).toBe(false)
+  })
+
   it('disposes Vite-injected development styles when the web layer deactivates', async () => {
     const deactivate = vi.fn()
     const disposeDevelopmentStyles = vi.fn()

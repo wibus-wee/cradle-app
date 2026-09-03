@@ -12,8 +12,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { ClaudeAgentIntegrationHarness } from './harness'
 import {
   createClaudeAgentIntegrationHarness,
-  createContextUsageProbeExchanges,
-  createCurrentModeContextUsageProbeExchange,
   createSimulatorController,
   createTextExchange,
   createToolUseExchange,
@@ -60,7 +58,6 @@ describeIntegration('Claude Agent real CLI integration', () => {
   it('does not duplicate Cradle history in the live Query wire payload', async () => {
     await simulator.enqueue(scenario(
       createTextExchange({ label: 'history-first', text: 'first wire response' }),
-      ...createContextUsageProbeExchanges(),
       createTextExchange({ label: 'history-second', text: 'second wire response' }),
     ))
     const harness = await createHarness()
@@ -143,7 +140,6 @@ describeIntegration('Claude Agent real CLI integration', () => {
     })
     const bypassFile = join(bypassHarness.workspacePath, 'permission.txt')
     await simulator.enqueue(scenario(
-      createCurrentModeContextUsageProbeExchange(),
       createToolUseExchange({
         label: 'bypass-write',
         toolUseId: 'toolu_bypass_write',

@@ -1,3 +1,5 @@
+import type { MenuAction } from '@expo/ui/community/menu'
+import { MenuView } from '@expo/ui/community/menu'
 import { ArrowUp, ChevronDown, GitBranch, Plus } from 'lucide-react-native'
 import {
   forwardRef,
@@ -31,6 +33,7 @@ import { useTheme } from '@/theme/use-theme'
 import { WorkspacePickerSheet } from './WorkspacePickerSheet'
 
 type Workspace = GetWorkspacesResponse[number]
+type BaseStrategy = 'source-head' | 'remote-default'
 type ComposerSnap = 0 | 0.5 | 1
 
 interface WorkComposerProps {
@@ -44,6 +47,15 @@ interface WorkComposerProps {
 export interface WorkComposerHandle {
   collapse: () => void
 }
+
+const baseStrategies: Array<{
+  image: NonNullable<MenuAction['image']>
+  label: string
+  value: BaseStrategy
+}> = [
+  { image: 'arrow.triangle.branch', label: 'Current HEAD', value: 'source-head' },
+  { image: 'cloud', label: 'Remote default branch', value: 'remote-default' },
+]
 
 export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
   initialWorkspaceId,
@@ -69,9 +81,11 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
     initialWorkspaceId ?? workspaces[0]?.id ?? '',
   )
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false)
+  const [baseStrategy, setBaseStrategy] = useState<BaseStrategy>('source-head')
   const [text, setText] = useState('')
   const [keyboardTop, setKeyboardTop] = useState<number | null>(() => Keyboard.metrics()?.screenY ?? null)
   const workspace = workspaces.find(item => item.id === workspaceId) ?? workspaces[0]
+  const base = baseStrategies.find(item => item.value === baseStrategy) ?? baseStrategies[0]!
   const composerMaxHeight = keyboardTop === null
     ? Math.min(windowHeight * 0.74, 620)
     : Math.max(
@@ -188,6 +202,13 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
     })
   }
 
+  const baseActions: MenuAction[] = baseStrategies.map(item => ({
+    id: item.value,
+    image: item.image,
+    state: item.value === baseStrategy ? 'on' : 'off',
+    title: item.label,
+  }))
+
   const collapsedOpacity = expansion.interpolate({
     inputRange: [0, 0.28],
     outputRange: [1, 0],
@@ -268,10 +289,10 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
         >
           <NativeMaterialView
             glassStyle="regular"
-            pointerEvents="none"
+            isInteractive
             style={styles.glass}
             tintColor={theme.glassTint}
-          />
+          >
 
           <Animated.View
             pointerEvents={expanded ? 'none' : 'auto'}
@@ -361,12 +382,22 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
                 <ChevronDown color={theme.mutedForeground} size={15} />
               </PressableScale>
 
-              <View style={styles.contextButton}>
-                <GitBranch color={theme.tertiaryForeground} size={16} />
-                <Text numberOfLines={1} style={[styles.contextLabel, { color: theme.foreground }]}>
-                  Current checkout
-                </Text>
-              </View>
+              <MenuView
+                actions={baseActions}
+                onPressAction={({ nativeEvent }) => {
+                  const next = baseStrategies.find(item => item.value === nativeEvent.event)
+                  if (next) { setBaseStrategy(next.value) }
+                }}
+                style={styles.contextMenu}
+              >
+                <View style={styles.contextButton}>
+                  <GitBranch color={theme.tertiaryForeground} size={16} />
+                  <Text numberOfLines={1} style={[styles.contextLabel, { color: theme.foreground }]}>
+                    {base.label}
+                  </Text>
+                  <ChevronDown color={theme.mutedForeground} size={15} />
+                </View>
+              </MenuView>
             </Animated.View>
 
             <Animated.View
@@ -423,6 +454,17 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
             >
               {showWorkType && (
                 <View style={styles.workType}>
+                  <MenuView
+                    actions={baseActions}
+                    onPressAction={({ nativeEvent }) => {
+                      const next = baseStrategies.find(item => item.value === nativeEvent.event)
+                      if (next) { setBaseStrategy(next.value) }
+                    }}
+                  >
+                    <View style={[styles.addButton, { backgroundColor: theme.muted }]}>
+                      <Plus color={theme.tertiaryForeground} size={20} />
+                    </View>
+                  </MenuView>
                   <GitBranch color={theme.foreground} size={16} />
                   <Text style={[styles.workTypeLabel, { color: theme.foreground }]}>
                     Isolated Work
@@ -455,6 +497,7 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
               </PressableScale>
             </Animated.View>
           </View>
+          </NativeMaterialView>
         </Animated.View>
       </Animated.View>
       <WorkspacePickerSheet
@@ -470,6 +513,13 @@ export const WorkComposer = forwardRef<WorkComposerHandle, WorkComposerProps>(({
 })
 
 const styles = StyleSheet.create({
+  addButton: {
+    alignItems: 'center',
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
   collapsedAdd: {
     alignItems: 'center',
     borderRadius: 22,

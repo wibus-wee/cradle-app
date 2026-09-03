@@ -56,6 +56,7 @@ function noticeId(status: CodexResetStatus): string | null {
 export function projectCodexResetFooterPresentation(
   status: CodexResetStatus,
   now = Date.now(),
+  timeZone?: string,
 ): BackgroundActivityFooterPresentation | null {
   const watch = status.data.active_watch
   if (!watch) {
@@ -79,10 +80,18 @@ export function projectCodexResetFooterPresentation(
   const chance = watch.reset_chance_percent === null
     ? null
     : `${watch.reset_chance_percent}% chance`
+  const deadline = new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+    timeZone,
+  }).format(expiresAt)
   return {
     id,
     title: 'Codex reset watch',
-    description: [chance, watch.forecast_window].filter(Boolean).join(' '),
+    description: [chance, `by ${deadline}`].filter(Boolean).join(' '),
     actionLabel: watch.source.url ? 'View source' : null,
     actionUrl: watch.source.url ?? null,
     expiresAt,

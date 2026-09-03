@@ -295,7 +295,6 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 		SubjectID:        "controller-a",
 		IdentityPubkey:   encodeDirectoryKey(controllerPublic),
 		EncryptionPubkey: "controller-x25519",
-		NodeID:           "node-a",
 		Scopes:           []membership.Scope{membership.ScopeView, membership.ScopeControl},
 		IssuedAt:         clock.Unix(),
 		Nonce:            "controller-certificate",
@@ -303,13 +302,29 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	controllerGrants := []fabric.Grant{{
-		ID:           "grant-node-a-view",
-		FabricID:     created.Fabric.ID,
-		ControllerID: "controller-a",
-		NodeID:       "node-a",
-		Scope:        membership.ScopeView,
-	}}
+	controllerGrants := []fabric.Grant{
+		{
+			ID:           "grant-node-a-view",
+			FabricID:     created.Fabric.ID,
+			ControllerID: "controller-a",
+			NodeID:       "node-a",
+			Scope:        membership.ScopeView,
+		},
+		{
+			ID:           "grant-node-b-view",
+			FabricID:     created.Fabric.ID,
+			ControllerID: "controller-a",
+			NodeID:       "node-b",
+			Scope:        membership.ScopeView,
+		},
+		{
+			ID:           "grant-node-b-control",
+			FabricID:     created.Fabric.ID,
+			ControllerID: "controller-a",
+			NodeID:       "node-b",
+			Scope:        membership.ScopeControl,
+		},
+	}
 	controllerApprovalPath := "/v1/join-requests/" + controllerJoin.RequestID + "/approve"
 	ownerHeaders = directoryProofHeaders(t, ownerPrivate, http.MethodPost, controllerApprovalPath, clock, "approve-controller")
 	postDirectoryJSON(t, httpServer.URL+controllerApprovalPath, approveJoinRequest{ControllerCertificate: &controllerCertificate, Grants: controllerGrants}, ownerHeaders, http.StatusOK, &map[string]string{})
@@ -329,11 +344,11 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 		Nodes []fabric.NodeSummary `json:"nodes"`
 	}
 	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", controllerHeaders, http.StatusOK, &discovered)
-	if len(discovered.Nodes) != 1 || discovered.Nodes[0].NodeID != "node-a" {
+	if len(discovered.Nodes) != 2 {
 		t.Fatalf("discovered nodes = %#v", discovered.Nodes)
 	}
-	if len(discovered.Nodes[0].Scopes) != 1 || discovered.Nodes[0].Scopes[0] != "view" {
-		t.Fatalf("discovered node caller scopes = %#v", discovered.Nodes[0].Scopes)
+	if len(discovered.Nodes[0].Scopes) != 1 || len(discovered.Nodes[1].Scopes) != 2 {
+		t.Fatalf("discovered node caller scopes = %#v", discovered.Nodes)
 	}
 
 	grantListHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodGet, "/v1/nodes/node-a/grants", clock, "list-grants")
@@ -343,6 +358,11 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	getDirectoryJSON(t, httpServer.URL+"/v1/nodes/node-a/grants", grantListHeaders, http.StatusOK, &grantList)
 	if len(grantList.Grants) != 3 || !hasActiveGrant(grantList.Grants, "grant-node-a-view", membership.ScopeView) {
 		t.Fatalf("node grants = %#v", grantList.Grants)
+	}
+	for _, grant := range grantList.Grants {
+		if grant.ControllerID == "controller-a" && grant.ControllerDisplayName != "iPhone" {
+			t.Fatalf("Controller display name = %q", grant.ControllerDisplayName)
+		}
 	}
 	// Grant management is owner-only: a Controller proof must not list grants.
 	controllerGrantHeaders := directoryProofHeaders(t, controllerPrivate, http.MethodGet, "/v1/nodes/node-a/grants", clock, "list-grants-controller")
@@ -359,9 +379,15 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	controllerHeaders = directoryProofHeaders(t, controllerPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "list-nodes-after-revoke")
 	controllerHeaders.Set(certificateHeader, directoryHeaderJSON(t, controllerCertificate))
 	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", controllerHeaders, http.StatusOK, &discovered)
-	if len(discovered.Nodes) != 0 {
+	if len(discovered.Nodes) != 1 || discovered.Nodes[0].NodeID != "node-b" {
 		t.Fatalf("nodes after grant revocation = %#v", discovered.Nodes)
 	}
+	revokeControllerPath := "/v1/fabrics/" + created.Fabric.ID + "/controllers/controller-a"
+	revokeControllerHeaders := directoryProofHeaders(t, ownerPrivate, http.MethodDelete, revokeControllerPath, clock, "revoke-controller-principal")
+	deleteDirectory(t, httpServer.URL+revokeControllerPath, revokeControllerHeaders, http.StatusNoContent)
+	controllerHeaders = directoryProofHeaders(t, controllerPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "list-nodes-after-controller-revoke")
+	controllerHeaders.Set(certificateHeader, directoryHeaderJSON(t, controllerCertificate))
+	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", controllerHeaders, http.StatusForbidden, nil)
 
 	if _, err := directory.MarkNodePresence(t.Context(), created.Fabric.ID, "node-a", fabric.NodeOnline); err != nil {
 		t.Fatal(err)
@@ -378,32 +404,7 @@ func TestDirectoryEnrollmentAndAuthorizedDiscovery(t *testing.T) {
 	}
 	nodeBHeaders := directoryProofHeaders(t, nodeBPrivate, http.MethodGet, "/v1/fabrics/"+created.Fabric.ID+"/nodes", clock, "removed-node-controller")
 	nodeBHeaders.Set(certificateHeader, directoryHeaderJSON(t, nodeBControllerCertificate))
-	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", nodeBHeaders, http.StatusNotFound, nil)
-}
-
-func TestControllerNodeRestriction(t *testing.T) {
-	nodes := []fabric.NodeSummary{
-		{NodeID: "node-a"},
-		{NodeID: "node-b"},
-	}
-
-	legacyAdmin := membership.Certificate{
-		NodeID: "node-a",
-		Scopes: []membership.Scope{membership.ScopeAdmin},
-	}
-	adminNodes := restrictNodes(nodes, controllerNodeRestriction(legacyAdmin))
-	if len(adminNodes) != 2 {
-		t.Fatalf("legacy admin visible nodes = %#v", adminNodes)
-	}
-
-	boundController := membership.Certificate{
-		NodeID: "node-a",
-		Scopes: []membership.Scope{membership.ScopeView},
-	}
-	boundNodes := restrictNodes(nodes, controllerNodeRestriction(boundController))
-	if len(boundNodes) != 1 || boundNodes[0].NodeID != "node-a" {
-		t.Fatalf("node-bound controller visible nodes = %#v", boundNodes)
-	}
+	getDirectoryJSON(t, httpServer.URL+"/v1/fabrics/"+created.Fabric.ID+"/nodes", nodeBHeaders, http.StatusForbidden, nil)
 }
 
 func hasActiveGrant(grants []fabric.Grant, id string, scope membership.Scope) bool {

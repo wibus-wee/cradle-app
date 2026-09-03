@@ -4,6 +4,7 @@ type BackgroundActivity = GetBackgroundActivitiesResponse[number]
 
 export interface BackgroundActivityFooterItem {
   identity: string
+  ownerNamespace: BackgroundActivity['ownerNamespace']
   priority: BackgroundActivity['priority']
   title: string
   description: string | null
@@ -28,7 +29,6 @@ export function backgroundActivityFooterIdentity(
 
 export function selectBackgroundActivityFooterItems(
   activities: readonly BackgroundActivity[] | undefined,
-  dismissedIdentities: ReadonlySet<string>,
   now = Date.now(),
 ): BackgroundActivityFooterItem[] {
   if (!activities) {
@@ -42,11 +42,9 @@ export function selectBackgroundActivityFooterItems(
         return []
       }
       const identity = backgroundActivityFooterIdentity(activity, footer.id)
-      if (dismissedIdentities.has(identity)) {
-        return []
-      }
       return [{
         identity,
+        ownerNamespace: activity.ownerNamespace,
         priority: activity.priority,
         title: footer.title,
         description: footer.description,

@@ -7,12 +7,6 @@ export const usageRanges = [
 
 export type UsageRange = typeof usageRanges[number]['key']
 
-export const DEFAULT_USAGE_RANGE: UsageRange = '30d'
-
-export function isUsageRange(value: string | null): value is UsageRange {
-  return usageRanges.some(option => option.key === value)
-}
-
 export function usageRangeDays(range: UsageRange): number {
   return usageRanges.find(option => option.key === range)?.days ?? 30
 }

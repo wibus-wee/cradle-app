@@ -4,7 +4,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { insertMessageFixtures } from '../../../tests/helpers/message-fixture'
 import { db } from '../../infra'
 import { toOpenCodeRuntimeNativeProviderTargetId } from '../chat-runtime-providers/opencode/native-provider-target-id'
-import { aggregateSessionStatus, get, list } from './service'
+import {
+  aggregateSessionStatus,
+  get,
+  list,
+  markRead,
+  markUnread,
+} from './service'
 
 afterEach(() => {
   db().delete(backendRuns).run()
@@ -43,7 +49,7 @@ describe('session service provider target projection', () => {
 })
 
 describe('session list activity and status projection', () => {
-  it('orders by latest user message within the listed workspace and ignores metadata updates', () => {
+  it('orders by latest conversation activity within the listed workspace and ignores metadata updates', () => {
     db().insert(workspaces).values([
       {
         id: 'ws-listed',
@@ -114,14 +120,16 @@ describe('session list activity and status projection', () => {
         content: 'reply',
         messageJson: '[]',
         createdAt: 110,
+        updatedAt: 700,
       },
     ])
 
     const rows = list({ workspaceId: 'ws-listed' }).items
-    expect(rows.map(row => row.id)).toEqual(['sess-older-activity', 'sess-newer-activity'])
-    expect(rows[0]?.latestUserMessageAt).toBe(500)
-    expect(rows[1]?.latestUserMessageAt).toBe(100)
-    expect(rows[1]?.latestAssistantMessageAt).toBe(110)
+    expect(rows.map(row => row.id)).toEqual(['sess-newer-activity', 'sess-older-activity'])
+    expect(rows[0]?.latestUserMessageAt).toBe(100)
+    expect(rows[0]?.latestAssistantMessageAt).toBe(110)
+    expect(rows[0]?.activityAt).toBe(700)
+    expect(rows[1]?.latestUserMessageAt).toBe(500)
     expect(rows.every(row => row.id !== 'sess-other-workspace')).toBe(true)
   })
 
@@ -132,7 +140,7 @@ describe('session list activity and status projection', () => {
       locatorJson: JSON.stringify({ nodeId: 'node-1', path: '/tmp/node' }),
     }).run()
     db().insert(sessions).values([
-      { id: 'node-older', workspaceId: 'ws-node', title: 'Older', createdAt: 900, updatedAt: 999 },
+      { id: 'node-older', workspaceId: 'ws-node', title: 'Older', createdAt: 90, updatedAt: 999 },
       { id: 'node-newer', workspaceId: 'ws-node', title: 'Newer', createdAt: 100, updatedAt: 100 },
     ]).run()
     db().insert(nodeSessionLinks).values([
@@ -160,6 +168,72 @@ describe('session list activity and status projection', () => {
       latestUserMessageAt: 800,
       latestAssistantMessageAt: 810,
     })
+  })
+
+  it('uses assistant completion time as the unread boundary', () => {
+    db().insert(sessions).values({
+      id: 'sess-unread',
+      title: 'Unread session',
+      createdAt: 100,
+      updatedAt: 100,
+      lastReadAt: 100,
+    }).run()
+    insertMessageFixtures(db(), {
+      id: 'msg-assistant-completed',
+      sessionId: 'sess-unread',
+      role: 'assistant',
+      status: 'complete',
+      content: 'reply',
+      messageJson: '[]',
+      createdAt: 120,
+      updatedAt: 200,
+    })
+
+    expect(get('sess-unread')).toMatchObject({
+      activityAt: 200,
+      latestAssistantMessageAt: 120,
+      unread: true,
+    })
+    expect(markRead('sess-unread')).toMatchObject({
+      lastReadAt: 120,
+      updatedAt: 100,
+      unread: false,
+    })
+    expect(markUnread('sess-unread')).toMatchObject({
+      lastReadAt: 119,
+      unread: true,
+    })
+  })
+
+  it('persists read state for node-projected sessions without advancing the projection clock', () => {
+    db().insert(sessions).values({
+      id: 'sess-node-unread',
+      title: 'Remote unread session',
+      createdAt: 100,
+      updatedAt: 150,
+      lastReadAt: 100,
+    }).run()
+    db().insert(nodeSessionLinks).values({
+      localSessionId: 'sess-node-unread',
+      nodeId: 'node-1',
+      remoteSessionId: 'remote-session-1',
+      remoteWorkspaceId: 'remote-workspace-1',
+      latestUserMessageAt: 180,
+      latestAssistantMessageAt: 200,
+    }).run()
+
+    expect(get('sess-node-unread')).toMatchObject({
+      activityAt: 200,
+      latestAssistantMessageAt: 200,
+      unread: true,
+    })
+    expect(markRead('sess-node-unread')).toMatchObject({
+      lastReadAt: 200,
+      updatedAt: 150,
+      unread: false,
+    })
+    expect(list().items.find(session => session.id === 'sess-node-unread'))
+      .toMatchObject({ lastReadAt: 200, unread: false })
   })
 
   it('projects status from the latest backend run per session only', () => {

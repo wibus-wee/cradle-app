@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 
 import type { Command } from 'commander'
@@ -66,7 +66,8 @@ export function resolvePluginDeveloperGuidePath(options: {
   cwd?: string
   configuredPath?: string
 } = {}): string {
-  const executableDir = dirname(resolve(options.executablePath ?? process.argv[1] ?? process.execPath))
+  const executablePath = resolve(options.executablePath ?? process.argv[1] ?? process.execPath)
+  const executableDir = dirname(existsSync(executablePath) ? realpathSync(executablePath) : executablePath)
   const cwd = resolve(options.cwd ?? process.cwd())
   const candidates = [
     options.configuredPath?.trim(),

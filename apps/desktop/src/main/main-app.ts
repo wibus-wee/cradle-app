@@ -383,7 +383,6 @@ async function showPluginInstallSuccess(result: PluginInstallResult): Promise<vo
     cancelId: 1,
   })
   if (response === 0) {
-    quitGuard.allowNextQuit()
     app.relaunch()
     app.exit(0)
   }
@@ -574,7 +573,6 @@ async function prepareDesktopExitForExternalQuit(input: {
 
 function registerProcessShutdownHandlers(): void {
   const handleSignal = (signal: NodeJS.Signals) => {
-    quitGuard.allowNextQuit()
     requestDesktopExit({
       reason: signal,
       exitCode: 0,
@@ -663,7 +661,6 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
       return win
     },
     requestQuit: () => {
-      quitGuard.allowNextQuit()
       requestDesktopExit({
         reason: 'tray quit',
         exitCode: 0,
@@ -695,7 +692,6 @@ async function initializeDesktopUpdateManager(): Promise<void> {
   const { DesktopUpdateManager } = await import('./update-manager')
   updateManager = new DesktopUpdateManager({
     prepareQuitForUpdate: async () => {
-      quitGuard.allowNextQuit()
       await prepareDesktopExitForExternalQuit({
         reason: 'desktop update',
         stopServerRuntime: true,
@@ -772,7 +768,6 @@ export async function startDesktopApp(): Promise<void> {
     getQuitGuard: () => quitGuard,
     requestDataRestart: (reason) => {
       setTimeout(() => {
-        quitGuard.allowNextQuit()
         app.relaunch()
         requestDesktopExit({
           reason,
@@ -809,6 +804,13 @@ export async function startDesktopApp(): Promise<void> {
         },
         openSettings: () => {
           void trayManager?.performAction('open-desktop-settings')
+        },
+        quit: (triggeredByCommandQ) => {
+          if (triggeredByCommandQ) {
+            quitGuard.handleCommandQ()
+            return
+          }
+          app.quit()
         },
       })
 
@@ -939,9 +941,6 @@ export async function startDesktopApp(): Promise<void> {
   })
 
   app.on('before-quit', (event) => {
-    if (!quitGuard.handleBeforeQuit(event)) {
-      return
-    }
     event.preventDefault()
     requestDesktopExit({
       reason: 'app quit',

@@ -3,10 +3,18 @@ import { useTranslation } from 'react-i18next'
 
 import { toastManager } from '~/components/ui/toast'
 
-import { decodeInviteCode, encodeInviteCode } from './invite-code'
-import type { FabricNodeInvitation, NodeGrant, PendingFabricNodeRequest } from './types'
+import { decodeInviteCode, encodeControllerPairingCode, encodeInviteCode } from './invite-code'
+import type {
+  ControllerGrantSelection,
+  FabricControllerAccess,
+  FabricNodeInvitation,
+  NodeGrant,
+  PendingFabricControllerRequest,
+  PendingFabricNodeRequest,
+} from './types'
 import {
   useApproveNodeInvitation,
+  useApprovePendingFabricControllerRequest,
   useApprovePendingFabricNodeRequest,
   useCancelPendingFabricEnrollment,
   useCompleteNodeEnrollment,
@@ -17,16 +25,63 @@ import {
   useLeaveFabric,
   useManagedRelay,
   useNodeGrants,
+  useNodeGrantsForNodes,
   useNodes,
+  usePendingFabricControllerRequests,
   usePendingFabricEnrollment,
   usePendingFabricNodeRequests,
+  useRejectPendingFabricControllerRequest,
   useRejectPendingFabricNodeRequest,
   useRemoveNode,
+  useRevokeFabricController,
   useRevokeNodeGrant,
 } from './use-nodes'
 
+interface ApiErrorPayload {
+  message?: unknown
+  body?: ApiErrorPayload
+  error?: ApiErrorPayload | string
+}
+
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const payload = error as ApiErrorPayload
+    if (typeof payload.message === 'string' && payload.message.length > 0) {
+      return payload.message
+    }
+    if (payload.body) {
+      const bodyMessage = errorMessage(payload.body)
+      if (bodyMessage !== '[object Object]') {
+        return bodyMessage
+      }
+    }
+      if (typeof payload.error === 'string' && payload.error.length > 0) {
+        return payload.error
+      }
+    if (payload.error) {
+      const nestedMessage = errorMessage(payload.error)
+      if (nestedMessage !== '[object Object]') {
+        return nestedMessage
+      }
+    }
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    try {
+      const serialized = JSON.stringify(error)
+      if (serialized) {
+        return serialized
+      }
+    }
+    catch {
+      // Fall through for cyclic values that cannot be serialized.
+    }
+  }
+  return String(error)
 }
 
 const APPROVAL_POLL_MS = 3000
@@ -41,17 +96,29 @@ export function useNodesController() {
   const managedRelay = managedRelayQuery.data ?? null
   const pendingEnrollment = pendingEnrollmentQuery.data ?? null
   const nodes = useMemo(() => nodesQuery.data ?? [], [nodesQuery.data])
+  const controllerGrantsQuery = useNodeGrantsForNodes(
+    nodes.map(node => node.nodeId),
+    membership?.role === 'owner',
+  )
   const pendingRequestsQuery = usePendingFabricNodeRequests(membership?.role === 'owner')
   const pendingRequests = useMemo<PendingFabricNodeRequest[]>(
     () => pendingRequestsQuery.data ?? [],
     [pendingRequestsQuery.data],
+  )
+  const pendingControllerRequestsQuery = usePendingFabricControllerRequests(membership?.role === 'owner')
+  const pendingControllerRequests = useMemo<PendingFabricControllerRequest[]>(
+    () => pendingControllerRequestsQuery.data ?? [],
+    [pendingControllerRequestsQuery.data],
   )
 
   const [connectOpen, setConnectOpen] = useState(false)
   const [accessNodeId, setAccessNodeId] = useState<string | null>(null)
   const [invitation, setInvitation] = useState<FabricNodeInvitation | null>(null)
   const [revokingGrantId, setRevokingGrantId] = useState<string | null>(null)
+  const [revokingControllerId, setRevokingControllerId] = useState<string | null>(null)
   const [pendingRequestAction, setPendingRequestAction] = useState<{ requestId: string, kind: 'approve' | 'reject' } | null>(null)
+  const [controllerApprovalRequestId, setControllerApprovalRequestId] = useState<string | null>(null)
+  const [pendingControllerAction, setPendingControllerAction] = useState<{ requestId: string, kind: 'approve' | 'reject' } | null>(null)
 
   const createFabric = useCreateFabric()
   const createInvitation = useCreateNodeInvitation()
@@ -61,30 +128,78 @@ export function useNodesController() {
   const approveInvitation = useApproveNodeInvitation()
   const approvePendingRequest = useApprovePendingFabricNodeRequest()
   const rejectPendingRequest = useRejectPendingFabricNodeRequest()
+  const approvePendingController = useApprovePendingFabricControllerRequest()
+  const rejectPendingController = useRejectPendingFabricControllerRequest()
   const connectNode = useConnectNode()
   const revokeGrant = useRevokeNodeGrant()
+  const revokeController = useRevokeFabricController(nodes.map(node => node.nodeId))
   const removeNode = useRemoveNode()
 
   const accessNode = accessNodeId
     ? (nodes.find(node => node.nodeId === accessNodeId) ?? null)
+    : null
+  const controllerApprovalRequest = controllerApprovalRequestId
+    ? (pendingControllerRequests.find(request => request.requestId === controllerApprovalRequestId) ?? null)
     : null
   const grantsQuery = useNodeGrants(accessNodeId)
   const accessGrants = useMemo<NodeGrant[]>(
     () =>
       (grantsQuery.data ?? []).map(grant => ({
         grantId: grant.grantId,
+        controllerId: grant.controllerId,
         controllerLabel:
-          nodes.find(node => node.nodeId === grant.controllerId)?.displayName ?? grant.controllerId,
+          grant.controllerDisplayName
+          ?? nodes.find(node => node.nodeId === grant.controllerId)?.displayName
+          ?? grant.controllerId,
+        nodeId: grant.nodeId,
         scope: grant.scope,
         revokedAt: grant.revokedAt ?? null,
       })),
     [grantsQuery.data, nodes],
   )
+  const controllers = useMemo(() => {
+    const nodeIds = new Set(nodes.map(node => node.nodeId))
+    const grouped = new Map<string, FabricControllerAccess>()
+    for (const sourceGrant of controllerGrantsQuery.data) {
+      if (sourceGrant.revokedAt) {
+        continue
+      }
+      const grant: NodeGrant = {
+        grantId: sourceGrant.grantId,
+        controllerId: sourceGrant.controllerId,
+        controllerLabel: sourceGrant.controllerDisplayName ?? sourceGrant.controllerId,
+        nodeId: sourceGrant.nodeId,
+        scope: sourceGrant.scope,
+        revokedAt: sourceGrant.revokedAt ?? null,
+      }
+      // A computer's companion Controller is represented by the Node itself;
+      // only show separately enrolled Controllers in this summary.
+      if (nodeIds.has(grant.controllerId)) {
+        continue
+      }
+      const existing = grouped.get(grant.controllerId)
+      if (existing) {
+        existing.grants.push(grant)
+      }
+      else {
+        grouped.set(grant.controllerId, {
+          controllerId: grant.controllerId,
+          displayName: sourceGrant.controllerDisplayName ?? sourceGrant.controllerId,
+          grants: [grant],
+        })
+      }
+    }
+    return [...grouped.values()]
+  }, [controllerGrantsQuery.data, nodes])
 
   const networkCode = useMemo(
     () =>
       membership
-        ? encodeInviteCode({ relayUrl: membership.relayUrl, fabricId: membership.fabricId })
+        ? encodeControllerPairingCode({
+            relayUrl: membership.relayUrl,
+            fabricId: membership.fabricId,
+            ownerPubkey: membership.ownerPubkey,
+          })
         : null,
     [membership],
   )
@@ -283,6 +398,55 @@ export function useNodesController() {
     }
   }, [rejectPendingRequest, t])
 
+  const handleApprovePendingController = useCallback(async (grants: ControllerGrantSelection[]) => {
+    if (!controllerApprovalRequestId) {
+      return
+    }
+    const requestId = controllerApprovalRequestId
+    setPendingControllerAction({ requestId, kind: 'approve' })
+    try {
+      await approvePendingController.mutateAsync({
+        path: { requestId },
+        body: { grants },
+      })
+      toastManager.add({
+        type: 'success',
+        title: t('toast.controllerApproved', { name: controllerApprovalRequest?.displayName ?? '' }),
+      })
+      setControllerApprovalRequestId(null)
+    }
+    catch (error) {
+      toastManager.add({
+        type: 'error',
+        title: t('toast.approveControllerFailed'),
+        description: errorMessage(error),
+      })
+    }
+    finally {
+      setPendingControllerAction(null)
+    }
+  }, [approvePendingController, controllerApprovalRequest?.displayName, controllerApprovalRequestId, t])
+
+  const handleRejectPendingController = useCallback(async (requestId: string) => {
+    setPendingControllerAction({ requestId, kind: 'reject' })
+    try {
+      await rejectPendingController.mutateAsync({ path: { requestId } })
+      if (controllerApprovalRequestId === requestId) {
+        setControllerApprovalRequestId(null)
+      }
+    }
+    catch (error) {
+      toastManager.add({
+        type: 'error',
+        title: t('toast.rejectControllerFailed'),
+        description: errorMessage(error),
+      })
+    }
+    finally {
+      setPendingControllerAction(null)
+    }
+  }, [controllerApprovalRequestId, rejectPendingController, t])
+
   const handleRevokeGrant = useCallback(
     async (grantId: string) => {
       if (!accessNodeId) {
@@ -304,6 +468,27 @@ export function useNodesController() {
       }
     },
     [accessNodeId, revokeGrant, t],
+  )
+
+  const handleRevokeController = useCallback(
+    async (controllerId: string) => {
+      setRevokingControllerId(controllerId)
+      try {
+        await revokeController.mutateAsync({ path: { controllerId } })
+        toastManager.add({ type: 'success', title: t('toast.controllerRevoked') })
+      }
+      catch (error) {
+        toastManager.add({
+          type: 'error',
+          title: t('toast.revokeControllerFailed'),
+          description: errorMessage(error),
+        })
+      }
+      finally {
+        setRevokingControllerId(null)
+      }
+    },
+    [revokeController, t],
   )
 
   const handleRemoveNode = useCallback(
@@ -343,12 +528,24 @@ export function useNodesController() {
     nodes,
     nodesLoading: nodesQuery.isLoading,
     nodesError: nodesQuery.isError,
+    controllers,
+    controllersLoading: controllerGrantsQuery.isLoading,
+    controllersError: controllerGrantsQuery.isError,
     refreshNodes: () => void nodesQuery.refetch(),
     pendingRequests,
     pendingRequestsLoading: pendingRequestsQuery.isLoading,
     pendingRequestsError: pendingRequestsQuery.isError,
-    refreshPendingRequests: () => void pendingRequestsQuery.refetch(),
+    pendingControllerRequests,
+    pendingControllerRequestsLoading: pendingControllerRequestsQuery.isLoading,
+    pendingControllerRequestsError: pendingControllerRequestsQuery.isError,
+    refreshPendingRequests: () => void Promise.all([
+      pendingRequestsQuery.refetch(),
+      pendingControllerRequestsQuery.refetch(),
+    ]),
     pendingRequestAction,
+    pendingControllerAction,
+    controllerApprovalRequest,
+    controllerApprovalRequestId,
     networkCode,
     inviteCode,
     awaitingApproval,
@@ -359,11 +556,13 @@ export function useNodesController() {
     accessNodeId,
     accessGrants,
     revokingGrantId,
+    revokingControllerId,
     removingNodeId: removeNode.isPending ? (removeNode.variables?.path.nodeId ?? null) : null,
     connectingNodeId: connectNode.isPending ? (connectNode.variables?.path.nodeId ?? null) : null,
     busy: managedRelayQuery.isLoading || createFabric.isPending || createInvitation.isPending || approveInvitation.isPending,
     setConnectOpen,
     setAccessNodeId,
+    setControllerApprovalRequestId,
     handleReconnect,
     handleStart,
     handleGetCode,
@@ -372,7 +571,10 @@ export function useNodesController() {
     handleLeaveFabric,
     handleApprovePendingRequest,
     handleRejectPendingRequest,
+    handleApprovePendingController,
+    handleRejectPendingController,
     handleRevokeGrant,
+    handleRevokeController,
     handleRemoveNode,
     handleConnectOpenChange,
   }
