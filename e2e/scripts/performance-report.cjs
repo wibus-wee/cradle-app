@@ -192,6 +192,27 @@ function aggregateByAction(interactions) {
   })).sort((left, right) => right.p95Ms - left.p95Ms || left.key.localeCompare(right.key))
 }
 
+function aggregateBySurface(interactions) {
+  const grouped = new Map()
+  for (const interaction of interactions) {
+    const current = grouped.get(interaction.source) || []
+    current.push(interaction)
+    grouped.set(interaction.source, current)
+  }
+
+  return Array.from(grouped, ([source, samples]) => {
+    const durations = samples.map(sample => sample.durationMs)
+    return {
+      source,
+      interactions: samples.length,
+      p50Ms: percentile(durations, 0.5),
+      p95Ms: percentile(durations, 0.95),
+      maximumMs: roundMilliseconds(Math.max(...durations)),
+      failures: samples.filter(sample => sample.status === 'FAILED').length,
+    }
+  }).sort((left, right) => left.source.localeCompare(right.source))
+}
+
 function buildComparison(actionAggregates, baseline) {
   const baselineByKey = new Map(
     (baseline?.actionAggregates || []).map(action => [action.key, action]),
@@ -244,6 +265,7 @@ function buildPerformanceReport(input) {
   }))
   const durations = interactions.map(interaction => interaction.durationMs)
   const actionAggregates = aggregateByAction(interactions)
+  const surfaceAggregates = aggregateBySurface(interactions)
   const bandCounts = Object.fromEntries(RESPONSE_BANDS.map(band => [band.id, 0]))
   for (const interaction of interactions) {
     bandCounts[interaction.band] += 1
@@ -263,7 +285,7 @@ function buildPerformanceReport(input) {
 
   const topRows = topInteractions.map(
     interaction =>
-      `| \`${interaction.stableId ?? 'unlabeled'}\` | \`${interaction.source}\` | ${interaction.action.replaceAll('|', '\\|')} | ${formatDuration(interaction.durationMs)} | \`${interaction.band}\` | \`${interaction.status}\` |`,
+      `| \`${interaction.stableId ?? 'unlabeled'}\` | \`${interaction.source}\` | ${interaction.action.replaceAll('|', '\\|')} | ${(interaction.responses || []).join('; ').replaceAll('|', '\\|') || 'n/a'} | ${formatDuration(interaction.durationMs)} | \`${interaction.band}\` | \`${interaction.status}\` |`,
   )
   const comparisonRows = (comparison?.regressions || [])
     .slice(0, 15)
@@ -271,6 +293,9 @@ function buildPerformanceReport(input) {
       change =>
         `| \`${change.stableId ?? 'unlabeled'}\` | ${change.action.replaceAll('|', '\\|')} | ${formatDuration(change.baselineP50Ms)} | ${formatDuration(change.currentP50Ms)} | ${change.deltaPercent === null ? 'n/a' : `${change.deltaPercent > 0 ? '+' : ''}${change.deltaPercent}%`} |`,
     )
+  const surfaceRows = surfaceAggregates.map(
+    surface => `| \`${surface.source}\` | ${surface.interactions} | ${formatDuration(surface.p50Ms)} | ${formatDuration(surface.p95Ms)} | ${formatDuration(surface.maximumMs)} | ${surface.failures} |`,
+  )
 
   const markdown = [
     input.suite ? `## ${input.suite} Performance` : '## Interaction Performance',
@@ -289,10 +314,16 @@ function buildPerformanceReport(input) {
     input.measurementDescription
     || 'Each sample starts at a Gherkin `Action` step and includes every following `Outcome` step, so the duration ends only after the expected user-visible response is verified. Setup steps and runner startup are excluded.',
     '',
+    '### Surface Summary',
+    '',
+    '| Surface | Samples | P50 | P95 | Maximum | Failures |',
+    '| --- | ---: | ---: | ---: | ---: | ---: |',
+    markdownTable(surfaceRows, 'No interaction surfaces were recorded.'),
+    '',
     '### Slowest Interactions',
     '',
-    '| Scenario | Surface | Action | Duration | Band | Status |',
-    '| --- | --- | --- | ---: | --- | --- |',
+    '| Scenario | Surface | Action | Response | Duration | Band | Status |',
+    '| --- | --- | --- | --- | ---: | --- | --- |',
     markdownTable(topRows, 'No interaction samples were recorded.'),
     ...(comparison
       ? [
@@ -321,6 +352,7 @@ function buildPerformanceReport(input) {
     summary,
     interactions,
     actionAggregates,
+    surfaceAggregates,
     comparison,
     markdown,
   }

@@ -1,23 +1,36 @@
 appId: app.cradle.mobile
 ---
-- launchApp
+- launchApp:
+    label: "perf-action:launch-workspaces|launch Mobile and show Workspaces"
 - extendedWaitUntil:
     visible: Workspaces
     timeout: 30000
+    label: "perf-response:launch-workspaces|Workspaces are visible"
 - runFlow:
     when:
       visible: Open navigation
     commands:
-      - tapOn: Open navigation
-      - tapOn: Settings
+      - tapOn:
+          text: Open navigation
+          label: "perf-action:open-settings-navigation|open navigation for Settings"
+      - extendedWaitUntil:
+          visible: Settings
+          timeout: 15000
+          label: "perf-response:open-settings-navigation|Settings navigation is visible"
+      - tapOn:
+          text: Settings
+          label: "perf-action:open-settings|open Settings"
 - runFlow:
     when:
       notVisible: Open navigation
     commands:
-      - tapOn: Settings
+      - tapOn:
+          text: Settings
+          label: "perf-action:open-settings|open Settings"
 - extendedWaitUntil:
     visible: Settings
     timeout: 15000
+    label: "perf-response:open-settings|Settings are visible"
 - runFlow:
     when:
       visible: Open navigation
@@ -28,50 +41,86 @@ appId: app.cradle.mobile
           timeout: 45000
       - tapOn:
           id: settings-node-${NODE_ID}
-- runFlow:
-    when:
-      notVisible: Open navigation
-    commands:
-      - extendedWaitUntil:
-          visible:
-            id: settings-node-${NODE_ID}
-          timeout: 45000
-      - tapOn:
-          id: settings-node-${NODE_ID}
+          label: "perf-action:switch-node|switch to another Node"
       - extendedWaitUntil:
           visible:
             id: settings-node-${NODE_ID}
             selected: true
           timeout: 45000
-- runFlow:
-    when:
-      visible: Open navigation
-    commands:
-      - tapOn: Open navigation
-      - tapOn: Workspaces
+          label: "perf-response:switch-node|the selected Node is active"
 - runFlow:
     when:
       notVisible: Open navigation
     commands:
-      - tapOn: Workspaces
+      - extendedWaitUntil:
+          visible:
+            id: settings-node-${NODE_ID}
+          timeout: 45000
+      - tapOn:
+          id: settings-node-${NODE_ID}
+          label: "perf-action:switch-node|switch to another Node"
+      - extendedWaitUntil:
+          visible:
+            id: settings-node-${NODE_ID}
+            selected: true
+          timeout: 45000
+          label: "perf-response:switch-node|the selected Node is active"
+- runFlow:
+    when:
+      visible: Open navigation
+    commands:
+      - tapOn:
+          text: Open navigation
+          label: "perf-action:open-workspaces-navigation|open navigation for Workspaces"
+      - extendedWaitUntil:
+          visible: Workspaces
+          timeout: 15000
+          label: "perf-response:open-workspaces-navigation|Workspaces navigation is visible"
+      - tapOn:
+          text: Workspaces
+          label: "perf-action:open-workspaces|open Workspaces"
+- runFlow:
+    when:
+      notVisible: Open navigation
+    commands:
+      - tapOn:
+          text: Workspaces
+          label: "perf-action:open-workspaces|open Workspaces"
 - extendedWaitUntil:
     visible: ${WORKSPACE_NAME}.*
     timeout: 45000
-- assertNotVisible: ${OTHER_WORKSPACE_NAME}.*
-- tapOn: ${WORKSPACE_NAME}.*
+- assertNotVisible:
+    text: ${OTHER_WORKSPACE_NAME}.*
+    label: "perf-response:open-workspaces|only the active Node Workspaces are visible"
+- tapOn:
+    text: ${WORKSPACE_NAME}.*
+    label: "perf-action:open-workspace|open a Workspace"
 - extendedWaitUntil:
     visible: ${SESSION_TITLE}.*
     timeout: 45000
-- tapOn: ${SESSION_TITLE}.*
+    label: "perf-response:open-workspace|the Workspace conversations are visible"
+- tapOn:
+    text: ${SESSION_TITLE}.*
+    label: "perf-action:open-session|open a Chat session"
 - extendedWaitUntil:
     visible:
       id: chat-message-input
     timeout: 45000
+    label: "perf-response:open-session|the Chat composer is visible"
 - tapOn:
     id: chat-message-input
-- inputText: ${CHAT_PROMPT}
+    label: "perf-action:enter-chat-message|focus the Chat composer and enter a message"
+- inputText:
+    text: ${CHAT_PROMPT}
+    label: "perf-continuation:enter-chat-message"
+- assertVisible:
+    id: chat-message-input
+    text: ${CHAT_PROMPT}
+    label: "perf-response:enter-chat-message|the Chat message is visible in the composer"
 - tapOn:
     id: chat-send-message
+    label: "perf-action:send-chat-message|send a Chat message"
 - extendedWaitUntil:
     visible: ${CHAT_RESPONSE}
     timeout: 60000
+    label: "perf-response:send-chat-message|the streamed Chat response is visible"

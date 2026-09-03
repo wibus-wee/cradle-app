@@ -9,11 +9,13 @@ move single E2E samples materially.
 | Area | Owner | Responsibility |
 | --- | --- | --- |
 | Cucumber boundary | [`scripts/performance-report.cjs`](scripts/performance-report.cjs) | Reconstructs each Gherkin action and its consecutive observable outcomes from `cucumber-messages.ndjson`. |
-| Fabric boundary | [`src/fabric/fabric-two-node.spec.ts`](src/fabric/fabric-two-node.spec.ts) | Marks Web and Mobile action-to-response operations as Playwright interaction steps. |
-| Fabric reporter | [`scripts/playwright-performance-reporter.cjs`](scripts/playwright-performance-reporter.cjs) | Converts marked Playwright steps, including failures, into the shared report model. |
+| Fabric Web boundary | [`src/fabric/fabric-two-node.spec.ts`](src/fabric/fabric-two-node.spec.ts) | Marks Web action-to-response operations as Playwright interaction steps. |
+| Fabric Mobile boundary | [`mobile/maestro`](mobile/maestro) | Labels each launch, tap, or text entry and its final visible response. |
+| Maestro parser | [`scripts/maestro-performance.cjs`](scripts/maestro-performance.cjs) | Reconstructs Mobile action-to-response samples from Maestro command timestamps. |
+| Fabric reporter | [`scripts/playwright-performance-reporter.cjs`](scripts/playwright-performance-reporter.cjs) | Merges Web Playwright steps and Mobile Maestro commands, including failures, into the shared report model. |
 | Cucumber integration | [`scripts/summarize-run.cjs`](scripts/summarize-run.cjs) | Writes performance artifacts beside each pass/fail summary. |
-| Human report | `e2e-performance.md` | Shows response bands and the 30 slowest interaction samples. |
-| Machine report | `e2e-performance.json` | Preserves every sample, surface, action aggregate, thresholds, and optional baseline comparison. |
+| Human report | `e2e-performance.md` | Shows per-surface summaries, response bands, and the action plus asserted endpoint for the 30 slowest samples. |
+| Machine report | `e2e-performance.json` | Preserves every sample, per-surface and per-action aggregates, thresholds, and optional baseline comparison. |
 
 ## Measurement Contract
 
@@ -24,23 +26,28 @@ response from raw click events:
   `Outcome` step. The next `Action` or `Context` closes the boundary.
 - Fabric Web wraps a user operation and its rendered, persisted, remote, or
   streamed result in `[interaction:fabric-web]` Playwright steps.
-- Fabric Mobile wraps every invoked Maestro flow in
-  `[interaction:mobile-ios]`. Each flow ends at its final visible assertion, so
-  app launch and navigation needed for that action are included but simulator,
-  app build, server, and topology startup are excluded.
+- Fabric Mobile gives each independent `launchApp`, `tapOn`, or `inputText`
+  operation a `perf-action:<id>|<action>` label. Multi-command operations such
+  as focusing an input before typing use `perf-continuation:<id>`. The final
+  independently asserted response carries `perf-response:<id>|<response>`.
+  The parser uses Maestro's command timestamps from action start through
+  response completion. Unselected conditional branches and their runner wait
+  are excluded.
 
-These are the authored user interaction boundaries in the E2E contracts. A
-single boundary may contain prerequisite taps or text entry when those commands
-do not have an independently asserted product response.
+These are the authored user interaction boundaries in the E2E contracts. The
+Mobile contract test rejects an unlabeled launch, tap, or text entry and rejects
+action/response ID drift. A runtime parser error rejects overlapping or
+mismatched boundaries. This keeps every maintained native operation attributable
+without treating a whole multi-operation journey as one latency sample.
 
 The report deliberately:
 
-- excludes hooks, fixtures, application build/startup, topology startup, and
-  Cucumber `Context` setup;
+- excludes hooks, fixtures, application build, simulator creation, topology
+  startup, unselected Maestro branches, and Cucumber `Context` setup;
 - uses only the latest retry attempt so a recovered retry is not mixed with its failed predecessor;
 - retains executed failures so timeout-heavy paths remain visible, while excluding skipped actions that never occurred;
 - groups repeated action definitions by stable `@CRADLE-*` scenario ID for baseline comparison;
-- labels samples by `web`, `fabric-web`, or `mobile-ios` surface;
+- labels and summarizes samples by `web`, `fabric-web`, or `mobile-ios` surface;
 - records every interaction in milliseconds to three decimal places and calculates nearest-rank P50/P95 values.
 
 Response bands use established human-response thresholds:
@@ -116,11 +123,13 @@ interaction before changing product code.
 
 Actions that intentionally release simulator gates or mutate files from an external process still appear when authored as Gherkin `Action` steps. They are retained because they describe an observable journey boundary, but should not be interpreted as direct UI latency. Parallel workers also share host resources; compare within the same lane and worker configuration.
 
-Fabric reports explicit interaction steps rather than every Playwright locator
-call. Mobile reports one sample per Maestro flow rather than each YAML command.
-That granularity keeps the end boundary tied to an asserted product response;
-recording a tap or text entry with no independent outcome would measure driver
-execution rather than user-perceived response time.
+Fabric Web reports explicit interaction steps rather than every Playwright
+locator call. Mobile reports every maintained launch, tap, and text entry, but
+only after the flow provides a paired visible response. The measured duration
+therefore includes Maestro driver execution and the application's response, as
+experienced by the automation client. It does not isolate native main-thread,
+network, relay, Server, or runtime-provider time; use command logs and runtime
+traces for attribution.
 
 ## Validation Record: 2026-09-04
 
@@ -142,7 +151,8 @@ The search helper's removed `500 ms` sleep affects Settings, Provider, Agent Ide
 | Change | Implementation cost | Side effects and risk | Impact radius | Decision |
 | --- | --- | --- | --- | --- |
 | Cucumber interaction report | One parser, one focused test file, two artifacts per CI lane, and about 32-45 KB per measured local lane. Report generation measured 50 ms wall time for 120 steps. | Informational comparisons may fluctuate with runner load; no runtime overhead and no CI failure gate. Failed interactions remain visible. | All maintained Cucumber scenarios across Claude, Codex, and runtime-none lanes; CI summary and artifact uploads. | Ship: broad observability gain with negligible run cost. |
-| Fabric interaction report | One Playwright reporter, one focused test file, and explicit interaction steps at the existing Web and Mobile orchestration boundaries. | Step titles are a report contract. Renaming one without updating its baseline creates a new series; there is no product runtime overhead. | Both maintained Fabric scenarios, including two-node Web and native Mobile iOS. | Ship: the same artifact schema now covers all maintained E2E surfaces. |
+| Fabric Web interaction report | One Playwright reporter, one focused test file, and explicit interaction steps at the existing Web orchestration boundaries. | Step titles are baseline keys. Renaming one creates a new series; there is no product runtime overhead. | The maintained two-node Fabric Web scenario. | Ship: every authored Fabric Web operation has an asserted end boundary in the shared report schema. |
+| Fabric Mobile command attribution | One Maestro parser and test file, labels plus response assertions in five flows, and about 30 ms to scan five command logs. | Action descriptions are baseline keys. Input focus is not exposed reliably by the iOS accessibility tree, so focus plus text entry is one operation. Added assertions can expose accessibility regressions; they add no product runtime code. | All 16 executed launch, tap, and text-entry operations in `CRADLE-FABRIC-002`; Mobile Fabric CI and artifacts only. | Ship: the data separates driver-heavy input and cold launch from product response paths. |
 | PR evidence check | Five required PR fields, a small body validator, and one workflow job. | Documentation-only and generated/dependency-only pull requests still need concise evidence or an explicit not-applicable rationale. The check validates presence, not the quality of measurements. | Every pull request and the repository PR template; no application runtime effect. | Ship: review cost is small and performance tradeoffs cannot be omitted silently. |
 | Replace Agent save sleep | One E2E assertion changed. | Depends on the create view disappearing only after successful mutation; that is the user-visible transition already owned by the screen. It can expose a real regression instead of waiting blindly. | `CRADLE-AGENT-ID-001`; no product runtime code. | Ship: removes 1.95 s of false latency and lowers flake risk. |
 | Remove search debounce sleep | One shared page-object line removed. | Downstream result locators must auto-wait; all current callers already assert or click a specific result. A missing result now consumes its owning assertion timeout rather than an unconditional delay. | Settings, Provider, Agent Identity, and Search E2E journeys; no product runtime code. | Ship: removes a fixed test tax without weakening response assertions. |
@@ -157,9 +167,12 @@ The remaining runtime-none investigation queue is `CRADLE-KANBAN-002` Issue dele
 ### Fabric Web
 
 The final two-node Web run passed all 33 measured interactions. Its P50 was
-`397 ms`, P95 was `1.898 s`, and maximum was `1.917 s`. The 11 flow-breaking
-samples cover Node pairing propagation, first Work creation, remote Chat, and
-approval, which measured about `1.0-1.9 s`. These paths cross process,
+`402 ms`, P95 was `1.894 s`, and maximum was `1.924 s`. Compared with the prior
+successful run (`397 ms`, `1.898 s`, `1.917 s`), the deltas are `+1.26%`,
+`-0.21%`, and `+0.37%`; no product code changed, so these are normal single-run
+variance. The 10 flow-breaking samples cover Node pairing propagation, first
+Work creation, remote Chat, and approval, which measured about `1.0-1.9 s`.
+These paths cross process,
 persistence, relay, or runtime boundaries; the report identifies them for trace
 attribution but does not justify a product change from one sample.
 
@@ -174,26 +187,52 @@ This was an E2E environment failure, not a 60-second application response.
 
 ### Fabric Mobile iOS
 
-The native run passed all five Mobile interactions and the 17 Web interactions
-that prepared and mutated its two-node topology. The combined report recorded
-22/22 passes with P50 `491 ms`, P95 `30.930 s`, and maximum `50.431 s`. Isolating
-the Mobile surface gives P50 `15.685 s`, P95/max `50.431 s`:
+The final native run passed all five Maestro flows, all 16 labeled Mobile
+interactions, and the 17 Web interactions that prepared and mutated its
+two-node topology. The combined report recorded 33/33 passes with P50
+`1.284 s`, P95 `5.329 s`, and maximum `9.555 s`. Isolating the Mobile surface
+gives P50 `2.291 s` and P95/max `9.555 s`:
 
 | Mobile action | Duration | Band |
 | --- | ---: | --- |
-| Switch Nodes, send Chat, and render the streamed response | 50.431 s | `severe` |
-| Enroll the Controller and show its pending state | 30.930 s | `severe` |
-| Select a Node and show only its Workspaces | 15.685 s | `severe` |
-| Refresh after grant revocation and remove that Node | 15.507 s | `severe` |
-| Refresh after Controller revocation and show access revoked | 13.196 s | `severe` |
+| Focus and enter the Fabric enrollment code | 9.555 s | `flow-breaking` |
+| Cold launch Mobile and show enrollment | 5.329 s | `flow-breaking` |
+| Launch Mobile and show Workspaces | 4.687 s | `flow-breaking` |
+| Focus the Chat composer and enter a message | 4.444 s | `flow-breaking` |
+| Relaunch after one Node grant is revoked | 4.378 s | `flow-breaking` |
+| Launch Mobile and show the Node picker | 4.378 s | `flow-breaking` |
+| Relaunch after Controller revocation | 3.339 s | `flow-breaking` |
+| Open Workspaces | 2.375 s | `flow-breaking` |
+| Select a Node | 2.291 s | `flow-breaking` |
+| Open Settings | 1.862 s | `flow-breaking` |
+| Send a Chat message and show the streamed response | 1.478 s | `flow-breaking` |
+| Open a Chat session | 1.393 s | `flow-breaking` |
+| Open a Workspace | 1.317 s | `flow-breaking` |
+| Request Controller access | 1.298 s | `flow-breaking` |
+| Submit the Fabric enrollment code | 1.284 s | `flow-breaking` |
+| Switch to another Node | 998 ms | `perceptible` |
 
-Each Mobile sample is one Maestro flow and includes a cold app launch plus the
-navigation required to reach its asserted response. The data therefore exposes
-slow end-to-end journeys, especially Chat and enrollment, but cannot distinguish
-native startup, driver overhead, navigation, network propagation, and final
-rendering. The next measurement improvement is to add independently asserted
-intermediate outcomes before changing product code; optimizing against these
-whole-flow numbers alone risks moving test overhead rather than user latency.
+This attribution changes the optimization queue. The earlier whole-flow report
+ranked the switch-and-Chat journey at `50.431 s`, but the final send-to-streamed
+response is `1.478 s`. Long text injection dominates enrollment (`9.555 s`) and
+also contributes `4.444 s` to Chat composition; that is primarily Maestro driver
+cost. Cold launch and state restoration remain product-relevant candidates at
+`3.339-5.329 s`. Navigation and Node selection are `998 ms-2.375 s` and should be
+traced before product changes.
+
+The five Maestro flows took `80.037 s` before command-level assertions and
+`76.519 s` after them (`-3.518 s`, `-4.40%`) on the same host. This is run
+variance, not a speedup claim, but it shows that the extra response assertions
+did not add a measurable fixed tax. Parsing all five `commands.json` files took
+about `30 ms` wall time. Per-interaction values cannot be compared to the old
+whole-flow values because the measurement definitions differ.
+
+One intermediate validation attempted to end input-focus interactions on
+`focused=true`. React Native iOS did not expose that state through its
+accessibility tree, so the assertion failed after `17.314 s`. The final contract
+combines focus and text entry and ends when the entered text is visible. This
+keeps the operation observable without weakening the production accessibility
+surface or reporting an unsupported state.
 
 The first native attempt failed after `80.613 s` because the Release app exited
 about three seconds after launch. Its bundle lacked the Expo Constants manifest:

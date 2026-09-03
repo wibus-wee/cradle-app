@@ -1,15 +1,20 @@
 appId: app.cradle.mobile
 ---
-- launchApp
+- launchApp:
+    label: "perf-action:launch-node-picker|launch Mobile and show the Node picker"
 - extendedWaitUntil:
     visible:
       id: fabric-node-picker
     timeout: 45000
+    label: "perf-response:launch-node-picker|the Node picker is visible"
 - assertVisible:
     id: fabric-node-${NODE_ID}
 - tapOn:
     id: fabric-node-${NODE_ID}
+    label: "perf-action:select-node|select a Node"
 - extendedWaitUntil:
     visible: ${WORKSPACE_NAME}.*
     timeout: 45000
-- assertNotVisible: ${OTHER_WORKSPACE_NAME}.*
+- assertNotVisible:
+    text: ${OTHER_WORKSPACE_NAME}.*
+    label: "perf-response:select-node|only the selected Node Workspaces are visible"

@@ -239,3 +239,35 @@ test('summarizes response bands and reports informational baseline changes', () 
   assert.match(report.markdown, /Comparisons are informational/)
   assert.match(report.markdown, /P95 action-to-response/)
 })
+
+test('reports each surface separately when a run mixes Web and Mobile interactions', () => {
+  const report = buildPerformanceReport({
+    interactions: [
+      { key: 'A::web', action: 'web', source: 'fabric-web', durationMs: 100, status: 'PASSED' },
+      { key: 'A::mobile-1', action: 'mobile 1', source: 'mobile-ios', durationMs: 1_000, status: 'PASSED' },
+      { key: 'A::mobile-2', action: 'mobile 2', source: 'mobile-ios', durationMs: 3_000, status: 'FAILED' },
+    ],
+  })
+
+  assert.deepEqual(report.surfaceAggregates, [
+    { source: 'fabric-web', interactions: 1, p50Ms: 100, p95Ms: 100, maximumMs: 100, failures: 0 },
+    { source: 'mobile-ios', interactions: 2, p50Ms: 1_000, p95Ms: 3_000, maximumMs: 3_000, failures: 1 },
+  ])
+  assert.match(report.markdown, /\| `mobile-ios` \| 2 \| 1\.00 s \| 3\.00 s \| 3\.00 s \| 1 \|/)
+})
+
+test('shows the asserted response boundary in the human-readable slow-path table', () => {
+  const report = buildPerformanceReport({
+    interactions: [{
+      key: 'A::send',
+      action: 'send Chat',
+      responses: ['streamed reply is visible'],
+      source: 'mobile-ios',
+      durationMs: 1_500,
+      status: 'PASSED',
+    }],
+  })
+
+  assert.match(report.markdown, /\| Action \| Response \| Duration \|/)
+  assert.match(report.markdown, /send Chat \| streamed reply is visible \| 1\.50 s/)
+})

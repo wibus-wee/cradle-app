@@ -1,6 +1,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
+const { loadMaestroInteractionSamples } = require('./maestro-performance.cjs')
 const { buildPerformanceReport } = require('./performance-report.cjs')
 
 const INTERACTION_STEP = /^\[interaction:([^\]]+)\]\s+(.+)$/
@@ -51,13 +52,23 @@ class PlaywrightPerformanceReporter {
       baseline = JSON.parse(fs.readFileSync(path.resolve(baselinePath), 'utf8'))
     }
     const mobile = process.env.CRADLE_E2E_MOBILE_IOS === '1'
+    const interactions = [...this.interactions]
+    if (mobile) {
+      const maestroArtifacts = process.env.CRADLE_E2E_MOBILE_ARTIFACTS_DIR?.trim()
+      if (!maestroArtifacts) {
+        throw new Error('CRADLE_E2E_MOBILE_ARTIFACTS_DIR is required for Mobile performance reporting.')
+      }
+      interactions.push(...loadMaestroInteractionSamples(maestroArtifacts))
+    }
     const report = buildPerformanceReport({
-      interactions: this.interactions,
+      interactions,
       suite: mobile ? 'Fabric Mobile iOS Interaction' : 'Fabric Two-Node Interaction',
       tagsFilter: mobile ? 'CRADLE-FABRIC-002' : 'CRADLE-FABRIC-001',
       runUrl: process.env.RUN_URL || '',
       baseline,
-      measurementDescription: 'Each sample is an explicit Playwright interaction step that starts with a Web or native user operation and ends after its asserted visible, persisted, remote, or streamed response. Fixtures and topology startup are excluded.',
+      measurementDescription: mobile
+        ? 'Web samples are explicit Playwright interaction steps. Mobile samples use labeled Maestro commands and span one launch, tap, or text entry through its paired visible response. Fixtures, build time, topology startup, and unselected conditional branches are excluded.'
+        : 'Each sample is an explicit Playwright interaction step that starts with a Web user operation and ends after its asserted visible, persisted, remote, or streamed response. Fixtures and topology startup are excluded.',
     })
 
     fs.mkdirSync(outputDir, { recursive: true })
