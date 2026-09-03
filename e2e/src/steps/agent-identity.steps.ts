@@ -361,8 +361,7 @@ When('我点击创建 Agent 保存按钮', async function (this: CradleWorld) {
   const button = this.page.locator('[data-testid="agent-detail-save"]')
   await expect(button).toBeEnabled({ timeout: 10_000 })
   await button.click()
-  // Wait for save to process — the agent name input should still be visible after save
-  await this.page.waitForTimeout(2000)
+  await expect(this.page.locator(AGENT_CREATE_PAGE)).toBeHidden({ timeout: 10_000 })
 })
 
 Then('当前 Agent Model 应显示{string}', async function (this: CradleWorld, modelId: string) {

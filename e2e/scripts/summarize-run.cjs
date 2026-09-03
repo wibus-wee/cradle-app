@@ -1,6 +1,8 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
+const { buildPerformanceReport, parseInteractionSamples } = require('./performance-report.cjs')
+
 const STATUS_RANK = {
   UNKNOWN: 0,
   PASSED: 1,
@@ -190,13 +192,34 @@ function summarizeRun(options = {}) {
   const messagesPath = path.join(artifactsDir, 'cucumber-messages.ndjson')
   let scenarios = []
   let parseError = ''
+  const messagesText = readText(messagesPath)
+  let interactions = []
   try {
-    scenarios = parseMessagesText(readText(messagesPath))
+    scenarios = parseMessagesText(messagesText)
+    interactions = parseInteractionSamples(messagesText)
   }
   catch (error) {
     parseError = `message parse error: ${error instanceof Error ? error.message : String(error)}`
   }
   const output = readText(path.join(artifactsDir, 'cucumber-output.log'))
+  let baseline = null
+  const baselinePath = options.performanceBaseline || process.env.E2E_PERFORMANCE_BASELINE
+  if (baselinePath) {
+    try {
+      baseline = JSON.parse(readText(baselinePath))
+    }
+    catch (error) {
+      parseError = [parseError, `performance baseline parse error: ${error instanceof Error ? error.message : String(error)}`]
+        .filter(Boolean)
+        .join('; ')
+    }
+  }
+  const performance = buildPerformanceReport({
+    interactions,
+    tagsFilter: options.tagsFilter || process.env.TAGS_FILTER || '',
+    runUrl: options.runUrl || process.env.RUN_URL || '',
+    baseline,
+  })
   const summary = buildRunSummary({
     scenarios,
     outcome: options.outcome || process.env.E2E_OUTCOME || 'unknown',
@@ -212,10 +235,15 @@ function summarizeRun(options = {}) {
     `${JSON.stringify(summary, null, 2)}\n`,
   )
   fs.writeFileSync(path.join(artifactsDir, 'e2e-summary.md'), `${summary.markdown}\n`)
+  fs.writeFileSync(
+    path.join(artifactsDir, 'e2e-performance.json'),
+    `${JSON.stringify(performance, null, 2)}\n`,
+  )
+  fs.writeFileSync(path.join(artifactsDir, 'e2e-performance.md'), `${performance.markdown}\n`)
   if (process.env.GITHUB_STEP_SUMMARY) {
-    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.markdown}\n`)
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.markdown}\n\n${performance.markdown}\n`)
   }
-  return summary
+  return { ...summary, performance }
 }
 
 if (require.main === module) {

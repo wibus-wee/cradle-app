@@ -46,7 +46,6 @@ export class SearchPage {
     const input = this.input()
     await expect(input).toBeVisible({ timeout: TIMEOUT })
     await input.fill(query)
-    await this.page.waitForTimeout(500)
   }
 
   commandRow(label: string): Locator {

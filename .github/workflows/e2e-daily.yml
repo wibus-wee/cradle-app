@@ -99,6 +99,8 @@ jobs:
             e2e/artifacts/cucumber-junit.xml
             e2e/artifacts/e2e-summary.json
             e2e/artifacts/e2e-summary.md
+            e2e/artifacts/e2e-performance.json
+            e2e/artifacts/e2e-performance.md
             e2e/artifacts/scenarios/**/failure.png
             e2e/artifacts/scenarios/**/failure.webm
             e2e/artifacts/scenarios/**/trace.zip

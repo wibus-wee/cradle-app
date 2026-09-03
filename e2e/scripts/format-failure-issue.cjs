@@ -85,6 +85,7 @@ ${formatFailureArtifactsSection(failureIndex)}
 | \`ARTIFACTS.md\` | This legend (also in the zip) |
 | \`failure-index.json\` | Machine index of failures → relative paths |
 | \`e2e-summary.md\` / \`e2e-summary.json\` | Run-level Cucumber summary |
+| \`e2e-performance.md\` / \`e2e-performance.json\` | Per-interaction action-to-response timings and slow-path ranking |
 | \`cucumber-output.log\` | Full runner stdout/stderr |
 | \`cucumber-junit.xml\` | JUnit for dashboards |
 | \`scenarios/<slug>-<n>/failure.webm\` | 1:1 scenario video (**CI upload only**, not embedded in Cucumber HTML) |

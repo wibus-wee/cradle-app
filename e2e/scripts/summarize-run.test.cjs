@@ -1,7 +1,10 @@
 const assert = require('node:assert/strict')
+const { mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
+const { tmpdir } = require('node:os')
+const { join } = require('node:path')
 const test = require('node:test')
 
-const { buildRunSummary, parseMessagesText } = require('./summarize-run.cjs')
+const { buildRunSummary, parseMessagesText, summarizeRun } = require('./summarize-run.cjs')
 
 function envelopeLines(...envelopes) {
   return envelopes.map(envelope => JSON.stringify(envelope)).join('\n')
@@ -100,4 +103,55 @@ test('preserves raw diagnostics when Cucumber fails before a scenario starts', (
   assert.match(summary.markdown, /BeforeAll failed/)
   assert.match(summary.markdown, /server failed to boot/)
   assert.deepEqual(summary.parseErrors, ['message parse error: truncated JSON'])
+})
+
+test('writes machine-readable and human-readable interaction reports with the run summary', (t) => {
+  const artifactsDir = mkdtempSync(join(tmpdir(), 'cradle-e2e-summary-'))
+  t.after(() => rmSync(artifactsDir, { force: true, recursive: true }))
+  const envelopes = [
+    discoveryEnvelopes[0],
+    {
+      pickle: {
+        ...discoveryEnvelopes[1].pickle,
+        steps: [
+          { id: 'action-1', text: 'open settings', type: 'Action' },
+          { id: 'outcome-1', text: 'settings are visible', type: 'Outcome' },
+        ],
+      },
+    },
+    {
+      testCase: {
+        id: 'case-1',
+        pickleId: 'pickle-1',
+        testSteps: [
+          { id: 'test-action-1', pickleStepId: 'action-1' },
+          { id: 'test-outcome-1', pickleStepId: 'outcome-1' },
+        ],
+      },
+    },
+    { testCaseStarted: { id: 'started-1', testCaseId: 'case-1', attempt: 0 } },
+    {
+      testStepFinished: {
+        testCaseStartedId: 'started-1',
+        testStepId: 'test-action-1',
+        testStepResult: { status: 'PASSED', duration: { seconds: 0, nanos: 40_000_000 } },
+      },
+    },
+    {
+      testStepFinished: {
+        testCaseStartedId: 'started-1',
+        testStepId: 'test-outcome-1',
+        testStepResult: { status: 'PASSED', duration: { seconds: 0, nanos: 70_000_000 } },
+      },
+    },
+  ]
+  writeFileSync(join(artifactsDir, 'cucumber-messages.ndjson'), envelopeLines(...envelopes))
+
+  const result = summarizeRun({ artifactsDir, outcome: 'success', tagsFilter: '@P0' })
+  const performance = JSON.parse(readFileSync(join(artifactsDir, 'e2e-performance.json'), 'utf8'))
+
+  assert.equal(result.totalScenarios, 1)
+  assert.equal(result.performance.summary.interactions, 1)
+  assert.equal(performance.interactions[0].durationMs, 110)
+  assert.match(readFileSync(join(artifactsDir, 'e2e-performance.md'), 'utf8'), /open settings/)
 })

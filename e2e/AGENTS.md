@@ -21,6 +21,7 @@ pnpm --filter @cradle/desktop sync:codex-runtime
 pnpm exec playwright install chromium-headless-shell
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0 or @P1"
+pnpm e2e:performance:report
 ```
 
 `pnpm e2e:check` enforces two contracts: the suite inventory (scenario tags,
@@ -90,6 +91,16 @@ Root `e2e/artifacts/ARTIFACTS.md` and `failure-index.json` document the bundle.
 Daily/smoke CI uploads all of the above and links them from the failure Issue / PR comment.
 Run summaries are parsed from `cucumber-messages.ndjson` by
 `e2e/scripts/summarize-run.cjs`; workflows must not carry their own report parser.
+
+## Interaction performance
+
+Every CI lane writes `e2e-performance.json` and `e2e-performance.md` from the
+same Cucumber message stream as the run summary. An interaction begins at an
+`Action` step and includes all following `Outcome` steps, so the reported time
+ends after the observable response rather than after the click alone. Hooks,
+runner startup, and `Context` setup are excluded. See [`PERFORMANCE.md`](PERFORMANCE.md)
+for the measurement contract, response bands, baseline comparison, limitations,
+and the performance/impact review record required for changes.
 
 ## Simulator usage
 

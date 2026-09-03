@@ -15,6 +15,10 @@
 
 <!-- Concrete verification: commands run, checks observed, what was skipped. Prefer evidence that the pressure is relieved. -->
 
+## Performance and impact
+
+<!-- Record baseline/current evidence or explain why the change has no measurable user interaction path. Include measurement scope, implementation cost, side effects/tradeoffs, and affected journeys/namespaces/platforms. See e2e/PERFORMANCE.md. -->
+
 ## Agent handoff
 
 <!-- Required when "I am an Agent" is checked. Humans may leave this section as N/A. -->
