@@ -4,7 +4,7 @@
 
 This directory owns the executable user-journey inventory. The broader module and state-combination audit lives in [`../../COVERAGE.md`](../../COVERAGE.md). Retired scenarios live in `e2e/_archive/features/` and are not part of the active suite.
 
-The active suite contains 70 scenarios: 24 `@P0` smoke journeys and 46 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
+The active suite contains 71 scenarios: 24 `@P0` smoke journeys and 47 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
 
 | Feature | Stable IDs | Journey boundary |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ The active suite contains 70 scenarios: 24 `@P0` smoke journeys and 46 `@P1` dee
 | `composer.feature` | `CRADLE-COMP-003` | Bang command execution and persisted output |
 | `context.feature` | `CRADLE-CONTEXT-001` | `@mention` filesystem context carried into the provider request |
 | `diff.feature` | `CRADLE-DIFF-001` | Real uncommitted diff review and external refresh |
+| `external-session-import.feature` | `CRADLE-IMPORT-001` | Read-only Claude history discovery, Cradle-owned import, reload persistence, and duplicate prevention |
 | `first-run.feature` | `CRADLE-FIRST-RUN-001` | Clean-install onboarding through first Claude reply |
 | `git.feature` | `CRADLE-GIT-001`, `002` | Header branch state, picker, create, and switch |
 | `issue-agent.feature` | `CRADLE-ISSUE-AGENT-001`–`004` | Delegation completion/rerun, active-run cancellation, isolated Work, and retained cancellation audit state |

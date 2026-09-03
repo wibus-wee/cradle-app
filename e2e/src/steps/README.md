@@ -15,6 +15,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `codex-tools.steps.ts` | Codex shell/plan/patch/approval simulator configuration and approval allowance |
 | `composer.steps.ts` | Bang command execution and persisted command output |
 | `diff.steps.ts` | Real repository mutation and diff-review assertions |
+| `external-session-import.steps.ts` | External Claude history fixture discovery, import, persisted transcript, and idempotency assertions |
 | `first-run.steps.ts` | Clean-install provider onboarding and first conversation |
 | `git.steps.ts` | Temporary Git repository, branch picker, branch creation, and switching |
 | `kanban.steps.ts` | Board/issue lifecycle plus Issue-Agent delegation, rerun, cancellation, and linked Chat |

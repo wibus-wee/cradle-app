@@ -14,6 +14,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `scenarios/` | Strict OpenAI Responses and Anthropic Messages exchanges |
 | `helpers/chat-scenario.ts` | Cross-turn Chat scripts, gates, queue timing, approvals, and tool loops |
 | `helpers/automation-scenario.ts` | Gated Automation cancellation and linked Session title scripts |
+| `helpers/external-session-import-scenario.ts` | Read-only external Claude JSONL fixture and source-integrity sentinel |
 | `helpers/issue-agent-scenario.ts` | Issue delegation, rerun, and cancellation scripts |
 | `helpers/skill-scenario.ts` | Strict Workspace Skill invocation request and response script |
 | `pages/` | Stable selectors and reusable UI mechanics |
@@ -28,6 +29,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/automation.ts` | Automation definition fixture, completion/cancellation, triage, artifacts, reload, and linked Session |
 | `pages/chat.ts` | New Chat, Chat, approval, messages, sessions, and queue |
 | `pages/diff.ts` | Diff review |
+| `pages/external-session-import.ts` | External session discovery, import, transcript, and duplicate-prevention checks |
 | `pages/first-run.ts` | Onboarding |
 | `pages/git.ts` | Branch controls |
 | `pages/kanban.ts` | Board, Issue detail, activity, and delegation |

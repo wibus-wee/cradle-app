@@ -13,6 +13,7 @@ import { dismissTransientOverlays } from './overlays'
 import { AwaitPage } from './pages/await'
 import { ApprovalPage, ChatPage, NewChatPage } from './pages/chat'
 import { DiffPage } from './pages/diff'
+import { ExternalSessionImportPage } from './pages/external-session-import'
 import { FirstRunPage } from './pages/first-run'
 import { GitPage } from './pages/git'
 import { KanbanPage } from './pages/kanban'
@@ -59,7 +60,7 @@ export class CradleWorld extends World {
   /** Scenarios tagged @first-run start with no onboarding/setup persistence. */
   firstRunMode = false
   private readonly scenarioState = new Map<string, unknown>()
-  private readonly tempWorkspaceDirs = new Set<string>()
+  private readonly scenarioCleanupPaths = new Set<string>()
 
   constructor(options: IWorldOptions) {
     super(options)
@@ -94,6 +95,10 @@ export class CradleWorld extends World {
 
   get diffPage(): DiffPage {
     return new DiffPage(this.page)
+  }
+
+  get externalSessionImportPage(): ExternalSessionImportPage {
+    return new ExternalSessionImportPage(this)
   }
 
   get search(): SearchPage {
@@ -180,8 +185,12 @@ export class CradleWorld extends World {
       : dirname(process.cwd())
     const workspaceDir = mkdtempSync(join(fixtureRoot, prefix))
     chmodSync(workspaceDir, 0o777)
-    this.tempWorkspaceDirs.add(workspaceDir)
+    this.scenarioCleanupPaths.add(workspaceDir)
     return workspaceDir
+  }
+
+  registerCleanupPath(path: string): void {
+    this.scenarioCleanupPaths.add(path)
   }
 
   async selectDirectoryInBrowser(dirPath: string): Promise<void> {
@@ -389,10 +398,10 @@ export class CradleWorld extends World {
     }
     await this.context?.close()
     await this.browser?.close()
-    for (const workspaceDir of this.tempWorkspaceDirs) {
-      rmSync(workspaceDir, { recursive: true, force: true })
+    for (const path of this.scenarioCleanupPaths) {
+      rmSync(path, { recursive: true, force: true })
     }
-    this.tempWorkspaceDirs.clear()
+    this.scenarioCleanupPaths.clear()
   }
 
   async mainProcess<T = unknown>(_fn: unknown, _arg?: unknown): Promise<T> {

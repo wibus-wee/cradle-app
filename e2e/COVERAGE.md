@@ -7,7 +7,7 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
 | Web feature namespaces | 24 | 12 | 13 | 1 |
-| Server module namespaces | 34 | 14 | 18 | 7 |
+| Server module namespaces | 35 | 14 | 17 | 7 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
 
@@ -70,6 +70,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Automation × real Agent run × triage × artifact × linked Session × reload | `CRADLE-AUTO-001` | A manual Automation run completes through Claude Agent, creates one reviewable result and transcript artifact, leaves triage after resolution, and retains the same linked Session and output after reload |
 | Automation × active Agent run × reload × cancellation × triage × linked Session | `CRADLE-AUTO-002` | A running Automation rehydrates with its Stop control, cancellation aborts the real Claude run, records a reviewable terminal state without an artifact, and prevents a late reply after reload |
 | Workspace Skill × explicit Composer selection × Claude runtime × deletion × Session history | `CRADLE-SKILL-001` | A UI-created Skill reaches the real Claude Agent request, survives reload as persisted invocation evidence, disappears from future selection after deletion, and remains auditable in the completed Session |
+| External Claude history × read-only discovery × Cradle-owned bundle × Session × reload × duplicate prevention | `CRADLE-IMPORT-001` | UI import creates one durable Cradle Session from provider-owned JSONL without mutating the source; the transcript survives reload and a new scan disables duplicate import |
 | Git branch × external file changes × diff refresh | `CRADLE-GIT-001`, `002`, `CRADLE-DIFF-001` | Repository projections refresh from real Git/filesystem state |
 | Await pending × external event × Agent continuation | `CRADLE-AWAIT-001` | Durable pending work resumes from an external signal |
 | Await cancel/expiry × Server crash × late external resolution × next Agent turn | `CRADLE-AWAIT-002` | Both terminal states persist across process recovery, reject late delivery without transcript pollution, and leave the Session usable |
@@ -94,9 +95,9 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `automation`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `skills`, `storage`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
+| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `automation`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `external-session-import`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `skills`, `storage`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
 | Indirect | `background-activity`, `code-activity`, `desktop`, `mcp-servers`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources`, `plugins` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
-| User-visible gap | `acp`, `assets`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `external-session-import`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
+| User-visible gap | `acp`, `assets`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
 | Service/infra contract | `background-job`, `blob-store`, `codex-reset-watch`, `health`, `maintenance`, `observability`, `test-reset` | Prefer focused service/contract verification; `test-reset` is harness-only |
 
 ## Prioritized Missing Journeys
@@ -110,7 +111,7 @@ The backlog below is ordered by semantic fan-out and state-corruption risk, not 
 | P1 | Runtime process environment configuration edit while idle versus locked during a run | Agent runtime configuration × session × active process lifecycle |
 | P1 | Plugin install/enable/disable/reload with a visible contribution | marketplace × plugin lifecycle × shell state |
 | P1 | Browser/asset/OCR path from capture or upload into a persisted prompt | browser × assets × OCR × context × session |
-| P1 | External issue/session import deduplicates and survives reload | external sources × issue/session ownership × idempotency |
+| P1 | External issue import deduplicates and survives reload | external issue sources × issue ownership × idempotency |
 | P1 | Chronicle/Recall opt-in, write, query, delete, and disabled behavior | preferences × chronicle/recall × privacy lifecycle |
 
 ## Acceptance Rules
