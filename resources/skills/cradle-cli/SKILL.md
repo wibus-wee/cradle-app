@@ -333,7 +333,7 @@ It intentionally lists modules, not routes or leaf actions. Use `cradle man <mod
 | `background-activity` | 2 | Generated Cradle CLI module. | `cradle man background-activity` |
 | `background-job` | 3 | Generated Cradle CLI module. | `cradle man background-job` |
 | `board` | 4 | Manage Kanban boards. | `cradle man board` |
-| `chat` | 24 | Control chat runtime commands. | `cradle man chat` |
+| `chat` | 23 | Control chat runtime commands. | `cradle man chat` |
 | `chronicle` | 56 | Generated Cradle CLI module. | `cradle man chronicle` |
 | `codex` | 1 | Generated Cradle CLI module. | `cradle man codex` |
 | `download-center` | 3 | Generated Cradle CLI module. | `cradle man download-center` |

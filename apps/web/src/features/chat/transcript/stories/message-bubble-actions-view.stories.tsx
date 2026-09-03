@@ -24,8 +24,6 @@ function MessageBubbleActionsScene() {
               onEdit: () => setActivity('edit'),
             }}
             onCopy={() => setActivity('copy')}
-            onPin={() => setActivity('pin')}
-            onMarkSelection={() => setActivity('mark selection')}
             forceVisible
           />
         </div>
@@ -43,7 +41,7 @@ const meta = {
     controls: { disable: true },
     docs: {
       description: {
-        component: 'Props-only message action surface. The runtime adapter owns store reads, pinning, markers, and toast reporting.',
+        component: 'Props-only message action surface. The runtime adapter owns store reads and clipboard access.',
       },
     },
   },

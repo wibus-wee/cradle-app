@@ -2936,6 +2936,34 @@ export type PostFabricResponses = {
 
 export type PostFabricResponse = PostFabricResponses[keyof PostFabricResponses];
 
+export type PatchFabricRelayUrlData = {
+    body: {
+        relayUrl: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/fabric/relay-url';
+};
+
+export type PatchFabricRelayUrlResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        fabricId: string;
+        relayUrl: string;
+        localNodeId: string;
+        role: string;
+        ownerPubkey: string;
+        nodeCertificate: unknown;
+        controllerCertificate?: unknown;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchFabricRelayUrlResponse = PatchFabricRelayUrlResponses[keyof PatchFabricRelayUrlResponses];
+
 export type GetFabricManagedRelayData = {
     body?: never;
     path?: never;
@@ -3204,8 +3232,10 @@ export type GetFabricControllerInvitationsRequestsResponse = GetFabricController
 
 export type PostFabricControllerInvitationsRequestsByRequestIdApproveData = {
     body: {
-        nodeId: string;
-        scopes: Array<'view' | 'control' | 'approve'>;
+        grants: Array<{
+            nodeId: string;
+            scopes: Array<'view' | 'control' | 'approve'>;
+        }>;
     };
     path: {
         requestId: string;
@@ -3236,6 +3266,22 @@ export type DeleteFabricControllerInvitationsRequestsByRequestIdData = {
 };
 
 export type DeleteFabricControllerInvitationsRequestsByRequestIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
+export type DeleteFabricControllersByControllerIdData = {
+    body?: never;
+    path: {
+        controllerId: string;
+    };
+    query?: never;
+    url: '/fabric/controllers/{controllerId}';
+};
+
+export type DeleteFabricControllersByControllerIdResponses = {
     /**
      * Response for status 204
      */
@@ -3331,6 +3377,7 @@ export type GetNodesByNodeIdGrantsResponses = {
         grantId: string;
         fabricId: string;
         controllerId: string;
+        controllerDisplayName?: string;
         nodeId: string;
         scope: 'view' | 'control' | 'approve' | 'admin';
         revokedAt?: string;
@@ -6991,6 +7038,16 @@ export type GetBackgroundActivitiesResponses = {
         manuallyRunnable: boolean;
         status: 'idle' | 'running' | 'succeeded' | 'failed';
         progress: unknown;
+        presentation: {
+            footer: {
+                id: string;
+                title: string;
+                description: string | null;
+                actionLabel: string | null;
+                actionUrl: string | null;
+                expiresAt: number | null;
+            } | null;
+        };
         lastError: string | null;
         createdAt: number;
         updatedAt: number;
@@ -7024,6 +7081,16 @@ export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses = {
         manuallyRunnable: boolean;
         status: 'idle' | 'running' | 'succeeded' | 'failed';
         progress: unknown;
+        presentation: {
+            footer: {
+                id: string;
+                title: string;
+                description: string | null;
+                actionLabel: string | null;
+                actionUrl: string | null;
+                expiresAt: number | null;
+            } | null;
+        };
         lastError: string | null;
         createdAt: number;
         updatedAt: number;
@@ -7225,6 +7292,7 @@ export type GetSessionsResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -7255,7 +7323,7 @@ export type PostSessionsData = {
         runtimeKind?: string;
         runtimeSettings?: {
             permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-            accessMode?: 'approval-required' | 'full-access' | null;
+            accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
             interactionMode?: 'default' | 'plan' | null;
             claudeAgent?: {
                 modelAliases?: {
@@ -7264,7 +7332,7 @@ export type PostSessionsData = {
                     opus?: string;
                 };
             } | null;
-            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
                 modelAliases?: {
                     haiku?: string;
                     sonnet?: string;
@@ -7314,6 +7382,7 @@ export type PostSessionsResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7389,6 +7458,7 @@ export type GetSessionsByIdResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7451,6 +7521,7 @@ export type PatchSessionsByIdResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7533,6 +7604,7 @@ export type PostSessionsByIdArchiveResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7588,6 +7660,7 @@ export type PostSessionsByIdReadResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7643,6 +7716,7 @@ export type PostSessionsByIdUnreadResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7924,395 +7998,6 @@ export type GetSessionsByIdIsolationResponses = {
 
 export type GetSessionsByIdIsolationResponse = GetSessionsByIdIsolationResponses[keyof GetSessionsByIdIsolationResponses];
 
-export type GetSessionsByIdEnvironmentData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/environment';
-};
-
-export type GetSessionsByIdEnvironmentResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        sessionId: string;
-        notes: string;
-        pins: Array<{
-            sessionId: string;
-            messageId: string;
-            label: string | null;
-            done: boolean;
-            pinnedAt: number;
-            updatedAt: number;
-        }>;
-        markers: Array<{
-            id: string;
-            sessionId: string;
-            messageId: string;
-            startOffset: number;
-            endOffset: number;
-            selectedText: string;
-            style: 'highlight' | 'underline';
-            color: 'yellow' | 'blue' | 'green' | 'pink';
-            label: string | null;
-            done: boolean;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-        usage: {
-            totalTokens: number;
-            promptTokens: number;
-            completionTokens: number;
-            count: number;
-            byModel: Array<{
-                modelId: string;
-                promptTokens: number;
-                completionTokens: number;
-                totalTokens: number;
-                turnCount: number;
-            }>;
-            providerBillingCheck: {
-                source: 'codex.account.usage.thread';
-                status: 'available' | 'unavailable' | 'error';
-                reason: string | null;
-                threadId: string;
-                reconciliationStatus: 'pending' | 'completed' | 'blocked' | 'unavailable';
-                estimatedUsageCreditsMicros: string | null;
-                estimatedUsageUsdMicros: string | null;
-                providerTotalTokens: string | null;
-                ledgerTotalTokens: number;
-                tokenDelta: string | null;
-                groups: Array<{
-                    model: string | null;
-                    reasoningEffort: string | null;
-                    speed: string | null;
-                    estimatedUsageCreditsMicros: string;
-                    netNewInputTokens: string | null;
-                    cachedInputTokens: string | null;
-                    inputTokens: string | null;
-                    outputTokens: string | null;
-                    totalTokens: string | null;
-                }>;
-            } | null;
-        };
-        pullRequest: {
-            owner: string;
-            repo: string;
-            number: number;
-            url: string;
-            title: string;
-            isDraft: boolean;
-            state: 'open' | 'closed';
-            merged: boolean;
-            headRef: string;
-            baseRef: string;
-            headSha: string | null;
-            createdAt: number;
-            updatedAt: number;
-            author?: {
-                login: string;
-                avatarUrl: string;
-                url: string;
-            } | null;
-            additions?: number;
-            deletions?: number;
-        } | null;
-        automationRuns: Array<{
-            id: string;
-            automationDefinitionId: string;
-            workspaceId: string | null;
-            triggerType: 'manual' | 'scheduled';
-            occurrenceKey: string | null;
-            status: 'queued' | 'running' | 'complete' | 'failed' | 'cancelled';
-            triggerSnapshot: {
-                type: 'rrule';
-                rrule: string;
-                timezone: string;
-                misfirePolicy?: 'skip' | 'run_latest';
-            };
-            recipeSnapshot: {
-                kind: 'agent_task';
-                prompt: string;
-                inputs: Array<{
-                    type: 'file_ref';
-                    path: string;
-                } | {
-                    type: 'inline_file';
-                    name: string;
-                    content: string;
-                } | {
-                    type: 'text';
-                    name: string;
-                    content: string;
-                } | {
-                    type: 'url';
-                    url: string;
-                }>;
-                artifactRequests: Array<{
-                    kind: 'markdown' | 'text' | 'json' | 'file_ref';
-                    name: string;
-                    description?: string;
-                }>;
-                agentId?: string;
-                providerTargetId?: string;
-                runtimeKind?: string;
-                modelId?: string;
-                thinkingEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
-                sessionPolicy?: 'new' | 'heartbeat';
-                isolationPolicy?: 'workspace' | 'worktree_per_run';
-                completionPolicy?: {
-                    stopWhen?: 'agent_complete';
-                    noFindingsBehavior?: 'archive' | 'triage';
-                };
-            };
-            chatSessionId: string | null;
-            backendRunId: string | null;
-            artifactCount: number;
-            errorText: string | null;
-            resultKind: 'findings' | 'no_findings' | 'stopped' | 'error' | null;
-            resultSummary: string | null;
-            triageStatus: 'unread' | 'read' | 'resolved' | 'archived' | null;
-            triagedAt: number | null;
-            scheduledFor: number | null;
-            claimedAt: number | null;
-            startedAt: number | null;
-            finishedAt: number | null;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-        checkpoints: Array<{
-            id: string;
-            sessionId: string;
-            runId: string;
-            assistantMessageId: string | null;
-            workspaceId: string | null;
-            workspacePath: string;
-            startRef: string;
-            endRef: string | null;
-            status: 'capturing' | 'completed' | 'failed' | 'cleanup_pending';
-            cleanupReason: string | null;
-            cleanupClaimedAt: number | null;
-            changedFiles: number;
-            additions: number;
-            deletions: number;
-            errorText: string | null;
-            completedAt: number | null;
-            restoredAt: number | null;
-            createdAt: number;
-            updatedAt: number;
-        }>;
-        handoff: {
-            id: string;
-            requestId: string;
-            sourceSessionId: string;
-            destinationSessionId: string;
-            sourceProviderTargetId: string | null;
-            destinationProviderTargetId: string | null;
-            importedMessageCount: number;
-            createdAt: number;
-        } | null;
-    };
-};
-
-export type GetSessionsByIdEnvironmentResponse = GetSessionsByIdEnvironmentResponses[keyof GetSessionsByIdEnvironmentResponses];
-
-export type PutSessionsByIdEnvironmentNotesData = {
-    body: {
-        notes: string;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/environment/notes';
-};
-
-export type PutSessionsByIdEnvironmentNotesResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        sessionId: string;
-        notes: string;
-        updatedAt: number;
-    };
-};
-
-export type PutSessionsByIdEnvironmentNotesResponse = PutSessionsByIdEnvironmentNotesResponses[keyof PutSessionsByIdEnvironmentNotesResponses];
-
-export type DeleteSessionsByIdEnvironmentPinsByMessageIdData = {
-    body?: never;
-    path: {
-        id: string;
-        messageId: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/environment/pins/{messageId}';
-};
-
-export type DeleteSessionsByIdEnvironmentPinsByMessageIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteSessionsByIdEnvironmentPinsByMessageIdResponse = DeleteSessionsByIdEnvironmentPinsByMessageIdResponses[keyof DeleteSessionsByIdEnvironmentPinsByMessageIdResponses];
-
-export type PatchSessionsByIdEnvironmentPinsByMessageIdData = {
-    body: {
-        label?: string | null;
-        done?: boolean;
-    };
-    path: {
-        id: string;
-        messageId: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/environment/pins/{messageId}';
-};
-
-export type PatchSessionsByIdEnvironmentPinsByMessageIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        sessionId: string;
-        messageId: string;
-        label: string | null;
-        done: boolean;
-        pinnedAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PatchSessionsByIdEnvironmentPinsByMessageIdResponse = PatchSessionsByIdEnvironmentPinsByMessageIdResponses[keyof PatchSessionsByIdEnvironmentPinsByMessageIdResponses];
-
-export type PostSessionsByIdEnvironmentPinsByMessageIdData = {
-    body?: never;
-    path: {
-        id: string;
-        messageId: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/environment/pins/{messageId}';
-};
-
-export type PostSessionsByIdEnvironmentPinsByMessageIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        sessionId: string;
-        messageId: string;
-        label: string | null;
-        done: boolean;
-        pinnedAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PostSessionsByIdEnvironmentPinsByMessageIdResponse = PostSessionsByIdEnvironmentPinsByMessageIdResponses[keyof PostSessionsByIdEnvironmentPinsByMessageIdResponses];
-
-export type PostSessionsByIdEnvironmentMarkersData = {
-    body: {
-        messageId: string;
-        startOffset: number;
-        endOffset: number;
-        selectedText: string;
-        style: 'highlight' | 'underline';
-        color: 'yellow' | 'blue' | 'green' | 'pink';
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/environment/markers';
-};
-
-export type PostSessionsByIdEnvironmentMarkersResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        sessionId: string;
-        messageId: string;
-        startOffset: number;
-        endOffset: number;
-        selectedText: string;
-        style: 'highlight' | 'underline';
-        color: 'yellow' | 'blue' | 'green' | 'pink';
-        label: string | null;
-        done: boolean;
-        createdAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PostSessionsByIdEnvironmentMarkersResponse = PostSessionsByIdEnvironmentMarkersResponses[keyof PostSessionsByIdEnvironmentMarkersResponses];
-
-export type DeleteSessionsByIdEnvironmentMarkersByMarkerIdData = {
-    body?: never;
-    path: {
-        id: string;
-        markerId: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/environment/markers/{markerId}';
-};
-
-export type DeleteSessionsByIdEnvironmentMarkersByMarkerIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteSessionsByIdEnvironmentMarkersByMarkerIdResponse = DeleteSessionsByIdEnvironmentMarkersByMarkerIdResponses[keyof DeleteSessionsByIdEnvironmentMarkersByMarkerIdResponses];
-
-export type PatchSessionsByIdEnvironmentMarkersByMarkerIdData = {
-    body: {
-        label?: string | null;
-        done?: boolean;
-    };
-    path: {
-        id: string;
-        markerId: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/environment/markers/{markerId}';
-};
-
-export type PatchSessionsByIdEnvironmentMarkersByMarkerIdResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        id: string;
-        sessionId: string;
-        messageId: string;
-        startOffset: number;
-        endOffset: number;
-        selectedText: string;
-        style: 'highlight' | 'underline';
-        color: 'yellow' | 'blue' | 'green' | 'pink';
-        label: string | null;
-        done: boolean;
-        createdAt: number;
-        updatedAt: number;
-    };
-};
-
-export type PatchSessionsByIdEnvironmentMarkersByMarkerIdResponse = PatchSessionsByIdEnvironmentMarkersByMarkerIdResponses[keyof PatchSessionsByIdEnvironmentMarkersByMarkerIdResponses];
-
 export type PostThreadHandoffsData = {
     body: {
         requestId: string;
@@ -8369,6 +8054,7 @@ export type PostThreadHandoffsResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -8616,7 +8302,7 @@ export type PostWorksData = {
         runtimeKind?: string;
         runtimeSettings?: {
             permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-            accessMode?: 'approval-required' | 'full-access' | null;
+            accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
             interactionMode?: 'default' | 'plan' | null;
             claudeAgent?: {
                 modelAliases?: {
@@ -8625,7 +8311,7 @@ export type PostWorksData = {
                     opus?: string;
                 };
             } | null;
-            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+            [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
                 modelAliases?: {
                     haiku?: string;
                     sonnet?: string;
@@ -8687,6 +8373,7 @@ export type PostWorksResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -8824,6 +8511,7 @@ export type GetWorksByIdResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -8938,6 +8626,7 @@ export type PostWorksByIdArchiveResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9054,6 +8743,7 @@ export type PostWorksByIdPrepareResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9171,6 +8861,7 @@ export type PostWorksByIdSubmitResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9285,6 +8976,7 @@ export type PostWorksByIdBranchResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -11640,6 +11332,7 @@ export type GetIssuesByIdSessionsResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -12524,6 +12217,7 @@ export type GetPluginsResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -12649,7 +12343,7 @@ export type GetPluginsSourcesResponses = {
      */
     200: Array<{
         id: string;
-        kind: 'localPath' | 'git' | 'npm';
+        kind: 'localPath' | 'personal' | 'git' | 'npm';
         location: string;
         ref: string | null;
         subPath: string | null;
@@ -12667,6 +12361,7 @@ export type GetPluginsSourcesResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -12771,7 +12466,7 @@ export type PostPluginsSourcesResponses = {
     200: {
         source: {
             id: string;
-            kind: 'localPath' | 'git' | 'npm';
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
             location: string;
             ref: string | null;
             subPath: string | null;
@@ -12789,6 +12484,7 @@ export type PostPluginsSourcesResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -12876,6 +12572,7 @@ export type PostPluginsSourcesResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -12954,6 +12651,14 @@ export type PostPluginsSourcesResponses = {
             webEntry: string | null;
             desktopEntry: string | null;
         }>;
+        operation: {
+            action: 'install' | 'update' | 'refresh';
+            status: 'success' | 'failed';
+            error: string | null;
+            reviewRequired: boolean;
+            reviewPath: string | null;
+            previousSnapshotPreserved: boolean;
+        };
     };
 };
 
@@ -13135,6 +12840,566 @@ export type GetPluginsDevSessionsEventsData = {
     url: '/plugins/dev-sessions/events';
 };
 
+export type GetPluginsEventsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/plugins/events';
+};
+
+export type GetPluginsReviewsData = {
+    body?: never;
+    path?: never;
+    query: {
+        chatSessionId: string;
+    };
+    url: '/plugins/reviews';
+};
+
+export type GetPluginsReviewsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: Array<{
+        sourceId: string;
+        createdAt: number;
+        source: {
+            id: string;
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+            label: string | null;
+            addedReason: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedDirectory: string | null;
+            error: string | null;
+            plugins: Array<{
+                identity: string;
+                routeSegment: string;
+                name: string;
+                version: string;
+                displayName: string;
+                description: string | null;
+                iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
+                source: {
+                    kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                    packageDir: string;
+                    trusted: boolean;
+                    reason: string | null;
+                    checksum: string | null;
+                    grantedPermissions: Array<string>;
+                };
+                activation: {
+                    enabled: boolean;
+                    source: 'default' | 'user';
+                    reason: string | null;
+                    updatedAt: number | null;
+                };
+                layers: {
+                    server: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    web: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    desktop: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                };
+                declaredCapabilities: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop' | null;
+                    label: string | null;
+                    description: string | null;
+                    permissions: Array<string>;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                declaredPermissions: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    label: string | null;
+                    description: string | null;
+                    required: boolean;
+                }>;
+                capabilities: Array<{
+                    id: string;
+                    owner: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'registered' | 'failed' | 'unsupported';
+                    label: string | null;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                warnings: Array<string>;
+                active: boolean;
+                hasWeb: boolean;
+                hasServer: boolean;
+                hasDesktop: boolean;
+                serverEntry: string | null;
+                webEntry: string | null;
+                desktopEntry: string | null;
+            }>;
+        };
+    }>;
+};
+
+export type GetPluginsReviewsResponse = GetPluginsReviewsResponses[keyof GetPluginsReviewsResponses];
+
+export type PostPluginsPersonalData = {
+    body: {
+        packageDir: string;
+        label?: string | null;
+        addedReason?: string | null;
+    };
+    path?: never;
+    query?: never;
+    url: '/plugins/personal';
+};
+
+export type PostPluginsPersonalResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: {
+            id: string;
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+            label: string | null;
+            addedReason: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedDirectory: string | null;
+            error: string | null;
+            plugins: Array<{
+                identity: string;
+                routeSegment: string;
+                name: string;
+                version: string;
+                displayName: string;
+                description: string | null;
+                iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
+                source: {
+                    kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                    packageDir: string;
+                    trusted: boolean;
+                    reason: string | null;
+                    checksum: string | null;
+                    grantedPermissions: Array<string>;
+                };
+                activation: {
+                    enabled: boolean;
+                    source: 'default' | 'user';
+                    reason: string | null;
+                    updatedAt: number | null;
+                };
+                layers: {
+                    server: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    web: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    desktop: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                };
+                declaredCapabilities: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop' | null;
+                    label: string | null;
+                    description: string | null;
+                    permissions: Array<string>;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                declaredPermissions: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    label: string | null;
+                    description: string | null;
+                    required: boolean;
+                }>;
+                capabilities: Array<{
+                    id: string;
+                    owner: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'registered' | 'failed' | 'unsupported';
+                    label: string | null;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                warnings: Array<string>;
+                active: boolean;
+                hasWeb: boolean;
+                hasServer: boolean;
+                hasDesktop: boolean;
+                serverEntry: string | null;
+                webEntry: string | null;
+                desktopEntry: string | null;
+            }>;
+        };
+        discoveredPlugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+                grantedPermissions: Array<string>;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop' | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+        operation: {
+            action: 'install' | 'update' | 'refresh';
+            status: 'success' | 'failed';
+            error: string | null;
+            reviewRequired: boolean;
+            reviewPath: string | null;
+            previousSnapshotPreserved: boolean;
+        };
+    };
+};
+
+export type PostPluginsPersonalResponse = PostPluginsPersonalResponses[keyof PostPluginsPersonalResponses];
+
+export type PostPluginsPersonalBySourceIdData = {
+    body: {
+        packageDir: string;
+    };
+    path: {
+        sourceId: string;
+    };
+    query?: never;
+    url: '/plugins/personal/{sourceId}';
+};
+
+export type PostPluginsPersonalBySourceIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        source: {
+            id: string;
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
+            location: string;
+            ref: string | null;
+            subPath: string | null;
+            label: string | null;
+            addedReason: string;
+            createdAt: number;
+            updatedAt: number;
+            resolvedDirectory: string | null;
+            error: string | null;
+            plugins: Array<{
+                identity: string;
+                routeSegment: string;
+                name: string;
+                version: string;
+                displayName: string;
+                description: string | null;
+                iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
+                source: {
+                    kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                    packageDir: string;
+                    trusted: boolean;
+                    reason: string | null;
+                    checksum: string | null;
+                    grantedPermissions: Array<string>;
+                };
+                activation: {
+                    enabled: boolean;
+                    source: 'default' | 'user';
+                    reason: string | null;
+                    updatedAt: number | null;
+                };
+                layers: {
+                    server: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    web: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                    desktop: {
+                        layer: 'server' | 'web' | 'desktop';
+                        status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                        entry: string | null;
+                        error: string | null;
+                        activatedAt: string | null;
+                    };
+                };
+                declaredCapabilities: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop' | null;
+                    label: string | null;
+                    description: string | null;
+                    permissions: Array<string>;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                declaredPermissions: Array<{
+                    id: string;
+                    owner: string;
+                    localId: string;
+                    label: string | null;
+                    description: string | null;
+                    required: boolean;
+                }>;
+                capabilities: Array<{
+                    id: string;
+                    owner: string;
+                    type: string;
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'registered' | 'failed' | 'unsupported';
+                    label: string | null;
+                    metadata: {
+                        [key: string]: unknown;
+                    };
+                }>;
+                warnings: Array<string>;
+                active: boolean;
+                hasWeb: boolean;
+                hasServer: boolean;
+                hasDesktop: boolean;
+                serverEntry: string | null;
+                webEntry: string | null;
+                desktopEntry: string | null;
+            }>;
+        };
+        discoveredPlugins: Array<{
+            identity: string;
+            routeSegment: string;
+            name: string;
+            version: string;
+            displayName: string;
+            description: string | null;
+            iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
+            source: {
+                kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
+                packageDir: string;
+                trusted: boolean;
+                reason: string | null;
+                checksum: string | null;
+                grantedPermissions: Array<string>;
+            };
+            activation: {
+                enabled: boolean;
+                source: 'default' | 'user';
+                reason: string | null;
+                updatedAt: number | null;
+            };
+            layers: {
+                server: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                web: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+                desktop: {
+                    layer: 'server' | 'web' | 'desktop';
+                    status: 'discovered' | 'invalid' | 'skipped' | 'disabled' | 'activating' | 'active' | 'failed' | 'partial';
+                    entry: string | null;
+                    error: string | null;
+                    activatedAt: string | null;
+                };
+            };
+            declaredCapabilities: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop' | null;
+                label: string | null;
+                description: string | null;
+                permissions: Array<string>;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            declaredPermissions: Array<{
+                id: string;
+                owner: string;
+                localId: string;
+                label: string | null;
+                description: string | null;
+                required: boolean;
+            }>;
+            capabilities: Array<{
+                id: string;
+                owner: string;
+                type: string;
+                layer: 'server' | 'web' | 'desktop';
+                status: 'registered' | 'failed' | 'unsupported';
+                label: string | null;
+                metadata: {
+                    [key: string]: unknown;
+                };
+            }>;
+            warnings: Array<string>;
+            active: boolean;
+            hasWeb: boolean;
+            hasServer: boolean;
+            hasDesktop: boolean;
+            serverEntry: string | null;
+            webEntry: string | null;
+            desktopEntry: string | null;
+        }>;
+        operation: {
+            action: 'install' | 'update' | 'refresh';
+            status: 'success' | 'failed';
+            error: string | null;
+            reviewRequired: boolean;
+            reviewPath: string | null;
+            previousSnapshotPreserved: boolean;
+        };
+    };
+};
+
+export type PostPluginsPersonalBySourceIdResponse = PostPluginsPersonalBySourceIdResponses[keyof PostPluginsPersonalBySourceIdResponses];
+
 export type PostPluginsSourcesPreviewData = {
     body: {
         kind: 'git' | 'npm';
@@ -13222,7 +13487,7 @@ export type GetPluginsSourcesByIdResponses = {
      */
     200: {
         id: string;
-        kind: 'localPath' | 'git' | 'npm';
+        kind: 'localPath' | 'personal' | 'git' | 'npm';
         location: string;
         ref: string | null;
         subPath: string | null;
@@ -13240,6 +13505,7 @@ export type GetPluginsSourcesByIdResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13339,7 +13605,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
     200: {
         source: {
             id: string;
-            kind: 'localPath' | 'git' | 'npm';
+            kind: 'localPath' | 'personal' | 'git' | 'npm';
             location: string;
             ref: string | null;
             subPath: string | null;
@@ -13357,6 +13623,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -13444,6 +13711,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13522,6 +13790,14 @@ export type PostPluginsSourcesByIdRefreshResponses = {
             webEntry: string | null;
             desktopEntry: string | null;
         }>;
+        operation: {
+            action: 'install' | 'update' | 'refresh';
+            status: 'success' | 'failed';
+            error: string | null;
+            reviewRequired: boolean;
+            reviewPath: string | null;
+            previousSnapshotPreserved: boolean;
+        };
     };
 };
 
@@ -13633,6 +13909,7 @@ export type GetPluginsByRouteSegmentResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -13719,6 +13996,7 @@ export type PatchPluginsByRouteSegmentEnabledData = {
     body: {
         enabled: boolean;
         reason?: string | null;
+        grantedPermissions?: Array<string>;
     };
     path: {
         routeSegment: string;
@@ -13739,6 +14017,7 @@ export type PatchPluginsByRouteSegmentEnabledResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -14140,6 +14419,180 @@ export type PostSkillsCancelFetchResponses = {
 };
 
 export type PostSkillsCancelFetchResponse = PostSkillsCancelFetchResponses[keyof PostSkillsCancelFetchResponses];
+
+export type GetStorageOverviewData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/storage/overview';
+};
+
+export type GetStorageOverviewResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        measuredAt: number;
+        dataDirectory: string;
+        totalBytes: number;
+        categories: Array<{
+            id: 'database' | 'runtime' | 'attachments' | 'artifacts' | 'terminal' | 'diagnostics' | 'other';
+            bytes: number;
+            fileCount: number;
+        }>;
+        sessions: Array<{
+            id: string;
+            title: string;
+            workspaceName: string | null;
+            runtimeKind: string;
+            updatedAt: number;
+            archivedAt: number | null;
+            pinned: boolean;
+            active: boolean;
+            messageCount: number;
+            localBytes: number;
+            runtimeBytes: number;
+            attachmentBytes: number;
+            artifactBytes: number;
+            terminalBytes: number;
+            reclaimableBytes: number;
+        }>;
+    };
+};
+
+export type GetStorageOverviewResponse = GetStorageOverviewResponses[keyof GetStorageOverviewResponses];
+
+export type PostStorageSessionsPurgeTranscriptsData = {
+    body: {
+        sessionIds: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/storage/sessions/purge-transcripts';
+};
+
+export type PostStorageSessionsPurgeTranscriptsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        cleanup: Array<{
+            sessionId: string;
+            nativeStorage: {
+                status: 'deleted' | 'partial' | 'preserved' | 'not_applicable' | 'failed';
+                detail?: string;
+            };
+            attachmentBytesFreed: number;
+        }>;
+        compaction: {
+            status: 'completed';
+            bytesBefore: number;
+            bytesAfter: number;
+        } | {
+            status: 'deferred';
+            reason: 'insufficient_space';
+        } | {
+            status: 'not_applicable';
+        } | {
+            status: 'skipped_active_runs';
+        };
+        overview: {
+            measuredAt: number;
+            dataDirectory: string;
+            totalBytes: number;
+            categories: Array<{
+                id: 'database' | 'runtime' | 'attachments' | 'artifacts' | 'terminal' | 'diagnostics' | 'other';
+                bytes: number;
+                fileCount: number;
+            }>;
+            sessions: Array<{
+                id: string;
+                title: string;
+                workspaceName: string | null;
+                runtimeKind: string;
+                updatedAt: number;
+                archivedAt: number | null;
+                pinned: boolean;
+                active: boolean;
+                messageCount: number;
+                localBytes: number;
+                runtimeBytes: number;
+                attachmentBytes: number;
+                artifactBytes: number;
+                terminalBytes: number;
+                reclaimableBytes: number;
+            }>;
+        };
+    };
+};
+
+export type PostStorageSessionsPurgeTranscriptsResponse = PostStorageSessionsPurgeTranscriptsResponses[keyof PostStorageSessionsPurgeTranscriptsResponses];
+
+export type PostStorageSessionsDeleteData = {
+    body: {
+        sessionIds: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/storage/sessions/delete';
+};
+
+export type PostStorageSessionsDeleteResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        cleanup: Array<{
+            sessionId: string;
+            nativeStorage: {
+                status: 'deleted' | 'partial' | 'preserved' | 'not_applicable' | 'failed';
+                detail?: string;
+            };
+            attachmentBytesFreed: number;
+        }>;
+        compaction: {
+            status: 'completed';
+            bytesBefore: number;
+            bytesAfter: number;
+        } | {
+            status: 'deferred';
+            reason: 'insufficient_space';
+        } | {
+            status: 'not_applicable';
+        } | {
+            status: 'skipped_active_runs';
+        };
+        overview: {
+            measuredAt: number;
+            dataDirectory: string;
+            totalBytes: number;
+            categories: Array<{
+                id: 'database' | 'runtime' | 'attachments' | 'artifacts' | 'terminal' | 'diagnostics' | 'other';
+                bytes: number;
+                fileCount: number;
+            }>;
+            sessions: Array<{
+                id: string;
+                title: string;
+                workspaceName: string | null;
+                runtimeKind: string;
+                updatedAt: number;
+                archivedAt: number | null;
+                pinned: boolean;
+                active: boolean;
+                messageCount: number;
+                localBytes: number;
+                runtimeBytes: number;
+                attachmentBytes: number;
+                artifactBytes: number;
+                terminalBytes: number;
+                reclaimableBytes: number;
+            }>;
+        };
+    };
+};
+
+export type PostStorageSessionsDeleteResponse = PostStorageSessionsDeleteResponses[keyof PostStorageSessionsDeleteResponses];
 
 export type GetWorkflowRulesByWorkspaceIdListData = {
     body?: never;
@@ -18996,6 +19449,12 @@ export type GetAcpAgentsResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19038,6 +19497,12 @@ export type PostAcpAgentsResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19045,6 +19510,53 @@ export type PostAcpAgentsResponses = {
 };
 
 export type PostAcpAgentsResponse = PostAcpAgentsResponses[keyof PostAcpAgentsResponses];
+
+export type PostAcpAgentsRemoteData = {
+    body: {
+        id?: string;
+        name: string;
+        connectionType: 'http' | 'websocket';
+        endpointUrl: string;
+        headerSecretRefs?: {
+            [key: string]: unknown;
+        };
+        version?: string;
+    };
+    path?: never;
+    query?: never;
+    url: '/acp/agents/remote';
+};
+
+export type PostAcpAgentsRemoteResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        version: string | null;
+        source: string;
+        distributionType: string;
+        installPath: string | null;
+        cmd: string | null;
+        args: string | null;
+        env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
+        status: string;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PostAcpAgentsRemoteResponse = PostAcpAgentsRemoteResponses[keyof PostAcpAgentsRemoteResponses];
 
 export type DeleteAcpAgentsByAgentIdData = {
     body?: never;
@@ -19092,6 +19604,12 @@ export type GetAcpAgentsByAgentIdResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19099,6 +19617,77 @@ export type GetAcpAgentsByAgentIdResponses = {
 };
 
 export type GetAcpAgentsByAgentIdResponse = GetAcpAgentsByAgentIdResponses[keyof GetAcpAgentsByAgentIdResponses];
+
+export type GetAcpAgentsByAgentIdAuthMethodsData = {
+    body?: never;
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth-methods';
+};
+
+export type GetAcpAgentsByAgentIdAuthMethodsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        methods: Array<{
+            id: string;
+            name: string;
+            description?: string;
+            kind: 'agent' | 'terminal';
+            status: 'supported' | 'unsupported';
+            unavailableReason?: string;
+            link?: string;
+        }>;
+        selectedMethodId: string | null;
+    };
+};
+
+export type GetAcpAgentsByAgentIdAuthMethodsResponse = GetAcpAgentsByAgentIdAuthMethodsResponses[keyof GetAcpAgentsByAgentIdAuthMethodsResponses];
+
+export type DeleteAcpAgentsByAgentIdAuthData = {
+    body?: never;
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth';
+};
+
+export type DeleteAcpAgentsByAgentIdAuthResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        selectedMethodId: string | null;
+    };
+};
+
+export type DeleteAcpAgentsByAgentIdAuthResponse = DeleteAcpAgentsByAgentIdAuthResponses[keyof DeleteAcpAgentsByAgentIdAuthResponses];
+
+export type PutAcpAgentsByAgentIdAuthData = {
+    body: {
+        methodId: string;
+    };
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/auth';
+};
+
+export type PutAcpAgentsByAgentIdAuthResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        selectedMethodId: string | null;
+    };
+};
+
+export type PutAcpAgentsByAgentIdAuthResponse = PutAcpAgentsByAgentIdAuthResponses[keyof PutAcpAgentsByAgentIdAuthResponses];
 
 export type PatchAcpAgentsByAgentIdLaunchConfigData = {
     body: {
@@ -19140,6 +19729,12 @@ export type PatchAcpAgentsByAgentIdLaunchConfigResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19147,6 +19742,54 @@ export type PatchAcpAgentsByAgentIdLaunchConfigResponses = {
 };
 
 export type PatchAcpAgentsByAgentIdLaunchConfigResponse = PatchAcpAgentsByAgentIdLaunchConfigResponses[keyof PatchAcpAgentsByAgentIdLaunchConfigResponses];
+
+export type PatchAcpAgentsByAgentIdRemoteConfigData = {
+    body: {
+        name?: string;
+        connectionType?: 'http' | 'websocket';
+        endpointUrl?: string;
+        headerSecretRefs?: {
+            [key: string]: unknown;
+        };
+        version?: string;
+    };
+    path: {
+        agentId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/remote-config';
+};
+
+export type PatchAcpAgentsByAgentIdRemoteConfigResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        id: string;
+        name: string;
+        version: string | null;
+        source: string;
+        distributionType: string;
+        installPath: string | null;
+        cmd: string | null;
+        args: string | null;
+        env: string | null;
+        overrideCmd: string | null;
+        overrideArgs: string | null;
+        overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
+        status: string;
+        createdAt: number;
+        updatedAt: number;
+    };
+};
+
+export type PatchAcpAgentsByAgentIdRemoteConfigResponse = PatchAcpAgentsByAgentIdRemoteConfigResponses[keyof PatchAcpAgentsByAgentIdRemoteConfigResponses];
 
 export type PostAcpAgentsByAgentIdDraftSessionData = {
     body: {
@@ -19174,6 +19817,27 @@ export type PostAcpAgentsByAgentIdDraftSessionResponses = {
 };
 
 export type PostAcpAgentsByAgentIdDraftSessionResponse = PostAcpAgentsByAgentIdDraftSessionResponses[keyof PostAcpAgentsByAgentIdDraftSessionResponses];
+
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdData = {
+    body?: never;
+    path: {
+        agentId: string;
+        sessionId: string;
+    };
+    query?: never;
+    url: '/acp/agents/{agentId}/draft-session/{sessionId}';
+};
+
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponse = DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses[keyof DeleteAcpAgentsByAgentIdDraftSessionBySessionIdResponses];
 
 export type DeleteAcpAgentsByAgentIdInstallationData = {
     body?: never;
@@ -19223,6 +19887,12 @@ export type PutAcpAgentsByAgentIdInstallationResponses = {
         overrideCmd: string | null;
         overrideArgs: string | null;
         overrideEnv: string | null;
+        authMethodId: string | null;
+        connectionType: 'stdio' | 'http' | 'websocket';
+        endpointUrl: string | null;
+        remoteHeadersSecretRefs: {
+            [key: string]: unknown;
+        };
         status: string;
         createdAt: number;
         updatedAt: number;
@@ -19983,6 +20653,17 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             supportsNamespaceTools: boolean | null;
             updatedAt: number;
         } | {
+            kind: 'mode';
+            slotId: string;
+            threadId: string;
+            currentModeId: string;
+            modes: Array<{
+                id: string;
+                name: string;
+                description: string;
+            }>;
+            updatedAt: number;
+        } | {
             kind: 'reasoning';
             slotId: string;
             threadId: string;
@@ -20045,6 +20726,7 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                 options: Array<{
                     label: string;
                     description: string;
+                    url?: string;
                 }> | null;
             }>;
             createdAt: number;
@@ -20266,6 +20948,29 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             hasCredits: boolean | null;
             rateLimitReachedType: string | null;
             planType: string | null;
+            estimatedCostUsd?: number | null;
+            queuedTurnCount?: number | null;
+            resultMessageId?: string | null;
+            correlatedUserMessageId?: string | null;
+            modelCosts?: Array<{
+                modelId: string;
+                canonicalModelId: string | null;
+                provider: string | null;
+                costUsd: number;
+                costBasis: 'list' | 'managed' | 'unknown';
+            }>;
+            lastModelSwitch?: {
+                fromModelId: string;
+                toModelId: string;
+                requestedModelId: string | null;
+                source: string;
+                contextTokens: number;
+                promptCacheWarm: boolean;
+                cacheTtl: '5m' | '1h';
+                estimatedCacheWriteUsd: number;
+                pricing: 'configured' | 'catalog' | 'default';
+                updatedAt: number;
+            } | null;
             updatedAt: number;
         } | {
             kind: 'config';
@@ -21565,6 +22270,7 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -21615,7 +22321,7 @@ export type GetChatSessionsBySessionIdRuntimeSettingsResponse = GetChatSessionsB
 export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
     body: {
         permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null;
-        accessMode?: 'approval-required' | 'full-access' | null;
+        accessMode?: 'approval-required' | 'approve-for-me' | 'full-access' | null;
         interactionMode?: 'default' | 'plan' | null;
         claudeAgent?: {
             modelAliases?: {
@@ -21624,7 +22330,7 @@ export type PatchChatSessionsBySessionIdRuntimeSettingsData = {
                 opus?: string;
             };
         } | null;
-        [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'full-access' | null | 'default' | 'plan' | null | {
+        [key: string]: string | number | boolean | null | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan' | null | 'approval-required' | 'approve-for-me' | 'full-access' | null | 'default' | 'plan' | null | {
             modelAliases?: {
                 haiku?: string;
                 sonnet?: string;
@@ -22044,10 +22750,140 @@ export type PostChatSessionsBySessionIdUserInputByRequestIdResponses = {
 
 export type PostChatSessionsBySessionIdUserInputByRequestIdResponse = PostChatSessionsBySessionIdUserInputByRequestIdResponses[keyof PostChatSessionsBySessionIdUserInputByRequestIdResponses];
 
+export type DeleteChatSessionsBySessionIdAuthRecoveryData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/auth-recovery';
+};
+
+export type DeleteChatSessionsBySessionIdAuthRecoveryResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type DeleteChatSessionsBySessionIdAuthRecoveryResponse = DeleteChatSessionsBySessionIdAuthRecoveryResponses[keyof DeleteChatSessionsBySessionIdAuthRecoveryResponses];
+
+export type GetChatSessionsBySessionIdAuthRecoveryData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/auth-recovery';
+};
+
+export type GetChatSessionsBySessionIdAuthRecoveryResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        sessionId: string;
+        queueItemId: string;
+        runId: string | null;
+        providerTargetId: string | null;
+        runtimeKind: string;
+        provider: string;
+        methods: Array<{
+            id: string;
+            name: string;
+            description?: string;
+            kind: 'agent' | 'terminal';
+            status: 'supported' | 'unsupported';
+            unavailableReason?: string;
+            link?: string;
+        }>;
+        configurationTarget: {
+            namespace: string;
+            resourceId: string;
+        };
+        createdAt: number;
+        updatedAt: number;
+    } | null;
+};
+
+export type GetChatSessionsBySessionIdAuthRecoveryResponse = GetChatSessionsBySessionIdAuthRecoveryResponses[keyof GetChatSessionsBySessionIdAuthRecoveryResponses];
+
+export type PostChatSessionsBySessionIdAuthRecoveryRetryData = {
+    body?: never;
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/auth-recovery/retry';
+};
+
+export type PostChatSessionsBySessionIdAuthRecoveryRetryResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+        queueItemId: string;
+    };
+};
+
+export type PostChatSessionsBySessionIdAuthRecoveryRetryResponse = PostChatSessionsBySessionIdAuthRecoveryRetryResponses[keyof PostChatSessionsBySessionIdAuthRecoveryRetryResponses];
+
+export type PutChatSessionsBySessionIdRuntimeModeData = {
+    body: {
+        modeId: string;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-mode';
+};
+
+export type PutChatSessionsBySessionIdRuntimeModeResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type PutChatSessionsBySessionIdRuntimeModeResponse = PutChatSessionsBySessionIdRuntimeModeResponses[keyof PutChatSessionsBySessionIdRuntimeModeResponses];
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsData = {
+    body: {
+        model?: string | null;
+        effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
+        summary?: 'auto' | 'concise' | 'detailed' | 'none' | null;
+        serviceTier?: string | null;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-turn-settings';
+};
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        status: 'applied' | 'targetUnavailable';
+    };
+};
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsResponse = PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses[keyof PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses];
+
 export type PostChatSessionsBySessionIdToolApprovalByRequestIdData = {
     body: {
         approved: boolean;
+        scope?: 'once' | 'always';
         reason?: string;
+        selectedOptionId?: string;
     };
     path: {
         sessionId: string;
@@ -22064,7 +22900,9 @@ export type PostChatSessionsBySessionIdToolApprovalByRequestIdResponses = {
     200: {
         requestId: string;
         approved: boolean;
+        scope?: 'once' | 'always';
         reason?: string;
+        selectedOptionId?: string;
     };
 };
 
