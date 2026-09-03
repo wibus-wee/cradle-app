@@ -28,12 +28,6 @@ vi.mock('~/features/session-await/await-panel', () => ({
   AwaitPanel: () => <div data-testid="await-panel" />,
 }))
 
-vi.mock('~/features/session-environment/session-environment-panel', () => ({
-  SessionEnvironmentPanel: ({ sessionId }: { sessionId: string }) => (
-    <div data-testid="environment-panel">{sessionId}</div>
-  ),
-}))
-
 vi.mock('~/features/git', () => ({
   ChangesPanelContainer: () => <div data-testid="changes-panel" />,
   GitPanelContainer: () => <div data-testid="git-panel" />,
@@ -123,28 +117,6 @@ describe('rightAside browser panel coupling', () => {
     expect(screen.getByTestId('right-aside').getAttribute('data-active-tab')).toBe('files')
     await waitFor(() => {
       expect(useLayoutStore.getState().asideActiveTab).toBe('files')
-    })
-  })
-
-  it('exposes the session environment editor only when a session is selected', async () => {
-    const { rerender } = renderRightAside(<RightAside visible />)
-
-    expect(screen.queryByTestId('right-aside-tab-environment')).toBeNull()
-
-    rerender(
-      <QueryClientProvider client={new QueryClient()}>
-        <TooltipProvider>
-          <RightAside visible sessionId="session-1" workspaceId="workspace-1" />
-        </TooltipProvider>
-      </QueryClientProvider>,
-    )
-
-    const tab = screen.getByTestId('right-aside-tab-environment')
-    tab.click()
-
-    await waitFor(() => {
-      expect(screen.getByTestId('right-aside-panel-environment')).not.toBeNull()
-      expect(screen.getByTestId('environment-panel').textContent).toBe('session-1')
     })
   })
 })

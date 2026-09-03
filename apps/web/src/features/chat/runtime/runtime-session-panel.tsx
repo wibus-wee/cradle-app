@@ -1,9 +1,6 @@
 import {
-  BookmarkLine as BookmarkIcon,
-  CalendarTimeAddLine as AutomationIcon,
   CheckCircleLine as CheckCircle2Icon,
   CloseCircleLine as XCircleIcon,
-  EyeLine as EyeIcon,
   HeartbeatLine as ActivityIcon,
   ListCheckLine as ListChecksIcon,
   MindMapLine as WorkflowIcon,
@@ -17,7 +14,6 @@ import { useQuery } from '@tanstack/react-query'
 import type { UIMessage } from 'ai'
 import { useTranslation } from 'react-i18next'
 
-import { getSessionsByIdEnvironmentOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
@@ -135,13 +131,7 @@ export function RuntimeSessionPanel({
     retry: false,
   })
   const todoSnapshot = useSessionTodos(sessionId, active)
-  const environmentQuery = useQuery({
-    ...getSessionsByIdEnvironmentOptions({ path: { id: sessionId ?? '' } }),
-    enabled: !!sessionId,
-    refetchInterval: 5_000,
-  })
   const workQuery = useWorkDetail(workId)
-  const environment = environmentQuery.data
   const lastAssistantId = useChatStore(
     activeSessionId ? chatSelectors.lastAssistantId(activeSessionId) : () => undefined,
   )
@@ -186,58 +176,19 @@ export function RuntimeSessionPanel({
         />
       )}
 
-     {sessionId && environment && (
-        <>
-          <section className="space-y-2">
-            <PanelHeading icon={EyeIcon} label="Environment" />
-            <div className="grid grid-cols-2 gap-2">
-              <Metric label="Checkpoints" value={String(environment.checkpoints.length)} />
-              <Metric label="Pins" value={String(environment.pins.length)} />
-              <Metric label="Markers" value={String(environment.markers.length)} />
-              <Metric label="Automation" value={String(environment.automationRuns.length)} />
-              {environment.usage && (
-                <>
-                  <Metric label="Tokens" value={environment.usage.totalTokens.toLocaleString()} />
-                  <Metric label="Turns" value={String(environment.usage.count)} />
-                </>
-              )}
-            </div>
-          </section>
-
-          {workQuery.data && (
-            <section className="space-y-2">
-              <PanelHeading icon={TargetIcon} label="Work" />
-              <div className="grid grid-cols-3 gap-2">
-                <Metric label="Files" value={String(workQuery.data.readiness.changedFiles)} />
-                <Metric label="Commits" value={String(workQuery.data.readiness.commitsAhead)} />
-                <Metric label="State" value={workQuery.data.activity} />
-              </div>
-              <p className="text-pretty text-[11px] leading-5 text-foreground/80">{workQuery.data.work.objective}</p>
-              {workQuery.data.work.handoffSummary && (
-                <p className="text-pretty text-[11px] leading-5 text-muted-foreground">{workQuery.data.work.handoffSummary}</p>
-              )}
-            </section>
+      {workQuery.data && (
+        <section className="space-y-2">
+          <PanelHeading icon={TargetIcon} label="Work" />
+          <div className="grid grid-cols-3 gap-2">
+            <Metric label="Files" value={String(workQuery.data.readiness.changedFiles)} />
+            <Metric label="Commits" value={String(workQuery.data.readiness.commitsAhead)} />
+            <Metric label="State" value={workQuery.data.activity} />
+          </div>
+          <p className="text-pretty text-[11px] leading-5 text-foreground/80">{workQuery.data.work.objective}</p>
+          {workQuery.data.work.handoffSummary && (
+            <p className="text-pretty text-[11px] leading-5 text-muted-foreground">{workQuery.data.work.handoffSummary}</p>
           )}
-
-          {environment.notes && (
-            <section className="space-y-2">
-              <PanelHeading icon={BookmarkIcon} label="Notes" />
-              <p className="whitespace-pre-wrap text-[11px] leading-5 text-foreground/80">{environment.notes}</p>
-            </section>
-          )}
-
-          {environment.automationRuns.length > 0 && (
-            <section className="space-y-2">
-              <PanelHeading icon={AutomationIcon} label="Automation" />
-              <div className="space-y-1.5 rounded-md bg-muted/40 p-2">
-                {environment.automationRuns.map(run => (
-                  <KeyValue key={run.id} label={run.id.slice(0, 8)} value={run.status} />
-                ))}
-              </div>
-            </section>
-          )}
-
-        </>
+        </section>
       )}
 
       <section className="space-y-2">

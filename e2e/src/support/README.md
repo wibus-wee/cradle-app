@@ -29,7 +29,6 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/git.ts` | Branch controls |
 | `pages/kanban.ts` | Board, Issue detail, activity, and delegation |
 | `pages/search.ts` | Global search |
-| `pages/session-environment.ts` | Session Environment notes and delayed real-save control |
 | `pages/settings.ts` | Settings shell and appearance |
 | `pages/terminal.ts` | Bottom panel and PTY sessions |
 | `pages/usage.ts` | Usage dashboard, range selection, and downloaded CSV |
