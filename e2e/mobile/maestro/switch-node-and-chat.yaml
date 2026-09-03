@@ -20,51 +20,40 @@ appId: app.cradle.mobile
       - tapOn:
           text: Settings
           label: "perf-action:open-settings|open Settings"
+      - extendedWaitUntil:
+          visible:
+            id: settings-node-${NODE_ID}
+          timeout: 15000
+          label: "perf-response:open-settings|the target Node is visible in Settings"
 - runFlow:
     when:
       notVisible: Open navigation
     commands:
-      - tapOn:
-          text: Settings
-          label: "perf-action:open-settings|open Settings"
+      - retry:
+          maxRetries: 2
+          commands:
+            - tapOn:
+                id: tab-settings
+                label: "perf-action:open-settings|open Settings"
+            - extendedWaitUntil:
+                visible:
+                  id: tab-settings
+                  selected: true
+                timeout: 15000
+                label: "perf-response:open-settings|the Settings tab is selected"
 - extendedWaitUntil:
-    visible: Settings
-    timeout: 15000
-    label: "perf-response:open-settings|Settings are visible"
-- runFlow:
-    when:
-      visible: Open navigation
-    commands:
-      - extendedWaitUntil:
-          visible:
-            id: settings-node-${NODE_ID}
-          timeout: 45000
-      - tapOn:
-          id: settings-node-${NODE_ID}
-          label: "perf-action:switch-node|switch to another Node"
-      - extendedWaitUntil:
-          visible:
-            id: settings-node-${NODE_ID}
-            selected: true
-          timeout: 45000
-          label: "perf-response:switch-node|the selected Node is active"
-- runFlow:
-    when:
-      notVisible: Open navigation
-    commands:
-      - extendedWaitUntil:
-          visible:
-            id: settings-node-${NODE_ID}
-          timeout: 45000
-      - tapOn:
-          id: settings-node-${NODE_ID}
-          label: "perf-action:switch-node|switch to another Node"
-      - extendedWaitUntil:
-          visible:
-            id: settings-node-${NODE_ID}
-            selected: true
-          timeout: 45000
-          label: "perf-response:switch-node|the selected Node is active"
+    visible:
+      id: settings-node-${NODE_ID}
+    timeout: 45000
+- tapOn:
+    id: settings-node-${NODE_ID}
+    label: "perf-action:switch-node|switch to another Node"
+- extendedWaitUntil:
+    visible:
+      id: settings-node-${NODE_ID}
+      selected: true
+    timeout: 45000
+    label: "perf-response:switch-node|the selected Node is active"
 - runFlow:
     when:
       visible: Open navigation
@@ -84,7 +73,7 @@ appId: app.cradle.mobile
       notVisible: Open navigation
     commands:
       - tapOn:
-          text: Workspaces
+          id: tab-projects
           label: "perf-action:open-workspaces|open Workspaces"
 - extendedWaitUntil:
     visible: ${WORKSPACE_NAME}.*

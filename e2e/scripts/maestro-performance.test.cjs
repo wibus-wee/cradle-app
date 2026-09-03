@@ -62,6 +62,23 @@ test('ignores an unselected conditional branch and retains an interrupted action
   assert.equal(samples[0].responseBoundary, 'maestro-interrupted')
 })
 
+test('retains failed retry attempts before the successful interaction', () => {
+  const samples = parseMaestroCommandEntries([
+    command(0, 1_000, 100, 'COMPLETED', 'tapOnElement', 'perf-action:open-settings|open Settings'),
+    command(1, 1_100, 15_000, 'FAILED', 'assertConditionCommand', 'perf-response:open-settings|the Settings tab is selected'),
+    command(2, 16_100, 100, 'COMPLETED', 'tapOnElement', 'perf-action:open-settings|open Settings'),
+    command(3, 16_200, 200, 'COMPLETED', 'assertConditionCommand', 'perf-response:open-settings|the Settings tab is selected'),
+  ], { flowName: 'settings', stableId: 'CRADLE-FABRIC-002' })
+
+  assert.deepEqual(samples.map(sample => ({
+    durationMs: sample.durationMs,
+    status: sample.status,
+  })), [
+    { durationMs: 15_100, status: 'FAILED' },
+    { durationMs: 300, status: 'PASSED' },
+  ])
+})
+
 test('rejects overlapping or mismatched Maestro boundaries', () => {
   assert.throws(() => parseMaestroCommandEntries([
     command(0, 1_000, 10, 'COMPLETED', 'tapOnElement', 'perf-action:first|first action'),
@@ -96,7 +113,7 @@ test('loads commands.json artifacts from each Maestro flow', (t) => {
 
 function flattenCommands(commands) {
   return commands.flatMap((command) => {
-    const nested = command.runFlow?.commands || command.repeat?.commands || []
+    const nested = command.runFlow?.commands || command.repeat?.commands || command.retry?.commands || []
     return [command, ...flattenCommands(nested)]
   })
 }

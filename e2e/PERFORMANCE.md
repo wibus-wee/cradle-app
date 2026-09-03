@@ -165,6 +165,7 @@ The search helper's removed `500 ms` sleep affects Settings, Provider, Agent Ide
 | Cucumber interaction report | One parser, one focused test file, a successful-run evidence check, two artifacts per CI lane, and about 32-45 KB per measured local lane. Report generation measured 50 ms wall time for 120 steps. | Informational comparisons may fluctuate with runner load; there is no latency regression gate or product runtime overhead. A missing or malformed message stream now fails an otherwise successful CI summary after writing diagnostics. Failed interactions remain visible. | All maintained Cucumber scenarios across Claude, Codex, and runtime-none lanes; CI summary and artifact uploads. | Ship: broad observability gain with negligible run cost, while successful runs cannot silently omit their timing evidence. |
 | Fabric Web interaction report | One Playwright reporter, one focused test file, explicit action plus response descriptions at the existing Web orchestration boundaries, and a successful-run evidence check. | Action descriptions are baseline keys; response descriptions are diagnostic metadata and may evolve without breaking comparison. A successful run with zero measured interactions now fails after writing the empty diagnostic report. Reporter parsing adds negligible work and no product runtime overhead. | The maintained two-node Fabric Web scenario and its 33 executed interaction samples. | Ship: every authored Fabric Web operation has an asserted, named end boundary in the shared report schema. |
 | Fabric Mobile command attribution | One Maestro parser and test file, labels plus response assertions in five flows, static flow-invocation coverage, successful-run completeness checks, and about 30 ms to scan five command logs. | Action descriptions are baseline keys. Input focus is not exposed reliably by the iOS accessibility tree, so focus plus text entry is one operation. Added assertions can expose accessibility regressions. An upstream Maestro output-layout change that drops a flow's samples now fails an otherwise successful run after preserving available evidence; no product runtime code is added. | All 16 executed launch, tap, and text-entry operations in `CRADLE-FABRIC-002`; Mobile Fabric CI and artifacts only. | Ship: the data separates driver-heavy input and cold launch from product response paths, and every successful maintained flow must contribute timing evidence. |
+| Verify native tab navigation by state | Two Expo Router tab identifiers, one condition-bounded Maestro retry, and retry-aware static contract traversal. | A dropped iOS automation tap can add up to two 15-second attempts. Each failed attempt remains a failed interaction sample instead of being hidden, and a persistent navigation failure still fails the flow. Reselecting Settings can pop that tab to its root, which is the intended destination here. The identifiers add no visible UI or product runtime work. | Native iOS Workspaces/Settings tabs and the `switch-node-and-chat` Mobile Fabric flow only; responsive drawer navigation keeps its existing semantic path. | Revise then ship: the hosted failure proved that visible `Settings` matched the unselected tab and was not a valid response boundary. The stronger state boundary passed all 16 Mobile interactions locally; accept after a hosted rerun. |
 | PR evidence check | Six required PR fields, a small body validator, and one workflow job. | Documentation-only and generated/dependency-only pull requests still need concise evidence or an explicit not-applicable rationale. The check validates presence, not the quality of measurements. | Every pull request and the repository PR template; no application runtime effect. | Ship: review cost is small and performance tradeoffs cannot be omitted silently. |
 | Replace Agent save sleep | One E2E assertion changed. | Depends on the create view disappearing only after successful mutation; that is the user-visible transition already owned by the screen. It can expose a real regression instead of waiting blindly. | `CRADLE-AGENT-ID-001`; no product runtime code. | Ship: removes 1.95 s of false latency and lowers flake risk. |
 | Remove search debounce sleep | One shared page-object line removed. | Downstream result locators must auto-wait; all current callers already assert or click a specific result. A missing result now consumes its owning assertion timeout rather than an unconditional delay. | Settings, Provider, Agent Identity, and Search E2E journeys; no product runtime code. | Ship: removes a fixed test tax without weakening response assertions. |
@@ -245,6 +246,28 @@ hosted outliers were Node-picker launch (`33.550 s`), Controller-revoked launch
 (`29.411 s`). The same definitions measured `3.339-5.329 s` locally, so the
 hosted sample is retained as environment evidence and a CI-budget risk, not a
 product-regression claim.
+
+The next current-head hosted run retained 21 partial interactions before
+`switch-node-and-chat` failed. Combined P50/P95/max were `2.866 s` / `32.195 s`
+/ `74.412 s`; its 8 Mobile samples were `17.535 s` / `74.412 s` / `74.412 s`.
+The report incorrectly marked `open Settings` passed at `7.617 s`: Maestro spent
+`7.192 s` on the tap, then the `421 ms` response assertion matched the always
+visible, unselected Settings tab. The subsequent target-Node wait failed after
+`36.938 s`, and the failure screenshot still showed Workspaces with that tab
+selected. The device log also reported incomplete synthesized touch events.
+This is a response-boundary and hosted-driver failure, not evidence of slow Node
+synchronization. The flow now targets stable tab identifiers, retries only while
+the Settings tab has not become selected, and requires the actual Node row on
+the responsive navigation path. A post-change local run passed 33/33 combined
+interactions, including 16/16 Mobile samples from 5/5 flows, without taking a
+retry. Combined P50/P95/max were `1.280 s` / `4.851 s` / `9.558 s`, versus the
+prior local `1.284 s` / `5.329 s` / `9.555 s` (`-0.31%` / `-8.97%` / `+0.03%`).
+Mobile-only values were `2.473 s` / `9.558 s` / `9.558 s`, versus `2.291 s` /
+`9.555 s` / `9.555 s` (`+7.94%` / `+0.03%` / `+0.03%`). The strengthened
+Settings boundary measured `1.864 s`, versus `1.862 s` before (`+0.11%`). These
+small mixed deltas are run variance, not a speedup claim. A post-change hosted
+value is still pending; the pre-change false-positive `7.617 s` is not a valid
+hosted latency baseline.
 
 This attribution changes the optimization queue. The earlier whole-flow report
 ranked the switch-and-Chat journey at `50.431 s`, but the final send-to-streamed
