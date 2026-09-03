@@ -25,6 +25,8 @@ interface AutomationPageOwner {
   chat: {
     openSession: (sessionId: string) => Promise<void>
     expectAssistantContains: (text: string | RegExp, timeout?: number) => Promise<void>
+    expectNoAssistantMessage: (text: string | RegExp) => Promise<void>
+    waitStatus: (status: 'idle' | 'streaming' | 'error', timeout?: number) => Promise<void>
   }
 }
 
@@ -131,6 +133,79 @@ export class AutomationPage {
     expect(run.chatSessionId).not.toBeNull()
     this.owner.remember(RUN_ID_KEY, run.id)
     this.owner.remember(SESSION_ID_KEY, run.chatSessionId!)
+  }
+
+  async startRun(): Promise<void> {
+    const button = this.dashboard().getByRole('button', { name: 'Run now', exact: true }).filter({ hasText: 'Run now' })
+    await expect(button).toBeEnabled({ timeout: TIMEOUT })
+    await button.click()
+  }
+
+  async rememberRunningRun(): Promise<void> {
+    const definitionId = this.owner.recall<string>(DEFINITION_ID_KEY)
+    let runningRun: AutomationRun | undefined
+    await expect.poll(async () => {
+      const response = await fetch(`${this.owner.params.serverUrl}/automations/${definitionId}/runs`)
+      expect(response.ok).toBe(true)
+      const runs = await response.json() as AutomationRun[]
+      runningRun = runs.find(run => run.status === 'running' && run.chatSessionId !== null)
+      return runningRun?.id
+    }, { timeout: TIMEOUT }).toBeTruthy()
+    this.owner.remember(RUN_ID_KEY, runningRun!.id)
+    this.owner.remember(SESSION_ID_KEY, runningRun!.chatSessionId!)
+  }
+
+  async expectRunningRunAfterReload(): Promise<void> {
+    await expect(this.dashboard()).toHaveAttribute('data-automation-ready', 'true', { timeout: TIMEOUT })
+    await this.selectDefinition()
+    await this.openTab('Runs')
+    const run = this.runItem(this.owner.recall<string>(RUN_ID_KEY))
+    await expect(run).toContainText('running', { timeout: TIMEOUT })
+    await run.hover()
+    await expect(run.getByRole('button', { name: 'Stop', exact: true })).toBeVisible({ timeout: TIMEOUT })
+  }
+
+  async stopRunningRun(): Promise<void> {
+    const runId = this.owner.recall<string>(RUN_ID_KEY)
+    const run = this.runItem(runId)
+    await run.hover()
+    const responsePromise = this.page.waitForResponse(response =>
+      response.request().method() === 'POST'
+      && new URL(response.url()).pathname.endsWith(`/runs/${runId}/stop`))
+    await run.getByRole('button', { name: 'Stop', exact: true }).click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+    expect(await response.json()).toMatchObject({ status: 'cancelled', triageStatus: 'unread' })
+  }
+
+  async expectCancelledRunInTriage(): Promise<void> {
+    const triage = this.dashboard().locator('aside').first()
+    await expect(triage).toContainText(DEFINITION_TITLE, { timeout: TIMEOUT })
+    await expect(triage).toContainText('Stopped by user.', { timeout: TIMEOUT })
+    await this.openTab('Runs')
+    const run = this.runItem(this.owner.recall<string>(RUN_ID_KEY))
+    await expect(run).toContainText('cancelled', { timeout: TIMEOUT })
+    await expect(run).toContainText('Stopped by user.', { timeout: TIMEOUT })
+    await this.openTab('Artifacts')
+    await expect(this.dashboard().locator('main')).toContainText('No artifacts recorded', { timeout: TIMEOUT })
+  }
+
+  async expectPersistedCancelledRun(): Promise<void> {
+    await expect(this.dashboard()).toHaveAttribute('data-automation-ready', 'true', { timeout: TIMEOUT })
+    await this.selectDefinition()
+    await this.expectCancelledRunInTriage()
+  }
+
+  async openCancelledLinkedSession(expectedTitle: string): Promise<void> {
+    const sessionId = this.owner.recall<string>(SESSION_ID_KEY)
+    await expect(this.page.locator(`[data-testid="session-title-${sessionId}"]`))
+      .toHaveText(expectedTitle, { timeout: TIMEOUT })
+    await this.owner.chat.openSession(sessionId)
+  }
+
+  async expectCancelledSessionWithoutReply(cancelledReply: string): Promise<void> {
+    await this.owner.chat.waitStatus('idle', TIMEOUT)
+    await this.owner.chat.expectNoAssistantMessage(cancelledReply)
   }
 
   async expectCompletedRunInTriage(): Promise<void> {

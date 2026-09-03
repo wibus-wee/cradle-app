@@ -13,6 +13,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `providers.ts` | Provider/profile/Agent prerequisites and workspace prerequisite |
 | `scenarios/` | Strict OpenAI Responses and Anthropic Messages exchanges |
 | `helpers/chat-scenario.ts` | Cross-turn Chat scripts, gates, queue timing, approvals, and tool loops |
+| `helpers/automation-scenario.ts` | Gated Automation cancellation and linked Session title scripts |
 | `helpers/issue-agent-scenario.ts` | Issue delegation, rerun, and cancellation scripts |
 | `pages/` | Stable selectors and reusable UI mechanics |
 | `database.ts` | Explicit fixture-only database support; never the proof of a user-visible outcome |
@@ -23,7 +24,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | File | Surface |
 | --- | --- |
 | `pages/await.ts` | Await creation and resolution |
-| `pages/automation.ts` | Automation definition fixture, real execution, triage, artifacts, and linked Session |
+| `pages/automation.ts` | Automation definition fixture, completion/cancellation, triage, artifacts, reload, and linked Session |
 | `pages/chat.ts` | New Chat, Chat, approval, messages, sessions, and queue |
 | `pages/diff.ts` | Diff review |
 | `pages/first-run.ts` | Onboarding |

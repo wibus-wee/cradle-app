@@ -68,6 +68,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Workspace removal × active Work run × runtime cancellation × delayed provider response × reload | `CRADLE-WS-005` | Destructive Workspace removal cancels the active Work run before Session disposal, so a delayed provider response cannot recreate deleted state |
 | Source Workspace × Issue/Kanban/Automation × dry-run preview × target Workspace × reload | `CRADLE-WS-006` | The UI previews exact cross-owner counts before atomically moving all three entity types; Issue and Automation target ownership and the migrated board contents persist |
 | Automation × real Agent run × triage × artifact × linked Session × reload | `CRADLE-AUTO-001` | A manual Automation run completes through Claude Agent, creates one reviewable result and transcript artifact, leaves triage after resolution, and retains the same linked Session and output after reload |
+| Automation × active Agent run × reload × cancellation × triage × linked Session | `CRADLE-AUTO-002` | A running Automation rehydrates with its Stop control, cancellation aborts the real Claude run, records a reviewable terminal state without an artifact, and prevents a late reply after reload |
 | Git branch × external file changes × diff refresh | `CRADLE-GIT-001`, `002`, `CRADLE-DIFF-001` | Repository projections refresh from real Git/filesystem state |
 | Await pending × external event × Agent continuation | `CRADLE-AWAIT-001` | Durable pending work resumes from an external signal |
 | Await cancel/expiry × Server crash × late external resolution × next Agent turn | `CRADLE-AWAIT-002` | Both terminal states persist across process recovery, reject late delivery without transcript pollution, and leave the Session usable |
@@ -103,7 +104,6 @@ The backlog below is ordered by semantic fan-out and state-corruption risk, not 
 
 | Priority | Proposed journey | State fusion and owning namespaces |
 | --- | --- | --- |
-| P1 | Automation failure/cancel with linked Session and notification | automation × background job/activity × session |
 | P1 | Pull-request delivery from Work, update, and failure recovery | Work × Git × pull request × provider auth |
 | P1 | Fabric Node disconnect/reconnect during an active terminal or Agent run | Fabric Node × relay × PTY/runtime × Session |
 | P1 | Runtime process environment configuration edit while idle versus locked during a run | Agent runtime configuration × session × active process lifecycle |
