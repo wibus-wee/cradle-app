@@ -4,11 +4,17 @@ const path = require('node:path')
 const { loadMaestroInteractionSamples } = require('./maestro-performance.cjs')
 const { buildPerformanceReport } = require('./performance-report.cjs')
 
-const INTERACTION_STEP = /^\[interaction:([^\]]+)\]\s+(.+)$/
+const INTERACTION_STEP = /^\[interaction:([^\]]+)\]\s+(.+?)\s+\[response:\s*(.+)\]$/
 
 function sampleFromStep(testCase, step) {
+  if (step.category !== 'test.step') {
+    return null
+  }
   const match = INTERACTION_STEP.exec(step.title)
-  if (step.category !== 'test.step' || !match) {
+  if (!match) {
+    if (step.title.startsWith('[interaction:')) {
+      throw new Error(`Interaction step must include an explicit [response: ...] boundary: ${step.title}`)
+    }
     return null
   }
 
@@ -20,7 +26,8 @@ function sampleFromStep(testCase, step) {
     feature: path.basename(testCase.location?.file || 'unknown.spec.ts'),
     scenario: testCase.title,
     action,
-    responses: [],
+    responses: [match[3]],
+    responseBoundary: 'playwright-assertion',
     source: match[1],
     durationMs: step.duration,
     status: step.error ? 'FAILED' : 'PASSED',

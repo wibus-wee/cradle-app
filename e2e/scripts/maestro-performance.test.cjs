@@ -40,6 +40,7 @@ test('measures a Maestro action through its labeled visible response', () => {
     scenario: 'settings',
     action: 'open Settings',
     responses: ['Settings is visible'],
+    responseBoundary: 'maestro-visible-assertion',
     source: 'mobile-ios',
     durationMs: 400,
     status: 'PASSED',
@@ -58,6 +59,7 @@ test('ignores an unselected conditional branch and retains an interrupted action
   assert.equal(samples[0].action, 'send Chat')
   assert.equal(samples[0].durationMs, 30_150)
   assert.equal(samples[0].status, 'FAILED')
+  assert.equal(samples[0].responseBoundary, 'maestro-interrupted')
 })
 
 test('rejects overlapping or mismatched Maestro boundaries', () => {

@@ -14,8 +14,8 @@ move single E2E samples materially.
 | Maestro parser | [`scripts/maestro-performance.cjs`](scripts/maestro-performance.cjs) | Reconstructs Mobile action-to-response samples from Maestro command timestamps. |
 | Fabric reporter | [`scripts/playwright-performance-reporter.cjs`](scripts/playwright-performance-reporter.cjs) | Merges Web Playwright steps and Mobile Maestro commands, including failures, into the shared report model. |
 | Cucumber integration | [`scripts/summarize-run.cjs`](scripts/summarize-run.cjs) | Writes performance artifacts beside each pass/fail summary. |
-| Human report | `e2e-performance.md` | Shows per-surface summaries, response bands, and the action plus asserted endpoint for the 30 slowest samples. |
-| Machine report | `e2e-performance.json` | Preserves every sample, per-surface and per-action aggregates, thresholds, and optional baseline comparison. |
+| Human report | `e2e-performance.md` | Shows per-surface summaries, response bands, and the action plus response boundary for the 30 slowest samples. |
+| Machine report | `e2e-performance.json` | Preserves every sample, response text and boundary kind, per-surface and per-action aggregates, thresholds, and optional baseline comparison. |
 
 ## Measurement Contract
 
@@ -23,9 +23,13 @@ The suites use their native semantic seams rather than attempting to infer a
 response from raw click events:
 
 - Cucumber starts at a Gherkin `Action` step and includes every consecutive
-  `Outcome` step. The next `Action` or `Context` closes the boundary.
+  `Outcome` step. The next `Action` or `Context` closes the boundary. When an
+  Action has no separate Outcome, its step completion is the response boundary;
+  the step or page object owns any immediate input, navigation, or render wait.
 - Fabric Web wraps a user operation and its rendered, persisted, remote, or
-  streamed result in `[interaction:fabric-web]` Playwright steps.
+  streamed result in `[interaction:fabric-web]` Playwright steps. Every marker
+  carries an explicit response description, and the reporter rejects a marker
+  without one.
 - Fabric Mobile gives each independent `launchApp`, `tapOn`, or `inputText`
   operation a `perf-action:<id>|<action>` label. Multi-command operations such
   as focusing an input before typing use `perf-continuation:<id>`. The final
@@ -39,6 +43,10 @@ Mobile contract test rejects an unlabeled launch, tap, or text entry and rejects
 action/response ID drift. A runtime parser error rejects overlapping or
 mismatched boundaries. This keeps every maintained native operation attributable
 without treating a whole multi-operation journey as one latency sample.
+Each sample also records `responseBoundary` as `action-step-completion`,
+`gherkin-outcome`, `playwright-assertion`, `maestro-visible-assertion`, or
+`maestro-interrupted`. This distinguishes a separately authored visible outcome
+from the completion contract owned by an Action step.
 
 The report deliberately:
 
@@ -151,7 +159,7 @@ The search helper's removed `500 ms` sleep affects Settings, Provider, Agent Ide
 | Change | Implementation cost | Side effects and risk | Impact radius | Decision |
 | --- | --- | --- | --- | --- |
 | Cucumber interaction report | One parser, one focused test file, two artifacts per CI lane, and about 32-45 KB per measured local lane. Report generation measured 50 ms wall time for 120 steps. | Informational comparisons may fluctuate with runner load; no runtime overhead and no CI failure gate. Failed interactions remain visible. | All maintained Cucumber scenarios across Claude, Codex, and runtime-none lanes; CI summary and artifact uploads. | Ship: broad observability gain with negligible run cost. |
-| Fabric Web interaction report | One Playwright reporter, one focused test file, and explicit interaction steps at the existing Web orchestration boundaries. | Step titles are baseline keys. Renaming one creates a new series; there is no product runtime overhead. | The maintained two-node Fabric Web scenario. | Ship: every authored Fabric Web operation has an asserted end boundary in the shared report schema. |
+| Fabric Web interaction report | One Playwright reporter, one focused test file, and explicit action plus response descriptions at the existing Web orchestration boundaries. | Action descriptions are baseline keys; response descriptions are diagnostic metadata and may evolve without breaking comparison. Reporter parsing adds negligible work and no product runtime overhead. | The maintained two-node Fabric Web scenario and its 33 executed interaction samples. | Ship: every authored Fabric Web operation has an asserted, named end boundary in the shared report schema. |
 | Fabric Mobile command attribution | One Maestro parser and test file, labels plus response assertions in five flows, and about 30 ms to scan five command logs. | Action descriptions are baseline keys. Input focus is not exposed reliably by the iOS accessibility tree, so focus plus text entry is one operation. Added assertions can expose accessibility regressions; they add no product runtime code. | All 16 executed launch, tap, and text-entry operations in `CRADLE-FABRIC-002`; Mobile Fabric CI and artifacts only. | Ship: the data separates driver-heavy input and cold launch from product response paths. |
 | PR evidence check | Five required PR fields, a small body validator, and one workflow job. | Documentation-only and generated/dependency-only pull requests still need concise evidence or an explicit not-applicable rationale. The check validates presence, not the quality of measurements. | Every pull request and the repository PR template; no application runtime effect. | Ship: review cost is small and performance tradeoffs cannot be omitted silently. |
 | Replace Agent save sleep | One E2E assertion changed. | Depends on the create view disappearing only after successful mutation; that is the user-visible transition already owned by the screen. It can expose a real regression instead of waiting blindly. | `CRADLE-AGENT-ID-001`; no product runtime code. | Ship: removes 1.95 s of false latency and lowers flake risk. |
@@ -166,12 +174,14 @@ The remaining runtime-none investigation queue is `CRADLE-KANBAN-002` Issue dele
 
 ### Fabric Web
 
-The final two-node Web run passed all 33 measured interactions. Its P50 was
-`402 ms`, P95 was `1.894 s`, and maximum was `1.924 s`. Compared with the prior
-successful run (`397 ms`, `1.898 s`, `1.917 s`), the deltas are `+1.26%`,
-`-0.21%`, and `+0.37%`; no product code changed, so these are normal single-run
-variance. The 10 flow-breaking samples cover Node pairing propagation, first
-Work creation, remote Chat, and approval, which measured about `1.0-1.9 s`.
+The final two-node Web run passed all 33 measured interactions and recorded a
+named response plus boundary kind for every sample. Its P50 was `459 ms`, P95
+was `1.890 s`, and maximum was `1.924 s`. Compared with the immediately prior
+successful run (`402 ms`, `1.894 s`, `1.924 s`), the deltas are `+14.18%`,
+`-0.21%`, and `0%`; only report metadata changed, so these are normal single-run
+variance rather than a product regression. The 11 flow-breaking samples cover
+Node pairing propagation, first Work creation, remote Chat, and approval, which
+measured about `1.0-1.9 s`.
 These paths cross process,
 persistence, relay, or runtime boundaries; the report identifies them for trace
 attribution but does not justify a product change from one sample.

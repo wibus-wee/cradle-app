@@ -42,6 +42,7 @@ function sample(input, active, responseEntry, responseText) {
     scenario: input.flowName,
     action: active.action,
     responses: responseText ? [responseText] : [],
+    responseBoundary: responseEntry ? 'maestro-visible-assertion' : 'maestro-interrupted',
     source: 'mobile-ios',
     durationMs: Math.max(0, end - active.startedAt),
     status: responseEntry

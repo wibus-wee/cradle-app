@@ -99,8 +99,9 @@ Run summaries are parsed from `cucumber-messages.ndjson` by
 Every Cucumber, Fabric two-node, and Fabric Mobile iOS CI lane writes
 `e2e-performance.json` and `e2e-performance.md`. Cucumber interactions begin at
 an `Action` and include following `Outcome` steps. Fabric interactions are
-explicit Playwright steps for Web; every Mobile `launchApp`, `tapOn`, and
-`inputText` command must carry a `perf-action` or same-operation
+explicit Playwright steps with a required response description for Web; every
+Mobile `launchApp`, `tapOn`, and `inputText` command must carry a `perf-action`
+or same-operation
 `perf-continuation` label paired with a `perf-response` visible assertion.
 Hooks, build/simulator startup, topology setup, unselected Mobile branches, and
 Cucumber `Context` steps are excluded.

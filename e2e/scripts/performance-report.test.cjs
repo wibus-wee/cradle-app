@@ -101,6 +101,7 @@ test('measures each action through its following outcomes and excludes setup and
       scenario: 'theme persists',
       action: 'reload the page',
       responses: [],
+      responseBoundary: 'action-step-completion',
       durationMs: 1_200,
       status: 'PASSED',
       band: 'flow-breaking',
@@ -112,6 +113,7 @@ test('measures each action through its following outcomes and excludes setup and
       scenario: 'theme persists',
       action: 'select dark theme',
       responses: ['dark theme is selected', 'document uses dark theme'],
+      responseBoundary: 'gherkin-outcome',
       durationMs: 150,
       status: 'PASSED',
       band: 'perceptible',
@@ -191,6 +193,7 @@ test('summarizes response bands and reports informational baseline changes', () 
       key: 'A::instant',
       stableId: 'A',
       action: 'instant',
+      responseBoundary: 'action-step-completion',
       durationMs: 99,
       band: 'instant',
       status: 'PASSED',
@@ -238,6 +241,7 @@ test('summarizes response bands and reports informational baseline changes', () 
   assert.equal(report.comparison.regressions.length, 4)
   assert.match(report.markdown, /Comparisons are informational/)
   assert.match(report.markdown, /P95 action-to-response/)
+  assert.match(report.markdown, /Action step completed \(no separate Outcome\)/)
 })
 
 test('reports each surface separately when a run mixes Web and Mobile interactions', () => {

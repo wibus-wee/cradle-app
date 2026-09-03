@@ -22,7 +22,7 @@ test('maps only explicit Playwright interaction steps into performance samples',
   }), null)
   assert.deepEqual(sampleFromStep(testCase, {
     category: 'test.step',
-    title: '[interaction:fabric-web] approve Node pairing request',
+    title: '[interaction:fabric-web] approve Node pairing request [response: both Nodes are online]',
     duration: 1_250.4321,
   }), {
     key: 'CRADLE-FABRIC-001::approve Node pairing request',
@@ -30,11 +30,18 @@ test('maps only explicit Playwright interaction steps into performance samples',
     feature: 'fabric-two-node.spec.ts',
     scenario: '[CRADLE-FABRIC-001] pairs two Nodes',
     action: 'approve Node pairing request',
-    responses: [],
+    responses: ['both Nodes are online'],
+    responseBoundary: 'playwright-assertion',
     source: 'fabric-web',
     durationMs: 1_250.4321,
     status: 'PASSED',
   })
+
+  assert.throws(() => sampleFromStep(testCase, {
+    category: 'test.step',
+    title: '[interaction:fabric-web] missing a response description',
+    duration: 10,
+  }), /must include an explicit/)
 })
 
 test('writes passed and failed Playwright interactions through the shared report model', (t) => {
@@ -49,7 +56,7 @@ test('writes passed and failed Playwright interactions through the shared report
 
   reporter.onStepEnd(testCase, {}, {
     category: 'test.step',
-    title: '[interaction:mobile-ios] send Chat and render response',
+    title: '[interaction:fabric-web] send Chat [response: the streamed response is visible]',
     duration: 31_000,
     error: new Error('timed out'),
   })
@@ -57,10 +64,12 @@ test('writes passed and failed Playwright interactions through the shared report
 
   const report = JSON.parse(readFileSync(join(outputDir, 'e2e-performance.json'), 'utf8'))
   assert.equal(report.summary.interactions, 1)
-  assert.equal(report.interactions[0].source, 'mobile-ios')
+  assert.equal(report.interactions[0].source, 'fabric-web')
+  assert.deepEqual(report.interactions[0].responses, ['the streamed response is visible'])
+  assert.equal(report.interactions[0].responseBoundary, 'playwright-assertion')
   assert.equal(report.interactions[0].status, 'FAILED')
   assert.equal(report.interactions[0].band, 'severe')
-  assert.match(readFileSync(join(outputDir, 'e2e-performance.md'), 'utf8'), /mobile-ios/)
+  assert.match(readFileSync(join(outputDir, 'e2e-performance.md'), 'utf8'), /the streamed response is visible/)
 })
 
 test('merges labeled Maestro command timings into the Mobile report', (t) => {
@@ -121,4 +130,5 @@ test('merges labeled Maestro command timings into the Mobile report', (t) => {
   assert.equal(report.interactions[0].scenario, 'select-node')
   assert.equal(report.interactions[0].durationMs, 500)
   assert.equal(report.interactions[0].source, 'mobile-ios')
+  assert.equal(report.interactions[0].responseBoundary, 'maestro-visible-assertion')
 })

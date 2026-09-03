@@ -139,6 +139,7 @@ function parseInteractionSamples(text) {
           scenario: pickle.name,
           action: pickleStep.text,
           responses: [],
+          responseBoundary: 'action-step-completion',
           durationMs,
           status,
           band: 'instant',
@@ -148,6 +149,7 @@ function parseInteractionSamples(text) {
 
       if (pickleStep.type === 'Outcome' && active) {
         active.responses.push(pickleStep.text)
+        active.responseBoundary = 'gherkin-outcome'
         active.durationMs += durationMs
         active.status = worstStatus(active.status, status)
         continue
@@ -256,6 +258,20 @@ function markdownTable(rows, emptyMessage) {
   return rows.length > 0 ? rows.join('\n') : `_${emptyMessage}_`
 }
 
+function responseDescription(interaction) {
+  const responses = (interaction.responses || []).join('; ')
+  if (responses) {
+    return responses
+  }
+  if (interaction.responseBoundary === 'action-step-completion') {
+    return 'Action step completed (no separate Outcome)'
+  }
+  if (interaction.responseBoundary === 'maestro-interrupted') {
+    return 'No response completed before interruption'
+  }
+  return 'n/a'
+}
+
 function buildPerformanceReport(input) {
   const interactions = input.interactions.map(interaction => ({
     ...interaction,
@@ -285,7 +301,7 @@ function buildPerformanceReport(input) {
 
   const topRows = topInteractions.map(
     interaction =>
-      `| \`${interaction.stableId ?? 'unlabeled'}\` | \`${interaction.source}\` | ${interaction.action.replaceAll('|', '\\|')} | ${(interaction.responses || []).join('; ').replaceAll('|', '\\|') || 'n/a'} | ${formatDuration(interaction.durationMs)} | \`${interaction.band}\` | \`${interaction.status}\` |`,
+      `| \`${interaction.stableId ?? 'unlabeled'}\` | \`${interaction.source}\` | ${interaction.action.replaceAll('|', '\\|')} | ${responseDescription(interaction).replaceAll('|', '\\|')} | ${formatDuration(interaction.durationMs)} | \`${interaction.band}\` | \`${interaction.status}\` |`,
   )
   const comparisonRows = (comparison?.regressions || [])
     .slice(0, 15)
