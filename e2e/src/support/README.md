@@ -34,6 +34,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/terminal.ts` | Bottom panel and PTY sessions |
 | `pages/usage.ts` | Usage dashboard, range selection, and downloaded CSV |
 | `pages/work.ts` | New Work and managed Work verification |
+| `pages/workspace-migration.ts` | Workspace migration prerequisites, wizard, preview, and Issue/Automation ownership projections |
 | `pages/workspace.ts` | Workspace list, Directory Browser, and overview |
 
 ## Runtime Rules
