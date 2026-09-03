@@ -4,7 +4,7 @@
 
 This directory owns the executable user-journey inventory. The broader module and state-combination audit lives in [`../../COVERAGE.md`](../../COVERAGE.md). Retired scenarios live in `e2e/_archive/features/` and are not part of the active suite.
 
-The active suite contains 65 scenarios: 24 `@P0` smoke journeys and 41 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
+The active suite contains 66 scenarios: 24 `@P0` smoke journeys and 42 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
 
 | Feature | Stable IDs | Journey boundary |
 | --- | --- | --- |
@@ -24,6 +24,7 @@ The active suite contains 65 scenarios: 24 `@P0` smoke journeys and 41 `@P1` dee
 | `provider.feature` | `CRADLE-PROVIDER-001`–`003` | Anthropic profile create, use, disable, and delete, including active-run cancellation and queued continuation removal |
 | `search.feature` | `CRADLE-SEARCH-001`, `003` | Session result navigation and command execution |
 | `settings.feature` | `CRADLE-SETTINGS-001` | Theme mutation and reload persistence |
+| `storage.feature` | `CRADLE-STORAGE-001` | Active-session protection plus transcript purge and full deletion across reload |
 | `stream-vocabulary.feature` | `CRADLE-CHAT-011`–`013` | Stream wire vocabulary: parallel tool_use blocks, chunked tool input, redacted thinking + ping, mid-stream disconnect |
 | `tabs.feature` | `CRADLE-TAB-001` | Two live chats switch, reload, and close without content bleed |
 | `terminal.feature` | `CRADLE-PTY-001`, `002` | Workspace PTY and multi-session input routing |

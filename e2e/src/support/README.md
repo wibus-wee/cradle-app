@@ -30,6 +30,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/kanban.ts` | Board, Issue detail, activity, and delegation |
 | `pages/search.ts` | Global search |
 | `pages/settings.ts` | Settings shell and appearance |
+| `pages/storage.ts` | Storage session inventory and destructive cleanup controls |
 | `pages/terminal.ts` | Bottom panel and PTY sessions |
 | `pages/usage.ts` | Usage dashboard, range selection, and downloaded CSV |
 | `pages/work.ts` | New Work and managed Work verification |
