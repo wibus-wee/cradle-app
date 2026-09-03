@@ -71,13 +71,16 @@ function captureLogs(child: ChildProcess, logPath: string): void {
   child.stderr?.on('data', chunk => appendFileSync(logPath, chunk))
 }
 
-function processGroupExists(pid: number): boolean {
+function processGroupIsSignalable(pid: number): boolean {
   try {
     process.kill(-pid, 0)
     return true
   }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+    const code = (error as NodeJS.ErrnoException).code
+    // EPERM means this runner cannot manage any remaining member. A long-lived
+    // macOS job can observe that after the original process group ID is reused.
+    if (code === 'ESRCH' || code === 'EPERM') {
       return false
     }
     throw error
@@ -90,7 +93,9 @@ function signalProcessGroup(pid: number, signal: NodeJS.Signals): boolean {
     return true
   }
   catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+    const code = (error as NodeJS.ErrnoException).code
+    // Treat a concurrently disappeared or no-longer-owned group as unsignaled.
+    if (code === 'ESRCH' || code === 'EPERM') {
       return false
     }
     throw error
@@ -99,7 +104,7 @@ function signalProcessGroup(pid: number, signal: NodeJS.Signals): boolean {
 
 async function waitForProcessGroupExit(pid: number, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
-  while (processGroupExists(pid)) {
+  while (processGroupIsSignalable(pid)) {
     if (Date.now() >= deadline) {
       return false
     }
@@ -110,7 +115,7 @@ async function waitForProcessGroupExit(pid: number, timeoutMs: number): Promise<
 
 async function stopProcess(child: ChildProcess | null, timeoutMs = 5_000): Promise<void> {
   const pid = child?.pid
-  if (!pid || !processGroupExists(pid)) {
+  if (!pid || !processGroupIsSignalable(pid)) {
     return
   }
 

@@ -169,7 +169,7 @@ The search helper's removed `500 ms` sleep affects Settings, Provider, Agent Ide
 | Replace Agent save sleep | One E2E assertion changed. | Depends on the create view disappearing only after successful mutation; that is the user-visible transition already owned by the screen. It can expose a real regression instead of waiting blindly. | `CRADLE-AGENT-ID-001`; no product runtime code. | Ship: removes 1.95 s of false latency and lowers flake risk. |
 | Remove search debounce sleep | One shared page-object line removed. | Downstream result locators must auto-wait; all current callers already assert or click a specific result. A missing result now consumes its owning assertion timeout rather than an unconditional delay. | Settings, Provider, Agent Identity, and Search E2E journeys; no product runtime code. | Ship: removes a fixed test tax without weakening response assertions. |
 | Keep Fabric loopback traffic off host proxies | One child-process environment merge adds loopback hosts to both `NO_PROXY` spellings. | A developer can no longer intentionally proxy Fabric loopback calls through `http_proxy`; non-loopback traffic and the parent shell remain unchanged. | Processes started by the Fabric topology only, including simulated Codex endpoints and local Servers. | Ship: local topology semantics require direct loopback traffic and the change removes environment-dependent `502` failures. |
-| Wait for Fabric process groups before cleanup | Two small process-group helpers replace the parent-only exit wait. The existing five-second graceful shutdown budget is retained before `SIGKILL`. | A process that ignores both signals now fails teardown explicitly instead of leaving data behind. POSIX detached process-group semantics were already required by this harness. | Fabric topology teardown on Web and Mobile CI; no product runtime or user data. | Ship: the first validation passed 33 interactions but ended with `ENOTEMPTY`; the repeat passed with one Web scenario and one expected Mobile skip and left no new topology directory. |
+| Wait for Fabric process groups before cleanup | Two small process-group helpers replace the parent-only exit wait. The existing five-second graceful shutdown budget is retained before `SIGKILL`; `ESRCH` and macOS `EPERM` stop polling a group that the runner can no longer signal. | A process group that remains signalable after both signals still fails teardown explicitly instead of leaving data behind. An inaccessible or reused process-group ID is no longer asserted to be gone, but it is outside this runner's ownership; subsequent topology-data deletion still exposes a process that continues writing. | Fabric topology teardown on Web and Mobile CI; no product runtime or user data. | Ship: the first validation passed 33 interactions but ended with `ENOTEMPTY`; a later hosted Mobile run passed every interaction but failed teardown when the already-signaled group probe returned `EPERM`. The focused fix preserved a passing local 33-interaction Web run and clean teardown. |
 | Make native iOS build phases space-safe | One quoted React Native script invocation in the app project and one strict post-`pod install` patch for Expo Constants 57.0.16. | The Expo patch is intentionally version-coupled and fails if its generated phase no longer matches exactly once. CocoaPods still emits a non-fatal path-splitting warning from an unrelated hook. | All iOS app builds for the React Native phase; the Expo patch is limited to the Mobile Fabric E2E runner. No product JavaScript changes. | Ship: Cradle-managed worktrees contain spaces, and without both fixes the Release bundle either fails to build or launches without its manifest. Remove the generated-phase patch when Expo quotes both path uses upstream. |
 
 The remaining runtime-none investigation queue is `CRADLE-KANBAN-002` Issue deletion (`1,237.534 ms`), `CRADLE-SETTINGS-001` open Settings (`1,096.490 ms`), and `CRADLE-KANBAN-001` open Kanban (`1,023.557 ms`). These were not changed because a single end-to-end sample does not attribute the delay to API, cache invalidation, or render work; use their traces before choosing a product optimization.
@@ -225,6 +225,26 @@ gives P50 `2.291 s` and P95/max `9.555 s`:
 | Request Controller access | 1.298 s | `flow-breaking` |
 | Submit the Fabric enrollment code | 1.284 s | `flow-breaking` |
 | Switch to another Node | 998 ms | `perceptible` |
+
+A focused local rerun after the `EPERM` teardown fix passed the same 33 Fabric
+Web interactions and exited cleanly. Its P50/P95/max were `389 ms` / `1.907 s`
+/ `1.924 s`, versus `459 ms` / `1.890 s` / `1.924 s` immediately before the
+fix (`-15.25%` / `+0.90%` / `0%`). The changed code runs only after the final
+interaction, so these mixed deltas are normal single-run variance rather than a
+user-path performance effect.
+
+A pre-fix `macos-26` hosted run on `d8087bf1` also preserved all 33/33 passing samples,
+including 16/16 Mobile interactions from 5/5 Maestro flows, before teardown
+failed on a macOS `EPERM` process-group probe. Runner contention was material:
+the combined P50/P95/max were `4.278 s` / `33.550 s` / `100.531 s`, while the
+Mobile-only values were `10.921 s` / `100.531 s` / `100.531 s`. The slowest
+sample was cold enrollment launch at `100.531 s`, split into `75.488 s` inside
+Maestro's `launchApp` command and `24.937 s` in its visible assertion. Other
+hosted outliers were Node-picker launch (`33.550 s`), Controller-revoked launch
+(`30.622 s`), grant-revoked launch (`30.345 s`), and Workspaces launch
+(`29.411 s`). The same definitions measured `3.339-5.329 s` locally, so the
+hosted sample is retained as environment evidence and a CI-budget risk, not a
+product-regression claim.
 
 This attribution changes the optimization queue. The earlier whole-flow report
 ranked the switch-and-Chat journey at `50.431 s`, but the final send-to-streamed
