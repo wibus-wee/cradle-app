@@ -18,7 +18,6 @@ import { register as registerChatRuntimeTurnSettingsSet } from '../chat/runtime-
 import { register as registerChatSessionCheckpointList } from '../chat/session/checkpoint/list'
 import { register as registerChatSessionCheckpointRestore } from '../chat/session/checkpoint/restore'
 import { register as registerChatSessionCheckpointRewind } from '../chat/session/checkpoint/rewind'
-import { register as registerChatSessionEnvironment } from '../chat/session/environment'
 import { register as registerChatSessionRollbackLastTurn } from '../chat/session/rollback-last-turn'
 import { register as registerChatSnapshotRun } from '../chat/snapshot/run'
 import { register as registerChatSnapshotSession } from '../chat/snapshot/session'
@@ -44,7 +43,6 @@ export function registerGeneratedCommands(program: Command): void {
   registerChatSessionCheckpointList(program)
   registerChatSessionCheckpointRestore(program)
   registerChatSessionCheckpointRewind(program)
-  registerChatSessionEnvironment(program)
   registerChatSessionRollbackLastTurn(program)
   registerChatSnapshotRun(program)
   registerChatSnapshotSession(program)

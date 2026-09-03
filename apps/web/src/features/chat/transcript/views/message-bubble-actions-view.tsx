@@ -1,6 +1,4 @@
 import {
-  BookmarkLine as BookmarkIcon,
-  BookmarksLine as MarkerIcon,
   CheckLine as CheckIcon,
   CopyLine as CopyIcon,
   PencilLine as PencilIcon,
@@ -24,8 +22,6 @@ export interface MessageBubbleActionsViewProps {
   isUser: boolean
   editAction?: MessageBubbleEditAction
   onCopy?: () => Promise<void> | void
-  onPin?: () => Promise<void> | void
-  onMarkSelection?: () => Promise<void> | void
   forceVisible?: boolean
 }
 
@@ -35,8 +31,6 @@ export function MessageBubbleActionsView({
   isUser,
   editAction,
   onCopy,
-  onPin,
-  onMarkSelection,
   forceVisible = false,
 }: MessageBubbleActionsViewProps) {
   const [copied, setCopied] = useState(false)
@@ -89,32 +83,6 @@ export function MessageBubbleActionsView({
           {editAction.busy
             ? <Spinner className="size-3.5" aria-hidden="true" />
             : <PencilIcon className="size-3.5" aria-hidden="true" />}
-        </Button>
-      )}
-      {hasPlainText && onPin && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => void onPin()}
-          className="text-muted-foreground/50 hover:text-foreground"
-          aria-label="Pin message"
-          title="Pin in environment"
-        >
-          <BookmarkIcon className="size-3.5" aria-hidden="true" />
-        </Button>
-      )}
-      {hasPlainText && isUser && onMarkSelection && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          onClick={() => void onMarkSelection()}
-          className="text-muted-foreground/50 hover:text-foreground"
-          aria-label="Mark selected text"
-          title="Mark selected text in environment"
-        >
-          <MarkerIcon className="size-3.5" aria-hidden="true" />
         </Button>
       )}
       {hasPlainText && onCopy && (

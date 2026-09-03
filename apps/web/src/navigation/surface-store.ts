@@ -20,9 +20,11 @@ type LegacyPersistedSurfaceState = PersistedSurfaceState & {
 }
 
 interface SurfaceState extends PersistedSurfaceState {
+  lastClosedSurface: AppSurface | null
   syncSurface: (surface: SurfaceDraft) => void
   replaceSurface: (replacedSurfaceId: string | null, surface: SurfaceDraft) => void
   closeSurface: (surfaceId: string) => void
+  rememberClosedSurface: (surface: AppSurface) => void
   reorderSurfaces: (orderedIds: string[]) => void
   updateSurfaceTitle: (surfaceId: string, title: string) => void
   resetSurfaces: () => void
@@ -299,23 +301,30 @@ export const useSurfaceStore = create<SurfaceState>()(
   persist(
     set => ({
       surfaces: [HOME_SURFACE],
+      lastClosedSurface: null,
 
       syncSurface: surface =>
         set((state) => {
           const surfaces = appendOrUpdateSurface(state.surfaces, surface)
-          if (surfaces === state.surfaces) {
+          const lastClosedSurface = state.lastClosedSurface?.id === surface.id
+            ? null
+            : state.lastClosedSurface
+          if (surfaces === state.surfaces && lastClosedSurface === state.lastClosedSurface) {
             return state
           }
-          return { surfaces }
+          return { surfaces, lastClosedSurface }
         }),
 
       replaceSurface: (replacedSurfaceId, surface) =>
         set((state) => {
           const surfaces = replaceSurfaceInCollection(state.surfaces, replacedSurfaceId, surface)
-          if (surfaces === state.surfaces) {
+          const lastClosedSurface = state.lastClosedSurface?.id === surface.id
+            ? null
+            : state.lastClosedSurface
+          if (surfaces === state.surfaces && lastClosedSurface === state.lastClosedSurface) {
             return state
           }
-          return { surfaces }
+          return { surfaces, lastClosedSurface }
         }),
 
       closeSurface: surfaceId =>
@@ -330,6 +339,8 @@ export const useSurfaceStore = create<SurfaceState>()(
           )
           return { surfaces: nextSurfaces }
         }),
+
+      rememberClosedSurface: surface => set({ lastClosedSurface: surface }),
 
       reorderSurfaces: orderedIds =>
         set((state) => {
@@ -367,10 +378,11 @@ export const useSurfaceStore = create<SurfaceState>()(
           if (
             state.surfaces.length === 1
             && state.surfaces[0]?.id === HOME_SURFACE_ID
+            && state.lastClosedSurface === null
           ) {
             return state
           }
-          return { surfaces: [HOME_SURFACE] }
+          return { surfaces: [HOME_SURFACE], lastClosedSurface: null }
         }),
     }),
     {

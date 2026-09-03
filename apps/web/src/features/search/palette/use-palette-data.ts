@@ -1,8 +1,12 @@
 import {
+  Copy2Line as CopyIcon,
   DotCircleLine as CircleDotIcon,
+  GitCompareLine as GitCompareIcon,
+  HistoryAnticlockwiseLine as HistoryIcon,
   Message1Line as MessageSquareIcon,
   Plugin2Line,
   Settings2Line as SettingsIcon,
+  Task2Line as WorkIcon,
   TerminalLine as TerminalIcon,
 } from '@mingcute/react'
 import { useQuery } from '@tanstack/react-query'
@@ -16,19 +20,29 @@ import {
   getKanbanBoardsOptions,
   getSessionsByIdOptions,
   getSessionsOptions,
+  getWorkspacesByWorkspaceIdOptions,
   getWorkspacesOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { useLayoutSlotsCtx } from '~/components/layout/use-layout-slots'
 import { toastManager } from '~/components/ui/toast'
 import { useThreadSearch } from '~/features/search/use-thread-search'
-import { getWorkspaceLocationLabel } from '~/features/workspace/types'
+import { getWorkspaceLocationLabel, isWorkEligibleWorkspace } from '~/features/workspace/types'
 import { useWorkspaceFiles } from '~/features/workspace/use-workspace-files'
+import { platform } from '~/lib/electron'
 import { rankFuzzyItems } from '~/lib/fuzzy-rank'
 import type { WebCommandRegistration } from '~/lib/plugin-store'
 import { usePluginStore } from '~/lib/plugin-store'
 import { useActiveSurface } from '~/navigation/active-surface'
-import { openNewChat, openSettingsSection, openUsage } from '~/navigation/navigation-commands'
+import {
+  openNewChat,
+  openNewWork,
+  openSettingsSection,
+  openUsage,
+  openWorkspaceDiffs,
+  reopenLastClosedSurface,
+} from '~/navigation/navigation-commands'
 import { chatSessionIdForSurface, workspaceIdForSurface } from '~/navigation/surface-identity'
+import { useSurfaceStore } from '~/navigation/surface-store'
 import { useLayoutStore } from '~/store/layout'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
@@ -47,6 +61,9 @@ import { useDebouncedValue } from './use-debounced-value'
 const ISSUE_DEBOUNCE_MS = 150
 const COMMAND_HISTORY_KEY = 'cradle.commandPalette.recentCommands'
 const COMMAND_HISTORY_LIMIT = 12
+const SETTINGS_SHORTCUT = platform === 'darwin' ? '⌘,' : 'Ctrl+,'
+const REOPEN_SURFACE_SHORTCUT = platform === 'darwin' ? '⇧⌘T' : 'Ctrl+Shift+T'
+const SIDEBAR_SHORTCUT = platform === 'darwin' ? '⌘B' : 'Ctrl+B'
 
 const SessionWorkspaceSchema = z
   .object({
@@ -130,31 +147,90 @@ function useActiveFileSearchWorkspaceId(enabled: boolean): {
   }
 }
 
-function useCommands(close: () => void): CommandAction[] {
+function useCommands(close: () => void, workspaceId: string | null): CommandAction[] {
   const { t } = useTranslation('search')
   const setSettingsSection = useSettingsOverlayStore(s => s.setSettingsSection)
   const toggleSidebar = useLayoutStore(s => s.toggleSidebar)
   const pluginCommands = usePluginStore(s => s.commands)
+  const lastClosedSurface = useSurfaceStore(s => s.lastClosedSurface)
+  const { data: workspace } = useQuery({
+    ...getWorkspacesByWorkspaceIdOptions({ path: { workspaceId: workspaceId ?? '' } }),
+    enabled: Boolean(workspaceId),
+    staleTime: 60_000,
+  })
 
   return useMemo<CommandAction[]>(() => {
     const appCommands: CommandAction[] = [
       {
         id: 'new-chat',
         label: t('command.newChat.label'),
+        description: workspace?.name,
         keywords: t('command.newChat.keywords'),
         icon: MessageSquareIcon,
         source: 'app',
         handler: () => {
           close()
-          openNewChat()
+          openNewChat(workspaceId ? { workspaceId } : {})
         },
       },
+      {
+        id: 'new-work',
+        label: t('command.newWork.label'),
+        description: workspace?.name,
+        keywords: t('command.newWork.keywords'),
+        icon: WorkIcon,
+        source: 'app',
+        handler: () => {
+          close()
+          openNewWork(workspaceId ? { workspaceId } : {})
+        },
+      },
+      ...(workspace
+        ? [{
+            id: 'copy-workspace-path',
+            label: t('command.copyWorkspacePath.label'),
+            description: getWorkspaceLocationLabel(workspace),
+            keywords: t('command.copyWorkspacePath.keywords'),
+            icon: CopyIcon,
+            source: 'app' as const,
+            handler: async () => {
+              close()
+              try {
+                await navigator.clipboard.writeText(getWorkspaceLocationLabel(workspace))
+                toastManager.add({
+                  type: 'success',
+                  title: t('command.copyWorkspacePath.success'),
+                })
+              }
+              catch {
+                toastManager.add({
+                  type: 'error',
+                  title: t('command.copyWorkspacePath.error'),
+                })
+              }
+            },
+          }]
+        : []),
+      ...(workspace && isWorkEligibleWorkspace(workspace)
+        ? [{
+            id: 'review-workspace-changes',
+            label: t('command.reviewWorkspaceChanges.label'),
+            description: workspace.name,
+            keywords: t('command.reviewWorkspaceChanges.keywords'),
+            icon: GitCompareIcon,
+            source: 'app' as const,
+            handler: () => {
+              close()
+              openWorkspaceDiffs({ workspaceId: workspace.id })
+            },
+          }]
+        : []),
       {
         id: 'open-settings',
         label: t('command.openSettings.label'),
         keywords: t('command.openSettings.keywords'),
         icon: SettingsIcon,
-        shortcut: '⌘,',
+        shortcut: SETTINGS_SHORTCUT,
         source: 'app',
         handler: () => {
           close()
@@ -162,12 +238,27 @@ function useCommands(close: () => void): CommandAction[] {
           openSettingsSection('appearance')
         },
       },
+      ...(lastClosedSurface
+        ? [{
+            id: 'reopen-closed-surface',
+            label: t('command.reopenClosed.label'),
+            description: lastClosedSurface.title,
+            keywords: t('command.reopenClosed.keywords'),
+            icon: HistoryIcon,
+            shortcut: REOPEN_SURFACE_SHORTCUT,
+            source: 'app' as const,
+            handler: () => {
+              close()
+              reopenLastClosedSurface()
+            },
+          }]
+        : []),
       {
         id: 'toggle-sidebar',
         label: t('command.toggleSidebar.label'),
         keywords: t('command.toggleSidebar.keywords'),
         icon: TerminalIcon,
-        shortcut: '⌘B',
+        shortcut: SIDEBAR_SHORTCUT,
         source: 'app',
         handler: () => {
           close()
@@ -218,7 +309,7 @@ function useCommands(close: () => void): CommandAction[] {
     }))
 
     return [...appCommands, ...contributedCommands]
-  }, [t, setSettingsSection, toggleSidebar, pluginCommands, close])
+  }, [t, setSettingsSection, toggleSidebar, pluginCommands, lastClosedSurface, workspace, workspaceId, close])
 }
 
 function useFileSearch(query: string, enabled: boolean, workspaceId: string | null | undefined) {
@@ -362,7 +453,7 @@ export function usePaletteData(params: {
 }): PaletteData {
   const { mode, query, close } = params
   const fileSearchWorkspace = useActiveFileSearchWorkspaceId(true)
-  const commands = useCommands(close)
+  const commands = useCommands(close, fileSearchWorkspace.workspaceId)
 
   const hasQuery = query.length > 0
   const searchCommands = mode === 'commands'

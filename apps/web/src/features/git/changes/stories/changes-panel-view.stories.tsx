@@ -26,6 +26,7 @@ const handleFileClick = fn()
 const handleReviewRepository = fn()
 const handleRenameError = fn()
 const handleCreateError = fn()
+const handleRetry = fn()
 
 function ChangesStoryScene({
   status = 'ready',
@@ -45,7 +46,9 @@ function ChangesStoryScene({
       <ChangesPanelView
         status={status}
         repositories={repositories}
+        retrying={false}
         initialViewMode={initialViewMode}
+        onRetry={handleRetry}
         onReviewRepository={handleReviewRepository}
         renderRepositoryChanges={(repository, viewMode) => (
           viewMode === 'tree'

@@ -19,6 +19,7 @@ const copy = {
   restoreDescription: defaultSettings['backup.restore.description'],
   restoreAction: defaultSettings['backup.restore.action'],
   unavailable: defaultSettings['backup.unavailable'],
+  showExport: defaultSettings['backup.status.showExport'],
   confirmTitle: defaultSettings['backup.restore.confirmTitle'],
   confirmDescription: defaultSettings['backup.restore.confirmDescription'].replace(
     '{{path}}',
@@ -40,9 +41,11 @@ const meta = {
     busy: false,
     statusMessage: null,
     statusTone: 'neutral',
+    exportedArchivePath: null,
     pendingRestorePath: null,
     onExport: fn(),
     onChooseRestore: fn(),
+    onShowExport: fn(),
     onCancelRestore: fn(),
     onConfirmRestore: fn(),
   },
@@ -56,7 +59,9 @@ export const Ready: Story = {}
 
 export const Exported: Story = {
   args: {
-    statusMessage: 'Backup exported successfully to /Users/clarity/Documents/Cradle Backup.cradle-backup.',
+    statusMessage:
+      'Backup exported successfully to /Users/clarity/Documents/Cradle Backup.cradle-backup.',
+    exportedArchivePath: '/Users/clarity/Documents/Cradle Backup.cradle-backup',
   },
 }
 

@@ -788,16 +788,6 @@ export function listRuns(definitionId: string): AutomationRunView[] {
     .map(toRunView)
 }
 
-export function listRunsForSession(sessionId: string): AutomationRunView[] {
-  return db()
-    .select()
-    .from(automationRuns)
-    .where(eq(automationRuns.chatSessionId, sessionId))
-    .orderBy(desc(automationRuns.updatedAt))
-    .all()
-    .map(toRunView)
-}
-
 export function getRun(definitionId: string, runId: string): AutomationRunView {
   return toRunView(getRunRow(runId, definitionId))
 }

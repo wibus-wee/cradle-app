@@ -1,0 +1,5896 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-28T14:26:18.247Z",
+  "command": "pnpm --filter @cradle/streamdown benchmark -- --samples 5 --warmups 1",
+  "environment": {
+    "platform": "darwin",
+    "release": "25.5.0",
+    "cpu": "Apple M4 Max",
+    "logicalCpus": 14,
+    "totalMemoryBytes": 38654705664,
+    "freeMemoryBytesAtStart": 366297088,
+    "node": "v26.7.0",
+    "chromium": "151.0.7922.174"
+  },
+  "versions": {
+    "cradle": "0.1.0",
+    "markstream": "2.0.6"
+  },
+  "configuration": {
+    "sampleCount": 5,
+    "warmupCount": 1,
+    "scenarios": [
+      {
+        "name": "completed",
+        "targetChars": 12000
+      },
+      {
+        "name": "typical-stream",
+        "targetChars": 2500,
+        "chunkChars": 16,
+        "chunkDelayMs": 67
+      },
+      {
+        "name": "paced-production",
+        "targetChars": 8000,
+        "chunkChars": 64,
+        "chunkDelayMs": 16
+      },
+      {
+        "name": "burst-full-render",
+        "targetChars": 48000,
+        "chunkChars": 512
+      },
+      {
+        "name": "long-document",
+        "targetChars": 160000
+      }
+    ]
+  },
+  "bundles": {
+    "cradle": {
+      "entryFiles": ["assets/cradle-DC2DwCSv.js"],
+      "rawBytes": 14923652,
+      "gzipBytes": 3392983,
+      "entryRawBytes": 2130091,
+      "entryGzipBytes": 647313,
+      "files": [
+        {
+          "fileName": "assets/cradle-DC2DwCSv.js",
+          "kind": "entry",
+          "rawBytes": 2130091,
+          "gzipBytes": 647313
+        },
+        {
+          "fileName": "assets/abap-xepUX4zJ.js",
+          "kind": "async",
+          "rawBytes": 15850,
+          "gzipBytes": 5896
+        },
+        {
+          "fileName": "assets/abnfDiagram-VRR7QNED-CVhLrghH.js",
+          "kind": "async",
+          "rawBytes": 1916,
+          "gzipBytes": 929
+        },
+        {
+          "fileName": "assets/actionscript-3-qloHSMra.js",
+          "kind": "async",
+          "rawBytes": 15203,
+          "gzipBytes": 2660
+        },
+        {
+          "fileName": "assets/ada-CBkI1wa2.js",
+          "kind": "async",
+          "rawBytes": 48080,
+          "gzipBytes": 6086
+        },
+        {
+          "fileName": "assets/andromeeda-DhLPRAzk.js",
+          "kind": "async",
+          "rawBytes": 9013,
+          "gzipBytes": 2368
+        },
+        {
+          "fileName": "assets/angular-html-QoYM_-Lz.js",
+          "kind": "async",
+          "rawBytes": 24249,
+          "gzipBytes": 3983
+        },
+        {
+          "fileName": "assets/angular-ts-QZeKFG_0.js",
+          "kind": "async",
+          "rawBytes": 183737,
+          "gzipBytes": 16646
+        },
+        {
+          "fileName": "assets/apache-CB94JNgz.js",
+          "kind": "async",
+          "rawBytes": 12454,
+          "gzipBytes": 3710
+        },
+        {
+          "fileName": "assets/apex-Ampd7ZQh.js",
+          "kind": "async",
+          "rawBytes": 46983,
+          "gzipBytes": 6781
+        },
+        {
+          "fileName": "assets/apl-ANhTJMhv.js",
+          "kind": "async",
+          "rawBytes": 24030,
+          "gzipBytes": 4160
+        },
+        {
+          "fileName": "assets/applescript-DB-_ZD22.js",
+          "kind": "async",
+          "rawBytes": 29569,
+          "gzipBytes": 5962
+        },
+        {
+          "fileName": "assets/ara-DUJywjkn.js",
+          "kind": "async",
+          "rawBytes": 6360,
+          "gzipBytes": 1797
+        },
+        {
+          "fileName": "assets/arc-C0nedKSc.js",
+          "kind": "async",
+          "rawBytes": 3496,
+          "gzipBytes": 1461
+        },
+        {
+          "fileName": "assets/architecture-TIHT7OUA-Dodlef-M.js",
+          "kind": "async",
+          "rawBytes": 127,
+          "gzipBytes": 129
+        },
+        {
+          "fileName": "assets/architectureDiagram-ZJ3FMSHR-PvynUYM7.js",
+          "kind": "async",
+          "rawBytes": 151882,
+          "gzipBytes": 42708
+        },
+        {
+          "fileName": "assets/array-BoNkwvLg.js",
+          "kind": "async",
+          "rawBytes": 114,
+          "gzipBytes": 121
+        },
+        {
+          "fileName": "assets/asciidoc-cxFXqipE.js",
+          "kind": "async",
+          "rawBytes": 131525,
+          "gzipBytes": 9324
+        },
+        {
+          "fileName": "assets/asm-DXri6NFh.js",
+          "kind": "async",
+          "rawBytes": 40715,
+          "gzipBytes": 8236
+        },
+        {
+          "fileName": "assets/astro-ZN5w5v2D.js",
+          "kind": "async",
+          "rawBytes": 24026,
+          "gzipBytes": 7586
+        },
+        {
+          "fileName": "assets/aurora-x-8A8fWSgS.js",
+          "kind": "async",
+          "rawBytes": 13657,
+          "gzipBytes": 2296
+        },
+        {
+          "fileName": "assets/awk-CRbUFiTS.js",
+          "kind": "async",
+          "rawBytes": 5459,
+          "gzipBytes": 1372
+        },
+        {
+          "fileName": "assets/ayu-dark-DEuvGiRk.js",
+          "kind": "async",
+          "rawBytes": 20079,
+          "gzipBytes": 3965
+        },
+        {
+          "fileName": "assets/ayu-light-bkJGJfkW.js",
+          "kind": "async",
+          "rawBytes": 20150,
+          "gzipBytes": 3950
+        },
+        {
+          "fileName": "assets/ayu-mirage-C-lyiveB.js",
+          "kind": "async",
+          "rawBytes": 20083,
+          "gzipBytes": 3959
+        },
+        {
+          "fileName": "assets/ballerina-B-f3ZZoW.js",
+          "kind": "async",
+          "rawBytes": 58691,
+          "gzipBytes": 8184
+        },
+        {
+          "fileName": "assets/bat-BMUPQkY8.js",
+          "kind": "async",
+          "rawBytes": 12886,
+          "gzipBytes": 3208
+        },
+        {
+          "fileName": "assets/beancount-BOEwdoHG.js",
+          "kind": "async",
+          "rawBytes": 10371,
+          "gzipBytes": 1437
+        },
+        {
+          "fileName": "assets/berry-u79CMLVJ.js",
+          "kind": "async",
+          "rawBytes": 3003,
+          "gzipBytes": 813
+        },
+        {
+          "fileName": "assets/bibtex-DZy8hyIZ.js",
+          "kind": "async",
+          "rawBytes": 4793,
+          "gzipBytes": 830
+        },
+        {
+          "fileName": "assets/bicep-CyBLerpk.js",
+          "kind": "async",
+          "rawBytes": 5380,
+          "gzipBytes": 1151
+        },
+        {
+          "fileName": "assets/bird2-DGKJNnRw.js",
+          "kind": "async",
+          "rawBytes": 16966,
+          "gzipBytes": 3857
+        },
+        {
+          "fileName": "assets/blade-DbWU3GlX.js",
+          "kind": "async",
+          "rawBytes": 104977,
+          "gzipBytes": 28048
+        },
+        {
+          "fileName": "assets/blockDiagram-677ZJIJ3-CcwtB83e.js",
+          "kind": "async",
+          "rawBytes": 73709,
+          "gzipBytes": 21027
+        },
+        {
+          "fileName": "assets/bsl-CF4o_ZpG.js",
+          "kind": "async",
+          "rawBytes": 33865,
+          "gzipBytes": 8300
+        },
+        {
+          "fileName": "assets/c-JyFSJZ1y.js",
+          "kind": "async",
+          "rawBytes": 72169,
+          "gzipBytes": 10534
+        },
+        {
+          "fileName": "assets/c3-BuAFvxQp.js",
+          "kind": "async",
+          "rawBytes": 25629,
+          "gzipBytes": 3870
+        },
+        {
+          "fileName": "assets/c4Diagram-LMCZKHZV-Di4aac8a.js",
+          "kind": "async",
+          "rawBytes": 69944,
+          "gzipBytes": 19457
+        },
+        {
+          "fileName": "assets/cadence-D_v4N1s-.js",
+          "kind": "async",
+          "rawBytes": 23667,
+          "gzipBytes": 3665
+        },
+        {
+          "fileName": "assets/cairo-Cpa5SoVn.js",
+          "kind": "async",
+          "rawBytes": 2934,
+          "gzipBytes": 809
+        },
+        {
+          "fileName": "assets/catppuccin-frappe-BWtsjIMm.js",
+          "kind": "async",
+          "rawBytes": 47256,
+          "gzipBytes": 8051
+        },
+        {
+          "fileName": "assets/catppuccin-latte-BdIDdo8I.js",
+          "kind": "async",
+          "rawBytes": 47254,
+          "gzipBytes": 8037
+        },
+        {
+          "fileName": "assets/catppuccin-macchiato-DDBVFNA9.js",
+          "kind": "async",
+          "rawBytes": 47261,
+          "gzipBytes": 8044
+        },
+        {
+          "fileName": "assets/catppuccin-mocha-CFY0NeAj.js",
+          "kind": "async",
+          "rawBytes": 47253,
+          "gzipBytes": 8036
+        },
+        {
+          "fileName": "assets/channel-D8vyjrMg.js",
+          "kind": "async",
+          "rawBytes": 115,
+          "gzipBytes": 125
+        },
+        {
+          "fileName": "assets/chunk-2Q5K7J3B-DJ0uIEHz.js",
+          "kind": "async",
+          "rawBytes": 197,
+          "gzipBytes": 167
+        },
+        {
+          "fileName": "assets/chunk-32BRIVSS-C4HsdpRS.js",
+          "kind": "async",
+          "rawBytes": 1994,
+          "gzipBytes": 896
+        },
+        {
+          "fileName": "assets/chunk-52WLFC77-D0sC4RDj.js",
+          "kind": "async",
+          "rawBytes": 34318,
+          "gzipBytes": 7428
+        },
+        {
+          "fileName": "assets/chunk-5FCAYU7R-DJwj7M4N.js",
+          "kind": "async",
+          "rawBytes": 480,
+          "gzipBytes": 341
+        },
+        {
+          "fileName": "assets/chunk-5HE753X5-CiRGe_2s.js",
+          "kind": "async",
+          "rawBytes": 844,
+          "gzipBytes": 476
+        },
+        {
+          "fileName": "assets/chunk-5JV3BV7I-BXUyLBHH.js",
+          "kind": "async",
+          "rawBytes": 1686,
+          "gzipBytes": 748
+        },
+        {
+          "fileName": "assets/chunk-5TONJI2A-Txg6E6Lx.js",
+          "kind": "async",
+          "rawBytes": 1061,
+          "gzipBytes": 601
+        },
+        {
+          "fileName": "assets/chunk-5VM5RSS4-B7tGzvU3.js",
+          "kind": "async",
+          "rawBytes": 363,
+          "gzipBytes": 272
+        },
+        {
+          "fileName": "assets/chunk-7BUUIJ7U-SBluA1nJ.js",
+          "kind": "async",
+          "rawBytes": 2147,
+          "gzipBytes": 841
+        },
+        {
+          "fileName": "assets/chunk-BIQX33UG-g18qZd9w.js",
+          "kind": "async",
+          "rawBytes": 459,
+          "gzipBytes": 323
+        },
+        {
+          "fileName": "assets/chunk-C7G6YPKG-DHdTYwVi.js",
+          "kind": "async",
+          "rawBytes": 1868,
+          "gzipBytes": 912
+        },
+        {
+          "fileName": "assets/chunk-CQNSW5MT-BygN1D0J.js",
+          "kind": "async",
+          "rawBytes": 934,
+          "gzipBytes": 503
+        },
+        {
+          "fileName": "assets/chunk-CYSBUYHQ-CkHsXiP3.js",
+          "kind": "async",
+          "rawBytes": 469,
+          "gzipBytes": 322
+        },
+        {
+          "fileName": "assets/chunk-EMLP6XTP-Sf09uDn_.js",
+          "kind": "async",
+          "rawBytes": 461,
+          "gzipBytes": 320
+        },
+        {
+          "fileName": "assets/chunk-EX3LRPZG-BYf6n_8R.js",
+          "kind": "async",
+          "rawBytes": 38217,
+          "gzipBytes": 12424
+        },
+        {
+          "fileName": "assets/chunk-FWX5IMBZ-CZPmGO1h.js",
+          "kind": "async",
+          "rawBytes": 3727,
+          "gzipBytes": 1580
+        },
+        {
+          "fileName": "assets/chunk-HOUHSVGY-vtad8bJM.js",
+          "kind": "async",
+          "rawBytes": 5980,
+          "gzipBytes": 2746
+        },
+        {
+          "fileName": "assets/chunk-ICXQ74PX-oV20DPrD.js",
+          "kind": "async",
+          "rawBytes": 31259,
+          "gzipBytes": 8607
+        },
+        {
+          "fileName": "assets/chunk-JG7HCLWE-PeIMUH9D.js",
+          "kind": "async",
+          "rawBytes": 1078,
+          "gzipBytes": 610
+        },
+        {
+          "fileName": "assets/chunk-JWPE2WC7-cPFtexaU.js",
+          "kind": "async",
+          "rawBytes": 224,
+          "gzipBytes": 172
+        },
+        {
+          "fileName": "assets/chunk-KEIR6QF5-BJUz7b6O.js",
+          "kind": "async",
+          "rawBytes": 668913,
+          "gzipBytes": 146851
+        },
+        {
+          "fileName": "assets/chunk-MOJQB5TN-XquUqvTJ.js",
+          "kind": "async",
+          "rawBytes": 15759,
+          "gzipBytes": 4409
+        },
+        {
+          "fileName": "assets/chunk-MOZMSUNE-CtqTgS-z.js",
+          "kind": "async",
+          "rawBytes": 904,
+          "gzipBytes": 499
+        },
+        {
+          "fileName": "assets/chunk-OGEWGWER-Bv-cjNAE.js",
+          "kind": "async",
+          "rawBytes": 976,
+          "gzipBytes": 598
+        },
+        {
+          "fileName": "assets/chunk-OSBZ3O6U-SnytULqZ.js",
+          "kind": "async",
+          "rawBytes": 470,
+          "gzipBytes": 325
+        },
+        {
+          "fileName": "assets/chunk-PUDLZKDR-DS4fXQOA.js",
+          "kind": "async",
+          "rawBytes": 60799,
+          "gzipBytes": 19251
+        },
+        {
+          "fileName": "assets/chunk-Q4XR5HBZ-GaHdo9De.js",
+          "kind": "async",
+          "rawBytes": 47250,
+          "gzipBytes": 15000
+        },
+        {
+          "fileName": "assets/chunk-QBLGF6JB-C-JQc5aB.js",
+          "kind": "async",
+          "rawBytes": 462,
+          "gzipBytes": 321
+        },
+        {
+          "fileName": "assets/chunk-R7FJI6CG-D6gUL-sD.js",
+          "kind": "async",
+          "rawBytes": 1598,
+          "gzipBytes": 802
+        },
+        {
+          "fileName": "assets/chunk-RYQCIY6F-B_UwkepS.js",
+          "kind": "async",
+          "rawBytes": 7099,
+          "gzipBytes": 2720
+        },
+        {
+          "fileName": "assets/chunk-U6XO7XAA-C5YSgYk3.js",
+          "kind": "async",
+          "rawBytes": 1148,
+          "gzipBytes": 636
+        },
+        {
+          "fileName": "assets/chunk-V7JOEXUC-CApLgkXm.js",
+          "kind": "async",
+          "rawBytes": 49318,
+          "gzipBytes": 15591
+        },
+        {
+          "fileName": "assets/chunk-VAUOI2AC-2VDLWCsG.js",
+          "kind": "async",
+          "rawBytes": 328,
+          "gzipBytes": 263
+        },
+        {
+          "fileName": "assets/chunk-VR4S4FIN-C8_NMJhj.js",
+          "kind": "async",
+          "rawBytes": 581,
+          "gzipBytes": 401
+        },
+        {
+          "fileName": "assets/chunk-WYO6CB5R-a0fgbKuN.js",
+          "kind": "async",
+          "rawBytes": 236277,
+          "gzipBytes": 35933
+        },
+        {
+          "fileName": "assets/chunk-XXDRQBXY-BEV5m3IX.js",
+          "kind": "async",
+          "rawBytes": 268,
+          "gzipBytes": 233
+        },
+        {
+          "fileName": "assets/chunk-Y2CYZVJY-D4lDkoob.js",
+          "kind": "async",
+          "rawBytes": 151,
+          "gzipBytes": 143
+        },
+        {
+          "fileName": "assets/chunk-YOTPTUD7-CVx9Mi9m.js",
+          "kind": "async",
+          "rawBytes": 606,
+          "gzipBytes": 399
+        },
+        {
+          "fileName": "assets/chunk-ZGVPDNZ5-CRv366rd.js",
+          "kind": "async",
+          "rawBytes": 103631,
+          "gzipBytes": 25656
+        },
+        {
+          "fileName": "assets/chunk-ZIRB5QZD-DzwhLAmP.js",
+          "kind": "async",
+          "rawBytes": 42142,
+          "gzipBytes": 14217
+        },
+        {
+          "fileName": "assets/clarity-BcBEvPtc.js",
+          "kind": "async",
+          "rawBytes": 14273,
+          "gzipBytes": 2460
+        },
+        {
+          "fileName": "assets/classDiagram-OUVF2IWQ-myOXyL79.js",
+          "kind": "async",
+          "rawBytes": 795,
+          "gzipBytes": 457
+        },
+        {
+          "fileName": "assets/classDiagram-v2-EOCWNBFH-DzGFB3k6.js",
+          "kind": "async",
+          "rawBytes": 795,
+          "gzipBytes": 457
+        },
+        {
+          "fileName": "assets/clojure-D9Q6jiqq.js",
+          "kind": "async",
+          "rawBytes": 6411,
+          "gzipBytes": 1417
+        },
+        {
+          "fileName": "assets/cmake-DCf1Rpps.js",
+          "kind": "async",
+          "rawBytes": 9853,
+          "gzipBytes": 3368
+        },
+        {
+          "fileName": "assets/cobol-C6KZspWM.js",
+          "kind": "async",
+          "rawBytes": 39097,
+          "gzipBytes": 10835
+        },
+        {
+          "fileName": "assets/codeowners-CiNyMD3r.js",
+          "kind": "async",
+          "rawBytes": 545,
+          "gzipBytes": 316
+        },
+        {
+          "fileName": "assets/codeql-DP3HrfvC.js",
+          "kind": "async",
+          "rawBytes": 26881,
+          "gzipBytes": 3795
+        },
+        {
+          "fileName": "assets/coffee-Dxm5pMer.js",
+          "kind": "async",
+          "rawBytes": 27425,
+          "gzipBytes": 6354
+        },
+        {
+          "fileName": "assets/common-lisp-D0buKO01.js",
+          "kind": "async",
+          "rawBytes": 22579,
+          "gzipBytes": 6085
+        },
+        {
+          "fileName": "assets/coq-zv3vu3fi.js",
+          "kind": "async",
+          "rawBytes": 5524,
+          "gzipBytes": 1924
+        },
+        {
+          "fileName": "assets/cose-bilkent-JH36ORCC-DPz6dGSA.js",
+          "kind": "async",
+          "rawBytes": 82249,
+          "gzipBytes": 22376
+        },
+        {
+          "fileName": "assets/cpp-BlkoBMnu.js",
+          "kind": "async",
+          "rawBytes": 626128,
+          "gzipBytes": 44919
+        },
+        {
+          "fileName": "assets/crystal-BXarFvdU.js",
+          "kind": "async",
+          "rawBytes": 29411,
+          "gzipBytes": 4426
+        },
+        {
+          "fileName": "assets/csharp-CrZchxXq.js",
+          "kind": "async",
+          "rawBytes": 89685,
+          "gzipBytes": 10725
+        },
+        {
+          "fileName": "assets/css-7PEQPdl6.js",
+          "kind": "async",
+          "rawBytes": 49084,
+          "gzipBytes": 11908
+        },
+        {
+          "fileName": "assets/csv-DuRw-pEK.js",
+          "kind": "async",
+          "rawBytes": 1141,
+          "gzipBytes": 366
+        },
+        {
+          "fileName": "assets/cue-D035h5aE.js",
+          "kind": "async",
+          "rawBytes": 16202,
+          "gzipBytes": 2049
+        },
+        {
+          "fileName": "assets/cynefin-VYW2F7L2-Bw4pybju.js",
+          "kind": "async",
+          "rawBytes": 122,
+          "gzipBytes": 124
+        },
+        {
+          "fileName": "assets/cynefinDiagram-TSTJHNR4-CAcWjZqm.js",
+          "kind": "async",
+          "rawBytes": 10124,
+          "gzipBytes": 3630
+        },
+        {
+          "fileName": "assets/cypher-CJv-mb_X.js",
+          "kind": "async",
+          "rawBytes": 5954,
+          "gzipBytes": 1711
+        },
+        {
+          "fileName": "assets/cytoscape.esm-CBUJVllI.js",
+          "kind": "async",
+          "rawBytes": 439956,
+          "gzipBytes": 139957
+        },
+        {
+          "fileName": "assets/d-Df0SL5Il.js",
+          "kind": "async",
+          "rawBytes": 43793,
+          "gzipBytes": 8435
+        },
+        {
+          "fileName": "assets/dagre-CfLZvhin.js",
+          "kind": "async",
+          "rawBytes": 32373,
+          "gzipBytes": 11801
+        },
+        {
+          "fileName": "assets/dagre-VKFMJZFB-Brhl3P_j.js",
+          "kind": "async",
+          "rawBytes": 8868,
+          "gzipBytes": 3433
+        },
+        {
+          "fileName": "assets/dark-plus-CraP6YJT.js",
+          "kind": "async",
+          "rawBytes": 9095,
+          "gzipBytes": 2103
+        },
+        {
+          "fileName": "assets/dart-SbTs-wnX.js",
+          "kind": "async",
+          "rawBytes": 7810,
+          "gzipBytes": 1918
+        },
+        {
+          "fileName": "assets/dax-C6F7fNNh.js",
+          "kind": "async",
+          "rawBytes": 5363,
+          "gzipBytes": 2202
+        },
+        {
+          "fileName": "assets/defaultLocale-BY1681In.js",
+          "kind": "async",
+          "rawBytes": 4686,
+          "gzipBytes": 2159
+        },
+        {
+          "fileName": "assets/desktop-lVgVTQoE.js",
+          "kind": "async",
+          "rawBytes": 1831,
+          "gzipBytes": 759
+        },
+        {
+          "fileName": "assets/diagram-FQU43EPY-BYrOy8el.js",
+          "kind": "async",
+          "rawBytes": 10808,
+          "gzipBytes": 4173
+        },
+        {
+          "fileName": "assets/diagram-G47NLZAW-DM6DrsvL.js",
+          "kind": "async",
+          "rawBytes": 15945,
+          "gzipBytes": 5649
+        },
+        {
+          "fileName": "assets/diagram-NH7WQ7WH-BMz-yrVV.js",
+          "kind": "async",
+          "rawBytes": 4343,
+          "gzipBytes": 1876
+        },
+        {
+          "fileName": "assets/diagram-OA4YK3LP-IJK-C8Iq.js",
+          "kind": "async",
+          "rawBytes": 8462,
+          "gzipBytes": 3767
+        },
+        {
+          "fileName": "assets/diagram-WEI45ONY-DW1e_ZcB.js",
+          "kind": "async",
+          "rawBytes": 6000,
+          "gzipBytes": 2563
+        },
+        {
+          "fileName": "assets/diff-DRTMfsmP.js",
+          "kind": "async",
+          "rawBytes": 2567,
+          "gzipBytes": 692
+        },
+        {
+          "fileName": "assets/dist-y3h0h-LC.js",
+          "kind": "async",
+          "rawBytes": 2164,
+          "gzipBytes": 981
+        },
+        {
+          "fileName": "assets/docker-DMau_ZRB.js",
+          "kind": "async",
+          "rawBytes": 1739,
+          "gzipBytes": 596
+        },
+        {
+          "fileName": "assets/dotenv-qZjvcigD.js",
+          "kind": "async",
+          "rawBytes": 1420,
+          "gzipBytes": 531
+        },
+        {
+          "fileName": "assets/dracula-CWbEpW5H.js",
+          "kind": "async",
+          "rawBytes": 21064,
+          "gzipBytes": 4030
+        },
+        {
+          "fileName": "assets/dracula-soft-DsYg5Y1x.js",
+          "kind": "async",
+          "rawBytes": 21074,
+          "gzipBytes": 4064
+        },
+        {
+          "fileName": "assets/dream-maker-Bd1xMUMb.js",
+          "kind": "async",
+          "rawBytes": 10467,
+          "gzipBytes": 2250
+        },
+        {
+          "fileName": "assets/ebnfDiagram-CCIWWBDH-Ct-iLMVz.js",
+          "kind": "async",
+          "rawBytes": 2130,
+          "gzipBytes": 929
+        },
+        {
+          "fileName": "assets/edge-CETD4Ajq.js",
+          "kind": "async",
+          "rawBytes": 2307,
+          "gzipBytes": 676
+        },
+        {
+          "fileName": "assets/elixir-DHy6bhUS.js",
+          "kind": "async",
+          "rawBytes": 16265,
+          "gzipBytes": 2758
+        },
+        {
+          "fileName": "assets/elm-DbqRkg9S.js",
+          "kind": "async",
+          "rawBytes": 10947,
+          "gzipBytes": 2095
+        },
+        {
+          "fileName": "assets/emacs-lisp-CT0U2wQd.js",
+          "kind": "async",
+          "rawBytes": 779852,
+          "gzipBytes": 196525
+        },
+        {
+          "fileName": "assets/erDiagram-Q63AITRT-Cr-AUbRD.js",
+          "kind": "async",
+          "rawBytes": 27481,
+          "gzipBytes": 9498
+        },
+        {
+          "fileName": "assets/erb-DDIzVccP.js",
+          "kind": "async",
+          "rawBytes": 2137,
+          "gzipBytes": 621
+        },
+        {
+          "fileName": "assets/erlang-Cylk5CMr.js",
+          "kind": "async",
+          "rawBytes": 37478,
+          "gzipBytes": 4404
+        },
+        {
+          "fileName": "assets/eventmodeling-45OFAUF4-BO9w3XNU.js",
+          "kind": "async",
+          "rawBytes": 128,
+          "gzipBytes": 130
+        },
+        {
+          "fileName": "assets/everforest-dark-TXjPW7lc.js",
+          "kind": "async",
+          "rawBytes": 53743,
+          "gzipBytes": 8460
+        },
+        {
+          "fileName": "assets/everforest-light-B9UwVQqN.js",
+          "kind": "async",
+          "rawBytes": 53746,
+          "gzipBytes": 8460
+        },
+        {
+          "fileName": "assets/fennel-CefAlWr0.js",
+          "kind": "async",
+          "rawBytes": 4766,
+          "gzipBytes": 1555
+        },
+        {
+          "fileName": "assets/fish-B8-BBezB.js",
+          "kind": "async",
+          "rawBytes": 13036,
+          "gzipBytes": 1738
+        },
+        {
+          "fileName": "assets/flowDiagram-23GEKE2U-C5WmCcJO.js",
+          "kind": "async",
+          "rawBytes": 615,
+          "gzipBytes": 331
+        },
+        {
+          "fileName": "assets/fluent-CFy688qk.js",
+          "kind": "async",
+          "rawBytes": 3608,
+          "gzipBytes": 895
+        },
+        {
+          "fileName": "assets/fortran-fixed-form-CTjH-UL1.js",
+          "kind": "async",
+          "rawBytes": 1663,
+          "gzipBytes": 684
+        },
+        {
+          "fileName": "assets/fortran-free-form-Quqd3elh.js",
+          "kind": "async",
+          "rawBytes": 88967,
+          "gzipBytes": 11282
+        },
+        {
+          "fileName": "assets/fsharp-DYNooVc7.js",
+          "kind": "async",
+          "rawBytes": 25303,
+          "gzipBytes": 4132
+        },
+        {
+          "fileName": "assets/ganttDiagram-NO4QXBWP-Bc0J5FMA.js",
+          "kind": "async",
+          "rawBytes": 70385,
+          "gzipBytes": 23427
+        },
+        {
+          "fileName": "assets/gdresource-DBh_-80S.js",
+          "kind": "async",
+          "rawBytes": 5283,
+          "gzipBytes": 1332
+        },
+        {
+          "fileName": "assets/gdscript-BHpmS4el.js",
+          "kind": "async",
+          "rawBytes": 18990,
+          "gzipBytes": 3746
+        },
+        {
+          "fileName": "assets/gdshader-DcCBcF8o.js",
+          "kind": "async",
+          "rawBytes": 6324,
+          "gzipBytes": 1724
+        },
+        {
+          "fileName": "assets/genie-DmA3Vv3T.js",
+          "kind": "async",
+          "rawBytes": 3354,
+          "gzipBytes": 1205
+        },
+        {
+          "fileName": "assets/gherkin-CRQMYoHg.js",
+          "kind": "async",
+          "rawBytes": 11944,
+          "gzipBytes": 4936
+        },
+        {
+          "fileName": "assets/git-commit-DfKTKklm.js",
+          "kind": "async",
+          "rawBytes": 1228,
+          "gzipBytes": 522
+        },
+        {
+          "fileName": "assets/git-rebase-DbE4sAPA.js",
+          "kind": "async",
+          "rawBytes": 986,
+          "gzipBytes": 442
+        },
+        {
+          "fileName": "assets/gitGraph-TEB2WS4Q-Bv8-m0xE.js",
+          "kind": "async",
+          "rawBytes": 123,
+          "gzipBytes": 125
+        },
+        {
+          "fileName": "assets/gitGraphDiagram-IHSO6WYX-D_ZKnF_H.js",
+          "kind": "async",
+          "rawBytes": 29424,
+          "gzipBytes": 8691
+        },
+        {
+          "fileName": "assets/github-dark-1eBxYT9s.js",
+          "kind": "async",
+          "rawBytes": 11403,
+          "gzipBytes": 2560
+        },
+        {
+          "fileName": "assets/github-dark-default-Dk4CXmd7.js",
+          "kind": "async",
+          "rawBytes": 14433,
+          "gzipBytes": 3142
+        },
+        {
+          "fileName": "assets/github-dark-dimmed-B_CKFJOr.js",
+          "kind": "async",
+          "rawBytes": 14431,
+          "gzipBytes": 3137
+        },
+        {
+          "fileName": "assets/github-dark-high-contrast-ComRlMvx.js",
+          "kind": "async",
+          "rawBytes": 14593,
+          "gzipBytes": 3100
+        },
+        {
+          "fileName": "assets/github-light-C_23uikG.js",
+          "kind": "async",
+          "rawBytes": 11182,
+          "gzipBytes": 2521
+        },
+        {
+          "fileName": "assets/github-light-default-CQIk6-Jj.js",
+          "kind": "async",
+          "rawBytes": 14154,
+          "gzipBytes": 3061
+        },
+        {
+          "fileName": "assets/github-light-high-contrast-DMgD8M4O.js",
+          "kind": "async",
+          "rawBytes": 14273,
+          "gzipBytes": 3034
+        },
+        {
+          "fileName": "assets/gleam-DqcrbLJt.js",
+          "kind": "async",
+          "rawBytes": 2575,
+          "gzipBytes": 821
+        },
+        {
+          "fileName": "assets/glimmer-js-BHWCJWHB.js",
+          "kind": "async",
+          "rawBytes": 20084,
+          "gzipBytes": 2941
+        },
+        {
+          "fileName": "assets/glimmer-ts-BTwTRWx0.js",
+          "kind": "async",
+          "rawBytes": 20084,
+          "gzipBytes": 2939
+        },
+        {
+          "fileName": "assets/glsl-DkTiwLQa.js",
+          "kind": "async",
+          "rawBytes": 3695,
+          "gzipBytes": 1463
+        },
+        {
+          "fileName": "assets/gn-BMP7_JFJ.js",
+          "kind": "async",
+          "rawBytes": 4000,
+          "gzipBytes": 1499
+        },
+        {
+          "fileName": "assets/gnuplot-D2czkR56.js",
+          "kind": "async",
+          "rawBytes": 14781,
+          "gzipBytes": 3279
+        },
+        {
+          "fileName": "assets/go-CjEVll96.js",
+          "kind": "async",
+          "rawBytes": 46806,
+          "gzipBytes": 5190
+        },
+        {
+          "fileName": "assets/graphlib-BBv42heX.js",
+          "kind": "async",
+          "rawBytes": 24049,
+          "gzipBytes": 8339
+        },
+        {
+          "fileName": "assets/graphql-BbQabmG4.js",
+          "kind": "async",
+          "rawBytes": 18078,
+          "gzipBytes": 2555
+        },
+        {
+          "fileName": "assets/groovy-BVye5WNa.js",
+          "kind": "async",
+          "rawBytes": 19177,
+          "gzipBytes": 3586
+        },
+        {
+          "fileName": "assets/gruvbox-dark-hard-ttyC_TO_.js",
+          "kind": "async",
+          "rawBytes": 22631,
+          "gzipBytes": 4198
+        },
+        {
+          "fileName": "assets/gruvbox-dark-medium-SRsHPcm_.js",
+          "kind": "async",
+          "rawBytes": 22635,
+          "gzipBytes": 4198
+        },
+        {
+          "fileName": "assets/gruvbox-dark-soft-B4gx_lLH.js",
+          "kind": "async",
+          "rawBytes": 22631,
+          "gzipBytes": 4197
+        },
+        {
+          "fileName": "assets/gruvbox-light-hard-B7jl0gsR.js",
+          "kind": "async",
+          "rawBytes": 22634,
+          "gzipBytes": 4206
+        },
+        {
+          "fileName": "assets/gruvbox-light-medium-CsYjXN_G.js",
+          "kind": "async",
+          "rawBytes": 22638,
+          "gzipBytes": 4206
+        },
+        {
+          "fileName": "assets/gruvbox-light-soft-BAWX2oup.js",
+          "kind": "async",
+          "rawBytes": 22634,
+          "gzipBytes": 4204
+        },
+        {
+          "fileName": "assets/hack-BKvjDifp.js",
+          "kind": "async",
+          "rawBytes": 80185,
+          "gzipBytes": 26053
+        },
+        {
+          "fileName": "assets/haml-CaTgprvs.js",
+          "kind": "async",
+          "rawBytes": 8334,
+          "gzipBytes": 1850
+        },
+        {
+          "fileName": "assets/handlebars-MNJx4ydC.js",
+          "kind": "async",
+          "rawBytes": 12163,
+          "gzipBytes": 2375
+        },
+        {
+          "fileName": "assets/haskell-DrcjH-wj.js",
+          "kind": "async",
+          "rawBytes": 41488,
+          "gzipBytes": 6420
+        },
+        {
+          "fileName": "assets/haxe--Qa-haLc.js",
+          "kind": "async",
+          "rawBytes": 35162,
+          "gzipBytes": 5924
+        },
+        {
+          "fileName": "assets/hcl-DNz7t8W1.js",
+          "kind": "async",
+          "rawBytes": 10051,
+          "gzipBytes": 1927
+        },
+        {
+          "fileName": "assets/hjson-CuAhFUFR.js",
+          "kind": "async",
+          "rawBytes": 12051,
+          "gzipBytes": 1635
+        },
+        {
+          "fileName": "assets/hlsl-SxVrCGih.js",
+          "kind": "async",
+          "rawBytes": 7262,
+          "gzipBytes": 2183
+        },
+        {
+          "fileName": "assets/horizon-CNWpWZ4d.js",
+          "kind": "async",
+          "rawBytes": 8778,
+          "gzipBytes": 1969
+        },
+        {
+          "fileName": "assets/horizon-bright-DN--Lyz6.js",
+          "kind": "async",
+          "rawBytes": 8784,
+          "gzipBytes": 1969
+        },
+        {
+          "fileName": "assets/houston-NLI8pIJP.js",
+          "kind": "async",
+          "rawBytes": 35420,
+          "gzipBytes": 5793
+        },
+        {
+          "fileName": "assets/html-BOHq-9F5.js",
+          "kind": "async",
+          "rawBytes": 57318,
+          "gzipBytes": 11787
+        },
+        {
+          "fileName": "assets/html-derivative-Qsl7DoK8.js",
+          "kind": "async",
+          "rawBytes": 839,
+          "gzipBytes": 460
+        },
+        {
+          "fileName": "assets/http-DWW4fZ8S.js",
+          "kind": "async",
+          "rawBytes": 4417,
+          "gzipBytes": 1058
+        },
+        {
+          "fileName": "assets/hurl-CyftxvAO.js",
+          "kind": "async",
+          "rawBytes": 3515,
+          "gzipBytes": 1098
+        },
+        {
+          "fileName": "assets/hxml-wVthH1eI.js",
+          "kind": "async",
+          "rawBytes": 1741,
+          "gzipBytes": 879
+        },
+        {
+          "fileName": "assets/hy-CjkGY995.js",
+          "kind": "async",
+          "rawBytes": 2646,
+          "gzipBytes": 1171
+        },
+        {
+          "fileName": "assets/imba-Deq3sLsG.js",
+          "kind": "async",
+          "rawBytes": 49928,
+          "gzipBytes": 9472
+        },
+        {
+          "fileName": "assets/info-DKCQHKI2-CCLljCot.js",
+          "kind": "async",
+          "rawBytes": 119,
+          "gzipBytes": 121
+        },
+        {
+          "fileName": "assets/infoDiagram-FWYZ7A6U-BPqVVJRg.js",
+          "kind": "async",
+          "rawBytes": 663,
+          "gzipBytes": 432
+        },
+        {
+          "fileName": "assets/ini-Yq9zuNWl.js",
+          "kind": "async",
+          "rawBytes": 1523,
+          "gzipBytes": 497
+        },
+        {
+          "fileName": "assets/init-Bz49HYDe.js",
+          "kind": "async",
+          "rawBytes": 147,
+          "gzipBytes": 129
+        },
+        {
+          "fileName": "assets/ishikawaDiagram-FXEZZL3T-CU_eCFU0.js",
+          "kind": "async",
+          "rawBytes": 17615,
+          "gzipBytes": 6669
+        },
+        {
+          "fileName": "assets/java-C-POkmcR.js",
+          "kind": "async",
+          "rawBytes": 27280,
+          "gzipBytes": 4321
+        },
+        {
+          "fileName": "assets/javascript-C3RmqXjs.js",
+          "kind": "async",
+          "rawBytes": 174888,
+          "gzipBytes": 16652
+        },
+        {
+          "fileName": "assets/jinja-ck0w8Ftr.js",
+          "kind": "async",
+          "rawBytes": 5629,
+          "gzipBytes": 1369
+        },
+        {
+          "fileName": "assets/jison-ChOXu__h.js",
+          "kind": "async",
+          "rawBytes": 9693,
+          "gzipBytes": 1851
+        },
+        {
+          "fileName": "assets/journeyDiagram-5HDEW3XC-DDDRlRJj.js",
+          "kind": "async",
+          "rawBytes": 23587,
+          "gzipBytes": 8288
+        },
+        {
+          "fileName": "assets/json-BtvkarwN.js",
+          "kind": "async",
+          "rawBytes": 2880,
+          "gzipBytes": 820
+        },
+        {
+          "fileName": "assets/json5-DZwsU1V5.js",
+          "kind": "async",
+          "rawBytes": 3252,
+          "gzipBytes": 830
+        },
+        {
+          "fileName": "assets/jsonc-B_LXzqkM.js",
+          "kind": "async",
+          "rawBytes": 3107,
+          "gzipBytes": 794
+        },
+        {
+          "fileName": "assets/jsonl-TbESOdF-.js",
+          "kind": "async",
+          "rawBytes": 3009,
+          "gzipBytes": 790
+        },
+        {
+          "fileName": "assets/jsonnet-Dn5G3KQX.js",
+          "kind": "async",
+          "rawBytes": 3616,
+          "gzipBytes": 1051
+        },
+        {
+          "fileName": "assets/jssm-D1GP9FKQ.js",
+          "kind": "async",
+          "rawBytes": 2236,
+          "gzipBytes": 621
+        },
+        {
+          "fileName": "assets/jsx-CEPa5D6u.js",
+          "kind": "async",
+          "rawBytes": 177853,
+          "gzipBytes": 16772
+        },
+        {
+          "fileName": "assets/julia-Co6ooxtK.js",
+          "kind": "async",
+          "rawBytes": 30999,
+          "gzipBytes": 4242
+        },
+        {
+          "fileName": "assets/just-CtaV5Dio.js",
+          "kind": "async",
+          "rawBytes": 10770,
+          "gzipBytes": 2573
+        },
+        {
+          "fileName": "assets/kanagawa-dragon-BTVg7V7G.js",
+          "kind": "async",
+          "rawBytes": 17125,
+          "gzipBytes": 2951
+        },
+        {
+          "fileName": "assets/kanagawa-lotus-D-r_WcXb.js",
+          "kind": "async",
+          "rawBytes": 17124,
+          "gzipBytes": 2937
+        },
+        {
+          "fileName": "assets/kanagawa-wave-Dz-JoGyb.js",
+          "kind": "async",
+          "rawBytes": 17121,
+          "gzipBytes": 2932
+        },
+        {
+          "fileName": "assets/kanban-definition-HUTT4EX6-DJeaCRfd.js",
+          "kind": "async",
+          "rawBytes": 20583,
+          "gzipBytes": 7254
+        },
+        {
+          "fileName": "assets/katex-BKajI3OC.js",
+          "kind": "async",
+          "rawBytes": 62,
+          "gzipBytes": 77
+        },
+        {
+          "fileName": "assets/katex-DXHzYEgC.js",
+          "kind": "async",
+          "rawBytes": 257951,
+          "gzipBytes": 76250
+        },
+        {
+          "fileName": "assets/kdl-DA-63Yjs.js",
+          "kind": "async",
+          "rawBytes": 3627,
+          "gzipBytes": 1033
+        },
+        {
+          "fileName": "assets/kotlin-BqY0u4eg.js",
+          "kind": "async",
+          "rawBytes": 8783,
+          "gzipBytes": 2127
+        },
+        {
+          "fileName": "assets/kusto-XYirJ5nf.js",
+          "kind": "async",
+          "rawBytes": 15171,
+          "gzipBytes": 3953
+        },
+        {
+          "fileName": "assets/laserwave-DNLMcD9n.js",
+          "kind": "async",
+          "rawBytes": 11497,
+          "gzipBytes": 2603
+        },
+        {
+          "fileName": "assets/latex-BKN2kYSK.js",
+          "kind": "async",
+          "rawBytes": 72618,
+          "gzipBytes": 6712
+        },
+        {
+          "fileName": "assets/lean-D2PU5wez.js",
+          "kind": "async",
+          "rawBytes": 5782,
+          "gzipBytes": 1920
+        },
+        {
+          "fileName": "assets/less-C-bz5cN2.js",
+          "kind": "async",
+          "rawBytes": 97631,
+          "gzipBytes": 14788
+        },
+        {
+          "fileName": "assets/light-plus-CXNANXvr.js",
+          "kind": "async",
+          "rawBytes": 9939,
+          "gzipBytes": 2293
+        },
+        {
+          "fileName": "assets/line-BlAWqUiF.js",
+          "kind": "async",
+          "rawBytes": 955,
+          "gzipBytes": 477
+        },
+        {
+          "fileName": "assets/linear-BX-Yyzfz.js",
+          "kind": "async",
+          "rawBytes": 5648,
+          "gzipBytes": 2301
+        },
+        {
+          "fileName": "assets/liquid-D0fTqE6u.js",
+          "kind": "async",
+          "rawBytes": 18102,
+          "gzipBytes": 3170
+        },
+        {
+          "fileName": "assets/llvm-K6dDHEzT.js",
+          "kind": "async",
+          "rawBytes": 5048,
+          "gzipBytes": 2032
+        },
+        {
+          "fileName": "assets/log-8EvMroCC.js",
+          "kind": "async",
+          "rawBytes": 2850,
+          "gzipBytes": 886
+        },
+        {
+          "fileName": "assets/logo-DB6CXjfp.js",
+          "kind": "async",
+          "rawBytes": 3125,
+          "gzipBytes": 1474
+        },
+        {
+          "fileName": "assets/lua-Csw9_ot0.js",
+          "kind": "async",
+          "rawBytes": 15596,
+          "gzipBytes": 3204
+        },
+        {
+          "fileName": "assets/luau-D65oIXT9.js",
+          "kind": "async",
+          "rawBytes": 13962,
+          "gzipBytes": 3189
+        },
+        {
+          "fileName": "assets/make-CpnP5dTL.js",
+          "kind": "async",
+          "rawBytes": 8959,
+          "gzipBytes": 1757
+        },
+        {
+          "fileName": "assets/map-B07Peo2l.js",
+          "kind": "async",
+          "rawBytes": 5088,
+          "gzipBytes": 2065
+        },
+        {
+          "fileName": "assets/markdown-CpvWoO65.js",
+          "kind": "async",
+          "rawBytes": 59333,
+          "gzipBytes": 5624
+        },
+        {
+          "fileName": "assets/marko-i4FEketc.js",
+          "kind": "async",
+          "rawBytes": 25487,
+          "gzipBytes": 3593
+        },
+        {
+          "fileName": "assets/material-theme-CBQnyE1l.js",
+          "kind": "async",
+          "rawBytes": 18613,
+          "gzipBytes": 3125
+        },
+        {
+          "fileName": "assets/material-theme-darker-imZD012-.js",
+          "kind": "async",
+          "rawBytes": 18627,
+          "gzipBytes": 3123
+        },
+        {
+          "fileName": "assets/material-theme-lighter-C_2TbB7v.js",
+          "kind": "async",
+          "rawBytes": 18632,
+          "gzipBytes": 3127
+        },
+        {
+          "fileName": "assets/material-theme-ocean-DPkgCp0c.js",
+          "kind": "async",
+          "rawBytes": 18627,
+          "gzipBytes": 3144
+        },
+        {
+          "fileName": "assets/material-theme-palenight-xzOWpYy_.js",
+          "kind": "async",
+          "rawBytes": 18633,
+          "gzipBytes": 3138
+        },
+        {
+          "fileName": "assets/matlab-BqZFIVHi.js",
+          "kind": "async",
+          "rawBytes": 16084,
+          "gzipBytes": 3049
+        },
+        {
+          "fileName": "assets/mdc-B3ZzmvJl.js",
+          "kind": "async",
+          "rawBytes": 19549,
+          "gzipBytes": 6646
+        },
+        {
+          "fileName": "assets/mdx-B_hihRjG.js",
+          "kind": "async",
+          "rawBytes": 136112,
+          "gzipBytes": 23583
+        },
+        {
+          "fileName": "assets/mermaid-DuEBZLlI.js",
+          "kind": "async",
+          "rawBytes": 29509,
+          "gzipBytes": 3653
+        },
+        {
+          "fileName": "assets/mermaid-parser.core-B6kPqFoJ.js",
+          "kind": "async",
+          "rawBytes": 6777,
+          "gzipBytes": 1855
+        },
+        {
+          "fileName": "assets/mermaid.core-CWHxlpZR.js",
+          "kind": "async",
+          "rawBytes": 36787,
+          "gzipBytes": 12180
+        },
+        {
+          "fileName": "assets/min-dark-zwyFz3Mw.js",
+          "kind": "async",
+          "rawBytes": 6289,
+          "gzipBytes": 1717
+        },
+        {
+          "fileName": "assets/min-light-BEHuudVa.js",
+          "kind": "async",
+          "rawBytes": 6967,
+          "gzipBytes": 1898
+        },
+        {
+          "fileName": "assets/mindmap-definition-LN4V7U3C-BN-psVLV.js",
+          "kind": "async",
+          "rawBytes": 23709,
+          "gzipBytes": 8004
+        },
+        {
+          "fileName": "assets/mipsasm-D19aPCdd.js",
+          "kind": "async",
+          "rawBytes": 3257,
+          "gzipBytes": 1169
+        },
+        {
+          "fileName": "assets/mojo-CHkBBFT8.js",
+          "kind": "async",
+          "rawBytes": 69797,
+          "gzipBytes": 9283
+        },
+        {
+          "fileName": "assets/monokai-Cxz9krbB.js",
+          "kind": "async",
+          "rawBytes": 7882,
+          "gzipBytes": 1920
+        },
+        {
+          "fileName": "assets/moonbit-DshRpK8O.js",
+          "kind": "async",
+          "rawBytes": 5898,
+          "gzipBytes": 1678
+        },
+        {
+          "fileName": "assets/move-DrkB1PaA.js",
+          "kind": "async",
+          "rawBytes": 17503,
+          "gzipBytes": 3047
+        },
+        {
+          "fileName": "assets/narrat-DDES1uZV.js",
+          "kind": "async",
+          "rawBytes": 3670,
+          "gzipBytes": 1115
+        },
+        {
+          "fileName": "assets/nextflow-C1KDkJwT.js",
+          "kind": "async",
+          "rawBytes": 4508,
+          "gzipBytes": 1167
+        },
+        {
+          "fileName": "assets/nextflow-groovy-CEFSjMHY.js",
+          "kind": "async",
+          "rawBytes": 10404,
+          "gzipBytes": 2117
+        },
+        {
+          "fileName": "assets/nginx-Ccv4t79D.js",
+          "kind": "async",
+          "rawBytes": 35353,
+          "gzipBytes": 4447
+        },
+        {
+          "fileName": "assets/night-owl-C7FSuSk8.js",
+          "kind": "async",
+          "rawBytes": 28911,
+          "gzipBytes": 5181
+        },
+        {
+          "fileName": "assets/night-owl-light-pMVw2AQe.js",
+          "kind": "async",
+          "rawBytes": 25900,
+          "gzipBytes": 4282
+        },
+        {
+          "fileName": "assets/nim-D28ymGZX.js",
+          "kind": "async",
+          "rawBytes": 22456,
+          "gzipBytes": 3153
+        },
+        {
+          "fileName": "assets/nix-X004nkvf.js",
+          "kind": "async",
+          "rawBytes": 15509,
+          "gzipBytes": 2486
+        },
+        {
+          "fileName": "assets/nord-BjiV1wkK.js",
+          "kind": "async",
+          "rawBytes": 26721,
+          "gzipBytes": 4404
+        },
+        {
+          "fileName": "assets/nushell-hVfw89My.js",
+          "kind": "async",
+          "rawBytes": 20411,
+          "gzipBytes": 5240
+        },
+        {
+          "fileName": "assets/objective-c-BwkjolJK.js",
+          "kind": "async",
+          "rawBytes": 105411,
+          "gzipBytes": 23348
+        },
+        {
+          "fileName": "assets/objective-cpp-V3h2ibOc.js",
+          "kind": "async",
+          "rawBytes": 171970,
+          "gzipBytes": 30742
+        },
+        {
+          "fileName": "assets/ocaml-C_UDOsdZ.js",
+          "kind": "async",
+          "rawBytes": 62447,
+          "gzipBytes": 5039
+        },
+        {
+          "fileName": "assets/odin-DJg2khsR.js",
+          "kind": "async",
+          "rawBytes": 16511,
+          "gzipBytes": 2940
+        },
+        {
+          "fileName": "assets/one-dark-pro-jm9-RObP.js",
+          "kind": "async",
+          "rawBytes": 33785,
+          "gzipBytes": 5537
+        },
+        {
+          "fileName": "assets/one-light-BLcc5okg.js",
+          "kind": "async",
+          "rawBytes": 25298,
+          "gzipBytes": 3675
+        },
+        {
+          "fileName": "assets/openscad-eM4vHaNx.js",
+          "kind": "async",
+          "rawBytes": 2822,
+          "gzipBytes": 1009
+        },
+        {
+          "fileName": "assets/ordinal-esBWT91L.js",
+          "kind": "async",
+          "rawBytes": 1192,
+          "gzipBytes": 581
+        },
+        {
+          "fileName": "assets/packet-7NZHBO7P-Ar9MCKZS.js",
+          "kind": "async",
+          "rawBytes": 121,
+          "gzipBytes": 123
+        },
+        {
+          "fileName": "assets/pascal-BjQ-23JD.js",
+          "kind": "async",
+          "rawBytes": 4148,
+          "gzipBytes": 1675
+        },
+        {
+          "fileName": "assets/path-D6dLR6gb.js",
+          "kind": "async",
+          "rawBytes": 2335,
+          "gzipBytes": 1009
+        },
+        {
+          "fileName": "assets/pegDiagram-2B236MQR-TaHrvbst.js",
+          "kind": "async",
+          "rawBytes": 2081,
+          "gzipBytes": 971
+        },
+        {
+          "fileName": "assets/perl-Bu7lW-VH.js",
+          "kind": "async",
+          "rawBytes": 43147,
+          "gzipBytes": 4643
+        },
+        {
+          "fileName": "assets/php-DydiLghv.js",
+          "kind": "async",
+          "rawBytes": 111054,
+          "gzipBytes": 28456
+        },
+        {
+          "fileName": "assets/pie-RZYD4A2V-DyvnmTMn.js",
+          "kind": "async",
+          "rawBytes": 118,
+          "gzipBytes": 120
+        },
+        {
+          "fileName": "assets/pieDiagram-ENE6RG2P-D4oOEGJT.js",
+          "kind": "async",
+          "rawBytes": 6445,
+          "gzipBytes": 2675
+        },
+        {
+          "fileName": "assets/pkl-C6cbD794.js",
+          "kind": "async",
+          "rawBytes": 10370,
+          "gzipBytes": 1379
+        },
+        {
+          "fileName": "assets/plastic-DyIkYaMY.js",
+          "kind": "async",
+          "rawBytes": 9293,
+          "gzipBytes": 1985
+        },
+        {
+          "fileName": "assets/plsql-Dtctq2Vl.js",
+          "kind": "async",
+          "rawBytes": 8510,
+          "gzipBytes": 3020
+        },
+        {
+          "fileName": "assets/po-DGeAfCS5.js",
+          "kind": "async",
+          "rawBytes": 3237,
+          "gzipBytes": 908
+        },
+        {
+          "fileName": "assets/poimandres-B-iVgsCk.js",
+          "kind": "async",
+          "rawBytes": 33492,
+          "gzipBytes": 5524
+        },
+        {
+          "fileName": "assets/polar-BMttLTVY.js",
+          "kind": "async",
+          "rawBytes": 4669,
+          "gzipBytes": 1128
+        },
+        {
+          "fileName": "assets/postcss-BFf0tIJD.js",
+          "kind": "async",
+          "rawBytes": 6415,
+          "gzipBytes": 1915
+        },
+        {
+          "fileName": "assets/powerquery-C-6njnl9.js",
+          "kind": "async",
+          "rawBytes": 5901,
+          "gzipBytes": 1521
+        },
+        {
+          "fileName": "assets/powershell-Dn6MCZ_l.js",
+          "kind": "async",
+          "rawBytes": 20149,
+          "gzipBytes": 4068
+        },
+        {
+          "fileName": "assets/prisma-Cnqjnr9x.js",
+          "kind": "async",
+          "rawBytes": 6328,
+          "gzipBytes": 1389
+        },
+        {
+          "fileName": "assets/prolog-BzcIB5vx.js",
+          "kind": "async",
+          "rawBytes": 11354,
+          "gzipBytes": 3852
+        },
+        {
+          "fileName": "assets/proto-Cz59ySR5.js",
+          "kind": "async",
+          "rawBytes": 6546,
+          "gzipBytes": 1418
+        },
+        {
+          "fileName": "assets/pug-r57v6leH.js",
+          "kind": "async",
+          "rawBytes": 13850,
+          "gzipBytes": 2577
+        },
+        {
+          "fileName": "assets/puppet-w7O52vgk.js",
+          "kind": "async",
+          "rawBytes": 11435,
+          "gzipBytes": 2114
+        },
+        {
+          "fileName": "assets/purescript-D39xPVT_.js",
+          "kind": "async",
+          "rawBytes": 24684,
+          "gzipBytes": 3239
+        },
+        {
+          "fileName": "assets/python-Cb6XLAhE.js",
+          "kind": "async",
+          "rawBytes": 69950,
+          "gzipBytes": 9157
+        },
+        {
+          "fileName": "assets/qml-B6IzaYOh.js",
+          "kind": "async",
+          "rawBytes": 5339,
+          "gzipBytes": 1386
+        },
+        {
+          "fileName": "assets/qmldir-DCI90_bS.js",
+          "kind": "async",
+          "rawBytes": 1000,
+          "gzipBytes": 449
+        },
+        {
+          "fileName": "assets/qss-DMXt8tzV.js",
+          "kind": "async",
+          "rawBytes": 7470,
+          "gzipBytes": 2592
+        },
+        {
+          "fileName": "assets/quadrantDiagram-ABIIQ3AL-DoTNCoh7.js",
+          "kind": "async",
+          "rawBytes": 33967,
+          "gzipBytes": 9822
+        },
+        {
+          "fileName": "assets/r-CrdNCRPm.js",
+          "kind": "async",
+          "rawBytes": 6602,
+          "gzipBytes": 1823
+        },
+        {
+          "fileName": "assets/racket-BDQIOQCL.js",
+          "kind": "async",
+          "rawBytes": 92387,
+          "gzipBytes": 15081
+        },
+        {
+          "fileName": "assets/radar-I7S5WNFK-CsgNzIzl.js",
+          "kind": "async",
+          "rawBytes": 120,
+          "gzipBytes": 122
+        },
+        {
+          "fileName": "assets/railroad-3IZDKUUU-yK1hmf5h.js",
+          "kind": "async",
+          "rawBytes": 123,
+          "gzipBytes": 125
+        },
+        {
+          "fileName": "assets/railroad-abnf-AHOZXSZD-D2DOBqTa.js",
+          "kind": "async",
+          "rawBytes": 127,
+          "gzipBytes": 129
+        },
+        {
+          "fileName": "assets/railroad-ebnf-EBAXGLYW-nppoQtrH.js",
+          "kind": "async",
+          "rawBytes": 127,
+          "gzipBytes": 129
+        },
+        {
+          "fileName": "assets/railroad-peg-LSFZ7HO6-C7SF8LIx.js",
+          "kind": "async",
+          "rawBytes": 126,
+          "gzipBytes": 128
+        },
+        {
+          "fileName": "assets/railroadDiagram-RFXS5EU6-COlGpI1B.js",
+          "kind": "async",
+          "rawBytes": 1716,
+          "gzipBytes": 796
+        },
+        {
+          "fileName": "assets/raku-ChIk05_D.js",
+          "kind": "async",
+          "rawBytes": 10470,
+          "gzipBytes": 2972
+        },
+        {
+          "fileName": "assets/razor-3JkJFRUb.js",
+          "kind": "async",
+          "rawBytes": 27454,
+          "gzipBytes": 3531
+        },
+        {
+          "fileName": "assets/red-CdNzKgiQ.js",
+          "kind": "async",
+          "rawBytes": 6260,
+          "gzipBytes": 1598
+        },
+        {
+          "fileName": "assets/reg-BSJCtdk1.js",
+          "kind": "async",
+          "rawBytes": 2343,
+          "gzipBytes": 697
+        },
+        {
+          "fileName": "assets/regexp-BQVcDDkz.js",
+          "kind": "async",
+          "rawBytes": 8049,
+          "gzipBytes": 1463
+        },
+        {
+          "fileName": "assets/rel-2w99gHCg.js",
+          "kind": "async",
+          "rawBytes": 3366,
+          "gzipBytes": 1098
+        },
+        {
+          "fileName": "assets/requirementDiagram-TGXJPOKE-DHXYCwCu.js",
+          "kind": "async",
+          "rawBytes": 31378,
+          "gzipBytes": 9795
+        },
+        {
+          "fileName": "assets/riscv-CGECi6Zi.js",
+          "kind": "async",
+          "rawBytes": 6912,
+          "gzipBytes": 1982
+        },
+        {
+          "fileName": "assets/ron-CoowgdVZ.js",
+          "kind": "async",
+          "rawBytes": 3912,
+          "gzipBytes": 975
+        },
+        {
+          "fileName": "assets/rose-pine-DHiRoxaa.js",
+          "kind": "async",
+          "rawBytes": 21741,
+          "gzipBytes": 3890
+        },
+        {
+          "fileName": "assets/rose-pine-dawn-CKkuQoot.js",
+          "kind": "async",
+          "rawBytes": 21752,
+          "gzipBytes": 3907
+        },
+        {
+          "fileName": "assets/rose-pine-moon-BHMXMJWY.js",
+          "kind": "async",
+          "rawBytes": 21751,
+          "gzipBytes": 3908
+        },
+        {
+          "fileName": "assets/rosmsg-BGHOZnpw.js",
+          "kind": "async",
+          "rawBytes": 4521,
+          "gzipBytes": 1055
+        },
+        {
+          "fileName": "assets/rough.esm-D73_VhwX.js",
+          "kind": "async",
+          "rawBytes": 27810,
+          "gzipBytes": 9156
+        },
+        {
+          "fileName": "assets/rst-B1gVYCci.js",
+          "kind": "async",
+          "rawBytes": 10306,
+          "gzipBytes": 2242
+        },
+        {
+          "fileName": "assets/ruby-Bu2wthti.js",
+          "kind": "async",
+          "rawBytes": 45838,
+          "gzipBytes": 5611
+        },
+        {
+          "fileName": "assets/rust-c4ivVrBu.js",
+          "kind": "async",
+          "rawBytes": 15067,
+          "gzipBytes": 2703
+        },
+        {
+          "fileName": "assets/sankeyDiagram-HTMAVEWB-BIAoqxAH.js",
+          "kind": "async",
+          "rawBytes": 23183,
+          "gzipBytes": 8546
+        },
+        {
+          "fileName": "assets/sas-DisBQGPX.js",
+          "kind": "async",
+          "rawBytes": 9065,
+          "gzipBytes": 3783
+        },
+        {
+          "fileName": "assets/sass-Csfl9VW3.js",
+          "kind": "async",
+          "rawBytes": 9287,
+          "gzipBytes": 2492
+        },
+        {
+          "fileName": "assets/scala-CWr60SdV.js",
+          "kind": "async",
+          "rawBytes": 28882,
+          "gzipBytes": 3924
+        },
+        {
+          "fileName": "assets/scheme-B0mwiIJr.js",
+          "kind": "async",
+          "rawBytes": 7167,
+          "gzipBytes": 2055
+        },
+        {
+          "fileName": "assets/scss-2LY16rtR.js",
+          "kind": "async",
+          "rawBytes": 27270,
+          "gzipBytes": 4245
+        },
+        {
+          "fileName": "assets/sdbl-C_Ouue_J.js",
+          "kind": "async",
+          "rawBytes": 4700,
+          "gzipBytes": 1965
+        },
+        {
+          "fileName": "assets/sequenceDiagram-DBY2YBRQ-BL_ujt7G.js",
+          "kind": "async",
+          "rawBytes": 117089,
+          "gzipBytes": 30924
+        },
+        {
+          "fileName": "assets/shaderlab-BnXQ-1kp.js",
+          "kind": "async",
+          "rawBytes": 5920,
+          "gzipBytes": 2075
+        },
+        {
+          "fileName": "assets/shellscript-CANv6Z3u.js",
+          "kind": "async",
+          "rawBytes": 41535,
+          "gzipBytes": 6146
+        },
+        {
+          "fileName": "assets/shellsession-CudVoo-E.js",
+          "kind": "async",
+          "rawBytes": 714,
+          "gzipBytes": 431
+        },
+        {
+          "fileName": "assets/sizeCapture-X5ZJPWSS-BeqyGkCG.js",
+          "kind": "async",
+          "rawBytes": 881,
+          "gzipBytes": 506
+        },
+        {
+          "fileName": "assets/slack-dark-C_-XhbWW.js",
+          "kind": "async",
+          "rawBytes": 9115,
+          "gzipBytes": 1976
+        },
+        {
+          "fileName": "assets/slack-ochin-XQccEUn5.js",
+          "kind": "async",
+          "rawBytes": 9429,
+          "gzipBytes": 2113
+        },
+        {
+          "fileName": "assets/smalltalk-Bns5Jav1.js",
+          "kind": "async",
+          "rawBytes": 6585,
+          "gzipBytes": 1621
+        },
+        {
+          "fileName": "assets/snazzy-light-Dk9xrMSu.js",
+          "kind": "async",
+          "rawBytes": 20771,
+          "gzipBytes": 3848
+        },
+        {
+          "fileName": "assets/solarized-dark-gNM-Xl2D.js",
+          "kind": "async",
+          "rawBytes": 6844,
+          "gzipBytes": 1807
+        },
+        {
+          "fileName": "assets/solarized-light-DxSqVqJ5.js",
+          "kind": "async",
+          "rawBytes": 6478,
+          "gzipBytes": 1740
+        },
+        {
+          "fileName": "assets/solidity-BmznNlYL.js",
+          "kind": "async",
+          "rawBytes": 16072,
+          "gzipBytes": 3107
+        },
+        {
+          "fileName": "assets/soy-Ct6FL4sW.js",
+          "kind": "async",
+          "rawBytes": 6925,
+          "gzipBytes": 1617
+        },
+        {
+          "fileName": "assets/sparql-8GxlsWHx.js",
+          "kind": "async",
+          "rawBytes": 1478,
+          "gzipBytes": 817
+        },
+        {
+          "fileName": "assets/splunk-OdYiJ_LK.js",
+          "kind": "async",
+          "rawBytes": 3434,
+          "gzipBytes": 1530
+        },
+        {
+          "fileName": "assets/sql-DxkAVtQh.js",
+          "kind": "async",
+          "rawBytes": 23463,
+          "gzipBytes": 7474
+        },
+        {
+          "fileName": "assets/src-BwMsZZ36.js",
+          "kind": "async",
+          "rawBytes": 47451,
+          "gzipBytes": 16583
+        },
+        {
+          "fileName": "assets/ssh-config-ClfoeOtG.js",
+          "kind": "async",
+          "rawBytes": 3615,
+          "gzipBytes": 1605
+        },
+        {
+          "fileName": "assets/stata-QdG3_znA.js",
+          "kind": "async",
+          "rawBytes": 56989,
+          "gzipBytes": 12317
+        },
+        {
+          "fileName": "assets/stateDiagram-2N3HPSRC-SS7C1bpi.js",
+          "kind": "async",
+          "rawBytes": 10780,
+          "gzipBytes": 3808
+        },
+        {
+          "fileName": "assets/stateDiagram-v2-6OUMAXLB-BUuTwrsq.js",
+          "kind": "async",
+          "rawBytes": 803,
+          "gzipBytes": 462
+        },
+        {
+          "fileName": "assets/stylus-C-jGcjC-.js",
+          "kind": "async",
+          "rawBytes": 31072,
+          "gzipBytes": 8018
+        },
+        {
+          "fileName": "assets/surrealql-DBFxckWa.js",
+          "kind": "async",
+          "rawBytes": 22586,
+          "gzipBytes": 4275
+        },
+        {
+          "fileName": "assets/svelte-CT8JcwGY.js",
+          "kind": "async",
+          "rawBytes": 18250,
+          "gzipBytes": 3148
+        },
+        {
+          "fileName": "assets/swift-CnyRa3F9.js",
+          "kind": "async",
+          "rawBytes": 86685,
+          "gzipBytes": 14710
+        },
+        {
+          "fileName": "assets/swimlanes-5IMT3BWC-B5vXosU0.js",
+          "kind": "async",
+          "rawBytes": 118720,
+          "gzipBytes": 43252
+        },
+        {
+          "fileName": "assets/swimlanesDiagram-G3AALYLV-CitBEAeL.js",
+          "kind": "async",
+          "rawBytes": 874,
+          "gzipBytes": 501
+        },
+        {
+          "fileName": "assets/synthwave-84-Bqbk4ufH.js",
+          "kind": "async",
+          "rawBytes": 14034,
+          "gzipBytes": 2875
+        },
+        {
+          "fileName": "assets/system-verilog-CjUp71uS.js",
+          "kind": "async",
+          "rawBytes": 26201,
+          "gzipBytes": 4834
+        },
+        {
+          "fileName": "assets/systemd-BA7TAOrL.js",
+          "kind": "async",
+          "rawBytes": 7867,
+          "gzipBytes": 2527
+        },
+        {
+          "fileName": "assets/talonscript-rr_ih-DD.js",
+          "kind": "async",
+          "rawBytes": 6755,
+          "gzipBytes": 1488
+        },
+        {
+          "fileName": "assets/tasl-Cx869dyz.js",
+          "kind": "async",
+          "rawBytes": 3286,
+          "gzipBytes": 846
+        },
+        {
+          "fileName": "assets/tcl-CAJBrTSx.js",
+          "kind": "async",
+          "rawBytes": 4427,
+          "gzipBytes": 1506
+        },
+        {
+          "fileName": "assets/templ-Do-_u5Yg.js",
+          "kind": "async",
+          "rawBytes": 24067,
+          "gzipBytes": 5412
+        },
+        {
+          "fileName": "assets/terraform-Bvyhqn3A.js",
+          "kind": "async",
+          "rawBytes": 11387,
+          "gzipBytes": 2509
+        },
+        {
+          "fileName": "assets/tex-BSmFOqkH.js",
+          "kind": "async",
+          "rawBytes": 9672,
+          "gzipBytes": 3085
+        },
+        {
+          "fileName": "assets/timeline-definition-FHXFAJF6-C2rPtKTU.js",
+          "kind": "async",
+          "rawBytes": 30933,
+          "gzipBytes": 10222
+        },
+        {
+          "fileName": "assets/tokyo-night-DzwGpuTv.js",
+          "kind": "async",
+          "rawBytes": 35663,
+          "gzipBytes": 6256
+        },
+        {
+          "fileName": "assets/toml-CqopktE3.js",
+          "kind": "async",
+          "rawBytes": 6424,
+          "gzipBytes": 1273
+        },
+        {
+          "fileName": "assets/treeView-QDETBFTQ-Bmp2Q-h8.js",
+          "kind": "async",
+          "rawBytes": 123,
+          "gzipBytes": 125
+        },
+        {
+          "fileName": "assets/treemap-6X3UGDF4-D6zoJVhN.js",
+          "kind": "async",
+          "rawBytes": 122,
+          "gzipBytes": 124
+        },
+        {
+          "fileName": "assets/ts-tags-2FtwiBF0.js",
+          "kind": "async",
+          "rawBytes": 8925,
+          "gzipBytes": 1192
+        },
+        {
+          "fileName": "assets/tsv-B4SLcGGn.js",
+          "kind": "async",
+          "rawBytes": 737,
+          "gzipBytes": 340
+        },
+        {
+          "fileName": "assets/tsx-fikqAFNT.js",
+          "kind": "async",
+          "rawBytes": 175592,
+          "gzipBytes": 16642
+        },
+        {
+          "fileName": "assets/turtle-_NA-xav5.js",
+          "kind": "async",
+          "rawBytes": 3698,
+          "gzipBytes": 971
+        },
+        {
+          "fileName": "assets/twig-BqT3GTwJ.js",
+          "kind": "async",
+          "rawBytes": 20904,
+          "gzipBytes": 3654
+        },
+        {
+          "fileName": "assets/typescript-DBBA1bGJ.js",
+          "kind": "async",
+          "rawBytes": 181141,
+          "gzipBytes": 16160
+        },
+        {
+          "fileName": "assets/typespec-BkDieef8.js",
+          "kind": "async",
+          "rawBytes": 24018,
+          "gzipBytes": 2580
+        },
+        {
+          "fileName": "assets/typst-sxkvD7Gc.js",
+          "kind": "async",
+          "rawBytes": 8385,
+          "gzipBytes": 1666
+        },
+        {
+          "fileName": "assets/v-D3wShZG6.js",
+          "kind": "async",
+          "rawBytes": 13212,
+          "gzipBytes": 2736
+        },
+        {
+          "fileName": "assets/vala-Bs-FYN5L.js",
+          "kind": "async",
+          "rawBytes": 3368,
+          "gzipBytes": 1183
+        },
+        {
+          "fileName": "assets/vb-CmJ3DiS-.js",
+          "kind": "async",
+          "rawBytes": 6091,
+          "gzipBytes": 2325
+        },
+        {
+          "fileName": "assets/vennDiagram-L72KCM5P-B6WV4TpT.js",
+          "kind": "async",
+          "rawBytes": 42054,
+          "gzipBytes": 15612
+        },
+        {
+          "fileName": "assets/verilog-C5YMOoZU.js",
+          "kind": "async",
+          "rawBytes": 5929,
+          "gzipBytes": 1901
+        },
+        {
+          "fileName": "assets/vesper-zvQIHNhX.js",
+          "kind": "async",
+          "rawBytes": 12690,
+          "gzipBytes": 1980
+        },
+        {
+          "fileName": "assets/vhdl-DKovRPcb.js",
+          "kind": "async",
+          "rawBytes": 24262,
+          "gzipBytes": 3890
+        },
+        {
+          "fileName": "assets/viml-BQjzjXPC.js",
+          "kind": "async",
+          "rawBytes": 20363,
+          "gzipBytes": 6758
+        },
+        {
+          "fileName": "assets/vitesse-black-CHAMsfKx.js",
+          "kind": "async",
+          "rawBytes": 13675,
+          "gzipBytes": 3080
+        },
+        {
+          "fileName": "assets/vitesse-dark-CJrQ6K0P.js",
+          "kind": "async",
+          "rawBytes": 13757,
+          "gzipBytes": 3083
+        },
+        {
+          "fileName": "assets/vitesse-light-BElkXaYU.js",
+          "kind": "async",
+          "rawBytes": 13614,
+          "gzipBytes": 3056
+        },
+        {
+          "fileName": "assets/vue-html-LVzYLd-6.js",
+          "kind": "async",
+          "rawBytes": 8470,
+          "gzipBytes": 1669
+        },
+        {
+          "fileName": "assets/vue-k0coJpqg.js",
+          "kind": "async",
+          "rawBytes": 24502,
+          "gzipBytes": 2979
+        },
+        {
+          "fileName": "assets/vue-vine-BFE5tZa_.js",
+          "kind": "async",
+          "rawBytes": 190064,
+          "gzipBytes": 18042
+        },
+        {
+          "fileName": "assets/vyper-DN1BG9qy.js",
+          "kind": "async",
+          "rawBytes": 74646,
+          "gzipBytes": 10738
+        },
+        {
+          "fileName": "assets/wardley-OPB4EBWU-B0qstbN8.js",
+          "kind": "async",
+          "rawBytes": 122,
+          "gzipBytes": 124
+        },
+        {
+          "fileName": "assets/wardleyDiagram-EHGQE667-Cw95fDqK.js",
+          "kind": "async",
+          "rawBytes": 25564,
+          "gzipBytes": 6780
+        },
+        {
+          "fileName": "assets/wasm-BlileT21.js",
+          "kind": "async",
+          "rawBytes": 622326,
+          "gzipBytes": 231149
+        },
+        {
+          "fileName": "assets/wasm-DyF92jKD.js",
+          "kind": "async",
+          "rawBytes": 12005,
+          "gzipBytes": 2188
+        },
+        {
+          "fileName": "assets/wenyan-BtpX6e2F.js",
+          "kind": "async",
+          "rawBytes": 2155,
+          "gzipBytes": 1061
+        },
+        {
+          "fileName": "assets/wgsl-CtrwGXXa.js",
+          "kind": "async",
+          "rawBytes": 5142,
+          "gzipBytes": 1377
+        },
+        {
+          "fileName": "assets/wikitext-BRhAy0Yz.js",
+          "kind": "async",
+          "rawBytes": 55883,
+          "gzipBytes": 4714
+        },
+        {
+          "fileName": "assets/wit-EQ5NCv2o.js",
+          "kind": "async",
+          "rawBytes": 21465,
+          "gzipBytes": 2880
+        },
+        {
+          "fileName": "assets/wolfram-Dk9icpHA.js",
+          "kind": "async",
+          "rawBytes": 262389,
+          "gzipBytes": 77069
+        },
+        {
+          "fileName": "assets/xml-Dsb-RfB7.js",
+          "kind": "async",
+          "rawBytes": 5450,
+          "gzipBytes": 1248
+        },
+        {
+          "fileName": "assets/xsl-CdkO7E9u.js",
+          "kind": "async",
+          "rawBytes": 1361,
+          "gzipBytes": 500
+        },
+        {
+          "fileName": "assets/xychartDiagram-FW5EYKEG-fGHKi6Dp.js",
+          "kind": "async",
+          "rawBytes": 42070,
+          "gzipBytes": 11906
+        },
+        {
+          "fileName": "assets/yaml-DD4nHZN4.js",
+          "kind": "async",
+          "rawBytes": 10567,
+          "gzipBytes": 2309
+        },
+        {
+          "fileName": "assets/zenscript-BRxGkpKv.js",
+          "kind": "async",
+          "rawBytes": 3910,
+          "gzipBytes": 1286
+        },
+        {
+          "fileName": "assets/zig-C0t0kDsz.js",
+          "kind": "async",
+          "rawBytes": 5338,
+          "gzipBytes": 1547
+        },
+        {
+          "fileName": "assets/cradle-DQqwEKTe.css",
+          "kind": "asset",
+          "rawBytes": 15086,
+          "gzipBytes": 3067
+        }
+      ]
+    },
+    "markstream": {
+      "entryFiles": ["assets/markstream-BcVgoXcq.js"],
+      "rawBytes": 4165264,
+      "gzipBytes": 1210802,
+      "entryRawBytes": 628800,
+      "entryGzipBytes": 206224,
+      "files": [
+        {
+          "fileName": "assets/markstream-BcVgoXcq.js",
+          "kind": "entry",
+          "rawBytes": 628800,
+          "gzipBytes": 206224
+        },
+        {
+          "fileName": "assets/abnfDiagram-VRR7QNED-B5oc5pgA.js",
+          "kind": "async",
+          "rawBytes": 1916,
+          "gzipBytes": 930
+        },
+        {
+          "fileName": "assets/arc-Dgn-BPdD.js",
+          "kind": "async",
+          "rawBytes": 3496,
+          "gzipBytes": 1462
+        },
+        {
+          "fileName": "assets/architecture-TIHT7OUA-Rjun9XmF.js",
+          "kind": "async",
+          "rawBytes": 127,
+          "gzipBytes": 129
+        },
+        {
+          "fileName": "assets/architectureDiagram-ZJ3FMSHR-BtgbPEZq.js",
+          "kind": "async",
+          "rawBytes": 151848,
+          "gzipBytes": 42691
+        },
+        {
+          "fileName": "assets/array-fYdIpUa7.js",
+          "kind": "async",
+          "rawBytes": 114,
+          "gzipBytes": 121
+        },
+        {
+          "fileName": "assets/blockDiagram-677ZJIJ3-B6N1TjQh.js",
+          "kind": "async",
+          "rawBytes": 73709,
+          "gzipBytes": 21027
+        },
+        {
+          "fileName": "assets/c4Diagram-LMCZKHZV-D_FMhTNb.js",
+          "kind": "async",
+          "rawBytes": 69944,
+          "gzipBytes": 19458
+        },
+        {
+          "fileName": "assets/channel-DRi5HPdJ.js",
+          "kind": "async",
+          "rawBytes": 115,
+          "gzipBytes": 125
+        },
+        {
+          "fileName": "assets/chunk-2Q5K7J3B-Bmta98XQ.js",
+          "kind": "async",
+          "rawBytes": 197,
+          "gzipBytes": 169
+        },
+        {
+          "fileName": "assets/chunk-32BRIVSS-BgRuJ144.js",
+          "kind": "async",
+          "rawBytes": 1994,
+          "gzipBytes": 899
+        },
+        {
+          "fileName": "assets/chunk-52WLFC77-DlIaSk2C.js",
+          "kind": "async",
+          "rawBytes": 34318,
+          "gzipBytes": 7428
+        },
+        {
+          "fileName": "assets/chunk-5FCAYU7R-qHNeWYFu.js",
+          "kind": "async",
+          "rawBytes": 480,
+          "gzipBytes": 340
+        },
+        {
+          "fileName": "assets/chunk-5HE753X5-CBZlTva6.js",
+          "kind": "async",
+          "rawBytes": 844,
+          "gzipBytes": 475
+        },
+        {
+          "fileName": "assets/chunk-5JV3BV7I-DxXF7sCb.js",
+          "kind": "async",
+          "rawBytes": 1686,
+          "gzipBytes": 747
+        },
+        {
+          "fileName": "assets/chunk-5TONJI2A-Cld_5AO0.js",
+          "kind": "async",
+          "rawBytes": 1061,
+          "gzipBytes": 600
+        },
+        {
+          "fileName": "assets/chunk-5VM5RSS4-gU7V5xkM.js",
+          "kind": "async",
+          "rawBytes": 363,
+          "gzipBytes": 275
+        },
+        {
+          "fileName": "assets/chunk-7BUUIJ7U-BU-LWNDh.js",
+          "kind": "async",
+          "rawBytes": 2147,
+          "gzipBytes": 842
+        },
+        {
+          "fileName": "assets/chunk-BIQX33UG-BhK4seiJ.js",
+          "kind": "async",
+          "rawBytes": 459,
+          "gzipBytes": 322
+        },
+        {
+          "fileName": "assets/chunk-C7G6YPKG-VM5ijEom.js",
+          "kind": "async",
+          "rawBytes": 1868,
+          "gzipBytes": 916
+        },
+        {
+          "fileName": "assets/chunk-CQNSW5MT-B7tWAsMP.js",
+          "kind": "async",
+          "rawBytes": 934,
+          "gzipBytes": 503
+        },
+        {
+          "fileName": "assets/chunk-CYSBUYHQ-Ddt7znuC.js",
+          "kind": "async",
+          "rawBytes": 469,
+          "gzipBytes": 321
+        },
+        {
+          "fileName": "assets/chunk-EMLP6XTP-Fl2FV6Dx.js",
+          "kind": "async",
+          "rawBytes": 461,
+          "gzipBytes": 319
+        },
+        {
+          "fileName": "assets/chunk-EX3LRPZG-f1etAuSv.js",
+          "kind": "async",
+          "rawBytes": 38217,
+          "gzipBytes": 12424
+        },
+        {
+          "fileName": "assets/chunk-FWX5IMBZ-B58EmQ3n.js",
+          "kind": "async",
+          "rawBytes": 3700,
+          "gzipBytes": 1565
+        },
+        {
+          "fileName": "assets/chunk-HOUHSVGY-D2LTGe09.js",
+          "kind": "async",
+          "rawBytes": 5980,
+          "gzipBytes": 2750
+        },
+        {
+          "fileName": "assets/chunk-ICXQ74PX-CpXIL72N.js",
+          "kind": "async",
+          "rawBytes": 31259,
+          "gzipBytes": 8609
+        },
+        {
+          "fileName": "assets/chunk-JG7HCLWE-ChGUCQAr.js",
+          "kind": "async",
+          "rawBytes": 1078,
+          "gzipBytes": 609
+        },
+        {
+          "fileName": "assets/chunk-JWPE2WC7-_mGHvYAN.js",
+          "kind": "async",
+          "rawBytes": 224,
+          "gzipBytes": 175
+        },
+        {
+          "fileName": "assets/chunk-KEIR6QF5-C5j7jEWj.js",
+          "kind": "async",
+          "rawBytes": 668913,
+          "gzipBytes": 146851
+        },
+        {
+          "fileName": "assets/chunk-MOJQB5TN-BnqDRIQZ.js",
+          "kind": "async",
+          "rawBytes": 15759,
+          "gzipBytes": 4413
+        },
+        {
+          "fileName": "assets/chunk-MOZMSUNE-C_ejUUs2.js",
+          "kind": "async",
+          "rawBytes": 904,
+          "gzipBytes": 497
+        },
+        {
+          "fileName": "assets/chunk-OGEWGWER-DiyLVtRF.js",
+          "kind": "async",
+          "rawBytes": 976,
+          "gzipBytes": 601
+        },
+        {
+          "fileName": "assets/chunk-OSBZ3O6U-D17GMs7u.js",
+          "kind": "async",
+          "rawBytes": 470,
+          "gzipBytes": 323
+        },
+        {
+          "fileName": "assets/chunk-PUDLZKDR-CyOxYly-.js",
+          "kind": "async",
+          "rawBytes": 60799,
+          "gzipBytes": 19250
+        },
+        {
+          "fileName": "assets/chunk-Q4XR5HBZ-BVo_I-mf.js",
+          "kind": "async",
+          "rawBytes": 47250,
+          "gzipBytes": 15004
+        },
+        {
+          "fileName": "assets/chunk-QBLGF6JB-PIPc3M-r.js",
+          "kind": "async",
+          "rawBytes": 462,
+          "gzipBytes": 320
+        },
+        {
+          "fileName": "assets/chunk-R7FJI6CG-UYYOQkyg.js",
+          "kind": "async",
+          "rawBytes": 1598,
+          "gzipBytes": 802
+        },
+        {
+          "fileName": "assets/chunk-RYQCIY6F-D4J_QWuq.js",
+          "kind": "async",
+          "rawBytes": 7099,
+          "gzipBytes": 2720
+        },
+        {
+          "fileName": "assets/chunk-U6XO7XAA-BNr-7fP6.js",
+          "kind": "async",
+          "rawBytes": 1148,
+          "gzipBytes": 635
+        },
+        {
+          "fileName": "assets/chunk-V7JOEXUC-C25xKL6V.js",
+          "kind": "async",
+          "rawBytes": 49318,
+          "gzipBytes": 15590
+        },
+        {
+          "fileName": "assets/chunk-VAUOI2AC-CDrfAH4N.js",
+          "kind": "async",
+          "rawBytes": 328,
+          "gzipBytes": 263
+        },
+        {
+          "fileName": "assets/chunk-VR4S4FIN-D4PitA7D.js",
+          "kind": "async",
+          "rawBytes": 581,
+          "gzipBytes": 401
+        },
+        {
+          "fileName": "assets/chunk-WYO6CB5R-BJNEUg8O.js",
+          "kind": "async",
+          "rawBytes": 236129,
+          "gzipBytes": 35835
+        },
+        {
+          "fileName": "assets/chunk-XXDRQBXY-DXLNDSF1.js",
+          "kind": "async",
+          "rawBytes": 268,
+          "gzipBytes": 235
+        },
+        {
+          "fileName": "assets/chunk-Y2CYZVJY-G3qyUOcg.js",
+          "kind": "async",
+          "rawBytes": 151,
+          "gzipBytes": 143
+        },
+        {
+          "fileName": "assets/chunk-YOTPTUD7-C6aF3uH8.js",
+          "kind": "async",
+          "rawBytes": 606,
+          "gzipBytes": 398
+        },
+        {
+          "fileName": "assets/chunk-ZGVPDNZ5-DoCK6nXE.js",
+          "kind": "async",
+          "rawBytes": 103631,
+          "gzipBytes": 25658
+        },
+        {
+          "fileName": "assets/chunk-ZIRB5QZD-C3_mWVmr.js",
+          "kind": "async",
+          "rawBytes": 42142,
+          "gzipBytes": 14218
+        },
+        {
+          "fileName": "assets/classDiagram-OUVF2IWQ-DCXNvah5.js",
+          "kind": "async",
+          "rawBytes": 795,
+          "gzipBytes": 457
+        },
+        {
+          "fileName": "assets/classDiagram-v2-EOCWNBFH-B7aav3on.js",
+          "kind": "async",
+          "rawBytes": 795,
+          "gzipBytes": 457
+        },
+        {
+          "fileName": "assets/cose-bilkent-JH36ORCC-C-EelMVc.js",
+          "kind": "async",
+          "rawBytes": 82215,
+          "gzipBytes": 22362
+        },
+        {
+          "fileName": "assets/cynefin-VYW2F7L2-D7gboFVg.js",
+          "kind": "async",
+          "rawBytes": 122,
+          "gzipBytes": 124
+        },
+        {
+          "fileName": "assets/cynefinDiagram-TSTJHNR4-BY6qRcHe.js",
+          "kind": "async",
+          "rawBytes": 10124,
+          "gzipBytes": 3629
+        },
+        {
+          "fileName": "assets/cytoscape.esm-DLEtbHFN.js",
+          "kind": "async",
+          "rawBytes": 439956,
+          "gzipBytes": 139957
+        },
+        {
+          "fileName": "assets/d2_markstream-react-61njCibJ.js",
+          "kind": "async",
+          "rawBytes": 118,
+          "gzipBytes": 126
+        },
+        {
+          "fileName": "assets/dagre-Dn8MK-EK.js",
+          "kind": "async",
+          "rawBytes": 32373,
+          "gzipBytes": 11799
+        },
+        {
+          "fileName": "assets/dagre-VKFMJZFB-DQ4HevNe.js",
+          "kind": "async",
+          "rawBytes": 8868,
+          "gzipBytes": 3433
+        },
+        {
+          "fileName": "assets/defaultLocale-BSEKTawp.js",
+          "kind": "async",
+          "rawBytes": 4686,
+          "gzipBytes": 2159
+        },
+        {
+          "fileName": "assets/diagram-FQU43EPY-C8nz0oJz.js",
+          "kind": "async",
+          "rawBytes": 10808,
+          "gzipBytes": 4175
+        },
+        {
+          "fileName": "assets/diagram-G47NLZAW-CWvS7C10.js",
+          "kind": "async",
+          "rawBytes": 15945,
+          "gzipBytes": 5649
+        },
+        {
+          "fileName": "assets/diagram-NH7WQ7WH-ML_9yk0N.js",
+          "kind": "async",
+          "rawBytes": 4343,
+          "gzipBytes": 1877
+        },
+        {
+          "fileName": "assets/diagram-OA4YK3LP-DbkkTqKr.js",
+          "kind": "async",
+          "rawBytes": 8462,
+          "gzipBytes": 3767
+        },
+        {
+          "fileName": "assets/diagram-WEI45ONY-CPHZym9p.js",
+          "kind": "async",
+          "rawBytes": 6000,
+          "gzipBytes": 2565
+        },
+        {
+          "fileName": "assets/dist-BxHZP6D3.js",
+          "kind": "async",
+          "rawBytes": 2161,
+          "gzipBytes": 981
+        },
+        {
+          "fileName": "assets/ebnfDiagram-CCIWWBDH-B4uBsDhM.js",
+          "kind": "async",
+          "rawBytes": 2130,
+          "gzipBytes": 929
+        },
+        {
+          "fileName": "assets/erDiagram-Q63AITRT-D6i5cjR7.js",
+          "kind": "async",
+          "rawBytes": 27481,
+          "gzipBytes": 9496
+        },
+        {
+          "fileName": "assets/eventmodeling-45OFAUF4-BSUjm_Xg.js",
+          "kind": "async",
+          "rawBytes": 128,
+          "gzipBytes": 130
+        },
+        {
+          "fileName": "assets/flowDiagram-23GEKE2U-CQaAPEk1.js",
+          "kind": "async",
+          "rawBytes": 615,
+          "gzipBytes": 328
+        },
+        {
+          "fileName": "assets/ganttDiagram-NO4QXBWP-BEC3MJO3.js",
+          "kind": "async",
+          "rawBytes": 70351,
+          "gzipBytes": 23413
+        },
+        {
+          "fileName": "assets/gitGraph-TEB2WS4Q-B6PCYion.js",
+          "kind": "async",
+          "rawBytes": 123,
+          "gzipBytes": 125
+        },
+        {
+          "fileName": "assets/gitGraphDiagram-IHSO6WYX-yTRORpRQ.js",
+          "kind": "async",
+          "rawBytes": 29424,
+          "gzipBytes": 8691
+        },
+        {
+          "fileName": "assets/graphlib-BusPjm7s.js",
+          "kind": "async",
+          "rawBytes": 24049,
+          "gzipBytes": 8339
+        },
+        {
+          "fileName": "assets/info-DKCQHKI2-X-FczWO8.js",
+          "kind": "async",
+          "rawBytes": 119,
+          "gzipBytes": 121
+        },
+        {
+          "fileName": "assets/infoDiagram-FWYZ7A6U-CWo0Cfnt.js",
+          "kind": "async",
+          "rawBytes": 663,
+          "gzipBytes": 431
+        },
+        {
+          "fileName": "assets/infographic_markstream-react-BUM6_Clp.js",
+          "kind": "async",
+          "rawBytes": 120,
+          "gzipBytes": 128
+        },
+        {
+          "fileName": "assets/init-DgtgB78f.js",
+          "kind": "async",
+          "rawBytes": 147,
+          "gzipBytes": 129
+        },
+        {
+          "fileName": "assets/ishikawaDiagram-FXEZZL3T-BL44zk1j.js",
+          "kind": "async",
+          "rawBytes": 17615,
+          "gzipBytes": 6671
+        },
+        {
+          "fileName": "assets/journeyDiagram-5HDEW3XC-gM9qNIBa.js",
+          "kind": "async",
+          "rawBytes": 23587,
+          "gzipBytes": 8289
+        },
+        {
+          "fileName": "assets/kanban-definition-HUTT4EX6-Fr0r6jtz.js",
+          "kind": "async",
+          "rawBytes": 20583,
+          "gzipBytes": 7255
+        },
+        {
+          "fileName": "assets/katex-C66QxSF6.js",
+          "kind": "async",
+          "rawBytes": 258106,
+          "gzipBytes": 76272
+        },
+        {
+          "fileName": "assets/languageIconExtended-DRR7G3nV-DLTOk2zA.js",
+          "kind": "async",
+          "rawBytes": 21099,
+          "gzipBytes": 8384
+        },
+        {
+          "fileName": "assets/line-DKwnp39s.js",
+          "kind": "async",
+          "rawBytes": 955,
+          "gzipBytes": 477
+        },
+        {
+          "fileName": "assets/linear-CV2uBik9.js",
+          "kind": "async",
+          "rawBytes": 5648,
+          "gzipBytes": 2299
+        },
+        {
+          "fileName": "assets/map-BwlpxpMp.js",
+          "kind": "async",
+          "rawBytes": 5088,
+          "gzipBytes": 2068
+        },
+        {
+          "fileName": "assets/markstream_markstream-react-BxvXwagh.js",
+          "kind": "async",
+          "rawBytes": 126,
+          "gzipBytes": 126
+        },
+        {
+          "fileName": "assets/mermaid-parser.core-zsOk1Dif.js",
+          "kind": "async",
+          "rawBytes": 6781,
+          "gzipBytes": 1856
+        },
+        {
+          "fileName": "assets/mermaid.core-DoCvZjO9.js",
+          "kind": "async",
+          "rawBytes": 36693,
+          "gzipBytes": 12145
+        },
+        {
+          "fileName": "assets/mhchem-B35O6yeA.js",
+          "kind": "async",
+          "rawBytes": 33261,
+          "gzipBytes": 8160
+        },
+        {
+          "fileName": "assets/mindmap-definition-LN4V7U3C-CxxVae-B.js",
+          "kind": "async",
+          "rawBytes": 23709,
+          "gzipBytes": 8004
+        },
+        {
+          "fileName": "assets/ordinal-DAZWKa5u.js",
+          "kind": "async",
+          "rawBytes": 1192,
+          "gzipBytes": 577
+        },
+        {
+          "fileName": "assets/packet-7NZHBO7P-5PDp0j97.js",
+          "kind": "async",
+          "rawBytes": 121,
+          "gzipBytes": 123
+        },
+        {
+          "fileName": "assets/path-CzDoa6my.js",
+          "kind": "async",
+          "rawBytes": 2335,
+          "gzipBytes": 1009
+        },
+        {
+          "fileName": "assets/pegDiagram-2B236MQR-Czb5cwAx.js",
+          "kind": "async",
+          "rawBytes": 2081,
+          "gzipBytes": 970
+        },
+        {
+          "fileName": "assets/pie-RZYD4A2V-QonhbrTI.js",
+          "kind": "async",
+          "rawBytes": 118,
+          "gzipBytes": 120
+        },
+        {
+          "fileName": "assets/pieDiagram-ENE6RG2P-BtUh1csq.js",
+          "kind": "async",
+          "rawBytes": 6445,
+          "gzipBytes": 2678
+        },
+        {
+          "fileName": "assets/quadrantDiagram-ABIIQ3AL-BnIYHawK.js",
+          "kind": "async",
+          "rawBytes": 33967,
+          "gzipBytes": 9823
+        },
+        {
+          "fileName": "assets/radar-I7S5WNFK-BIvwhpMp.js",
+          "kind": "async",
+          "rawBytes": 120,
+          "gzipBytes": 122
+        },
+        {
+          "fileName": "assets/railroad-3IZDKUUU-BK2ao35r.js",
+          "kind": "async",
+          "rawBytes": 123,
+          "gzipBytes": 125
+        },
+        {
+          "fileName": "assets/railroad-abnf-AHOZXSZD-71LnROqh.js",
+          "kind": "async",
+          "rawBytes": 127,
+          "gzipBytes": 128
+        },
+        {
+          "fileName": "assets/railroad-ebnf-EBAXGLYW-DK5qZUNQ.js",
+          "kind": "async",
+          "rawBytes": 127,
+          "gzipBytes": 129
+        },
+        {
+          "fileName": "assets/railroad-peg-LSFZ7HO6-qV5F0y_v.js",
+          "kind": "async",
+          "rawBytes": 126,
+          "gzipBytes": 128
+        },
+        {
+          "fileName": "assets/railroadDiagram-RFXS5EU6-Dth7AYnj.js",
+          "kind": "async",
+          "rawBytes": 1716,
+          "gzipBytes": 801
+        },
+        {
+          "fileName": "assets/requirementDiagram-TGXJPOKE-CBYmluaE.js",
+          "kind": "async",
+          "rawBytes": 31378,
+          "gzipBytes": 9793
+        },
+        {
+          "fileName": "assets/rough.esm-BWkXjiC2.js",
+          "kind": "async",
+          "rawBytes": 27810,
+          "gzipBytes": 9156
+        },
+        {
+          "fileName": "assets/sankeyDiagram-HTMAVEWB-ZPxrBa_C.js",
+          "kind": "async",
+          "rawBytes": 23183,
+          "gzipBytes": 8548
+        },
+        {
+          "fileName": "assets/sequenceDiagram-DBY2YBRQ-CFlir9z3.js",
+          "kind": "async",
+          "rawBytes": 117089,
+          "gzipBytes": 30924
+        },
+        {
+          "fileName": "assets/sizeCapture-X5ZJPWSS-DJAOk72N.js",
+          "kind": "async",
+          "rawBytes": 881,
+          "gzipBytes": 506
+        },
+        {
+          "fileName": "assets/src-Dm75vqBI.js",
+          "kind": "async",
+          "rawBytes": 47975,
+          "gzipBytes": 16813
+        },
+        {
+          "fileName": "assets/stateDiagram-2N3HPSRC-CJwv_eiT.js",
+          "kind": "async",
+          "rawBytes": 10780,
+          "gzipBytes": 3808
+        },
+        {
+          "fileName": "assets/stateDiagram-v2-6OUMAXLB-CyehGNNh.js",
+          "kind": "async",
+          "rawBytes": 803,
+          "gzipBytes": 460
+        },
+        {
+          "fileName": "assets/swimlanes-5IMT3BWC-ffy8K-R8.js",
+          "kind": "async",
+          "rawBytes": 118724,
+          "gzipBytes": 43256
+        },
+        {
+          "fileName": "assets/swimlanesDiagram-G3AALYLV-IkKaPckl.js",
+          "kind": "async",
+          "rawBytes": 874,
+          "gzipBytes": 499
+        },
+        {
+          "fileName": "assets/timeline-definition-FHXFAJF6-CUmKhsl_.js",
+          "kind": "async",
+          "rawBytes": 30933,
+          "gzipBytes": 10222
+        },
+        {
+          "fileName": "assets/treeView-QDETBFTQ-g-tNH80j.js",
+          "kind": "async",
+          "rawBytes": 123,
+          "gzipBytes": 125
+        },
+        {
+          "fileName": "assets/treemap-6X3UGDF4-DGYAA3nc.js",
+          "kind": "async",
+          "rawBytes": 122,
+          "gzipBytes": 124
+        },
+        {
+          "fileName": "assets/vennDiagram-L72KCM5P-CJCHqAVr.js",
+          "kind": "async",
+          "rawBytes": 42054,
+          "gzipBytes": 15613
+        },
+        {
+          "fileName": "assets/wardley-OPB4EBWU-4fWJt9vb.js",
+          "kind": "async",
+          "rawBytes": 122,
+          "gzipBytes": 124
+        },
+        {
+          "fileName": "assets/wardleyDiagram-EHGQE667-DL0xQOal.js",
+          "kind": "async",
+          "rawBytes": 25564,
+          "gzipBytes": 6779
+        },
+        {
+          "fileName": "assets/xychartDiagram-FW5EYKEG-CRN2rrlI.js",
+          "kind": "async",
+          "rawBytes": 42070,
+          "gzipBytes": 11906
+        },
+        {
+          "fileName": "assets/markstream-CswOmBlw.css",
+          "kind": "asset",
+          "rawBytes": 63469,
+          "gzipBytes": 11018
+        }
+      ]
+    }
+  },
+  "results": {
+    "completed": {
+      "cradle": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 172.79999995231628,
+            "ingestMs": 42.299999952316284,
+            "settleMs": 121.39999997615814,
+            "frameCount": 10,
+            "maxFrameGapMs": 45.86800000000005,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 0,
+            "longTaskCount": 1,
+            "longTaskMs": 52,
+            "maxLongTaskMs": 52,
+            "domElements": 530,
+            "htmlBytes": 19574,
+            "textChars": 10832,
+            "mutationCount": 208,
+            "endSentinelVisible": true,
+            "taskMs": 63.987,
+            "cpuPercent": 37.029513899107094,
+            "scriptMs": 0.393,
+            "layoutMs": 5.321000000000001,
+            "styleMs": 0.48500000000000004,
+            "heapDeltaBytes": 1782380,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 160.89999997615814,
+            "ingestMs": 37,
+            "settleMs": 117.60000002384186,
+            "frameCount": 10,
+            "maxFrameGapMs": 51.833999999999946,
+            "framesOver25Ms": 1,
+            "framesOver50Ms": 1,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 530,
+            "htmlBytes": 19574,
+            "textChars": 10832,
+            "mutationCount": 208,
+            "endSentinelVisible": true,
+            "taskMs": 56.29899999999999,
+            "cpuPercent": 34.99005594054834,
+            "scriptMs": 0.374,
+            "layoutMs": 5.191999999999999,
+            "styleMs": 0.513,
+            "heapDeltaBytes": 1767192,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 163.5,
+            "ingestMs": 38.5,
+            "settleMs": 117.5,
+            "frameCount": 10,
+            "maxFrameGapMs": 28.5,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 530,
+            "htmlBytes": 19574,
+            "textChars": 10832,
+            "mutationCount": 208,
+            "endSentinelVisible": true,
+            "taskMs": 57.410000000000004,
+            "cpuPercent": 35.1131498470948,
+            "scriptMs": 0.34400000000000003,
+            "layoutMs": 5.399,
+            "styleMs": 0.535,
+            "heapDeltaBytes": 1768064,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 158.89999997615814,
+            "ingestMs": 38.700000047683716,
+            "settleMs": 112.29999995231628,
+            "frameCount": 10,
+            "maxFrameGapMs": 47.73400000000004,
+            "framesOver25Ms": 1,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 530,
+            "htmlBytes": 19574,
+            "textChars": 10832,
+            "mutationCount": 208,
+            "endSentinelVisible": true,
+            "taskMs": 58.69599999999999,
+            "cpuPercent": 36.938955323352374,
+            "scriptMs": 0.365,
+            "layoutMs": 5.112,
+            "styleMs": 0.536,
+            "heapDeltaBytes": 1779940,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 172.39999997615814,
+            "ingestMs": 38.5,
+            "settleMs": 126,
+            "frameCount": 11,
+            "maxFrameGapMs": 27.699999999999932,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 530,
+            "htmlBytes": 19574,
+            "textChars": 10832,
+            "mutationCount": 208,
+            "endSentinelVisible": true,
+            "taskMs": 59.44700000000001,
+            "cpuPercent": 34.48201856625357,
+            "scriptMs": 0.35,
+            "layoutMs": 5.031,
+            "styleMs": 0.501,
+            "heapDeltaBytes": 1767192,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 163.5,
+              "p95": 172.79999995231628,
+              "min": 158.89999997615814,
+              "max": 172.79999995231628
+            },
+            "ingestMs": {
+              "median": 38.5,
+              "p95": 42.299999952316284,
+              "min": 37,
+              "max": 42.299999952316284
+            },
+            "settleMs": {
+              "median": 117.60000002384186,
+              "p95": 126,
+              "min": 112.29999995231628,
+              "max": 126
+            },
+            "frameCount": {
+              "median": 10,
+              "p95": 11,
+              "min": 10,
+              "max": 11
+            },
+            "maxFrameGapMs": {
+              "median": 45.86800000000005,
+              "p95": 51.833999999999946,
+              "min": 27.699999999999932,
+              "max": 51.833999999999946
+            },
+            "framesOver25Ms": {
+              "median": 2,
+              "p95": 2,
+              "min": 1,
+              "max": 2
+            },
+            "framesOver50Ms": {
+              "median": 0,
+              "p95": 1,
+              "min": 0,
+              "max": 1
+            },
+            "longTaskCount": {
+              "median": 0,
+              "p95": 1,
+              "min": 0,
+              "max": 1
+            },
+            "longTaskMs": {
+              "median": 0,
+              "p95": 52,
+              "min": 0,
+              "max": 52
+            },
+            "maxLongTaskMs": {
+              "median": 0,
+              "p95": 52,
+              "min": 0,
+              "max": 52
+            },
+            "domElements": {
+              "median": 530,
+              "p95": 530,
+              "min": 530,
+              "max": 530
+            },
+            "htmlBytes": {
+              "median": 19574,
+              "p95": 19574,
+              "min": 19574,
+              "max": 19574
+            },
+            "textChars": {
+              "median": 10832,
+              "p95": 10832,
+              "min": 10832,
+              "max": 10832
+            },
+            "mutationCount": {
+              "median": 208,
+              "p95": 208,
+              "min": 208,
+              "max": 208
+            },
+            "taskMs": {
+              "median": 58.69599999999999,
+              "p95": 63.987,
+              "min": 56.29899999999999,
+              "max": 63.987
+            },
+            "cpuPercent": {
+              "median": 35.1131498470948,
+              "p95": 37.029513899107094,
+              "min": 34.48201856625357,
+              "max": 37.029513899107094
+            },
+            "scriptMs": {
+              "median": 0.365,
+              "p95": 0.393,
+              "min": 0.34400000000000003,
+              "max": 0.393
+            },
+            "layoutMs": {
+              "median": 5.191999999999999,
+              "p95": 5.399,
+              "min": 5.031,
+              "max": 5.399
+            },
+            "styleMs": {
+              "median": 0.513,
+              "p95": 0.536,
+              "min": 0.48500000000000004,
+              "max": 0.536
+            },
+            "heapDeltaBytes": {
+              "median": 1768064,
+              "p95": 1782380,
+              "min": 1767192,
+              "max": 1782380
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 28,
+              "p95": 28,
+              "min": 28,
+              "max": 28
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      },
+      "markstream": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 231.60000002384186,
+            "ingestMs": 64.80000007152557,
+            "settleMs": 153.60000002384186,
+            "frameCount": 12,
+            "maxFrameGapMs": 80.1339999999999,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 88,
+            "maxLongTaskMs": 88,
+            "domElements": 2155,
+            "htmlBytes": 111950,
+            "textChars": 10270,
+            "mutationCount": 122,
+            "endSentinelVisible": true,
+            "taskMs": 115.818,
+            "cpuPercent": 50.00777201557738,
+            "scriptMs": 19.523,
+            "layoutMs": 8.359,
+            "styleMs": 1.171,
+            "heapDeltaBytes": 2739056,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 230.5,
+            "ingestMs": 63.60000002384186,
+            "settleMs": 154.79999995231628,
+            "frameCount": 11,
+            "maxFrameGapMs": 77.89999999999998,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 84,
+            "maxLongTaskMs": 84,
+            "domElements": 2155,
+            "htmlBytes": 111950,
+            "textChars": 10270,
+            "mutationCount": 122,
+            "endSentinelVisible": true,
+            "taskMs": 114.07100000000001,
+            "cpuPercent": 49.488503253796104,
+            "scriptMs": 19.604,
+            "layoutMs": 7.093,
+            "styleMs": 1.038,
+            "heapDeltaBytes": 2741196,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 229.29999995231628,
+            "ingestMs": 61.60000002384186,
+            "settleMs": 157,
+            "frameCount": 13,
+            "maxFrameGapMs": 81.43400000000008,
+            "framesOver25Ms": 1,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 81,
+            "maxLongTaskMs": 81,
+            "domElements": 2155,
+            "htmlBytes": 111950,
+            "textChars": 10270,
+            "mutationCount": 122,
+            "endSentinelVisible": true,
+            "taskMs": 111.599,
+            "cpuPercent": 48.669428706152374,
+            "scriptMs": 19.02,
+            "layoutMs": 7.548,
+            "styleMs": 1.1720000000000002,
+            "heapDeltaBytes": 2739408,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 237.89999997615814,
+            "ingestMs": 69.20000004768372,
+            "settleMs": 152.29999995231628,
+            "frameCount": 11,
+            "maxFrameGapMs": 92.33399999999995,
+            "framesOver25Ms": 3,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 95,
+            "maxLongTaskMs": 95,
+            "domElements": 2155,
+            "htmlBytes": 111950,
+            "textChars": 10270,
+            "mutationCount": 122,
+            "endSentinelVisible": true,
+            "taskMs": 121.32600000000002,
+            "cpuPercent": 50.998738971063084,
+            "scriptMs": 19.084,
+            "layoutMs": 7.933000000000001,
+            "styleMs": 1.105,
+            "heapDeltaBytes": 2739180,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 233.39999997615814,
+            "ingestMs": 63.90000009536743,
+            "settleMs": 158.39999997615814,
+            "frameCount": 11,
+            "maxFrameGapMs": 98.20000000000005,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 84,
+            "maxLongTaskMs": 84,
+            "domElements": 2155,
+            "htmlBytes": 111950,
+            "textChars": 10270,
+            "mutationCount": 122,
+            "endSentinelVisible": true,
+            "taskMs": 113.57100000000001,
+            "cpuPercent": 48.65938303838959,
+            "scriptMs": 19.139,
+            "layoutMs": 7.479,
+            "styleMs": 1.081,
+            "heapDeltaBytes": 2739360,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 231.60000002384186,
+              "p95": 237.89999997615814,
+              "min": 229.29999995231628,
+              "max": 237.89999997615814
+            },
+            "ingestMs": {
+              "median": 63.90000009536743,
+              "p95": 69.20000004768372,
+              "min": 61.60000002384186,
+              "max": 69.20000004768372
+            },
+            "settleMs": {
+              "median": 154.79999995231628,
+              "p95": 158.39999997615814,
+              "min": 152.29999995231628,
+              "max": 158.39999997615814
+            },
+            "frameCount": {
+              "median": 11,
+              "p95": 13,
+              "min": 11,
+              "max": 13
+            },
+            "maxFrameGapMs": {
+              "median": 81.43400000000008,
+              "p95": 98.20000000000005,
+              "min": 77.89999999999998,
+              "max": 98.20000000000005
+            },
+            "framesOver25Ms": {
+              "median": 2,
+              "p95": 3,
+              "min": 1,
+              "max": 3
+            },
+            "framesOver50Ms": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "longTaskCount": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "longTaskMs": {
+              "median": 84,
+              "p95": 95,
+              "min": 81,
+              "max": 95
+            },
+            "maxLongTaskMs": {
+              "median": 84,
+              "p95": 95,
+              "min": 81,
+              "max": 95
+            },
+            "domElements": {
+              "median": 2155,
+              "p95": 2155,
+              "min": 2155,
+              "max": 2155
+            },
+            "htmlBytes": {
+              "median": 111950,
+              "p95": 111950,
+              "min": 111950,
+              "max": 111950
+            },
+            "textChars": {
+              "median": 10270,
+              "p95": 10270,
+              "min": 10270,
+              "max": 10270
+            },
+            "mutationCount": {
+              "median": 122,
+              "p95": 122,
+              "min": 122,
+              "max": 122
+            },
+            "taskMs": {
+              "median": 114.07100000000001,
+              "p95": 121.32600000000002,
+              "min": 111.599,
+              "max": 121.32600000000002
+            },
+            "cpuPercent": {
+              "median": 49.488503253796104,
+              "p95": 50.998738971063084,
+              "min": 48.65938303838959,
+              "max": 50.998738971063084
+            },
+            "scriptMs": {
+              "median": 19.139,
+              "p95": 19.604,
+              "min": 19.02,
+              "max": 19.604
+            },
+            "layoutMs": {
+              "median": 7.548,
+              "p95": 8.359,
+              "min": 7.093,
+              "max": 8.359
+            },
+            "styleMs": {
+              "median": 1.105,
+              "p95": 1.1720000000000002,
+              "min": 1.038,
+              "max": 1.1720000000000002
+            },
+            "heapDeltaBytes": {
+              "median": 2739360,
+              "p95": 2741196,
+              "min": 2739056,
+              "max": 2741196
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 27,
+              "p95": 27,
+              "min": 27,
+              "max": 27
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      }
+    },
+    "typical-stream": {
+      "cradle": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 12956.600000023842,
+            "ingestMs": 12818.199999928474,
+            "settleMs": 133,
+            "frameCount": 908,
+            "maxFrameGapMs": 26.40000000000009,
+            "framesOver25Ms": 123,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 127,
+            "htmlBytes": 4662,
+            "textChars": 2571,
+            "mutationCount": 12375,
+            "endSentinelVisible": true,
+            "taskMs": 1948.7189999999998,
+            "cpuPercent": 15.040357809891592,
+            "scriptMs": 1490.081,
+            "layoutMs": 85.652,
+            "styleMs": 43.102000000000004,
+            "heapDeltaBytes": 4103104,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 12955.5,
+            "ingestMs": 12829,
+            "settleMs": 118.89999997615814,
+            "frameCount": 935,
+            "maxFrameGapMs": 26.400000000000546,
+            "framesOver25Ms": 114,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 127,
+            "htmlBytes": 4662,
+            "textChars": 2571,
+            "mutationCount": 12744,
+            "endSentinelVisible": true,
+            "taskMs": 1882.1560000000002,
+            "cpuPercent": 14.527853035390375,
+            "scriptMs": 1451.552,
+            "layoutMs": 87.325,
+            "styleMs": 38.687,
+            "heapDeltaBytes": 4094776,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 12991.399999976158,
+            "ingestMs": 12861.699999928474,
+            "settleMs": 123.5,
+            "frameCount": 914,
+            "maxFrameGapMs": 26.399999999999636,
+            "framesOver25Ms": 122,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 127,
+            "htmlBytes": 4662,
+            "textChars": 2571,
+            "mutationCount": 12406,
+            "endSentinelVisible": true,
+            "taskMs": 1989.423,
+            "cpuPercent": 15.313384238832233,
+            "scriptMs": 1516.559,
+            "layoutMs": 89.448,
+            "styleMs": 41.573,
+            "heapDeltaBytes": 4115992,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 12970.5,
+            "ingestMs": 12844,
+            "settleMs": 120.5,
+            "frameCount": 911,
+            "maxFrameGapMs": 26.30000000000109,
+            "framesOver25Ms": 121,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 127,
+            "htmlBytes": 4662,
+            "textChars": 2571,
+            "mutationCount": 12357,
+            "endSentinelVisible": true,
+            "taskMs": 1996.8000000000002,
+            "cpuPercent": 15.394934659419453,
+            "scriptMs": 1526.17,
+            "layoutMs": 88.10600000000001,
+            "styleMs": 40.84,
+            "heapDeltaBytes": 4107392,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 12982.800000071526,
+            "ingestMs": 12852.200000047684,
+            "settleMs": 123.39999997615814,
+            "frameCount": 913,
+            "maxFrameGapMs": 26.600000000000364,
+            "framesOver25Ms": 120,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 127,
+            "htmlBytes": 4662,
+            "textChars": 2571,
+            "mutationCount": 12400,
+            "endSentinelVisible": true,
+            "taskMs": 1956.5059999999999,
+            "cpuPercent": 15.06998490301954,
+            "scriptMs": 1496.684,
+            "layoutMs": 86.20800000000001,
+            "styleMs": 41.272999999999996,
+            "heapDeltaBytes": 4097748,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 12970.5,
+              "p95": 12991.399999976158,
+              "min": 12955.5,
+              "max": 12991.399999976158
+            },
+            "ingestMs": {
+              "median": 12844,
+              "p95": 12861.699999928474,
+              "min": 12818.199999928474,
+              "max": 12861.699999928474
+            },
+            "settleMs": {
+              "median": 123.39999997615814,
+              "p95": 133,
+              "min": 118.89999997615814,
+              "max": 133
+            },
+            "frameCount": {
+              "median": 913,
+              "p95": 935,
+              "min": 908,
+              "max": 935
+            },
+            "maxFrameGapMs": {
+              "median": 26.40000000000009,
+              "p95": 26.600000000000364,
+              "min": 26.30000000000109,
+              "max": 26.600000000000364
+            },
+            "framesOver25Ms": {
+              "median": 121,
+              "p95": 123,
+              "min": 114,
+              "max": 123
+            },
+            "framesOver50Ms": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "longTaskCount": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "longTaskMs": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "maxLongTaskMs": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "domElements": {
+              "median": 127,
+              "p95": 127,
+              "min": 127,
+              "max": 127
+            },
+            "htmlBytes": {
+              "median": 4662,
+              "p95": 4662,
+              "min": 4662,
+              "max": 4662
+            },
+            "textChars": {
+              "median": 2571,
+              "p95": 2571,
+              "min": 2571,
+              "max": 2571
+            },
+            "mutationCount": {
+              "median": 12400,
+              "p95": 12744,
+              "min": 12357,
+              "max": 12744
+            },
+            "taskMs": {
+              "median": 1956.5059999999999,
+              "p95": 1996.8000000000002,
+              "min": 1882.1560000000002,
+              "max": 1996.8000000000002
+            },
+            "cpuPercent": {
+              "median": 15.06998490301954,
+              "p95": 15.394934659419453,
+              "min": 14.527853035390375,
+              "max": 15.394934659419453
+            },
+            "scriptMs": {
+              "median": 1496.684,
+              "p95": 1526.17,
+              "min": 1451.552,
+              "max": 1526.17
+            },
+            "layoutMs": {
+              "median": 87.325,
+              "p95": 89.448,
+              "min": 85.652,
+              "max": 89.448
+            },
+            "styleMs": {
+              "median": 41.272999999999996,
+              "p95": 43.102000000000004,
+              "min": 38.687,
+              "max": 43.102000000000004
+            },
+            "heapDeltaBytes": {
+              "median": 4103104,
+              "p95": 4115992,
+              "min": 4094776,
+              "max": 4115992
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 28,
+              "p95": 28,
+              "min": 28,
+              "max": 28
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      },
+      "markstream": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 14893,
+            "ingestMs": 12847.099999904633,
+            "settleMs": 2035.5,
+            "frameCount": 1042,
+            "maxFrameGapMs": 26.600000000000364,
+            "framesOver25Ms": 140,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 863,
+            "htmlBytes": 31733,
+            "textChars": 2438,
+            "mutationCount": 710,
+            "endSentinelVisible": true,
+            "taskMs": 1346.28,
+            "cpuPercent": 9.039683072584435,
+            "scriptMs": 961.31,
+            "layoutMs": 49.149,
+            "styleMs": 15.389,
+            "heapDeltaBytes": 3696580,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 14901.600000023842,
+            "ingestMs": 12858.100000023842,
+            "settleMs": 2028.1000000238419,
+            "frameCount": 1039,
+            "maxFrameGapMs": 26.699999999999818,
+            "framesOver25Ms": 141,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 843,
+            "htmlBytes": 31473,
+            "textChars": 2438,
+            "mutationCount": 716,
+            "endSentinelVisible": true,
+            "taskMs": 1317.983,
+            "cpuPercent": 8.844573737034219,
+            "scriptMs": 945.164,
+            "layoutMs": 49.33,
+            "styleMs": 15.103,
+            "heapDeltaBytes": 3701116,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 15001.699999928474,
+            "ingestMs": 12858.399999976158,
+            "settleMs": 2127.6999999284744,
+            "frameCount": 1031,
+            "maxFrameGapMs": 26.30000000000109,
+            "framesOver25Ms": 126,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 871,
+            "htmlBytes": 31837,
+            "textChars": 2438,
+            "mutationCount": 709,
+            "endSentinelVisible": true,
+            "taskMs": 1326.916,
+            "cpuPercent": 8.845104221563732,
+            "scriptMs": 952.954,
+            "layoutMs": 50.957,
+            "styleMs": 15.334,
+            "heapDeltaBytes": 3711800,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 14922.400000095367,
+            "ingestMs": 12855.799999952316,
+            "settleMs": 2055.4000000953674,
+            "frameCount": 1042,
+            "maxFrameGapMs": 26.400000000001455,
+            "framesOver25Ms": 139,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 861,
+            "htmlBytes": 31707,
+            "textChars": 2438,
+            "mutationCount": 713,
+            "endSentinelVisible": true,
+            "taskMs": 1322.495,
+            "cpuPercent": 8.862481906339115,
+            "scriptMs": 947.671,
+            "layoutMs": 46.269,
+            "styleMs": 14.904,
+            "heapDeltaBytes": 3705544,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 14886.899999976158,
+            "ingestMs": 12824.399999976158,
+            "settleMs": 2052.399999976158,
+            "frameCount": 1041,
+            "maxFrameGapMs": 26.30000000000109,
+            "framesOver25Ms": 138,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 855,
+            "htmlBytes": 31629,
+            "textChars": 2438,
+            "mutationCount": 714,
+            "endSentinelVisible": true,
+            "taskMs": 1080.693,
+            "cpuPercent": 7.2593555407890875,
+            "scriptMs": 754.2710000000001,
+            "layoutMs": 41.404999999999994,
+            "styleMs": 13.142,
+            "heapDeltaBytes": 3712704,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 14901.600000023842,
+              "p95": 15001.699999928474,
+              "min": 14886.899999976158,
+              "max": 15001.699999928474
+            },
+            "ingestMs": {
+              "median": 12855.799999952316,
+              "p95": 12858.399999976158,
+              "min": 12824.399999976158,
+              "max": 12858.399999976158
+            },
+            "settleMs": {
+              "median": 2052.399999976158,
+              "p95": 2127.6999999284744,
+              "min": 2028.1000000238419,
+              "max": 2127.6999999284744
+            },
+            "frameCount": {
+              "median": 1041,
+              "p95": 1042,
+              "min": 1031,
+              "max": 1042
+            },
+            "maxFrameGapMs": {
+              "median": 26.400000000001455,
+              "p95": 26.699999999999818,
+              "min": 26.30000000000109,
+              "max": 26.699999999999818
+            },
+            "framesOver25Ms": {
+              "median": 139,
+              "p95": 141,
+              "min": 126,
+              "max": 141
+            },
+            "framesOver50Ms": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "longTaskCount": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "longTaskMs": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "maxLongTaskMs": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "domElements": {
+              "median": 861,
+              "p95": 871,
+              "min": 843,
+              "max": 871
+            },
+            "htmlBytes": {
+              "median": 31707,
+              "p95": 31837,
+              "min": 31473,
+              "max": 31837
+            },
+            "textChars": {
+              "median": 2438,
+              "p95": 2438,
+              "min": 2438,
+              "max": 2438
+            },
+            "mutationCount": {
+              "median": 713,
+              "p95": 716,
+              "min": 709,
+              "max": 716
+            },
+            "taskMs": {
+              "median": 1322.495,
+              "p95": 1346.28,
+              "min": 1080.693,
+              "max": 1346.28
+            },
+            "cpuPercent": {
+              "median": 8.845104221563732,
+              "p95": 9.039683072584435,
+              "min": 7.2593555407890875,
+              "max": 9.039683072584435
+            },
+            "scriptMs": {
+              "median": 947.671,
+              "p95": 961.31,
+              "min": 754.2710000000001,
+              "max": 961.31
+            },
+            "layoutMs": {
+              "median": 49.149,
+              "p95": 50.957,
+              "min": 41.404999999999994,
+              "max": 50.957
+            },
+            "styleMs": {
+              "median": 15.103,
+              "p95": 15.389,
+              "min": 13.142,
+              "max": 15.389
+            },
+            "heapDeltaBytes": {
+              "median": 3705544,
+              "p95": 3712704,
+              "min": 3696580,
+              "max": 3712704
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 27,
+              "p95": 27,
+              "min": 27,
+              "max": 27
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      }
+    },
+    "paced-production": {
+      "cradle": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 2381.2000000476837,
+            "ingestMs": 2254.2999999523163,
+            "settleMs": 121.30000007152557,
+            "frameCount": 175,
+            "maxFrameGapMs": 26.299999999999955,
+            "framesOver25Ms": 20,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 344,
+            "htmlBytes": 12674,
+            "textChars": 7004,
+            "mutationCount": 2453,
+            "endSentinelVisible": true,
+            "taskMs": 387.855,
+            "cpuPercent": 16.288216025207173,
+            "scriptMs": 229.243,
+            "layoutMs": 17.72,
+            "styleMs": 9.655000000000001,
+            "heapDeltaBytes": 3478488,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 2382.7999999523163,
+            "ingestMs": 2257.5,
+            "settleMs": 118.59999990463257,
+            "frameCount": 166,
+            "maxFrameGapMs": 29.800000000000182,
+            "framesOver25Ms": 23,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 344,
+            "htmlBytes": 12674,
+            "textChars": 7004,
+            "mutationCount": 2238,
+            "endSentinelVisible": true,
+            "taskMs": 390.75899999999996,
+            "cpuPercent": 16.39915225817608,
+            "scriptMs": 225.06599999999997,
+            "layoutMs": 18.079,
+            "styleMs": 9.328,
+            "heapDeltaBytes": 3439972,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 2380.899999976158,
+            "ingestMs": 2250.399999976158,
+            "settleMs": 122.5,
+            "frameCount": 169,
+            "maxFrameGapMs": 26.200000000000273,
+            "framesOver25Ms": 22,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 344,
+            "htmlBytes": 12674,
+            "textChars": 7004,
+            "mutationCount": 2280,
+            "endSentinelVisible": true,
+            "taskMs": 380.562,
+            "cpuPercent": 15.983955647184295,
+            "scriptMs": 223.811,
+            "layoutMs": 17.944000000000003,
+            "styleMs": 8.918000000000001,
+            "heapDeltaBytes": 3458348,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 2382.9000000953674,
+            "ingestMs": 2251.7000000476837,
+            "settleMs": 125.70000004768372,
+            "frameCount": 166,
+            "maxFrameGapMs": 26.300000000000068,
+            "framesOver25Ms": 22,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 344,
+            "htmlBytes": 12674,
+            "textChars": 7004,
+            "mutationCount": 2230,
+            "endSentinelVisible": true,
+            "taskMs": 365.038,
+            "cpuPercent": 15.319065004212959,
+            "scriptMs": 210.41199999999998,
+            "layoutMs": 16.556,
+            "styleMs": 9.162,
+            "heapDeltaBytes": 3444756,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 2370.899999976158,
+            "ingestMs": 2242.2000000476837,
+            "settleMs": 122.5,
+            "frameCount": 167,
+            "maxFrameGapMs": 26.300000000000182,
+            "framesOver25Ms": 22,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 344,
+            "htmlBytes": 12674,
+            "textChars": 7004,
+            "mutationCount": 2314,
+            "endSentinelVisible": true,
+            "taskMs": 381.88500000000005,
+            "cpuPercent": 16.107174490861713,
+            "scriptMs": 225.366,
+            "layoutMs": 18.128999999999998,
+            "styleMs": 9.601,
+            "heapDeltaBytes": 3445088,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 2381.2000000476837,
+              "p95": 2382.9000000953674,
+              "min": 2370.899999976158,
+              "max": 2382.9000000953674
+            },
+            "ingestMs": {
+              "median": 2251.7000000476837,
+              "p95": 2257.5,
+              "min": 2242.2000000476837,
+              "max": 2257.5
+            },
+            "settleMs": {
+              "median": 122.5,
+              "p95": 125.70000004768372,
+              "min": 118.59999990463257,
+              "max": 125.70000004768372
+            },
+            "frameCount": {
+              "median": 167,
+              "p95": 175,
+              "min": 166,
+              "max": 175
+            },
+            "maxFrameGapMs": {
+              "median": 26.300000000000068,
+              "p95": 29.800000000000182,
+              "min": 26.200000000000273,
+              "max": 29.800000000000182
+            },
+            "framesOver25Ms": {
+              "median": 22,
+              "p95": 23,
+              "min": 20,
+              "max": 23
+            },
+            "framesOver50Ms": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "longTaskCount": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "longTaskMs": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "maxLongTaskMs": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "domElements": {
+              "median": 344,
+              "p95": 344,
+              "min": 344,
+              "max": 344
+            },
+            "htmlBytes": {
+              "median": 12674,
+              "p95": 12674,
+              "min": 12674,
+              "max": 12674
+            },
+            "textChars": {
+              "median": 7004,
+              "p95": 7004,
+              "min": 7004,
+              "max": 7004
+            },
+            "mutationCount": {
+              "median": 2280,
+              "p95": 2453,
+              "min": 2230,
+              "max": 2453
+            },
+            "taskMs": {
+              "median": 381.88500000000005,
+              "p95": 390.75899999999996,
+              "min": 365.038,
+              "max": 390.75899999999996
+            },
+            "cpuPercent": {
+              "median": 16.107174490861713,
+              "p95": 16.39915225817608,
+              "min": 15.319065004212959,
+              "max": 16.39915225817608
+            },
+            "scriptMs": {
+              "median": 225.06599999999997,
+              "p95": 229.243,
+              "min": 210.41199999999998,
+              "max": 229.243
+            },
+            "layoutMs": {
+              "median": 17.944000000000003,
+              "p95": 18.128999999999998,
+              "min": 16.556,
+              "max": 18.128999999999998
+            },
+            "styleMs": {
+              "median": 9.328,
+              "p95": 9.655000000000001,
+              "min": 8.918000000000001,
+              "max": 9.655000000000001
+            },
+            "heapDeltaBytes": {
+              "median": 3445088,
+              "p95": 3478488,
+              "min": 3439972,
+              "max": 3478488
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 28,
+              "p95": 28,
+              "min": 28,
+              "max": 28
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      },
+      "markstream": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 10609.200000047684,
+            "ingestMs": 2230.899999976158,
+            "settleMs": 8367.5,
+            "frameCount": 729,
+            "maxFrameGapMs": 26.899999999999636,
+            "framesOver25Ms": 83,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 1561,
+            "htmlBytes": 75675,
+            "textChars": 6640,
+            "mutationCount": 3230,
+            "endSentinelVisible": true,
+            "taskMs": 1610.247,
+            "cpuPercent": 15.177836217554225,
+            "scriptMs": 1293.721,
+            "layoutMs": 43.136,
+            "styleMs": 15.955,
+            "heapDeltaBytes": 4416532,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 10650.399999976158,
+            "ingestMs": 2240.7000000476837,
+            "settleMs": 8393.799999952316,
+            "frameCount": 747,
+            "maxFrameGapMs": 26.5,
+            "framesOver25Ms": 97,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 1551,
+            "htmlBytes": 75545,
+            "textChars": 6640,
+            "mutationCount": 3331,
+            "endSentinelVisible": true,
+            "taskMs": 1686.901,
+            "cpuPercent": 15.838851122997974,
+            "scriptMs": 1365.84,
+            "layoutMs": 44.722,
+            "styleMs": 15.904000000000002,
+            "heapDeltaBytes": 4664768,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 10479.899999976158,
+            "ingestMs": 2248.1999999284744,
+            "settleMs": 8217.5,
+            "frameCount": 736,
+            "maxFrameGapMs": 26.300000000000182,
+            "framesOver25Ms": 100,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 1557,
+            "htmlBytes": 75623,
+            "textChars": 6640,
+            "mutationCount": 3486,
+            "endSentinelVisible": true,
+            "taskMs": 1654.39,
+            "cpuPercent": 15.786314754947698,
+            "scriptMs": 1339.57,
+            "layoutMs": 42.452999999999996,
+            "styleMs": 16.243000000000002,
+            "heapDeltaBytes": 4660476,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 10525.099999904633,
+            "ingestMs": 2210.5,
+            "settleMs": 8303,
+            "frameCount": 737,
+            "maxFrameGapMs": 44.79999999999973,
+            "framesOver25Ms": 105,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 1553,
+            "htmlBytes": 75571,
+            "textChars": 6640,
+            "mutationCount": 3475,
+            "endSentinelVisible": true,
+            "taskMs": 1685.9869999999999,
+            "cpuPercent": 16.018726663074712,
+            "scriptMs": 1368.6750000000002,
+            "layoutMs": 43.799,
+            "styleMs": 16.015,
+            "heapDeltaBytes": 4640144,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 10561.899999976158,
+            "ingestMs": 2221,
+            "settleMs": 8329.299999952316,
+            "frameCount": 751,
+            "maxFrameGapMs": 26.90000000000009,
+            "framesOver25Ms": 101,
+            "framesOver50Ms": 0,
+            "longTaskCount": 0,
+            "longTaskMs": 0,
+            "maxLongTaskMs": 0,
+            "domElements": 1555,
+            "htmlBytes": 75597,
+            "textChars": 6640,
+            "mutationCount": 3483,
+            "endSentinelVisible": true,
+            "taskMs": 1667.168,
+            "cpuPercent": 15.784735700998526,
+            "scriptMs": 1352.055,
+            "layoutMs": 43.601,
+            "styleMs": 16.38,
+            "heapDeltaBytes": 4424576,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 10561.899999976158,
+              "p95": 10650.399999976158,
+              "min": 10479.899999976158,
+              "max": 10650.399999976158
+            },
+            "ingestMs": {
+              "median": 2230.899999976158,
+              "p95": 2248.1999999284744,
+              "min": 2210.5,
+              "max": 2248.1999999284744
+            },
+            "settleMs": {
+              "median": 8329.299999952316,
+              "p95": 8393.799999952316,
+              "min": 8217.5,
+              "max": 8393.799999952316
+            },
+            "frameCount": {
+              "median": 737,
+              "p95": 751,
+              "min": 729,
+              "max": 751
+            },
+            "maxFrameGapMs": {
+              "median": 26.899999999999636,
+              "p95": 44.79999999999973,
+              "min": 26.300000000000182,
+              "max": 44.79999999999973
+            },
+            "framesOver25Ms": {
+              "median": 100,
+              "p95": 105,
+              "min": 83,
+              "max": 105
+            },
+            "framesOver50Ms": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "longTaskCount": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "longTaskMs": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "maxLongTaskMs": {
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "domElements": {
+              "median": 1555,
+              "p95": 1561,
+              "min": 1551,
+              "max": 1561
+            },
+            "htmlBytes": {
+              "median": 75597,
+              "p95": 75675,
+              "min": 75545,
+              "max": 75675
+            },
+            "textChars": {
+              "median": 6640,
+              "p95": 6640,
+              "min": 6640,
+              "max": 6640
+            },
+            "mutationCount": {
+              "median": 3475,
+              "p95": 3486,
+              "min": 3230,
+              "max": 3486
+            },
+            "taskMs": {
+              "median": 1667.168,
+              "p95": 1686.901,
+              "min": 1610.247,
+              "max": 1686.901
+            },
+            "cpuPercent": {
+              "median": 15.786314754947698,
+              "p95": 16.018726663074712,
+              "min": 15.177836217554225,
+              "max": 16.018726663074712
+            },
+            "scriptMs": {
+              "median": 1352.055,
+              "p95": 1368.6750000000002,
+              "min": 1293.721,
+              "max": 1368.6750000000002
+            },
+            "layoutMs": {
+              "median": 43.601,
+              "p95": 44.722,
+              "min": 42.452999999999996,
+              "max": 44.722
+            },
+            "styleMs": {
+              "median": 16.015,
+              "p95": 16.38,
+              "min": 15.904000000000002,
+              "max": 16.38
+            },
+            "heapDeltaBytes": {
+              "median": 4640144,
+              "p95": 4664768,
+              "min": 4416532,
+              "max": 4664768
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 27,
+              "p95": 27,
+              "min": 27,
+              "max": 27
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      }
+    },
+    "burst-full-render": {
+      "cradle": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 2533.2000000476837,
+            "ingestMs": 2404.899999976158,
+            "settleMs": 121.60000002384186,
+            "frameCount": 10,
+            "maxFrameGapMs": 2408.5,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 2412,
+            "maxLongTaskMs": 2412,
+            "domElements": 2018,
+            "htmlBytes": 74781,
+            "textChars": 41463,
+            "mutationCount": 4227,
+            "endSentinelVisible": true,
+            "taskMs": 2432.048,
+            "cpuPercent": 96.00694773228408,
+            "scriptMs": 0.583,
+            "layoutMs": 10.847000000000001,
+            "styleMs": 1.411,
+            "heapDeltaBytes": 2615376,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 2493.2000000476837,
+            "ingestMs": 2363.5,
+            "settleMs": 123.40000009536743,
+            "frameCount": 10,
+            "maxFrameGapMs": 2377.8999999999996,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 2370,
+            "maxLongTaskMs": 2370,
+            "domElements": 2018,
+            "htmlBytes": 74781,
+            "textChars": 41463,
+            "mutationCount": 4227,
+            "endSentinelVisible": true,
+            "taskMs": 2388.288,
+            "cpuPercent": 95.79207444065149,
+            "scriptMs": 0.619,
+            "layoutMs": 8.937000000000001,
+            "styleMs": 1.5150000000000001,
+            "heapDeltaBytes": 2614940,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 2442.7000000476837,
+            "ingestMs": 2318.100000023842,
+            "settleMs": 117.30000007152557,
+            "frameCount": 9,
+            "maxFrameGapMs": 2331.334,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 2326,
+            "maxLongTaskMs": 2326,
+            "domElements": 2018,
+            "htmlBytes": 74781,
+            "textChars": 41463,
+            "mutationCount": 4227,
+            "endSentinelVisible": true,
+            "taskMs": 2345.58,
+            "cpuPercent": 96.02407172203759,
+            "scriptMs": 0.675,
+            "layoutMs": 10.234,
+            "styleMs": 1.321,
+            "heapDeltaBytes": 2512080,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 2463.600000023842,
+            "ingestMs": 2334.899999976158,
+            "settleMs": 120,
+            "frameCount": 10,
+            "maxFrameGapMs": 2330.2000000000003,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 2344,
+            "maxLongTaskMs": 2344,
+            "domElements": 2018,
+            "htmlBytes": 74781,
+            "textChars": 41463,
+            "mutationCount": 4227,
+            "endSentinelVisible": true,
+            "taskMs": 2363.445,
+            "cpuPercent": 95.93460788996296,
+            "scriptMs": 0.5609999999999999,
+            "layoutMs": 10.149000000000001,
+            "styleMs": 1.294,
+            "heapDeltaBytes": 2611620,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 2540.899999976158,
+            "ingestMs": 2418,
+            "settleMs": 116,
+            "frameCount": 10,
+            "maxFrameGapMs": 2427.034,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 2425,
+            "maxLongTaskMs": 2425,
+            "domElements": 2018,
+            "htmlBytes": 74781,
+            "textChars": 41463,
+            "mutationCount": 4227,
+            "endSentinelVisible": true,
+            "taskMs": 2444.9159999999997,
+            "cpuPercent": 96.22244086831205,
+            "scriptMs": 0.57,
+            "layoutMs": 10.116,
+            "styleMs": 1.3699999999999999,
+            "heapDeltaBytes": 2614892,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 2493.2000000476837,
+              "p95": 2540.899999976158,
+              "min": 2442.7000000476837,
+              "max": 2540.899999976158
+            },
+            "ingestMs": {
+              "median": 2363.5,
+              "p95": 2418,
+              "min": 2318.100000023842,
+              "max": 2418
+            },
+            "settleMs": {
+              "median": 120,
+              "p95": 123.40000009536743,
+              "min": 116,
+              "max": 123.40000009536743
+            },
+            "frameCount": {
+              "median": 10,
+              "p95": 10,
+              "min": 9,
+              "max": 10
+            },
+            "maxFrameGapMs": {
+              "median": 2377.8999999999996,
+              "p95": 2427.034,
+              "min": 2330.2000000000003,
+              "max": 2427.034
+            },
+            "framesOver25Ms": {
+              "median": 2,
+              "p95": 2,
+              "min": 2,
+              "max": 2
+            },
+            "framesOver50Ms": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "longTaskCount": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "longTaskMs": {
+              "median": 2370,
+              "p95": 2425,
+              "min": 2326,
+              "max": 2425
+            },
+            "maxLongTaskMs": {
+              "median": 2370,
+              "p95": 2425,
+              "min": 2326,
+              "max": 2425
+            },
+            "domElements": {
+              "median": 2018,
+              "p95": 2018,
+              "min": 2018,
+              "max": 2018
+            },
+            "htmlBytes": {
+              "median": 74781,
+              "p95": 74781,
+              "min": 74781,
+              "max": 74781
+            },
+            "textChars": {
+              "median": 41463,
+              "p95": 41463,
+              "min": 41463,
+              "max": 41463
+            },
+            "mutationCount": {
+              "median": 4227,
+              "p95": 4227,
+              "min": 4227,
+              "max": 4227
+            },
+            "taskMs": {
+              "median": 2388.288,
+              "p95": 2444.9159999999997,
+              "min": 2345.58,
+              "max": 2444.9159999999997
+            },
+            "cpuPercent": {
+              "median": 96.00694773228408,
+              "p95": 96.22244086831205,
+              "min": 95.79207444065149,
+              "max": 96.22244086831205
+            },
+            "scriptMs": {
+              "median": 0.583,
+              "p95": 0.675,
+              "min": 0.5609999999999999,
+              "max": 0.675
+            },
+            "layoutMs": {
+              "median": 10.149000000000001,
+              "p95": 10.847000000000001,
+              "min": 8.937000000000001,
+              "max": 10.847000000000001
+            },
+            "styleMs": {
+              "median": 1.3699999999999999,
+              "p95": 1.5150000000000001,
+              "min": 1.294,
+              "max": 1.5150000000000001
+            },
+            "heapDeltaBytes": {
+              "median": 2614892,
+              "p95": 2615376,
+              "min": 2512080,
+              "max": 2615376
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 28,
+              "p95": 28,
+              "min": 28,
+              "max": 28
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      },
+      "markstream": {
+        "samples": [
+          {
+            "status": "failed",
+            "error": "page.evaluate: Error: Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.\n    at getRootForUpdatedFiber (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:2633:166)\n    at enqueueUpdate (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:3941:11)\n    at updateContainerImpl (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:11263:14)\n    at ReactDOMHydrationRoot.render.ReactDOMRoot.render (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:14268:4)\n    at http://127.0.0.1:5173/src/renderers/markstream.tsx:45:10\n    at exports.flushSync (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom.js?v=41a8f471:79:68)\n    at Object.render (http://127.0.0.1:5173/src/renderers/markstream.tsx:10:4)\n    at run (http://127.0.0.1:5173/src/main.tsx:82:13)\n    at Object.run (http://127.0.0.1:5173/src/main.tsx:123:22)\n    at eval (eval at evaluate (:302:30), <anonymous>:1:34)",
+            "taskMs": 294.768
+          },
+          {
+            "status": "failed",
+            "error": "page.evaluate: Error: Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.\n    at getRootForUpdatedFiber (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:2633:166)\n    at enqueueUpdate (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:3941:11)\n    at updateContainerImpl (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:11263:14)\n    at ReactDOMHydrationRoot.render.ReactDOMRoot.render (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:14268:4)\n    at http://127.0.0.1:5173/src/renderers/markstream.tsx:45:10\n    at exports.flushSync (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom.js?v=41a8f471:79:68)\n    at Object.render (http://127.0.0.1:5173/src/renderers/markstream.tsx:10:4)\n    at run (http://127.0.0.1:5173/src/main.tsx:82:13)\n    at Object.run (http://127.0.0.1:5173/src/main.tsx:123:22)\n    at eval (eval at evaluate (:302:30), <anonymous>:1:34)",
+            "taskMs": 294.324
+          },
+          {
+            "status": "failed",
+            "error": "page.evaluate: Error: Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.\n    at getRootForUpdatedFiber (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:2633:166)\n    at enqueueUpdate (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:3941:11)\n    at updateContainerImpl (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:11263:14)\n    at ReactDOMHydrationRoot.render.ReactDOMRoot.render (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:14268:4)\n    at http://127.0.0.1:5173/src/renderers/markstream.tsx:45:10\n    at exports.flushSync (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom.js?v=41a8f471:79:68)\n    at Object.render (http://127.0.0.1:5173/src/renderers/markstream.tsx:10:4)\n    at run (http://127.0.0.1:5173/src/main.tsx:82:13)\n    at Object.run (http://127.0.0.1:5173/src/main.tsx:123:22)\n    at eval (eval at evaluate (:302:30), <anonymous>:1:34)",
+            "taskMs": 300.126
+          },
+          {
+            "status": "failed",
+            "error": "page.evaluate: Error: Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.\n    at getRootForUpdatedFiber (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:2633:166)\n    at enqueueUpdate (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:3941:11)\n    at updateContainerImpl (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:11263:14)\n    at ReactDOMHydrationRoot.render.ReactDOMRoot.render (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:14268:4)\n    at http://127.0.0.1:5173/src/renderers/markstream.tsx:45:10\n    at exports.flushSync (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom.js?v=41a8f471:79:68)\n    at Object.render (http://127.0.0.1:5173/src/renderers/markstream.tsx:10:4)\n    at run (http://127.0.0.1:5173/src/main.tsx:82:13)\n    at Object.run (http://127.0.0.1:5173/src/main.tsx:123:22)\n    at eval (eval at evaluate (:302:30), <anonymous>:1:34)",
+            "taskMs": 293.59000000000003
+          },
+          {
+            "status": "failed",
+            "error": "page.evaluate: Error: Maximum update depth exceeded. This can happen when a component repeatedly calls setState inside componentWillUpdate or componentDidUpdate. React limits the number of nested updates to prevent infinite loops.\n    at getRootForUpdatedFiber (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:2633:166)\n    at enqueueUpdate (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:3941:11)\n    at updateContainerImpl (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:11263:14)\n    at ReactDOMHydrationRoot.render.ReactDOMRoot.render (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom_client.js?v=fa75deac:14268:4)\n    at http://127.0.0.1:5173/src/renderers/markstream.tsx:45:10\n    at exports.flushSync (http://127.0.0.1:5173/@fs/Users/wibus/Library/Application%20Support/@cradle/desktop/data/worktrees/40581f80-66c1-4509-8b5f-8e6350785d7f/78fccbc1-benchmark-streamdown-https-github-com-si/packages/streamdown/node_modules/.vite/deps/react-dom.js?v=41a8f471:79:68)\n    at Object.render (http://127.0.0.1:5173/src/renderers/markstream.tsx:10:4)\n    at run (http://127.0.0.1:5173/src/main.tsx:82:13)\n    at Object.run (http://127.0.0.1:5173/src/main.tsx:123:22)\n    at eval (eval at evaluate (:302:30), <anonymous>:1:34)",
+            "taskMs": 291.97299999999996
+          }
+        ],
+        "summary": {
+          "successfulSamples": 0,
+          "failedSamples": 5
+        }
+      }
+    },
+    "long-document": {
+      "cradle": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 372.5,
+            "ingestMs": 252,
+            "settleMs": 113.09999990463257,
+            "frameCount": 7,
+            "maxFrameGapMs": 280.9340000000001,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 260,
+            "maxLongTaskMs": 260,
+            "domElements": 6637,
+            "htmlBytes": 247224,
+            "textChars": 137503,
+            "mutationCount": 2572,
+            "endSentinelVisible": true,
+            "taskMs": 303.46399999999994,
+            "cpuPercent": 81.46684563758387,
+            "scriptMs": 2.692,
+            "layoutMs": 24.268,
+            "styleMs": 4.424,
+            "heapDeltaBytes": 1919448,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 427.8000000715256,
+            "ingestMs": 305.5,
+            "settleMs": 114.30000007152557,
+            "frameCount": 8,
+            "maxFrameGapMs": 334.79999999999995,
+            "framesOver25Ms": 1,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 314,
+            "maxLongTaskMs": 314,
+            "domElements": 6637,
+            "htmlBytes": 247224,
+            "textChars": 137503,
+            "mutationCount": 2572,
+            "endSentinelVisible": true,
+            "taskMs": 356.407,
+            "cpuPercent": 83.31159418896935,
+            "scriptMs": 2.502,
+            "layoutMs": 22.290999999999997,
+            "styleMs": 3.999,
+            "heapDeltaBytes": 1920632,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 390.3000000715256,
+            "ingestMs": 261.89999997615814,
+            "settleMs": 121.60000002384186,
+            "frameCount": 8,
+            "maxFrameGapMs": 289.9340000000001,
+            "framesOver25Ms": 3,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 269,
+            "maxLongTaskMs": 269,
+            "domElements": 6637,
+            "htmlBytes": 247224,
+            "textChars": 137503,
+            "mutationCount": 2572,
+            "endSentinelVisible": true,
+            "taskMs": 312.195,
+            "cpuPercent": 79.98847039272042,
+            "scriptMs": 2.714,
+            "layoutMs": 22.809,
+            "styleMs": 4.175,
+            "heapDeltaBytes": 1918872,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 439.5,
+            "ingestMs": 311.8000000715256,
+            "settleMs": 120.39999997615814,
+            "frameCount": 8,
+            "maxFrameGapMs": 339.7339999999999,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 320,
+            "maxLongTaskMs": 320,
+            "domElements": 6637,
+            "htmlBytes": 247224,
+            "textChars": 137503,
+            "mutationCount": 2572,
+            "endSentinelVisible": true,
+            "taskMs": 363.32,
+            "cpuPercent": 82.66666666666667,
+            "scriptMs": 2.699,
+            "layoutMs": 23.093,
+            "styleMs": 4.452,
+            "heapDeltaBytes": 1918636,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 402.89999997615814,
+            "ingestMs": 261.90000009536743,
+            "settleMs": 134.09999990463257,
+            "frameCount": 9,
+            "maxFrameGapMs": 305.6,
+            "framesOver25Ms": 2,
+            "framesOver50Ms": 1,
+            "longTaskCount": 1,
+            "longTaskMs": 269,
+            "maxLongTaskMs": 269,
+            "domElements": 6637,
+            "htmlBytes": 247224,
+            "textChars": 137503,
+            "mutationCount": 2572,
+            "endSentinelVisible": true,
+            "taskMs": 312.65999999999997,
+            "cpuPercent": 77.60238272983415,
+            "scriptMs": 2.435,
+            "layoutMs": 23.116999999999997,
+            "styleMs": 4.233,
+            "heapDeltaBytes": 1930344,
+            "documents": 1,
+            "browserNodes": 28,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 402.89999997615814,
+              "p95": 439.5,
+              "min": 372.5,
+              "max": 439.5
+            },
+            "ingestMs": {
+              "median": 261.90000009536743,
+              "p95": 311.8000000715256,
+              "min": 252,
+              "max": 311.8000000715256
+            },
+            "settleMs": {
+              "median": 120.39999997615814,
+              "p95": 134.09999990463257,
+              "min": 113.09999990463257,
+              "max": 134.09999990463257
+            },
+            "frameCount": {
+              "median": 8,
+              "p95": 9,
+              "min": 7,
+              "max": 9
+            },
+            "maxFrameGapMs": {
+              "median": 305.6,
+              "p95": 339.7339999999999,
+              "min": 280.9340000000001,
+              "max": 339.7339999999999
+            },
+            "framesOver25Ms": {
+              "median": 2,
+              "p95": 3,
+              "min": 1,
+              "max": 3
+            },
+            "framesOver50Ms": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "longTaskCount": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "longTaskMs": {
+              "median": 269,
+              "p95": 320,
+              "min": 260,
+              "max": 320
+            },
+            "maxLongTaskMs": {
+              "median": 269,
+              "p95": 320,
+              "min": 260,
+              "max": 320
+            },
+            "domElements": {
+              "median": 6637,
+              "p95": 6637,
+              "min": 6637,
+              "max": 6637
+            },
+            "htmlBytes": {
+              "median": 247224,
+              "p95": 247224,
+              "min": 247224,
+              "max": 247224
+            },
+            "textChars": {
+              "median": 137503,
+              "p95": 137503,
+              "min": 137503,
+              "max": 137503
+            },
+            "mutationCount": {
+              "median": 2572,
+              "p95": 2572,
+              "min": 2572,
+              "max": 2572
+            },
+            "taskMs": {
+              "median": 312.65999999999997,
+              "p95": 363.32,
+              "min": 303.46399999999994,
+              "max": 363.32
+            },
+            "cpuPercent": {
+              "median": 81.46684563758387,
+              "p95": 83.31159418896935,
+              "min": 77.60238272983415,
+              "max": 83.31159418896935
+            },
+            "scriptMs": {
+              "median": 2.692,
+              "p95": 2.714,
+              "min": 2.435,
+              "max": 2.714
+            },
+            "layoutMs": {
+              "median": 23.093,
+              "p95": 24.268,
+              "min": 22.290999999999997,
+              "max": 24.268
+            },
+            "styleMs": {
+              "median": 4.233,
+              "p95": 4.452,
+              "min": 3.999,
+              "max": 4.452
+            },
+            "heapDeltaBytes": {
+              "median": 1919448,
+              "p95": 1930344,
+              "min": 1918636,
+              "max": 1930344
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 28,
+              "p95": 28,
+              "min": 28,
+              "max": 28
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      },
+      "markstream": {
+        "samples": [
+          {
+            "status": "ok",
+            "wallMs": 861.5,
+            "ingestMs": 44.89999997615814,
+            "settleMs": 803.4000000953674,
+            "frameCount": 34,
+            "maxFrameGapMs": 101.29999999999995,
+            "framesOver25Ms": 12,
+            "framesOver50Ms": 3,
+            "longTaskCount": 4,
+            "longTaskMs": 307,
+            "maxLongTaskMs": 91,
+            "domElements": 4003,
+            "htmlBytes": 209018,
+            "textChars": 19406,
+            "mutationCount": 2643,
+            "endSentinelVisible": true,
+            "taskMs": 669.856,
+            "cpuPercent": 77.75461404526988,
+            "scriptMs": 530.79,
+            "layoutMs": 32.800000000000004,
+            "styleMs": 14.064,
+            "heapDeltaBytes": 3466068,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 861.7000000476837,
+            "ingestMs": 43.199999928474426,
+            "settleMs": 806.4000000953674,
+            "frameCount": 32,
+            "maxFrameGapMs": 90.10000000000014,
+            "framesOver25Ms": 13,
+            "framesOver50Ms": 4,
+            "longTaskCount": 4,
+            "longTaskMs": 304,
+            "maxLongTaskMs": 89,
+            "domElements": 4003,
+            "htmlBytes": 209018,
+            "textChars": 19406,
+            "mutationCount": 2643,
+            "endSentinelVisible": true,
+            "taskMs": 666.481,
+            "cpuPercent": 77.34489961275607,
+            "scriptMs": 534.547,
+            "layoutMs": 31.364000000000004,
+            "styleMs": 15.179,
+            "heapDeltaBytes": 3470356,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 883.8000000715256,
+            "ingestMs": 44.89999997615814,
+            "settleMs": 823.3000000715256,
+            "frameCount": 33,
+            "maxFrameGapMs": 101.5,
+            "framesOver25Ms": 13,
+            "framesOver50Ms": 4,
+            "longTaskCount": 4,
+            "longTaskMs": 315,
+            "maxLongTaskMs": 87,
+            "domElements": 4003,
+            "htmlBytes": 209018,
+            "textChars": 19406,
+            "mutationCount": 2643,
+            "endSentinelVisible": true,
+            "taskMs": 679.66,
+            "cpuPercent": 76.90201402409996,
+            "scriptMs": 540.497,
+            "layoutMs": 32.446000000000005,
+            "styleMs": 14.831000000000001,
+            "heapDeltaBytes": 3471676,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 847,
+            "ingestMs": 43.299999952316284,
+            "settleMs": 791.1000000238419,
+            "frameCount": 33,
+            "maxFrameGapMs": 115.60000000000014,
+            "framesOver25Ms": 12,
+            "framesOver50Ms": 5,
+            "longTaskCount": 4,
+            "longTaskMs": 311,
+            "maxLongTaskMs": 125,
+            "domElements": 4003,
+            "htmlBytes": 209018,
+            "textChars": 19406,
+            "mutationCount": 2643,
+            "endSentinelVisible": true,
+            "taskMs": 657.121,
+            "cpuPercent": 77.58217237308146,
+            "scriptMs": 526.364,
+            "layoutMs": 29.977,
+            "styleMs": 14.716999999999999,
+            "heapDeltaBytes": 3471124,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          },
+          {
+            "status": "ok",
+            "wallMs": 875.8999999761581,
+            "ingestMs": 44.90000009536743,
+            "settleMs": 817.5999999046326,
+            "frameCount": 33,
+            "maxFrameGapMs": 105.10000000000002,
+            "framesOver25Ms": 12,
+            "framesOver50Ms": 4,
+            "longTaskCount": 5,
+            "longTaskMs": 369,
+            "maxLongTaskMs": 93,
+            "domElements": 4003,
+            "htmlBytes": 209018,
+            "textChars": 19406,
+            "mutationCount": 2643,
+            "endSentinelVisible": true,
+            "taskMs": 689.297,
+            "cpuPercent": 78.69585569343104,
+            "scriptMs": 550.9540000000001,
+            "layoutMs": 32.502,
+            "styleMs": 15.232000000000001,
+            "heapDeltaBytes": 3471064,
+            "documents": 1,
+            "browserNodes": 27,
+            "jsEventListeners": 159
+          }
+        ],
+        "summary": {
+          "successfulSamples": 5,
+          "failedSamples": 0,
+          "metrics": {
+            "wallMs": {
+              "median": 861.7000000476837,
+              "p95": 883.8000000715256,
+              "min": 847,
+              "max": 883.8000000715256
+            },
+            "ingestMs": {
+              "median": 44.89999997615814,
+              "p95": 44.90000009536743,
+              "min": 43.199999928474426,
+              "max": 44.90000009536743
+            },
+            "settleMs": {
+              "median": 806.4000000953674,
+              "p95": 823.3000000715256,
+              "min": 791.1000000238419,
+              "max": 823.3000000715256
+            },
+            "frameCount": {
+              "median": 33,
+              "p95": 34,
+              "min": 32,
+              "max": 34
+            },
+            "maxFrameGapMs": {
+              "median": 101.5,
+              "p95": 115.60000000000014,
+              "min": 90.10000000000014,
+              "max": 115.60000000000014
+            },
+            "framesOver25Ms": {
+              "median": 12,
+              "p95": 13,
+              "min": 12,
+              "max": 13
+            },
+            "framesOver50Ms": {
+              "median": 4,
+              "p95": 5,
+              "min": 3,
+              "max": 5
+            },
+            "longTaskCount": {
+              "median": 4,
+              "p95": 5,
+              "min": 4,
+              "max": 5
+            },
+            "longTaskMs": {
+              "median": 311,
+              "p95": 369,
+              "min": 304,
+              "max": 369
+            },
+            "maxLongTaskMs": {
+              "median": 91,
+              "p95": 125,
+              "min": 87,
+              "max": 125
+            },
+            "domElements": {
+              "median": 4003,
+              "p95": 4003,
+              "min": 4003,
+              "max": 4003
+            },
+            "htmlBytes": {
+              "median": 209018,
+              "p95": 209018,
+              "min": 209018,
+              "max": 209018
+            },
+            "textChars": {
+              "median": 19406,
+              "p95": 19406,
+              "min": 19406,
+              "max": 19406
+            },
+            "mutationCount": {
+              "median": 2643,
+              "p95": 2643,
+              "min": 2643,
+              "max": 2643
+            },
+            "taskMs": {
+              "median": 669.856,
+              "p95": 689.297,
+              "min": 657.121,
+              "max": 689.297
+            },
+            "cpuPercent": {
+              "median": 77.58217237308146,
+              "p95": 78.69585569343104,
+              "min": 76.90201402409996,
+              "max": 78.69585569343104
+            },
+            "scriptMs": {
+              "median": 534.547,
+              "p95": 550.9540000000001,
+              "min": 526.364,
+              "max": 550.9540000000001
+            },
+            "layoutMs": {
+              "median": 32.446000000000005,
+              "p95": 32.800000000000004,
+              "min": 29.977,
+              "max": 32.800000000000004
+            },
+            "styleMs": {
+              "median": 14.831000000000001,
+              "p95": 15.232000000000001,
+              "min": 14.064,
+              "max": 15.232000000000001
+            },
+            "heapDeltaBytes": {
+              "median": 3471064,
+              "p95": 3471676,
+              "min": 3466068,
+              "max": 3471676
+            },
+            "documents": {
+              "median": 1,
+              "p95": 1,
+              "min": 1,
+              "max": 1
+            },
+            "browserNodes": {
+              "median": 27,
+              "p95": 27,
+              "min": 27,
+              "max": 27
+            },
+            "jsEventListeners": {
+              "median": 159,
+              "p95": 159,
+              "min": 159,
+              "max": 159
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,13 +1,16 @@
 import {
   GitCompareLine as FileDiffIcon,
+  Refresh1Line as RefreshCwIcon,
   Scan2Line as ScanEyeIcon,
 } from '@mingcute/react'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
 import { ToggleGroup, ToggleGroupItem } from '~/components/ui/toggle-group'
+import { cn } from '~/lib/cn'
 
 import type { GitRepository } from '../../shared/types'
 import { ChangesRepositoryListView } from './changes-repository-list-view'
@@ -18,7 +21,9 @@ export type ChangesViewMode = 'type' | 'tree'
 export interface ChangesPanelViewProps {
   status: ChangesPanelStatus
   repositories: GitRepository[]
+  retrying: boolean
   initialViewMode?: ChangesViewMode
+  onRetry: () => void
   onReviewRepository: (repository: GitRepository) => void
   renderRepositoryChanges: (
     repository: GitRepository,
@@ -29,7 +34,9 @@ export interface ChangesPanelViewProps {
 export function ChangesPanelView({
   status,
   repositories,
+  retrying,
   initialViewMode = 'type',
+  onRetry,
   onReviewRepository,
   renderRepositoryChanges,
 }: ChangesPanelViewProps) {
@@ -68,6 +75,16 @@ export function ChangesPanelView({
         <div className="flex flex-col items-center gap-2">
           <FileDiffIcon className="size-5 !text-muted-foreground/30" aria-hidden />
           <p className="text-xs text-muted-foreground">{t('changes.error')}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            disabled={retrying}
+          >
+            <RefreshCwIcon className={cn('size-3.5', retrying && 'animate-spin')} aria-hidden />
+            {t('action.retry')}
+          </Button>
         </div>
       </div>
     )

@@ -1,4 +1,5 @@
 {
+  "action.retry": "Reintentar",
   "branch.checkout.error": "Error al cambiar de rama",
   "branch.create.cancel": "Cancelar creación de rama",
   "branch.create.creating": "Creando...",
@@ -31,6 +32,9 @@
   "changes.viewMode.type": "Tipo",
   "changes.viewMode.typeLabel": "Mostrar cambios por tipo",
   "graphRow.justNow": "Ahora mismo",
+  "graphRow.copyError": "No se pudo copiar el SHA del commit",
+  "graphRow.copySha": "Copiar el SHA completo del commit",
+  "graphRow.copySuccess": "SHA del commit copiado",
   "graphRow.mergedFrom": "Fusionado desde {{sha}}",
   "panel.emptyCommits": "Aún no hay commits",
   "panel.emptyRepositories": "No se encontraron repositorios Git",

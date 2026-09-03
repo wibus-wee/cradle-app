@@ -1,4 +1,5 @@
 {
+  "action.retry": "重试",
   "branch.checkout.error": "切换分支失败",
   "branch.create.cancel": "取消创建分支",
   "branch.create.creating": "创建中...",
@@ -31,6 +32,9 @@
   "changes.viewMode.type": "类型",
   "changes.viewMode.typeLabel": "按类型显示更改",
   "graphRow.justNow": "刚刚",
+  "graphRow.copyError": "无法复制 commit SHA",
+  "graphRow.copySha": "复制完整 commit SHA",
+  "graphRow.copySuccess": "已复制 commit SHA",
   "graphRow.mergedFrom": "合并自 {{sha}}",
   "panel.emptyCommits": "暂无 commit",
   "panel.emptyRepositories": "未找到 Git 仓库",

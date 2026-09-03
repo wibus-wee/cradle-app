@@ -1,10 +1,11 @@
 import {
   DownloadLine as DownloadIcon,
+  FolderOpenLine as FolderOpenIcon,
   InformationLine as InformationIcon,
   UploadLine as UploadIcon,
 } from '@mingcute/react'
 
-import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,7 @@ import {
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Spinner } from '~/components/ui/spinner'
+import { cn } from '~/lib/cn'
 
 import { SettingsGroup, SettingsPage } from './settings-container'
 import { SettingsRow } from './settings-row'
@@ -35,6 +37,7 @@ export interface DataBackupSettingsViewCopy {
   restoreDescription: string
   restoreAction: string
   unavailable: string
+  showExport: string
   confirmTitle: string
   confirmDescription: string
   confirmCancel: string
@@ -47,9 +50,11 @@ export interface DataBackupSettingsViewProps {
   busy: boolean
   statusMessage: string | null
   statusTone: 'neutral' | 'error'
+  exportedArchivePath: string | null
   pendingRestorePath: string | null
   onExport: () => void
   onChooseRestore: () => void
+  onShowExport: () => void
   onCancelRestore: () => void
   onConfirmRestore: () => void
 }
@@ -61,9 +66,11 @@ export function DataBackupSettingsView({
   busy,
   statusMessage,
   statusTone,
+  exportedArchivePath,
   pendingRestorePath,
   onExport,
   onChooseRestore,
+  onShowExport,
   onCancelRestore,
   onConfirmRestore,
 }: DataBackupSettingsViewProps) {
@@ -113,8 +120,19 @@ export function DataBackupSettingsView({
       )}
 
       {statusMessage && (
-        <Alert variant={statusTone === 'error' ? 'destructive' : 'default'}>
+        <Alert
+          variant={statusTone === 'error' ? 'destructive' : 'default'}
+          className={cn(exportedArchivePath && 'pr-32')}
+        >
           <AlertDescription className="break-words">{statusMessage}</AlertDescription>
+          {exportedArchivePath && (
+            <AlertAction>
+              <Button type="button" variant="ghost" size="xs" onClick={onShowExport}>
+                <FolderOpenIcon className="size-3.5" aria-hidden="true" />
+                {copy.showExport}
+              </Button>
+            </AlertAction>
+          )}
         </Alert>
       )}
 

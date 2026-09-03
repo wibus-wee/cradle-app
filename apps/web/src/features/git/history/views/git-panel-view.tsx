@@ -5,6 +5,9 @@ import {
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
+import { cn } from '~/lib/cn'
+
 import type { GitRepository } from '../../shared/types'
 
 export type GitPanelStatus = 'empty-workspace' | 'loading' | 'error' | 'ready'
@@ -12,6 +15,8 @@ export type GitPanelStatus = 'empty-workspace' | 'loading' | 'error' | 'ready'
 export interface GitPanelViewProps {
   status: GitPanelStatus
   repositories: GitRepository[]
+  retrying: boolean
+  onRetry: () => void
   renderRepository: (
     repository: GitRepository,
     showRepositoryHeader: boolean,
@@ -21,6 +26,8 @@ export interface GitPanelViewProps {
 export function GitPanelView({
   status,
   repositories,
+  retrying,
+  onRetry,
   renderRepository,
 }: GitPanelViewProps) {
   const { t } = useTranslation('git')
@@ -45,6 +52,16 @@ export function GitPanelView({
         <div className="flex flex-col items-center gap-2">
           <GitGraphIcon className="size-5 !text-muted-foreground/30" />
           <p className="text-xs text-muted-foreground">{t('panel.error')}</p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            disabled={retrying}
+          >
+            <RefreshCwIcon className={cn('size-3.5', retrying && 'animate-spin')} aria-hidden />
+            {t('action.retry')}
+          </Button>
         </div>
       </div>
     )

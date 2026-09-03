@@ -9,7 +9,7 @@ describe('surface store persistence', () => {
   beforeEach(() => {
     localStorage.clear()
     sessionStorage.clear()
-    useSurfaceStore.setState({ surfaces: [HOME_SURFACE] })
+    useSurfaceStore.setState({ surfaces: [HOME_SURFACE], lastClosedSurface: null })
   })
 
   it('drops invalid persisted surfaces and keeps valid old payload entries', async () => {
@@ -110,5 +110,45 @@ describe('surface store persistence', () => {
         sessionGroupId: 'group-1',
       },
     })
+  })
+
+  it('keeps one closed surface available until that surface is reopened', () => {
+    const closedSurface = {
+      id: 'chat:session-1',
+      kind: 'chat' as const,
+      title: 'Investigate retries',
+      route: { to: '/chat/$sessionId' as const, params: { sessionId: 'session-1' } },
+      order: 1,
+      closable: true,
+    }
+    const store = useSurfaceStore.getState()
+    store.syncSurface(closedSurface)
+    store.rememberClosedSurface(closedSurface)
+    store.closeSurface(closedSurface.id)
+
+    expect(useSurfaceStore.getState().lastClosedSurface).toEqual(closedSurface)
+
+    useSurfaceStore.getState().syncSurface(closedSurface)
+
+    expect(useSurfaceStore.getState().lastClosedSurface).toBeNull()
+    expect(useSurfaceStore.getState().surfaces).toContainEqual(closedSurface)
+  })
+
+  it('does not persist the closed-surface recovery target', () => {
+    const closedSurface = {
+      id: 'work:work-2',
+      kind: 'work' as const,
+      title: 'Ship recovery',
+      route: { to: '/work/$workId' as const, params: { workId: 'work-2' } },
+      order: 1,
+      closable: true,
+    }
+    useSurfaceStore.getState().rememberClosedSurface(closedSurface)
+
+    const stored = JSON.parse(localStorage.getItem(SURFACE_STORAGE_KEY) ?? '{}') as {
+      state?: Record<string, unknown>
+    }
+
+    expect(stored.state?.lastClosedSurface).toBeUndefined()
   })
 })

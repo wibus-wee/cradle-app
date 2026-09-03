@@ -94,6 +94,10 @@ export class NewChatPage {
     await expect(menu).toBeVisible({ timeout: 10_000 })
     await menu.locator('[role="menuitem"]', { hasText: label }).first().click()
     await this.page.keyboard.press('Escape')
+    if (await menu.isVisible().catch(() => false)) {
+      await this.page.keyboard.press('Escape')
+    }
+    await expect(menu).toBeHidden({ timeout: 10_000 })
   }
 
   async selectPermissionMode(label: string | RegExp): Promise<void> {
