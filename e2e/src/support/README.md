@@ -15,6 +15,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `helpers/chat-scenario.ts` | Cross-turn Chat scripts, gates, queue timing, approvals, and tool loops |
 | `helpers/automation-scenario.ts` | Gated Automation cancellation and linked Session title scripts |
 | `helpers/issue-agent-scenario.ts` | Issue delegation, rerun, and cancellation scripts |
+| `helpers/skill-scenario.ts` | Strict Workspace Skill invocation request and response script |
 | `pages/` | Stable selectors and reusable UI mechanics |
 | `database.ts` | Explicit fixture-only database support; never the proof of a user-visible outcome |
 | `world-utils.ts` | Artifact paths and scenario-safe names |
@@ -32,6 +33,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/kanban.ts` | Board, Issue detail, activity, and delegation |
 | `pages/search.ts` | Global search |
 | `pages/settings.ts` | Settings shell and appearance |
+| `pages/skills.ts` | Workspace Skill creation, Composer invocation, deletion, and Session evidence |
 | `pages/storage.ts` | Storage session inventory and destructive cleanup controls |
 | `pages/terminal.ts` | Bottom panel and PTY sessions |
 | `pages/usage.ts` | Usage dashboard, range selection, and downloaded CSV |
