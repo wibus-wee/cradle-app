@@ -4,6 +4,11 @@ import { Octokit, RequestError } from 'octokit'
 import { resolveLegacyGitHubToken } from '../github-api-token'
 import { outboundFetch } from '../outbound-network'
 import { resolveGitHubAppIdentity } from './auth-provider'
+import type { GitHubRepository } from './repository-access'
+import {
+  clearGitHubRepositoryAccessCache,
+  resolveGitHubAppRepositoryAccess,
+} from './repository-access'
 
 const GITHUB_REQUEST_TIMEOUT_MS = 20_000
 /** Below this remaining budget, non-force GETs must not hit the network. */
@@ -17,6 +22,12 @@ let rateLimitRemaining = 5000
 let rateLimitReset = 0
 let cachedOctokit: CradleOctokitInstance | null = null
 let cachedOctokitCacheKey: string | null | undefined
+
+interface GitHubCredential {
+  token: string | null
+  cacheKey: string | null
+  source: 'github-app' | 'legacy'
+}
 
 export { RequestError }
 
@@ -77,6 +88,7 @@ export function resetGitHubClientState(): void {
   rateLimitReset = 0
   cachedOctokit = null
   cachedOctokitCacheKey = undefined
+  clearGitHubRepositoryAccessCache()
 }
 
 function createOctokitFetch(): typeof fetch {
@@ -102,21 +114,14 @@ function createOctokitFetch(): typeof fetch {
   }
 }
 
-export async function getOctokit(options?: { requireToken?: boolean }): Promise<CradleOctokitInstance> {
-  const appIdentity = await resolveGitHubAppIdentity()
-  const token = appIdentity?.accessToken ?? await resolveLegacyGitHubToken()
-  const cacheKey = appIdentity?.cacheKey ?? (token ? 'legacy:process' : null)
-  if (options?.requireToken && !token) {
-    throw new GitHubAuthRequiredError()
-  }
-
-  if (cachedOctokit && cachedOctokitCacheKey === cacheKey) {
+function getOctokitForCredential(credential: GitHubCredential): CradleOctokitInstance {
+  if (cachedOctokit && cachedOctokitCacheKey === credential.cacheKey) {
     return cachedOctokit
   }
 
-  cachedOctokitCacheKey = cacheKey
+  cachedOctokitCacheKey = credential.cacheKey
   cachedOctokit = new CradleOctokit({
-    auth: token ?? undefined,
+    auth: credential.token ?? undefined,
     request: {
       timeout: GITHUB_REQUEST_TIMEOUT_MS,
       fetch: createOctokitFetch(),
@@ -127,4 +132,76 @@ export async function getOctokit(options?: { requireToken?: boolean }): Promise<
     },
   })
   return cachedOctokit
+}
+
+async function resolveGitHubCredential(repository?: GitHubRepository): Promise<GitHubCredential> {
+  const appIdentity = await resolveGitHubAppIdentity()
+  if (appIdentity) {
+    const appCredential: GitHubCredential = {
+      token: appIdentity.accessToken,
+      cacheKey: appIdentity.cacheKey,
+      source: 'github-app',
+    }
+    if (!repository) {
+      return appCredential
+    }
+
+    const legacyToken = await resolveLegacyGitHubToken()
+    if (!legacyToken) {
+      return appCredential
+    }
+
+    const appOctokit = getOctokitForCredential(appCredential)
+    const accessible = await resolveGitHubAppRepositoryAccess(
+      appOctokit,
+      appIdentity.cacheKey,
+      repository,
+    )
+    if (accessible !== false) {
+      return appCredential
+    }
+
+    return {
+      token: legacyToken,
+      cacheKey: 'legacy:process',
+      source: 'legacy',
+    }
+  }
+
+  const legacyToken = await resolveLegacyGitHubToken()
+  if (legacyToken) {
+    return {
+      token: legacyToken,
+      cacheKey: 'legacy:process',
+      source: 'legacy',
+    }
+  }
+
+  return {
+    token: null,
+    cacheKey: null,
+    source: 'legacy',
+  }
+}
+
+export async function getGitHubCacheScope(repository?: GitHubRepository): Promise<string | null> {
+  const credential = await resolveGitHubCredential(repository)
+  return credential.source === 'github-app' ? credential.cacheKey : null
+}
+
+export async function resolveGitHubRepositoryToken(
+  repository: GitHubRepository,
+): Promise<string | null> {
+  return (await resolveGitHubCredential(repository)).token
+}
+
+export async function getOctokit(options?: {
+  requireToken?: boolean
+  repository?: GitHubRepository
+}): Promise<CradleOctokitInstance> {
+  const credential = await resolveGitHubCredential(options?.repository)
+  if (options?.requireToken && !credential.token) {
+    throw new GitHubAuthRequiredError()
+  }
+  return getOctokitForCredential(credential)
 }

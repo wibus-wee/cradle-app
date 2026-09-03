@@ -6,7 +6,9 @@ The diff-review module owns Cradle Diffs review records, local worktree, branch-
 
 GitHub Auth owns connection credentials and identity selection. This module uses
 the shared GitHub API client for remote review operations and never manages
-tokens itself.
+tokens itself. Repository operations therefore use the connected App identity
+only when its installation includes the repository, with the local `gh`
+credential as the repository-level fallback.
 
 ## Files
 

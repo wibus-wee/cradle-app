@@ -9,7 +9,9 @@ import {
   isGitHubRateLimited,
   RequestError,
   resetGitHubClientState,
+  resolveGitHubRepositoryToken,
 } from './github/client'
+import type { GitHubRepository } from './github/repository-access'
 import {
   hasGitHubToken,
   resetGitHubTokenCache,
@@ -18,7 +20,12 @@ import {
 import type { CachedFetchResult } from './github-cache'
 import { deleteCache, deleteCachePrefix } from './github-cache'
 
-export { hasGitHubToken, isGitHubRateLimited, resolveGitHubToken }
+export {
+  hasGitHubToken,
+  isGitHubRateLimited,
+  resolveGitHubRepositoryToken,
+  resolveGitHubToken,
+}
 
 export class GitHubApiError extends Error {
   readonly status: number
@@ -79,6 +86,7 @@ async function restGetCached<T>(options: {
   route: string
   params: Record<string, unknown>
   path: string
+  repository: GitHubRepository
   etag?: boolean
   swr?: boolean
   mode?: GitHubReadMode
@@ -89,12 +97,14 @@ async function restGetCached<T>(options: {
     etag: options.etag,
     swr: options.swr,
     mode: options.mode ?? 'read',
+    repository: options.repository,
     fetcher: async (etag) => {
       try {
         return await octokitRestGet<T>({
           route: options.route,
           params: options.params,
           etag,
+          repository: options.repository,
         })
       }
       catch (error) {
@@ -111,9 +121,13 @@ async function restGetCached<T>(options: {
   })
 }
 
-async function graphql<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
+async function graphql<T>(
+  query: string,
+  variables: Record<string, unknown> = {},
+  repository?: GitHubRepository,
+): Promise<T> {
   try {
-    const octokit = await getOctokit({ requireToken: true })
+    const octokit = await getOctokit({ requireToken: true, repository })
     return await octokit.graphql<T>(query, variables)
   }
   catch (error) {
@@ -465,6 +479,7 @@ export function fetchPullRequest(
     route: 'GET /repos/{owner}/{repo}/pulls/{pull_number}',
     params: { owner, repo, pull_number: pr },
     path: `/repos/${owner}/${repo}/pulls/${pr}`,
+    repository: { owner, repo },
   })
 }
 
@@ -481,6 +496,7 @@ export function fetchPullRequestDetail(
     route: 'GET /repos/{owner}/{repo}/pulls/{pull_number}',
     params: { owner, repo, pull_number: pr },
     path: `/repos/${owner}/${repo}/pulls/${pr}`,
+    repository: { owner, repo },
   })
 }
 
@@ -495,9 +511,10 @@ export function fetchPullRequestComments(
     ttlS: 60,
     etag: false,
     mode,
+    repository: { owner, repo },
     fetcher: async () => {
       try {
-        const octokit = await getOctokit()
+        const octokit = await getOctokit({ repository: { owner, repo } })
         const items = await octokit.paginate(
           octokit.rest.issues.listComments,
           { owner, repo, issue_number: pr, per_page: 100 },
@@ -526,9 +543,10 @@ export function fetchPullRequestFiles(
     ttlS: 60,
     etag: false,
     mode,
+    repository: { owner, repo },
     fetcher: async () => {
       try {
-        const octokit = await getOctokit()
+        const octokit = await getOctokit({ repository: { owner, repo } })
         const items = await octokit.paginate(
           octokit.rest.pulls.listFiles,
           { owner, repo, pull_number: pr, per_page: 100 },
@@ -552,7 +570,7 @@ async function fetchPullRequestNodeId(
   pr: number,
 ): Promise<string | null> {
   try {
-    const { data } = await (await getOctokit()).rest.pulls.get({ owner, repo, pull_number: pr })
+    const { data } = await (await getOctokit({ repository: { owner, repo } })).rest.pulls.get({ owner, repo, pull_number: pr })
     return data.node_id
   }
   catch (error) {
@@ -575,10 +593,11 @@ export async function fetchCheckRuns(
     ttlS: 30,
     etag: false,
     mode,
+    repository: { owner, repo },
     fetcher: async () => {
       try {
         const runs = await paginateRest<CheckRunData>(async (page) => {
-          const { data } = await (await getOctokit()).rest.checks.listForRef({
+          const { data } = await (await getOctokit({ repository: { owner, repo } })).rest.checks.listForRef({
             owner,
             repo,
             ref,
@@ -616,7 +635,7 @@ export async function fetchCheckRun(
   checkRunId: number,
 ): Promise<CheckRunData | null> {
   try {
-    const { data } = await (await getOctokit()).rest.checks.get({
+    const { data } = await (await getOctokit({ repository: { owner, repo } })).rest.checks.get({
       owner,
       repo,
       check_run_id: checkRunId,
@@ -641,9 +660,10 @@ export async function fetchWorkflowRunsForHead(
     cacheKey: `workflow-runs:${owner}/${repo}:${headSha}`,
     ttlS: 30,
     etag: false,
+    repository: { owner, repo },
     fetcher: async () => {
       try {
-        const { data } = await (await getOctokit()).rest.actions.listWorkflowRunsForRepo({
+        const { data } = await (await getOctokit({ repository: { owner, repo } })).rest.actions.listWorkflowRunsForRepo({
           owner,
           repo,
           head_sha: headSha,
@@ -673,7 +693,7 @@ export async function fetchWorkflowRunJobs(
 ): Promise<{ total_count: number, jobs: WorkflowJobData[] } | null> {
   try {
     const jobs = await paginateRest<WorkflowJobData>(async (page) => {
-      const { data } = await (await getOctokit()).rest.actions.listJobsForWorkflowRun({
+      const { data } = await (await getOctokit({ repository: { owner, repo } })).rest.actions.listJobsForWorkflowRun({
         owner,
         repo,
         run_id: runId,
@@ -706,6 +726,7 @@ export function fetchRepo(owner: string, repo: string): Promise<RepoData | null>
     route: 'GET /repos/{owner}/{repo}',
     params: { owner, repo },
     path: `/repos/${owner}/${repo}`,
+    repository: { owner, repo },
   })
 }
 
@@ -720,6 +741,7 @@ export function fetchBranchHead(
     route: 'GET /repos/{owner}/{repo}/branches/{branch}',
     params: { owner, repo, branch },
     path: `/repos/${owner}/${repo}/branches/${branch}`,
+    repository: { owner, repo },
   }).then(data => (data ? { sha: data.commit.sha } : null))
 }
 
@@ -736,6 +758,7 @@ export function fetchCombinedStatus(
     route: 'GET /repos/{owner}/{repo}/commits/{ref}/status',
     params: { owner, repo, ref },
     path: `/repos/${owner}/${repo}/commits/${ref}/status`,
+    repository: { owner, repo },
   })
 }
 
@@ -750,9 +773,10 @@ export function fetchPullRequestReviews(
     ttlS: 60,
     etag: false,
     mode,
+    repository: { owner, repo },
     fetcher: async () => {
       try {
-        const octokit = await getOctokit()
+        const octokit = await getOctokit({ repository: { owner, repo } })
         const items = await octokit.paginate(
           octokit.rest.pulls.listReviews,
           { owner, repo, pull_number: pr, per_page: 100 },
@@ -780,12 +804,14 @@ export async function fetchBranchProtection(
   return cachedFetch({
     cacheKey: `branch-protection:${owner}/${repo}:${branch}`,
     ttlS: BRANCH_PROTECTION_CACHE_TTL_S,
+    repository: { owner, repo },
     fetcher: async (etag) => {
       try {
         const result = await octokitRestGet<BranchProtectionData>({
           route: 'GET /repos/{owner}/{repo}/branches/{branch}/protection',
           params: { owner, repo, branch },
           etag,
+          repository: { owner, repo },
         })
         return result
       }
@@ -850,6 +876,7 @@ async function loadPullRequestFingerprint(
     route: 'GET /repos/{owner}/{repo}/pulls/{pull_number}',
     params: { owner, repo, pull_number: number },
     path: `/repos/${owner}/${repo}/pulls/${number}`,
+    repository: { owner, repo },
   })
   if (!pull) {
     return null
@@ -862,6 +889,7 @@ async function loadPullRequestFingerprint(
     route: 'GET /repos/{owner}/{repo}/commits/{ref}/status',
     params: { owner, repo, ref: pull.head.sha },
     path: `/repos/${owner}/${repo}/commits/${pull.head.sha}/status`,
+    repository: { owner, repo },
   })
 
   return {
@@ -903,6 +931,7 @@ export function fetchRepoMergeSettings(
     cacheKey: `repo-merge-settings:${owner}/${repo}`,
     ttlS: 3600,
     mode,
+    repository: { owner, repo },
     fetcher: async (etag) => {
       const result = await octokitRestGet<Pick<
         RepoData,
@@ -911,6 +940,7 @@ export function fetchRepoMergeSettings(
         route: 'GET /repos/{owner}/{repo}',
         params: { owner, repo },
         etag,
+        repository: { owner, repo },
       })
       if (result.status === 304 || result.data === null) {
         return { data: null, etag: null, status: result.status }
@@ -940,7 +970,10 @@ export async function createPullRequest(input: {
   draft?: boolean
 }): Promise<PullRequestData> {
   try {
-    const { data } = await (await getOctokit({ requireToken: true })).rest.pulls.create({
+    const { data } = await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.pulls.create({
       owner: input.owner,
       repo: input.repo,
       title: input.title,
@@ -965,7 +998,10 @@ export async function updatePullRequest(input: {
   body?: string
 }): Promise<PullRequestData> {
   try {
-    const { data } = await (await getOctokit({ requireToken: true })).rest.pulls.update({
+    const { data } = await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.pulls.update({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -991,7 +1027,10 @@ export async function submitPullRequestReview(input: {
   event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT'
 }) {
   try {
-    const { data } = await (await getOctokit({ requireToken: true })).rest.pulls.createReview({
+    const { data } = await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.pulls.createReview({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -1022,7 +1061,10 @@ export async function mergePullRequest(input: {
   commitMessage?: string
 }): Promise<MergePullRequestData> {
   try {
-    const { data } = await (await getOctokit({ requireToken: true })).rest.pulls.merge({
+    const { data } = await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.pulls.merge({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -1050,7 +1092,10 @@ export async function createPullRequestIssueComment(input: {
   body: string
 }): Promise<IssueCommentData> {
   try {
-    const { data } = await (await getOctokit({ requireToken: true })).rest.issues.createComment({
+    const { data } = await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.issues.createComment({
       owner: input.owner,
       repo: input.repo,
       issue_number: input.pullRequestNumber,
@@ -1074,7 +1119,10 @@ export async function addPullRequestAssignees(input: {
   assignees: string[]
 }): Promise<void> {
   try {
-    await (await getOctokit({ requireToken: true })).rest.issues.addAssignees({
+    await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.issues.addAssignees({
       owner: input.owner,
       repo: input.repo,
       issue_number: input.pullRequestNumber,
@@ -1097,7 +1145,10 @@ export async function removePullRequestAssignees(input: {
   assignees: string[]
 }): Promise<void> {
   try {
-    await (await getOctokit({ requireToken: true })).rest.issues.removeAssignees({
+    await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.issues.removeAssignees({
       owner: input.owner,
       repo: input.repo,
       issue_number: input.pullRequestNumber,
@@ -1120,7 +1171,10 @@ export async function requestPullRequestReviewers(input: {
   reviewers: string[]
 }): Promise<void> {
   try {
-    await (await getOctokit({ requireToken: true })).rest.pulls.requestReviewers({
+    await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.pulls.requestReviewers({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -1143,7 +1197,10 @@ export async function removePullRequestReviewers(input: {
   reviewers: string[]
 }): Promise<void> {
   try {
-    await (await getOctokit({ requireToken: true })).rest.pulls.removeRequestedReviewers({
+    await (await getOctokit({
+      requireToken: true,
+      repository: input,
+    })).rest.pulls.removeRequestedReviewers({
       owner: input.owner,
       repo: input.repo,
       pull_number: input.pullRequestNumber,
@@ -1236,6 +1293,7 @@ export async function fetchPullRequestReviewThreads(
       }
       ${REVIEW_THREAD_FRAGMENT}`,
       { owner, repo, number: pullRequestNumber, after },
+      { owner, repo },
     )
     const pullRequest = data.repository?.pullRequest
     if (!pullRequest) {
@@ -1294,11 +1352,14 @@ export async function createPullRequestReviewThread(input: {
         startSide: input.startSide,
       },
     },
+    { owner: input.owner, repo: input.repo },
   )
   return data.addPullRequestReviewThread.thread
 }
 
 export async function replyToPullRequestReviewThread(input: {
+  owner: string
+  repo: string
   threadId: string
   body: string
 }) {
@@ -1310,13 +1371,16 @@ export async function replyToPullRequestReviewThread(input: {
     }
     ${REVIEW_THREAD_FRAGMENT}`,
     { input: { pullRequestReviewThreadId: input.threadId, body: input.body } },
+    { owner: input.owner, repo: input.repo },
   )
   return data.addPullRequestReviewThreadReply.thread
 }
 
-export async function resolvePullRequestReviewThread(
-  threadId: string,
-) {
+export async function resolvePullRequestReviewThread(input: {
+  owner: string
+  repo: string
+  threadId: string
+}) {
   const data = await graphql<{
     resolveReviewThread: { thread: GraphQLReviewThread }
   }>(
@@ -1324,7 +1388,8 @@ export async function resolvePullRequestReviewThread(
       resolveReviewThread(input: $input) { thread { ...CradleReviewThread } }
     }
     ${REVIEW_THREAD_FRAGMENT}`,
-    { input: { threadId } },
+    { input: { threadId: input.threadId } },
+    { owner: input.owner, repo: input.repo },
   )
   return data.resolveReviewThread.thread
 }
@@ -1368,6 +1433,7 @@ export async function markPullRequestReady(
       }
     }`,
     { pullRequestId },
+    { owner, repo },
   )
   return fetchPullRequestAfterGraphQlMutation(owner, repo, pr)
 }
@@ -1394,6 +1460,7 @@ export async function markPullRequestDraft(
       }
     }`,
     { pullRequestId },
+    { owner, repo },
   )
   return fetchPullRequestAfterGraphQlMutation(owner, repo, number)
 }
@@ -1406,6 +1473,7 @@ export async function fetchAssignableUsers(
     cacheKey: `assignable-users:${owner}/${repo}`,
     ttlS: 900,
     etag: false,
+    repository: { owner, repo },
     fetcher: async () => {
       const data = await graphql<{
         repository: {
@@ -1421,6 +1489,7 @@ export async function fetchAssignableUsers(
             }
           }
         }`,
+        { owner, repo },
         { owner, repo },
       )
       return {

@@ -11,6 +11,12 @@ the technical auth-provider port in `app.ts`; Pull Request, Diff Review,
 Session Await, and GitHub Issues consume that shared client and do not own
 credentials.
 
+The shared client checks the connected App user's installations before a
+repository-scoped operation. If the App installation does not include that
+repository, Cradle uses the local `GH_TOKEN`, `GITHUB_TOKEN`, or `gh auth token`
+credential for that repository. An expired or revoked App user connection
+still fails closed and requires reconnection.
+
 ## Routes
 
 | Method | Path | Notes |

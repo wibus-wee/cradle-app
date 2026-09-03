@@ -17,6 +17,6 @@ The external product owns issue content such as title, body, labels, assignees, 
 Settings and Kanban are host-owned surfaces. Settings creates explicit `workspaceId + sourceKey + owner/repo` bindings and can trigger refresh. Kanban reads `external_issue_items` beside native issues, marks them as external, and routes detail display to a read-only external issue panel whose only mutation is status.
 
 Refresh context may include host-owned shared access config. For GitHub sources,
-this module injects the selected Cradle App user token when connected; otherwise
-the common legacy development fallback resolves `GH_TOKEN`, `GITHUB_TOKEN`, or
+this module injects the connected App user token when its installation includes
+the bound repository. Otherwise it resolves `GH_TOKEN`, `GITHUB_TOKEN`, or
 `gh auth token`. Plugin-specific explicit configuration remains an override.
