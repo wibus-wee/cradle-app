@@ -61,6 +61,10 @@ export class AutomationPage {
     await this.dashboard().getByRole('button', { name, exact: true }).click()
   }
 
+  private runItem(runId: string): Locator {
+    return this.dashboard().getByText(runId, { exact: true }).locator('../..')
+  }
+
   async seedDefinition(): Promise<void> {
     const fixture = this.owner.workspacePage.recallCurrentWorkspace()
     const workspacesResponse = await fetch(`${this.owner.params.serverUrl}/workspaces`)
@@ -133,7 +137,7 @@ export class AutomationPage {
     await expect(triage).toContainText(DEFINITION_TITLE, { timeout: TIMEOUT })
     await expect(triage).toContainText(AUTOMATION_SUMMARY, { timeout: TIMEOUT })
     await this.openTab('Runs')
-    const run = this.dashboard().getByText(this.owner.recall<string>(RUN_ID_KEY), { exact: true }).locator('..')
+    const run = this.runItem(this.owner.recall<string>(RUN_ID_KEY))
     await expect(run).toContainText('complete', { timeout: TIMEOUT })
     await expect(run).toContainText(AUTOMATION_SUMMARY, { timeout: TIMEOUT })
   }
