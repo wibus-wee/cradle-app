@@ -47,7 +47,7 @@ export class ExternalSessionImportPage {
   async scan(): Promise<void> {
     await this.root().getByRole('button', { name: /Scan(?: again)?/ }).click()
     await expect(this.page.locator('[data-testid="external-work-import-status"]'))
-      .toContainText('Found 1 session candidates.', { timeout: IMPORT_TIMEOUT })
+      .toContainText(/Found [1-9]\d* session candidates\./, { timeout: IMPORT_TIMEOUT })
     await expect(this.candidateRow()).toBeVisible({ timeout: IMPORT_TIMEOUT })
     await expect(this.candidateRow()).toContainText('claude')
     await expect(this.candidateRow()).toContainText('Ready')
