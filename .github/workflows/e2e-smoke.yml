@@ -237,6 +237,8 @@ jobs:
         run: pnpm --filter @cradle/desktop sync:codex-runtime
 
       - name: Run the real two-node Fabric journey
+        env:
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: pnpm e2e:fabric
 
       - name: Upload Fabric E2E artifacts
@@ -305,6 +307,8 @@ jobs:
         run: pnpm --filter @cradle/desktop sync:codex-runtime
 
       - name: Run the native Mobile Fabric journey
+        env:
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: pnpm e2e:fabric:mobile:ios
 
       - name: Upload Mobile Fabric E2E artifacts

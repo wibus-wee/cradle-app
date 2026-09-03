@@ -71,37 +71,62 @@ function captureLogs(child: ChildProcess, logPath: string): void {
   child.stderr?.on('data', chunk => appendFileSync(logPath, chunk))
 }
 
+function processGroupExists(pid: number): boolean {
+  try {
+    process.kill(-pid, 0)
+    return true
+  }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+      return false
+    }
+    throw error
+  }
+}
+
+function signalProcessGroup(pid: number, signal: NodeJS.Signals): boolean {
+  try {
+    process.kill(-pid, signal)
+    return true
+  }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+      return false
+    }
+    throw error
+  }
+}
+
+async function waitForProcessGroupExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (processGroupExists(pid)) {
+    if (Date.now() >= deadline) {
+      return false
+    }
+    await new Promise(resolveWait => setTimeout(resolveWait, 50))
+  }
+  return true
+}
+
 async function stopProcess(child: ChildProcess | null, timeoutMs = 5_000): Promise<void> {
-  if (!child || child.exitCode !== null || child.signalCode !== null) {
+  const pid = child?.pid
+  if (!pid || !processGroupExists(pid)) {
     return
   }
-  if (child.pid) {
-    try {
-      process.kill(-child.pid, 'SIGTERM')
-    }
-    catch {
-      return
-    }
+
+  if (!signalProcessGroup(pid, 'SIGTERM')) {
+    return
   }
-  await new Promise<void>((resolveStop) => {
-    let settled = false
-    const finish = () => {
-      if (!settled) {
-        settled = true
-        resolveStop()
-      }
-    }
-    child.once('exit', finish)
-    setTimeout(() => {
-      if (child.pid) {
-        try {
-          process.kill(-child.pid, 'SIGKILL')
-        }
-        catch {}
-      }
-      setTimeout(finish, 500)
-    }, timeoutMs)
-  })
+  if (await waitForProcessGroupExit(pid, timeoutMs)) {
+    return
+  }
+
+  if (!signalProcessGroup(pid, 'SIGKILL')) {
+    return
+  }
+  if (!await waitForProcessGroupExit(pid, timeoutMs)) {
+    throw new Error(`Process group ${pid} did not exit after SIGKILL.`)
+  }
 }
 
 function removeTopologyData(rootDir: string): void {
@@ -170,6 +195,13 @@ async function startNode(input: {
   const serverUrl = `http://127.0.0.1:${port}`
   const nodeBinary = process.env.CRADLE_E2E_NODE ?? process.execPath
   const codexAppServerPath = resolveManagedCodexAppServerPath(ROOT)
+  // Native provider runtimes honor proxy variables. Keep the topology's
+  // loopback relay, Servers, and model simulators out of an inherited proxy.
+  const noProxy = [
+    process.env.NO_PROXY,
+    process.env.no_proxy,
+    '127.0.0.1,localhost,::1',
+  ].filter(Boolean).join(',')
   const child = spawn(nodeBinary, ['--import', 'tsx', 'src/index.ts'], {
     cwd: join(ROOT, 'apps', 'server'),
     env: {
@@ -185,6 +217,8 @@ async function startNode(input: {
       CRADLE_RELAYD_ACCESS_MODE: 'network',
       CRADLE_FABRIC_NODE_NAME: input.name,
       ...(codexAppServerPath ? { CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath } : {}),
+      NO_PROXY: noProxy,
+      no_proxy: noProxy,
       CRADLE_E2E: '1',
       NODE_ENV: 'production',
     },

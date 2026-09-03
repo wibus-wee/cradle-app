@@ -22,6 +22,8 @@ pnpm exec playwright install chromium-headless-shell
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0"
 pnpm exec cucumber-js --config e2e/cucumber.mjs --tags "@P0 or @P1"
 pnpm e2e:performance:report
+pnpm e2e:fabric
+pnpm e2e:fabric:mobile:ios
 ```
 
 `pnpm e2e:check` enforces two contracts: the suite inventory (scenario tags,
@@ -94,13 +96,14 @@ Run summaries are parsed from `cucumber-messages.ndjson` by
 
 ## Interaction performance
 
-Every CI lane writes `e2e-performance.json` and `e2e-performance.md` from the
-same Cucumber message stream as the run summary. An interaction begins at an
-`Action` step and includes all following `Outcome` steps, so the reported time
-ends after the observable response rather than after the click alone. Hooks,
-runner startup, and `Context` setup are excluded. See [`PERFORMANCE.md`](PERFORMANCE.md)
-for the measurement contract, response bands, baseline comparison, limitations,
-and the performance/impact review record required for changes.
+Every Cucumber, Fabric two-node, and Fabric Mobile iOS CI lane writes
+`e2e-performance.json` and `e2e-performance.md`. Cucumber interactions begin at
+an `Action` and include following `Outcome` steps. Fabric interactions are
+explicit Playwright steps that close only after a Web or Maestro-visible
+response. Hooks, runner/build startup, topology setup, and Cucumber `Context`
+steps are excluded. See [`PERFORMANCE.md`](PERFORMANCE.md) for the measurement
+contract, artifact paths, response bands, baseline comparison, limitations, and
+the performance/impact review record required for every change.
 
 ## Simulator usage
 

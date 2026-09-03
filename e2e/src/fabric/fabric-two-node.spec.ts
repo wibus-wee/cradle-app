@@ -84,6 +84,23 @@ let desktopSimulator: E2ESimulator
 let macbookSimulator: E2ESimulator
 
 const mobileIosEnabled = process.env.CRADLE_E2E_MOBILE_IOS === '1'
+const MAESTRO_INTERACTIONS = {
+  'controller-revoked': 'refresh after Controller revocation and show access revoked',
+  'enroll-controller': 'enroll the Controller and show its pending state',
+  'grant-revoked': 'refresh after grant revocation and remove that Node',
+  'select-node': 'select a Node and show only its Workspaces',
+  'switch-node-and-chat': 'switch Nodes, send Chat, and render the streamed response',
+} as const
+
+type MaestroFlowName = keyof typeof MAESTRO_INTERACTIONS
+
+async function interaction<T>(
+  surface: 'fabric-web' | 'mobile-ios',
+  action: string,
+  body: () => Promise<T>,
+): Promise<T> {
+  return await test.step(`[interaction:${surface}] ${action}`, body)
+}
 
 async function json<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init)
@@ -173,24 +190,30 @@ async function addLocalWorkspace(page: Page, node: FabricNodeProcess, path: stri
   await expect(dialog.locator('[data-testid="directory-browser-breadcrumb"]')).toContainText(basename(path))
   const confirm = dialog.locator('[data-testid="directory-browser-confirm"]')
   await expect(confirm).toBeEnabled()
-  await confirm.click()
-  await expect(dialog).toBeHidden()
+  return await interaction('fabric-web', 'add a local Workspace and show it in the workspace list', async () => {
+    await confirm.click()
+    await expect(dialog).toBeHidden()
 
-  let workspace: WorkspaceSummary | undefined
-  await expect.poll(async () => {
-    const workspaces = await json<WorkspaceSummary[]>(`${node.serverUrl}/workspaces`)
-    workspace = workspaces.find(candidate => candidate.locator.path === path)
-    return workspace?.id ?? null
-  }).not.toBeNull()
-  return workspace!
+    let workspace: WorkspaceSummary | undefined
+    await expect.poll(async () => {
+      const workspaces = await json<WorkspaceSummary[]>(`${node.serverUrl}/workspaces`)
+      workspace = workspaces.find(candidate => candidate.locator.path === path)
+      return workspace?.id ?? null
+    }).not.toBeNull()
+    return workspace!
+  })
 }
 
 async function openNodeSettings(page: Page): Promise<void> {
   await page.goto(topology.webUrl)
-  await page.locator('[data-testid="settings-btn"]').click()
-  await expect(page.locator('[data-testid="settings-sidebar"]')).toBeVisible()
-  await page.locator('[data-testid="settings-nav-nodes"]').click()
-  await expect(page.locator('[data-testid="nodes-settings"]')).toBeVisible()
+  await interaction('fabric-web', 'open Settings', async () => {
+    await page.locator('[data-testid="settings-btn"]').click()
+    await expect(page.locator('[data-testid="settings-sidebar"]')).toBeVisible()
+  })
+  await interaction('fabric-web', 'open Node settings', async () => {
+    await page.locator('[data-testid="settings-nav-nodes"]').click()
+    await expect(page.locator('[data-testid="nodes-settings"]')).toBeVisible()
+  })
 }
 
 function initializeGitWorkspace(path: string, markerName: string, markerContent: string): void {
@@ -208,11 +231,14 @@ async function pairNodesThroughUi(): Promise<{
   macbookMembership: FabricMembership
 }> {
   await openNodeSettings(desktopPage)
-  await desktopPage.locator('[data-testid="nodes-link-device"]').click()
-  await desktopPage.locator('[data-testid="connect-start"]').click()
   const networkCode = desktopPage.locator('[data-testid="connect-network-code"]')
-  await expect(networkCode).toBeVisible()
-  const code = (await networkCode.textContent())?.trim()
+  let code: string | undefined
+  await interaction('fabric-web', 'start Node pairing and show a network code', async () => {
+    await desktopPage.locator('[data-testid="nodes-link-device"]').click()
+    await desktopPage.locator('[data-testid="connect-start"]').click()
+    await expect(networkCode).toBeVisible()
+    code = (await networkCode.textContent())?.trim()
+  })
   expect(code).toBeTruthy()
   await desktopPage.keyboard.press('Escape')
   await expect(desktopPage.getByRole('dialog')).toBeHidden()
@@ -221,31 +247,34 @@ async function pairNodesThroughUi(): Promise<{
   await macbookPage.locator('[data-testid="nodes-link-device"]').click()
   await macbookPage.locator('[data-testid="connect-join"]').click()
   await macbookPage.locator('[data-testid="connect-network-code-input"]').fill(code!)
-  await macbookPage.locator('[data-testid="connect-join-submit"]').click()
-  await expect(macbookPage.locator('[data-testid="connect-invite-code"]')).toBeVisible()
-
   const pending = desktopPage.locator('[data-testid^="node-pending-request-"]')
-  await expect(pending).toBeVisible({ timeout: 45_000 })
-  await pending.locator('[data-testid^="node-pending-approve-"]').click()
+  await interaction('fabric-web', 'submit a Node pairing request', async () => {
+    await macbookPage.locator('[data-testid="connect-join-submit"]').click()
+    await expect(macbookPage.locator('[data-testid="connect-invite-code"]')).toBeVisible()
+    await expect(pending).toBeVisible({ timeout: 45_000 })
+  })
 
   let desktopMembership: FabricMembership | null = null
   let macbookMembership: FabricMembership | null = null
-  await expect.poll(async () => {
-    desktopMembership = await json<FabricMembership | null>(`${topology.desktop.serverUrl}/fabric`)
-    macbookMembership = await json<FabricMembership | null>(`${topology.macbook.serverUrl}/fabric`)
-    return Boolean(desktopMembership && macbookMembership)
-  }, { timeout: 45_000 }).toBe(true)
+  await interaction('fabric-web', 'approve a Node pairing request and show both Nodes online', async () => {
+    await pending.locator('[data-testid^="node-pending-approve-"]').click()
+    await expect.poll(async () => {
+      desktopMembership = await json<FabricMembership | null>(`${topology.desktop.serverUrl}/fabric`)
+      macbookMembership = await json<FabricMembership | null>(`${topology.macbook.serverUrl}/fabric`)
+      return Boolean(desktopMembership && macbookMembership)
+    }, { timeout: 45_000 }).toBe(true)
 
-  await expect.poll(async () => {
-    const [desktopNodes, macbookNodes] = await Promise.all([
-      json<Array<{ status: string }>>(`${topology.desktop.serverUrl}/nodes`),
-      json<Array<{ status: string }>>(`${topology.macbook.serverUrl}/nodes`),
-    ])
-    return desktopNodes.length === 2
-      && macbookNodes.length === 2
-      && desktopNodes.every(node => node.status === 'online')
-      && macbookNodes.every(node => node.status === 'online')
-  }, { timeout: 45_000 }).toBe(true)
+    await expect.poll(async () => {
+      const [desktopNodes, macbookNodes] = await Promise.all([
+        json<Array<{ status: string }>>(`${topology.desktop.serverUrl}/nodes`),
+        json<Array<{ status: string }>>(`${topology.macbook.serverUrl}/nodes`),
+      ])
+      return desktopNodes.length === 2
+        && macbookNodes.length === 2
+        && desktopNodes.every(node => node.status === 'online')
+        && macbookNodes.every(node => node.status === 'online')
+    }, { timeout: 45_000 }).toBe(true)
+  })
 
   return { desktopMembership: desktopMembership!, macbookMembership: macbookMembership! }
 }
@@ -266,7 +295,7 @@ async function ensurePairedNodes(): Promise<{
   return await pairNodesThroughUi()
 }
 
-async function runMaestroFlow(flowName: string, variables: Record<string, string>): Promise<void> {
+async function executeMaestroFlow(flowName: MaestroFlowName, variables: Record<string, string>): Promise<void> {
   const maestroPath = process.env.MAESTRO_CLI_PATH?.trim()
   const simulatorUdid = process.env.CRADLE_E2E_IOS_UDID?.trim()
   const artifactsRoot = process.env.CRADLE_E2E_MOBILE_ARTIFACTS_DIR?.trim()
@@ -328,15 +357,24 @@ async function runMaestroFlow(flowName: string, variables: Record<string, string
   }
 }
 
+async function runMaestroFlow(flowName: MaestroFlowName, variables: Record<string, string>): Promise<void> {
+  await interaction('mobile-ios', MAESTRO_INTERACTIONS[flowName], async () => {
+    await executeMaestroFlow(flowName, variables)
+  })
+}
+
 async function rejoinMacbookThroughUi(previousNodeId: string): Promise<FabricMembership> {
   const leave = await fetch(`${topology.macbook.serverUrl}/fabric`, { method: 'DELETE' })
   expect(leave.status).toBe(204)
 
   await openNodeSettings(desktopPage)
-  await desktopPage.locator('[data-testid="nodes-link-device"]').click()
   const networkCode = desktopPage.locator('[data-testid="connect-network-code"]')
-  await expect(networkCode).toBeVisible()
-  const code = (await networkCode.textContent())?.trim()
+  let code: string | undefined
+  await interaction('fabric-web', 'start replacement Node pairing and show a network code', async () => {
+    await desktopPage.locator('[data-testid="nodes-link-device"]').click()
+    await expect(networkCode).toBeVisible()
+    code = (await networkCode.textContent())?.trim()
+  })
   expect(code).toBeTruthy()
   await desktopPage.keyboard.press('Escape')
 
@@ -345,20 +383,23 @@ async function rejoinMacbookThroughUi(previousNodeId: string): Promise<FabricMem
   await macbookPage.locator('[data-testid="nodes-link-device"]').click()
   await macbookPage.locator('[data-testid="connect-join"]').click()
   await macbookPage.locator('[data-testid="connect-network-code-input"]').fill(code!)
-  await macbookPage.locator('[data-testid="connect-join-submit"]').click()
-  await expect(macbookPage.locator('[data-testid="connect-invite-code"]')).toBeVisible()
-
   const pending = desktopPage.locator('[data-testid^="node-pending-request-"]')
-  await expect(pending).toBeVisible({ timeout: 45_000 })
-  await pending.locator('[data-testid^="node-pending-approve-"]').click()
+  await interaction('fabric-web', 'submit a replacement Node pairing request', async () => {
+    await macbookPage.locator('[data-testid="connect-join-submit"]').click()
+    await expect(macbookPage.locator('[data-testid="connect-invite-code"]')).toBeVisible()
+    await expect(pending).toBeVisible({ timeout: 45_000 })
+  })
 
   let membership: FabricMembership | null = null
-  await expect.poll(async () => {
-    membership = await json<FabricMembership | null>(`${topology.macbook.serverUrl}/fabric`)
-    return membership && membership.localNodeId !== previousNodeId
-      ? membership.localNodeId
-      : null
-  }, { timeout: 45_000 }).not.toBeNull()
+  await interaction('fabric-web', 'approve replacement Node pairing and show the new device', async () => {
+    await pending.locator('[data-testid^="node-pending-approve-"]').click()
+    await expect.poll(async () => {
+      membership = await json<FabricMembership | null>(`${topology.macbook.serverUrl}/fabric`)
+      return membership && membership.localNodeId !== previousNodeId
+        ? membership.localNodeId
+        : null
+    }, { timeout: 45_000 }).not.toBeNull()
+  })
   return membership!
 }
 
@@ -380,17 +421,19 @@ async function mountRemoteWorkspace(input: {
     hasText: input.remoteWorkspace.name,
   }).first()
   await expect(row).toBeVisible()
-  await row.locator('[data-testid^="node-workspace-add-"]').click()
+  return await interaction('fabric-web', 'mount a remote Workspace and show it locally', async () => {
+    await row.locator('[data-testid^="node-workspace-add-"]').click()
 
-  let mounted: WorkspaceSummary | undefined
-  await expect.poll(async () => {
-    const workspaces = await json<WorkspaceSummary[]>(`${input.controller.serverUrl}/workspaces`)
-    mounted = workspaces.find(workspace =>
-      workspace.locator.nodeId === input.targetNodeId
-      && workspace.locator.sourceWorkspaceId === input.remoteWorkspace.id)
-    return mounted?.id ?? null
-  }).not.toBeNull()
-  return mounted!
+    let mounted: WorkspaceSummary | undefined
+    await expect.poll(async () => {
+      const workspaces = await json<WorkspaceSummary[]>(`${input.controller.serverUrl}/workspaces`)
+      mounted = workspaces.find(workspace =>
+        workspace.locator.nodeId === input.targetNodeId
+        && workspace.locator.sourceWorkspaceId === input.remoteWorkspace.id)
+      return mounted?.id ?? null
+    }).not.toBeNull()
+    return mounted!
+  })
 }
 
 async function sendChat(input: {
@@ -417,9 +460,11 @@ async function sendChat(input: {
   await newChat.selectRuntime(/Codex/i)
   await newChat.selectProvider(E2E_CODEX_AGENT_NAME)
   await newChat.fill(input.prompt)
-  await newChat.send()
-  await chat.expectAssistantContains(input.response, 60_000)
-  input.targetSimulator.assertExhausted()
+  await interaction('fabric-web', 'send Chat and render the remote streamed response', async () => {
+    await newChat.send()
+    await chat.expectAssistantContains(input.response, 60_000)
+    input.targetSimulator.assertExhausted()
+  })
   return await chat.sessionId()
 }
 
@@ -454,9 +499,11 @@ async function createWork(input: {
   await input.page.locator('[data-testid="new-work-textarea"]').fill(input.goal)
   const send = input.page.locator('[data-testid="new-work-send-btn"]')
   await expect(send).toBeEnabled()
-  await send.click()
-  await chat.expectAssistantContains(input.response, 60_000)
-  input.targetSimulator.assertExhausted()
+  await interaction('fabric-web', 'create remote Work and render its first response', async () => {
+    await send.click()
+    await chat.expectAssistantContains(input.response, 60_000)
+    input.targetSimulator.assertExhausted()
+  })
 
   const localSessionId = await chat.sessionId()
   const localWork = await json<{ work: { id: string } | null }>(
@@ -490,9 +537,11 @@ async function createWork(input: {
       bodyTextExcludes: 'You are naming a Codex task thread.',
     }),
   ]))
-  await chat.fillAndSend(input.followUp)
-  await chat.expectAssistantContains(input.followUpResponse, 60_000)
-  input.targetSimulator.assertExhausted()
+  await interaction('fabric-web', 'continue remote Work and render its response', async () => {
+    await chat.fillAndSend(input.followUp)
+    await chat.expectAssistantContains(input.followUpResponse, 60_000)
+    input.targetSimulator.assertExhausted()
+  })
   return detail
 }
 
@@ -531,9 +580,11 @@ async function approveRemoteToolRequest(input: {
   await newChat.selectProvider(E2E_CLAUDE_AGENT_NAME)
   await newChat.selectPermissionMode(/Approval required|需要审批|Requiere aprobación|承認が必要/i)
   await newChat.fill(input.prompt)
-  await newChat.send()
-  await approval.waitVisible(60_000)
-  await approval.expectContains(/Approval required|需要审批|Requiere aprobación|承認が必要/i)
+  await interaction('fabric-web', 'request a remote tool and show approval', async () => {
+    await newChat.send()
+    await approval.waitVisible(60_000)
+    await approval.expectContains(/Approval required|需要审批|Requiere aprobación|承認が必要/i)
+  })
 
   input.targetSimulator.enqueue(anthropicScenario([
     anthropicTextExchange({
@@ -543,10 +594,12 @@ async function approveRemoteToolRequest(input: {
       bodyTextExcludes: 'You are naming a Claude Agent task session',
     }),
   ]))
-  await approval.allow()
-  await approval.expectHidden(60_000)
-  await chat.expectAssistantContains(input.response, 60_000)
-  input.targetSimulator.assertExhausted()
+  await interaction('fabric-web', 'approve a remote tool and render the continued response', async () => {
+    await approval.allow()
+    await approval.expectHidden(60_000)
+    await chat.expectAssistantContains(input.response, 60_000)
+    input.targetSimulator.assertExhausted()
+  })
 
   const localSessionId = await chat.sessionId()
   const projection = await json<SessionSummary>(`${input.controller.serverUrl}/sessions/${localSessionId}`)
@@ -841,23 +894,25 @@ test.describe('Fabric two-node user journey', () => {
       ])
 
       await openNodeSettings(desktopPage)
-      await desktopPage.locator(`[data-testid="remove-device-${staleNodeId}"]`).click()
-      await expect(desktopPage.locator('[data-testid="remove-device-confirm"]')).toBeVisible()
-      await desktopPage.locator('[data-testid="remove-device-confirm"]').click()
+      await interaction('fabric-web', 'remove a stale Node and update both device lists', async () => {
+        await desktopPage.locator(`[data-testid="remove-device-${staleNodeId}"]`).click()
+        await expect(desktopPage.locator('[data-testid="remove-device-confirm"]')).toBeVisible()
+        await desktopPage.locator('[data-testid="remove-device-confirm"]').click()
 
-      await expect.poll(async () => {
-        const [desktopNodes, macbookNodes] = await Promise.all([
-          json<Array<{ nodeId: string }>>(`${topology.desktop.serverUrl}/nodes`),
-          json<Array<{ nodeId: string }>>(`${topology.macbook.serverUrl}/nodes`),
+        await expect.poll(async () => {
+          const [desktopNodes, macbookNodes] = await Promise.all([
+            json<Array<{ nodeId: string }>>(`${topology.desktop.serverUrl}/nodes`),
+            json<Array<{ nodeId: string }>>(`${topology.macbook.serverUrl}/nodes`),
+          ])
+          return [
+            desktopNodes.map(node => node.nodeId).sort(),
+            macbookNodes.map(node => node.nodeId).sort(),
+          ]
+        }, { timeout: 45_000 }).toEqual([
+          [desktopMembership.localNodeId, macbookMembership.localNodeId].sort(),
+          [desktopMembership.localNodeId, macbookMembership.localNodeId].sort(),
         ])
-        return [
-          desktopNodes.map(node => node.nodeId).sort(),
-          macbookNodes.map(node => node.nodeId).sort(),
-        ]
-      }, { timeout: 45_000 }).toEqual([
-        [desktopMembership.localNodeId, macbookMembership.localNodeId].sort(),
-        [desktopMembership.localNodeId, macbookMembership.localNodeId].sort(),
-      ])
+      })
     })
   })
 
@@ -917,11 +972,13 @@ test.describe('Fabric two-node user journey', () => {
       mobileControllerId = request!.subjectId
 
       await expect(desktopPage.locator(`[data-testid="controller-pending-request-${request!.requestId}"]`)).toBeVisible({ timeout: 10_000 })
-      await desktopPage.locator(`[data-testid="controller-pending-review-${request!.requestId}"]`).click()
-      await desktopPage.locator(`[data-testid="controller-grant-${desktopMembership.localNodeId}-control"]`).click()
-      await desktopPage.locator(`[data-testid="controller-grant-${macbookMembership.localNodeId}-control"]`).click()
-      await desktopPage.locator('[data-testid="controller-approval-submit"]').click()
-      await expect(desktopPage.locator(`[data-testid="controller-pending-request-${request!.requestId}"]`)).toHaveCount(0)
+      await interaction('fabric-web', 'approve Mobile Controller access and clear the pending request', async () => {
+        await desktopPage.locator(`[data-testid="controller-pending-review-${request!.requestId}"]`).click()
+        await desktopPage.locator(`[data-testid="controller-grant-${desktopMembership.localNodeId}-control"]`).click()
+        await desktopPage.locator(`[data-testid="controller-grant-${macbookMembership.localNodeId}-control"]`).click()
+        await desktopPage.locator('[data-testid="controller-approval-submit"]').click()
+        await expect(desktopPage.locator(`[data-testid="controller-pending-request-${request!.requestId}"]`)).toHaveCount(0)
+      })
     })
 
     await test.step('select Desktop and keep Node-scoped Workspace caches isolated', async () => {
@@ -963,10 +1020,12 @@ test.describe('Fabric two-node user journey', () => {
       expect(controlGrant).toBeTruthy()
 
       await openNodeSettings(desktopPage)
-      await desktopPage.locator(`[data-testid="manage-access-${macbookMembership.localNodeId}"]`).click()
-      await desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`).click()
-      await desktopPage.locator('[data-testid="revoke-grant-confirm"]').click()
-      await expect(desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`)).toHaveCount(0)
+      await interaction('fabric-web', 'revoke one Node grant and remove it from access management', async () => {
+        await desktopPage.locator(`[data-testid="manage-access-${macbookMembership.localNodeId}"]`).click()
+        await desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`).click()
+        await desktopPage.locator('[data-testid="revoke-grant-confirm"]').click()
+        await expect(desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`)).toHaveCount(0)
+      })
 
       await runMaestroFlow('grant-revoked', {
         REMAINING_NODE_ID: desktopMembership.localNodeId,
@@ -984,11 +1043,13 @@ test.describe('Fabric two-node user journey', () => {
 
       await desktopPage.keyboard.press('Escape')
       await expect(desktopPage.getByRole('dialog')).toBeHidden()
-      await desktopPage.locator(`[data-testid="manage-access-${desktopMembership.localNodeId}"]`).click()
-      await desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`).click()
-      await desktopPage.locator('[data-testid="revoke-controller-choice"]').click()
-      await desktopPage.locator('[data-testid="revoke-controller-confirm"]').click()
-      await expect(desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`)).toHaveCount(0)
+      await interaction('fabric-web', 'revoke the Controller and remove its final grant', async () => {
+        await desktopPage.locator(`[data-testid="manage-access-${desktopMembership.localNodeId}"]`).click()
+        await desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`).click()
+        await desktopPage.locator('[data-testid="revoke-controller-choice"]').click()
+        await desktopPage.locator('[data-testid="revoke-controller-confirm"]').click()
+        await expect(desktopPage.locator(`[data-testid="node-grant-remove-${controlGrant!.grantId}"]`)).toHaveCount(0)
+      })
 
       await runMaestroFlow('controller-revoked', {})
     })

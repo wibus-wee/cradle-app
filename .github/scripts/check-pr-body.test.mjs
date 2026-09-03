@@ -17,7 +17,15 @@ Reject duplicate required sections with a specific finding.
 
 ## Test plan
 
-Run the focused PR body checker tests.`
+Run the focused PR body checker tests.
+
+## Performance and impact
+
+- **Baseline/current evidence:** No runtime path; this changes static validation only.
+- **Measurement scope:** PR body checker fixtures.
+- **Implementation cost:** One validation rule and its fixtures.
+- **Side effects/tradeoffs:** Existing PRs must fill the new fields when updated.
+- **Impact radius:** All non-bot pull requests.`
 
 assert.deepEqual(checkPullRequestBody(validHumanBody), {
   ok: true,
@@ -65,6 +73,17 @@ const duplicateAgentHandoffResult = checkPullRequestBody(duplicateAgentHandoffBo
 assert.equal(duplicateAgentHandoffResult.ok, false)
 assert.ok(duplicateAgentHandoffResult.findings.includes(
   'Duplicate required Agent section: ## Agent handoff appears 2 times; each required Agent section must appear exactly once.',
+))
+
+const missingPerformanceFieldBody = validHumanBody.replace(
+  '- **Implementation cost:** One validation rule and its fixtures.',
+  '- **Implementation cost:** <!-- not filled -->',
+)
+const missingPerformanceFieldResult = checkPullRequestBody(missingPerformanceFieldBody)
+
+assert.equal(missingPerformanceFieldResult.ok, false)
+assert.ok(missingPerformanceFieldResult.findings.includes(
+  '## Performance and impact must fill **Implementation cost:** with evidence or an explicit reason it is not measurable.',
 ))
 
 console.log('PR body checker regression tests passed')

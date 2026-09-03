@@ -216,6 +216,7 @@ function summarizeRun(options = {}) {
   }
   const performance = buildPerformanceReport({
     interactions,
+    suite: 'Cucumber Interaction',
     tagsFilter: options.tagsFilter || process.env.TAGS_FILTER || '',
     runUrl: options.runUrl || process.env.RUN_URL || '',
     baseline,

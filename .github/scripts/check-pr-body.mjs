@@ -19,6 +19,15 @@ const REQUIRED_HEADINGS = [
   '## Problem / pressure',
   '## Summary',
   '## Test plan',
+  '## Performance and impact',
+]
+
+const REQUIRED_PERFORMANCE_FIELDS = [
+  'Baseline/current evidence',
+  'Measurement scope',
+  'Implementation cost',
+  'Side effects/tradeoffs',
+  'Impact radius',
 ]
 
 const AGENT_CHECKBOX = /- \[x\] I am an Agent/i
@@ -83,6 +92,12 @@ function isFilledSection(chunk) {
   return !PLACEHOLDER_ONLY.test(withoutComments)
 }
 
+function fieldValue(markdown, label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = markdown.match(new RegExp(`^\\s*[-*]\\s+\\*\\*${escaped}:\\*\\*\\s*(.*)$`, 'imu'))
+  return match?.[1] ?? null
+}
+
 export function checkPullRequestBody(body) {
   const findings = []
   const text = (body ?? '').replace(/\r\n/g, '\n')
@@ -132,6 +147,16 @@ export function checkPullRequestBody(body) {
   if (requiredHeadingCounts.get('## Test plan') === 1
     && !isFilledSection(sectionBody(text, '## Test plan'))) {
     findings.push('## Test plan must include concrete verification (not only HTML comments / placeholders).')
+  }
+  if (requiredHeadingCounts.get('## Performance and impact') === 1) {
+    const performanceSection = sectionBody(text, '## Performance and impact')
+    for (const field of REQUIRED_PERFORMANCE_FIELDS) {
+      if (!isFilledSection(fieldValue(performanceSection ?? '', field))) {
+        findings.push(
+          `## Performance and impact must fill **${field}:** with evidence or an explicit reason it is not measurable.`,
+        )
+      }
+    }
   }
 
   if (agent) {

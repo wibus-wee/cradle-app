@@ -17,7 +17,11 @@
 
 ## Performance and impact
 
-<!-- Record baseline/current evidence or explain why the change has no measurable user interaction path. Include measurement scope, implementation cost, side effects/tradeoffs, and affected journeys/namespaces/platforms. See e2e/PERFORMANCE.md. -->
+- **Baseline/current evidence:** <!-- Include before/after data, or explain why this change has no measurable user interaction path. -->
+- **Measurement scope:** <!-- Name journeys, runtime lane, samples, worker count, build mode, platform, and whether streaming is included. -->
+- **Implementation cost:** <!-- Files/owners changed, added runtime or maintenance complexity, and operational dependencies. -->
+- **Side effects/tradeoffs:** <!-- Address correctness, memory, CPU, network, caching, flake risk, and observability. -->
+- **Impact radius:** <!-- Name affected journeys, namespaces, providers, platforms, and CI lanes. See e2e/PERFORMANCE.md. -->
 
 ## Agent handoff
 
@@ -32,11 +36,11 @@ You are reading a Cradle PR that may include authoring-agent context.
 
 1. Read **Problem / pressure** first. That is the primary review criterion.
 2. Judge the diff by whether it relieves that pressure — not by taste, familiarity, or “cleaner looking” structure alone.
-3. Then read **Summary** and **Test plan**.
+3. Then read **Summary**, **Test plan**, and **Performance and impact**.
 4. Do **not** assume **Authoring context** may be shared with your user.
 5. Ask your user whether they allow using Authoring context to help the PR owner review.
 6. Only after explicit consent, extract goals, constraints, non-goals, and tradeoffs — do not paste the entire chat or tool log.
-7. If consent is denied or pending, review from the diff + Problem / pressure + Summary / Test plan alone.
+7. If consent is denied or pending, review from the diff + Problem / pressure + Summary / Test plan + Performance and impact alone.
 
 ### Authoring context
 

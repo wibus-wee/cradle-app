@@ -173,6 +173,7 @@ function aggregateByAction(interactions) {
       key: interaction.key,
       stableId: interaction.stableId,
       action: interaction.action,
+      source: interaction.source,
       samples: [],
     }
     current.samples.push(interaction.durationMs)
@@ -183,6 +184,7 @@ function aggregateByAction(interactions) {
     key: group.key,
     stableId: group.stableId,
     action: group.action,
+    source: group.source,
     samples: group.samples.length,
     p50Ms: percentile(group.samples, 0.5),
     p95Ms: percentile(group.samples, 0.95),
@@ -234,7 +236,12 @@ function markdownTable(rows, emptyMessage) {
 }
 
 function buildPerformanceReport(input) {
-  const interactions = input.interactions
+  const interactions = input.interactions.map(interaction => ({
+    ...interaction,
+    source: interaction.source || 'web',
+    durationMs: roundMilliseconds(interaction.durationMs),
+    band: responseBand(interaction.durationMs),
+  }))
   const durations = interactions.map(interaction => interaction.durationMs)
   const actionAggregates = aggregateByAction(interactions)
   const bandCounts = Object.fromEntries(RESPONSE_BANDS.map(band => [band.id, 0]))
@@ -256,7 +263,7 @@ function buildPerformanceReport(input) {
 
   const topRows = topInteractions.map(
     interaction =>
-      `| \`${interaction.stableId ?? 'unlabeled'}\` | ${interaction.action.replaceAll('|', '\\|')} | ${formatDuration(interaction.durationMs)} | \`${interaction.band}\` | \`${interaction.status}\` |`,
+      `| \`${interaction.stableId ?? 'unlabeled'}\` | \`${interaction.source}\` | ${interaction.action.replaceAll('|', '\\|')} | ${formatDuration(interaction.durationMs)} | \`${interaction.band}\` | \`${interaction.status}\` |`,
   )
   const comparisonRows = (comparison?.regressions || [])
     .slice(0, 15)
@@ -266,7 +273,7 @@ function buildPerformanceReport(input) {
     )
 
   const markdown = [
-    '## Interaction Performance',
+    input.suite ? `## ${input.suite} Performance` : '## Interaction Performance',
     '',
     '| Metric | Value |',
     '| --- | ---: |',
@@ -279,12 +286,13 @@ function buildPerformanceReport(input) {
     `| Flow breaking (1-10 s) | ${bandCounts['flow-breaking']} |`,
     `| Severe wait (>=10 s) | ${bandCounts.severe} |`,
     '',
-    'Each sample starts at a Gherkin `Action` step and includes every following `Outcome` step, so the duration ends only after the expected user-visible response is verified. Setup steps and runner startup are excluded.',
+    input.measurementDescription
+    || 'Each sample starts at a Gherkin `Action` step and includes every following `Outcome` step, so the duration ends only after the expected user-visible response is verified. Setup steps and runner startup are excluded.',
     '',
     '### Slowest Interactions',
     '',
-    '| Scenario | Action | Duration | Band | Status |',
-    '| --- | --- | ---: | --- | --- |',
+    '| Scenario | Surface | Action | Duration | Band | Status |',
+    '| --- | --- | --- | ---: | --- | --- |',
     markdownTable(topRows, 'No interaction samples were recorded.'),
     ...(comparison
       ? [
@@ -302,6 +310,7 @@ function buildPerformanceReport(input) {
 
   return {
     version: 1,
+    suite: input.suite || '',
     tagsFilter: input.tagsFilter || '',
     runUrl: input.runUrl || '',
     thresholdsMs: {
