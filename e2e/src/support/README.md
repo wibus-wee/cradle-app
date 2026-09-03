@@ -23,6 +23,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | File | Surface |
 | --- | --- |
 | `pages/await.ts` | Await creation and resolution |
+| `pages/automation.ts` | Automation definition fixture, real execution, triage, artifacts, and linked Session |
 | `pages/chat.ts` | New Chat, Chat, approval, messages, sessions, and queue |
 | `pages/diff.ts` | Diff review |
 | `pages/first-run.ts` | Onboarding |
