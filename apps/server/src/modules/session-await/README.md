@@ -34,7 +34,8 @@ Evaluation failures are classified differently from invalid results. A syntax or
 
 GitHub Auth owns the connected App-user credential and refresh lifecycle. These
 sources only consume the shared GitHub API client and do not select or persist
-credentials.
+credentials. The client uses the local `gh` credential for an await target when
+the connected App installation does not include that repository.
 
 `github-ci` waits for all visible check runs and commit statuses on the resolved ref to complete. A CI filter must target exactly one of `{ pr }`, `{ sha }`, or `{ runs_id }`. With `{ repo, runs_id }`, it waits only for that GitHub check run ID and does not fold in sibling checks or legacy statuses from the same commit. It treats `success`, `neutral`, and `skipped` check conclusions as passing; `success` commit statuses as passing; pending signals as still pending; and any failure/error/cancelled/action-required signal as a completed failure. GitHub Actions workflow runs for the same head are also lifecycle barriers: queued or running workflows prevent early success, while a completed failed workflow produces a failure result. If no checks or statuses appear, it waits for `allowNoChecksAfterSeconds` or the default grace period before resuming with `noCIConfigured`.
 

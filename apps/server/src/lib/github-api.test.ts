@@ -13,6 +13,7 @@ import {
   fetchPullRequestDetail,
   fetchPullRequestFiles,
   fetchPullRequestReviewThreads,
+  fetchRepo,
   invalidatePullRequestCaches,
   markPullRequestReady,
   mergePullRequest,
@@ -67,6 +68,70 @@ describe('gitHub App identity', () => {
     }))
 
     await expect(resolveGitHubToken()).resolves.toBe('app-user-token')
+  })
+
+  it('uses the legacy gh token when the App installation does not include the repository', async () => {
+    setGitHubAuthProvider(async () => ({
+      accessToken: 'app-user-token',
+      cacheKey: 'app-user-identity-v1',
+      source: 'github-app',
+    }))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        total_count: 1,
+        installations: [{
+          id: 17,
+          account: { login: 'cradle' },
+          repository_selection: 'selected',
+          suspended_at: null,
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        total_count: 1,
+        repositories: [{ full_name: 'cradle/other' }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: 1,
+        full_name: 'cradle/app',
+      }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchRepo('cradle', 'app')).resolves.toMatchObject({ full_name: 'cradle/app' })
+
+    expect(fetchMock.mock.calls.map(call => call[0])).toEqual([
+      'https://api.github.com/user/installations?per_page=100&page=1',
+      'https://api.github.com/user/installations/17/repositories?per_page=100&page=1',
+      'https://api.github.com/repos/cradle/app',
+    ])
+    expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('authorization')).toContain('app-user-token')
+    expect(new Headers(fetchMock.mock.calls[2]?.[1]?.headers).get('authorization')).toContain('legacy-token')
+  })
+
+  it('keeps the App identity when its installation includes the repository', async () => {
+    setGitHubAuthProvider(async () => ({
+      accessToken: 'app-user-token',
+      cacheKey: 'app-user-identity-v1',
+      source: 'github-app',
+    }))
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        total_count: 1,
+        installations: [{
+          id: 17,
+          account: { login: 'cradle' },
+          repository_selection: 'all',
+          suspended_at: null,
+        }],
+      }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        id: 1,
+        full_name: 'cradle/app',
+      }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(fetchRepo('cradle', 'app')).resolves.toMatchObject({ full_name: 'cradle/app' })
+
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get('authorization')).toContain('app-user-token')
   })
 
   it('namespaces authenticated cache data with a non-secret identity version', async () => {
@@ -463,8 +528,13 @@ describe('pull request review threads', () => {
       line: 8,
       side: 'RIGHT',
     })
-    await replyToPullRequestReviewThread({ threadId: 'PRRT_thread', body: 'Reply' })
-    await resolvePullRequestReviewThread('PRRT_thread')
+    await replyToPullRequestReviewThread({
+      owner: 'cradle',
+      repo: 'app',
+      threadId: 'PRRT_thread',
+      body: 'Reply',
+    })
+    await resolvePullRequestReviewThread({ owner: 'cradle', repo: 'app', threadId: 'PRRT_thread' })
 
     const requests = fetchMock.mock.calls.slice(1).map(call => JSON.parse(String(call[1]?.body)))
     expect(requests[0]).toMatchObject({

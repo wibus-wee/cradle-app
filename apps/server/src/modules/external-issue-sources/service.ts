@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { AppError } from '../../errors/app-error'
 import { currentUnixSeconds } from '../../helpers/time'
 import { db } from '../../infra'
-import { resolveGitHubToken } from '../../lib/github-api'
+import { resolveGitHubRepositoryToken } from '../../lib/github-api'
 import {
   getExternalIssueSource,
   listExternalIssueSources as listRegisteredExternalIssueSources,
@@ -26,9 +26,12 @@ const MIN_REFRESH_INTERVAL_SECONDS = 3600
 
 type Tx = ReturnType<typeof db>
 
-async function createExternalIssueSourceSharedConfig(): Promise<ReadonlyMap<string, string>> {
+async function createExternalIssueSourceSharedConfig(repository: {
+  owner: string
+  repo: string
+}): Promise<ReadonlyMap<string, string>> {
   const config = new Map<string, string>()
-  const token = await resolveGitHubToken()
+  const token = await resolveGitHubRepositoryToken(repository)
   if (token) {
     config.set('GITHUB_ISSUES_TOKEN', token)
   }
@@ -679,7 +682,10 @@ async function fetchRepositorySnapshot(input: {
         error() {},
         debug() {},
       },
-      sharedConfig: await createExternalIssueSourceSharedConfig(),
+      sharedConfig: await createExternalIssueSourceSharedConfig({
+        owner: input.repositoryOwner,
+        repo: input.repositoryName,
+      }),
       repository: {
         owner: input.repositoryOwner,
         name: input.repositoryName,
