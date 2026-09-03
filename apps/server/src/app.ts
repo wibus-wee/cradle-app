@@ -102,7 +102,6 @@ import { secrets } from './modules/secrets'
 import { session } from './modules/session'
 import * as Session from './modules/session/service'
 import { sessionAwait } from './modules/session-await'
-import { sessionEnvironment } from './modules/session-environment'
 import { sessionGroup } from './modules/session-group'
 import { skills } from './modules/skills'
 import { storage } from './modules/storage'
@@ -276,7 +275,6 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(backgroundActivity)
   app.use(backgroundJob)
   app.use(session)
-  app.use(sessionEnvironment)
   app.use(threadHandoff)
   app.use(turnCheckpoint)
   app.use(work)

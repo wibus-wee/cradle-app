@@ -48,6 +48,7 @@ export const workspaceFixture: WorkspaceViewProps = {
     lastReadAt: 1_750_000_000,
     createdAt: 1_750_000_000,
     updatedAt: 1_750_000_100,
+    activityAt: 1_750_000_100,
     latestUserMessageAt: 1_750_000_050,
     latestAssistantMessageAt: 1_750_000_100,
     unread: true,

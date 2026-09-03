@@ -15,6 +15,7 @@ export const workDetailFixture: WorkDetailViewProps = {
     primaryThread: {
       agentId: null,
       archivedAt: null,
+      activityAt: 1_750_000_100,
       createdAt: 1_750_000_000,
       execution: { kind: 'local' },
       id: 'session-1',
