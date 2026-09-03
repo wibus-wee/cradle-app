@@ -28,6 +28,7 @@ const REQUIRED_PERFORMANCE_FIELDS = [
   'Implementation cost',
   'Side effects/tradeoffs',
   'Impact radius',
+  'Decision',
 ]
 
 const AGENT_CHECKBOX = /- \[x\] I am an Agent/i

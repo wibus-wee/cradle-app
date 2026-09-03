@@ -25,7 +25,8 @@ Run the focused PR body checker tests.
 - **Measurement scope:** PR body checker fixtures.
 - **Implementation cost:** One validation rule and its fixtures.
 - **Side effects/tradeoffs:** Existing PRs must fill the new fields when updated.
-- **Impact radius:** All non-bot pull requests.`
+- **Impact radius:** All non-bot pull requests.
+- **Decision:** Ship because the validation cost is small and required evidence becomes reviewable.`
 
 assert.deepEqual(checkPullRequestBody(validHumanBody), {
   ok: true,
@@ -84,6 +85,17 @@ const missingPerformanceFieldResult = checkPullRequestBody(missingPerformanceFie
 assert.equal(missingPerformanceFieldResult.ok, false)
 assert.ok(missingPerformanceFieldResult.findings.includes(
   '## Performance and impact must fill **Implementation cost:** with evidence or an explicit reason it is not measurable.',
+))
+
+const missingDecisionBody = validHumanBody.replace(
+  '- **Decision:** Ship because the validation cost is small and required evidence becomes reviewable.',
+  '- **Decision:** <!-- not filled -->',
+)
+const missingDecisionResult = checkPullRequestBody(missingDecisionBody)
+
+assert.equal(missingDecisionResult.ok, false)
+assert.ok(missingDecisionResult.findings.includes(
+  '## Performance and impact must fill **Decision:** with evidence or an explicit reason it is not measurable.',
 ))
 
 console.log('PR body checker regression tests passed')

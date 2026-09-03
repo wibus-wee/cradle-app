@@ -22,6 +22,7 @@
 - **Implementation cost:** <!-- Files/owners changed, added runtime or maintenance complexity, and operational dependencies. -->
 - **Side effects/tradeoffs:** <!-- Address correctness, memory, CPU, network, caching, flake risk, and observability. -->
 - **Impact radius:** <!-- Name affected journeys, namespaces, providers, platforms, and CI lanes. See e2e/PERFORMANCE.md. -->
+- **Decision:** <!-- Ship, revise, or reject, and explain why the evidence justifies the cost and tradeoffs. -->
 
 ## Agent handoff
 
