@@ -1,4 +1,8 @@
-import { CheckLine as CheckIcon, SearchLine as SearchIcon } from '@mingcute/react'
+import {
+  CheckLine as CheckIcon,
+  CloseLine as XIcon,
+  SearchLine as SearchIcon,
+} from '@mingcute/react'
 import { useMemo, useState } from 'react'
 
 import { cn } from '~/lib/cn'
@@ -138,6 +142,12 @@ export function ReviewFileRail({
         <input
           value={query}
           onChange={event => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && query) {
+              event.stopPropagation()
+              setQuery('')
+            }
+          }}
           placeholder="Filter files"
           aria-label="Filter files"
           className={cn(
@@ -145,6 +155,17 @@ export function ReviewFileRail({
             'placeholder:text-[var(--rv-fg-subtle)] focus:outline-none',
           )}
         />
+        {query && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            title="Clear file filter"
+            aria-label="Clear file filter"
+            className="inline-flex size-5 shrink-0 items-center justify-center rounded text-[var(--rv-fg-subtle)] transition-colors hover:bg-[var(--rv-bg-hover)] hover:text-[var(--rv-fg)]"
+          >
+            <XIcon className="size-3" aria-hidden />
+          </button>
+        )}
         <span data-rv-num className="shrink-0 text-[11px] text-[var(--rv-fg-subtle)]">
           {matched.length}
         </span>

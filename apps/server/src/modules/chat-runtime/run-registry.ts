@@ -80,7 +80,7 @@ export interface PendingRunState {
   queueItemId?: string
 }
 
-export type SessionMaintenanceKind = 'rollback'
+export type SessionMaintenanceKind = 'rollback' | 'storage-cleanup'
 
 /**
  * The active-run registry owns the module-level maps that track in-flight chat

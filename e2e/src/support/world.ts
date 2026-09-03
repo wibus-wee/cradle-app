@@ -17,6 +17,7 @@ import { FirstRunPage } from './pages/first-run'
 import { GitPage } from './pages/git'
 import { KanbanPage } from './pages/kanban'
 import { SearchPage } from './pages/search'
+import { SessionEnvironmentPage } from './pages/session-environment'
 import { SettingsPage } from './pages/settings'
 import { TerminalPage } from './pages/terminal'
 import { UsagePage } from './pages/usage'
@@ -101,6 +102,10 @@ export class CradleWorld extends World {
 
   get settingsPage(): SettingsPage {
     return new SettingsPage(this.page)
+  }
+
+  get sessionEnvironmentPage(): SessionEnvironmentPage {
+    return new SessionEnvironmentPage(this.page)
   }
 
   get gitPage(): GitPage {

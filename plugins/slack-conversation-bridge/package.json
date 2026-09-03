@@ -36,14 +36,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slack/bolt": "^4.1.0",
-    "markdown-to-slack-blocks": "^1.5.0"
+    "@slack/bolt": "^5.0.0",
+    "markdown-to-slack-blocks": "^1.6.1"
   },
   "devDependencies": {
     "@cradle/plugin-sdk": "workspace:*",
-    "@types/node": "^22.19.1",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.0",
-    "vitest": "^4.1.4"
+    "@types/node": "^22.20.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }

@@ -13,6 +13,7 @@ import {
 
 const E2E_HOOK_TIMEOUT_MS = 120_000
 const ARTIFACTS_ROOT = join(process.cwd(), 'e2e', 'artifacts')
+let workerFailureIndexPrepared = false
 
 setDefaultTimeout(E2E_HOOK_TIMEOUT_MS)
 
@@ -39,6 +40,7 @@ Also at the artifact root:
 |------|------------|
 | \`failure-index.json\` | Machine-readable list of failed scenarios → relative artifact paths |
 | \`e2e-summary.md\` / \`.json\` | Aggregated Cucumber pass/fail summary for the run |
+| \`cucumber-messages.ndjson\` | Structured Cucumber event stream used to build the run summary |
 | \`cucumber-output.log\` | Full Cucumber stdout/stderr |
 | \`cucumber-junit.xml\` | JUnit for CI dashboards |
 
@@ -66,6 +68,13 @@ function collectWebmFiles(dir: string): string[] {
 }
 
 Before({ timeout: E2E_HOOK_TIMEOUT_MS }, async function (this: CradleWorld, scenario: ITestCaseHookParameter) {
+  if (!workerFailureIndexPrepared) {
+    workerFailureIndexPrepared = true
+    const indexPath = join(ARTIFACTS_ROOT, failureIndexFilename())
+    if (existsSync(indexPath)) {
+      unlinkSync(indexPath)
+    }
+  }
   this.prepareScenario(scenario.pickle.name, scenario.pickle.tags.map(tag => tag.name))
   writeArtifactsGuide()
   if (this.scenarioArtifacts) {

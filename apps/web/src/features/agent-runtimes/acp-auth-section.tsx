@@ -5,7 +5,6 @@ import {
   deleteAcpAgentsByAgentIdAuthMutation,
   getAcpAgentsByAgentIdAuthMethodsOptions,
   getAcpAgentsByAgentIdAuthMethodsQueryKey,
-  getSecretsOptions,
   putAcpAgentsByAgentIdAuthMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type { GetAcpAgentsByAgentIdAuthMethodsResponse } from '~/api-gen/types.gen'
@@ -39,11 +38,6 @@ export function AcpAuthSection({
   const queryOptions = getAcpAgentsByAgentIdAuthMethodsOptions({ path: { agentId } })
   const queryKey = getAcpAgentsByAgentIdAuthMethodsQueryKey({ path: { agentId } })
   const authQuery = useQuery(queryOptions)
-  const needsSecrets = authQuery.data?.methods.some(method => method.kind === 'env_var') ?? false
-  const secretsQuery = useQuery({
-    ...getSecretsOptions(),
-    enabled: needsSecrets,
-  })
 
   const setAuth = useMutation({
     ...putAcpAgentsByAgentIdAuthMutation(),
@@ -88,16 +82,9 @@ export function AcpAuthSection({
     clearing: t('auth.action.clearing'),
     methodLabel: t('auth.methodLabel'),
     agentKind: t('auth.kind.agent'),
-    envVarKind: t('auth.kind.envVar'),
     terminalKind: t('auth.kind.terminal'),
     unsupported: t('auth.unsupported'),
-    optional: t('auth.optional'),
-    secretPlaceholder: t('auth.secret.placeholder'),
-    secretNotSet: t('auth.secret.notSet'),
-    noSecrets: t('auth.secret.empty'),
-    secretLoadError: t('auth.secret.error'),
     cancel: t('auth.action.cancel'),
-    save: t('auth.action.save'),
     authenticate: t('auth.action.authenticate'),
     saving: t('auth.action.saving'),
   }
@@ -112,17 +99,13 @@ export function AcpAuthSection({
       key={selectedMethodId ?? 'unconfigured'}
       methods={authQuery.data?.methods ?? []}
       selectedMethodId={selectedMethodId}
-      secrets={secretsQuery.data ?? []}
       isLoading={authQuery.isLoading}
-      isSecretsLoading={needsSecrets && secretsQuery.isLoading}
       loadError={authQuery.isError}
-      secretsError={secretsQuery.isError}
       pendingAction={pendingAction}
       labels={labels}
       onRetry={() => void authQuery.refetch()}
-      onRetrySecrets={() => void secretsQuery.refetch()}
-      onSave={({ methodId, secretRefs }) => {
-        setAuth.mutate({ path: { agentId }, body: { methodId, secretRefs } })
+      onSave={({ methodId }) => {
+        setAuth.mutate({ path: { agentId }, body: { methodId } })
       }}
       onClear={() => {
         clearAuth.mutate({ path: { agentId } })

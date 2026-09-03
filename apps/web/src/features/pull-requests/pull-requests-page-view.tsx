@@ -1,4 +1,5 @@
 import {
+  CloseLine as CloseIcon,
   GitPullRequestLine as PullRequestIcon,
   Refresh1Line as RefreshIcon,
   Search2Line as SearchIcon,
@@ -127,6 +128,10 @@ export function PullRequestsPageView({
     () => groupPullRequestsByRecency(visiblePullRequests, now),
     [now, visiblePullRequests],
   )
+  const hasActiveFilter = search.trim().length > 0
+    || filter !== 'all'
+    || stateFilter !== 'all'
+    || repository !== null
   const activeFeeds = filter === 'authored'
     ? [authoredFeed]
     : filter === 'reviewing'
@@ -167,7 +172,12 @@ export function PullRequestsPageView({
           <div className="flex items-baseline gap-2">
             <h1 className="text-lg font-semibold text-foreground">{t('page.title')}</h1>
             <span className="text-[12px] tabular-nums text-muted-foreground">
-              {entries.length}
+              {hasActiveFilter
+                ? t('page.filteredCount', {
+                    visible: visiblePullRequests.length,
+                    total: entries.length,
+                  })
+                : entries.length}
             </span>
           </div>
           {viewer
@@ -214,7 +224,22 @@ export function PullRequestsPageView({
                     ⌘K
                   </kbd>
                 )
-              : null}
+              : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => {
+                      setSearch('')
+                      searchInputRef.current?.focus()
+                    }}
+                    aria-label={t('page.clearSearch')}
+                    title={t('page.clearSearch')}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <CloseIcon className="size-3.5" aria-hidden />
+                  </Button>
+                )}
           </div>
         </div>
       </header>
@@ -285,6 +310,23 @@ export function PullRequestsPageView({
                         : t('empty.filteredDescription')}
                     </EmptyDescription>
                   </EmptyHeader>
+                  {entries.length > 0
+                    ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearch('')
+                            setFilter('all')
+                            setStateFilter('all')
+                            setRepository(null)
+                          }}
+                        >
+                          {t('empty.clearFilters')}
+                        </Button>
+                      )
+                    : null}
                 </Empty>
               )}
       </div>

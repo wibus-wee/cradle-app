@@ -22,6 +22,7 @@ export interface ManagedResourcesPageViewProps {
   actionPending: boolean
   actionError: boolean
   initialFace?: ManagedResourcesPageFace
+  onFaceChange?: (face: ManagedResourcesPageFace) => void
   onRetryResources: () => void
   onResourceAction: (
     resource: ManagedResource,
@@ -41,6 +42,7 @@ export function ManagedResourcesPageView({
   actionPending,
   actionError,
   initialFace = 'library',
+  onFaceChange,
   onRetryResources,
   onResourceAction,
   onCancelTask,
@@ -100,7 +102,10 @@ export function ManagedResourcesPageView({
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setFace(id)}
+                onClick={() => {
+                  setFace(id)
+                  onFaceChange?.(id)
+                }}
                 aria-pressed={active}
                 className={cn(
                   'relative h-9 gap-1.5 rounded-none px-0 text-[13px] hover:bg-transparent focus-visible:ring-2 focus-visible:ring-ring/40',

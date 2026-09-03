@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: Claude Agent 工具矩阵
   作为用户，我希望通过真实 Claude Agent SDK 遍历 canonical 工具词汇中的每一类工具调用，
   在零真实 API 成本下验证工具执行、活动流投影与条目详情渲染

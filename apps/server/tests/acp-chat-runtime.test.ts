@@ -597,7 +597,6 @@ describe('acp chat runtime capability', () => {
       args: JSON.stringify(['--stdio']),
       env: JSON.stringify({ LEGACY_FLAG: '1' }),
       authMethodId: null,
-      authSecretRefs: {},
     })
   })
 
@@ -638,7 +637,6 @@ describe('acp chat runtime capability', () => {
         args: JSON.stringify(['--stdio']),
         env: JSON.stringify({ LOCAL: '1' }),
         authMethodId: null,
-        authSecretRefs: {},
         configurationTarget: { namespace: 'acp', resourceId: 'local-cmd-agent' },
       })
 
@@ -822,7 +820,6 @@ describe('acp chat runtime capability', () => {
       env: '{}',
       installPath: null,
       authMethodId: null,
-      authSecretRefs: {},
     })
 
     await manager.loadSession('profile-acp', 'acp-session-load', '/tmp/workspace')
@@ -901,7 +898,6 @@ describe('acp chat runtime capability', () => {
       env: '{}',
       installPath: null,
       authMethodId: null,
-      authSecretRefs: {},
     })
     await manager.newSession('profile-acp', '/tmp/workspace')
     await manager.setSessionModel('profile-acp', 'acp-model-session', 'model-b')
@@ -940,7 +936,6 @@ describe('acp chat runtime capability', () => {
         env: '{}',
         installPath: null,
         authMethodId: null,
-        authSecretRefs: {},
       })
 
       const client = acpMocks.getClient()
@@ -988,7 +983,6 @@ describe('acp chat runtime capability', () => {
         env: '{}',
         installPath: null,
         authMethodId: null,
-        authSecretRefs: {},
       })
 
       const client = acpMocks.getClient()

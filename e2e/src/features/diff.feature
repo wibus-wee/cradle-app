@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-none
 功能: 本地变更审查与提交
   作为用户，我希望 Diffs 反映真实 Git working tree，并能在源文件变化后刷新到最新内容
 

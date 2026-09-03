@@ -3,6 +3,7 @@
   "empty.description": "Pending CI, review, and timed awaits will appear here.",
   "empty.title": "No pending awaits",
   "error.description": "Desktop await data could not be loaded.",
+  "error.retry": "Retry",
   "error.title": "Awaits unavailable",
   "overview.description": "Sessions waiting on external signals",
   "overview.title": "Awaits",

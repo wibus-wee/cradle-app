@@ -12,6 +12,7 @@ interface FakeSyncEngine {
   updatePassiveStream: ReturnType<typeof vi.fn>
   passiveStreamFactory: ((request: {
     sessionId: string
+    runId: string
     messageId: string
     onSettled: () => void
   }) => unknown) | null
@@ -171,6 +172,7 @@ describe('useChatSessionDriver', () => {
       enabled: true,
       sessionId: 'new-session',
       locallyDriven: false,
+      runtimeActiveRunId: 'run-1',
       runtimeActiveRunMessageId: 'assistant-1',
     })
   })
@@ -192,6 +194,7 @@ describe('useChatSessionDriver', () => {
     expect(factory).not.toBeNull()
     factory?.({
       sessionId: 'new-session',
+      runId: 'run-1',
       messageId: 'assistant-1',
       onSettled: vi.fn(),
     })
@@ -213,7 +216,7 @@ describe('useChatSessionDriver', () => {
 
     expect(mocks.store.releaseStreamLease).toHaveBeenCalledWith('assistant-1')
     expect(mocks.store.releaseStreamLease.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.store.setMessages.mock.invocationCallOrder[0]!,
+      mocks.store.setMessages.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
     )
   })
 })

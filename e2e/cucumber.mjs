@@ -12,9 +12,8 @@ export default {
   requireModule: [tsxEntry],
   /**
    * Each parallel worker boots its own managed server + web stack. Default is 1:
-   * concurrent Codex threads (main turn / title / quick-question) on one worker
-   * can starve each other's notification queues under load — see
-   * COVERAGE.md "Prioritized Missing Journeys". Opt in via CRADLE_E2E_PARALLEL.
+   * CI parallelizes the Claude/local lane while native Codex host traffic remains
+   * serial. Opt in for local runs via CRADLE_E2E_PARALLEL.
    */
   parallel: Number(process.env.CRADLE_E2E_PARALLEL ?? 1),
   publishQuiet: true,

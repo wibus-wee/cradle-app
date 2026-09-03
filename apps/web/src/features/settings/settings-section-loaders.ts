@@ -24,6 +24,7 @@ export const settingsSectionLoaders: Record<string, SettingsSectionLoader> = {
   desktop: () => import('./desktop-update-settings').then(module => ({ default: module.DesktopUpdateSettings })),
   backup: () => import('./data-backup-settings').then(module => ({ default: module.DataBackupSettings })),
   downloads: () => import('~/features/managed-resources/managed-resources-page').then(module => ({ default: module.ManagedResourcesPage })),
+  storage: () => import('~/features/storage/storage-manager').then(module => ({ default: module.StorageManager })),
   features: () => import('./feature-settings').then(module => ({ default: module.FeatureSettings })),
   nodes: () => import('~/features/nodes/nodes-settings').then(module => ({ default: module.NodesSettings })),
   externalIssues: () => import('./external-issue-source-settings').then(module => ({ default: module.ExternalIssueSourceSettings })),

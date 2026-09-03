@@ -19,7 +19,7 @@ const spec = {
     "workspace",
     "relink"
   ],
-  "description": "Relink a missing local workspace location",
+  "description": "Relink workspace location",
   "flags": [
     {
       "name": "path",

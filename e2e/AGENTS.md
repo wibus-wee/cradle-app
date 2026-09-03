@@ -33,16 +33,16 @@ binary. `CRADLE_E2E_BROWSER_PATH` may point local runs at an existing Chromium
 executable; CI installs the Playwright-pinned browser instead.
 `CRADLE_E2E_PARALLEL` sets the Cucumber worker count (default `1`). Each worker
 boots its own managed server + web stack; the chat settlement timeout scales with
-the worker count to absorb shared-machine load. Note: Codex scenarios can flake
-at `≥2` workers due to a known app-server notification-starvation race (see
-`COVERAGE.md` Prioritized Missing Journeys) — Claude-only runs parallelize safely.
+the worker count to absorb shared-machine load. CI keeps `@runtime-codex` serial
+because its scenarios exercise several native streams on one app-server host;
+`@runtime-claude` and `@runtime-none` lanes may use multiple workers.
 
 ## CI gate
 
 - PR smoke (`e2e-smoke.yml`) runs `@P0` when **critical paths** change
   (`e2e/**`, `packages/model-api-simulator/**`, `apps/web/**`, `apps/server/**`, …)
   **or** when the `e2e` label is present (force / keep running).
-- Always checks out the **PR head**, provisions Codex via `sync:codex-runtime`.
+- Always checks out the **PR head**; only the `@runtime-codex` lane provisions Codex via `sync:codex-runtime`.
 - Both workflows run `pnpm e2e:check` before expensive builds and browser setup.
 - PR full E2E: add the `e2e-full` label to a PR. The existing PR workflow then
   runs the exact PR head with `@P0 or @P1`; while the label remains, later pushes
@@ -53,6 +53,8 @@ at `≥2` workers due to a known app-server notification-starvation race (see
   - `@P0` — smoke / must-never-break core path
   - `@P1` — important journeys (daily with P0)
   - `@essence` — quality marker on every live scenario (not a CI selector)
+  - `@runtime-claude` / `@runtime-codex` / `@runtime-none` — exactly one execution lane
+  - `@serial` — keep native host traffic serial inside that lane
 - **No `@wip`.** Unfinished scenarios do not land on the branch. Fix them or do not commit them.
 
 ## Quality bar（精）
@@ -66,7 +68,7 @@ do not invent a parallel mock LLM.
 ## Authoring Rules
 
 - Write `.feature` files in Chinese.
-- Tags: `@cradle`, `@P0`/`@P1`, `@essence`, plus stable IDs like `@CRADLE-CHAT-001`.
+- Tags: `@cradle`, `@P0`/`@P1`, `@essence`, one `@runtime-*` owner, plus stable IDs like `@CRADLE-CHAT-001`.
   Every live scenario must carry a priority (`@P0` or `@P1`) **and** `@essence`.
 - Put reusable setup in `e2e/src/support/` (simulator, providers, scenarios, pages).
 - Keep step definitions thin; use page objects under `e2e/src/support/pages/`.
@@ -86,6 +88,8 @@ On scenario failure, `e2e/artifacts/scenarios/<slug>-<n>/` contains:
 
 Root `e2e/artifacts/ARTIFACTS.md` and `failure-index.json` document the bundle.
 Daily/smoke CI uploads all of the above and links them from the failure Issue / PR comment.
+Run summaries are parsed from `cucumber-messages.ndjson` by
+`e2e/scripts/summarize-run.cjs`; workflows must not carry their own report parser.
 
 ## Simulator usage
 

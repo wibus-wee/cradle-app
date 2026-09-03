@@ -102,9 +102,7 @@ export default defineConfig({
     }),
     viteReact({
       exclude: /[/\\](?:node_modules|api-gen)[/\\]/,
-      babel: {
-        plugins: ['babel-plugin-react-compiler'],
-      },
+      compiler: true,
     }),
     pluginImportMap(),
     createAssetPrecachePlugin(),

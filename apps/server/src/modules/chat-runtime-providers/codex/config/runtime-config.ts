@@ -168,6 +168,11 @@ export function buildCodexConfig(
     network_access: 'enabled',
     show_raw_agent_reasoning: true,
     disable_response_storage: true,
+    tools: {
+      update_plan: {
+        enabled: true,
+      },
+    },
   }
   const mcpServers = buildCodexMcpServersConfig()
   codexConfig.approval_policy = toSupportedCodexApprovalPolicy(config.approvalPolicy)

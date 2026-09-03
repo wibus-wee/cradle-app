@@ -1,4 +1,4 @@
-export { subscribeSyncSessionRunChunks } from './adapters/chunk-stream'
+export { subscribeSyncSessionRunChunks, SyncRunStreamError } from './adapters/chunk-stream'
 export { createSyncGlobalSessionEventSource } from './adapters/global-event-source'
 export { createSyncSessionEventSource } from './adapters/session-event-source'
 export { disposeSyncSocketClient, getActiveSyncSubscriptionCount, isSyncSocketSupported } from './client'

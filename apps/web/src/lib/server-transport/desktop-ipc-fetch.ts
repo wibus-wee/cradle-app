@@ -49,6 +49,7 @@ interface DesktopServerFetchBridge {
 }
 
 interface PendingBody {
+  bridge: DesktopServerFetchBridge
   controller: ReadableStreamDefaultController<Uint8Array> | null
   queued: Uint8Array[]
   terminal: 'open' | 'closed' | Error
@@ -58,6 +59,22 @@ interface PendingBody {
 const pendingBodies = new Map<string, PendingBody>()
 let activeBridge: DesktopServerFetchBridge | null = null
 let unsubscribeBridge: (() => void) | null = null
+
+const handlePageHide = (): void => {
+  disposeDesktopIpcFetchDocument()
+}
+
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('pagehide', handlePageHide)
+}
+
+import.meta.hot?.dispose(() => {
+  disposeDesktopIpcFetchDocument('The renderer module was replaced.')
+  unsubscribeBridge?.()
+  unsubscribeBridge = null
+  activeBridge = null
+  window.removeEventListener?.('pagehide', handlePageHide)
+})
 
 export function isDesktopIpcFetchAvailable(): boolean {
   return !!window.cradle?.serverFetch
@@ -71,12 +88,12 @@ export async function desktopIpcFetch(request: Request): Promise<Response> {
   }
   const requestId = crypto.randomUUID()
   const abort = () => {
-    bridge.cancel(requestId)
-    terminatePending(requestId, request.signal.reason instanceof Error
+    cancelPending(requestId, request.signal.reason instanceof Error
       ? request.signal.reason
       : new DOMException('The operation was aborted.', 'AbortError'))
   }
   const pending: PendingBody = {
+    bridge,
     controller: null,
     queued: [],
     terminal: 'open',
@@ -84,9 +101,9 @@ export async function desktopIpcFetch(request: Request): Promise<Response> {
   }
   pendingBodies.set(requestId, pending)
   if (request.signal.aborted) {
-    pending.cleanupAbort()
-    pendingBodies.delete(requestId)
-    bridge.cancel(requestId)
+    cancelPending(requestId, request.signal.reason instanceof Error
+      ? request.signal.reason
+      : new DOMException('The operation was aborted.', 'AbortError'))
     throw request.signal.reason ?? new DOMException('The operation was aborted.', 'AbortError')
   }
   request.signal.addEventListener('abort', abort, { once: true })
@@ -122,16 +139,12 @@ export async function desktopIpcFetch(request: Request): Promise<Response> {
         bridge.credit(requestId, 1)
       },
       cancel() {
-        bridge.cancel(requestId)
-        pending.cleanupAbort()
-        pendingBodies.delete(requestId)
+        cancelPending(requestId, new DOMException('The response body was cancelled.', 'AbortError'))
       },
     }, { highWaterMark: 0 })
 
     if (!responseBody) {
-      pending.cleanupAbort()
-      pendingBodies.delete(requestId)
-      bridge.cancel(requestId)
+      cancelPending(requestId, new DOMException('The response has no body.', 'AbortError'))
     }
 
     return new Response(responseBody, {
@@ -141,21 +154,22 @@ export async function desktopIpcFetch(request: Request): Promise<Response> {
     })
   }
   catch (error) {
-    pending.cleanupAbort()
-    pendingBodies.delete(requestId)
-    bridge.cancel(requestId)
+    cancelPending(requestId, error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }
 
 export function resetDesktopIpcFetchForTests(): void {
+  cancelAllDesktopIpcFetches(new DOMException('Desktop IPC fetch test state was reset.', 'AbortError'))
   unsubscribeBridge?.()
   unsubscribeBridge = null
   activeBridge = null
-  for (const pending of pendingBodies.values()) {
-    pending.cleanupAbort()
-  }
-  pendingBodies.clear()
+}
+
+export function disposeDesktopIpcFetchDocument(
+  message = 'The renderer document was discarded.',
+): void {
+  cancelAllDesktopIpcFetches(new DOMException(message, 'AbortError'))
 }
 
 function requireBridge(): DesktopServerFetchBridge {
@@ -164,6 +178,7 @@ function requireBridge(): DesktopServerFetchBridge {
     throw new Error('Desktop Server fetch bridge is unavailable.')
   }
   if (activeBridge !== bridge) {
+    cancelAllDesktopIpcFetches(new DOMException('The Desktop Server fetch bridge changed.', 'AbortError'))
     unsubscribeBridge?.()
     activeBridge = bridge
     const unsubscribers = [
@@ -178,6 +193,30 @@ function requireBridge(): DesktopServerFetchBridge {
     }
   }
   return bridge
+}
+
+function cancelAllDesktopIpcFetches(error: Error): void {
+  for (const requestId of [...pendingBodies.keys()]) {
+    cancelPending(requestId, error)
+  }
+}
+
+function cancelPending(requestId: string, error: Error): void {
+  const pending = pendingBodies.get(requestId)
+  if (!pending) {
+    return
+  }
+  pendingBodies.delete(requestId)
+  pending.cleanupAbort()
+  pending.bridge.cancel(requestId)
+  if (pending.controller && pending.terminal === 'open') {
+    try {
+      pending.controller.error(error)
+    }
+    catch {
+      // The stream may have reached a terminal state concurrently with teardown.
+    }
+  }
 }
 
 function handleChunk(event: DesktopServerFetchChunk): void {

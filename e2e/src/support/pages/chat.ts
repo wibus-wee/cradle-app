@@ -94,6 +94,10 @@ export class NewChatPage {
     await expect(menu).toBeVisible({ timeout: 10_000 })
     await menu.locator('[role="menuitem"]', { hasText: label }).first().click()
     await this.page.keyboard.press('Escape')
+    if (await menu.isVisible().catch(() => false)) {
+      await this.page.keyboard.press('Escape')
+    }
+    await expect(menu).toBeHidden({ timeout: 10_000 })
   }
 
   async selectPermissionMode(label: string | RegExp): Promise<void> {
@@ -155,6 +159,10 @@ export class ChatPage {
     const slot = this.page.locator('[data-testid="quick-question-slot"]').filter({ visible: true }).first()
     await expect(slot).toBeVisible({ timeout })
     await expect(slot).toContainText(text, { timeout })
+  }
+
+  async expectQuickQuestionGone(timeout = CHAT_TIMEOUT): Promise<void> {
+    await expect(this.page.locator('[data-testid="quick-question-slot"]')).toHaveCount(0, { timeout })
   }
 
   async expectUserMessage(text: string | RegExp, timeout = CHAT_TIMEOUT): Promise<void> {
@@ -376,6 +384,10 @@ export class ChatPage {
     await expect(this.sessionItem(sessionId)).toBeVisible({ timeout })
   }
 
+  async expectSessionTitle(sessionId: string, title: string, timeout = CHAT_TIMEOUT): Promise<void> {
+    await expect(this.page.locator(`[data-testid="session-title-${sessionId}"]`)).toHaveText(title, { timeout })
+  }
+
   async openSession(sessionId: string): Promise<void> {
     const item = this.sessionItem(sessionId)
     await expect(item).toBeVisible({ timeout: CHAT_TIMEOUT })
@@ -395,7 +407,7 @@ export class ChatPage {
 
   async clickSessionMenuAction(
     sessionId: string,
-    action: 'toggle-pin' | 'copy-markdown' | 'archive' | 'rename',
+    action: 'toggle-pin' | 'copy-markdown' | 'archive' | 'rename' | 'regenerate-title',
   ): Promise<void> {
     const locator = this.page.locator(`[data-testid="session-menu-${action}-${sessionId}-context"]`)
     await expect(locator).toBeVisible({ timeout: 10_000 })

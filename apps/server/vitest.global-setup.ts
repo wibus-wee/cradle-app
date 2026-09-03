@@ -22,7 +22,7 @@ interface SimulatorControlBody {
 }
 
 export async function setup(project: TestProject): Promise<() => Promise<void>> {
-  const simulator = await startModelApiSimulator({ port: 0 })
+  const simulator = await startModelApiSimulator({ port: 0, autoRespond: 'probes-only' })
   const control = await startSimulatorControlServer(simulator.controller)
 
   // Global setup and test workers cannot share the controller object, so provide loopback URLs only.

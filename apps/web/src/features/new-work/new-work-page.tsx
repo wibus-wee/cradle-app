@@ -239,6 +239,7 @@ export function NewWorkPage() {
       composer={composer}
       workspaceCount={localWorkspaces.length}
       loadingWorkspaces={loading}
+      addingWorkspace={adding}
       failureKind={failureKind}
       failureMessage={failureKind === 'generic' ? apiErrorMessage(error) : null}
       canOpenChanges={dirty && selectedWorkspace !== null}
@@ -247,6 +248,7 @@ export function NewWorkPage() {
           openWorkspaceDiffs({ workspaceId: selectedWorkspace.id })
         }
       }}
+      onAddWorkspace={() => void addFromPicker()}
       onDismissFailure={() => {
         setError(null)
       }}

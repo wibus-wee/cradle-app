@@ -6,6 +6,7 @@ import type { PluginLayer, PluginManifest } from '@cradle/plugin-sdk'
 import { parseCradlePluginPackageJsonText } from '@cradle/plugin-sdk/manifest'
 
 import { AppError } from '../../errors/app-error'
+import { openSseEventStream } from '../../infra/sse-event-stream'
 import {
   activateDevelopmentPlugin,
   deactivateDevelopmentPlugin,
@@ -217,9 +218,18 @@ export class PluginDevSessionService {
     this.stopSweepTimer()
   }
 
-  subscribe(listener: EventListener): () => void {
-    this.listeners.add(listener)
-    return () => this.listeners.delete(listener)
+  stream(signal: AbortSignal): ReadableStream<Uint8Array> {
+    return openSseEventStream({
+      signal,
+      source: {
+        subscribe: (listener) => {
+          this.listeners.add(listener)
+          return () => {
+            this.listeners.delete(listener)
+          }
+        },
+      },
+    })
   }
 
   private requireSession(sessionId: string): PluginDevSession {

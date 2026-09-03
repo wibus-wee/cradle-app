@@ -52,6 +52,7 @@ export interface SessionPassiveStreamHandle {
 
 export interface SessionPassiveStreamRequest {
   sessionId: string
+  runId: string
   messageId: string
   onSettled: () => void
 }
@@ -60,6 +61,7 @@ export interface SessionPassiveStreamInput {
   enabled: boolean
   sessionId: string | null
   locallyDriven: boolean
+  runtimeActiveRunId: string | null
   runtimeActiveRunMessageId: string | null
 }
 
@@ -134,6 +136,7 @@ export class SessionSyncEngine {
   private passiveStream: {
     token: object
     sessionId: string
+    runId: string
     messageId: string
     handle: SessionPassiveStreamHandle
   } | null = null
@@ -178,18 +181,29 @@ export class SessionSyncEngine {
   }
 
   updatePassiveStream(input: SessionPassiveStreamInput): void {
-    if (!input.enabled || !input.sessionId || input.locallyDriven || !input.runtimeActiveRunMessageId) {
+    if (
+      !input.enabled
+      || !input.sessionId
+      || input.locallyDriven
+      || !input.runtimeActiveRunId
+      || !input.runtimeActiveRunMessageId
+    ) {
       this.stopPassiveStream(input.sessionId)
       return
     }
 
+    const runId = input.runtimeActiveRunId
     const messageId = input.runtimeActiveRunMessageId
-    if (this.passiveStream?.sessionId === input.sessionId && this.passiveStream.messageId === messageId) {
+    if (
+      this.passiveStream?.sessionId === input.sessionId
+      && this.passiveStream.runId === runId
+      && this.passiveStream.messageId === messageId
+    ) {
       return
     }
 
     this.stopPassiveStream()
-    this.startPassiveStream(input.sessionId, messageId)
+    this.startPassiveStream(input.sessionId, runId, messageId)
   }
 
   reconcileRuntimeState(input: SessionRuntimeReconciliationInput): SessionRuntimeReconciliationAction {
@@ -255,7 +269,7 @@ export class SessionSyncEngine {
     this.requestSnapshotCatchup()
   }
 
-  private startPassiveStream(sessionId: string, messageId: string): void {
+  private startPassiveStream(sessionId: string, runId: string, messageId: string): void {
     if (!this.passiveStreamFactory) {
       return
     }
@@ -263,6 +277,7 @@ export class SessionSyncEngine {
     const token = {}
     const handle = this.passiveStreamFactory({
       sessionId,
+      runId,
       messageId,
       onSettled: () => {
         if (this.passiveStream?.token === token) {
@@ -273,6 +288,7 @@ export class SessionSyncEngine {
     this.passiveStream = {
       token,
       sessionId,
+      runId,
       messageId,
       handle,
     }

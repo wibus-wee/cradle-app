@@ -22,8 +22,8 @@ export function useCreateWork() {
       },
     ),
     onSuccess: (work) => {
-      void queryClient.invalidateQueries({ queryKey: ['works', connection?.url] })
-      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.url] })
+      void queryClient.invalidateQueries({ queryKey: ['works', connection?.resourceId] })
+      void queryClient.invalidateQueries({ queryKey: ['workspace', connection?.resourceId] })
       router.push(`/work/${work.work.id}`)
     },
   })

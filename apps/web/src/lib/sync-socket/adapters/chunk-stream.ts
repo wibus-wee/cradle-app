@@ -20,6 +20,7 @@ export class SyncRunStreamError extends Error {
 
 export function subscribeSyncSessionRunChunks(input: {
   sessionId: string
+  expectedRunId?: string
   signal?: AbortSignal
 }): Promise<ChatStreamTransportResult> {
   const subId = crypto.randomUUID()
@@ -75,6 +76,13 @@ export function subscribeSyncSessionRunChunks(input: {
             return
           }
           if (frame.kind === 'chunk') {
+            if (input.expectedRunId && frame.runId !== input.expectedRunId) {
+              fail(new SyncRunStreamError(
+                'snapshot-required',
+                `Run stream changed from ${input.expectedRunId} to ${frame.runId}`,
+              ))
+              return
+            }
             const cursorResult = updateSyncRunSubscriptionCursor(subId, {
               runId: frame.runId,
               cursor: frame.cursor,

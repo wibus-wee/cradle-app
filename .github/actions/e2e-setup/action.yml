@@ -1,6 +1,12 @@
 name: Setup E2E runtime
 description: Build E2E workspace artifacts and provision cached browser/runtime dependencies
 
+inputs:
+  provision-codex:
+    description: Provision the native Codex app-server for this runtime lane
+    required: false
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -33,6 +39,7 @@ runs:
       run: timeout --preserve-status 15m pnpm exec playwright install chromium-headless-shell
 
     - name: Cache Codex runtime
+      if: inputs.provision-codex == 'true'
       uses: actions/cache@v4
       with:
         path: apps/desktop/resources/codex
@@ -41,6 +48,7 @@ runs:
           ${{ runner.os }}-${{ runner.arch }}-codex-runtime-
 
     - name: Provision Codex app-server for E2E
+      if: inputs.provision-codex == 'true'
       shell: bash
       env:
         GITHUB_TOKEN: ${{ github.token }}

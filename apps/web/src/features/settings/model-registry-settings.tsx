@@ -14,6 +14,16 @@ import {
   getModelRegistryMappingsQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { deleteModelRegistryMappingsByModelId } from '~/api-gen/sdk.gen'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '~/components/ui/alert-dialog'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -144,6 +154,7 @@ export function ModelRegistrySettings() {
   const [query, setQuery] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingMapping, setEditingMapping] = useState<ModelRegistryMapping | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<ModelRegistryMapping | null>(null)
 
   const { data: mappings = [], isLoading } = useQuery(getModelRegistryMappingsOptions())
 
@@ -235,7 +246,7 @@ export function ModelRegistrySettings() {
                     mapping={mapping}
                     deleting={deleteMapping.isPending && deleteMapping.variables === mapping.modelId}
                     onEdit={() => setEditingMapping(mapping)}
-                    onDelete={() => deleteMapping.mutate(mapping.modelId)}
+                    onDelete={() => setPendingDelete(mapping)}
                   />
                 ))}
               </SettingsGroup>
@@ -265,6 +276,36 @@ export function ModelRegistrySettings() {
           initialRegistryModel={editingMapping.model}
         />
       )}
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={open => !open && setPendingDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('registry.delete.title')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('registry.delete.description', {
+                modelId: pendingDelete?.modelId ?? '',
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('registry.action.cancel' as SettingsKey)}</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (pendingDelete) {
+                  deleteMapping.mutate(pendingDelete.modelId)
+                  setPendingDelete(null)
+                }
+              }}
+            >
+              {t('registry.action.delete' as SettingsKey)}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SettingsPage>
   )
 }

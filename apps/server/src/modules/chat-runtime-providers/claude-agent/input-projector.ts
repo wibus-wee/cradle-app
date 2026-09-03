@@ -33,6 +33,8 @@ import type {
 import {
   createClaudeAgentCanUseTool,
   createClaudeAgentPermissionBridgeState,
+  createClaudeAgentPostModelSwitchHook,
+  createClaudeAgentPreModelSwitchHook,
   createClaudeAgentPreToolUseHook,
   updateClaudeAgentPermissionBridgeState,
 } from './permission-bridge'
@@ -45,6 +47,7 @@ import {
   readClaudeAgentAllowDangerouslySkipPermissions,
   readClaudeAgentPermissionMode,
 } from './runtime-settings'
+import { writeClaudeAgentModelSwitchSnapshot } from './state-projector'
 import type {
   AnthropicImageMediaType,
   ClaudeAgentContentBlock,
@@ -286,6 +289,21 @@ export function buildClaudeQueryOptions(input: {
       PreToolUse: [
         ...(queryOptions.hooks?.PreToolUse ?? []),
         { hooks: [createClaudeAgentPreToolUseHook({ state: permissionBridgeState })] },
+      ],
+      PreModelSwitch: [
+        ...(queryOptions.hooks?.PreModelSwitch ?? []),
+        { hooks: [createClaudeAgentPreModelSwitchHook({ deps: input.deps, state: permissionBridgeState })] },
+      ],
+      PostModelSwitch: [
+        ...(queryOptions.hooks?.PostModelSwitch ?? []),
+        {
+          hooks: [createClaudeAgentPostModelSwitchHook({
+            onModelSwitch: modelSwitch => writeClaudeAgentModelSwitchSnapshot(
+              permissionBridgeState.runtimeInput.runtimeSession,
+              modelSwitch,
+            ),
+          })],
+        },
       ],
     }
   }
@@ -546,6 +564,7 @@ function projectClaudeAgentMcpServers(
             command: config.command,
             args: config.args,
             env: config.env,
+            ...(config.timeout !== undefined ? { timeout: config.timeout } : {}),
           } satisfies McpServerConfig,
         ]
       }
@@ -556,6 +575,7 @@ function projectClaudeAgentMcpServers(
           type: 'http',
           url: config.url,
           ...(Object.keys(config.headers).length > 0 ? { headers: config.headers } : {}),
+          ...(config.timeout !== undefined ? { timeout: config.timeout } : {}),
         } satisfies McpServerConfig,
       ]
     }),

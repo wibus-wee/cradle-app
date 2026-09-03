@@ -1,4 +1,6 @@
 {
+  "backgroundActivityFooter.open": "打开后台活动提示",
+  "backgroundActivityFooter.title": "后台活动",
   "browser.annotation.cancel": "Cancel annotation",
   "browser.annotation.comment": "Comment",
   "browser.annotation.toggleTitle": "Toggle browser comments (Command/Ctrl Shift F)",
@@ -72,6 +74,11 @@
   "update.tooltip.title": "Cradle 更新",
   "aside.localServers.scanning": "正在扫描 localhost…",
   "aside.notes.placeholder": "在这里记录会话笔记…",
+  "aside.notes.label": "笔记",
+  "aside.notes.saved": "已保存",
+  "aside.notes.unsaved": "尚未保存",
+  "aside.notes.saving": "正在保存…",
+  "aside.notes.error": "保存失败",
   "whatsNew.dismiss": "知道了",
   "whatsNew.eyebrow": "新版亮点",
   "whatsNew.history": "历史版本",

@@ -1,4 +1,11 @@
-import type { IpcMain, IpcMainInvokeEvent, WebContents } from 'electron'
+import type {
+  Event as ElectronEvent,
+  IpcMain,
+  IpcMainInvokeEvent,
+  RenderProcessGoneDetails,
+  WebContents,
+  WebContentsDidStartNavigationEventParams,
+} from 'electron'
 import { Agent, fetch as undiciFetch } from 'undici'
 
 import type {
@@ -15,6 +22,7 @@ import {
   DESKTOP_SERVER_FETCH_CHUNK_CHANNEL,
   DESKTOP_SERVER_FETCH_CLOSED_CHANNEL,
   DESKTOP_SERVER_FETCH_CREDIT_CHANNEL,
+  DESKTOP_SERVER_FETCH_DOCUMENT_CHANNEL,
   DESKTOP_SERVER_FETCH_ERROR_CHANNEL,
   DESKTOP_SERVER_FETCH_MAX_CREDIT,
   DESKTOP_SERVER_FETCH_OPEN_CHANNEL,
@@ -39,23 +47,51 @@ const STRIPPED_RESPONSE_HEADERS = new Set([
   'transfer-encoding',
 ])
 
+const DEFAULT_CONSUMER_IDLE_MS = 60_000
+const DIAGNOSTIC_REQUEST_LIMIT = 20
+
+type ActiveRequestState = 'opening' | 'reading' | 'waiting-credit'
+type CancellationReason
+  = | 'consumer-idle'
+    | 'explicit'
+    | 'navigation'
+    | 'owner-destroyed'
+    | 'render-process-gone'
+    | 'server-generation'
+    | 'shutdown'
+
 interface ActiveRequest {
   key: string
   requestId: string
   owner: WebContents
+  ownerGeneration: number
   kind: 'finite' | 'stream'
+  method: string
+  pathname: string
   controller: AbortController
   reader: ReadableStreamDefaultReader<Uint8Array> | null
   credit: number
   remainder: Uint8Array | null
+  declaredBytes: number | null
+  deliveredBytes: number
+  openedAt: number
+  responseHeadAt: number | null
+  lastCreditAt: number | null
+  lastDeliveryAt: number | null
+  idleTimer: ReturnType<typeof setTimeout> | null
   pumping: boolean
   closed: boolean
 }
 
 interface OwnerRequests {
   owner: WebContents
+  currentDocumentId: string | null
+  retiredDocumentIds: Set<string>
+  generation: number
   keys: Set<string>
   handleDestroyed: () => void
+  handleNavigation: (event: ElectronEvent<WebContentsDidStartNavigationEventParams>) => void
+  handleRenderProcessGone: (event: ElectronEvent, details: RenderProcessGoneDetails) => void
 }
 
 type ServerFetch = typeof undiciFetch
@@ -63,24 +99,84 @@ type ServerFetch = typeof undiciFetch
 interface DesktopServerFetchBrokerOptions {
   fetchFn?: ServerFetch
   isAllowedSender: (sender: WebContents) => boolean
+  consumerIdleMs?: number
+}
+
+export interface DesktopServerFetchRequestDiagnostics {
+  requestId: string
+  ownerId: number
+  ownerGeneration: number
+  method: string
+  pathname: string
+  kind: 'finite' | 'stream'
+  state: ActiveRequestState
+  ageMs: number
+  responseAgeMs: number | null
+  credit: number
+  declaredBytes: number | null
+  deliveredBytes: number
+  declaredUndeliveredBytes: number | null
+  bufferedBytes: number
+  lastCreditAgeMs: number | null
+  lastDeliveryAgeMs: number | null
+}
+
+export interface DesktopServerFetchDiagnostics {
+  generation: number
+  activeRequests: number
+  finiteRequests: number
+  streamRequests: number
+  rendererCount: number
+  zeroCreditRequests: number
+  oldestRequestAgeMs: number
+  declaredUndeliveredBytes: number
+  bufferedBytes: number
+  cancellations: Record<CancellationReason, number>
+  requests: DesktopServerFetchRequestDiagnostics[]
 }
 
 export class DesktopServerFetchBroker {
   private readonly fetchFn: ServerFetch
   private readonly isAllowedSender: (sender: WebContents) => boolean
+  private readonly consumerIdleMs: number
   private readonly finiteDispatcher = new Agent({ connections: 128, pipelining: 1 })
   private readonly streamDispatcher = new Agent({ connections: 256, pipelining: 1 })
   private readonly active = new Map<string, ActiveRequest>()
   private readonly ownerRequests = new Map<number, OwnerRequests>()
+  private readonly cancellations: Record<CancellationReason, number> = {
+    'consumer-idle': 0,
+    'explicit': 0,
+    'navigation': 0,
+    'owner-destroyed': 0,
+    'render-process-gone': 0,
+    'server-generation': 0,
+    'shutdown': 0,
+  }
+
   private serverUrl: string | null = null
   private generation = 0
 
   constructor(options: DesktopServerFetchBrokerOptions) {
     this.fetchFn = options.fetchFn ?? undiciFetch
     this.isAllowedSender = options.isAllowedSender
+    this.consumerIdleMs = options.consumerIdleMs ?? DEFAULT_CONSUMER_IDLE_MS
+    if (!Number.isFinite(this.consumerIdleMs) || this.consumerIdleMs <= 0) {
+      throw new Error('Desktop Server fetch consumer idle lease must be positive.')
+    }
   }
 
   register(ipcMain: IpcMain): void {
+    ipcMain.on(DESKTOP_SERVER_FETCH_DOCUMENT_CHANNEL, (event, documentId: unknown) => {
+      if (
+        !this.isAllowedSender(event.sender)
+        || typeof documentId !== 'string'
+        || documentId.length < 1
+        || documentId.length > 128
+      ) {
+        return
+      }
+      this.activateDocument(this.ensureOwner(event.sender), documentId)
+    })
     ipcMain.handle(
       DESKTOP_SERVER_FETCH_OPEN_CHANNEL,
       async (event, request: DesktopServerFetchRequest): Promise<DesktopServerFetchOpenResponse> => {
@@ -106,6 +202,8 @@ export class DesktopServerFetchBroker {
       if (!active || !Number.isSafeInteger(credit) || (credit as number) <= 0) {
         return
       }
+      active.lastCreditAt = Date.now()
+      this.clearConsumerIdle(active)
       active.credit = Math.min(
         DESKTOP_SERVER_FETCH_MAX_CREDIT,
         active.credit + (credit as number),
@@ -116,7 +214,7 @@ export class DesktopServerFetchBroker {
       if (!this.isAllowedSender(event.sender) || typeof requestId !== 'string') {
         return
       }
-      void this.cancel(this.key(event.sender, requestId))
+      void this.cancel(this.key(event.sender, requestId), 'explicit')
     })
   }
 
@@ -128,13 +226,16 @@ export class DesktopServerFetchBroker {
     this.serverUrl = next
     this.generation = generation
     for (const key of this.active.keys()) {
-      void this.cancel(key)
+      void this.cancel(key, 'server-generation')
     }
   }
 
   async close(): Promise<void> {
     for (const key of this.active.keys()) {
-      await this.cancel(key)
+      await this.cancel(key, 'shutdown')
+    }
+    for (const registration of this.ownerRequests.values()) {
+      this.removeOwner(registration)
     }
     await Promise.all([
       this.finiteDispatcher.close(),
@@ -142,20 +243,30 @@ export class DesktopServerFetchBroker {
     ])
   }
 
-  diagnostics(): {
-    generation: number
-    activeRequests: number
-    finiteRequests: number
-    streamRequests: number
-    rendererCount: number
-  } {
+  diagnostics(): DesktopServerFetchDiagnostics {
+    const now = Date.now()
     const requests = [...this.active.values()]
+    const details = requests
+      .map(request => this.requestDiagnostics(request, now))
+      .sort((left, right) => right.ageMs - left.ageMs
+        || (right.declaredUndeliveredBytes ?? -1) - (left.declaredUndeliveredBytes ?? -1))
+      .slice(0, DIAGNOSTIC_REQUEST_LIMIT)
     return {
       generation: this.generation,
       activeRequests: requests.length,
       finiteRequests: requests.filter(request => request.kind === 'finite').length,
       streamRequests: requests.filter(request => request.kind === 'stream').length,
-      rendererCount: this.ownerRequests.size,
+      rendererCount: [...this.ownerRequests.values()].filter(owner => owner.keys.size > 0).length,
+      zeroCreditRequests: requests.filter(request => request.reader && request.credit === 0).length,
+      oldestRequestAgeMs: details[0]?.ageMs ?? 0,
+      declaredUndeliveredBytes: requests.reduce((total, request) => total + (
+        request.declaredBytes === null
+          ? 0
+          : Math.max(0, request.declaredBytes - request.deliveredBytes)
+      ), 0),
+      bufferedBytes: requests.reduce((total, request) => total + (request.remainder?.byteLength ?? 0), 0),
+      cancellations: { ...this.cancellations },
+      requests: details,
     }
   }
 
@@ -172,6 +283,23 @@ export class DesktopServerFetchBroker {
     validateRequest(request)
     if (request.generation !== this.generation) {
       throw new Error('Desktop Server fetch generation is stale.')
+    }
+    const owner = this.ensureOwner(event.sender)
+    const senderFrameIsCurrent = event.senderFrame !== null
+      && !event.senderFrame.detached
+      && event.senderFrame === event.sender.mainFrame
+    if (
+      senderFrameIsCurrent
+      && owner.currentDocumentId === null
+      && !owner.retiredDocumentIds.has(request.documentId)
+    ) {
+      this.activateDocument(owner, request.documentId)
+    }
+    if (
+      owner.currentDocumentId !== request.documentId
+      || !senderFrameIsCurrent
+    ) {
+      throw new DesktopServerFetchCancelledError(request.requestId)
     }
 
     const target = new URL(request.path, this.serverUrl)
@@ -190,16 +318,26 @@ export class DesktopServerFetchBroker {
       key,
       requestId: request.requestId,
       owner: event.sender,
+      ownerGeneration: owner.generation,
       kind: acceptsEventStream(headers) ? 'stream' : 'finite',
+      method: request.method.toUpperCase(),
+      pathname: target.pathname,
       controller,
       reader: null,
       credit: 0,
       remainder: null,
+      declaredBytes: null,
+      deliveredBytes: 0,
+      openedAt: Date.now(),
+      responseHeadAt: null,
+      lastCreditAt: null,
+      lastDeliveryAt: null,
+      idleTimer: null,
       pumping: false,
       closed: false,
     }
     this.active.set(key, active)
-    this.attachOwner(active)
+    owner.keys.add(active.key)
 
     let response: Awaited<ReturnType<ServerFetch>>
     try {
@@ -230,9 +368,14 @@ export class DesktopServerFetchBroker {
       throw new DesktopServerFetchCancelledError(request.requestId)
     }
     active.reader = response.body?.getReader() ?? null
+    active.responseHeadAt = Date.now()
+    active.declaredBytes = parseContentLength(response.headers.get('content-length'))
 
     if (!active.reader) {
       queueMicrotask(() => this.finish(active))
+    }
+    else {
+      this.scheduleConsumerIdle(active)
     }
 
     return {
@@ -252,13 +395,21 @@ export class DesktopServerFetchBroker {
     try {
       while (active.credit > 0 && !active.closed) {
         const bytes = await this.readChunk(active)
+        if (active.closed) {
+          return
+        }
         if (bytes === null) {
           this.finish(active)
           return
         }
         active.credit -= 1
+        active.deliveredBytes += bytes.byteLength
+        active.lastDeliveryAt = Date.now()
         const payload: DesktopServerFetchChunk = { requestId: active.requestId, bytes }
         active.owner.send(DESKTOP_SERVER_FETCH_CHUNK_CHANNEL, payload)
+        if (active.credit === 0) {
+          this.scheduleConsumerIdle(active)
+        }
       }
     }
     catch (error) {
@@ -315,11 +466,12 @@ export class DesktopServerFetchBroker {
     }
   }
 
-  private async cancel(key: string): Promise<void> {
+  private async cancel(key: string, reason: CancellationReason): Promise<void> {
     const active = this.active.get(key)
     if (!active || !this.take(active)) {
       return
     }
+    this.cancellations[reason] += 1
     active.controller.abort()
     await active.reader?.cancel().catch(() => {})
   }
@@ -329,25 +481,10 @@ export class DesktopServerFetchBroker {
       return false
     }
     active.closed = true
+    this.clearConsumerIdle(active)
     this.active.delete(active.key)
     this.detachOwner(active)
     return true
-  }
-
-  private attachOwner(active: ActiveRequest): void {
-    let registration = this.ownerRequests.get(active.owner.id)
-    if (!registration) {
-      const keys = new Set<string>()
-      const handleDestroyed = () => {
-        for (const key of [...keys]) {
-          void this.cancel(key)
-        }
-      }
-      registration = { owner: active.owner, keys, handleDestroyed }
-      this.ownerRequests.set(active.owner.id, registration)
-      active.owner.once('destroyed', handleDestroyed)
-    }
-    registration.keys.add(active.key)
   }
 
   private detachOwner(active: ActiveRequest): void {
@@ -356,14 +493,136 @@ export class DesktopServerFetchBroker {
       return
     }
     registration.keys.delete(active.key)
-    if (registration.keys.size === 0) {
-      registration.owner.removeListener('destroyed', registration.handleDestroyed)
-      this.ownerRequests.delete(active.owner.id)
-    }
   }
 
   private key(sender: WebContents, requestId: string): string {
     return `${sender.id}:${requestId}`
+  }
+
+  private cancelOwner(keys: Set<string>, reason: CancellationReason): void {
+    for (const key of [...keys]) {
+      void this.cancel(key, reason)
+    }
+  }
+
+  private ensureOwner(owner: WebContents): OwnerRequests {
+    const existing = this.ownerRequests.get(owner.id)
+    if (existing) {
+      return existing
+    }
+    const keys = new Set<string>()
+    const registration: OwnerRequests = {
+      owner,
+      currentDocumentId: null,
+      retiredDocumentIds: new Set(),
+      generation: 0,
+      keys,
+      handleDestroyed: () => {},
+      handleNavigation: () => {},
+      handleRenderProcessGone: () => {},
+    }
+    registration.handleDestroyed = () => {
+      this.cancelOwner(keys, 'owner-destroyed')
+      this.removeOwner(registration)
+    }
+    registration.handleNavigation = (event) => {
+      if (!event.isMainFrame || event.isSameDocument) {
+        return
+      }
+      this.retireDocument(registration)
+      this.cancelOwner(keys, 'navigation')
+    }
+    registration.handleRenderProcessGone = () => {
+      this.retireDocument(registration)
+      this.cancelOwner(keys, 'render-process-gone')
+    }
+    this.ownerRequests.set(owner.id, registration)
+    owner.once('destroyed', registration.handleDestroyed)
+    owner.on('did-start-navigation', registration.handleNavigation)
+    owner.on('render-process-gone', registration.handleRenderProcessGone)
+    return registration
+  }
+
+  private activateDocument(registration: OwnerRequests, documentId: string): void {
+    if (
+      registration.currentDocumentId === documentId
+      || registration.retiredDocumentIds.has(documentId)
+    ) {
+      return
+    }
+    const hadCurrentDocument = registration.currentDocumentId !== null
+    if (hadCurrentDocument) {
+      this.retireDocument(registration)
+      this.cancelOwner(registration.keys, 'navigation')
+    }
+    registration.currentDocumentId = documentId
+    registration.generation += 1
+  }
+
+  private retireDocument(registration: OwnerRequests): void {
+    if (registration.currentDocumentId) {
+      registration.retiredDocumentIds.add(registration.currentDocumentId)
+      registration.currentDocumentId = null
+    }
+  }
+
+  private removeOwner(registration: OwnerRequests): void {
+    if (this.ownerRequests.get(registration.owner.id) !== registration) {
+      return
+    }
+    registration.owner.removeListener('destroyed', registration.handleDestroyed)
+    registration.owner.removeListener('did-start-navigation', registration.handleNavigation)
+    registration.owner.removeListener('render-process-gone', registration.handleRenderProcessGone)
+    this.ownerRequests.delete(registration.owner.id)
+  }
+
+  private scheduleConsumerIdle(active: ActiveRequest): void {
+    if (active.closed || !active.reader || active.credit > 0 || active.idleTimer) {
+      return
+    }
+    active.idleTimer = setTimeout(() => {
+      active.idleTimer = null
+      if (!active.closed && active.credit === 0) {
+        void this.cancel(active.key, 'consumer-idle')
+      }
+    }, this.consumerIdleMs)
+    active.idleTimer.unref?.()
+  }
+
+  private clearConsumerIdle(active: ActiveRequest): void {
+    if (!active.idleTimer) {
+      return
+    }
+    clearTimeout(active.idleTimer)
+    active.idleTimer = null
+  }
+
+  private requestDiagnostics(active: ActiveRequest, now: number): DesktopServerFetchRequestDiagnostics {
+    const declaredUndeliveredBytes = active.declaredBytes === null
+      ? null
+      : Math.max(0, active.declaredBytes - active.deliveredBytes)
+    return {
+      requestId: active.requestId,
+      ownerId: active.owner.id,
+      ownerGeneration: active.ownerGeneration,
+      method: active.method,
+      pathname: active.pathname,
+      kind: active.kind,
+      state: active.responseHeadAt === null
+        ? 'opening'
+        : active.credit > 0
+          ? 'reading'
+          : 'waiting-credit',
+      ageMs: now - active.openedAt,
+      responseAgeMs: active.responseHeadAt === null ? null : now - active.responseHeadAt,
+      credit: active.credit,
+      declaredBytes: active.declaredBytes,
+      deliveredBytes: active.deliveredBytes,
+      declaredUndeliveredBytes,
+      bufferedBytes: active.remainder?.byteLength ?? 0,
+      lastCreditAgeMs: active.lastCreditAt === null ? null : now - active.lastCreditAt,
+      lastDeliveryAgeMs: active.lastDeliveryAt === null ? null : now - active.lastDeliveryAt,
+    }
   }
 }
 
@@ -383,6 +642,9 @@ function validateRequest(request: DesktopServerFetchRequest): void {
     || typeof request.requestId !== 'string'
     || request.requestId.length < 1
     || request.requestId.length > 128
+    || typeof request.documentId !== 'string'
+    || request.documentId.length < 1
+    || request.documentId.length > 128
     || !Number.isSafeInteger(request.generation)
     || request.generation < 1
     || typeof request.method !== 'string'
@@ -420,4 +682,12 @@ function acceptsEventStream(headers: Headers): boolean {
   return headers.get('accept')
     ?.split(',')
     .some(value => value.trim().toLowerCase().startsWith('text/event-stream')) ?? false
+}
+
+function parseContentLength(value: string | null): number | null {
+  if (value === null || !/^\d+$/.test(value)) {
+    return null
+  }
+  const bytes = Number(value)
+  return Number.isSafeInteger(bytes) ? bytes : null
 }

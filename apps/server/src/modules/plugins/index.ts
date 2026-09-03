@@ -4,8 +4,8 @@ import { resolveActorContext } from '../../http/actor-context'
 import type { PluginSourceInstallerOptions } from '../../plugins/source-installer'
 import { pluginMarketplaceRoutes } from '../plugin-marketplace'
 import { pluginDevSessions } from './dev-session-service'
+import { pluginLifecycle } from './lifecycle-service'
 import { PluginsModel } from './model'
-import { openPluginEventStream } from './plugin-event-stream'
 import * as Plugins from './service'
 
 export function createPluginsModule(options: PluginSourceInstallerOptions = {}) {
@@ -63,14 +63,23 @@ export function createPluginsModule(options: PluginSourceInstallerOptions = {}) 
     params: t.Object({ id: t.String({ minLength: 1 }) }),
     response: { 200: t.Object({ removed: t.Literal(true) }) },
   })
-  .get('/events', ({ request }) => new Response(openPluginEventStream(request.signal), {
+  .get('/dev-sessions/events', ({ request }) => new Response(pluginDevSessions.stream(request.signal), {
     headers: {
       'content-type': 'text/event-stream',
       'cache-control': 'no-cache',
       'connection': 'keep-alive',
     },
   }), {
-    detail: { summary: 'Subscribe to plugin lifecycle and development session changes' },
+    detail: { summary: 'Subscribe to plugin development session changes' },
+  })
+  .get('/events', ({ request }) => new Response(pluginLifecycle.stream(request.signal), {
+    headers: {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      'connection': 'keep-alive',
+    },
+  }), {
+    detail: { summary: 'Subscribe to persisted plugin lifecycle changes' },
   })
   .get('/reviews', ({ query }) => Plugins.listPendingReviews(query.chatSessionId), {
     detail: { summary: 'List pending plugin reviews for a chat session' },

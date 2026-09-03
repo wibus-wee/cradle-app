@@ -3,6 +3,7 @@ import {
   DownloadLine as DownloadIcon,
   PencilLine as PencilIcon,
 } from '@mingcute/react'
+import { useTranslation } from 'react-i18next'
 
 import { Button } from '~/components/ui/button'
 import { ScrollArea } from '~/components/ui/scroll-area'
@@ -34,6 +35,7 @@ export function SkillDetailView({
   onExport,
   onDelete,
 }: SkillDetailViewProps) {
+  const { t } = useTranslation('skills')
   const isEditable = entry.scope === editableScope
   const Icon = skillScopeIcons[entry.scope]
 
@@ -63,7 +65,7 @@ export function SkillDetailView({
               size="icon-xs"
               onClick={onEdit}
               className="text-muted-foreground hover:text-foreground"
-              aria-label={`Edit ${entry.name}`}
+              aria-label={t('detail.edit', { name: entry.name })}
               data-testid="skill-edit-btn"
             >
               <PencilIcon aria-hidden="true" />
@@ -74,7 +76,7 @@ export function SkillDetailView({
             size="icon-xs"
             onClick={onExport}
             className="text-muted-foreground hover:text-foreground"
-            aria-label={`Export ${entry.name}`}
+            aria-label={t('detail.export', { name: entry.name })}
             data-testid="skill-export-btn"
           >
             <DownloadIcon aria-hidden="true" />
@@ -85,7 +87,7 @@ export function SkillDetailView({
               size="icon-xs"
               onClick={onDelete}
               className="text-muted-foreground hover:text-destructive"
-              aria-label={`Delete ${entry.name}`}
+              aria-label={t('detail.delete', { name: entry.name })}
               data-testid="skill-delete-btn"
             >
               <Trash2Icon aria-hidden="true" />
@@ -102,7 +104,7 @@ export function SkillDetailView({
 
       {document?.body && (
         <div>
-          <span className="text-[10px] text-muted-foreground">Content</span>
+          <span className="text-[10px] text-muted-foreground">{t('detail.content')}</span>
           <ScrollArea className="mt-1.5 max-h-96">
             <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground/60">
               {document.body}

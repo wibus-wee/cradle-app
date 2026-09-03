@@ -1,12 +1,13 @@
-import type { UIMessage } from 'ai'
-import { Square } from 'lucide-react-native'
-import { useMemo, useRef } from 'react'
-import type { NativeSyntheticEvent, NativeTouchEvent } from 'react-native'
+import type { FileUIPart, UIMessage } from 'ai'
+import { ArrowDown, Square } from 'lucide-react-native'
+import { useMemo, useRef, useState } from 'react'
+import type { NativeScrollEvent, NativeSyntheticEvent, NativeTouchEvent } from 'react-native'
 import {
   ActivityIndicator,
   Animated,
   FlatList,
   Keyboard,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -26,7 +27,7 @@ import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
 import { ChatActivitySheet } from './ChatActivitySheet'
-import type { ChatSubmitInput } from './ChatComposer'
+import type { ChatComposerDraft, ChatSubmitInput } from './ChatComposer'
 import { ChatComposer } from './ChatComposer'
 import { ChatMessage } from './ChatMessage'
 
@@ -39,6 +40,9 @@ type TranscriptItem = MessageItem | PendingItem | LiveItem
 
 export interface ChatViewProps {
   capabilities?: GetChatSessionsBySessionIdCapabilitiesResponse
+  clearComposerDraftSignal: number
+  composerDraft: ChatComposerDraft
+  composerDraftKey: string
   messages: MessageRow[]
   activeRun?: ActiveRun
   hasEarlier: boolean
@@ -55,15 +59,22 @@ export interface ChatViewProps {
   queuedCount?: number
   sendError?: string | null
   onCancel: () => void
+  onComposerDraftChange: (draft: ChatComposerDraft) => void
+  onCopyMessage: (text: string) => Promise<void>
   onLoadEarlier: () => void
   onModeChange: (mode: 'build' | 'plan') => void
+  onPreviewAttachment?: (file: FileUIPart) => Promise<void>
   onRequestMessageDetail: (messageId: string | null) => void
   onSend: (input: ChatSubmitInput) => void
+  onShareMessage: (text: string) => Promise<void>
   runtimeSettings?: GetChatSessionsBySessionIdRuntimeSettingsResponse
 }
 
 export function ChatView({
   capabilities,
+  clearComposerDraftSignal,
+  composerDraft,
+  composerDraftKey,
   messages,
   activeRun,
   hasEarlier,
@@ -80,10 +91,14 @@ export function ChatView({
   queuedCount = 0,
   sendError = null,
   onCancel,
+  onComposerDraftChange,
+  onCopyMessage,
   onLoadEarlier,
   onModeChange,
+  onPreviewAttachment,
   onRequestMessageDetail,
   onSend,
+  onShareMessage,
   runtimeSettings,
 }: ChatViewProps) {
   const theme = useTheme()
@@ -95,6 +110,8 @@ export function ChatView({
   })
   const listTouchStartRef = useRef({ pageX: 0, pageY: 0 })
   const listTouchMovedRef = useRef(false)
+  const listRef = useRef<FlatList<TranscriptItem>>(null)
+  const [isAwayFromLatest, setIsAwayFromLatest] = useState(false)
   const items = useMemo<TranscriptItem[]>(() => {
     const durableIds = new Set(messages.map(row => row.messageId))
     const showPendingUser = pendingUser && (!pendingUser.id || !durableIds.has(pendingUser.id))
@@ -161,6 +178,10 @@ export function ChatView({
     }
     listTouchMovedRef.current = false
   }
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const next = event.nativeEvent.contentOffset.y > 160
+    setIsAwayFromLatest(current => current === next ? current : next)
+  }
 
   return (
     <SafeAreaView edges={['bottom']} style={[styles.safeArea, { backgroundColor: theme.chrome }]}>
@@ -173,7 +194,7 @@ export function ChatView({
             ]}
             data={displayItems}
             inverted
-            keyboardDismissMode="none"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'none'}
             keyboardShouldPersistTaps="always"
             ListHeaderComponent={(
               <Animated.View
@@ -202,6 +223,7 @@ export function ChatView({
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             onEndReached={handleEndReached}
             onEndReachedThreshold={0.2}
+            onScroll={handleScroll}
             onTouchEnd={handleListTouchEnd}
             onTouchMove={handleListTouchMove}
             onTouchStart={handleListTouchStart}
@@ -218,6 +240,8 @@ export function ChatView({
                     errorText={item.row.errorText}
                     message={message}
                     onActivityPress={onRequestMessageDetail}
+                    onCopy={onCopyMessage}
+                    onShare={onShareMessage}
                     status={liveMessage?.id === item.row.messageId ? 'streaming' : item.row.status}
                   />
                 )
@@ -226,12 +250,15 @@ export function ChatView({
                 <ChatMessage
                   message={item.message}
                   onActivityPress={item.kind === 'live' ? onRequestMessageDetail : undefined}
+                  onCopy={onCopyMessage}
+                  onShare={onShareMessage}
                   status={
                     item.kind === 'live' ? (isStreaming ? 'streaming' : 'complete') : undefined
                   }
                 />
               )
             }}
+            ref={listRef}
             scrollEventThrottle={32}
           />
 
@@ -253,6 +280,20 @@ export function ChatView({
               },
             ]}
           >
+            {isAwayFromLatest && (
+              <PressableScale
+                accessibilityLabel="Jump to latest message"
+                accessibilityRole="button"
+                haptic
+                onPress={() => listRef.current?.scrollToOffset({ animated: true, offset: 0 })}
+                style={[
+                  styles.jumpButton,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                <ArrowDown color={theme.foreground} size={18} />
+              </PressableScale>
+            )}
             {isStreaming && (
               <View style={styles.runStatus}>
                 <View style={[styles.progressDot, { backgroundColor: theme.success }]} />
@@ -291,9 +332,14 @@ export function ChatView({
 
             <ChatComposer
               capabilities={capabilities}
+              clearDraftSignal={clearComposerDraftSignal}
+              initialDraft={composerDraft}
               isSending={isSending}
               isStreaming={isStreaming}
+              key={composerDraftKey}
+              onDraftChange={onComposerDraftChange}
               onModeChange={onModeChange}
+              onPreviewAttachment={onPreviewAttachment}
               onSend={onSend}
               runtimeSettings={runtimeSettings}
             />
@@ -330,6 +376,18 @@ const styles = StyleSheet.create({
   keyboardSpacer: {
     width: '100%',
   },
+  jumpButton: {
+    alignItems: 'center',
+    borderRadius: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 44,
+    justifyContent: 'center',
+    position: 'absolute',
+    right: spacing.md,
+    top: -52,
+    width: 44,
+    zIndex: 1,
+  },
   messages: {
     flexGrow: 1,
     gap: spacing.lg,
@@ -356,7 +414,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
-    minHeight: 32,
+    minHeight: 44,
   },
   safeArea: {
     flex: 1,
@@ -368,10 +426,10 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     alignItems: 'center',
-    borderRadius: 16,
-    height: 32,
+    borderRadius: 22,
+    height: 44,
     justifyContent: 'center',
-    width: 32,
+    width: 44,
   },
   surface: {
     flex: 1,

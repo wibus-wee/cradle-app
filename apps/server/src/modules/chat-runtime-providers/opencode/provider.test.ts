@@ -216,7 +216,7 @@ function createFakeResource(events: AsyncEventStream<OpencodeEvent>) {
     messages: vi.fn(async () => ({ data: state.sessionMessagesData, error: undefined })),
     fork: vi.fn(async () => ({ data: state.forkSessionData, error: undefined })),
     children: vi.fn(async () => ({ data: state.sessionChildrenData, error: undefined })),
-    delete: vi.fn(),
+    delete: vi.fn(async () => ({ data: true, error: undefined })),
     revert: vi.fn(async () => ({ data: true, error: undefined })),
     status: vi.fn(async () => ({ data: state.sessionStatusData, error: undefined })),
     todo: vi.fn(async () => ({ data: state.sessionTodoData, error: undefined })),
@@ -360,6 +360,22 @@ describe('resolveNativeOpencodeRuntimeConfig', () => {
 })
 
 describe('opencodeProvider rollback', () => {
+  it('deletes the native session through the typed OpenCode client', async () => {
+    const events = new AsyncEventStream<OpencodeEvent>()
+    const fake = createFakeResource(events)
+    const provider = new OpencodeProvider({ readSecret: () => 'secret' })
+
+    await expect(provider.deleteSessionStorage({
+      runtimeSession: createRuntimeSession(fake.resource),
+      profile: null,
+      workspacePath: '/tmp/workspace',
+    })).resolves.toEqual({ status: 'deleted' })
+    expect(fake.session.delete).toHaveBeenCalledWith({
+      path: { id: 'ses_1' },
+      query: { directory: '/tmp/workspace' },
+    })
+  })
+
   it('rewinds to the requested historical assistant message', async () => {
     const events = new AsyncEventStream<OpencodeEvent>()
     const fake = createFakeResource(events)

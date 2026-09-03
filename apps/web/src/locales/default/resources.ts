@@ -27,6 +27,7 @@ export default {
   'action.uninstall': 'Uninstall',
   'action.cancel': 'Cancel',
   'action.retry': 'Try again',
+  'action.clearFilters': 'Clear filters',
   'action.failed': 'The resource action could not be completed.',
   'uninstall.title': 'Uninstall {{name}}?',
   'uninstall.description': 'Only files managed by Cradle will be removed. External installations are never changed.',

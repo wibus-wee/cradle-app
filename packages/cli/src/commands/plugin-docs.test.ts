@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -92,5 +92,25 @@ describe('Plugin developer guide command', () => {
       executablePath: join(cliDir, 'index.cjs'),
       cwd: resourcesDir,
     })).toBe(guidePath)
+  })
+
+  it('resolves the guide from a pnpm-linked monorepo CLI', () => {
+    const repoDir = mkdtempSync(join(tmpdir(), 'cradle-plugin-docs-linked-'))
+    tempDirs.push(repoDir)
+    const cliDir = join(repoDir, 'packages/cli')
+    const executablePath = join(cliDir, 'dist/index.cjs')
+    const guidePath = join(repoDir, 'packages/plugin-sdk/DEVELOPERS.md')
+    const linkedCliDir = join(repoDir, 'node_modules/@cradle/cli')
+    mkdirSync(join(cliDir, 'dist'), { recursive: true })
+    mkdirSync(join(repoDir, 'packages/plugin-sdk'), { recursive: true })
+    mkdirSync(join(repoDir, 'node_modules/@cradle'), { recursive: true })
+    writeFileSync(executablePath, '')
+    writeFileSync(guidePath, guide)
+    symlinkSync(cliDir, linkedCliDir, 'dir')
+
+    expect(resolvePluginDeveloperGuidePath({
+      executablePath: join(linkedCliDir, 'dist/index.cjs'),
+      cwd: tmpdir(),
+    })).toBe(realpathSync(guidePath))
   })
 })

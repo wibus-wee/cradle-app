@@ -8,7 +8,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | --- | --- |
 | `hooks.ts` | Scenario launch, Playwright tracing, screenshots/video, console capture, and simulator request ledger |
 | `world.ts` | Cucumber World, browser/context/page, temporary workspaces, scenario memory, and runtime configuration |
-| `server-lifecycle.ts` | Managed server and production web preview without `CRADLE_MOCK_LLM_URL` |
+| `server-lifecycle.ts` | Managed server, crash/restart with preserved data and port, and production web preview without `CRADLE_MOCK_LLM_URL` |
 | `model-api-simulator.ts` | `@cradle/model-api-simulator` in `probes-only` auto-response mode |
 | `providers.ts` | Provider/profile/Agent prerequisites and workspace prerequisite |
 | `scenarios/` | Strict OpenAI Responses and Anthropic Messages exchanges |
@@ -29,9 +29,10 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/git.ts` | Branch controls |
 | `pages/kanban.ts` | Board, Issue detail, activity, and delegation |
 | `pages/search.ts` | Global search |
+| `pages/session-environment.ts` | Session Environment notes and delayed real-save control |
 | `pages/settings.ts` | Settings shell and appearance |
 | `pages/terminal.ts` | Bottom panel and PTY sessions |
-| `pages/usage.ts` | Usage dashboard |
+| `pages/usage.ts` | Usage dashboard, range selection, and downloaded CSV |
 | `pages/work.ts` | New Work and managed Work verification |
 | `pages/workspace.ts` | Workspace list, Directory Browser, and overview |
 

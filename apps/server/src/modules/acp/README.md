@@ -43,7 +43,7 @@ Resolve (`chat-runtime-providers/acp/config.ts`) requires `status === 'installed
 | `POST` | `/acp/agents/remote` | `acp agent create-remote` | Register an HTTP/WebSocket endpoint with Secrets references |
 | `GET` | `/acp/agents/:agentId` | `acp agent get` | One row |
 | `GET` | `/acp/agents/:agentId/auth-methods` | `acp agent auth-methods` | Initialize without ACP credential values and return live advertised methods. |
-| `PUT` | `/acp/agents/:agentId/auth` | `acp agent auth-set` | Persist a method ID and Secrets-owned credential refs, then reconnect and authenticate. |
+| `PUT` | `/acp/agents/:agentId/auth` | `acp agent auth-set` | Persist a supported agent-managed method ID, then reconnect and authenticate. |
 | `DELETE` | `/acp/agents/:agentId/auth` | `acp agent auth-clear` | Clear the selection and disconnect the current process. |
 | `PATCH` | `/acp/agents/:agentId/launch-config` | `acp agent launch-config` | Local base or registry overrides; disconnects the current process |
 | `PATCH` | `/acp/agents/:agentId/remote-config` | `acp agent remote-config` | Update a remote endpoint and reconnect on next use |
@@ -55,7 +55,7 @@ Resolve (`chat-runtime-providers/acp/config.ts`) requires `status === 'installed
 
 `saveInstalledToDb` / `markInstalling` update base install fields only and never write `override_*` or flip `source` on conflict updates. If reinstall changes `distributionType`, all overrides are cleared and audit `launch_override_cleared` is recorded when prior overrides existed.
 
-Auth selection is also preserved across registry reinstall. ACP rows contain `auth_method_id` and an env-name-to-credential-ID map only, and every submitted ID must already exist in the Secrets owner before persistence. Credential values are accepted and resolved exclusively by the Secrets owner; ACP responses, audit details, launch records, and runtime snapshots never include them. Changing or clearing a selection does not delete the referenced Secrets rows.
+Auth selection is also preserved across registry reinstall. Stable ACP authentication methods are agent-managed or terminal-based, so ACP rows persist only `auth_method_id`. Cradle supports agent-managed methods through the runtime connection; terminal methods are returned as unsupported because Cradle does not host an interactive terminal authentication flow. Legacy environment-variable credential mappings are cleared when a selection changes. Remote transport headers remain separate connection configuration and continue to reference values owned by the Secrets module.
 
 ## Files
 

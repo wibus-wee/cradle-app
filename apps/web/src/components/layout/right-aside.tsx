@@ -1,6 +1,7 @@
 import {
   CircleDashLine as CircleDashedIcon,
   DotCircleLine as CircleDotIcon,
+  EyeLine as EnvironmentIcon,
   GitBranchLine as GitBranchIcon,
   GitCompareLine as FileDiffIcon,
   HeartbeatLine as ActivityIcon,
@@ -25,6 +26,7 @@ import { IssueAsidePanel } from '~/features/kanban/issue-aside-panel'
 import { useLinkedIssue } from '~/features/kanban/use-kanban'
 import { useSessionIsolationState } from '~/features/session/use-session-isolation'
 import { AwaitPanel } from '~/features/session-await/await-panel'
+import { SessionEnvironmentPanel } from '~/features/session-environment/session-environment-panel'
 import { FileTree } from '~/features/workspace/file-tree'
 import type { Workspace } from '~/features/workspace/types'
 import { getLocalWorkspacePath } from '~/features/workspace/types'
@@ -40,6 +42,7 @@ interface Tab {
     | 'rightAside.tab.git'
     | 'rightAside.tab.issue'
     | 'rightAside.tab.await'
+    | 'rightAside.tab.environment'
     | 'rightAside.tab.runtime'
     | 'rightAside.tab.adjustment'
   icon: typeof FolderTreeIcon
@@ -52,6 +55,7 @@ const TABS: Tab[] = [
   { id: 'changes', labelKey: 'rightAside.tab.changes', icon: FileDiffIcon },
   { id: 'git', labelKey: 'rightAside.tab.git', icon: GitBranchIcon },
   { id: 'issue', labelKey: 'rightAside.tab.issue', icon: CircleDotIcon, requiresSession: true },
+  { id: 'environment', labelKey: 'rightAside.tab.environment', icon: EnvironmentIcon, requiresSession: true },
   { id: 'runtime', labelKey: 'rightAside.tab.runtime', icon: ActivityIcon, requiresSession: true },
   { id: 'await', labelKey: 'rightAside.tab.await', icon: RssIcon, requiresSession: true },
   { id: 'adjustment', labelKey: 'rightAside.tab.adjustment', icon: SlidersHorizontalIcon },
@@ -243,6 +247,21 @@ function RightAsidePanelContent({
         data-testid="right-aside-panel-await"
       >
         <AwaitPanel sessionId={sessionId ?? null} workspaceId={workspaceId} />
+      </div>
+    )
+  }
+
+  if (tabId === 'environment' && sessionId) {
+    return (
+      <div
+        className="flex flex-1 flex-col overflow-hidden"
+        data-testid="right-aside-panel-environment"
+      >
+        <SessionEnvironmentPanel
+          sessionId={sessionId}
+          workspaceId={workspaceId}
+          workId={workId}
+        />
       </div>
     )
   }

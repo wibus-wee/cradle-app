@@ -22,7 +22,7 @@ ENV['RCT_HERMES_V1_ENABLED'] ||= '0' if podfile_properties['expo.useHermesV1'] =
 # (e.g. EXPO_USE_PRECOMPILED_MODULES exported by EAS Build), so force-disable here before the default.
 ENV['EXPO_USE_PRECOMPILED_MODULES'] = '0' if podfile_properties['EXPO_USE_PRECOMPILED_MODULES'] == 'false'
 ENV['EXPO_USE_PRECOMPILED_MODULES'] ||= '1'
-platform :ios, podfile_properties['ios.deploymentTarget'] || '16.4'
+platform :ios, podfile_properties['ios.deploymentTarget'] || '26.0'
 
 prepare_react_native_project!
 

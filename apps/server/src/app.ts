@@ -48,6 +48,7 @@ import { createChronicleModule } from './modules/chronicle'
 import { createChronicleManagedResourceAdapter } from './modules/chronicle/managed-resource-adapter'
 import { codeActivity } from './modules/code-activity'
 import { codexAppServer } from './modules/codex-app-server'
+import { registerCodexResetWatchMaintenance } from './modules/codex-reset-watch/service'
 import { conversationBridge } from './modules/conversation-bridge'
 import { desktop } from './modules/desktop'
 import { diffReview } from './modules/diff-review'
@@ -104,6 +105,8 @@ import { sessionAwait } from './modules/session-await'
 import { sessionEnvironment } from './modules/session-environment'
 import { sessionGroup } from './modules/session-group'
 import { skills } from './modules/skills'
+import { storage } from './modules/storage'
+import { registerStorageMaintenance } from './modules/storage/maintenance'
 import { registerSyncGatewayRoutes } from './modules/sync-gateway'
 import { testReset } from './modules/test-reset'
 import { threadHandoff } from './modules/thread-handoff'
@@ -291,6 +294,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(recall)
   app.use(createPluginsModule({ downloadCenter: downloadCenter.service }))
   app.use(skills)
+  app.use(storage)
   app.use(workflowRules)
   app.use(git)
   app.use(worktree)
@@ -411,9 +415,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     registerRunSnapshotMaintenance()
     TurnCheckpoint.registerTurnCheckpointMaintenance()
     registerBlobStoreMaintenance()
+    registerStorageMaintenance()
     registerMessageBlobBackfillMaintenance()
     registerMessageSteerSplitBackfillMaintenance()
     registerWorkspaceGitIdentityBackfillMaintenance()
+    registerCodexResetWatchMaintenance()
     Maintenance.registerTask({
       ownerNamespace: 'logging',
       key: 'rotate-server-log',
@@ -497,6 +503,8 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     })
     await hydrateCustomMcpServers()
     reconcileExternalIssueSourceRegistrations()
+    const { resumePersistedSessionQueues } = await import('./modules/chat-runtime/runtime')
+    resumePersistedSessionQueues()
   })
 
   const runtimeResources = new RuntimeResourceRegistry()

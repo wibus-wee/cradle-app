@@ -1,9 +1,11 @@
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 
 import type { BrowserWindow } from 'electron'
 import { app } from 'electron'
+
+import { resolveStagedNativeAddonPath } from './native-addon-paths'
 
 export interface CaptionButtonRect {
   x: number
@@ -25,6 +27,7 @@ export interface CaptionButtonHoverEvent {
 
 interface CaptionButtonsAddon {
   attach: (handle: Buffer, onHover: (event: { button: string, phase: string }) => void) => boolean
+  beginWindowDrag: (handle: Buffer) => boolean
   detach: (handle: Buffer) => boolean
   setButtons: (handle: Buffer, buttons: CaptionButtonRectsInput) => boolean
 }
@@ -34,12 +37,12 @@ const require = createRequire(import.meta.url)
 let cachedAddon: CaptionButtonsAddon | null | undefined
 
 function resolveAddonCandidates(): string[] {
+  const appPath = app.getAppPath()
   const candidates: string[] = []
-  const packedPath = __dirname.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
-  candidates.push(join(packedPath, 'native', 'caption-buttons.node'))
+  candidates.push(resolveStagedNativeAddonPath(appPath, 'caption-buttons.node'))
   if (!app.isPackaged) {
     candidates.push(
-      resolve(__dirname, '..', '..', 'native', 'windows', 'caption-buttons', 'build', 'Release', 'caption_buttons.node'),
+      join(appPath, 'native', 'windows', 'caption-buttons', 'build', 'Release', 'caption_buttons.node'),
     )
   }
   return candidates
@@ -114,6 +117,16 @@ export function installWindowsCaptionButtons(win: BrowserWindow): void {
   win.once('closed', () => {
     addon.detach(handle)
   })
+}
+
+/** Continue the currently held left button as a native non-client window drag. */
+export function beginWindowsWindowDrag(win: BrowserWindow): boolean {
+  if (process.platform !== 'win32') {
+    return false
+  }
+  const addon = loadCaptionButtonsAddon()
+  const handle = readWindowHandle(win)
+  return addon && handle ? addon.beginWindowDrag(handle) : false
 }
 
 /**

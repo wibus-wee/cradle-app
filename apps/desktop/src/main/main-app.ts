@@ -78,7 +78,8 @@ import { resolveDesktopPrimaryPluginsDir } from './plugin-paths'
 import {
   registerPluginSourceSyncIpcHandlers,
   setPluginSourceSyncServerUrl,
-  startPluginSync,
+  startPluginDevSessionSync,
+  startPluginSourceLifecycleSync,
 } from './plugin-source-sync'
 import { QuitGuard } from './quit-guard'
 import { DesktopServerFetchBroker } from './server-fetch-broker'
@@ -98,7 +99,8 @@ let desktopAppBadgeManager: DesktopAppBadgeManager | null = null
 let macBridgeManager: MacBridgeManager | null = null
 let chatStreamBroker: ChatStreamBroker | null = null
 let chatEventTailBroker: ChatEventTailBroker | null = null
-let stopPluginSync: (() => void) | null = null
+let stopPluginDevSessionSync: (() => void) | null = null
+let stopPluginSourceLifecycleSync: (() => void) | null = null
 let desktopServerGeneration = 0
 
 let notificationCenterManager: NotificationCenterManager | null = null
@@ -381,7 +383,6 @@ async function showPluginInstallSuccess(result: PluginInstallResult): Promise<vo
     cancelId: 1,
   })
   if (response === 0) {
-    quitGuard.allowNextQuit()
     app.relaunch()
     app.exit(0)
   }
@@ -505,8 +506,10 @@ async function shutdownDesktopRuntime(options: { stopServerRuntime: boolean }): 
   chatStreamBroker = null
   chatEventTailBroker?.stop()
   chatEventTailBroker = null
-  stopPluginSync?.()
-  stopPluginSync = null
+  stopPluginDevSessionSync?.()
+  stopPluginDevSessionSync = null
+  stopPluginSourceLifecycleSync?.()
+  stopPluginSourceLifecycleSync = null
   trayManager?.destroy()
   trayManager = null
   desktopAppBadgeManager?.destroy()
@@ -570,7 +573,6 @@ async function prepareDesktopExitForExternalQuit(input: {
 
 function registerProcessShutdownHandlers(): void {
   const handleSignal = (signal: NodeJS.Signals) => {
-    quitGuard.allowNextQuit()
     requestDesktopExit({
       reason: signal,
       exitCode: 0,
@@ -659,7 +661,6 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
       return win
     },
     requestQuit: () => {
-      quitGuard.allowNextQuit()
       requestDesktopExit({
         reason: 'tray quit',
         exitCode: 0,
@@ -681,15 +682,16 @@ function initializeDesktopServicesForServer(serverUrl: string): void {
   void syncDesktopPreferencesFromServer(serverUrl).then(() => {
     updateManager?.startBackgroundChecks()
   })
-  stopPluginSync?.()
-  stopPluginSync = startPluginSync()
+  stopPluginSourceLifecycleSync?.()
+  stopPluginSourceLifecycleSync = startPluginSourceLifecycleSync()
+  stopPluginDevSessionSync?.()
+  stopPluginDevSessionSync = startPluginDevSessionSync()
 }
 
 async function initializeDesktopUpdateManager(): Promise<void> {
   const { DesktopUpdateManager } = await import('./update-manager')
   updateManager = new DesktopUpdateManager({
     prepareQuitForUpdate: async () => {
-      quitGuard.allowNextQuit()
       await prepareDesktopExitForExternalQuit({
         reason: 'desktop update',
         stopServerRuntime: true,
@@ -703,6 +705,9 @@ export async function startDesktopApp(): Promise<void> {
   registerProcessShutdownHandlers()
   registerPluginInstallProtocol()
   registerBrowserIpcHandlers(ipcMain, browserManager)
+  ipcMain.on('window:tearoff-renderer-ready', (event) => {
+    windowManager?.markTearoffRendererReady(event.sender.id)
+  })
   serverFetchBroker.register(ipcMain)
   initializeIpcDevtool()
   browserManager.subscribe((state) => {
@@ -763,7 +768,6 @@ export async function startDesktopApp(): Promise<void> {
     getQuitGuard: () => quitGuard,
     requestDataRestart: (reason) => {
       setTimeout(() => {
-        quitGuard.allowNextQuit()
         app.relaunch()
         requestDesktopExit({
           reason,
@@ -800,6 +804,13 @@ export async function startDesktopApp(): Promise<void> {
         },
         openSettings: () => {
           void trayManager?.performAction('open-desktop-settings')
+        },
+        quit: (triggeredByCommandQ) => {
+          if (triggeredByCommandQ) {
+            quitGuard.handleCommandQ()
+            return
+          }
+          app.quit()
         },
       })
 
@@ -930,9 +941,6 @@ export async function startDesktopApp(): Promise<void> {
   })
 
   app.on('before-quit', (event) => {
-    if (!quitGuard.handleBeforeQuit(event)) {
-      return
-    }
     event.preventDefault()
     requestDesktopExit({
       reason: 'app quit',

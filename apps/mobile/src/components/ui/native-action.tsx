@@ -10,6 +10,7 @@ interface NativeActionProps {
   loading?: boolean
   role?: 'default' | 'destructive'
   style?: StyleProp<ViewStyle>
+  testID?: string
   variant?: 'filled' | 'outlined' | 'text'
 }
 
@@ -20,13 +21,14 @@ export function NativeAction({
   loading = false,
   role = 'default',
   style,
+  testID,
   variant = 'filled',
 }: NativeActionProps) {
   const theme = useTheme()
   const seedColor = role === 'destructive' ? theme.destructive : theme.primary
 
   return (
-    <View style={[styles.frame, style]}>
+    <View style={[styles.frame, style]} testID={testID}>
       {loading
         ? <ActivityIndicator color={seedColor} style={styles.loading} />
         : (

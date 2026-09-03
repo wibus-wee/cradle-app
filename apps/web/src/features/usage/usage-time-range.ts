@@ -20,6 +20,12 @@ export const USAGE_RANGE_OPTIONS: UsageRangeOption[] = [
   { key: '1y', days: 365, label: '1Y' },
 ]
 
+const USAGE_RANGE_KEYS = new Set<UsageRangeKey>(USAGE_RANGE_OPTIONS.map(option => option.key))
+
+export function isUsageRangeKey(value: unknown): value is UsageRangeKey {
+  return typeof value === 'string' && USAGE_RANGE_KEYS.has(value as UsageRangeKey)
+}
+
 export function rangeDays(range: UsageRangeKey): number {
   return USAGE_RANGE_OPTIONS.find(option => option.key === range)?.days ?? 30
 }

@@ -178,6 +178,29 @@ describe('fabric Session', () => {
     expect(events.at(-1)).toBe('close')
   })
 
+  it('propagates a controller stream close to the node exactly once', () => {
+    const nodeKeys = generateFabricSessionKeyPair()
+    const controllerKeys = generateFabricSessionKeyPair()
+    const nodeStreamClose = vi.fn()
+    const node = session('node', nodeKeys, controllerKeys.publicKeyBase64, {
+      send: () => {},
+      onStreamOpen: () => {},
+      onStreamClose: nodeStreamClose,
+    })
+    const controller = session('controller', controllerKeys, nodeKeys.publicKeyBase64, {
+      send: () => {},
+    })
+    wire(node, controller)
+    controller.start()
+    controller.openStream('cancelled-stream')
+
+    controller.closeStream('cancelled-stream', 'local socket closed')
+    controller.closeStream('cancelled-stream', 'duplicate close')
+
+    expect(nodeStreamClose).toHaveBeenCalledOnce()
+    expect(nodeStreamClose).toHaveBeenCalledWith('cancelled-stream', 'local socket closed')
+  })
+
   it('rejects a session when the peer key is not the Fabric certificate key', () => {
     const nodeKeys = generateFabricSessionKeyPair()
     const controllerKeys = generateFabricSessionKeyPair()

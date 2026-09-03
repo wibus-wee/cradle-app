@@ -21,7 +21,11 @@ function killProcessGroup(proc: ChildProcess, signal: NodeJS.Signals) {
   }
 }
 
-async function stopProcessGroup(proc: ChildProcess | null, timeoutMs: number): Promise<void> {
+async function stopProcessGroup(
+  proc: ChildProcess | null,
+  timeoutMs: number,
+  signal: NodeJS.Signals = 'SIGTERM',
+): Promise<void> {
   if (!proc) {
     return
   }
@@ -29,7 +33,7 @@ async function stopProcessGroup(proc: ChildProcess | null, timeoutMs: number): P
     return
   }
 
-  killProcessGroup(proc, 'SIGTERM')
+  killProcessGroup(proc, signal)
 
   await new Promise<void>((resolve) => {
     let settled = false
@@ -47,7 +51,9 @@ async function stopProcessGroup(proc: ChildProcess | null, timeoutMs: number): P
 
     proc.once('exit', finish)
     timeout = setTimeout(() => {
-      killProcessGroup(proc, 'SIGKILL')
+      if (signal !== 'SIGKILL') {
+        killProcessGroup(proc, 'SIGKILL')
+      }
       // Wait for the process exit event before deleting its SQLite/log files.
       // A final guard keeps teardown bounded if the platform never reaps it.
       timeout = setTimeout(finish, 1000)
@@ -84,6 +90,15 @@ interface E2EServerInstance {
   dataDir: string
   serverUrl: string
   webUrl: string | null
+  launchConfig: ManagedServerLaunchConfig
+}
+
+interface ManagedServerLaunchConfig {
+  dataDir: string
+  serverHomeDir: string
+  serverPort: number
+  nodeBinary: string
+  codexAppServerPath: string | null
 }
 
 let instance: E2EServerInstance | null = null
@@ -140,6 +155,70 @@ async function reserveAvailablePort(): Promise<number> {
       })
     })
   })
+}
+
+async function startManagedServer(config: ManagedServerLaunchConfig): Promise<ChildProcess> {
+  const {
+    codexAppServerPath,
+    dataDir,
+    nodeBinary,
+    serverHomeDir,
+    serverPort,
+  } = config
+  const serverProcess = spawn(nodeBinary, ['--import', 'tsx', 'src/index.ts'], {
+    cwd: join(ROOT, 'apps', 'server'),
+    env: {
+      ...process.env,
+      PATH: `${dirname(nodeBinary)}:${process.env.PATH ?? ''}`,
+      HOME: serverHomeDir,
+      // Workspace fixtures and ad-hoc workspaces live under this checkout-owned
+      // cache. Prevent Git from inheriting the Cradle repository above it.
+      GIT_CEILING_DIRECTORIES: dataDir,
+      CRADLE_DATA_DIR: dataDir,
+      CRADLE_AD_HOC_WORKSPACE_ROOT: join(dataDir, 'ad-hoc-workspaces'),
+      CRADLE_PORT: String(serverPort),
+      CRADLE_HOST: '127.0.0.1',
+      CRADLE_ALLOW_PRIVATE_PROVIDER_HOSTS: '127.0.0.1,localhost,::1',
+      CRADLE_CREDENTIAL_SECRET: 'e2e-test-secret',
+      ...(codexAppServerPath ? { CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath } : {}),
+      CRADLE_E2E: '1',
+      NODE_ENV: 'test',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  })
+
+  serverProcess.stdout?.on('data', (chunk: Buffer) => {
+    if (process.env.CRADLE_E2E_VERBOSE) {
+      process.stderr.write(`[server] ${chunk.toString()}`)
+    }
+  })
+  serverProcess.stderr?.on('data', (chunk: Buffer) => {
+    if (process.env.CRADLE_E2E_VERBOSE) {
+      process.stderr.write(`[server:err] ${chunk.toString()}`)
+    }
+  })
+
+  const serverUrl = `http://127.0.0.1:${serverPort}`
+  try {
+    await waitForReady(`${serverUrl}/health`, 'Managed E2E Server')
+    return serverProcess
+  }
+  catch (error) {
+    await stopProcessGroup(serverProcess, 5000)
+    throw error
+  }
+}
+
+/** Crash and restart only the managed Server, preserving its data, port, and web preview. */
+export async function restartManagedServer(): Promise<void> {
+  if (!instance) {
+    throw new Error('Application process restart requires the managed E2E Server')
+  }
+
+  await stopProcessGroup(instance.serverProcess, 5000, 'SIGKILL')
+  instance.serverProcess = await startManagedServer(instance.launchConfig)
+  console.log(`[e2e] Managed server restarted at ${instance.serverUrl} (data preserved: ${instance.dataDir})`)
 }
 
 const BUILD_LOCK_PATH = join(ROOT, 'node_modules', '.cache', 'cradle-e2e-web-build.lock')
@@ -207,65 +286,28 @@ BeforeAll({ timeout: 120_000 }, async () => {
   chmodSync(serverHomeDir, 0o777)
   const serverPort = await reserveAvailablePort()
   const codexAppServerPath = resolveManagedCodexAppServerPath(ROOT)
+  const nodeBinary = process.env.CRADLE_E2E_NODE
+    ?? (existsSync(join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node'))
+      ? join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node')
+      : process.execPath)
+  const launchConfig: ManagedServerLaunchConfig = {
+    dataDir,
+    serverHomeDir,
+    serverPort,
+    nodeBinary,
+    codexAppServerPath,
+  }
 
   let serverProcess: ChildProcess | null = null
   let webProcess: ChildProcess | null = null
   let webDistDir: string | null = null
 
   try {
-    const nodeBinary = process.env.CRADLE_E2E_NODE
-      ?? (existsSync(join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node'))
-        ? join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node')
-        : process.execPath)
     // Use tsx as a Node loader instead of its CLI. The CLI creates an IPC socket even
     // for a one-shot process, which is blocked in hardened CI/sandbox environments.
-    serverProcess = spawn(nodeBinary, ['--import', 'tsx', 'src/index.ts'], {
-      cwd: join(ROOT, 'apps', 'server'),
-      env: {
-        ...process.env,
-        PATH: `${dirname(nodeBinary)}:${process.env.PATH ?? ''}`,
-        HOME: serverHomeDir,
-        // Workspace fixtures live below the checkout-owned data cache so the
-        // directory browser can reach them. Do not let Git inherit the Cradle
-        // repository identity through that parent path.
-        GIT_CEILING_DIRECTORIES: serverHomeDir,
-        CRADLE_DATA_DIR: dataDir,
-        // The managed data directory lives under the checkout cache. Prevent
-        // temporary workspace probes from inheriting the checkout repository.
-        GIT_CEILING_DIRECTORIES: dataDir,
-        // Keep ad-hoc chat workspaces inside the per-run writable sandbox. The
-        // production default (~/Documents/Cradle) may not exist or be writable
-        // on a clean CI runner.
-        CRADLE_AD_HOC_WORKSPACE_ROOT: join(dataDir, 'ad-hoc-workspaces'),
-        CRADLE_PORT: String(serverPort),
-        CRADLE_HOST: '127.0.0.1',
-        // Allow loopback model-api-simulator hosts for provider probe/warm during E2E.
-        CRADLE_ALLOW_PRIVATE_PROVIDER_HOSTS: '127.0.0.1,localhost,::1',
-        CRADLE_CREDENTIAL_SECRET: 'e2e-test-secret',
-        // Do NOT set CRADLE_MOCK_LLM_URL — E2E must use the real Claude Agent Provider
-        // talking to @cradle/model-api-simulator over Anthropic Messages.
-        ...(codexAppServerPath ? { CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath } : {}),
-        CRADLE_E2E: '1',
-        NODE_ENV: 'test',
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-      detached: true,
-    })
-
-    serverProcess.stdout?.on('data', (chunk: Buffer) => {
-      if (process.env.CRADLE_E2E_VERBOSE) {
-        process.stderr.write(`[server] ${chunk.toString()}`)
-      }
-    })
-    serverProcess.stderr?.on('data', (chunk: Buffer) => {
-      if (process.env.CRADLE_E2E_VERBOSE) {
-        process.stderr.write(`[server:err] ${chunk.toString()}`)
-      }
-    })
+    serverProcess = await startManagedServer(launchConfig)
 
     const serverUrl = `http://127.0.0.1:${serverPort}`
-    await waitForReady(`${serverUrl}/health`, 'Managed E2E Server')
-
     console.log(`[e2e] Managed server started at ${serverUrl} (data: ${dataDir})`)
     if (codexAppServerPath) {
       console.log(`[e2e] Codex app-server: ${codexAppServerPath}`)
@@ -339,7 +381,7 @@ BeforeAll({ timeout: 120_000 }, async () => {
       console.log(`[e2e] Managed web production preview started at ${webUrl}`)
     }
 
-    instance = { serverProcess, webProcess, webDistDir, dataDir, serverUrl, webUrl }
+    instance = { serverProcess, webProcess, webDistDir, dataDir, serverUrl, webUrl, launchConfig }
   }
   catch (error) {
     await stopProcessGroup(webProcess, 3000)

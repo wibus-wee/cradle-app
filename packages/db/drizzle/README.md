@@ -21,6 +21,8 @@ SQL 文件负责重放数据库结构，`meta/` 负责 journal 与 snapshot，�
 - **0054_provider_targets_provider_id.sql**: Nullable `provider_id` on `provider_targets` for explicit Provider identity (never inferred from endpoint URL).
 - **0062_fabric_session_projection_ownership.sql**: Records whether a Fabric Session projection created its remote authority or discovered an existing remote Session, so local deletion follows the correct ownership rule.
 - **0063_fabric_work_projection_ownership.sql**: Maps controller-local Work projections to their authoritative Fabric Node Work and workspace IDs; worktree lifecycle remains Node-owned.
+- **0066_remote_session_activity_clock.sql**: Caches remote user and assistant message clocks on node Session links so controller-side pagination and sidebar ordering retain the authoritative Session activity order.
+- **0068_drop_acp_auth_secret_refs.sql**: Removes the retired ACP auth credential-reference persistence while keeping auth method selection and remote transport header Secret references intact. The same generated migration also removes the orphaned Work acceptance-criteria column left in migration history after the delivery control plane was reverted.
 - **meta/**: Drizzle journal 与 schema snapshot，用于 tooling 和 migration 顺序管理；该目录必须保持 JSON-only，否则 `drizzle-kit generate` 会解析失败
 
 ## Regenerate Before Release Boundary

@@ -1,0 +1,12 @@
+# Attach files from the Mobile chat composer
+
+- **Date:** 2026-08-31
+- **Problem:** Mobile chat could attach photos but could not select code, logs, PDFs, or text documents from the system file browser, leaving common agent context trapped outside the conversation.
+- **Motivation:** Files are often the fastest way to provide exact debugging evidence or product context. Reusing the established `FileUIPart` draft and send path turns an existing backend capability into a practical mobile workflow.
+- **Product behavior:** Composer Options now includes Add File beside Add Photo. The system document picker opens Files on iOS and the platform picker elsewhere, copies the selected file into readable app cache, and adds it to the existing persistent draft. Image attachments retain thumbnails; other documents show a file icon and filename instead of a broken image preview. Users can remove either type before sending. Empty picker results and read failures produce system alerts, and documents above 10 MB are rejected before base64 encoding with an explanation.
+- **Implementation:** Expo Document Picker provides the system selection surface, while the modern Expo FileSystem `File` API reads native file URIs as base64. The resulting data URL uses the picker or file MIME type and flows unchanged through the existing send, queue, steer, and draft APIs. CocoaPods was synchronized so the iOS native target links `ExpoDocumentPicker`; the native dependency set also aligns with the versions already declared by the Mobile package.
+- **Systems affected:** Mobile Chat Composer, Expo Mobile dependencies and lockfile, iOS CocoaPods lockfile, and native project dependency path.
+- **Validation:** Mobile TypeScript and ESLint passed; Expo production exports passed for iOS, Android, and Web; CocoaPods installed the new module; and a no-sign iOS Simulator Xcode build succeeded.
+- **Tradeoffs:** Selected documents are stored inline as base64 because that is the contract already owned by Chat Runtime. The 10 MB client limit protects mobile memory and draft persistence but is not yet advertised by the server.
+- **Follow-up ideas:** Move attachment limits into a server capability response, add aggregate-size feedback, and consider multi-file selection after measuring single-file usage.
+- **Out of scope:** Server upload/blob redesign, attachment preview viewers, camera capture, document editing, multiple document selection, and provider-specific file compatibility rules.

@@ -1,5 +1,6 @@
 {
   "action.cancel": "Cancel",
+  "action.clearFilters": "Clear filters",
   "action.failed": "The resource action could not be completed.",
   "action.install": "Install",
   "action.installManaged": "Install managed",

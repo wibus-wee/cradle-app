@@ -1,4 +1,4 @@
-import { index, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { index, int, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 import { sessions } from './chat'
 import { timestamps } from './shared'
@@ -19,6 +19,9 @@ export const nodeSessionLinks = sqliteTable(
     projectionKind: text('projection_kind', {
       enum: ['controller-created', 'discovered'],
     }).notNull().default('controller-created'),
+    /** Activity clocks owned by the remote Session and cached by reconciliation. */
+    latestUserMessageAt: int('latest_user_message_at'),
+    latestAssistantMessageAt: int('latest_assistant_message_at'),
     ...timestamps(),
   },
   table => ({

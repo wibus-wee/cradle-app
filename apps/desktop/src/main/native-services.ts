@@ -639,12 +639,18 @@ class WindowService extends IpcService {
   static readonly groupName = 'window'
 
   @IpcMethod()
-  async tearOffSurface(surfaceId: string, route: TearoffSurfaceRoute, screenX: number, screenY: number): Promise<void> {
+  async tearOffSurface(
+    surfaceId: string,
+    route: TearoffSurfaceRoute,
+    screenX: number,
+    screenY: number,
+    options: { bootstrap?: unknown, continuePointerDrag?: boolean } = {},
+  ): Promise<void> {
     const windowManager = getWindowManager()
     if (!windowManager) {
       throw new Error('WindowManager not initialized')
     }
-    await windowManager.openSurfaceWindow(surfaceId, route, screenX, screenY)
+    await windowManager.openSurfaceWindow(surfaceId, route, screenX, screenY, options)
   }
 
   @IpcMethod()

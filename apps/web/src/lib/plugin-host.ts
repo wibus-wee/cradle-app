@@ -16,7 +16,7 @@ import { toastManager } from '~/components/ui/toast'
 import { readPluginDevSessions } from '~/features/plugins/api/plugin-dev'
 
 import { getAuthenticatedServerResourceUrl } from './authenticated-server-url'
-import { getServerUrl } from './electron'
+import { getServerUrl, isElectron } from './electron'
 import { usePluginStore } from './plugin-store'
 import { cradleFetch } from './server-credential'
 import type { ServerEventSource } from './server-transport'
@@ -32,6 +32,7 @@ interface WebPluginDescriptor {
   hasWeb: boolean
   identity?: string
   routeSegment?: string
+  deployments?: Array<'desktop' | 'web'> | null
   layers?: { web: { status: PluginDescriptor['layers']['web']['status'] } }
 }
 
@@ -82,11 +83,6 @@ const PluginLifecycleEventSchema = z.object({
   ]),
   pluginIdentities: z.array(z.string().min(1)),
 })
-
-const PluginEventSchema = z.discriminatedUnion('scope', [
-  z.object({ scope: z.literal('lifecycle'), event: PluginLifecycleEventSchema }),
-  z.object({ scope: z.literal('dev-session'), event: PluginDevSessionEventSchema }),
-])
 
 type PluginDevSession = z.infer<typeof PluginDevSessionSchema>
 
@@ -319,9 +315,17 @@ function getWebBundleRouteSegment(plugin: WebPluginDescriptor): string {
   return plugin.routeSegment ?? derivePluginRouteSegment(plugin.identity ?? plugin.name)
 }
 
-export function isWebLayerLoadable(plugin: WebPluginDescriptor): boolean {
+export function isWebLayerLoadable(
+  plugin: WebPluginDescriptor,
+  deployment: 'desktop' | 'web' = isElectron ? 'desktop' : 'web',
+): boolean {
   const status = plugin.layers?.web.status
-  return plugin.hasWeb && status !== 'invalid' && status !== 'disabled' && status !== 'failed'
+  const supportsDeployment = !plugin.deployments || plugin.deployments.includes(deployment)
+  return plugin.hasWeb
+    && supportsDeployment
+    && status !== 'invalid'
+    && status !== 'disabled'
+    && status !== 'failed'
 }
 
 /**
@@ -330,7 +334,7 @@ export function isWebLayerLoadable(plugin: WebPluginDescriptor): boolean {
  */
 export async function loadWebPlugins(): Promise<void> {
   const plugins = await readPluginDescriptors()
-  await activatePersistedWebPlugins(plugins.filter(isWebLayerLoadable))
+  await activatePersistedWebPlugins(plugins.filter(plugin => isWebLayerLoadable(plugin)))
 }
 
 async function activatePersistedWebPlugins(webPlugins: PluginDescriptor[]): Promise<void> {
@@ -372,6 +376,29 @@ async function reconcilePersistedWebPlugins(pluginIdentities: string[]): Promise
   )
 }
 
+export function startPluginLifecycleWatcher(onReconciled?: () => void): () => void {
+  const eventsUrl = new URL('/plugins/events', getServerUrl()).toString()
+  const source = openServerEventSource(eventsUrl)
+  let reconcileQueue = Promise.resolve()
+  source.onmessage = (message) => {
+    reconcileQueue = reconcileQueue
+      .then(() => {
+        const event = PluginLifecycleEventSchema.parse(JSON.parse(message.data))
+        return event.type === 'review-completed'
+          ? undefined
+          : reconcilePersistedWebPlugins(event.pluginIdentities)
+      })
+      .then(() => onReconciled?.())
+      .catch((error: unknown) => {
+        console.error('[plugin-host] persisted plugin reconciliation failed:', error)
+      })
+  }
+  source.onerror = () => {
+    console.warn('[plugin-host] persisted plugin event stream disconnected; fetch SSE will retry')
+  }
+  return () => source.close()
+}
+
 async function readPluginDescriptors(): Promise<PluginDescriptor[]> {
   const { data } = await getPlugins({ throwOnError: true })
   return data
@@ -395,15 +422,17 @@ async function reloadDevelopmentWebPlugin(session: PluginDevSession): Promise<vo
   console.log(`[plugin-host] development web reloaded: ${session.pluginName}@${session.revisions.web}`)
 }
 
-export async function startPluginWatcher(onPersistedPluginsReconciled?: () => void): Promise<() => void> {
+export async function startPluginDevSessionWatcher(): Promise<() => void> {
+  let source: ServerEventSource | null = null
+  let discoveryTimer: ReturnType<typeof setTimeout> | null = null
+  let disposed = false
   const appliedRevisions = new Map<string, number>()
-  let persistedReconcileQueue = Promise.resolve()
-  let devSessionReconcileQueue = Promise.resolve()
+  let reconcileQueue = Promise.resolve()
 
-  const reconcileDevSession = (session: PluginDevSession): void => {
+  const reconcile = (session: PluginDevSession): void => {
     if (!session.entries.web || appliedRevisions.get(session.id) === session.revisions.web) { return }
     appliedRevisions.set(session.id, session.revisions.web)
-    devSessionReconcileQueue = devSessionReconcileQueue
+    reconcileQueue = reconcileQueue
       .then(() => reloadDevelopmentWebPlugin(session))
       .catch((error: unknown) => {
         appliedRevisions.delete(session.id)
@@ -412,48 +441,53 @@ export async function startPluginWatcher(onPersistedPluginsReconciled?: () => vo
       })
   }
 
-  try {
-    const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
-    for (const session of sessions) { reconcileDevSession(session) }
-  }
-  catch (error) {
-    // Development sessions are optional and the event stream below reconnects.
-    // A transient localhost reset during packaged startup must not abort the
-    // entire post-render bootstrap or prevent the main application from loading.
-    console.warn('[plugin-host] initial development session read failed; continuing with event stream', error)
+  const openEventStream = (): void => {
+    if (disposed || source) { return }
+    const eventsUrl = new URL('/plugins/dev-sessions/events', getServerUrl()).toString()
+    source = openServerEventSource(eventsUrl)
+    source.onmessage = (message) => {
+      const event = PluginDevSessionEventSchema.parse(JSON.parse(message.data))
+      if (event.type === 'stopped') {
+        appliedRevisions.delete(event.session.id)
+        void deactivateWebPlugin(event.session.pluginName)
+        return
+      }
+      if (event.type === 'started' || event.layer === 'web') {
+        reconcile(event.session)
+      }
+    }
+    source.onerror = () => {
+      console.warn('[plugin-host] plugin development event stream disconnected; fetch SSE will retry')
+    }
   }
 
-  const eventsUrl = new URL('/plugins/events', getServerUrl()).toString()
-  const source: ServerEventSource = openServerEventSource(eventsUrl)
-  source.onmessage = (message) => {
-    const pluginEvent = PluginEventSchema.parse(JSON.parse(message.data))
-    if (pluginEvent.scope === 'lifecycle') {
-      persistedReconcileQueue = persistedReconcileQueue
-        .then(() => pluginEvent.event.type === 'review-completed'
-          ? undefined
-          : reconcilePersistedWebPlugins(pluginEvent.event.pluginIdentities))
-        .then(() => onPersistedPluginsReconciled?.())
-        .catch((error: unknown) => {
-          console.error('[plugin-host] persisted plugin reconciliation failed:', error)
-        })
+  const discoverSessions = async (): Promise<void> => {
+    try {
+      const sessions = z.array(PluginDevSessionSchema).parse(await readPluginDevSessions())
+      for (const session of sessions) { reconcile(session) }
+      if (sessions.length > 0) {
+        openEventStream()
+        return
+      }
+    }
+    catch (error) {
+      // A transient snapshot failure should not disable development reloads.
+      // The event stream reconnects and supplies the authoritative state.
+      console.warn('[plugin-host] initial development session read failed; continuing with event stream', error)
+      openEventStream()
       return
     }
 
-    const devSessionEvent = pluginEvent.event
-    if (devSessionEvent.type === 'stopped') {
-      appliedRevisions.delete(devSessionEvent.session.id)
-      void deactivateWebPlugin(devSessionEvent.session.pluginName)
-      return
-    }
-    if (devSessionEvent.type === 'started' || devSessionEvent.layer === 'web') {
-      reconcileDevSession(devSessionEvent.session)
+    if (!disposed) {
+      discoveryTimer = setTimeout(() => void discoverSessions(), 2_000)
     }
   }
-  source.onerror = () => {
-    console.warn('[plugin-host] plugin event stream disconnected; fetch SSE will retry')
-  }
+
+  await discoverSessions()
 
   return () => {
-    source.close()
+    disposed = true
+    if (discoveryTimer) { clearTimeout(discoveryTimer) }
+    source?.close()
   }
 }

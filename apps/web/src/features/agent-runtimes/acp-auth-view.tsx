@@ -7,20 +7,15 @@ import {
 } from '@mingcute/react'
 import { useState } from 'react'
 
-import type {
-  GetAcpAgentsByAgentIdAuthMethodsResponse,
-  GetSecretsResponse,
-} from '~/api-gen/types.gen'
+import type { GetAcpAgentsByAgentIdAuthMethodsResponse } from '~/api-gen/types.gen'
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { Button } from '~/components/ui/button'
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui/select'
 import { Skeleton } from '~/components/ui/skeleton'
 import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/cn'
 
 export type AcpAuthMethod = GetAcpAgentsByAgentIdAuthMethodsResponse['methods'][number]
-export type AcpAuthSecret = Pick<GetSecretsResponse[number], 'id' | 'label' | 'maskedSecret'>
 
 export interface AcpAuthViewLabels {
   title: string
@@ -36,16 +31,9 @@ export interface AcpAuthViewLabels {
   clearing: string
   methodLabel: string
   agentKind: string
-  envVarKind: string
   terminalKind: string
   unsupported: string
-  optional: string
-  secretPlaceholder: string
-  secretNotSet: string
-  noSecrets: string
-  secretLoadError: string
   cancel: string
-  save: string
   authenticate: string
   saving: string
 }
@@ -53,16 +41,12 @@ export interface AcpAuthViewLabels {
 export interface AcpAuthViewProps {
   methods: AcpAuthMethod[]
   selectedMethodId: string | null
-  secrets: AcpAuthSecret[]
   isLoading: boolean
-  isSecretsLoading: boolean
   loadError: boolean
-  secretsError: boolean
   pendingAction: 'save' | 'clear' | null
   labels: AcpAuthViewLabels
   onRetry: () => void
-  onRetrySecrets: () => void
-  onSave: (input: { methodId: string, secretRefs: Record<string, string> }) => void
+  onSave: (input: { methodId: string }) => void
   onClear: () => void
   onOpenLink: (url: string) => void
 }
@@ -71,24 +55,17 @@ function methodKindLabel(method: AcpAuthMethod, labels: AcpAuthViewLabels): stri
   if (method.kind === 'agent') {
     return labels.agentKind
   }
-  if (method.kind === 'env_var') {
-    return labels.envVarKind
-  }
   return labels.terminalKind
 }
 
 export function AcpAuthView({
   methods,
   selectedMethodId,
-  secrets,
   isLoading,
-  isSecretsLoading,
   loadError,
-  secretsError,
   pendingAction,
   labels,
   onRetry,
-  onRetrySecrets,
   onSave,
   onClear,
   onOpenLink,
@@ -100,21 +77,16 @@ export function AcpAuthView({
   const [draftMethodId, setDraftMethodId] = useState(
     selectedMethod?.status === 'supported' ? selectedMethod.id : (firstSupportedMethod?.id ?? ''),
   )
-  const [secretRefs, setSecretRefs] = useState<Record<string, string>>({})
 
   const draftMethod = methods.find(method => method.id === draftMethodId)
-  const requiredFieldsComplete = draftMethod?.kind !== 'env_var'
-    || (draftMethod.fields ?? []).every(field => field.optional || Boolean(secretRefs[field.name]))
-  const canSave = draftMethod?.status === 'supported' && requiredFieldsComplete && pendingAction == null
+  const canSave = draftMethod?.status === 'supported' && pendingAction == null
 
   const selectMethod = (methodId: string) => {
     setDraftMethodId(methodId)
-    setSecretRefs({})
   }
 
   const cancelEditing = () => {
     setDraftMethodId(selectedMethod?.status === 'supported' ? selectedMethod.id : (firstSupportedMethod?.id ?? ''))
-    setSecretRefs({})
     setIsEditing(false)
   }
 
@@ -289,59 +261,6 @@ export function AcpAuthView({
             </RadioGroup>
           </fieldset>
 
-          {draftMethod?.kind === 'env_var' && draftMethod.status === 'supported' && (
-            <div className="flex flex-col gap-2.5 pl-6">
-              {(draftMethod.fields ?? []).map(field => (
-                <div key={field.name} className="flex flex-col gap-1.5">
-                  <label className="flex items-baseline gap-1.5 text-[12px] font-medium text-foreground">
-                    <span>{field.label ?? field.name}</span>
-                    <span className="font-mono text-[10px] font-normal text-muted-foreground">{field.name}</span>
-                    {field.optional && (
-                      <span className="text-[10px] font-normal text-text-tertiary">{labels.optional}</span>
-                    )}
-                  </label>
-                  <Select
-                    value={secretRefs[field.name] ?? ''}
-                    disabled={isSecretsLoading || secretsError || secrets.length === 0}
-                    onValueChange={(secretId) => {
-                      setSecretRefs(current => ({ ...current, [field.name]: secretId }))
-                    }}
-                  >
-                    <SelectTrigger className="h-10 w-full text-[12px]" aria-label={field.label ?? field.name}>
-                      <SelectValue placeholder={isSecretsLoading ? labels.loading : labels.secretPlaceholder} />
-                    </SelectTrigger>
-                    <SelectContent position="popper" align="start">
-                      {field.optional && <SelectItem value="">{labels.secretNotSet}</SelectItem>}
-                      {secrets.map(secret => (
-                        <SelectItem key={secret.id} value={secret.id}>
-                          {`${secret.label} · ${secret.maskedSecret}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-              {!isSecretsLoading && secretsError && (
-                <div className="flex items-center gap-2">
-                  <p className="text-[11px] leading-relaxed text-destructive text-pretty">{labels.secretLoadError}</p>
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="ghost"
-                    className="after:absolute after:-inset-y-2"
-                    onClick={onRetrySecrets}
-                  >
-                    <RefreshIcon className="size-3" />
-                    {labels.retry}
-                  </Button>
-                </div>
-              )}
-              {!isSecretsLoading && !secretsError && secrets.length === 0 && (
-                <p className="text-[11px] leading-relaxed text-muted-foreground text-pretty">{labels.noSecrets}</p>
-              )}
-            </div>
-          )}
-
           <div className="flex items-center gap-2">
             <Button
               type="button"
@@ -351,20 +270,11 @@ export function AcpAuthView({
                 if (!draftMethod || !canSave) {
                   return
                 }
-                onSave({
-                  methodId: draftMethod.id,
-                  secretRefs: Object.fromEntries(
-                    Object.entries(secretRefs).filter(([, secretId]) => secretId.length > 0),
-                  ),
-                })
+                onSave({ methodId: draftMethod.id })
               }}
             >
               {pendingAction === 'save' && <Spinner className="size-3.5" />}
-              {pendingAction === 'save'
-                ? labels.saving
-                : draftMethod?.kind === 'agent'
-                  ? labels.authenticate
-                  : labels.save}
+              {pendingAction === 'save' ? labels.saving : labels.authenticate}
             </Button>
             {selectedMethodId != null && (
               <Button

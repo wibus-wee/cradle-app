@@ -1,0 +1,19 @@
+appId: app.cradle.mobile
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: fabric-code-input
+    timeout: 30000
+- tapOn:
+    id: fabric-code-input
+- inputText: ${FABRIC_CODE}
+- tapOn: Join your Fabric
+- tapOn:
+    id: fabric-request-access
+- extendedWaitUntil:
+    visible:
+      id: fabric-enrollment-pending
+    timeout: 30000
+- assertVisible: Waiting for approval

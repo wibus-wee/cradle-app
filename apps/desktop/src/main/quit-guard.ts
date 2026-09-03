@@ -1,4 +1,3 @@
-import type { Event } from 'electron'
 import { app, BrowserWindow } from 'electron'
 
 export interface DesktopPreferences {
@@ -14,7 +13,6 @@ export class QuitGuard {
   }
 
   private armedUntilMs = 0
-  private bypassNextQuit = false
 
   updatePreferences(preferences: Partial<DesktopPreferences>): DesktopPreferences {
     this.preferences = {
@@ -27,28 +25,21 @@ export class QuitGuard {
     return this.preferences
   }
 
-  allowNextQuit(): void {
-    this.bypassNextQuit = true
-  }
-
-  handleBeforeQuit(event: Event): boolean {
-    if (this.bypassNextQuit || !this.preferences.requireDoubleCommandQToQuit) {
-      this.bypassNextQuit = false
-      return true
+  handleCommandQ(): void {
+    if (!this.preferences.requireDoubleCommandQToQuit) {
+      app.quit()
+      return
     }
 
     const now = Date.now()
     if (now <= this.armedUntilMs) {
-      this.bypassNextQuit = true
-      queueMicrotask(() => app.quit())
-      event.preventDefault()
-      return false
+      this.armedUntilMs = 0
+      app.quit()
+      return
     }
 
     this.armedUntilMs = now + QUIT_ARMED_WINDOW_MS
-    event.preventDefault()
     this.notifyQuitArmed()
-    return false
   }
 
   private notifyQuitArmed(): void {

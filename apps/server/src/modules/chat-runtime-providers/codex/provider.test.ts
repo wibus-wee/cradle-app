@@ -64,6 +64,7 @@ class FakeCodexAppServerClient {
   terminatedBackgroundProcesses: string[] = []
   hangingMethods = new Set<string>()
   unsupportedMethods = new Set<string>()
+  turnSettingsUpdateStatus: 'applied' | 'targetUnavailable' = 'applied'
 
   private readonly notifications: CodexAppServerMessage[] = []
   private notificationWaiter: ((message: CodexAppServerMessage | null) => void) | null = null
@@ -122,7 +123,7 @@ class FakeCodexAppServerClient {
               { reasoningEffort: 'high', description: 'High' },
             ],
             serviceTiers: [
-              { id: 'fast', name: 'Fast', description: 'Fast responses' },
+              { id: 'priority', name: 'Fast', description: 'Fast responses' },
             ],
           },
         ],
@@ -134,6 +135,7 @@ class FakeCodexAppServerClient {
         data: [
           {
             name: 'github',
+            runtimeStatus: 'connected',
             tools: { search: {}, read_issue: {} },
             resources: [{ uri: 'repo://cradle' }],
             resourceTemplates: [{ uriTemplate: 'repo://{owner}/{repo}' }],
@@ -141,10 +143,27 @@ class FakeCodexAppServerClient {
           },
           {
             name: 'linear',
+            runtimeStatus: 'authenticationRequired',
             tools: { issue_search: {} },
             resources: [],
             resourceTemplates: [],
             authStatus: 'notLoggedIn',
+          },
+          {
+            name: 'slack',
+            runtimeStatus: 'starting',
+            tools: {},
+            resources: [],
+            resourceTemplates: [],
+            authStatus: 'unsupported',
+          },
+          {
+            name: 'disabled-server',
+            runtimeStatus: 'disabled',
+            tools: {},
+            resources: [],
+            resourceTemplates: [],
+            authStatus: 'unsupported',
           },
         ],
         nextCursor: null,
@@ -312,7 +331,7 @@ class FakeCodexAppServerClient {
         reasoningEffort: 'high',
       }
     }
-    if (method === 'thread/rollback') {
+    if (method === 'thread/revert') {
       return { ok: true }
     }
     if (method === 'thread/list') {
@@ -439,6 +458,9 @@ class FakeCodexAppServerClient {
         return { turn: { id: 'codex-title-turn-1', status: 'inProgress' } }
       }
       return { turn: { id: 'codex-turn-1', status: 'inProgress' } }
+    }
+    if (method === 'turn/settings/update') {
+      return { status: this.turnSettingsUpdateStatus }
     }
     if (method === 'review/start') {
       return {
@@ -770,6 +792,22 @@ function createForkedNonSubagentThreadRecord() {
 }
 
 describe('codexProvider app-server integration', () => {
+  it('deletes the parent Codex thread through app-server', async () => {
+    const client = new FakeCodexAppServerClient({})
+    const provider = createProvider(client)
+
+    await expect(provider.deleteSessionStorage({
+      runtimeSession: createRuntimeSession('codex-thread-1'),
+      profile: createProfile(),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/cradle-workspace',
+    })).resolves.toEqual({ status: 'deleted' })
+    expect(client.requests).toContainEqual({
+      method: 'thread/delete',
+      params: { threadId: 'codex-thread-1' },
+    })
+  })
+
   it('streams a Codex turn for a workspace-less Jarvis session', async () => {
     const client = new FakeCodexAppServerClient({})
     const resolveSkillPaths = vi.fn(() => ['/tmp/cradle-skill'])
@@ -968,6 +1006,11 @@ describe('codexProvider app-server integration', () => {
 
   it('rolls back multiple Codex thread turns without forking', async () => {
     const client = new FakeCodexAppServerClient({})
+    client.threadTurnsListData = [
+      { id: 'turn-3' },
+      { id: 'turn-2' },
+      { id: 'turn-1' },
+    ]
     const provider = createProvider(client)
 
     await expect(provider.rollbackLastTurn({
@@ -983,17 +1026,30 @@ describe('codexProvider app-server integration', () => {
       fileChangesReverted: false,
     })
 
-    expect(client.requests.map(request => request.method)).toEqual(['thread/resume', 'thread/rollback'])
+    expect(client.requests.map(request => request.method)).toEqual(['thread/resume', 'thread/turns/list', 'thread/revert'])
     expect(client.requests[1]).toEqual(
       {
-        method: 'thread/rollback',
+        method: 'thread/turns/list',
         params: {
           threadId: 'codex-thread-1',
-          numTurns: 3,
+          cursor: null,
+          limit: 3,
+          sortDirection: 'desc',
+          itemsView: 'summary',
+        },
+      },
+    )
+    expect(client.requests[2]).toEqual(
+      {
+        method: 'thread/revert',
+        params: {
+          threadId: 'codex-thread-1',
+          beforeTurnId: 'turn-1',
         },
       },
     )
     expect(client.requests.some(request => request.method === 'thread/fork')).toBe(false)
+    expect(client.requests.some(request => request.method === 'thread/rollback')).toBe(false)
   })
 
   it('rejects unrelated Codex provider threads', async () => {
@@ -2708,7 +2764,7 @@ describe('codexProvider app-server integration', () => {
         modelLabel: 'GPT-5 Codex',
         modelProvider: 'openai',
         serviceTier: 'priority',
-        serviceTiers: [{ id: 'fast', name: 'Fast', description: 'Fast responses' }],
+        serviceTiers: [{ id: 'priority', name: 'Fast', description: 'Fast responses' }],
         supportsImages: true,
         supportsWebSearch: true,
         supportsNamespaceTools: true,
@@ -2872,7 +2928,7 @@ describe('codexProvider app-server integration', () => {
         kind: 'mcp',
         slotId: 'codex:mcp',
         threadId: 'codex-thread-1',
-        serverCount: 3,
+        serverCount: 5,
         readyCount: 1,
         failedCount: 2,
         needsLoginCount: 1,
@@ -2880,6 +2936,8 @@ describe('codexProvider app-server integration', () => {
         servers: expect.arrayContaining([
           expect.objectContaining({ name: 'github', status: 'ready', authStatus: 'oAuth', toolCount: 2, resourceCount: 2 }),
           expect.objectContaining({ name: 'linear', status: 'failed', authStatus: 'notLoggedIn', error: 'Denied' }),
+          expect.objectContaining({ name: 'slack', status: 'starting', authStatus: 'unsupported' }),
+          expect.objectContaining({ name: 'disabled-server', status: 'unknown', authStatus: 'unsupported' }),
           expect.objectContaining({ name: 'local-dev', status: 'failed', error: 'Missing command' }),
         ]),
       }),
@@ -3691,11 +3749,11 @@ describe('codexProvider app-server integration', () => {
       params: expect.objectContaining({
         config: expect.objectContaining({
           mcp: false,
-          computer_use: false,
           use_bash: false,
         }),
       }),
     }))
+    expect((client.requests[0]?.params as { config?: Record<string, unknown> }).config).not.toHaveProperty('computer_use')
     expect((client.requests[0]?.params as { config?: Record<string, unknown> }).config).not.toHaveProperty('mcp_servers')
     expect(client.requests[1]).toEqual({
       method: 'thread/inject_items',
@@ -3830,6 +3888,98 @@ describe('codexProvider app-server integration', () => {
         }),
       }),
     })
+  })
+
+  it('uses the configured title provider host while the session turn is active', async () => {
+    const mainClient = new FakeCodexAppServerClient({})
+    const titleClient = new FakeCodexAppServerClient({})
+    titleClient.generatedThreadTitle = 'Title from dedicated provider'
+    const mainProfile = createProfile({ apiKey: 'sk-main' })
+    const titleProfile = {
+      ...createProfile({ apiKey: 'sk-title', model: 'gpt-title' }),
+      id: 'profile-title',
+      name: 'Title provider',
+      providerTargetId: 'profile-title',
+    }
+    const provider = new CodexProvider({
+      readSecret: () => 'sk-secret',
+      resolveSkillPaths: () => ['/tmp/cradle-skill'],
+      recordObservability: vi.fn(),
+      readChatPreferences: () => ({
+        titleGeneration: {
+          providerTargetId: titleProfile.providerTargetId,
+          modelId: 'gpt-title',
+          thinkingEffort: 'minimal',
+        },
+      }),
+      resolveProviderTargetProfile: providerTargetId => (
+        providerTargetId === titleProfile.providerTargetId ? titleProfile : null
+      ),
+      createAppServerClient: options => (
+        options.apiKey === 'sk-title' ? titleClient : mainClient
+      ),
+    })
+    const runtimeSession = createRuntimeSession()
+    const stream = provider.streamTurn({
+      runId: 'run-codex-active-title-regeneration',
+      runtimeSession,
+      profile: mainProfile,
+      message: createUserMessage('Keep this turn active while regenerating the title'),
+      workspaceId: 'workspace-1',
+    })
+    const firstChunkPromise = stream.next()
+
+    await vi.waitFor(() => {
+      expect(mainClient.requests).toContainEqual({
+        method: 'turn/start',
+        params: expect.objectContaining({ threadId: 'codex-thread-1' }),
+      })
+    })
+
+    await expect(provider.generateSessionTitle({
+      runtimeSession,
+      profile: mainProfile,
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/cradle-workspace',
+      promptText: 'Keep this turn active while regenerating the title',
+    })).resolves.toBe('Title from dedicated provider')
+
+    expect(providerRuntimeHostManager.listHosts()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        hostId: 'codex:profile-codex:provider-host',
+        refCount: 1,
+      }),
+      expect.objectContaining({
+        hostId: 'codex:profile-title:provider-host',
+        refCount: 0,
+      }),
+    ]))
+    expect(titleClient.requests).toContainEqual({
+      method: 'turn/start',
+      params: expect.objectContaining({
+        threadId: 'codex-title-thread-1',
+        model: 'gpt-title',
+      }),
+    })
+
+    mainClient.pushNotification({
+      method: 'item/agentMessage/delta',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        itemId: 'assistant-message-1',
+        delta: 'Done',
+      },
+    })
+    await firstChunkPromise
+    mainClient.pushNotification({
+      method: 'turn/completed',
+      params: {
+        threadId: 'codex-thread-1',
+        turn: { id: 'codex-turn-1', status: 'completed' },
+      },
+    })
+    await drainStream(stream)
   })
 
   it('waits for explicit Codex title generation beyond 20 seconds', async () => {
@@ -4412,7 +4562,7 @@ describe('codexProvider app-server integration', () => {
         runtimeSettings: {
           accessMode: 'approve-for-me',
           interactionMode: 'plan',
-          serviceTier: 'fast',
+          serviceTier: 'priority',
         },
       },
     })
@@ -4433,7 +4583,7 @@ describe('codexProvider app-server integration', () => {
         approvalPolicy: 'on-request',
         approvalsReviewer: 'auto_review',
         sandbox: 'workspace-write',
-        serviceTier: 'fast',
+        serviceTier: 'priority',
         config: expect.objectContaining({
           approval_policy: 'on-request',
           sandbox_mode: 'workspace-write',
@@ -4446,7 +4596,7 @@ describe('codexProvider app-server integration', () => {
         approvalPolicy: 'on-request',
         approvalsReviewer: 'auto_review',
         sandboxPolicy: expect.objectContaining({ type: 'workspaceWrite' }),
-        serviceTier: 'fast',
+        serviceTier: 'priority',
         collaborationMode: {
           mode: 'plan',
           settings: {
@@ -4464,7 +4614,7 @@ describe('codexProvider app-server integration', () => {
       settings: {
         accessMode: 'full-access',
         interactionMode: 'default',
-        serviceTier: 'fast',
+        serviceTier: 'priority',
       },
     })
 
@@ -4475,7 +4625,7 @@ describe('codexProvider app-server integration', () => {
         approvalPolicy: 'never',
         approvalsReviewer: 'user',
         sandboxPolicy: { type: 'dangerFullAccess' },
-        serviceTier: 'fast',
+        serviceTier: 'priority',
         collaborationMode: {
           mode: 'default',
           settings: {
@@ -4486,6 +4636,43 @@ describe('codexProvider app-server integration', () => {
         },
       },
     })
+    expect(client.requests[3]).toEqual({
+      method: 'turn/settings/update',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        serviceTier: 'priority',
+      },
+    })
+
+    await expect(provider.updateRuntimeTurnSettings({
+      runtimeSession,
+      profile: createProfile({ model: 'gpt-test', reasoningEffort: 'low' }),
+      settings: {
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+        summary: 'concise',
+        serviceTier: 'priority',
+      },
+    })).resolves.toEqual({ status: 'applied' })
+    expect(client.requests[4]).toEqual({
+      method: 'turn/settings/update',
+      params: {
+        threadId: 'codex-thread-1',
+        turnId: 'codex-turn-1',
+        model: 'gpt-5.1-codex',
+        effort: 'high',
+        summary: 'concise',
+        serviceTier: 'priority',
+      },
+    })
+
+    client.turnSettingsUpdateStatus = 'targetUnavailable'
+    await expect(provider.updateRuntimeTurnSettings({
+      runtimeSession,
+      profile: createProfile(),
+      settings: { summary: 'detailed' },
+    })).resolves.toEqual({ status: 'targetUnavailable' })
 
     client.pushNotification({
       method: 'item/agentMessage/delta',

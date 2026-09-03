@@ -277,3 +277,13 @@ export function listPendingQueueRows(sessionId: string): QueueItemRow[] {
     .all()
     .sort(compareQueueRows)
 }
+
+export function listPendingQueueSessionIds(): string[] {
+  return db()
+    .selectDistinct({ sessionId: chatSessionQueueItems.sessionId })
+    .from(chatSessionQueueItems)
+    .where(eq(chatSessionQueueItems.status, 'pending'))
+    .all()
+    .map(row => row.sessionId)
+    .sort()
+}

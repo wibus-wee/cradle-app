@@ -52,6 +52,7 @@ const session = t.Object({
     lastReadAt: t.Nullable(t.Number()),
     createdAt: t.Number(),
     updatedAt: t.Number(),
+    activityAt: t.Number(),
     latestUserMessageAt: t.Nullable(t.Number()),
     latestAssistantMessageAt: t.Nullable(t.Number()),
     unread: t.Boolean(),

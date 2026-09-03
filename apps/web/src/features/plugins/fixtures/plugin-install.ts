@@ -137,6 +137,7 @@ export const installedPluginFixture = {
   displayName: 'Browser Use',
   description: 'Drive a real browser from chat — navigate pages, fill forms, click elements, and capture screenshots as evidence.',
   iconUrl: null,
+  deployments: null,
   source: {
     kind: 'externalLocal',
     packageDir: '/tmp/cradle/plugins/browser-use',

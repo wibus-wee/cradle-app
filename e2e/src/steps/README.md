@@ -19,11 +19,12 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `kanban.steps.ts` | Board/issue lifecycle plus Issue-Agent delegation, rerun, cancellation, and linked Chat |
 | `provider.steps.ts` | Provider profile UI lifecycle and runtime selection |
 | `search.steps.ts` | Global search result and command navigation |
+| `session-environment.steps.ts` | Session Environment navigation and deterministic notes autosave ordering |
 | `settings.steps.ts` | Settings navigation and appearance persistence |
 | `stream-vocabulary.steps.ts` | Parallel tool blocks, redacted thinking, disconnect, and error-status vocabulary setup |
 | `tab-management.steps.ts` | Live tab creation, activation, reload, close, and content isolation |
 | `terminal.steps.ts` | Bottom panel, PTY command execution, and active-session routing |
-| `usage.steps.ts` | Usage dashboard navigation and exact aggregate assertions |
+| `usage.steps.ts` | Usage navigation, exact aggregates, range persistence, and CSV assertions |
 | `work.steps.ts` | New Work launch and managed worktree/session verification |
 | `workspace.steps.ts` | Directory Browser, workspace overview, rename/remove, and selection |
 

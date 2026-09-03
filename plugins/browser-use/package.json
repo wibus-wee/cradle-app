@@ -62,12 +62,12 @@
     "dev": "vite build --watch"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
-    "zod": "^4.4.3"
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@cradle/plugin-sdk": "workspace:*",
-    "@types/node": "^25.8.0",
-    "vite": "^8.0.0"
+    "@types/node": "^25.9.5",
+    "vite": "^8.2.2"
   }
 }

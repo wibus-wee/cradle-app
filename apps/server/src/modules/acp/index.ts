@@ -139,14 +139,10 @@ export function createAcpModule(downloadCenter: AcpDownloadCenter) {
     const agentId = requireNonBlankString(params.agentId, 'agentId')
     const runtime = requireAcpRuntime()
     Acp.readAgentAuthConfig(agentId)
-    const availableSecretIds = body.secretRefs && Object.keys(body.secretRefs).length > 0
-      ? new Set(Secrets.listSecrets().map(secret => secret.id))
-      : new Set<string>()
     const methods = await runtime.listAgentAuthMethods(agentId)
     const selection = Acp.setAgentAuthSelection(agentId, {
       methodId: body.methodId,
-      secretRefs: body.secretRefs,
-    }, methods, availableSecretIds)
+    }, methods)
     await runtime.reconnectAgent(agentId)
     return { selectedMethodId: selection.methodId }
   }, {

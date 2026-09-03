@@ -17,15 +17,6 @@ import {
 } from '../src/modules/acp/service'
 
 const methods: ProviderAuthMethod[] = [{
-  id: 'api-key',
-  name: 'API key',
-  kind: 'env_var',
-  status: 'supported',
-  fields: [
-    { name: 'API_KEY', secret: true, optional: false },
-    { name: 'REGION', secret: false, optional: true },
-  ],
-}, {
   id: 'provider-login',
   name: 'Provider login',
   kind: 'agent',
@@ -38,7 +29,7 @@ const methods: ProviderAuthMethod[] = [{
   unavailableReason: 'Terminal auth is unavailable',
 }]
 
-describe('aCP auth persistence', () => {
+describe('acp auth persistence', () => {
   const previousDataDir = process.env.CRADLE_DATA_DIR
 
   afterEach(() => {
@@ -51,33 +42,30 @@ describe('aCP auth persistence', () => {
     }
   })
 
-  it('persists only method and credential references and preserves them across launch updates', () => {
+  it('persists and clears the selected supported method', () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'cradle-acp-auth-'))
     process.env.CRADLE_DATA_DIR = dataDir
 
     try {
       createLocalAgent({ id: 'auth-agent', name: 'Auth Agent', cmd: '/bin/echo' })
       setAgentAuthSelection('auth-agent', {
-        methodId: 'api-key',
-        secretRefs: { API_KEY: 'credential-api-key', REGION: 'credential-region' },
-      }, methods, new Set(['credential-api-key', 'credential-region']))
+        methodId: 'provider-login',
+      }, methods)
       updateLaunchConfig('auth-agent', { args: ['--stdio'] })
 
       expect(readAgentAuthConfig('auth-agent')).toEqual({
-        methodId: 'api-key',
-        secretRefs: { API_KEY: 'credential-api-key', REGION: 'credential-region' },
+        methodId: 'provider-login',
       })
       expect(getInstalled('auth-agent')).toMatchObject({
-        authMethodId: 'api-key',
-        authSecretRefsJson: JSON.stringify({ API_KEY: 'credential-api-key', REGION: 'credential-region' }),
+        authMethodId: 'provider-login',
       })
-      const audit = getAuditLog('auth-agent')
-      expect(audit.map(entry => entry.action)).toContain('auth_selection_update')
-      expect(JSON.stringify(audit)).not.toContain('credential-api-key')
-      expect(JSON.stringify(audit)).not.toContain('credential-region')
+      expect(getAuditLog('auth-agent').map(entry => entry.action)).toContain('auth_selection_update')
 
       clearAgentAuthSelection('auth-agent')
-      expect(readAgentAuthConfig('auth-agent')).toEqual({ methodId: null, secretRefs: {} })
+
+      expect(readAgentAuthConfig('auth-agent')).toEqual({ methodId: null })
+      expect(getInstalled('auth-agent')).toMatchObject({ authMethodId: null })
+      expect(getAuditLog('auth-agent').map(entry => entry.action)).toContain('auth_selection_clear')
     }
     finally {
       shutdownInfra()
@@ -85,7 +73,7 @@ describe('aCP auth persistence', () => {
     }
   })
 
-  it('rejects missing, unknown, unsupported, and agent-auth secret references', () => {
+  it('rejects unavailable and unsupported methods', () => {
     const dataDir = mkdtempSync(join(tmpdir(), 'cradle-acp-auth-'))
     process.env.CRADLE_DATA_DIR = dataDir
 
@@ -93,25 +81,11 @@ describe('aCP auth persistence', () => {
       createLocalAgent({ id: 'auth-agent', name: 'Auth Agent', cmd: '/bin/echo' })
 
       expect(() => setAgentAuthSelection('auth-agent', {
-        methodId: 'api-key',
-        secretRefs: { API_KEY: 'actual-secret-value' },
-      }, methods, new Set())).toThrow('must reference existing Secrets credentials')
-      expect(readAgentAuthConfig('auth-agent')).toEqual({ methodId: null, secretRefs: {} })
-      expect(() => setAgentAuthSelection('auth-agent', {
-        methodId: 'api-key',
-        secretRefs: {},
-      }, methods, new Set())).toThrow('Required ACP authentication variables are missing')
-      expect(() => setAgentAuthSelection('auth-agent', {
-        methodId: 'api-key',
-        secretRefs: { API_KEY: 'credential-api-key', UNKNOWN: 'credential-unknown' },
-      }, methods, new Set(['credential-api-key', 'credential-unknown']))).toThrow('variables not advertised')
-      expect(() => setAgentAuthSelection('auth-agent', {
-        methodId: 'provider-login',
-        secretRefs: { API_KEY: 'credential-api-key' },
-      }, methods, new Set(['credential-api-key']))).toThrow('valid only for ACP env-var authentication')
+        methodId: 'missing',
+      }, methods)).toThrow('not advertised')
       expect(() => setAgentAuthSelection('auth-agent', {
         methodId: 'terminal-login',
-      }, methods, new Set())).toThrow('Terminal auth is unavailable')
+      }, methods)).toThrow('Terminal auth is unavailable')
     }
     finally {
       shutdownInfra()

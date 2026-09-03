@@ -188,6 +188,17 @@ overflow policy `'drop-oldest'/'close'`、负 desiredSize 停滞 watchdog），c
 流走 `'close'` + Plan 071 snapshot 重连，side-chat 改 pull 驱动消费，其余低频 SSE 全部
 迁入共享 primitive，并用 grep ratchet 封死「绕过 bounded primitive 的 enqueue」。
 
+2026-08-29 在 commit `cf1fdb87` 上补充 Plan 078（P0）：约 50 小时运行后，Server
+当前 93 个 active request 全部是 `WriteWrap`，174,028,273 B pending write 可解释
+约 85% 的 ArrayBuffer；Electron Main 对一个 Renderer 仍保留 69 个请求（66 SSE、
+3 finite），同一消息快照被遗弃三份共 100,294,033 B。首个已证实断点是 Plan 075
+broker 只按 `WebContents.destroyed` 清理，reload/navigation 后旧 document 已消失但
+请求 ownership 仍存活，receiver credit 归零只暂停读取而不取消 upstream。Plan 078
+以 Main main-frame document lifecycle 为权威，加 no-credit body lease、payload-free
+age/credit/byte diagnostics、Renderer page/HMR 与 SSE/plugin cleanup，并用同窗口十次
+reload 证明 broker、Server socket 与 Fabric stream 回到常量基线。Fabric 已有显式
+close 传播，先做 characterization test，失败才允许修改；Plan 077 保持 DONE。
+
 2026-08-02 补充 Plan 073：Cradle Platform Constitution — Jarvis as Agent Kind。
 **宪法/方向**文档（非实现计划）。核心定论：Jarvis 是窄义 Platform Kind（管家身份），不是聊天升级、不是 HiJarvis 品牌、不是第二调度器；默认 propose-before-act；诚实委托语义 + 工作账本 + Session 执行载体双中心；IRON LAW 升格为对所有 native 与 Kind 概念本身的宪法。竞争姿态是拒克隆 / niche 天花板，不是征服。人类决策：accept / amend / reject。不重开 Plan 061/062 的既定生命周期边界。
 
@@ -280,6 +291,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 075  | Add per-Provider extensions and make CPA the first protocol converter | P1 | XL | — (coordinate with 073 if active) | IN PROGRESS (API-key extension path implemented and verified; Codex OAuth codec/two-phase lease implemented but disabled at M0 gate pending authorized real refresh-credential test against pinned `7.2.130`) |
 | 076  | Replace point-to-point Remote Hosts with the Cradle Fabric | P0 | XL | 032, 033, 034 | IN PROGRESS — implementation essentially complete (relayd directory/membership/v3 links, server `modules/fabric/` + node projections, Nodes UI, legacy removal; two-node e2e spec landed via PR #185 and wired into CI) ; remaining: manual desktop smoke + plan doc reconciliation |
 | 077  | Bound every server stream producer behind one backpressure seam | P0 | M–L | — (composes with 054/071 recovery) | DONE (bounded primitive + watchdog + close-policy chat streams; HWM-0 deadlock fixed; ratchet in typecheck; codex app-server bridge also bounded (close policy + truncation error frame)) |
+| 078  | Fence Desktop Server fetches to renderer document lifetimes | P0 | M | 075 broker baseline | IN PROGRESS (implementation, focused gates, and isolated Electron ten-reload proof done; real-process restart/memory observation pending) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 

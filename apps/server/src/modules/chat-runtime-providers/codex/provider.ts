@@ -50,6 +50,8 @@ import type {
   TerminateBackgroundTerminalInput,
   TokenUsage,
   UpdateRuntimeSettingsInput,
+  UpdateRuntimeTurnSettingsInput,
+  UpdateRuntimeTurnSettingsResult,
 } from '../../chat-runtime/runtime-provider-types'
 import {
   ProviderErrors,
@@ -99,6 +101,7 @@ import type { ThreadReadResponse } from './app-server-protocol/v2/ThreadReadResp
 import type { ThreadSourceKind } from './app-server-protocol/v2/ThreadSourceKind'
 import type { ThreadTurnsListResponse } from './app-server-protocol/v2/ThreadTurnsListResponse'
 import type { Turn } from './app-server-protocol/v2/Turn'
+import type { TurnSettingsUpdateResponse } from './app-server-protocol/v2/TurnSettingsUpdateResponse'
 import type { UserInput } from './app-server-protocol/v2/UserInput'
 import {
   bindCodexCradleMcpInvocation,
@@ -443,7 +446,6 @@ export class CodexProvider implements ChatRuntime {
     // transcript below, but it must not initialize tool or skill surfaces.
     const codexConfig = buildCodexConfig(config, workspacePath, this.resolveSkillPaths, effectiveModel, auth)
     codexConfig.mcp = false
-    codexConfig.computer_use = false
     codexConfig.use_bash = false
     delete codexConfig.mcp_servers
 
@@ -826,6 +828,23 @@ export class CodexProvider implements ChatRuntime {
     }
   }
 
+  async deleteSessionStorage(input: GetCapabilitiesInput) {
+    const threadId = input.runtimeSession.providerSessionId
+    if (!threadId) {
+      return { status: 'not_applicable' as const }
+    }
+    const context = await this.createProviderThreadClient(input)
+    try {
+      await context.client.request('thread/delete', { threadId })
+      context.hostLease.resource.loadedThreadIds.delete(threadId)
+      context.hostLease.resource.uiSlotThreadFacts.delete(threadId)
+      return { status: 'deleted' as const }
+    }
+    finally {
+      context.hostLease.release()
+    }
+  }
+
   async listProviderThreadTurns(input: ProviderThreadTurnsInput): Promise<ProviderThreadTurnsResult> {
     const context = await this.createProviderThreadClient(input)
     try {
@@ -867,9 +886,25 @@ export class CodexProvider implements ChatRuntime {
 
     const context = await this.createProviderThreadClient(input)
     try {
-      const response = await context.client.request('thread/rollback', {
+      const turnsResponse = await context.client.request('thread/turns/list', {
         threadId: providerSessionId,
-        numTurns: input.numTurns,
+        cursor: null,
+        limit: input.numTurns,
+        sortDirection: 'desc',
+        itemsView: 'summary',
+      }) as ThreadTurnsListResponse
+      const turns = turnsResponse.data ?? []
+      const oldestTargetedTurn = turns[input.numTurns - 1]
+      if (!oldestTargetedTurn) {
+        throw new ProviderRuntimeError(ProviderErrors.requestFailed(
+          this.runtimeKind,
+          'rollbackLastTurn',
+          `Codex returned ${turns.length} turn(s), fewer than the requested ${input.numTurns}`,
+        ))
+      }
+      const response = await context.client.request('thread/revert', {
+        threadId: providerSessionId,
+        beforeTurnId: oldestTargetedTurn.id,
       })
       return {
         runtimeKind: this.runtimeKind,
@@ -1053,6 +1088,7 @@ export class CodexProvider implements ChatRuntime {
           updateSecretValue: this.deps.updateSecret,
         })
         handler.readThreadId = () => input.runtimeSession.providerSessionId
+        handler.ownsInteractiveRequests = true
         return handler
       },
     })
@@ -1223,13 +1259,14 @@ export class CodexProvider implements ChatRuntime {
         return
       }
       const titleGeneration = this.resolveCodexThreadTitleGenerationConfig({
+        currentProviderTargetId: profile.providerTargetId,
         currentAuth: context.auth,
         currentCodexConfig: context.codexConfig,
         workspacePath: context.workspacePath,
         fallbackModel: threadContext.threadStart.modelId ?? context.effectiveModel ?? context.config.model ?? null,
       })
       this.generateCodexThreadTitleInBackground({
-        providerTargetId: profile.providerTargetId,
+        providerTargetId: titleGeneration.providerTargetId,
         apiKey: readCodexApiKeyAuth(titleGeneration.auth),
         chatgptAuth: readCodexChatgptAuth(titleGeneration.auth),
         codexConfig: titleGeneration.codexConfig,
@@ -1646,6 +1683,36 @@ export class CodexProvider implements ChatRuntime {
           }
         : {}),
     })
+    if (entry.turnId) {
+      await entry.client.request('turn/settings/update', {
+        threadId: entry.threadId,
+        turnId: entry.turnId,
+        serviceTier,
+      })
+    }
+  }
+
+  async updateRuntimeTurnSettings(
+    input: UpdateRuntimeTurnSettingsInput,
+  ): Promise<UpdateRuntimeTurnSettingsResult> {
+    const entry = this.activeTurns.read(input.runtimeSession.chatSessionId)
+    if (!entry?.turnId) {
+      return { status: 'targetUnavailable' }
+    }
+    const response = await entry.client.request('turn/settings/update', {
+      threadId: entry.threadId,
+      turnId: entry.turnId,
+      ...input.settings,
+    }) as TurnSettingsUpdateResponse
+    if (response.status === 'applied') {
+      if (input.settings.model !== undefined && input.settings.model !== null) {
+        entry.modelId = input.settings.model
+      }
+      if (input.settings.effort !== undefined && input.settings.effort !== null) {
+        entry.reasoningEffort = input.settings.effort
+      }
+    }
+    return { status: response.status }
   }
 
   async cancelTurn(input: CancelTurnInput): Promise<void> {
@@ -1731,11 +1798,13 @@ export class CodexProvider implements ChatRuntime {
   }
 
   private resolveCodexThreadTitleGenerationConfig(input: {
+    currentProviderTargetId: string
     currentAuth: CodexAppServerAuthResolution
     currentCodexConfig: NonNullable<ThreadForkParams['config']>
     workspacePath: string
     fallbackModel: string | null
   }): {
+      providerTargetId: string
       auth: CodexAppServerAuthResolution
       codexConfig: NonNullable<ThreadForkParams['config']>
       model: string | null
@@ -1750,6 +1819,7 @@ export class CodexProvider implements ChatRuntime {
 
     if (!explicitProviderTargetId) {
       return {
+        providerTargetId: input.currentProviderTargetId,
         auth: input.currentAuth,
         codexConfig: input.currentCodexConfig,
         model: null,
@@ -1761,6 +1831,7 @@ export class CodexProvider implements ChatRuntime {
     const profile = this.deps.resolveProviderTargetProfile?.(explicitProviderTargetId)
     if (!profile) {
       return {
+        providerTargetId: input.currentProviderTargetId,
         auth: input.currentAuth,
         codexConfig: input.currentCodexConfig,
         model: explicitModelId,
@@ -1773,6 +1844,7 @@ export class CodexProvider implements ChatRuntime {
     const model = explicitModelId ?? config.model ?? null
     const auth = this.resolveAppServerAuth(profile, config)
     return {
+      providerTargetId: profile.providerTargetId,
       auth,
       codexConfig: buildCodexConfig(config, input.workspacePath, this.resolveSkillPaths, model, auth),
       model,
@@ -1902,6 +1974,7 @@ export class CodexProvider implements ChatRuntime {
       writeCodexThreadSnapshot(input.runtimeSession, threadStart)
 
       const titleGeneration = this.resolveCodexThreadTitleGenerationConfig({
+        currentProviderTargetId: profile.providerTargetId,
         currentAuth: auth,
         currentCodexConfig: codexConfig,
         workspacePath,
@@ -1911,7 +1984,7 @@ export class CodexProvider implements ChatRuntime {
       const titleCodexConfig = buildCodexTitleConfig(titleGeneration.codexConfig, titleModel)
       const titleChatgptAuth = readCodexChatgptAuth(titleGeneration.auth)
       titleHostLease = await this.acquireCodexAppServerHost({
-        providerTargetId: profile.providerTargetId,
+        providerTargetId: titleGeneration.providerTargetId,
         chatgptAuth: titleChatgptAuth,
         options: {
           apiKey: readCodexApiKeyAuth(titleGeneration.auth) ?? undefined,

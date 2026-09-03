@@ -13,8 +13,8 @@ This module owns host activation APIs. Host activation means Cradle decides whet
 | Persistent sources | `GET|POST /plugins/sources`, `GET /plugins/sources/:id`, `POST /plugins/sources/preview`, `POST /plugins/sources/:id/refresh` | Resolves local, Git, and npm sources and projects their cached packages. Read routes never download, pack, extract, or publish. |
 | Personal Plugins | `POST /plugins/personal`, `POST /plugins/personal/:sourceId` | Packs a retained authoring directory into a validated Cradle-owned snapshot. Update publishes through staging so build or validation failure preserves the prior snapshot. |
 | Uninstall | `GET /plugins/sources/:id/uninstall-plan`, `DELETE /plugins/sources/:id` | Inspects and confirms Plugin cleanup before deleting records and Cradle-owned snapshots. Personal authoring directories are retained. |
-| Development sessions | `GET|POST /plugins/dev-sessions`, `POST /plugins/dev-sessions/:id/reload`, `POST /plugins/dev-sessions/:id/heartbeat`, `DELETE /plugins/dev-sessions/:id` | Owns attached, memory-only watch sessions that expire after 45 seconds without a CLI heartbeat and never write persistent source or trust records. |
-| Plugin events and review handoff | `GET /plugins/events`, `GET /plugins/reviews?chatSessionId=...` | Multiplexes persisted lifecycle and development-session events for Web/Desktop reconciliation, and projects memory-only pending reviews into the Chat Session that initiated an Agent install or update. Consumers dispatch by event scope and fetch authoritative projections after lifecycle events. |
+| Development sessions | `GET|POST /plugins/dev-sessions`, `POST /plugins/dev-sessions/:id/reload`, `POST /plugins/dev-sessions/:id/heartbeat`, `DELETE /plugins/dev-sessions/:id`, `GET /plugins/dev-sessions/events` | Owns attached, memory-only watch sessions that expire after 45 seconds without a CLI heartbeat and never write persistent source or trust records. |
+| Lifecycle and review handoff | `GET /plugins/events`, `GET /plugins/reviews?chatSessionId=...` | Streams persisted source and activation identities for Web/Desktop reconciliation and projects memory-only pending reviews into the Chat Session that initiated an Agent install or update. Consumers fetch authoritative descriptors after each event. |
 
 GitHub archives are downloaded through the server Download Center; the Plugin
 host owns extraction, package discovery, trust evaluation, and cache
@@ -24,6 +24,8 @@ Plugin snapshots instead use the package's standard `npm pack` boundary after
 the CLI completes its package-owned build.
 
 Enabling an `externalLocal` plugin records package trust plus one permission grant per reviewed manifest permission for the currently discovered package checksum. These grants are host policy, not plugin-owned settings. If the package contents change, the checksum changes and Cradle disables every runtime layer until the operator reviews that exact package revision again. External local plugins remain blocked while the server is enrolled as a Fabric node.
+
+The narrow exception is a Plugin whose manifest is both `deployments: ['desktop']` and renderer-only: it has a Web entry, no Server or Desktop-main entry, and no Server/Desktop capability declaration. The local Desktop may load that reviewed Web bundle even while its Server participates in Fabric; browser deployments filter it out. Adding a privileged layer returns the package to the Fabric block.
 
 Plugin-owned runtime routes are not stable host APIs. They are dispatched under `/api/plugins/:routeSegment/...` by the plugin host so web plugins can call their own server handlers through `ctx.routes`.
 

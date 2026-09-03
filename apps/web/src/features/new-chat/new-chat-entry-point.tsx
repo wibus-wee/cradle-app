@@ -32,6 +32,7 @@ import {
 import { getLocalWorkspacePath, isLocalWorkspace } from '~/features/workspace/types'
 import { sessionsQueryKey, updateSessionInSessionLists, useWorkspaceSessions } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
+import { useNow } from '~/hooks/use-now'
 import { parseRepoKey, repoOwnerAvatarUrl, workspaceRepoKey } from '~/lib/repo-identity'
 import { openChatSession } from '~/navigation/navigation-commands'
 import { openTearoffChatSessionWindow } from '~/navigation/tearoff-surfaces'
@@ -39,6 +40,7 @@ import { useNewChatStore } from '~/store/new-chat'
 
 import { NewChatMachineSelectorView } from './new-chat-machine-selector-view'
 import { NewChatQuickActionsView } from './new-chat-quick-actions-view'
+import { NewChatRecentSessionsView } from './new-chat-recent-sessions-view'
 import { NewChatSurfaceView } from './new-chat-surface-view'
 import type { NewChatWorkspaceOption } from './new-chat-workspace-selector-view'
 import { NewChatWorkspaceSelectorView } from './new-chat-workspace-selector-view'
@@ -225,7 +227,28 @@ function useNewChatPageOwner(
     // Remote Nodes own their provider catalog; local Agents are not executable there.
     enableAgents: !nodeId,
   })
-  const { loading: sessionsLoading } = useWorkspaceSessions(selectedProjectWorkspaceId)
+  const { sessions, loading: sessionsLoading } = useWorkspaceSessions(selectedProjectWorkspaceId)
+  const now = useNow(60_000, active)
+  const recentSessions = useMemo(() => sessions
+    .toSorted((left, right) => right.updatedAt - left.updatedAt)
+    .slice(0, 3)
+    .map((session) => {
+      const minutes = Math.max(0, Math.floor((now / 1000 - session.updatedAt) / 60))
+      const relativeTimeLabel = minutes < 1
+        ? t('relative.justNow')
+        : minutes < 60
+          ? t('relative.minutesAgo', { count: minutes })
+          : minutes < 1_440
+            ? t('relative.hoursAgo', { count: Math.floor(minutes / 60) })
+            : minutes < 43_200
+              ? t('relative.daysAgo', { count: Math.floor(minutes / 1_440) })
+              : t('relative.monthsAgo', { count: Math.floor(minutes / 43_200) })
+      return {
+        id: session.id,
+        title: session.title?.trim() || t('recent.untitled'),
+        relativeTimeLabel,
+      }
+    }), [now, sessions, t])
   const sessionsReady = selectedProjectWorkspaceId === null || !sessionsLoading
   const isReady = !workspacesLoading
     && sessionsReady
@@ -536,6 +559,10 @@ function useNewChatPageOwner(
     quickActionKey,
     quickActionText,
     workspaces,
+    recentSessions,
+    resumeSession: (sessionId: string) => {
+      void openCreatedChatSession(sessionId, 'tab')
+    },
   }
 }
 
@@ -697,6 +724,15 @@ export function NewChatEntryPoint({
               onSelect={owner.handleQuickAction}
             />
           )}
+      recentSessions={!owner.promptInputCollapsed && owner.draft.length === 0
+        ? (
+            <NewChatRecentSessionsView
+              title={owner.t('recent.title')}
+              sessions={owner.recentSessions}
+              onResume={owner.resumeSession}
+            />
+          )
+        : null}
       dialog={(
         <IssueIsolationStartDialog
           open={owner.isolationDialogOpen}

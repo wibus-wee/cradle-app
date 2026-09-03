@@ -3232,8 +3232,10 @@ export type GetFabricControllerInvitationsRequestsResponse = GetFabricController
 
 export type PostFabricControllerInvitationsRequestsByRequestIdApproveData = {
     body: {
-        nodeId: string;
-        scopes: Array<'view' | 'control' | 'approve'>;
+        grants: Array<{
+            nodeId: string;
+            scopes: Array<'view' | 'control' | 'approve'>;
+        }>;
     };
     path: {
         requestId: string;
@@ -3264,6 +3266,22 @@ export type DeleteFabricControllerInvitationsRequestsByRequestIdData = {
 };
 
 export type DeleteFabricControllerInvitationsRequestsByRequestIdResponses = {
+    /**
+     * Response for status 204
+     */
+    204: unknown;
+};
+
+export type DeleteFabricControllersByControllerIdData = {
+    body?: never;
+    path: {
+        controllerId: string;
+    };
+    query?: never;
+    url: '/fabric/controllers/{controllerId}';
+};
+
+export type DeleteFabricControllersByControllerIdResponses = {
     /**
      * Response for status 204
      */
@@ -3359,6 +3377,7 @@ export type GetNodesByNodeIdGrantsResponses = {
         grantId: string;
         fabricId: string;
         controllerId: string;
+        controllerDisplayName?: string;
         nodeId: string;
         scope: 'view' | 'control' | 'approve' | 'admin';
         revokedAt?: string;
@@ -7019,6 +7038,16 @@ export type GetBackgroundActivitiesResponses = {
         manuallyRunnable: boolean;
         status: 'idle' | 'running' | 'succeeded' | 'failed';
         progress: unknown;
+        presentation: {
+            footer: {
+                id: string;
+                title: string;
+                description: string | null;
+                actionLabel: string | null;
+                actionUrl: string | null;
+                expiresAt: number | null;
+            } | null;
+        };
         lastError: string | null;
         createdAt: number;
         updatedAt: number;
@@ -7052,6 +7081,16 @@ export type PostBackgroundActivitiesByOwnerNamespaceByKeyRunResponses = {
         manuallyRunnable: boolean;
         status: 'idle' | 'running' | 'succeeded' | 'failed';
         progress: unknown;
+        presentation: {
+            footer: {
+                id: string;
+                title: string;
+                description: string | null;
+                actionLabel: string | null;
+                actionUrl: string | null;
+                expiresAt: number | null;
+            } | null;
+        };
         lastError: string | null;
         createdAt: number;
         updatedAt: number;
@@ -7253,6 +7292,7 @@ export type GetSessionsResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -7342,6 +7382,7 @@ export type PostSessionsResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7417,6 +7458,7 @@ export type GetSessionsByIdResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7479,6 +7521,7 @@ export type PatchSessionsByIdResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7561,6 +7604,7 @@ export type PostSessionsByIdArchiveResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7616,6 +7660,7 @@ export type PostSessionsByIdReadResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -7671,6 +7716,7 @@ export type PostSessionsByIdUnreadResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -8397,6 +8443,7 @@ export type PostThreadHandoffsResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -8715,6 +8762,7 @@ export type PostWorksResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -8852,6 +8900,7 @@ export type GetWorksByIdResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -8966,6 +9015,7 @@ export type PostWorksByIdArchiveResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9082,6 +9132,7 @@ export type PostWorksByIdPrepareResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9199,6 +9250,7 @@ export type PostWorksByIdSubmitResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -9313,6 +9365,7 @@ export type PostWorksByIdBranchResponses = {
             lastReadAt: number | null;
             createdAt: number;
             updatedAt: number;
+            activityAt: number;
             latestUserMessageAt: number | null;
             latestAssistantMessageAt: number | null;
             unread: boolean;
@@ -11668,6 +11721,7 @@ export type GetIssuesByIdSessionsResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -12552,6 +12606,7 @@ export type GetPluginsResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -12695,6 +12750,7 @@ export type GetPluginsSourcesResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -12817,6 +12873,7 @@ export type PostPluginsSourcesResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -12904,6 +12961,7 @@ export type PostPluginsSourcesResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13164,6 +13222,13 @@ export type DeletePluginsDevSessionsByIdResponses = {
 
 export type DeletePluginsDevSessionsByIdResponse = DeletePluginsDevSessionsByIdResponses[keyof DeletePluginsDevSessionsByIdResponses];
 
+export type GetPluginsDevSessionsEventsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/plugins/dev-sessions/events';
+};
+
 export type GetPluginsEventsData = {
     body?: never;
     path?: never;
@@ -13207,6 +13272,7 @@ export type GetPluginsReviewsResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -13327,6 +13393,7 @@ export type PostPluginsPersonalResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -13414,6 +13481,7 @@ export type PostPluginsPersonalResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13541,6 +13609,7 @@ export type PostPluginsPersonalBySourceIdResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -13628,6 +13697,7 @@ export type PostPluginsPersonalBySourceIdResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13824,6 +13894,7 @@ export type GetPluginsSourcesByIdResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -13941,6 +14012,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
                 displayName: string;
                 description: string | null;
                 iconUrl: string | null;
+                deployments: Array<'desktop' | 'web'> | null;
                 source: {
                     kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                     packageDir: string;
@@ -14028,6 +14100,7 @@ export type PostPluginsSourcesByIdRefreshResponses = {
             displayName: string;
             description: string | null;
             iconUrl: string | null;
+            deployments: Array<'desktop' | 'web'> | null;
             source: {
                 kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
                 packageDir: string;
@@ -14225,6 +14298,7 @@ export type GetPluginsByRouteSegmentResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -14332,6 +14406,7 @@ export type PatchPluginsByRouteSegmentEnabledResponses = {
         displayName: string;
         description: string | null;
         iconUrl: string | null;
+        deployments: Array<'desktop' | 'web'> | null;
         source: {
             kind: 'workspaceDev' | 'bundledResource' | 'externalLocal';
             packageDir: string;
@@ -14733,6 +14808,180 @@ export type PostSkillsCancelFetchResponses = {
 };
 
 export type PostSkillsCancelFetchResponse = PostSkillsCancelFetchResponses[keyof PostSkillsCancelFetchResponses];
+
+export type GetStorageOverviewData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/storage/overview';
+};
+
+export type GetStorageOverviewResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        measuredAt: number;
+        dataDirectory: string;
+        totalBytes: number;
+        categories: Array<{
+            id: 'database' | 'runtime' | 'attachments' | 'artifacts' | 'terminal' | 'diagnostics' | 'other';
+            bytes: number;
+            fileCount: number;
+        }>;
+        sessions: Array<{
+            id: string;
+            title: string;
+            workspaceName: string | null;
+            runtimeKind: string;
+            updatedAt: number;
+            archivedAt: number | null;
+            pinned: boolean;
+            active: boolean;
+            messageCount: number;
+            localBytes: number;
+            runtimeBytes: number;
+            attachmentBytes: number;
+            artifactBytes: number;
+            terminalBytes: number;
+            reclaimableBytes: number;
+        }>;
+    };
+};
+
+export type GetStorageOverviewResponse = GetStorageOverviewResponses[keyof GetStorageOverviewResponses];
+
+export type PostStorageSessionsPurgeTranscriptsData = {
+    body: {
+        sessionIds: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/storage/sessions/purge-transcripts';
+};
+
+export type PostStorageSessionsPurgeTranscriptsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        cleanup: Array<{
+            sessionId: string;
+            nativeStorage: {
+                status: 'deleted' | 'partial' | 'preserved' | 'not_applicable' | 'failed';
+                detail?: string;
+            };
+            attachmentBytesFreed: number;
+        }>;
+        compaction: {
+            status: 'completed';
+            bytesBefore: number;
+            bytesAfter: number;
+        } | {
+            status: 'deferred';
+            reason: 'insufficient_space';
+        } | {
+            status: 'not_applicable';
+        } | {
+            status: 'skipped_active_runs';
+        };
+        overview: {
+            measuredAt: number;
+            dataDirectory: string;
+            totalBytes: number;
+            categories: Array<{
+                id: 'database' | 'runtime' | 'attachments' | 'artifacts' | 'terminal' | 'diagnostics' | 'other';
+                bytes: number;
+                fileCount: number;
+            }>;
+            sessions: Array<{
+                id: string;
+                title: string;
+                workspaceName: string | null;
+                runtimeKind: string;
+                updatedAt: number;
+                archivedAt: number | null;
+                pinned: boolean;
+                active: boolean;
+                messageCount: number;
+                localBytes: number;
+                runtimeBytes: number;
+                attachmentBytes: number;
+                artifactBytes: number;
+                terminalBytes: number;
+                reclaimableBytes: number;
+            }>;
+        };
+    };
+};
+
+export type PostStorageSessionsPurgeTranscriptsResponse = PostStorageSessionsPurgeTranscriptsResponses[keyof PostStorageSessionsPurgeTranscriptsResponses];
+
+export type PostStorageSessionsDeleteData = {
+    body: {
+        sessionIds: Array<string>;
+    };
+    path?: never;
+    query?: never;
+    url: '/storage/sessions/delete';
+};
+
+export type PostStorageSessionsDeleteResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        cleanup: Array<{
+            sessionId: string;
+            nativeStorage: {
+                status: 'deleted' | 'partial' | 'preserved' | 'not_applicable' | 'failed';
+                detail?: string;
+            };
+            attachmentBytesFreed: number;
+        }>;
+        compaction: {
+            status: 'completed';
+            bytesBefore: number;
+            bytesAfter: number;
+        } | {
+            status: 'deferred';
+            reason: 'insufficient_space';
+        } | {
+            status: 'not_applicable';
+        } | {
+            status: 'skipped_active_runs';
+        };
+        overview: {
+            measuredAt: number;
+            dataDirectory: string;
+            totalBytes: number;
+            categories: Array<{
+                id: 'database' | 'runtime' | 'attachments' | 'artifacts' | 'terminal' | 'diagnostics' | 'other';
+                bytes: number;
+                fileCount: number;
+            }>;
+            sessions: Array<{
+                id: string;
+                title: string;
+                workspaceName: string | null;
+                runtimeKind: string;
+                updatedAt: number;
+                archivedAt: number | null;
+                pinned: boolean;
+                active: boolean;
+                messageCount: number;
+                localBytes: number;
+                runtimeBytes: number;
+                attachmentBytes: number;
+                artifactBytes: number;
+                terminalBytes: number;
+                reclaimableBytes: number;
+            }>;
+        };
+    };
+};
+
+export type PostStorageSessionsDeleteResponse = PostStorageSessionsDeleteResponses[keyof PostStorageSessionsDeleteResponses];
 
 export type GetWorkflowRulesByWorkspaceIdListData = {
     body?: never;
@@ -19776,16 +20025,10 @@ export type GetAcpAgentsByAgentIdAuthMethodsResponses = {
             id: string;
             name: string;
             description?: string;
-            kind: 'agent' | 'env_var' | 'terminal';
+            kind: 'agent' | 'terminal';
             status: 'supported' | 'unsupported';
             unavailableReason?: string;
             link?: string;
-            fields?: Array<{
-                name: string;
-                label?: string;
-                secret: boolean;
-                optional: boolean;
-            }>;
         }>;
         selectedMethodId: string | null;
     };
@@ -19816,9 +20059,6 @@ export type DeleteAcpAgentsByAgentIdAuthResponse = DeleteAcpAgentsByAgentIdAuthR
 export type PutAcpAgentsByAgentIdAuthData = {
     body: {
         methodId: string;
-        secretRefs?: {
-            [key: string]: unknown;
-        };
     };
     path: {
         agentId: string;
@@ -21097,6 +21337,29 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
             hasCredits: boolean | null;
             rateLimitReachedType: string | null;
             planType: string | null;
+            estimatedCostUsd?: number | null;
+            queuedTurnCount?: number | null;
+            resultMessageId?: string | null;
+            correlatedUserMessageId?: string | null;
+            modelCosts?: Array<{
+                modelId: string;
+                canonicalModelId: string | null;
+                provider: string | null;
+                costUsd: number;
+                costBasis: 'list' | 'managed' | 'unknown';
+            }>;
+            lastModelSwitch?: {
+                fromModelId: string;
+                toModelId: string;
+                requestedModelId: string | null;
+                source: string;
+                contextTokens: number;
+                promptCacheWarm: boolean;
+                cacheTtl: '5m' | '1h';
+                estimatedCacheWriteUsd: number;
+                pricing: 'configured' | 'catalog' | 'default';
+                updatedAt: number;
+            } | null;
             updatedAt: number;
         } | {
             kind: 'config';
@@ -22396,6 +22659,7 @@ export type PostChatSessionsBySessionIdTitleRegenerateResponses = {
         lastReadAt: number | null;
         createdAt: number;
         updatedAt: number;
+        activityAt: number;
         latestUserMessageAt: number | null;
         latestAssistantMessageAt: number | null;
         unread: boolean;
@@ -22919,16 +23183,10 @@ export type GetChatSessionsBySessionIdAuthRecoveryResponses = {
             id: string;
             name: string;
             description?: string;
-            kind: 'agent' | 'env_var' | 'terminal';
+            kind: 'agent' | 'terminal';
             status: 'supported' | 'unsupported';
             unavailableReason?: string;
             link?: string;
-            fields?: Array<{
-                name: string;
-                label?: string;
-                secret: boolean;
-                optional: boolean;
-            }>;
         }>;
         configurationTarget: {
             namespace: string;
@@ -22983,6 +23241,31 @@ export type PutChatSessionsBySessionIdRuntimeModeResponses = {
 };
 
 export type PutChatSessionsBySessionIdRuntimeModeResponse = PutChatSessionsBySessionIdRuntimeModeResponses[keyof PutChatSessionsBySessionIdRuntimeModeResponses];
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsData = {
+    body: {
+        model?: string | null;
+        effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | null;
+        summary?: 'auto' | 'concise' | 'detailed' | 'none' | null;
+        serviceTier?: string | null;
+    };
+    path: {
+        sessionId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-turn-settings';
+};
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        status: 'applied' | 'targetUnavailable';
+    };
+};
+
+export type PatchChatSessionsBySessionIdRuntimeTurnSettingsResponse = PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses[keyof PatchChatSessionsBySessionIdRuntimeTurnSettingsResponses];
 
 export type PostChatSessionsBySessionIdToolApprovalByRequestIdData = {
     body: {

@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 标签页精华旅程
   作为用户，我希望创建、切换并关闭标签页以管理多个上下文
 

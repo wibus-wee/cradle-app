@@ -1,6 +1,6 @@
 # ACP Chat Runtime
 
-This module projects a locally installed Agent Client Protocol (ACP) agent into Cradle's shared Chat Runtime. It owns protocol negotiation, process and native-session lifecycle, ACP-to-Cradle event mapping, interaction bridges, and runtime presentation. Installed-agent records and authentication selections remain owned by [`modules/acp`](../../acp/README.md); credential values remain owned by `modules/secrets`.
+This module projects an Agent Client Protocol (ACP) agent into Cradle's shared Chat Runtime. It owns protocol negotiation, process and native-session lifecycle, ACP-to-Cradle event mapping, interaction bridges, and runtime presentation. Installed-agent records and authentication selections remain owned by [`modules/acp`](../../acp/README.md); remote transport credential values remain owned by `modules/secrets`.
 
 | Area | Owner | Responsibility |
 | --- | --- | --- |
@@ -15,13 +15,13 @@ This module projects a locally installed Agent Client Protocol (ACP) agent into 
 
 Initialization sends the server package version and requires the agent to return the SDK `PROTOCOL_VERSION`. A connection is published only after negotiation and the selected authentication method succeed. Cold startup uses three bounded attempts; authentication failures are never retried. A process disconnect fails active channels so the Chat Runtime run owner can terminate the stream, release the run lease, and reconnect on the next operation.
 
-An installed agent stores an auth method ID and Secrets-owned credential references. For env-var authentication, the first local process discovers the live method contract without credential values. The runtime then stops it, resolves values through `modules/secrets`, and spawns the authenticated process. Remote targets advertise env-var methods as unsupported because no local process environment exists. Agent-managed authentication runs on the discovery connection. Startup tokens and resolved secret values are not logged.
+An installed agent stores only an auth method ID. Stable ACP methods are agent-managed or terminal-based: Cradle runs agent-managed authentication on the initialized connection and advertises terminal methods as unsupported because it does not host an interactive terminal authentication flow. The removed experimental environment-variable method is not projected into Cradle's contracts or startup lifecycle.
 
 Remote targets use the SDK HTTP or WebSocket transport selected by the ACP-owned connection record. Header values are resolved from Secrets only while connecting. HTTP cookies remain in a target-scoped in-memory SDK cookie store across reconnects and are cleared on explicit disconnect; they are never persisted by Chat Runtime.
 
 Structured `auth_required` failures carry an ACP configuration target into the shared Chat Runtime recovery owner. The failed durable queue item remains historical. The transcript can render the ACP authentication form inline and, after successful configuration, enqueue an exact copy of the failed text, files, context, model, thinking effort, runtime settings, provider target, and queue/steer mode. Dismissal closes only the recovery record.
 
-Metadata requests have a 30-second deadline, authentication has a five-minute deadline, and prompts have a ten-minute deadline. A timeout sends best-effort `session/cancel`, closes the connection, fails every active channel, and stops the process. Redacted stderr is retained in bounded process diagnostics and included in disconnect errors.
+Metadata requests have a 30-second deadline, authentication has a five-minute deadline, and prompts have a ten-minute deadline. A timeout sends best-effort `session/cancel`, closes the connection, fails every active channel, and stops the process. Bounded stderr is retained in process diagnostics and included in disconnect errors. ACP authentication no longer injects credential values into the local process environment.
 
 ## Sessions and turns
 

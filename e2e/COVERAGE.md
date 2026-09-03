@@ -6,8 +6,8 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
-| Web feature namespaces | 21 | 10 | 15 | 1 |
-| Server module namespaces | 30 | 15 | 20 | 6 |
+| Web feature namespaces | 21 | 12 | 16 | 1 |
+| Server module namespaces | 31 | 15 | 20 | 7 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
 
@@ -40,6 +40,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Provider failure × retry × reload | `CRADLE-CHAT-003` | Error state does not poison the next persisted turn |
 | Streaming × reload × eventual completion | `CRADLE-CHAT-004` | In-flight state rehydrates to the final message |
 | Streaming × queue × reload × auto-drain × title generation | `CRADLE-CHAT-009` | A queued continuation persists and executes after the exact parent run |
+| Active stream × durable queue × Server process crash × startup recovery | `CRADLE-CHAT-014` | The interrupted run no longer blocks admission, then startup schedules and completes the persisted continuation without a client nudge; event-sourcing parity tests own the exact `response.interrupted` fact |
 | Streaming × multiple queue items × edit × reorder × cancel × reload | `CRADLE-CHAT-010` | Final durable queue order is the only order executed |
 | Approval pending × reload × allow/deny | `CRADLE-AGENT-001`, `002` | Pending permission state rehydrates and both decisions control the real runtime continuation |
 | Claude runtime × Read tool × tool result × final reply | `CRADLE-AGENT-004` | The simulator drives a real Claude Agent tool loop rather than replacing the runtime |
@@ -51,7 +52,9 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Codex × update_plan execution round-trip | `CRADLE-CODEX-006` | The plan handler executes and its result crosses back through the model continuation; plan-item UI projection stays a backlog item |
 | Codex × apply_patch file change × file-diff UI | `CRADLE-CODEX-007` | In-workspace patches execute under sandbox and project file-change tool state |
 | Codex × sandbox escape × real approval round-trip | `CRADLE-CODEX-008` | With Approval-required access mode, an out-of-workspace command requests approval, and Allow resumes the same turn |
-| Codex × rollback branch / transient `btw` | `CRADLE-CODEX-002`–`004` | Persistent history branches correctly and transient turns do not leak |
+| Codex runtime × real app-server × model simulator | `CRADLE-CODEX-001` | A native Codex turn reaches the strict OpenAI Responses simulator and projects its reply |
+| Codex × rollback branch / transient `btw` × reload × next main turn | `CRADLE-CODEX-002`, `CRADLE-CODEX-003`, `CRADLE-CODEX-004` | Persistent history branches correctly; transient questions disappear on reload and never enter the next main-thread model request |
+| Codex active turn × independent title provider × regenerate | `CRADLE-CODEX-009` | Title traffic uses its configured provider host without starving or consuming the active main turn |
 | Filesystem context × provider request | `CRADLE-CONTEXT-001` | Selected `AGENTS.md` content crosses the UI/runtime boundary |
 | Two live sessions × tabs × reload × close | `CRADLE-TAB-001` | Active content and session identity do not bleed across tabs |
 | Issue × delegation × Agent Session × reload × rerun × new Chat | `CRADLE-ISSUE-AGENT-001` | Delegation state persists and rerun attaches its own completed Chat |
@@ -65,29 +68,32 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Workspace removal × active Work run × runtime cancellation × delayed provider response × reload | `CRADLE-WS-005` | Destructive Workspace removal cancels the active Work run before Session disposal, so a delayed provider response cannot recreate deleted state |
 | Git branch × external file changes × diff refresh | `CRADLE-GIT-001`, `002`, `CRADLE-DIFF-001` | Repository projections refresh from real Git/filesystem state |
 | Await pending × external event × Agent continuation | `CRADLE-AWAIT-001` | Durable pending work resumes from an external signal |
+| Await cancel/expiry × Server crash × late external resolution × next Agent turn | `CRADLE-AWAIT-002` | Both terminal states persist across process recovery, reject late delivery without transcript pollution, and leave the Session usable |
 | Multiple PTYs × active-session input routing | `CRADLE-PTY-002` | Input reaches only the selected terminal session |
-| Completed Agent run × usage aggregation × reload | `CRADLE-USAGE-001` | Runtime usage is counted once and persists |
+| Completed Agent run × usage aggregation × selected range × CSV export × reload | `CRADLE-USAGE-001` | Runtime usage is counted once, the selected range persists, and the downloaded export contains the same aggregate |
+| Session × delayed notes save × continued typing × reload | `CRADLE-ENV-001` | A stale save/refetch cannot overwrite a newer local draft, and the newest notes persist across reload |
 | Provider profile × Agent selection × disable | `CRADLE-PROVIDER-001` | A UI-created provider can run and later become unavailable |
-| Provider disable/delete × two active sessions × queued continuation × runtime cancellation | `CRADLE-PROVIDER-002`, `003` | Disabling or deleting a UI-created provider cancels every in-flight run and prevents a queued continuation in another session from executing |
+| Provider disable/delete × two active sessions × queued continuation × runtime cancellation | `CRADLE-PROVIDER-002`, `CRADLE-PROVIDER-003` | Disabling or deleting a UI-created provider cancels every in-flight run and prevents a queued continuation in another session from executing |
 | Fabric pairing × two databases × bidirectional Workspace/Chat/Work × Node-owned worktrees × remote tool approval × Session discovery × relay/server restart | `CRADLE-FABRIC-001` | Two real Nodes enroll through the UI, create Work and managed worktrees on the selected authority in both directions, continue each Work conversation, approve a remote Claude Agent tool request from each controller, discover conversations created by the other controller, and recover mounted routing without re-pairing |
+| Native Mobile Controller × two Node grants × cache isolation × Chat SSE × grant/principal revocation | `CRADLE-FABRIC-002` | A signed Release iOS app enrolls through the real owner UI, selects both Nodes without Server credentials, keeps Workspace state Node-scoped, continues a real Codex conversation over Fabric streaming, preserves one Node after a grant removal, and fails closed after Controller revocation |
 
 ## Web Feature Namespace Disposition
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-management`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `search`, `session`, `session-await`, `settings`, `split-view`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
-| Indirect | `activity`, `agent-runtime`, `agent-runtimes`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `plugins`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
-| User-visible gap | `assets`, `automation`, `browser`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `server-connection`, `session-environment`, `shortcuts`, `skills`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
+| Direct | `agent-management`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `search`, `session`, `session-await`, `session-environment`, `settings`, `split-view`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
+| Indirect | `activity`, `agent-runtime`, `agent-runtimes`, `background-activity`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `plugins`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
+| User-visible gap | `assets`, `automation`, `browser`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `server-connection`, `shortcuts`, `skills`, `storage`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
 | Service/infra contract | `product-analytics` | Verify event correctness at the event boundary; add browser coverage only for user-visible consent controls |
 
 ## Server Module Namespace Disposition
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
+| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `session-environment`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
 | Indirect | `background-activity`, `code-activity`, `desktop`, `mcp-servers`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `skills`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources`, `plugins` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
-| User-visible gap | `acp`, `assets`, `automation`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `external-session-import`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-environment`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
-| Service/infra contract | `background-job`, `blob-store`, `health`, `maintenance`, `observability`, `test-reset` | Prefer focused service/contract verification; `test-reset` is harness-only |
+| User-visible gap | `acp`, `assets`, `automation`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `external-session-import`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-group`, `storage`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
+| Service/infra contract | `background-job`, `blob-store`, `codex-reset-watch`, `health`, `maintenance`, `observability`, `test-reset` | Prefer focused service/contract verification; `test-reset` is harness-only |
 
 ## Prioritized Missing Journeys
 
@@ -95,19 +101,16 @@ The backlog below is ordered by semantic fan-out and state-corruption risk, not 
 
 | Priority | Proposed journey | State fusion and owning namespaces |
 | --- | --- | --- |
-| P0 | Fix `/btw` quick-question regression surfaced by `CRADLE-CODEX-003`: the question and answer persist into the main chat timeline instead of the transient quick-question slot (`composerRuntime.uiSlots` never yields the `codex:quick-question` composerState slot, so the composer falls back to a normal send) | chat-runtime interaction × composer slash dispatch × runtime ui-slot projection |
-| P0 | Fix Codex app-server notification starvation under concurrent threads: with parallel e2e workers (`CRADLE_E2E_PARALLEL≥2`), main turns stall at "Thinking…" (TTFT never arrives), and quick-question results misroute — concurrent streams (main / title / ephemeral) share one host client queue, and `readTurnNotifications` drops other-thread events instead of demultiplexing them. Evidence: `e2e/artifacts/scenarios/{edit-last-message-codex-w1-6,update_plan-w2-9,codex-btw-*}` | codex app-server client multiplexing × turn streaming × quick-question |
-| P0 | Application process restart with active stream and queued continuation | desktop lifecycle × persisted Run × queue × rehydration |
-| P1 | Await timeout/cancel/restart plus late external resolution | Await × terminal state × idempotent external event |
 | P1 | Automation run success/failure/cancel with linked Session and notification | automation × background job/activity × session |
 | P1 | Pull-request delivery from Work, update, and failure recovery | Work × Git × pull request × provider auth |
 | P1 | Fabric Node disconnect/reconnect during an active terminal or Agent run | Fabric Node × relay × PTY/runtime × Session |
-| P1 | Session environment edit while idle versus locked during a run | environment × session × runtime process configuration |
+| P1 | Runtime process environment configuration edit while idle versus locked during a run | Agent runtime configuration × session × active process lifecycle |
 | P1 | Skill create/import/delete, then invoke from a real Agent | skills × Agent identity × runtime tool catalog |
 | P1 | Plugin install/enable/disable/reload with a visible contribution | marketplace × plugin lifecycle × shell state |
 | P1 | Browser/asset/OCR path from capture or upload into a persisted prompt | browser × assets × OCR × context × session |
 | P1 | External issue/session import deduplicates and survives reload | external sources × issue/session ownership × idempotency |
 | P1 | Chronicle/Recall opt-in, write, query, delete, and disabled behavior | preferences × chronicle/recall × privacy lifecycle |
+| P1 | Storage inventory, transcript purge, and full session deletion with active-session protection and reload | storage × session/runtime cleanup × attachment/artifact ownership |
 
 ## Acceptance Rules
 

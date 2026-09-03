@@ -10,7 +10,6 @@ export type AcpRuntimeConfig = AcpChatConfig
 
 interface AcpConnectionAuth {
   authMethodId: string | null
-  authSecretRefs: Record<string, string>
   configurationTarget?: { namespace: 'acp', resourceId: string }
 }
 
@@ -54,7 +53,6 @@ export function buildAcpConnectionRecord(configJson: string): AcpConnectionRecor
     args: JSON.stringify(parsed.args),
     env: JSON.stringify(parsed.env),
     authMethodId: null,
-    authSecretRefs: {},
   }
 }
 
@@ -102,7 +100,6 @@ export function resolveAcpConnectionRecord(configJson: string, legacyConnectionK
         endpointUrl: installed.endpointUrl,
         headerSecretRefs: JSON.parse(installed.remoteHeadersSecretRefsJson) as Record<string, string>,
         authMethodId: auth.methodId,
-        authSecretRefs: auth.secretRefs,
         configurationTarget: { namespace: 'acp', resourceId: acpAgentId },
       },
       connectionKey: `acp:${acpAgentId}`,
@@ -120,7 +117,6 @@ export function resolveAcpConnectionRecord(configJson: string, legacyConnectionK
       args: JSON.stringify(effective.args),
       env: JSON.stringify(effective.env),
       authMethodId: auth.methodId,
-      authSecretRefs: auth.secretRefs,
       configurationTarget: { namespace: 'acp', resourceId: acpAgentId },
     },
     connectionKey: `acp:${acpAgentId}`,

@@ -1,17 +1,20 @@
-import type { LucideIcon } from 'lucide-react-native'
 import { AlertCircle, Inbox } from 'lucide-react-native'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 
 import { spacing } from '@/theme/tokens'
 import { useTheme } from '@/theme/use-theme'
 
-interface StateProps {
-  title: string
-  description?: string
-  icon?: LucideIcon
-}
+import { Button } from './button'
+import type { StateProps } from './states-contract'
 
-export function EmptyState({ title, description, icon: Icon = Inbox }: StateProps) {
+export function EmptyState({
+  actionLabel = 'Try Again',
+  description,
+  icon: Icon = Inbox,
+  isActionPending = false,
+  onAction,
+  title,
+}: StateProps) {
   const theme = useTheme()
   return (
     <View style={styles.state}>
@@ -22,12 +25,13 @@ export function EmptyState({ title, description, icon: Icon = Inbox }: StateProp
         <Text style={[styles.title, { color: theme.foreground }]}>{title}</Text>
         {description && <Text style={[styles.description, { color: theme.mutedForeground }]}>{description}</Text>}
       </View>
+      {onAction && <Button label={actionLabel} loading={isActionPending} onPress={onAction} />}
     </View>
   )
 }
 
-export function ErrorState({ title, description }: StateProps) {
-  return <EmptyState icon={AlertCircle} title={title} description={description} />
+export function ErrorState(props: StateProps) {
+  return <EmptyState {...props} icon={AlertCircle} />
 }
 
 export function LoadingState() {

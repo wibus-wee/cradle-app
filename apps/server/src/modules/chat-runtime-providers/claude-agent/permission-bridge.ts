@@ -1,4 +1,4 @@
-import type { CanUseTool, HookCallback, Options, PermissionResult } from '@anthropic-ai/claude-agent-sdk'
+import type { CanUseTool, HookCallback, Options, PermissionResult, PostModelSwitchHookInput, PreModelSwitchHookInput } from '@anthropic-ai/claude-agent-sdk'
 
 import type { GetCapabilitiesInput, ProviderContext, RuntimeSettings, StreamTurnInput } from '../../chat-runtime/runtime-provider-types'
 import { requireRuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
@@ -75,6 +75,97 @@ export function createClaudeAgentPreToolUseHook(input: {
     }
 
     return { continue: true }
+  }
+}
+
+export function createClaudeAgentPreModelSwitchHook(input: {
+  deps: ProviderContext
+  state: ClaudeAgentPermissionBridgeState
+}): HookCallback {
+  return async (hookInput) => {
+    if (hookInput.hook_event_name !== 'PreModelSwitch') {
+      return { continue: true }
+    }
+    if (!hookInput.prompt_cache_warm || hookInput.estimated_cache_write_usd <= 0) {
+      return modelSwitchDecision('allow')
+    }
+
+    const runtimeInput = input.state.runtimeInput
+    if (!('runId' in runtimeInput) || !input.deps.requestToolApproval) {
+      return modelSwitchDecision(
+        'ask',
+        describeClaudeAgentModelSwitchCost(hookInput),
+      )
+    }
+
+    const requestId = [
+      'claude-model-switch',
+      runtimeInput.runId,
+      hookInput.from_model,
+      hookInput.to_model,
+    ].join(':')
+    const resolution = await requestProviderToolApproval({
+      deps: input.deps,
+      sessionId: runtimeInput.runtimeSession.chatSessionId,
+      runId: runtimeInput.runId,
+      providerRequestId: requestId,
+      providerKind: requireRuntimeProviderTargetProfile(runtimeInput.profile, CLAUDE_AGENT_RUNTIME_KIND).providerKind ?? 'universal',
+      runtimeKind: CLAUDE_AGENT_RUNTIME_KIND,
+      providerMethod: 'PreModelSwitch',
+      toolCallId: requestId,
+      metadata: {
+        toolName: 'ModelSwitch',
+        modelSwitch: projectClaudeAgentModelSwitchMetadata(hookInput),
+      },
+    })
+
+    return modelSwitchDecision(
+      resolution.approved ? 'allow' : 'deny',
+      resolution.reason ?? describeClaudeAgentModelSwitchCost(hookInput),
+    )
+  }
+}
+
+export function createClaudeAgentPostModelSwitchHook(input: {
+  onModelSwitch: (modelSwitch: PostModelSwitchHookInput) => void
+}): HookCallback {
+  return async (hookInput) => {
+    if (hookInput.hook_event_name === 'PostModelSwitch') {
+      input.onModelSwitch(hookInput)
+    }
+    return { continue: true }
+  }
+}
+
+function modelSwitchDecision(
+  permissionDecision: 'allow' | 'deny' | 'ask',
+  permissionDecisionReason?: string,
+) {
+  return {
+    continue: true,
+    hookSpecificOutput: {
+      hookEventName: 'PreModelSwitch' as const,
+      permissionDecision,
+      ...(permissionDecisionReason ? { permissionDecisionReason } : {}),
+    },
+  }
+}
+
+function describeClaudeAgentModelSwitchCost(input: PreModelSwitchHookInput): string {
+  return `Switching from ${input.from_model} to ${input.to_model} will replace a warm ${input.cache_ttl} prompt cache and is estimated to cost $${input.estimated_cache_write_usd.toFixed(4)} to cache ${input.context_tokens} context tokens (${input.pricing} pricing).`
+}
+
+function projectClaudeAgentModelSwitchMetadata(input: PreModelSwitchHookInput) {
+  return {
+    fromModelId: input.from_model,
+    toModelId: input.to_model,
+    requestedModelId: input.requested_model,
+    source: input.source,
+    contextTokens: input.context_tokens,
+    promptCacheWarm: input.prompt_cache_warm,
+    cacheTtl: input.cache_ttl,
+    estimatedCacheWriteUsd: input.estimated_cache_write_usd,
+    pricing: input.pricing,
   }
 }
 
@@ -219,6 +310,8 @@ async function handleClaudeAgentToolPermissionRequest(input: {
         displayName: input.options.displayName,
         description: input.options.description,
         agentID: input.options.agentID,
+        requestId: input.options.requestId,
+        matchedAskRule: input.options.matchedAskRule,
       },
     },
     policy: {

@@ -1,5 +1,5 @@
 # language: zh-CN
-@cradle
+@cradle @runtime-claude
 功能: 精华 Composer 旁路
   作为用户，我希望用 !bang 在 Composer 中进入本地命令模式
 

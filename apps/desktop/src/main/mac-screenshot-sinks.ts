@@ -1,5 +1,5 @@
 /* Runs optional post-capture actions for Mac Bridge screenshots. */
-import { clipboard, nativeImage, shell } from 'electron'
+import { clipboard, ClipboardItem, nativeImage, shell } from 'electron'
 
 import type { MacCaptureFrontmostWindowResult } from './mac-bridge-protocol'
 
@@ -31,7 +31,11 @@ async function runClipboardSink(capture: MacCaptureFrontmostWindowResult): Promi
       message: 'Captured image could not be loaded into the clipboard.',
     }
   }
-  clipboard.writeImage(image)
+  await clipboard.write([
+    new ClipboardItem({
+      'image/png': new Blob([Uint8Array.from(image.toPNG())], { type: 'image/png' }),
+    }),
+  ])
   return {
     sink: 'clipboard',
     ok: true,

@@ -8,6 +8,7 @@ import {
   clearBrowserClipboard,
   configureClaudeAgentProviderWithoutExchanges,
   configureClaudeApprovalSimulator,
+  configureCodexActiveTitleGenerationSimulator,
   configureCodexMultiTurnSimulator,
   configureCodexQuickQuestionSimulator,
   configureCodexRollbackSimulator,
@@ -35,8 +36,10 @@ import {
   fillChatComposerWithNextReply,
   navigateToNewChatWithSimulator,
   openToolCall,
+  prepareDurableQueueProcessRestart,
   QUEUED_RESPONSE,
   recallSessionAlias,
+  releaseCodexActiveTitleGate,
   releaseSlowStreamGate,
   renameRememberedSession,
   selectClaudeAgentSimulator,
@@ -44,6 +47,7 @@ import {
   selectNewChatWorkspace,
   SLOW_RESPONSE,
 } from '../support/helpers/chat-scenario'
+import { restartManagedServer } from '../support/server-lifecycle'
 import type { CradleWorld } from '../support/world'
 
 Given('应用已启动', async function (this: CradleWorld) {
@@ -95,6 +99,10 @@ Given('我已配置 Codex Simulator', async function (this: CradleWorld) {
   await configureDefaultAiReply(this)
 })
 
+Given('我已配置进行中标题生成 Codex Simulator', async function (this: CradleWorld) {
+  await configureCodexActiveTitleGenerationSimulator(this)
+})
+
 Given('我已配置 Claude Agent Read 工具环 Simulator', async function (this: CradleWorld) {
   await configureReadToolLoopSimulator(this)
 })
@@ -114,14 +122,28 @@ When('我在新建聊天中提及文件{string}并输入{string}', async functio
   await editor.pressSequentially(` ${prompt}`)
 })
 
-Then('Simulator 请求应包含文件内容{string}', function (this: CradleWorld, content: string) {
-  const requests = this.simulator?.requests() ?? []
-  expect(JSON.stringify(requests)).toContain(content)
+Then('Simulator 请求应包含文件内容{string}', async function (this: CradleWorld, content: string) {
+  const simulator = this.simulator
+  if (!simulator) {
+    throw new Error('Expected simulator to be configured')
+  }
+  await simulator.waitForRequest({
+    method: 'POST',
+    path: '/v1/messages',
+    bodyTextIncludes: content,
+  })
 })
 
-Then('Simulator 请求应包含{string}', function (this: CradleWorld, content: string) {
-  const requests = this.simulator?.requests() ?? []
-  expect(JSON.stringify(requests)).toContain(content)
+Then('Simulator 请求应包含{string}', async function (this: CradleWorld, content: string) {
+  const simulator = this.simulator
+  if (!simulator) {
+    throw new Error('Expected simulator to be configured')
+  }
+  await simulator.waitForRequest({
+    method: 'POST',
+    path: '/v1/responses',
+    bodyTextIncludes: content,
+  })
 })
 
 Given('我已配置 Codex 多轮 Simulator', async function (this: CradleWorld) {
@@ -166,6 +188,17 @@ When('我选择 Codex 运行时与 Simulator Provider', async function (this: Cr
 
 When('我释放慢速流门控', async function (this: CradleWorld) {
   await releaseSlowStreamGate(this)
+})
+
+When('Cradle Server 在活动流中崩溃并使用原数据目录重启', async function (this: CradleWorld) {
+  await prepareDurableQueueProcessRestart(this)
+  await restartManagedServer()
+  await this.page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(this.page.locator('[data-testid="app-sidebar"]')).toBeVisible({ timeout: CHAT_STATUS_TIMEOUT })
+})
+
+When('我释放 Codex 标题旅程流门控', async function (this: CradleWorld) {
+  await releaseCodexActiveTitleGate(this)
 })
 
 Then('聊天流应结束于空闲状态', async function (this: CradleWorld) {
@@ -271,6 +304,10 @@ Then('Composer 的 btw 结果应包含{string}', async function (this: CradleWor
   await this.chat.expectQuickQuestionContains(text, CHAT_STATUS_TIMEOUT)
 })
 
+Then('Composer 中不应显示 btw 结果', async function (this: CradleWorld) {
+  await this.chat.expectQuickQuestionGone(CHAT_STATUS_TIMEOUT)
+})
+
 Then('聊天中不应出现错误提示', async function (this: CradleWorld) {
   await this.chat.expectNoError()
 })
@@ -374,6 +411,12 @@ When('我点击会话{string}的复制 Markdown 菜单项', async function (this
   await this.chat.clickSessionMenuAction(recallSessionAlias(this, alias).id, 'copy-markdown')
 })
 
+When('我在当前会话菜单中重新生成标题', async function (this: CradleWorld) {
+  const sessionId = await this.chat.sessionId()
+  await this.chat.openSessionMenu(sessionId)
+  await this.chat.clickSessionMenuAction(sessionId, 'regenerate-title')
+})
+
 When('我清空 Electron 剪贴板', async function (this: CradleWorld) {
   await clearBrowserClipboard(this)
 })
@@ -406,6 +449,11 @@ Then('会话{string}不应显示为已置顶', async function (this: CradleWorld
 
 Then('侧栏中的会话{string}标题应为{string}', async function (this: CradleWorld, alias: string, expectedTitle: string) {
   await expectSessionTitle(this, alias, expectedTitle)
+})
+
+Then('当前会话标题应为{string}', async function (this: CradleWorld, expectedTitle: string) {
+  const sessionId = await this.chat.sessionId()
+  await this.chat.expectSessionTitle(sessionId, expectedTitle, CHAT_STATUS_TIMEOUT)
 })
 
 Then('最后一条 AI 消息应显示 Reasoning 入口', async function (this: CradleWorld) {

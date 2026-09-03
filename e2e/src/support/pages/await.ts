@@ -3,6 +3,8 @@ import { expect } from '@playwright/test'
 
 const TIMEOUT = 40_000
 
+type AwaitStatus = 'pending' | 'triggered' | 'expired' | 'cancelled' | 'failed'
+
 interface AwaitPageOwner {
   page: Page
   params: { serverUrl: string }
@@ -19,8 +21,9 @@ export class AwaitPage {
     return this.page.locator('[data-testid="right-aside-await-panel"]')
   }
 
-  card(): Locator {
-    return this.panel().locator('[data-testid="javascript-await-card"]')
+  card(reason?: string): Locator {
+    const cards = this.panel().locator('[data-testid="javascript-await-card"]')
+    return reason ? cards.filter({ hasText: reason }) : cards
   }
 
   async open(): Promise<void> {
@@ -35,14 +38,25 @@ export class AwaitPage {
     await expect(this.panel()).toHaveAttribute('data-right-aside-await-ready', 'true', { timeout: TIMEOUT })
   }
 
-  async expectStatus(status: 'pending' | 'triggered', reason?: string): Promise<void> {
-    await expect(this.card()).toHaveAttribute('data-status', status, { timeout: TIMEOUT })
+  async expectStatus(status: AwaitStatus, reason?: string): Promise<void> {
+    await expect(this.card(reason)).toHaveAttribute('data-status', status, { timeout: TIMEOUT })
     if (reason) {
-      await expect(this.card()).toContainText(reason, { timeout: TIMEOUT })
+      await expect(this.card(reason)).toContainText(reason, { timeout: TIMEOUT })
     }
   }
 
-  async register(sessionId: string, reason: string): Promise<string> {
+  async cancel(reason: string): Promise<void> {
+    const card = this.card(reason)
+    await expect(card).toHaveAttribute('data-status', 'pending', { timeout: TIMEOUT })
+    await card.getByRole('button', { name: 'Cancel await' }).click()
+    await expect(card).toHaveAttribute('data-status', 'cancelled', { timeout: TIMEOUT })
+  }
+
+  async register(
+    sessionId: string,
+    reason: string,
+    options: { expiresAt?: number } = {},
+  ): Promise<string> {
     const sessionResponse = await fetch(`${this.owner.params.serverUrl}/sessions/${sessionId}`)
     if (!sessionResponse.ok) {
       throw new Error(`Failed to read Await session: ${sessionResponse.status}`)
@@ -61,6 +75,7 @@ export class AwaitPage {
         source: 'javascript',
         filterJson: JSON.stringify({ program: 'export default async () => false' }),
         reason,
+        ...options,
       }),
     })
     if (!response.ok) {
@@ -78,6 +93,16 @@ export class AwaitPage {
     if (!response.ok) {
       throw new Error(`Failed to trigger Await: ${response.status} ${await response.text()}`)
     }
+  }
+
+  async expectTriggerRejected(awaitId: string, resumeText: string): Promise<void> {
+    const response = await fetch(`${this.owner.params.serverUrl}/session-awaits/${awaitId}/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeText }),
+    })
+    expect(response.status).toBe(404)
+    await expect(response.text()).resolves.toContain('not found or not pending')
   }
 
   async expectServerStatus(awaitId: string, status: string): Promise<void> {

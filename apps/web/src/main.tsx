@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
 import * as React from 'react'
 import * as ReactJSXDevRuntime from 'react/jsx-dev-runtime'
 import * as ReactJSXRuntime from 'react/jsx-runtime'
@@ -8,6 +8,8 @@ import * as ReactDOMClient from 'react-dom/client'
 import { AppErrorBoundary } from './components/common/app-error-boundary'
 import { resolveInitialLocale } from './i18n/browser-locale'
 import { I18nProvider } from './i18n/client'
+import { createBootstrapDisposerRegistry } from './lib/bootstrap-disposer'
+import { queryClient } from './lib/query-client'
 import { waitForServer } from './lib/server-readiness'
 
 // Expose shared React modules for plugin runtime
@@ -23,15 +25,6 @@ Object.defineProperty(window, Symbol.for('cradle:modules'), {
   },
 })
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: 1,
-    },
-  },
-})
-
 // Hash-based routing: #devtool renders the devtool page (Electron second window)
 const isDevtoolWindow = window.location.hash === '#devtool' || window.location.hash === '#/devtool'
 const initialLocale = resolveInitialLocale()
@@ -40,6 +33,13 @@ const applicationPromise: Promise<React.ComponentType> = isDevtoolWindow
   : import('./app').then(module => module.App)
 const stylesheetPromise = import('./styles.css')
 const root = ReactDOMClient.createRoot(document.getElementById('app')!)
+const postRenderDisposers = createBootstrapDisposerRegistry()
+const disposeRendererDocument = (): void => postRenderDisposers.dispose()
+window.addEventListener('pagehide', disposeRendererDocument)
+import.meta.hot?.dispose(() => {
+  window.removeEventListener('pagehide', disposeRendererDocument)
+  disposeRendererDocument()
+})
 
 function renderBootstrapFallback(error: unknown): void {
   const message = document.querySelector<HTMLElement>('[data-bootstrap-message]')
@@ -100,9 +100,10 @@ async function startApp(): Promise<void> {
         reactDiagnostics.initializeReactDiagnostics()
         rendererDiagnostics.installRendererDiagnostics()
         await pluginHost.loadWebPlugins()
-        await pluginHost.startPluginWatcher(() => {
+        pluginHost.startPluginLifecycleWatcher(() => {
           void queryClient.invalidateQueries({ queryKey: ['plugins'] })
         })
+        postRenderDisposers.add(await pluginHost.startPluginDevSessionWatcher())
       })
       .catch((error) => {
         console.error('[bootstrap] post-render startup failed:', error)

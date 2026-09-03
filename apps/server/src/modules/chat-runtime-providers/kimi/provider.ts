@@ -25,6 +25,7 @@ import type {
   RuntimeModelCatalog,
   RuntimeProgressItem,
   RuntimeSession,
+  RuntimeSessionStorageDeletionResult,
   RuntimeSettings,
   RuntimeUiSlotState,
   RuntimeUserInputResolution,
@@ -37,15 +38,15 @@ import type {
 } from '../../chat-runtime/runtime-provider-types'
 import { ProviderErrors, ProviderRuntimeError, requireRuntimeProviderTargetProfile } from '../../chat-runtime/runtime-provider-types'
 import { lookupModelRaw } from '../../model-registry/model-info-registry'
-import { extractProviderInputText } from '../kit/input-projector'
 import { requestProviderToolApproval } from '../kit/permission-bridge'
 import { readProviderStateSnapshot } from '../kit/state-snapshot'
 import { projectKimiProviderConfig, resolveKimiModelReference } from './config'
 import { KimiEventToChunkMapper } from './event-to-chunk-mapper'
 import type { KimiWebHostLease } from './host-lease'
-import { acquireKimiWebHostLease } from './host-lease'
+import { acquireKimiWebHostLease, stopKimiWebHostForSessionStorage } from './host-lease'
 import { KIMI_RUNTIME_CAPABILITIES, KIMI_RUNTIME_KIND, KIMI_RUNTIME_METADATA } from './metadata'
 import { createKimiRuntimePresentation } from './presentation'
+import { projectKimiPrompt } from './prompt-content'
 import {
   closeTerminal,
   getApiV1McpServers,
@@ -70,7 +71,9 @@ import {
   submitPrompt,
 } from './protocol/rest/sdk.gen'
 import type { GetApiV1SessionsBySessionIdQuestionsResponses } from './protocol/rest/types.gen'
+import { getKimiEventAgentId, KimiProviderThreadEventProjector } from './provider-thread-event-projector'
 import { projectKimiRuntimeSettings } from './runtime-settings'
+import { deleteKimiSessionStorage } from './session-storage'
 import type { KimiTranscriptAgentMetadata, KimiTranscriptData, KimiTranscriptTurn } from './transcript-projector'
 import {
   findKimiPhaseTranscriptTurn,
@@ -209,7 +212,7 @@ class KimiProvider implements ChatRuntime {
         totalTokens: status.context_tokens,
         maxTokens,
         rawMaxTokens: maxTokens,
-        percentage: maxTokens ? status.context_usage : null,
+        percentage: maxTokens ? (status.context_usage ?? null) : null,
         sections: [],
         messageBreakdown: null,
         apiUsage: null,
@@ -401,6 +404,7 @@ updatedAt,
     if (!sessionId) { throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId)) }
     const lease = await this.acquire(profile)
     const mapper = new KimiEventToChunkMapper()
+    const providerThreadProjector = new KimiProviderThreadEventProjector()
     const queue: KimiStreamItem[] = []
     const bridgedApprovalIds = new Set<string>()
     const bridgedQuestionIds = new Set<string>()
@@ -418,11 +422,12 @@ updatedAt,
         input.modelId ?? snapshot.models.currentModelId,
       )
       await this.applyRuntimeSettings({ lease, sessionId, settings: input.providerOptions?.runtimeSettings })
+      const promptProjection = projectKimiPrompt(input.message)
       const prompt = await lease.resource.http.request(submitPrompt({
         client: lease.resource.http.client,
         path: { session_id: sessionId },
         body: {
-          content: [{ type: 'text', text: extractProviderInputText(input.message) }],
+          ...promptProjection,
           model: resolveKimiModelReference(providerConfig, input.modelId ?? snapshot.models.currentModelId),
         },
       }))
@@ -461,9 +466,11 @@ updatedAt,
         if (!isKimiSessionEvent(item.event)) {
           continue
         }
-        const usageEvent = usageProjector.project(item.event)
-        if (usageEvent) {
-          await input.onUsageEvent?.(usageEvent)
+        if (item.event.payload.type === 'mcp.server.status') {
+          for (const chunk of mapper.map(item.event)) {
+            yield chunk
+          }
+          continue
         }
         if (item.event.payload.type === 'agent.status.updated' && item.event.payload.phase?.kind === 'awaiting_approval') {
           await this.resolvePendingApprovals({ lease, sessionId, runId: input.runId, profile, handledIds: bridgedApprovalIds })
@@ -473,6 +480,23 @@ updatedAt,
           || (item.event.payload.type === 'event.session.status_changed' && item.event.payload.status === 'awaiting_question')
         ) {
           await this.resolvePendingQuestions({ lease, sessionId, input, handledIds: bridgedQuestionIds })
+        }
+        const eventAgentId = getKimiEventAgentId(item.event)
+        if (eventAgentId && eventAgentId !== 'main') {
+          const providerThreadEvent = providerThreadProjector.project(item.event)
+          if (providerThreadEvent) {
+            try {
+              input.onProviderThreadEvent?.(providerThreadEvent)
+            }
+            catch {
+              // Child-thread subscribers must not affect the parent turn stream.
+            }
+          }
+          continue
+        }
+        const usageEvent = usageProjector.project(item.event)
+        if (usageEvent) {
+          await input.onUsageEvent?.(usageEvent)
         }
         const chunks = mapper.map(item.event)
         for (const chunk of chunks) { yield chunk }
@@ -491,7 +515,11 @@ updatedAt,
     if (!sessionId) { throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId)) }
     const lease = await this.acquire(profile)
     try {
-      const prompt = await lease.resource.http.request(submitPrompt({ client: lease.resource.http.client, path: { session_id: sessionId }, body: { content: [{ type: 'text', text: extractProviderInputText(input.message) }] } }))
+      const prompt = await lease.resource.http.request(submitPrompt({
+        client: lease.resource.http.client,
+        path: { session_id: sessionId },
+        body: projectKimiPrompt(input.message),
+      }))
       if (!prompt || !('prompt_id' in prompt)) { throw new ProviderRuntimeError(ProviderErrors.requestFailed(this.runtimeKind, 'prompt.steer.submit', 'Kimi did not accept the steering prompt.')) }
       await lease.resource.http.request(steerPrompts({ client: lease.resource.http.client, path: { session_id: sessionId }, body: { prompt_ids: [prompt.prompt_id] } }))
     }
@@ -637,6 +665,33 @@ path: { session_id: sessionId },
       await lease.resource.http.request(promptAction({ client: lease.resource.http.client, path: { session_id: sessionId, tail: 'abort' } }))
     }
     finally { lease.release() }
+  }
+
+  async deleteSessionStorage(input: GetCapabilitiesInput): Promise<RuntimeSessionStorageDeletionResult> {
+    const providerSessionId = input.runtimeSession.providerSessionId
+    if (!providerSessionId) {
+      return { status: 'not_applicable' as const }
+    }
+    const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
+
+    const hostStatus = await stopKimiWebHostForSessionStorage(profile.providerTargetId)
+    if (hostStatus === 'busy') {
+      return {
+        status: 'preserved',
+        detail: 'Kimi storage cannot be deleted while another session is using the same provider target.',
+      }
+    }
+    input.runtimeSession.providerRuntimeLease?.release()
+
+    const result = deleteKimiSessionStorage({
+      providerTargetId: profile.providerTargetId,
+      providerSessionIds: [providerSessionId],
+      clearDerivedCache: true,
+    })
+    return {
+      status: 'deleted' as const,
+      detail: `Deleted ${result.bytes} bytes from Kimi session storage.`,
+    }
   }
 
   async updateRuntimeSettings(input: UpdateRuntimeSettingsInput): Promise<void> {

@@ -1,0 +1,77 @@
+appId: app.cradle.mobile
+---
+- launchApp
+- extendedWaitUntil:
+    visible: Workspaces
+    timeout: 30000
+- runFlow:
+    when:
+      visible: Open navigation
+    commands:
+      - tapOn: Open navigation
+      - tapOn: Settings
+- runFlow:
+    when:
+      notVisible: Open navigation
+    commands:
+      - tapOn: Settings
+- extendedWaitUntil:
+    visible: Settings
+    timeout: 15000
+- runFlow:
+    when:
+      visible: Open navigation
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: settings-node-${NODE_ID}
+          timeout: 45000
+      - tapOn:
+          id: settings-node-${NODE_ID}
+- runFlow:
+    when:
+      notVisible: Open navigation
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: settings-node-${NODE_ID}
+          timeout: 45000
+      - tapOn:
+          id: settings-node-${NODE_ID}
+      - extendedWaitUntil:
+          visible:
+            id: settings-node-${NODE_ID}
+            selected: true
+          timeout: 45000
+- runFlow:
+    when:
+      visible: Open navigation
+    commands:
+      - tapOn: Open navigation
+      - tapOn: Workspaces
+- runFlow:
+    when:
+      notVisible: Open navigation
+    commands:
+      - tapOn: Workspaces
+- extendedWaitUntil:
+    visible: ${WORKSPACE_NAME}.*
+    timeout: 45000
+- assertNotVisible: ${OTHER_WORKSPACE_NAME}.*
+- tapOn: ${WORKSPACE_NAME}.*
+- extendedWaitUntil:
+    visible: ${SESSION_TITLE}.*
+    timeout: 45000
+- tapOn: ${SESSION_TITLE}.*
+- extendedWaitUntil:
+    visible:
+      id: chat-message-input
+    timeout: 45000
+- tapOn:
+    id: chat-message-input
+- inputText: ${CHAT_PROMPT}
+- tapOn:
+    id: chat-send-message
+- extendedWaitUntil:
+    visible: ${CHAT_RESPONSE}
+    timeout: 60000

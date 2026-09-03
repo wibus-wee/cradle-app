@@ -95,7 +95,6 @@ function connectionRecord(overrides: Partial<AcpLocalConnectionRecord> = {}): Ac
     args: '[]',
     env: '{}',
     authMethodId: null,
-    authSecretRefs: {},
     ...overrides,
   }
 }
@@ -194,7 +193,6 @@ describe('acpConnectionManager', () => {
         endpointUrl: `${connectionType === 'http' ? 'http' : 'ws'}://127.0.0.1:${port}`,
         headerSecretRefs: { Authorization: 'remote-token' },
         authMethodId: null,
-        authSecretRefs: {},
         configurationTarget: { namespace: 'acp', resourceId: 'remote-agent' },
       })
 
@@ -211,39 +209,6 @@ describe('acpConnectionManager', () => {
       await new Promise<void>(resolve => webSocketServer.close(() => resolve()))
       await new Promise<void>(resolve => httpServer.close(() => resolve()))
     }
-  })
-
-  it('discovers env auth without secrets, respawns once with resolved values, then authenticates', async () => {
-    const authenticate = vi.fn()
-    const initialize = vi.fn((_request: InitializeRequest) => ({
-      protocolVersion: PROTOCOL_VERSION,
-      authMethods: [{
-        id: 'api-key',
-        name: 'API key',
-        type: 'env_var' as const,
-        vars: [{ name: 'ACP_API_KEY' }],
-      }],
-    }))
-    const host = new MemoryAcpProcessHost({ initialize, authenticate })
-    const runtime = new AcpConnectionManager(host, {
-      readSecret: ref => ref === 'credential-1' ? 'resolved-secret' : '',
-    })
-
-    await runtime.connect('agent', connectionRecord({
-      env: JSON.stringify({ ACP_API_KEY: 'stale-launch-value' }),
-      authMethodId: 'api-key',
-      authSecretRefs: { ACP_API_KEY: 'credential-1' },
-    }))
-
-    expect(initialize).toHaveBeenCalledTimes(2)
-    expect(host.spawns).toHaveLength(2)
-    expect(host.spawns[0]?.env).toEqual({})
-    expect(host.spawns[1]?.env).toEqual({ ACP_API_KEY: 'resolved-secret' })
-    expect(authenticate).toHaveBeenCalledWith(
-      { methodId: 'api-key' },
-      expect.objectContaining({ env: { ACP_API_KEY: 'resolved-secret' } }),
-    )
-    expect(JSON.stringify(runtime.getAuthMethods('agent'))).not.toContain('resolved-secret')
   })
 
   it('rejects a protocol version mismatch and cleans up the unpublished process', async () => {

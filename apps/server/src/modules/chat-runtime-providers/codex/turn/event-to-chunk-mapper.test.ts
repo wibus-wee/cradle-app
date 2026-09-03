@@ -167,6 +167,21 @@ describe('mapCodexAppServerNotificationToChunks', () => {
     ])
   })
 
+  it('projects strict automatic-review escalation as a runtime warning', () => {
+    const state = createCodexAppServerMapperState('text-1')
+
+    expect(mapCodexAppServerNotificationToChunks({
+      method: 'autoApprovalReview/strictReviewRequired',
+      params: { threadId: 'thread-1', turnId: 'turn-1', startedAtMs: 1 },
+    }, state)).toEqual([{
+      type: 'data-runtime-warning',
+      data: {
+        message: 'Codex requires explicit review before continuing.',
+        additionalDetails: null,
+      },
+    }])
+  })
+
   it('projects Codex image generation items as tool output and renderable file content', () => {
     const state = createCodexAppServerMapperState('text-1')
     const imageUrl = 'data:image/png;base64,generated-image'
@@ -621,5 +636,54 @@ describe('mapCodexAppServerNotificationToChunks', () => {
         },
       },
     ])
+  })
+
+  it('ends interrupted collaboration activity with an error and completed activity with output', () => {
+    const state = createCodexAppServerMapperState('text-1')
+
+    expect(mapCodexAppServerNotificationToChunks({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          id: 'crew-interrupted',
+          type: 'collabAgentToolCall',
+          tool: 'wait',
+          status: 'interrupted',
+          senderThreadId: 'thread-1',
+          receiverThreadIds: ['agent-thread-1'],
+          prompt: null,
+          model: null,
+          agentsStates: {},
+        },
+      },
+    }, state)).toEqual([{
+      type: 'tool-output-error',
+      toolCallId: 'crew-interrupted',
+      errorText: 'Collaboration tool call interrupted',
+    }])
+
+    expect(mapCodexAppServerNotificationToChunks({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        item: {
+          id: 'activity-completed',
+          type: 'subAgentActivity',
+          kind: 'completed',
+          agentThreadId: 'agent-thread-1',
+          agentPath: 'agents/reviewer',
+        },
+      },
+    }, state)).toEqual([{
+      type: 'tool-output-available',
+      toolCallId: 'activity-completed',
+      output: expect.objectContaining({
+        apiName: 'sub_agent_activity',
+        result: expect.objectContaining({ kind: 'completed' }),
+      }),
+    }])
   })
 })

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { openDownloadRetryDestination } from '~/features/download-center/open-download-retry-destination'
 import { isActiveDownload } from '~/features/download-center/types'
@@ -9,6 +9,7 @@ import {
 } from '~/features/download-center/use-download-center'
 
 import { getManagedResourcesQueryKey } from './api/managed-resources-api'
+import type { ManagedResourcesPageFace } from './managed-resources-page-view'
 import { ManagedResourcesPageView } from './managed-resources-page-view'
 import type { ManagedResource } from './projection'
 import { managedResourceKey } from './projection'
@@ -24,6 +25,16 @@ export function ManagedResourcesPage() {
   const { tasks, active } = useDownloadCenter()
   const cancelTask = useDownloadCenterCancel()
   const action = useManagedResourceAction()
+  const [initialFace] = useState<ManagedResourcesPageFace>(() => {
+    try {
+      return localStorage.getItem('cradle:managed-resources:face') === 'activity'
+        ? 'activity'
+        : 'library'
+    }
+    catch {
+      return 'library'
+    }
+  })
   const terminalRevision = useMemo(
     () => tasks
       .filter(task => !isActiveDownload(task))
@@ -61,6 +72,13 @@ export function ManagedResourcesPage() {
       actionResourceKey={actionResourceKey}
       actionPending={action.isPending}
       actionError={action.isError}
+      initialFace={initialFace}
+      onFaceChange={(face) => {
+        try {
+          localStorage.setItem('cradle:managed-resources:face', face)
+        }
+        catch {}
+      }}
       onRetryResources={() => void resourcesQuery.refetch()}
       onResourceAction={runResourceAction}
       onCancelTask={task => void cancelTask(task)}

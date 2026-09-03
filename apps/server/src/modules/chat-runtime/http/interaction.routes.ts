@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 
 import { releaseSideConversation } from '../../provider-runtime/side-conversation-registry'
 import { updateChatRuntimeMode } from '../interaction/runtime-mode'
+import { updateChatRuntimeTurnSettings } from '../interaction/runtime-turn-settings'
 import { submitChatRuntimeUserInput } from '../interaction/user-input'
 import { ChatRuntimeModel } from '../model'
 import { submitRuntimeToolApproval } from '../pending-tool-approval'
@@ -208,6 +209,22 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       params: ChatRuntimeModel.sessionIdParams,
       body: ChatRuntimeModel.runtimeModeBody,
       response: { 200: ChatRuntimeModel.cancelResponse },
+    },
+  )
+  .patch(
+    '/sessions/:sessionId/runtime-turn-settings',
+    async ({ params, body }) => updateChatRuntimeTurnSettings({
+      sessionId: params.sessionId,
+      settings: body,
+    }),
+    {
+      detail: {
+        'summary': 'Update settings for the currently running provider turn',
+        'x-cradle-cli': { command: ['chat', 'runtime-turn-settings', 'set'] },
+      },
+      params: ChatRuntimeModel.sessionIdParams,
+      body: ChatRuntimeModel.runtimeTurnSettingsBody,
+      response: { 200: ChatRuntimeModel.runtimeTurnSettingsResponse },
     },
   )
   // POST /chat/sessions/:sessionId/tool-approval/:requestId -> resolve a provider pending tool approval request

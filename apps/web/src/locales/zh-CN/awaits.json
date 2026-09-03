@@ -3,6 +3,7 @@
   "empty.description": "等待 CI、review 和定时信号的会话会显示在这里。",
   "empty.title": "暂无等待项",
   "error.description": "无法加载桌面端等待数据。",
+  "error.retry": "重试",
   "error.title": "等待数据不可用",
   "overview.description": "正在等待外部信号的会话",
   "overview.title": "等待",

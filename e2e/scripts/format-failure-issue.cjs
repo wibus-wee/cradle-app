@@ -40,6 +40,7 @@ function buildDailyFailureIssueBody(input) {
     runId,
     runUrl,
     artifactsUrl,
+    artifactName,
     summary,
     failureIndex,
   } = input
@@ -59,7 +60,7 @@ function buildDailyFailureIssueBody(input) {
 | Tags | \`${tagsFilter}\` |
 | Result | ❌ ${summary.resultLine || 'unknown'} |
 | Run | [Actions run #${runId}](${runUrl}) |
-| Artifacts | [Download \`e2e-artifacts-${runId}\`](${artifactsUrl}/artifacts) |
+| Artifacts | [Download \`${artifactName}\`](${artifactsUrl}/artifacts) |
 | Assignee | @wibus-wee |
 
 ## Failed scenarios
@@ -68,7 +69,7 @@ ${(summary.nonPassedScenarios || []).length > 0 ? failedList : (summary.markdown
 
 ## How to reproduce from artifacts
 
-1. Open the Actions run → **Artifacts** → download \`e2e-artifacts-${runId}\`.
+1. Open the Actions run → **Artifacts** → download \`${artifactName}\`.
 2. Read root \`ARTIFACTS.md\` (legend for every file type).
 3. For each failure below: watch \`failure.webm\` first, then open \`failure.png\`, then \`npx playwright show-trace …/trace.zip\` if you need DOM/network detail.
 4. Local replay: from repo root, \`pnpm exec cucumber-js --config e2e/cucumber.mjs --tags '@CRADLE-…'\` (use the scenario tag from the list).
@@ -103,7 +104,7 @@ Failures:
 ${agentPrompt || '(see run logs)'}
 
 Run: ${runUrl}
-Artifacts zip: ${artifactsUrl}/artifacts  (name: e2e-artifacts-${runId})
+Artifacts zip: ${artifactsUrl}/artifacts  (name: ${artifactName})
 
 For each failure: watch failure.webm, check failure.png, then playwright show-trace on trace.zip.
 Reproduce: pnpm exec cucumber-js --config e2e/cucumber.mjs --tags '<scenario-tag>'.

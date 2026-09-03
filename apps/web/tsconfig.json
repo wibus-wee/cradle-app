@@ -5,11 +5,10 @@
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "moduleDetection": "force",
     "useDefineForClassFields": true,
-    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "~/*": ["src/*"],
+      "~/*": ["./src/*"],
       "react": ["./node_modules/@types/react/index.d.ts"]
     },
     "types": ["vite/client", "node"],

@@ -1,4 +1,6 @@
 {
+  "action.exportCsv": "Export CSV",
+  "action.refresh": "Refresh usage data",
   "breakdown.description": "Token and cost share by model, agent, and provider target.",
   "breakdown.dimension.agents": "Agents",
   "breakdown.dimension.models": "Models",

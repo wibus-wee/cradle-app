@@ -4,7 +4,7 @@ import type {
   DesktopServerFetchChunk,
   DesktopServerFetchErrorEvent,
   DesktopServerFetchOpenResponse,
-  DesktopServerFetchRequest,
+  DesktopServerFetchRendererRequest,
   DesktopServerFetchTerminalEvent,
 } from '../shared/server-fetch-transport'
 import {
@@ -12,6 +12,7 @@ import {
   DESKTOP_SERVER_FETCH_CHUNK_CHANNEL,
   DESKTOP_SERVER_FETCH_CLOSED_CHANNEL,
   DESKTOP_SERVER_FETCH_CREDIT_CHANNEL,
+  DESKTOP_SERVER_FETCH_DOCUMENT_CHANNEL,
   DESKTOP_SERVER_FETCH_ERROR_CHANNEL,
   DESKTOP_SERVER_FETCH_OPEN_CHANNEL,
 } from '../shared/server-fetch-transport'
@@ -19,6 +20,9 @@ import {
 type ServerFetchIpcRenderer = Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener' | 'send'>
 
 export function createDesktopServerFetchBridge(ipcRenderer: ServerFetchIpcRenderer) {
+  const documentId = createDocumentId()
+  ipcRenderer.send(DESKTOP_SERVER_FETCH_DOCUMENT_CHANNEL, documentId)
+
   function subscribe<T>(channel: string, handler: (payload: T) => void): () => void {
     const listener = (_event: Electron.IpcRendererEvent, payload: T) => handler(payload)
     ipcRenderer.on(channel, listener)
@@ -26,10 +30,10 @@ export function createDesktopServerFetchBridge(ipcRenderer: ServerFetchIpcRender
   }
 
   return {
-    open: (request: DesktopServerFetchRequest) =>
+    open: (request: DesktopServerFetchRendererRequest) =>
       ipcRenderer.invoke(
         DESKTOP_SERVER_FETCH_OPEN_CHANNEL,
-        request,
+        { ...request, documentId },
       ) as Promise<DesktopServerFetchOpenResponse>,
     credit: (requestId: string, credit: number) =>
       ipcRenderer.send(DESKTOP_SERVER_FETCH_CREDIT_CHANNEL, requestId, credit),
@@ -45,3 +49,9 @@ export function createDesktopServerFetchBridge(ipcRenderer: ServerFetchIpcRender
 }
 
 export type DesktopServerFetchBridge = ReturnType<typeof createDesktopServerFetchBridge>
+
+function createDocumentId(): string {
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+}

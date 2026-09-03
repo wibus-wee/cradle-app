@@ -485,6 +485,29 @@ export interface ChatRuntimeUsageUiSlotState {
   hasCredits: boolean | null
   rateLimitReachedType: string | null
   planType: string | null
+  estimatedCostUsd?: number | null
+  queuedTurnCount?: number | null
+  resultMessageId?: string | null
+  correlatedUserMessageId?: string | null
+  modelCosts?: Array<{
+    modelId: string
+    canonicalModelId: string | null
+    provider: string | null
+    costUsd: number
+    costBasis: 'list' | 'managed' | 'unknown'
+  }>
+  lastModelSwitch?: {
+    fromModelId: string
+    toModelId: string
+    requestedModelId: string | null
+    source: string
+    contextTokens: number
+    promptCacheWarm: boolean
+    cacheTtl: '5m' | '1h'
+    estimatedCacheWriteUsd: number
+    pricing: 'configured' | 'catalog' | 'default'
+    updatedAt: number
+  } | null
   updatedAt: number
 }
 

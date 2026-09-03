@@ -505,9 +505,11 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
           ANTHROPIC_API_KEY: 'sk-ant-test',
           CLAUDE_CONFIG_DIR: join(process.env.CRADLE_DATA_DIR!, 'runtimes', 'claude-agent'),
         }),
-        hooks: {
+        hooks: expect.objectContaining({
           PreToolUse: [{ hooks: [expect.any(Function)] }],
-        },
+          PreModelSwitch: [{ hooks: [expect.any(Function)] }],
+          PostModelSwitch: [{ hooks: [expect.any(Function)] }],
+        }),
       }),
     )
     expect(readQueryOptions(0).maxTurns).toBeUndefined()
@@ -1995,6 +1997,12 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
           { command: 'pwd' },
           canUseToolOptions({
             toolUseID: 'toolu_reused_requires_approval',
+            requestId: 'request-reused-approval',
+            matchedAskRule: {
+              source: 'projectSettings',
+              toolName: 'Bash',
+              ruleContent: 'Bash(*)',
+            },
           }),
         ),
       ).resolves.toEqual({
@@ -2002,6 +2010,18 @@ describe.sequential('claudeAgentProvider MCP integration', () => {
         updatedInput: { command: 'pwd' },
       })
       expect(requestToolApproval).toHaveBeenCalledOnce()
+      expect(requestToolApproval).toHaveBeenCalledWith(expect.objectContaining({
+        metadata: expect.objectContaining({
+          permission: expect.objectContaining({
+            requestId: 'request-reused-approval',
+            matchedAskRule: {
+              source: 'projectSettings',
+              toolName: 'Bash',
+              ruleContent: 'Bash(*)',
+            },
+          }),
+        }),
+      }))
       expect(prompts).toEqual(['Start with full access', 'Now require approval'])
     }
  finally {

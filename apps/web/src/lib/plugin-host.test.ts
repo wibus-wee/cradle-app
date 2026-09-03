@@ -1,11 +1,12 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   activateWebPluginModule,
   deactivateWebPlugin,
   isWebLayerLoadable,
   loadWebPlugins,
-  startPluginWatcher,
+  startPluginDevSessionWatcher,
+  startPluginLifecycleWatcher,
 } from './plugin-host'
 
 const mocks = vi.hoisted(() => ({
@@ -54,6 +55,10 @@ function createLayers(webStatus: 'discovered' | 'failed') {
 }
 
 describe('plugin host web layer filtering', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('reads descriptors through the generated SDK', async () => {
     mocks.getPlugins.mockResolvedValueOnce({ data: [] })
 
@@ -82,6 +87,20 @@ describe('plugin host web layer filtering', () => {
     })).toBe(true)
   })
 
+  it('loads desktop-only web plugins only in the Desktop renderer', () => {
+    const plugin = {
+      name: 'runtime-radar',
+      version: '0.1.0',
+      displayName: 'Runtime Radar',
+      hasWeb: true,
+      deployments: ['desktop'] as Array<'desktop' | 'web'>,
+      layers: createLayers('discovered'),
+    }
+
+    expect(isWebLayerLoadable(plugin, 'desktop')).toBe(true)
+    expect(isWebLayerLoadable(plugin, 'web')).toBe(false)
+  })
+
   it('disposes Vite-injected development styles when the web layer deactivates', async () => {
     const deactivate = vi.fn()
     const disposeDevelopmentStyles = vi.fn()
@@ -106,11 +125,63 @@ describe('plugin host web layer filtering', () => {
       onmessage: null,
     })
 
-    const dispose = await startPluginWatcher()
+    const dispose = await startPluginDevSessionWatcher()
 
     expect(mocks.openServerEventSource).toHaveBeenCalledOnce()
     dispose()
     expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('does not reserve an event-stream connection without active development sessions', async () => {
+    vi.useFakeTimers()
+    try {
+      mocks.readPluginDevSessions.mockResolvedValueOnce([])
+
+      const dispose = await startPluginDevSessionWatcher()
+
+      expect(mocks.openServerEventSource).not.toHaveBeenCalled()
+      dispose()
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('discovers a development session before subscribing to reload events', async () => {
+    vi.useFakeTimers()
+    const close = vi.fn()
+    const session = {
+      id: 'dev-session-1',
+      pluginName: '@cradle/dev-plugin',
+      routeSegment: 'dev-plugin',
+      entries: { web: null, server: null, desktop: null },
+      revisions: { web: 0, server: 0, desktop: 0 },
+      createdAt: '2026-08-29T00:00:00.000Z',
+      updatedAt: '2026-08-29T00:00:00.000Z',
+      expiresAt: '2026-08-29T00:01:00.000Z',
+    }
+    mocks.readPluginDevSessions
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([session])
+    mocks.openServerEventSource.mockReturnValueOnce({
+      close,
+      onerror: null,
+      onmessage: null,
+    })
+
+    try {
+      const dispose = await startPluginDevSessionWatcher()
+      expect(mocks.openServerEventSource).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(2_000)
+
+      expect(mocks.openServerEventSource).toHaveBeenCalledOnce()
+      dispose()
+      expect(close).toHaveBeenCalledOnce()
+    }
+    finally {
+      vi.useRealTimers()
+    }
   })
 
   it('deactivates a persisted web plugin after a lifecycle removal event', async () => {
@@ -125,15 +196,11 @@ describe('plugin host web layer filtering', () => {
       onerror: null,
       onmessage: null as ((event: MessageEvent<string>) => void) | null,
     }
-    mocks.readPluginDevSessions.mockResolvedValueOnce([])
     mocks.openServerEventSource.mockReturnValueOnce(source)
 
-    const dispose = await startPluginWatcher()
+    const dispose = startPluginLifecycleWatcher()
     source.onmessage?.(new MessageEvent('message', {
-      data: JSON.stringify({
-        scope: 'lifecycle',
-        event: { type: 'source-removed', pluginIdentities: ['@personal/removed'] },
-      }),
+      data: JSON.stringify({ type: 'source-removed', pluginIdentities: ['@personal/removed'] }),
     }))
     await vi.waitFor(() => expect(deactivate).toHaveBeenCalledOnce())
 

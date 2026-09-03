@@ -1,3 +1,4 @@
+import { SyncRunStreamError } from '~/lib/sync-socket'
 import { useChatStore } from '~/store/chat'
 
 import { subscribeChatSessionStreamForSession } from '../transport/chat-stream-transport'
@@ -29,8 +30,12 @@ export function openPassiveSessionStream(input: OpenPassiveSessionStreamInput) {
     try {
       const transport = await subscribeChatSessionStreamForSession({
         sessionId: request.sessionId,
+        expectedRunId: request.runId,
         signal: controller.signal,
       })
+      if (transport.runId && transport.runId !== request.runId) {
+        return
+      }
       if (transport.runId) {
         useChatStore.getState().setRunDisplayId(request.messageId, transport.runId)
       }
@@ -40,14 +45,17 @@ export function openPassiveSessionStream(input: OpenPassiveSessionStreamInput) {
     }
     catch (err) {
       if (!(err instanceof DOMException && err.name === 'AbortError')) {
-        handler.fail(err instanceof Error ? err.message : 'Stream failed')
+        const snapshotWillRecover = err instanceof SyncRunStreamError
+          && (err.code === 'not-found' || err.code === 'snapshot-required')
+        if (!snapshotWillRecover) {
+          handler.fail(err instanceof Error ? err.message : 'Stream failed')
+        }
       }
     }
     finally {
-      const messageId = handler.readActiveMessageId()
       handler.dispose()
       request.onSettled()
-      releaseStreamLeaseAfterSnapshot(messageId)
+      releaseStreamLeaseAfterSnapshot(request.messageId)
       scheduleSnapshotRefresh(0)
       refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
     }

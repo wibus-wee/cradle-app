@@ -16,7 +16,7 @@ packageExtensions:
   # Electron runtime into the virtual package so this works with GVS enabled.
   electron-vite:
     dependencies:
-      electron: 42.4.1
+      electron: 44.0.0
 allowBuilds:
   '@google/genai': true
   '@swc/core': true
@@ -59,6 +59,8 @@ minimumReleaseAgeExclude:
   - '@arcships/light-ocr@0.3.0'
 overrides:
   '@cradle/cli': link:packages/cli
+  # @electron/rebuild 4.2 resolves an older release that predates Electron 44.
+  node-abi: 4.35.0
   # Mobile pins React 19.2.3 for Expo; keep web/desktop on the same exact pair.
   react: 19.2.3
   react-dom: 19.2.3

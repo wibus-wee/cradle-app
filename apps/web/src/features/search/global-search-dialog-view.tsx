@@ -1,3 +1,4 @@
+import { CloseLine as CloseIcon } from '@mingcute/react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import {
   useCallback,
@@ -9,6 +10,7 @@ import {
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '~/components/ui/button'
 import {
   Command,
   CommandEmpty,
@@ -17,6 +19,7 @@ import {
   CommandList,
 } from '~/components/ui/command'
 import { DelayedSpinner } from '~/components/ui/spinner'
+import { cn } from '~/lib/cn'
 
 import { CommandActionRow } from './palette/command-action-row'
 import { FileSearchRow } from './palette/file-search-row'
@@ -119,7 +122,11 @@ export function GlobalSearchDialogView({
     }
     const input = event.currentTarget
     const position = input.selectionStart ?? 0
-    if (event.key === 'ArrowLeft' && position === 0) {
+    if (event.key === 'Backspace' && input.value.length === 0 && mode !== 'all') {
+      event.preventDefault()
+      onModeChange('all')
+    }
+    else if (event.key === 'ArrowLeft' && position === 0) {
       event.preventDefault()
       cycleMode(-1)
     }
@@ -127,7 +134,7 @@ export function GlobalSearchDialogView({
       event.preventDefault()
       cycleMode(1)
     }
-  }, [cycleMode])
+  }, [cycleMode, mode, onModeChange])
 
   const counts = useMemo<Partial<Record<PaletteModeId, number>>>(() => ({
     commands: data.filteredCommands.length || data.suggestedCommands.length,
@@ -182,8 +189,28 @@ export function GlobalSearchDialogView({
             />
             <DelayedSpinner
               active={data.isPending}
-              className="pointer-events-none absolute top-1/2 right-3.5 size-3.5 -translate-y-1/2"
+              className={cn(
+                'pointer-events-none absolute top-1/2 size-3.5 -translate-y-1/2',
+                query ? 'right-10' : 'right-3.5',
+              )}
             />
+            {query
+              ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => {
+                      onQueryChange('')
+                      focusInputAtEnd()
+                    }}
+                    aria-label={t('action.clearSearch')}
+                    className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
+                  >
+                    <CloseIcon className="size-3.5" aria-hidden />
+                  </Button>
+                )
+              : null}
           </div>
 
           <div className="border-b border-foreground/[0.05] dark:border-white/[0.05]">

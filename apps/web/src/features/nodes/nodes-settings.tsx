@@ -1,4 +1,7 @@
+import { fabricPublicKeyFingerprint } from '@cradle/fabric-protocol'
+
 import { ConnectDeviceDialogView } from './connect-device-dialog-view'
+import { ControllerApprovalView } from './controller-approval-view'
 import { FabricSettingsGroup } from './fabric-settings'
 import { NodeAccessDialogView } from './node-access-dialog-view'
 import { NodesSettingsView } from './nodes-settings-view'
@@ -20,10 +23,17 @@ export function NodesSettings() {
         nodes={controller.nodes}
         nodesLoading={controller.nodesLoading}
         nodesError={controller.nodesError}
+        controllers={controller.controllers}
+        controllersLoading={controller.controllersLoading}
+        controllersError={controller.controllersError}
         pendingRequests={controller.pendingRequests}
         pendingRequestsLoading={controller.pendingRequestsLoading}
         pendingRequestsError={controller.pendingRequestsError}
         pendingRequestAction={controller.pendingRequestAction}
+        pendingControllerRequests={controller.pendingControllerRequests}
+        pendingControllerRequestsLoading={controller.pendingControllerRequestsLoading}
+        pendingControllerRequestsError={controller.pendingControllerRequestsError}
+        pendingControllerAction={controller.pendingControllerAction}
         networkCode={controller.networkCode}
         canManageAccess={controller.membership?.role === 'owner'}
         reconnectingNodeId={controller.connectingNodeId}
@@ -39,6 +49,8 @@ export function NodesSettings() {
         onRefreshPendingRequests={controller.refreshPendingRequests}
         onApprovePendingRequest={requestId => void controller.handleApprovePendingRequest(requestId)}
         onRejectPendingRequest={requestId => void controller.handleRejectPendingRequest(requestId)}
+        onReviewPendingController={controller.setControllerApprovalRequestId}
+        onRejectPendingController={requestId => void controller.handleRejectPendingController(requestId)}
         onCancelPendingEnrollment={() => void controller.handleCancelEnrollment()}
         onLeaveFabric={() => void controller.handleLeaveFabric()}
         fabricSettings={<FabricSettingsGroup />}
@@ -63,12 +75,29 @@ export function NodesSettings() {
         node={controller.accessNode}
         grants={controller.accessGrants}
         revokingGrantId={controller.revokingGrantId}
+        revokingControllerId={controller.revokingControllerId}
         onOpenChange={(open) => {
           if (!open) {
             controller.setAccessNodeId(null)
           }
         }}
         onRevokeGrant={grantId => void controller.handleRevokeGrant(grantId)}
+        onRevokeController={controllerId => void controller.handleRevokeController(controllerId)}
+      />
+      <ControllerApprovalView
+        open={controller.controllerApprovalRequest !== null}
+        request={controller.controllerApprovalRequest}
+        identityFingerprint={controller.controllerApprovalRequest
+          ? fabricPublicKeyFingerprint(controller.controllerApprovalRequest.identityPubkey)
+          : null}
+        nodes={controller.nodes}
+        submitting={controller.pendingControllerAction?.kind === 'approve'}
+        onOpenChange={(open) => {
+          if (!open && controller.pendingControllerAction === null) {
+            controller.setControllerApprovalRequestId(null)
+          }
+        }}
+        onApprove={grants => void controller.handleApprovePendingController(grants)}
       />
     </>
   )

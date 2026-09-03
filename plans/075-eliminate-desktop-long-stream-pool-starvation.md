@@ -88,6 +88,10 @@ Browser builds and remote/attached Server traffic continue to use native Fetch.
   Linux unpacked smoke package, and diff hygiene; updated Plan 063/README status.
 - [ ] Commit, push, and update the draft PR. The GitHub publish skill requires
   `gh`, which is absent from this environment; no remote mutation is claimed.
+- [x] (2026-08-30) Completed Plan 078's document/navigation ownership,
+  no-credit lease, renderer cleanup, diagnostics, and isolated actual-Electron
+  ten-reload proof. Real-process restart and post-restart memory observation
+  remain Plan 078's rollout gate.
 
 ## Surprises & Discoveries
 
@@ -103,6 +107,11 @@ Browser builds and remote/attached Server traffic continue to use native Fetch.
 - The current environment has no Xvfb binary, so a GUI Electron runtime cannot be
   truthfully claimed here. The production Main, preload, and renderer bundles do
   build successfully.
+- A 2026-08-29 live incident found 69 broker requests (66 streams, 3 finite)
+  retained for one still-live `WebContents` after renderer document reloads.
+  Receiver credit bounded Main reads as designed, but zero credit did not cancel
+  upstream. Plan 078 is the corrective lifecycle plan; packaged concurrency
+  smoke alone cannot close this gap.
 
 ## Decision Log
 
@@ -261,6 +270,10 @@ to the caller; it must never replay a mutating request over HTTP.
 The initial implementation confirms the architectural premise: existing OpenAPI
 call sites can remain unchanged, while 21 simultaneous requests reach a real
 localhost Server through Main. The implementation also survives the actual
-Electron production bundler. Packaged GUI and complete raw-fetch coverage remain
-open, so this plan is not yet DONE and no claim is made that all Renderer Server
-traffic has migrated.
+Electron production bundler. Plan 078 now closes the document-lifetime gap with
+navigation/crash cancellation, a preload-owned document fence, a no-credit
+lease, and deterministic Renderer cleanup. Its isolated actual-Electron smoke
+returned four requests to zero after each of ten same-window reloads and closed
+all 40 fixture responses. This plan remains in progress for its credential
+removal and packaged platform smoke gates; Plan 078 separately retains the
+real-process restart and memory-observation rollout gate.

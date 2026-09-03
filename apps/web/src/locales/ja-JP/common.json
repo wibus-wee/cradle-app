@@ -4,6 +4,8 @@
   "action.cancel": "キャンセル",
   "action.close": "閉じる",
   "action.continue": "続行",
+  "action.copied": "コピーしました",
+  "action.copyError": "エラーをコピー",
   "action.refresh": "更新",
   "action.reload": "再読み込み",
   "action.retry": "再試行",
