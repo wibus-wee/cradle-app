@@ -155,3 +155,14 @@ test('writes machine-readable and human-readable interaction reports with the ru
   assert.equal(performance.interactions[0].durationMs, 110)
   assert.match(readFileSync(join(artifactsDir, 'e2e-performance.md'), 'utf8'), /open settings/)
 })
+
+test('rejects a successful run without structured interaction evidence', (t) => {
+  const artifactsDir = mkdtempSync(join(tmpdir(), 'cradle-e2e-summary-empty-'))
+  t.after(() => rmSync(artifactsDir, { force: true, recursive: true }))
+
+  assert.throws(
+    () => summarizeRun({ artifactsDir, outcome: 'success', tagsFilter: '@P0' }),
+    /did not produce cucumber-messages\.ndjson/,
+  )
+  assert.equal(JSON.parse(readFileSync(join(artifactsDir, 'e2e-performance.json'), 'utf8')).summary.interactions, 0)
+})

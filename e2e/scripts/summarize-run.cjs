@@ -188,6 +188,7 @@ function readText(file) {
 
 function summarizeRun(options = {}) {
   const artifactsDir = options.artifactsDir || path.join('e2e', 'artifacts')
+  const outcome = options.outcome || process.env.E2E_OUTCOME || 'unknown'
   fs.mkdirSync(artifactsDir, { recursive: true })
   const messagesPath = path.join(artifactsDir, 'cucumber-messages.ndjson')
   let scenarios = []
@@ -223,7 +224,7 @@ function summarizeRun(options = {}) {
   })
   const summary = buildRunSummary({
     scenarios,
-    outcome: options.outcome || process.env.E2E_OUTCOME || 'unknown',
+    outcome,
     tagsFilter: options.tagsFilter || process.env.TAGS_FILTER || '',
     runUrl: options.runUrl || process.env.RUN_URL || '',
     rawSummary: readText(path.join(artifactsDir, 'cucumber-summary.txt')),
@@ -243,6 +244,20 @@ function summarizeRun(options = {}) {
   fs.writeFileSync(path.join(artifactsDir, 'e2e-performance.md'), `${performance.markdown}\n`)
   if (process.env.GITHUB_STEP_SUMMARY) {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.markdown}\n\n${performance.markdown}\n`)
+  }
+  if (outcome === 'success') {
+    if (!messagesText) {
+      throw new Error('Successful E2E run did not produce cucumber-messages.ndjson for interaction performance reporting.')
+    }
+    if (parseError) {
+      throw new Error(`Successful E2E run produced invalid performance evidence: ${parseError}`)
+    }
+    if (scenarios.length === 0) {
+      throw new Error('Successful E2E run did not contain any parsed scenarios.')
+    }
+    if (interactions.length === 0) {
+      throw new Error('Successful E2E run did not contain any measured user interactions.')
+    }
   }
   return { ...summary, performance }
 }

@@ -6,6 +6,14 @@ const { buildPerformanceReport } = require('./performance-report.cjs')
 
 const INTERACTION_STEP = /^\[interaction:([^\]]+)\]\s+(.+?)\s+\[response:\s*(.+)\]$/
 
+function maintainedMaestroFlows() {
+  const flowsDir = path.join(__dirname, '..', 'mobile', 'maestro')
+  return fs.readdirSync(flowsDir)
+    .filter(name => name.endsWith('.yaml'))
+    .map(name => path.basename(name, '.yaml'))
+    .sort()
+}
+
 function sampleFromStep(testCase, step) {
   if (step.category !== 'test.step') {
     return null
@@ -47,7 +55,7 @@ class PlaywrightPerformanceReporter {
     }
   }
 
-  onEnd() {
+  onEnd(result) {
     const outputDir = path.resolve(
       __dirname,
       '..',
@@ -60,12 +68,26 @@ class PlaywrightPerformanceReporter {
     }
     const mobile = process.env.CRADLE_E2E_MOBILE_IOS === '1'
     const interactions = [...this.interactions]
+    let instrumentationError = null
     if (mobile) {
       const maestroArtifacts = process.env.CRADLE_E2E_MOBILE_ARTIFACTS_DIR?.trim()
       if (!maestroArtifacts) {
         throw new Error('CRADLE_E2E_MOBILE_ARTIFACTS_DIR is required for Mobile performance reporting.')
       }
-      interactions.push(...loadMaestroInteractionSamples(maestroArtifacts))
+      const mobileInteractions = loadMaestroInteractionSamples(maestroArtifacts)
+      interactions.push(...mobileInteractions)
+      if (result?.status === 'passed') {
+        const recordedFlows = new Set(mobileInteractions.map(interaction => interaction.scenario))
+        const missingFlows = maintainedMaestroFlows().filter(flow => !recordedFlows.has(flow))
+        if (missingFlows.length > 0) {
+          instrumentationError = new Error(
+            `Successful Mobile Fabric run did not record interaction samples for: ${missingFlows.join(', ')}.`,
+          )
+        }
+      }
+    }
+    else if (result?.status === 'passed' && interactions.length === 0) {
+      instrumentationError = new Error('Successful Fabric Web run did not record any user interactions.')
     }
     const report = buildPerformanceReport({
       interactions,
@@ -86,6 +108,9 @@ class PlaywrightPerformanceReporter {
     fs.writeFileSync(path.join(outputDir, 'e2e-performance.md'), `${report.markdown}\n`)
     if (process.env.GITHUB_STEP_SUMMARY) {
       fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${report.markdown}\n`)
+    }
+    if (instrumentationError) {
+      throw instrumentationError
     }
   }
 

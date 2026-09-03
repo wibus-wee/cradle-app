@@ -103,7 +103,15 @@ function flattenCommands(commands) {
 
 test('every maintained Maestro user operation has a paired performance response', () => {
   const flowsDir = path.join(__dirname, '..', 'mobile', 'maestro')
-  for (const fileName of fs.readdirSync(flowsDir).filter(name => name.endsWith('.yaml'))) {
+  const flowFiles = fs.readdirSync(flowsDir).filter(name => name.endsWith('.yaml'))
+  const fabricSpec = fs.readFileSync(path.join(__dirname, '..', 'src', 'fabric', 'fabric-two-node.spec.ts'), 'utf8')
+  const invokedFlows = Array.from(
+    fabricSpec.matchAll(/runMaestroFlow\('([^']+)'/gu),
+    match => `${match[1]}.yaml`,
+  )
+  assert.deepEqual([...new Set(invokedFlows)].sort(), [...flowFiles].sort(), 'every maintained Maestro flow must run in the Mobile scenario')
+
+  for (const fileName of flowFiles) {
     const documents = []
     yaml.loadAll(fs.readFileSync(path.join(flowsDir, fileName), 'utf8'), document => documents.push(document))
     const flow = documents.at(-1)

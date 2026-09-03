@@ -132,3 +132,40 @@ test('merges labeled Maestro command timings into the Mobile report', (t) => {
   assert.equal(report.interactions[0].source, 'mobile-ios')
   assert.equal(report.interactions[0].responseBoundary, 'maestro-visible-assertion')
 })
+
+test('rejects successful Fabric runs with missing interaction evidence', (t) => {
+  const outputDir = mkdtempSync(join(tmpdir(), 'cradle-fabric-performance-empty-'))
+  const maestroRoot = mkdtempSync(join(tmpdir(), 'cradle-maestro-artifacts-empty-'))
+  const previousMobile = process.env.CRADLE_E2E_MOBILE_IOS
+  const previousArtifacts = process.env.CRADLE_E2E_MOBILE_ARTIFACTS_DIR
+  t.after(() => {
+    if (previousMobile === undefined) {
+      delete process.env.CRADLE_E2E_MOBILE_IOS
+    }
+    else {
+      process.env.CRADLE_E2E_MOBILE_IOS = previousMobile
+    }
+    if (previousArtifacts === undefined) {
+      delete process.env.CRADLE_E2E_MOBILE_ARTIFACTS_DIR
+    }
+    else {
+      process.env.CRADLE_E2E_MOBILE_ARTIFACTS_DIR = previousArtifacts
+    }
+    rmSync(outputDir, { force: true, recursive: true })
+    rmSync(maestroRoot, { force: true, recursive: true })
+  })
+
+  delete process.env.CRADLE_E2E_MOBILE_IOS
+  assert.throws(
+    () => new PlaywrightPerformanceReporter({ outputDir }).onEnd({ status: 'passed' }),
+    /Fabric Web run did not record any user interactions/,
+  )
+
+  process.env.CRADLE_E2E_MOBILE_IOS = '1'
+  process.env.CRADLE_E2E_MOBILE_ARTIFACTS_DIR = maestroRoot
+  assert.throws(
+    () => new PlaywrightPerformanceReporter({ outputDir }).onEnd({ status: 'passed' }),
+    /Mobile Fabric run did not record interaction samples for/,
+  )
+  assert.equal(JSON.parse(readFileSync(join(outputDir, 'e2e-performance.json'), 'utf8')).summary.interactions, 0)
+})
