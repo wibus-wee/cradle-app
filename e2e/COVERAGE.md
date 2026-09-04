@@ -6,8 +6,8 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
-| Web feature namespaces | 24 | 12 | 13 | 1 |
-| Server module namespaces | 35 | 14 | 17 | 7 |
+| Web feature namespaces | 25 | 12 | 12 | 1 |
+| Server module namespaces | 36 | 14 | 16 | 7 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
 
@@ -48,6 +48,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Claude runtime × redacted thinking × SSE ping | `CRADLE-CHAT-012` | Opaque encrypted thinking blocks do not block answer projection |
 | Streaming transport failure (mid-stream disconnect) × retry | `CRADLE-CHAT-013` | A cut SSE stream never persists a partial answer and the next turn recovers |
 | Claude runtime × TodoWrite / TaskCreate / WebFetch / MCP naming / generic tools | `CRADLE-AGENT-005`–`009` | Each canonical tool kind completes a real execution and input-projection loop |
+| Claude runtime × Artifact create/update × chat preview × Browser Panel × reload | `CRADLE-AGENT-010` | Two real `write_artifact` tool turns revise one persisted record; revision 2 replaces revision 1 in the panel, and both chat evidence and the latest rendered content survive reload |
 | Codex × real shell execution (`exec_command`) × terminal tool UI | `CRADLE-CODEX-005` | The app-server runs the command locally and the output crosses back through the model continuation |
 | Codex × update_plan execution round-trip | `CRADLE-CODEX-006` | The plan handler executes and its result crosses back through the model continuation; plan-item UI projection stays a backlog item |
 | Codex × apply_patch file change × file-diff UI | `CRADLE-CODEX-007` | In-workspace patches execute under sandbox and project file-change tool state |
@@ -87,18 +88,18 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-management`, `automation`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `plugins`, `search`, `session`, `session-await`, `settings`, `skills`, `split-view`, `storage`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
+| Direct | `agent-management`, `automation`, `browser`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `plugins`, `search`, `session`, `session-await`, `settings`, `skills`, `split-view`, `storage`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
 | Indirect | `activity`, `agent-runtime`, `agent-runtimes`, `background-activity`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
-| User-visible gap | `assets`, `browser`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `server-connection`, `shortcuts`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
+| User-visible gap | `assets`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `server-connection`, `shortcuts`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
 | Service/infra contract | `product-analytics` | Verify event correctness at the event boundary; add browser coverage only for user-visible consent controls |
 
 ## Server Module Namespace Disposition
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `automation`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `external-session-import`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `plugins`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `skills`, `storage`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
+| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `automation`, `chat-artifacts`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `external-session-import`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `plugins`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `skills`, `storage`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
 | Indirect | `background-activity`, `code-activity`, `desktop`, `mcp-servers`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
-| User-visible gap | `acp`, `assets`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
+| User-visible gap | `acp`, `assets`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-group`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
 | Service/infra contract | `background-job`, `blob-store`, `codex-reset-watch`, `health`, `maintenance`, `observability`, `test-reset` | Prefer focused service/contract verification; `test-reset` is harness-only |
 
 ## Prioritized Missing Journeys
