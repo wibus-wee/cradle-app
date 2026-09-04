@@ -21,6 +21,7 @@ import { KanbanPage } from './pages/kanban'
 import { McpServersPage } from './pages/mcp-servers'
 import { PluginsPage } from './pages/plugins'
 import { SearchPage } from './pages/search'
+import { SessionExportPage } from './pages/session-export'
 import { SessionGroupsPage } from './pages/session-groups'
 import { SettingsPage } from './pages/settings'
 import { SkillsPage } from './pages/skills'
@@ -116,6 +117,10 @@ export class CradleWorld extends World {
 
   get sessionGroupsPage(): SessionGroupsPage {
     return new SessionGroupsPage(this.page)
+  }
+
+  get sessionExportPage(): SessionExportPage {
+    return new SessionExportPage(this)
   }
 
   get settingsPage(): SettingsPage {

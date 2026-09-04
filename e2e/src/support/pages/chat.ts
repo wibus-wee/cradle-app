@@ -407,7 +407,7 @@ export class ChatPage {
 
   async clickSessionMenuAction(
     sessionId: string,
-    action: 'toggle-pin' | 'copy-markdown' | 'archive' | 'rename' | 'regenerate-title',
+    action: 'toggle-pin' | 'copy-markdown' | 'export-zip' | 'archive' | 'rename' | 'regenerate-title',
   ): Promise<void> {
     const locator = this.page.locator(`[data-testid="session-menu-${action}-${sessionId}-context"]`)
     await expect(locator).toBeVisible({ timeout: 10_000 })

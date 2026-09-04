@@ -78,6 +78,8 @@ describe('elysia migration skeleton', () => {
 
       expect(response.status).toBe(200)
       expect(response.headers.get('access-control-allow-origin')).toBe(origin)
+      expect(response.headers.get('access-control-expose-headers')?.split(',').map(header => header.trim().toLowerCase()))
+        .toContain('content-disposition')
 
       const preflight = await app.handle(new Request('http://localhost/health', {
         method: 'OPTIONS',
