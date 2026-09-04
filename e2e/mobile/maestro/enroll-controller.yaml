@@ -19,14 +19,17 @@ appId: app.cradle.mobile
 - assertVisible:
     id: fabric-code-input
     text: ${FABRIC_CODE}
-    label: "perf-response:enter-fabric-code|the Fabric enrollment code is visible"
-- hideKeyboard
+- tapOn:
+    text: Join your Fabric
+    retryTapIfNoChange: true
+    label: "perf-continuation:enter-fabric-code"
 - waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       id: fabric-request-access
       enabled: true
     timeout: 15000
+    label: "perf-response:enter-fabric-code|the request access action is enabled"
 - tapOn:
     id: fabric-request-access
     retryTapIfNoChange: true
