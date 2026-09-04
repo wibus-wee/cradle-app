@@ -7,6 +7,7 @@ const SETTINGS_TIMEOUT = 10_000
 
 const SETTINGS_NAV_IDS: Record<string, string> = {
   'Appearance': 'appearance',
+  'Chat': 'chat',
   'Jarvis': 'jarvis',
   'MCP Servers': 'mcpServers',
   'Runtimes': 'runtimes',
@@ -14,7 +15,6 @@ const SETTINGS_NAV_IDS: Record<string, string> = {
   'Server Endpoint': 'serverEndpoint',
   'Support': 'support',
   '外观': 'appearance',
-  '记录': 'chronicle',
   '桌面端': 'desktop',
   '支持': 'support',
 }

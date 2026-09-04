@@ -37,6 +37,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/mcp-servers.ts` | Local MCP validation, exact mutation contracts, secret-safe reload projections, disable, and deletion |
 | `pages/plugins.ts` | Plugin Center install/trust/toggle flow and visible panel contribution |
 | `pages/search.ts` | Global Session/Issue search, empty-state assertions, and result navigation |
+| `pages/session-archive.ts` | Session archive/restore request contracts, archived-list search, and recovery persistence |
 | `pages/session-export.ts` | Browser download capture, ZIP parsing, and portable Session-content assertions |
 | `pages/session-groups.ts` | Session Group creation, membership, expansion, rename, and non-destructive deletion |
 | `pages/settings.ts` | Settings shell, appearance, and Server Endpoint validation, probing, reload, and recovery |

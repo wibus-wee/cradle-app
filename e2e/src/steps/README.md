@@ -25,6 +25,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `plugins.steps.ts` | Plugin source install, trust, activation, disable, reload, and visible contribution assertions |
 | `provider.steps.ts` | Provider profile UI lifecycle and runtime selection |
 | `search.steps.ts` | Global Session/Issue search results, empty state, and command navigation |
+| `session-archive.steps.ts` | Session archive/restore mutations, archived-list search, and recovery assertions |
 | `session-export.steps.ts` | Completed ZIP download, archive identity/content, and read-only Session assertions |
 | `session-groups.steps.ts` | Session Group creation, membership, rename, reload persistence, and non-destructive deletion assertions |
 | `settings.steps.ts` | Settings navigation, appearance persistence, and Server Endpoint connection lifecycle |
