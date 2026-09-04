@@ -4,7 +4,7 @@
 
 This directory owns the executable user-journey inventory. The broader module and state-combination audit lives in [`../../COVERAGE.md`](../../COVERAGE.md). Retired scenarios live in `e2e/_archive/features/` and are not part of the active suite.
 
-The active suite contains 82 scenarios: 24 `@P0` smoke journeys and 58 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
+The active suite contains 83 scenarios: 24 `@P0` smoke journeys and 59 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
 
 | Feature | Stable IDs | Journey boundary |
 | --- | --- | --- |
@@ -28,6 +28,7 @@ The active suite contains 82 scenarios: 24 `@P0` smoke journeys and 58 `@P1` dee
 | `issue-bulk-actions.feature` | `CRADLE-ISSUE-BULK-001` | Multi-select priority and status updates, selection cleanup, and reload persistence |
 | `issue-hierarchy.feature` | `CRADLE-ISSUE-HIERARCHY-001` | Parent-created sub-issue persistence, bidirectional navigation, board projection, and deletion cleanup |
 | `issue-relations.feature` | `CRADLE-ISSUE-RELATION-001` | Directed blocker creation, reload persistence, inverse navigation, and removal from either Issue |
+| `issue-search.feature` | `CRADLE-SEARCH-002` | Issue search navigation, rename invalidation, new-title discovery, and detail persistence across reload |
 | `mcp-servers.feature` | `CRADLE-MCP-001` | Local MCP validation, secret-safe create/update persistence, disable, and confirmed deletion across reload |
 | `plugins.feature` | `CRADLE-PLUGIN-001` | npm source preview/install, explicit trust, visible Web panel activation, disable, re-enable, and reload persistence |
 | `provider.feature` | `CRADLE-PROVIDER-001`–`003` | Anthropic profile create, use, disable, and delete, including active-run cancellation and queued continuation removal |

@@ -64,6 +64,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Issue × isolated delegation × Work × worktree × linked Chat | `CRADLE-ISSUE-AGENT-003` | The Issue-owned action creates a Work-owned isolated execution without losing linkage |
 | Issue × active isolated Work × reload × undelegate × abort | `CRADLE-ISSUE-AGENT-004` | Cancellation stops runtime work while retaining the Work and worktree as explicit audit state |
 | Issue multi-selection × bulk priority × bulk status × reload | `CRADLE-ISSUE-BULK-001` | Both bulk mutations update the exact selected Issue set, clear transient selection, and retain every visible card projection after reload |
+| Issue create × global search × detail rename × cache invalidation × reload | `CRADLE-SEARCH-002` | Search opens the matching Issue, an edit invalidates the previously used title query immediately, and the new result keeps navigating to the persisted detail |
 | Issue × directed blocker × reload × inverse projection × deletion | `CRADLE-ISSUE-RELATION-001` | A blocker persists from both Issue perspectives, relation navigation opens the counterpart, and deletion clears both projections |
 | Parent Issue × sub-issue × reload × board/detail navigation × deletion | `CRADLE-ISSUE-HIERARCHY-001` | Hierarchy and progress persist across reload, both surfaces navigate to the right parent, and child deletion clears every parent projection |
 | Work × Git × worktree × file mutation × Session | `CRADLE-WORK-001` | Isolated execution uses a managed worktree and persistent primary thread |

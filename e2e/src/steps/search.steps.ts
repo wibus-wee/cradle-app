@@ -30,6 +30,26 @@ When('我在全局搜索中输入{string}', async function (this: CradleWorld, q
   await this.search.fill(query)
 })
 
+When('我在全局搜索中搜索 Issue {string}', async function (this: CradleWorld, query: string) {
+  await this.search.fillIssueQuery(query)
+})
+
+Then('全局搜索中应该显示 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.search.expectIssueVisible(title)
+})
+
+Then('全局搜索中不应显示 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.search.expectIssueHidden(title)
+})
+
+Then('全局搜索应提示无匹配结果', async function (this: CradleWorld) {
+  await this.search.expectNoMatchingResults()
+})
+
+When('我从全局搜索打开 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.search.openIssue(title)
+})
+
 When('我从全局搜索执行命令{string}', async function (this: CradleWorld, label: string) {
   console.warn(`[step] run global search command: ${label}`)
   await this.search.runCommand(label)

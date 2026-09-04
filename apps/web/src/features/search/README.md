@@ -9,6 +9,10 @@ files, conversations, issues, and workspaces.
   prefetch.
 - `global-search-dialog-content.tsx` owns palette data hooks, browser-panel
   actions, command history, and application navigation.
+- Issue results reuse the Kanban owner's search hook and query-key root, so
+  Issue creation, edits, bulk updates, and deletion invalidate both board and
+  global-search projections together. A result becomes visible only after its
+  target board resolves, making every visible Issue row navigable.
 - App commands include one-shot recovery for the most recently user-closed
   surface. The command is omitted when navigation has no recovery target.
 - Primary creation commands open New Chat and New Work through their existing

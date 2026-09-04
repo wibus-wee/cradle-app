@@ -16,7 +16,6 @@ import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 
 import {
-  getIssuesSearchOptions,
   getKanbanBoardsOptions,
   getSessionsByIdOptions,
   getSessionsOptions,
@@ -25,6 +24,7 @@ import {
 } from '~/api-gen/@tanstack/react-query.gen'
 import { useLayoutSlotsCtx } from '~/components/layout/use-layout-slots'
 import { toastManager } from '~/components/ui/toast'
+import { useSearchIssues } from '~/features/kanban/use-kanban'
 import { useThreadSearch } from '~/features/search/use-thread-search'
 import { getWorkspaceLocationLabel, isWorkEligibleWorkspace } from '~/features/workspace/types'
 import { useWorkspaceFiles } from '~/features/workspace/use-workspace-files'
@@ -387,27 +387,24 @@ function useWorkspaceSearch(query: string, enabled: boolean) {
 
 function useIssueSearch(query: string, enabled: boolean) {
   const trimmed = query.trim()
-  const { data, isPending } = useQuery({
-    ...getIssuesSearchOptions({ query: { q: trimmed, limit: '10' } }),
-    enabled: enabled && trimmed.length > 0,
-    staleTime: 10_000,
-  })
+  const { data, isPending } = useSearchIssues(trimmed, 10, enabled)
 
-  const issues = (data ?? []) as IssueSearchHit[]
+  const issues: IssueSearchHit[] = data ?? []
   const workspaceIds = [...new Set(issues.map(issue => issue.workspaceId))]
   const firstWorkspaceId = workspaceIds[0] ?? null
 
-  const { data: boardsData } = useQuery({
+  const { data: boardsData, isPending: boardsPending } = useQuery({
     ...getKanbanBoardsOptions({ query: { workspaceId: firstWorkspaceId ?? undefined } }),
     enabled: enabled && !!firstWorkspaceId,
     staleTime: 60_000,
   })
 
   const boardId = (boardsData as Array<{ id: string }> | undefined)?.[0]?.id ?? null
+  const resolvingBoard = enabled && issues.length > 0 && boardsPending
 
   return {
-    issues: enabled ? issues : [],
-    isPending: enabled && trimmed.length > 0 && isPending,
+    issues: enabled && !resolvingBoard && boardId ? issues : [],
+    isPending: enabled && trimmed.length > 0 && (isPending || resolvingBoard),
     boardId,
   }
 }

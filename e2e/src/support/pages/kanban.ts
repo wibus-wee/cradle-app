@@ -669,7 +669,18 @@ export class KanbanPage {
     const input = this.page.locator(KanbanPage.ISSUE_TITLE_INPUT)
     await expect(input).toBeVisible({ timeout: 10_000 })
     await input.fill(title)
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'PATCH' && /^\/issues\/[^/]+$/.test(url.pathname)
+    })
     await input.press('Enter')
+
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+    const request = response.request().postDataJSON() as { title: string }
+    expect(request.title).toBe(title)
+    const updatedIssue = await response.json() as { title: string }
+    expect(updatedIssue.title).toBe(title)
 
     await expect(display).toHaveText(title, { timeout: 10_000 })
   }
