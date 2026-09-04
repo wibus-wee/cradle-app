@@ -20,7 +20,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `external-session-import.steps.ts` | External Claude history fixture discovery, import, persisted transcript, and idempotency assertions |
 | `first-run.steps.ts` | Clean-install provider onboarding and first conversation |
 | `git.steps.ts` | Temporary Git repository, branch picker, branch creation, and switching |
-| `kanban.steps.ts` | Board/issue lifecycle, parent-child hierarchy, directed relations, and Issue-Agent delegation, rerun, cancellation, and linked Chat |
+| `kanban.steps.ts` | Board/issue lifecycle, bulk triage, parent-child hierarchy, directed relations, and Issue-Agent delegation, rerun, cancellation, and linked Chat |
 | `mcp-servers.steps.ts` | Local MCP validation, create/update persistence, secret-safe projections, disable, and deletion assertions |
 | `plugins.steps.ts` | Plugin source install, trust, activation, disable, reload, and visible contribution assertions |
 | `provider.steps.ts` | Provider profile UI lifecycle and runtime selection |

@@ -14,6 +14,18 @@ interface IssueDescriptionAssetReference {
   markdownUrl: string
 }
 
+interface BulkUpdateRequest {
+  issueIds: string[]
+  update: {
+    priority?: string
+    statusId?: string | null
+  }
+}
+
+interface BulkUpdateResponse {
+  updated: number
+}
+
 export class KanbanPage {
   private static readonly KANBAN_SIDEBAR = '[data-testid="kanban-sidebar"]'
   private static readonly KANBAN_BOARD = '[data-testid="kanban-board"]'
@@ -24,6 +36,7 @@ export class KanbanPage {
   private static readonly KANBAN_ISSUE_INPUT = '[data-testid="kanban-new-issue-input"]'
   private static readonly _KANBAN_CREATE_ISSUE_BUTTON = '[data-testid="kanban-create-issue-btn"]'
   private static readonly KANBAN_SEARCH_INPUT = '[data-testid="kanban-search-input"]'
+  private static readonly KANBAN_SELECTION_BAR = '[data-testid="kanban-selection-bar"]'
   private static readonly ISSUE_DETAIL_PANEL = '[data-testid="issue-detail-panel"]'
   private static readonly ISSUE_DETAIL_HEADER = '[data-testid="issue-detail-header"]'
   private static readonly ISSUE_DETAIL_CLOSE_BUTTON = '[data-testid="issue-detail-close-btn"]'
@@ -371,6 +384,101 @@ export class KanbanPage {
   async expectCardPriority(title: string, label: string): Promise<void> {
     const card = await this.getIssueCardByTitle(title)
     await expect(card).toContainText(label, { timeout: 10_000 })
+  }
+
+  async selectIssue(title: string): Promise<void> {
+    const card = await this.getIssueCardByTitle(title)
+    const toggle = card.getByRole('checkbox', { name: `Select ${title}`, exact: true })
+    await expect(toggle).toBeVisible({ timeout: 10_000 })
+    await toggle.click()
+    await expect(card.getByRole('checkbox', { name: `Deselect ${title}`, exact: true }))
+      .toBeChecked({ timeout: 10_000 })
+    const selectedTitles = this.owner.maybeRecall<string[]>('selectedIssueTitles') ?? []
+    this.owner.remember('selectedIssueTitles', [...selectedTitles, title])
+  }
+
+  async expectSelectedIssueCount(count: number): Promise<void> {
+    const selectionBar = this.page.locator(KanbanPage.KANBAN_SELECTION_BAR)
+    await expect(selectionBar).toBeVisible({ timeout: 10_000 })
+    await expect(selectionBar.getByText(String(count), { exact: true })).toBeVisible()
+    await expect(selectionBar.getByText('selected', { exact: true })).toBeVisible()
+  }
+
+  async expectNoSelectedIssues(): Promise<void> {
+    await expect(this.page.locator(KanbanPage.KANBAN_SELECTION_BAR)).toHaveCount(0, { timeout: 10_000 })
+    await expect(this.visibleKanbanBoard().getByRole('checkbox', { checked: true })).toHaveCount(0)
+  }
+
+  async bulkUpdateSelectedIssuePriority(label: string): Promise<void> {
+    const priority = Object.entries(KanbanPage.PRIORITY_LABELS)
+      .find(([, candidateLabel]) => candidateLabel === label)?.[0]
+    if (!priority) {
+      throw new Error(`Unsupported Issue priority label: ${label}`)
+    }
+
+    const issueIds = await this.selectedIssueIds()
+    const responsePromise = this.waitForBulkUpdateResponse(issueIds, { priority })
+    const selectionBar = this.page.locator(KanbanPage.KANBAN_SELECTION_BAR)
+    await selectionBar.getByRole('button', { name: 'Priority', exact: true }).click()
+    await this.page.getByRole('menuitemradio', { name: label, exact: true }).click()
+    await responsePromise
+    this.owner.remember('selectedIssueTitles', [])
+  }
+
+  async bulkMoveSelectedIssues(columnName: string): Promise<void> {
+    const issueIds = await this.selectedIssueIds()
+    const statusId = await this.getColumnStatusIdByName(columnName)
+    const responsePromise = this.waitForBulkUpdateResponse(issueIds, { statusId })
+    const selectionBar = this.page.locator(KanbanPage.KANBAN_SELECTION_BAR)
+    await selectionBar.getByRole('button', { name: 'Status', exact: true }).click()
+    await this.page.getByRole('menuitemradio', { name: columnName, exact: true }).click()
+    await responsePromise
+    this.owner.remember('selectedIssueTitles', [])
+  }
+
+  async reloadCurrentBoard(): Promise<void> {
+    const boardName = this.owner.maybeRecall<string>('currentBoardName')
+    if (!boardName) {
+      throw new Error('Cannot reload the current board before remembering its name')
+    }
+
+    await this.page.reload({ waitUntil: 'domcontentloaded' })
+    const boardButton = await this.getBoardButtonByName(boardName)
+    await boardButton.click()
+    await expect(this.visibleKanbanBoard()).toBeVisible({ timeout: 10_000 })
+  }
+
+  private async issueIdsForTitles(titles: string[]): Promise<string[]> {
+    return Promise.all(titles.map(async (title) => {
+      const card = await this.getIssueCardByTitle(title)
+      return this.extractIdFromTestId(card, 'issue-card-')
+    }))
+  }
+
+  private async selectedIssueIds(): Promise<string[]> {
+    const titles = this.owner.maybeRecall<string[]>('selectedIssueTitles') ?? []
+    if (titles.length === 0) {
+      throw new Error('Cannot bulk update Issues before selecting at least one card')
+    }
+    return this.issueIdsForTitles(titles)
+  }
+
+  private async waitForBulkUpdateResponse(
+    expectedIssueIds: string[],
+    expectedUpdate: BulkUpdateRequest['update'],
+  ): Promise<void> {
+    const response = await this.page.waitForResponse((candidate) => {
+      const url = new URL(candidate.url())
+      return candidate.request().method() === 'PATCH' && url.pathname === '/issues/bulk'
+    })
+    expect(response.ok()).toBe(true)
+
+    const request = response.request().postDataJSON() as BulkUpdateRequest
+    expect([...request.issueIds].sort()).toEqual([...expectedIssueIds].sort())
+    expect(request.update).toEqual(expectedUpdate)
+
+    const body = await response.json() as BulkUpdateResponse
+    expect(body.updated).toBe(expectedIssueIds.length)
   }
 
   async createIssueInFirstColumn(title: string): Promise<void> {

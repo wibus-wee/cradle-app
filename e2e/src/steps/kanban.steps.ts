@@ -76,6 +76,30 @@ Then('名为{string}的卡片应显示优先级{string}', async function (this: 
   await this.kanbanPage.expectCardPriority(title, label)
 })
 
+When('我选择 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.selectIssue(title)
+})
+
+Then('看板应显示 {int} 个已选 Issue', async function (this: CradleWorld, count: number) {
+  await this.kanbanPage.expectSelectedIssueCount(count)
+})
+
+Then('看板不应显示已选 Issue', async function (this: CradleWorld) {
+  await this.kanbanPage.expectNoSelectedIssues()
+})
+
+When('我将已选 Issue 的优先级批量修改为{string}', async function (this: CradleWorld, priority: string) {
+  await this.kanbanPage.bulkUpdateSelectedIssuePriority(priority)
+})
+
+When('我将已选 Issue 批量移动到{string}列', async function (this: CradleWorld, columnName: string) {
+  await this.kanbanPage.bulkMoveSelectedIssues(columnName)
+})
+
+When('我重新加载当前看板', async function (this: CradleWorld) {
+  await this.kanbanPage.reloadCurrentBoard()
+})
+
 Given('我已在第一列创建了一个 Issue{string}', async function (this: CradleWorld, title: string) {
   await this.kanbanPage.createIssueInFirstColumn(title)
 })
