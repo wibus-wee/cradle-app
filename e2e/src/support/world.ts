@@ -10,6 +10,7 @@ import { chromium, expect } from '@playwright/test'
 import type { E2ESimulator } from './model-api-simulator'
 import { startE2ESimulator } from './model-api-simulator'
 import { dismissTransientOverlays } from './overlays'
+import { AgentRuntimesPage } from './pages/agent-runtimes'
 import { AwaitPage } from './pages/await'
 import { ApprovalPage, ChatPage, NewChatPage } from './pages/chat'
 import { DiffPage } from './pages/diff'
@@ -82,6 +83,10 @@ export class CradleWorld extends World {
 
   get newChat(): NewChatPage {
     return new NewChatPage(this.page)
+  }
+
+  get agentRuntimesPage(): AgentRuntimesPage {
+    return new AgentRuntimesPage(this)
   }
 
   get chat(): ChatPage {

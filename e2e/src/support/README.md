@@ -25,6 +25,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 
 | File | Surface |
 | --- | --- |
+| `pages/agent-runtimes.ts` | Local ACP validation, canonical mutation contracts, reload recovery, and deletion |
 | `pages/await.ts` | Await creation and resolution |
 | `pages/automation.ts` | Automation definition fixture, completion/cancellation, triage, artifacts, reload, and linked Session |
 | `pages/chat.ts` | New Chat, Chat, approval, messages, sessions, and queue |

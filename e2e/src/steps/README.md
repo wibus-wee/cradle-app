@@ -7,6 +7,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | File | Owned vocabulary |
 | --- | --- |
 | `agent-identity.steps.ts` | Agent settings navigation and identity lifecycle |
+| `agent-runtimes.steps.ts` | Local ACP launch-config validation, create/update persistence, and deletion assertions |
 | `automation.steps.ts` | Automation completion/cancellation, triage, artifact, reload, and linked Session assertions |
 | `approval.steps.ts` | Claude approval prompt, allow, deny, and visible result |
 | `await.steps.ts` | Await creation, pending state, external resolution, and Agent continuation |
