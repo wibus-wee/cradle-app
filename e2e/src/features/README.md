@@ -4,7 +4,7 @@
 
 This directory owns the executable user-journey inventory. The broader module and state-combination audit lives in [`../../COVERAGE.md`](../../COVERAGE.md). Retired scenarios live in `e2e/_archive/features/` and are not part of the active suite.
 
-The active suite contains 74 scenarios: 24 `@P0` smoke journeys and 50 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
+The active suite contains 75 scenarios: 24 `@P0` smoke journeys and 51 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
 
 | Feature | Stable IDs | Journey boundary |
 | --- | --- | --- |
@@ -27,7 +27,7 @@ The active suite contains 74 scenarios: 24 `@P0` smoke journeys and 50 `@P1` dee
 | `provider.feature` | `CRADLE-PROVIDER-001`–`003` | Anthropic profile create, use, disable, and delete, including active-run cancellation and queued continuation removal |
 | `search.feature` | `CRADLE-SEARCH-001`, `003` | Session result navigation and command execution |
 | `session-groups.feature` | `CRADLE-SESSION-GROUP-001` | Session-backed group creation, rename, expanded-state and membership persistence, then non-destructive group deletion across reload |
-| `settings.feature` | `CRADLE-SETTINGS-001` | Theme mutation and reload persistence |
+| `settings.feature` | `CRADLE-SETTINGS-001`, `CRADLE-SERVER-001` | Theme persistence plus Server Endpoint validation, health probing, custom connection reload, and default recovery |
 | `skills.feature` | `CRADLE-SKILL-001` | Workspace Skill creation, explicit Claude Agent invocation, reload persistence, deletion, and retained Session evidence |
 | `storage.feature` | `CRADLE-STORAGE-001` | Active-session protection plus transcript purge and full deletion across reload |
 | `stream-vocabulary.feature` | `CRADLE-CHAT-011`–`013` | Stream wire vocabulary: parallel tool_use blocks, chunked tool input, redacted thinking + ping, mid-stream disconnect |

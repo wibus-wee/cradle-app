@@ -6,7 +6,7 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
-| Web feature namespaces | 25 | 12 | 12 | 1 |
+| Web feature namespaces | 26 | 12 | 11 | 1 |
 | Server module namespaces | 37 | 14 | 15 | 7 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
@@ -74,6 +74,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | External Claude history × read-only discovery × Cradle-owned bundle × Session × reload × duplicate prevention | `CRADLE-IMPORT-001` | UI import creates one durable Cradle Session from provider-owned JSONL without mutating the source; the transcript survives reload and a new scan disables duplicate import |
 | npm plugin source × install preview × trust × Web contribution × disable/re-enable × reload | `CRADLE-PLUGIN-001` | A UI-installed external plugin remains inert until explicit trust, contributes its panel only while enabled, and preserves the activation policy across reloads without duplicate installation |
 | Session × Session Group × persisted sidebar expansion × reload × group deletion | `CRADLE-SESSION-GROUP-001` | UI creation binds the initiating Session, rename and membership survive reload with the persisted expanded state, and deleting the group returns its still-readable Session to the ungrouped list |
+| Invalid Server Endpoint × health probe × persisted custom URL × reload × default recovery | `CRADLE-SERVER-001` | Invalid schemes cannot replace the active connection; a real `/health` response admits a reachable custom endpoint, startup uses it after reload, and reset restores the app-provided endpoint through another startup |
 | Git branch × external file changes × diff refresh | `CRADLE-GIT-001`, `002`, `CRADLE-DIFF-001` | Repository projections refresh from real Git/filesystem state |
 | Await pending × external event × Agent continuation | `CRADLE-AWAIT-001` | Durable pending work resumes from an external signal |
 | Await cancel/expiry × Server crash × late external resolution × next Agent turn | `CRADLE-AWAIT-002` | Both terminal states persist across process recovery, reject late delivery without transcript pollution, and leave the Session usable |
@@ -89,9 +90,9 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-management`, `automation`, `browser`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `plugins`, `search`, `session`, `session-await`, `settings`, `skills`, `split-view`, `storage`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
+| Direct | `agent-management`, `automation`, `browser`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `plugins`, `search`, `server-connection`, `session`, `session-await`, `settings`, `skills`, `split-view`, `storage`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
 | Indirect | `activity`, `agent-runtime`, `agent-runtimes`, `background-activity`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
-| User-visible gap | `assets`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `server-connection`, `shortcuts`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
+| User-visible gap | `assets`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `shortcuts`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
 | Service/infra contract | `product-analytics` | Verify event correctness at the event boundary; add browser coverage only for user-visible consent controls |
 
 ## Server Module Namespace Disposition
