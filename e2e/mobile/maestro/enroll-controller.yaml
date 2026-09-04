@@ -8,10 +8,19 @@ appId: app.cradle.mobile
     timeout: 30000
 - tapOn:
     id: fabric-code-input
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
 - inputText: ${FABRIC_CODE}
-- tapOn: Join your Fabric
+- hideKeyboard
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: fabric-request-access
+      enabled: true
+    timeout: 15000
 - tapOn:
     id: fabric-request-access
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible:
       id: fabric-enrollment-pending
