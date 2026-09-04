@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, unlinkSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const ROOT = resolve(import.meta.dirname, '..', '..')
@@ -93,6 +93,21 @@ function ensureMaestro(): string {
     throw new Error(`Maestro archive did not contain ${binary}.`)
   }
   return binary
+}
+
+function patchExpoConstantsBuildPhase(): void {
+  const projectPath = join(ROOT, 'apps', 'mobile', 'ios', 'Pods', 'Pods.xcodeproj', 'project.pbxproj')
+  const source = 'shellScript = "bash -l -c \\"$PODS_TARGET_SRCROOT/../scripts/get-app-config-ios.sh\\"";'
+  const replacement = 'shellScript = "PROJECT_ROOT=\\"$PROJECT_DIR/../..\\" PROJECT_DIR=Pods bash -l \\"$PODS_TARGET_SRCROOT/../scripts/get-app-config-ios.sh\\"";'
+  const project = readFileSync(projectPath, 'utf8')
+  const matches = project.split(source).length - 1
+  if (matches !== 1) {
+    throw new Error(`Expected one Expo Constants build phase in ${projectPath}, found ${matches}.`)
+  }
+
+  // Expo Constants 57.0.16 loses spaces both in `bash -c` and in an unquoted
+  // `basename $PROJECT_DIR`. Preserve the real root while normalizing the latter.
+  writeFileSync(projectPath, project.replace(source, replacement))
 }
 
 interface SimulatorRuntime {
@@ -196,6 +211,7 @@ function main(): void {
         cwd: join(ROOT, 'apps', 'mobile', 'ios'),
         env: commandEnv,
       })
+      patchExpoConstantsBuildPhase()
 
       run('xcodebuild', [
         '-quiet',

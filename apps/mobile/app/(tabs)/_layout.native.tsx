@@ -64,7 +64,7 @@ export default function NativeTabsLayout() {
     <NativeTabNavigator
       {...tabBarAppearance}
     >
-      <NativeTabs.Trigger name="projects">
+      <NativeTabs.Trigger name="projects" testID="tab-projects">
         <NativeTabs.Trigger.Icon
           md={{ default: 'folder', selected: 'folder_open' }}
           sf={{ default: 'folder', selected: 'folder.fill' }}
@@ -88,7 +88,7 @@ export default function NativeTabsLayout() {
         />
         <NativeTabs.Trigger.Label>Pulls</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
+      <NativeTabs.Trigger name="settings" testID="tab-settings">
         <NativeTabs.Trigger.Icon
           md={{ default: 'settings', selected: 'settings' }}
           sf={{ default: 'gearshape', selected: 'gearshape.fill' }}

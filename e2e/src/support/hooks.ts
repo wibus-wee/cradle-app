@@ -40,6 +40,7 @@ Also at the artifact root:
 |------|------------|
 | \`failure-index.json\` | Machine-readable list of failed scenarios → relative artifact paths |
 | \`e2e-summary.md\` / \`.json\` | Aggregated Cucumber pass/fail summary for the run |
+| \`e2e-performance.md\` / \`.json\` | Action-to-visible-response timings, slowest interactions, and optional baseline comparison |
 | \`cucumber-messages.ndjson\` | Structured Cucumber event stream used to build the run summary |
 | \`cucumber-output.log\` | Full Cucumber stdout/stderr |
 | \`cucumber-junit.xml\` | JUnit for CI dashboards |
