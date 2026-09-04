@@ -22,6 +22,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `plugins.steps.ts` | Plugin source install, trust, activation, disable, reload, and visible contribution assertions |
 | `provider.steps.ts` | Provider profile UI lifecycle and runtime selection |
 | `search.steps.ts` | Global search result and command navigation |
+| `session-groups.steps.ts` | Session Group creation, membership, rename, reload persistence, and non-destructive deletion assertions |
 | `settings.steps.ts` | Settings navigation and appearance persistence |
 | `skills.steps.ts` | Workspace Skill creation, explicit runtime invocation, deletion, and historical Session assertions |
 | `storage.steps.ts` | Storage inventory, active-session protection, transcript purge, and session deletion |

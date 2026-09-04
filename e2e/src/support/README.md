@@ -35,6 +35,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/kanban.ts` | Board, Issue detail, activity, and delegation |
 | `pages/plugins.ts` | Plugin Center install/trust/toggle flow and visible panel contribution |
 | `pages/search.ts` | Global search |
+| `pages/session-groups.ts` | Session Group creation, membership, expansion, rename, and non-destructive deletion |
 | `pages/settings.ts` | Settings shell and appearance |
 | `pages/skills.ts` | Workspace Skill creation, Composer invocation, deletion, and Session evidence |
 | `pages/storage.ts` | Storage session inventory and destructive cleanup controls |

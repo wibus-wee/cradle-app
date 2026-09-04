@@ -19,6 +19,7 @@ import { GitPage } from './pages/git'
 import { KanbanPage } from './pages/kanban'
 import { PluginsPage } from './pages/plugins'
 import { SearchPage } from './pages/search'
+import { SessionGroupsPage } from './pages/session-groups'
 import { SettingsPage } from './pages/settings'
 import { SkillsPage } from './pages/skills'
 import { TerminalPage } from './pages/terminal'
@@ -104,6 +105,10 @@ export class CradleWorld extends World {
 
   get search(): SearchPage {
     return new SearchPage(this.page)
+  }
+
+  get sessionGroupsPage(): SessionGroupsPage {
+    return new SessionGroupsPage(this.page)
   }
 
   get settingsPage(): SettingsPage {
