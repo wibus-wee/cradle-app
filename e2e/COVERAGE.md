@@ -63,6 +63,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Issue × active Run × reload × undelegate × abort | `CRADLE-ISSUE-AGENT-002` | Cancellation removes delegation and prevents a gated reply from persisting |
 | Issue × isolated delegation × Work × worktree × linked Chat | `CRADLE-ISSUE-AGENT-003` | The Issue-owned action creates a Work-owned isolated execution without losing linkage |
 | Issue × active isolated Work × reload × undelegate × abort | `CRADLE-ISSUE-AGENT-004` | Cancellation stops runtime work while retaining the Work and worktree as explicit audit state |
+| Issue × directed blocker × reload × inverse projection × deletion | `CRADLE-ISSUE-RELATION-001` | A blocker persists from both Issue perspectives, relation navigation opens the counterpart, and deletion clears both projections |
 | Work × Git × worktree × file mutation × Session | `CRADLE-WORK-001` | Isolated execution uses a managed worktree and persistent primary thread |
 | Work × provider failure × reload × retry × worktree × Session | `CRADLE-WORK-002` | A failed initial run retains exactly one isolated Work primary thread; reload and retry recover in that same session and mutate its worktree |
 | Work × stop × reload × retry × worktree × Session | `CRADLE-WORK-003` | Stopping an active initial run returns the Work UI to idle without duplicating its isolated primary thread; reload and retry recover in that same session and mutate its worktree |

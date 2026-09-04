@@ -100,6 +100,30 @@ Then('面板标题应为{string}', async function (this: CradleWorld, title: str
   await this.kanbanPage.expectPanelTitle(title)
 })
 
+When('我将当前 Issue 标记为被{string}阻塞', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.addBlockedByRelation(title)
+})
+
+Then('当前 Issue 应显示被{string}阻塞的关系', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.expectIssueRelation('Blocked by', title)
+})
+
+Then('当前 Issue 应显示阻塞{string}的关系', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.expectIssueRelation('Blocks', title)
+})
+
+When('我通过该关系打开 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.openRelatedIssue('Blocked by', title)
+})
+
+When('我删除当前 Issue 与{string}的阻塞关系', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.removeIssueRelation('Blocks', title)
+})
+
+Then('当前 Issue 应不再显示任何关系', async function (this: CradleWorld) {
+  await this.kanbanPage.expectNoIssueRelations()
+})
+
 When('我在评论框中输入{string}', async function (this: CradleWorld, text: string) {
   await this.kanbanPage.fillComment(text)
 })

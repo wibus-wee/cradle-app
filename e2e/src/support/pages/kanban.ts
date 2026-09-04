@@ -35,6 +35,7 @@ export class KanbanPage {
   private static readonly ISSUE_TITLE_INPUT = '[data-testid="issue-title-input"]'
   private static readonly ISSUE_DESCRIPTION_EDITOR = '[data-testid="issue-description-editor"]'
   private static readonly ISSUE_PRIORITY_TRIGGER = '[data-testid="issue-priority-trigger"]'
+  private static readonly ISSUE_RELATION_CHIP = '[data-testid^="issue-relation-chip-"]'
   private static readonly STATUS_MANAGER = '[data-testid="status-manager"]'
   private static readonly STATUS_ROW = '[data-testid^="status-row-"]'
   private static readonly STATUS_NAME_INPUT = '[data-testid="status-name-input"]'
@@ -64,6 +65,20 @@ export class KanbanPage {
 
   private issueCardByTitle(title: string): Locator {
     return this.visibleKanbanBoard().locator(KanbanPage.KANBAN_ISSUE_CARD).filter({ hasText: title }).first()
+  }
+
+  private issueRelationButton(kindLabel: string, targetTitle: string): Locator {
+    return this.page
+      .locator(KanbanPage.ISSUE_DETAIL_PANEL)
+      .getByRole('button', { name: this.issueRelationAccessibleName(kindLabel, targetTitle) })
+  }
+
+  private issueRelationAccessibleName(kindLabel: string, targetTitle: string): RegExp {
+    return new RegExp(`^${this.escapeRegExp(kindLabel)} [^:]+: ${this.escapeRegExp(targetTitle)}$`)
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
   private _sortableIssueByTitle(title: string): Locator {
@@ -399,6 +414,72 @@ export class KanbanPage {
 
   async expectPanelTitle(title: string): Promise<void> {
     await expect(this.page.locator(KanbanPage.ISSUE_TITLE_DISPLAY)).toHaveText(title, { timeout: 10_000 })
+  }
+
+  async addBlockedByRelation(targetTitle: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    await expect(panel).toBeVisible({ timeout: 10_000 })
+
+    await panel.locator('[data-testid="issue-relation-add"]').click()
+    await this.page.locator('[data-testid="issue-relation-kind-blocked-by"]').click()
+
+    const search = this.page.locator('[data-testid="issue-relation-search"]')
+    await expect(search).toBeFocused({ timeout: 10_000 })
+    await search.fill(targetTitle)
+
+    const candidate = this.page.getByRole('option', {
+      name: new RegExp(`${this.escapeRegExp(targetTitle)}$`),
+    })
+    await expect(candidate).toBeVisible({ timeout: 10_000 })
+
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'POST' && url.pathname === '/issues/relations'
+    })
+    await candidate.click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+  }
+
+  async expectIssueRelation(kindLabel: string, targetTitle: string): Promise<void> {
+    await expect(this.issueRelationButton(kindLabel, targetTitle)).toBeVisible({ timeout: 10_000 })
+  }
+
+  async openRelatedIssue(kindLabel: string, targetTitle: string): Promise<void> {
+    const relation = this.issueRelationButton(kindLabel, targetTitle)
+    await expect(relation).toBeVisible({ timeout: 10_000 })
+    await relation.click()
+    await this.expectPanelTitle(targetTitle)
+  }
+
+  async removeIssueRelation(kindLabel: string, targetTitle: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const chip = panel.locator(KanbanPage.ISSUE_RELATION_CHIP).filter({
+      has: this.page.getByRole('button', {
+        name: this.issueRelationAccessibleName(kindLabel, targetTitle),
+      }),
+    })
+    await expect(chip).toBeVisible({ timeout: 10_000 })
+    await chip.hover()
+
+    const remove = chip.getByRole('button', {
+      name: new RegExp(`^Remove ${this.escapeRegExp(kindLabel)} relation to `),
+    })
+    await expect(remove).toBeVisible({ timeout: 10_000 })
+
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'DELETE' && /^\/issues\/relations\/[^/]+$/.test(url.pathname)
+    })
+    await remove.click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+  }
+
+  async expectNoIssueRelations(): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    await expect(panel.getByText('No related issues', { exact: true })).toBeVisible({ timeout: 10_000 })
+    await expect(panel.locator(KanbanPage.ISSUE_RELATION_CHIP)).toHaveCount(0, { timeout: 10_000 })
   }
 
   async fillComment(text: string): Promise<void> {

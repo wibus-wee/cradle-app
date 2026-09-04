@@ -33,7 +33,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/external-session-import.ts` | External session discovery, import, transcript, and duplicate-prevention checks |
 | `pages/first-run.ts` | Onboarding |
 | `pages/git.ts` | Branch controls |
-| `pages/kanban.ts` | Board, Issue detail, description assets, activity, and delegation |
+| `pages/kanban.ts` | Board, Issue detail, directed relations, description assets, activity, and delegation |
 | `pages/mcp-servers.ts` | Local MCP validation, exact mutation contracts, secret-safe reload projections, disable, and deletion |
 | `pages/plugins.ts` | Plugin Center install/trust/toggle flow and visible panel contribution |
 | `pages/search.ts` | Global search |
