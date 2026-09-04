@@ -220,6 +220,34 @@ Then('子 Issue 列表应显示{string}', async function (this: CradleWorld, tit
   await this.kanbanPage.expectSubIssueVisible(title)
 })
 
+Then('当前 Issue 的子 Issue 进度应为{string}', async function (this: CradleWorld, progress: string) {
+  await this.kanbanPage.expectSubIssueProgress(progress)
+})
+
+When('我从当前 Issue 打开子 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.openSubIssue(title)
+})
+
+Then('当前 Issue 应显示父 Issue {string}链接', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.expectParentIssueLink(title)
+})
+
+When('我通过父 Issue 链接打开 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.openParentIssue(title)
+})
+
+When('我从子 Issue {string}卡片的父链接打开 Issue {string}', async function (
+  this: CradleWorld,
+  childTitle: string,
+  parentTitle: string,
+) {
+  await this.kanbanPage.openParentIssueFromCard(childTitle, parentTitle)
+})
+
+Then('当前 Issue 应不再显示子 Issue', async function (this: CradleWorld) {
+  await this.kanbanPage.expectNoSubIssues()
+})
+
 Then('名为{string}的卡片应显示标签{string}', async function (this: CradleWorld, title: string, label: string) {
   await this.kanbanPage.expectCardLabel(title, label)
 })

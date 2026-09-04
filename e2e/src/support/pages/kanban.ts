@@ -676,7 +676,13 @@ export class KanbanPage {
 
     const deleteItem = this.page.locator(KanbanPage.ISSUE_DETAIL_DELETE_ISSUE)
     await expect(deleteItem).toBeVisible({ timeout: 10_000 })
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'DELETE' && /^\/issues\/[^/]+$/.test(url.pathname)
+    })
     await deleteItem.click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
 
     await expect(this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)).toHaveCount(0, { timeout: 10_000 })
   }
@@ -695,7 +701,16 @@ export class KanbanPage {
 
     const createButton = panel.locator('[data-testid="sub-issue-create-btn"]')
     await expect(createButton).toBeEnabled({ timeout: 10_000 })
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'POST' && url.pathname === '/issues/'
+    })
     await createButton.click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+    const createdIssue = await response.json() as { parentIssueId: string | null, title: string }
+    expect(createdIssue.title).toBe(title)
+    expect(createdIssue.parentIssueId).toBeTruthy()
   }
 
   async addLabelToOpenIssue(label: string): Promise<void> {
@@ -810,7 +825,51 @@ export class KanbanPage {
   async expectSubIssueVisible(title: string): Promise<void> {
     const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
     const list = panel.locator('[data-testid="sub-issues-list"]')
-    await expect(list.locator('[data-testid^="sub-issue-"]').filter({ hasText: title })).toBeVisible({ timeout: 10_000 })
+    await expect(list.getByRole('button', { name: `Open sub-issue ${title}`, exact: true })).toBeVisible({ timeout: 10_000 })
+  }
+
+  async expectSubIssueProgress(progress: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    await expect(panel.locator('[data-testid="issue-detail-sub-issue-progress"]'))
+      .toHaveText(progress, { timeout: 10_000 })
+  }
+
+  async openSubIssue(title: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const subIssue = panel.getByRole('button', { name: `Open sub-issue ${title}`, exact: true })
+    await expect(subIssue).toBeVisible({ timeout: 10_000 })
+    await subIssue.click()
+    await this.expectPanelTitle(title)
+  }
+
+  async expectParentIssueLink(title: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    await expect(panel.getByRole('button', { name: `Open parent issue ${title}`, exact: true }))
+      .toBeVisible({ timeout: 10_000 })
+  }
+
+  async openParentIssue(title: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const parent = panel.getByRole('button', { name: `Open parent issue ${title}`, exact: true })
+    await expect(parent).toBeVisible({ timeout: 10_000 })
+    await parent.click()
+    await this.expectPanelTitle(title)
+  }
+
+  async openParentIssueFromCard(childTitle: string, parentTitle: string): Promise<void> {
+    const childCard = await this.getIssueCardByTitle(childTitle)
+    const parentLink = childCard.getByRole('button', { name: /^Open parent issue [^ ]+$/ })
+    await expect(parentLink).toBeVisible({ timeout: 10_000 })
+    await parentLink.click()
+    await this.expectPanelTitle(parentTitle)
+  }
+
+  async expectNoSubIssues(): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const list = panel.locator('[data-testid="sub-issues-list"]')
+    await expect(list).toBeVisible({ timeout: 10_000 })
+    await expect(list.getByRole('button', { name: /^Open sub-issue / })).toHaveCount(0, { timeout: 10_000 })
+    await expect(panel.locator('[data-testid="issue-detail-sub-issue-progress"]')).toHaveCount(0, { timeout: 10_000 })
   }
 
   async expectCardLabel(title: string, label: string): Promise<void> {
