@@ -17,6 +17,7 @@ import { ExternalSessionImportPage } from './pages/external-session-import'
 import { FirstRunPage } from './pages/first-run'
 import { GitPage } from './pages/git'
 import { KanbanPage } from './pages/kanban'
+import { PluginsPage } from './pages/plugins'
 import { SearchPage } from './pages/search'
 import { SettingsPage } from './pages/settings'
 import { SkillsPage } from './pages/skills'
@@ -107,6 +108,10 @@ export class CradleWorld extends World {
 
   get settingsPage(): SettingsPage {
     return new SettingsPage(this.page)
+  }
+
+  get pluginsPage(): PluginsPage {
+    return new PluginsPage(this)
   }
 
   get skillsPage(): SkillsPage {

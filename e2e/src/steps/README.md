@@ -19,6 +19,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `first-run.steps.ts` | Clean-install provider onboarding and first conversation |
 | `git.steps.ts` | Temporary Git repository, branch picker, branch creation, and switching |
 | `kanban.steps.ts` | Board/issue lifecycle plus Issue-Agent delegation, rerun, cancellation, and linked Chat |
+| `plugins.steps.ts` | Plugin source install, trust, activation, disable, reload, and visible contribution assertions |
 | `provider.steps.ts` | Provider profile UI lifecycle and runtime selection |
 | `search.steps.ts` | Global search result and command navigation |
 | `settings.steps.ts` | Settings navigation and appearance persistence |
