@@ -11,6 +11,9 @@ export default defineConfig({
   reporter: [
     ['line'],
     ['html', { outputFolder: 'artifacts/fabric-report', open: 'never' }],
+    ['./scripts/playwright-performance-reporter.cjs', {
+      outputDir: 'artifacts/fabric-results/performance',
+    }],
   ],
   outputDir: 'artifacts/fabric-results',
   use: {

@@ -2,15 +2,24 @@ appId: app.cradle.mobile
 ---
 - launchApp:
     clearState: true
+    label: "perf-action:launch-enrollment|cold launch Mobile and show enrollment"
 - extendedWaitUntil:
     visible:
       id: fabric-code-input
     timeout: 30000
+    label: "perf-response:launch-enrollment|the Fabric code input is visible"
 - tapOn:
     id: fabric-code-input
     retryTapIfNoChange: true
+    label: "perf-action:enter-fabric-code|focus and enter the Fabric enrollment code"
 - waitForAnimationToEnd
-- inputText: ${FABRIC_CODE}
+- inputText:
+    text: ${FABRIC_CODE}
+    label: "perf-continuation:enter-fabric-code"
+- assertVisible:
+    id: fabric-code-input
+    text: ${FABRIC_CODE}
+    label: "perf-response:enter-fabric-code|the Fabric enrollment code is visible"
 - hideKeyboard
 - waitForAnimationToEnd
 - extendedWaitUntil:
@@ -21,8 +30,11 @@ appId: app.cradle.mobile
 - tapOn:
     id: fabric-request-access
     retryTapIfNoChange: true
+    label: "perf-action:request-controller-access|request Controller access"
 - extendedWaitUntil:
     visible:
       id: fabric-enrollment-pending
     timeout: 30000
-- assertVisible: Waiting for approval
+- assertVisible:
+    text: Waiting for approval
+    label: "perf-response:request-controller-access|the pending approval state is visible"

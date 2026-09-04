@@ -1501,7 +1501,10 @@ export async function addComment(input: {
   const userId = input.userId ?? LOCAL_USER_ID
   const now = currentUnixSeconds()
   if (review.sourceKind === 'github-pull-request') {
+    const binding = readSourceBinding<GitHubPullRequestBinding>(getReviewSource(review))
     const remoteThread = await replyToPullRequestReviewThread({
+      owner: binding.owner,
+      repo: binding.repo,
       threadId: requireGitHubThreadId(review, thread),
       body: input.bodyMarkdown,
     })
@@ -1554,7 +1557,12 @@ export async function resolveThread(
   const thread = getThreadForReview(review.id, threadId)
   const now = currentUnixSeconds()
   if (review.sourceKind === 'github-pull-request') {
-    const remoteThread = await resolvePullRequestReviewThread(requireGitHubThreadId(review, thread))
+    const binding = readSourceBinding<GitHubPullRequestBinding>(getReviewSource(review))
+    const remoteThread = await resolvePullRequestReviewThread({
+      owner: binding.owner,
+      repo: binding.repo,
+      threadId: requireGitHubThreadId(review, thread),
+    })
     syncGitHubThreadResult(review, remoteThread)
     recordEvent({
       reviewId: review.id,

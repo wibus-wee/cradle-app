@@ -5,13 +5,14 @@ import {
   setCache,
   touchCache,
 } from '../github-cache'
-import { resolveGitHubAppIdentity } from './auth-provider'
 import {
+  getGitHubCacheScope,
   getOctokit,
   recordGitHubRateLimit,
   RequestError,
   shouldAvoidGitHubNetwork,
 } from './client'
+import type { GitHubRepository } from './repository-access'
 
 export type GitHubReadMode = 'read' | 'probe' | 'force'
 
@@ -21,6 +22,7 @@ export interface GitHubCachedReadOptions<T> {
   /** When true (default), send If-None-Match on revalidation. */
   etag?: boolean
   mode?: GitHubReadMode
+  repository?: GitHubRepository
   /**
    * When true (default), stale hits return cached data immediately and
    * revalidate in the background. Set false for list feeds that must
@@ -49,7 +51,7 @@ export async function cachedGitHubRead<T>(options: GitHubCachedReadOptions<T>): 
     fetcher,
   } = options
 
-  const scopedCacheKey = await scopedGitHubCacheKey(cacheKey)
+  const scopedCacheKey = await scopedGitHubCacheKey(cacheKey, options.repository)
   const cached = getCached<T>(scopedCacheKey)
   const fresh = Boolean(cached && !isCacheStale(scopedCacheKey, ttlS))
 
@@ -79,9 +81,12 @@ export async function cachedGitHubRead<T>(options: GitHubCachedReadOptions<T>): 
   return coalesce(scopedCacheKey, async () => revalidate(scopedCacheKey, etag, fetcher))
 }
 
-async function scopedGitHubCacheKey(cacheKey: string): Promise<string> {
-  const identity = await resolveGitHubAppIdentity()
-  return identity ? `${cacheKey}:identity:${identity.cacheKey}` : cacheKey
+async function scopedGitHubCacheKey(
+  cacheKey: string,
+  repository?: GitHubRepository,
+): Promise<string> {
+  const identityKey = await getGitHubCacheScope(repository)
+  return identityKey ? `${cacheKey}:identity:${identityKey}` : cacheKey
 }
 
 async function revalidate<T>(
@@ -130,6 +135,7 @@ export async function cachedFetch<T>(options: {
   etag?: boolean
   mode?: GitHubReadMode
   swr?: boolean
+  repository?: GitHubRepository
   fetcher: (etag: string | null) => Promise<CachedFetchResult<T>>
 }): Promise<T | null> {
   return cachedGitHubRead(options)
@@ -140,8 +146,12 @@ export async function octokitRestGet<T>(input: {
   params?: Record<string, unknown>
   etag?: string | null
   requireToken?: boolean
+  repository?: GitHubRepository
 }): Promise<CachedFetchResult<T>> {
-  const octokit = await getOctokit({ requireToken: input.requireToken })
+  const octokit = await getOctokit({
+    requireToken: input.requireToken,
+    repository: input.repository,
+  })
   try {
     const response = await octokit.request(input.route, {
       ...input.params,

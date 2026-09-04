@@ -6,7 +6,7 @@ The plugin reads GitHub Issues through the GitHub REST API and returns a fixed s
 
 ## Configuration
 
-- `CRADLE_GITHUB_ISSUES_TOKEN`: optional plugin-specific GitHub token. This explicit plugin value takes precedence. When absent, the Cradle host provides the selected GitHub App user token when connected; otherwise it uses the legacy `GH_TOKEN`, `GITHUB_TOKEN`, or `gh auth token` fallback. Private repositories require one of these token paths.
+- `CRADLE_GITHUB_ISSUES_TOKEN`: optional plugin-specific GitHub token. This explicit plugin value takes precedence. When absent, the Cradle host provides the connected GitHub App user token only when its installation includes the bound repository; otherwise it uses `GH_TOKEN`, `GITHUB_TOKEN`, or `gh auth token`. Private repositories require one of these token paths.
 - `CRADLE_GITHUB_API_BASE_URL`: optional GitHub or GitHub Enterprise REST base URL. Defaults to `https://api.github.com`.
 - `CRADLE_GITHUB_ISSUES_MAX_PER_REPO`: optional maximum issues per repository per refresh. Defaults to `100`.
 

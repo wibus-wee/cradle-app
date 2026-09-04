@@ -13,7 +13,9 @@ Owns session-bound GitHub pull request lifecycle for isolated agent work:
 
 The module consumes the shared asynchronous GitHub API client. GitHub Auth owns
 the selected user credential and its lifecycle, so comments, reviews, and pull
-request mutations use the connected App user identity when present.
+request mutations use the connected App user identity when its installation
+includes the repository, then fall back to the local `gh` credential when it
+does not.
 
 The module also owns read-only delivery readiness (`baseRef..HEAD`, cleanliness,
 changed files) and updating an existing open PR after pushing follow-up commits.

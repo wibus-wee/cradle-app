@@ -16,9 +16,9 @@ jobs:
   check:
     name: Check PR body format
     runs-on: ubuntu-latest
-    # The repo owner's own PRs skip the format check; bots / Dependabot use their own body shapes;
-    # humans and agents must follow the template.
-    if: ${{ github.actor != 'wibus-wee' && !endsWith(github.actor, '[bot]') && github.actor != 'dependabot' }}
+    # Automated dependency and service PRs use provider-owned body shapes.
+    # Every human- or agent-authored PR, including the repository owner's, follows this contract.
+    if: ${{ !endsWith(github.actor, '[bot]') && github.actor != 'dependabot' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,7 +59,7 @@ jobs:
               '',
               '- Check **Author type** (`I am an Agent` or `I am a human`)',
               '- Fill **Problem / pressure** (the constraint this PR responds to — review against pressure, not aesthetics)',
-              '- Fill **Summary** and **Test plan**',
+              '- Fill **Summary**, **Test plan**, and every **Performance and impact** field',
               '- If you are an Agent: keep the **Agent handoff** block (reviewing-agent instructions, authoring context, sharing consent)',
               '',
               '<details><summary>Checker findings</summary>',

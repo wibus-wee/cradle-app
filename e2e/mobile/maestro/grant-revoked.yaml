@@ -1,7 +1,8 @@
 appId: app.cradle.mobile
 ---
 - stopApp
-- launchApp
+- launchApp:
+    label: "perf-action:refresh-node-grants|relaunch after one Node grant is revoked"
 - extendedWaitUntil:
     visible:
       id: fabric-node-picker
@@ -10,3 +11,4 @@ appId: app.cradle.mobile
     id: fabric-node-${REMAINING_NODE_ID}
 - assertNotVisible:
     id: fabric-node-${REVOKED_NODE_ID}
+    label: "perf-response:refresh-node-grants|only the remaining Node is visible"
