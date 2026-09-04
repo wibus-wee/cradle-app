@@ -80,8 +80,10 @@ export class WorkspaceEditorPage {
     const editor = this.editor()
     await expect(editor).toBeVisible({ timeout: EDITOR_TIMEOUT })
     await editor.click()
+    await expect(editor.getByRole('textbox', { name: 'Editor content', exact: true }))
+      .toBeFocused({ timeout: EDITOR_TIMEOUT })
     await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A')
-    await this.page.keyboard.type(content)
+    await this.page.keyboard.insertText(content)
     await this.expectContent(content)
   }
 
