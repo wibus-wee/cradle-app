@@ -26,6 +26,7 @@ import { TerminalPage } from './pages/terminal'
 import { UsagePage } from './pages/usage'
 import { WorkPage } from './pages/work'
 import { WorkspacePage } from './pages/workspace'
+import { WorkspaceEditorPage } from './pages/workspace-editor'
 import {
   configureClaudeAgentSimulatorProvider,
   configureCodexSimulatorProvider,
@@ -145,6 +146,10 @@ export class CradleWorld extends World {
 
   get workspacePage(): WorkspacePage {
     return new WorkspacePage(this)
+  }
+
+  get workspaceEditorPage(): WorkspaceEditorPage {
+    return new WorkspaceEditorPage(this)
   }
 
   get kanbanPage(): KanbanPage {

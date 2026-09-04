@@ -31,6 +31,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `terminal.steps.ts` | Bottom panel, PTY command execution, and active-session routing |
 | `usage.steps.ts` | Usage navigation, exact aggregates, range persistence, and CSV assertions |
 | `work.steps.ts` | New Work launch and managed worktree/session verification |
+| `workspace-editor.steps.ts` | Workspace file-tree open, in-app edit/save, persisted content, and reload assertions |
 | `workspace-migration.steps.ts` | Workspace migration setup, preview, commit, and cross-feature ownership assertions |
 | `workspace.steps.ts` | Directory Browser, workspace overview, rename/remove, and selection |
 

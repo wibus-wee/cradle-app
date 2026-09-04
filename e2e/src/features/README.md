@@ -4,7 +4,7 @@
 
 This directory owns the executable user-journey inventory. The broader module and state-combination audit lives in [`../../COVERAGE.md`](../../COVERAGE.md). Retired scenarios live in `e2e/_archive/features/` and are not part of the active suite.
 
-The active suite contains 75 scenarios: 24 `@P0` smoke journeys and 51 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
+The active suite contains 76 scenarios: 24 `@P0` smoke journeys and 52 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
 
 | Feature | Stable IDs | Journey boundary |
 | --- | --- | --- |
@@ -35,6 +35,7 @@ The active suite contains 75 scenarios: 24 `@P0` smoke journeys and 51 `@P1` dee
 | `terminal.feature` | `CRADLE-PTY-001`, `002` | Workspace PTY and multi-session input routing |
 | `usage.feature` | `CRADLE-USAGE-001` | Exact usage aggregation, remembered range, CSV export, and reload after a real Agent run |
 | `work.feature` | `CRADLE-WORK-001`–`003`, `CRADLE-WS-004`–`005` | Isolated Work, managed worktree, provider failure/stop recovery, real file mutation, persisted primary thread, and destructive Workspace cleanup |
+| `workspace-editor.feature` | `CRADLE-WORKSPACE-EDITOR-001` | Workspace file-tree open, in-app edit/save, real filesystem write, and editor restoration across reload |
 | `workspace-migration.feature` | `CRADLE-WS-006` | Dry-run preview and atomic Issue, Kanban, and Automation ownership migration across reload |
 | `workspace-kanban.feature` | `CRADLE-WS-001`–`003`, `CRADLE-KANBAN-001`–`003`, `CRADLE-CHAT-008` | Workspace directory flow, overview, lifecycle, board, issue, and search |
 
