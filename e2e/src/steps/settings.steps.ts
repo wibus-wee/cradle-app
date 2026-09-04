@@ -8,6 +8,7 @@ const SETTINGS_TIMEOUT = 10_000
 const SETTINGS_NAV_IDS: Record<string, string> = {
   'Appearance': 'appearance',
   'Jarvis': 'jarvis',
+  'MCP Servers': 'mcpServers',
   'Runtimes': 'runtimes',
   'Desktop': 'desktop',
   'Server Endpoint': 'serverEndpoint',

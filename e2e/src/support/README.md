@@ -34,6 +34,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/first-run.ts` | Onboarding |
 | `pages/git.ts` | Branch controls |
 | `pages/kanban.ts` | Board, Issue detail, activity, and delegation |
+| `pages/mcp-servers.ts` | Local MCP validation, exact mutation contracts, secret-safe reload projections, disable, and deletion |
 | `pages/plugins.ts` | Plugin Center install/trust/toggle flow and visible panel contribution |
 | `pages/search.ts` | Global search |
 | `pages/session-groups.ts` | Session Group creation, membership, expansion, rename, and non-destructive deletion |

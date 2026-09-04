@@ -6,8 +6,8 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
-| Web feature namespaces | 27 | 11 | 11 | 1 |
-| Server module namespaces | 38 | 14 | 14 | 7 |
+| Web feature namespaces | 28 | 10 | 11 | 1 |
+| Server module namespaces | 39 | 13 | 14 | 7 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
 
@@ -86,6 +86,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Provider profile × Agent selection × disable | `CRADLE-PROVIDER-001` | A UI-created provider can run and later become unavailable |
 | Provider disable/delete × two active sessions × queued continuation × runtime cancellation | `CRADLE-PROVIDER-002`, `CRADLE-PROVIDER-003` | Disabling or deleting a UI-created provider cancels every in-flight run and prevents a queued continuation in another session from executing |
 | Local ACP Runtime × environment validation × create/update × reload × delete | `CRADLE-ACP-001` | Invalid launch environment syntax cannot persist; canonical command, arguments, and environment survive create and update reloads before confirmed deletion removes the Runtime |
+| Local MCP server × encrypted secrets × transport update × disable × reload × delete | `CRADLE-MCP-001` | Invalid secret syntax cannot persist; normalized stdio metadata and public secret keys survive reload, an HTTP update preserves encrypted values without exposing them, and disabled/deleted state remains durable |
 | Fabric pairing × two databases × bidirectional Workspace/Chat/Work × Node-owned worktrees × remote tool approval × Session discovery × relay/server restart | `CRADLE-FABRIC-001` | Two real Nodes enroll through the UI, create Work and managed worktrees on the selected authority in both directions, continue each Work conversation, approve a remote Claude Agent tool request from each controller, discover conversations created by the other controller, and recover mounted routing without re-pairing |
 | Native Mobile Controller × two Node grants × cache isolation × Chat SSE × grant/principal revocation | `CRADLE-FABRIC-002` | A signed Release iOS app enrolls through the real owner UI, selects both Nodes without Server credentials, keeps Workspace state Node-scoped, continues a real Codex conversation over Fabric streaming, preserves one Node after a grant removal, and fails closed after Controller revocation |
 
@@ -93,8 +94,8 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-management`, `agent-runtimes`, `automation`, `browser`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `plugins`, `search`, `server-connection`, `session`, `session-await`, `settings`, `skills`, `split-view`, `storage`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
-| Indirect | `activity`, `agent-runtime`, `background-activity`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
+| Direct | `agent-management`, `agent-runtimes`, `automation`, `browser`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `mcp-servers`, `new-chat`, `new-work`, `nodes`, `onboarding`, `plugins`, `search`, `server-connection`, `session`, `session-await`, `settings`, `skills`, `split-view`, `storage`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
+| Indirect | `activity`, `agent-runtime`, `background-activity`, `code-activity`, `filesystem`, `home`, `model-registry`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
 | User-visible gap | `assets`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `shortcuts`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
 | Service/infra contract | `product-analytics` | Verify event correctness at the event boundary; add browser coverage only for user-visible consent controls |
 
@@ -102,8 +103,8 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `acp`, `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `automation`, `chat-artifacts`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `external-session-import`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `plugins`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `session-group`, `skills`, `storage`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
-| Indirect | `background-activity`, `code-activity`, `desktop`, `mcp-servers`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
+| Direct | `acp`, `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `automation`, `chat-artifacts`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `external-session-import`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `mcp-servers`, `plugins`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `session-group`, `skills`, `storage`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
+| Indirect | `background-activity`, `code-activity`, `desktop`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
 | User-visible gap | `assets`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
 | Service/infra contract | `background-job`, `blob-store`, `codex-reset-watch`, `health`, `maintenance`, `observability`, `test-reset` | Prefer focused service/contract verification; `test-reset` is harness-only |
 

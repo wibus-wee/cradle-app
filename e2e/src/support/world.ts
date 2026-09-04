@@ -18,6 +18,7 @@ import { ExternalSessionImportPage } from './pages/external-session-import'
 import { FirstRunPage } from './pages/first-run'
 import { GitPage } from './pages/git'
 import { KanbanPage } from './pages/kanban'
+import { McpServersPage } from './pages/mcp-servers'
 import { PluginsPage } from './pages/plugins'
 import { SearchPage } from './pages/search'
 import { SessionGroupsPage } from './pages/session-groups'
@@ -119,6 +120,10 @@ export class CradleWorld extends World {
 
   get settingsPage(): SettingsPage {
     return new SettingsPage(this.page)
+  }
+
+  get mcpServersPage(): McpServersPage {
+    return new McpServersPage(this)
   }
 
   get pluginsPage(): PluginsPage {
