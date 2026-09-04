@@ -9,6 +9,11 @@ interface KanbanPageOwner {
   maybeRecall: <T>(key: string) => T | undefined
 }
 
+interface IssueDescriptionAssetReference {
+  contentUrl: string
+  markdownUrl: string
+}
+
 export class KanbanPage {
   private static readonly KANBAN_SIDEBAR = '[data-testid="kanban-sidebar"]'
   private static readonly KANBAN_BOARD = '[data-testid="kanban-board"]'
@@ -33,6 +38,7 @@ export class KanbanPage {
   private static readonly STATUS_MANAGER = '[data-testid="status-manager"]'
   private static readonly STATUS_ROW = '[data-testid^="status-row-"]'
   private static readonly STATUS_NAME_INPUT = '[data-testid="status-name-input"]'
+  private static readonly ISSUE_DESCRIPTION_ASSET_REFERENCE_KEY = 'issueDescriptionAssetReference'
 
   private static readonly PRIORITY_LABELS: Record<string, string> = {
     none: 'No priority',
@@ -486,6 +492,80 @@ export class KanbanPage {
     await editor.fill(description)
     await this.page.locator(KanbanPage.ISSUE_DETAIL_HEADER).click()
     await expect(editor).toHaveValue(description, { timeout: 10_000 })
+  }
+
+  async uploadIssueDescriptionImage(filePath: string, filename: string): Promise<void> {
+    const editor = this.page.locator(KanbanPage.ISSUE_DESCRIPTION_EDITOR)
+    await expect(editor).toBeVisible({ timeout: 10_000 })
+
+    const imageInput = editor.locator('input[type="file"][accept*="image/png"]')
+    await expect(imageInput).toBeAttached()
+    const uploadResponsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'POST' && url.pathname === '/assets'
+    })
+    await imageInput.setInputFiles(filePath)
+    const uploadResponse = await uploadResponsePromise
+    if (!uploadResponse.ok()) {
+      throw new Error(
+        `Asset upload failed with ${uploadResponse.status()} ${uploadResponse.statusText()}: ${await uploadResponse.text()}`,
+      )
+    }
+
+    const asset = await uploadResponse.json() as {
+      filename: string
+      markdownUrl: string
+      url: string
+    }
+    expect(asset.filename).toBe(filename)
+    expect(asset.markdownUrl).toMatch(/^cradle-asset:\/\/[^/?#]+$/)
+    const assetReference = {
+      contentUrl: new URL(asset.url, this.owner.params.serverUrl).toString(),
+      markdownUrl: asset.markdownUrl,
+    }
+    this.owner.remember(KanbanPage.ISSUE_DESCRIPTION_ASSET_REFERENCE_KEY, assetReference)
+
+    await this.expectIssueDescriptionImage(filename, assetReference)
+
+    const saveResponsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'PATCH' && /^\/issues\/[^/]+$/.test(url.pathname)
+    })
+    await this.page.locator(KanbanPage.ISSUE_DETAIL_HEADER).click()
+    const saveResponse = await saveResponsePromise
+    expect(saveResponse.ok()).toBe(true)
+    const savedIssue = await saveResponse.json() as { description: string | null }
+    expect(savedIssue.description).toContain(asset.markdownUrl)
+  }
+
+  async expectSavedIssueDescriptionImage(filename: string): Promise<void> {
+    await this.expectIssueDescriptionImage(filename, this.requireIssueDescriptionAssetReference())
+  }
+
+  async expectPersistedIssueDescriptionImage(filename: string): Promise<void> {
+    await this.expectIssueDescriptionImage(filename, this.requireIssueDescriptionAssetReference())
+  }
+
+  private requireIssueDescriptionAssetReference(): IssueDescriptionAssetReference {
+    const asset = this.owner.maybeRecall<IssueDescriptionAssetReference>(KanbanPage.ISSUE_DESCRIPTION_ASSET_REFERENCE_KEY)
+    if (!asset) {
+      throw new Error('Expected a remembered Issue description asset reference')
+    }
+    return asset
+  }
+
+  private async expectIssueDescriptionImage(
+    filename: string,
+    asset: IssueDescriptionAssetReference,
+  ): Promise<void> {
+    const editor = this.page.locator(KanbanPage.ISSUE_DESCRIPTION_EDITOR)
+    const image = editor.getByRole('img', { name: filename, exact: true })
+    await expect(image).toBeVisible({ timeout: 10_000 })
+    await expect(image).toHaveAttribute('src', asset.contentUrl)
+    await expect.poll(async () => image.evaluate((element) => {
+      const rendered = element as HTMLImageElement
+      return rendered.complete && rendered.naturalWidth > 0 && rendered.naturalHeight > 0
+    }), { timeout: 10_000 }).toBe(true)
   }
 
   async updateIssuePriority(priority: string): Promise<void> {

@@ -1,6 +1,11 @@
 import { t } from 'elysia'
 
 export const AssetsModel = {
+  uploadBody: t.Object({
+    file: t.File(),
+    workspaceId: t.Optional(t.String()),
+  }),
+
   idParams: t.Object({
     id: t.String({ minLength: 1 }),
   }),

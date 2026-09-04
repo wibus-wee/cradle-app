@@ -9,7 +9,7 @@ Files are stored under the server data directory in the `assets/` namespace. The
 ## Files
 
 - `index.ts`: Elysia `/assets` routes for multipart image upload, metadata reads, content reads, and deletion. Upload is intentionally HTTP-only and is not exposed as a generated CLI command.
-- `model.ts`: TypeBox response schemas for asset metadata and delete acknowledgements.
+- `model.ts`: TypeBox schemas for the multipart upload body, asset metadata, and delete acknowledgements.
 - `service.ts`: Asset validation, workspace guard, `sharp` image processing, filesystem writes under the Cradle data directory, Drizzle persistence, content path resolution, and deletion cleanup.
 
 ## Current Scope

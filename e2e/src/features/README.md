@@ -4,12 +4,13 @@
 
 This directory owns the executable user-journey inventory. The broader module and state-combination audit lives in [`../../COVERAGE.md`](../../COVERAGE.md). Retired scenarios live in `e2e/_archive/features/` and are not part of the active suite.
 
-The active suite contains 78 scenarios: 24 `@P0` smoke journeys and 54 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
+The active suite contains 79 scenarios: 24 `@P0` smoke journeys and 55 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
 
 | Feature | Stable IDs | Journey boundary |
 | --- | --- | --- |
 | `agent-identity.feature` | `CRADLE-AGENT-ID-001` | Agent identity create and delete |
 | `agent-runtimes.feature` | `CRADLE-ACP-001` | Local ACP launch-config validation, canonical create/update persistence across reload, and deletion |
+| `assets.feature` | `CRADLE-ASSET-001` | Issue description image upload, Cradle asset persistence, rendered content, and reload recovery |
 | `automation.feature` | `CRADLE-AUTO-001`–`002` | Real Agent completion and cancellation across triage, artifacts, reload, and linked Sessions |
 | `await.feature` | `CRADLE-AWAIT-001`–`002` | Persistent JavaScript Await resume plus cancelled/expired terminal-state rejection across a Server crash |
 | `chat.feature` | `CRADLE-CHAT-001`–`007`, `009`–`014` | Claude multi-turn, stop, failure recovery, reload, queue management, application-process recovery, reasoning, session lifecycle, parallel tool blocks with incremental tool input, redacted thinking, and mid-stream disconnect recovery |
