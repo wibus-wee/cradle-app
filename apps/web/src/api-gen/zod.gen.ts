@@ -3929,6 +3929,11 @@ export const zPutChatSessionsBySessionIdRuntimeModePath = z.object({
     sessionId: z.string().min(1)
 });
 
+export const zPostChatSessionsBySessionIdRuntimeTasksByTaskIdCancelPath = z.object({
+    sessionId: z.string().min(1),
+    taskId: z.string().min(1)
+});
+
 export const zPatchChatSessionsBySessionIdRuntimeTurnSettingsBody = z.object({
     model: z.string().min(1).nullish(),
     effort: z.enum([

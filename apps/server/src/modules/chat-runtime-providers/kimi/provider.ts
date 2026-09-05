@@ -3,6 +3,7 @@ import type { UIMessageChunk } from 'ai'
 import { getRegisteredMcpServers } from '../../../plugins/mcp-registry'
 import type {
   BackgroundTerminalListResult,
+  CancelRuntimeTaskInput,
   CancelTurnInput,
   ChatRuntime,
   GetCapabilitiesInput,
@@ -68,6 +69,7 @@ import {
   postApiV1SessionsBySessionIdProfile,
   postApiV1SessionsBySessionIdQuestionsByTail,
   promptAction,
+  runTaskAction,
   steerPrompts,
   submitPrompt,
 } from './protocol/rest/sdk.gen'
@@ -347,6 +349,7 @@ updatedAt,
 label: task.description,
         status: task.status === 'running' ? 'inProgress' : task.status === 'completed' ? 'completed' : 'pending',
         sourceStatus: task.status,
+        action: task.status === 'running' ? { id: 'cancel', label: 'Cancel task' } : null,
       }]))
       for (const task of projectKimiTranscriptProgressItems(transcript)) {
         taskItemsById.set(task.id ?? `${task.sourceStatus}:${task.label}`, task)
@@ -676,6 +679,22 @@ path: { session_id: sessionId },
         body: { answers: projectKimiQuestionAnswers(question, input.answers) },
       }))
       return { requestId: input.requestId, answers: input.answers }
+    }
+    finally { lease.release() }
+  }
+
+  async cancelRuntimeTask(input: CancelRuntimeTaskInput): Promise<void> {
+    const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
+    const sessionId = input.runtimeSession.providerSessionId
+    if (!sessionId) {
+      throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId))
+    }
+    const lease = await this.acquire(profile)
+    try {
+      await lease.resource.http.request(runTaskAction({
+        client: lease.resource.http.client,
+        path: { session_id: sessionId, tail: `${input.taskId}:cancel` },
+      }))
     }
     finally { lease.release() }
   }

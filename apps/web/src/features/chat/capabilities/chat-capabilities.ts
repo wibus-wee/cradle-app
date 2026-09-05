@@ -5,6 +5,7 @@ import {
   getChatSessionsBySessionIdContextUsage,
   getChatSessionsBySessionIdUiSlotStates,
   postChatSessionsBySessionIdBackgroundTerminalsByProcessIdTerminate,
+  postChatSessionsBySessionIdRuntimeTasksByTaskIdCancel,
 } from '~/api-gen/sdk.gen'
 import type { GetChatSessionsBySessionIdContextUsageResponse } from '~/api-gen/types.gen'
 
@@ -226,6 +227,12 @@ export interface ChatRuntimeProgressItem {
   label: string
   status: ChatRuntimePlanStepStatus
   sourceStatus: string | null
+  action?: ChatRuntimeProgressItemAction | null
+}
+
+export interface ChatRuntimeProgressItemAction {
+  id: 'cancel'
+  label: string
 }
 
 export interface ChatRuntimeProgressUiSlotState {
@@ -673,6 +680,13 @@ export async function terminateChatRuntimeBackgroundTerminal(
     path: { sessionId, processId },
   })
   return readChatCapabilityData(result, 'Failed to terminate background terminal') as ChatRuntimeBackgroundTerminalTerminateResponse
+}
+
+export async function cancelChatRuntimeTask(sessionId: string, taskId: string): Promise<void> {
+  const result = await postChatSessionsBySessionIdRuntimeTasksByTaskIdCancel({
+    path: { sessionId, taskId },
+  })
+  readChatCapabilityData(result, 'Failed to cancel background task')
 }
 
 export async function getChatRuntimeContextUsage(

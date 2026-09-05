@@ -470,6 +470,13 @@ export interface RuntimeProgressItem {
   label: string
   status: RuntimePlanStepStatus
   sourceStatus: string | null
+  action?: RuntimeProgressItemAction | null
+}
+
+/** A provider-native task action exposed through the runtime-neutral progress slot. */
+export interface RuntimeProgressItemAction {
+  id: 'cancel'
+  label: string
 }
 
 export interface RuntimeProgressUiSlotState {
@@ -1060,6 +1067,10 @@ export interface RuntimeUserInputResolution {
 export interface SubmitRuntimeUserInputInput extends GetCapabilitiesInput {
   requestId: string
   answers: Record<string, string[]>
+}
+
+export interface CancelRuntimeTaskInput extends GetCapabilitiesInput {
+  taskId: string
 }
 
 export interface RuntimeToolApprovalRequest {
@@ -1712,6 +1723,7 @@ export interface ChatRuntime {
     input: GetCapabilitiesInput,
   ) => Promise<RuntimeSessionStorageDeletionResult>
   submitUserInput?: (input: SubmitRuntimeUserInputInput) => Promise<RuntimeUserInputResolution | null>
+  cancelRuntimeTask?: (input: CancelRuntimeTaskInput) => Promise<void>
   listProviderThreads?: (input: ProviderThreadListInput) => Promise<ProviderThreadListResult>
   readProviderThread?: (input: ProviderThreadReadInput) => Promise<ProviderThreadReadResult>
   deleteProviderThread?: (input: ProviderThreadDeleteInput) => Promise<ProviderThreadDeleteResult>

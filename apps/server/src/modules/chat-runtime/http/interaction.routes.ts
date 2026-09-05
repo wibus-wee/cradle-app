@@ -2,6 +2,7 @@ import { Elysia } from 'elysia'
 
 import { releaseSideConversation } from '../../provider-runtime/side-conversation-registry'
 import { updateChatRuntimeMode } from '../interaction/runtime-mode'
+import { cancelChatRuntimeTask } from '../interaction/runtime-task'
 import { updateChatRuntimeTurnSettings } from '../interaction/runtime-turn-settings'
 import { submitChatRuntimeUserInput } from '../interaction/user-input'
 import { ChatRuntimeModel } from '../model'
@@ -208,6 +209,20 @@ export const chatRuntimeInteractionRoutes = new Elysia({
       detail: { summary: 'Set the provider-native mode for a chat runtime session' },
       params: ChatRuntimeModel.sessionIdParams,
       body: ChatRuntimeModel.runtimeModeBody,
+      response: { 200: ChatRuntimeModel.cancelResponse },
+    },
+  )
+  .post(
+    '/sessions/:sessionId/runtime-tasks/:taskId/cancel',
+    async ({ params }) => cancelChatRuntimeTask({
+      sessionId: params.sessionId,
+      taskId: params.taskId,
+    }),
+    {
+      detail: {
+        summary: 'Cancel a provider-native background task',
+      },
+      params: ChatRuntimeModel.runtimeTaskParams,
       response: { 200: ChatRuntimeModel.cancelResponse },
     },
   )
