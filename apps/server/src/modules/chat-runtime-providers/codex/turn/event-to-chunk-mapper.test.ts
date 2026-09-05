@@ -182,6 +182,38 @@ describe('mapCodexAppServerNotificationToChunks', () => {
     }])
   })
 
+  it.each([
+    [
+      'modelProvider/authRecoveryStarted',
+      'Codex is recovering authentication for openai.',
+      undefined,
+    ],
+    [
+      'modelProvider/authRecoveryCompleted',
+      'Codex authentication recovery for openai completed.',
+      'info',
+    ],
+  ] as const)('projects Codex %s lifecycle notifications', (method, message, severity) => {
+    const state = createCodexAppServerMapperState('text-1')
+
+    expect(mapCodexAppServerNotificationToChunks({
+      method,
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-1',
+        provider: 'openai',
+        message: 'Refreshing the session credential.',
+      },
+    }, state)).toEqual([{
+      type: 'data-runtime-warning',
+      data: {
+        message,
+        additionalDetails: 'Refreshing the session credential.',
+        ...(severity ? { severity } : {}),
+      },
+    }])
+  })
+
   it('projects Codex image generation items as tool output and renderable file content', () => {
     const state = createCodexAppServerMapperState('text-1')
     const imageUrl = 'data:image/png;base64,generated-image'

@@ -323,6 +323,7 @@ export type RuntimeAlertSeverity = 'info' | 'warning' | 'error'
 export interface RuntimeWarningPartData {
   message: string
   additionalDetails: string | null
+  severity?: RuntimeAlertSeverity
 }
 
 export interface RuntimeTokenUsageBreakdown {
