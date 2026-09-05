@@ -20958,6 +20958,8 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                 provider: string | null;
                 costUsd: number;
                 costBasis: 'list' | 'managed' | 'unknown';
+                reasoningOutputTokens?: number;
+                reasoningOutputTokensMayBePartial?: boolean;
             }>;
             lastModelSwitch?: {
                 fromModelId: string;

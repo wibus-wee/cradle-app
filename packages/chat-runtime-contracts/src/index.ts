@@ -743,6 +743,12 @@ export interface RuntimeUsageModelCost {
   provider: string | null
   costUsd: number
   costBasis: 'list' | 'managed' | 'unknown'
+  /**
+   * Provider-reported reasoning tokens included in `outputTokens`. Providers may only report
+   * this for part of a resumed session, so it must never be added to output token totals.
+   */
+  reasoningOutputTokens?: number
+  reasoningOutputTokensMayBePartial?: boolean
 }
 
 export interface RuntimeModelSwitchCost {
