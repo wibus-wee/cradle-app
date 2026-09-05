@@ -6,14 +6,17 @@ import type { CradleWorld } from '../support/world'
 const SETTINGS_TIMEOUT = 10_000
 
 const SETTINGS_NAV_IDS: Record<string, string> = {
-  Appearance: 'appearance',
-  Jarvis: 'jarvis',
-  Desktop: 'desktop',
-  Support: 'support',
-  外观: 'appearance',
-  记录: 'chronicle',
-  桌面端: 'desktop',
-  支持: 'support',
+  'Appearance': 'appearance',
+  'Chat': 'chat',
+  'Jarvis': 'jarvis',
+  'MCP Servers': 'mcpServers',
+  'Runtimes': 'runtimes',
+  'Desktop': 'desktop',
+  'Server Endpoint': 'serverEndpoint',
+  'Support': 'support',
+  '外观': 'appearance',
+  '桌面端': 'desktop',
+  '支持': 'support',
 }
 
 const THEME_LABEL_TO_ID: Record<string, string> = {
@@ -21,6 +24,8 @@ const THEME_LABEL_TO_ID: Record<string, string> = {
   深色: 'dark',
   自动: 'system',
 }
+
+const SERVER_ENDPOINT_ALIAS_STATE = 'settings.server-endpoint.alias'
 
 function settingNavId(label: string): string {
   const id = SETTINGS_NAV_IDS[label]
@@ -70,8 +75,55 @@ When('我选择外观主题{string}', async function (this: CradleWorld, label: 
   await option.click()
 })
 
+When('我输入无效的 Server Endpoint 地址', async function (this: CradleWorld) {
+  await this.settingsPage.enterServerEndpoint('ftp://localhost:21423')
+})
+
+When('我尝试保存 Server Endpoint', async function (this: CradleWorld) {
+  await this.settingsPage.attemptSave()
+})
+
+When('我输入受管服务器的可达替代地址', async function (this: CradleWorld) {
+  const alias = this.settingsPage.reachableServerAlias(this.params.serverUrl)
+  this.remember(SERVER_ENDPOINT_ALIAS_STATE, alias)
+  await this.settingsPage.enterServerEndpoint(alias)
+})
+
+When('我测试 Server Endpoint 连接', async function (this: CradleWorld) {
+  await this.settingsPage.testServerEndpoint()
+})
+
+When('我保存 Server Endpoint 并等待重新加载', async function (this: CradleWorld) {
+  await this.settingsPage.saveAndWaitForReload()
+})
+
+When('我恢复默认 Server Endpoint 并等待重新加载', async function (this: CradleWorld) {
+  await this.settingsPage.restoreDefaultAndWaitForReload()
+})
+
 Then('我应该看到 Appearance 设置页面', async function (this: CradleWorld) {
   await this.settingsPage.expectAppearancePage()
+})
+
+Then('Server Endpoint 应显示默认的活动地址', async function (this: CradleWorld) {
+  await this.settingsPage.expectServerEndpoint(this.params.serverUrl, 'Default', this.params.serverUrl)
+})
+
+Then('Server Endpoint 应拒绝无效地址并保持默认连接', async function (this: CradleWorld) {
+  await this.settingsPage.expectInvalidServerEndpoint(this.params.serverUrl)
+})
+
+Then('Server Endpoint 连接测试应成功', async function (this: CradleWorld) {
+  await this.settingsPage.expectConnectionSucceeded()
+})
+
+Then('Server Endpoint 应显示自定义的活动地址', async function (this: CradleWorld) {
+  const alias = this.recall<string>(SERVER_ENDPOINT_ALIAS_STATE)
+  await this.settingsPage.expectServerEndpoint(this.params.serverUrl, 'Custom', alias)
+})
+
+Then('应用应通过{string} Server Endpoint 完成启动', async function (this: CradleWorld, _mode: string) {
+  await this.settingsPage.expectApplicationStarted()
 })
 
 Then('侧边栏应处于设置模式', async function (this: CradleWorld) {

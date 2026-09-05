@@ -48,6 +48,44 @@ export class SearchPage {
     await input.fill(query)
   }
 
+  issueResult(title: string): Locator {
+    return this.page.getByTestId(`global-search-issue-result-${title}`)
+      .filter({ visible: true })
+      .last()
+  }
+
+  async fillIssueQuery(query: string): Promise<void> {
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'GET'
+        && url.pathname === '/issues/search'
+        && url.searchParams.get('q') === query
+    })
+    await this.fill(`#${query}`)
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+  }
+
+  async expectIssueVisible(title: string): Promise<void> {
+    await expect(this.issueResult(title)).toBeVisible({ timeout: TIMEOUT })
+  }
+
+  async expectIssueHidden(title: string): Promise<void> {
+    await expect(this.issueResult(title)).toHaveCount(0, { timeout: TIMEOUT })
+  }
+
+  async expectNoMatchingResults(): Promise<void> {
+    await expect(this.dialog().getByText('No matching results found', { exact: true }))
+      .toBeVisible({ timeout: TIMEOUT })
+  }
+
+  async openIssue(title: string): Promise<void> {
+    const result = this.issueResult(title)
+    await expect(result).toBeVisible({ timeout: TIMEOUT })
+    await result.click()
+    await expect(this.input()).toBeHidden({ timeout: TIMEOUT })
+  }
+
   commandRow(label: string): Locator {
     const id = COMMAND_LABEL_TO_ID[label]
     if (!id) {

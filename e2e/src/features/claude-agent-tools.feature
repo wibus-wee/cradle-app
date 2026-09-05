@@ -78,3 +78,26 @@
     而且 聊天流应结束于空闲状态
     而且 聊天中不应出现错误提示
     而且 Simulator 脚本化交换应全部耗尽
+
+  @essence @P1 @CRADLE-AGENT-010
+  场景: Artifact 创建更新与侧边面板持久化闭环
+    假如 我已配置 Claude Agent Artifact 生命周期 Simulator
+    而且 我已添加了一个工作区
+    而且 我已导航到新建聊天并选中 Simulator
+    当 我在新建聊天输入框中输入"请创建并更新发布检查 Artifact"
+    而且 我点击发送按钮
+    那么 应该跳转到聊天视图
+    而且 聊天应显示 Artifact "E2E Release Readiness"（ID "e2e-release-readiness"）的 revision 1
+    而且 聊天应显示 Artifact "E2E Release Readiness"（ID "e2e-release-readiness"）的 revision 2
+    当 我打开 Artifact "E2E Release Readiness" 的 revision 2
+    那么 Artifact 面板应显示标题 "E2E Release Readiness"、ID "e2e-release-readiness"、revision 2 与内容 "5 of 5"
+    而且 Artifact 面板不应显示旧内容 "3 of 5"
+    当 我重新加载当前页面
+    那么 应该跳转到聊天视图
+    而且 聊天应显示 Artifact "E2E Release Readiness"（ID "e2e-release-readiness"）的 revision 2
+    而且 Artifact 面板应显示标题 "E2E Release Readiness"、ID "e2e-release-readiness"、revision 2 与内容 "5 of 5"
+    而且 Artifact 面板不应显示旧内容 "3 of 5"
+    而且 最后一条 AI 消息应包含"Artifact 已更新到 revision 2 并可在侧边面板查看"
+    而且 聊天流应结束于空闲状态
+    而且 聊天中不应出现错误提示
+    而且 Simulator 脚本化交换应全部耗尽

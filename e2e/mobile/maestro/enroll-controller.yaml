@@ -10,24 +10,29 @@ appId: app.cradle.mobile
     label: "perf-response:launch-enrollment|the Fabric code input is visible"
 - tapOn:
     id: fabric-code-input
+    retryTapIfNoChange: true
     label: "perf-action:enter-fabric-code|focus and enter the Fabric enrollment code"
+- waitForAnimationToEnd
 - inputText:
     text: ${FABRIC_CODE}
     label: "perf-continuation:enter-fabric-code"
 - assertVisible:
     id: fabric-code-input
     text: ${FABRIC_CODE}
-    label: "perf-response:enter-fabric-code|the Fabric enrollment code is visible"
 - tapOn:
     text: Join your Fabric
-    label: "perf-action:join-fabric|submit the Fabric enrollment code"
+    retryTapIfNoChange: true
+    label: "perf-continuation:enter-fabric-code"
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       id: fabric-request-access
-    timeout: 30000
-    label: "perf-response:join-fabric|the request access action is visible"
+      enabled: true
+    timeout: 15000
+    label: "perf-response:enter-fabric-code|the request access action is enabled"
 - tapOn:
     id: fabric-request-access
+    retryTapIfNoChange: true
     label: "perf-action:request-controller-access|request Controller access"
 - extendedWaitUntil:
     visible:

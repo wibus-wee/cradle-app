@@ -52,9 +52,7 @@ const KIND_COVERAGE: Record<(typeof cradleToolKinds)[number], KindCoverage> = {
   'question': {
     acceptedGap: 'AskUserQuestion blocks on an interactive control request with no simulator answer path yet.',
   },
-  'artifact': {
-    acceptedGap: 'Cradle artifact write tools ride a dedicated artifact panel journey still on the backlog.',
-  },
+  'artifact': { scenarioIds: ['CRADLE-AGENT-010'] },
   'mcp': { scenarioIds: ['CRADLE-AGENT-008'] },
   'worktree': {
     acceptedGap: 'Enter/exit-worktree tools are not emitted by any scripted runtime flow.',

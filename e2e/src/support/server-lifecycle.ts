@@ -1,6 +1,6 @@
 import type { ChildProcess } from 'node:child_process'
-import { spawn } from 'node:child_process'
-import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, rmSync, statSync, unlinkSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -81,6 +81,49 @@ async function runProcess(command: string, args: string[], options: Parameters<t
   })
 }
 
+async function preparePluginFixture(dataDir: string): Promise<{ fixtureBinDir: string, fixturePluginArchive: string, realNpmPath: string }> {
+  const fixtureBinDir = join(dataDir, 'fixture-bin')
+  const archiveDir = join(dataDir, 'fixture-archives')
+  mkdirSync(fixtureBinDir, { recursive: true })
+  mkdirSync(archiveDir, { recursive: true })
+
+  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  const realNpmPath = execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', [npm], { encoding: 'utf8' })
+    .split(/\r?\n/)[0]!
+    .trim()
+  await runProcess(npm, ['pack', join(ROOT, 'e2e', 'fixtures', 'plugins', 'visible-panel'), '--ignore-scripts', '--pack-destination', archiveDir], {
+    cwd: ROOT,
+    env: process.env,
+    stdio: process.env.CRADLE_E2E_VERBOSE ? 'inherit' : ['ignore', 'ignore', 'pipe'],
+  })
+  const archiveName = readdirSync(archiveDir).find(entry => entry.endsWith('.tgz'))
+  if (!archiveName) {
+    throw new Error('E2E plugin fixture archive was not created')
+  }
+  const fixturePluginArchive = join(archiveDir, archiveName)
+
+  const shimPath = join(fixtureBinDir, 'npm')
+  writeFileSync(shimPath, `#!/usr/bin/env node
+const { copyFileSync } = require('node:fs')
+const { spawnSync } = require('node:child_process')
+const { basename, join } = require('node:path')
+const args = process.argv.slice(2)
+const destinationIndex = args.indexOf('--pack-destination')
+const specifier = args[1] ?? ''
+if (args[0] !== 'pack' || specifier !== '@cradle/e2e-visible-panel@latest' || destinationIndex < 0) {
+  const result = spawnSync(process.env.CRADLE_E2E_REAL_NPM_PATH, args, { stdio: 'inherit' })
+  process.exit(result.status ?? 1)
+}
+const archive = process.env.CRADLE_E2E_PLUGIN_FIXTURE_ARCHIVE
+const destination = args[destinationIndex + 1]
+if (!archive || !destination) process.exit(2)
+copyFileSync(archive, join(destination, basename(archive)))
+console.log(basename(archive))
+`, 'utf8')
+  chmodSync(shimPath, 0o755)
+  return { fixtureBinDir, fixturePluginArchive, realNpmPath }
+}
+
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
 
 interface E2EServerInstance {
@@ -99,6 +142,9 @@ interface ManagedServerLaunchConfig {
   serverPort: number
   nodeBinary: string
   codexAppServerPath: string | null
+  fixtureBinDir: string
+  fixturePluginArchive: string
+  realNpmPath: string
 }
 
 let instance: E2EServerInstance | null = null
@@ -164,12 +210,15 @@ async function startManagedServer(config: ManagedServerLaunchConfig): Promise<Ch
     nodeBinary,
     serverHomeDir,
     serverPort,
+    fixtureBinDir,
+    fixturePluginArchive,
+    realNpmPath,
   } = config
   const serverProcess = spawn(nodeBinary, ['--import', 'tsx', 'src/index.ts'], {
     cwd: join(ROOT, 'apps', 'server'),
     env: {
       ...process.env,
-      PATH: `${dirname(nodeBinary)}:${process.env.PATH ?? ''}`,
+      PATH: `${fixtureBinDir}:${dirname(nodeBinary)}:${process.env.PATH ?? ''}`,
       HOME: serverHomeDir,
       // Workspace fixtures and ad-hoc workspaces live under this checkout-owned
       // cache. Prevent Git from inheriting the Cradle repository above it.
@@ -182,6 +231,8 @@ async function startManagedServer(config: ManagedServerLaunchConfig): Promise<Ch
       CRADLE_CREDENTIAL_SECRET: 'e2e-test-secret',
       ...(codexAppServerPath ? { CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath } : {}),
       CRADLE_E2E: '1',
+      CRADLE_E2E_PLUGIN_FIXTURE_ARCHIVE: fixturePluginArchive,
+      CRADLE_E2E_REAL_NPM_PATH: realNpmPath,
       NODE_ENV: 'test',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -290,12 +341,14 @@ BeforeAll({ timeout: 120_000 }, async () => {
     ?? (existsSync(join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node'))
       ? join(process.env.HOME ?? '', '.nvm/versions/node/v22.22.2/bin/node')
       : process.execPath)
+  const pluginFixture = await preparePluginFixture(dataDir)
   const launchConfig: ManagedServerLaunchConfig = {
     dataDir,
     serverHomeDir,
     serverPort,
     nodeBinary,
     codexAppServerPath,
+    ...pluginFixture,
   }
 
   let serverProcess: ChildProcess | null = null
