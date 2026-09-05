@@ -52,6 +52,8 @@ export interface RuntimeModelCatalog {
 
 export interface ListRuntimeModelsInput {
   workspacePath?: string
+  /** Resolved by the server; runtime adapters must not load targets or secrets themselves. */
+  profile?: RuntimeProviderTargetProfile | null
 }
 
 export type RuntimeObservabilitySeverity = 'debug' | 'info' | 'warn' | 'error' | 'fatal'

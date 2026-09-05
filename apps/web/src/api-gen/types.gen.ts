@@ -20428,6 +20428,7 @@ export type GetChatRuntimesByRuntimeKindModelsData = {
     };
     query?: {
         workspaceId?: string;
+        providerTargetId?: string;
     };
     url: '/chat/runtimes/{runtimeKind}/models';
 };

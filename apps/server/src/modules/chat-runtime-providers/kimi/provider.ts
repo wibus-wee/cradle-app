@@ -50,6 +50,7 @@ import { projectKimiPrompt } from './prompt-content'
 import {
   closeTerminal,
   getApiV1McpServers,
+  getApiV1Models,
   getApiV1OauthUsage,
   getApiV1Sessions,
   getApiV1SessionsBySessionId,
@@ -184,8 +185,31 @@ class KimiProvider implements ChatRuntime {
     }
   }
 
-  async listModels(_input: ListRuntimeModelsInput): Promise<RuntimeModelCatalog> {
-    return { runtimeKind: this.runtimeKind, source: 'runtime-cache', fetchedAt: Date.now(), models: [] }
+  async listModels(input: ListRuntimeModelsInput): Promise<RuntimeModelCatalog> {
+    const profile = requireRuntimeProviderTargetProfile(input.profile ?? null, this.runtimeKind)
+    const lease = await this.acquire(profile)
+    try {
+      const catalog = await lease.resource.http.request(getApiV1Models({ client: lease.resource.http.client }))
+      return {
+        runtimeKind: this.runtimeKind,
+        source: 'runtime',
+        fetchedAt: Date.now(),
+        models: catalog.items.map(model => ({
+          id: model.model,
+          label: model.display_name ?? model.model,
+          providerKind: profile.providerKind ?? 'openai-compatible',
+          runtimeKind: this.runtimeKind,
+          source: 'runtime',
+          nativeProviderId: model.provider,
+          capabilities: {
+            contextWindow: model.max_context_size,
+          },
+        })),
+      }
+    }
+    finally {
+      lease.release()
+    }
   }
 
   async healthCheck(): Promise<ProviderHealthStatus> {

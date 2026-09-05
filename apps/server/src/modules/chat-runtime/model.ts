@@ -452,6 +452,7 @@ export const ChatRuntimeModel = {
 
   runtimeModelsQuery: t.Object({
     workspaceId: t.Optional(t.String()),
+    providerTargetId: t.Optional(t.String()),
   }),
 
   runtimeKindParams: t.Object({
