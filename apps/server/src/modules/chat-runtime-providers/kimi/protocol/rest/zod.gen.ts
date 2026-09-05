@@ -263,6 +263,7 @@ export const zPostApiV1SessionsBody = z.object({
         system_prompt: z.string().optional(),
         thinking: z.string().min(1).optional(),
         tools: z.array(z.string()).optional(),
+        tower_base: z.string().min(1).optional(),
         tower_mode: z.boolean().optional()
     }).optional(),
     metadata: z.object({
@@ -444,6 +445,24 @@ export const zPostApiV1SessionsBySessionIdExportPath = z.object({
     session_id: z.string().min(1)
 });
 
+export const zGetApiV1SessionsBySessionIdFileHistoryChangesPath = z.object({
+    session_id: z.string().min(1)
+});
+
+export const zGetApiV1SessionsBySessionIdFileHistoryChangesQuery = z.object({
+    turn_id: z.int().gte(0).lte(9007199254740991)
+});
+
+export const zGetApiV1SessionsBySessionIdFileHistoryContentPath = z.object({
+    session_id: z.string().min(1)
+});
+
+export const zGetApiV1SessionsBySessionIdFileHistoryContentQuery = z.object({
+    turn_id: z.int().gte(0).lte(9007199254740991),
+    path: z.string().min(1),
+    phase: z.enum(['start', 'end']).optional()
+});
+
 export const zDownloadFilePath = z.object({
     session_id: z.string(),
     '*': z.string()
@@ -507,6 +526,7 @@ export const zPostApiV1SessionsBySessionIdProfileBody = z.object({
         system_prompt: z.string().optional(),
         thinking: z.string().min(1).optional(),
         tools: z.array(z.string()).optional(),
+        tower_base: z.string().min(1).optional(),
         tower_mode: z.boolean().optional()
     }).optional(),
     metadata: z.object({
@@ -957,6 +977,15 @@ export const zPatchApiV1WorkspacesByWorkspaceIdBody = z.object({
 });
 
 export const zPatchApiV1WorkspacesByWorkspaceIdPath = z.object({
+    workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
+});
+
+export const zPostApiV1WorkspacesByWorkspaceIdAddDirBody = z.object({
+    path: z.string().min(1),
+    persist: z.boolean().optional()
+});
+
+export const zPostApiV1WorkspacesByWorkspaceIdAddDirPath = z.object({
     workspace_id: z.string().regex(/^wd_[a-z0-9._-]+_[0-9a-f]{12}$/)
 });
 

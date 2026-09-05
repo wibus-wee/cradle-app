@@ -1318,6 +1318,10 @@ export const KIMI_WEB_SOCKET_MESSAGES = [
                               },
                               type: 'array',
                             },
+                            tower_base: {
+                              minLength: 1,
+                              type: 'string',
+                            },
                             tower_mode: {
                               type: 'boolean',
                             },
