@@ -1414,6 +1414,10 @@
                                   },
                                   "type": "array"
                                 },
+                                "tower_base": {
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
                                 "tower_mode": {
                                   "type": "boolean"
                                 }
@@ -7356,7 +7360,7 @@
   "info": {
     "description": "WebSocket protocol for Kimi Code daemon control frames, acknowledgements, system frames, and session event streaming.",
     "title": "Kimi Code WebSocket API",
-    "version": "0.39.1"
+    "version": "0.41.0"
   },
   "operations": {
     "receiveClientMessages": {

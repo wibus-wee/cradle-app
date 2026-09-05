@@ -2099,6 +2099,7 @@ export type GetApiV1SessionsResponses = {
                     system_prompt?: string;
                     thinking?: string;
                     tools?: Array<string>;
+                    tower_base?: string;
                     tower_mode?: boolean;
                 };
                 archived?: boolean;
@@ -2179,6 +2180,7 @@ export type PostApiV1SessionsData = {
             system_prompt?: string;
             thinking?: string;
             tools?: Array<string>;
+            tower_base?: string;
             tower_mode?: boolean;
         };
         metadata?: {
@@ -2211,6 +2213,7 @@ export type PostApiV1SessionsResponses = {
                 system_prompt?: string;
                 thinking?: string;
                 tools?: Array<string>;
+                tower_base?: string;
                 tower_mode?: boolean;
             };
             archived?: boolean;
@@ -2310,6 +2313,7 @@ export type GetApiV1SessionsBySessionIdResponses = {
                 system_prompt?: string;
                 thinking?: string;
                 tools?: Array<string>;
+                tower_base?: string;
                 tower_mode?: boolean;
             };
             archived?: boolean;
@@ -2887,6 +2891,7 @@ export type GetApiV1SessionsBySessionIdChildrenResponses = {
                     system_prompt?: string;
                     thinking?: string;
                     tools?: Array<string>;
+                    tower_base?: string;
                     tower_mode?: boolean;
                 };
                 archived?: boolean;
@@ -2986,6 +2991,7 @@ export type PostApiV1SessionsBySessionIdChildrenResponses = {
                 system_prompt?: string;
                 thinking?: string;
                 tools?: Array<string>;
+                tower_base?: string;
                 tower_mode?: boolean;
             };
             archived?: boolean;
@@ -3085,6 +3091,88 @@ export type PostApiV1SessionsBySessionIdExportResponses = {
 };
 
 export type PostApiV1SessionsBySessionIdExportResponse = PostApiV1SessionsBySessionIdExportResponses[keyof PostApiV1SessionsBySessionIdExportResponses];
+
+export type GetApiV1SessionsBySessionIdFileHistoryChangesData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query: {
+        turn_id: number;
+    };
+    url: '/api/v1/sessions/{session_id}/file-history/changes';
+};
+
+export type GetApiV1SessionsBySessionIdFileHistoryChangesResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            changes: Array<{
+                additions: number;
+                binary?: boolean;
+                deletions: number;
+                oversize?: boolean;
+                path: string;
+                status: 'added' | 'modified' | 'deleted';
+            }>;
+            recorded: boolean;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40401;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1SessionsBySessionIdFileHistoryChangesResponse = GetApiV1SessionsBySessionIdFileHistoryChangesResponses[keyof GetApiV1SessionsBySessionIdFileHistoryChangesResponses];
+
+export type GetApiV1SessionsBySessionIdFileHistoryContentData = {
+    body?: never;
+    path: {
+        session_id: string;
+    };
+    query: {
+        turn_id: number;
+        path: string;
+        phase?: 'start' | 'end';
+    };
+    url: '/api/v1/sessions/{session_id}/file-history/content';
+};
+
+export type GetApiV1SessionsBySessionIdFileHistoryContentResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            content: {
+                binary?: boolean;
+                content?: string;
+                version: number;
+            } | null;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40401;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type GetApiV1SessionsBySessionIdFileHistoryContentResponse = GetApiV1SessionsBySessionIdFileHistoryContentResponses[keyof GetApiV1SessionsBySessionIdFileHistoryContentResponses];
 
 export type DownloadFileData = {
     body?: never;
@@ -3460,6 +3548,7 @@ export type GetApiV1SessionsBySessionIdProfileResponses = {
                 system_prompt?: string;
                 thinking?: string;
                 tools?: Array<string>;
+                tower_base?: string;
                 tower_mode?: boolean;
             };
             archived?: boolean;
@@ -3539,6 +3628,7 @@ export type PostApiV1SessionsBySessionIdProfileData = {
             system_prompt?: string;
             thinking?: string;
             tools?: Array<string>;
+            tower_base?: string;
             tower_mode?: boolean;
         };
         metadata?: {
@@ -3583,6 +3673,7 @@ export type PostApiV1SessionsBySessionIdProfileResponses = {
                 system_prompt?: string;
                 thinking?: string;
                 tools?: Array<string>;
+                tower_base?: string;
                 tower_mode?: boolean;
             };
             archived?: boolean;
@@ -4699,6 +4790,7 @@ export type GetApiV1SessionsBySessionIdSnapshotResponses = {
                     system_prompt?: string;
                     thinking?: string;
                     tools?: Array<string>;
+                    tower_base?: string;
                     tower_mode?: boolean;
                 };
                 archived?: boolean;
@@ -5383,8 +5475,24 @@ export type GetApiV1SessionsBySessionIdTranscriptResponses = {
                         attachmentIds?: Array<string>;
                         frameId: string;
                         kind: 'text';
+                        origin?: unknown;
                         promptIds?: Array<string>;
-                        role: 'assistant' | 'user';
+                        role: 'assistant';
+                        taskId?: string;
+                        text: string;
+                    } | {
+                        attachmentIds?: Array<string>;
+                        frameId: string;
+                        kind: 'text';
+                        origin?: {
+                            kind: 'user';
+                            skillActivations?: Array<{
+                                skillArgs?: string;
+                                skillName: string;
+                            }>;
+                        };
+                        promptIds?: Array<string>;
+                        role: 'user';
                         taskId?: string;
                         text: string;
                     } | {
@@ -5455,6 +5563,7 @@ export type GetApiV1SessionsBySessionIdTranscriptResponses = {
                         output: number;
                     };
                 }>;
+                triggerPromptId?: string;
                 turnId: string;
                 usage?: {
                     cachedTokens?: number;
@@ -5741,8 +5850,24 @@ export type GetApiV1SessionsBySessionIdTranscriptOpsResponses = {
                                     attachmentIds?: Array<string>;
                                     frameId: string;
                                     kind: 'text';
+                                    origin?: unknown;
                                     promptIds?: Array<string>;
-                                    role: 'assistant' | 'user';
+                                    role: 'assistant';
+                                    taskId?: string;
+                                    text: string;
+                                } | {
+                                    attachmentIds?: Array<string>;
+                                    frameId: string;
+                                    kind: 'text';
+                                    origin?: {
+                                        kind: 'user';
+                                        skillActivations?: Array<{
+                                            skillArgs?: string;
+                                            skillName: string;
+                                        }>;
+                                    };
+                                    promptIds?: Array<string>;
+                                    role: 'user';
                                     taskId?: string;
                                     text: string;
                                 } | {
@@ -5813,6 +5938,7 @@ export type GetApiV1SessionsBySessionIdTranscriptOpsResponses = {
                                     output: number;
                                 };
                             }>;
+                            triggerPromptId?: string;
                             turnId: string;
                             usage?: {
                                 cachedTokens?: number;
@@ -6016,6 +6142,7 @@ export type GetApiV1SessionsBySessionIdTranscriptOpsResponses = {
                         prompt?: string;
                         startedAt?: string;
                         state: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+                        triggerPromptId?: string;
                         turnId: string;
                         usage?: {
                             cachedTokens?: number;
@@ -6067,8 +6194,24 @@ export type GetApiV1SessionsBySessionIdTranscriptOpsResponses = {
                         attachmentIds?: Array<string>;
                         frameId: string;
                         kind: 'text';
+                        origin?: unknown;
                         promptIds?: Array<string>;
-                        role: 'assistant' | 'user';
+                        role: 'assistant';
+                        taskId?: string;
+                        text: string;
+                    } | {
+                        attachmentIds?: Array<string>;
+                        frameId: string;
+                        kind: 'text';
+                        origin?: {
+                            kind: 'user';
+                            skillActivations?: Array<{
+                                skillArgs?: string;
+                                skillName: string;
+                            }>;
+                        };
+                        promptIds?: Array<string>;
+                        role: 'user';
                         taskId?: string;
                         text: string;
                     } | {
@@ -6903,6 +7046,59 @@ export type PatchApiV1WorkspacesByWorkspaceIdResponses = {
 };
 
 export type PatchApiV1WorkspacesByWorkspaceIdResponse = PatchApiV1WorkspacesByWorkspaceIdResponses[keyof PatchApiV1WorkspacesByWorkspaceIdResponses];
+
+export type PostApiV1WorkspacesByWorkspaceIdAddDirData = {
+    body: {
+        path: string;
+        persist?: boolean;
+    };
+    path: {
+        workspace_id: string;
+    };
+    query?: never;
+    url: '/api/v1/workspaces/{workspace_id}/add-dir';
+};
+
+export type PostApiV1WorkspacesByWorkspaceIdAddDirResponses = {
+    /**
+     * Default Response
+     */
+    200: {
+        code: 0;
+        data: {
+            additional_dirs: Array<string>;
+            config_path: string;
+            persisted: boolean;
+            project_root: string;
+        };
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40001;
+        data: null;
+        details?: Array<{
+            message: string;
+            path: string;
+        }> | null;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40409;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    } | {
+        code: 40410;
+        data: null;
+        details?: unknown;
+        msg: string;
+        request_id: string;
+    };
+};
+
+export type PostApiV1WorkspacesByWorkspaceIdAddDirResponse = PostApiV1WorkspacesByWorkspaceIdAddDirResponses[keyof PostApiV1WorkspacesByWorkspaceIdAddDirResponses];
 
 export type ListWorkspaceSkillsData = {
     body?: never;
