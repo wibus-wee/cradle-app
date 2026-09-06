@@ -1,5 +1,5 @@
 import type { Span } from '@opentelemetry/api'
-import { context, SpanStatusCode, trace } from '@opentelemetry/api'
+import { context, isSpanContextValid, SpanStatusCode, trace } from '@opentelemetry/api'
 
 const tracer = trace.getTracer('cradle-server')
 
@@ -8,7 +8,7 @@ export function getActiveSpanContext():
   | null {
   const span = trace.getSpan(context.active())
   const spanContext = span?.spanContext()
-  if (!spanContext) {
+  if (!spanContext || !isSpanContextValid(spanContext)) {
     return null
   }
   return {
