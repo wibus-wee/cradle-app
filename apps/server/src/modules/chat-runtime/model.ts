@@ -137,6 +137,11 @@ export const ChatRuntimeModel = {
     requestId: t.String({ minLength: 1 }),
   }),
 
+  runtimeTaskParams: t.Object({
+    sessionId: t.String({ minLength: 1 }),
+    taskId: t.String({ minLength: 1 }),
+  }),
+
   authRecoveryResponse: t.Union([
     t.Object({
       sessionId: t.String(),
@@ -452,6 +457,7 @@ export const ChatRuntimeModel = {
 
   runtimeModelsQuery: t.Object({
     workspaceId: t.Optional(t.String()),
+    providerTargetId: t.Optional(t.String()),
   }),
 
   runtimeKindParams: t.Object({

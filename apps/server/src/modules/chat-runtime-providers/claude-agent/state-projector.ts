@@ -354,6 +354,12 @@ export function writeClaudeAgentResultSnapshot(
         provider: usage.provider ?? null,
         costUsd: usage.costUSD,
         costBasis: usage.costBasis ?? 'unknown',
+        ...(typeof usage.thinkingTokens === 'number'
+          ? {
+              reasoningOutputTokens: usage.thinkingTokens,
+              reasoningOutputTokensMayBePartial: true,
+            }
+          : {}),
       })),
       updatedAt,
     } satisfies ClaudeAgentResultSnapshot,
@@ -506,6 +512,12 @@ function readClaudeAgentModelCosts(value: unknown): NonNullable<RuntimeUsageUiSl
       provider: typeof cost.provider === 'string' ? cost.provider : null,
       costUsd: cost.costUsd,
       costBasis: cost.costBasis,
+      ...(typeof cost.reasoningOutputTokens === 'number'
+        ? {
+            reasoningOutputTokens: cost.reasoningOutputTokens,
+            reasoningOutputTokensMayBePartial: cost.reasoningOutputTokensMayBePartial === true,
+          }
+        : {}),
     }]
   })
 }

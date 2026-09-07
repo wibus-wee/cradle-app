@@ -158,6 +158,8 @@ export function mapCodexAppServerNotificationToChunks(
     case 'deprecationNotice':
     case 'windows/worldWritableWarning':
     case 'autoApprovalReview/strictReviewRequired':
+    case 'modelProvider/authRecoveryStarted':
+    case 'modelProvider/authRecoveryCompleted':
       return mapRuntimeWarning(notification, state)
     default:
       return []

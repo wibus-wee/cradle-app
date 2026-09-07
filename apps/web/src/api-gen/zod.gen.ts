@@ -3181,7 +3181,8 @@ export const zGetChatRuntimesByRuntimeKindModelsPath = z.object({
 });
 
 export const zGetChatRuntimesByRuntimeKindModelsQuery = z.object({
-    workspaceId: z.string().optional()
+    workspaceId: z.string().optional(),
+    providerTargetId: z.string().optional()
 });
 
 export const zGetChatDraftRuntimeCapabilitiesQuery = z.object({
@@ -3926,6 +3927,11 @@ export const zPutChatSessionsBySessionIdRuntimeModeBody = z.object({
 
 export const zPutChatSessionsBySessionIdRuntimeModePath = z.object({
     sessionId: z.string().min(1)
+});
+
+export const zPostChatSessionsBySessionIdRuntimeTasksByTaskIdCancelPath = z.object({
+    sessionId: z.string().min(1),
+    taskId: z.string().min(1)
 });
 
 export const zPatchChatSessionsBySessionIdRuntimeTurnSettingsBody = z.object({
