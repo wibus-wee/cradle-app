@@ -14,7 +14,7 @@ import {
 } from './client'
 import type { GitHubRepository } from './repository-access'
 
-export type GitHubReadMode = 'read' | 'probe' | 'force'
+export type GitHubReadMode = 'read' | 'probe' | 'force' | 'verify'
 
 export interface GitHubCachedReadOptions<T> {
   cacheKey: string
@@ -40,6 +40,7 @@ const inFlight = new Map<string, Promise<unknown>>()
  * - stale hit → return stale immediately; background ETag revalidate (SWR)
  * - miss → sync fetch (unless budget is low)
  * - force / probe → sync conditional fetch
+ * - verify → sync conditional fetch without stale fallback, respecting network budget
  */
 export async function cachedGitHubRead<T>(options: GitHubCachedReadOptions<T>): Promise<T | null> {
   const {
@@ -52,6 +53,13 @@ export async function cachedGitHubRead<T>(options: GitHubCachedReadOptions<T>): 
   } = options
 
   const scopedCacheKey = await scopedGitHubCacheKey(cacheKey, options.repository)
+  // Decisions that resume an agent require a validated response, never stale fallback.
+  if (mode === 'verify') {
+    if (shouldAvoidGitHubNetwork()) {
+      return null
+    }
+    return coalesce(`${scopedCacheKey}:verify`, async () => revalidate(scopedCacheKey, etag, fetcher, false))
+  }
   const cached = getCached<T>(scopedCacheKey)
   const fresh = Boolean(cached && !isCacheStale(scopedCacheKey, ttlS))
 
@@ -93,6 +101,7 @@ async function revalidate<T>(
   cacheKey: string,
   useEtag: boolean,
   fetcher: (etag: string | null) => Promise<CachedFetchResult<T>>,
+  allowStale = true,
 ): Promise<T | null> {
   const existingEtag = useEtag ? getCached(cacheKey)?.etag ?? null : null
   const result = await fetcher(existingEtag)
@@ -103,7 +112,7 @@ async function revalidate<T>(
   }
 
   if (result.data === null) {
-    return getCached<T>(cacheKey)?.data ?? null
+    return allowStale ? getCached<T>(cacheKey)?.data ?? null : null
   }
 
   setCache(cacheKey, result.data, result.etag ?? null)

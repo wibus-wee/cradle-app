@@ -74,10 +74,9 @@ export function DevBottomBar() {
               window.open('/#/devtool', '_blank')
             }
           }}
-          className="flex items-center gap-1 rounded px-2 py-0.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+          className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
         >
           <MonitorIcon className="inline-block size-3.5" aria-hidden="true" />
-          {t('dev.action.openDevtools')}
         </button>
         <button
           type="button"
@@ -86,10 +85,9 @@ export function DevBottomBar() {
           onClick={() => {
             window.location.reload()
           }}
-          className="flex items-center gap-1 rounded px-2 py-0.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+          className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground"
         >
           <RefreshCwIcon className="inline-block size-3.5" aria-hidden="true" />
-          {t('dev.action.hardReload')}
         </button>
         <button
           type="button"
@@ -97,10 +95,9 @@ export function DevBottomBar() {
           aria-label={t('dev.action.openUserData')}
           disabled={!nativeIpc}
           onClick={() => void openUserData()}
-          className="flex items-center gap-1 rounded px-2 py-0.5 text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+          className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted/60 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
         >
           <FolderOpenIcon className="inline-block size-3.5" aria-hidden="true" />
-          {t('dev.action.openUserData')}
         </button>
         <BackgroundActivityPopover />
         <UiActivityPopover />

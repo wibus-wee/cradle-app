@@ -770,6 +770,28 @@ describe('session-await trigger', () => {
     expect(db().select().from(sessionAwaits).all()).toHaveLength(0)
   })
 
+  it('reuses equivalent pending CI registrations, including concurrent requests', async () => {
+    process.env.GITHUB_TOKEN = 'token'
+    resetTokenCache()
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const { pathname } = new URL(new Request(input).url)
+      return new Response(JSON.stringify(pathname.endsWith('/check-runs')
+        ? { total_count: 0, check_runs: [] }
+        : { total_count: 0, statuses: [] }), {
+        status: 200,
+headers: { 'content-type': 'application/json' },
+      })
+    }) as typeof fetch
+    const { workspaceId, sessionId } = seedSession()
+    const input = { chatSessionId: sessionId, workspaceId, source: 'github-ci', filterJson: JSON.stringify({ repo: 'acme/app', sha: 'head-sha' }) }
+    const [first, second] = await Promise.all([register(input), register({
+      ...input,
+filterJson: JSON.stringify({ sha: 'head-sha', repo: 'acme/app' }),
+    })])
+    expect(second.id).toBe(first.id)
+    expect(listBySession(sessionId)).toHaveLength(1)
+  })
+
   it('returns a product error when available checks cannot read the repo', async () => {
     process.env.GITHUB_TOKEN = 'token'
     resetTokenCache()
