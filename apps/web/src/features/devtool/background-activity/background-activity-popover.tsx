@@ -104,9 +104,8 @@ export function BackgroundActivityPopover() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" className="flex h-6 items-center gap-1 rounded px-2 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground active:scale-[0.96]" title="Background activity" aria-label="Background activity">
+        <button type="button" className="flex size-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground active:scale-[0.96]" title="Background activity" aria-label="Background activity">
           <TaskIcon className="size-3.5" aria-hidden="true" />
-          <span>Activity</span>
           {activities.data?.some(activity => activity.status === 'running') && <span className="size-1.5 rounded-full bg-amber-500" aria-label="Background activity running" />}
         </button>
       </PopoverTrigger>
