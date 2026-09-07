@@ -130,6 +130,81 @@ describe('gitHub session-await sources', () => {
     })
   })
 
+  it('refreshes completed cached checks before deciding a newly registered await', async () => {
+    const routes = {
+      '/repos/acme/app/commits/head-sha/check-runs': {
+        total_count: 1,
+        check_runs: [{ id: 1, name: 'build', status: 'completed', conclusion: 'failure' }],
+      },
+      '/repos/acme/app/commits/head-sha/status': { total_count: 0, statuses: [] },
+      '/repos/acme/app/actions/runs': { total_count: 0, workflow_runs: [] },
+    }
+    installGitHubFetch(routes)
+    const [first] = await githubCISource.checkPending([awaitRow({ repo: 'acme/app', sha: 'head-sha' })])
+    expect(first.matched).toBe(true)
+    routes['/repos/acme/app/commits/head-sha/check-runs'].check_runs[0].status = 'in_progress'
+    installGitHubFetch(routes)
+    const [second] = await githubCISource.checkPending([awaitRow({ repo: 'acme/app', sha: 'head-sha' }, { id: 'await-2' })])
+    expect(second.matched).toBe(false)
+  })
+
+  it('distinguishes workflow reruns even when their conclusions are identical', async () => {
+    const routes = {
+      '/repos/acme/app/commits/head-sha/check-runs': {
+        total_count: 1,
+        check_runs: [{ id: 1, name: 'build', status: 'completed', conclusion: 'failure' }],
+      },
+      '/repos/acme/app/commits/head-sha/status': { total_count: 0, statuses: [] },
+      '/repos/acme/app/actions/runs': {
+        total_count: 1,
+workflow_runs: [{ id: 10, run_attempt: 1, status: 'completed', conclusion: 'failure' }],
+      },
+    }
+    installGitHubFetch(routes)
+    const [first] = await githubCISource.checkPending([awaitRow({ repo: 'acme/app', sha: 'head-sha' })])
+    routes['/repos/acme/app/actions/runs'].workflow_runs[0].run_attempt = 2
+    installGitHubFetch(routes)
+    const [second] = await githubCISource.checkPending([awaitRow({ repo: 'acme/app', sha: 'head-sha' })])
+    expect(first.matched).toBe(true)
+    expect(second.matched).toBe(true)
+    expect(JSON.parse(first.resumePayloadJson!).resultKey).not.toBe(JSON.parse(second.resumePayloadJson!).resultKey)
+  })
+
+  it('replaces historical workflow and check-suite failures with the latest run on the same head', async () => {
+    const routes = {
+      '/repos/acme/app/commits/head-sha/check-runs': {
+        total_count: 2,
+        check_runs: [
+          { id: 1, name: 'PR body', status: 'completed', conclusion: 'failure', check_suite: { id: 10 } },
+          { id: 2, name: 'PR body', status: 'completed', conclusion: 'success', check_suite: { id: 20 } },
+        ],
+      },
+      '/repos/acme/app/commits/head-sha/status': { total_count: 0, statuses: [] },
+      '/repos/acme/app/actions/runs': {
+        total_count: 2,
+        workflow_runs: [
+          { id: 100, workflow_id: 5, event: 'pull_request', head_branch: 'feature', run_number: 1, run_attempt: 1, check_suite_id: 10, status: 'completed', conclusion: 'failure' },
+          { id: 200, workflow_id: 5, event: 'pull_request', head_branch: 'feature', run_number: 2, run_attempt: 1, check_suite_id: 20, status: 'completed', conclusion: 'success' },
+        ],
+      },
+    }
+    installGitHubFetch(routes)
+    const [passed] = await githubCISource.checkPending([awaitRow({ repo: 'acme/app', sha: 'head-sha' })])
+    expect(passed.matched).toBe(true)
+    expect(JSON.parse(passed.resumePayloadJson!)).toMatchObject({ allSuccess: true, totalCount: 1, workflowFailureCount: 0 })
+
+    routes['/repos/acme/app/actions/runs'].workflow_runs[1].status = 'in_progress'
+    installGitHubFetch(routes)
+    const [pending] = await githubCISource.checkPending([awaitRow({ repo: 'acme/app', sha: 'head-sha' })])
+    expect(pending.matched).toBe(false)
+
+    routes['/repos/acme/app/actions/runs'].workflow_runs[1].status = 'completed'
+    routes['/repos/acme/app/actions/runs'].workflow_runs[1].event = 'push'
+    installGitHubFetch(routes)
+    const [differentEvent] = await githubCISource.checkPending([awaitRow({ repo: 'acme/app', sha: 'head-sha' })])
+    expect(JSON.parse(differentEvent.resumePayloadJson!)).toMatchObject({ allSuccess: false, totalCount: 2, workflowFailureCount: 1 })
+  })
+
   it('waits while a GitHub Actions workflow for the target head is still running', async () => {
     installGitHubFetch({
       '/repos/acme/app/pulls/42': {
