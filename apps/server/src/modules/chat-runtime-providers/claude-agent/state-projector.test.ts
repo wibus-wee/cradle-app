@@ -62,6 +62,7 @@ describe('claude result usage projection', () => {
           canonicalModel: 'claude-sonnet-4-6',
           provider: 'bedrock',
           costBasis: 'managed',
+          thinkingTokens: 3,
         },
       },
       permission_denials: [],
@@ -82,6 +83,8 @@ describe('claude result usage projection', () => {
         provider: 'bedrock',
         costUsd: 0.123,
         costBasis: 'managed',
+        reasoningOutputTokens: 3,
+        reasoningOutputTokensMayBePartial: true,
       }],
       updatedAt: 123,
     })

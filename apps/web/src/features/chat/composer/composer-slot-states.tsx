@@ -174,7 +174,7 @@ export function ComposerSlotStates({
     standaloneProgressState
       ? {
         key: `progress:${standaloneProgressState.slotId}:${standaloneProgressState.threadId}:${standaloneProgressState.turnId ?? 'turn'}`,
-        node: <ProgressSlotState state={standaloneProgressState} className={className} />,
+        node: <ProgressSlotState state={standaloneProgressState} sessionId={sessionId} className={className} />,
       }
       : null,
     visiblePlanState

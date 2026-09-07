@@ -79,6 +79,7 @@ describe('kimi transcript projector', () => {
       label: 'Audit provider changes',
       status: 'inProgress',
       sourceStatus: 'running',
+      action: { id: 'cancel', label: 'Cancel task' },
     }])
   })
 
