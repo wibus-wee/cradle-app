@@ -51,6 +51,8 @@ The `github-ci` live-status route also reads GitHub Actions workflow runs for th
 
 CI polling synchronously verifies PR heads, checks, commit statuses, and workflow runs through the GitHub cache gate's `verify` mode. A verified 304 may reuse cached content; network failures and network-budget restrictions cannot fall back to cached results for completion decisions. Live status display retains cache-first reads.
 
+For each workflow ID, event type, and head branch, completion uses the greatest GitHub run number and attempt on the target SHA. Check suites belonging only to superseded runs are excluded, so a failed run followed by a successful new run on the same commit does not remain a failure. Different workflows, events, branches, and checks without a known superseded suite remain independent signals.
+
 Equivalent pending CI registrations in the same session and workspace reuse one await. Completed CI payloads identify the repository, target commit, check/status identities, and workflow run attempts. A result already triggered in that session is not enqueued again; a newly registered await stays pending for a different result. Delivery failures retain their original result and use delivery retry. Historical payloads without a result key cannot be deduplicated against newly observed results.
 
 Work-owned GitHub awaits include `workId` and pin `headSha`. A new head cancels the older pending Work-owned subscriptions and registers new ones. A pinned PR await follows a changed head without resuming and resolves when the PR is merged or closed. Repeated delivery of the same completed CI round does not wake the Agent again; a new run attempt can notify even when its conclusion is unchanged.

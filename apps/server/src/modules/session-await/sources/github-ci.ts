@@ -129,6 +129,7 @@ interface AggregatedCI {
 
 interface AggregatedWorkflowRuns {
   workflowRuns: GitHubWorkflowRun[]
+  supersededCheckSuiteIds: Set<number>
   pendingCount: number
   failureCount: number
 }
@@ -352,7 +353,23 @@ function aggregateCI(checkRuns: GitHubCheckRun[], statuses: GitHubCommitStatus[]
   }
 }
 
-function aggregateWorkflowRuns(workflowRuns: GitHubWorkflowRun[]): AggregatedWorkflowRuns {
+function aggregateWorkflowRuns(runs: GitHubWorkflowRun[]): AggregatedWorkflowRuns {
+  const latest = new Map<string, GitHubWorkflowRun>()
+  for (const run of runs) {
+    const key = run.workflow_id
+      ? JSON.stringify([run.workflow_id, run.event, run.head_branch])
+      : String(run.id)
+    const previous = latest.get(key)
+    if (!previous || run.run_number > previous.run_number
+      || (run.run_number === previous.run_number && (run.run_attempt ?? 1) > (previous.run_attempt ?? 1))) {
+      latest.set(key, run)
+    }
+  }
+  const workflowRuns = [...latest.values()]
+  const currentSuites = new Set(workflowRuns.map(run => run.check_suite_id))
+  const supersededCheckSuiteIds = new Set(runs
+    .filter(run => run.check_suite_id && !currentSuites.has(run.check_suite_id))
+    .map(run => run.check_suite_id!))
   let pendingCount = 0
   let failureCount = 0
 
@@ -366,12 +383,12 @@ function aggregateWorkflowRuns(workflowRuns: GitHubWorkflowRun[]): AggregatedWor
     }
   }
 
-  return { workflowRuns, pendingCount, failureCount }
+  return { workflowRuns, supersededCheckSuiteIds, pendingCount, failureCount }
 }
 
 async function fetchAggregatedWorkflowRuns(target: ResolvedCITarget, mode: GitHubReadMode = 'read'): Promise<AggregatedWorkflowRuns | null> {
   if (target.checkRunId || !target.ref) {
-    return { workflowRuns: [], pendingCount: 0, failureCount: 0 }
+    return aggregateWorkflowRuns([])
   }
   let response: Awaited<ReturnType<typeof fetchWorkflowRunsForHead>>
   try {
@@ -379,7 +396,7 @@ async function fetchAggregatedWorkflowRuns(target: ResolvedCITarget, mode: GitHu
   }
   catch (error) {
     if (isGitHubMissingTarget(error)) {
-      return { workflowRuns: [], pendingCount: 0, failureCount: 0 }
+      return aggregateWorkflowRuns([])
     }
     throw error
   }
@@ -657,6 +674,12 @@ export const githubCISource: SessionAwaitSource = {
           results.push({ awaitId: row.id, matched: false, transientError: 'GitHub Actions API unavailable' })
           continue
         }
+
+        aggregate = aggregateCI(
+          aggregate.checkRuns.filter(run => !run.check_suite?.id
+            || !workflowAggregate.supersededCheckSuiteIds.has(run.check_suite.id)),
+          aggregate.statuses,
+        )
 
         if (workflowAggregate.pendingCount) {
           results.push(pendingResult(row.id, filter, needsNormalization))
