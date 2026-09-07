@@ -81,7 +81,7 @@ import {
   codexSecretKindForAuthMode,
   normalizeCodexAuthMode,
 } from './codex-auth-modes'
-import { CodexConfigContainer } from './codex-config-container'
+import { CodexConfigDialog } from './codex-config-dialog'
 import { CustomModelsEditor } from './custom-models-editor'
 import { ModelsPanel } from './models-panel'
 import { ProviderConnectionTestControls } from './provider-connection-test'
@@ -990,7 +990,7 @@ export function ProfileDetailPanel({
         )}
 
         {(providerKind === 'openai-compatible' || providerKind === 'universal') && (
-          <CodexConfigContainer
+          <CodexConfigDialog
             providerTargetId={profile.id}
             onSaved={(configJson) => { latestConfigRef.current = configJson; onSaved() }}
             onSavingChange={setCodexConfigSaving}

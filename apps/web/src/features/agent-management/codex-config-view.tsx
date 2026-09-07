@@ -1,25 +1,29 @@
-import { Refresh1Line as ResetIcon, SaveLine as SaveIcon } from '@mingcute/react'
-import type { json } from 'monaco-editor'
-import { lazy, Suspense, useState } from 'react'
-import { z } from 'zod'
+import {
+  CheckLine as CheckIcon,
+  RefreshAnticlockwise1Line as ResetIcon,
+  SaveLine as SaveIcon,
+  WarningLine as WarningIcon,
+} from '@mingcute/react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 
 import type { GetProviderTargetsCodexConfigSchemaResponse } from '~/api-gen/types.gen'
+import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 import { Spinner } from '~/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { cn } from '~/lib/cn'
 
+import {
+  countOverrides,
+  parseCodexConfig,
+  parseCodexSchema,
+  setConfigFlag,
+  setPathValue,
+} from './codex-config-schema'
+import { CodexConfigSettingsView } from './codex-config-settings-view'
+
 const CodexConfigEditorView = lazy(() =>
   import('./codex-config-editor-view').then(module => ({ default: module.CodexConfigEditorView })))
-const Config = z.record(z.string(), z.json())
 
 export interface CodexConfigViewProps {
   schema: GetProviderTargetsCodexConfigSchemaResponse
@@ -38,60 +42,25 @@ export function CodexConfigView({
 }: CodexConfigViewProps) {
   const [value, setValue] = useState(initialValue)
   const [savedValue, setSavedValue] = useState(initialValue)
-  const [mode, setMode] = useState('settings')
+  const [mode, setMode] = useState<'settings' | 'json'>('settings')
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
-  let config: z.infer<typeof Config> = {}
-  let parseError: string | null = null
-  try {
-    config = Config.parse(JSON.parse(value))
-  }
-  catch {
-    parseError = 'Enter a JSON object with valid configuration values.'
-  }
 
-  const nativeSchema: json.JSONSchema = JSON.parse(schema.schemaJson)
-  const featureSchema = nativeSchema.properties?.features
-  const flags = Object.entries(
-    typeof featureSchema === 'object' ? (featureSchema.properties ?? {}) : {},
-  ).filter(
-    ([name, field]) =>
-      typeof field === 'object'
-      && field.type === 'boolean'
-      && name.toLowerCase().includes(search.toLowerCase()),
-  )
-  const features = Config.safeParse(config.features ?? {})
-  const setField = (key: string, next: string) => {
-    const updated = { ...config }
-    if (next === 'inherit') {
-      delete updated[key]
-    }
-    else {
-      updated[key] = next
-    }
-    setValue(JSON.stringify(updated, null, 2))
+  const model = useMemo(() => parseCodexSchema(schema), [schema])
+  const parsed = parseCodexConfig(value)
+  const parseError = 'error' in parsed ? parsed.error : null
+  const config = 'config' in parsed ? parsed.config : {}
+
+  const commit = (next: Record<string, unknown>) => {
+    setValue(JSON.stringify(next, null, 2))
     setSaved(false)
   }
-  const setFlag = (key: string, next: string) => {
-    const updated = { ...(features.success ? features.data : {}) }
-    if (next === 'inherit') {
-      delete updated[key]
-    }
-    else {
-      updated[key] = next === 'true'
-    }
-    const nextConfig = { ...config }
-    if (Object.keys(updated).length) {
-      nextConfig.features = updated
-    }
-    else {
-      delete nextConfig.features
-    }
-    setValue(JSON.stringify(nextConfig, null, 2))
-    setSaved(false)
-  }
+  const busy = disabled || saving
+  const dirty = value !== savedValue
+  const overrides = countOverrides(config)
+
   const save = async () => {
     setSaving(true)
     setError(null)
@@ -100,190 +69,159 @@ export function CodexConfigView({
       setSavedValue(value)
       setSaved(true)
     }
-    catch (error) {
-      setError(error instanceof Error ? error.message : 'Could not save Codex configuration')
+    catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save Codex configuration')
     }
     finally {
       setSaving(false)
     }
   }
-  const busy = disabled || saving
+
   return (
-    <section className="flex min-w-0 flex-col gap-4" aria-label="Codex configuration">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <section aria-label="Codex configuration" className="flex min-w-0 flex-col gap-6">
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 px-0.5">
           <h3 className="text-sm font-medium text-foreground">Codex configuration</h3>
-          <p className="text-xs text-muted-foreground">{`Codex ${schema.version}`}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground [text-wrap:pretty]">
+            {`Native settings for this provider's Codex runtime · Codex ${model.version}`}
+          </p>
         </div>
-        <Tabs value={mode} onValueChange={setMode}>
+        <Tabs
+          value={mode}
+          onValueChange={next => setMode(next as 'settings' | 'json')}
+        >
           <TabsList>
             <TabsTrigger value="settings">Settings</TabsTrigger>
             <TabsTrigger value="json">JSON</TabsTrigger>
           </TabsList>
         </Tabs>
-      </div>
+      </header>
+
       {mode === 'settings'
         ? (
-          <fieldset disabled={busy || Boolean(parseError)} className="flex min-w-0 flex-col gap-4">
-            {[
-              {
-                key: 'web_search',
-                label: 'Web search',
-                definition: nativeSchema.definitions?.WebSearchMode,
-              },
-              {
-                key: 'model_verbosity',
-                label: 'Response verbosity',
-                definition: nativeSchema.definitions?.Verbosity,
-              },
-            ]
-              .filter(field => field.key in (nativeSchema.properties ?? {}))
-              .map(field => (
-                <div key={field.key} className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs text-foreground">{field.label}</span>
-                  <Select
-                    value={
-                      typeof config[field.key] === 'string'
-                        ? (config[field.key] as string)
-                        : 'inherit'
-                    }
-                    onValueChange={value => setField(field.key, value)}
-                    disabled={busy || Boolean(parseError)}
-                  >
-                    <SelectTrigger className="w-36" aria-label={field.label}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="inherit">Inherit default</SelectItem>
-                      {(typeof field.definition === 'object'
-                        ? (field.definition.enum ?? [])
-                        : []
-                      ).map((option: string) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-            <label className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground">
-              Service tier
-              <Input
-                className="w-36"
-                value={typeof config.service_tier === 'string' ? config.service_tier : ''}
-                placeholder="Inherit default"
-                onChange={event => setField('service_tier', event.target.value || 'inherit')}
-              />
-            </label>
-            <Input
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-              placeholder="Search feature flags"
-              aria-label="Search feature flags"
-            />
-            <div className="max-h-64 overflow-y-auto">
-              {flags.map(([key]) => (
-                <div key={key} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span className="min-w-0 break-all font-mono text-xs text-foreground">{key}</span>
-                  <Select
-                    value={
-                      features.success && typeof features.data[key] === 'boolean'
-                        ? String(features.data[key])
-                        : 'inherit'
-                    }
-                    onValueChange={value => setFlag(key, value)}
-                    disabled={busy || Boolean(parseError)}
-                  >
-                    <SelectTrigger className="w-36 shrink-0" aria-label={key}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="inherit">Inherit default</SelectItem>
-                      <SelectItem value="true">Enabled</SelectItem>
-                      <SelectItem value="false">Disabled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
-              {!flags.length && (
-                <p className="py-3 text-xs text-muted-foreground">No matching feature flags</p>
-              )}
-            </div>
-          </fieldset>
-        )
-        : (
-          <Suspense
-            fallback={(
-              <div className="flex h-80 items-center justify-center">
-                <Spinner />
-              </div>
-            )}
-          >
-            <CodexConfigEditorView
-              value={value}
-              schemaJson={schema.schemaJson}
+            <CodexConfigSettingsView
+              schema={schema}
+              model={model}
+              config={config}
               theme={theme}
+              readOnly={busy || Boolean(parseError)}
+              search={search}
+              onSearchChange={setSearch}
+              onSetPath={(path, next) => commit(setPathValue(config, path, next))}
+              onSetFlag={(key, next) => commit(setConfigFlag(config, key, next))}
+            />
+          )
+        : (
+            <div className="flex min-w-0 flex-col gap-2">
+              <Suspense
+                fallback={(
+                  <div className="flex h-96 items-center justify-center">
+                    <Spinner />
+                  </div>
+                )}
+              >
+                <CodexConfigEditorView
+                  value={value}
+                  schemaJson={schema.schemaJson}
+                  theme={theme}
+                  disabled={busy}
+                  onChange={(next) => {
+                    setValue(next)
+                    setSaved(false)
+                  }}
+                />
+              </Suspense>
+              <p className="text-xs text-muted-foreground">
+                {`Validated against the Codex ${model.version} configuration schema.`}
+              </p>
+            </div>
+          )}
+
+      {parseError && mode !== 'json' && (
+        <Alert variant="warning">
+          <WarningIcon />
+          <AlertTitle>Configuration JSON is invalid</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {parseError}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setMode('json')}
+            >
+              Fix in JSON
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      {error && (
+        <Alert variant="destructive">
+          <WarningIcon />
+          <AlertTitle>Could not save Codex configuration</AlertTitle>
+          <AlertDescription className="break-words">{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-foreground/4 pt-4">
+        <span
+          aria-live="polite"
+          className={cn(
+            'flex min-w-0 items-center gap-1.5 text-xs',
+            saved ? 'text-success' : 'text-muted-foreground',
+          )}
+        >
+          {saved && <CheckIcon className="size-3 shrink-0" />}
+          {saving
+            ? 'Saving…'
+            : saved
+              ? 'Saved. Applies to the next runtime connection.'
+              : dirty
+                ? 'Unsaved changes'
+                : 'Applies to the next runtime connection.'}
+        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {overrides > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
               disabled={busy}
-              onChange={(value) => {
-                setValue(value)
+              onClick={() => {
+                commit({})
+                setError(null)
+                setSearch('')
+              }}
+            >
+              <ResetIcon />
+              Reset overrides
+            </Button>
+          )}
+          {dirty && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              disabled={busy}
+              onClick={() => {
+                setValue(savedValue)
+                setError(null)
                 setSaved(false)
               }}
-            />
-          </Suspense>
-        )}
-      <details className="text-xs text-muted-foreground">
-        <summary className="cursor-pointer">Managed by Cradle</summary>
-        <p className="mt-2 break-words font-mono">{schema.managedKeys.join(', ')}</p>
-      </details>
-      {(error || parseError) && (
-        <p role="alert" className="break-words text-xs text-destructive">
-          {error || parseError}
-        </p>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className={cn('text-xs', saved ? 'text-success' : 'text-muted-foreground')}>
-          {saved
-            ? 'Saved. Applies to the next runtime connection.'
-            : value !== savedValue
-              ? 'Unsaved changes'
-              : 'Existing connections keep their current configuration.'}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={busy || value === savedValue}
-            onClick={() => {
-              setValue(savedValue)
-              setError(null)
-              setSaved(false)
-            }}
-          >
-            Discard
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={busy || value === '{}'}
-            onClick={() => {
-              setValue('{}')
-              setSaved(false)
-            }}
-          >
-            <ResetIcon />
-            Reset overrides
-          </Button>
+            >
+              Discard
+            </Button>
+          )}
           <Button
             size="sm"
-            disabled={busy || Boolean(parseError) || value === savedValue}
+            className="gap-1.5"
+            disabled={busy || Boolean(parseError) || !dirty}
             onClick={() => void save()}
           >
             {saving ? <Spinner /> : <SaveIcon />}
             Save
           </Button>
         </div>
-      </div>
+      </footer>
     </section>
   )
 }
