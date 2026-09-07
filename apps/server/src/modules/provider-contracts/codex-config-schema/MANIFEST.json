@@ -1,0 +1,6 @@
+{
+  "version": "0.153.4",
+  "releaseTag": "rust-v0.153.4",
+  "source": "https://raw.githubusercontent.com/openai/codex/rust-v0.153.4/codex-rs/core/config.schema.json",
+  "sha256": "ef8db62916d1fade5c64183ed39d778aa8b3ecaae6f010679d0e202a0c3c4be6"
+}

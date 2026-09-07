@@ -11,6 +11,7 @@ import { listCodexChatgptModels } from '../chat-runtime-providers/codex/app-serv
 import {
   buildCodexExternalModelProviderConfig,
 } from '../chat-runtime-providers/codex/config/runtime-config'
+import { parseCodexNativeConfig } from '../provider-contracts/codex-native-config'
 import {
   AnthropicConfigJsonSchema,
   normalizeBaseUrl,
@@ -100,15 +101,14 @@ class OpenAICompatibleMetadataProvider implements ProviderMetadataProvider {
     if (chatgptAuth) {
       try {
         const baseUrl = config.baseUrl?.trim() || null
+        const codexConfig = parseCodexNativeConfig(config.codex ?? {})
+        if (baseUrl) {
+          Object.assign(codexConfig, buildCodexExternalModelProviderConfig(normalizeBaseUrl(baseUrl), 'chatgptAuthTokens'))
+        }
         return await listCodexChatgptModels({
           credential: chatgptAuth,
           readSecret: deps.readSecret,
-          config: baseUrl
-            ? buildCodexExternalModelProviderConfig(
-                normalizeBaseUrl(baseUrl),
-                'chatgptAuthTokens',
-              )
-            : undefined,
+          config: baseUrl || config.codex ? codexConfig : undefined,
           updateSecretValue: deps.updateSecretValue,
         })
       }

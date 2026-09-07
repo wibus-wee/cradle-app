@@ -789,6 +789,9 @@ importers:
       ai:
         specifier: ^6.0.168
         version: 6.0.168(zod@4.5.4)
+      ajv:
+        specifier: 8.20.0
+        version: 8.20.0
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3

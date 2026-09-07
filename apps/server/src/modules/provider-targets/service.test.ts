@@ -14,6 +14,7 @@ import {
   listProviderTargets,
   pruneDiscoveredProviderTargetCustomModels,
   resolveProviderTarget,
+  updateProviderTargetCodexConfig,
   upsertManualProviderTarget,
 } from './service'
 
@@ -30,6 +31,18 @@ afterEach(() => {
 })
 
 describe('runtime-owned provider targets', () => {
+  it('stores Codex overrides per target, preserves connection fields, validates both write paths and resets', async () => {
+    for (const id of [ORDINARY_PROVIDER_TARGET_ID, ANTHROPIC_PROVIDER_TARGET_ID]) {
+      await upsertManualProviderTarget({ id, displayName: id, providerKind: 'openai-compatible', connectionConfigJson: JSON.stringify({ baseUrl: 'https://example.com/v1' }) })
+    }
+    updateProviderTargetCodexConfig(ORDINARY_PROVIDER_TARGET_ID, { features: { multi_agent: false } })
+    expect(JSON.parse(getProviderTargetModelSettings(ORDINARY_PROVIDER_TARGET_ID).connectionConfigJson)).toMatchObject({ baseUrl: 'https://example.com/v1', codex: { features: { multi_agent: false } } })
+    expect(JSON.parse(getProviderTargetModelSettings(ANTHROPIC_PROVIDER_TARGET_ID).connectionConfigJson).codex).toBeUndefined()
+    expect(() => updateProviderTargetCodexConfig(ORDINARY_PROVIDER_TARGET_ID, { model: 'forbidden' })).toThrow()
+    await expect(upsertManualProviderTarget({ id: ORDINARY_PROVIDER_TARGET_ID, displayName: 'Invalid', providerKind: 'openai-compatible', connectionConfigJson: JSON.stringify({ codex: { invented: true } }) })).rejects.toThrow()
+    updateProviderTargetCodexConfig(ORDINARY_PROVIDER_TARGET_ID, {})
+    expect(JSON.parse(getProviderTargetModelSettings(ORDINARY_PROVIDER_TARGET_ID).connectionConfigJson).codex).toBeUndefined()
+  })
   it('projects runtime-owned provider targets and restricts them to their owner runtime', () => {
     const providerTargetId = toOpenCodeRuntimeNativeProviderTargetId('openai')
     const target = resolveProviderTarget(providerTargetId)

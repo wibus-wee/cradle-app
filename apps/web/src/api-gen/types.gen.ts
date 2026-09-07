@@ -2216,6 +2216,58 @@ export type PatchProfilesByIdCustomModelsResponses = {
 
 export type PatchProfilesByIdCustomModelsResponse = PatchProfilesByIdCustomModelsResponses[keyof PatchProfilesByIdCustomModelsResponses];
 
+export type GetProviderTargetsCodexConfigSchemaData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/provider-targets/codex/config-schema';
+};
+
+export type GetProviderTargetsCodexConfigSchemaResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        version: string;
+        releaseTag: string;
+        source: string;
+        sha256: string;
+        schemaJson: string;
+        managedKeys: Array<string>;
+    };
+};
+
+export type GetProviderTargetsCodexConfigSchemaResponse = GetProviderTargetsCodexConfigSchemaResponses[keyof GetProviderTargetsCodexConfigSchemaResponses];
+
+export type PatchProviderTargetsByProviderTargetIdCodexConfigData = {
+    body: {
+        codex: {
+            [key: string]: unknown;
+        };
+    };
+    path: {
+        providerTargetId: string;
+    };
+    query?: never;
+    url: '/provider-targets/{providerTargetId}/codex/config';
+};
+
+export type PatchProviderTargetsByProviderTargetIdCodexConfigResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        providerTargetKind?: 'manual' | 'external';
+        providerTargetId: string;
+        connectionConfigJson: string;
+        enabledModelsJson: string;
+        configJson: string;
+        customModelsJson: string;
+    };
+};
+
+export type PatchProviderTargetsByProviderTargetIdCodexConfigResponse = PatchProviderTargetsByProviderTargetIdCodexConfigResponses[keyof PatchProviderTargetsByProviderTargetIdCodexConfigResponses];
+
 export type GetProviderTargetsData = {
     body?: never;
     path?: never;

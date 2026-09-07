@@ -24,6 +24,7 @@ import {
   createCodexAppServerLeaseClient,
   disposeCodexAppServerHostResource,
 } from './host-resource'
+import { projectCodexProcessConfig } from './process-config'
 
 const CODEX_APP_SERVER_SCOPE_ID = 'provider-host'
 export const CODEX_APP_SERVER_IDLE_TTL_MS = 30 * 60 * 1000
@@ -62,17 +63,18 @@ export async function acquireCodexAppServerHostLease(
   const clientOptions = configureCodexAppServerClientOptions(input.options, input.deps)
   const { serverRequestHandler, ...hostClientOptions } = clientOptions
   const processClientOptions = sanitizeCodexAppServerProcessOptions(hostClientOptions)
+  const resourceFingerprint = createCodexAppServerHostFingerprint({
+    options: processClientOptions,
+    chatgptAuth: input.chatgptAuth,
+  })
   const lease = await acquireProviderProcessHostResource({
     runtimeKind: input.runtimeKind,
     providerTargetId: input.providerTargetId,
-    scopeId: codexProviderAppServerScopeId(),
+    scopeId: `${codexProviderAppServerScopeId()}:${resourceFingerprint}`,
     ttlMs: CODEX_APP_SERVER_IDLE_TTL_MS,
     pinned: input.pinned ?? false,
     retainOnRelease: true,
-    resourceFingerprint: createCodexAppServerHostFingerprint({
-      options: processClientOptions,
-      chatgptAuth: input.chatgptAuth,
-    }),
+    resourceFingerprint,
     createResource: (): CodexAppServerHostResource => createCodexAppServerHostResource({
       clientOptions: processClientOptions,
       createClient: options => input.deps.createAppServerClient?.(options) ?? new CodexAppServerClient(options),
@@ -121,11 +123,7 @@ export async function acquireCodexAppServerHostLease(
 function sanitizeCodexAppServerProcessOptions(
   options: CodexAppServerClientOptions,
 ): CodexAppServerClientOptions {
-  const config = options.config
-    ? Object.fromEntries(Object.entries(options.config).filter(([key]) => (
-        key === 'model_provider' || key === 'model_providers'
-      ))) as NonNullable<CodexAppServerClientOptions['config']>
-    : undefined
+  const config = projectCodexProcessConfig(options.config)
   const env = { ...options.env }
   delete env.CRADLE_CHAT_SESSION_ID
   delete env.CRADLE_WORKSPACE_ID

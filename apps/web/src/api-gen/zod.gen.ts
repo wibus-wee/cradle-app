@@ -438,6 +438,14 @@ export const zPatchProfilesByIdCustomModelsPath = z.object({
     id: z.string().min(1)
 });
 
+export const zPatchProviderTargetsByProviderTargetIdCodexConfigBody = z.object({
+    codex: z.record(z.string(), z.unknown())
+});
+
+export const zPatchProviderTargetsByProviderTargetIdCodexConfigPath = z.object({
+    providerTargetId: z.string().min(1)
+});
+
 export const zGetProviderTargetsQuery = z.object({
     runtimeKind: z.string().min(1).optional(),
     workspaceId: z.string().min(1).optional()
