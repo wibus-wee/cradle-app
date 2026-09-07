@@ -81,6 +81,26 @@ function readAwait(awaitId: string) {
 }
 
 describe('session-await service lifecycle', () => {
+  it('suppresses a previously delivered CI round but delivers a new attempt with the same conclusion', async () => {
+    const { awaitId, sessionId } = seedAwait({ source: 'github-ci' })
+    const firstPayload = JSON.stringify({ resultKey: 'head:run-1:attempt-1' })
+    await trigger({ awaitId, resumeText: 'CI failed', resumePayloadJson: firstPayload })
+    const previous = readAwait(awaitId)!
+    const nextId = randomUUID()
+    db().insert(sessionAwaits).values({
+      id: nextId,
+chatSessionId: sessionId,
+workspaceId: previous.workspaceId,
+      source: 'github-ci',
+status: 'pending',
+filterJson: '{}',
+    }).run()
+    await trigger({ awaitId: nextId, resumeText: 'CI failed', resumePayloadJson: firstPayload })
+    expect(mockedEnqueue).toHaveBeenCalledTimes(1)
+    expect(readAwait(nextId)?.status).toBe('pending')
+    await trigger({ awaitId: nextId, resumeText: 'CI failed', resumePayloadJson: JSON.stringify({ resultKey: 'head:run-1:attempt-2' }) })
+    expect(mockedEnqueue).toHaveBeenCalledTimes(2)
+  })
   beforeEach(() => {
     mockedEnqueue.mockReset()
     mockedEnqueue.mockResolvedValue({} as never)

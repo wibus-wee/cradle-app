@@ -248,6 +248,18 @@ export async function register(rawInput: RegisterAwaitInput): Promise<SessionAwa
     filterJson: input.filterJson,
   })
 
+  if (input.source === 'github-ci') {
+    const filter = GitHubCIFilterJsonSchema.parse(filterJson)
+    const existing = listBySession(input.chatSessionId).find(row =>
+      row.source === input.source && row.status === 'pending'
+      && row.workspaceId === input.workspaceId
+      && row.expiresAt === input.expiresAt
+      && JSON.stringify(GitHubCIFilterJsonSchema.parse(row.filterJson)) === JSON.stringify(filter))
+    if (existing) {
+      return existing
+    }
+  }
+
   const id = randomUUID()
   return db()
     .insert(sessionAwaits)
@@ -300,6 +312,19 @@ export async function trigger(rawInput: TriggerAwaitInput): Promise<SessionAwait
 
   if (row.status !== 'pending') {
     return null
+  }
+
+  if (row.source === 'github-ci' && input.resumePayloadJson) {
+    const payloadSchema = z.object({ resultKey: z.string().optional() })
+    const { resultKey } = payloadSchema.parse(JSON.parse(input.resumePayloadJson))
+    if (resultKey && listBySession(row.chatSessionId).some(previous =>
+      previous.source === row.source && previous.workspaceId === row.workspaceId
+      && (previous.status === 'triggered' || (previous.status === 'failed' && previous.failureKind === 'delivery'))
+      && previous.resumePayloadJson
+      && payloadSchema.parse(JSON.parse(previous.resumePayloadJson)).resultKey === resultKey)) {
+      updateLastChecked(row.id)
+      return row
+    }
   }
 
   const now = Math.floor(Date.now() / 1000)

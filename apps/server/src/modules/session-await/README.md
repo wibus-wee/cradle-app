@@ -49,7 +49,11 @@ The `github-ci` live-status route also reads GitHub Actions workflow runs for th
 - `changes-requested`: at least one current-head changes-requested review.
 - `reviewed`: any current-head submitted review signal.
 
-Work-owned GitHub awaits include `workId` and pin `headSha`. A repeated submission for the same head is idempotent; a new head cancels the older Work-owned subscriptions and registers new ones. A pinned PR await also resolves when the PR is merged or closed, or when its head changes, so an event subscription cannot remain pending after its target lifecycle ends.
+CI polling synchronously verifies PR heads, checks, commit statuses, and workflow runs through the GitHub cache gate's `verify` mode. A verified 304 may reuse cached content; network failures and network-budget restrictions cannot fall back to cached results for completion decisions. Live status display retains cache-first reads.
+
+Equivalent pending CI registrations in the same session and workspace reuse one await. Completed CI payloads identify the repository, target commit, check/status identities, and workflow run attempts. A result already triggered in that session is not enqueued again; a newly registered await stays pending for a different result. Delivery failures retain their original result and use delivery retry. Historical payloads without a result key cannot be deduplicated against newly observed results.
+
+Work-owned GitHub awaits include `workId` and pin `headSha`. A new head cancels the older pending Work-owned subscriptions and registers new ones. A pinned PR await follows a changed head without resuming and resolves when the PR is merged or closed. Repeated delivery of the same completed CI round does not wake the Agent again; a new run attempt can notify even when its conclusion is unchanged.
 
 These sources intentionally do not claim exact branch-protection equivalence. Required checks, required review counts, code owners, stale dismissal rules, and rulesets need separate GitHub permissions and should be modeled as a later source or explicit mode.
 

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import type { GitHubReadMode } from '../../../lib/github/cache-gate'
 import {
   fetchBranchProtection,
   fetchCheckRun,
@@ -216,7 +217,7 @@ function pendingResult(awaitId: string, filter: GitHubCIFilter, needsNormalizati
     : { awaitId, matched: false }
 }
 
-async function resolveTarget(filter: GitHubCIFilter): Promise<ResolvedCITarget | null> {
+async function resolveTarget(filter: GitHubCIFilter, mode: GitHubReadMode = 'read'): Promise<ResolvedCITarget | null> {
   let ref = filter.sha
   let prTitle: string | null = null
   let baseBranch: string | null = null
@@ -231,7 +232,7 @@ async function resolveTarget(filter: GitHubCIFilter): Promise<ResolvedCITarget |
     ref = checkRun.head_sha ?? filter.sha
   }
   if (filter.pr) {
-    const prData = await fetchPullRequest(filter.owner, filter.repo, filter.pr)
+    const prData = await fetchPullRequest(filter.owner, filter.repo, filter.pr, mode)
     if (!prData) {
       return null
     }
@@ -368,13 +369,13 @@ function aggregateWorkflowRuns(workflowRuns: GitHubWorkflowRun[]): AggregatedWor
   return { workflowRuns, pendingCount, failureCount }
 }
 
-async function fetchAggregatedWorkflowRuns(target: ResolvedCITarget): Promise<AggregatedWorkflowRuns | null> {
+async function fetchAggregatedWorkflowRuns(target: ResolvedCITarget, mode: GitHubReadMode = 'read'): Promise<AggregatedWorkflowRuns | null> {
   if (target.checkRunId || !target.ref) {
     return { workflowRuns: [], pendingCount: 0, failureCount: 0 }
   }
   let response: Awaited<ReturnType<typeof fetchWorkflowRunsForHead>>
   try {
-    response = await fetchWorkflowRunsForHead(target.owner, target.repo, target.ref)
+    response = await fetchWorkflowRunsForHead(target.owner, target.repo, target.ref, mode)
   }
   catch (error) {
     if (isGitHubMissingTarget(error)) {
@@ -412,7 +413,7 @@ function filterBypassedCI(
   return aggregateCI(filteredRuns, filteredStatuses)
 }
 
-async function fetchAggregatedCI(target: ResolvedCITarget): Promise<AggregatedCI | null> {
+async function fetchAggregatedCI(target: ResolvedCITarget, mode: GitHubReadMode = 'read'): Promise<AggregatedCI | null> {
   if (target.checkRunId) {
     const checkRun = await fetchCheckRun(target.owner, target.repo, target.checkRunId)
     if (!checkRun) {
@@ -422,8 +423,8 @@ async function fetchAggregatedCI(target: ResolvedCITarget): Promise<AggregatedCI
   }
 
   const [checkRuns, combinedStatus] = await Promise.all([
-    fetchCheckRuns(target.owner, target.repo, target.ref),
-    fetchCombinedStatus(target.owner, target.repo, target.ref),
+    fetchCheckRuns(target.owner, target.repo, target.ref, mode),
+    fetchCombinedStatus(target.owner, target.repo, target.ref, mode),
   ])
   if (!checkRuns || !combinedStatus) {
     return null
@@ -556,9 +557,18 @@ function toLiveCheckRun(run: GitHubCheckRun, workflowRuns: LiveWorkflowRun[], re
   }
 }
 
-function buildCIResumePayload(target: ResolvedCITarget, aggregate: AggregatedCI, noCIConfigured = false): string {
+function buildCIResumePayload(target: ResolvedCITarget, aggregate: AggregatedCI, noCIConfigured = false, workflowRuns: GitHubWorkflowRun[] = []): string {
   return JSON.stringify({
     kind: 'github-ci',
+    resultKey: JSON.stringify({
+      repo: `${target.owner}/${target.repo}`.toLowerCase(),
+      pr: target.prNumber,
+      ref: target.ref,
+      checkRunId: target.checkRunId,
+      checks: aggregate.checkRuns.map(run => JSON.stringify([run.id, run.status, run.conclusion, run.started_at, run.completed_at])).sort(),
+      statuses: aggregate.statuses.map(status => JSON.stringify([status.id, status.context, status.state, status.updated_at])).sort(),
+      workflows: workflowRuns.map(run => JSON.stringify([run.id, run.run_attempt ?? 1, run.status, run.conclusion])).sort(),
+    }),
     repo: `${target.owner}/${target.repo}`,
     pr: target.prNumber,
     ref: target.ref,
@@ -602,7 +612,7 @@ export const githubCISource: SessionAwaitSource = {
 
         let target: ResolvedCITarget | null
         try {
-          target = await resolveTarget(filter)
+          target = await resolveTarget(filter, 'verify')
         }
         catch (err) {
           if (isGitHubMissingTarget(err)) {
@@ -627,8 +637,8 @@ export const githubCISource: SessionAwaitSource = {
         let workflowAggregate: AggregatedWorkflowRuns | null
         try {
           ;[aggregate, workflowAggregate] = await Promise.all([
-            fetchAggregatedCI(target),
-            fetchAggregatedWorkflowRuns(target),
+            fetchAggregatedCI(target, 'verify'),
+            fetchAggregatedWorkflowRuns(target, 'verify'),
           ])
         }
         catch (err) {
@@ -690,7 +700,7 @@ export const githubCISource: SessionAwaitSource = {
               awaitId: row.id,
               matched: true,
               resumeText: 'No GitHub checks or commit statuses were found. Proceeding without CI signals.',
-              resumePayloadJson: buildCIResumePayload(target, aggregate, true),
+              resumePayloadJson: buildCIResumePayload(target, aggregate, true, workflowAggregate.workflowRuns),
             })
           }
           else {
@@ -716,11 +726,12 @@ export const githubCISource: SessionAwaitSource = {
                   .map(run => `${run.name ?? `Workflow ${run.id}`}: ${run.conclusion ?? 'unknown'}`),
               ].filter(Boolean).join(', ')}`,
           resumePayloadJson: JSON.stringify({
-            ...JSON.parse(buildCIResumePayload(target, aggregate)),
+            ...JSON.parse(buildCIResumePayload(target, aggregate, false, workflowAggregate.workflowRuns)),
             allSuccess: aggregate.allPassed && !workflowAggregate.failureCount,
             workflowFailureCount: workflowAggregate.failureCount,
             workflowRuns: workflowAggregate.workflowRuns.map(run => ({
               id: run.id,
+              runAttempt: run.run_attempt ?? 1,
               name: run.name,
               status: run.status,
               conclusion: run.conclusion,
