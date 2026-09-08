@@ -37,9 +37,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Detect desktop release scope
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.filter.outputs.release_desktop }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'push' && github.ref_type == 'branch'
+        with:
+          base: ${{ github.event.before }}
+          filters: .github/ci-paths.yml
+
   # Resolve release parameters.
   resolve:
     name: Resolve release params
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' || needs.changes.outputs.release == 'true'
     runs-on: ubuntu-latest
     outputs:
       channel: ${{ steps.params.outputs.channel }}

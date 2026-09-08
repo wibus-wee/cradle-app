@@ -259,7 +259,7 @@ describe('codex account diagnostics', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'codex-chatgpt-target',
-        scopeId: codexProviderAppServerScopeId(),
+        scopeId: expect.stringMatching(new RegExp(`^${codexProviderAppServerScopeId()}:[a-f0-9]{64}$`)),
         hasResource: true,
       }),
     ])

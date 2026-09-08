@@ -10,7 +10,7 @@ name: E2E PR Suite
 
 on:
   pull_request:
-    types: [labeled, synchronize, opened, reopened]
+    types: [labeled, unlabeled, synchronize, opened, reopened]
 
 permissions:
   contents: read
@@ -26,29 +26,13 @@ jobs:
     name: Detect critical paths
     runs-on: ubuntu-latest
     outputs:
-      critical: ${{ steps.filter.outputs.critical }}
+      critical: ${{ steps.filter.outputs.e2e }}
     steps:
+      - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
-          filters: |
-            critical:
-              - 'e2e/**'
-              - 'packages/model-api-simulator/**'
-              - 'packages/chat-runtime-contracts/**'
-              - 'packages/db/**'
-              - 'packages/plugin-sdk/**'
-              - 'packages/streamdown/**'
-              - 'packages/ipc/**'
-              - 'plugins/**'
-              - 'apps/web/**'
-              - 'apps/server/**'
-              - 'apps/desktop/**'
-              - 'apps/relayd/**'
-              - '.github/workflows/e2e-smoke.yml'
-              - '.github/actions/setup/**'
-              - '.github/actions/e2e-setup/**'
-              - '.github/actions/e2e-run/**'
+          filters: .github/ci-paths.yml
 
   gate:
     name: Check E2E gate
@@ -59,9 +43,7 @@ jobs:
       needs.changes.result == 'success' && (
         needs.changes.outputs.critical == 'true' ||
         contains(github.event.pull_request.labels.*.name, 'e2e') ||
-        github.event.label.name == 'e2e' ||
-        contains(github.event.pull_request.labels.*.name, 'e2e-full') ||
-        github.event.label.name == 'e2e-full'
+        contains(github.event.pull_request.labels.*.name, 'e2e-full')
       )
     steps:
       - run: echo "E2E gate open — @P0 smoke by default, @P0 or @P1 full suite when the e2e-full label is present"

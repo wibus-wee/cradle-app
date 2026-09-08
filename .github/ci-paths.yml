@@ -1,0 +1,115 @@
+# dorny/paths-filter accepts nested YAML anchor lists. Keep shared inputs here
+# so PR checks and main-branch delivery use the same dependency boundaries.
+toolchain: &toolchain
+  - 'package.json'
+  - 'pnpm-lock.yaml'
+  - 'pnpm-workspace.yaml'
+  - '.npmrc'
+  - '.node-version'
+  - '.nvmrc'
+  - 'patches/**'
+  - '.github/actions/setup/**'
+  - '.github/ci-paths.yml'
+
+ci: &ci
+  - *toolchain
+  - '.github/workflows/ci.yml'
+
+shared: &shared
+  - 'packages/**'
+  - 'plugins/**'
+  - 'src/**'
+  - 'scripts/**'
+  - 'resources/**'
+  - 'tsconfig*.json'
+
+web: &web
+  - *ci
+  - *shared
+  - 'apps/web/**'
+
+server: &server
+  - *ci
+  - *shared
+  - 'apps/server/**'
+
+desktop: &desktop
+  - *ci
+  - *shared
+  - 'apps/desktop/**'
+
+build_web: *web
+build_server: *server
+build_desktop:
+  - *desktop
+  - 'apps/web/**'
+  - 'apps/server/**'
+  - 'apps/relayd/**'
+
+simulator:
+  - *ci
+  - 'packages/model-api-simulator/**'
+
+mobile:
+  - *ci
+  - 'apps/mobile/**'
+  - 'packages/ai-sdk/**'
+  - 'packages/fabric-protocol/**'
+
+unit:
+  - *web
+  - *desktop
+  - 'apps/mobile/**'
+  - 'apps/server/**'
+  - 'vitest.config.*'
+
+server_tests:
+  - *server
+  - 'vitest.config.*'
+  - 'apps/relayd/**'
+
+relayd:
+  - 'apps/relayd/**'
+  - '.github/workflows/ci.yml'
+  - '.github/ci-paths.yml'
+
+chronicle:
+  - 'chronicle/**'
+  - '.github/workflows/ci.yml'
+  - '.github/ci-paths.yml'
+
+lint:
+  - *ci
+  - '**/*.{cjs,js,jsx,mjs,ts,tsx}'
+  - 'eslint.config.*'
+
+e2e:
+  - *toolchain
+  - *shared
+  - 'e2e/**'
+  - 'apps/web/**'
+  - 'apps/server/**'
+  - 'apps/desktop/**'
+  - 'apps/relayd/**'
+  - '.github/workflows/e2e-smoke.yml'
+  - '.github/actions/e2e-setup/**'
+  - '.github/actions/e2e-run/**'
+
+deploy_web:
+  - *toolchain
+  - *shared
+  - 'apps/web/**'
+  - 'apps/landing/**'
+  - '.github/workflows/deploy-web.yml'
+
+release_desktop:
+  - *toolchain
+  - *shared
+  - 'apps/web/**'
+  - 'apps/server/**'
+  - 'apps/desktop/**'
+  - 'apps/relayd/**'
+  - 'chronicle/**'
+  - '.github/workflows/release-desktop.yml'
+  - '.github/actions/desktop-*/**'
+  - '.github/release-body.template.md'
