@@ -107,6 +107,7 @@ export function projectKimiTranscriptProgressItems(data: KimiTranscriptData): Ru
         ? 'completed'
         : 'pending',
     sourceStatus: task.state,
+    action: task.state === 'running' ? { id: 'cancel', label: 'Cancel task' } : null,
   }))
 }
 

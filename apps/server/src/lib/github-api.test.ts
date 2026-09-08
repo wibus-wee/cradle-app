@@ -31,6 +31,17 @@ const originalDataDir = process.env.CRADLE_DATA_DIR
 describe('gitHub App identity', () => {
   let dataDir = ''
 
+  it('verifies cached reads synchronously and never falls back after a failed verification', async () => {
+    setCache('ci-verification', { state: 'failure' }, 'old-etag')
+    const fetcher = vi.fn().mockResolvedValue({ data: { state: 'pending' }, status: 200, etag: 'new-etag' })
+    await expect(cachedGitHubRead({ cacheKey: 'ci-verification', mode: 'verify', fetcher })).resolves.toEqual({ state: 'pending' })
+    expect(fetcher).toHaveBeenCalledWith('old-etag')
+    fetcher.mockResolvedValue({ data: null, status: 503 })
+    await expect(cachedGitHubRead({ cacheKey: 'ci-verification', mode: 'verify', fetcher })).resolves.toBeNull()
+    fetcher.mockResolvedValue({ data: null, status: 304 })
+    await expect(cachedGitHubRead({ cacheKey: 'ci-verification', mode: 'verify', fetcher })).resolves.toEqual({ state: 'pending' })
+  })
+
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'cradle-github-api-'))
     process.env.CRADLE_DATA_DIR = dataDir

@@ -5,7 +5,8 @@
  * replace the old count badge + linear progress bar — the data is steps, not a
  * continuous percentage, so the dots stay the most faithful representation.
  */
-import { CheckCircleLine as CheckCircle2Icon, ListCheckLine as ListChecksIcon } from '@mingcute/react'
+import { CheckCircleLine as CheckCircle2Icon, ListCheckLine as ListChecksIcon, StopCircleLine as CircleStopIcon } from '@mingcute/react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { cn } from '~/lib/cn'
 
@@ -14,7 +15,8 @@ import type {
   ChatRuntimePlanUiSlotState,
   ChatRuntimeProgressUiSlotState,
 } from '../../capabilities/chat-capabilities'
-import { ComposerSlotShell } from './composer-slot-shell'
+import { cancelChatRuntimeTask, runtimeUiSlotStatesQueryKey } from '../../capabilities/chat-capabilities'
+import { ComposerSlotIconAction, ComposerSlotShell } from './composer-slot-shell'
 
 /** Above this step count dots get unreadable; fall back to a `done/total` fraction. */
 const PROGRESS_STEP_DOTS_MAX = 10
@@ -23,19 +25,28 @@ type ComposerProgressStep = { label: string, status: ChatRuntimePlanStepStatus }
 
 export function ProgressSlotState({
   state,
+  sessionId,
   className,
 }: {
   state: ComposerProgressState
+  sessionId?: string | null
   className?: string
 }) {
   return (
     <ComposerSlotShell stateName="progress" testId="progress-slot" className={className}>
-      <ProgressSlotContent state={state} />
+      <ProgressSlotContent state={state} sessionId={sessionId} />
     </ComposerSlotShell>
   )
 }
 
-function ProgressSlotContent({ state }: { state: ComposerProgressState }) {
+function ProgressSlotContent({ state, sessionId }: { state: ComposerProgressState, sessionId?: string | null }) {
+  const queryClient = useQueryClient()
+  const cancel = useMutation({
+    mutationFn: (taskId: string) => cancelChatRuntimeTask(sessionId!, taskId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(sessionId!) })
+    },
+  })
   const progress = readPlanProgress(state)
   if (!progress) {
     return null
@@ -69,6 +80,18 @@ function ProgressSlotContent({ state }: { state: ComposerProgressState }) {
         )}
       </div>
       <ProgressStepDots steps={progress.steps} fraction={progress.fraction} />
+      {sessionId && state.kind === 'progress' && state.items
+        .filter(item => item.id && item.action?.id === 'cancel')
+        .map(item => (
+          <ComposerSlotIconAction
+            key={item.id}
+            label={item.action!.label}
+            disabled={cancel.isPending}
+            onClick={() => cancel.mutate(item.id!)}
+          >
+            <CircleStopIcon className="size-3.5 !text-destructive" aria-hidden="true" />
+          </ComposerSlotIconAction>
+        ))}
     </div>
   )
 }

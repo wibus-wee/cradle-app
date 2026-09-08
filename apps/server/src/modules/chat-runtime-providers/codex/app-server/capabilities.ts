@@ -25,8 +25,8 @@ export interface CodexAppServerCapabilityManifest {
 }
 
 const CODEX_APP_SERVER_PROTOCOL = 'codex-app-server'
-const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.151.0'
-const CODEX_APP_SERVER_GENERATED_DATE = '2026-08-30'
+const CODEX_APP_SERVER_GENERATOR_VERSION = 'codex-cli 0.153.4'
+const CODEX_APP_SERVER_GENERATED_DATE = '2026-09-05'
 
 export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'initialize', paramsType: 'InitializeParams', category: 'initialize', operation: 'initialize', interaction: 'request' },
@@ -91,6 +91,7 @@ export const CODEX_APP_SERVER_CLIENT_METHODS = [
   { method: 'plugin/list', paramsType: 'PluginListParams', category: 'plugin', operation: 'list', interaction: 'request' },
   { method: 'plugin/search', paramsType: 'PluginSearchParams', category: 'plugin', operation: 'search', interaction: 'request' },
   { method: 'plugin/installed', paramsType: 'PluginInstalledParams', category: 'plugin', operation: 'installed', interaction: 'request' },
+  { method: 'plugin/reconcile', paramsType: 'PluginReconcileParams', category: 'plugin', operation: 'reconcile', interaction: 'request' },
   { method: 'plugin/read', paramsType: 'PluginReadParams', category: 'plugin', operation: 'read', interaction: 'request' },
   { method: 'plugin/skill/read', paramsType: 'PluginSkillReadParams', category: 'plugin', operation: 'skill/read', interaction: 'request' },
   { method: 'plugin/share/save', paramsType: 'PluginShareSaveParams', category: 'plugin', operation: 'share/save', interaction: 'request' },
@@ -262,6 +263,8 @@ export const CODEX_APP_SERVER_SERVER_NOTIFICATIONS = [
   { method: 'thread/compacted', paramsType: 'ContextCompactedNotification', category: 'thread' },
   { method: 'model/rerouted', paramsType: 'ModelReroutedNotification', category: 'model' },
   { method: 'model/verification', paramsType: 'ModelVerificationNotification', category: 'model' },
+  { method: 'modelProvider/authRecoveryStarted', paramsType: 'AuthRecoveryNotification', category: 'model-provider' },
+  { method: 'modelProvider/authRecoveryCompleted', paramsType: 'AuthRecoveryNotification', category: 'model-provider' },
   { method: 'turn/moderationMetadata', paramsType: 'TurnModerationMetadataNotification', category: 'turn' },
   { method: 'model/safetyBuffering/updated', paramsType: 'ModelSafetyBufferingUpdatedNotification', category: 'model' },
   { method: 'warning', paramsType: 'WarningNotification', category: 'warning' },

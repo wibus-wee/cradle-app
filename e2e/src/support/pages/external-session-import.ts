@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs'
 import { expect } from '@playwright/test'
 
 import {
-  EXTERNAL_SESSION_ID,
   EXTERNAL_SESSION_REPLY,
   EXTERNAL_SESSION_TITLE,
+  externalSessionIdForWorld,
 } from '../helpers/external-session-import-scenario'
 import type { CradleWorld } from '../world'
 
@@ -97,7 +97,7 @@ export class ExternalSessionImportPage {
     const response = await fetch(`${this.world.params.serverUrl}/external-session-import/imports`)
     expect(response.ok).toBe(true)
     const records = await response.json() as ExternalSessionImportRecord[]
-    const matches = records.filter(record => record.externalSessionId === EXTERNAL_SESSION_ID)
+    const matches = records.filter(record => record.externalSessionId === externalSessionIdForWorld(this.world))
     expect(matches).toHaveLength(1)
     expect(matches[0]).toMatchObject({
       sessionId: this.world.recall<string>('external-import.session-id'),

@@ -224,6 +224,13 @@ export const runtimeProgressUiSlotStateSchema = t.Object({
       label: t.String(),
       status: runtimePlanStepStatusSchema,
       sourceStatus: t.Union([t.String(), t.Null()]),
+      action: t.Optional(t.Union([
+        t.Object({
+          id: t.Literal('cancel'),
+          label: t.String(),
+        }),
+        t.Null(),
+      ])),
     }),
   ),
   currentItem: t.Union([t.String(), t.Null()]),
@@ -564,6 +571,8 @@ export const runtimeUsageUiSlotStateSchema = t.Object({
     provider: t.Union([t.String(), t.Null()]),
     costUsd: t.Number(),
     costBasis: t.Union([t.Literal('list'), t.Literal('managed'), t.Literal('unknown')]),
+    reasoningOutputTokens: t.Optional(t.Number()),
+    reasoningOutputTokensMayBePartial: t.Optional(t.Boolean()),
   }))),
   lastModelSwitch: t.Optional(t.Union([
     t.Object({

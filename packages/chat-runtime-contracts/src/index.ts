@@ -52,6 +52,8 @@ export interface RuntimeModelCatalog {
 
 export interface ListRuntimeModelsInput {
   workspacePath?: string
+  /** Resolved by the server; runtime adapters must not load targets or secrets themselves. */
+  profile?: RuntimeProviderTargetProfile | null
 }
 
 export type RuntimeObservabilitySeverity = 'debug' | 'info' | 'warn' | 'error' | 'fatal'
@@ -323,6 +325,7 @@ export type RuntimeAlertSeverity = 'info' | 'warning' | 'error'
 export interface RuntimeWarningPartData {
   message: string
   additionalDetails: string | null
+  severity?: RuntimeAlertSeverity
 }
 
 export interface RuntimeTokenUsageBreakdown {
@@ -467,6 +470,13 @@ export interface RuntimeProgressItem {
   label: string
   status: RuntimePlanStepStatus
   sourceStatus: string | null
+  action?: RuntimeProgressItemAction | null
+}
+
+/** A provider-native task action exposed through the runtime-neutral progress slot. */
+export interface RuntimeProgressItemAction {
+  id: 'cancel'
+  label: string
 }
 
 export interface RuntimeProgressUiSlotState {
@@ -742,6 +752,12 @@ export interface RuntimeUsageModelCost {
   provider: string | null
   costUsd: number
   costBasis: 'list' | 'managed' | 'unknown'
+  /**
+   * Provider-reported reasoning tokens included in `outputTokens`. Providers may only report
+   * this for part of a resumed session, so it must never be added to output token totals.
+   */
+  reasoningOutputTokens?: number
+  reasoningOutputTokensMayBePartial?: boolean
 }
 
 export interface RuntimeModelSwitchCost {
@@ -1051,6 +1067,10 @@ export interface RuntimeUserInputResolution {
 export interface SubmitRuntimeUserInputInput extends GetCapabilitiesInput {
   requestId: string
   answers: Record<string, string[]>
+}
+
+export interface CancelRuntimeTaskInput extends GetCapabilitiesInput {
+  taskId: string
 }
 
 export interface RuntimeToolApprovalRequest {
@@ -1703,6 +1723,7 @@ export interface ChatRuntime {
     input: GetCapabilitiesInput,
   ) => Promise<RuntimeSessionStorageDeletionResult>
   submitUserInput?: (input: SubmitRuntimeUserInputInput) => Promise<RuntimeUserInputResolution | null>
+  cancelRuntimeTask?: (input: CancelRuntimeTaskInput) => Promise<void>
   listProviderThreads?: (input: ProviderThreadListInput) => Promise<ProviderThreadListResult>
   readProviderThread?: (input: ProviderThreadReadInput) => Promise<ProviderThreadReadResult>
   deleteProviderThread?: (input: ProviderThreadDeleteInput) => Promise<ProviderThreadDeleteResult>

@@ -2,6 +2,7 @@ import type { RuntimeWarningPartData } from '../../../chat-runtime/runtime-provi
 import { OBSERVABILITY_CODES } from '../../../observability/contract'
 import type { RuntimeKind } from '../../../provider-contracts/types'
 import type { CodexAppServerMessage } from '../app-server/client'
+import type { AuthRecoveryNotification } from '../app-server-protocol/v2/AuthRecoveryNotification'
 import type { WindowsWorldWritableWarningNotification } from '../app-server-protocol/v2/WindowsWorldWritableWarningNotification'
 import { CODEX_RUNTIME_KIND } from '../metadata'
 import type { WarningNotificationParams } from '../types'
@@ -183,9 +184,10 @@ export function isRetryableCodexAppServerError(notification: CodexAppServerMessa
 export function readCodexAppServerRuntimeWarning(
   notification: Pick<CodexAppServerMessage, 'method' | 'params'>,
 ): RuntimeWarningPartData | null {
-  const params = notification.params as ErrorNotificationParams | WarningNotificationParams | WindowsWorldWritableWarningNotification | undefined
+  const params = notification.params as ErrorNotificationParams | WarningNotificationParams | WindowsWorldWritableWarningNotification | AuthRecoveryNotification | undefined
   let message: string | null = null
   let additionalDetails: string | null = null
+  let severity: RuntimeWarningPartData['severity']
 
   if (notification.method === 'error') {
     if ((params as ErrorNotificationParams | undefined)?.willRetry !== true) {
@@ -220,6 +222,18 @@ export function readCodexAppServerRuntimeWarning(
     message = 'Codex requires explicit review before continuing.'
     additionalDetails = null
   }
+  else if (
+    notification.method === 'modelProvider/authRecoveryStarted'
+    || notification.method === 'modelProvider/authRecoveryCompleted'
+  ) {
+    const recovery = params as AuthRecoveryNotification | undefined
+    const provider = normalizeProviderErrorMessage(recovery?.provider)
+    message = notification.method === 'modelProvider/authRecoveryStarted'
+      ? `Codex is recovering authentication${provider ? ` for ${provider}` : ''}.`
+      : `Codex authentication recovery${provider ? ` for ${provider}` : ''} completed.`
+    additionalDetails = normalizeProviderErrorMessage(recovery?.message)
+    severity = notification.method === 'modelProvider/authRecoveryCompleted' ? 'info' : undefined
+  }
   else {
     return null
   }
@@ -230,6 +244,7 @@ export function readCodexAppServerRuntimeWarning(
   return {
     message: message ?? (notification.method === 'error' ? 'Codex is reconnecting' : 'Codex reported a warning'),
     additionalDetails,
+    ...(severity ? { severity } : {}),
   }
 }
 

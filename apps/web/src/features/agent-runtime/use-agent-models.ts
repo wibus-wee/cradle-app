@@ -1,4 +1,5 @@
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { QueryClient } from '@tanstack/react-query'
+import { queryOptions, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
@@ -7,9 +8,11 @@ import {
   getProfilesById,
   getProvidersByProfileIdModelsCache,
   getProvidersTargetsByProviderTargetIdModelsCache,
+  getProviderTargets,
   getProviderTargetsByProviderTargetIdModelSettings,
   postProvidersModels,
 } from '~/api-gen/sdk.gen'
+import type { GetProviderTargetsResponse } from '~/api-gen/types.gen'
 import { toastManager } from '~/components/ui/toast'
 import type { AgentProfile, ApiProviderKind, ModelDescriptor, ProviderKind, ProviderTarget } from '~/features/agent-runtime/types'
 import { fetchNodeUpstreamJson } from '~/features/nodes/upstream-fetch'
@@ -20,11 +23,11 @@ import { ProfileConfigJsonSchema } from './profile-config-schema'
 export const AGENT_MODELS_QUERY_KEY = ['agent-models'] as const
 const MODEL_INVENTORY_GC_TIME_MS = 1_800_000
 const MODEL_INVENTORY_QUERY_OPTIONS = {
-  staleTime: Infinity,
+  staleTime: 60_000,
   gcTime: MODEL_INVENTORY_GC_TIME_MS,
-  refetchOnMount: false,
+  refetchOnMount: true,
   refetchOnWindowFocus: false,
-  refetchOnReconnect: false,
+  refetchOnReconnect: true,
   retry: false,
 } as const
 
@@ -51,6 +54,7 @@ interface ProviderTargetModelFetchOptions {
   workspaceId?: string | null
   nodeId?: string | null
   refresh?: boolean
+  signal?: AbortSignal
 }
 
 const EMPTY_INITIAL_PROFILE_IDS: ReadonlyArray<string | null> = []
@@ -145,44 +149,14 @@ export function isRuntimeOwnedProviderTarget(
     || target.sourceKey?.startsWith(RUNTIME_OWNED_PROVIDER_TARGET_PREFIX) === true
 }
 
-/** Live-fetch when server inventory is missing/empty or past the soft TTL. */
+/** The server owns inventory freshness; a fresh empty catalog is valid. */
 export function shouldLiveRefreshModelInventory(cache: {
   cached: boolean
   stale: boolean
   coolingDown: boolean
   models: readonly unknown[]
 }): boolean {
-  return !cache.coolingDown && (!cache.cached || cache.models.length === 0 || cache.stale)
-}
-
-const inFlightProviderTargetModelRefreshes = new Map<string, Promise<ModelDescriptor[]>>()
-
-function providerTargetModelRefreshKey(
-  target: Pick<ProviderTarget, 'id'>,
-  options?: ProviderTargetModelFetchOptions,
-): string {
-  return [
-    target.id,
-    options?.workspaceId ?? '',
-    options?.nodeId ?? '',
-  ].join('\0')
-}
-
-async function refreshProviderTargetModelsDeduped(
-  target: ProviderTargetModelRequestTarget,
-  options?: ProviderTargetModelFetchOptions,
-): Promise<ModelDescriptor[]> {
-  const key = providerTargetModelRefreshKey(target, options)
-  const existing = inFlightProviderTargetModelRefreshes.get(key)
-  if (existing) {
-    return existing
-  }
-
-  const pending = refreshProviderTargetModels(target, options).finally(() => {
-    inFlightProviderTargetModelRefreshes.delete(key)
-  })
-  inFlightProviderTargetModelRefreshes.set(key, pending)
-  return pending
+  return !cache.coolingDown && (!cache.cached || cache.stale)
 }
 
 async function fetchCachedVisibleModelsForProfile(
@@ -216,28 +190,20 @@ async function readProviderTargetModelInventory(
     ? fetchNodeUpstreamJson<z.infer<typeof ProviderTargetModelsCacheSchema>>(
         nodeId,
         `/providers/targets/${encodeURIComponent(target.id)}/models-cache`,
+        { signal: options?.signal },
       )
     : getProvidersTargetsByProviderTargetIdModelsCache({
         path: { providerTargetId: target.id },
+        signal: options?.signal,
         throwOnError: true,
       }).then(result => result.data)
-
-  // Provider-target listings already carry the visibility config. Use the
-  // cache endpoint directly when it is available instead of waiting for the
-  // separate model-settings request to return.
-  if ('enabledModelsJson' in target && typeof target.enabledModelsJson === 'string') {
-    const visibility = ModelVisibilitySchema.parse(JSON.parse(target.enabledModelsJson))
-    return {
-      visibility,
-      cache: ProviderTargetModelsCacheSchema.parse(await cachePromise),
-    }
-  }
 
   if (nodeId) {
     const [settings, cache] = await Promise.all([
       fetchNodeUpstreamJson<{ configJson: string }>(
         nodeId,
         `/provider-targets/${encodeURIComponent(target.id)}/model-settings`,
+        { signal: options?.signal },
       ),
       cachePromise,
     ])
@@ -252,6 +218,7 @@ async function readProviderTargetModelInventory(
   const [settingsResult, cacheResult] = await Promise.all([
     getProviderTargetsByProviderTargetIdModelSettings({
       path: { providerTargetId: target.id },
+      signal: options?.signal,
       throwOnError: true,
     }),
     cachePromise.then(data => ({ data })),
@@ -283,77 +250,84 @@ async function refreshProviderTargetModels(
     const data = await fetchNodeUpstreamJson<unknown>(nodeId, '/providers/models', {
       method: 'POST',
       body,
+      signal: options?.signal,
     })
     return ModelDescriptorListSchema.parse(data) satisfies ModelDescriptor[]
   }
 
   const { data } = await postProvidersModels({
     body,
+    signal: options?.signal,
     throwOnError: true,
   })
   return ModelDescriptorListSchema.parse(data) satisfies ModelDescriptor[]
 }
 
-/**
- * Shared inventory read policy for full provider-target records:
- * - `refresh: true` always live-fetches (even when cache is warm)
- * - cache hit with models → return filtered cache immediately (including stale)
- * - cache miss / empty → return immediately; the model-map owner may refresh in background
- * - runtime-owned target cache miss → live-fetch because no durable cache exists
- *
- * Stale soft-TTL refresh is owned by `useProviderTargetModelMap` so the UI can
- * paint cached models first, then replace them when a background live fetch finishes.
- */
-async function fetchVisibleModelsForProviderTarget(
-  target: ProviderTargetModelRequestTarget,
-  options?: ProviderTargetModelFetchOptions,
-): Promise<ModelDescriptor[]> {
-  const { visibility, cache } = await readProviderTargetModelInventory(target, options)
-  const canLiveFetch = Boolean(target.enabled && isApiProviderKind(target.providerKind))
-
-  if (options?.refresh) {
-    if (!canLiveFetch) {
-      if (cache.cached) {
-        return filterVisibleModels(ModelDescriptorListSchema.parse(cache.models), visibility)
+function providerTargetModelQueryOptions(
+  queryClient: QueryClient,
+  target: ProviderTarget | ProviderTargetModelRequestTarget,
+  options: ProviderTargetModelFetchOptions = {},
+) {
+  const queryKey = providerTargetModelsQueryKey(target, options.workspaceId, options.nodeId)
+  return queryOptions({
+    queryKey,
+    ...MODEL_INVENTORY_QUERY_OPTIONS,
+    queryFn: async ({ signal }): Promise<ModelDescriptor[]> => {
+      const fetchOptions = { ...options, signal }
+      const { visibility, cache } = await readProviderTargetModelInventory(target, fetchOptions)
+      signal.throwIfAborted()
+      const cachedModels = filterVisibleModels(
+        cache.cached ? cache.models : queryClient.getQueryData<ModelDescriptor[]>(queryKey) ?? [],
+        visibility,
+      )
+      if (!options.refresh && !shouldLiveRefreshModelInventory(cache)) {
+        return cachedModels
       }
-      return []
-    }
-    const liveModels = await refreshProviderTargetModelsDeduped(target, options)
-    return filterVisibleModels(liveModels, visibility)
-  }
 
-  if (cache.coolingDown) {
-    return cache.cached
-      ? filterVisibleModels(ModelDescriptorListSchema.parse(cache.models), visibility)
-      : []
-  }
-
-  if (cache.cached && cache.models.length > 0) {
-    return filterVisibleModels(ModelDescriptorListSchema.parse(cache.models), visibility)
-  }
-
-  if (canLiveFetch && isRuntimeOwnedProviderTarget(target)) {
-    const liveModels = await refreshProviderTargetModelsDeduped(target, options)
-    return filterVisibleModels(liveModels, visibility)
-  }
-
-  return []
-}
-
-/**
- * Cache-first inventory for id-only provider targets (e.g. session binding).
- * Does not invent providerKind for live fetch — callers with full target metadata
- * should use fetchVisibleModelsForProviderTarget via useProviderTargetModelMap.
- */
-async function fetchCachedVisibleModelsForProviderTarget(
-  target: ProviderTarget,
-  options?: ProviderTargetModelFetchOptions,
-): Promise<ModelDescriptor[]> {
-  const { visibility, cache } = await readProviderTargetModelInventory(target, options)
-  if (!cache.cached || cache.models.length === 0) {
-    return []
-  }
-  return filterVisibleModels(ModelDescriptorListSchema.parse(cache.models), visibility)
+      // Publish cached inventory while the same cancellable query owns the live request.
+      if (!options.refresh) {
+        queryClient.setQueryData(queryKey, cachedModels)
+      }
+      try {
+        // Session bindings carry only an ID but must use the same query policy as pickers.
+        let requestTarget: ProviderTargetModelRequestTarget
+        if ('providerKind' in target) {
+          requestTarget = target
+        }
+        else {
+          const targets = options.nodeId
+            ? await fetchNodeUpstreamJson<GetProviderTargetsResponse>(
+                options.nodeId,
+                `/provider-targets${options.workspaceId ? `?workspaceId=${encodeURIComponent(options.workspaceId)}` : ''}`,
+                { signal },
+              )
+            : (await getProviderTargets({
+                query: { workspaceId: options.workspaceId ?? undefined },
+                signal,
+                throwOnError: true,
+              })).data
+          const resolved = targets.find(candidate => candidate.id === target.id)
+          if (!resolved) {
+            return cachedModels
+          }
+          requestTarget = { ...resolved, name: resolved.displayName }
+        }
+        if (!requestTarget.enabled || !isApiProviderKind(requestTarget.providerKind)) {
+          return cachedModels
+        }
+        const models = await refreshProviderTargetModels(requestTarget, fetchOptions)
+        signal.throwIfAborted()
+        return filterVisibleModels(models, visibility)
+      }
+      catch (error) {
+        signal.throwIfAborted()
+        if (options.refresh) {
+          throw error
+        }
+        return cachedModels
+      }
+    },
+  })
 }
 
 export function useAgentModels(profileId: string | null) {
@@ -378,16 +352,11 @@ export function useProviderTargetModels(
   target: ProviderTarget | null,
   options: { workspaceId?: string | null, nodeId?: string | null } = {},
 ) {
+  const queryClient = useQueryClient()
   const { data: models = [], isLoading } = useQuery({
+    ...providerTargetModelQueryOptions(queryClient, target ?? { id: '' }, options),
     queryKey: providerTargetModelsQueryKey(target, options.workspaceId, options.nodeId),
     enabled: target !== null,
-    queryFn: async (): Promise<ModelDescriptor[]> => {
-      if (!target) {
-        return []
-      }
-      return fetchCachedVisibleModelsForProviderTarget(target, options)
-    },
-    ...MODEL_INVENTORY_QUERY_OPTIONS,
   })
 
   return { models, isLoading }
@@ -472,8 +441,6 @@ export function useProviderTargetModelMap(
 ) {
   const { t } = useTranslation('common')
   const queryClient = useQueryClient()
-  const refreshesRef = useRef(new Map<string, Promise<ModelDescriptor[]>>())
-  const [refreshingProviderTargetIds, setRefreshingProviderTargetIds] = useState<Set<string>>(() => new Set())
   const reportedErrorsRef = useRef(new Map<string, number>())
   const [requestedProviderTargetIds, setRequestedProviderTargetIds] = useState<Set<string>>(
     () => new Set(initialProviderTargetIds.flatMap(targetId => (targetId ? [targetId] : []))),
@@ -501,13 +468,8 @@ export function useProviderTargetModelMap(
 
   const queries = useQueries({
     queries: requestedTargets.map(target => ({
-      queryKey: providerTargetModelsQueryKey(target, hookOptions.workspaceId, hookOptions.nodeId),
-      queryFn: () => fetchVisibleModelsForProviderTarget(target, {
-        workspaceId: hookOptions.workspaceId,
-        nodeId: hookOptions.nodeId,
-      }),
+      ...providerTargetModelQueryOptions(queryClient, target, hookOptions),
       enabled: target.enabled,
-      ...MODEL_INVENTORY_QUERY_OPTIONS,
     })),
   })
 
@@ -535,94 +497,6 @@ export function useProviderTargetModelMap(
     })
   }, [queries, requestedTargets, t])
 
-  const liveRefreshProviderTargetModels = useCallback((target: ProviderTargetModelRequestTarget) => {
-    if (!target.enabled || !isApiProviderKind(target.providerKind)) {
-      return
-    }
-
-    const existingRefresh = refreshesRef.current.get(target.id)
-    if (existingRefresh) {
-      return
-    }
-
-    const queryKey = providerTargetModelsQueryKey(target, hookOptions.workspaceId, hookOptions.nodeId)
-    setRefreshingProviderTargetIds(current => new Set(current).add(target.id))
-    const refresh = fetchVisibleModelsForProviderTarget(target, {
-      refresh: true,
-      workspaceId: hookOptions.workspaceId,
-      nodeId: hookOptions.nodeId,
-    })
-    refreshesRef.current.set(target.id, refresh)
-    void refresh
-      .then(models => queryClient.setQueryData(queryKey, models))
-      .catch(() => {
-        // Background inventory probes are opportunistic. The server records a
-        // cooldown; opening a picker must not surface an operational toast.
-      })
-      .finally(() => {
-        refreshesRef.current.delete(target.id)
-        setRefreshingProviderTargetIds((current) => {
-          const next = new Set(current)
-          next.delete(target.id)
-          return next
-        })
-      })
-  }, [hookOptions.nodeId, hookOptions.workspaceId, queryClient])
-
-  const ensureProviderTargetModelsFresh = useCallback((target: ProviderTargetModelRequestTarget) => {
-    if (!target.enabled || !isApiProviderKind(target.providerKind)) {
-      return
-    }
-    // Runtime-owned targets (currently OpenCode) are projected at runtime and
-    // have no durable provider_target_model_cache row. Their initial query
-    // already fetched the live catalog; treating that permanent cache miss as
-    // a background-refresh signal creates an endless fetch → query update loop.
-    if (isRuntimeOwnedProviderTarget(target)) {
-      return
-    }
-    if (refreshesRef.current.has(target.id)) {
-      return
-    }
-
-    void (async () => {
-      try {
-        const { cache } = await readProviderTargetModelInventory(target, {
-          workspaceId: hookOptions.workspaceId,
-          nodeId: hookOptions.nodeId,
-        })
-        if (!shouldLiveRefreshModelInventory(cache)) {
-          return
-        }
-        liveRefreshProviderTargetModels(target)
-      }
-      catch {
-        // Leave queryFn / explicit refresh to surface inventory errors.
-      }
-    })()
-  }, [hookOptions.nodeId, hookOptions.workspaceId, liveRefreshProviderTargetModels])
-
-  const inventorySyncKey = requestedTargets
-    .map((target, index) => {
-      const query = queries[index]
-      return `${target.id}:${query?.status ?? 'idle'}:${query?.dataUpdatedAt ?? 0}`
-    })
-    .join('|')
-
-  const requestedTargetsRef = useRef(requestedTargets)
-  const queriesRef = useRef(queries)
-  requestedTargetsRef.current = requestedTargets
-  queriesRef.current = queries
-
-  // After cache-first paint, soft-refresh only when server cache is missing or stale.
-  useEffect(() => {
-    requestedTargetsRef.current.forEach((target, index) => {
-      if (!queriesRef.current[index]?.isSuccess) {
-        return
-      }
-      ensureProviderTargetModelsFresh(target)
-    })
-  }, [ensureProviderTargetModelsFresh, inventorySyncKey])
-
   const requestProviderTargetModels = useCallback((targetId: string, options?: { refresh?: boolean }) => {
     const target = providerTargets.find(candidate => candidate.id === targetId)
     if (!target?.enabled) {
@@ -637,14 +511,23 @@ export function useProviderTargetModelMap(
       setRequestedProviderTargetIds(next)
     }
 
-    if (options?.refresh) {
-      liveRefreshProviderTargetModels(target)
+    const query = providerTargetModelQueryOptions(queryClient, target, {
+      workspaceId: hookOptions.workspaceId,
+      nodeId: hookOptions.nodeId,
+      ...options,
+    })
+    const state = queryClient.getQueryState(query.queryKey)
+    if (!options?.refresh && state?.status === 'error') {
+      return
     }
-
-    // A mounted query owns the initial cache read and any automatic refresh.
-    // Menu open, focus, hover, and a previously failed query must never retry
-    // the provider implicitly. Only an explicit { refresh: true } may do that.
-  }, [liveRefreshProviderTargetModels, providerTargets])
+    // fetchQuery deduplicates concurrent consumers and only revalidates stale data.
+    void queryClient.fetchQuery({
+      ...query,
+      ...(options?.refresh ? { staleTime: 0 } : {}),
+    }).catch(() => {
+      // The query observer reports explicit refresh and cache-read failures.
+    })
+  }, [hookOptions.nodeId, hookOptions.workspaceId, providerTargets, queryClient])
 
   const modelsByProviderTargetId: Record<string, ModelDescriptor[]> = {}
   const loadingProviderTargetIds = new Set<string>()
@@ -656,10 +539,10 @@ export function useProviderTargetModelMap(
       query?.data,
     ) satisfies ModelDescriptor[]
     const hasModels = (query?.data?.length ?? 0) > 0
-    if (query?.isLoading || (refreshingProviderTargetIds.has(target.id) && !hasModels)) {
+    if (query?.isLoading || (query?.isFetching && !hasModels)) {
       loadingProviderTargetIds.add(target.id)
     }
-    if (query?.isSuccess) {
+    if (query?.isSuccess && (!query.isFetching || hasModels)) {
       successfulProviderTargetIds.add(target.id)
     }
   })

@@ -93,6 +93,7 @@ export const chatRuntimeIntrospectionRoutes = new Elysia({
       return await listRuntimeModels({
         runtimeKind: params.runtimeKind,
         workspaceId: query.workspaceId?.trim() || undefined,
+        providerTargetId: query.providerTargetId?.trim() || undefined,
       })
     },
     {

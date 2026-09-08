@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { Progress } from '~/components/ui/progress'
 import { cn } from '~/lib/cn'
-import { clampPercent } from '~/lib/number-format'
+import { clampPercent, formatTokenCount } from '~/lib/number-format'
 
 import type { ChatRuntimeUsageUiSlotState } from '../../capabilities/chat-capabilities'
 
@@ -37,11 +37,38 @@ export function UsageSlotContent({
         {state.estimatedCostUsd !== undefined && state.estimatedCostUsd !== null && (
           <UsageCostSummary state={state} />
         )}
+        {readReasoningTokenSummary(state) && <UsageReasoningTokenSummary state={state} />}
         {state.lastModelSwitch && <ModelSwitchCostSummary modelSwitch={state.lastModelSwitch} />}
       </div>
       {action}
     </div>
   )
+}
+
+function UsageReasoningTokenSummary({ state }: { state: ChatRuntimeUsageUiSlotState }) {
+  const summary = readReasoningTokenSummary(state)
+  if (!summary) {
+    return null
+  }
+  return (
+    <div className="min-w-0 text-pretty leading-4 text-muted-foreground">
+      {`${formatTokenCount(summary.tokens)} reasoning tokens${summary.mayBePartial ? ' (may be partial)' : ''}`}
+    </div>
+  )
+}
+
+function readReasoningTokenSummary(state: ChatRuntimeUsageUiSlotState): { tokens: number, mayBePartial: boolean } | null {
+  const modelCosts = state.modelCosts ?? []
+  const costsWithReasoning = modelCosts.filter((cost): cost is typeof cost & { reasoningOutputTokens: number } => {
+    return typeof cost.reasoningOutputTokens === 'number'
+  })
+  if (costsWithReasoning.length === 0) {
+    return null
+  }
+  return {
+    tokens: costsWithReasoning.reduce((total, cost) => total + cost.reasoningOutputTokens, 0),
+    mayBePartial: costsWithReasoning.some(cost => cost.reasoningOutputTokensMayBePartial === true),
+  }
 }
 
 function ModelSwitchCostSummary({

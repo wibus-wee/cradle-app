@@ -3,6 +3,7 @@ import type { UIMessageChunk } from 'ai'
 import { getRegisteredMcpServers } from '../../../plugins/mcp-registry'
 import type {
   BackgroundTerminalListResult,
+  CancelRuntimeTaskInput,
   CancelTurnInput,
   ChatRuntime,
   GetCapabilitiesInput,
@@ -50,6 +51,7 @@ import { projectKimiPrompt } from './prompt-content'
 import {
   closeTerminal,
   getApiV1McpServers,
+  getApiV1Models,
   getApiV1OauthUsage,
   getApiV1Sessions,
   getApiV1SessionsBySessionId,
@@ -67,6 +69,7 @@ import {
   postApiV1SessionsBySessionIdProfile,
   postApiV1SessionsBySessionIdQuestionsByTail,
   promptAction,
+  runTaskAction,
   steerPrompts,
   submitPrompt,
 } from './protocol/rest/sdk.gen'
@@ -184,8 +187,31 @@ class KimiProvider implements ChatRuntime {
     }
   }
 
-  async listModels(_input: ListRuntimeModelsInput): Promise<RuntimeModelCatalog> {
-    return { runtimeKind: this.runtimeKind, source: 'runtime-cache', fetchedAt: Date.now(), models: [] }
+  async listModels(input: ListRuntimeModelsInput): Promise<RuntimeModelCatalog> {
+    const profile = requireRuntimeProviderTargetProfile(input.profile ?? null, this.runtimeKind)
+    const lease = await this.acquire(profile)
+    try {
+      const catalog = await lease.resource.http.request(getApiV1Models({ client: lease.resource.http.client }))
+      return {
+        runtimeKind: this.runtimeKind,
+        source: 'runtime',
+        fetchedAt: Date.now(),
+        models: catalog.items.map(model => ({
+          id: model.model,
+          label: model.display_name ?? model.model,
+          providerKind: profile.providerKind ?? 'openai-compatible',
+          runtimeKind: this.runtimeKind,
+          source: 'runtime',
+          nativeProviderId: model.provider,
+          capabilities: {
+            contextWindow: model.max_context_size,
+          },
+        })),
+      }
+    }
+    finally {
+      lease.release()
+    }
   }
 
   async healthCheck(): Promise<ProviderHealthStatus> {
@@ -323,6 +349,7 @@ updatedAt,
 label: task.description,
         status: task.status === 'running' ? 'inProgress' : task.status === 'completed' ? 'completed' : 'pending',
         sourceStatus: task.status,
+        action: task.status === 'running' ? { id: 'cancel', label: 'Cancel task' } : null,
       }]))
       for (const task of projectKimiTranscriptProgressItems(transcript)) {
         taskItemsById.set(task.id ?? `${task.sourceStatus}:${task.label}`, task)
@@ -652,6 +679,22 @@ path: { session_id: sessionId },
         body: { answers: projectKimiQuestionAnswers(question, input.answers) },
       }))
       return { requestId: input.requestId, answers: input.answers }
+    }
+    finally { lease.release() }
+  }
+
+  async cancelRuntimeTask(input: CancelRuntimeTaskInput): Promise<void> {
+    const profile = requireRuntimeProviderTargetProfile(input.profile, this.runtimeKind)
+    const sessionId = input.runtimeSession.providerSessionId
+    if (!sessionId) {
+      throw new ProviderRuntimeError(ProviderErrors.sessionNotFound(this.runtimeKind, input.runtimeSession.chatSessionId))
+    }
+    const lease = await this.acquire(profile)
+    try {
+      await lease.resource.http.request(runTaskAction({
+        client: lease.resource.http.client,
+        path: { session_id: sessionId, tail: `${input.taskId}:cancel` },
+      }))
     }
     finally { lease.release() }
   }

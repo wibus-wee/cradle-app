@@ -20428,6 +20428,7 @@ export type GetChatRuntimesByRuntimeKindModelsData = {
     };
     query?: {
         workspaceId?: string;
+        providerTargetId?: string;
     };
     url: '/chat/runtimes/{runtimeKind}/models';
 };
@@ -20701,6 +20702,10 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                 label: string;
                 status: 'pending' | 'inProgress' | 'completed';
                 sourceStatus: string | null;
+                action?: {
+                    id: 'cancel';
+                    label: string;
+                } | null;
             }>;
             currentItem: string | null;
             pendingCount: number;
@@ -20958,6 +20963,8 @@ export type GetChatSessionsBySessionIdUiSlotStatesResponses = {
                 provider: string | null;
                 costUsd: number;
                 costBasis: 'list' | 'managed' | 'unknown';
+                reasoningOutputTokens?: number;
+                reasoningOutputTokensMayBePartial?: boolean;
             }>;
             lastModelSwitch?: {
                 fromModelId: string;
@@ -22852,6 +22859,27 @@ export type PutChatSessionsBySessionIdRuntimeModeResponses = {
 };
 
 export type PutChatSessionsBySessionIdRuntimeModeResponse = PutChatSessionsBySessionIdRuntimeModeResponses[keyof PutChatSessionsBySessionIdRuntimeModeResponses];
+
+export type PostChatSessionsBySessionIdRuntimeTasksByTaskIdCancelData = {
+    body?: never;
+    path: {
+        sessionId: string;
+        taskId: string;
+    };
+    query?: never;
+    url: '/chat/sessions/{sessionId}/runtime-tasks/{taskId}/cancel';
+};
+
+export type PostChatSessionsBySessionIdRuntimeTasksByTaskIdCancelResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        ok: boolean;
+    };
+};
+
+export type PostChatSessionsBySessionIdRuntimeTasksByTaskIdCancelResponse = PostChatSessionsBySessionIdRuntimeTasksByTaskIdCancelResponses[keyof PostChatSessionsBySessionIdRuntimeTasksByTaskIdCancelResponses];
 
 export type PatchChatSessionsBySessionIdRuntimeTurnSettingsData = {
     body: {
