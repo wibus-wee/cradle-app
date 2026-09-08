@@ -76,6 +76,30 @@ Then('名为{string}的卡片应显示优先级{string}', async function (this: 
   await this.kanbanPage.expectCardPriority(title, label)
 })
 
+When('我选择 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.selectIssue(title)
+})
+
+Then('看板应显示 {int} 个已选 Issue', async function (this: CradleWorld, count: number) {
+  await this.kanbanPage.expectSelectedIssueCount(count)
+})
+
+Then('看板不应显示已选 Issue', async function (this: CradleWorld) {
+  await this.kanbanPage.expectNoSelectedIssues()
+})
+
+When('我将已选 Issue 的优先级批量修改为{string}', async function (this: CradleWorld, priority: string) {
+  await this.kanbanPage.bulkUpdateSelectedIssuePriority(priority)
+})
+
+When('我将已选 Issue 批量移动到{string}列', async function (this: CradleWorld, columnName: string) {
+  await this.kanbanPage.bulkMoveSelectedIssues(columnName)
+})
+
+When('我重新加载当前看板', async function (this: CradleWorld) {
+  await this.kanbanPage.reloadCurrentBoard()
+})
+
 Given('我已在第一列创建了一个 Issue{string}', async function (this: CradleWorld, title: string) {
   await this.kanbanPage.createIssueInFirstColumn(title)
 })
@@ -98,6 +122,30 @@ Then('Issue 详情面板应显示', async function (this: CradleWorld) {
 
 Then('面板标题应为{string}', async function (this: CradleWorld, title: string) {
   await this.kanbanPage.expectPanelTitle(title)
+})
+
+When('我将当前 Issue 标记为被{string}阻塞', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.addBlockedByRelation(title)
+})
+
+Then('当前 Issue 应显示被{string}阻塞的关系', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.expectIssueRelation('Blocked by', title)
+})
+
+Then('当前 Issue 应显示阻塞{string}的关系', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.expectIssueRelation('Blocks', title)
+})
+
+When('我通过该关系打开 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.openRelatedIssue('Blocked by', title)
+})
+
+When('我删除当前 Issue 与{string}的阻塞关系', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.removeIssueRelation('Blocks', title)
+})
+
+Then('当前 Issue 应不再显示任何关系', async function (this: CradleWorld) {
+  await this.kanbanPage.expectNoIssueRelations()
 })
 
 When('我在评论框中输入{string}', async function (this: CradleWorld, text: string) {
@@ -194,6 +242,34 @@ Then('看板列顺序应为:', async function (this: CradleWorld, table: DataTab
 
 Then('子 Issue 列表应显示{string}', async function (this: CradleWorld, title: string) {
   await this.kanbanPage.expectSubIssueVisible(title)
+})
+
+Then('当前 Issue 的子 Issue 进度应为{string}', async function (this: CradleWorld, progress: string) {
+  await this.kanbanPage.expectSubIssueProgress(progress)
+})
+
+When('我从当前 Issue 打开子 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.openSubIssue(title)
+})
+
+Then('当前 Issue 应显示父 Issue {string}链接', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.expectParentIssueLink(title)
+})
+
+When('我通过父 Issue 链接打开 Issue {string}', async function (this: CradleWorld, title: string) {
+  await this.kanbanPage.openParentIssue(title)
+})
+
+When('我从子 Issue {string}卡片的父链接打开 Issue {string}', async function (
+  this: CradleWorld,
+  childTitle: string,
+  parentTitle: string,
+) {
+  await this.kanbanPage.openParentIssueFromCard(childTitle, parentTitle)
+})
+
+Then('当前 Issue 应不再显示子 Issue', async function (this: CradleWorld) {
+  await this.kanbanPage.expectNoSubIssues()
 })
 
 Then('名为{string}的卡片应显示标签{string}', async function (this: CradleWorld, title: string, label: string) {

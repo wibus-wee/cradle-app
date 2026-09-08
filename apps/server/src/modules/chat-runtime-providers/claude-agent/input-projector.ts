@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import type { McpServerConfig, Options } from '@anthropic-ai/claude-agent-sdk'
 import type { UIMessage } from 'ai'
 
@@ -21,6 +24,7 @@ import {
   readTrustedUniversalConfig,
   resolveApiKey,
 } from '../../provider-contracts/provider-base'
+import { resolveNativeSkillPackageDir } from '../../skills/native-skill-projection'
 import { createBoundedTextCollector } from '../bounded-text-collector'
 import type { ProviderInputPart } from '../kit/input-projector'
 import { projectProviderInputParts } from '../kit/input-projector'
@@ -142,7 +146,15 @@ function describePluginMentionForText(plugin: ProviderPluginInputPart['plugin'])
 }
 
 function describeSkillMentionForText(skill: ProviderSkillInputPart['skill']): string {
-  return `/${skill.name}`
+  const skillFile = join(resolveNativeSkillPackageDir(skill.path), 'SKILL.md')
+  const instructions = readFileSync(skillFile, 'utf8').trim()
+  return [
+    `/${skill.name}`,
+    '',
+    `<selected_cradle_skill name=${JSON.stringify(skill.name)}>`,
+    instructions,
+    '</selected_cradle_skill>',
+  ].join('\n')
 }
 
 export function buildClaudeAgentTurnContent(input: {

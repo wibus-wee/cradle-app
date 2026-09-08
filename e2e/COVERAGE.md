@@ -6,8 +6,8 @@ This document is the audit map for Cradle's active E2E suite. Executable scenari
 
 | Layer | Directly asserted | Traversed indirectly | User-visible gap | Service/infra contract |
 | --- | ---: | ---: | ---: | ---: |
-| Web feature namespaces | 21 | 12 | 16 | 1 |
-| Server module namespaces | 31 | 15 | 20 | 7 |
+| Web feature namespaces | 30 | 10 | 9 | 1 |
+| Server module namespaces | 40 | 13 | 13 | 7 |
 
 These counts classify ownership, not line coverage. A namespace is “direct” only when an active scenario asserts behavior owned by it. “Indirect” means the real module participates in a journey without a domain-specific assertion. “Gap” means it owns user-visible behavior with no active journey. “Contract” means browser E2E is not the primary verification layer.
 
@@ -23,6 +23,7 @@ Onboarding ──> Profiles / Provider Targets ──> Agent Identity / Runtime
               │             │             └── Tabs / Search / Export
               │             ├── Context / Filesystem
               │             └── Git / Diff / PTY
+              ├── Files ──> Browser Panel ──> Editor ──> Filesystem
               ├── Kanban / Issue ──> Delegation ──> Agent Session ──> Chat
               │                                      └── isolated ──> Work
               └── New Work ──> Worktree ──> Primary Thread ──> Delivery / PR
@@ -48,6 +49,7 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Claude runtime × redacted thinking × SSE ping | `CRADLE-CHAT-012` | Opaque encrypted thinking blocks do not block answer projection |
 | Streaming transport failure (mid-stream disconnect) × retry | `CRADLE-CHAT-013` | A cut SSE stream never persists a partial answer and the next turn recovers |
 | Claude runtime × TodoWrite / TaskCreate / WebFetch / MCP naming / generic tools | `CRADLE-AGENT-005`–`009` | Each canonical tool kind completes a real execution and input-projection loop |
+| Claude runtime × Artifact create/update × chat preview × Browser Panel × reload | `CRADLE-AGENT-010` | Two real `write_artifact` tool turns revise one persisted record; revision 2 replaces revision 1 in the panel, and both chat evidence and the latest rendered content survive reload |
 | Codex × real shell execution (`exec_command`) × terminal tool UI | `CRADLE-CODEX-005` | The app-server runs the command locally and the output crosses back through the model continuation |
 | Codex × update_plan execution round-trip | `CRADLE-CODEX-006` | The plan handler executes and its result crosses back through the model continuation; plan-item UI projection stays a backlog item |
 | Codex × apply_patch file change × file-diff UI | `CRADLE-CODEX-007` | In-workspace patches execute under sandbox and project file-change tool state |
@@ -61,18 +63,37 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 | Issue × active Run × reload × undelegate × abort | `CRADLE-ISSUE-AGENT-002` | Cancellation removes delegation and prevents a gated reply from persisting |
 | Issue × isolated delegation × Work × worktree × linked Chat | `CRADLE-ISSUE-AGENT-003` | The Issue-owned action creates a Work-owned isolated execution without losing linkage |
 | Issue × active isolated Work × reload × undelegate × abort | `CRADLE-ISSUE-AGENT-004` | Cancellation stops runtime work while retaining the Work and worktree as explicit audit state |
+| Issue multi-selection × bulk priority × bulk status × reload | `CRADLE-ISSUE-BULK-001` | Both bulk mutations update the exact selected Issue set, clear transient selection, and retain every visible card projection after reload |
+| Issue create × global search × detail rename × cache invalidation × reload | `CRADLE-SEARCH-002` | Search opens the matching Issue, an edit invalidates the previously used title query immediately, and the new result keeps navigating to the persisted detail |
+| Issue × directed blocker × reload × inverse projection × deletion | `CRADLE-ISSUE-RELATION-001` | A blocker persists from both Issue perspectives, relation navigation opens the counterpart, and deletion clears both projections |
+| Parent Issue × sub-issue × reload × board/detail navigation × deletion | `CRADLE-ISSUE-HIERARCHY-001` | Hierarchy and progress persist across reload, both surfaces navigate to the right parent, and child deletion clears every parent projection |
 | Work × Git × worktree × file mutation × Session | `CRADLE-WORK-001` | Isolated execution uses a managed worktree and persistent primary thread |
 | Work × provider failure × reload × retry × worktree × Session | `CRADLE-WORK-002` | A failed initial run retains exactly one isolated Work primary thread; reload and retry recover in that same session and mutate its worktree |
 | Work × stop × reload × retry × worktree × Session | `CRADLE-WORK-003` | Stopping an active initial run returns the Work UI to idle without duplicating its isolated primary thread; reload and retry recover in that same session and mutate its worktree |
 | Workspace removal × Work primary Session × live PTY × managed worktree × reload | `CRADLE-WS-004` | Destructive Workspace removal explicitly releases Session-owned runtime/PTY resources, removes Work and managed checkout state, and leaves no stale server or filesystem projection |
 | Workspace removal × active Work run × runtime cancellation × delayed provider response × reload | `CRADLE-WS-005` | Destructive Workspace removal cancels the active Work run before Session disposal, so a delayed provider response cannot recreate deleted state |
+| Source Workspace × Issue/Kanban/Automation × dry-run preview × target Workspace × reload | `CRADLE-WS-006` | The UI previews exact cross-owner counts before atomically moving all three entity types; Issue and Automation target ownership and the migrated board contents persist |
+| Automation × real Agent run × triage × artifact × linked Session × reload | `CRADLE-AUTO-001` | A manual Automation run completes through Claude Agent, creates one reviewable result and transcript artifact, leaves triage after resolution, and retains the same linked Session and output after reload |
+| Automation × active Agent run × reload × cancellation × triage × linked Session | `CRADLE-AUTO-002` | A running Automation rehydrates with its Stop control, cancellation aborts the real Claude run, records a reviewable terminal state without an artifact, and prevents a late reply after reload |
+| Workspace Skill × explicit Composer selection × Claude runtime × deletion × Session history | `CRADLE-SKILL-001` | A UI-created Skill reaches the real Claude Agent request, survives reload as persisted invocation evidence, disappears from future selection after deletion, and remains auditable in the completed Session |
+| External Claude history × read-only discovery × Cradle-owned bundle × Session × reload × duplicate prevention | `CRADLE-IMPORT-001` | UI import creates one durable Cradle Session from provider-owned JSONL without mutating the source; the transcript survives reload and a new scan disables duplicate import |
+| npm plugin source × install preview × trust × Web contribution × disable/re-enable × reload | `CRADLE-PLUGIN-001` | A UI-installed external plugin remains inert until explicit trust, contributes its panel only while enabled, and preserves the activation policy across reloads without duplicate installation |
+| Session × Session Group × persisted sidebar expansion × reload × group deletion | `CRADLE-SESSION-GROUP-001` | UI creation binds the initiating Session, rename and membership survive reload with the persisted expanded state, and deleting the group returns its still-readable Session to the ungrouped list |
+| External Claude history × imported Session × rename × reload × ZIP download | `CRADLE-SESSION-EXPORT-001` | A recovered transcript keeps its Cradle Session identity across reload, then exports a deterministic ZIP with complete JSON/Markdown records without mutating the open Session |
+| Session × archive mutation × Settings search × reload × restore | `CRADLE-SESSION-ARCHIVE-001` | Archiving removes a completed conversation from active navigation; its settings projection remains searchable across reload and restoration returns the complete conversation to the sidebar |
+| Invalid Server Endpoint × health probe × persisted custom URL × reload × default recovery | `CRADLE-SERVER-001` | Invalid schemes cannot replace the active connection; a real `/health` response admits a reachable custom endpoint, startup uses it after reload, and reset restores the app-provided endpoint through another startup |
+| Workspace file tree × Browser Panel editor × filesystem write × reload | `CRADLE-WORKSPACE-EDITOR-001` | A real text file opens from the Workspace tree, exposes dirty/saved transitions, persists edited content to disk, and restores the clean editor tab after reload |
 | Git branch × external file changes × diff refresh | `CRADLE-GIT-001`, `002`, `CRADLE-DIFF-001` | Repository projections refresh from real Git/filesystem state |
 | Await pending × external event × Agent continuation | `CRADLE-AWAIT-001` | Durable pending work resumes from an external signal |
 | Await cancel/expiry × Server crash × late external resolution × next Agent turn | `CRADLE-AWAIT-002` | Both terminal states persist across process recovery, reject late delivery without transcript pollution, and leave the Session usable |
 | Multiple PTYs × active-session input routing | `CRADLE-PTY-002` | Input reaches only the selected terminal session |
 | Completed Agent run × usage aggregation × selected range × CSV export × reload | `CRADLE-USAGE-001` | Runtime usage is counted once, the selected range persists, and the downloaded export contains the same aggregate |
+| Active Codex run × storage inventory × transcript purge × full Session deletion × reload | `CRADLE-STORAGE-001` | Active Session cleanup controls remain locked while another Session is purged without losing metadata, then fully deleted; the protected run completes afterward |
 | Provider profile × Agent selection × disable | `CRADLE-PROVIDER-001` | A UI-created provider can run and later become unavailable |
 | Provider disable/delete × two active sessions × queued continuation × runtime cancellation | `CRADLE-PROVIDER-002`, `CRADLE-PROVIDER-003` | Disabling or deleting a UI-created provider cancels every in-flight run and prevents a queued continuation in another session from executing |
+| Local ACP Runtime × environment validation × create/update × reload × delete | `CRADLE-ACP-001` | Invalid launch environment syntax cannot persist; canonical command, arguments, and environment survive create and update reloads before confirmed deletion removes the Runtime |
+| Local MCP server × encrypted secrets × transport update × disable × reload × delete | `CRADLE-MCP-001` | Invalid secret syntax cannot persist; normalized stdio metadata and public secret keys survive reload, an HTTP update preserves encrypted values without exposing them, and disabled/deleted state remains durable |
+| Issue description × image upload × Cradle asset × reload | `CRADLE-ASSET-001` | A real editor upload creates a Workspace-owned image asset, saves its canonical Markdown reference, renders the stored bytes, and restores the same decoded image after reload |
 | Fabric pairing × two databases × bidirectional Workspace/Chat/Work × Node-owned worktrees × remote tool approval × Session discovery × relay/server restart | `CRADLE-FABRIC-001` | Two real Nodes enroll through the UI, create Work and managed worktrees on the selected authority in both directions, continue each Work conversation, approve a remote Claude Agent tool request from each controller, discover conversations created by the other controller, and recover mounted routing without re-pairing |
 | Native Mobile Controller × two Node grants × cache isolation × Chat SSE × grant/principal revocation | `CRADLE-FABRIC-002` | A signed Release iOS app enrolls through the real owner UI, selects both Nodes without Server credentials, keeps Workspace state Node-scoped, continues a real Codex conversation over Fabric streaming, preserves one Node after a grant removal, and fails closed after Controller revocation |
 
@@ -80,18 +101,18 @@ The highest-risk joins are lifecycle joins: a provider request may outlive a vie
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-management`, `chat`, `composer-toolbar`, `context`, `diff-review`, `git`, `kanban`, `new-chat`, `new-work`, `nodes`, `onboarding`, `search`, `session`, `session-await`, `settings`, `split-view`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
-| Indirect | `activity`, `agent-runtime`, `agent-runtimes`, `background-activity`, `code-activity`, `filesystem`, `home`, `mcp-servers`, `model-registry`, `plugins`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
-| User-visible gap | `assets`, `automation`, `browser`, `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `editor`, `managed-resources`, `pull-requests`, `server-connection`, `shortcuts`, `skills`, `storage`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
+| Direct | `agent-management`, `agent-runtimes`, `assets`, `automation`, `browser`, `chat`, `composer-toolbar`, `context`, `diff-review`, `editor`, `git`, `kanban`, `mcp-servers`, `new-chat`, `new-work`, `nodes`, `onboarding`, `plugins`, `search`, `server-connection`, `session`, `session-await`, `settings`, `skills`, `split-view`, `storage`, `usage`, `work`, `workspace`, `workspace-detail` | Active IDs listed in the state matrix and feature inventory |
+| Indirect | `activity`, `agent-runtime`, `background-activity`, `code-activity`, `filesystem`, `home`, `model-registry`, `tui`, `window-controls` | Real code is traversed, but its own visible contract is not asserted |
+| User-visible gap | `changelog`, `chronicle`, `desktop-tray`, `devtool`, `download-center`, `managed-resources`, `pull-requests`, `shortcuts`, `system-agent` | Add only journeys that cross a lifecycle or destructive boundary; avoid shallow navigation checks |
 | Service/infra contract | `product-analytics` | Verify event correctness at the event boundary; add browser coverage only for user-visible consent controls |
 
 ## Server Module Namespace Disposition
 
 | Classification | Namespaces | Evidence or required journey |
 | --- | --- | --- |
-| Direct | `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
-| Indirect | `background-activity`, `code-activity`, `desktop`, `mcp-servers`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `skills`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources`, `plugins` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
-| User-visible gap | `acp`, `assets`, `automation`, `chat-artifacts`, `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `external-session-import`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `session-group`, `storage`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
+| Direct | `acp`, `agent-identity`, `agent-interaction-runtime`, `agent-tools`, `assets`, `automation`, `chat-artifacts`, `chat-runtime`, `chat-runtime-engine`, `chat-runtime-providers`, `codex-app-server`, `conversation-bridge`, `diff-review`, `external-session-import`, `fabric`, `filesystem`, `git`, `issue`, `issue-agent`, `javascript-eval`, `kanban`, `mcp-servers`, `plugins`, `preferences`, `profiles`, `provider-runtime`, `provider-targets`, `pty`, `relay-transport`, `search`, `session`, `session-await`, `session-group`, `skills`, `storage`, `turn-checkpoint`, `usage`, `work`, `workspace`, `worktree` | Active scenarios assert their user-visible lifecycle effects |
+| Indirect | `background-activity`, `code-activity`, `desktop`, `model-registry`, `provider-auth`, `provider-catalog`, `provider-contracts`, `secrets`, `thread-handoff`, `workflow-rules`, `pull-request`, `managed-resources` | Participates in a real path or supplies runtime metadata, but no owning assertion exists |
+| User-visible gap | `chronicle`, `download-center`, `external-issue-sources`, `external-provider-sources`, `github-auth`, `image-ocr`, `kimi-server`, `link-preview`, `opencode-server`, `plugin-marketplace`, `provider-extensions`, `recall`, `sync-gateway` | Needs an end-user journey before release confidence can include the namespace |
 | Service/infra contract | `background-job`, `blob-store`, `codex-reset-watch`, `health`, `maintenance`, `observability`, `test-reset` | Prefer focused service/contract verification; `test-reset` is harness-only |
 
 ## Prioritized Missing Journeys
@@ -100,16 +121,12 @@ The backlog below is ordered by semantic fan-out and state-corruption risk, not 
 
 | Priority | Proposed journey | State fusion and owning namespaces |
 | --- | --- | --- |
-| P1 | Automation run success/failure/cancel with linked Session and notification | automation × background job/activity × session |
 | P1 | Pull-request delivery from Work, update, and failure recovery | Work × Git × pull request × provider auth |
 | P1 | Fabric Node disconnect/reconnect during an active terminal or Agent run | Fabric Node × relay × PTY/runtime × Session |
-| P1 | Runtime process environment configuration edit while idle versus locked during a run | Agent runtime configuration × session × active process lifecycle |
-| P1 | Skill create/import/delete, then invoke from a real Agent | skills × Agent identity × runtime tool catalog |
-| P1 | Plugin install/enable/disable/reload with a visible contribution | marketplace × plugin lifecycle × shell state |
-| P1 | Browser/asset/OCR path from capture or upload into a persisted prompt | browser × assets × OCR × context × session |
-| P1 | External issue/session import deduplicates and survives reload | external sources × issue/session ownership × idempotency |
+| P1 | ACP launch-config change during an active Session and process reconnect | Agent runtime configuration × active ACP process × Session recovery |
+| P1 | Browser capture or OCR path into a persisted prompt | browser × image OCR × context × session |
+| P1 | External issue import deduplicates and survives reload | external issue sources × issue ownership × idempotency |
 | P1 | Chronicle/Recall opt-in, write, query, delete, and disabled behavior | preferences × chronicle/recall × privacy lifecycle |
-| P1 | Storage inventory, transcript purge, and full session deletion with active-session protection and reload | storage × session/runtime cleanup × attachment/artifact ownership |
 
 ## Acceptance Rules
 

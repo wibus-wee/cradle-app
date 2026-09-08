@@ -1,8 +1,5 @@
-import { File } from 'node:buffer'
-
 import { Elysia } from 'elysia'
 
-import { AppError } from '../../errors/app-error'
 import { AssetsModel } from './model'
 import * as Assets from './service'
 
@@ -10,26 +7,17 @@ export const assets = new Elysia({
   prefix: '/assets',
   detail: { tags: ['assets'] },
 })
-  .post('/', async ({ request }) => {
-    const form = await request.formData()
-    const file = form.get('file')
-    if (!(file instanceof File)) {
-      throw new AppError({
-        code: 'asset_file_required',
-        status: 400,
-        message: 'Asset upload requires a file',
-      })
-    }
-    const workspaceId = form.get('workspaceId')
+  .post('/', ({ body }) => {
     return Assets.createAsset({
-      file,
-      workspaceId: typeof workspaceId === 'string' ? workspaceId : null,
+      file: body.file,
+      workspaceId: body.workspaceId,
     })
   }, {
     detail: {
       summary: 'Upload asset',
       description: 'Upload a Cradle-owned image asset with multipart/form-data fields: file and optional workspaceId. This route is HTTP-only because generated CLI commands do not model file uploads well.',
     },
+    body: AssetsModel.uploadBody,
     response: { 200: AssetsModel.asset },
   })
   .get('/:id', ({ params }) => Assets.getAsset(params.id), {

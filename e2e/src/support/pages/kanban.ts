@@ -9,6 +9,23 @@ interface KanbanPageOwner {
   maybeRecall: <T>(key: string) => T | undefined
 }
 
+interface IssueDescriptionAssetReference {
+  contentUrl: string
+  markdownUrl: string
+}
+
+interface BulkUpdateRequest {
+  issueIds: string[]
+  update: {
+    priority?: string
+    statusId?: string | null
+  }
+}
+
+interface BulkUpdateResponse {
+  updated: number
+}
+
 export class KanbanPage {
   private static readonly KANBAN_SIDEBAR = '[data-testid="kanban-sidebar"]'
   private static readonly KANBAN_BOARD = '[data-testid="kanban-board"]'
@@ -19,6 +36,7 @@ export class KanbanPage {
   private static readonly KANBAN_ISSUE_INPUT = '[data-testid="kanban-new-issue-input"]'
   private static readonly _KANBAN_CREATE_ISSUE_BUTTON = '[data-testid="kanban-create-issue-btn"]'
   private static readonly KANBAN_SEARCH_INPUT = '[data-testid="kanban-search-input"]'
+  private static readonly KANBAN_SELECTION_BAR = '[data-testid="kanban-selection-bar"]'
   private static readonly ISSUE_DETAIL_PANEL = '[data-testid="issue-detail-panel"]'
   private static readonly ISSUE_DETAIL_HEADER = '[data-testid="issue-detail-header"]'
   private static readonly ISSUE_DETAIL_CLOSE_BUTTON = '[data-testid="issue-detail-close-btn"]'
@@ -30,9 +48,11 @@ export class KanbanPage {
   private static readonly ISSUE_TITLE_INPUT = '[data-testid="issue-title-input"]'
   private static readonly ISSUE_DESCRIPTION_EDITOR = '[data-testid="issue-description-editor"]'
   private static readonly ISSUE_PRIORITY_TRIGGER = '[data-testid="issue-priority-trigger"]'
+  private static readonly ISSUE_RELATION_CHIP = '[data-testid^="issue-relation-chip-"]'
   private static readonly STATUS_MANAGER = '[data-testid="status-manager"]'
   private static readonly STATUS_ROW = '[data-testid^="status-row-"]'
   private static readonly STATUS_NAME_INPUT = '[data-testid="status-name-input"]'
+  private static readonly ISSUE_DESCRIPTION_ASSET_REFERENCE_KEY = 'issueDescriptionAssetReference'
 
   private static readonly PRIORITY_LABELS: Record<string, string> = {
     none: 'No priority',
@@ -58,6 +78,20 @@ export class KanbanPage {
 
   private issueCardByTitle(title: string): Locator {
     return this.visibleKanbanBoard().locator(KanbanPage.KANBAN_ISSUE_CARD).filter({ hasText: title }).first()
+  }
+
+  private issueRelationButton(kindLabel: string, targetTitle: string): Locator {
+    return this.page
+      .locator(KanbanPage.ISSUE_DETAIL_PANEL)
+      .getByRole('button', { name: this.issueRelationAccessibleName(kindLabel, targetTitle) })
+  }
+
+  private issueRelationAccessibleName(kindLabel: string, targetTitle: string): RegExp {
+    return new RegExp(`^${this.escapeRegExp(kindLabel)} [^:]+: ${this.escapeRegExp(targetTitle)}$`)
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
   private _sortableIssueByTitle(title: string): Locator {
@@ -352,6 +386,101 @@ export class KanbanPage {
     await expect(card).toContainText(label, { timeout: 10_000 })
   }
 
+  async selectIssue(title: string): Promise<void> {
+    const card = await this.getIssueCardByTitle(title)
+    const toggle = card.getByRole('checkbox', { name: `Select ${title}`, exact: true })
+    await expect(toggle).toBeVisible({ timeout: 10_000 })
+    await toggle.click()
+    await expect(card.getByRole('checkbox', { name: `Deselect ${title}`, exact: true }))
+      .toBeChecked({ timeout: 10_000 })
+    const selectedTitles = this.owner.maybeRecall<string[]>('selectedIssueTitles') ?? []
+    this.owner.remember('selectedIssueTitles', [...selectedTitles, title])
+  }
+
+  async expectSelectedIssueCount(count: number): Promise<void> {
+    const selectionBar = this.page.locator(KanbanPage.KANBAN_SELECTION_BAR)
+    await expect(selectionBar).toBeVisible({ timeout: 10_000 })
+    await expect(selectionBar.getByText(String(count), { exact: true })).toBeVisible()
+    await expect(selectionBar.getByText('selected', { exact: true })).toBeVisible()
+  }
+
+  async expectNoSelectedIssues(): Promise<void> {
+    await expect(this.page.locator(KanbanPage.KANBAN_SELECTION_BAR)).toHaveCount(0, { timeout: 10_000 })
+    await expect(this.visibleKanbanBoard().getByRole('checkbox', { checked: true })).toHaveCount(0)
+  }
+
+  async bulkUpdateSelectedIssuePriority(label: string): Promise<void> {
+    const priority = Object.entries(KanbanPage.PRIORITY_LABELS)
+      .find(([, candidateLabel]) => candidateLabel === label)?.[0]
+    if (!priority) {
+      throw new Error(`Unsupported Issue priority label: ${label}`)
+    }
+
+    const issueIds = await this.selectedIssueIds()
+    const responsePromise = this.waitForBulkUpdateResponse(issueIds, { priority })
+    const selectionBar = this.page.locator(KanbanPage.KANBAN_SELECTION_BAR)
+    await selectionBar.getByRole('button', { name: 'Priority', exact: true }).click()
+    await this.page.getByRole('menuitemradio', { name: label, exact: true }).click()
+    await responsePromise
+    this.owner.remember('selectedIssueTitles', [])
+  }
+
+  async bulkMoveSelectedIssues(columnName: string): Promise<void> {
+    const issueIds = await this.selectedIssueIds()
+    const statusId = await this.getColumnStatusIdByName(columnName)
+    const responsePromise = this.waitForBulkUpdateResponse(issueIds, { statusId })
+    const selectionBar = this.page.locator(KanbanPage.KANBAN_SELECTION_BAR)
+    await selectionBar.getByRole('button', { name: 'Status', exact: true }).click()
+    await this.page.getByRole('menuitemradio', { name: columnName, exact: true }).click()
+    await responsePromise
+    this.owner.remember('selectedIssueTitles', [])
+  }
+
+  async reloadCurrentBoard(): Promise<void> {
+    const boardName = this.owner.maybeRecall<string>('currentBoardName')
+    if (!boardName) {
+      throw new Error('Cannot reload the current board before remembering its name')
+    }
+
+    await this.page.reload({ waitUntil: 'domcontentloaded' })
+    const boardButton = await this.getBoardButtonByName(boardName)
+    await boardButton.click()
+    await expect(this.visibleKanbanBoard()).toBeVisible({ timeout: 10_000 })
+  }
+
+  private async issueIdsForTitles(titles: string[]): Promise<string[]> {
+    return Promise.all(titles.map(async (title) => {
+      const card = await this.getIssueCardByTitle(title)
+      return this.extractIdFromTestId(card, 'issue-card-')
+    }))
+  }
+
+  private async selectedIssueIds(): Promise<string[]> {
+    const titles = this.owner.maybeRecall<string[]>('selectedIssueTitles') ?? []
+    if (titles.length === 0) {
+      throw new Error('Cannot bulk update Issues before selecting at least one card')
+    }
+    return this.issueIdsForTitles(titles)
+  }
+
+  private async waitForBulkUpdateResponse(
+    expectedIssueIds: string[],
+    expectedUpdate: BulkUpdateRequest['update'],
+  ): Promise<void> {
+    const response = await this.page.waitForResponse((candidate) => {
+      const url = new URL(candidate.url())
+      return candidate.request().method() === 'PATCH' && url.pathname === '/issues/bulk'
+    })
+    expect(response.ok()).toBe(true)
+
+    const request = response.request().postDataJSON() as BulkUpdateRequest
+    expect([...request.issueIds].sort()).toEqual([...expectedIssueIds].sort())
+    expect(request.update).toEqual(expectedUpdate)
+
+    const body = await response.json() as BulkUpdateResponse
+    expect(body.updated).toBe(expectedIssueIds.length)
+  }
+
   async createIssueInFirstColumn(title: string): Promise<void> {
     const firstColumn = this.visibleKanbanBoard().locator(KanbanPage.KANBAN_COLUMN).first()
     await expect(firstColumn).toBeVisible({ timeout: 10_000 })
@@ -393,6 +522,72 @@ export class KanbanPage {
 
   async expectPanelTitle(title: string): Promise<void> {
     await expect(this.page.locator(KanbanPage.ISSUE_TITLE_DISPLAY)).toHaveText(title, { timeout: 10_000 })
+  }
+
+  async addBlockedByRelation(targetTitle: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    await expect(panel).toBeVisible({ timeout: 10_000 })
+
+    await panel.locator('[data-testid="issue-relation-add"]').click()
+    await this.page.locator('[data-testid="issue-relation-kind-blocked-by"]').click()
+
+    const search = this.page.locator('[data-testid="issue-relation-search"]')
+    await expect(search).toBeFocused({ timeout: 10_000 })
+    await search.fill(targetTitle)
+
+    const candidate = this.page.getByRole('option', {
+      name: new RegExp(`${this.escapeRegExp(targetTitle)}$`),
+    })
+    await expect(candidate).toBeVisible({ timeout: 10_000 })
+
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'POST' && url.pathname === '/issues/relations'
+    })
+    await candidate.click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+  }
+
+  async expectIssueRelation(kindLabel: string, targetTitle: string): Promise<void> {
+    await expect(this.issueRelationButton(kindLabel, targetTitle)).toBeVisible({ timeout: 10_000 })
+  }
+
+  async openRelatedIssue(kindLabel: string, targetTitle: string): Promise<void> {
+    const relation = this.issueRelationButton(kindLabel, targetTitle)
+    await expect(relation).toBeVisible({ timeout: 10_000 })
+    await relation.click()
+    await this.expectPanelTitle(targetTitle)
+  }
+
+  async removeIssueRelation(kindLabel: string, targetTitle: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const chip = panel.locator(KanbanPage.ISSUE_RELATION_CHIP).filter({
+      has: this.page.getByRole('button', {
+        name: this.issueRelationAccessibleName(kindLabel, targetTitle),
+      }),
+    })
+    await expect(chip).toBeVisible({ timeout: 10_000 })
+    await chip.hover()
+
+    const remove = chip.getByRole('button', {
+      name: new RegExp(`^Remove ${this.escapeRegExp(kindLabel)} relation to `),
+    })
+    await expect(remove).toBeVisible({ timeout: 10_000 })
+
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'DELETE' && /^\/issues\/relations\/[^/]+$/.test(url.pathname)
+    })
+    await remove.click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+  }
+
+  async expectNoIssueRelations(): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    await expect(panel.getByText('No related issues', { exact: true })).toBeVisible({ timeout: 10_000 })
+    await expect(panel.locator(KanbanPage.ISSUE_RELATION_CHIP)).toHaveCount(0, { timeout: 10_000 })
   }
 
   async fillComment(text: string): Promise<void> {
@@ -474,7 +669,18 @@ export class KanbanPage {
     const input = this.page.locator(KanbanPage.ISSUE_TITLE_INPUT)
     await expect(input).toBeVisible({ timeout: 10_000 })
     await input.fill(title)
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'PATCH' && /^\/issues\/[^/]+$/.test(url.pathname)
+    })
     await input.press('Enter')
+
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+    const request = response.request().postDataJSON() as { title: string }
+    expect(request.title).toBe(title)
+    const updatedIssue = await response.json() as { title: string }
+    expect(updatedIssue.title).toBe(title)
 
     await expect(display).toHaveText(title, { timeout: 10_000 })
   }
@@ -486,6 +692,80 @@ export class KanbanPage {
     await editor.fill(description)
     await this.page.locator(KanbanPage.ISSUE_DETAIL_HEADER).click()
     await expect(editor).toHaveValue(description, { timeout: 10_000 })
+  }
+
+  async uploadIssueDescriptionImage(filePath: string, filename: string): Promise<void> {
+    const editor = this.page.locator(KanbanPage.ISSUE_DESCRIPTION_EDITOR)
+    await expect(editor).toBeVisible({ timeout: 10_000 })
+
+    const imageInput = editor.locator('input[type="file"][accept*="image/png"]')
+    await expect(imageInput).toBeAttached()
+    const uploadResponsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'POST' && url.pathname === '/assets'
+    })
+    await imageInput.setInputFiles(filePath)
+    const uploadResponse = await uploadResponsePromise
+    if (!uploadResponse.ok()) {
+      throw new Error(
+        `Asset upload failed with ${uploadResponse.status()} ${uploadResponse.statusText()}: ${await uploadResponse.text()}`,
+      )
+    }
+
+    const asset = await uploadResponse.json() as {
+      filename: string
+      markdownUrl: string
+      url: string
+    }
+    expect(asset.filename).toBe(filename)
+    expect(asset.markdownUrl).toMatch(/^cradle-asset:\/\/[^/?#]+$/)
+    const assetReference = {
+      contentUrl: new URL(asset.url, this.owner.params.serverUrl).toString(),
+      markdownUrl: asset.markdownUrl,
+    }
+    this.owner.remember(KanbanPage.ISSUE_DESCRIPTION_ASSET_REFERENCE_KEY, assetReference)
+
+    await this.expectIssueDescriptionImage(filename, assetReference)
+
+    const saveResponsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'PATCH' && /^\/issues\/[^/]+$/.test(url.pathname)
+    })
+    await this.page.locator(KanbanPage.ISSUE_DETAIL_HEADER).click()
+    const saveResponse = await saveResponsePromise
+    expect(saveResponse.ok()).toBe(true)
+    const savedIssue = await saveResponse.json() as { description: string | null }
+    expect(savedIssue.description).toContain(asset.markdownUrl)
+  }
+
+  async expectSavedIssueDescriptionImage(filename: string): Promise<void> {
+    await this.expectIssueDescriptionImage(filename, this.requireIssueDescriptionAssetReference())
+  }
+
+  async expectPersistedIssueDescriptionImage(filename: string): Promise<void> {
+    await this.expectIssueDescriptionImage(filename, this.requireIssueDescriptionAssetReference())
+  }
+
+  private requireIssueDescriptionAssetReference(): IssueDescriptionAssetReference {
+    const asset = this.owner.maybeRecall<IssueDescriptionAssetReference>(KanbanPage.ISSUE_DESCRIPTION_ASSET_REFERENCE_KEY)
+    if (!asset) {
+      throw new Error('Expected a remembered Issue description asset reference')
+    }
+    return asset
+  }
+
+  private async expectIssueDescriptionImage(
+    filename: string,
+    asset: IssueDescriptionAssetReference,
+  ): Promise<void> {
+    const editor = this.page.locator(KanbanPage.ISSUE_DESCRIPTION_EDITOR)
+    const image = editor.getByRole('img', { name: filename, exact: true })
+    await expect(image).toBeVisible({ timeout: 10_000 })
+    await expect(image).toHaveAttribute('src', asset.contentUrl)
+    await expect.poll(async () => image.evaluate((element) => {
+      const rendered = element as HTMLImageElement
+      return rendered.complete && rendered.naturalWidth > 0 && rendered.naturalHeight > 0
+    }), { timeout: 10_000 }).toBe(true)
   }
 
   async updateIssuePriority(priority: string): Promise<void> {
@@ -515,7 +795,13 @@ export class KanbanPage {
 
     const deleteItem = this.page.locator(KanbanPage.ISSUE_DETAIL_DELETE_ISSUE)
     await expect(deleteItem).toBeVisible({ timeout: 10_000 })
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'DELETE' && /^\/issues\/[^/]+$/.test(url.pathname)
+    })
     await deleteItem.click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
 
     await expect(this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)).toHaveCount(0, { timeout: 10_000 })
   }
@@ -534,7 +820,16 @@ export class KanbanPage {
 
     const createButton = panel.locator('[data-testid="sub-issue-create-btn"]')
     await expect(createButton).toBeEnabled({ timeout: 10_000 })
+    const responsePromise = this.page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return response.request().method() === 'POST' && url.pathname === '/issues/'
+    })
     await createButton.click()
+    const response = await responsePromise
+    expect(response.ok()).toBe(true)
+    const createdIssue = await response.json() as { parentIssueId: string | null, title: string }
+    expect(createdIssue.title).toBe(title)
+    expect(createdIssue.parentIssueId).toBeTruthy()
   }
 
   async addLabelToOpenIssue(label: string): Promise<void> {
@@ -649,7 +944,51 @@ export class KanbanPage {
   async expectSubIssueVisible(title: string): Promise<void> {
     const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
     const list = panel.locator('[data-testid="sub-issues-list"]')
-    await expect(list.locator('[data-testid^="sub-issue-"]').filter({ hasText: title })).toBeVisible({ timeout: 10_000 })
+    await expect(list.getByRole('button', { name: `Open sub-issue ${title}`, exact: true })).toBeVisible({ timeout: 10_000 })
+  }
+
+  async expectSubIssueProgress(progress: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    await expect(panel.locator('[data-testid="issue-detail-sub-issue-progress"]'))
+      .toHaveText(progress, { timeout: 10_000 })
+  }
+
+  async openSubIssue(title: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const subIssue = panel.getByRole('button', { name: `Open sub-issue ${title}`, exact: true })
+    await expect(subIssue).toBeVisible({ timeout: 10_000 })
+    await subIssue.click()
+    await this.expectPanelTitle(title)
+  }
+
+  async expectParentIssueLink(title: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    await expect(panel.getByRole('button', { name: `Open parent issue ${title}`, exact: true }))
+      .toBeVisible({ timeout: 10_000 })
+  }
+
+  async openParentIssue(title: string): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const parent = panel.getByRole('button', { name: `Open parent issue ${title}`, exact: true })
+    await expect(parent).toBeVisible({ timeout: 10_000 })
+    await parent.click()
+    await this.expectPanelTitle(title)
+  }
+
+  async openParentIssueFromCard(childTitle: string, parentTitle: string): Promise<void> {
+    const childCard = await this.getIssueCardByTitle(childTitle)
+    const parentLink = childCard.getByRole('button', { name: /^Open parent issue [^ ]+$/ })
+    await expect(parentLink).toBeVisible({ timeout: 10_000 })
+    await parentLink.click()
+    await this.expectPanelTitle(parentTitle)
+  }
+
+  async expectNoSubIssues(): Promise<void> {
+    const panel = this.page.locator(KanbanPage.ISSUE_DETAIL_PANEL)
+    const list = panel.locator('[data-testid="sub-issues-list"]')
+    await expect(list).toBeVisible({ timeout: 10_000 })
+    await expect(list.getByRole('button', { name: /^Open sub-issue / })).toHaveCount(0, { timeout: 10_000 })
+    await expect(panel.locator('[data-testid="issue-detail-sub-issue-progress"]')).toHaveCount(0, { timeout: 10_000 })
   }
 
   async expectCardLabel(title: string, label: string): Promise<void> {

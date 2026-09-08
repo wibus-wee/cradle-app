@@ -407,7 +407,7 @@ export class ChatPage {
 
   async clickSessionMenuAction(
     sessionId: string,
-    action: 'toggle-pin' | 'copy-markdown' | 'archive' | 'rename' | 'regenerate-title',
+    action: 'toggle-pin' | 'copy-markdown' | 'export-zip' | 'archive' | 'rename' | 'regenerate-title',
   ): Promise<void> {
     const locator = this.page.locator(`[data-testid="session-menu-${action}-${sessionId}-context"]`)
     await expect(locator).toBeVisible({ timeout: 10_000 })
@@ -520,6 +520,47 @@ export class ChatPage {
     }
     await expect(block).toBeVisible({ timeout: 10_000 })
     return block
+  }
+
+  artifactPreview(title: string, revision: number): Locator {
+    return this.view()
+      .locator('[data-testid="chat-artifact-preview"]')
+      .filter({ hasText: title })
+      .filter({ hasText: `rev ${revision}` })
+      .last()
+  }
+
+  async expectArtifactPreview(title: string, artifactId: string, revision: number): Promise<void> {
+    const preview = this.artifactPreview(title, revision)
+    await expect(preview).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await expect(preview).toContainText(artifactId)
+  }
+
+  async openArtifact(title: string, revision: number): Promise<void> {
+    const preview = this.artifactPreview(title, revision)
+    await expect(preview).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await preview.click()
+    await expect(this.page.locator('[data-testid="browser-panel"]')).toBeVisible({ timeout: CHAT_TIMEOUT })
+  }
+
+  async expectArtifactPanel(input: {
+    title: string
+    artifactId: string
+    revision: number
+    content: string
+  }): Promise<void> {
+    const panel = this.page.locator('[data-testid="browser-panel"]')
+    await expect(panel).toBeVisible({ timeout: CHAT_TIMEOUT })
+    await expect(panel).toContainText(input.title, { timeout: CHAT_TIMEOUT })
+    await expect(panel).toContainText(input.artifactId, { timeout: CHAT_TIMEOUT })
+    await expect(panel).toContainText(`rev ${input.revision}`, { timeout: CHAT_TIMEOUT })
+    await expect(panel).toContainText(input.content, { timeout: CHAT_TIMEOUT })
+  }
+
+  async expectArtifactPanelExcludes(content: string): Promise<void> {
+    await expect(this.page.locator('[data-testid="browser-panel"]')).not.toContainText(content, {
+      timeout: CHAT_TIMEOUT,
+    })
   }
 }
 

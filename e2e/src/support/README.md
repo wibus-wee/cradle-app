@@ -8,12 +8,15 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | --- | --- |
 | `hooks.ts` | Scenario launch, Playwright tracing, screenshots/video, console capture, and simulator request ledger |
 | `world.ts` | Cucumber World, browser/context/page, temporary workspaces, scenario memory, and runtime configuration |
-| `server-lifecycle.ts` | Managed server, crash/restart with preserved data and port, and production web preview without `CRADLE_MOCK_LLM_URL` |
+| `server-lifecycle.ts` | Managed server, crash/restart with preserved data and port, deterministic npm plugin fixture boundary, and production web preview without `CRADLE_MOCK_LLM_URL` |
 | `model-api-simulator.ts` | `@cradle/model-api-simulator` in `probes-only` auto-response mode |
 | `providers.ts` | Provider/profile/Agent prerequisites and workspace prerequisite |
 | `scenarios/` | Strict OpenAI Responses and Anthropic Messages exchanges |
 | `helpers/chat-scenario.ts` | Cross-turn Chat scripts, gates, queue timing, approvals, and tool loops |
+| `helpers/automation-scenario.ts` | Gated Automation cancellation and linked Session title scripts |
+| `helpers/external-session-import-scenario.ts` | Read-only external Claude JSONL fixture and source-integrity sentinel |
 | `helpers/issue-agent-scenario.ts` | Issue delegation, rerun, and cancellation scripts |
+| `helpers/skill-scenario.ts` | Strict Workspace Skill invocation request and response script |
 | `pages/` | Stable selectors and reusable UI mechanics |
 | `database.ts` | Explicit fixture-only database support; never the proof of a user-visible outcome |
 | `world-utils.ts` | Artifact paths and scenario-safe names |
@@ -22,17 +25,29 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 
 | File | Surface |
 | --- | --- |
+| `pages/agent-runtimes.ts` | Local ACP validation, canonical mutation contracts, reload recovery, and deletion |
 | `pages/await.ts` | Await creation and resolution |
+| `pages/automation.ts` | Automation definition fixture, completion/cancellation, triage, artifacts, reload, and linked Session |
 | `pages/chat.ts` | New Chat, Chat, approval, messages, sessions, and queue |
 | `pages/diff.ts` | Diff review |
+| `pages/external-session-import.ts` | External session discovery, import, transcript, and duplicate-prevention checks |
 | `pages/first-run.ts` | Onboarding |
 | `pages/git.ts` | Branch controls |
-| `pages/kanban.ts` | Board, Issue detail, activity, and delegation |
-| `pages/search.ts` | Global search |
-| `pages/settings.ts` | Settings shell and appearance |
+| `pages/kanban.ts` | Board, Issue detail, multi-select bulk triage, parent-child hierarchy, directed relations, description assets, activity, and delegation |
+| `pages/mcp-servers.ts` | Local MCP validation, exact mutation contracts, secret-safe reload projections, disable, and deletion |
+| `pages/plugins.ts` | Plugin Center install/trust/toggle flow and visible panel contribution |
+| `pages/search.ts` | Global Session/Issue search, empty-state assertions, and result navigation |
+| `pages/session-archive.ts` | Session archive/restore request contracts, archived-list search, and recovery persistence |
+| `pages/session-export.ts` | Browser download capture, ZIP parsing, and portable Session-content assertions |
+| `pages/session-groups.ts` | Session Group creation, membership, expansion, rename, and non-destructive deletion |
+| `pages/settings.ts` | Settings shell, appearance, and Server Endpoint validation, probing, reload, and recovery |
+| `pages/skills.ts` | Workspace Skill creation, Composer invocation, deletion, and Session evidence |
+| `pages/storage.ts` | Storage session inventory and destructive cleanup controls |
 | `pages/terminal.ts` | Bottom panel and PTY sessions |
 | `pages/usage.ts` | Usage dashboard, range selection, and downloaded CSV |
 | `pages/work.ts` | New Work and managed Work verification |
+| `pages/workspace-editor.ts` | Workspace file tree, Monaco editor, save lifecycle, and real file-content assertions |
+| `pages/workspace-migration.ts` | Workspace migration prerequisites, wizard, preview, and Issue/Automation ownership projections |
 | `pages/workspace.ts` | Workspace list, Directory Browser, and overview |
 
 ## Runtime Rules

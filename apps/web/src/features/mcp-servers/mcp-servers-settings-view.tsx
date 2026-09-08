@@ -69,7 +69,10 @@ function ServerCard({ server, toggling, onToggle, onEdit, onDelete }: {
   const { t } = useTranslation('settings')
   const TransportGlyph = server.transport === 'stdio' ? TerminalIcon : GlobeIcon
   return (
-    <div className="group relative min-w-0 overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/20">
+    <div
+      className="group relative min-w-0 overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/20"
+      data-testid="mcp-server-card"
+    >
       <div className={cardDotTexture} aria-hidden="true" />
       <DitheredGlyph icon={TransportGlyph} className="-bottom-6 -right-5 size-24 rotate-12 opacity-[0.15]" />
 
@@ -175,8 +178,9 @@ export function McpServersSettingsView({
       title={t('mcpServers.page.title')}
       description={t('mcpServers.page.description')}
       maxWidth="3xl"
+      data-testid="mcp-servers-settings"
       action={(
-        <Button size="sm" onClick={onAdd}>
+        <Button size="sm" onClick={onAdd} data-testid="mcp-server-add">
           <AddIcon />
           {t('mcpServers.action.add')}
         </Button>
