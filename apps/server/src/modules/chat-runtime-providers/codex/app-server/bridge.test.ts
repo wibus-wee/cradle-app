@@ -4,7 +4,6 @@ import type { RuntimeProviderTargetProfile, RuntimeSession } from '../../../chat
 import { providerRuntimeHostManager } from '../../../provider-runtime/host-manager'
 import { CodexAppServerBridge } from './bridge'
 import type { CodexAppServerClientOptions, CodexAppServerMessage } from './client'
-import { codexProviderAppServerScopeId } from './host-lease'
 
 afterEach(() => {
   providerRuntimeHostManager.clear()
@@ -316,7 +315,7 @@ describe('codexAppServerBridge stream lifecycle', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'profile-codex',
-        scopeId: codexProviderAppServerScopeId(),
+        scopeId: expect.stringMatching(/^provider-host:[a-f0-9]{64}$/),
         refCount: 2,
         hasResource: true,
       }),

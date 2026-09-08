@@ -6,6 +6,7 @@ import type {
   RuntimeSettings,
 } from '../../../chat-runtime/runtime-provider-types'
 import { readCodexLikeRuntimeSettings } from '../../../chat-runtime/runtime-settings'
+import { parseCodexNativeConfig } from '../../../provider-contracts/codex-native-config'
 import type { CodexAuthMode, CodexConfig } from '../../../provider-contracts/provider-base'
 import type { CodexAppServerAuthResolution } from '../app-server/chatgpt-auth'
 import {
@@ -173,6 +174,7 @@ export function buildCodexConfig(
         enabled: true,
       },
     },
+    ...parseCodexNativeConfig(config.codex ?? {}),
   }
   const mcpServers = buildCodexMcpServersConfig()
   codexConfig.approval_policy = toSupportedCodexApprovalPolicy(config.approvalPolicy)

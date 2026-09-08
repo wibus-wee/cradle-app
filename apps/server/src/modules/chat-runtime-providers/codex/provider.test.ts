@@ -22,7 +22,6 @@ import {
 import { providerRuntimeHostManager } from '../../provider-runtime/host-manager'
 import { assertValidProviderChunkSequence } from '../kit/testing/chunk-contract'
 import type { CodexAppServerClientOptions, CodexAppServerMessage, CodexAppServerServerRequest } from './app-server/client'
-import { codexProviderAppServerScopeId } from './app-server/host-lease'
 import { isCodexAppServerInteractiveServerRequest } from './app-server/server-request-methods'
 import { CodexProvider } from './provider'
 import { classifyCodexToolKind } from './tools/mapper'
@@ -1360,7 +1359,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'profile-codex',
-        scopeId: codexProviderAppServerScopeId(),
+        scopeId: expect.stringMatching(/^provider-host:[a-f0-9]{64}$/),
         refCount: 1,
         pinnedCount: 1,
         hasResource: true,
@@ -1415,6 +1414,41 @@ describe('codexProvider app-server integration', () => {
     ])
   })
 
+  it('keeps active provider configuration generations separate and reuses reordered overrides', async () => {
+    const clients: FakeCodexAppServerClient[] = []
+    const options: CodexAppServerClientOptions[] = []
+    const provider = new CodexProvider({
+      readSecret: () => 'sk-test',
+      resolveSkillPaths: () => [],
+      recordObservability: vi.fn(),
+      createAppServerClient: (input) => {
+        options.push(input)
+        const client = new FakeCodexAppServerClient(input)
+        clients.push(client)
+        return client
+      },
+    })
+    const fork = (codex: Record<string, unknown>, id: string) => provider.forkRuntimeSession({
+      sourceRuntimeSession: createRuntimeSession('parent-thread'),
+      childChatSessionId: id,
+      profile: createProfile({ codex }),
+      workspaceId: 'workspace-1',
+      workspacePath: '/tmp/cradle-workspace',
+      modelId: 'gpt-5-codex',
+    })
+    const first = await fork({ features: { multi_agent: false }, web_search: 'cached' }, 'first')
+    const second = await fork({ features: { multi_agent: true }, web_search: 'cached' }, 'second')
+    const reordered = await fork({ web_search: 'cached', features: { multi_agent: true } }, 'third')
+    expect(clients).toHaveLength(2)
+    expect(options[0]?.config?.features).toEqual({ multi_agent: false })
+    expect(options[1]?.config?.features).toEqual({ multi_agent: true })
+    expect(clients[0]?.close).not.toHaveBeenCalled()
+    expect(providerRuntimeHostManager.listHosts().map(host => host.refCount).sort()).toEqual([1, 2])
+    first.providerRuntimeLease?.release()
+    second.providerRuntimeLease?.release()
+    reordered.providerRuntimeLease?.release()
+  })
+
   it('reuses the chat-session host across provider turns and provider-native app-server invokes', async () => {
     const clients: FakeCodexAppServerClient[] = []
     const provider = new CodexProvider({
@@ -1461,7 +1495,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'profile-codex',
-        scopeId: codexProviderAppServerScopeId(),
+        scopeId: expect.stringMatching(/^provider-host:[a-f0-9]{64}$/),
         refCount: 1,
         hasResource: true,
       }),
@@ -1568,7 +1602,7 @@ describe('codexProvider app-server integration', () => {
       expect.objectContaining({
         runtimeKind: 'codex',
         providerTargetId: 'profile-codex',
-        scopeId: codexProviderAppServerScopeId(),
+        scopeId: expect.stringMatching(/^provider-host:[a-f0-9]{64}$/),
         refCount: 2,
         hasResource: true,
       }),
@@ -3946,11 +3980,11 @@ describe('codexProvider app-server integration', () => {
 
     expect(providerRuntimeHostManager.listHosts()).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        hostId: 'codex:profile-codex:provider-host',
+        hostId: expect.stringMatching(/^codex:profile-codex:provider-host:[a-f0-9]{64}$/),
         refCount: 1,
       }),
       expect.objectContaining({
-        hostId: 'codex:profile-title:provider-host',
+        hostId: expect.stringMatching(/^codex:profile-title:provider-host:[a-f0-9]{64}$/),
         refCount: 0,
       }),
     ]))
@@ -5198,7 +5232,10 @@ describe('codexProvider app-server integration', () => {
     expect(appServerOptions[0]?.env).toEqual({
       CODEX_ACCESS_TOKEN: 'pat-token-1',
     })
-    expect(appServerOptions[0]?.config).toBeUndefined()
+    expect(appServerOptions[0]?.config).toEqual({
+      show_raw_agent_reasoning: true,
+      tools: { update_plan: { enabled: true } },
+    })
 
     clients[0]?.pushNotification({
       method: 'item/agentMessage/delta',

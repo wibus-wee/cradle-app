@@ -3,6 +3,19 @@ import { describe, expect, it } from 'vitest'
 import { createCodexAppServerHostFingerprint } from './host-fingerprint'
 
 describe('createCodexAppServerHostFingerprint', () => {
+  it('includes every native override and canonicalizes nested key order without disclosing secrets', () => {
+    const fingerprint = (config: Record<string, boolean | Record<string, boolean>>) => createCodexAppServerHostFingerprint({
+      options: { apiKey: 'secret-value', config },
+chatgptAuth: null,
+    })
+    const first = fingerprint({ features: { multi_agent: false, browser_use: true }, show_raw_agent_reasoning: false })
+    expect(first).toBe(fingerprint({ show_raw_agent_reasoning: false, features: { browser_use: true, multi_agent: false } }))
+    expect(first).not.toBe(fingerprint({ features: { multi_agent: true, browser_use: true }, show_raw_agent_reasoning: false }))
+    expect(first).not.toBe(fingerprint({ features: { browser_use: true }, show_raw_agent_reasoning: false }))
+    expect(first).toMatch(/^[a-f0-9]{64}$/)
+    expect(first).not.toContain('secret-value')
+  })
+
   it('excludes request-level config and host-scope-owned Cradle env from fingerprint', () => {
     const fp1 = createCodexAppServerHostFingerprint({
       options: {

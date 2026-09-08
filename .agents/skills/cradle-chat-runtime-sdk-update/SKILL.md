@@ -12,7 +12,7 @@ Own the Cradle projections, not the provider implementations: Server owns runtim
 Use `.github/workflows/update-chat-runtime-sdks.yml`; do not update only one provider by default. It has no schedule and does not run tests itself. It updates all of:
 
 - `@anthropic-ai/claude-agent-sdk` in `apps/server` with pnpm's supply-chain policy intact.
-- The full Codex CLI runtime and generated app-server protocol/capabilities.
+- The full Codex CLI runtime, generated app-server protocol/capabilities, and the config schema pinned to that same release.
 - The Kimi Code CLI, then Kimi's REST and WebSocket protocol snapshots and bindings.
 
 Dispatch from `main`, leaving version inputs empty for the latest release or supplying explicit versions for a reproducible update:
@@ -53,7 +53,7 @@ If the CI run is not visible immediately, register a short JavaScript await for 
 
 After the update workflow and PR CI finish, inspect the PR diff and classify every changed provider surface. Do not hand-edit generated bindings.
 
-- Codex: inspect `ClientRequest.ts`, `ServerNotification.ts`, `capabilities.ts`, changed `v2/*Params.ts` and `v2/*Response.ts`, plus root unions. Identify new methods, notifications, and type narrowing/widening.
+- Codex: inspect `ClientRequest.ts`, `ServerNotification.ts`, `capabilities.ts`, changed `v2/*Params.ts` and `v2/*Response.ts`, plus root unions. Identify new methods, notifications, and type narrowing/widening. Also inspect `provider-contracts/codex-config-schema/`: report added/removed configuration fields and feature flags, changed enums/types/defaults/descriptions, and any changes requiring updates to Cradle's managed configuration keys or settings controls. The config schema manifest must match the protocol generator version.
 - Claude Agent: inspect the dependency and lockfile diff, then compare its exported types and tool/event semantics against Cradle's Claude provider. Preserve Cradle-canonical persisted tool names.
 - Kimi: inspect OpenAPI, AsyncAPI, manifest hashes, REST bindings, and `websocket.ts`. Classify frames as text/thinking, tool lifecycle, turn lifecycle, approval/question, goal/task state, or diagnostics.
 

@@ -33,6 +33,7 @@ import {
   applyClaudeAgentConfigPatch,
   normalizeClaudeAgentConfigPatch,
 } from '../provider-contracts/claude-agent-config'
+import { parseCodexNativeConfig } from '../provider-contracts/codex-native-config'
 import { CodexAuthModeSchema, readTrustedUniversalConfig } from '../provider-contracts/provider-base'
 import {
   listProviderKindsForRuntime,
@@ -167,6 +168,10 @@ function mergeConnectionConfigWithEnabledModels(
 }
 
 function normalizeManualConnectionConfig(input: UpsertManualProviderTargetInput): string {
+  const parsed = JsonObjectTextSchema.parse(input.connectionConfigJson)
+  if (parsed.codex !== undefined) {
+    validateCodexNativeConfig(parsed.codex)
+  }
   if (input.providerKind !== 'openai-compatible') {
     return input.connectionConfigJson
   }
@@ -184,6 +189,36 @@ function normalizeManualConnectionConfig(input: UpsertManualProviderTargetInput)
     ...config,
     ...(authMode ? { authMode } : {}),
   })
+}
+
+function validateCodexNativeConfig(value: unknown) {
+  try {
+    return parseCodexNativeConfig(value)
+  }
+  catch (error) {
+    throw new AppError({
+      code: 'invalid_codex_config',
+      status: 400,
+      message: error instanceof Error ? error.message : 'Invalid Codex configuration',
+    })
+  }
+}
+
+export function updateProviderTargetCodexConfig(providerTargetId: string, value: unknown): ProviderTargetModelSettings {
+  const target = resolveProviderTarget(providerTargetId)
+  if (target.kind !== 'manual') {
+    throw new AppError({ code: 'invalid_provider_target', status: 400, message: 'External provider configuration is read-only' })
+  }
+  const codex = validateCodexNativeConfig(value)
+  const config = JsonObjectTextSchema.parse(target.connectionConfigJson)
+  if (Object.keys(codex).length > 0) { config.codex = codex }
+  else { delete config.codex }
+  db().update(providerTargets).set({
+    connectionConfigJson: JSON.stringify(config),
+    updatedAt: nowUnix(),
+  }).where(eq(providerTargets.id, providerTargetId)).run()
+  db().delete(providerTargetModelCache).where(eq(providerTargetModelCache.providerTargetId, providerTargetId)).run()
+  return getProviderTargetModelSettings(providerTargetId)
 }
 
 function resolveCredentialAuthMode(credentialRef: string | null): z.infer<typeof CodexAuthModeSchema> | null {

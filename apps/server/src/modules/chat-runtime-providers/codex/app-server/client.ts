@@ -9,6 +9,7 @@ import type { ManagedChildProcess } from '../../../../infra/managed-process'
 import { spawnManagedProcess } from '../../../../infra/managed-process'
 import type { ClientInfo } from '../app-server-protocol/ClientInfo'
 import type { ThreadForkParams } from '../app-server-protocol/v2/ThreadForkParams'
+import { serializeConfigOverrides } from './config-overrides'
 import { syncCodexAppServerLogInsertBlockerFromFeatureFlag } from './log-insert-blocker'
 import { looksLikeJsonNdjsonLine, NdjsonLineSplitter } from './ndjson-lines'
 import { prepareCodexAppServerHome } from './runtime-home'
@@ -592,32 +593,4 @@ function findExecutableOnPath(executableName: string, env: Record<string, string
     }
   }
   return null
-}
-
-function serializeConfigOverrides(config: Record<string, unknown>, prefix = ''): string[] {
-  const overrides: string[] = []
-  for (const [key, value] of Object.entries(config)) {
-    const path = prefix ? `${prefix}.${key}` : key
-    if (isPlainRecord(value)) {
-      overrides.push(...serializeConfigOverrides(value, path))
-    }
-    else {
-      overrides.push(`${path}=${toTomlValue(value)}`)
-    }
-  }
-  return overrides
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
-}
-
-function toTomlValue(value: unknown): string {
-  if (typeof value === 'string') {
-    return JSON.stringify(value)
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    return String(value)
-  }
-  return JSON.stringify(value)
 }

@@ -40,7 +40,7 @@ describe('providerCatalog', () => {
         throw new Error(`Unexpected OpenAI-compatible model list request: ${url}`)
       }
 
-      expect(init?.headers).toMatchObject({ Authorization: 'Bearer sk-openai-compatible' })
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer sk-openai-compatible')
       return new Response(JSON.stringify({ data: [{ id: 'gpt-5-codex' }] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -210,6 +210,7 @@ describe('providerCatalog', () => {
       configJson: JSON.stringify({
         baseUrl: 'https://api.openai.com/v1',
         authMode: 'chatgptAuthTokens',
+        codex: { features: { multi_agent: false } },
       }),
       secretRef: 'chatgpt-auth-secret',
       profileId: null,
@@ -241,6 +242,7 @@ describe('providerCatalog', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(codexClientOptions).toEqual([{
       config: {
+        features: { multi_agent: false },
         model_provider: 'cradle-openai-compatible',
         model_providers: {
           'cradle-openai-compatible': {
@@ -262,7 +264,7 @@ describe('providerCatalog', () => {
         throw new Error(`Unexpected Universal model list request: ${url}`)
       }
 
-      expect(init?.headers).toMatchObject({ Authorization: 'Bearer sk-universal' })
+      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer sk-universal')
       return new Response(JSON.stringify({ data: [{ id: 'gpt-universal' }] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -326,11 +328,10 @@ describe('providerCatalog', () => {
         throw new Error(`Unexpected Anthropic model list request: ${url}`)
       }
 
-      expect(init?.headers).toMatchObject({
-        'anthropic-version': '2023-06-01',
-        'Authorization': 'Bearer volcengine-token',
-      })
-      expect(init?.headers).not.toHaveProperty('x-api-key')
+      const headers = new Headers(init?.headers)
+      expect(headers.get('anthropic-version')).toBe('2023-06-01')
+      expect(headers.get('Authorization')).toBe('Bearer volcengine-token')
+      expect(headers.has('x-api-key')).toBe(false)
       return new Response(JSON.stringify({ data: [{ id: 'glm-5.2', display_name: 'GLM 5.2' }] }), {
         status: 200,
         headers: { 'content-type': 'application/json' },

@@ -106,6 +106,15 @@ const providerConnectionStatus = t.Union([
 ])
 
 export const ProviderTargetsModel = {
+  codexConfigSchema: t.Object({
+    version: t.String(),
+    releaseTag: t.String(),
+    source: t.String(),
+    sha256: t.String(),
+    schemaJson: t.String(),
+    managedKeys: t.Array(t.String()),
+  }),
+  codexConfigBody: t.Object({ codex: t.Record(t.String(), t.Any()) }, { additionalProperties: false }),
   providerTarget: t.Object({
     id: t.String(),
     kind: providerTargetKind,

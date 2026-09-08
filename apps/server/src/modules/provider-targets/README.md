@@ -2,9 +2,14 @@
 
 Provider-target resolver and Cradle-owned runtime preference API.
 
-- `index.ts`: HTTP routes for reading and updating provider-target model settings, Claude Agent model matrix defaults, model visibility, custom model IDs, provider-target auth diagnostics, provider-target scoped Codex account diagnostics, and Codex WHAM diagnostics.
-- `model.ts`: Elysia request and response schemas for provider-target preference, Claude Agent matrix, auth diagnostics, and diagnostics routes.
-- `service.ts`: Resolves a runtime provider target into normalized config, credential, and ownership-aware metadata for manual profiles and external provider records; writes Cradle-owned `connection_config_json.claudeAgent.modelAliases`; disables bound agents when a provider target becomes disabled.
+| Owner | Responsibility |
+| --- | --- |
+| [`index.ts`](./index.ts), [`model.ts`](./model.ts) | Typed preference, configuration, model inventory and authentication/usage diagnostics APIs |
+| [`service.ts`](./service.ts) | Target resolution, Cradle-owned preference writes and target/agent lifecycle |
+
+`GET /provider-targets/codex/config-schema` (CLI: `cradle codex config-schema`) returns the bundled editable Codex schema, source version/hash and managed keys. `PATCH /provider-targets/:providerTargetId/codex/config` replaces a manual target's native `codex` overrides and invalidates its model inventory; `{ "codex": {} }` removes the overrides. This dedicated write preserves connection fields and credentials. Both it and full manual-target upserts enforce the [native configuration contract](../provider-contracts/README.md). External targets remain read-only for this setting. The write is a Settings API rather than a CLI command because native configuration can contain sensitive values.
+
+Saving does not call Codex `config/value/write` or write a shared `config.toml`. Runtime connections consume the saved target projection; [Codex host generations](../chat-runtime-providers/codex/README.md) define reuse and activation timing.
 
 Manual profiles and external runtime targets both implement the provider-target contract. External source records remain source-owned; model visibility, custom model IDs, and Claude Agent haiku / sonnet / opus model aliases are Cradle-owned runtime preferences written to the runtime target namespace. Model registry mappings are global and owned by `modules/model-registry`, not by any target.
 Provider target availability is a launch prerequisite for provider-backed agents. Turning a provider target off preserves the target record and its preferences, but forces every bound agent to disabled until the user reselects or re-enables an available provider target.
