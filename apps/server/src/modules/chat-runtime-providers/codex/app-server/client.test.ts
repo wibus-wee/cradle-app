@@ -270,7 +270,7 @@ describe('codexAppServerClient', () => {
           '--config',
           'model="gpt-5.4"',
           '--config',
-          'features.remoteControl=true',
+          'features={ "remoteControl" = true }',
         ],
       }),
     )

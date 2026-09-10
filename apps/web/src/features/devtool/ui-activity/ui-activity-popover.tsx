@@ -224,16 +224,15 @@ export function UiActivityPopover() {
         <Button
           type="button"
           variant="ghost"
-          size="sm"
+          size="icon-xs"
           className={cn(
-            'h-5 max-w-[15rem] gap-1 px-1.5 text-[11px] font-normal tabular-nums transition-transform hover:text-foreground active:scale-[0.96]',
+            'text-[11px] font-normal tabular-nums transition-transform hover:text-foreground active:scale-[0.96]',
             isActive ? 'text-foreground' : 'text-muted-foreground',
           )}
           aria-label={`UI Activity: ${triggerLabel}`}
           title="UI Activity"
         >
           <ActivityIcon className="size-3.5 shrink-0" aria-hidden="true" />
-          <span className="whitespace-nowrap">UI Activity</span>
           <span
             className={cn('size-1.5 shrink-0 rounded-full', {
               'bg-emerald-500 shadow-[0_0_0_2px_rgba(16,185,129,0.25)]': isActive,
@@ -241,12 +240,6 @@ export function UiActivityPopover() {
             })}
             aria-hidden="true"
           />
-          <span className="truncate font-mono text-[10px]">{triggerLabel}</span>
-          {segment && (
-            <span className="shrink-0 text-muted-foreground">
-              {formatDuration(segmentDurationMs)}
-            </span>
-          )}
         </Button>
       </PopoverTrigger>
 

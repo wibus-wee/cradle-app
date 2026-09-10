@@ -6,6 +6,8 @@ Provider live catalog HTTP API 与模型列表缓存。
 
 ## Four-layer contract (Plan 035 M1)
 
+ChatGPT-authenticated targets discover models through Codex `model/list`. That client receives the target's schema-validated native `codex` overrides alongside Cradle's managed endpoint projection, so catalog-related native settings apply to discovery as well as chat startup. [Provider Targets](../provider-targets/README.md) invalidates cached inventory when these overrides change.
+
 This module owns **Inventory** (layer 1):
 - `collectProviderModelInventory(input)` fetches raw upstream models WITHOUT enrichment. This is
   the correct payload to write to `provider_target_model_cache`.

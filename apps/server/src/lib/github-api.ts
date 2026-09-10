@@ -472,9 +472,11 @@ export function fetchPullRequest(
   owner: string,
   repo: string,
   pr: number,
+  mode: GitHubReadMode = 'read',
 ): Promise<PullRequestData | null> {
   return restGetCached<PullRequestData>({
     cacheKey: `pr:${owner}/${repo}:${pr}`,
+    mode,
     ttlS: 30,
     route: 'GET /repos/{owner}/{repo}/pulls/{pull_number}',
     params: { owner, repo, pull_number: pr },
@@ -655,9 +657,11 @@ export async function fetchWorkflowRunsForHead(
   owner: string,
   repo: string,
   headSha: string,
+  mode: GitHubReadMode = 'read',
 ): Promise<WorkflowRunsResponseData | null> {
   return cachedFetch({
     cacheKey: `workflow-runs:${owner}/${repo}:${headSha}`,
+    mode,
     ttlS: 30,
     etag: false,
     repository: { owner, repo },

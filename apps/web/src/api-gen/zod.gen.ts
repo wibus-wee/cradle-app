@@ -438,6 +438,14 @@ export const zPatchProfilesByIdCustomModelsPath = z.object({
     id: z.string().min(1)
 });
 
+export const zPatchProviderTargetsByProviderTargetIdCodexConfigBody = z.object({
+    codex: z.record(z.string(), z.unknown())
+});
+
+export const zPatchProviderTargetsByProviderTargetIdCodexConfigPath = z.object({
+    providerTargetId: z.string().min(1)
+});
+
 export const zGetProviderTargetsQuery = z.object({
     runtimeKind: z.string().min(1).optional(),
     workspaceId: z.string().min(1).optional()
@@ -1292,6 +1300,11 @@ export const zPutCronJobsByIdPath = z.object({
 
 export const zGetCronRunsQuery = z.object({
     jobId: z.string().min(1)
+});
+
+export const zPostAssetsBody = z.object({
+    file: z.string().default('File'),
+    workspaceId: z.string().optional()
 });
 
 export const zDeleteAssetsByIdPath = z.object({

@@ -17,6 +17,13 @@ function createCodexConfig(config: Partial<CodexConfig> = {}): CodexConfig {
 }
 
 describe('buildCodexConfig MCP projection', () => {
+  it('projects stored provider overrides while keeping invocation fields managed', () => {
+    const config = buildCodexConfig(createCodexConfig({ codex: { features: { multi_agent: false }, show_raw_agent_reasoning: false } }), '/tmp/project', () => [], 'selected-model', { kind: 'none' })
+    expect(config.features).toEqual({ multi_agent: false })
+    expect(config.show_raw_agent_reasoning).toBe(false)
+    expect(config.model).toBe('selected-model')
+    expect(() => buildCodexConfig(createCodexConfig({ codex: { model: 'conflicting-model' } }), '/tmp/project', () => [], 'selected-model', { kind: 'none' })).toThrow()
+  })
   afterEach(() => {
     removeHostMcpServer('browser-use')
     removeHostMcpServer('nowledge-mem')

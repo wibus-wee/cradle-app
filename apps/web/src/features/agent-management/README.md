@@ -6,7 +6,14 @@ Agent Management 负责 Provider 与 Agent Identity 的统一设置界面。
 Provider 配置决定模型与运行时来源，Agent Identity 决定 persona、system prompt 与专属 Skills 工作区。
 Agent 专属 Skills 基于文件系统表达，存储在 `~/.cradle/agents/{agentId}/skills/`。
 Agent Management 的用户可见文案由 `agentManagement` i18n namespace 负责，默认英文源位于 `src/locales/default/agent-management.ts`。Provider-backed Agent 的 thinking effort 支持 `low`、`medium`、`high`、`xhigh`。
-Session title generation is no longer configured from provider details. Chat settings own the provider/model/thinking-effort preference; provider detail panels only edit provider connection and model inventory state.
+Chat settings own session title-generation preferences. Provider details edit connections, model inventory and provider-native configuration.
+
+| Configuration surface | Runtime owner | Rendering owner |
+| --- | --- | --- |
+| Codex native settings | [`codex-config-container.tsx`](./codex-config-container.tsx) loads the server's versioned schema and saves target overrides | [`codex-config-view.tsx`](./codex-config-view.tsx) owns the draft, searchable inherited/on/off flags, common settings, save/discard/reset and errors |
+| Codex advanced JSON | Server schema supplies validation and completion metadata | [`codex-config-editor-view.tsx`](./codex-config-editor-view.tsx) lazily mounts Monaco; typed props include theme and callbacks |
+
+Codex settings appear for manual OpenAI-compatible and universal targets. The editor preserves unspecified defaults and fields edited through JSON when common controls change. Native saves and profile auto-save are serialized so connection edits preserve the latest native overrides. Fixture stories cover inherited settings, overrides, invalid JSON, failed saves and disabled state. Activation timing and managed fields come from the [server configuration contract](../../../../server/src/modules/provider-contracts/README.md).
 
 ## Files
 

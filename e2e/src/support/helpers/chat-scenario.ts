@@ -19,6 +19,7 @@ const MULTI_TURN_RESPONSES = [
   '第二轮助手：你让我记住了苹果',
 ]
 export const SLOW_RESPONSE = '慢速助手回复完成'
+export const STORAGE_ACTIVE_RESPONSE = '存储清理期间的活动会话已完成'
 export const STOP_RECOVERY_RESPONSE = '停止后新一轮成功完成'
 export const ERROR_RECOVERY_RESPONSE = '错误后新一轮成功完成'
 export const QUEUED_RESPONSE = '持久化队列跟进已完成'
@@ -35,6 +36,7 @@ export const WORK_STOP_RECOVERY_FILE_NAME = 'e2e-work-stop-recovery.txt'
 export const WORK_STOP_RECOVERY_FILE_CONTENT = 'created after the initial Work was stopped\n'
 const SLOW_GATE = 'e2e-slow-stream'
 const CODEX_ACTIVE_TITLE_GATE = 'e2e-codex-active-title'
+const STORAGE_ACTIVE_GATE = 'e2e-storage-active'
 const CODEX_TITLE_PROMPT = 'You are naming a Codex task thread'
 /**
  * Turn-settlement budget. Parallel workers share one machine, so provider round-trips
@@ -135,6 +137,36 @@ export async function configureSlowGatedClaudeAgentSimulator(world: CradleWorld)
     }),
   ]))
   world.remember('simulator.slow-gate', SLOW_GATE)
+}
+
+export async function configureStorageLifecycleCodexSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure storage lifecycle Codex simulator')
+  await world.configureCodexChat()
+  const simulator = requireSimulator(world)
+  simulator.reset()
+  world.enqueueOpenAi(
+    openAiTextExchange({
+      label: 'storage-completed-session',
+      text: '可清理会话已完成',
+      bodyTextIncludes: '创建可清理会话',
+      bodyTextExcludes: CODEX_TITLE_PROMPT,
+    }),
+    openAiTextExchange({
+      label: 'storage-active-session',
+      text: STORAGE_ACTIVE_RESPONSE,
+      gateAfterCreated: STORAGE_ACTIVE_GATE,
+      bodyTextIncludes: '保持活动以验证存储保护',
+      bodyTextExcludes: CODEX_TITLE_PROMPT,
+    }),
+  )
+  world.remember('simulator.storage-gate', STORAGE_ACTIVE_GATE)
+}
+
+export async function releaseStorageActiveGate(world: CradleWorld): Promise<void> {
+  const simulator = requireSimulator(world)
+  const gate = world.recall<string>('simulator.storage-gate')
+  await simulator.waitForGate(gate)
+  simulator.release(gate)
 }
 
 export async function configureStoppableClaudeAgentSimulator(world: CradleWorld): Promise<void> {
@@ -560,6 +592,22 @@ export async function createRememberedSession(
   rememberSessionAlias(world, alias, session)
   await world.chat.waitForSessionInSidebar(session.id)
   return session
+}
+
+export async function startRememberedStreamingSession(
+  world: CradleWorld,
+  alias: string,
+  text: string,
+): Promise<void> {
+  await navigateToNewChatWithSimulator(world)
+  await world.newChat.fill(text)
+  await world.newChat.send()
+  await world.chat.waitVisible(20_000)
+  await expectChatStreaming(world)
+  rememberSessionAlias(world, alias, {
+    id: await world.chat.sessionId(),
+    firstUserText: text,
+  })
 }
 
 export async function enqueueNextScriptedReply(world: CradleWorld, fallbackText?: string): Promise<void> {

@@ -4,6 +4,7 @@ import {
   anthropicScenario,
   anthropicTextExchange,
 } from '../scenarios/anthropic'
+import { claudeAgentArtifactLifecycleExchanges } from '../scenarios/artifact'
 import { claudeAgentParallelToolsExchanges, claudeAgentToolLoopExchanges, toolMatrixEntry } from '../scenarios/tool-matrix'
 import type { CradleWorld } from '../world'
 
@@ -71,6 +72,16 @@ export async function configureToolMatrixSimulator(world: CradleWorld, key: stri
   await world.configureClaudeAgentChat()
   requireSimulator(world).reset()
   for (const exchange of claudeAgentToolLoopExchanges(toolMatrixEntry(key))) {
+    world.enqueue(anthropicScenario([exchange]))
+  }
+}
+
+/** Two write_artifact turns that create and revise one persisted Artifact. */
+export async function configureArtifactLifecycleSimulator(world: CradleWorld): Promise<void> {
+  console.warn('[step] configure Claude Agent Artifact lifecycle simulator')
+  await world.configureClaudeAgentChat()
+  requireSimulator(world).reset()
+  for (const exchange of claudeAgentArtifactLifecycleExchanges()) {
     world.enqueue(anthropicScenario([exchange]))
   }
 }

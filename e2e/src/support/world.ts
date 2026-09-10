@@ -10,18 +10,27 @@ import { chromium, expect } from '@playwright/test'
 import type { E2ESimulator } from './model-api-simulator'
 import { startE2ESimulator } from './model-api-simulator'
 import { dismissTransientOverlays } from './overlays'
+import { AgentRuntimesPage } from './pages/agent-runtimes'
 import { AwaitPage } from './pages/await'
 import { ApprovalPage, ChatPage, NewChatPage } from './pages/chat'
 import { DiffPage } from './pages/diff'
+import { ExternalSessionImportPage } from './pages/external-session-import'
 import { FirstRunPage } from './pages/first-run'
 import { GitPage } from './pages/git'
 import { KanbanPage } from './pages/kanban'
+import { McpServersPage } from './pages/mcp-servers'
+import { PluginsPage } from './pages/plugins'
 import { SearchPage } from './pages/search'
+import { SessionArchivePage } from './pages/session-archive'
+import { SessionExportPage } from './pages/session-export'
+import { SessionGroupsPage } from './pages/session-groups'
 import { SettingsPage } from './pages/settings'
+import { SkillsPage } from './pages/skills'
 import { TerminalPage } from './pages/terminal'
 import { UsagePage } from './pages/usage'
 import { WorkPage } from './pages/work'
 import { WorkspacePage } from './pages/workspace'
+import { WorkspaceEditorPage } from './pages/workspace-editor'
 import {
   configureClaudeAgentSimulatorProvider,
   configureCodexSimulatorProvider,
@@ -58,7 +67,7 @@ export class CradleWorld extends World {
   /** Scenarios tagged @first-run start with no onboarding/setup persistence. */
   firstRunMode = false
   private readonly scenarioState = new Map<string, unknown>()
-  private readonly tempWorkspaceDirs = new Set<string>()
+  private readonly scenarioCleanupPaths = new Set<string>()
 
   constructor(options: IWorldOptions) {
     super(options)
@@ -79,6 +88,10 @@ export class CradleWorld extends World {
     return new NewChatPage(this.page)
   }
 
+  get agentRuntimesPage(): AgentRuntimesPage {
+    return new AgentRuntimesPage(this)
+  }
+
   get chat(): ChatPage {
     return new ChatPage(this.page)
   }
@@ -95,12 +108,40 @@ export class CradleWorld extends World {
     return new DiffPage(this.page)
   }
 
+  get externalSessionImportPage(): ExternalSessionImportPage {
+    return new ExternalSessionImportPage(this)
+  }
+
   get search(): SearchPage {
     return new SearchPage(this.page)
   }
 
+  get sessionArchivePage(): SessionArchivePage {
+    return new SessionArchivePage(this)
+  }
+
+  get sessionGroupsPage(): SessionGroupsPage {
+    return new SessionGroupsPage(this.page)
+  }
+
+  get sessionExportPage(): SessionExportPage {
+    return new SessionExportPage(this)
+  }
+
   get settingsPage(): SettingsPage {
     return new SettingsPage(this.page)
+  }
+
+  get mcpServersPage(): McpServersPage {
+    return new McpServersPage(this)
+  }
+
+  get pluginsPage(): PluginsPage {
+    return new PluginsPage(this)
+  }
+
+  get skillsPage(): SkillsPage {
+    return new SkillsPage(this)
   }
 
   get gitPage(): GitPage {
@@ -125,6 +166,10 @@ export class CradleWorld extends World {
 
   get workspacePage(): WorkspacePage {
     return new WorkspacePage(this)
+  }
+
+  get workspaceEditorPage(): WorkspaceEditorPage {
+    return new WorkspaceEditorPage(this)
   }
 
   get kanbanPage(): KanbanPage {
@@ -175,8 +220,12 @@ export class CradleWorld extends World {
       : dirname(process.cwd())
     const workspaceDir = mkdtempSync(join(fixtureRoot, prefix))
     chmodSync(workspaceDir, 0o777)
-    this.tempWorkspaceDirs.add(workspaceDir)
+    this.scenarioCleanupPaths.add(workspaceDir)
     return workspaceDir
+  }
+
+  registerCleanupPath(path: string): void {
+    this.scenarioCleanupPaths.add(path)
   }
 
   async selectDirectoryInBrowser(dirPath: string): Promise<void> {
@@ -384,10 +433,10 @@ export class CradleWorld extends World {
     }
     await this.context?.close()
     await this.browser?.close()
-    for (const workspaceDir of this.tempWorkspaceDirs) {
-      rmSync(workspaceDir, { recursive: true, force: true })
+    for (const path of this.scenarioCleanupPaths) {
+      rmSync(path, { recursive: true, force: true })
     }
-    this.tempWorkspaceDirs.clear()
+    this.scenarioCleanupPaths.clear()
   }
 
   async mainProcess<T = unknown>(_fn: unknown, _arg?: unknown): Promise<T> {

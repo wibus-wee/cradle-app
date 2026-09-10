@@ -81,6 +81,7 @@ import {
   codexSecretKindForAuthMode,
   normalizeCodexAuthMode,
 } from './codex-auth-modes'
+import { CodexConfigDialog } from './codex-config-dialog'
 import { CustomModelsEditor } from './custom-models-editor'
 import { ModelsPanel } from './models-panel'
 import { ProviderConnectionTestControls } from './provider-connection-test'
@@ -457,6 +458,9 @@ export function ProfileDetailPanel({
   onSaved: () => void
 }) {
   const queryClient = useQueryClient()
+  const [codexConfigSaving, setCodexConfigSaving] = useState(false)
+  const latestConfigRef = useRef(profile.configJson)
+  useEffect(() => { latestConfigRef.current = profile.configJson }, [profile.configJson])
   const providerTarget: ProviderTarget = ({ kind: 'manual', id: profile.id })
 
   const supportsModels = true
@@ -805,11 +809,11 @@ export function ProfileDetailPanel({
           config: supportsModels
             ? buildProfileConfig(
                 currentValues,
-                ProfileConfigJsonSchema.parse(profile.configJson),
+                ProfileConfigJsonSchema.parse(latestConfigRef.current),
                 profile.providerId,
                 { openaiAuthMode },
               )
-            : ProfileConfigJsonSchema.parse(profile.configJson),
+            : ProfileConfigJsonSchema.parse(latestConfigRef.current),
           credentialRef,
           providerId: profile.providerId,
         },
@@ -862,7 +866,7 @@ export function ProfileDetailPanel({
 
   // Auto-save with debounce — but skip the very first run after switching profiles
   useEffect(() => {
-    if (watchedSignature === savedSignatureRef.current || saveState === 'saving') {
+    if (watchedSignature === savedSignatureRef.current || saveState === 'saving' || codexConfigSaving) {
       return
     }
 
@@ -882,7 +886,7 @@ export function ProfileDetailPanel({
         autoSaveTimerRef.current = null
       }
     }
-  }, [saveState, watchedSignature])
+  }, [codexConfigSaving, saveState, watchedSignature])
 
   // ── Icon change handler ──
   const handleIconChange = (slug: string | null) => {
@@ -983,6 +987,15 @@ export function ProfileDetailPanel({
 
         {showCodexAccountDiagnostics && (
           <CodexAccountDiagnosticsPanel providerTargetId={profile.id} />
+        )}
+
+        {(providerKind === 'openai-compatible' || providerKind === 'universal') && (
+          <CodexConfigDialog
+            providerTargetId={profile.id}
+            onSaved={(configJson) => { latestConfigRef.current = configJson; onSaved() }}
+            onSavingChange={setCodexConfigSaving}
+            disabled={saveState === 'pending' || saveState === 'saving'}
+          />
         )}
 
         {supportsModels && supportsClaudeAgentModelAliases(providerKind) && (

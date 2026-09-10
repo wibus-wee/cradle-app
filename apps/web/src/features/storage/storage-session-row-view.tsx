@@ -40,6 +40,7 @@ export function StorageSessionRowView({
 
   return (
     <div
+      data-testid={`storage-session-${session.id}`}
       className={cn(
         'group grid grid-cols-[auto_1fr_auto_auto] items-start gap-x-3 px-3 py-3 transition-colors',
         'hover:bg-muted/40 focus-within:bg-muted/40',

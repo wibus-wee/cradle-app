@@ -11,6 +11,7 @@ import {
   readCodexChatgptCredentialLoginStatus,
   startCodexChatgptCredentialLogin,
 } from '../chat-runtime-providers/codex/app-server/account-service'
+import { readCodexConfigSchema } from '../provider-contracts/codex-native-config'
 import {
   readCachedConnectionTest,
   testProviderConnection,
@@ -22,6 +23,16 @@ export const providerTargets = new Elysia({
   prefix: '/provider-targets',
   detail: { tags: ['provider-targets'] },
 })
+  .get('/codex/config-schema', () => readCodexConfigSchema(), {
+    detail: { 'summary': 'Read the bundled Codex provider configuration schema', 'x-cradle-cli': { command: ['codex', 'config-schema'] } },
+    response: { 200: ProviderTargetsModel.codexConfigSchema },
+  })
+  .patch('/:providerTargetId/codex/config', ({ params, body }) => ProviderTargets.updateProviderTargetCodexConfig(params.providerTargetId, body.codex), {
+    detail: { summary: 'Replace Codex configuration overrides for a provider target' },
+    params: ProviderTargetsModel.idParams,
+    body: ProviderTargetsModel.codexConfigBody,
+    response: { 200: ProviderTargetsModel.modelSettings },
+  })
   .get(
     '/',
     ({ query }) => ProviderTargets.listProviderTargets({

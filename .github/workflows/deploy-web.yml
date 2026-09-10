@@ -21,8 +21,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Detect deployment scope
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.filter.outputs.deploy_web }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'push'
+        with:
+          base: ${{ github.event.before }}
+          filters: .github/ci-paths.yml
+
   deploy-web:
     name: Deploy Web
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

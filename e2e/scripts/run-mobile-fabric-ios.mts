@@ -6,6 +6,7 @@ const ROOT = resolve(import.meta.dirname, '..', '..')
 const MAESTRO_VERSION = '2.9.0'
 const MAESTRO_SHA256 = '855bb2ce1399d82f4f4a73d84a4d945f70b0d43eb86127e027af82809f63f0bd'
 const MAESTRO_URL = `https://github.com/mobile-dev-inc/Maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip`
+const MAESTRO_DRIVER_STARTUP_TIMEOUT_MS = 240_000
 const APP_ID = 'app.cradle.mobile'
 
 interface CommandOptions {
@@ -193,6 +194,9 @@ function main(): void {
     LC_ALL: process.env.LC_ALL || 'en_US.UTF-8',
     MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true',
     MAESTRO_CLI_NO_ANALYTICS: '1',
+    // Match Maestro's own CI allowance for cold XCTest driver startup.
+    MAESTRO_DRIVER_STARTUP_TIMEOUT: process.env.MAESTRO_DRIVER_STARTUP_TIMEOUT?.trim()
+      || String(MAESTRO_DRIVER_STARTUP_TIMEOUT_MS),
   }
 
   try {

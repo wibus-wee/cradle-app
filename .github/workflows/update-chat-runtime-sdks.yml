@@ -71,4 +71,5 @@ jobs:
             pnpm-lock.yaml
             apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/**
             apps/server/src/modules/chat-runtime-providers/codex/app-server/capabilities.ts
+            apps/server/src/modules/provider-contracts/codex-config-schema/**
             apps/server/src/modules/chat-runtime-providers/kimi/protocol/**

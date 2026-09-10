@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto'
+
+import stringify from 'safe-stable-stringify'
+
 import type { CodexChatgptAuthCredential } from './chatgpt-auth'
 import {
   CODEX_BEDROCK_API_KEY_ENV,
@@ -5,6 +9,7 @@ import {
   CODEX_PERSONAL_ACCESS_TOKEN_ENV,
 } from './chatgpt-auth'
 import type { CodexAppServerClientOptions } from './client'
+import { projectCodexProcessConfig } from './process-config'
 
 /**
  * Creates a fingerprint for Codex app-server host resource that includes only
@@ -17,17 +22,12 @@ export function createCodexAppServerHostFingerprint(input: {
   options: CodexAppServerClientOptions
   chatgptAuth: CodexChatgptAuthCredential | null
 }): string {
-  // Extract only process-level config that affects app-server lifetime:
-  // - baseUrl and model_provider affect which API the process connects to
-  // - Other config keys (approval_policy, sandbox_mode, model, etc.) are thread-level
-  const processLevelConfig = input.options.config
-    ? extractProcessLevelConfig(input.options.config)
-    : null
+  const processLevelConfig = projectCodexProcessConfig(input.options.config)
   const processLevelEnv = input.options.env
     ? extractProcessLevelEnv(input.options.env)
     : null
 
-  return JSON.stringify({
+  return createHash('sha256').update(stringify({
     apiKey: input.options.apiKey ?? null,
     chatgptAuth: input.chatgptAuth
       ? {
@@ -38,22 +38,11 @@ export function createCodexAppServerHostFingerprint(input: {
       : null,
     appServerPath: input.options.appServerPath ?? null,
     codexCliPath: input.options.codexCliPath ?? null,
-    processLevelConfig: stableJson(processLevelConfig),
-    processLevelEnv: stableJson(processLevelEnv),
+    processLevelConfig,
+    processLevelEnv,
     userAgentMode: input.options.userAgentMode ?? null,
     cliCompatibleIdentity: input.options.cliCompatibleIdentity ?? false,
-  })
-}
-
-function extractProcessLevelConfig(config: Record<string, unknown>): Record<string, unknown> | null {
-  const processKeys = ['model_provider', 'model_providers']
-  const processConfig: Record<string, unknown> = {}
-  for (const key of processKeys) {
-    if (key in config) {
-      processConfig[key] = config[key]
-    }
-  }
-  return Object.keys(processConfig).length > 0 ? processConfig : null
+  })!).digest('hex')
 }
 
 function extractProcessLevelEnv(env: Record<string, string | undefined>): Record<string, string> | null {
@@ -69,22 +58,4 @@ function extractProcessLevelEnv(env: Record<string, string | undefined>): Record
     }
   }
   return Object.keys(processEnv).length > 0 ? processEnv : null
-}
-
-function stableJson(value: unknown): string {
-  return JSON.stringify(sortJsonValue(value))
-}
-
-function sortJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(sortJsonValue)
-  }
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, entry]) => [key, sortJsonValue(entry)]),
-    )
-  }
-  return value
 }

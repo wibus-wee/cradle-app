@@ -225,6 +225,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
       credentials: true,
       origin: isAllowedCorsOrigin,
       exposeHeaders: [
+        'content-disposition',
         'x-cradle-run-id',
         'x-cradle-assistant-message-id',
         'x-cradle-user-message-id',

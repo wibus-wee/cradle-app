@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { CodexNativeConfigSchema } from './codex-native-config'
+
 export const CODEX_DEFAULT_APPROVAL_POLICY = 'never'
 export const CODEX_DEFAULT_SANDBOX_MODE = 'danger-full-access'
 
@@ -30,6 +32,7 @@ export const OpenAICompatibleConfigSchema = BaseProviderConfig.pick({
   model: true,
   enabledModels: true,
 }).extend({
+  codex: CodexNativeConfigSchema.optional(),
   authMode: CodexAuthModeSchema.optional(),
   baseUrl: z.string().nullable().default(null),
   model: z.string().nullable().default(null),
@@ -50,6 +53,7 @@ export const AnthropicConfigSchema = BaseProviderConfig.pick({
 })
 
 export const CodexConfigSchema = BaseProviderConfig.extend({
+  codex: CodexNativeConfigSchema.optional(),
   authMode: CodexAuthModeSchema.optional(),
   approvalPolicy: z.enum(['never', 'on-request', 'untrusted']).default(CODEX_DEFAULT_APPROVAL_POLICY),
   sandboxMode: z.enum(['read-only', 'workspace-write', 'danger-full-access']).default(CODEX_DEFAULT_SANDBOX_MODE),
@@ -201,6 +205,7 @@ export function readTrustedCodexConfig(raw: string): CodexConfig {
     ? { region: config.bedrock.region.trim() }
     : undefined
   return {
+    codex: config.codex,
     baseUrl: config.baseUrl,
     model: config.model,
     apiKey: config.apiKey,
