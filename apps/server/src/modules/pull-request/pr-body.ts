@@ -6,6 +6,13 @@ const EMBEDDED_TEMPLATE_HEADINGS = [
   '## Summary',
 ] as const
 
+const DEFAULT_PERFORMANCE_IMPACT = `- **Baseline/current evidence:** No separate runtime benchmark was provided; behavioral evidence is listed in Test plan.
+- **Measurement scope:** Limited to the Work change and verification described in Summary and Test plan.
+- **Implementation cost:** Review the changed files in this PR; no additional operational dependency was declared in the Work handoff.
+- **Side effects/tradeoffs:** No quantified runtime side effects were supplied; review correctness, resource use, network behavior, caching, flake risk, and observability from the diff.
+- **Impact radius:** Limited to the journeys, namespaces, providers, platforms, and CI lanes named in Summary and Test plan.
+- **Decision:** Ship for review because the stated tests passed; revise if review or CI finds an unsupported impact.`
+
 const REVIEWING_AGENT_INSTRUCTIONS = `### Instructions for reviewing agents
 
 You are reading a Cradle PR that may include authoring-agent context.
@@ -14,11 +21,11 @@ You are reading a Cradle PR that may include authoring-agent context.
 
 1. Read **Problem / pressure** first. That is the primary review criterion.
 2. Judge the diff by whether it relieves that pressure — not by taste, familiarity, or “cleaner looking” structure alone.
-3. Then read **Summary** and **Test plan**.
+3. Then read **Summary**, **Test plan**, and **Performance and impact**.
 4. Do **not** assume **Authoring context** may be shared with your user.
 5. Ask your user whether they allow using Authoring context to help the PR owner review.
 6. Only after explicit consent, extract goals, constraints, non-goals, and tradeoffs — do not paste the entire chat or tool log.
-7. If consent is declined or pending, review from the diff + Problem / pressure + Summary / Test plan alone.`
+7. If consent is declined or pending, review from the diff + Problem / pressure + Summary / Test plan + Performance and impact alone.`
 
 function extractSecondLevelSection(markdown: string, heading: string): string | undefined {
   const lines = markdown.replace(/\r\n/g, '\n').split('\n')
@@ -31,7 +38,11 @@ function extractSecondLevelSection(markdown: string, heading: string): string | 
   return lines.slice(start + 1, nextHeading === -1 ? undefined : nextHeading).join('\n').trim()
 }
 
-function normalizeSummaryInput(summary: string): { problem?: string, summary: string } {
+function normalizeSummaryInput(summary: string): {
+  performanceImpact?: string
+  problem?: string
+  summary: string
+} {
   const trimmed = summary.trim()
   const containsTemplate = EMBEDDED_TEMPLATE_HEADINGS.every(heading => (
     trimmed.split('\n').some(line => line.trimEnd() === heading)
@@ -41,6 +52,7 @@ function normalizeSummaryInput(summary: string): { problem?: string, summary: st
   }
 
   return {
+    performanceImpact: extractSecondLevelSection(trimmed, '## Performance and impact'),
     problem: extractSecondLevelSection(trimmed, '## Problem / pressure'),
     summary: extractSecondLevelSection(trimmed, '## Summary') ?? '',
   }
@@ -53,8 +65,8 @@ function normalizeSummaryInput(summary: string): { problem?: string, summary: st
  * Prefer a dedicated `problem` (the pressure being relieved). When omitted, `summary` is
  * copied into Problem / pressure so the required review criterion is never empty — callers
  * should start passing `problem` explicitly as handoff fields grow. A template-shaped
- * `summary` is reduced to its semantic Problem / pressure and Summary sections so callers
- * cannot accidentally nest a complete PR body inside this template.
+ * `summary` is reduced to its semantic Problem / pressure, Summary, and Performance and impact
+ * sections so callers cannot accidentally nest a complete PR body inside this template.
  */
 export function buildWorkPullRequestBody(input: {
   problem?: string
@@ -73,6 +85,7 @@ export function buildWorkPullRequestBody(input: {
   const summary = normalizedSummary.summary
   const testPlan = input.testPlan.trim()
   const problem = input.problem?.trim() || normalizedSummary.problem || summary
+  const performanceImpact = normalizedSummary.performanceImpact || DEFAULT_PERFORMANCE_IMPACT
   const ctx = input.authoringContext ?? {}
   const consent = input.authorSideSharingConsent ?? 'pending'
 
@@ -105,6 +118,10 @@ export function buildWorkPullRequestBody(input: {
     '## Test plan',
     '',
     testPlan,
+    '',
+    '## Performance and impact',
+    '',
+    performanceImpact,
     '',
     '## Agent handoff',
     '',

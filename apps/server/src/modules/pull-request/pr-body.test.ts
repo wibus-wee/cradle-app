@@ -19,6 +19,13 @@ describe('buildWorkPullRequestBody', () => {
     expect(body).toContain('Adds PR body template and format CI.')
     expect(body).toContain('## Test plan')
     expect(body).toContain('Run check-pr-body.mjs against fixture bodies.')
+    expect(body).toContain('## Performance and impact')
+    expect(body).toContain('- **Baseline/current evidence:**')
+    expect(body).toContain('- **Measurement scope:**')
+    expect(body).toContain('- **Implementation cost:**')
+    expect(body).toContain('- **Side effects/tradeoffs:**')
+    expect(body).toContain('- **Impact radius:**')
+    expect(body).toContain('- **Decision:**')
     expect(body).toContain('## Agent handoff')
     expect(body).toContain('<!-- agent-handoff:begin -->')
     expect(body).toContain('### Instructions for reviewing agents')
@@ -27,6 +34,7 @@ describe('buildWorkPullRequestBody', () => {
     expect(body).toContain('### Sharing consent (author side)')
     expect(body).toContain('<!-- agent-handoff:end -->')
     expect(body).toContain('author-side sharing consent pending')
+    expect(body).toContain('Then read **Summary**, **Test plan**, and **Performance and impact**.')
   })
 
   it('falls back to summary for Problem / pressure when problem is omitted', () => {
@@ -54,6 +62,15 @@ describe('buildWorkPullRequestBody', () => {
         '',
         '- Add the requested native client.',
         '',
+        '## Performance and impact',
+        '',
+        '- **Baseline/current evidence:** The failure reproduced before the change.',
+        '- **Measurement scope:** Focused PR delivery.',
+        '- **Implementation cost:** One server helper.',
+        '- **Side effects/tradeoffs:** No runtime hot path changed.',
+        '- **Impact radius:** Work-created pull requests.',
+        '- **Decision:** Ship because generated bodies now satisfy CI.',
+        '',
         '## Agent handoff',
         '',
         'Legacy handoff content that must not be embedded.',
@@ -65,9 +82,12 @@ describe('buildWorkPullRequestBody', () => {
     expect(body.match(/^## Problem \/ pressure$/gm)).toHaveLength(1)
     expect(body.match(/^## Summary$/gm)).toHaveLength(1)
     expect(body.match(/^## Test plan$/gm)).toHaveLength(1)
+    expect(body.match(/^## Performance and impact$/gm)).toHaveLength(1)
     expect(body.match(/^## Agent handoff$/gm)).toHaveLength(1)
     expect(body).toContain('## Problem / pressure\n\nThe Work handoff was already formatted as a PR body.')
     expect(body).toContain('## Summary\n\n- Add the requested native client.')
+    expect(body).toContain('## Performance and impact\n\n- **Baseline/current evidence:** The failure reproduced before the change.')
+    expect(body).toContain('- **Decision:** Ship because generated bodies now satisfy CI.')
     expect(body).not.toContain('Legacy handoff content that must not be embedded.')
   })
 
