@@ -87,6 +87,16 @@ async function preparePluginFixture(dataDir: string): Promise<{ fixtureBinDir: s
   mkdirSync(fixtureBinDir, { recursive: true })
   mkdirSync(archiveDir, { recursive: true })
 
+  const cliEntryPath = join(ROOT, 'packages', 'cli', 'dist', 'index.cjs')
+  if (!existsSync(cliEntryPath)) {
+    throw new Error('Cradle CLI is not built. Run `pnpm --filter @cradle/cli build` before E2E.')
+  }
+  const cliShimPath = join(fixtureBinDir, process.platform === 'win32' ? 'cradle.cmd' : 'cradle')
+  writeFileSync(cliShimPath, process.platform === 'win32'
+    ? `@echo off\r\n"${process.execPath}" "${cliEntryPath}" %*\r\n`
+    : `#!/usr/bin/env node\nrequire(${JSON.stringify(cliEntryPath)})\n`, 'utf8')
+  chmodSync(cliShimPath, 0o755)
+
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
   const realNpmPath = execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', [npm], { encoding: 'utf8' })
     .split(/\r?\n/)[0]!
