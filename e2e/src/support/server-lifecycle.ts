@@ -214,6 +214,7 @@ async function startManagedServer(config: ManagedServerLaunchConfig): Promise<Ch
     fixturePluginArchive,
     realNpmPath,
   } = config
+  const serverUrl = `http://127.0.0.1:${serverPort}`
   const serverProcess = spawn(nodeBinary, ['--import', 'tsx', 'src/index.ts'], {
     cwd: join(ROOT, 'apps', 'server'),
     env: {
@@ -227,6 +228,7 @@ async function startManagedServer(config: ManagedServerLaunchConfig): Promise<Ch
       CRADLE_AD_HOC_WORKSPACE_ROOT: join(dataDir, 'ad-hoc-workspaces'),
       CRADLE_PORT: String(serverPort),
       CRADLE_HOST: '127.0.0.1',
+      CRADLE_SERVER_URL: serverUrl,
       CRADLE_ALLOW_PRIVATE_PROVIDER_HOSTS: '127.0.0.1,localhost,::1',
       CRADLE_CREDENTIAL_SECRET: 'e2e-test-secret',
       ...(codexAppServerPath ? { CRADLE_CODEX_APP_SERVER_PATH: codexAppServerPath } : {}),
@@ -250,7 +252,6 @@ async function startManagedServer(config: ManagedServerLaunchConfig): Promise<Ch
     }
   })
 
-  const serverUrl = `http://127.0.0.1:${serverPort}`
   try {
     await waitForReady(`${serverUrl}/health`, 'Managed E2E Server')
     return serverProcess

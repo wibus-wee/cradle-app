@@ -23,6 +23,7 @@ Step definitions translate Chinese Gherkin into page-object calls and determinis
 | `kanban.steps.ts` | Board/issue lifecycle, bulk triage, parent-child hierarchy, directed relations, and Issue-Agent delegation, rerun, cancellation, and linked Chat |
 | `mcp-servers.steps.ts` | Local MCP validation, create/update persistence, secret-safe projections, disable, and deletion assertions |
 | `plugins.steps.ts` | Plugin source install, trust, activation, disable, reload, and visible contribution assertions |
+| `personal-plugins.steps.ts` | Agent-authored personal install, originating-chat review, failed update preservation, replacement snapshot, and permission-bound activation assertions |
 | `provider.steps.ts` | Provider profile UI lifecycle and runtime selection |
 | `search.steps.ts` | Global Session/Issue search results, empty state, and command navigation |
 | `session-archive.steps.ts` | Session archive/restore mutations, archived-list search, and recovery assertions |

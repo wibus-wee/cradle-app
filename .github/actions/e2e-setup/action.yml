@@ -18,6 +18,10 @@ runs:
       shell: bash
       run: pnpm --filter @cradle/plugin-sdk build
 
+    - name: Build Cradle CLI
+      shell: bash
+      run: pnpm --filter @cradle/cli build
+
     - name: Build workspace plugins
       shell: bash
       run: pnpm --filter "./plugins/*" build

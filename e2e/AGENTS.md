@@ -14,6 +14,7 @@ This file applies to everything under `e2e/`.
 ```bash
 # Prefer Node >= 22.15 for zstd (e.g. nvm use 22.22.2)
 pnpm --filter @cradle/plugin-sdk build
+pnpm --filter @cradle/cli build
 pnpm --filter "./plugins/*" build
 pnpm e2e:check
 # Optional: provision native Codex app-server for Codex essence scenarios

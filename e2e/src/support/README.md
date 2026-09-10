@@ -16,6 +16,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `helpers/automation-scenario.ts` | Gated Automation cancellation and linked Session title scripts |
 | `helpers/external-session-import-scenario.ts` | Read-only external Claude JSONL fixture and source-integrity sentinel |
 | `helpers/issue-agent-scenario.ts` | Issue delegation, rerun, and cancellation scripts |
+| `helpers/personal-plugin-scenario.ts` | Real Claude Bash install/update commands and strict personal Plugin lifecycle exchanges |
 | `helpers/skill-scenario.ts` | Strict Workspace Skill invocation request and response script |
 | `pages/` | Stable selectors and reusable UI mechanics |
 | `database.ts` | Explicit fixture-only database support; never the proof of a user-visible outcome |
@@ -35,7 +36,7 @@ Support code owns deterministic infrastructure and interaction mechanics; it doe
 | `pages/git.ts` | Branch controls |
 | `pages/kanban.ts` | Board, Issue detail, multi-select bulk triage, parent-child hierarchy, directed relations, description assets, activity, and delegation |
 | `pages/mcp-servers.ts` | Local MCP validation, exact mutation contracts, secret-safe reload projections, disable, and deletion |
-| `pages/plugins.ts` | Plugin Center install/trust/toggle flow and visible panel contribution |
+| `pages/plugins.ts` | Plugin Center and personal Plugin install/trust/update state, originating-chat review, immutable snapshots, and visible panel contributions |
 | `pages/search.ts` | Global Session/Issue search, empty-state assertions, and result navigation |
 | `pages/session-archive.ts` | Session archive/restore request contracts, archived-list search, and recovery persistence |
 | `pages/session-export.ts` | Browser download capture, ZIP parsing, and portable Session-content assertions |

@@ -38,7 +38,10 @@ export function PersonalPluginReviewCardView({
   onActivate,
 }: PersonalPluginReviewCardViewProps) {
   return (
-    <div className="pointer-events-auto mb-2 border border-border/70 bg-background/95 px-3 py-2.5 shadow-sm">
+    <div
+      className="pointer-events-auto mb-2 border border-border/70 bg-background/95 px-3 py-2.5 shadow-sm"
+      data-testid="personal-plugin-review-card"
+    >
       <div className="flex items-start gap-2.5">
         <ShieldCheckIcon className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
         <div className="min-w-0 flex-1">

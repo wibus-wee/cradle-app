@@ -4,7 +4,7 @@
 
 This directory owns the executable user-journey inventory. The broader module and state-combination audit lives in [`../../COVERAGE.md`](../../COVERAGE.md). Retired scenarios live in `e2e/_archive/features/` and are not part of the active suite.
 
-The active suite contains 85 scenarios: 24 `@P0` smoke journeys and 61 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
+The active suite contains 86 scenarios: 24 `@P0` smoke journeys and 62 `@P1` deeper journeys. Every scenario is tagged `@essence`, one priority, one runtime owner, and one stable `@CRADLE-*` ID.
 
 | Feature | Stable IDs | Journey boundary |
 | --- | --- | --- |
@@ -31,6 +31,7 @@ The active suite contains 85 scenarios: 24 `@P0` smoke journeys and 61 `@P1` dee
 | `issue-search.feature` | `CRADLE-SEARCH-002` | Issue search navigation, rename invalidation, new-title discovery, and detail persistence across reload |
 | `mcp-servers.feature` | `CRADLE-MCP-001` | Local MCP validation, secret-safe create/update persistence, disable, and confirmed deletion across reload |
 | `plugins.feature` | `CRADLE-PLUGIN-001` | npm source preview/install, explicit trust, visible Web panel activation, disable, re-enable, and reload persistence |
+| `personal-plugins.feature` | `CRADLE-PLUGIN-002` | Real Agent-authored build, immutable personal install, originating-chat review, failed-update preservation, checksum-bound re-review, Web activation, and reload persistence |
 | `provider.feature` | `CRADLE-PROVIDER-001`–`003` | Anthropic profile create, use, disable, and delete, including active-run cancellation and queued continuation removal |
 | `search.feature` | `CRADLE-SEARCH-001`, `003` | Session result navigation and command execution |
 | `session-archive.feature` | `CRADLE-SESSION-ARCHIVE-001` | Session archive mutation, archived-list search and reload persistence, restoration, and complete conversation recovery |
