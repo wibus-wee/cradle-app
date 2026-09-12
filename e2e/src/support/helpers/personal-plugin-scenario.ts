@@ -48,7 +48,10 @@ export async function configurePersonalPluginLifecycleSimulator(world: CradleWor
     anthropicTextExchange({
       label: 'personal-plugin-install-final',
       text: '个人 Plugin 已构建并安装，正在原会话等待权限审查。',
-      bodyTextIncludes: installToolId,
+      bodyTextIncludes: [
+        installToolId,
+        'Review and activation are waiting in the originating Cradle chat.',
+      ],
       bodyTextExcludes: TITLE_PROMPT,
     }),
     anthropicToolUseExchange({
@@ -71,7 +74,10 @@ export async function configurePersonalPluginLifecycleSimulator(world: CradleWor
     anthropicTextExchange({
       label: 'personal-plugin-failed-update-final',
       text: '无效更新被拒绝，已安装的 v1 快照保持可用。',
-      bodyTextIncludes: failedUpdateToolId,
+      bodyTextIncludes: [
+        failedUpdateToolId,
+        'Unsupported E2E personal Plugin version: broken',
+      ],
       bodyTextExcludes: TITLE_PROMPT,
     }),
     anthropicToolUseExchange({
@@ -94,7 +100,10 @@ export async function configurePersonalPluginLifecycleSimulator(world: CradleWor
     anthropicTextExchange({
       label: 'personal-plugin-successful-update-final',
       text: '个人 Plugin v2 已发布为新快照，正在原会话等待重新审查。',
-      bodyTextIncludes: successfulUpdateToolId,
+      bodyTextIncludes: [
+        successfulUpdateToolId,
+        'Review and activation are waiting in the originating Cradle chat.',
+      ],
       bodyTextExcludes: TITLE_PROMPT,
     }),
   ]))
