@@ -304,7 +304,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 076  | Replace point-to-point Remote Hosts with the Cradle Fabric | P0 | XL | 032, 033, 034 | IN PROGRESS — implementation essentially complete (relayd directory/membership/v3 links, server `modules/fabric/` + node projections, Nodes UI, legacy removal; two-node e2e spec landed via PR #185 and wired into CI) ; remaining: manual desktop smoke + plan doc reconciliation |
 | 077  | Bound every server stream producer behind one backpressure seam | P0 | M–L | — (composes with 054/071 recovery) | DONE (bounded primitive + watchdog + close-policy chat streams; HWM-0 deadlock fixed; ratchet in typecheck; codex app-server bridge also bounded (close policy + truncation error frame)) |
 | 078  | Fence Desktop Server fetches to renderer document lifetimes | P0 | M | 075 broker baseline | IN PROGRESS (implementation, focused gates, and isolated Electron ten-reload proof done; real-process restart/memory observation pending) |
-| 079  | Ship provider runtimes + OCR model as managed downloads, not bundled | P1 | XL | 047, 056, 057 | TODO |
+| 079  | Ship provider runtimes + OCR model as managed downloads, not bundled | P1 | XL | 047, 056, 057 | DONE (.app 1.0 GB → 471 MB measured; codex/claude/OCR all managed) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 
