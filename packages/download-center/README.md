@@ -6,6 +6,7 @@
 
 - `contract.ts` defines the redacted `DownloadTaskView` shared by server, desktop, and web.
 - `http-artifact-downloader.ts` streams HTTPS artifacts, enforces byte/checksum limits, resumes only strong-ETag partial transfers, and emits throttled progress.
+- `@cradle/download-center/installation` (node hosts only) owns the versioned-installation layout — `rootDir/{versions/<v>/,staging/,current.json}` with atomic pointer promotion, boot cleanup, serialized install flights, lease-gated uninstall — plus safe archive payload extraction (`zip`/`tar`, path traversal + entry-type validation, owner-declared payload classification). Owners inject `createError` so failures surface in their own error contract; they keep release manifests, target resolution, and version probing.
 - Server and Electron main own durable task lifecycle, storage roots, event fan-out, retry policy, and artifact release. Renderer code consumes only their redacted task projections.
 
 `DownloadRequest` is host-internal. Its URLs and optional headers must never be persisted in a public task view or crossed into renderer IPC.

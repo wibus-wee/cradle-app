@@ -1,24 +1,18 @@
 import { execFile } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
-import { accessSync, constants, createWriteStream, existsSync, readFileSync, statSync } from 'node:fs'
-import {
-  chmod,
-  lstat,
-  mkdir,
-  open,
-  readdir,
-  rename,
-  rm,
-  stat,
-} from 'node:fs/promises'
+import { chmod, mkdir, rename, stat } from 'node:fs/promises'
 import path from 'node:path'
-import { pipeline } from 'node:stream/promises'
 import { promisify } from 'node:util'
 
 import type { DownloadedArtifact, DownloadRequest } from '@cradle/download-center'
-import { extract as extractTar, list as listTar } from 'tar'
-import type { Entry, ZipFile } from 'yauzl'
-import { openPromise as openZipPromise } from 'yauzl'
+import type { ArchivePayloadSpec, InstallationErrorFactory } from '@cradle/download-center/installation'
+import {
+  extractArchivePayload,
+  findExecutableOnPath,
+  readCurrentInstallation,
+  resolveManagedPath,
+  validateArchiveEntryPath,
+  VersionedInstallation,
+} from '@cradle/download-center/installation'
 
 import { AppError } from '../../../errors/app-error'
 import { getServerConfig } from '../../../infra'
@@ -92,67 +86,37 @@ export function defaultOpencodeRuntimeRoot(): string {
   return path.join(config.dataDir ?? path.dirname(config.dbPath), 'runtimes', 'opencode')
 }
 
-function isInside(root: string, target: string): boolean {
-  const relative = path.relative(root, target)
-  return relative.length === 0 || (!relative.startsWith('..') && !path.isAbsolute(relative))
-}
+const createOpencodeError: InstallationErrorFactory = (code, status, message) =>
+  new AppError({ code: `opencode_runtime_${code}`, status, message })
 
-function resolveManagedExecutablePath(rootDir: string, relativePath: string): string | null {
-  if (!relativePath || path.isAbsolute(relativePath) || relativePath.includes('\0')) {
+function parseOpencodeInstallationManifest(raw: unknown): OpencodeInstallationManifest | null {
+  if (typeof raw !== 'object' || raw === null) {
     return null
   }
-  const target = path.resolve(rootDir, relativePath)
-  return isInside(rootDir, target) ? target : null
+  const manifest = raw as OpencodeInstallationManifest
+  return manifest.schemaVersion === INSTALLATION_SCHEMA_VERSION
+    && typeof manifest.version === 'string'
+    && VERSION_PATTERN.test(manifest.version)
+    && manifest.releaseTag === `v${manifest.version}`
+    && typeof manifest.targetKey === 'string'
+    && manifest.targetKey.length > 0
+    && typeof manifest.sha256 === 'string'
+    && /^[a-f0-9]{64}$/.test(manifest.sha256)
+    && typeof manifest.executablePath === 'string'
+    ? manifest
+    : null
 }
 
-function readInstallationManifestSync(rootDir: string): OpencodeInstallationManifest | null {
-  try {
-    const currentPath = path.join(rootDir, 'current.json')
-    const manifest: OpencodeInstallationManifest = JSON.parse(readFileSync(currentPath, 'utf8'))
-    const executablePath = resolveManagedExecutablePath(rootDir, manifest.executablePath)
-    if (
-      manifest.schemaVersion !== INSTALLATION_SCHEMA_VERSION
-      || !VERSION_PATTERN.test(manifest.version)
-      || manifest.releaseTag !== `v${manifest.version}`
-      || manifest.targetKey.length === 0
-      || !/^[a-f0-9]{64}$/.test(manifest.sha256)
-      || !executablePath
-      || !statSync(executablePath).isFile()
-    ) {
-      return null
-    }
-    const versionManifestPath = path.join(rootDir, 'versions', manifest.version, 'installation.json')
-    const versionManifest: OpencodeInstallationManifest = JSON.parse(readFileSync(versionManifestPath, 'utf8'))
-    return JSON.stringify(versionManifest) === JSON.stringify(manifest) ? manifest : null
-  }
-  catch {
-    return null
-  }
+function opencodePayloadPaths(manifest: OpencodeInstallationManifest) {
+  return [{ path: manifest.executablePath, kind: 'file' as const }]
 }
 
-function findExecutableOnPath(command: string, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string | null {
-  const hasSeparator = command.includes('/') || command.includes('\\')
-  const candidates = hasSeparator
-    ? [path.resolve(command)]
-    : (env.PATH ?? '').split(path.delimiter).filter(Boolean).flatMap((directory) => {
-        if (platform !== 'win32') {
-          return [path.join(directory, command)]
-        }
-        const extensions = (env.PATHEXT ?? '.EXE;.CMD;.BAT;.COM').split(';').filter(Boolean)
-        return path.extname(command) ? [path.join(directory, command)] : extensions.map(extension => path.join(directory, `${command}${extension.toLowerCase()}`))
-      })
-  for (const candidate of candidates) {
-    try {
-      accessSync(candidate, platform === 'win32' ? constants.F_OK : constants.X_OK)
-      if (statSync(candidate).isFile()) {
-        return path.resolve(candidate)
-      }
-    }
-    catch {
-      continue
-    }
-  }
-  return null
+function readOpencodeInstallation(rootDir: string): OpencodeInstallationManifest | null {
+  return readCurrentInstallation({
+    rootDir,
+    parseManifest: parseOpencodeInstallationManifest,
+    payloadPaths: opencodePayloadPaths,
+  })
 }
 
 export function resolveOpencodeExecutable(input: {
@@ -179,9 +143,9 @@ export function resolveOpencodeExecutable(input: {
     return { source: 'configured', command, version: null, managed: false }
   }
   const rootDir = input.rootDir ?? defaultOpencodeRuntimeRoot()
-  const managed = readInstallationManifestSync(rootDir)
+  const managed = readOpencodeInstallation(rootDir)
   if (managed) {
-    const command = resolveManagedExecutablePath(rootDir, managed.executablePath)!
+    const command = resolveManagedPath(rootDir, managed.executablePath)!
     return { source: 'managed', command, version: managed.version, managed: true }
   }
   const command = findExecutableOnPath(platform === 'win32' ? 'opencode.exe' : 'opencode', env, platform)
@@ -246,145 +210,17 @@ export async function checkOpencodeRuntimeHealth(input: {
 }
 
 export function validateOpencodeArchivePath(entryPath: string): void {
-  const normalized = entryPath.replaceAll('\\', '/')
-  if (
-    entryPath.includes('\0')
-    || path.posix.isAbsolute(normalized)
-    || path.win32.isAbsolute(entryPath)
-    || normalized.split('/').includes('..')
-  ) {
-    throw new AppError({
-      code: 'opencode_runtime_archive_invalid',
-      status: 422,
-      message: 'OpenCode archive contains an unsafe path.',
-    })
-  }
+  validateArchiveEntryPath(entryPath, createOpencodeError)
 }
 
-function readNextZipEntry(zipfile: ZipFile): Promise<Entry | null> {
-  return new Promise((resolve, reject) => {
-    const onEntry = (entry: Entry): void => {
-      cleanup()
-      resolve(entry)
-    }
-    const onEnd = (): void => {
-      cleanup()
-      resolve(null)
-    }
-    const onError = (error: Error): void => {
-      cleanup()
-      reject(error)
-    }
-    const cleanup = (): void => {
-      zipfile.off('entry', onEntry)
-      zipfile.off('end', onEnd)
-      zipfile.off('error', onError)
-    }
-    zipfile.on('entry', onEntry)
-    zipfile.on('end', onEnd)
-    zipfile.on('error', onError)
-    zipfile.readEntry()
-  })
-}
-
-async function extractZipExecutable(
-  archivePath: string,
-  target: ResolvedOpencodeReleaseTarget,
-  destination: string,
-): Promise<string> {
-  let executableRelativePath: string | null = null
-  const zipfile = await openZipPromise(archivePath, { lazyEntries: true })
-  try {
-    for (;;) {
-      const entry = await readNextZipEntry(zipfile)
-      if (!entry) {
-        break
-      }
-      validateOpencodeArchivePath(entry.fileName)
-      const normalized = entry.fileName.replaceAll('\\', '/')
-      const isDirectory = normalized.endsWith('/')
-      const mode = (entry.externalFileAttributes >> 16) & 0xFFFF
-      const fileType = mode & 0o170000
-      const isSymlink = fileType === 0o120000
-      const isRegular = fileType === 0 || fileType === 0o100000
-      if (isSymlink || (!isDirectory && !isRegular)) {
-        throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive contains an unsupported entry.' })
-      }
-      if (isDirectory) {
-        continue
-      }
-      if (path.posix.basename(normalized) !== target.executableName || executableRelativePath) {
-        throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive contains unexpected executable contents.' })
-      }
-      executableRelativePath = normalized
-      const executablePath = path.resolve(destination, normalized)
-      await mkdir(path.dirname(executablePath), { recursive: true })
-      const readStream = await zipfile.openReadStreamPromise(entry)
-      await pipeline(readStream, createWriteStream(executablePath))
-    }
+function singleExecutableSpec(executableName: string): ArchivePayloadSpec {
+  return {
+    classify: (normalizedPath, payloadPaths) =>
+      path.posix.basename(normalizedPath) === executableName && payloadPaths.length === 0
+        ? 'payload'
+        : 'reject',
+    isComplete: payloadPaths => payloadPaths.length === 1,
   }
-  finally {
-    zipfile.close()
-  }
-  if (!executableRelativePath) {
-    throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive does not contain the CLI executable.' })
-  }
-  return path.resolve(destination, executableRelativePath)
-}
-
-async function extractTarExecutable(
-  archivePath: string,
-  target: ResolvedOpencodeReleaseTarget,
-  destination: string,
-): Promise<string> {
-  const scan: { error: Error | null, executableRelativePath: string | null } = {
-    error: null,
-    executableRelativePath: null,
-  }
-  await listTar({
-    file: archivePath,
-    strict: true,
-    onReadEntry(entry) {
-      if (scan.error) {
-        return
-      }
-      try {
-        const entryPath = entry.path
-        validateOpencodeArchivePath(entryPath)
-        const entryType = entry.type
-        const isDirectory = entryType === 'Directory'
-        if (!isDirectory && entryType !== 'File' && entryType !== 'OldFile') {
-          throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive contains an unsupported entry.' })
-        }
-        if (isDirectory) {
-          return
-        }
-        if (path.posix.basename(entryPath) !== target.executableName || scan.executableRelativePath) {
-          throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive contains unexpected executable contents.' })
-        }
-        scan.executableRelativePath = entryPath
-      }
-      catch (error) {
-        scan.error = error instanceof Error
-          ? error
-          : new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive validation failed.' })
-      }
-    },
-  })
-  if (scan.error) {
-    throw scan.error
-  }
-  if (!scan.executableRelativePath) {
-    throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'OpenCode archive does not contain the CLI executable.' })
-  }
-  const executableRelativePath = scan.executableRelativePath
-  await extractTar({
-    file: archivePath,
-    cwd: destination,
-    strict: true,
-    filter: entryPath => entryPath === executableRelativePath,
-  })
-  return path.resolve(destination, executableRelativePath)
 }
 
 export async function extractOpencodeExecutable(
@@ -392,53 +228,41 @@ export async function extractOpencodeExecutable(
   target: ResolvedOpencodeReleaseTarget,
   destination: string,
 ): Promise<string> {
-  await mkdir(destination, { recursive: true })
-  const executablePath = target.format === 'zip'
-    ? await extractZipExecutable(archivePath, target, destination)
-    : await extractTarExecutable(archivePath, target, destination)
-  const stats = await lstat(executablePath)
-  if (!stats.isFile() || stats.isSymbolicLink() || !isInside(destination, executablePath)) {
-    throw new AppError({ code: 'opencode_runtime_archive_invalid', status: 422, message: 'Extracted OpenCode executable is invalid.' })
-  }
-  return executablePath
-}
-
-async function writeJsonAtomic(filePath: string, value: OpencodeInstallationManifest): Promise<void> {
-  await mkdir(path.dirname(filePath), { recursive: true })
-  const temporaryPath = `${filePath}.${randomUUID()}.tmp`
-  const handle = await open(temporaryPath, 'wx')
-  try {
-    await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, 'utf8')
-    await handle.sync()
-  }
-  finally {
-    await handle.close()
-  }
-  await rename(temporaryPath, filePath)
+  const extractedPaths = await extractArchivePayload({
+    archivePath,
+    format: target.format === 'zip' ? 'zip' : 'tar',
+    destination,
+    spec: singleExecutableSpec(target.executableName),
+    createError: createOpencodeError,
+  })
+  return extractedPaths[0]!
 }
 
 export class OpencodeRuntimeInstallationService {
   private readonly downloadCenter: OpencodeRuntimeDownloadCenter
-  private readonly rootDir: string
+  private readonly installation: VersionedInstallation<OpencodeInstallationManifest>
   private readonly env: NodeJS.ProcessEnv
   private readonly target: ResolvedOpencodeReleaseTarget | null
   private readonly probeVersion: (command: string) => Promise<string>
   private readonly extractExecutable: NonNullable<OpencodeRuntimeInstallationOptions['extractExecutable']>
-  private readonly prepareManagedPathForRemoval: NonNullable<OpencodeRuntimeInstallationOptions['prepareManagedPathForRemoval']>
   private readonly now: () => Date
-  private installFlight: Promise<OpencodeRuntimeStatus> | null = null
-  private acceptingCommands = true
   private lastErrorCode: string | null = null
 
   constructor(options: OpencodeRuntimeInstallationOptions) {
     this.downloadCenter = options.downloadCenter
-    this.rootDir = options.rootDir ?? defaultOpencodeRuntimeRoot()
     this.env = options.env ?? process.env
     this.target = options.target === undefined ? resolveOpencodeReleaseTarget() : options.target
     this.probeVersion = options.probeVersion ?? probeOpencodeVersion
     this.extractExecutable = options.extractExecutable ?? extractOpencodeExecutable
-    this.prepareManagedPathForRemoval = options.prepareManagedPathForRemoval ?? (async () => true)
     this.now = options.now ?? (() => new Date())
+    this.installation = new VersionedInstallation({
+      rootDir: options.rootDir ?? defaultOpencodeRuntimeRoot(),
+      label: 'OpenCode runtime',
+      parseManifest: parseOpencodeInstallationManifest,
+      payloadPaths: opencodePayloadPaths,
+      prepareForRemoval: options.prepareManagedPathForRemoval,
+      createError: createOpencodeError,
+    })
   }
 
   private extractExecutableWithTimeout(
@@ -466,23 +290,13 @@ export class OpencodeRuntimeInstallationService {
   }
 
   async boot(): Promise<void> {
-    await mkdir(path.join(this.rootDir, 'versions'), { recursive: true })
-    await rm(path.join(this.rootDir, 'staging'), { recursive: true, force: true })
-    await mkdir(path.join(this.rootDir, 'staging'), { recursive: true })
-    if (!readInstallationManifestSync(this.rootDir)) {
-      await rm(path.join(this.rootDir, 'current.json'), { force: true })
-    }
-    const current = readInstallationManifestSync(this.rootDir)
-    const versions = await readdir(path.join(this.rootDir, 'versions'), { withFileTypes: true })
-    await Promise.all(versions
-      .filter(entry => entry.isDirectory() && entry.name !== current?.version)
-      .map(entry => rm(path.join(this.rootDir, 'versions', entry.name), { recursive: true, force: true })))
+    await this.installation.boot()
   }
 
   async status(ignoreInstallFlight = false): Promise<OpencodeRuntimeStatus> {
-    const managedManifest = readInstallationManifestSync(this.rootDir)
+    const managedManifest = this.installation.current()
     const managedExecutablePath = managedManifest
-      ? resolveManagedExecutablePath(this.rootDir, managedManifest.executablePath)
+      ? this.installation.resolvePath(managedManifest.executablePath)
       : null
     const installedSizeBytes = managedExecutablePath
       ? (await stat(managedExecutablePath).catch(() => null))?.size ?? null
@@ -499,7 +313,7 @@ export class OpencodeRuntimeInstallationService {
         errorCode: 'opencode_runtime_target_unsupported',
       }
     }
-    if (this.installFlight && !ignoreInstallFlight) {
+    if (this.installation.isInstalling() && !ignoreInstallFlight) {
       return {
         state: 'installing',
         source: managedManifest ? 'managed' : null,
@@ -512,7 +326,7 @@ export class OpencodeRuntimeInstallationService {
       }
     }
     try {
-      const executable = resolveOpencodeExecutable({ env: this.env, rootDir: this.rootDir })
+      const executable = resolveOpencodeExecutable({ env: this.env, rootDir: this.installation.rootDir })
       const version = executable.version ?? await this.probeVersion(executable.command)
       return {
         state: this.lastErrorCode
@@ -543,7 +357,7 @@ export class OpencodeRuntimeInstallationService {
   }
 
   install(): Promise<OpencodeRuntimeStatus> {
-    if (!this.acceptingCommands) {
+    if (!this.installation.accepting) {
       throw new AppError({ code: 'opencode_runtime_stopping', status: 503, message: 'OpenCode runtime installation is stopping.' })
     }
     if (this.env.CRADLE_OPENCODE_PATH?.trim()) {
@@ -552,88 +366,30 @@ export class OpencodeRuntimeInstallationService {
     if (!this.target) {
       throw new AppError({ code: 'opencode_runtime_target_unsupported', status: 409, message: 'This platform does not have a supported OpenCode CLI target.' })
     }
-    if (this.installFlight) {
-      return this.installFlight
-    }
-    this.lastErrorCode = null
-    const flight = this.installTarget(this.target)
-      .catch((error) => {
+    const target = this.target
+    return this.installation.install(async () => {
+      try {
+        return await this.installTarget(target)
+      }
+      catch (error) {
         this.lastErrorCode = error instanceof AppError ? error.code : 'opencode_runtime_install_failed'
         throw error
-      })
-      .finally(() => {
-        if (this.installFlight === flight) {
-          this.installFlight = null
-        }
-      })
-    this.installFlight = flight
-    return flight
+      }
+    })
   }
 
   async uninstall(): Promise<OpencodeRuntimeStatus> {
-    if (!this.acceptingCommands) {
-      throw new AppError({ code: 'opencode_runtime_stopping', status: 503, message: 'OpenCode runtime installation is stopping.' })
-    }
-    if (this.installFlight) {
-      throw new AppError({ code: 'opencode_runtime_install_in_progress', status: 409, message: 'OpenCode runtime installation is in progress.' })
-    }
-    const manifest = readInstallationManifestSync(this.rootDir)
-    if (!manifest) {
-      throw new AppError({ code: 'opencode_runtime_not_installed', status: 409, message: 'No managed OpenCode runtime is installed.' })
-    }
-    const executablePaths = await this.listInstalledExecutablePaths(manifest)
-    for (const executablePath of executablePaths) {
-      if (!await this.prepareManagedPathForRemoval(executablePath)) {
-        throw new AppError({ code: 'opencode_runtime_in_use', status: 409, message: 'OpenCode runtime is in use by an active session.' })
-      }
-    }
-    await rm(path.join(this.rootDir, 'current.json'), { force: true })
-    await rm(path.join(this.rootDir, 'versions'), { recursive: true, force: true })
-    await mkdir(path.join(this.rootDir, 'versions'), { recursive: true })
+    await this.installation.uninstall()
     this.lastErrorCode = null
     return await this.status()
   }
 
   async shutdown(): Promise<void> {
-    this.acceptingCommands = false
-    await this.installFlight?.catch(() => undefined)
-  }
-
-  private async listInstalledExecutablePaths(
-    current: OpencodeInstallationManifest,
-  ): Promise<string[]> {
-    const executablePaths = new Set<string>([
-      resolveManagedExecutablePath(this.rootDir, current.executablePath)!,
-    ])
-    const versionEntries = await readdir(path.join(this.rootDir, 'versions'), { withFileTypes: true })
-    for (const entry of versionEntries) {
-      if (!entry.isDirectory()) {
-        continue
-      }
-      try {
-        const installation: OpencodeInstallationManifest = JSON.parse(readFileSync(
-          path.join(this.rootDir, 'versions', entry.name, 'installation.json'),
-          'utf8',
-        ))
-        const executablePath = resolveManagedExecutablePath(this.rootDir, installation.executablePath)
-        if (
-          installation.schemaVersion === INSTALLATION_SCHEMA_VERSION
-          && installation.version === entry.name
-          && executablePath
-          && statSync(executablePath).isFile()
-        ) {
-          executablePaths.add(executablePath)
-        }
-      }
-      catch {
-        // Corrupt orphaned versions were never resolvable and cannot own a live pool lease.
-      }
-    }
-    return [...executablePaths]
+    await this.installation.shutdown()
   }
 
   private async installTarget(target: ResolvedOpencodeReleaseTarget): Promise<OpencodeRuntimeStatus> {
-    const existing = readInstallationManifestSync(this.rootDir)
+    const existing = this.installation.current()
     if (existing?.version === target.version && existing.targetKey === target.key && existing.sha256 === target.sha256) {
       return await this.status(true)
     }
@@ -659,50 +415,41 @@ export class OpencodeRuntimeInstallationService {
     const artifact = retryable
       ? await this.downloadCenter.retry(retryable.taskId, request)
       : await this.downloadCenter.execute(request)
-    const operationRoot = path.join(this.rootDir, 'staging', randomUUID())
-    const versionStagingRoot = path.join(operationRoot, target.version)
     try {
-      const extractedPath = await this.extractExecutableWithTimeout(
-        artifact.filePath,
-        target,
-        path.join(operationRoot, 'extract'),
-      )
-      const executableRelativePath = path.join('versions', target.version, 'bin', target.executableName)
-      const stagedExecutablePath = path.join(versionStagingRoot, 'bin', target.executableName)
-      await mkdir(path.dirname(stagedExecutablePath), { recursive: true })
-      await rename(extractedPath, stagedExecutablePath)
-      if (process.platform !== 'win32') {
-        await chmod(stagedExecutablePath, 0o755)
-      }
-      const version = await this.probeVersion(stagedExecutablePath)
-      if (version !== target.version) {
-        throw new AppError({ code: 'opencode_runtime_probe_failed', status: 422, message: 'OpenCode executable version does not match the compatible release.' })
-      }
-      const installation: OpencodeInstallationManifest = {
-        schemaVersion: INSTALLATION_SCHEMA_VERSION,
+      await this.installation.stageVersion({
         version: target.version,
-        releaseTag: target.releaseTag,
-        targetKey: target.key,
-        executablePath: executableRelativePath,
-        sha256: target.sha256,
-        installedAt: this.now().toISOString(),
-      }
-      await writeJsonAtomic(path.join(versionStagingRoot, 'installation.json'), installation)
-      const versionRoot = path.join(this.rootDir, 'versions', target.version)
-      if (existsSync(versionRoot)) {
-        throw new AppError({
-          code: 'opencode_runtime_install_conflict',
-          status: 409,
-          message: 'The compatible OpenCode version directory already exists without a valid installation pointer.',
-        })
-      }
-      await rename(versionStagingRoot, versionRoot)
-      await writeJsonAtomic(path.join(this.rootDir, 'current.json'), installation)
+        stage: async (versionStagingRoot, operationRoot) => {
+          const extractedPath = await this.extractExecutableWithTimeout(
+            artifact.filePath,
+            target,
+            path.join(operationRoot, 'extract'),
+          )
+          const executableRelativePath = path.join('versions', target.version, 'bin', target.executableName)
+          const stagedExecutablePath = path.join(versionStagingRoot, 'bin', target.executableName)
+          await mkdir(path.dirname(stagedExecutablePath), { recursive: true })
+          await rename(extractedPath, stagedExecutablePath)
+          if (process.platform !== 'win32') {
+            await chmod(stagedExecutablePath, 0o755)
+          }
+          const version = await this.probeVersion(stagedExecutablePath)
+          if (version !== target.version) {
+            throw new AppError({ code: 'opencode_runtime_probe_failed', status: 422, message: 'OpenCode executable version does not match the compatible release.' })
+          }
+          return {
+            schemaVersion: INSTALLATION_SCHEMA_VERSION,
+            version: target.version,
+            releaseTag: target.releaseTag,
+            targetKey: target.key,
+            executablePath: executableRelativePath,
+            sha256: target.sha256,
+            installedAt: this.now().toISOString(),
+          } satisfies OpencodeInstallationManifest
+        },
+      })
       this.lastErrorCode = null
       return await this.status(true)
     }
     finally {
-      await rm(operationRoot, { recursive: true, force: true })
       await this.downloadCenter.release(artifact.taskId).catch(() => undefined)
     }
   }
