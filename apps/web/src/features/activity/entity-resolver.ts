@@ -20,9 +20,9 @@ function entityFromSurfaceRoute(route: SurfaceRoute): ResolvedUiActivityEntity |
     case '/work/$workId':
       return { entity: `work:${route.params.workId}`, entityType: 'work' }
     case '/pull-requests': {
-      const workId = route.search?.workId
-      if (workId) {
-        return { entity: `pr:${workId}`, entityType: 'pr' }
+      const prRef = route.search?.pr
+      if (prRef) {
+        return { entity: `pr:${prRef}`, entityType: 'pr' }
       }
       return { entity: 'app:pull-requests', entityType: 'app' }
     }
