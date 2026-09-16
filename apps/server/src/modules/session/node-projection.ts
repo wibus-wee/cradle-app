@@ -18,6 +18,7 @@ import { getFabricNodeLinkManager } from '../relay-transport/node-link-manager'
 import * as Workspace from '../workspace/service'
 import type { WorkspaceLocator } from '../workspace/workspace-locator'
 import { isLocalWorkspaceLocator } from '../workspace/workspace-locator'
+import { assertLinkedIssue } from './issue-association'
 
 export interface NodeSessionLinkView {
   localSessionId: string
@@ -175,6 +176,12 @@ export interface ExistingNodeSessionProjectionInput {
   nodeId: string
   remoteWorkspaceId: string
   sessionGroupId?: string | null
+  /**
+   * Local Issue association for the projection row. Issue IDs are
+   * workspace-local to this Cradle host, so they are validated through the
+   * Issue-owned gate here and are never read from or sent to the remote host.
+   */
+  linkedIssueId?: string | null
   remoteSession: {
     id: string
     title: string | null
@@ -183,7 +190,6 @@ export interface ExistingNodeSessionProjectionInput {
     modelId: string | null
     thinkingEffort: ChatThinkingEffort | null
     runtimeKind: string
-    linkedIssueId?: string | null
     archivedAt: number | null
     createdAt: number
     updatedAt: number
@@ -209,6 +215,10 @@ export function attachExistingNodeSessionProjection(
     return existing
   }
 
+  if (input.linkedIssueId) {
+    assertLinkedIssue({ issueId: input.linkedIssueId, workspaceId: input.workspaceId })
+  }
+
   const localSessionId = input.localSessionId ?? randomUUID()
   const remote = input.remoteSession
   db().transaction((tx) => {
@@ -222,7 +232,7 @@ export function attachExistingNodeSessionProjection(
         runtimeKind: remote.runtimeKind,
         agentId: null,
         configJson: projectionConfigJson(remote),
-        linkedIssueId: remote.linkedIssueId ?? null,
+        linkedIssueId: input.linkedIssueId ?? null,
         sessionGroupId: input.sessionGroupId ?? null,
         archivedAt: remote.archivedAt,
         createdAt: remote.createdAt,
@@ -286,7 +296,6 @@ export async function createNodeProjectedSession(input: {
         thinkingEffort: input.thinkingEffort,
         runtimeKind: input.runtimeKind ?? 'standard',
         runtimeSettings: input.runtimeSettings,
-        linkedIssueId: input.linkedIssueId ?? null,
         sessionGroupId: null,
       }),
     })
@@ -309,6 +318,7 @@ export async function createNodeProjectedSession(input: {
       nodeId: locator.nodeId,
       remoteWorkspaceId,
       sessionGroupId: input.sessionGroupId ?? null,
+      linkedIssueId: input.linkedIssueId ?? null,
       remoteSession: {
         id: remoteSession.id,
         title: input.title,
@@ -317,7 +327,6 @@ export async function createNodeProjectedSession(input: {
         modelId: input.modelId ?? null,
         thinkingEffort: input.thinkingEffort ?? null,
         runtimeKind: input.runtimeKind ?? 'standard',
-        linkedIssueId: input.linkedIssueId ?? null,
         archivedAt: null,
         createdAt: currentUnixSeconds(),
         updatedAt: currentUnixSeconds(),

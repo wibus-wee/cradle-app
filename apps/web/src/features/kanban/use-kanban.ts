@@ -10,7 +10,6 @@ import {
   deleteIssuesRelationsById,
   deleteIssuesStatusesById,
   deleteKanbanBoardsById,
-  deleteSessionsByIdLinkedIssue,
   getExternalIssueSourcesItems,
   getIssues,
   getIssuesById,
@@ -43,7 +42,6 @@ import {
   postIssuesStatuses,
   postIssuesStatusesReorder,
   postKanbanBoards,
-  postSessionsByIdLinkedIssue,
 } from '~/api-gen/sdk.gen'
 import type {
   AgentSession,
@@ -74,6 +72,7 @@ export const kanbanKeys = {
   agentSessions: (issueId: string) => ['kanban', 'agentSessions', issueId] as const,
   linkedSessions: (issueId: string) => ['kanban', 'linkedSessions', issueId] as const,
   linkedSessionGroups: (issueId: string) => ['kanban', 'linkedSessionGroups', issueId] as const,
+  linkedIssueRef: (sessionId: string) => ['kanban', 'linkedIssue', sessionId] as const,
   activity: (issueId: string) => ['kanban', 'activity', issueId] as const,
   comments: (issueId: string) => ['kanban', 'comments', issueId] as const,
   fieldChanges: (issueId: string) => ['kanban', 'fieldChanges', issueId] as const,
@@ -1193,13 +1192,13 @@ function useRemoveContextRef() {
 
 // ── Session ↔ Issue Link ──────────────────────────────────────────────────────
 
-type LinkedIssueRef = {
+export type LinkedIssueRef = {
   issueId: string | null
 }
 
 export function useLinkedIssue(chatSessionId: string | null) {
   return useQuery({
-    queryKey: ['kanban', 'linkedIssue', chatSessionId] as const,
+    queryKey: kanbanKeys.linkedIssueRef(chatSessionId ?? ''),
     queryFn: async () => {
       if (!chatSessionId) {
         return null
@@ -1212,30 +1211,6 @@ export function useLinkedIssue(chatSessionId: string | null) {
   })
 }
 
-export function useLinkIssue() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (vars: { chatSessionId: string, issueId: string }) => {
-      await postSessionsByIdLinkedIssue({
-        path: { id: vars.chatSessionId },
-        body: { issueId: vars.issueId },
-      })
-    },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['kanban', 'linkedIssue', vars.chatSessionId] })
-      qc.invalidateQueries({ queryKey: kanbanKeys.linkedSessions(vars.issueId) })
-    },
-  })
-}
-
-export function useUnlinkIssue() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async (chatSessionId: string) => {
-      await deleteSessionsByIdLinkedIssue({ path: { id: chatSessionId } })
-    },
-    onSuccess: (_data, chatSessionId) => {
-      qc.invalidateQueries({ queryKey: ['kanban', 'linkedIssue', chatSessionId] })
-    },
-  })
-}
+// Link/unlink/relink mutations live in `use-issue-execution-association.ts`:
+// they consume the Issue-owned transition response and reconcile participant
+// plus old/new Issue projections through owner APIs.

@@ -10,7 +10,6 @@ import {
   issues,
   issueStatuses,
   providerTargets,
-  sessions,
   workspaces,
 } from '@cradle/db'
 import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
@@ -1595,14 +1594,6 @@ export function removeContextRef(
   return getIssue(issueId)
 }
 
-export function getLinkedIssue(sessionId: string): { issueId: string | null } {
-  const s = db().select({ linkedIssueId: sessions.linkedIssueId }).from(sessions).where(eq(sessions.id, sessionId)).get()
-  if (!s) {
-    throw new AppError({ code: 'session_not_found', status: 404, message: 'Session not found', details: { sessionId } })
-  }
-  return { issueId: s.linkedIssueId }
-}
-
 export function listLinkedSessions(issueId: string): Session.SessionView[] {
   getIssue(issueId)
   return Session.listLinkedToIssue(issueId)
@@ -1611,25 +1602,6 @@ export function listLinkedSessions(issueId: string): Session.SessionView[] {
 export function listLinkedSessionGroups(issueId: string) {
   getIssue(issueId)
   return SessionGroup.listByLinkedIssue(issueId)
-}
-
-export function linkIssue(sessionId: string, issueId: string): { ok: true } {
-  const s = db().select().from(sessions).where(eq(sessions.id, sessionId)).get()
-  if (!s) {
-    throw new AppError({ code: 'session_not_found', status: 404, message: 'Session not found', details: { sessionId } })
-  }
-  getIssue(issueId)
-  db().update(sessions).set({ linkedIssueId: issueId }).where(eq(sessions.id, sessionId)).run()
-  return { ok: true }
-}
-
-export function unlinkIssue(sessionId: string): { ok: true } {
-  const s = db().select().from(sessions).where(eq(sessions.id, sessionId)).get()
-  if (!s) {
-    throw new AppError({ code: 'session_not_found', status: 404, message: 'Session not found', details: { sessionId } })
-  }
-  db().update(sessions).set({ linkedIssueId: null }).where(eq(sessions.id, sessionId)).run()
-  return { ok: true }
 }
 
 export interface MigrateIssuesOptions {

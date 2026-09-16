@@ -794,3 +794,408 @@ describe('kanban capability', () => {
     }
   })
 })
+
+describe('issue-execution association', () => {
+  interface AssociationFixture {
+    app: Awaited<ReturnType<typeof createServerApp>>
+    issueA1: Issue
+    issueA2: Issue
+    issueB: Issue
+    cleanup: () => void
+  }
+
+  async function setupAssociationFixture(): Promise<AssociationFixture> {
+    const dataDir = makeTempDir('cradle-data-')
+    const workspaceRoot = makeTempDir('cradle-workspace-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    process.env.CRADLE_DATA_DIR = dataDir
+    const app = await createServerApp()
+
+    db().insert(workspaces).values([
+      workspaceFixture({
+        id: 'workspace-assoc-a',
+        name: 'Workspace Assoc A',
+        identifier: 'WSA',
+        path: join(workspaceRoot, 'a'),
+      }),
+      workspaceFixture({
+        id: 'workspace-assoc-b',
+        name: 'Workspace Assoc B',
+        identifier: 'WSB',
+        path: join(workspaceRoot, 'b'),
+      }),
+    ]).run()
+
+    db().insert(providerTargets).values({
+      id: 'provider-target-assoc',
+      kind: 'manual',
+      providerKind: 'openai-compatible',
+      displayName: 'Association Provider',
+    }).run()
+
+    async function createIssue(workspaceId: string, title: string): Promise<Issue> {
+      const res = await app.handle(new Request('http://localhost/issues', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId, title }),
+      }))
+      expect(res.status).toBe(200)
+      return await res.json() as Issue
+    }
+
+    const issueA1 = await createIssue('workspace-assoc-a', 'Issue A1')
+    const issueA2 = await createIssue('workspace-assoc-a', 'Issue A2')
+    const issueB = await createIssue('workspace-assoc-b', 'Issue B')
+
+    return {
+      app,
+      issueA1,
+      issueA2,
+      issueB,
+      cleanup: () => {
+        shutdownInfra()
+        rmSync(dataDir, { recursive: true, force: true })
+        rmSync(workspaceRoot, { recursive: true, force: true })
+        if (previousDataDir === undefined) {
+          delete process.env.CRADLE_DATA_DIR
+        }
+        else {
+          process.env.CRADLE_DATA_DIR = previousDataDir
+        }
+      },
+    }
+  }
+
+  async function createSession(app: AssociationFixture['app'], body: Record<string, unknown>) {
+    const res = await app.handle(new Request('http://localhost/sessions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }))
+    return res
+  }
+
+  async function linkSession(app: AssociationFixture['app'], sessionId: string, issueId: string) {
+    return await app.handle(new Request(`http://localhost/sessions/${encodeURIComponent(sessionId)}/linked-issue`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ issueId }),
+    }))
+  }
+
+  async function readLinkedIssue(app: AssociationFixture['app'], sessionId: string): Promise<{ issueId: string | null }> {
+    const res = await app.handle(new Request(`http://localhost/sessions/${encodeURIComponent(sessionId)}/linked-issue`))
+    expect(res.status).toBe(200)
+    return await res.json() as { issueId: string | null }
+  }
+
+  it('links, relinks, and unlinks a session within one workspace with typed transitions', async () => {
+    const fixture = await setupAssociationFixture()
+    const { app, issueA1, issueA2 } = fixture
+    try {
+      const createRes = await createSession(app, {
+        workspaceId: 'workspace-assoc-a',
+        title: 'Linked chat',
+        providerTargetId: 'provider-target-assoc',
+      })
+      expect(createRes.status).toBe(200)
+      const session = await createRes.json() as { id: string }
+
+      const linkRes = await linkSession(app, session.id, issueA1.id)
+      expect(linkRes.status).toBe(200)
+      expect(await linkRes.json()).toEqual({
+        participantKind: 'session',
+        participantId: session.id,
+        previousIssueId: null,
+        nextIssueId: issueA1.id,
+      })
+      expect(await readLinkedIssue(app, session.id)).toEqual({ issueId: issueA1.id })
+
+      const relinkRes = await linkSession(app, session.id, issueA2.id)
+      expect(relinkRes.status).toBe(200)
+      expect(await relinkRes.json()).toEqual({
+        participantKind: 'session',
+        participantId: session.id,
+        previousIssueId: issueA1.id,
+        nextIssueId: issueA2.id,
+      })
+
+      const unlinkRes = await app.handle(new Request(`http://localhost/sessions/${encodeURIComponent(session.id)}/linked-issue`, {
+        method: 'DELETE',
+      }))
+      expect(unlinkRes.status).toBe(200)
+      expect(await unlinkRes.json()).toEqual({
+        participantKind: 'session',
+        participantId: session.id,
+        previousIssueId: issueA2.id,
+        nextIssueId: null,
+      })
+      expect(await readLinkedIssue(app, session.id)).toEqual({ issueId: null })
+    }
+    finally {
+      fixture.cleanup()
+    }
+  })
+
+  it('rejects cross-workspace session links and preserves the previous association', async () => {
+    const fixture = await setupAssociationFixture()
+    const { app, issueA1, issueB } = fixture
+    try {
+      const createRes = await createSession(app, {
+        workspaceId: 'workspace-assoc-a',
+        title: 'Linked chat',
+        providerTargetId: 'provider-target-assoc',
+      })
+      const session = await createRes.json() as { id: string }
+
+      const crossLinkRes = await linkSession(app, session.id, issueB.id)
+      expect(crossLinkRes.status).toBe(409)
+      expect((await crossLinkRes.json()).code).toBe('issue_workspace_mismatch')
+      expect(await readLinkedIssue(app, session.id)).toEqual({ issueId: null })
+
+      const linkRes = await linkSession(app, session.id, issueA1.id)
+      expect(linkRes.status).toBe(200)
+
+      const crossRelinkRes = await linkSession(app, session.id, issueB.id)
+      expect(crossRelinkRes.status).toBe(409)
+      expect((await crossRelinkRes.json()).code).toBe('issue_workspace_mismatch')
+      expect(await readLinkedIssue(app, session.id)).toEqual({ issueId: issueA1.id })
+    }
+    finally {
+      fixture.cleanup()
+    }
+  })
+
+  it('rejects association mutations for missing sessions or issues', async () => {
+    const fixture = await setupAssociationFixture()
+    const { app, issueA1 } = fixture
+    try {
+      const createRes = await createSession(app, {
+        workspaceId: 'workspace-assoc-a',
+        title: 'Linked chat',
+        providerTargetId: 'provider-target-assoc',
+      })
+      const session = await createRes.json() as { id: string }
+
+      const missingIssueRes = await linkSession(app, session.id, 'missing-issue')
+      expect(missingIssueRes.status).toBe(404)
+      expect((await missingIssueRes.json()).code).toBe('issue_not_found')
+      expect(await readLinkedIssue(app, session.id)).toEqual({ issueId: null })
+
+      const missingSessionLink = await linkSession(app, 'missing-session', issueA1.id)
+      expect(missingSessionLink.status).toBe(404)
+      expect((await missingSessionLink.json()).code).toBe('session_not_found')
+
+      const missingSessionUnlink = await app.handle(new Request('http://localhost/sessions/missing-session/linked-issue', {
+        method: 'DELETE',
+      }))
+      expect(missingSessionUnlink.status).toBe(404)
+      expect((await missingSessionUnlink.json()).code).toBe('session_not_found')
+
+      const missingSessionRead = await app.handle(new Request('http://localhost/sessions/missing-session/linked-issue'))
+      expect(missingSessionRead.status).toBe(404)
+    }
+    finally {
+      fixture.cleanup()
+    }
+  })
+
+  it('validates linkedIssueId on session create-with-link', async () => {
+    const fixture = await setupAssociationFixture()
+    const { app, issueA1, issueB } = fixture
+    try {
+      const linkedRes = await createSession(app, {
+        id: 'session-link-ok',
+        workspaceId: 'workspace-assoc-a',
+        title: 'Linked at create',
+        providerTargetId: 'provider-target-assoc',
+        linkedIssueId: issueA1.id,
+      })
+      expect(linkedRes.status).toBe(200)
+      expect(await linkedRes.json()).toEqual(expect.objectContaining({ linkedIssueId: issueA1.id }))
+      expect(await readLinkedIssue(app, 'session-link-ok')).toEqual({ issueId: issueA1.id })
+
+      const crossWorkspaceRes = await createSession(app, {
+        id: 'session-link-cross',
+        workspaceId: 'workspace-assoc-a',
+        title: 'Cross workspace link',
+        providerTargetId: 'provider-target-assoc',
+        linkedIssueId: issueB.id,
+      })
+      expect(crossWorkspaceRes.status).toBe(409)
+      expect((await crossWorkspaceRes.json()).code).toBe('issue_workspace_mismatch')
+      const missingSession = await app.handle(new Request('http://localhost/sessions/session-link-cross'))
+      expect(missingSession.status).toBe(404)
+
+      const missingIssueRes = await createSession(app, {
+        id: 'session-link-missing',
+        workspaceId: 'workspace-assoc-a',
+        title: 'Missing issue link',
+        providerTargetId: 'provider-target-assoc',
+        linkedIssueId: 'missing-issue',
+      })
+      expect(missingIssueRes.status).toBe(404)
+      expect((await missingIssueRes.json()).code).toBe('issue_not_found')
+      const missingCreated = await app.handle(new Request('http://localhost/sessions/session-link-missing'))
+      expect(missingCreated.status).toBe(404)
+    }
+    finally {
+      fixture.cleanup()
+    }
+  })
+
+  it('rejects linkedIssueId for sessions without a workspace', async () => {
+    const fixture = await setupAssociationFixture()
+    const { app, issueA1 } = fixture
+    try {
+      const unboundRes = await createSession(app, {
+        id: 'session-unbound',
+        workspaceId: null,
+        title: 'Unbound session',
+        providerTargetId: 'provider-target-assoc',
+      })
+      expect(unboundRes.status).toBe(200)
+
+      const linkRes = await linkSession(app, 'session-unbound', issueA1.id)
+      expect(linkRes.status).toBe(409)
+      expect((await linkRes.json()).code).toBe('issue_workspace_mismatch')
+
+      const createRes = await createSession(app, {
+        id: 'session-unbound-link',
+        workspaceId: null,
+        title: 'Unbound linked session',
+        providerTargetId: 'provider-target-assoc',
+        linkedIssueId: issueA1.id,
+      })
+      expect(createRes.status).toBe(409)
+      expect((await createRes.json()).code).toBe('issue_workspace_mismatch')
+      const missingCreated = await app.handle(new Request('http://localhost/sessions/session-unbound-link'))
+      expect(missingCreated.status).toBe(404)
+    }
+    finally {
+      fixture.cleanup()
+    }
+  })
+
+  it('enforces the same invariant for session group create and update-with-link', async () => {
+    const fixture = await setupAssociationFixture()
+    const { app, issueA1, issueA2, issueB } = fixture
+    try {
+      const createRes = await app.handle(new Request('http://localhost/session-groups', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: 'workspace-assoc-a',
+          title: 'Linked group',
+          linkedIssueId: issueA1.id,
+        }),
+      }))
+      expect(createRes.status).toBe(200)
+      const group = await createRes.json() as { id: string, linkedIssueId: string | null }
+      expect(group.linkedIssueId).toBe(issueA1.id)
+
+      const crossCreateRes = await app.handle(new Request('http://localhost/session-groups', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: 'workspace-assoc-a',
+          title: 'Cross-workspace group',
+          linkedIssueId: issueB.id,
+        }),
+      }))
+      expect(crossCreateRes.status).toBe(409)
+      expect((await crossCreateRes.json()).code).toBe('issue_workspace_mismatch')
+      const listRes = await app.handle(new Request('http://localhost/session-groups?workspaceId=workspace-assoc-a'))
+      expect(await listRes.json()).toHaveLength(1)
+
+      const relinkRes = await app.handle(new Request(`http://localhost/session-groups/${group.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ linkedIssueId: issueA2.id }),
+      }))
+      expect(relinkRes.status).toBe(200)
+      const relinkBody = await relinkRes.json()
+      expect(relinkBody.association).toEqual({
+        participantKind: 'session-group',
+        participantId: group.id,
+        previousIssueId: issueA1.id,
+        nextIssueId: issueA2.id,
+      })
+      expect(relinkBody.group.linkedIssueId).toBe(issueA2.id)
+
+      const crossUpdateRes = await app.handle(new Request(`http://localhost/session-groups/${group.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ linkedIssueId: issueB.id }),
+      }))
+      expect(crossUpdateRes.status).toBe(409)
+      expect((await crossUpdateRes.json()).code).toBe('issue_workspace_mismatch')
+      const unchangedRes = await app.handle(new Request(`http://localhost/session-groups/${group.id}`))
+      expect((await unchangedRes.json()).linkedIssueId).toBe(issueA2.id)
+
+      const unlinkRes = await app.handle(new Request(`http://localhost/session-groups/${group.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ linkedIssueId: null }),
+      }))
+      expect(unlinkRes.status).toBe(200)
+      const unlinkBody = await unlinkRes.json()
+      expect(unlinkBody.association).toEqual({
+        participantKind: 'session-group',
+        participantId: group.id,
+        previousIssueId: issueA2.id,
+        nextIssueId: null,
+      })
+      expect(unlinkBody.group.linkedIssueId).toBeNull()
+
+      const renameRes = await app.handle(new Request(`http://localhost/session-groups/${group.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Renamed group' }),
+      }))
+      expect(renameRes.status).toBe(200)
+      expect((await renameRes.json()).association).toBeNull()
+
+      const missingIssueRes = await app.handle(new Request(`http://localhost/session-groups/${group.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ linkedIssueId: 'missing-issue' }),
+      }))
+      expect(missingIssueRes.status).toBe(404)
+      expect((await missingIssueRes.json()).code).toBe('issue_not_found')
+    }
+    finally {
+      fixture.cleanup()
+    }
+  })
+
+  it('lists linked session groups through the issue association reads', async () => {
+    const fixture = await setupAssociationFixture()
+    const { app, issueA1, issueB } = fixture
+    try {
+      const createRes = await app.handle(new Request('http://localhost/session-groups', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId: 'workspace-assoc-a',
+          title: 'Linked group',
+          linkedIssueId: issueA1.id,
+        }),
+      }))
+      const group = await createRes.json() as { id: string }
+
+      const linkedGroupsRes = await app.handle(new Request(`http://localhost/issues/${encodeURIComponent(issueA1.id)}/session-groups`))
+      expect(linkedGroupsRes.status).toBe(200)
+      expect(await linkedGroupsRes.json()).toEqual([
+        expect.objectContaining({ id: group.id, linkedIssueId: issueA1.id }),
+      ])
+
+      const otherIssueGroupsRes = await app.handle(new Request(`http://localhost/issues/${encodeURIComponent(issueB.id)}/session-groups`))
+      expect(otherIssueGroupsRes.status).toBe(200)
+      expect(await otherIssueGroupsRes.json()).toEqual([])
+    }
+    finally {
+      fixture.cleanup()
+    }
+  })
+})

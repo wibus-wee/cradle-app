@@ -77,7 +77,8 @@ import * as Health from './modules/health/service'
 import { imageOcr } from './modules/image-ocr'
 import { createOcrModelManagedResourceAdapter } from './modules/image-ocr/managed-resource-adapter'
 import { OcrModelInstallationService } from './modules/image-ocr/model-installation'
-import { issue } from './modules/issue'
+import { issue, issueExecutionAssociation } from './modules/issue'
+import * as IssueAssociation from './modules/issue/execution-association'
 import { issueAgent } from './modules/issue-agent'
 import { javascriptEval } from './modules/javascript-eval'
 import { kanban } from './modules/kanban'
@@ -107,9 +108,11 @@ import { getFabricNodeLinkManager } from './modules/relay-transport/node-link-ma
 import { search } from './modules/search'
 import { secrets } from './modules/secrets'
 import { session } from './modules/session'
+import { registerLinkedIssueValidator as registerSessionLinkedIssueValidator } from './modules/session/issue-association'
 import * as Session from './modules/session/service'
 import { sessionAwait } from './modules/session-await'
 import { sessionGroup } from './modules/session-group'
+import { registerLinkedIssueValidator as registerSessionGroupLinkedIssueValidator } from './modules/session-group/service'
 import { skills } from './modules/skills'
 import { storage } from './modules/storage'
 import { registerStorageMaintenance } from './modules/storage/maintenance'
@@ -204,6 +207,10 @@ export async function createServerContractApp(options: CreateServerContractAppOp
     },
   })
   Session.registerSessionDeletingHandler(TurnCheckpoint.prepareSessionDeletion)
+  // Issue owns the execution-association workspace invariant; participants
+  // expose narrow gates so Session/Session Group never import Issue.
+  registerSessionLinkedIssueValidator(IssueAssociation.assertSessionLinkedIssue)
+  registerSessionGroupLinkedIssueValidator(IssueAssociation.assertSessionGroupLinkedIssue)
   const { includeRuntimeHttpPlugins = false } = options
   const downloadCenter = createDownloadCenterModule(options.downloadCenterService)
   const chronicle = createChronicleModule(downloadCenter.service)
@@ -308,6 +315,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   app.use(sessionAwait)
   app.use(javascriptEval)
   app.use(issue)
+  app.use(issueExecutionAssociation)
   app.use(imageOcr)
   app.use(kanban)
   app.use(linkPreview)

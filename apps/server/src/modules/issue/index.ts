@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { resolveActorContext } from '../../http/actor-context'
 import * as Worktree from '../worktree/service'
+import * as ExecutionAssociation from './execution-association'
 import { IssueModel } from './model'
 import * as Issue from './service'
 
@@ -315,4 +316,49 @@ export const issue = new Elysia({
     },
     params: IssueModel.contextRefIndexParams,
     response: { 200: IssueModel.issue },
+  })
+
+/**
+ * Issue-owned Issue–execution association endpoints. They live under the
+ * `/sessions` prefix for contract stability, but the workflow, the shared
+ * workspace invariant, and the transition response are Issue-owned; Session
+ * only exposes narrow read/write commands for its own `linkedIssueId` column.
+ */
+export const issueExecutionAssociation = new Elysia({
+  prefix: '/sessions',
+  detail: { tags: ['session'] },
+})
+  .get('/:id/linked-issue', ({ params }) => ExecutionAssociation.getSessionLinkedIssue(params.id), {
+    detail: {
+      'summary': 'Get linked issue',
+      'x-cradle-cli': {
+        command: ['session', 'linked-issue', 'get'],
+        defaultChatSessionId: true,
+      },
+    },
+    params: IssueModel.idParams,
+    response: { 200: IssueModel.linkedIssueResponse },
+  })
+  .post('/:id/linked-issue', ({ params, body }) => ExecutionAssociation.linkIssueToSession(params.id, body.issueId), {
+    detail: {
+      'summary': 'Link issue to session',
+      'x-cradle-cli': {
+        command: ['session', 'linked-issue', 'link'],
+        defaultChatSessionId: true,
+      },
+    },
+    params: IssueModel.idParams,
+    body: IssueModel.linkIssueBody,
+    response: { 200: IssueModel.executionAssociationTransition },
+  })
+  .delete('/:id/linked-issue', ({ params }) => ExecutionAssociation.unlinkIssueFromSession(params.id), {
+    detail: {
+      'summary': 'Unlink issue from session',
+      'x-cradle-cli': {
+        command: ['session', 'linked-issue', 'unlink'],
+        defaultChatSessionId: true,
+      },
+    },
+    params: IssueModel.idParams,
+    response: { 200: IssueModel.executionAssociationTransition },
   })

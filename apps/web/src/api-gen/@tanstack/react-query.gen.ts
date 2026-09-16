@@ -3900,58 +3900,6 @@ export const getSessionsByIdExportZipOptions = (options: Options<GetSessionsById
 });
 
 /**
- * Unlink issue from session
- */
-export const deleteSessionsByIdLinkedIssueMutation = (options?: Partial<Options<DeleteSessionsByIdLinkedIssueData>>): UseMutationOptions<DeleteSessionsByIdLinkedIssueResponse, DefaultError, Options<DeleteSessionsByIdLinkedIssueData>> => {
-    const mutationOptions: UseMutationOptions<DeleteSessionsByIdLinkedIssueResponse, DefaultError, Options<DeleteSessionsByIdLinkedIssueData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await deleteSessionsByIdLinkedIssue({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-export const getSessionsByIdLinkedIssueQueryKey = (options: Options<GetSessionsByIdLinkedIssueData>) => createQueryKey('getSessionsByIdLinkedIssue', options);
-
-/**
- * Get linked issue
- */
-export const getSessionsByIdLinkedIssueOptions = (options: Options<GetSessionsByIdLinkedIssueData>) => queryOptions<GetSessionsByIdLinkedIssueResponse, DefaultError, GetSessionsByIdLinkedIssueResponse, ReturnType<typeof getSessionsByIdLinkedIssueQueryKey>>({
-    queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getSessionsByIdLinkedIssue({
-            ...options,
-            ...queryKey[0],
-            signal,
-            throwOnError: true
-        });
-        return data;
-    },
-    queryKey: getSessionsByIdLinkedIssueQueryKey(options)
-});
-
-/**
- * Link issue to session
- */
-export const postSessionsByIdLinkedIssueMutation = (options?: Partial<Options<PostSessionsByIdLinkedIssueData>>): UseMutationOptions<PostSessionsByIdLinkedIssueResponse, DefaultError, Options<PostSessionsByIdLinkedIssueData>> => {
-    const mutationOptions: UseMutationOptions<PostSessionsByIdLinkedIssueResponse, DefaultError, Options<PostSessionsByIdLinkedIssueData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await postSessionsByIdLinkedIssue({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-/**
  * Start session isolation
  */
 export const postSessionsByIdIsolationStartMutation = (options?: Partial<Options<PostSessionsByIdIsolationStartData>>): UseMutationOptions<PostSessionsByIdIsolationStartResponse, DefaultError, Options<PostSessionsByIdIsolationStartData>> => {
@@ -5698,6 +5646,58 @@ export const deleteIssuesByIdContextRefsByIndexMutation = (options?: Partial<Opt
     const mutationOptions: UseMutationOptions<DeleteIssuesByIdContextRefsByIndexResponse, DefaultError, Options<DeleteIssuesByIdContextRefsByIndexData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await deleteIssuesByIdContextRefsByIndex({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Unlink issue from session
+ */
+export const deleteSessionsByIdLinkedIssueMutation = (options?: Partial<Options<DeleteSessionsByIdLinkedIssueData>>): UseMutationOptions<DeleteSessionsByIdLinkedIssueResponse, DefaultError, Options<DeleteSessionsByIdLinkedIssueData>> => {
+    const mutationOptions: UseMutationOptions<DeleteSessionsByIdLinkedIssueResponse, DefaultError, Options<DeleteSessionsByIdLinkedIssueData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteSessionsByIdLinkedIssue({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getSessionsByIdLinkedIssueQueryKey = (options: Options<GetSessionsByIdLinkedIssueData>) => createQueryKey('getSessionsByIdLinkedIssue', options);
+
+/**
+ * Get linked issue
+ */
+export const getSessionsByIdLinkedIssueOptions = (options: Options<GetSessionsByIdLinkedIssueData>) => queryOptions<GetSessionsByIdLinkedIssueResponse, DefaultError, GetSessionsByIdLinkedIssueResponse, ReturnType<typeof getSessionsByIdLinkedIssueQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getSessionsByIdLinkedIssue({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getSessionsByIdLinkedIssueQueryKey(options)
+});
+
+/**
+ * Link issue to session
+ */
+export const postSessionsByIdLinkedIssueMutation = (options?: Partial<Options<PostSessionsByIdLinkedIssueData>>): UseMutationOptions<PostSessionsByIdLinkedIssueResponse, DefaultError, Options<PostSessionsByIdLinkedIssueData>> => {
+    const mutationOptions: UseMutationOptions<PostSessionsByIdLinkedIssueResponse, DefaultError, Options<PostSessionsByIdLinkedIssueData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await postSessionsByIdLinkedIssue({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

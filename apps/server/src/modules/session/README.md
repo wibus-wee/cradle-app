@@ -5,6 +5,7 @@ Session owns CRUD, pin toggle, soft archive/restore, markdown export, and sessio
 | Area | Owner | Responsibility |
 | --- | --- | --- |
 | Session state | [`service.ts`](./service.ts) | Owns CRUD, archive lifecycle, titles, origin, read state, and execution projections returned by list/get. |
+| Issue association seam | [`issue-association.ts`](./issue-association.ts) | Owns reads/writes of `sessions.linkedIssueId` plus the `assertLinkedIssue` gate the composition root wires to the Issue-owned invariant; Session never imports Issue implementation. |
 | HTTP contract | [`index.ts`](./index.ts), [`model.ts`](./model.ts) | Defines Session routes, pagination, mutation schemas, and generated-client response shapes. |
 | Fabric projection | [`node-projection.ts`](./node-projection.ts) | Maps a controller-local Session id to an authoritative Session on another Node and reconciles mounted Workspace sessions. |
 | Chat traffic | [`linked-session-proxy.ts`](../chat-runtime/http/linked-session-proxy.ts) | Rewrites linked Session paths and forwards all Session-scoped Chat Runtime traffic to the target Node. |
@@ -59,6 +60,11 @@ composer loads that remote catalog and forwards the selected remote
 local projection create call. The target server validates and stores the binding;
 the local projection row keeps `providerTargetId` null so it does not claim a
 foreign provider namespace.
+
+Issue association on a projected Session is likewise local-only: `linkedIssueId`
+is a top-level projection input validated through the Issue-owned
+`assertLinkedIssue` gate against the local workspace identity, and is never read
+from or forwarded to the remote host.
 Provider-backed session creation resolves a stable agent persona and stores `agentId`, so CLI calls carrying the session context can be attributed to an Agent identity.
 Session creation rejects disabled agents and provider-backed agents whose selected provider target is disabled, returning a conflict before any runtime launch is attempted.
 Agent-terminal session creation is driven by runtime session launch descriptors and must start from an agent with terminal launch configuration; provider-launched sessions continue to resolve provider targets through provider compatibility metadata.
@@ -68,6 +74,7 @@ Session-bound GitHub draft PR create/get/ready lives in the `pull-request` modul
 
 ## Files
 
-- **index.ts**: Elysia route surface for CRUD, archive/restore, read/unread cursor updates, export, and linked-issue helpers.
+- **index.ts**: Elysia route surface for CRUD, archive/restore, read/unread cursor updates, and export. The `/sessions/:id/linked-issue` routes live in the Issue module's `issueExecutionAssociation` plugin — they keep the stable Session URL prefix while the association workflow and workspace invariant stay Issue-owned.
 - **model.ts**: Session HTTP params/body/response schemas, including side chat parent/source response fields, coarse `origin` filtering, the list/get `status` and read-state projections, and provider/model/thinking patch fields.
 - **service.ts**: Module semantics (CRUD + archive + export + lifecycle hooks), session-owned origin persistence and filtering, session-owned side chat relationship persistence, session-owned provider/model/thinking updates, read-only run and Codex active-goal status projection, read cursor persistence, no-project chat workspace binding, provider-backed default agent binding and launchability checks, session-owned title updates, archive hooks, and session-owned delete hooks.
+- **issue-association.ts**: Session-owned seam for the Issue–execution association — `readIssueAssociationState`, `writeLinkedIssue` (the only write path for `sessions.linkedIssueId`), and the `registerLinkedIssueValidator`/`assertLinkedIssue` port that fails closed until the composition root registers the Issue-owned validator. Every non-null link (create-with-link, direct link/relink, node-projection attach) passes through this gate before any write, so a rejected association is atomic and preserves prior state.

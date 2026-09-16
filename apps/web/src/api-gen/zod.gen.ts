@@ -1486,22 +1486,6 @@ export const zGetSessionsByIdExportZipPath = z.object({
     id: z.string().min(1)
 });
 
-export const zDeleteSessionsByIdLinkedIssuePath = z.object({
-    id: z.string().min(1)
-});
-
-export const zGetSessionsByIdLinkedIssuePath = z.object({
-    id: z.string().min(1)
-});
-
-export const zPostSessionsByIdLinkedIssueBody = z.object({
-    issueId: z.string().min(1)
-});
-
-export const zPostSessionsByIdLinkedIssuePath = z.object({
-    id: z.string().min(1)
-});
-
 export const zPostSessionsByIdIsolationStartBody = z.object({
     slug: z.string().min(1).optional()
 });
@@ -2238,6 +2222,22 @@ export const zPostIssuesByIdContextRefsPath = z.object({
 export const zDeleteIssuesByIdContextRefsByIndexPath = z.object({
     id: z.string().min(1),
     index: z.string()
+});
+
+export const zDeleteSessionsByIdLinkedIssuePath = z.object({
+    id: z.string().min(1)
+});
+
+export const zGetSessionsByIdLinkedIssuePath = z.object({
+    id: z.string().min(1)
+});
+
+export const zPostSessionsByIdLinkedIssueBody = z.object({
+    issueId: z.string().min(1)
+});
+
+export const zPostSessionsByIdLinkedIssuePath = z.object({
+    id: z.string().min(1)
 });
 
 export const zPostImageOcrRecognizeBody = z.object({

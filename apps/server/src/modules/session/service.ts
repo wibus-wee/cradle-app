@@ -63,6 +63,7 @@ import {
 } from '../worktree/service'
 import type { SessionArchive } from './export-archive'
 import { sessionArchiveFileName, threadExportBlockedReason } from './export-archive'
+import { assertLinkedIssue } from './issue-association'
 import type { SessionExecutionTarget } from './node-projection'
 import {
   createNodeProjectedSession,
@@ -941,6 +942,11 @@ export async function create(input: {
 }): Promise<SessionView> {
   const parsed = SessionCreateInputSchema.parse(input)
   const workspaceId = resolveSessionWorkspaceId(parsed)
+  // The Issue-owned workspace invariant runs before any local insert or
+  // upstream effect so a rejected association never leaves a partial Session.
+  if (parsed.linkedIssueId) {
+    assertLinkedIssue({ issueId: parsed.linkedIssueId, workspaceId })
+  }
   if (workspaceId) {
     const workspace = Workspace.get(workspaceId)
     if (workspace && !isLocalWorkspaceLocator(workspace.locator)) {
