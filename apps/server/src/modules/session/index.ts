@@ -1,7 +1,6 @@
 import { Elysia, t } from 'elysia'
 
 import { AppError } from '../../errors/app-error'
-import * as Issue from '../issue/service'
 import { WorktreeModel } from '../worktree/model'
 import * as Worktree from '../worktree/service'
 import { sessionArchiveChunks } from './export-archive'
@@ -220,40 +219,9 @@ export const session = new Elysia({
   })
 
   // ── linked issue ──
-  .get('/:id/linked-issue', ({ params }) => Issue.getLinkedIssue(params.id), {
-    detail: {
-      'summary': 'Get linked issue',
-      'x-cradle-cli': {
-        command: ['session', 'linked-issue', 'get'],
-        defaultChatSessionId: true,
-      },
-    },
-    params: SessionModel.idParams,
-    response: { 200: t.Object({ issueId: t.Nullable(t.String()) }) },
-  })
-  .post('/:id/linked-issue', ({ params, body }) => Issue.linkIssue(params.id, body.issueId), {
-    detail: {
-      'summary': 'Link issue to session',
-      'x-cradle-cli': {
-        command: ['session', 'linked-issue', 'link'],
-        defaultChatSessionId: true,
-      },
-    },
-    params: SessionModel.idParams,
-    body: t.Object({ issueId: t.String({ minLength: 1 }) }),
-    response: { 200: t.Object({ ok: t.Literal(true) }) },
-  })
-  .delete('/:id/linked-issue', ({ params }) => Issue.unlinkIssue(params.id), {
-    detail: {
-      'summary': 'Unlink issue from session',
-      'x-cradle-cli': {
-        command: ['session', 'linked-issue', 'unlink'],
-        defaultChatSessionId: true,
-      },
-    },
-    params: SessionModel.idParams,
-    response: { 200: t.Object({ ok: t.Literal(true) }) },
-  })
+  // Association semantics are owned by the Issue module; the
+  // `/sessions/:id/linked-issue` routes live in the issue-owned
+  // `issueExecutionAssociation` plugin (see modules/issue).
   .post('/:id/isolation/start', async ({ params, body }) => {
     return await Worktree.startSessionIsolation({
       sessionId: params.id,

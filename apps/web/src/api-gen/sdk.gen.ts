@@ -3201,49 +3201,6 @@ export const getSessionsByIdExportZip = <ThrowOnError extends boolean = false>(o
 });
 
 /**
- * Unlink issue from session
- */
-export const deleteSessionsByIdLinkedIssue = <ThrowOnError extends boolean = false>(options: Options<DeleteSessionsByIdLinkedIssueData, ThrowOnError>): RequestResult<DeleteSessionsByIdLinkedIssueResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteSessionsByIdLinkedIssueResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zDeleteSessionsByIdLinkedIssuePath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/sessions/{id}/linked-issue',
-    ...options
-});
-
-/**
- * Get linked issue
- */
-export const getSessionsByIdLinkedIssue = <ThrowOnError extends boolean = false>(options: Options<GetSessionsByIdLinkedIssueData, ThrowOnError>): RequestResult<GetSessionsByIdLinkedIssueResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetSessionsByIdLinkedIssueResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: z.never().optional(),
-        path: zGetSessionsByIdLinkedIssuePath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/sessions/{id}/linked-issue',
-    ...options
-});
-
-/**
- * Link issue to session
- */
-export const postSessionsByIdLinkedIssue = <ThrowOnError extends boolean = false>(options: Options<PostSessionsByIdLinkedIssueData, ThrowOnError>): RequestResult<PostSessionsByIdLinkedIssueResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostSessionsByIdLinkedIssueResponses, unknown, ThrowOnError>({
-    requestValidator: async (data) => await z.object({
-        body: zPostSessionsByIdLinkedIssueBody,
-        path: zPostSessionsByIdLinkedIssuePath,
-        query: z.never().optional()
-    }).parseAsync(data),
-    url: '/sessions/{id}/linked-issue',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
  * Start session isolation
  */
 export const postSessionsByIdIsolationStart = <ThrowOnError extends boolean = false>(options: Options<PostSessionsByIdIsolationStartData, ThrowOnError>): RequestResult<PostSessionsByIdIsolationStartResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostSessionsByIdIsolationStartResponses, unknown, ThrowOnError>({
@@ -4653,6 +4610,49 @@ export const deleteIssuesByIdContextRefsByIndex = <ThrowOnError extends boolean 
     }).parseAsync(data),
     url: '/issues/{id}/context-refs/{index}',
     ...options
+});
+
+/**
+ * Unlink issue from session
+ */
+export const deleteSessionsByIdLinkedIssue = <ThrowOnError extends boolean = false>(options: Options<DeleteSessionsByIdLinkedIssueData, ThrowOnError>): RequestResult<DeleteSessionsByIdLinkedIssueResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteSessionsByIdLinkedIssueResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zDeleteSessionsByIdLinkedIssuePath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/sessions/{id}/linked-issue',
+    ...options
+});
+
+/**
+ * Get linked issue
+ */
+export const getSessionsByIdLinkedIssue = <ThrowOnError extends boolean = false>(options: Options<GetSessionsByIdLinkedIssueData, ThrowOnError>): RequestResult<GetSessionsByIdLinkedIssueResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetSessionsByIdLinkedIssueResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: z.never().optional(),
+        path: zGetSessionsByIdLinkedIssuePath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/sessions/{id}/linked-issue',
+    ...options
+});
+
+/**
+ * Link issue to session
+ */
+export const postSessionsByIdLinkedIssue = <ThrowOnError extends boolean = false>(options: Options<PostSessionsByIdLinkedIssueData, ThrowOnError>): RequestResult<PostSessionsByIdLinkedIssueResponses, unknown, ThrowOnError> => (options.client ?? client).post<PostSessionsByIdLinkedIssueResponses, unknown, ThrowOnError>({
+    requestValidator: async (data) => await z.object({
+        body: zPostSessionsByIdLinkedIssueBody,
+        path: zPostSessionsByIdLinkedIssuePath,
+        query: z.never().optional()
+    }).parseAsync(data),
+    url: '/sessions/{id}/linked-issue',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

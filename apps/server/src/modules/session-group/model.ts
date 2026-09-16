@@ -16,6 +16,36 @@ const sessionMemberSummarySchema = t.Object({
   latestUserMessageAt: t.Nullable(t.Number()),
 })
 
+/**
+ * Issue–execution association transition produced when an update writes
+ * `linkedIssueId`. The shape matches `IssueModel.executionAssociationTransition`;
+ * it is declared here because Session Group owns its own wire contract and
+ * must not depend on Issue module internals.
+ */
+const sessionGroupAssociationTransitionSchema = t.Object({
+  participantKind: t.Literal('session-group'),
+  participantId: t.String(),
+  previousIssueId: t.Nullable(t.String()),
+  nextIssueId: t.Nullable(t.String()),
+})
+
+const sessionGroupDetailSchema = t.Object({
+  id: t.String(),
+  workspaceId: t.String(),
+  title: t.String(),
+  description: nullableString,
+  linkedIssueId: nullableString,
+  status: sessionGroupStatusSchema,
+  configJson: t.String(),
+  archivedAt: t.Nullable(t.Number()),
+  createdAt: t.Number(),
+  updatedAt: t.Number(),
+  sessionCount: t.Number(),
+  statusAggregate: aggregateStatusSchema,
+  latestActivityAt: t.Nullable(t.Number()),
+  sessions: t.Array(sessionMemberSummarySchema),
+})
+
 export const SessionGroupModel = {
   sessionGroup: t.Object({
     id: t.String(),
@@ -33,22 +63,7 @@ export const SessionGroupModel = {
     latestActivityAt: t.Nullable(t.Number()),
   }),
 
-  sessionGroupDetail: t.Object({
-    id: t.String(),
-    workspaceId: t.String(),
-    title: t.String(),
-    description: nullableString,
-    linkedIssueId: nullableString,
-    status: sessionGroupStatusSchema,
-    configJson: t.String(),
-    archivedAt: t.Nullable(t.Number()),
-    createdAt: t.Number(),
-    updatedAt: t.Number(),
-    sessionCount: t.Number(),
-    statusAggregate: aggregateStatusSchema,
-    latestActivityAt: t.Nullable(t.Number()),
-    sessions: t.Array(sessionMemberSummarySchema),
-  }),
+  sessionGroupDetail: sessionGroupDetailSchema,
 
   createBody: t.Object({
     workspaceId: t.String({ minLength: 1 }),
@@ -63,6 +78,11 @@ export const SessionGroupModel = {
     description: t.Optional(nullableRequiredString),
     linkedIssueId: t.Optional(nullableRequiredString),
     archived: t.Optional(t.Boolean()),
+  }),
+
+  updateResponse: t.Object({
+    group: sessionGroupDetailSchema,
+    association: t.Union([sessionGroupAssociationTransitionSchema, t.Null()]),
   }),
 
   addMembersBody: t.Object({

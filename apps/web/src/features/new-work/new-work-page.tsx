@@ -13,6 +13,7 @@ import { DraftChatComposerWithState } from '~/features/chat/composer/containers/
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { useComposerState } from '~/features/composer-toolbar'
 import { useGitBranches } from '~/features/git/shared/use-git'
+import { reconcileIssueExecutionAssociation } from '~/features/kanban/use-issue-execution-association'
 import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
 import { refreshSessionLists } from '~/features/session/api/session-projection'
 import { isLocalWorkspace, isWorkEligibleWorkspace } from '~/features/workspace/types'
@@ -160,6 +161,16 @@ export function NewWorkPage() {
 
     const detail = result.data
     trackProductTaskFinished(analyticsTask, 'success')
+    // Create-with-link attached the Issue association on the server;
+    // reconcile participant + Issue projections through the shared path.
+    if (detail.primaryThread.linkedIssueId) {
+      void reconcileIssueExecutionAssociation(queryClient, {
+        participantKind: 'session',
+        participantId: detail.primaryThread.id,
+        previousIssueId: null,
+        nextIssueId: detail.primaryThread.linkedIssueId,
+      })
+    }
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
       refreshSessionLists(queryClient),

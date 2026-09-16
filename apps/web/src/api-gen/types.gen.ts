@@ -7816,68 +7816,6 @@ export type GetSessionsByIdExportZipData = {
     url: '/sessions/{id}/export/zip';
 };
 
-export type DeleteSessionsByIdLinkedIssueData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/linked-issue';
-};
-
-export type DeleteSessionsByIdLinkedIssueResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type DeleteSessionsByIdLinkedIssueResponse = DeleteSessionsByIdLinkedIssueResponses[keyof DeleteSessionsByIdLinkedIssueResponses];
-
-export type GetSessionsByIdLinkedIssueData = {
-    body?: never;
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/linked-issue';
-};
-
-export type GetSessionsByIdLinkedIssueResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        issueId: string | null;
-    };
-};
-
-export type GetSessionsByIdLinkedIssueResponse = GetSessionsByIdLinkedIssueResponses[keyof GetSessionsByIdLinkedIssueResponses];
-
-export type PostSessionsByIdLinkedIssueData = {
-    body: {
-        issueId: string;
-    };
-    path: {
-        id: string;
-    };
-    query?: never;
-    url: '/sessions/{id}/linked-issue';
-};
-
-export type PostSessionsByIdLinkedIssueResponses = {
-    /**
-     * Response for status 200
-     */
-    200: {
-        ok: boolean;
-    };
-};
-
-export type PostSessionsByIdLinkedIssueResponse = PostSessionsByIdLinkedIssueResponses[keyof PostSessionsByIdLinkedIssueResponses];
-
 export type PostSessionsByIdIsolationStartData = {
     body: {
         slug?: string;
@@ -10198,25 +10136,33 @@ export type PatchSessionGroupsByIdResponses = {
      * Response for status 200
      */
     200: {
-        id: string;
-        workspaceId: string;
-        title: string;
-        description: string | null;
-        linkedIssueId: string | null;
-        status: 'active' | 'archived';
-        configJson: string;
-        archivedAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-        sessionCount: number;
-        statusAggregate: 'idle' | 'streaming' | 'error';
-        latestActivityAt: number | null;
-        sessions: Array<{
+        group: {
             id: string;
-            title: string | null;
-            status: 'idle' | 'streaming' | 'error';
-            latestUserMessageAt: number | null;
-        }>;
+            workspaceId: string;
+            title: string;
+            description: string | null;
+            linkedIssueId: string | null;
+            status: 'active' | 'archived';
+            configJson: string;
+            archivedAt: number | null;
+            createdAt: number;
+            updatedAt: number;
+            sessionCount: number;
+            statusAggregate: 'idle' | 'streaming' | 'error';
+            latestActivityAt: number | null;
+            sessions: Array<{
+                id: string;
+                title: string | null;
+                status: 'idle' | 'streaming' | 'error';
+                latestUserMessageAt: number | null;
+            }>;
+        };
+        association: {
+            participantKind: 'session-group';
+            participantId: string;
+            previousIssueId: string | null;
+            nextIssueId: string | null;
+        } | null;
     };
 };
 
@@ -11875,6 +11821,74 @@ export type DeleteIssuesByIdContextRefsByIndexResponses = {
 };
 
 export type DeleteIssuesByIdContextRefsByIndexResponse = DeleteIssuesByIdContextRefsByIndexResponses[keyof DeleteIssuesByIdContextRefsByIndexResponses];
+
+export type DeleteSessionsByIdLinkedIssueData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/linked-issue';
+};
+
+export type DeleteSessionsByIdLinkedIssueResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        participantKind: 'session' | 'session-group';
+        participantId: string;
+        previousIssueId: string | null;
+        nextIssueId: string | null;
+    };
+};
+
+export type DeleteSessionsByIdLinkedIssueResponse = DeleteSessionsByIdLinkedIssueResponses[keyof DeleteSessionsByIdLinkedIssueResponses];
+
+export type GetSessionsByIdLinkedIssueData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/linked-issue';
+};
+
+export type GetSessionsByIdLinkedIssueResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        issueId: string | null;
+    };
+};
+
+export type GetSessionsByIdLinkedIssueResponse = GetSessionsByIdLinkedIssueResponses[keyof GetSessionsByIdLinkedIssueResponses];
+
+export type PostSessionsByIdLinkedIssueData = {
+    body: {
+        issueId: string;
+    };
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/sessions/{id}/linked-issue';
+};
+
+export type PostSessionsByIdLinkedIssueResponses = {
+    /**
+     * Response for status 200
+     */
+    200: {
+        participantKind: 'session' | 'session-group';
+        participantId: string;
+        previousIssueId: string | null;
+        nextIssueId: string | null;
+    };
+};
+
+export type PostSessionsByIdLinkedIssueResponse = PostSessionsByIdLinkedIssueResponses[keyof PostSessionsByIdLinkedIssueResponses];
 
 export type PostImageOcrRecognizeData = {
     body: {

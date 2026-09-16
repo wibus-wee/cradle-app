@@ -374,6 +374,19 @@ export const IssueModel = {
     issueId: t.String({ minLength: 1 }),
   }),
 
+  /**
+   * Compact transition returned by Issue–execution association mutations so
+   * callers can reconcile previous and next Issue projections without
+   * scanning caches. Session Group update responses carry the same shape
+   * through `SessionGroupModel` because that module owns its wire contract.
+   */
+  executionAssociationTransition: t.Object({
+    participantKind: t.Union([t.Literal('session'), t.Literal('session-group')]),
+    participantId: t.String(),
+    previousIssueId: t.Nullable(t.String()),
+    nextIssueId: t.Nullable(t.String()),
+  }),
+
   listIssuesQuery: t.Object({
     workspaceId: t.Optional(t.String({ minLength: 1 })),
     milestoneId: t.Optional(t.String()),

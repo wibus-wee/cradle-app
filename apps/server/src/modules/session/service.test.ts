@@ -1,11 +1,16 @@
-import { backendRuns, backendSessionBindings, messages, nodeSessionLinks, sessions, workspaces } from '@cradle/db'
-import { afterEach, describe, expect, it } from 'vitest'
+import { backendRuns, backendSessionBindings, issues, messages, nodeSessionLinks, providerTargets, sessions, workspaces } from '@cradle/db'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { insertMessageFixtures } from '../../../tests/helpers/message-fixture'
+import { localWorkspaceLocatorJson } from '../../../tests/helpers/workspace-fixture'
 import { db } from '../../infra'
 import { toOpenCodeRuntimeNativeProviderTargetId } from '../chat-runtime-providers/opencode/native-provider-target-id'
+import * as IssueAssociation from '../issue/execution-association'
+import * as Issue from '../issue/service'
+import * as SessionIssueAssociation from './issue-association'
 import {
   aggregateSessionStatus,
+  create,
   get,
   list,
   markRead,
@@ -300,5 +305,152 @@ describe('session list activity and status projection', () => {
     expect(third.items).toHaveLength(5)
     expect(third.nextCursor).toBeNull()
     expect(new Set([...first.items, ...second.items, ...third.items].map(row => row.id)).size).toBe(205)
+  })
+})
+
+describe('session issue association', () => {
+  const WORKSPACE_A = 'ws-issue-assoc-a'
+  const WORKSPACE_B = 'ws-issue-assoc-b'
+
+  beforeEach(() => {
+    // Register the Issue-owned invariant validator — the same gate the
+    // composition root wires in app.ts.
+    SessionIssueAssociation.registerLinkedIssueValidator(IssueAssociation.assertSessionLinkedIssue)
+    db().insert(workspaces).values([
+      {
+        id: WORKSPACE_A,
+        name: 'Assoc A',
+        locatorJson: localWorkspaceLocatorJson('/tmp/ws-assoc-a'),
+        identifier: 'WAA',
+      },
+      {
+        id: WORKSPACE_B,
+        name: 'Assoc B',
+        locatorJson: localWorkspaceLocatorJson('/tmp/ws-assoc-b'),
+        identifier: 'WBB',
+      },
+    ]).run()
+    db().insert(providerTargets).values({
+      id: 'provider-target-assoc',
+      kind: 'manual',
+      providerKind: 'openai-compatible',
+      displayName: 'Association Provider',
+    }).run()
+  })
+
+  afterEach(() => {
+    // Inner afterEach runs before the file-level cleanup; delete the session
+    // rows first so the providerTargets/issues deletes cannot hit FK guards.
+    db().delete(sessions).run()
+    db().delete(issues).run()
+    db().delete(providerTargets).run()
+  })
+
+  it('persists a linked issue on create when the workspace matches', async () => {
+    const issue = Issue.createIssue({ workspaceId: WORKSPACE_A, title: 'Linked issue' })
+
+    const session = await create({
+      id: 'session-linked-create',
+      workspaceId: WORKSPACE_A,
+      title: 'Linked session',
+      providerTargetId: 'provider-target-assoc',
+      linkedIssueId: issue.id,
+    })
+
+    expect(session.linkedIssueId).toBe(issue.id)
+    expect(SessionIssueAssociation.readIssueAssociationState(session.id)).toEqual({
+      sessionId: session.id,
+      workspaceId: WORKSPACE_A,
+      linkedIssueId: issue.id,
+    })
+  })
+
+  it('rejects create-with-link across workspaces without leaving a session row', async () => {
+    const otherIssue = Issue.createIssue({ workspaceId: WORKSPACE_B, title: 'Other workspace issue' })
+
+    await expect(create({
+      id: 'session-cross-link',
+      workspaceId: WORKSPACE_A,
+      title: 'Cross workspace link',
+      providerTargetId: 'provider-target-assoc',
+      linkedIssueId: otherIssue.id,
+    })).rejects.toThrowError(expect.objectContaining({
+      code: 'issue_workspace_mismatch',
+      status: 409,
+    }))
+    expect(get('session-cross-link')).toBeNull()
+  })
+
+  it('rejects create-with-link for sessions without a workspace', async () => {
+    const issue = Issue.createIssue({ workspaceId: WORKSPACE_A, title: 'Issue' })
+
+    await expect(create({
+      id: 'session-unbound-link',
+      workspaceId: null,
+      title: 'Unbound session',
+      providerTargetId: 'provider-target-assoc',
+      linkedIssueId: issue.id,
+    })).rejects.toThrowError(expect.objectContaining({
+      code: 'issue_workspace_mismatch',
+      status: 409,
+    }))
+    expect(get('session-unbound-link')).toBeNull()
+  })
+
+  it('rejects create-with-link when the issue does not exist', async () => {
+    await expect(create({
+      id: 'session-missing-issue',
+      workspaceId: WORKSPACE_A,
+      title: 'Missing issue link',
+      providerTargetId: 'provider-target-assoc',
+      linkedIssueId: 'missing-issue',
+    })).rejects.toThrowError(expect.objectContaining({
+      code: 'issue_not_found',
+      status: 404,
+    }))
+    expect(get('session-missing-issue')).toBeNull()
+  })
+
+  it('fails closed when no Issue validator is registered', async () => {
+    SessionIssueAssociation.registerLinkedIssueValidator(null)
+    const issue = Issue.createIssue({ workspaceId: WORKSPACE_A, title: 'Issue' })
+
+    await expect(create({
+      id: 'session-no-gate',
+      workspaceId: WORKSPACE_A,
+      title: 'No gate session',
+      providerTargetId: 'provider-target-assoc',
+      linkedIssueId: issue.id,
+    })).rejects.toThrowError(expect.objectContaining({
+      code: 'issue_link_validation_unavailable',
+      status: 500,
+    }))
+    expect(get('session-no-gate')).toBeNull()
+  })
+
+  it('exposes narrow read/write commands for the association column', async () => {
+    const issue = Issue.createIssue({ workspaceId: WORKSPACE_A, title: 'Issue' })
+    const session = await create({
+      id: 'session-commands',
+      workspaceId: WORKSPACE_A,
+      title: 'Command target',
+      providerTargetId: 'provider-target-assoc',
+    })
+
+    expect(SessionIssueAssociation.readIssueAssociationState(session.id)).toEqual({
+      sessionId: session.id,
+      workspaceId: WORKSPACE_A,
+      linkedIssueId: null,
+    })
+
+    const next = SessionIssueAssociation.writeLinkedIssue({ sessionId: session.id, issueId: issue.id })
+    expect(next.linkedIssueId).toBe(issue.id)
+    expect(SessionIssueAssociation.readIssueAssociationState(session.id).linkedIssueId).toBe(issue.id)
+
+    SessionIssueAssociation.writeLinkedIssue({ sessionId: session.id, issueId: null })
+    expect(SessionIssueAssociation.readIssueAssociationState(session.id).linkedIssueId).toBeNull()
+
+    expect(() => SessionIssueAssociation.readIssueAssociationState('missing-session'))
+      .toThrowError(expect.objectContaining({ code: 'session_not_found', status: 404 }))
   })
 })

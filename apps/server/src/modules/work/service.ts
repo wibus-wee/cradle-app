@@ -16,6 +16,7 @@ import type { CreateRunResult } from '../chat-runtime/run/run-coordinator'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { buildWorkPullRequestBody } from '../pull-request/pr-body'
 import * as PullRequest from '../pull-request/service'
+import { assertLinkedIssue } from '../session/issue-association'
 import * as NodeSession from '../session/node-projection'
 import * as Session from '../session/service'
 import * as SessionAwait from '../session-await/service'
@@ -750,6 +751,11 @@ async function createNodeWork(
     linkedIssueId: _linkedIssueId,
     ...remoteInput
   } = input
+  // The Issue–execution workspace invariant is validated locally before any
+  // upstream effect; local Issue IDs are never forwarded to the remote host.
+  if (input.linkedIssueId) {
+    assertLinkedIssue({ issueId: input.linkedIssueId, workspaceId: input.workspaceId })
+  }
   const remote = await NodeWork.createRemoteWork(authority, remoteInput)
   const localWorkId = randomUUID()
   let localSessionId: string | null = null
@@ -759,6 +765,7 @@ async function createNodeWork(
       workspaceId: input.workspaceId,
       nodeId: authority.nodeId,
       remoteWorkspaceId: authority.remoteWorkspaceId,
+      linkedIssueId: input.linkedIssueId ?? null,
       remoteSession: remote.primaryThread,
       projectionKind: 'controller-created',
     }).localSessionId

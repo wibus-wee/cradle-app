@@ -23,6 +23,7 @@ import {
 import { executeOptimisticBangCommand } from '~/features/chat/session/optimistic-bang-command'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
 import { useComposerState } from '~/features/composer-toolbar'
+import { reconcileIssueExecutionAssociation } from '~/features/kanban/use-issue-execution-association'
 import type { IssueIsolationStartChoice } from '~/features/new-chat/issue-isolation-start-dialog'
 import { IssueIsolationStartDialog } from '~/features/new-chat/issue-isolation-start-dialog'
 import { resolveNodeDisplayName } from '~/features/nodes/node-grouping'
@@ -301,7 +302,7 @@ function useNewChatPageOwner(
         const { data: sessionData } = await postSessions({
           body,
         })
-        const session = sessionData as { id: string, workspaceId: string | null } | null
+        const session = sessionData as { id: string, workspaceId: string | null, linkedIssueId?: string | null } | null
         if (!session?.id) {
           return false
         }
@@ -319,6 +320,16 @@ function useNewChatPageOwner(
           runtimeKind: options.runtimeKind,
           sessionGroupId,
         })
+        // Create-with-link attached the Issue association on the server;
+        // reconcile participant + Issue projections through the shared path.
+        if (session.linkedIssueId) {
+          void reconcileIssueExecutionAssociation(queryClient, {
+            participantKind: 'session',
+            participantId: session.id,
+            previousIssueId: null,
+            nextIssueId: session.linkedIssueId,
+          })
+        }
         void Promise.all([
           refreshSessionLists(queryClient),
           queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
@@ -397,7 +408,7 @@ function useNewChatPageOwner(
       const { data: sessionData } = await postSessions({
         body,
       })
-      const session = sessionData as { id: string, workspaceId: string | null } | null
+      const session = sessionData as { id: string, workspaceId: string | null, linkedIssueId?: string | null } | null
       if (!session?.id) {
         return false
       }
@@ -417,6 +428,16 @@ function useNewChatPageOwner(
         runtimeKind: options.runtimeKind,
         sessionGroupId,
       })
+      // Create-with-link attached the Issue association on the server;
+      // reconcile participant + Issue projections through the shared path.
+      if (session.linkedIssueId) {
+        void reconcileIssueExecutionAssociation(queryClient, {
+          participantKind: 'session',
+          participantId: session.id,
+          previousIssueId: null,
+          nextIssueId: session.linkedIssueId,
+        })
+      }
       const bangCommand = files.length === 0 && contextParts.length === 0
         ? readBangCommand(text)
         : null
