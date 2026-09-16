@@ -15,7 +15,8 @@ import {
   resolveModelEnrichment,
   searchModelsInData,
 } from '../src/modules/model-registry/model-info-registry'
-import { getCachedModelsForTarget, setCachedModelsForTarget } from '../src/modules/provider-catalog/model-cache'
+import { setCachedModelsForTarget } from '../src/modules/provider-catalog/model-cache'
+import { queryProviderTargetModels } from '../src/modules/provider-catalog/target-model-query'
 import type { ModelDescriptor } from '../src/modules/provider-contracts/types'
 
 const MODELS_DEV_URL = 'https://models.dev/api.json'
@@ -644,12 +645,12 @@ describe('cache write/read re-enrichment cycle', () => {
       expect(storedModels[0].capabilities.family).toBeUndefined()
 
       // Read before mapping: gpt-4o should be exact, my-custom-model should be unmatched
-      const beforeMapping = await getCachedModelsForTarget({ id: targetId })
-      expect(beforeMapping).not.toBeNull()
-      const gpt4oBefore = beforeMapping!.models.find(m => m.id === 'gpt-4o')
+      const beforeMapping = await queryProviderTargetModels({ target: { id: targetId }, freshness: 'cached' })
+      expect(beforeMapping.cached).toBe(true)
+      const gpt4oBefore = beforeMapping.models.find(m => m.id === 'gpt-4o')
       expect(gpt4oBefore?.capabilities.registryMatch).toBe('exact')
       expect(gpt4oBefore?.capabilities.family).toBe('gpt-4')
-      const customBefore = beforeMapping!.models.find(m => m.id === 'my-custom-model')
+      const customBefore = beforeMapping.models.find(m => m.id === 'my-custom-model')
       expect(customBefore?.capabilities.registryMatch).toBe('unmatched')
 
       // Upsert a mapping: my-custom-model → gpt-4o
@@ -663,9 +664,9 @@ describe('cache write/read re-enrichment cycle', () => {
       }).run()
 
       // Read after mapping: my-custom-model should now reflect the mapping
-      const afterMapping = await getCachedModelsForTarget({ id: targetId })
-      expect(afterMapping).not.toBeNull()
-      const customAfter = afterMapping!.models.find(m => m.id === 'my-custom-model')
+      const afterMapping = await queryProviderTargetModels({ target: { id: targetId }, freshness: 'cached' })
+      expect(afterMapping.cached).toBe(true)
+      const customAfter = afterMapping.models.find(m => m.id === 'my-custom-model')
       expect(customAfter?.capabilities.registryMatch).toBe('alias')
       expect(customAfter?.capabilities.registryModelId).toBe('gpt-4o')
       expect(customAfter?.capabilities.family).toBe('gpt-4')
