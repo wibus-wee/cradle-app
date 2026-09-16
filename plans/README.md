@@ -199,6 +199,18 @@ age/credit/byte diagnostics、Renderer page/HMR 与 SSE/plugin cleanup，并用�
 reload 证明 broker、Server socket 与 Fabric stream 回到常量基线。Fabric 已有显式
 close 传播，先做 characterization test，失败才允许修改；Plan 077 保持 DONE。
 
+2026-09-16 在 commit `724fd83b` 上补充 Plan 079（P1/XL）：Desktop 发行包
+1.0 GB 中约 600 MB 是三块可按需下载的 payload —— Claude Code 平台二进制
+（302 MB，SDK optional dep）、Codex app-server + code-mode-host（226 MB，
+build 期 GitHub sync 进 Resources）、Light OCR 模型（70 MB，npm dep）。方案把
+三者全部迁到 Plan 047/056/057 已落地的 Managed Resources + Download Center
+轨道：先从 opencode `runtime-installation.ts` 抽出共享 versioned-installation
+primitive 放进 `packages/download-center`，再按 owner 逐个接入；Codex 标记
+`required`（onboarding 必需安装），在既有 env→PATH→CLI 解析链中间插入
+managed 槽位；Claude 通过 `pathToClaudeCodeExecutable` 指向 managed 二进
+制，optional。迁移后 .app 约 400 MB。
+不重开 bundled-runtime 兼容层，不为单一资源新增 installer HTTP 面。
+
 2026-08-02 补充 Plan 073：Cradle Platform Constitution — Jarvis as Agent Kind。
 **宪法/方向**文档（非实现计划）。核心定论：Jarvis 是窄义 Platform Kind（管家身份），不是聊天升级、不是 HiJarvis 品牌、不是第二调度器；默认 propose-before-act；诚实委托语义 + 工作账本 + Session 执行载体双中心；IRON LAW 升格为对所有 native 与 Kind 概念本身的宪法。竞争姿态是拒克隆 / niche 天花板，不是征服。人类决策：accept / amend / reject。不重开 Plan 061/062 的既定生命周期边界。
 
@@ -292,6 +304,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 076  | Replace point-to-point Remote Hosts with the Cradle Fabric | P0 | XL | 032, 033, 034 | IN PROGRESS — implementation essentially complete (relayd directory/membership/v3 links, server `modules/fabric/` + node projections, Nodes UI, legacy removal; two-node e2e spec landed via PR #185 and wired into CI) ; remaining: manual desktop smoke + plan doc reconciliation |
 | 077  | Bound every server stream producer behind one backpressure seam | P0 | M–L | — (composes with 054/071 recovery) | DONE (bounded primitive + watchdog + close-policy chat streams; HWM-0 deadlock fixed; ratchet in typecheck; codex app-server bridge also bounded (close policy + truncation error frame)) |
 | 078  | Fence Desktop Server fetches to renderer document lifetimes | P0 | M | 075 broker baseline | IN PROGRESS (implementation, focused gates, and isolated Electron ten-reload proof done; real-process restart/memory observation pending) |
+| 079  | Ship provider runtimes + OCR model as managed downloads, not bundled | P1 | XL | 047, 056, 057 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED (one-line rationale).
 
