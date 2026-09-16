@@ -1,7 +1,7 @@
 import type { ContextItem } from '~/features/context/context-items'
 import { estimateContextTokens } from '~/features/context/context-items'
 import type { ContextProvider } from '~/features/context/context-registry'
-import { readUnreadSessionIdsSnapshot } from '~/features/workspace/use-session'
+import { readUnreadSessionIdsSnapshot } from '~/features/session/api/session-projection'
 import { readActiveSurface } from '~/navigation/active-surface'
 import { useSurfaceStore } from '~/navigation/surface-store'
 import { chatSelectors, useChatStore } from '~/store/chat'

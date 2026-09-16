@@ -9,11 +9,11 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { shallow } from 'zustand/shallow'
 
+import { useAllSessions, useRunningSessionIds, useUnreadSessionIds } from '~/features/session/use-session'
 import { publishSurfaceDrag } from '~/features/split-view/dnd/surface-drag-stream'
 import { dropSurfaceRouteAtPoint } from '~/features/split-view/split-commands'
 import { usePreviewCard } from '~/features/workspace/preview-card/preview-card-context'
 import { PreviewCardProvider } from '~/features/workspace/preview-card/preview-card-provider'
-import { useAllSessions, useRunningSessionIds, useUnreadSessionIds } from '~/features/workspace/use-session'
 import { cn } from '~/lib/cn'
 import { nativeIpc, subscribePointerOutsideWindow } from '~/lib/electron'
 import { chatSelectors, useChatStore } from '~/store/chat'

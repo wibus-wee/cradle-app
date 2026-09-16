@@ -21,8 +21,8 @@ import {
   MenuPopup,
   MenuSeparator,
 } from '~/components/ui/menu'
+import type { WorkspaceSession } from '~/features/session/use-session'
 
-import type { WorkspaceSession } from './use-session'
 import type { WorkspaceSessionGroup } from './use-session-group'
 import type { WorkspaceSessionMenuAnchor } from './workspace-session-item-view'
 

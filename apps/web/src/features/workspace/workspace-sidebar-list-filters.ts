@@ -1,6 +1,6 @@
+import type { WorkspaceSession } from '~/features/session/use-session'
 import type { WorkSummary } from '~/features/work/use-work'
 
-import type { WorkspaceSession } from './use-session'
 import {
   hasUnreadWorkspaceSessionError,
   isWorkspaceSessionRunning,

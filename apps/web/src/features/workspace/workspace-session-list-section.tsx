@@ -8,10 +8,10 @@ import {
 
 import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
+import type { WorkspaceSession } from '~/features/session/use-session'
 import type { WorkSummary } from '~/features/work/use-work'
 
 import type { Workspace } from './types'
-import type { WorkspaceSession } from './use-session'
 import type {
   WorkspaceSessionItemMenuRequest,
 } from './workspace-session-item'

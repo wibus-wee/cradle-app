@@ -14,8 +14,8 @@ import type { ChatContextPart } from '~/features/chat/context/chat-context-parts
 import { useComposerState } from '~/features/composer-toolbar'
 import { useGitBranches } from '~/features/git/shared/use-git'
 import { trackProductTaskFinished, trackProductTaskStarted } from '~/features/product-analytics/client'
+import { refreshSessionLists } from '~/features/session/api/session-projection'
 import { isLocalWorkspace, isWorkEligibleWorkspace } from '~/features/workspace/types'
-import { sessionsQueryKey } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { apiErrorMessage } from '~/lib/api-error'
 import { openWork, openWorkspaceDiffs } from '~/navigation/navigation-commands'
@@ -162,8 +162,7 @@ export function NewWorkPage() {
     trackProductTaskFinished(analyticsTask, 'success')
     void Promise.all([
       queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey(selectedWorkspace.id) }),
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
+      refreshSessionLists(queryClient),
       queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
     ])
     openWork(detail.work.id, { replace: true })

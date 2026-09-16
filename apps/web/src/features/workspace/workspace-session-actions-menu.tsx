@@ -12,12 +12,17 @@ import {
   postWorksByIdArchive,
 } from '~/api-gen'
 import {
-  getSessionsByIdQueryKey,
   getWorksByIdQueryKey,
   getWorksQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { toastManager } from '~/components/ui/toast'
+import {
+  applySessionReadResult,
+  refreshSessionLists,
+  refreshSessionProjections,
+} from '~/features/session/api/session-projection'
 import { downloadSessionZip } from '~/features/session/download-session-zip'
+import type { WorkspaceSession } from '~/features/session/use-session'
 import type { WorkSummary } from '~/features/work/use-work'
 import { isElectron, nativeIpc } from '~/lib/electron'
 import {
@@ -32,11 +37,6 @@ import {
 } from '~/navigation/tearoff-surfaces'
 import { useTitleRegenerationStore } from '~/store/title-regeneration'
 
-import type { WorkspaceSession } from './use-session'
-import {
-  sessionsQueryKey,
-  updateSessionReadState,
-} from './use-session'
 import type { WorkspaceSessionGroup } from './use-session-group'
 import type {
   WorkspaceSessionActionsMenuState,
@@ -47,7 +47,6 @@ export interface WorkspaceSessionActionsMenuProps {
   state: WorkspaceSessionActionsMenuState
   session: WorkspaceSession | null
   work: WorkSummary | null
-  workspaceId: string
   sessionGroups: WorkspaceSessionGroup[]
   onOpenChange: (open: boolean) => void
   onPrepareSessionOpen: (session: WorkspaceSession) => void
@@ -99,7 +98,6 @@ export function WorkspaceSessionActionsMenu({
   state,
   session,
   work,
-  workspaceId,
   sessionGroups,
   onOpenChange,
   onPrepareSessionOpen,
@@ -117,13 +115,7 @@ export function WorkspaceSessionActionsMenu({
     }
 
     await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: sessionsQueryKey(workspaceId),
-      }),
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-      queryClient.invalidateQueries({
-        queryKey: getSessionsByIdQueryKey({ path: { id: session.id } }),
-      }),
+      refreshSessionProjections(queryClient, session.id),
       queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
       ...(work
         ? [queryClient.invalidateQueries({
@@ -131,7 +123,7 @@ export function WorkspaceSessionActionsMenu({
           })]
         : []),
     ])
-  }, [queryClient, session, work, workspaceId])
+  }, [queryClient, session, work])
 
   const openInSurface = useCallback(() => {
     if (!session) {
@@ -216,7 +208,7 @@ export function WorkspaceSessionActionsMenu({
       ? await postSessionsByIdRead({ path: { id: session.id } })
       : await postSessionsByIdUnread({ path: { id: session.id } })
     if (data) {
-      updateSessionReadState(queryClient, data)
+      applySessionReadResult(queryClient, data)
     }
   }, [queryClient, session])
 
@@ -229,13 +221,8 @@ export function WorkspaceSessionActionsMenu({
       path: { id: session.id },
       body: { pinned: !session.pinned },
     })
-    void Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: sessionsQueryKey(workspaceId),
-      }),
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-    ])
-  }, [queryClient, session, workspaceId])
+    void refreshSessionLists(queryClient)
+  }, [queryClient, session])
 
   const copyMarkdown = useCallback(async () => {
     if (!session) {

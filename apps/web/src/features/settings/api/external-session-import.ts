@@ -1,7 +1,6 @@
 export {
   getExternalSessionImportImportsOptions,
   getExternalSessionImportImportsQueryKey,
-  getSessionsQueryKey,
   getWorkspacesQueryKey,
   postExternalSessionImportImportsByImportIdSyncMutation,
   postExternalSessionImportImportsMutation,

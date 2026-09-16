@@ -6,12 +6,12 @@ import {
 } from 'react'
 
 import { Button } from '~/components/ui/button'
+import type { WorkspaceSession } from '~/features/session/use-session'
 
 import {
   workspaceSessionFixtures,
   workspaceSessionGroupFixtures,
 } from './fixtures/workspace-sidebar'
-import type { WorkspaceSession } from './use-session'
 import { WorkspaceSessionActionsMenuView } from './workspace-session-actions-menu-view'
 import type { WorkspaceSessionMenuAnchor } from './workspace-session-item-view'
 

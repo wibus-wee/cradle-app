@@ -9,9 +9,8 @@ import {
   postSessionGroupsMutation,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type { GetSessionGroupsResponse } from '~/api-gen/types.gen'
+import { refreshSessionLists } from '~/features/session/api/session-projection'
 import { queryRefreshPolicy } from '~/lib/query-refresh-policy'
-
-import { sessionsQueryKey } from './use-session'
 
 export type WorkspaceSessionGroup = GetSessionGroupsResponse[number]
 
@@ -42,8 +41,7 @@ function invalidateSessionGroupQueries(
   void Promise.all([
     queryClient.invalidateQueries({ queryKey: sessionGroupsQueryKey(workspaceId) }),
     queryClient.invalidateQueries({ queryKey: sessionGroupsQueryKey() }),
-    queryClient.invalidateQueries({ queryKey: sessionsQueryKey(workspaceId) }),
-    queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
+    refreshSessionLists(queryClient),
   ])
 }
 

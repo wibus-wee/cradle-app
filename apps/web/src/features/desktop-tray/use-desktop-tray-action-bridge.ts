@@ -2,11 +2,10 @@ import type { QueryClient } from '@tanstack/react-query'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect } from 'react'
 
-import { getChatSessionsBySessionIdMessagesQueryKey, getSessionsByIdQueryKey } from '~/api-gen/@tanstack/react-query.gen'
+import { getChatSessionsBySessionIdMessagesQueryKey } from '~/api-gen/@tanstack/react-query.gen'
 import { runtimeUiSlotStatesQueryKey } from '~/features/chat/capabilities/chat-capabilities'
 import { runtimeSettingsQueryKey } from '~/features/chat/commands/runtime-settings-command'
-import { runtimeSessionStatusQueryKey } from '~/features/chat/runtime/use-runtime-session-status'
-import { isSessionsQueryKey } from '~/features/workspace/use-session'
+import { refreshSessionProjections } from '~/features/session/api/session-projection'
 import { WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { usePluginStore } from '~/lib/plugin-store'
 import {
@@ -63,14 +62,9 @@ function refreshChatSessionQueries(queryClient: QueryClient, sessionId: string):
   void queryClient.invalidateQueries({
     queryKey: getChatSessionsBySessionIdMessagesQueryKey({ path: { sessionId } }),
   })
-  void queryClient.invalidateQueries({
-    queryKey: getSessionsByIdQueryKey({ path: { id: sessionId } }),
-  })
-  void queryClient.invalidateQueries({ queryKey: runtimeSessionStatusQueryKey(sessionId) })
-  void queryClient.invalidateQueries({ queryKey: ['chat', 'session-queue', sessionId] })
+  void refreshSessionProjections(queryClient, sessionId)
   void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(sessionId) })
   void queryClient.invalidateQueries({ queryKey: runtimeSettingsQueryKey(sessionId) })
-  void queryClient.invalidateQueries({ predicate: query => isSessionsQueryKey(query.queryKey) })
 }
 
 function openSettingsRouteSection(section: string): void {

@@ -4,7 +4,11 @@ import { useCallback, useRef } from 'react'
 
 import { toastManager } from '~/components/ui/toast'
 import { submitSideConversationMessage } from '~/features/browser/side-conversation-message'
-import { updateSessionInSessionLists } from '~/features/workspace/use-session'
+import {
+  projectSessionActivity,
+  refreshSessionProjections,
+  refreshSessionRuntimeStatus,
+} from '~/features/session/api/session-projection'
 import { useBrowserPanelStore } from '~/store/browser-panel'
 import { chatSelectors, useChatStore } from '~/store/chat'
 
@@ -16,7 +20,7 @@ import type { RuntimeSessionStatus } from '../commands/runtime-session-status-co
 import { runtimeSettingsQueryKey, updateSessionRuntimeSettings } from '../commands/runtime-settings-command'
 import type { ChatContextPart } from '../context/chat-context-parts'
 import { setCodexThreadGoal } from '../runtime/codex-app-server-bridge'
-import { runtimeSessionStatusQueryKey, runtimeSessionStatusQueryOptions } from '../runtime/use-runtime-session-status'
+import { runtimeSessionStatusQueryOptions } from '../runtime/use-runtime-session-status'
 import { startChatResponseStream } from '../transport/chat-stream-transport'
 import { ChatStreamingHandler } from '../transport/chat-streaming-handler'
 import { executeOptimisticBangCommand } from './optimistic-bang-command'
@@ -49,7 +53,6 @@ export function useChatActions(input: UseChatActionsInput) {
   const { chatSessionId, controls, runtimeStatus, supportsGoalCommand, supportsCodexGoalBridge } = input
   const {
     queryClient,
-    sessionBindingQueryKey,
     scheduleSnapshotRefresh,
     refreshSessionLists,
     refreshQueue,
@@ -147,7 +150,7 @@ export function useChatActions(input: UseChatActionsInput) {
     }
 
     if (bangCommand) {
-      updateSessionInSessionLists(queryClient, { id: chatSessionId }, { promote: true })
+      projectSessionActivity(queryClient, chatSessionId)
       await executeOptimisticBangCommand({
         sessionId: chatSessionId,
         command: bangCommand,
@@ -170,7 +173,7 @@ export function useChatActions(input: UseChatActionsInput) {
         contextParts,
         supportsGoalCommand,
       }))
-      updateSessionInSessionLists(queryClient, { id: chatSessionId }, { promote: true })
+      projectSessionActivity(queryClient, chatSessionId)
 
       const assistantMessageId = `assistant-${Date.now()}`
       const controller = new AbortController()
@@ -209,10 +212,7 @@ export function useChatActions(input: UseChatActionsInput) {
         }
         store.markRunAccepted(activeMessageId, acceptedAtMs)
 
-        if (sessionBindingQueryKey) {
-          void queryClient.invalidateQueries({ queryKey: sessionBindingQueryKey })
-        }
-        refreshSessionLists()
+        void refreshSessionProjections(queryClient, chatSessionId)
 
         await handler.consume(transport.stream)
         handler.finish()
@@ -266,7 +266,7 @@ export function useChatActions(input: UseChatActionsInput) {
             modelId: opts?.modelId,
           })
           scheduleSnapshotRefresh(0)
-          void queryClient.invalidateQueries({ queryKey: runtimeSessionStatusQueryKey(chatSessionId) })
+          void refreshSessionRuntimeStatus(queryClient, chatSessionId)
           void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(chatSessionId) })
           refreshSessionLists()
           return
@@ -321,7 +321,7 @@ export function useChatActions(input: UseChatActionsInput) {
     }
 
     await startNewResponse()
-  }, [chatSessionId, queryClient, refreshQueue, refreshSessionLists, runtimeStatus, scheduleSnapshotRefresh, sessionBindingQueryKey, supportsCodexGoalBridge, supportsGoalCommand])
+  }, [chatSessionId, queryClient, refreshQueue, refreshSessionLists, runtimeStatus, scheduleSnapshotRefresh, supportsCodexGoalBridge, supportsGoalCommand])
 
   // ── Respond to tool approval ──
 
@@ -438,10 +438,7 @@ export function useChatActions(input: UseChatActionsInput) {
       }
       store.markRunAccepted(activeMessageId, acceptedAtMs)
 
-      if (sessionBindingQueryKey) {
-        void queryClient.invalidateQueries({ queryKey: sessionBindingQueryKey })
-      }
-      refreshSessionLists()
+      void refreshSessionProjections(queryClient, chatSessionId)
 
       await handler.consume(transport.stream)
       handler.finish()
@@ -463,7 +460,7 @@ export function useChatActions(input: UseChatActionsInput) {
         refreshQueue(QUEUE_DRAIN_SYNC_DELAY_MS)
       }
     }
-  }, [chatSessionId, queryClient, refreshQueue, refreshSessionLists, scheduleSnapshotRefresh, sendMessage, sessionBindingQueryKey])
+  }, [chatSessionId, queryClient, refreshQueue, scheduleSnapshotRefresh, sendMessage])
 
   // ── Submit pending user input ──
 
@@ -522,7 +519,7 @@ export function useChatActions(input: UseChatActionsInput) {
     }
 
     scheduleSnapshotRefresh(0)
-    void queryClient.invalidateQueries({ queryKey: runtimeSessionStatusQueryKey(chatSessionId) })
+    void refreshSessionRuntimeStatus(queryClient, chatSessionId)
     refreshSessionLists()
     refreshQueue()
 

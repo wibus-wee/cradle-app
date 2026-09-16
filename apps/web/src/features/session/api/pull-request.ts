@@ -1,6 +1,5 @@
 import { z } from 'zod'
 
-import { getSessionsByIdQueryKey } from '~/api-gen/@tanstack/react-query.gen'
 import {
   getSessionsByIdPullRequest,
   postSessionsByIdPullRequestReady,
@@ -30,10 +29,6 @@ export type SessionPullRequest = z.infer<typeof SessionPullRequestSchema>
 
 export function sessionPullRequestQueryKey(sessionId: string) {
   return ['session', sessionId, 'pull-request'] as const
-}
-
-export function sessionDetailQueryKey(sessionId: string) {
-  return getSessionsByIdQueryKey({ path: { id: sessionId } })
 }
 
 export async function readSessionPullRequest(

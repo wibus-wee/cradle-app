@@ -7,7 +7,12 @@ import { openServerEventSource } from '~/lib/server-transport'
 
 export interface GlobalSessionSyncEngineCallbacks {
   onSessionChanged: (event: ChatGlobalSessionTailEvent) => void
-  onSnapshotRequired?: () => void
+  /**
+   * Fired when the tail reports a coverage gap (`SnapshotRequired`) or the
+   * transport fails. The `SnapshotRequired` event carries its `sessionId`;
+   * transport errors pass `null` for identity-less recovery.
+   */
+  onSnapshotRequired?: (event: ChatGlobalSessionTailEvent | null) => void
   onError?: (error: unknown) => void
 }
 
@@ -94,7 +99,7 @@ export class GlobalSessionSyncEngine {
 
     this.lastSeenSequenceId = event.sequenceId
     if (event.type === 'SnapshotRequired') {
-      this.callbacks.onSnapshotRequired?.()
+      this.callbacks.onSnapshotRequired?.(event)
       return
     }
     if (SESSION_SUMMARY_EVENT_TYPES.has(event.type)) {
@@ -104,7 +109,7 @@ export class GlobalSessionSyncEngine {
 
   private readonly handleError = (event: Event): void => {
     this.callbacks.onError?.(event)
-    this.callbacks.onSnapshotRequired?.()
+    this.callbacks.onSnapshotRequired?.(null)
   }
 }
 

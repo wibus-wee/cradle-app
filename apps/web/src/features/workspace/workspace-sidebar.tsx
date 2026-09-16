@@ -20,7 +20,6 @@ import { shallow } from 'zustand/shallow'
 import { patchSessionsById, postSessionsByIdRead } from '~/api-gen'
 import {
   getNodesOptions,
-  getSessionsByIdQueryKey,
   patchWorkspacesByWorkspaceIdLocationMutation,
   patchWorkspacesByWorkspaceIdMutation,
   postWorkspacesByWorkspaceIdFilesFileMutation,
@@ -37,6 +36,15 @@ import { KanbanSidebar } from '~/features/kanban/kanban-sidebar'
 import { resolveNodeDisplayName } from '~/features/nodes/node-grouping'
 import { PluginsSidebar } from '~/features/plugins/plugins-sidebar'
 import { useGlobalSearchStore } from '~/features/search/global-search-store'
+import {
+  applySessionReadResult,
+  refreshSessionProjections,
+} from '~/features/session/api/session-projection'
+import type { WorkspaceSession } from '~/features/session/use-session'
+import {
+  useAllSessions,
+  useNodeSessionReconciliation,
+} from '~/features/session/use-session'
 import { GithubRequiredDialog } from '~/features/settings/github-required-dialog'
 import { openGithubRequiredDialog } from '~/features/settings/github-required-dialog-store'
 import { useFeatureFlag } from '~/features/settings/use-app-preferences'
@@ -65,13 +73,6 @@ import { chatSelectors, useChatStore } from '~/store/chat'
 import { useSettingsOverlayStore } from '~/store/settings-overlay'
 
 import { PreviewCardProvider } from './preview-card/preview-card-provider'
-import type { WorkspaceSession } from './use-session'
-import {
-  sessionsQueryKey,
-  updateSessionReadState,
-  useAllSessions,
-  useNodeSessionReconciliation,
-} from './use-session'
 import type { WorkspaceSessionGroup } from './use-session-group'
 import {
   useAddSessionGroupMembers,
@@ -551,15 +552,9 @@ const WorkspaceGroup = memo(
         }
 
         await patchSessionsById({ path: { id: session.id }, body: { title: nextTitle } })
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: sessionsQueryKey(workspace.id) }),
-          queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-          queryClient.invalidateQueries({
-            queryKey: getSessionsByIdQueryKey({ path: { id: session.id } }),
-          }),
-        ])
+        await refreshSessionProjections(queryClient, session.id)
       },
-      [queryClient, t, workspace.id],
+      [queryClient, t],
     )
     const handleRenameCancel = useCallback(() => {
       setRenamingSessionId(null)
@@ -925,7 +920,6 @@ const WorkspaceGroup = memo(
           state={sessionMenuState}
           session={activeMenuSession}
           work={activeMenuWork}
-          workspaceId={workspace.id}
           sessionGroups={sessionGroups}
           onOpenChange={handleSessionMenuOpenChange}
           onPrepareSessionOpen={handlePrepareSessionOpen}
@@ -1606,7 +1600,7 @@ export const WorkspaceSidebar = memo(({ collapsed = false }: { collapsed?: boole
           if (!data) {
             throw new Error(`Marking session ${session.id} as read returned no data`)
           }
-          updateSessionReadState(queryClient, data)
+          applySessionReadResult(queryClient, data)
         }),
       )
     },

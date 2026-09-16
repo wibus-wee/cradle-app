@@ -2,7 +2,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { useRef } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { WorkspaceSession } from '../use-session'
+import type { WorkspaceSession } from '~/features/session/use-session'
+
 import { usePreviewCard } from './preview-card-context'
 import { PreviewCardProvider } from './preview-card-provider'
 

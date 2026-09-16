@@ -27,10 +27,14 @@ import type { IssueIsolationStartChoice } from '~/features/new-chat/issue-isolat
 import { IssueIsolationStartDialog } from '~/features/new-chat/issue-isolation-start-dialog'
 import { resolveNodeDisplayName } from '~/features/nodes/node-grouping'
 import {
+  projectCreatedSession,
+  refreshSessionLists,
+} from '~/features/session/api/session-projection'
+import { useWorkspaceSessions } from '~/features/session/use-session'
+import {
   useIssueIsolationContext,
 } from '~/features/session/use-session-isolation'
 import { getLocalWorkspacePath, isLocalWorkspace } from '~/features/workspace/types'
-import { sessionsQueryKey, updateSessionInSessionLists, useWorkspaceSessions } from '~/features/workspace/use-session'
 import { useAddWorkspace, useWorkspaces, WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { useNow } from '~/hooks/use-now'
 import { parseRepoKey, repoOwnerAvatarUrl, workspaceRepoKey } from '~/lib/repo-identity'
@@ -307,17 +311,16 @@ function useNewChatPageOwner(
             body: { slug: body.title ?? 'isolated' },
           })
         }
-        updateSessionInSessionLists(queryClient, {
+        projectCreatedSession(queryClient, {
           id: session.id,
           title: trimmedText.slice(0, 80) || options.agentName || options.agentId,
           workspaceId: session.workspaceId ?? selectedProjectWorkspaceId ?? null,
           agentId: options.agentId,
           runtimeKind: options.runtimeKind,
           sessionGroupId,
-        }, { promote: true })
+        })
         void Promise.all([
-          queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
-          queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
+          refreshSessionLists(queryClient),
           queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
         ])
         await openCreatedChatSession(session.id, target)
@@ -404,7 +407,7 @@ function useNewChatPageOwner(
           body: { slug: sessionTitle },
         })
       }
-      updateSessionInSessionLists(queryClient, {
+      projectCreatedSession(queryClient, {
         id: session.id,
         title: sessionTitle,
         workspaceId: session.workspaceId ?? selectedProjectWorkspaceId ?? null,
@@ -413,7 +416,7 @@ function useNewChatPageOwner(
         modelId: options.modelId ?? null,
         runtimeKind: options.runtimeKind,
         sessionGroupId,
-      }, { promote: true })
+      })
       const bangCommand = files.length === 0 && contextParts.length === 0
         ? readBangCommand(text)
         : null
@@ -422,10 +425,7 @@ function useNewChatPageOwner(
           sessionId: session.id,
           command: bangCommand,
           onSuccess: () => {
-            void Promise.all([
-              queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
-              queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-            ])
+            void refreshSessionLists(queryClient)
           },
           onError: (error) => {
             console.error('[NewChatPage] bang command failed:', describeChatExecutionError(error) ?? error)
@@ -446,10 +446,7 @@ function useNewChatPageOwner(
             reviewTarget: options.reviewTarget,
           },
           onAccepted: () => {
-            void Promise.all([
-              queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
-              queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-            ])
+            void refreshSessionLists(queryClient)
           },
           onError: (err) => {
             console.error('[NewChatPage] start response failed:', describeChatExecutionError(err) ?? err)
@@ -457,8 +454,7 @@ function useNewChatPageOwner(
         })
       }
       void Promise.all([
-        queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? selectedProjectWorkspaceId) }),
-        queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
+        refreshSessionLists(queryClient),
         queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
       ])
       await openCreatedChatSession(session.id, target)

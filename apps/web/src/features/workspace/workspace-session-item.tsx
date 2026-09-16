@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next'
 
 import { getSessionsByIdWorkOptions } from '~/api-gen/@tanstack/react-query.gen'
 import type { RuntimeIconDescriptor } from '~/components/common/provider-icons'
+import type { WorkspaceSession } from '~/features/session/use-session'
+import { getSessionActivityAt, isManualSession } from '~/features/session/use-session'
 import { writeSurfaceRouteDrag } from '~/features/split-view/dnd/split-drag-payload'
 import type { WorkSummary } from '~/features/work/use-work'
 import type { Workspace } from '~/features/workspace/types'
@@ -37,8 +39,6 @@ import { useTitleRegenerationStore } from '~/store/title-regeneration'
 
 import { usePreviewCard } from './preview-card/preview-card-context'
 import { SESSION_DRAG_MIME_TYPE } from './session-drag-data'
-import type { WorkspaceSession } from './use-session'
-import { getSessionActivityAt, isManualSession } from './use-session'
 import type {
   WorkspaceSessionAttentionKind,
   WorkspaceSessionMenuAnchor,

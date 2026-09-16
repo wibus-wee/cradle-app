@@ -116,6 +116,11 @@ describe('globalSessionSyncEngine', () => {
 
     expect(onSessionChanged).toHaveBeenCalledTimes(3)
     expect(onSnapshotRequired).toHaveBeenCalledTimes(1)
+    expect(onSnapshotRequired).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'SnapshotRequired',
+      sessionId: 'session-1',
+      sequenceId: 20,
+    }))
     expect(engine.getLastSeenSequenceId()).toBe(20)
 
     engine.stop()
@@ -142,6 +147,7 @@ describe('globalSessionSyncEngine', () => {
 
     expect(onError).toHaveBeenCalledTimes(1)
     expect(onSnapshotRequired).toHaveBeenCalledTimes(1)
+    expect(onSnapshotRequired).toHaveBeenCalledWith(null)
     expect(onSessionChanged).not.toHaveBeenCalled()
   })
 })

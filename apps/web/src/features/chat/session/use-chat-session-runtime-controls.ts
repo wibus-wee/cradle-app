@@ -2,9 +2,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 
 import {
-  getSessionsByIdQueryKey,
-} from '~/api-gen/@tanstack/react-query.gen'
-import { isSessionsQueryKey } from '~/features/workspace/use-session'
+  refreshSessionDetail,
+  refreshSessionLists as refreshSessionListProjections,
+  sessionQueueQueryKey,
+} from '~/features/session/api/session-projection'
 
 import { chatMessageSnapshotQueryKey } from '../api/messages'
 import { runtimeUiSlotStatesQueryKey } from '../capabilities/chat-capabilities'
@@ -13,8 +14,7 @@ import { SNAPSHOT_SYNC_DEBOUNCE_MS } from './use-chat-session-types'
 export interface ChatSessionRuntimeControls {
   queryClient: ReturnType<typeof useQueryClient>
   snapshotRowsQueryKey: ReturnType<typeof chatMessageSnapshotQueryKey> | null
-  sessionBindingQueryKey: ReturnType<typeof getSessionsByIdQueryKey> | null
-  queueQueryKey: readonly ['chat', 'session-queue', string]
+  queueQueryKey: ReturnType<typeof sessionQueueQueryKey>
   scheduleSnapshotRefresh: (delay?: number) => void
   refreshRuntimeUiSlotStates: () => void
   refreshSessionLists: () => void
@@ -33,20 +33,20 @@ export function useChatSessionRuntimeControls(chatSessionId: string | null): Cha
       : null,
     [chatSessionId],
   )
-  const sessionBindingQueryKey = useMemo(
-    () => chatSessionId
-      ? getSessionsByIdQueryKey({ path: { id: chatSessionId } })
-      : null,
-    [chatSessionId],
-  )
 
   const queueQueryKey = useMemo(
-    () => ['chat', 'session-queue', chatSessionId ?? 'none'] as const,
+    () => sessionQueueQueryKey(chatSessionId ?? 'none'),
     [chatSessionId],
   )
 
+  const refreshDetail = useCallback(() => {
+    if (chatSessionId) {
+      void refreshSessionDetail(queryClient, chatSessionId)
+    }
+  }, [chatSessionId, queryClient])
+
   const scheduleSnapshotRefresh = useCallback((delay = SNAPSHOT_SYNC_DEBOUNCE_MS) => {
-    if (!snapshotRowsQueryKey && !sessionBindingQueryKey) {
+    if (!snapshotRowsQueryKey && !chatSessionId) {
       return
     }
     if (snapshotTimerRef.current) {
@@ -57,14 +57,12 @@ export function useChatSessionRuntimeControls(chatSessionId: string | null): Cha
       if (snapshotRowsQueryKey) {
         void queryClient.invalidateQueries({ queryKey: snapshotRowsQueryKey })
       }
-      if (sessionBindingQueryKey) {
-        void queryClient.invalidateQueries({ queryKey: sessionBindingQueryKey })
-      }
+      refreshDetail()
     }, delay)
-  }, [queryClient, sessionBindingQueryKey, snapshotRowsQueryKey])
+  }, [chatSessionId, queryClient, refreshDetail, snapshotRowsQueryKey])
 
   const refreshSessionLists = useCallback(() => {
-    void queryClient.invalidateQueries({ predicate: query => isSessionsQueryKey(query.queryKey) })
+    void refreshSessionListProjections(queryClient)
   }, [queryClient])
 
   const refreshRuntimeUiSlotStates = useCallback(() => {
@@ -118,7 +116,6 @@ export function useChatSessionRuntimeControls(chatSessionId: string | null): Cha
   return {
     queryClient,
     snapshotRowsQueryKey,
-    sessionBindingQueryKey,
     queueQueryKey,
     scheduleSnapshotRefresh,
     refreshRuntimeUiSlotStates,

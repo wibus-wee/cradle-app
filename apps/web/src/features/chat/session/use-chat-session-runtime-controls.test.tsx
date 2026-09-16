@@ -3,6 +3,8 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import { sessionQueueQueryKey } from '~/features/session/api/session-projection'
+
 import { useChatSessionRuntimeControls } from './use-chat-session-runtime-controls'
 
 function renderRuntimeControls(queryClient: QueryClient) {
@@ -42,7 +44,7 @@ describe('useChatSessionRuntimeControls', () => {
 
     expect(refetchQueries).toHaveBeenCalledTimes(1)
     expect(refetchQueries).toHaveBeenCalledWith(
-      { queryKey: ['chat', 'session-queue', 'session-a'], type: 'active', exact: true },
+      { queryKey: sessionQueueQueryKey('session-a'), type: 'active', exact: true },
       { cancelRefetch: false },
     )
 

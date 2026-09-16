@@ -3,9 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   markSessionPullRequestReady,
   readSessionPullRequest,
-  sessionDetailQueryKey,
   sessionPullRequestQueryKey,
 } from './api/pull-request'
+import { refreshSessionDetail } from './api/session-projection'
 
 export function useSessionPullRequest(sessionId: string | null | undefined) {
   return useQuery({
@@ -26,7 +26,7 @@ export function useMarkSessionPullRequestReady() {
     mutationFn: markSessionPullRequestReady,
     onSuccess: (pullRequest, sessionId) => {
       queryClient.setQueryData(sessionPullRequestQueryKey(sessionId), pullRequest)
-      void queryClient.invalidateQueries({ queryKey: sessionDetailQueryKey(sessionId) })
+      void refreshSessionDetail(queryClient, sessionId)
     },
   })
 }

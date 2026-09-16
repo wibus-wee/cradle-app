@@ -3,10 +3,10 @@ import { hashKey, QueryClient } from '@tanstack/react-query'
 import { describe, expect, it } from 'vitest'
 
 import {
-  getSessionsByIdOptions,
   getSessionsByIdWorkOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { chatMessageHistoryInfiniteOptions } from '~/features/chat/api/messages'
+import { sessionDetailQueryKey } from '~/features/session/api/session-projection'
 
 import type { AppSurface } from './surface-identity'
 import { createTearoffBootstrapFromClient } from './tearoff-bootstrap'
@@ -24,7 +24,7 @@ const CHAT_SURFACE: AppSurface = {
 describe('createTearoffBootstrapFromClient', () => {
   it('copies only first-frame queries and caps message history to its newest page', () => {
     const client = new QueryClient()
-    const sessionKey = getSessionsByIdOptions({ path: { id: SESSION_ID } }).queryKey
+    const sessionKey = sessionDetailQueryKey(SESSION_ID)
     const workKey = getSessionsByIdWorkOptions({ path: { id: SESSION_ID } }).queryKey
     const messageKey = chatMessageHistoryInfiniteOptions(SESSION_ID).queryKey
     const unrelatedKey = ['large-unrelated-cache'] as const

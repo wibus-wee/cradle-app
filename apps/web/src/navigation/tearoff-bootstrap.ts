@@ -2,10 +2,10 @@ import type { QueryClient } from '@tanstack/react-query'
 import { dehydrate, hashKey } from '@tanstack/react-query'
 
 import {
-  getSessionsByIdOptions,
   getSessionsByIdWorkOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { chatMessageHistoryInfiniteOptions } from '~/features/chat/api/messages'
+import { sessionDetailQueryKey } from '~/features/session/api/session-projection'
 import { queryClient } from '~/lib/query-client'
 
 import type { AppSurface } from './surface-identity'
@@ -42,7 +42,7 @@ export function createTearoffBootstrapFromClient(surface: AppSurface, client: Qu
   }
   const messageHistoryQueryHash = hashKey(chatMessageHistoryInfiniteOptions(sessionId).queryKey)
   const allowedQueryHashes = new Set([
-    hashKey(getSessionsByIdOptions({ path: { id: sessionId } }).queryKey),
+    hashKey(sessionDetailQueryKey(sessionId)),
     hashKey(getSessionsByIdWorkOptions({ path: { id: sessionId } }).queryKey),
     messageHistoryQueryHash,
   ])

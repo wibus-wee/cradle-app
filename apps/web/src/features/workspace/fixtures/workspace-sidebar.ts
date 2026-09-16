@@ -1,7 +1,7 @@
+import type { WorkspaceSession } from '~/features/session/use-session'
 import type { WorkSummary } from '~/features/work/use-work'
 import type { Workspace } from '~/features/workspace/types'
 
-import type { WorkspaceSession } from '../use-session'
 import type { WorkspaceSessionGroup } from '../use-session-group'
 
 export const workspaceSidebarFixtureNow = 1_784_836_800

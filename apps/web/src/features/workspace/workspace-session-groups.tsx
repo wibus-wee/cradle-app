@@ -1,8 +1,8 @@
 import { memo, useCallback } from 'react'
 
+import type { WorkspaceSession } from '~/features/session/use-session'
 import { openNewChat } from '~/navigation/navigation-commands'
 
-import type { WorkspaceSession } from './use-session'
 import type { WorkspaceSessionGroup } from './use-session-group'
 import { WorkspaceSessionGroupSectionView } from './workspace-session-group-section-view'
 import { useWorkspaceSidebarUiStore } from './workspace-sidebar-ui-store'

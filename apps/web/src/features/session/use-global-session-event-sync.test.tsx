@@ -3,9 +3,9 @@ import { QueryClient } from '@tanstack/react-query'
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { SESSION_LIST_REFRESH_INTERVAL_MS } from './api/session-projection'
 import type { GlobalSessionEventSource } from './global-session-sync-engine'
 import { useGlobalSessionEventSync } from './use-global-session-event-sync'
-import { SESSION_LIST_REFRESH_INTERVAL_MS } from './use-session'
 
 const transportMocks = vi.hoisted(() => ({
   createGlobalSessionEventSource: vi.fn(),
@@ -49,6 +49,29 @@ class FakeEventSource implements GlobalSessionEventSource {
     })
     for (const listener of this.sessionListeners) {
       listener(message)
+    }
+  }
+
+  emitSnapshotRequired(sessionId: string, sequenceId: number): void {
+    const message = new MessageEvent('sessions', {
+      data: JSON.stringify({
+        scope: 'sessions',
+        sessionId,
+        sequenceId,
+        version: sequenceId,
+        type: 'SnapshotRequired',
+        occurredAt: 100 + sequenceId,
+        payload: { reason: 'tail_gap', latestVersion: sequenceId, latestSequenceId: sequenceId },
+      }),
+    })
+    for (const listener of this.sessionListeners) {
+      listener(message)
+    }
+  }
+
+  emitError(): void {
+    for (const listener of this.errorListeners) {
+      listener(new Event('error'))
     }
   }
 }
@@ -99,5 +122,43 @@ describe('useGlobalSessionEventSync', () => {
       await vi.advanceTimersByTimeAsync(1)
     })
     expect(countSessionListInvalidations()).toBe(3)
+  })
+
+  it('recovers the snapshot-gap session detail, not just the lists', async () => {
+    const source = new FakeEventSource()
+    transportMocks.createGlobalSessionEventSource.mockReturnValue(source)
+    const queryClient = new QueryClient()
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+    const detailKeyEntry = expect.objectContaining({
+      _id: 'getSessionsById',
+      path: { id: 'session-9' },
+    })
+
+    render(<Probe queryClient={queryClient} />)
+
+    await act(async () => {
+      source.emitSnapshotRequired('session-9', 7)
+    })
+
+    expect(invalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: expect.arrayContaining([detailKeyEntry]) }),
+    )
+  })
+
+  it('an identity-less transport error runs a global session projection wave', async () => {
+    const source = new FakeEventSource()
+    transportMocks.createGlobalSessionEventSource.mockReturnValue(source)
+    const queryClient = new QueryClient()
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+
+    render(<Probe queryClient={queryClient} />)
+
+    await act(async () => {
+      source.emitError()
+    })
+
+    expect(invalidateQueries).toHaveBeenCalledWith(
+      expect.objectContaining({ predicate: expect.any(Function) }),
+    )
   })
 })

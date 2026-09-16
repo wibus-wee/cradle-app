@@ -8,7 +8,6 @@ import type { UIMessage } from 'ai'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { getPluginsReviews, patchPluginsByRouteSegmentEnabled } from '~/api-gen/sdk.gen'
 import type { GetPluginsReviewsResponse } from '~/api-gen/types.gen'
 import { useRegisterLayoutSlots } from '~/components/layout/use-layout-slots'
@@ -17,6 +16,7 @@ import { toastManager } from '~/components/ui/toast'
 import { useRuntimeCatalog } from '~/features/agent-runtime/use-runtime-catalog'
 import { nodeAccessDisablesInteraction, useNodeAccess } from '~/features/nodes/node-access'
 import { SessionNodeBadge } from '~/features/nodes/session-node-badge'
+import { sessionDetailOptions } from '~/features/session/api/session-projection'
 import { IsolationBoundaryDialog } from '~/features/session/isolation-boundary-dialog'
 import { IsolationMissingDialog } from '~/features/session/isolation-missing-dialog'
 import {
@@ -141,7 +141,7 @@ export function ChatView({
     [nodeInteractionLocked, respondToToolApproval],
   )
   const sessionMetaQuery = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId ?? '' } }),
+    ...sessionDetailOptions(sessionId ?? ''),
     enabled: chatActive && !!sessionId,
     staleTime: 5_000,
   })

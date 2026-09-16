@@ -7,11 +7,11 @@ import type { TFunction } from 'i18next'
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getSessionsOptions } from '~/api-gen/@tanstack/react-query.gen'
 import type { GetSessionsResponse } from '~/api-gen/types.gen'
 import { Popover, PopoverContent, PopoverTrigger } from '~/components/ui/popover'
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { Spinner } from '~/components/ui/spinner'
+import { sessionListQueryOptions } from '~/features/session/api/session-projection'
 import { useNow } from '~/hooks/use-now'
 import { cn } from '~/lib/cn'
 
@@ -71,7 +71,7 @@ export function JarvisHistoryPicker({
     isError,
     isPending,
   } = useQuery({
-    ...getSessionsOptions({ query: { limit: 30 } }),
+    ...sessionListQueryOptions(undefined, undefined, MAX_HISTORY_SESSIONS),
     enabled: open,
     select: page => page.items
       .filter(isJarvisHistorySession)

@@ -1,29 +1,21 @@
-import type { QueryClient } from '@tanstack/react-query'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo } from 'react'
 
-import {
-  getSessionsByIdQueryKey,
-  getSessionsOptions,
-  getSessionsQueryKey,
-} from '~/api-gen/@tanstack/react-query.gen'
 import { postSessionsNodeProjectionsReconcile } from '~/api-gen/sdk.gen'
-import type { GetSessionsByIdResponse, GetSessionsData, GetSessionsResponse } from '~/api-gen/types.gen'
+import type { GetSessionsResponse } from '~/api-gen/types.gen'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
 import type { SessionExecution } from '~/features/chat/session/session-execution'
 import { readSessionExecution } from '~/features/chat/session/session-execution'
 import type { Workspace } from '~/features/workspace/types'
 import { queryRefreshPolicy } from '~/lib/query-refresh-policy'
 
-let unreadSessionIdsSnapshot: string[] = []
+import {
+  refreshSessionLists,
+  sessionListQueryOptions,
+  updateUnreadSessionIdsSnapshot,
+} from './api/session-projection'
 
-export const SESSION_LIST_REFRESH_INTERVAL_MS = 5_000
 const NODE_SESSION_RECONCILE_INTERVAL_MS = 15_000
-const SESSION_LIST_PAGE_LIMIT = 200
-
-export function readUnreadSessionIdsSnapshot(): string[] {
-  return unreadSessionIdsSnapshot
-}
 
 export interface WorkspaceSession {
   id: string
@@ -81,193 +73,6 @@ export function isManualSession(session: { origin?: string | null }): boolean {
   return !origin || origin === 'manual'
 }
 
-function sessionListOptions(workspaceId?: string | null, archived?: boolean): GetSessionsData {
-  const query: NonNullable<GetSessionsData['query']> = { limit: SESSION_LIST_PAGE_LIMIT }
-
-  if (workspaceId) {
-    query.workspaceId = workspaceId
-  }
-  if (archived !== undefined) {
-    query.archived = archived
-  }
-
-  return { url: '/sessions/', query }
-}
-
-export const sessionsQueryKey = (workspaceId?: string | null, archived?: boolean) =>
-  getSessionsQueryKey(sessionListOptions(workspaceId, archived))
-
-export function isSessionsQueryKey(queryKey: readonly unknown[]): boolean {
-  const head = queryKey[0]
-  return head !== null
-    && typeof head === 'object'
-    && (head as { _id?: unknown })._id === 'getSessions'
-}
-
-type SessionListResponseRow = GetSessionsResponse['items'][number] & {
-  latestUserMessageAt?: unknown
-}
-
-type SessionListOptimisticPatch = Partial<SessionListResponseRow> & {
-  id: string
-}
-
-interface SessionListOptimisticOptions {
-  promote?: boolean
-  updatedAt?: number
-  latestUserMessageAt?: number
-}
-
-export function updateSessionReadState(queryClient: QueryClient, session: GetSessionsByIdResponse) {
-  queryClient.setQueryData(
-    getSessionsByIdQueryKey({ path: { id: session.id } }),
-    session,
-  )
-  updateSessionInSessionLists(queryClient, session)
-  unreadSessionIdsSnapshot = session.unread
-    ? [...new Set([...unreadSessionIdsSnapshot, session.id])]
-    : unreadSessionIdsSnapshot.filter(sessionId => sessionId !== session.id)
-}
-
-function queryKeyMatchesWorkspace(queryKey: readonly unknown[], workspaceId: string | null | undefined): boolean {
-  if (workspaceId === undefined) {
-    return true
-  }
-  const query = queryKey[0] && typeof queryKey[0] === 'object' && 'query' in queryKey[0]
-    ? (queryKey[0].query as { workspaceId?: unknown } | undefined)
-    : undefined
-  return query?.workspaceId === undefined || query.workspaceId === workspaceId
-}
-
-function queryKeyMatchesArchiveState(queryKey: readonly unknown[], archivedAt: number | null | undefined): boolean {
-  if (archivedAt === undefined) {
-    return true
-  }
-  const query = queryKey[0] && typeof queryKey[0] === 'object' && 'query' in queryKey[0]
-    ? (queryKey[0].query as { archived?: unknown } | undefined)
-    : undefined
-  return archivedAt === null
-    ? query?.archived !== true
-    : query?.archived === true
-}
-
-function readOptimisticWorkspaceId(value: unknown): string | null | undefined {
-  return typeof value === 'string' || value === null ? value : undefined
-}
-
-function readOptimisticArchivedAt(value: unknown): number | null | undefined {
-  return typeof value === 'number' || value === null ? value : undefined
-}
-
-function sessionListRowsEqual(
-  left: SessionListResponseRow,
-  right: SessionListResponseRow,
-): boolean {
-  if (left === right) {
-    return true
-  }
-
-  const keys = new Set([...Object.keys(left), ...Object.keys(right)])
-  for (const key of keys) {
-    if (!Object.is(
-      left[key as keyof SessionListResponseRow],
-      right[key as keyof SessionListResponseRow],
-    )) {
-      return false
-    }
-  }
-  return true
-}
-
-function createSessionListRow(
-  existing: SessionListResponseRow | null,
-  patch: SessionListOptimisticPatch,
-  updatedAt: number,
-  latestUserMessageAt: number | null,
-  fallbackStatus: SessionListResponseRow['status'],
-): GetSessionsResponse['items'][number] {
-  return {
-    workspaceId: null,
-    title: null,
-    providerTargetId: null,
-    agentId: null,
-    modelId: null,
-    linkedIssueId: null,
-    sessionGroupId: null,
-    runtimeKind: 'standard',
-    pinned: 0,
-    archivedAt: null,
-    lastReadAt: null,
-    createdAt: updatedAt,
-    activityAt: updatedAt,
-    latestAssistantMessageAt: null,
-    unread: false,
-    ...existing,
-    ...patch,
-    id: patch.id,
-    updatedAt,
-    latestUserMessageAt,
-    status: patch.status ?? existing?.status ?? fallbackStatus,
-  } as GetSessionsResponse['items'][number]
-}
-
-export function updateSessionInSessionLists(
-  queryClient: QueryClient,
-  patch: SessionListOptimisticPatch,
-  options: SessionListOptimisticOptions = {},
-) {
-  const now = Math.floor(Date.now() / 1000)
-  const optimisticUpdatedAt = options.updatedAt ?? (options.promote ? now : undefined)
-  const optimisticLatestUserMessageAt = options.latestUserMessageAt ?? (options.promote ? now : undefined)
-  const workspaceId = readOptimisticWorkspaceId(patch.workspaceId)
-  const archivedAt = readOptimisticArchivedAt(patch.archivedAt)
-  queryClient.setQueriesData<GetSessionsResponse>(
-    {
-      predicate: query =>
-        isSessionsQueryKey(query.queryKey)
-        && queryKeyMatchesWorkspace(query.queryKey, workspaceId)
-        && queryKeyMatchesArchiveState(query.queryKey, archivedAt ?? null),
-    },
-    (page) => {
-      if (!page) {
-        return page
-      }
-      const sessions = page.items
-      const index = sessions.findIndex(session => session.id === patch.id)
-      const existing = index >= 0 ? sessions[index] as SessionListResponseRow : null
-      if (!existing && patch.workspaceId === undefined) {
-        return page
-      }
-      const updatedAt = patch.updatedAt ?? optimisticUpdatedAt ?? existing?.updatedAt ?? now
-      const latestUserMessageAt
-        = patch.latestUserMessageAt ?? optimisticLatestUserMessageAt ?? (existing as SessionListResponseRow | null)?.latestUserMessageAt ?? null
-      const fallbackStatus = options.promote ? 'streaming' : 'idle'
-      const row = createSessionListRow(existing, patch, updatedAt, latestUserMessageAt, fallbackStatus)
-
-      if (existing && !options.promote) {
-        if (sessionListRowsEqual(existing, row as SessionListResponseRow)) {
-          return page
-        }
-
-        const next = sessions.slice()
-        next[index] = row
-        return { ...page, items: next }
-      }
-
-      if (existing && index === 0 && sessionListRowsEqual(existing, row as SessionListResponseRow)) {
-        return page
-      }
-
-      const next = existing
-        ? sessions.filter(session => session.id !== patch.id)
-        : sessions.slice()
-      next.unshift(row)
-      next.splice(SESSION_LIST_PAGE_LIMIT)
-      return { ...page, items: next }
-    },
-  )
-}
-
 function nullableString(value: unknown): string | null {
   return typeof value === 'string' ? value : null
 }
@@ -319,10 +124,6 @@ function asWorkspaceSessions(page: GetSessionsResponse): WorkspaceSession[] {
   return page.items.map(asWorkspaceSession)
 }
 
-function updateUnreadSessionIdsSnapshot(sessions: WorkspaceSession[]) {
-  unreadSessionIdsSnapshot = sessions.filter(session => session.unread).map(session => session.id)
-}
-
 function selectUnreadSessionIds(page: GetSessionsResponse): string[] {
   return page.items.filter(session => session.unread === true).map(session => session.id)
 }
@@ -332,24 +133,22 @@ function selectRunningSessionIds(page: GetSessionsResponse): string[] {
 }
 
 export function useUnreadSessionIds(): Set<string> {
-  const queryOptions = sessionListOptions()
   const { data: unreadSessionIds = [] } = useQuery({
-    ...getSessionsOptions(queryOptions),
+    ...sessionListQueryOptions(),
     ...queryRefreshPolicy('interactive', { refetchInterval: false }),
     select: selectUnreadSessionIds,
   })
 
   useEffect(() => {
-    unreadSessionIdsSnapshot = unreadSessionIds
+    updateUnreadSessionIdsSnapshot(unreadSessionIds.map(id => ({ id, unread: true })))
   }, [unreadSessionIds])
 
   return useMemo(() => new Set(unreadSessionIds), [unreadSessionIds])
 }
 
 export function useRunningSessionIds(): Set<string> {
-  const queryOptions = sessionListOptions()
   const { data: runningSessionIds = [] } = useQuery({
-    ...getSessionsOptions(queryOptions),
+    ...sessionListQueryOptions(),
     ...queryRefreshPolicy('interactive', { refetchInterval: false }),
     select: selectRunningSessionIds,
   })
@@ -358,9 +157,8 @@ export function useRunningSessionIds(): Set<string> {
 }
 
 export function useAllSessions(archived?: boolean) {
-  const queryOptions = sessionListOptions(null, archived)
   const { data: sessions = [], isPending: loading } = useQuery({
-    ...getSessionsOptions(queryOptions),
+    ...sessionListQueryOptions(null, archived),
     ...queryRefreshPolicy('interactive', { refetchInterval: false }),
     select: asWorkspaceSessions,
   })
@@ -408,9 +206,7 @@ export function useNodeSessionReconciliation(workspaces: readonly Workspace[]): 
         if (!disposed && results.some(result =>
           result.status === 'fulfilled'
           && (result.value.discovered > 0 || result.value.updated > 0 || result.value.removed > 0))) {
-          await queryClient.invalidateQueries({
-            predicate: query => isSessionsQueryKey(query.queryKey),
-          })
+          await refreshSessionLists(queryClient)
         }
       }
       finally {
@@ -428,9 +224,8 @@ export function useNodeSessionReconciliation(workspaces: readonly Workspace[]): 
 }
 
 export function useWorkspaceSessions(workspaceId: string | null, archived?: boolean) {
-  const queryOptions = sessionListOptions(workspaceId, archived)
   const { data: page, isPending: loading } = useQuery({
-    ...getSessionsOptions(queryOptions),
+    ...sessionListQueryOptions(workspaceId, archived),
     ...queryRefreshPolicy('interactive', { refetchInterval: false }),
     enabled: Boolean(workspaceId),
   })

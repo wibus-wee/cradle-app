@@ -17,8 +17,6 @@ import { z } from 'zod'
 
 import {
   getKanbanBoardsOptions,
-  getSessionsByIdOptions,
-  getSessionsOptions,
   getWorkspacesByWorkspaceIdOptions,
   getWorkspacesOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
@@ -26,6 +24,10 @@ import { useLayoutSlotsCtx } from '~/components/layout/use-layout-slots'
 import { toastManager } from '~/components/ui/toast'
 import { useSearchIssues } from '~/features/kanban/use-kanban'
 import { useThreadSearch } from '~/features/search/use-thread-search'
+import {
+  sessionDetailOptions,
+  sessionListQueryOptions,
+} from '~/features/session/api/session-projection'
 import { getWorkspaceLocationLabel, isWorkEligibleWorkspace } from '~/features/workspace/types'
 import { useWorkspaceFiles } from '~/features/workspace/use-workspace-files'
 import { platform } from '~/lib/electron'
@@ -117,7 +119,7 @@ function useActiveFileSearchWorkspaceId(enabled: boolean): {
   const chatSessionId = enabled ? chatSessionIdForSurface(activeSurface) : null
 
   const { data: chatSession } = useQuery({
-    ...getSessionsByIdOptions({ path: { id: chatSessionId ?? '' } }),
+    ...sessionDetailOptions(chatSessionId ?? ''),
     enabled: enabled && !!chatSessionId,
     staleTime: 60_000,
     select: data => (data ? SessionWorkspaceSchema.parse(data) : undefined),
@@ -411,7 +413,7 @@ function useIssueSearch(query: string, enabled: boolean) {
 
 function useRecentConversations(enabled: boolean): RecentConversation[] {
   const { data } = useQuery({
-    ...getSessionsOptions({ query: { limit: 5 } }),
+    ...sessionListQueryOptions(undefined, undefined, 5),
     enabled,
     staleTime: 30_000,
     select: (page): RecentConversation[] =>

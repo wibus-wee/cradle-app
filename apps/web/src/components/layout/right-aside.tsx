@@ -13,7 +13,6 @@ import { AnimatePresence, LayoutGroup, m } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { getWorkspacesByWorkspaceId } from '~/api-gen/sdk.gen'
 import { Tooltip, TooltipContent, TooltipTrigger } from '~/components/ui/tooltip'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
@@ -23,6 +22,7 @@ import { useSessionAwaitSummary } from '~/features/chat/session/use-session-awai
 import { ChangesPanelContainer, GitPanelContainer } from '~/features/git'
 import { IssueAsidePanel } from '~/features/kanban/issue-aside-panel'
 import { useLinkedIssue } from '~/features/kanban/use-kanban'
+import { sessionDetailOptions } from '~/features/session/api/session-projection'
 import { useSessionIsolationState } from '~/features/session/use-session-isolation'
 import { AwaitPanel } from '~/features/session-await/await-panel'
 import { FileTree } from '~/features/workspace/file-tree'
@@ -359,7 +359,7 @@ function ActiveRightAside({
 
   // Derive workspaceId from session
   const { data: sessionMeta } = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId ?? '' } }),
+    ...sessionDetailOptions(sessionId ?? ''),
     select: s => ({
       workspaceId: s?.workspaceId as string | null,
       runtimeKind: s?.runtimeKind as RuntimeKind | null,

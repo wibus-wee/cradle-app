@@ -1,4 +1,4 @@
-import type { WorkspaceSession } from './use-session'
+import type { WorkspaceSession } from '~/features/session/use-session'
 
 export function isWorkspaceSessionRunning(
   session: WorkspaceSession,

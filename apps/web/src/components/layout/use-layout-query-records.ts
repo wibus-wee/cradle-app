@@ -1,15 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
 
 import {
-  getSessionsByIdOptions,
   getWorkspacesByWorkspaceIdOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
 import type { SessionLayoutRecord, WorkspaceLayoutRecord } from '~/components/layout/layout-records'
+import { sessionDetailOptions } from '~/features/session/api/session-projection'
 import { getLocalWorkspacePath } from '~/features/workspace/types'
 
 export function useChatSessionLayoutRecord(sessionId: string | null): SessionLayoutRecord | undefined {
   const query = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId ?? '' } }),
+    ...sessionDetailOptions(sessionId ?? ''),
     enabled: !!sessionId,
     staleTime: 60_000,
     select: data => data
