@@ -42,6 +42,8 @@ import { registerChatRuntimeSessionLifecycleHandlers } from './modules/chat-runt
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
 import { ClaudeUsageReconciliationScheduler } from './modules/chat-runtime-providers/claude-agent/usage-reconciliation-scheduler'
 import { readCodexChatgptAuthCredential } from './modules/chat-runtime-providers/codex/app-server/chatgpt-auth'
+import { createCodexManagedResourceAdapter } from './modules/chat-runtime-providers/codex/managed-resource-adapter'
+import { CodexRuntimeInstallationService } from './modules/chat-runtime-providers/codex/runtime-installation'
 import { createOpencodeManagedResourceAdapter } from './modules/chat-runtime-providers/opencode/managed-resource-adapter'
 import { OpencodeRuntimeInstallationService } from './modules/chat-runtime-providers/opencode/runtime-installation'
 import { createChronicleModule } from './modules/chronicle'
@@ -131,6 +133,7 @@ interface CreateServerContractAppOptions {
   downloadCenterService?: DownloadCenterService
   managedResourceService?: ManagedResourceService
   opencodeRuntimeInstallationService?: OpencodeRuntimeInstallationService
+  codexRuntimeInstallationService?: CodexRuntimeInstallationService
 }
 
 const HOSTED_WEB_APP_ORIGINS = new Set([
@@ -200,11 +203,15 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   const opencodeRuntimeInstallation
     = options.opencodeRuntimeInstallationService
       ?? new OpencodeRuntimeInstallationService({ downloadCenter: downloadCenter.service })
+  const codexRuntimeInstallation
+    = options.codexRuntimeInstallationService
+      ?? new CodexRuntimeInstallationService({ downloadCenter: downloadCenter.service })
   const managedResources
     = options.managedResourceService
       ?? new ManagedResourceService([
       createChronicleManagedResourceAdapter(downloadCenter.service),
       createOpencodeManagedResourceAdapter(opencodeRuntimeInstallation),
+      createCodexManagedResourceAdapter(codexRuntimeInstallation),
     ])
   const app = new Elysia({
     name: 'cradle.server.elysia',
@@ -348,6 +355,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     app,
     managedResourceService,
     opencodeRuntimeInstallationService,
+    codexRuntimeInstallationService,
     serverConfig,
     runtime,
   ] = await runBootstrapPhase(bootstrapReporter, 'service-initialization', async () => {
@@ -365,6 +373,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       conversationBridgeSupervisor,
       { destroyWorkspaceFileIndexes },
       { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
+      { prepareCodexManagedPathForRemoval },
       { shutdownImageOcr },
       { CodexUsageReconciliationScheduler },
       { registerRunSnapshotMaintenance },
@@ -382,6 +391,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       import('./modules/conversation-bridge/runtime-supervisor'),
       import('./modules/workspace/files'),
       import('./modules/chat-runtime-providers/opencode/runtime-context'),
+      import('./modules/chat-runtime-providers/codex/app-server/host-lease'),
       import('./modules/image-ocr/service'),
       import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
       import('./modules/chat-runtime/run-snapshot-maintenance'),
@@ -391,10 +401,18 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       downloadCenter: downloadCenterService,
       prepareManagedPathForRemoval: prepareOpencodeManagedPathForRemoval,
     })
-    await opencodeRuntimeInstallationService.boot()
+    const codexRuntimeInstallationService = new CodexRuntimeInstallationService({
+      downloadCenter: downloadCenterService,
+      prepareManagedPathForRemoval: prepareCodexManagedPathForRemoval,
+    })
+    await Promise.all([
+      opencodeRuntimeInstallationService.boot(),
+      codexRuntimeInstallationService.boot(),
+    ])
     const managedResourceService = new ManagedResourceService([
       createChronicleManagedResourceAdapter(downloadCenterService),
       createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
+      createCodexManagedResourceAdapter(codexRuntimeInstallationService),
     ])
     chronicleService.startMemoryEmbeddingIndexer()
     chronicleService.reconcileMemoryEmbeddingCandidateIndex()
@@ -403,6 +421,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       downloadCenterService,
       managedResourceService,
       opencodeRuntimeInstallationService,
+      codexRuntimeInstallationService,
     })
     Health.check()
     Worktree.registerStorageMeasurementActivity({
@@ -449,6 +468,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       app,
       managedResourceService,
       opencodeRuntimeInstallationService,
+      codexRuntimeInstallationService,
       serverConfig,
       {
         abortAllRuns,
@@ -551,6 +571,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     name: 'opencode-runtime-installation',
     phase: 'drain',
     stop: () => opencodeRuntimeInstallationService.shutdown(),
+  })
+  runtimeResources.register({
+    name: 'codex-runtime-installation',
+    phase: 'drain',
+    stop: () => codexRuntimeInstallationService.shutdown(),
   })
   runtimeResources.register({
     name: 'claude-usage-reconciliation',

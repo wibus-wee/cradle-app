@@ -1,4 +1,5 @@
 import type { RuntimeLiveResourceLease } from '../../chat-runtime/runtime-provider-types'
+import type { RuntimeKind } from '../../provider-contracts/types'
 import type {
   ProviderRuntimeHostKey,
   ProviderRuntimeHostSnapshot,
@@ -33,6 +34,13 @@ export function invalidateProviderProcessHostResource(hostId: string, expectedRe
 
 export function listProviderProcessHosts(): ProviderProcessHostSnapshot[] {
   return providerRuntimeHostManager.listHosts()
+}
+
+export function collectProviderProcessHostResources<T>(
+  runtimeKind: RuntimeKind,
+  callback: (resource: unknown, entry: ProviderProcessHostSnapshot) => T | undefined,
+): T[] {
+  return providerRuntimeHostManager.collectResources(runtimeKind, callback)
 }
 
 export function createDetachedProcessHostLease<Resource>(

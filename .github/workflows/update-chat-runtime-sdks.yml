@@ -52,6 +52,7 @@ jobs:
           pnpm --filter @cradle/server up "@anthropic-ai/claude-agent-sdk@${CLAUDE_AGENT_SDK_VERSION}"
           pnpm --filter @cradle/desktop sync:codex-runtime
           pnpm --filter @cradle/server generate:codex-app-server-protocol
+          pnpm --filter @cradle/server sync:codex-runtime-manifest
           pnpm --filter @cradle/server generate:kimi-web-protocol
 
       - name: Create or update SDK pull request
@@ -70,6 +71,7 @@ jobs:
             apps/server/package.json
             pnpm-lock.yaml
             apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/**
+            apps/server/src/modules/chat-runtime-providers/codex/codex-runtime-manifest.json
             apps/server/src/modules/chat-runtime-providers/codex/app-server/capabilities.ts
             apps/server/src/modules/provider-contracts/codex-config-schema/**
             apps/server/src/modules/chat-runtime-providers/kimi/protocol/**

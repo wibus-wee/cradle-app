@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "sdkVersion": "0.153.4",
+  "releaseTag": "rust-v0.153.4",
+  "repository": "openai/codex",
+  "targets": {
+    "darwin-arm64": {
+      "appServer": {
+        "assetName": "codex-app-server-aarch64-apple-darwin.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 68183444,
+        "sha256": "1c68b24d3191fb7d5f57e1c15472fd87a5aa06c18160dd0430b21f10c6abe7f6"
+      },
+      "codeModeHost": {
+        "assetName": "codex-code-mode-host-aarch64-apple-darwin.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 22569619,
+        "sha256": "45a9b0fdf53b98b85a6bb91e175dd90e961328a7a14fb50a40902205199df1df"
+      }
+    },
+    "darwin-x64": {
+      "appServer": {
+        "assetName": "codex-app-server-x86_64-apple-darwin.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 74311579,
+        "sha256": "1c7bcc3037d204305a81976227153250b58e546109b882649fee5420a14b7591"
+      },
+      "codeModeHost": {
+        "assetName": "codex-code-mode-host-x86_64-apple-darwin.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 24311461,
+        "sha256": "2ffaebd0103d976232c358419a508859da862e128f3ca0bb071541346fbe3bf7"
+      }
+    },
+    "linux-arm64": {
+      "appServer": {
+        "assetName": "codex-app-server-aarch64-unknown-linux-musl.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 71472352,
+        "sha256": "d2a3d0882f6eb4ddb84dfe1c90c5113dfbe32301f718706da0acd276770d3c75"
+      },
+      "codeModeHost": {
+        "assetName": "codex-code-mode-host-aarch64-unknown-linux-musl.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 24358441,
+        "sha256": "d8047b8d33370d6090e729d27eb76de60a2686baa1c143c138c9b05dc70d813b"
+      }
+    },
+    "linux-x64": {
+      "appServer": {
+        "assetName": "codex-app-server-x86_64-unknown-linux-musl.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 77514699,
+        "sha256": "ace0e794c53d0c1abe2fdb9248684904d04b08aca5a7851bc4a7ce0887773cf0"
+      },
+      "codeModeHost": {
+        "assetName": "codex-code-mode-host-x86_64-unknown-linux-musl.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 25733165,
+        "sha256": "f95830a869590957664bbfc67bccb08773806b693670baf15908176f89b4cd31"
+      }
+    },
+    "win32-arm64": {
+      "appServer": {
+        "assetName": "codex-app-server-aarch64-pc-windows-msvc.exe.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 70443720,
+        "sha256": "b449726b0a75e47a2ea3161c466bd122aa87d4c1215c3df6e09cf5620cda220f"
+      },
+      "codeModeHost": {
+        "assetName": "codex-code-mode-host-aarch64-pc-windows-msvc.exe.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 26574814,
+        "sha256": "ba8d8ed6556f099909db12802d20f1f7058788c22a8a571cdf23f0c059a6af41"
+      }
+    },
+    "win32-x64": {
+      "appServer": {
+        "assetName": "codex-app-server-x86_64-pc-windows-msvc.exe.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 76919116,
+        "sha256": "7f924beba3182f808197c1df01135d4932468f3be20fb2ac82308ac850e01b91"
+      },
+      "codeModeHost": {
+        "assetName": "codex-code-mode-host-x86_64-pc-windows-msvc.exe.tar.gz",
+        "format": "tar.gz",
+        "sizeBytes": 27924129,
+        "sha256": "82f9455e7bc71f28c7df6bf0998ff1dc02d317ee0259adde103fab66615e7c5e"
+      }
+    }
+  }
+}
