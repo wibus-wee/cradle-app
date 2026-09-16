@@ -20,6 +20,7 @@ import {
 import { buildClaudeQueryOptions, createClaudeStderrSink } from './input-projector'
 import { projectClaudeAgentPresentation } from './metadata'
 import type { ActiveClaudeQuery, ContextUsageRuntimeInput } from './provider-internals'
+import { trackClaudeManagedQuery } from './runtime-executable'
 import {
   projectClaudeAgentCrewUiSlotState,
   projectClaudeAgentPlanUiSlotState,
@@ -60,7 +61,10 @@ export class ClaudeAgentPresentation {
       persistSession: false,
       onStderr: stderrSink.onStderr,
     })
-    const activeQuery = query({ prompt: emptyClaudeAgentInput(), options: queryOptions })
+    const activeQuery = trackClaudeManagedQuery(
+      query({ prompt: emptyClaudeAgentInput(), options: queryOptions }),
+      queryOptions,
+    )
 
     try {
       const slashCommands = await activeQuery.supportedCommands()

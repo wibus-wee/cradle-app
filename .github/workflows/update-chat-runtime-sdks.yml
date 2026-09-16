@@ -50,6 +50,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           pnpm --filter @cradle/server up "@anthropic-ai/claude-agent-sdk@${CLAUDE_AGENT_SDK_VERSION}"
+          pnpm --filter @cradle/server sync:claude-code-runtime-manifest
           pnpm --filter @cradle/desktop sync:codex-runtime
           pnpm --filter @cradle/server generate:codex-app-server-protocol
           pnpm --filter @cradle/server sync:codex-runtime-manifest
@@ -72,6 +73,7 @@ jobs:
             pnpm-lock.yaml
             apps/server/src/modules/chat-runtime-providers/codex/app-server-protocol/**
             apps/server/src/modules/chat-runtime-providers/codex/codex-runtime-manifest.json
+            apps/server/src/modules/chat-runtime-providers/claude-agent/claude-code-runtime-manifest.json
             apps/server/src/modules/chat-runtime-providers/codex/app-server/capabilities.ts
             apps/server/src/modules/provider-contracts/codex-config-schema/**
             apps/server/src/modules/chat-runtime-providers/kimi/protocol/**

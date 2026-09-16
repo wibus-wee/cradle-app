@@ -23,6 +23,7 @@
     "start": "node dist/main.js",
     "generate:codex-app-server-protocol": "node scripts/generate-codex-app-server-protocol.mjs && node scripts/generate-codex-app-server-capabilities.mjs && node scripts/sync-codex-config-schema.mjs",
     "sync:codex-runtime-manifest": "node scripts/sync-codex-runtime-manifest.mjs",
+    "sync:claude-code-runtime-manifest": "node scripts/sync-claude-code-runtime-manifest.mjs",
     "sync:codex-config-schema": "node scripts/sync-codex-config-schema.mjs",
     "generate:codex-app-server-capabilities": "node scripts/generate-codex-app-server-capabilities.mjs",
     "generate:kimi-web-protocol": "tsx scripts/generate-kimi-web-protocol.ts",
