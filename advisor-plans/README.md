@@ -11,10 +11,10 @@ conditions, and update the status row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |---|---|---|---|---|---|
-| 001 | Build a deterministic Anthropic Messages and OpenAI Responses API simulator | P1 | L | — | IN PROGRESS |
+| 001 | Build a deterministic Anthropic Messages and OpenAI Responses API simulator | P1 | L | — | DONE (`packages/model-api-simulator` with anthropic/openai implementations; 49 tests incl. official-SDK conformance pass) |
 | 002 | Expose committed chat-run activity to server plugins | P1 | M | — | DONE |
 | 003 | UI activity pipeline with Jarvis, analytics, and web plugin sinks | P1 | L | — | DONE |
-| 004 | ACP runtime negotiation, turn correctness, and authentication | P1 | L | — | TODO |
+| 004 | ACP runtime negotiation, turn correctness, and authentication | P1 | L | — | DONE (runtime gaps completed in `098e0c4e` #202; auth-methods/auth-set/auth-clear routes + CLI; legacy env_var auth removed in `29c53209` #214) |
 
 Status values: `TODO` | `IN PROGRESS` | `DONE` | `BLOCKED` (with a one-line
 reason) | `REJECTED` (with a one-line rationale).
