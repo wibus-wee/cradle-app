@@ -85,6 +85,92 @@ describe('submitAndClearDraft', () => {
     expect(promptEditor.getText()).toBe('')
   })
 
+  it('clears the editor once when the submit resolves false asynchronously', async () => {
+    const promptEditor = createPromptEditor('Keep this objective')
+    const onResult = vi.fn()
+
+    const submissionStarted = submitDraft({
+      onResult,
+      promptEditor,
+      submit: () => Promise.resolve(false),
+    })
+
+    expect(submissionStarted).toBe(true)
+    expect(promptEditor.getText()).toBe('')
+    await vi.waitFor(() => expect(promptEditor.getText()).toBe('Keep this objective'))
+    expect(onResult).toHaveBeenCalledWith({ accepted: false, restored: true })
+  })
+
+  it('reports synchronous accept without restoring the draft', () => {
+    const promptEditor = createPromptEditor('Keep this objective')
+    const onResult = vi.fn()
+
+    const submissionStarted = submitAndClearDraft({
+      appendFileParts: vi.fn<(fileParts: FileUIPart[]) => void>(),
+      clearAttachments: vi.fn(),
+      contextParts: [],
+      dispatch: vi.fn<(action: ComposerAction) => void>(),
+      files: [],
+      onResult,
+      promptEditor,
+      submit: () => true,
+      text: 'Keep this objective',
+    })
+
+    expect(submissionStarted).toBe(true)
+    expect(promptEditor.getText()).toBe('')
+    expect(onResult).toHaveBeenCalledWith({ accepted: true, restored: false })
+  })
+
+  it('does not overwrite a newer edit when an async submit is rejected', async () => {
+    const promptEditor = createPromptEditor('Keep this objective')
+    const onResult = vi.fn()
+    let resolveSubmit: (result: boolean) => void = () => {}
+
+    const submissionStarted = submitDraft({
+      onResult,
+      promptEditor,
+      submit: () => new Promise<boolean>((resolve) => {
+        resolveSubmit = resolve
+      }),
+    })
+
+    expect(submissionStarted).toBe(true)
+    expect(promptEditor.getText()).toBe('')
+
+    // The user starts a newer draft while the rejection is still in flight.
+    promptEditor.setText('Newer draft')
+    resolveSubmit(false)
+
+    await vi.waitFor(() => expect(onResult).toHaveBeenCalledWith({ accepted: false, restored: true }))
+    expect(promptEditor.getText()).toBe('Newer draft')
+  })
+
+  it('restores attachments with the snapshot when an async submit is rejected', async () => {
+    const promptEditor = createPromptEditor('Keep this objective')
+    const onResult = vi.fn()
+    const appendFileParts = vi.fn<(fileParts: FileUIPart[]) => void>()
+    const files: FileUIPart[] = [
+      { type: 'file', mediaType: 'image/png', url: 'data:image/png;base64,AAA', filename: 'a.png' },
+    ]
+
+    const submissionStarted = submitAndClearDraft({
+      appendFileParts,
+      clearAttachments: vi.fn(),
+      contextParts: [],
+      dispatch: vi.fn<(action: ComposerAction) => void>(),
+      files,
+      onResult,
+      promptEditor,
+      submit: () => Promise.resolve(false),
+      text: 'Keep this objective',
+    })
+
+    expect(submissionStarted).toBe(true)
+    await vi.waitFor(() => expect(promptEditor.getText()).toBe('Keep this objective'))
+    expect(appendFileParts).toHaveBeenCalledWith(files)
+  })
+
   it('does not start a submission when the sender rejects it synchronously', () => {
     const promptEditor = createPromptEditor('Keep this objective')
     const onResult = vi.fn()
