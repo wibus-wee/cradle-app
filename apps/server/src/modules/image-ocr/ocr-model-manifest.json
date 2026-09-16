@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "packageName": "@arcships/light-ocr-model-ppocrv6-small",
+  "version": "0.3.4",
+  "bundleId": "ppocrv6-small-native-20260719.1",
+  "registry": "https://registry.npmjs.org",
+  "tarball": "https://registry.npmjs.org/@arcships/light-ocr-model-ppocrv6-small/-/light-ocr-model-ppocrv6-small-0.3.4.tgz",
+  "unpackedSizeBytes": 73594252,
+  "sha512": "176463c77c6888ac3579473f0d6e64e7fb75025bd67d17940d376945d40a3420f3e58f186227fed7908774fcfb59db7f3736bb76b0ce33735319422e036d0447"
+}

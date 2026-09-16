@@ -75,6 +75,8 @@ import * as GitHubAuth from './modules/github-auth/service'
 import { health } from './modules/health'
 import * as Health from './modules/health/service'
 import { imageOcr } from './modules/image-ocr'
+import { createOcrModelManagedResourceAdapter } from './modules/image-ocr/managed-resource-adapter'
+import { OcrModelInstallationService } from './modules/image-ocr/model-installation'
 import { issue } from './modules/issue'
 import { issueAgent } from './modules/issue-agent'
 import { javascriptEval } from './modules/javascript-eval'
@@ -138,6 +140,7 @@ interface CreateServerContractAppOptions {
   opencodeRuntimeInstallationService?: OpencodeRuntimeInstallationService
   codexRuntimeInstallationService?: CodexRuntimeInstallationService
   claudeCodeRuntimeInstallationService?: ClaudeCodeRuntimeInstallationService
+  ocrModelInstallationService?: OcrModelInstallationService
 }
 
 const HOSTED_WEB_APP_ORIGINS = new Set([
@@ -213,6 +216,9 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   const claudeCodeRuntimeInstallation
     = options.claudeCodeRuntimeInstallationService
       ?? new ClaudeCodeRuntimeInstallationService({ downloadCenter: downloadCenter.service })
+  const ocrModelInstallation
+    = options.ocrModelInstallationService
+      ?? new OcrModelInstallationService({ downloadCenter: downloadCenter.service })
   const managedResources
     = options.managedResourceService
       ?? new ManagedResourceService([
@@ -220,6 +226,7 @@ export async function createServerContractApp(options: CreateServerContractAppOp
       createOpencodeManagedResourceAdapter(opencodeRuntimeInstallation),
       createCodexManagedResourceAdapter(codexRuntimeInstallation),
       createClaudeManagedResourceAdapter(claudeCodeRuntimeInstallation),
+      createOcrModelManagedResourceAdapter(ocrModelInstallation),
     ])
   const app = new Elysia({
     name: 'cradle.server.elysia',
@@ -365,6 +372,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     opencodeRuntimeInstallationService,
     codexRuntimeInstallationService,
     claudeCodeRuntimeInstallationService,
+    ocrModelInstallationService,
     serverConfig,
     runtime,
   ] = await runBootstrapPhase(bootstrapReporter, 'service-initialization', async () => {
@@ -418,16 +426,21 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       downloadCenter: downloadCenterService,
       prepareManagedPathForRemoval: prepareClaudeManagedPathForRemoval,
     })
+    const ocrModelInstallationService = new OcrModelInstallationService({
+      downloadCenter: downloadCenterService,
+    })
     await Promise.all([
       opencodeRuntimeInstallationService.boot(),
       codexRuntimeInstallationService.boot(),
       claudeCodeRuntimeInstallationService.boot(),
+      ocrModelInstallationService.boot(),
     ])
     const managedResourceService = new ManagedResourceService([
       createChronicleManagedResourceAdapter(downloadCenterService),
       createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
       createCodexManagedResourceAdapter(codexRuntimeInstallationService),
       createClaudeManagedResourceAdapter(claudeCodeRuntimeInstallationService),
+      createOcrModelManagedResourceAdapter(ocrModelInstallationService),
     ])
     chronicleService.startMemoryEmbeddingIndexer()
     chronicleService.reconcileMemoryEmbeddingCandidateIndex()
@@ -438,6 +451,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       opencodeRuntimeInstallationService,
       codexRuntimeInstallationService,
       claudeCodeRuntimeInstallationService,
+      ocrModelInstallationService,
     })
     Health.check()
     Worktree.registerStorageMeasurementActivity({
@@ -486,6 +500,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       opencodeRuntimeInstallationService,
       codexRuntimeInstallationService,
       claudeCodeRuntimeInstallationService,
+      ocrModelInstallationService,
       serverConfig,
       {
         abortAllRuns,
@@ -598,6 +613,11 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     name: 'claude-code-runtime-installation',
     phase: 'drain',
     stop: () => claudeCodeRuntimeInstallationService.shutdown(),
+  })
+  runtimeResources.register({
+    name: 'ocr-model-installation',
+    phase: 'drain',
+    stop: () => ocrModelInstallationService.shutdown(),
   })
   runtimeResources.register({
     name: 'claude-usage-reconciliation',
