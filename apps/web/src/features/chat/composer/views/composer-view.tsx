@@ -13,10 +13,8 @@ import {
 } from 'react'
 
 import type { RuntimeKind } from '~/features/agent-runtime/types'
-import { useComposerDraftSync } from '~/hooks/use-composer-draft-sync'
 import { cn } from '~/lib/cn'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
-import type { ComposerDraft } from '~/store/composer-draft'
 
 import type {
   ChatRuntimeCompactUiSlotState,
@@ -79,6 +77,8 @@ import {
   reportComposerSubmitError,
   submitAndClearDraft,
 } from '../composer-submit'
+import type { ComposerDraft } from '../draft/composer-draft-store'
+import { useComposerDraftSync } from '../draft/use-composer-draft-sync'
 import type {
   PromptEditorController,
   PromptEditorSnapshot,
@@ -325,6 +325,8 @@ export function ComposerView({
     handleDraftPartsChange,
     replaceDraft: syncedReplaceDraft,
     replaceDraftKey: syncedReplaceDraftKey,
+    beginDraftSubmit,
+    settleDraftSubmit,
   } = useComposerDraftSync(surfaceId ?? '')
   // Parent-provided replaceDraft takes priority (e.g. queue item editing)
   const replaceDraft = parentReplaceDraft ?? (surfaceId ? syncedReplaceDraft : undefined)
@@ -645,7 +647,8 @@ export function ComposerView({
         }
 
         dispatch({ type: 'slash/selected', inputValue: currentState.inputValue, command: null })
-        const submissionStarted = submitAndClearDraft({
+        const submitToken = beginDraftSubmit()
+        submitAndClearDraft({
           appendFileParts: appendComposerFileParts,
           clearAttachments: clearComposerAttachments,
           contextParts: [],
@@ -654,11 +657,11 @@ export function ComposerView({
           promptEditor: promptEditorRef.current,
           submit,
           text: submitText,
-          onResult: handleSubmitResult,
+          onResult: (outcome) => {
+            handleSubmitResult(outcome)
+            settleDraftSubmit(submitToken, outcome.accepted)
+          },
         })
-        if (submissionStarted && surfaceId) {
-          clearSyncedDraft()
-        }
         requestAnimationFrame(() => promptEditorRef.current?.focus())
         return
       }
@@ -687,15 +690,15 @@ export function ComposerView({
     },
     [
       appendComposerFileParts,
+      beginDraftSubmit,
       clearComposerAttachments,
       composerAttachments,
       disabled,
-      clearSyncedDraft,
       handleSubmitResult,
       isSending,
       onSlashCommandAction,
       sendDisabled,
-      surfaceId,
+      settleDraftSubmit,
       submit,
     ],
   )
@@ -753,7 +756,8 @@ export function ComposerView({
         }
       }
 
-      const submissionStarted = submitAndClearDraft({
+      const submitToken = beginDraftSubmit()
+      submitAndClearDraft({
         appendFileParts: appendComposerFileParts,
         clearAttachments: clearComposerAttachments,
         contextParts,
@@ -763,19 +767,19 @@ export function ComposerView({
         promptEditor: promptEditorRef.current,
         submit: submitHandler,
         text,
-        onResult: handleSubmitResult,
+        onResult: (outcome) => {
+          handleSubmitResult(outcome)
+          settleDraftSubmit(submitToken, outcome.accepted)
+        },
       })
-      if (submissionStarted && surfaceId) {
-        clearSyncedDraft()
-      }
     },
     [
       allowEmptySend,
       appendComposerFileParts,
       bangPty,
       bangPtyActive,
+      beginDraftSubmit,
       clearComposerAttachments,
-      clearSyncedDraft,
       composerAttachments,
       disabled,
       inputCollapsed,
@@ -786,7 +790,7 @@ export function ComposerView({
       submit,
       handleSubmitResult,
       pastedTexts,
-      surfaceId,
+      settleDraftSubmit,
     ],
   )
 

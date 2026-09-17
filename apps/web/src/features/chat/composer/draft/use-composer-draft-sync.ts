@@ -1,44 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import {
-  activateComposerDraftSurface,
-  queueServerComposerDraftDelete,
-  queueServerComposerDraftWrite,
-  readServerComposerDraft,
-} from '~/features/chat/commands/composer-draft-command'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import type { ComposerPastedText } from '~/features/chat/pasted-text/pasted-text'
-import type { ComposerDraft } from '~/store/composer-draft'
-import { useComposerDraftStore } from '~/store/composer-draft'
 
-const DEBOUNCE_MS = 300
-
-const EMPTY_COMPOSER_DRAFT: ComposerDraft = {
-  text: '',
-  contextParts: [],
-  files: [],
-  pastedTexts: [],
-}
+import type { ComposerDraftSubmitToken } from './composer-draft-lifecycle'
+import {
+  activateComposerDraftSurface,
+  beginComposerDraftSubmit,
+  changeComposerDraft,
+  clearComposerDraft,
+  flushComposerDraft,
+  noteComposerDraftRestore,
+  queueComposerDraftServerWrite,
+  settleComposerDraftSubmit,
+} from './composer-draft-lifecycle'
+import { readServerComposerDraft } from './composer-draft-server'
+import type { ComposerDraft } from './composer-draft-store'
+import {
+  EMPTY_COMPOSER_DRAFT,
+  hasComposerDraftContent,
+  useComposerDraftStore,
+} from './composer-draft-store'
 
 interface ReplaceDraftState {
   draft: ComposerDraft | undefined
   key: number
 }
 
-function hasComposerDraftContent(draft: ComposerDraft): boolean {
-  return (
-    draft.text.trim() !== ''
-    || draft.contextParts.length > 0
-    || draft.files.length > 0
-    || draft.pastedTexts.length > 0
-  )
-}
-
 /**
  * Syncs a Composer's draft text + context parts with localStorage and the server LWW draft row.
  *
- * On mount: reads local draft synchronously, then reconciles the server draft.
- * On change: debounced local save plus serialized server write/delete.
+ * On mount: activates the surface lifecycle, reads the local draft
+ * synchronously, then reconciles the server draft. On change: routes through
+ * the per-surface lifecycle owner, which owns the debounce, serialized server
+ * writes, discard suppression, and submit tombstone settlement.
  *
  * When surfaceId is empty, all returned handlers are no-ops.
  */
@@ -62,7 +57,6 @@ export function useComposerDraftSync(surfaceId: string) {
   const skipNextEmptyDraftChangeRef = useRef(
     Boolean(replaceDraftState.draft && hasComposerDraftContent(replaceDraftState.draft)),
   )
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const activeSurfaceId = enabled ? surfaceId : null
@@ -81,9 +75,8 @@ export function useComposerDraftSync(surfaceId: string) {
       return
     }
 
-    activateComposerDraftSurface(surfaceId)
-
     const localDraft = getDraft(surfaceId)
+    activateComposerDraftSurface(surfaceId, localDraft)
     draftRef.current = localDraft ?? EMPTY_COMPOSER_DRAFT
     if (surfaceChanged) {
       skipNextEmptyDraftChangeRef.current = Boolean(
@@ -107,6 +100,7 @@ export function useComposerDraftSync(surfaceId: string) {
 
         if (serverDraft.draft) {
           setDraft(surfaceId, serverDraft.draft)
+          noteComposerDraftRestore(surfaceId, serverDraft.draft, { persistedOnServer: true })
           draftRef.current = serverDraft.draft
           skipNextEmptyDraftChangeRef.current = hasComposerDraftContent(serverDraft.draft)
           setReplaceDraftState(state => ({
@@ -118,6 +112,7 @@ export function useComposerDraftSync(surfaceId: string) {
 
         if (serverDraft.revision > 0) {
           deleteDraft(surfaceId)
+          noteComposerDraftRestore(surfaceId, EMPTY_COMPOSER_DRAFT, { persistedOnServer: true })
           draftRef.current = EMPTY_COMPOSER_DRAFT
           setReplaceDraftState(state => ({
             draft: EMPTY_COMPOSER_DRAFT,
@@ -127,7 +122,7 @@ export function useComposerDraftSync(surfaceId: string) {
         }
 
         if (localDraft && hasComposerDraftContent(localDraft)) {
-          queueServerComposerDraftWrite(surfaceId, localDraft)
+          queueComposerDraftServerWrite(surfaceId, localDraft)
         }
       }
  catch {
@@ -140,26 +135,15 @@ export function useComposerDraftSync(surfaceId: string) {
     }
   }, [enabled, surfaceId, getDraft, setDraft, deleteDraft])
 
-  // Flush pending save on unmount
+  // Flush pending save on unmount — a no-op once the surface is discarded.
   useEffect(() => {
     if (!enabled) {
       return
     }
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-        const draft = draftRef.current
-        if (hasComposerDraftContent(draft)) {
-          setDraft(surfaceId, draft)
-          queueServerComposerDraftWrite(surfaceId, draft)
-          return
-        }
-        deleteDraft(surfaceId)
-        queueServerComposerDraftDelete(surfaceId)
-      }
+      flushComposerDraft(surfaceId)
     }
-  }, [enabled, surfaceId, setDraft, deleteDraft])
+  }, [enabled, surfaceId])
 
   const clearDraft = useCallback(() => {
     if (!enabled) {
@@ -170,14 +154,8 @@ export function useComposerDraftSync(surfaceId: string) {
     draftRef.current = EMPTY_COMPOSER_DRAFT
     skipNextEmptyDraftChangeRef.current = false
 
-    if (timerRef.current) {
-      clearTimeout(timerRef.current)
-      timerRef.current = null
-    }
-
-    deleteDraft(surfaceId)
-    queueServerComposerDraftDelete(surfaceId)
-  }, [enabled, surfaceId, deleteDraft])
+    clearComposerDraft(surfaceId)
+  }, [enabled, surfaceId])
 
   const handleDraftPartsChange = useCallback(
     (
@@ -205,25 +183,26 @@ export function useComposerDraftSync(surfaceId: string) {
       localEditVersionRef.current += 1
       draftRef.current = draft
 
-      if (timerRef.current) {
-        clearTimeout(timerRef.current)
-        timerRef.current = null
-      }
+      changeComposerDraft(surfaceId, draft)
+    },
+    [enabled, surfaceId],
+  )
 
-      // Don't persist empty drafts
-      if (!draftHasContent) {
-        deleteDraft(surfaceId)
-        queueServerComposerDraftDelete(surfaceId)
+  const beginDraftSubmit = useCallback((): ComposerDraftSubmitToken | null => {
+    if (!enabled) {
+      return null
+    }
+    return beginComposerDraftSubmit(surfaceId)
+  }, [enabled, surfaceId])
+
+  const settleDraftSubmit = useCallback(
+    (token: ComposerDraftSubmitToken | null, accepted: boolean) => {
+      if (!enabled) {
         return
       }
-
-      timerRef.current = setTimeout(() => {
-        timerRef.current = null
-        setDraft(surfaceId, draft)
-        queueServerComposerDraftWrite(surfaceId, draft)
-      }, DEBOUNCE_MS)
+      settleComposerDraftSubmit(surfaceId, token, accepted)
     },
-    [enabled, surfaceId, setDraft, deleteDraft],
+    [enabled, surfaceId],
   )
 
   return {
@@ -235,5 +214,12 @@ export function useComposerDraftSync(surfaceId: string) {
     clearDraft,
     /** Wire into Composer's view.onDraftPartsChange */
     handleDraftPartsChange,
+    /**
+     * Marks a submission start so the optimistic clear does not delete the
+     * persisted draft. Returns a token to settle via `settleDraftSubmit`.
+     */
+    beginDraftSubmit,
+    /** Commits exactly one tombstone when the submission is accepted. */
+    settleDraftSubmit,
   }
 }
