@@ -28,6 +28,7 @@ import { SurfaceActivityProvider } from '~/navigation/surface-activity-context'
 import type { SurfaceRoute } from '~/navigation/surface-identity'
 import { layoutSlotIdForRoute, layoutSlotIdForSurface } from '~/navigation/surface-identity'
 import { installSurfaceResourceLifecycle } from '~/navigation/surface-resource-lifecycle'
+import { surfaceRouteNavigateOptions } from '~/navigation/surface-route-codec'
 import { useSurfaceStore } from '~/navigation/surface-store'
 import { useTearoffSurfaceBinding } from '~/navigation/tearoff-binding'
 import { installTearoffSurfaceRestore } from '~/navigation/tearoff-surfaces'
@@ -183,7 +184,7 @@ function TearoffAppRuntime() {
     if (!surfaceRoute) {
       return
     }
-    void navigate({ ...surfaceRoute, replace: true } as Parameters<typeof navigate>[0])
+    void navigate(surfaceRouteNavigateOptions(surfaceRoute, { replace: true }))
   }, [navigate, surfaceRoute])
 
   useEffect(() => {

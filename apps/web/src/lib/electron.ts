@@ -1,6 +1,7 @@
 import { createIpcProxy } from '@cradle/ipc/client'
 
 import type { SurfaceRoute } from '~/navigation/surface-identity'
+import { parseSurfaceRoute } from '~/navigation/surface-route-codec'
 
 import {
   getRendererServerUrl,
@@ -80,7 +81,7 @@ export const tearoffSurfaceId = window.cradle?.env?.surface ?? null
  * The route to navigate to inside a tearoff window. Null outside tearoff windows
  * or when the surface route could not be parsed.
  */
-export const tearoffSurfaceRoute = (window.cradle?.env?.surfaceRoute ?? null) as SurfaceRoute | null
+export const tearoffSurfaceRoute = parseSurfaceRoute(window.cradle?.env?.surfaceRoute)
 
 /**
  * The OS platform.

@@ -1,37 +1,10 @@
 import { router } from '~/router'
 
+import type { DiffAnchorSide } from './search-params'
 import { WORKING_TREE_REVIEW_ID } from './types'
-
-export interface DiffsViewSearch {
-  workspace?: string
-  repo?: string
-  path?: string
-  review?: string
-  line?: number
-  side?: 'base' | 'head'
-}
 
 function normalizeRepositoryPath(repositoryPath?: string | null): string | undefined {
   return repositoryPath && repositoryPath !== '.' ? repositoryPath : undefined
-}
-
-/**
- * Coerce a route search value (string from the URL, or number from in-memory navigation) into a
- * positive integer. Used by the diff route `validateSearch` schemas so `line` arrives typed.
- */
-export function parsePositiveInt(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
-    return value
-  }
-  if (typeof value === 'string' && /^\d+$/.test(value)) {
-    const parsed = Number(value)
-    return parsed > 0 ? parsed : undefined
-  }
-  return undefined
-}
-
-export function parseAnchorSide(value: unknown): 'base' | 'head' | undefined {
-  return value === 'base' || value === 'head' ? value : undefined
 }
 
 function navigateWithinCurrentDiffSurface(input: {
@@ -40,7 +13,7 @@ function navigateWithinCurrentDiffSurface(input: {
   path?: string | null
   review?: string
   line?: number | null
-  side?: 'base' | 'head' | null
+  side?: DiffAnchorSide | null
   replace?: boolean
 }): void {
   const repo = normalizeRepositoryPath(input.repositoryPath)
@@ -104,7 +77,7 @@ export function navigateToReviewAtAnchor(
     repositoryPath?: string | null
     path: string
     line?: number
-    side?: 'base' | 'head'
+    side?: DiffAnchorSide
   },
 ): void {
   navigateWithinCurrentDiffSurface({

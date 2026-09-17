@@ -1,44 +1,32 @@
 import { getI18n } from '~/i18n/instance'
 
-export type SurfaceKind
-  = | 'home'
-    | 'new-work'
-    | 'work'
-    | 'pull-requests'
-    | 'new-chat'
-    | 'chat'
-    | 'diff'
-    | 'workspace'
-    | 'workspace-diffs'
-    | 'kanban'
-    | 'plugin'
-    | 'plugin-center'
-    | 'awaits'
-    | 'automation'
-    | 'usage'
-    | 'settings'
-    | 'onboarding'
-    | 'devtool'
+import type { SurfaceKind, SurfaceRoute } from './surface-route-codec'
+import {
+  HOME_SURFACE_ID,
+  pullRequestsSurfaceId,
+  surfaceIdForRoute,
+  surfaceKindForRoute,
+  surfaceRouteFromLocation,
+  workSurfaceId,
+} from './surface-route-codec'
 
-export type SurfaceRoute
-  = | { to: '/', params?: undefined, search?: undefined }
-    | { to: '/work/new', params?: undefined, search?: { workspaceId?: string, issueId?: string } }
-    | { to: '/work/$workId', params: { workId: string }, search?: undefined }
-    | { to: '/pull-requests', params?: undefined, search?: { workId?: string } }
-    | { to: '/chat/new', params?: undefined, search?: { issueId?: string, workspaceId?: string, sessionGroupId?: string } }
-    | { to: '/chat/$sessionId', params: { sessionId: string }, search?: undefined }
-    | { to: '/diff', params?: undefined, search?: { workspace?: string, repo?: string, path?: string, review?: string } }
-    | { to: '/workspaces/$workspaceId', params: { workspaceId: string }, search?: undefined }
-    | { to: '/workspaces/$workspaceId/diffs', params: { workspaceId: string }, search?: { repo?: string, path?: string, review?: string } }
-    | { to: '/kanban/$boardId', params: { boardId: string }, search?: { issue?: string, milestoneId?: string } }
-    | { to: '/plugins/$routeSegment/$localId', params: { routeSegment: string, localId: string }, search?: undefined }
-    | { to: '/plugins', params?: undefined, search?: undefined }
-    | { to: '/awaits', params?: undefined, search?: undefined }
-    | { to: '/automation', params?: undefined, search?: undefined }
-    | { to: '/usage', params?: undefined, search?: undefined }
-    | { to: '/settings/$section', params: { section: string }, search?: undefined }
-    | { to: '/onboarding', params?: undefined, search?: undefined }
-    | { to: '/devtool', params?: undefined, search?: undefined }
+export type { SurfaceKind, SurfaceRoute } from './surface-route-codec'
+export {
+  chatSurfaceId,
+  diffSurfaceId,
+  HOME_SURFACE_ID,
+  isSurfaceKindPersistable,
+  kanbanSurfaceId,
+  parseSurfaceRoute,
+  pluginSurfaceId,
+  pullRequestsSurfaceId,
+  surfaceIdForRoute,
+  surfaceKindForRoute,
+  surfaceRouteNavigateOptions,
+  workspaceDiffsSurfaceId,
+  workspaceSurfaceId,
+  workSurfaceId,
+} from './surface-route-codec'
 
 export interface AppSurface {
   id: string
@@ -56,8 +44,6 @@ export interface SurfaceDraft {
   route: SurfaceRoute
   closable: boolean
 }
-
-export const HOME_SURFACE_ID = 'home'
 
 export const HOME_SURFACE: AppSurface = {
   id: HOME_SURFACE_ID,
@@ -78,421 +64,58 @@ export function createHomeSurfaceDraft(): SurfaceDraft {
   }
 }
 
-export function chatSurfaceId(sessionId: string): string {
-  return `chat:${sessionId}`
-}
-
-export function workSurfaceId(workId: string): string {
-  return `work:${workId}`
-}
-
-export function pullRequestsSurfaceId(): string {
-  return 'pull-requests'
-}
-
-export function workspaceSurfaceId(workspaceId: string): string {
-  return `workspace:${workspaceId}`
-}
-
-export function workspaceDiffsSurfaceId(workspaceId: string): string {
-  return `workspace-diffs:${workspaceId}`
-}
-
-export function diffSurfaceId(): string {
-  return 'diff'
-}
-
-export function kanbanSurfaceId(boardId: string): string {
-  return `kanban:${boardId}`
-}
-
-export function pluginSurfaceId(routeSegment: string, localId: string): string {
-  return `plugin:${routeSegment}:${localId}`
+/**
+ * Surface titles are presentation metadata, not part of route identity —
+ * they resolve at draft time and may be replaced later by live resource data
+ * (e.g. chat session titles) via `updateSurfaceTitle`.
+ */
+const SURFACE_TITLES: Record<SurfaceKind, () => string> = {
+  'home': () => getI18n().t('chrome:surface.home'),
+  'new-work': () => getI18n().t('work:surface.new'),
+  'work': () => getI18n().t('work:surface.work'),
+  'pull-requests': () => getI18n().t('pull-requests:surface.title'),
+  'new-chat': () => getI18n().t('chrome:surface.newChat'),
+  'chat': () => 'Chat',
+  'diff': () => 'Cradle Diffs',
+  'workspace': () => 'Workspace',
+  'workspace-diffs': () => 'Cradle Diffs',
+  'kanban': () => getI18n().t('chrome:surface.kanban'),
+  'plugin': () => getI18n().t('settings:plugins.panel.fallbackTitle'),
+  'plugin-center': () => getI18n().t('settings:plugins.center.title'),
+  'awaits': () => 'Awaits',
+  'automation': () => 'Automations',
+  'usage': () => getI18n().t('chrome:surface.usage'),
+  'settings': () => 'Settings',
+  'onboarding': () => 'Onboarding',
+  'devtool': () => 'Devtool',
 }
 
 /**
- * Canonical identity of a route instance. Two routes that address the same
- * thing (same chat, same workspace, same settings page) share one id, which is
- * what makes a route usable both as a surface (tab) and as a split pane — the
- * same interface can never be opened twice inside one workspace.
+ * Router-state → surface draft: the codec decodes the canonical route, and
+ * this module decorates it with surface identity (id, kind) and presentation
+ * metadata (title). Unknown or malformed locations produce no draft.
  */
-export function surfaceIdForRoute(route: SurfaceRoute): string {
-  switch (route.to) {
-    case '/':
-      return HOME_SURFACE_ID
-    case '/work/new':
-      return 'new-work'
-    case '/work/$workId':
-      return workSurfaceId(route.params.workId)
-    case '/pull-requests':
-      return pullRequestsSurfaceId()
-    case '/chat/new':
-      return 'new-chat'
-    case '/chat/$sessionId':
-      return chatSurfaceId(route.params.sessionId)
-    case '/diff':
-      return diffSurfaceId()
-    case '/workspaces/$workspaceId':
-      return workspaceSurfaceId(route.params.workspaceId)
-    case '/workspaces/$workspaceId/diffs':
-      return workspaceDiffsSurfaceId(route.params.workspaceId)
-    case '/kanban/$boardId':
-      return kanbanSurfaceId(route.params.boardId)
-    case '/plugins/$routeSegment/$localId':
-      return pluginSurfaceId(route.params.routeSegment, route.params.localId)
-    case '/plugins':
-      return 'plugin-center'
-    case '/awaits':
-      return 'awaits'
-    case '/automation':
-      return 'automation'
-    case '/usage':
-      return 'usage'
-    case '/settings/$section':
-      return 'settings'
-    case '/onboarding':
-      return 'onboarding'
-    case '/devtool':
-      return 'devtool'
-  }
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.length > 0 ? value : undefined
-}
-
-/**
- * Validate an untrusted `SurfaceRoute` — persisted split layouts and drag
- * payloads both cross a serialization boundary, and a malformed route would
- * otherwise reach the router as a navigation target.
- */
-export function parseSurfaceRoute(value: unknown): SurfaceRoute | null {
-  if (!value || typeof value !== 'object') {
-    return null
-  }
-  const candidate = value as { to?: unknown, params?: Record<string, unknown>, search?: Record<string, unknown> }
-  return surfaceRouteFromParts(
-    candidate.to,
-    candidate.params ?? {},
-    typeof candidate.search === 'object' && candidate.search !== null ? candidate.search : undefined,
-  )
-}
-
-function surfaceRouteFromParts(
-  to: unknown,
-  params: Record<string, unknown>,
-  search: Record<string, unknown> | undefined,
-): SurfaceRoute | null {
-  switch (to) {
-    case '/':
-    case '/plugins':
-    case '/awaits':
-    case '/automation':
-    case '/usage':
-    case '/onboarding':
-    case '/devtool':
-      return { to }
-    case '/chat/new':
-      return {
-        to,
-        search: {
-          issueId: readString(search?.issueId),
-          workspaceId: readString(search?.workspaceId),
-          sessionGroupId: readString(search?.sessionGroupId),
-        },
-      }
-    case '/work/new':
-      return { to, search: { workspaceId: readString(search?.workspaceId), issueId: readString(search?.issueId) } }
-    case '/pull-requests':
-      return { to, search: { workId: readString(search?.workId) } }
-    case '/diff':
-      return {
-        to,
-        search: {
-          workspace: readString(search?.workspace),
-          repo: readString(search?.repo),
-          path: readString(search?.path),
-          review: readString(search?.review),
-        },
-      }
-    case '/chat/$sessionId': {
-      const sessionId = readString(params.sessionId)
-      return sessionId ? { to, params: { sessionId } } : null
-    }
-    case '/work/$workId': {
-      const workId = readString(params.workId)
-      return workId ? { to, params: { workId } } : null
-    }
-    case '/workspaces/$workspaceId': {
-      const workspaceId = readString(params.workspaceId)
-      return workspaceId ? { to, params: { workspaceId } } : null
-    }
-    case '/workspaces/$workspaceId/diffs': {
-      const workspaceId = readString(params.workspaceId)
-      return workspaceId
-        ? {
-            to,
-            params: { workspaceId },
-            search: {
-              repo: readString(search?.repo),
-              path: readString(search?.path),
-              review: readString(search?.review),
-            },
-          }
-        : null
-    }
-    case '/kanban/$boardId': {
-      const boardId = readString(params.boardId)
-      return boardId
-        ? {
-            to,
-            params: { boardId },
-            search: { issue: readString(search?.issue), milestoneId: readString(search?.milestoneId) },
-          }
-        : null
-    }
-    case '/plugins/$routeSegment/$localId': {
-      const routeSegment = readString(params.routeSegment)
-      const localId = readString(params.localId)
-      return routeSegment && localId ? { to, params: { routeSegment, localId } } : null
-    }
-    case '/settings/$section': {
-      const section = readString(params.section)
-      return section ? { to, params: { section } } : null
-    }
-    default:
-      return null
-  }
-}
-
 export function surfaceDraftFromRoute(input: {
   pathname: string
   params?: Record<string, unknown>
   search?: Record<string, unknown>
 }): SurfaceDraft | null {
-  const params = input.params ?? {}
-  const search = input.search ?? {}
-
-  if (input.pathname === '/' || input.pathname === '/home') {
+  const route = surfaceRouteFromLocation(input)
+  if (!route) {
+    return null
+  }
+  if (route.to === '/') {
     return createHomeSurfaceDraft()
   }
 
-  if (input.pathname === '/chat/new') {
-    return {
-      id: 'new-chat',
-      kind: 'new-chat',
-      title: getI18n().t('chrome:surface.newChat'),
-      route: {
-        to: '/chat/new',
-        search: {
-          issueId: readString(search.issueId),
-          workspaceId: readString(search.workspaceId),
-          sessionGroupId: readString(search.sessionGroupId),
-        },
-      },
-      closable: true,
-    }
+  const kind = surfaceKindForRoute(route)
+  return {
+    id: surfaceIdForRoute(route),
+    kind,
+    title: SURFACE_TITLES[kind](),
+    route,
+    closable: true,
   }
-
-  if (input.pathname === '/work/new') {
-    return {
-      id: 'new-work',
-      kind: 'new-work',
-      title: getI18n().t('work:surface.new'),
-      route: {
-        to: '/work/new',
-        search: {
-          workspaceId: readString(search.workspaceId),
-          issueId: readString(search.issueId),
-        },
-      },
-      closable: true,
-    }
-  }
-
-  if (input.pathname === '/pull-requests') {
-    return {
-      id: pullRequestsSurfaceId(),
-      kind: 'pull-requests',
-      title: getI18n().t('pull-requests:surface.title'),
-      route: {
-        to: '/pull-requests',
-        search: { workId: readString(search.workId) },
-      },
-      closable: true,
-    }
-  }
-
-  const workId = readString(params.workId)
-  if (input.pathname.startsWith('/work/') && workId) {
-    return {
-      id: workSurfaceId(workId),
-      kind: 'work',
-      title: getI18n().t('work:surface.work'),
-      route: { to: '/work/$workId', params: { workId } },
-      closable: true,
-    }
-  }
-
-  const sessionId = readString(params.sessionId)
-  if (input.pathname.startsWith('/chat/') && sessionId) {
-    return {
-      id: chatSurfaceId(sessionId),
-      kind: 'chat',
-      title: 'Chat',
-      route: { to: '/chat/$sessionId', params: { sessionId } },
-      closable: true,
-    }
-  }
-
-  const workspaceId = readString(params.workspaceId)
-  if (input.pathname === '/diff') {
-    return {
-      id: diffSurfaceId(),
-      kind: 'diff',
-      title: 'Cradle Diffs',
-      route: {
-        to: '/diff',
-        search: {
-          workspace: readString(search.workspace),
-          repo: readString(search.repo),
-          path: readString(search.path),
-          review: readString(search.review),
-        },
-      },
-      closable: true,
-    }
-  }
-
-  if (input.pathname.startsWith('/workspaces/') && input.pathname.endsWith('/diffs') && workspaceId) {
-    return {
-      id: workspaceDiffsSurfaceId(workspaceId),
-      kind: 'workspace-diffs',
-      title: 'Cradle Diffs',
-      route: {
-        to: '/workspaces/$workspaceId/diffs',
-        params: { workspaceId },
-        search: {
-          repo: readString(search.repo),
-          path: readString(search.path),
-          review: readString(search.review),
-        },
-      },
-      closable: true,
-    }
-  }
-
-  if (input.pathname.startsWith('/workspaces/') && workspaceId) {
-    return {
-      id: workspaceSurfaceId(workspaceId),
-      kind: 'workspace',
-      title: 'Workspace',
-      route: { to: '/workspaces/$workspaceId', params: { workspaceId } },
-      closable: true,
-    }
-  }
-
-  const boardId = readString(params.boardId)
-  if (input.pathname.startsWith('/kanban/') && boardId) {
-    return {
-      id: kanbanSurfaceId(boardId),
-      kind: 'kanban',
-      title: getI18n().t('chrome:surface.kanban'),
-      route: {
-        to: '/kanban/$boardId',
-        params: { boardId },
-        search: {
-          issue: readString(search.issue),
-          milestoneId: readString(search.milestoneId),
-        },
-      },
-      closable: true,
-    }
-  }
-
-  const routeSegment = readString(params.routeSegment)
-  const localId = readString(params.localId)
-  if (input.pathname === '/plugins' || input.pathname === '/plugins/') {
-    return {
-      id: 'plugin-center',
-      kind: 'plugin-center',
-      title: getI18n().t('settings:plugins.center.title'),
-      route: { to: '/plugins' },
-      closable: true,
-    }
-  }
-  if (input.pathname.startsWith('/plugins/') && routeSegment && localId) {
-    return {
-      id: pluginSurfaceId(routeSegment, localId),
-      kind: 'plugin',
-      title: getI18n().t('settings:plugins.panel.fallbackTitle'),
-      route: { to: '/plugins/$routeSegment/$localId', params: { routeSegment, localId } },
-      closable: true,
-    }
-  }
-
-  if (input.pathname === '/awaits') {
-    return {
-      id: 'awaits',
-      kind: 'awaits',
-      title: 'Awaits',
-      route: { to: '/awaits' },
-      closable: true,
-    }
-  }
-
-  if (input.pathname === '/automation') {
-    return {
-      id: 'automation',
-      kind: 'automation',
-      title: 'Automations',
-      route: { to: '/automation' },
-      closable: true,
-    }
-  }
-
-  if (input.pathname === '/usage') {
-    return {
-      id: 'usage',
-      kind: 'usage',
-      title: getI18n().t('chrome:surface.usage'),
-      route: { to: '/usage' },
-      closable: true,
-    }
-  }
-
-  const section = readString(params.section) ?? 'appearance'
-  if (input.pathname.startsWith('/settings/')) {
-    return {
-      id: 'settings',
-      kind: 'settings',
-      title: 'Settings',
-      route: { to: '/settings/$section', params: { section } },
-      closable: true,
-    }
-  }
-
-  if (input.pathname === '/onboarding') {
-    return {
-      id: 'onboarding',
-      kind: 'onboarding',
-      title: 'Onboarding',
-      route: { to: '/onboarding' },
-      closable: true,
-    }
-  }
-
-  if (input.pathname === '/devtool') {
-    return {
-      id: 'devtool',
-      kind: 'devtool',
-      title: 'Devtool',
-      route: { to: '/devtool' },
-      closable: true,
-    }
-  }
-
-  return null
 }
 
 export function layoutSlotIdForRoute(route: SurfaceRoute | null | undefined): string | null {

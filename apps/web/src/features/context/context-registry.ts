@@ -56,6 +56,22 @@ function surfaceKindToContextType(kind: string): string {
   return kind
 }
 
+/**
+ * Route params/search are typed scalars (strings plus numeric fields like the
+ * diff anchor `line`); the context envelope is a string-valued projection, so
+ * non-string values serialize at this boundary rather than widening the
+ * provider contract.
+ */
+function toStringRecord(
+  record: Record<string, string | number | undefined> | undefined,
+): Record<string, string | undefined> {
+  const result: Record<string, string | undefined> = {}
+  for (const [key, value] of Object.entries(record ?? {})) {
+    result[key] = value === undefined ? undefined : String(value)
+  }
+  return result
+}
+
 function readCradleActiveSurface(): {
   id: string | null
   type: string | null
@@ -67,8 +83,8 @@ function readCradleActiveSurface(): {
   return {
     id: activeSurface?.id ?? null,
     type: activeSurface ? surfaceKindToContextType(activeSurface.kind) : null,
-    params: activeSurface?.route.params ?? {},
-    search: activeSurface?.route.search ?? {},
+    params: toStringRecord(activeSurface?.route.params),
+    search: toStringRecord(activeSurface?.route.search),
   }
 }
 
