@@ -317,9 +317,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
   provider-host lease + thread 多路复用）、061（五里程碑全部落地：唯一活跃 run 不变量 + 部分唯一
   索引、synthetic-turn inbox、统一 completion owner、boot 恢复屏障、有界 history hydration）、
   072（blob store/GC/cradle-blob:// 解析/回填任务均已运行）、073 Provider identity（`a02e9ffb`
-  一次落地）。075 Desktop fetch、075 CPA、076 Fabric 保持 IN PROGRESS 但备注已更新为真实剩余项
-  （packaged smoke / M0 OAuth gate / 手动 desktop smoke）。050 已落地（Session projection
-  gateway + targeted snapshot recovery）。经核实仍未开始的：043、045。
+  一次落地）。075 Desktop fetch、075 CPA、076 Fabric、078 fetch 生命周期围栏均已验收 DONE。
+  043、045、049、050、051 均已落地（#246–#249、#251）。
 
 - 2026-07-15，Plan 055 完成：Codex `thread/tokenUsage/updated` 在 root filtering 前投影为
   deterministic per-call usage events，TurnExecutor 附加 Cradle session/run/message/provider identity，
