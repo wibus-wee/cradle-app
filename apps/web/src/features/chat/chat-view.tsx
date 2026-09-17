@@ -26,7 +26,6 @@ import { useFeatureFlag } from '~/features/settings/use-app-preferences'
 import { readWorkspaceFileDragText } from '~/lib/workspace-drag-data'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
 import { useChatStore } from '~/store/chat'
-import type { ComposerDraft } from '~/store/composer-draft'
 
 import type { ChatRuntimeGoalUiSlotState } from './capabilities/chat-capabilities'
 import { runtimeUiSlotStatesQueryKey } from './capabilities/chat-capabilities'
@@ -44,6 +43,7 @@ import type {
   ComposerReviewSlotActions,
   ComposerUsageSlotActions,
 } from './composer/composer-slot-states'
+import type { ComposerDraft } from './composer/draft/composer-draft-store'
 import type { ChatComposerRuntime } from './composer/use-chat-composer-runtime'
 import { useChatComposerRuntime } from './composer/use-chat-composer-runtime'
 import { useComposerAppshotCapture } from './composer/use-composer-appshot-capture'

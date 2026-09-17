@@ -7,5 +7,9 @@
     "better-sqlite3",
     "node-pty",
     "sharp"
+  ],
+  "prunePackages": [
+    "@anthropic-ai/claude-agent-sdk-*",
+    "@arcships/light-ocr-model-*"
   ]
 }

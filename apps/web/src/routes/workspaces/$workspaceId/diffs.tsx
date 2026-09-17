@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { RouteErrorFallback } from '~/components/common/route-error-fallback'
-import { parseAnchorSide, parsePositiveInt } from '~/features/diff-review/shared/navigation'
+import { parseAnchorSide, parsePositiveInt } from '~/features/diff-review/shared/search-params'
 import { WorkspaceDiffsView } from '~/features/diff-review/workspace-diffs-view'
 
 interface WorkspaceDiffsSearch {

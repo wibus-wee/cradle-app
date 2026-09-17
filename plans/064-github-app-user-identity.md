@@ -17,6 +17,7 @@
 
 ## Status
 
+- **Execution**: DONE (real GitHub App acceptance completed by maintainer 2026-09-17; device-login flow verified live on dev instance through code issuance, authorization exercised by maintainer)
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: HIGH

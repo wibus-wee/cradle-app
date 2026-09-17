@@ -11,6 +11,7 @@ import { ProviderRuntimeError } from '../../chat-runtime/runtime-provider-types'
 import { readTrustedClaudeAgentConfig } from '../../provider-contracts/provider-base'
 import { createBoundedTextCollector } from '../bounded-text-collector'
 import { buildClaudeQueryOptions, createClaudeStderrSink } from './input-projector'
+import { trackClaudeManagedQuery } from './runtime-executable'
 import type { ClaudeAgentProviderDeps, ClaudeTitleGenerationThinkingEffort } from './types'
 
 const CLAUDE_SESSION_TITLE_MAX_LENGTH = 60
@@ -76,10 +77,13 @@ export async function generateClaudeSessionTitle(input: {
 
     queryOptions.stderr = stderrSink.onStderr
 
-    const titleQuery = query({
-      prompt: titlePrompt,
-      options: queryOptions,
-    })
+    const titleQuery = trackClaudeManagedQuery(
+      query({
+        prompt: titlePrompt,
+        options: queryOptions,
+      }),
+      queryOptions,
+    )
 
     const titleCollector = createBoundedTextCollector()
 

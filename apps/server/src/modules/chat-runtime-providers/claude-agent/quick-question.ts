@@ -17,6 +17,7 @@ import {
   createClaudeStderrSink,
   projectClaudeAgentInput,
 } from './input-projector'
+import { trackClaudeManagedQuery } from './runtime-executable'
 import type { ClaudeAgentProviderDeps } from './types'
 
 export async function* streamClaudeAgentQuickQuestion(
@@ -49,7 +50,10 @@ export async function* streamClaudeAgentQuickQuestion(
   delete queryOptions.skills
 
   const inputStream = new ClaudeAgentInputStream()
-  const activeQuery = query({ prompt: inputStream, options: queryOptions })
+  const activeQuery = trackClaudeManagedQuery(
+    query({ prompt: inputStream, options: queryOptions }),
+    queryOptions,
+  )
   const mapperState = createClaudeAgentChunkMapperState()
 
   try {

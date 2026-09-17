@@ -109,6 +109,7 @@ export class DownloadCenterService {
     this.now = options.now ?? (() => Math.floor(Date.now() / 1000))
     this.downloader = options.downloader ?? new HttpArtifactDownloader({
       rootDir: this.rootDir,
+      parallelConnections: 6,
       onProgress: progress => this.recordProgress(progress),
     })
   }
@@ -364,6 +365,10 @@ errorMessage: progress.error?.message ?? null,
     void this.cleanup().catch(error => console.error('[download-center] cleanup failed:', error))
   }
 
-  private async removePartial(taskId: string): Promise<void> { await rm(path.join(this.rootDir, 'partial', `${taskId}.part`), { force: true }) }
+  private async removePartial(taskId: string): Promise<void> {
+    await rm(path.join(this.rootDir, 'partial', `${taskId}.part`), { force: true })
+    await rm(path.join(this.rootDir, 'partial', `${taskId}.chunks`), { force: true, recursive: true })
+  }
+
   private async removeArtifact(taskId: string): Promise<void> { await rm(path.join(this.rootDir, 'artifacts', taskId), { recursive: true, force: true }) }
 }

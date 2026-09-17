@@ -95,6 +95,7 @@ import { streamClaudeAgentQuickQuestion } from './quick-question'
 import {
   resolveClaudeAgentRuntimeContext,
 } from './runtime-context'
+import { trackClaudeManagedQuery } from './runtime-executable'
 import { readClaudeAgentPermissionMode } from './runtime-settings'
 import { ClaudeAgentSessionArtifacts } from './session-artifacts'
 import { deleteClaudeAgentSessionStorage } from './session-storage'
@@ -296,7 +297,10 @@ export class ClaudeAgentProvider implements ChatRuntime {
       })
       this.activePermissionModesBySession.set(sessionId, turnPermissionMode)
       const inputStream = new ClaudeAgentInputStream()
-      const activeQuery = query({ prompt: inputStream, options: queryOptions })
+      const activeQuery = trackClaudeManagedQuery(
+        query({ prompt: inputStream, options: queryOptions }),
+        queryOptions,
+      )
       const taskLaunchesById: Map<string, ClaudeCrewLink> = new Map()
       const workflowOutputsByToolCallId: Map<string, Record<string, unknown>> = new Map()
       const workflowLifecyclesByToolCallId: Map<string, Array<Record<string, unknown>>> = new Map()

@@ -1,10 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { AppSurface } from './surface-identity'
 import {
   releaseSurfaceResources,
   selectClosedChatSessionIds,
 } from './surface-resource-lifecycle'
+
+const draftLifecycleMocks = vi.hoisted(() => ({
+  discardComposerDraftSurface: vi.fn(),
+}))
+
+vi.mock('~/features/chat/composer/draft/composer-draft-lifecycle', () => draftLifecycleMocks)
 
 function chatSurface(sessionId: string, order: number): AppSurface {
   return {
@@ -18,6 +24,10 @@ function chatSurface(sessionId: string, order: number): AppSurface {
 }
 
 describe('surface resource lifecycle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('selects only CLI TUI candidates whose chat surface was closed', () => {
     expect(selectClosedChatSessionIds(
       [chatSurface('one', 0), chatSurface('two', 1)],
@@ -37,5 +47,18 @@ describe('surface resource lifecycle', () => {
     )
 
     expect(releaseTuiSessions).toHaveBeenCalledWith(['one'])
+  })
+
+  it('routes closed surfaces through the single draft discard operation', () => {
+    releaseSurfaceResources(
+      [chatSurface('one', 0), chatSurface('two', 1)],
+      [chatSurface('two', 0)],
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+    )
+
+    expect(draftLifecycleMocks.discardComposerDraftSurface).toHaveBeenCalledTimes(1)
+    expect(draftLifecycleMocks.discardComposerDraftSurface).toHaveBeenCalledWith('chat:one')
   })
 })

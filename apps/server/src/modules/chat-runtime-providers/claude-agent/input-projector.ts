@@ -47,6 +47,7 @@ import {
   removeCradleOwnedClaudeConfigDirFromEnv,
   resolveClaudeAgentRuntimeContext,
 } from './runtime-context'
+import { applyClaudeAgentExecutableToQueryOptions } from './runtime-executable'
 import {
   readClaudeAgentAllowDangerouslySkipPermissions,
   readClaudeAgentPermissionMode,
@@ -388,6 +389,8 @@ export function buildClaudeQueryOptions(input: {
   if (input.onStderr) {
     queryOptions.stderr = input.onStderr
   }
+
+  applyClaudeAgentExecutableToQueryOptions(queryOptions)
 
   return queryOptions
 }

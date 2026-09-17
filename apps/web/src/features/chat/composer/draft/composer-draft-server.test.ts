@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ComposerDraft } from '~/store/composer-draft'
+import type { ComposerDraft } from './composer-draft-store'
 
 const sdkMocks = vi.hoisted(() => ({
   deleteChatComposerDraftsBySurfaceId: vi.fn(),
@@ -30,12 +30,12 @@ function serverResponse(draft: ComposerDraft | null = DRAFT) {
   }
 }
 
-async function readCommandModule() {
+async function readServerModule() {
   vi.resetModules()
-  return await import('./composer-draft-command')
+  return await import('./composer-draft-server')
 }
 
-describe('composer draft command', () => {
+describe('composer draft server adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     sdkMocks.getChatComposerDraftsBySurfaceId.mockResolvedValue(serverResponse())
@@ -44,9 +44,9 @@ describe('composer draft command', () => {
   })
 
   it('projects generated draft responses into the web draft type', async () => {
-    const command = await readCommandModule()
+    const server = await readServerModule()
 
-    const response = await command.writeServerComposerDraft(SURFACE_ID, DRAFT)
+    const response = await server.writeServerComposerDraft(SURFACE_ID, DRAFT)
 
     expect(response.draft).toEqual(DRAFT)
     expect(sdkMocks.putChatComposerDraftsBySurfaceId).toHaveBeenCalledWith({
@@ -56,25 +56,32 @@ describe('composer draft command', () => {
     })
   })
 
-  it('skips queued writes after a surface is discarded', async () => {
-    const command = await readCommandModule()
+  it('never sends attachments in the draft write payload', async () => {
+    const server = await readServerModule()
+    const draftWithAttachment: ComposerDraft = {
+      ...DRAFT,
+      files: [
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          url: 'data:image/png;base64,AAA',
+          filename: 'a.png',
+        },
+      ],
+    }
 
-    command.markComposerDraftSurfaceDiscarded(SURFACE_ID)
-    command.queueServerComposerDraftWrite(SURFACE_ID, DRAFT)
-    await command.flushComposerDraftServerQueue(SURFACE_ID)
+    await server.writeServerComposerDraft(SURFACE_ID, draftWithAttachment)
 
-    expect(sdkMocks.putChatComposerDraftsBySurfaceId).not.toHaveBeenCalled()
-  })
-
-  it('still sends tombstones after a surface is discarded', async () => {
-    const command = await readCommandModule()
-
-    command.markComposerDraftSurfaceDiscarded(SURFACE_ID)
-    command.queueServerComposerDraftDelete(SURFACE_ID)
-    await command.flushComposerDraftServerQueue(SURFACE_ID)
-
-    expect(sdkMocks.deleteChatComposerDraftsBySurfaceId).toHaveBeenCalledWith({
+    expect(sdkMocks.putChatComposerDraftsBySurfaceId).toHaveBeenCalledWith({
       path: { surfaceId: SURFACE_ID },
+      body: {
+        draft: {
+          text: 'Queued draft',
+          contextParts: [],
+          files: [],
+          pastedTexts: [],
+        },
+      },
       throwOnError: true,
     })
   })

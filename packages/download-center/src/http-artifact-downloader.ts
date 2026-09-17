@@ -1,8 +1,8 @@
-import { createWriteStream } from 'node:fs'
-import { mkdir, rename, stat, truncate, unlink } from 'node:fs/promises'
+import { createReadStream, createWriteStream } from 'node:fs'
+import { mkdir, readFile, rename, rm, stat, truncate, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { Readable, Transform, Writable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
+import { finished, pipeline } from 'node:stream/promises'
 
 import type {
   DownloadExecution,
@@ -22,6 +22,7 @@ import { computeFileChecksum } from './file-integrity'
 const MAX_REDIRECTS = 5
 const PROGRESS_INTERVAL_MS = 200
 const DEFAULT_INACTIVITY_TIMEOUT_MS = 30_000
+const DEFAULT_PARALLEL_MIN_BYTES = 8 * 1024 * 1024
 
 export interface DownloadTimerHooks {
   now: () => number
@@ -36,7 +37,34 @@ export interface HttpArtifactDownloaderOptions {
   inactivityTimeoutMs?: number
   onProgress?: (progress: DownloadProgress) => void
   writeStreamFactory?: (filePath: string, flags: 'a' | 'w') => Writable
+  /**
+   * Split a large single-source transfer into this many concurrent HTTP range
+   * requests. `1` (default) keeps the sequential single-stream behavior.
+   */
+  parallelConnections?: number
+  /**
+   * Minimum response size that qualifies for parallel range requests.
+   * Defaults to 8 MiB.
+   */
+  parallelMinBytes?: number
 }
+
+interface ByteRange {
+  start: number
+  end?: number
+}
+
+/** Persisted beside chunk partials; file sizes are the resume source of truth. */
+interface ChunkPlan {
+  sourceId: string
+  etag: string | null
+  totalBytes: number
+  chunkSize: number
+  connections: number
+}
+
+/** A chunk request answered with 200 means the recorded etag went stale. */
+class ChunkPlanStaleError extends Error {}
 
 interface TransferResult {
   etag: string | null
@@ -118,6 +146,8 @@ export class HttpArtifactDownloader {
   private readonly inactivityTimeoutMs: number
   private readonly onProgress: ((progress: DownloadProgress) => void) | undefined
   private readonly writeStreamFactory: (filePath: string, flags: 'a' | 'w') => Writable
+  private readonly parallelConnections: number
+  private readonly parallelMinBytes: number
 
   constructor(private readonly options: HttpArtifactDownloaderOptions) {
     this.fetchImplementation = options.fetch ?? globalThis.fetch
@@ -125,8 +155,16 @@ export class HttpArtifactDownloader {
     this.inactivityTimeoutMs = options.inactivityTimeoutMs ?? DEFAULT_INACTIVITY_TIMEOUT_MS
     this.onProgress = options.onProgress
     this.writeStreamFactory = options.writeStreamFactory ?? ((filePath, flags) => createWriteStream(filePath, { flags }))
+    this.parallelConnections = options.parallelConnections ?? 1
+    this.parallelMinBytes = options.parallelMinBytes ?? DEFAULT_PARALLEL_MIN_BYTES
     if (!Number.isFinite(this.inactivityTimeoutMs) || this.inactivityTimeoutMs <= 0) {
       throw new TypeError('inactivityTimeoutMs must be positive.')
+    }
+    if (!Number.isInteger(this.parallelConnections) || this.parallelConnections < 1) {
+      throw new TypeError('parallelConnections must be a positive integer.')
+    }
+    if (!Number.isSafeInteger(this.parallelMinBytes) || this.parallelMinBytes < 0) {
+      throw new TypeError('parallelMinBytes must be a non-negative safe integer.')
     }
   }
 
@@ -193,6 +231,7 @@ export class HttpArtifactDownloader {
 
         try {
           const transfer = await this.transferSource({
+            taskId,
             source,
             request,
             partialPath,
@@ -259,6 +298,7 @@ export class HttpArtifactDownloader {
   }
 
   private async transferSource(input: {
+    taskId: string
     source: DownloadSource
     request: DownloadRequest
     partialPath: string
@@ -277,9 +317,98 @@ export class HttpArtifactDownloader {
       input.observation.transferredBytes = 0
     }
 
+    // A persisted chunk plan resumes independently of the single-file offset:
+    // per-chunk `.part` sizes are the resume source of truth.
+    const chunkDir = this.chunkDirPath(input.taskId)
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const plan = await this.readChunkPlan(chunkDir)
+      if (plan === null) {
+        break
+      }
+      if (plan.sourceId !== input.source.id) {
+        await this.removeChunkState(chunkDir)
+        break
+      }
+      try {
+        return await this.transferChunked({
+          taskId: input.taskId,
+          source: input.source,
+          request: input.request,
+          partialPath: input.partialPath,
+          signal: input.signal,
+          progress: input.progress,
+          observation: input.observation,
+          plan,
+          chunkDir,
+        })
+      }
+      catch (error) {
+        if (error instanceof ChunkPlanStaleError && attempt === 0) {
+          await this.removeChunkState(chunkDir)
+          continue
+        }
+        throw error
+      }
+    }
+
     for (let pass = 0; pass < 2; pass += 1) {
-      const response = await this.fetchWithRedirects(input.source, input.signal, offset, resumeEtag)
+      // Parallel probe: on a fresh transfer, ask for `bytes=0-`. Servers that
+      // honor ranges answer 206 (whole file) — cancel it and split into
+      // concurrent range chunks. Others answer 200 and stream normally.
+      const probe = offset === 0 && this.parallelConnections > 1
+      const response = await this.fetchWithRedirects(
+        input.source,
+        input.signal,
+        probe ? { start: 0 } : (offset > 0 && resumeEtag !== null ? { start: offset } : null),
+        resumeEtag,
+      )
       const responseEtag = response.headers.get('etag')
+      let probeWholeFile: { end: number, total: number } | null = null
+
+      if (probe && response.status === 206) {
+        const range = this.parseContentRange(response.headers.get('content-range'))
+        if (range === null || range.start !== 0 || range.total === null || range.end !== range.total - 1) {
+          await response.body?.cancel()
+          throw new DownloadError('invalid_response', false)
+        }
+        if (range.total >= this.parallelMinBytes) {
+          if (range.total > input.request.maxBytes) {
+            await response.body?.cancel()
+            throw new DownloadError('byte_limit_exceeded', false)
+          }
+          await response.body?.cancel()
+          const plan: ChunkPlan = {
+            sourceId: input.source.id,
+            etag: isStrongEtag(responseEtag) ? responseEtag : null,
+            totalBytes: range.total,
+            chunkSize: Math.ceil(range.total / this.parallelConnections),
+            connections: this.parallelConnections,
+          }
+          try {
+            return await this.transferChunked({
+              taskId: input.taskId,
+              source: input.source,
+              request: input.request,
+              partialPath: input.partialPath,
+              signal: input.signal,
+              progress: input.progress,
+              observation: input.observation,
+              plan,
+              chunkDir,
+            })
+          }
+          catch (error) {
+            if (error instanceof ChunkPlanStaleError && pass === 0) {
+              await this.removeChunkState(chunkDir)
+              continue
+            }
+            throw error
+          }
+        }
+        // Below the parallel threshold: the 206 body already carries the whole
+        // payload — consume it exactly like a fresh 200 response.
+        probeWholeFile = { end: range.end, total: range.total }
+      }
 
       if (offset > 0 && resumeEtag !== null && response.status === 416) {
         const remoteTotal = this.parseUnsatisfiedRange(response.headers.get('content-range'))
@@ -325,7 +454,7 @@ export class HttpArtifactDownloader {
         expectedBodyBytes = range.end - range.start + 1
         input.observation.etag = resumeEtag
       }
-      else if (response.status === 200) {
+      else if (response.status === 200 || probeWholeFile !== null) {
         if (offset > 0) {
           await this.filesystem(() => truncate(input.partialPath, 0))
           offset = 0
@@ -335,8 +464,8 @@ export class HttpArtifactDownloader {
         // while leaving the wire-level Content-Length header untouched. In that
         // case the header describes the compressed payload, not the bytes we
         // stream to disk, so it cannot be used to validate the decoded body.
-        totalBytes = this.responseContentLength(response)
-        expectedBodyBytes = totalBytes
+        totalBytes = probeWholeFile?.total ?? this.responseContentLength(response)
+        expectedBodyBytes = probeWholeFile !== null ? probeWholeFile.end + 1 : totalBytes
         input.observation.etag = isStrongEtag(responseEtag) ? responseEtag : null
       }
       else {
@@ -382,17 +511,21 @@ export class HttpArtifactDownloader {
   private async fetchWithRedirects(
     source: DownloadSource,
     callerSignal: AbortSignal | undefined,
-    offset: number,
+    range: ByteRange | null,
     etag: string | null,
   ): Promise<Response> {
+    const applyRangeHeaders = (headers: Headers): void => {
+      headers.set('accept-encoding', 'identity')
+      if (range !== null) {
+        headers.set('range', `bytes=${range.start}-${range.end ?? ''}`)
+        if (etag !== null) {
+          headers.set('if-range', etag)
+        }
+      }
+    }
     let url = new URL(source.url)
     let headers = new Headers(source.headers)
-    headers.set('accept-encoding', 'identity')
-    if (offset > 0 && etag !== null) {
-      headers.set('range', `bytes=${offset}-`)
-      headers.set('if-range', etag)
-      headers.set('accept-encoding', 'identity')
-    }
+    applyRangeHeaders(headers)
     for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects += 1) {
       const timeout = this.createInactivityController(callerSignal)
       let response: Response
@@ -425,12 +558,7 @@ export class HttpArtifactDownloader {
       }
       if (nextUrl.origin !== url.origin) {
         headers = new Headers()
-        headers.set('accept-encoding', 'identity')
-        if (offset > 0 && etag !== null) {
-          headers.set('range', `bytes=${offset}-`)
-          headers.set('if-range', etag)
-          headers.set('accept-encoding', 'identity')
-        }
+        applyRangeHeaders(headers)
       }
       url = nextUrl
     }
@@ -494,6 +622,250 @@ export class HttpArtifactDownloader {
       timeout.signal.removeEventListener('abort', abortReadable)
       timeout.dispose()
     }
+  }
+
+  /**
+   * Download `plan` as `connections` concurrent range chunks. Each chunk
+   * appends to `partial/<taskId>.chunks/<i>.part`; file sizes are the resume
+   * truth, so an interrupted attempt resumes mid-chunk on the next call.
+   */
+  private async transferChunked(input: {
+    taskId: string
+    source: DownloadSource
+    request: DownloadRequest
+    partialPath: string
+    signal: AbortSignal | undefined
+    progress: ProgressEmitter
+    observation: DownloadFailureContext
+    plan: ChunkPlan
+    chunkDir: string
+  }): Promise<TransferResult> {
+    const { plan, chunkDir } = input
+    input.observation.etag = plan.etag
+    input.observation.totalBytes = plan.totalBytes
+    if (plan.etag === null) {
+      // Without a validator, chunk bytes cannot be trusted across attempts.
+      await this.removeChunkState(chunkDir)
+    }
+    await this.filesystem(() => mkdir(chunkDir, { recursive: true }))
+    await this.writeChunkPlan(chunkDir, plan)
+
+    const chunkCount = Math.ceil(plan.totalBytes / plan.chunkSize)
+    const written: number[] = await Promise.all(
+      Array.from({ length: chunkCount }, (_, index) => this.chunkOffset(input.taskId, index, plan)),
+    )
+    const baseTransferred = written.reduce((sum, value) => sum + value, 0)
+    const shared = { received: 0 }
+    input.observation.transferredBytes = baseTransferred
+    input.progress.emit(this.progressState(input.source.id, 'downloading', baseTransferred, plan.totalBytes), true)
+
+    const group = new AbortController()
+    const onCallerAbort = (): void => group.abort()
+    input.signal?.addEventListener('abort', onCallerAbort, { once: true })
+    const mergedSignal = AbortSignal.any([group.signal, ...(input.signal ? [input.signal] : [])])
+    const workers = written.map((alreadyWritten, index) =>
+      this.transferChunk({
+        chunkPath: path.join(chunkDir, `${index}.part`),
+        source: input.source,
+        signal: mergedSignal,
+        etag: plan.etag,
+        start: index * plan.chunkSize,
+        end: Math.min((index + 1) * plan.chunkSize, plan.totalBytes) - 1,
+        totalBytes: plan.totalBytes,
+        alreadyWritten,
+        maxBytes: input.request.maxBytes,
+        shared,
+        baseTransferred,
+        progress: input.progress,
+        observation: input.observation,
+      }))
+    try {
+      await Promise.all(workers)
+    }
+    catch (error) {
+      group.abort()
+      await Promise.allSettled(workers)
+      throw error
+    }
+    finally {
+      input.signal?.removeEventListener('abort', onCallerAbort)
+    }
+
+    // All chunks landed: assemble the single partial and verify it downstream.
+    const destination = this.writerBoundary(input.partialPath, 'w')
+    try {
+      for (let index = 0; index < chunkCount; index += 1) {
+        const chunkPath = path.join(chunkDir, `${index}.part`)
+        await pipeline(createReadStream(chunkPath), destination, { end: false })
+      }
+      destination.end()
+      await finished(destination)
+    }
+    catch (error) {
+      destination.destroy()
+      throw error
+    }
+    await this.filesystem(() => rm(chunkDir, { recursive: true, force: true }))
+    input.observation.transferredBytes = plan.totalBytes
+    return { etag: plan.etag, bytes: plan.totalBytes, totalBytes: plan.totalBytes }
+  }
+
+  private async transferChunk(input: {
+    chunkPath: string
+    source: DownloadSource
+    signal: AbortSignal
+    etag: string | null
+    start: number
+    end: number
+    totalBytes: number
+    alreadyWritten: number
+    maxBytes: number
+    shared: { received: number }
+    baseTransferred: number
+    progress: ProgressEmitter
+    observation: DownloadFailureContext
+  }): Promise<void> {
+    const length = input.end - input.start + 1
+    let written = input.alreadyWritten
+    if (written === length) {
+      return
+    }
+    const response = await this.fetchWithRedirects(
+      input.source,
+      input.signal,
+      { start: input.start + written, end: input.end },
+      input.etag,
+    )
+    if (response.status === 200) {
+      await response.body?.cancel()
+      throw new ChunkPlanStaleError()
+    }
+    if (response.status !== 206) {
+      await response.body?.cancel()
+      throw this.httpError(response.status)
+    }
+    const range = this.parseContentRange(response.headers.get('content-range'))
+    const responseEtag = response.headers.get('etag')
+    const encoding = response.headers.get('content-encoding')
+    if (
+      !range
+      || range.start !== input.start + written
+      || range.end !== input.end
+      || range.total !== input.totalBytes
+      || (encoding !== null && encoding.toLowerCase() !== 'identity')
+      || (input.etag !== null && responseEtag !== input.etag)
+    ) {
+      await response.body?.cancel()
+      if (input.etag !== null && isStrongEtag(responseEtag) && responseEtag !== input.etag) {
+        throw new ChunkPlanStaleError()
+      }
+      throw new DownloadError('invalid_response', false)
+    }
+    if (!response.body) {
+      throw new DownloadError('invalid_response', false)
+    }
+
+    const timeout = this.createInactivityController(input.signal)
+    let receivedBytes = 0
+    const meter = new Transform({
+      transform: (chunk: Buffer, _encoding, callback) => {
+        receivedBytes += chunk.byteLength
+        written += chunk.byteLength
+        input.shared.received += chunk.byteLength
+        if (written > length || input.baseTransferred + input.shared.received > input.maxBytes) {
+          callback(new DownloadError('invalid_response', false))
+          return
+        }
+        timeout.reset()
+        input.observation.transferredBytes = input.baseTransferred + input.shared.received
+        input.progress.emit(this.progressState(
+          input.source.id,
+          'downloading',
+          input.baseTransferred + input.shared.received,
+          input.totalBytes,
+        ))
+        callback(null, chunk)
+      },
+    })
+    let readable: Readable | null = null
+    const abortReadable = (): void => {
+      readable?.destroy(new DOMException('The transfer was aborted.', 'AbortError'))
+    }
+    timeout.signal.addEventListener('abort', abortReadable, { once: true })
+    try {
+      readable = Readable.fromWeb(
+        response.body as import('node:stream/web').ReadableStream<Uint8Array>,
+        { signal: timeout.signal },
+      )
+      const writer = this.writerBoundary(input.chunkPath, 'a')
+      await pipeline(readable, meter, writer, { signal: timeout.signal })
+      if (receivedBytes !== length - input.alreadyWritten) {
+        throw new DownloadError('invalid_response', false)
+      }
+    }
+    catch (error) {
+      throw timeout.error(error)
+    }
+    finally {
+      timeout.signal.removeEventListener('abort', abortReadable)
+      timeout.dispose()
+    }
+  }
+
+  private chunkDirPath(taskId: string): string {
+    return path.join(this.options.rootDir, 'partial', `${taskId}.chunks`)
+  }
+
+  private async chunkOffset(taskId: string, index: number, plan: ChunkPlan): Promise<number> {
+    const length = Math.min(plan.chunkSize, plan.totalBytes - index * plan.chunkSize)
+    const written = await this.fileSize(path.join(this.chunkDirPath(taskId), `${index}.part`))
+    if (written > length) {
+      await this.removePartial(path.join(this.chunkDirPath(taskId), `${index}.part`))
+      return 0
+    }
+    return written
+  }
+
+  private async readChunkPlan(chunkDir: string): Promise<ChunkPlan | null> {
+    let raw: string
+    try {
+      raw = await readFile(path.join(chunkDir, 'state.json'), 'utf8')
+    }
+    catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        return null
+      }
+      throw new DownloadError('filesystem_error', false, error instanceof Error ? { cause: error } : undefined)
+    }
+    try {
+      const parsed = JSON.parse(raw) as ChunkPlan
+      if (
+        typeof parsed.sourceId !== 'string'
+        || (parsed.etag !== null && typeof parsed.etag !== 'string')
+        || !Number.isSafeInteger(parsed.totalBytes) || parsed.totalBytes <= 0
+        || !Number.isSafeInteger(parsed.chunkSize) || parsed.chunkSize <= 0
+        || !Number.isSafeInteger(parsed.connections) || parsed.connections <= 0
+      ) {
+        throw new Error('invalid chunk plan')
+      }
+      return parsed
+    }
+    catch {
+      await this.removeChunkState(chunkDir)
+      return null
+    }
+  }
+
+  private async writeChunkPlan(chunkDir: string, plan: ChunkPlan): Promise<void> {
+    const statePath = path.join(chunkDir, 'state.json')
+    await this.filesystem(async () => {
+      await writeFile(`${statePath}.tmp`, JSON.stringify(plan), 'utf8')
+      await rename(`${statePath}.tmp`, statePath)
+    })
+  }
+
+  private async removeChunkState(chunkDir: string): Promise<void> {
+    await this.filesystem(() => rm(chunkDir, { recursive: true, force: true }))
   }
 
   private writerBoundary(filePath: string, flags: 'a' | 'w'): Writable {

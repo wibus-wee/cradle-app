@@ -83,41 +83,50 @@ export async function waitForDesktopServer(): Promise<string> {
   const initialStatus = await runtime.getStatus()
   return new Promise((resolve, reject) => {
     let settled = false
-    let unsubscribe = () => {}
 
-    const handleStatus = (status: DesktopServerStatus) => {
-      updateBootstrapStatus(status)
-      if (
-        settled
-        || status.state === 'starting'
-        || status.state === 'migrating'
-        || status.state === 'bootstrapping'
-      ) {
-        return
-      }
-      settled = true
-      unsubscribe()
-
-      if (status.state === 'failed') {
-        reject(new Error(status.message))
-        return
-      }
-
+    const applyReadyEndpoint = (status: Extract<DesktopServerStatus, { state: 'ready' }>) => {
       applyDesktopServerReadyEndpoint({
         serverUrl: status.serverUrl,
         connection: status.connection ?? null,
       })
       // Keep the generated client baseUrl aligned after Desktop publishes ready.
       client.setConfig({ baseUrl: getServerUrl() })
+    }
+
+    const handleStatus = (status: DesktopServerStatus) => {
+      updateBootstrapStatus(status)
+      if (settled) {
+        // A respawned server re-publishes ready with a new owned-ipc
+        // generation; re-apply so subsequent requests stamp it and the Main
+        // broker can fence stragglers from the dead generation.
+        if (status.state === 'ready') {
+          applyReadyEndpoint(status)
+        }
+        return
+      }
+      if (
+        status.state === 'starting'
+        || status.state === 'migrating'
+        || status.state === 'bootstrapping'
+      ) {
+        return
+      }
+      settled = true
+
+      if (status.state === 'failed') {
+        reject(new Error(status.message))
+        return
+      }
+
+      applyReadyEndpoint(status)
       resolve(getServerUrl())
     }
 
     // Snapshot first: a renderer may attach after the server emitted ready.
     handleStatus(initialStatus)
-    if (settled) {
-      return
-    }
-    unsubscribe = runtime.onStatusChanged(handleStatus)
+    // Keep the subscription for the document lifetime so a post-ready
+    // respawn status can re-arm the owned-ipc generation.
+    runtime.onStatusChanged(handleStatus)
     // Close the snapshot/subscribe race; updates remain event-driven afterward.
     void runtime.getStatus().then(handleStatus, reject)
   })

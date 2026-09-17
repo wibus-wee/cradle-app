@@ -1,11 +1,7 @@
-import {
-  markComposerDraftSurfaceDiscarded,
-  queueServerComposerDraftDelete,
-} from '~/features/chat/commands/composer-draft-command'
+import { discardComposerDraftSurface } from '~/features/chat/composer/draft/composer-draft-lifecycle'
 import { getTerminalLifetimeController } from '~/features/tui/terminal-lifetime-controller'
 import { stopTerminalPanelOwners } from '~/features/tui/terminal-panel-cleanup'
 import { useBrowserPanelStore } from '~/store/browser-panel'
-import { useComposerDraftStore } from '~/store/composer-draft'
 
 import type { AppSurface } from './surface-identity'
 import { useSurfaceStore } from './surface-store'
@@ -143,12 +139,9 @@ function cleanupClosedComposerDrafts(
   nextSurfaces: readonly Pick<AppSurface, 'id'>[],
 ): void {
   const nextIds = new Set(nextSurfaces.map(surface => surface.id))
-  const draftStore = useComposerDraftStore.getState()
   for (const surface of previousSurfaces) {
     if (!nextIds.has(surface.id)) {
-      markComposerDraftSurfaceDiscarded(surface.id)
-      draftStore.deleteDraft(surface.id)
-      queueServerComposerDraftDelete(surface.id)
+      discardComposerDraftSurface(surface.id)
     }
   }
 }

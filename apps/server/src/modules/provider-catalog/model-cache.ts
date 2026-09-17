@@ -3,12 +3,9 @@ import { eq } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { db } from '../../infra'
-import { enrichModelsFromRegistryMappings } from '../model-registry/model-info-registry'
-import * as ModelRegistry from '../model-registry/service'
 import type { ModelCapabilities, ModelDescriptor } from '../provider-contracts/types'
 import type { ProviderTarget } from '../provider-targets/service'
 import { providerTargetCacheId } from '../provider-targets/service'
-import { projectProviderModelListCapabilities } from './model-capabilities'
 
 const STALE_THRESHOLD_S = 60 * 60 // 1 hour soft TTL — clients may background-refresh when stale
 const FAILED_REFRESH_COOLDOWN_S = 2 * 60
@@ -18,10 +15,9 @@ const FAILED_REFRESH_COOLDOWN_S = 2 * 60
 // without persisting an obsolete outage across an app restart.
 const failedModelRefreshRetryAfterByTargetId = new Map<string, number>()
 
-export interface CachedModelsResult {
+export interface CachedModelInventory {
   models: ModelDescriptor[]
   fetchedAt: number
-  cached: boolean
 }
 
 export interface CachedModelRefreshFailure {
@@ -87,11 +83,12 @@ function toInventoryModel(model: ModelDescriptor): ModelDescriptor {
 }
 
 /**
- * Load cached inventory from DB, apply current registry enrichment and provider
- * capability defaults, and return the projected result. Re-enriching on every
- * cache read ensures mapping changes take effect without a cache invalidation.
+ * Load the raw persisted inventory for a provider target. This module only owns
+ * inventory persistence and freshness/failure state; registry enrichment and
+ * capability projection happen in the target model query pipeline
+ * (`target-model-query.ts`) so cached rows stay pure inventory.
  */
-export async function getCachedModelsForTarget(target: ProviderTarget): Promise<CachedModelsResult | null> {
+export function readCachedModelInventory(target: ProviderTarget): CachedModelInventory | null {
   const row = db()
     .select()
     .from(providerTargetModelCache)
@@ -100,10 +97,7 @@ export async function getCachedModelsForTarget(target: ProviderTarget): Promise<
   if (!row) {
     return null
   }
-  const inventory = CachedModelsJsonSchema.parse(row.modelsJson)
-  const enriched = await enrichModelsFromRegistryMappings(inventory, ModelRegistry.listMappingEntries())
-  const models = projectProviderModelListCapabilities(enriched)
-  return { models, fetchedAt: row.fetchedAt, cached: true }
+  return { models: CachedModelsJsonSchema.parse(row.modelsJson), fetchedAt: row.fetchedAt }
 }
 
 /**

@@ -84,7 +84,11 @@ Unit tests with a fake SDK `query` factory own provider-local construction and p
 - `metadata.ts`: Claude Agent runtime kind, catalog metadata, static capabilities, slash-command presentation projection, and static runtime UI slots. Slash commands are served from the live Query and replaced on `commands_changed`; only a session without a live Query spawns a short-lived Query for presentation discovery.
 - `types.ts`: Claude Agent provider-private content and session-info types shared by package modules.
 - `runtime-context.ts`: Resolves per-session Claude Agent cwd, agent home, project workspace path, SDK additional directories, and the Cradle-owned SDK config root used by API-key mode.
-- `input-projector.ts`: Projects Cradle message input, history, selected Skills, provider config, and environment into Claude Agent SDK content and query options.
+- `runtime-release.ts`: Pins the Claude Code managed-runtime manifest (npm platform-package tarballs, sha512, unpacked sizes) generated from the installed SDK's optionalDependencies.
+- `runtime-executable.ts`: Owns executable resolution precedence (`CRADLE_CLAUDE_CODE_PATH` → managed install → SDK-bundled platform package → PATH), the `claude_agent_runtime_not_installed` pre-spawn error, and per-Query leases on managed binaries that gate uninstall.
+- `runtime-installation.ts`: Download Center-backed install/uninstall/status owner for the managed Claude Code binary under `<data>/runtimes/claude-agent/managed/`.
+- `managed-resource-adapter.ts`: Projects installation state into the `{claude-agent, runtime, cli}` managed resource (optional, not required for onboarding).
+- `input-projector.ts`: Projects Cradle message input, history, selected Skills, provider config, and environment into Claude Agent SDK content and query options, including `pathToClaudeCodeExecutable` from the runtime-executable resolver.
 - `context-usage-projector.ts`: Projects Claude Agent SDK context usage control responses and assistant `context_usage` snapshots into Chat Runtime context usage details and compact UI slot state.
 - `async-input-stream.ts`: Claude Agent SDK async user-message input stream built on shared provider queue infrastructure.
 - `permission-bridge.ts`: Provider-owned bridge between SDK permission callbacks and Chat Runtime semantics, including AskUserQuestion user-input requests, plan-mode denial, pending tool approvals, and SubAgent `agentID` metadata forwarding.

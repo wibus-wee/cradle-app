@@ -25,6 +25,7 @@ vi.mock('electron', () => electronMocks)
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('desktop server readiness', () => {
@@ -426,5 +427,18 @@ describe('desktop server exit diagnostic rotation', () => {
     finally {
       rmSync(dataDir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('desktop Codex app-server path resolution', () => {
+  it('forwards an explicit override and otherwise defers to server-side managed resolution', async () => {
+    const { resolveDesktopCodexAppServerPath } = await import('./server-process')
+
+    vi.stubEnv('CRADLE_CODEX_APP_SERVER_PATH', '  /custom/codex-app-server  ')
+    expect(resolveDesktopCodexAppServerPath()).toBe('/custom/codex-app-server')
+
+    vi.stubEnv('CRADLE_CODEX_APP_SERVER_PATH', '')
+    expect(resolveDesktopCodexAppServerPath()).toBeUndefined()
+    expect(() => resolveDesktopCodexAppServerPath()).not.toThrow()
   })
 })

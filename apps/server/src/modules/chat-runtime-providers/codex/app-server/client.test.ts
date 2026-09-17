@@ -22,6 +22,7 @@ const syncLogInsertBlockerMock = vi.hoisted(() => vi.fn())
 
 vi.mock('node:child_process', () => ({
   spawn: spawnMock,
+  execFile: vi.fn(),
 }))
 
 vi.mock('../../../../infra/managed-process', () => ({
@@ -175,6 +176,45 @@ describe('resolveCodexAppServerLaunch', () => {
     }
     finally {
       rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  it('prefers the managed installation over PATH discovery', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'cradle-codex-managed-'))
+    const pathDir = mkdtempSync(join(tmpdir(), 'cradle-codex-app-server-path-'))
+    const executableName = process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server'
+    const managedRoot = join(dataDir, 'runtimes', 'codex-app-server', 'managed')
+    const managedExecutable = join(managedRoot, 'versions', '0.153.4', 'bin', executableName)
+    const managedManifest = {
+      schemaVersion: 1,
+      version: '0.153.4',
+      releaseTag: 'rust-v0.153.4',
+      targetKey: `${process.platform}-${process.arch}`,
+      appServerPath: join('versions', '0.153.4', 'bin', executableName),
+      codeModeHostPath: join('versions', '0.153.4', 'bin', process.platform === 'win32' ? 'codex-code-mode-host.exe' : 'codex-code-mode-host'),
+      sha256: { appServer: 'a'.repeat(64), codeModeHost: 'b'.repeat(64) },
+      installedAt: '2026-07-16T00:00:00.000Z',
+    }
+    try {
+      mkdirSync(join(managedRoot, 'versions', '0.153.4', 'bin'), { recursive: true })
+      writeFileSync(managedExecutable, '')
+      writeFileSync(join(managedRoot, managedManifest.codeModeHostPath), '')
+      const serialized = JSON.stringify(managedManifest)
+      writeFileSync(join(managedRoot, 'versions', '0.153.4', 'installation.json'), serialized)
+      writeFileSync(join(managedRoot, 'current.json'), serialized)
+      writeFileSync(join(pathDir, executableName), '')
+
+      expect(resolveCodexAppServerLaunch({
+        env: { CRADLE_DATA_DIR: dataDir, PATH: pathDir },
+      })).toEqual({
+        command: managedExecutable,
+        args: ['--listen', 'stdio://', '--session-source', 'cli'],
+        source: 'managed-app-server',
+      })
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(pathDir, { recursive: true, force: true })
     }
   })
 })

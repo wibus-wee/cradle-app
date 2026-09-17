@@ -23,20 +23,12 @@ import {
   workspaceSurfaceId,
   workSurfaceId,
 } from './surface-identity'
+import { surfaceRouteNavigateOptions } from './surface-route-codec'
 import { readSurface, useSurfaceStore } from './surface-store'
-
-type RouterNavigateOptions = Parameters<typeof router.navigate>[0]
-
-function toRouterNavigateOptions(surface: Pick<AppSurface, 'route'> | SurfaceDraft, replace = false): RouterNavigateOptions {
-  return {
-    ...surface.route,
-    replace,
-  } as RouterNavigateOptions
-}
 
 export function navigateToSurface(surface: AppSurface, options: { replace?: boolean } = {}): void {
   useSurfaceStore.getState().syncSurface(surface)
-  void router.navigate(toRouterNavigateOptions(surface, options.replace))
+  void router.navigate(surfaceRouteNavigateOptions(surface.route, options))
 }
 
 function openSurface(surface: SurfaceDraft, options: { replace?: boolean } = {}): void {
@@ -47,7 +39,7 @@ function openSurface(surface: SurfaceDraft, options: { replace?: boolean } = {})
   else {
     useSurfaceStore.getState().syncSurface(surface)
   }
-  void router.navigate(toRouterNavigateOptions(surface, options.replace))
+  void router.navigate(surfaceRouteNavigateOptions(surface.route, options))
 }
 
 export function openHome(options: { replace?: boolean } = {}): void {
@@ -70,8 +62,6 @@ function routeBelongsToRemovedWorkspace(
       return input.removedSessionIds.has(route.params.sessionId)
     case '/work/$workId':
       return input.removedWorkIds.has(route.params.workId)
-    case '/pull-requests':
-      return route.search?.workId !== undefined && input.removedWorkIds.has(route.search.workId)
     default:
       return false
   }
@@ -132,23 +122,18 @@ export function openNewChat(options: {
   workspaceId?: string
   sessionGroupId?: string
 } = {}): void {
-  const search: Record<string, string> = {}
-  if (options.issueId) {
-    search.issueId = options.issueId
-  }
-  if (options.workspaceId) {
-    search.workspaceId = options.workspaceId
-  }
-  if (options.sessionGroupId) {
-    search.sessionGroupId = options.sessionGroupId
-  }
   openSurface({
     id: 'new-chat',
     kind: 'new-chat',
     title: getI18n().t('search:command.newChat.label'),
-    route: Object.keys(search).length > 0
-      ? { to: '/chat/new', search }
-      : { to: '/chat/new' },
+    route: {
+      to: '/chat/new',
+      search: {
+        issueId: options.issueId,
+        workspaceId: options.workspaceId,
+        sessionGroupId: options.sessionGroupId,
+      },
+    },
     closable: true,
   }, options)
 }
@@ -183,14 +168,14 @@ export function openWork(workId: string, options: { replace?: boolean } = {}): v
   }, options)
 }
 
-export function openPullRequests(options: { replace?: boolean, workId?: string } = {}): void {
+export function openPullRequests(options: { replace?: boolean, pr?: string } = {}): void {
   openSurface({
     id: pullRequestsSurfaceId(),
     kind: 'pull-requests',
     title: getI18n().t('pull-requests:surface.title'),
     route: {
       to: '/pull-requests',
-      search: { workId: options.workId },
+      search: { pr: options.pr },
     },
     closable: true,
   }, options)
@@ -299,11 +284,10 @@ export function openSettingsSection(section: string, options: { replace?: boolea
   }
   settingsStore.setSettingsSection(section)
 
-  void router.navigate({
-    to: '/settings/$section',
-    params: { section },
-    replace: options.replace,
-  })
+  void router.navigate(surfaceRouteNavigateOptions(
+    { to: '/settings/$section', params: { section } },
+    options,
+  ))
 }
 
 export function openAwaits(options: { replace?: boolean } = {}): void {

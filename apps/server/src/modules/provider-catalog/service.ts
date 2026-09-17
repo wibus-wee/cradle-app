@@ -3,11 +3,10 @@ import { z } from 'zod'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import { enrichModelsFromRegistryMappings } from '../model-registry/model-info-registry'
 import * as ModelRegistry from '../model-registry/service'
 import { listRuntimeOwnedProviderTargetModels } from '../provider-contracts/runtime-compatibility'
 import type { ModelDescriptor, ProviderKind, ProviderRequest } from '../provider-contracts/types'
-import type { ResolvedProviderTarget } from '../provider-targets/service'
+import type { ProviderTarget, ResolvedProviderTarget } from '../provider-targets/service'
 import {
   pruneDiscoveredProviderTargetCustomModels,
   resolveProviderTarget,
@@ -82,9 +81,9 @@ const RuntimeAuditProfileInputSchema = z.object({
   providerTargetId: z.string().nullable().default(null),
 })
 
-function requestedProviderTarget(
+export function requestedProviderTarget(
   input: Pick<ProviderRequest, 'providerTargetKind' | 'providerTargetId' | 'profileId'>,
-) {
+): ProviderTarget | null {
   if (input.providerTargetId) {
     return {
       id: input.providerTargetId,
@@ -92,6 +91,24 @@ function requestedProviderTarget(
     }
   }
   return input.profileId ? { id: input.profileId, kind: 'manual' as const } : null
+}
+
+/**
+ * Build the effective provider request for an already-resolved target. The
+ * stored target is authoritative for kind/config/credentials; request-body
+ * fields are ignored once a target ref is present.
+ */
+export function providerRequestForResolvedTarget(resolved: ResolvedProviderTarget): ProviderRequest {
+  return {
+    providerKind: resolved.providerKind,
+    label: resolved.label,
+    configJson: resolved.configJson,
+    secretRef: resolved.credentialRef,
+    profileId: resolved.id,
+    providerTargetKind: resolved.target.kind,
+    providerTargetId: resolved.target.id,
+    sourceApp: resolved.sourceMetadata?.app ?? null,
+  }
 }
 
 function resolveEffectiveProviderRequest(input: ProviderRequest) {
@@ -108,16 +125,7 @@ function resolveEffectiveProviderRequest(input: ProviderRequest) {
   return {
     target,
     resolved,
-    request: {
-      providerKind: resolved.providerKind,
-      label: resolved.label,
-      configJson: resolved.configJson,
-      secretRef: resolved.credentialRef,
-      profileId: resolved.id,
-      providerTargetKind: resolved.target.kind,
-      providerTargetId: resolved.target.id,
-      sourceApp: resolved.sourceMetadata?.app ?? null,
-    } satisfies ProviderRequest,
+    request: providerRequestForResolvedTarget(resolved),
   }
 }
 
@@ -202,13 +210,15 @@ export async function collectProviderModelInventory(input: ProviderRequest & { w
 }
 
 /**
- * List models for a provider request: collect inventory, apply registry enrichment,
- * then project provider-level capability defaults. Use collectProviderModelInventory
- * when you need the raw inventory for caching.
+ * List models for a provider request without a target-scoped cache: collect
+ * inventory, apply registry enrichment, then project provider-level capability
+ * defaults. Use collectProviderModelInventory when you need the raw inventory
+ * for caching, and queryProviderTargetModels (target-model-query.ts) for
+ * target-scoped freshness/cache/visibility semantics.
  */
 export async function listModels(input: ProviderRequest & { workspaceId?: string | null }): Promise<ModelDescriptor[]> {
   const inventory = await collectProviderModelInventory(input)
-  const enriched = await enrichModelsFromRegistryMappings(inventory, ModelRegistry.listMappingEntries())
+  const enriched = await ModelRegistry.enrichModels(inventory)
   return projectProviderModelListCapabilities(enriched)
 }
 

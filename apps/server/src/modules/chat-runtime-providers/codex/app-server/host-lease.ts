@@ -1,10 +1,15 @@
+import { resolve } from 'node:path'
+
 import type { RuntimeKind } from '../../../provider-contracts/types'
 import type { ProviderProcessHostLease } from '../../kit/process-host'
 import {
   acquireProviderProcessHostResource,
+  collectProviderProcessHostResources,
   invalidateProviderProcessHostResource,
+  listProviderProcessHosts,
   registerProcessHostLeaseCleanup,
 } from '../../kit/process-host'
+import { CODEX_RUNTIME_KIND } from '../metadata'
 import type {
   CodexAppServerClientLike,
   CodexAppServerHostResource,
@@ -139,6 +144,39 @@ function sanitizeCodexAppServerProcessOptions(
 
 export function invalidateCodexAppServerHost(hostId: string): Promise<void> {
   return invalidateProviderProcessHostResource(hostId)
+}
+
+/**
+ * Drain pooled app-server hosts that launched the given executable so the
+ * managed install can be removed. Actively leased hosts (or hosts still
+ * spawning, which cannot report their executable yet) refuse removal —
+ * mirrors the opencode runtime pool's preparePathForRemoval contract.
+ */
+export async function prepareCodexManagedPathForRemoval(binaryPath: string): Promise<boolean> {
+  const target = resolve(binaryPath)
+  const appServerScopePrefix = `${CODEX_APP_SERVER_SCOPE_ID}:`
+
+  const stillSpawning = listProviderProcessHosts().some(entry =>
+    entry.runtimeKind === CODEX_RUNTIME_KIND
+    && entry.scopeId.startsWith(appServerScopePrefix)
+    && entry.spawning)
+  if (stillSpawning) {
+    return false
+  }
+
+  const matching = collectProviderProcessHostResources(
+    CODEX_RUNTIME_KIND,
+    (resource, entry) => {
+      const executable = (resource as CodexAppServerHostResource).client.executablePath
+      return executable && resolve(executable) === target ? { entry, resource } : undefined
+    },
+  )
+  if (matching.some(({ entry }) => entry.refCount > 0)) {
+    return false
+  }
+  await Promise.all(matching.map(({ entry, resource }) =>
+    invalidateProviderProcessHostResource(entry.hostId, resource)))
+  return true
 }
 
 function configureCodexAppServerClientOptions(

@@ -879,8 +879,29 @@ export async function startDesktopApp(): Promise<void> {
             desktopServerBootstrapSnapshot = snapshot
             publishDesktopServerStatus({ state: 'bootstrapping', bootstrap: snapshot })
           }
+          const publishReadyStatus = (readyUrl: string) => {
+            publishDesktopServerStatus({
+              state: 'ready',
+              serverUrl: readyUrl,
+              bootstrap: desktopServerBootstrapSnapshot ?? createDesktopServerBootstrapSnapshot(),
+              connection: {
+                kind: 'owned-ipc',
+                serverUrl: readyUrl,
+                rendererBaseUrl: readyUrl,
+                generation: desktopServerGeneration,
+              },
+            })
+          }
+          const startServerCallbacks = {
+            onBootstrapSnapshot: publishServerBootstrapSnapshot,
+            onRestarted: (restartedUrl: string) => {
+              desktopServerGeneration += 1
+              serverFetchBroker.setServerUrl(restartedUrl, desktopServerGeneration)
+              publishReadyStatus(restartedUrl)
+            },
+          }
           try {
-            serverUrl = await startServer(publishServerBootstrapSnapshot)
+            serverUrl = await startServer(startServerCallbacks)
           }
           catch (error) {
             const message = error instanceof Error ? error.message : String(error)
@@ -889,12 +910,12 @@ export async function startDesktopApp(): Promise<void> {
             if (migration.migrated) {
               console.error('[desktop] new data root failed health check; restored previous root')
               desktopServerBootstrapSnapshot = createDesktopServerBootstrapSnapshot()
-              serverUrl = await startServer(publishServerBootstrapSnapshot)
+              serverUrl = await startServer(startServerCallbacks)
             }
             else if (backup.restored) {
               console.error('[desktop] restored data failed health check; restored previous data')
               desktopServerBootstrapSnapshot = createDesktopServerBootstrapSnapshot()
-              serverUrl = await startServer(publishServerBootstrapSnapshot)
+              serverUrl = await startServer(startServerCallbacks)
             }
             else {
               throw error
@@ -903,17 +924,7 @@ export async function startDesktopApp(): Promise<void> {
           initializeDesktopServicesForServer(serverUrl)
           await completeDesktopDataMigrationAfterHealthyStart()
           await completeDesktopDataBackupAfterHealthyStart()
-          publishDesktopServerStatus({
-            state: 'ready',
-            serverUrl,
-            bootstrap: desktopServerBootstrapSnapshot ?? createDesktopServerBootstrapSnapshot(),
-            connection: {
-              kind: 'owned-ipc',
-              serverUrl,
-              rendererBaseUrl: serverUrl,
-              generation: desktopServerGeneration,
-            },
-          })
+          publishReadyStatus(serverUrl)
         }
  catch (error) {
           console.error('[desktop] runtime startup failed:', error)

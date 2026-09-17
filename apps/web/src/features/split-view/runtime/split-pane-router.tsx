@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { RouteErrorFallback } from '~/components/common/route-error-fallback'
 import type { SurfaceRoute } from '~/navigation/surface-identity'
 import { surfaceDraftFromRoute } from '~/navigation/surface-identity'
+import { surfaceRouteNavigateOptions } from '~/navigation/surface-route-codec'
 
 import { useSplitWorkspaceStore } from '../store/split-workspace-store'
 import { SplitPaneRootProvider } from './split-pane-root-context'
@@ -32,7 +33,7 @@ export function SplitPaneRouter({
   // Reading the href off the host router keeps path building in one place and
   // avoids importing the router singleton (which owns this module's route
   // tree) back into the pane runtime.
-  const href = hostRouter.buildLocation(route as Parameters<typeof hostRouter.buildLocation>[0]).href
+  const href = hostRouter.buildLocation(surfaceRouteNavigateOptions(route)).href
   const initialHref = useRef(href).current
 
   const paneRouter = useMemo(
@@ -55,10 +56,7 @@ export function SplitPaneRouter({
     if (paneRouter.state.location.href === href) {
       return
     }
-    void paneRouter.navigate({
-      ...route,
-      replace: true,
-    } as Parameters<typeof paneRouter.navigate>[0])
+    void paneRouter.navigate(surfaceRouteNavigateOptions(route, { replace: true }))
   }, [href, paneRouter, route])
 
   useEffect(() => {

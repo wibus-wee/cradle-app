@@ -15,6 +15,7 @@ const serverPackageJson = JSON.parse(readFileSync(serverPackageJsonPath, 'utf8')
 const desktopRuntimeExternalsPath = join(serverRoot, 'desktop-runtime.externals.json')
 const desktopRuntimeExternals = JSON.parse(readFileSync(desktopRuntimeExternalsPath, 'utf8'))
 const externalRuntimePackages = desktopRuntimeExternals.packages ?? []
+const prunedRuntimePackagePatterns = desktopRuntimeExternals.prunePackages ?? []
 const runtimeEntry = 'dist/main.js'
 
 if (!existsSync(join(distRoot, 'main.js'))) {
@@ -70,6 +71,7 @@ writeFileSync(
       entry: runtimeEntry,
       bundling: {
         externalPackages: externalRuntimePackages,
+        prunedPackages: prunedRuntimePackagePatterns,
       },
       generatedAt: new Date().toISOString(),
     },
@@ -144,6 +146,9 @@ function pruneExternalRuntimeDependencies() {
 
     const packageJson = readPackageJson(packageRoot)
     for (const dependencyName of listRuntimeDependencyNames(packageJson)) {
+      if (isPrunedRuntimePackage(dependencyName)) {
+        continue
+      }
       const dependencyPath = resolvePackageFrom(dependencyName, packageRoot, nodeModulesDir)
       if (!dependencyPath) {
         if (packageJson.dependencies?.[dependencyName]) {
@@ -171,6 +176,20 @@ function joinPackagePath(root, packageName) {
 
 function readPackageJson(packageRoot) {
   return JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
+}
+
+function isPrunedRuntimePackage(packageName) {
+  return prunedRuntimePackagePatterns.some((pattern) => {
+    if (!pattern.includes('*')) {
+      return packageName === pattern
+    }
+    const regex = new RegExp(`^${pattern.split('*').map(escapeRegExp).join('.*')}$`)
+    return regex.test(packageName)
+  })
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function listRuntimeDependencyNames(packageJson) {

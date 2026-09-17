@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow'
 
 import type { SurfaceRoute } from '~/navigation/surface-identity'
 import { surfaceIdForRoute } from '~/navigation/surface-identity'
+import { parseSurfaceRoute } from '~/navigation/surface-route-codec'
 import { useSurfaceStore } from '~/navigation/surface-store'
 import { persistStorage } from '~/store/persist-storage'
 
@@ -68,6 +69,53 @@ function createPaneId(route: SurfaceRoute): string {
   }
   localPaneId += 1
   return `pane:${resourceId}:${Date.now().toString(36)}-${localPaneId.toString(36)}`
+}
+
+/**
+ * Persisted pane routes cross a storage boundary: validate them through the
+ * surface-route codec and drop anything that no longer decodes, keeping the
+ * workspace invariants (primary pane owns the surface's own route).
+ */
+function sanitizePersistedWorkspaces(value: unknown): Record<string, SplitWorkspace> {
+  if (!value || typeof value !== 'object') {
+    return {}
+  }
+
+  const workspaces: Record<string, SplitWorkspace> = {}
+  for (const [surfaceId, workspace] of Object.entries(value as Record<string, unknown>)) {
+    if (!workspace || typeof workspace !== 'object') {
+      continue
+    }
+    const candidate = workspace as Partial<SplitWorkspace>
+    if (typeof candidate.primaryPaneId !== 'string' || !candidate.panes || typeof candidate.panes !== 'object') {
+      continue
+    }
+
+    const panes: Record<string, SplitPane> = {}
+    for (const [paneId, pane] of Object.entries(candidate.panes)) {
+      const route = parseSurfaceRoute(pane && typeof pane === 'object' ? (pane as Partial<SplitPane>).route : undefined)
+      if (!route) {
+        continue
+      }
+      panes[paneId] = { id: paneId, route }
+    }
+
+    const primaryPane = panes[candidate.primaryPaneId]
+    if (!primaryPane || surfaceIdForRoute(primaryPane.route) !== candidate.primaryPaneId) {
+      continue
+    }
+
+    const focusedPaneId = typeof candidate.focusedPaneId === 'string' && panes[candidate.focusedPaneId]
+      ? candidate.focusedPaneId
+      : candidate.primaryPaneId
+    workspaces[surfaceId] = {
+      primaryPaneId: candidate.primaryPaneId,
+      panes,
+      focusedPaneId,
+      layout: Object.keys(panes).length > 1 ? (candidate.layout ?? null) : null,
+    }
+  }
+  return workspaces
 }
 
 function createWorkspace(route: SurfaceRoute): SplitWorkspace {
@@ -220,6 +268,12 @@ export const useSplitWorkspaceStore = create<SplitWorkspaceStoreState>()(
       name: STORAGE_KEY,
       storage: persistStorage,
       partialize: state => ({ workspaces: state.workspaces }),
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        workspaces: sanitizePersistedWorkspaces(
+          (persistedState as { workspaces?: unknown } | undefined)?.workspaces,
+        ),
+      }),
     },
   ),
 )

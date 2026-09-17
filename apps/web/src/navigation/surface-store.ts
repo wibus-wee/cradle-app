@@ -6,10 +6,20 @@ import { isTearoffWindow } from '~/lib/electron'
 
 import type { AppSurface, SurfaceDraft, SurfaceRoute } from './surface-identity'
 import { HOME_SURFACE, HOME_SURFACE_ID, sortSurfaces } from './surface-identity'
+import {
+  isSurfaceKindPersistable,
+  parseSurfaceRoute,
+  persistedSurfaceSchema,
+} from './surface-route-codec'
 
-const SURFACE_STORAGE_KEY = 'cradle:surfaces:v1'
-const LEGACY_TABS_STORAGE_KEY = 'cradle:tabs-next:v1'
-const SURFACE_PERSIST_VERSION = 1
+const SURFACE_STORAGE_KEY = 'cradle:surfaces:v2'
+const SURFACE_PERSIST_VERSION = 2
+/**
+ * Any versioned snapshot under the surface namespaces other than the live key
+ * is stale. Pre-codec snapshots are deleted outright, never migrated: surface
+ * tabs are rebuildable UI state.
+ */
+const STALE_SURFACE_SNAPSHOT_KEY = /^cradle:(surfaces|tabs-next):v\d+$/
 
 interface PersistedSurfaceState {
   surfaces: AppSurface[]
@@ -30,106 +40,6 @@ interface SurfaceState extends PersistedSurfaceState {
   resetSurfaces: () => void
 }
 
-const optionalStringSchema = z.string().optional()
-const diffSearchSchema = z.object({
-  workspace: optionalStringSchema,
-  repo: optionalStringSchema,
-  path: optionalStringSchema,
-  review: optionalStringSchema,
-}).optional()
-
-const surfaceRouteSchema = z.discriminatedUnion('to', [
-  z.object({ to: z.literal('/') }),
-  z.object({
-    to: z.literal('/work/new'),
-    search: z.object({
-      workspaceId: optionalStringSchema,
-      issueId: optionalStringSchema,
-    }).optional(),
-  }),
-  z.object({
-    to: z.literal('/work/$workId'),
-    params: z.object({ workId: z.string() }),
-  }),
-  z.object({
-    to: z.literal('/pull-requests'),
-    search: z.object({ workId: optionalStringSchema }).optional(),
-  }),
-  z.object({
-    to: z.literal('/chat/new'),
-    search: z.object({
-      issueId: optionalStringSchema,
-      workspaceId: optionalStringSchema,
-      sessionGroupId: optionalStringSchema,
-    }).optional(),
-  }),
-  z.object({
-    to: z.literal('/chat/$sessionId'),
-    params: z.object({ sessionId: z.string() }),
-  }),
-  z.object({
-    to: z.literal('/diff'),
-    search: diffSearchSchema,
-  }),
-  z.object({
-    to: z.literal('/workspaces/$workspaceId'),
-    params: z.object({ workspaceId: z.string() }),
-  }),
-  z.object({
-    to: z.literal('/workspaces/$workspaceId/diffs'),
-    params: z.object({ workspaceId: z.string() }),
-    search: diffSearchSchema,
-  }),
-  z.object({
-    to: z.literal('/kanban/$boardId'),
-    params: z.object({ boardId: z.string() }),
-    search: z.object({
-      issue: optionalStringSchema,
-      milestoneId: optionalStringSchema,
-    }).optional(),
-  }),
-  z.object({
-    to: z.literal('/plugins/$routeSegment/$localId'),
-    params: z.object({ routeSegment: z.string(), localId: z.string() }),
-  }),
-  z.object({ to: z.literal('/awaits') }),
-  z.object({ to: z.literal('/automation') }),
-  z.object({ to: z.literal('/usage') }),
-  z.object({
-    to: z.literal('/settings/$section'),
-    params: z.object({ section: z.string() }),
-  }),
-  z.object({ to: z.literal('/onboarding') }),
-  z.object({ to: z.literal('/devtool') }),
-]) satisfies z.ZodType<SurfaceRoute>
-
-const appSurfaceSchema = z.object({
-  id: z.string().min(1),
-  kind: z.enum([
-    'home',
-    'new-work',
-    'work',
-    'pull-requests',
-    'new-chat',
-    'chat',
-    'diff',
-    'workspace',
-    'workspace-diffs',
-    'kanban',
-    'plugin',
-    'awaits',
-    'automation',
-    'usage',
-    'settings',
-    'onboarding',
-    'devtool',
-  ]),
-  title: z.string(),
-  route: surfaceRouteSchema,
-  order: z.number().finite(),
-  closable: z.boolean(),
-}) satisfies z.ZodType<AppSurface>
-
 const persistedSurfaceStateSchema = z.object({
   surfaces: z.array(z.unknown()).optional(),
 })
@@ -141,7 +51,7 @@ export function readPersistedSurfaceState(raw: unknown): PersistedSurfaceState {
   }
 
   const surfaces = (parsedState.data.surfaces ?? [])
-    .map(surface => appSurfaceSchema.safeParse(surface))
+    .map(surface => persistedSurfaceSchema.safeParse(surface))
     .filter(result => result.success)
     .map(result => result.data)
 
@@ -153,7 +63,8 @@ export function readPersistedSurfaceState(raw: unknown): PersistedSurfaceState {
 function normalizeSurfaces(surfaces: readonly AppSurface[]): AppSurface[] {
   const byId = new Map<string, AppSurface>()
   for (const surface of surfaces) {
-    if (surface.kind === 'settings') {
+    // Settings stays overlay-only: it is never persisted as a surface tab.
+    if (!isSurfaceKindPersistable(surface.kind)) {
       continue
     }
     byId.set(surface.id, surface)
@@ -173,9 +84,22 @@ function normalizeSurfaces(surfaces: readonly AppSurface[]): AppSurface[] {
   }))
 }
 
+/**
+ * Canonicalize a route through the codec so every stored surface keeps the
+ * same normalized search shape regardless of which adapter produced it.
+ */
+function canonicalSurfaceRoute(route: SurfaceRoute): SurfaceRoute {
+  return parseSurfaceRoute(route) ?? route
+}
+
+function canonicalizeSurfaceDraft(surface: SurfaceDraft): SurfaceDraft {
+  const route = canonicalSurfaceRoute(surface.route)
+  return route === surface.route ? surface : { ...surface, route }
+}
+
 function routeRecordsEqual(
-  left: Record<string, string | undefined> | undefined,
-  right: Record<string, string | undefined> | undefined,
+  left: Record<string, string | number | undefined> | undefined,
+  right: Record<string, string | number | undefined> | undefined,
 ): boolean {
   if (left === right) {
     return true
@@ -290,9 +214,19 @@ function replaceSurfaceInCollection(
   )
 }
 
-function clearLegacyTabsPersistence(): void {
+/** Delete stale versioned surface snapshots: tabs are reset, not migrated. */
+function clearStaleSurfaceSnapshots(): void {
   try {
-    window.localStorage.removeItem(LEGACY_TABS_STORAGE_KEY)
+    const staleKeys: string[] = []
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index)
+      if (key && key !== SURFACE_STORAGE_KEY && STALE_SURFACE_SNAPSHOT_KEY.test(key)) {
+        staleKeys.push(key)
+      }
+    }
+    for (const key of staleKeys) {
+      window.localStorage.removeItem(key)
+    }
   }
   catch {}
 }
@@ -303,8 +237,9 @@ export const useSurfaceStore = create<SurfaceState>()(
       surfaces: [HOME_SURFACE],
       lastClosedSurface: null,
 
-      syncSurface: surface =>
+      syncSurface: draft =>
         set((state) => {
+          const surface = canonicalizeSurfaceDraft(draft)
           const surfaces = appendOrUpdateSurface(state.surfaces, surface)
           const lastClosedSurface = state.lastClosedSurface?.id === surface.id
             ? null
@@ -315,8 +250,9 @@ export const useSurfaceStore = create<SurfaceState>()(
           return { surfaces, lastClosedSurface }
         }),
 
-      replaceSurface: (replacedSurfaceId, surface) =>
+      replaceSurface: (replacedSurfaceId, draft) =>
         set((state) => {
+          const surface = canonicalizeSurfaceDraft(draft)
           const surfaces = replaceSurfaceInCollection(state.surfaces, replacedSurfaceId, surface)
           const lastClosedSurface = state.lastClosedSurface?.id === surface.id
             ? null
@@ -398,7 +334,7 @@ export const useSurfaceStore = create<SurfaceState>()(
         ...readPersistedSurfaceState(persistedState),
       }),
       onRehydrateStorage: () => (state) => {
-        clearLegacyTabsPersistence()
+        clearStaleSurfaceSnapshots()
         if (!state) {
           return
         }

@@ -240,9 +240,11 @@ export function resolveDesktopRelayAdvertisedUrl(
  * Start the Cradle server as a forked child process.
  * Returns the full URL the server is listening on.
  */
-export async function startServer(
-  onBootstrapSnapshot?: (snapshot: DesktopServerBootstrapSnapshot) => void,
-): Promise<string> {
+export async function startServer(callbacks?: {
+  onBootstrapSnapshot?: (snapshot: DesktopServerBootstrapSnapshot) => void
+  onRestarted?: (serverUrl: string) => void
+}): Promise<string> {
+  const onBootstrapSnapshot = callbacks?.onBootstrapSnapshot
   expectedServerExit = null
   lastServerSignalBeforeExit = null
   restartCount = 0
@@ -280,6 +282,7 @@ export async function startServer(
         bootstrapSnapshot = applyServerBootstrapEvent(bootstrapSnapshot, event)
         onBootstrapSnapshot?.(bootstrapSnapshot)
       },
+      onRestarted: callbacks?.onRestarted,
     })
   }
  catch (error) {
@@ -524,6 +527,7 @@ async function spawnServer(opts: {
   managedRelay: { relayUrl: string | null, accessMode: DesktopRelayAccessMode, pid: number | null }
   bootstrapWatchdog?: ServerBootstrapWatchdog
   onBootstrapEvent?: (event: ServerBootstrapEvent) => void
+  onRestarted?: (serverUrl: string) => void
 }): Promise<void> {
   const { host, port, dataDir, credentialSecret, managedRelay } = opts
 
@@ -542,7 +546,7 @@ async function spawnServer(opts: {
   const migrationsDir
     = configuredMigrationsDir || (isDev ? undefined : join(process.resourcesPath, 'drizzle'))
   const builtinSkillsDir = isDev ? undefined : join(process.resourcesPath, 'resources/skills')
-  const codexAppServerPath = resolveDesktopCodexAppServerPath({ isDev, moduleDir: __dirname })
+  const codexAppServerPath = resolveDesktopCodexAppServerPath()
   const installedPluginsDir = resolveDesktopInstalledPluginsDir(app.getPath('userData'))
   const externalPluginsDirs = [installedPluginsDir, process.env.CRADLE_EXTERNAL_PLUGINS_DIRS]
   const externalPluginsDirList
@@ -643,6 +647,7 @@ async function spawnServer(opts: {
             dataDir: app.getPath('userData'),
             serverUrl: currentServerUrl,
           })
+          opts.onRestarted?.(currentServerUrl)
         })
         .catch((err) => {
           console.error('[desktop] Server restart failed:', err)
@@ -930,48 +935,10 @@ function joinPathSegments(segments: string[]): string {
   return uniqueSegments.join(delimiter)
 }
 
-function resolveDesktopCodexAppServerPath(input: {
-  isDev: boolean
-  moduleDir: string
-}): string | undefined {
-  const configuredPath = process.env[CODEX_APP_SERVER_PATH_ENV]?.trim()
-  if (configuredPath) {
-    return configuredPath
-  }
-
-  const executableName = getCodexAppServerExecutableName()
-  if (!input.isDev) {
-    const bundledPath = join(process.resourcesPath, executableName)
-    if (!existsSync(bundledPath)) {
-      throw new Error(`Bundled Codex app-server runtime is missing at ${bundledPath}`)
-    }
-    return bundledPath
-  }
-
-  return [
-    resolve(
-      input.moduleDir,
-      '../../resources/codex',
-      `${process.platform}-${process.arch}`,
-      executableName,
-    ),
-    resolve(
-      process.cwd(),
-      'resources/codex',
-      `${process.platform}-${process.arch}`,
-      executableName,
-    ),
-    resolve(
-      process.cwd(),
-      'apps/desktop/resources/codex',
-      `${process.platform}-${process.arch}`,
-      executableName,
-    ),
-  ].find(candidate => existsSync(candidate))
-}
-
-function getCodexAppServerExecutableName(): string {
-  return process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server'
+export function resolveDesktopCodexAppServerPath(): string | undefined {
+  // Only an explicit override is forwarded. Bundled and dev-cache binaries are
+  // gone — the server resolves its managed installation (or PATH/CLI fallback).
+  return process.env[CODEX_APP_SERVER_PATH_ENV]?.trim() || undefined
 }
 
 function readDesktopCommandPathFallbackSegments(env: NodeJS.ProcessEnv): string[] {

@@ -1,4 +1,4 @@
-// Chat-owned command boundary for server-authoritative composer drafts.
+// Server-authoritative composer draft adapter over the generated API client.
 import {
   deleteChatComposerDraftsBySurfaceId,
   getChatComposerDraftsBySurfaceId,
@@ -10,7 +10,9 @@ import type {
   PutChatComposerDraftsBySurfaceIdResponse,
 } from '~/api-gen/types.gen'
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
-import type { ComposerDraft } from '~/store/composer-draft'
+
+import type { ComposerDraft } from './composer-draft-store'
+import { toPersistedComposerDraft } from './composer-draft-store'
 
 export interface ComposerDraftServerState {
   surfaceId: string
@@ -24,17 +26,6 @@ type ComposerDraftApiResponse
   = | DeleteChatComposerDraftsBySurfaceIdResponse
     | GetChatComposerDraftsBySurfaceIdResponse
     | PutChatComposerDraftsBySurfaceIdResponse
-
-const discardedSurfaceIds = new Set<string>()
-const serverDraftQueues = new Map<string, Promise<void>>()
-
-export function activateComposerDraftSurface(surfaceId: string): void {
-  discardedSurfaceIds.delete(surfaceId)
-}
-
-export function markComposerDraftSurfaceDiscarded(surfaceId: string): void {
-  discardedSurfaceIds.add(surfaceId)
-}
 
 export async function readServerComposerDraft(
   surfaceId: string,
@@ -55,7 +46,9 @@ export async function writeServerComposerDraft(
 ): Promise<ComposerDraftServerState> {
   const { data } = await putChatComposerDraftsBySurfaceId({
     path: { surfaceId },
-    body: { draft },
+    // Attachments never enter the server draft JSON; the wire schema keeps the
+    // field but the payload stays text + context parts + pasted texts.
+    body: { draft: toPersistedComposerDraft(draft) },
     throwOnError: true,
   })
 
@@ -71,44 +64,6 @@ export async function deleteServerComposerDraft(
   })
 
   return projectComposerDraftResponse(data)
-}
-
-export function queueServerComposerDraftWrite(surfaceId: string, draft: ComposerDraft): void {
-  if (discardedSurfaceIds.has(surfaceId)) {
-    return
-  }
-
-  appendServerDraftOperation(surfaceId, async () => {
-    if (discardedSurfaceIds.has(surfaceId)) {
-      return
-    }
-    await writeServerComposerDraft(surfaceId, draft)
-  })
-}
-
-export function queueServerComposerDraftDelete(surfaceId: string): void {
-  appendServerDraftOperation(surfaceId, async () => {
-    await deleteServerComposerDraft(surfaceId)
-  })
-}
-
-export function flushComposerDraftServerQueue(surfaceId: string): Promise<void> {
-  return serverDraftQueues.get(surfaceId) ?? Promise.resolve()
-}
-
-function appendServerDraftOperation(surfaceId: string, operation: () => Promise<void>): void {
-  const previous = serverDraftQueues.get(surfaceId) ?? Promise.resolve()
-  const next = previous
-    .catch(() => undefined)
-    .then(operation)
-    .catch(() => undefined)
-
-  serverDraftQueues.set(surfaceId, next)
-  void next.finally(() => {
-    if (serverDraftQueues.get(surfaceId) === next) {
-      serverDraftQueues.delete(surfaceId)
-    }
-  })
 }
 
 function projectComposerDraftResponse(

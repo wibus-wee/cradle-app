@@ -271,15 +271,15 @@ Web:
 
 ## Done criteria
 
-- [ ] Cache JSON no longer treated as enrichment source of truth; read paths re-enrich
-- [ ] One resolve function used by list, lookup, pricing, OpenCode, system-agent, context-window
-- [ ] `refresh: true` always live-fetches inventory
-- [ ] Visibility only from `enabled_models_json` / model-settings
-- [ ] Selection never silently replaces a bound/selected id with `models[0]` on mount
-- [ ] Custom Match writes global mapping
-- [ ] READMEs match the four-layer contract
-- [ ] M0 tests updated to new behavior; server + web typecheck/tests pass
-- [ ] `plans/README.md` row marked DONE
+- [x] Cache JSON no longer treated as enrichment source of truth; read paths re-enrich
+- [x] One resolve function used by list, lookup, pricing, OpenCode, system-agent, context-window
+- [x] `refresh: true` always live-fetches inventory
+- [x] Visibility only from `enabled_models_json` / model-settings
+- [x] Selection never silently replaces a bound/selected id with `models[0]` on mount
+- [x] Custom Match writes global mapping
+- [x] READMEs match the four-layer contract
+- [x] M0 tests updated to new behavior; server + web typecheck/tests pass
+- [x] `plans/README.md` row marked DONE
 
 ## STOP conditions
 
@@ -298,6 +298,7 @@ Web:
   - M5: OpenCode + system-agent mapping resolve use fuzzy `lookupModelRaw`; OpenCode also fuzzy-falls back when unmapped
   - Web: mapping dialog/settings invalidate `AGENT_MODELS_QUERY_KEY`; custom-models Match writes global alias mapping
 - 2026-07-10: M0–M6 core landed. Optional follow-ups: richer orphan/hidden-bound UI copy in composer picker; client auto-refresh when `stale: true`; Universal Anthropic-only list URL; strip `enabledModels` from connection config on write.
+- 2026-09-17: follow-up sweep verified against live code. `stale: true` client SWR already implemented (`use-agent-models.ts` revalidates when `!cache.cached || cache.stale`); `reconcileProfiles` was deleted outright (moot); `enabledModels` is stripped from persisted connection config on write (`buildProfileConfig` discards it; visibility reads `enabledModelsJson`); orphan bound ids render their raw id with no fake substitution (`provider-model-picker`). Implemented the last open item: Universal targets with only an Anthropic base URL now list via the Anthropic `/v1/models` wire instead of failing OpenAI-only (`catalog.ts` + regression test).
 
 ## Surprises & Discoveries
 

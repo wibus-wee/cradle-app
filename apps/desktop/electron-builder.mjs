@@ -3,7 +3,6 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 
 import { fixMacOSFrameworkSymlinks } from './scripts/fix-macos-framework-symlinks.mjs'
-import { copyCodexRuntimeToPackagedResources } from './scripts/sync-codex-runtime.mjs'
 
 const require = createRequire(import.meta.url)
 
@@ -143,7 +142,6 @@ async function adHocSignAfterPack(context) {
 }
 
 async function afterPack(context) {
-  await copyCodexRuntimeToPackagedResources(context)
   await removeMacFrameworkLocales(context)
   if (['darwin', 'mas'].includes(context.electronPlatformName)) {
     const appPath = path.join(

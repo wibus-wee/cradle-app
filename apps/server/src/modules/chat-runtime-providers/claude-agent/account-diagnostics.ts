@@ -8,6 +8,10 @@ import { readTrustedClaudeAgentConfig, resolveApiKey } from '../../provider-cont
 import * as ProviderTargets from '../../provider-targets/service'
 import * as Secrets from '../../secrets/service'
 import { removeCradleOwnedClaudeConfigDirFromEnv } from './runtime-context'
+import {
+  applyClaudeAgentExecutableToQueryOptions,
+  trackClaudeManagedQuery,
+} from './runtime-executable'
 
 export type ClaudeAgentAuthDiagnosticsStatus = 'ready' | 'warning' | 'error' | 'unknown'
 export type ClaudeAgentAuthStatus = 'authenticated' | 'unauthenticated' | 'unknown'
@@ -509,10 +513,14 @@ async function probeClaudeAccount(
     env,
   }
   try {
-    const activeQuery = deps.query({
-      prompt: emptyClaudeAgentProbeInput(abortController.signal),
+    applyClaudeAgentExecutableToQueryOptions(options)
+    const activeQuery = trackClaudeManagedQuery(
+      deps.query({
+        prompt: emptyClaudeAgentProbeInput(abortController.signal),
+        options,
+      }),
       options,
-    })
+    )
     try {
       const initializationResult = activeQuery.initializationResult
       if (typeof initializationResult !== 'function') {

@@ -17,6 +17,8 @@ export interface ProviderRuntimeHostSnapshot {
   refCount: number
   pinnedCount: number
   hasResource: boolean
+  /** A resource creation is in flight (unlike a disposed or lease-only host). */
+  spawning: boolean
   expiresAt: number
   updatedAt: number
 }
@@ -51,7 +53,7 @@ export class ProviderRuntimeLease<Resource = undefined> {
 export type ProviderRuntimeResourceFactory<Resource> = () => Resource | Promise<Resource>
 export type ProviderRuntimeResourceDisposer<Resource> = (resource: Resource) => void | Promise<void>
 
-interface RuntimeHostEntry extends ProviderRuntimeHostSnapshot {
+interface RuntimeHostEntry extends Omit<ProviderRuntimeHostSnapshot, 'spawning'> {
   retainOnRelease: boolean
   resource?: unknown
   resourcePromise?: Promise<unknown>
@@ -200,17 +202,7 @@ export class ProviderRuntimeHostManager {
 
   listHosts(): ProviderRuntimeHostSnapshot[] {
     this.reapIdleHosts()
-    return Array.from(this.hosts.values(), entry => ({
-      hostId: entry.hostId,
-      runtimeKind: entry.runtimeKind,
-      providerTargetId: entry.providerTargetId,
-      scopeId: entry.scopeId,
-      refCount: entry.refCount,
-      pinnedCount: entry.pinnedCount,
-      hasResource: entry.hasResource,
-      expiresAt: entry.expiresAt,
-      updatedAt: entry.updatedAt,
-    }))
+    return Array.from(this.hosts.values(), entry => this.snapshot(entry))
   }
 
   /**
@@ -235,23 +227,27 @@ export class ProviderRuntimeHostManager {
       if (entry.runtimeKind !== runtimeKind || !entry.hasResource || entry.resource === undefined) {
         continue
       }
-      const snapshot: ProviderRuntimeHostSnapshot = {
-        hostId: entry.hostId,
-        runtimeKind: entry.runtimeKind,
-        providerTargetId: entry.providerTargetId,
-        scopeId: entry.scopeId,
-        refCount: entry.refCount,
-        pinnedCount: entry.pinnedCount,
-        hasResource: entry.hasResource,
-        expiresAt: entry.expiresAt,
-        updatedAt: entry.updatedAt,
-      }
-      const result = callback(entry.resource, snapshot)
+      const result = callback(entry.resource, this.snapshot(entry))
       if (result !== undefined) {
         results.push(result)
       }
     }
     return results
+  }
+
+  private snapshot(entry: RuntimeHostEntry): ProviderRuntimeHostSnapshot {
+    return {
+      hostId: entry.hostId,
+      runtimeKind: entry.runtimeKind,
+      providerTargetId: entry.providerTargetId,
+      scopeId: entry.scopeId,
+      refCount: entry.refCount,
+      pinnedCount: entry.pinnedCount,
+      hasResource: entry.hasResource,
+      spawning: entry.resourcePromise !== undefined && !entry.hasResource,
+      expiresAt: entry.expiresAt,
+      updatedAt: entry.updatedAt,
+    }
   }
 
   hasHost(hostId: string): boolean {

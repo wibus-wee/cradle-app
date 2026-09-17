@@ -4,6 +4,11 @@ import { fileURLToPath } from 'node:url'
 import { createEngine, OcrError } from '@arcships/light-ocr'
 
 import { AppError } from '../../errors/app-error'
+import {
+  registerOcrEngineLease,
+  releaseOcrEngineLease,
+  resolveOcrModelBundle,
+} from './model-bundle'
 
 export interface ImageOcrFile {
   mediaType: string
@@ -23,12 +28,31 @@ const MAX_IMAGE_COUNT = 8
 const BASE64_DATA_URL_RE = /^data:image\/[a-z0-9.+-]+;base64,([a-z0-9+/=\s]+)$/i
 
 let enginePromise: ReturnType<typeof createEngine> | null = null
+let engineBundlePath: string | null = null
 
 async function getEngine() {
-  enginePromise ??= createEngine({
-    queueCapacity: 2,
-    maxPendingInputBytes: MAX_SOURCE_BYTES * 2,
-  })
+  if (!enginePromise) {
+    const bundle = resolveOcrModelBundle()
+    if (!bundle) {
+      throw new AppError({
+        code: 'image_ocr_model_not_installed',
+        status: 409,
+        message: 'The Light OCR model is not installed. Install it from Resources.',
+      })
+    }
+    const pendingBundlePath = bundle.path
+    enginePromise = createEngine({
+      queueCapacity: 2,
+      maxPendingInputBytes: MAX_SOURCE_BYTES * 2,
+      ...(pendingBundlePath ? { bundlePath: pendingBundlePath } : {}),
+    }).then((engine) => {
+      if (pendingBundlePath) {
+        engineBundlePath = pendingBundlePath
+        registerOcrEngineLease(pendingBundlePath, () => shutdownImageOcr())
+      }
+      return engine
+    })
+  }
   const pendingEngine = enginePromise
   try {
     return await pendingEngine
@@ -128,6 +152,10 @@ export async function recognizeImages(
 export async function shutdownImageOcr(): Promise<void> {
   const engine = enginePromise
   enginePromise = null
+  if (engineBundlePath) {
+    releaseOcrEngineLease(engineBundlePath)
+    engineBundlePath = null
+  }
   if (engine) {
     await engine.then(
       instance => instance.close(),

@@ -34,7 +34,7 @@ import { messagePayloadJoinCondition } from '../chat-runtime/message-payload-sto
 import { submitRuntimeToolApproval } from '../chat-runtime/pending-tool-approval'
 import * as ChatRuntime from '../chat-runtime/runtime'
 import { extractMessageText, parseStoredMessageSnapshot } from '../chat-runtime/ui-message'
-import { getCachedModelsForTarget } from '../provider-catalog/model-cache'
+import { queryProviderTargetModels } from '../provider-catalog/target-model-query'
 import * as ProviderTargets from '../provider-targets/service'
 import * as Session from '../session/service'
 import * as Workspace from '../workspace/service'
@@ -298,32 +298,29 @@ function listSessionTargets(): SessionTargetSummary[] {
   return [...agentTargets, ...providerRuntimeTargets]
 }
 
+/**
+ * List the selectable models for a provider target through the shared
+ * Provider Catalog target query (`prefer-cache` + stored visibility):
+ * a fresh cache never touches the network, a cold/stale cache performs one
+ * cooldown-governed inventory fetch, and a failed fetch surfaces the catalog's
+ * own fallback/error instead of a separate empty-list semantic. A target that
+ * no longer resolves simply has no models.
+ */
 async function listProviderTargetModels(providerTargetId: string): Promise<ProviderModelSummary[]> {
-  const target = ProviderTargets.getProviderTarget(providerTargetId)
-  if (!target) {
-    return []
+  try {
+    const result = await queryProviderTargetModels({
+      target: { id: providerTargetId },
+      freshness: 'prefer-cache',
+      visibility: 'stored',
+    })
+    return result.models.map(model => ({ id: model.id, label: model.label }))
   }
-  const cached = await getCachedModelsForTarget({ id: target.id, kind: target.kind })
-  const models = cached?.models ?? []
-  const enabledRaw = (() => {
-    try {
-      const parsed = JSON.parse(target.enabledModelsJson)
-      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string' && id.length > 0) : []
-    }
-    catch {
+  catch (error) {
+    if (error instanceof AppError && error.code === 'provider_target_not_found') {
       return []
     }
-  })()
-  if (enabledRaw.length === 0) {
-    return models.map(model => ({ id: model.id, label: model.label }))
+    throw error
   }
-  if (enabledRaw.length === 1 && enabledRaw[0] === '__all_disabled__') {
-    return []
-  }
-  const allowed = new Set(enabledRaw.filter(id => id !== '__all_disabled__'))
-  return models
-    .filter(model => allowed.has(model.id))
-    .map(model => ({ id: model.id, label: model.label }))
 }
 
 function sessionTargetValue(

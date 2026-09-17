@@ -9,6 +9,7 @@ import type { ManagedChildProcess } from '../../../../infra/managed-process'
 import { spawnManagedProcess } from '../../../../infra/managed-process'
 import type { ClientInfo } from '../app-server-protocol/ClientInfo'
 import type { ThreadForkParams } from '../app-server-protocol/v2/ThreadForkParams'
+import { resolveCodexManagedAppServerPath } from '../runtime-installation'
 import { serializeConfigOverrides } from './config-overrides'
 import { syncCodexAppServerLogInsertBlockerFromFeatureFlag } from './log-insert-blocker'
 import { looksLikeJsonNdjsonLine, NdjsonLineSplitter } from './ndjson-lines'
@@ -88,7 +89,8 @@ export class CodexAppServerClient {
   private readonly serverRequestHandler?: (request: CodexAppServerServerRequest) => Promise<unknown> | unknown
   private readonly exposeServerRequestsAsNotifications: boolean
   private readonly clientInfoVersion: string
-  private readonly executablePath: string
+  /** The resolved app-server command this client spawned (or will spawn). */
+  readonly executablePath: string
   private readonly userAgentMode: CodexUserAgentMode
   private readonly cliCompatibleIdentity: boolean
   private readonly onTerminated?: (error: Error) => void
@@ -497,7 +499,7 @@ export function isCodexAppServerUnknownMethodError(error: unknown, method: strin
 export interface CodexAppServerLaunch {
   command: string
   args: string[]
-  source: 'configured-app-server' | 'path-app-server' | 'codex-cli-fallback'
+  source: 'configured-app-server' | 'managed-app-server' | 'path-app-server' | 'codex-cli-fallback'
 }
 
 export function resolveCodexAppServerLaunch(input: {
@@ -512,6 +514,15 @@ export function resolveCodexAppServerLaunch(input: {
       command: configuredAppServerPath,
       args: ['--listen', 'stdio://', '--session-source', 'cli'],
       source: 'configured-app-server',
+    }
+  }
+
+  const managedAppServer = resolveCodexManagedAppServerPath({ env })
+  if (managedAppServer) {
+    return {
+      command: managedAppServer,
+      args: ['--listen', 'stdio://', '--session-source', 'cli'],
+      source: 'managed-app-server',
     }
   }
 

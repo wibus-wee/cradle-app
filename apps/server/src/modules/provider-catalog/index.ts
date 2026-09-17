@@ -1,19 +1,10 @@
 import { Elysia, t } from 'elysia'
 
-import { enrichModelsFromRegistryMappings, lookupModel, searchModels } from '../model-registry/model-info-registry'
-import * as ModelRegistry from '../model-registry/service'
-import { resolveProviderTarget } from '../provider-targets/service'
+import { lookupModel, searchModels } from '../model-registry/model-info-registry'
 import { ProvidersModel } from './model'
-import {
-  getCachedModelRefreshFailure,
-  getCachedModelsForTarget,
-  isCacheStale,
-  setCachedModelRefreshFailure,
-  setCachedModelsForTarget,
-} from './model-cache'
-import { projectProviderModelListCapabilities } from './model-capabilities'
 import { collectProviderPresets } from './provider-presets'
 import * as Providers from './service'
+import { queryProviderTargetModels } from './target-model-query'
 
 export const providerPresets = new Elysia({
   detail: { tags: ['providers'] },
@@ -40,29 +31,14 @@ export const providers = new Elysia({
     '/models',
     async ({ body }) => {
       const request = Providers.ProviderRequestSchema.parse(body)
-      const target = request.providerTargetId
-        ? {
-            ...(request.providerTargetKind ? { kind: request.providerTargetKind } : {}),
-            id: request.providerTargetId,
-          }
-        : request.profileId
-          ? { kind: 'manual' as const, id: request.profileId }
-          : null
-      try {
-        // Collect raw inventory first so we can cache it before enriching.
-        const inventory = await Providers.collectProviderModelInventory(request)
-        if (target) {
-          setCachedModelsForTarget(target, inventory)
-        }
-        const enriched = await enrichModelsFromRegistryMappings(inventory, ModelRegistry.listMappingEntries())
-        return projectProviderModelListCapabilities(enriched)
-      }
-      catch (error) {
-        if (target) {
-          setCachedModelRefreshFailure(target)
-        }
-        throw error
-      }
+      const target = Providers.requestedProviderTarget(request)
+      // An explicit POST is a user-driven refresh: unconditional live fetch that
+      // bypasses the failed-refresh cooldown, with cache persistence owned by
+      // the target query pipeline.
+      const result = target
+        ? await queryProviderTargetModels({ target, freshness: 'refresh', workspaceId: request.workspaceId })
+        : { models: await Providers.listModels(request) }
+      return result.models
     },
     {
       detail: {
@@ -78,21 +54,16 @@ export const providers = new Elysia({
   .get(
     '/targets/:providerTargetId/models-cache',
     async ({ params }) => {
-      const target = { id: params.providerTargetId }
-      const [cached, failure] = await Promise.all([
-        getCachedModelsForTarget(target),
-        getCachedModelRefreshFailure(target),
-      ])
-      if (!cached) {
-        return { models: [], cached: false, stale: false, coolingDown: failure !== null, providerLabel: '' }
-      }
-      const resolved = resolveProviderTarget(target)
+      const result = await queryProviderTargetModels({
+        target: { id: params.providerTargetId },
+        freshness: 'cached',
+      })
       return {
-        models: cached.models,
-        cached: true,
-        stale: isCacheStale(cached.fetchedAt),
-        coolingDown: failure !== null,
-        providerLabel: resolved.label,
+        models: result.models,
+        cached: result.cached,
+        stale: result.stale,
+        coolingDown: result.coolingDown,
+        providerLabel: result.providerLabel,
       }
     },
     {
@@ -116,19 +87,15 @@ export const providers = new Elysia({
   .get(
     '/:profileId/models-cache',
     async ({ params }) => {
-      const target = { kind: 'manual' as const, id: params.profileId }
-      const [cached, failure] = await Promise.all([
-        getCachedModelsForTarget(target),
-        getCachedModelRefreshFailure(target),
-      ])
-      if (!cached) {
-        return { models: [], cached: false, stale: false, coolingDown: failure !== null }
-      }
+      const result = await queryProviderTargetModels({
+        target: { kind: 'manual', id: params.profileId },
+        freshness: 'cached',
+      })
       return {
-        models: cached.models,
-        cached: true,
-        stale: isCacheStale(cached.fetchedAt),
-        coolingDown: failure !== null,
+        models: result.models,
+        cached: result.cached,
+        stale: result.stale,
+        coolingDown: result.coolingDown,
       }
     },
     {

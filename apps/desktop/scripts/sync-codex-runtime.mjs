@@ -13,7 +13,7 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import path, { dirname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -27,13 +27,6 @@ const codexResourceRoot = join(desktopRoot, 'resources', 'codex')
 const githubApiBase = 'https://api.github.com/repos/openai/codex/releases'
 const githubSource = 'github:openai/codex'
 const defaultReleaseTag = process.env.CRADLE_CODEX_RELEASE_TAG?.trim() || 'latest'
-const electronBuilderArchNames = new Map([
-  [0, 'ia32'],
-  [1, 'x64'],
-  [2, 'armv7l'],
-  [3, 'arm64'],
-  [4, 'universal'],
-])
 
 const supportedTargets = new Map([
   ['darwin-arm64', {
@@ -119,17 +112,6 @@ export function resolveCodexRuntimeTarget(input = {}) {
     throw new Error(`Unsupported Codex runtime target: ${platform}-${arch}`)
   }
   return target
-}
-
-export function normalizeElectronBuilderArch(arch) {
-  if (typeof arch === 'string') {
-    return normalizeArch(arch)
-  }
-  const name = electronBuilderArchNames.get(arch)
-  if (!name) {
-    throw new Error(`Unsupported electron-builder arch: ${String(arch)}`)
-  }
-  return normalizeArch(name)
 }
 
 export function getCodexRuntimePath(targetInput = {}) {
@@ -320,43 +302,77 @@ async function installExecutableAtomically(source, destination, target) {
   }
 }
 
-export async function copyCodexRuntimeToPackagedResources(context, input = {}) {
-  const platform = normalizePlatform(context.electronPlatformName)
-  const arch = normalizeElectronBuilderArch(context.arch)
-  const runtime = await ensureCodexRuntime({
-    platform,
-    arch,
-    releaseTag: input.releaseTag,
-    force: input.force,
-  })
-  const resourcesDir = resolvePackagedResourcesDir(context, platform)
-  const destination = join(resourcesDir, runtime.target.appServerExecutableName)
-  const codeModeHostDestination = join(resourcesDir, runtime.target.codeModeHostExecutableName)
-  await mkdir(resourcesDir, { recursive: true })
+/**
+ * Mirror of `resolveCodexAppServerHome` in the server runtime — kept in sync so
+ * `--managed` writes into the same root the managed-installation service reads.
+ */
+export function resolveCodexManagedRoot(env = process.env, homeDir = homedir()) {
+  const dataDir = env.CRADLE_DATA_DIR?.trim()
+  if (dataDir) {
+    return join(dataDir, 'runtimes', 'codex-app-server', 'managed')
+  }
+  const dbPath = env.CRADLE_DB_PATH?.trim()
+  if (dbPath) {
+    return join(dirname(dbPath), 'runtimes', 'codex-app-server', 'managed')
+  }
+  return join(homeDir, '.cradle', 'runtimes', 'codex-app-server', 'managed')
+}
+
+function readAssetSha256(digest) {
+  const sha256 = typeof digest === 'string' ? digest.match(/^sha256:([a-f0-9]{64})$/)?.[1] : null
+  if (!sha256) {
+    throw new Error(`Codex release asset has no valid SHA-256 digest: ${String(digest)}`)
+  }
+  return sha256
+}
+
+/**
+ * Materialize the downloaded binaries into the managed-installation layout the
+ * server resolves at runtime (`versions/<version>/bin`, `installation.json`,
+ * `current.json`). Only valid for the host platform target.
+ */
+export async function materializeManagedCodexInstallation(runtime) {
+  const targetKey = `${runtime.target.platform}-${runtime.target.arch}`
+  if (targetKey !== `${process.platform}-${normalizeArch(process.arch)}`) {
+    throw new Error(`--managed only supports the host target; got ${targetKey}`)
+  }
+  const version = runtime.manifest.release.tagName.match(/^rust-v(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)$/)?.[1]
+  if (!version) {
+    throw new Error(`Cannot derive a Codex SDK version from release tag ${runtime.manifest.release.tagName}`)
+  }
+  const rootDir = resolveCodexManagedRoot()
+  const binDir = join(rootDir, 'versions', version, 'bin')
+  await mkdir(binDir, { recursive: true })
+  const appServerPath = join(binDir, runtime.target.appServerExecutableName)
+  const codeModeHostPath = join(binDir, runtime.target.codeModeHostExecutableName)
   await Promise.all([
-    copyFile(runtime.appServerExecutablePath, destination),
-    copyFile(runtime.codeModeHostExecutablePath, codeModeHostDestination),
+    copyFile(runtime.appServerExecutablePath, appServerPath),
+    copyFile(runtime.codeModeHostExecutablePath, codeModeHostPath),
   ])
   if (runtime.target.platform !== 'win32') {
     await Promise.all([
-      chmod(destination, 0o755),
-      chmod(codeModeHostDestination, 0o755),
+      chmod(appServerPath, 0o755),
+      chmod(codeModeHostPath, 0o755),
     ])
   }
-  console.warn(`[desktop] Bundled Codex app-server and code-mode host ${runtime.manifest.release.tagName} ${platform}-${arch} at ${resourcesDir}`)
-  return { ...runtime, destination, codeModeHostDestination }
-}
-
-export function resolvePackagedResourcesDir(context, platform = normalizePlatform(context.electronPlatformName)) {
-  if (platform === 'darwin') {
-    return join(
-      context.appOutDir,
-      `${context.packager.appInfo.productFilename}.app`,
-      'Contents',
-      'Resources',
-    )
+  const manifest = {
+    schemaVersion: 1,
+    version,
+    releaseTag: runtime.manifest.release.tagName,
+    targetKey,
+    appServerPath: join('versions', version, 'bin', runtime.target.appServerExecutableName),
+    codeModeHostPath: join('versions', version, 'bin', runtime.target.codeModeHostExecutableName),
+    sha256: {
+      appServer: readAssetSha256(runtime.appServerAsset.digest),
+      codeModeHost: readAssetSha256(runtime.codeModeHostAsset.digest),
+    },
+    installedAt: new Date().toISOString(),
   }
-  return join(context.appOutDir, 'resources')
+  const serialized = `${JSON.stringify(manifest, null, 2)}\n`
+  await writeFile(join(rootDir, 'versions', version, 'installation.json'), serialized, 'utf8')
+  await writeFile(join(rootDir, 'current.json'), serialized, 'utf8')
+  console.warn(`[desktop] Installed managed Codex runtime ${version} (${targetKey}) at ${rootDir}`)
+  return { rootDir, version, appServerPath, codeModeHostPath }
 }
 
 export async function readCodexRuntimeVersion(executablePath) {
@@ -566,6 +582,7 @@ function parseCliArgs(argv) {
     current: false,
     all: false,
     force: false,
+    managed: false,
     releaseTag: defaultReleaseTag,
     targets: [],
   }
@@ -577,6 +594,9 @@ function parseCliArgs(argv) {
     }
     else if (arg === '--all') {
       options.all = true
+    }
+    else if (arg === '--managed') {
+      options.managed = true
     }
     else if (arg === '--force') {
       options.force = true
@@ -642,6 +662,9 @@ async function main() {
       releaseTag: options.releaseTag,
       force: options.force,
     })
+    if (options.managed) {
+      await materializeManagedCodexInstallation(result)
+    }
     results.push(result)
     console.log(
       `${result.manifest.release.tagName} ${result.target.platform}-${result.target.arch} -> ${result.executablePath}, ${result.appServerExecutablePath}, ${result.codeModeHostExecutablePath}`,

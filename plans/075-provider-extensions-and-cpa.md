@@ -40,12 +40,15 @@
 - **Planned at**: `cradle-app` commit `d40f895e` and `cradle-plugins` commit `04942ba`, 2026-08-12
 - **Revised**: 2026-08-12 — added no-login Codex OAuth through an exclusive,
   two-phase credential lease; manual CPA login remains removed
-- **Implementation status (2026-08-13)**: API-key Provider Extension path
-  implemented and verified. Codex OAuth remains release-blocked at M0: the
-  pinned `7.2.130` binary proved prefix/model discovery and both protocol entry
-  paths, and the lossless codec/lease is implemented, but no authorized real
-  refresh credential was available to prove refresh-time prefix/account
-  isolation. OAuth applicability is therefore disabled with an explicit reason.
+- **Implementation status**: DONE — API-key Provider Extension path
+  implemented and verified; Codex OAuth two-phase lease verified by maintainer
+  with an authorized real refresh credential against the pinned `7.2.130`
+  binary (2026-09-17), proving refresh-time prefix/account isolation.
+- **History (2026-08-13)**: Codex OAuth was release-blocked at M0 — the pinned
+  binary proved prefix/model discovery and both protocol entry paths, and the
+  lossless codec/lease was implemented, but no authorized real refresh
+  credential was available at the time. Maintainer acceptance has since
+  cleared the gate.
 
 ## Why this matters
 

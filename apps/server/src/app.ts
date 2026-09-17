@@ -40,8 +40,13 @@ import { runRegistry } from './modules/chat-runtime/run-registry'
 import { flushRunSnapshotWriteBehind } from './modules/chat-runtime/run-snapshot-journal'
 import { registerChatRuntimeSessionLifecycleHandlers } from './modules/chat-runtime/runtime'
 import { registerTurnCheckpointHooks } from './modules/chat-runtime/turn-checkpoint-hooks'
+import { createClaudeManagedResourceAdapter } from './modules/chat-runtime-providers/claude-agent/managed-resource-adapter'
+import { prepareClaudeManagedPathForRemoval } from './modules/chat-runtime-providers/claude-agent/runtime-executable'
+import { ClaudeCodeRuntimeInstallationService } from './modules/chat-runtime-providers/claude-agent/runtime-installation'
 import { ClaudeUsageReconciliationScheduler } from './modules/chat-runtime-providers/claude-agent/usage-reconciliation-scheduler'
 import { readCodexChatgptAuthCredential } from './modules/chat-runtime-providers/codex/app-server/chatgpt-auth'
+import { createCodexManagedResourceAdapter } from './modules/chat-runtime-providers/codex/managed-resource-adapter'
+import { CodexRuntimeInstallationService } from './modules/chat-runtime-providers/codex/runtime-installation'
 import { createOpencodeManagedResourceAdapter } from './modules/chat-runtime-providers/opencode/managed-resource-adapter'
 import { OpencodeRuntimeInstallationService } from './modules/chat-runtime-providers/opencode/runtime-installation'
 import { createChronicleModule } from './modules/chronicle'
@@ -70,6 +75,8 @@ import * as GitHubAuth from './modules/github-auth/service'
 import { health } from './modules/health'
 import * as Health from './modules/health/service'
 import { imageOcr } from './modules/image-ocr'
+import { createOcrModelManagedResourceAdapter } from './modules/image-ocr/managed-resource-adapter'
+import { OcrModelInstallationService } from './modules/image-ocr/model-installation'
 import { issue } from './modules/issue'
 import { issueAgent } from './modules/issue-agent'
 import { javascriptEval } from './modules/javascript-eval'
@@ -131,6 +138,9 @@ interface CreateServerContractAppOptions {
   downloadCenterService?: DownloadCenterService
   managedResourceService?: ManagedResourceService
   opencodeRuntimeInstallationService?: OpencodeRuntimeInstallationService
+  codexRuntimeInstallationService?: CodexRuntimeInstallationService
+  claudeCodeRuntimeInstallationService?: ClaudeCodeRuntimeInstallationService
+  ocrModelInstallationService?: OcrModelInstallationService
 }
 
 const HOSTED_WEB_APP_ORIGINS = new Set([
@@ -200,11 +210,23 @@ export async function createServerContractApp(options: CreateServerContractAppOp
   const opencodeRuntimeInstallation
     = options.opencodeRuntimeInstallationService
       ?? new OpencodeRuntimeInstallationService({ downloadCenter: downloadCenter.service })
+  const codexRuntimeInstallation
+    = options.codexRuntimeInstallationService
+      ?? new CodexRuntimeInstallationService({ downloadCenter: downloadCenter.service })
+  const claudeCodeRuntimeInstallation
+    = options.claudeCodeRuntimeInstallationService
+      ?? new ClaudeCodeRuntimeInstallationService({ downloadCenter: downloadCenter.service })
+  const ocrModelInstallation
+    = options.ocrModelInstallationService
+      ?? new OcrModelInstallationService({ downloadCenter: downloadCenter.service })
   const managedResources
     = options.managedResourceService
       ?? new ManagedResourceService([
       createChronicleManagedResourceAdapter(downloadCenter.service),
       createOpencodeManagedResourceAdapter(opencodeRuntimeInstallation),
+      createCodexManagedResourceAdapter(codexRuntimeInstallation),
+      createClaudeManagedResourceAdapter(claudeCodeRuntimeInstallation),
+      createOcrModelManagedResourceAdapter(ocrModelInstallation),
     ])
   const app = new Elysia({
     name: 'cradle.server.elysia',
@@ -348,6 +370,9 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     app,
     managedResourceService,
     opencodeRuntimeInstallationService,
+    codexRuntimeInstallationService,
+    claudeCodeRuntimeInstallationService,
+    ocrModelInstallationService,
     serverConfig,
     runtime,
   ] = await runBootstrapPhase(bootstrapReporter, 'service-initialization', async () => {
@@ -365,6 +390,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       conversationBridgeSupervisor,
       { destroyWorkspaceFileIndexes },
       { prepareOpencodeManagedPathForRemoval, stopOpencodeServer },
+      { prepareCodexManagedPathForRemoval },
       { shutdownImageOcr },
       { CodexUsageReconciliationScheduler },
       { registerRunSnapshotMaintenance },
@@ -382,6 +408,7 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       import('./modules/conversation-bridge/runtime-supervisor'),
       import('./modules/workspace/files'),
       import('./modules/chat-runtime-providers/opencode/runtime-context'),
+      import('./modules/chat-runtime-providers/codex/app-server/host-lease'),
       import('./modules/image-ocr/service'),
       import('./modules/chat-runtime-providers/codex/usage-reconciliation-scheduler'),
       import('./modules/chat-runtime/run-snapshot-maintenance'),
@@ -391,10 +418,29 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       downloadCenter: downloadCenterService,
       prepareManagedPathForRemoval: prepareOpencodeManagedPathForRemoval,
     })
-    await opencodeRuntimeInstallationService.boot()
+    const codexRuntimeInstallationService = new CodexRuntimeInstallationService({
+      downloadCenter: downloadCenterService,
+      prepareManagedPathForRemoval: prepareCodexManagedPathForRemoval,
+    })
+    const claudeCodeRuntimeInstallationService = new ClaudeCodeRuntimeInstallationService({
+      downloadCenter: downloadCenterService,
+      prepareManagedPathForRemoval: prepareClaudeManagedPathForRemoval,
+    })
+    const ocrModelInstallationService = new OcrModelInstallationService({
+      downloadCenter: downloadCenterService,
+    })
+    await Promise.all([
+      opencodeRuntimeInstallationService.boot(),
+      codexRuntimeInstallationService.boot(),
+      claudeCodeRuntimeInstallationService.boot(),
+      ocrModelInstallationService.boot(),
+    ])
     const managedResourceService = new ManagedResourceService([
       createChronicleManagedResourceAdapter(downloadCenterService),
       createOpencodeManagedResourceAdapter(opencodeRuntimeInstallationService),
+      createCodexManagedResourceAdapter(codexRuntimeInstallationService),
+      createClaudeManagedResourceAdapter(claudeCodeRuntimeInstallationService),
+      createOcrModelManagedResourceAdapter(ocrModelInstallationService),
     ])
     chronicleService.startMemoryEmbeddingIndexer()
     chronicleService.reconcileMemoryEmbeddingCandidateIndex()
@@ -403,6 +449,9 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       downloadCenterService,
       managedResourceService,
       opencodeRuntimeInstallationService,
+      codexRuntimeInstallationService,
+      claudeCodeRuntimeInstallationService,
+      ocrModelInstallationService,
     })
     Health.check()
     Worktree.registerStorageMeasurementActivity({
@@ -449,6 +498,9 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
       app,
       managedResourceService,
       opencodeRuntimeInstallationService,
+      codexRuntimeInstallationService,
+      claudeCodeRuntimeInstallationService,
+      ocrModelInstallationService,
       serverConfig,
       {
         abortAllRuns,
@@ -551,6 +603,21 @@ export async function createServerApp(options: CreateServerAppOptions = {}) {
     name: 'opencode-runtime-installation',
     phase: 'drain',
     stop: () => opencodeRuntimeInstallationService.shutdown(),
+  })
+  runtimeResources.register({
+    name: 'codex-runtime-installation',
+    phase: 'drain',
+    stop: () => codexRuntimeInstallationService.shutdown(),
+  })
+  runtimeResources.register({
+    name: 'claude-code-runtime-installation',
+    phase: 'drain',
+    stop: () => claudeCodeRuntimeInstallationService.shutdown(),
+  })
+  runtimeResources.register({
+    name: 'ocr-model-installation',
+    phase: 'drain',
+    stop: () => ocrModelInstallationService.shutdown(),
   })
   runtimeResources.register({
     name: 'claude-usage-reconciliation',

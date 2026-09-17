@@ -6,8 +6,8 @@ lookup, and install/update/uninstall command dispatch for retained resources.
 Owners register immutable declarations before HTTP routes accept requests and
 provide adapters for dynamic state and commands. The catalog does not discover
 releases, download bytes, extract archives, own installation storage, activate
-runtimes, or remove files. Those semantics remain in Chronicle, OpenCode, and
-future owner namespaces.
+runtimes, or remove files. Those semantics remain in Chronicle, OpenCode,
+Codex, Claude Agent, and image-ocr owner namespaces.
 
 The public key is the same `(namespace, resourceType, resourceId)` triple used
 by related Download Center tasks. Web joins declarations and transfers only by
