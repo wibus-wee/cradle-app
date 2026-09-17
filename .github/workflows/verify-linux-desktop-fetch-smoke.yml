@@ -1,0 +1,38 @@
+name: Verify Linux Desktop Fetch Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref in this repository to checkout (branch, tag, or SHA)
+        required: true
+        default: main
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-linux-desktop-fetch-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-linux:
+    name: Server-fetch lifecycle smoke (Xvfb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+
+      - name: Setup desktop build environment
+        uses: ./.github/actions/desktop-build-setup
+        with:
+          node-version: '24'
+
+      - name: Install Xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+
+      - name: Server-fetch lifecycle smoke
+        run: xvfb-run -a pnpm --filter @cradle/desktop smoke:server-fetch-lifecycle

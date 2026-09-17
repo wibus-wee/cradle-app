@@ -49,6 +49,9 @@ jobs:
             throw "Expected desktop runtime arch x64, got $($manifest.electron.arch)"
           }
 
+      - name: Server-fetch lifecycle smoke (isolated Electron)
+        run: pnpm --filter @cradle/desktop smoke:server-fetch-lifecycle
+
       - name: Package unpacked Windows app
         working-directory: apps/desktop
         run: pnpm exec electron-builder --config electron-builder.mjs --win --x64 --dir --publish never

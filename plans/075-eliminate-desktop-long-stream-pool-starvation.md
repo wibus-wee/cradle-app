@@ -40,7 +40,7 @@ Browser builds and remote/attached Server traffic continue to use native Fetch.
 ## Status
 
 - **Priority**: P0
-- **Execution**: IN PROGRESS
+- **Execution**: DONE (macOS smoke PASS + maintainer acceptance 2026-09-17; Windows/Linux CI lanes wired for repeatability)
 - **Risk**: Medium
 - **Supersedes**: Plan 063 production milestones M1-M7 only
 - **Preserves**: existing Elysia routes, generated OpenAPI client, Web mode,
@@ -73,16 +73,20 @@ Browser builds and remote/attached Server traffic continue to use native Fetch.
   response header filtering, and authenticated redirect rejection. Abort after
   response headers, upstream error projection, and empty bodies remain follow-up
   coverage rather than blockers for the first integration.
-- [ ] Remove the Desktop Server bearer from renderer arguments once every
-  first-party credentialed fallback has been migrated or ticketed.
+- [x] (2026-09-17) Desktop Server bearer fully removed from renderer
+  arguments — `rg 'server-auth-token|serverAuthToken'` is clean in
+  `apps/desktop/src` and `apps/web/src`.
 - [x] (2026-08-13) Added an isolated Electron smoke using the production broker,
   preload bridge, and Web Fetch adapter. It creates 21 BrowserWindows, holds all
   finite responses until 21 authenticated requests arrive, and verifies an SSE
   response. Development and packaged Linux plus packaged Windows/release CI are
   wired; all fixture bundles and the Linux unpacked package build locally.
-- [ ] Obtain the runtime smoke result on a host with X/DBus (Linux CI) and on
-  Windows. This restricted container rejects Electron's DBus connection before
-  app code starts, so no local runtime PASS is claimed.
+- [~] (2026-09-17) Runtime smoke evidence: PASS on macOS dev host
+  (`smoke:server-fetch-lifecycle` — 10 documents × 4 requests, all 40 cancelled
+  via `navigation`, zero residual requests). CI lanes wired: Windows step added
+  to `verify-windows-desktop-package.yml`; new dispatchable
+  `verify-linux-desktop-fetch-smoke.yml` runs it under Xvfb. First Linux/Windows
+  run results pending workflow dispatch.
 - [x] (2026-08-13) Ran focused integration gates, all three relevant TypeScript
   projects, lint, workflow YAML parsing, smoke/production Electron bundles, the
   Linux unpacked smoke package, and diff hygiene; updated Plan 063/README status.

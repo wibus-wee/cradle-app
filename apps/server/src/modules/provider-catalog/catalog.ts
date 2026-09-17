@@ -205,11 +205,36 @@ class UniversalMetadataProvider implements ProviderMetadataProvider {
   ): Promise<ModelDescriptor[]> {
     const config = UniversalProviderConfigJsonSchema.parse(input.configJson)
     const openaiBaseUrl = config.openaiBaseUrl || config.baseUrl
-    if (!openaiBaseUrl) {
-      throw invalidProviderRequest('OpenAI Base URL is required')
+    const anthropicBaseUrl = config.anthropicBaseUrl || config.baseUrl
+    const apiKey = input.secretRef ? deps.readSecret(input.secretRef) : null
+
+    if (!openaiBaseUrl && anthropicBaseUrl) {
+      try {
+        const baseUrl = normalizeBaseUrl(anthropicBaseUrl).replace(TRAILING_SLASH_RE, '')
+        const payload = AnthropicModelsResponseSchema.parse(
+          await fetchModelsPayload(
+            this.providerKind,
+            modelRequestOptions(baseUrl, {
+              'anthropic-version': ANTHROPIC_VERSION,
+              ...projectAnthropicAuthHeaders(anthropicBaseUrl, apiKey),
+            }),
+          ),
+        )
+        return payload.data.map(item => ({
+          id: item.id,
+          label: item.display_name ?? item.id,
+          providerKind: 'universal' as const,
+          capabilities: readProviderDefaultModelCapabilities('anthropic'),
+        }))
+      }
+      catch (error) {
+        throw wrapProviderModelsError(this.providerKind, error)
+      }
     }
 
-    const apiKey = input.secretRef ? deps.readSecret(input.secretRef) : null
+    if (!openaiBaseUrl) {
+      throw invalidProviderRequest('OpenAI or Anthropic Base URL is required')
+    }
 
     try {
       const baseUrl = normalizeBaseUrl(openaiBaseUrl)

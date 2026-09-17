@@ -28,8 +28,9 @@
 
 ## Status
 
-- **Execution**: IN PROGRESS (implementation, focused gates, and isolated
-  Electron reload proof complete; real-process recovery observation pending)
+- **Execution**: DONE (isolated runtime acceptance passed 2026-09-17 —
+  ten-reload baseline restoration, flat external/ArrayBuffer, real server kill
+  + respawn with generation re-arm; see Step 6 progress notes)
 - **Priority**: P0
 - **Effort**: M
 - **Risk**: HIGH
@@ -535,9 +536,29 @@ this living plan with the actual command rather than using `|| true`.
   document and bootstrap disposal.
 - [x] (2026-08-30) Step 5: actual Electron, sandboxed-preload, real-IPC smoke
   returned all four requests to zero after each of ten same-window reloads.
-- [ ] Step 6: isolated Electron runtime acceptance is complete. Restart and
-  post-restart external/ArrayBuffer observation of the user's live Cradle
-  process remain pending to avoid interrupting active work.
+- [x] (2026-09-17) Step 6: isolated Electron runtime acceptance passed against
+  a live dev instance (`--user-data-dir=/tmp`, CDP-driven). Ten main-frame
+  reloads produced exactly ten `navigation` cancellations, owner generations
+  advanced 1→11, active requests returned to the live-document baseline, and
+  Server external/ArrayBuffer stayed flat (~18.6→19.7 MiB across the run, no
+  reload-correlated step growth). A real `kill` of the embedded Server process
+  was also exercised: sockets tore down, the supervisor respawned it, and all
+  three SSE families re-established against the new process with zero
+  buffered/declared-undelivered bytes. The user's 18-hour packaged instance
+  (`be.387`) was sampled read-only for the same signals (2 streams, zero
+  buffered bytes, no accumulation); it was not restarted, per the deferred
+  live-process constraint.
+- [x] (2026-09-17) Respawn-generation wiring gap found and fixed: the
+  supervisor's auto-restart path never re-invoked `initializeDesktopServicesForServer`,
+  so `desktopServerGeneration` never advanced and the broker's
+  `server-generation` fence was unreachable outside unit tests; the renderer
+  also dropped its status subscription after first ready, so a bumped
+  generation could never reach it. `startServer` now accepts an
+  `onRestarted` callback that bumps the generation, re-arms the broker, and
+  republishes `ready`; the renderer keeps its status subscription for the
+  document lifetime and re-applies the endpoint on each post-ready `ready`.
+  Verified live: after `kill`, broker diagnostics show `generation: 2` and
+  re-established streams are accepted (proving the renderer re-armed).
 
 ## Surprises & Discoveries
 
@@ -561,6 +582,12 @@ this living plan with the actual command rather than using `|| true`.
 - The actual sandboxed preload does not provide Node `crypto`, and the smoke's
   `data:` renderer did not provide `crypto.randomUUID`. A 128-bit nonce generated
   with Web Crypto `getRandomValues` works in the supported preload boundary.
+- The supervisor respawn path bypassed `initializeDesktopServicesForServer`,
+  so `server-generation` cancellation was dead code in production: socket
+  teardown masked it for in-flight requests, but nothing armed the fence for
+  stragglers and the renderer's one-shot readiness subscription meant a bumped
+  generation could never propagate. Both halves were required for the fence to
+  be real.
 
 ## Decision Log
 

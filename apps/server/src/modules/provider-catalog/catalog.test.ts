@@ -4,6 +4,7 @@ import { setSsrAddressLookupForTests } from '../../lib/ssrf-guard'
 import { setCodexChatgptModelListClientFactoryForTests } from '../chat-runtime-providers/codex/app-server/model-list'
 import type { ProviderRequest } from '../provider-contracts/types'
 import { ProviderCatalog } from './catalog'
+import { readProviderDefaultModelCapabilities } from './model-capabilities'
 import {
   matchProviderEndpoint,
   resolveAnthropicWireAuth,
@@ -301,6 +302,57 @@ describe('providerCatalog', () => {
         label: 'gpt-universal',
         providerKind: 'universal',
         capabilities: {},
+      },
+    ])
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('lists Universal models from the Anthropic endpoint when no OpenAI URL is configured', async () => {
+    setSsrAddressLookupForTests(async () => ['93.184.216.34'])
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = getRequestUrl(input)
+      if (url !== 'https://anthropic.example.test/v1/models') {
+        throw new Error(`Unexpected Universal model list request: ${url}`)
+      }
+
+      const headers = new Headers(init?.headers)
+      expect(headers.get('anthropic-version')).toBe('2023-06-01')
+      expect(headers.get('x-api-key')).toBe('sk-universal')
+      return new Response(JSON.stringify({
+        data: [{ id: 'claude-universal', display_name: 'Claude Universal' }],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    })
+
+    const provider = new ProviderCatalog().get('universal')
+    if (!provider) {
+      throw new Error('Universal provider is not registered')
+    }
+
+    const request: ProviderRequest = {
+      providerKind: 'universal',
+      label: 'Universal',
+      configJson: JSON.stringify({
+        anthropicBaseUrl: 'https://anthropic.example.test/v1',
+      }),
+      secretRef: 'secret-universal',
+      profileId: null,
+      providerTargetKind: null,
+      providerTargetId: null,
+      sourceApp: null,
+    }
+
+    await expect(provider.listModels(request, {
+      readSecret: () => 'sk-universal',
+    })).resolves.toEqual([
+      {
+        id: 'claude-universal',
+        label: 'Claude Universal',
+        providerKind: 'universal',
+        capabilities: readProviderDefaultModelCapabilities('anthropic'),
       },
     ])
 

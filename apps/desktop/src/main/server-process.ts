@@ -240,9 +240,11 @@ export function resolveDesktopRelayAdvertisedUrl(
  * Start the Cradle server as a forked child process.
  * Returns the full URL the server is listening on.
  */
-export async function startServer(
-  onBootstrapSnapshot?: (snapshot: DesktopServerBootstrapSnapshot) => void,
-): Promise<string> {
+export async function startServer(callbacks?: {
+  onBootstrapSnapshot?: (snapshot: DesktopServerBootstrapSnapshot) => void
+  onRestarted?: (serverUrl: string) => void
+}): Promise<string> {
+  const onBootstrapSnapshot = callbacks?.onBootstrapSnapshot
   expectedServerExit = null
   lastServerSignalBeforeExit = null
   restartCount = 0
@@ -280,6 +282,7 @@ export async function startServer(
         bootstrapSnapshot = applyServerBootstrapEvent(bootstrapSnapshot, event)
         onBootstrapSnapshot?.(bootstrapSnapshot)
       },
+      onRestarted: callbacks?.onRestarted,
     })
   }
  catch (error) {
@@ -524,6 +527,7 @@ async function spawnServer(opts: {
   managedRelay: { relayUrl: string | null, accessMode: DesktopRelayAccessMode, pid: number | null }
   bootstrapWatchdog?: ServerBootstrapWatchdog
   onBootstrapEvent?: (event: ServerBootstrapEvent) => void
+  onRestarted?: (serverUrl: string) => void
 }): Promise<void> {
   const { host, port, dataDir, credentialSecret, managedRelay } = opts
 
@@ -643,6 +647,7 @@ async function spawnServer(opts: {
             dataDir: app.getPath('userData'),
             serverUrl: currentServerUrl,
           })
+          opts.onRestarted?.(currentServerUrl)
         })
         .catch((err) => {
           console.error('[desktop] Server restart failed:', err)
