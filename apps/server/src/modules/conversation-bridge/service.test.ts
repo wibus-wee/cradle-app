@@ -21,6 +21,7 @@ import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { db, shutdownInfra } from '../../infra'
+import { setSsrAddressLookupForTests } from '../../lib/ssrf-guard'
 import {
   registerConversationBridgeAdapter,
   resetConversationBridgeAdapterRegistry,
@@ -194,7 +195,8 @@ describe('conversation bridge service', () => {
     await stopAllConversationBridgeConnections()
     resetConversationBridgeAdapterRegistry()
     resetPluginRuntimeRegistry()
-    vi.clearAllMocks()
+    setSsrAddressLookupForTests(null)
+    vi.restoreAllMocks()
     shutdownInfra()
     rmSync(dataDir, { recursive: true, force: true })
     if (previousDataDir === undefined) {
@@ -440,5 +442,176 @@ describe('conversation bridge service', () => {
         text: expect.stringContaining('External channel: external-channel-1'),
       }),
     )
+  })
+
+  describe('provider target model listing (shared target query)', () => {
+    const BRIDGE_UPSTREAM_MODELS_URL = 'https://bridge-provider.test/v1/models'
+
+    function pointTargetAtMockUpstream(overrides: { enabledModelsJson?: string } = {}): void {
+      db()
+        .update(providerTargets)
+        .set({
+          connectionConfigJson: JSON.stringify({ baseUrl: 'https://bridge-provider.test/v1' }),
+          ...(overrides.enabledModelsJson === undefined
+            ? {}
+            : { enabledModelsJson: overrides.enabledModelsJson }),
+        })
+        .where(eq(providerTargets.id, 'target-1'))
+        .run()
+    }
+
+    function mockModelFetches(handler: () => Response) {
+      setSsrAddressLookupForTests(async () => ['93.184.216.34'])
+      const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+        const url = new Request(input).url
+        if (url === BRIDGE_UPSTREAM_MODELS_URL) {
+          return handler()
+        }
+        if (url === 'https://models.dev/api.json') {
+          return new Response(JSON.stringify({}), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
+        throw new Error(`Unexpected fetch: ${url}`)
+      })
+      return {
+        upstreamCalls: () => spy.mock.calls.filter(
+          ([input]) => new Request(input).url === BRIDGE_UPSTREAM_MODELS_URL,
+        ).length,
+      }
+    }
+
+    function upstreamModelsResponse(modelIds: string[]): () => Response {
+      return () => new Response(
+        JSON.stringify({ data: modelIds.map(id => ({ id })) }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    }
+
+    function modelSelectValues(response: { blocks?: Array<unknown> } | undefined): string[] {
+      return (response?.blocks ?? [])
+        .filter((block): block is { type: 'actions', elements: Array<{ type: string, actionId: string, options: Array<{ value: string }> }> } =>
+          typeof block === 'object' && block !== null && (block as { type?: string }).type === 'actions')
+        .flatMap(block => block.elements)
+        .filter(element => element.type === 'static_select' && element.actionId === 'cradle_session_model_select')
+        .flatMap(element => element.options.map(option => option.value))
+    }
+
+    async function boundChannelStatus(connectionId: string) {
+      ConversationBridge.bindChannel({
+        connectionId,
+        externalWorkspaceId: 'external-workspace-1',
+        externalChannelId: 'external-channel-1',
+        cradleWorkspaceId: 'workspace-1',
+        sessionProviderTargetId: 'target-1',
+        sessionRuntimeKind: 'standard',
+      })
+      return await ConversationBridge.handleControl({
+        connectionId,
+        externalWorkspaceId: 'external-workspace-1',
+        externalChannelId: 'external-channel-1',
+        externalActorId: 'external-user-1',
+        kind: 'command',
+        command: '/cradle',
+        text: 'status',
+      })
+    }
+
+    it('lists models from a single governed fetch on a cold cache', async () => {
+      seedCradleRuntimeTarget()
+      pointTargetAtMockUpstream()
+      const upstream = mockModelFetches(upstreamModelsResponse(['gpt-5', 'local-1']))
+      const connection = ConversationBridge.createConnection({
+        platform: 'test',
+        adapterOwner: '@cradle/test-conversation-adapter',
+        adapterId: 'fake',
+        displayName: 'Fake',
+        enabled: true,
+      })
+
+      const response = await boundChannelStatus(connection.id)
+
+      expect(upstream.upstreamCalls()).toBe(1)
+      expect(modelSelectValues(response)).toEqual(
+        expect.arrayContaining(['gpt-5', 'local-1']),
+      )
+      // The fetch populated the shared inventory cache.
+      expect(db().select().from(providerTargetModelCache).all()).toHaveLength(1)
+
+      const second = await boundChannelStatus(connection.id)
+      expect(upstream.upstreamCalls()).toBe(1)
+      expect(modelSelectValues(second)).toEqual(
+        expect.arrayContaining(['gpt-5', 'local-1']),
+      )
+    })
+
+    it('applies stored subset visibility to fetched models', async () => {
+      seedCradleRuntimeTarget()
+      pointTargetAtMockUpstream({ enabledModelsJson: JSON.stringify(['gpt-5']) })
+      const upstream = mockModelFetches(upstreamModelsResponse(['gpt-5', 'local-1']))
+      const connection = ConversationBridge.createConnection({
+        platform: 'test',
+        adapterOwner: '@cradle/test-conversation-adapter',
+        adapterId: 'fake',
+        displayName: 'Fake',
+        enabled: true,
+      })
+
+      const response = await boundChannelStatus(connection.id)
+
+      expect(upstream.upstreamCalls()).toBe(1)
+      const values = modelSelectValues(response)
+      expect(values).toContain('gpt-5')
+      expect(values).not.toContain('local-1')
+    })
+
+    it('returns no models for an all-disabled target without fetching', async () => {
+      seedCradleRuntimeTarget()
+      pointTargetAtMockUpstream({ enabledModelsJson: JSON.stringify(['__all_disabled__']) })
+      const upstream = mockModelFetches(upstreamModelsResponse(['gpt-5']))
+      const connection = ConversationBridge.createConnection({
+        platform: 'test',
+        adapterOwner: '@cradle/test-conversation-adapter',
+        adapterId: 'fake',
+        displayName: 'Fake',
+        enabled: true,
+      })
+
+      const response = await boundChannelStatus(connection.id)
+
+      expect(upstream.upstreamCalls()).toBe(0)
+      expect(modelSelectValues(response)).toEqual(['__cradle_default_model__'])
+    })
+
+    it('serves the stale cache when the governed refresh fails', async () => {
+      seedCradleRuntimeTarget()
+      pointTargetAtMockUpstream()
+      db()
+        .insert(providerTargetModelCache)
+        .values({
+          providerTargetId: 'target-1',
+          modelsJson: JSON.stringify([
+            { id: 'old-model', label: 'Old Model', providerKind: 'openai-compatible', capabilities: {} },
+          ]),
+          fetchedAt: Math.floor(Date.now() / 1000) - 2 * 60 * 60,
+        })
+        .run()
+      const upstream = mockModelFetches(() => {
+        throw new Error('upstream down')
+      })
+      const connection = ConversationBridge.createConnection({
+        platform: 'test',
+        adapterOwner: '@cradle/test-conversation-adapter',
+        adapterId: 'fake',
+        displayName: 'Fake',
+        enabled: true,
+      })
+
+      const response = await boundChannelStatus(connection.id)
+
+      expect(upstream.upstreamCalls()).toBe(1)
+      expect(modelSelectValues(response)).toContain('old-model')
+    })
   })
 })

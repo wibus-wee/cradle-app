@@ -7,10 +7,12 @@ import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
 import type { ModelRegistryMappingEntry, ModelsDevModel } from '../model-registry/model-info-registry'
 import {
+  enrichModelsFromRegistryMappings,
   lookupModelRaw,
   ModelsDevModelSchema,
   updateCachedModelRegistryMapping,
 } from '../model-registry/model-info-registry'
+import type { ModelDescriptor } from '../provider-contracts/types'
 
 const nonEmptyTrimmedString = z.string().trim().min(1)
 
@@ -69,6 +71,16 @@ export function getMapping(modelId: string): ModelRegistryMapping | null {
     .where(eq(modelRegistryMappings.modelId, id))
     .get()
   return row ? toMapping(row) : null
+}
+
+/**
+ * Enrich inventory model descriptors with the registry's current models.dev data
+ * and mapping rows. This is the public enrichment seam for other modules: the
+ * registry reads its own mappings so callers never pair a resolver with
+ * `listMappingEntries()` themselves.
+ */
+export async function enrichModels(models: ModelDescriptor[]): Promise<ModelDescriptor[]> {
+  return enrichModelsFromRegistryMappings(models, listMappingEntries())
 }
 
 export function listMappingEntries(): ModelRegistryMappingEntry[] {

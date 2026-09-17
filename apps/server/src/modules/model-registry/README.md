@@ -23,7 +23,9 @@ reconstructs the optimistic model projection without guessing an upstream provid
 - `index.ts`: HTTP routes for listing, upserting, and deleting global model registry mappings.
 - `model.ts`: TypeBox schemas for mapping route params, payloads, and responses.
 - `service.ts`: Drizzle-backed global mapping persistence. `upsertMapping` uses fuzzy lookup
-  (`lookupModelRaw`) so alias rows store usable JSON when possible.
+  (`lookupModelRaw`) so alias rows store usable JSON when possible. `enrichModels(models)` is
+  the public enrichment operation for other modules — it reads current mappings internally so
+  callers never pair a resolver with `listMappingEntries()` themselves.
 - `model-info-registry.ts`: Read-only models.dev cache (SWR: 1h soft / 24h hard TTL, force-refresh
   on server boot), `resolveModelEnrichment`, `enrichModelsWithRegistryData`,
   `enrichModelsFromRegistryMappings`, `getCachedModelsDevCost` (DB-backed, not mem-only),

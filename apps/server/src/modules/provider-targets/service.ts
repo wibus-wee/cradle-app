@@ -129,6 +129,17 @@ export interface CustomModelEntry {
   capabilities: ModelCapabilities
 }
 
+/**
+ * Projection of a target's stored `enabledModelsJson` visibility setting.
+ * Provider Targets owns the stored form; consumers apply the projection.
+ */
+export type ProviderTargetModelVisibility
+  = | { kind: 'all' }
+    | { kind: 'all-disabled' }
+    | { kind: 'subset', modelIds: readonly string[] }
+
+const ALL_MODELS_DISABLED_SENTINEL = '__all_disabled__'
+
 const JsonObjectTextSchema = z
   .string()
   .transform(raw => JSON.parse(raw))
@@ -820,6 +831,26 @@ export function getProviderTargetModelSettings(
     connectionConfigJson: resolved.connectionConfigJson,
     enabledModelsJson: resolved.enabledModelsJson,
     customModelsJson: resolved.customModelsJson,
+  }
+}
+
+/**
+ * Read the stored model visibility for a target: an empty/malformed list means
+ * every model is visible, the `__all_disabled__` sentinel disables all models,
+ * and any other list restricts visibility to the listed model ids.
+ */
+export function readProviderTargetModelVisibility(enabledModelsJson: string): ProviderTargetModelVisibility {
+  const parsed = EnabledModelsJsonSchema.safeParse(enabledModelsJson)
+  const enabledModels = parsed.success ? parsed.data : []
+  if (enabledModels.length === 0) {
+    return { kind: 'all' }
+  }
+  if (enabledModels.length === 1 && enabledModels[0] === ALL_MODELS_DISABLED_SENTINEL) {
+    return { kind: 'all-disabled' }
+  }
+  return {
+    kind: 'subset',
+    modelIds: enabledModels.filter(id => id !== ALL_MODELS_DISABLED_SENTINEL),
   }
 }
 
