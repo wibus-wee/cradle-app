@@ -46,20 +46,22 @@ function fixtureFetch(fixtures: Record<string, Buffer>): typeof globalThis.fetch
     const headers = new Headers(init?.headers)
     const range = headers.get('range')
     const ifRange = headers.get('if-range')
-    if (range !== null && ifRange === etag) {
-      const start = Number(range.slice('bytes='.length, -1))
-      if (!Number.isInteger(start) || start >= body.length) {
+    if (range !== null && (ifRange === null || ifRange === etag)) {
+      const match = range.match(/^bytes=(\d+)-(\d*)$/)
+      const start = match ? Number(match[1]) : Number.NaN
+      const end = match ? (match[2] === '' ? body.length - 1 : Number(match[2])) : Number.NaN
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start >= body.length || end >= body.length || end < start) {
         return new Response(null, {
           status: 416,
           headers: { 'content-range': `bytes */${body.length}` },
         })
       }
-      const slice = body.subarray(start)
+      const slice = body.subarray(start, end + 1)
       return new Response(new Uint8Array(slice), {
         status: 206,
         headers: {
           'content-length': String(slice.length),
-          'content-range': `bytes ${start}-${body.length - 1}/${body.length}`,
+          'content-range': `bytes ${start}-${end}/${body.length}`,
           etag,
         },
       })
@@ -76,7 +78,12 @@ function realDownloadCenter(fixtures: Record<string, Buffer>): DownloadCenterSer
   const rootDir = path.join(tempRoot(), 'downloads')
   return new DownloadCenterService({
     rootDir,
-    downloader: new HttpArtifactDownloader({ rootDir, fetch: fixtureFetch(fixtures) }),
+    downloader: new HttpArtifactDownloader({
+      rootDir,
+      fetch: fixtureFetch(fixtures),
+      parallelConnections: 4,
+      parallelMinBytes: 1,
+    }),
   })
 }
 

@@ -5,7 +5,7 @@
 ## Ownership boundary
 
 - `contract.ts` defines the redacted `DownloadTaskView` shared by server, desktop, and web.
-- `http-artifact-downloader.ts` streams HTTPS artifacts, enforces byte/checksum limits, resumes only strong-ETag partial transfers, and emits throttled progress.
+- `http-artifact-downloader.ts` streams HTTPS artifacts, enforces byte/checksum limits, resumes strong-ETag partial transfers, and emits throttled progress. With `parallelConnections > 1`, a range-capable source is probed once (`bytes=0-`) and the payload splits into N concurrent range chunks under `partial/<taskId>.chunks/`; per-chunk file sizes are the resume truth, so interrupted chunked transfers pick up mid-chunk. Sources without range support fall through to the sequential path unchanged.
 - `@cradle/download-center/installation` (node hosts only) owns the versioned-installation layout — `rootDir/{versions/<v>/,staging/,current.json}` with atomic pointer promotion, boot cleanup, serialized install flights, lease-gated uninstall — plus safe archive payload extraction (`zip`/`tar`, path traversal + entry-type validation, owner-declared payload classification). Owners inject `createError` so failures surface in their own error contract; they keep release manifests, target resolution, and version probing.
 - Server and Electron main own durable task lifecycle, storage roots, event fan-out, retry policy, and artifact release. Renderer code consumes only their redacted task projections.
 
