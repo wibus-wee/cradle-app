@@ -6,13 +6,48 @@ import { and, desc, eq, inArray, isNotNull, isNull, max } from 'drizzle-orm'
 
 import { AppError } from '../../errors/app-error'
 import { db } from '../../infra'
-import * as Issue from '../issue/service'
 import type { SessionStatus, SessionView } from '../session/service'
 import {
   aggregateSessionStatus,
   listBySessionGroupId,
 } from '../session/service'
 import * as Workspace from '../workspace/service'
+
+/**
+ * Issue-owned invariant validator injected by the composition root. Session
+ * Group owns reads and writes of `sessionGroups.linkedIssueId`; Issue owns
+ * the association workflow and shared-workspace invariant, so this module
+ * never imports Issue implementation.
+ */
+export type SessionGroupLinkedIssueValidator = (input: {
+  issueId: string
+  workspaceId: string
+}) => void
+
+let linkedIssueValidator: SessionGroupLinkedIssueValidator | null = null
+
+export function registerLinkedIssueValidator(validator: SessionGroupLinkedIssueValidator | null): void {
+  linkedIssueValidator = validator
+}
+
+/**
+ * Run the Issue-owned association invariant for a candidate link. Fails
+ * closed when no validator is registered so the invariant cannot be bypassed.
+ */
+export function assertLinkedIssue(input: {
+  issueId: string
+  workspaceId: string
+}): void {
+  if (!linkedIssueValidator) {
+    throw new AppError({
+      code: 'issue_link_validation_unavailable',
+      status: 500,
+      message: 'Issue link validation is not registered.',
+      details: { issueId: input.issueId },
+    })
+  }
+  linkedIssueValidator(input)
+}
 
 export type SessionGroupStatus = 'active' | 'archived'
 export type SessionGroupAggregateStatus = SessionStatus
@@ -237,8 +272,10 @@ export function create(input: {
     })
   }
 
+  // Issue-owned workspace invariant, checked before insert so a rejected
+  // association cannot leave a partially created group.
   if (input.linkedIssueId) {
-    Issue.getIssue(input.linkedIssueId)
+    assertLinkedIssue({ issueId: input.linkedIssueId, workspaceId: input.workspaceId })
   }
 
   const now = currentUnixSeconds()
@@ -266,20 +303,38 @@ export function create(input: {
   return get(group.id)!
 }
 
+export interface SessionGroupUpdateResult {
+  group: SessionGroupDetailView
+  /**
+   * Present when the update wrote `linkedIssueId` — the Issue–execution
+   * association transition for cache reconciliation.
+   */
+  association: SessionGroupIssueAssociationTransition | null
+}
+
+export interface SessionGroupIssueAssociationTransition {
+  participantKind: 'session-group'
+  participantId: string
+  previousIssueId: string | null
+  nextIssueId: string | null
+}
+
 export function update(input: {
   id: string
   title?: string
   description?: string | null
   linkedIssueId?: string | null
   archived?: boolean
-}): SessionGroupDetailView | null {
+}): SessionGroupUpdateResult | null {
   const group = getGroupRow(input.id)
   if (!group) {
     return null
   }
 
+  // Issue-owned workspace invariant, checked before the update so a rejected
+  // association leaves the previous link unchanged.
   if (input.linkedIssueId) {
-    Issue.getIssue(input.linkedIssueId)
+    assertLinkedIssue({ issueId: input.linkedIssueId, workspaceId: group.workspaceId })
   }
 
   const now = currentUnixSeconds()
@@ -300,7 +355,17 @@ export function update(input: {
   }
 
   db().update(sessionGroups).set(patch).where(eq(sessionGroups.id, input.id)).run()
-  return get(input.id)
+  return {
+    group: get(input.id)!,
+    association: input.linkedIssueId !== undefined
+      ? {
+          participantKind: 'session-group',
+          participantId: input.id,
+          previousIssueId: group.linkedIssueId,
+          nextIssueId: input.linkedIssueId,
+        }
+      : null,
+  }
 }
 
 export function remove(id: string): void {
@@ -361,6 +426,5 @@ export function removeMember(groupId: string, sessionId: string): SessionGroupDe
 }
 
 export function listByLinkedIssue(issueId: string): SessionGroupView[] {
-  Issue.getIssue(issueId)
   return list({ linkedIssueId: issueId, archived: false })
 }

@@ -41,6 +41,9 @@ operations and never composes Session cache topology itself.
 - **workspace-session-actions-menu-view.tsx**: Pure props rendering seam for open, edit, read/pin, export, grouping, and archive actions.
 - **workspace-session-actions-menu-view.stories.tsx**: Interactive fixture-driven Storybook catalog for standard, unread/pinned, and grouped Session menus.
 - **workspace-session-group-partition.ts**: Pure owner-typed Session grouping calculation kept outside the Session-group rendering module.
+- **session-group-projection.ts**: Session Group projection gateway — sole owner of Session Group cache topology (workspace-scoped and filtered list variants plus detail). `refreshSessionGroupProjections` is the reconciliation entry point used by group mutations and Issue–execution association transitions so linkedIssueId-filtered list variants cannot drift.
+- **use-session-group.ts**: Session Group query/mutation hooks. Mutations refresh group projections through `session-group-projection` and Session lists through the `features/session` gateway; create/update-with-link consume the server's typed association transition (`{ group, association }` PATCH envelope) via `kanban/use-issue-execution-association` so participant and old/new Issue projections reconcile together.
+- **use-session-group.test.ts**: Real-`QueryClient` coverage of group update relink reconciliation, non-association patches leaving Issue projections untouched, and create-with-link reconciliation.
 - **workspace-session-list-section.tsx**: Session-list runtime adapter that owns persisted expansion state, running-session retention, progressive row rendering, and composition of individual Session adapters.
 - **workspace-session-list-clock.tsx**: Sidebar-level shared clock provider that refreshes relative Session times without creating one timer per row.
 - **workspace-session-list-clock-context.ts**: Context contract consumed by Session row adapters for the shared current time.

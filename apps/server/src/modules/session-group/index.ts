@@ -67,15 +67,15 @@ export const sessionGroup = new Elysia({
           message: 'at least one session group field is required',
         })
       }
-      const group = SessionGroup.update({ id: params.id, ...body })
-      if (!group) {
+      const result = SessionGroup.update({ id: params.id, ...body })
+      if (!result) {
         throw new AppError({
           code: 'session_group_not_found',
           status: 404,
           message: 'Session group not found',
         })
       }
-      return group
+      return result
     },
     {
       detail: {
@@ -86,7 +86,7 @@ export const sessionGroup = new Elysia({
       },
       params: SessionGroupModel.idParams,
       body: SessionGroupModel.updateBody,
-      response: { 200: SessionGroupModel.sessionGroupDetail },
+      response: { 200: SessionGroupModel.updateResponse },
     },
   )
   .delete(

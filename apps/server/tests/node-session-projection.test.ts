@@ -39,6 +39,7 @@ interface FakeRemoteState {
     runtimeKind?: string
     runtimeSettings?: Record<string, unknown>
   }>
+  createSessionBodies: Record<string, unknown>[]
   deletedSessionIds: string[]
   forwardedPaths: string[]
 }
@@ -69,6 +70,7 @@ async function createAppWithDataDir(dataDir: string): Promise<ElysiaApp> {
 async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
   const state: FakeRemoteState = {
     sessions: new Map(),
+    createSessionBodies: [],
     deletedSessionIds: [],
     forwardedPaths: [],
   }
@@ -141,6 +143,7 @@ async function startFakeRemoteCradleServer(): Promise<FakeRemoteCradleServer> {
           runtimeKind?: string
           runtimeSettings?: Record<string, unknown>
         }
+        state.createSessionBodies.push(body as Record<string, unknown>)
         const id = `remote-session-${state.sessions.size + 1}`
         state.sessions.set(id, {
           workspaceId: payload.workspaceId ?? workspace.id,
@@ -593,6 +596,110 @@ describe('node session projection', () => {
     }
     finally {
       rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
+  it('keeps local Issue links on the projection and never forwards them upstream', async () => {
+    const dataDir = makeTempDir('cradle-remote-session-issue-link-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    let app: ElysiaApp | undefined
+
+    try {
+      fakeRemote = await startFakeRemoteCradleServer()
+      app = await createAppWithDataDir(dataDir)
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-issue-link')
+
+      // Local Issue in the mounted workspace's local identity — a valid link.
+      const issueRes = await app.handle(new Request('http://localhost/issues', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId, title: 'Local issue on remote workspace' }),
+      }))
+      expect(issueRes.status).toBe(200)
+      const issue = await issueRes.json() as { id: string }
+
+      const createRes = await app.handle(new Request('http://localhost/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Remote chat linked to a local issue',
+          workspaceId,
+          linkedIssueId: issue.id,
+        }),
+      }))
+      expect(createRes.status).toBe(200)
+      const session = await createRes.json() as { id: string, linkedIssueId: string | null }
+      expect(session.linkedIssueId).toBe(issue.id)
+
+      // The upstream create must not carry the local Issue ID — Issue identity
+      // is local to this host.
+      expect(fakeRemote.state.createSessionBodies).toHaveLength(1)
+      expect(fakeRemote.state.createSessionBodies[0]).not.toHaveProperty('linkedIssueId')
+      expect(fakeRemote.state.sessions.get('remote-session-1')).toBeDefined()
+
+      const localRow = db().select().from(sessions).where(eq(sessions.id, session.id)).get()
+      expect(localRow?.linkedIssueId).toBe(issue.id)
+
+      const linkedIssueRes = await app.handle(new Request(`http://localhost/sessions/${session.id}/linked-issue`))
+      expect(linkedIssueRes.status).toBe(200)
+      expect(await linkedIssueRes.json()).toEqual({ issueId: issue.id })
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      restoreEnv('CRADLE_DATA_DIR', previousDataDir)
+    }
+  })
+
+  it('rejects a remote-projected session create whose Issue is in another local workspace before any upstream effect', async () => {
+    const dataDir = makeTempDir('cradle-remote-session-issue-link-cross-')
+    const otherWorkspaceRoot = makeTempDir('cradle-other-workspace-')
+    const previousDataDir = process.env.CRADLE_DATA_DIR
+    let app: ElysiaApp | undefined
+
+    try {
+      fakeRemote = await startFakeRemoteCradleServer()
+      app = await createAppWithDataDir(dataDir)
+      const workspaceId = await createRemoteMountedWorkspace(app, 'node-issue-link-cross')
+
+      const otherWorkspaceRes = await app.handle(new Request('http://localhost/workspaces', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Other Local Workspace',
+          locator: { nodeId: 'local', path: otherWorkspaceRoot },
+        }),
+      }))
+      expect(otherWorkspaceRes.status).toBe(200)
+      const otherWorkspace = await otherWorkspaceRes.json() as { id: string }
+
+      const issueRes = await app.handle(new Request('http://localhost/issues', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ workspaceId: otherWorkspace.id, title: 'Issue in another workspace' }),
+      }))
+      expect(issueRes.status).toBe(200)
+      const issue = await issueRes.json() as { id: string }
+
+      const createRes = await app.handle(new Request('http://localhost/sessions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Remote chat with cross-workspace issue link',
+          workspaceId,
+          linkedIssueId: issue.id,
+        }),
+      }))
+      expect(createRes.status).toBe(409)
+      expect((await createRes.json() as { code?: string }).code).toBe('issue_workspace_mismatch')
+      // Local validation happens before any upstream effect.
+      expect(fakeRemote.state.createSessionBodies).toHaveLength(0)
+      expect(fakeRemote.state.sessions.size).toBe(0)
+      expect(db().select().from(sessions).all()).toHaveLength(0)
+    }
+    finally {
+      rmSync(dataDir, { recursive: true, force: true })
+      rmSync(otherWorkspaceRoot, { recursive: true, force: true })
       restoreEnv('CRADLE_DATA_DIR', previousDataDir)
     }
   })

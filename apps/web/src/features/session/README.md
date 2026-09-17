@@ -18,6 +18,12 @@ across every existing Session projection query. Recovery coalescing is
 explicit promise ownership, not timing-based debounce: concurrent callers join
 the in-flight wave, and arrivals during a wave queue exactly one follow-up.
 
+Issue–execution association mutations reconcile Session projections through
+this gateway: `features/kanban/use-issue-execution-association` consumes the
+server's typed previous/next transition and calls `refreshSessionProjections`
+for Session participants, so link/unlink/relink never composes Session query
+keys outside this directory.
+
 ## Files
 
 - **api/session-projection.ts**: Session projection gateway — the sole owner of Session cache topology. Exposes query-key constructors and options (`sessionsQueryKey`, `sessionListOptions`, `sessionDetailQueryKey`, `sessionDetailOptions`, `sessionQueueQueryKey`), projection-family predicates (`isSessionsQueryKey`, `isSessionProjectionQueryKey`), optimistic writes (`projectCreatedSession`, `projectSessionActivity`, `applySessionOptimisticPatch`, `applySessionReadResult`, `applyConfirmedSession`, `rollbackSessionOptimisticPatch`, `updateUnreadSessionIdsSnapshot`), semantic refresh (`refreshSessionLists`, `refreshSessionProjections`, `refreshSessionDetail`, `refreshSessionRuntimeStatus`, `refreshSessionQueue`, `dropSessionProjection`), event projection (`applySessionTailEvent`), and coalesced gap recovery (`recoverProjectionGap`).
