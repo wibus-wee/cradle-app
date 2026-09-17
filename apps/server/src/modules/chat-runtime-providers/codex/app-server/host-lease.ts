@@ -159,7 +159,7 @@ export async function prepareCodexManagedPathForRemoval(binaryPath: string): Pro
   const stillSpawning = listProviderProcessHosts().some(entry =>
     entry.runtimeKind === CODEX_RUNTIME_KIND
     && entry.scopeId.startsWith(appServerScopePrefix)
-    && !entry.hasResource)
+    && entry.spawning)
   if (stillSpawning) {
     return false
   }
