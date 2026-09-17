@@ -1,10 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useRef } from 'react'
 
-import { getSessionsByIdOptions, getSessionsByIdQueryKey } from '~/api-gen/@tanstack/react-query.gen'
 import { patchSessionsById } from '~/api-gen/sdk.gen'
 import type { RuntimeKind } from '~/features/agent-runtime/types'
-import { updateSessionInSessionLists } from '~/features/workspace/use-session'
+import {
+  applyConfirmedSession,
+  applySessionOptimisticPatch,
+  readSessionDetailSnapshot,
+  rollbackSessionOptimisticPatch,
+  sessionDetailOptions,
+} from '~/features/session/api/session-projection'
 
 import type { SessionExecution } from './session-execution'
 import { readSessionExecution } from './session-execution'
@@ -40,7 +45,7 @@ export function useSessionBinding(
   active: boolean,
 ): ChatSessionBinding | null {
   const query = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId ?? '' } }),
+    ...sessionDetailOptions(sessionId ?? ''),
     enabled: active && !!sessionId,
     staleTime: 60_000,
     select: data => data
@@ -68,8 +73,7 @@ export function useSessionProviderModelPersistence(
   const saveStateRef = useRef<SessionProviderModelSaveState | null>(null)
 
   return useCallback((body: SessionProviderModelPatch) => {
-    const previousSessionKey = getSessionsByIdQueryKey({ path: { id: sessionId } })
-    const previousSession = queryClient.getQueryData(previousSessionKey)
+    const previousSession = readSessionDetailSnapshot(queryClient, sessionId)
     let saveState = saveStateRef.current
     if (!saveState) {
       saveState = {
@@ -88,11 +92,11 @@ export function useSessionProviderModelPersistence(
       ...(body.thinkingEffort !== undefined ? { thinkingEffort: body.thinkingEffort } : {}),
     }
 
-    queryClient.setQueryData(previousSessionKey, current =>
-      current && typeof current === 'object'
-        ? { ...current, ...optimisticPatch }
-        : current)
-    updateSessionInSessionLists(queryClient, { id: sessionId, ...optimisticPatch })
+    applySessionOptimisticPatch(
+      queryClient,
+      { id: sessionId, ...optimisticPatch },
+      { updateDetail: true },
+    )
 
     const saveTask = saveState.queue
       .catch(() => undefined)
@@ -107,19 +111,16 @@ export function useSessionProviderModelPersistence(
             currentSaveState.confirmedSession = data
           }
           if (data && currentSaveState?.revision === revision) {
-            queryClient.setQueryData(previousSessionKey, data)
-            updateSessionInSessionLists(queryClient, data)
+            applyConfirmedSession(queryClient, data)
           }
         }
- catch {
+        catch {
           const currentSaveState = saveStateRef.current
           if (currentSaveState?.revision === revision) {
-            queryClient.setQueryData(previousSessionKey, currentSaveState.confirmedSession ?? previousSession)
-            void queryClient.invalidateQueries({ queryKey: previousSessionKey })
-            void queryClient.invalidateQueries({ predicate: query =>
-              query.queryKey[0] !== null
-              && typeof query.queryKey[0] === 'object'
-              && (query.queryKey[0] as { _id?: unknown })._id === 'getSessions' })
+            rollbackSessionOptimisticPatch(queryClient, {
+              sessionId,
+              previousSession: currentSaveState.confirmedSession ?? previousSession,
+            })
           }
         }
       })

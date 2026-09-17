@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import type { WorkspaceSession } from '~/features/session/use-session'
+
 import { workspaceSessionFixtures } from './fixtures/workspace-sidebar'
-import type { WorkspaceSession } from './use-session'
 import { sessionMatchesListFilters } from './workspace-sidebar-list-filters'
 import {
   DEFAULT_WORKSPACE_SIDEBAR_LIST_FILTERS,

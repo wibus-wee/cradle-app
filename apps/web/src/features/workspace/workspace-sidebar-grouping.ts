@@ -1,9 +1,9 @@
 import type { GetNodesResponse } from '~/api-gen/types.gen'
+import type { WorkspaceSession } from '~/features/session/use-session'
+import { getSessionActivityAt } from '~/features/session/use-session'
 import type { WorkSummary } from '~/features/work/use-work'
 
 import type { Workspace } from './types'
-import type { WorkspaceSession } from './use-session'
-import { getSessionActivityAt } from './use-session'
 import {
   hasUnreadWorkspaceSessionError,
   isWorkspaceSessionRunning,

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import type { WorkspaceSession } from '~/features/session/use-session'
+
 import type { Workspace } from './types'
-import type { WorkspaceSession } from './use-session'
 import type { FabricNodeSummary, SidebarSessionEntry } from './workspace-sidebar-grouping'
 import {
   classifyStatusBucket,

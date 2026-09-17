@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { useState } from 'react'
 
+import type { WorkspaceSession } from '~/features/session/use-session'
+
 import {
   workspaceSessionFixtures,
 } from './fixtures/workspace-sidebar'
-import type { WorkspaceSession } from './use-session'
 import { WorkspaceSessionItemView } from './workspace-session-item-view'
 import { WorkspaceSessionListView } from './workspace-session-list-view'
 

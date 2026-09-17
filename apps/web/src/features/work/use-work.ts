@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
-  getSessionsByIdQueryKey,
   getSessionsByIdWorkOptions,
   getSessionsByIdWorkQueryKey,
   getWorksByIdOptions,
@@ -16,6 +15,7 @@ import type {
   GetWorksByIdResponse,
   GetWorksResponse,
 } from '~/api-gen/types.gen'
+import { refreshSessionDetail } from '~/features/session/api/session-projection'
 
 export type WorkDetail = GetWorksByIdResponse
 export type WorkSummary = GetWorksResponse['items'][number]
@@ -87,9 +87,7 @@ function invalidateWorkQueries(
   void queryClient.invalidateQueries({
     queryKey: getSessionsByIdWorkQueryKey({ path: { id: detail.primaryThread.id } }),
   })
-  void queryClient.invalidateQueries({
-    queryKey: getSessionsByIdQueryKey({ path: { id: detail.primaryThread.id } }),
-  })
+  void refreshSessionDetail(queryClient, detail.primaryThread.id)
 }
 
 export function useSubmitWork() {

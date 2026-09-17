@@ -6,9 +6,9 @@ import { useTranslation } from 'react-i18next'
 
 import { chatMessageSnapshotQueryOptions } from '~/features/chat/api/messages'
 import type { ChatSessionMessageRow } from '~/features/chat/session/use-chat-session-types'
+import type { WorkspaceSession } from '~/features/session/use-session'
 import { cn } from '~/lib/cn'
 
-import type { WorkspaceSession } from '../../use-session'
 import type { PreviewCardPlacement } from '../preview-card-context'
 
 const SESSION_PREVIEW_MESSAGE_LIMIT = 4

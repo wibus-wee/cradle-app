@@ -1,4 +1,4 @@
-import type { GlobalSessionEventSource } from '~/features/workspace/global-session-sync-engine'
+import type { GlobalSessionEventSource } from '~/features/session/global-session-sync-engine'
 import type {
   DesktopChatEventTailBridge,
   DesktopChatEventTailClosedEvent,

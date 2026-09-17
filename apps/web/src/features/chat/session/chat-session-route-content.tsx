@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 
 import {
-  getSessionsByIdOptions,
   getWorkspacesByWorkspaceIdOptions,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { postSessionsByIdRead } from '~/api-gen/sdk.gen'
@@ -11,8 +10,8 @@ import {
   runtimeComposerUsesCollapsedInput,
   useRuntimeCatalog,
 } from '~/features/agent-runtime/use-runtime-catalog'
+import { applySessionReadResult, sessionDetailOptions } from '~/features/session/api/session-projection'
 import { getLocalWorkspacePath } from '~/features/workspace/types'
-import { updateSessionReadState } from '~/features/workspace/use-session'
 import { isElectron, nativeIpc } from '~/lib/electron'
 import { closeSurfaceById } from '~/navigation/navigation-commands'
 import { useSurfaceActive } from '~/navigation/surface-activity-context'
@@ -109,7 +108,7 @@ export function ChatSessionRouteContent({
     void postSessionsByIdRead({ path: { id: sessionId } })
       .then(({ data }) => {
         if (data) {
-          updateSessionReadState(queryClient, data)
+          applySessionReadResult(queryClient, data)
         }
       })
       .catch(() => {})
@@ -123,7 +122,7 @@ export function ChatSessionRouteContent({
   }, [active, queryClient, sessionId])
 
   const { data: session } = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId } }),
+    ...sessionDetailOptions(sessionId),
     enabled: !!sessionId,
   })
   const hasLoadedSession = !!session

@@ -10,6 +10,11 @@ Work Sessions participate in the same ordering, preview limit, and Session Group
 partitioning as ordinary Chats, with Work metadata decorating their rows and routing
 them to the Work surface.
 
+Session business projections (query keys, list/detail/runtime/queue cache
+topology, optimistic writes, event-tail recovery) are owned by
+`features/session/` — Workspace consumes `features/session` hooks and gateway
+operations and never composes Session cache topology itself.
+
 ## Files
 
 - **index.ts**: Barrel re-exports for the workspace feature
@@ -23,9 +28,6 @@ them to the Work surface.
 - **use-workspace-file-content.ts**: Hooks and URL builders for workspace file text content, preview metadata, raw bytes, and PDF renditions through workspace-owned APIs.
 - **use-workspace-files.ts**: Workspace file search helper/hook for composer mentions, smart mentions, and quick open, using the bounded workspace file search API instead of preloading recursive inventories.
 - **use-workspace.ts**: Hooks for listing, adding (via native directory picker), pin toggling, and deleting workspaces; exposes list readiness for interaction-level performance gates that depend on workspace names.
-- **use-session.ts**: Hooks for listing active or archived sessions globally or under a single workspace, with memoized row normalization, session layout metadata hydration for app chrome, message activity timestamps for list display, and targeted session-list cache updates; ordinary row patches preserve the API's latest-user-message order and existing timestamps, while explicit optimistic promotion is reserved for new user messages or newly created chat sessions.
-- **use-global-session-event-sync.ts**: Global Session event-tail adapter that immediately invalidates affected projections and owns resettable five-second fallback polling for active Session-list queries.
-- **use-global-session-event-sync.test.tsx**: Timer coverage for periodic Session-list refresh and restarting the polling delay after an event-triggered refresh.
 - **use-cli-agents.ts**: Transitional hook for listing CLI-TUI Agent Profiles from the unified Agent Runtime
 - **workspace-sidebar-ui-store.ts**: Workspace-owned persisted UI state (v4) for sidebar grouping, session ordering, list filters, preview limit, project group collapse, and per-project full session-list expansion, using the shared safe localStorage wrapper and bounded workspace-id flag maps.
 - **workspace-group-disclosure.tsx**: Thin adapter that owns persisted collapse state and workspace-detail navigation for a project group.

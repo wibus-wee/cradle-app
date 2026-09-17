@@ -273,7 +273,7 @@ Ordered by leverage (security/correctness first, structural refactors last).
 | 047  | Build a unified, thin Download Center                    | P1       | XL     | 028, 041   | DONE (`packages/download-center` wired through server module, desktop service/preload, and web projection) |
 | 048  | Publish a safe Provider Endpoint catalog projection      | P1       | M      | 035        | DONE (landed as `GET /provider-presets` with `endpointProfiles`; web mirror registry deleted; runtime wireAuth stays server-internal) |
 | 049  | Complete lossless Navigation surface round-trip          | P1       | L      | 040        | DONE (`navigation/surface-route-codec.ts` owns route decode/encode + persistence validation; v2 storage key, router casts removed) |
-| 050  | Own Session projection and cache coherence               | P0       | L      | 040        | TODO                                                                                  |
+| 050  | Own Session projection and cache coherence               | P0       | L      | 040        | DONE (`features/session/api/session-projection.ts` owns all Session key/topology semantics; `SnapshotRequired` carries `sessionId` for targeted recovery; ownership ratchet test) |
 | 051  | Own Issue–execution association end to end               | P0       | L      | 050        | TODO                                                                                  |
 | 052  | Make Codex app-server provider-owned and thread-multiplexed | P0     | XL     | 041        | DONE (`codex/app-server/host-lease.ts`: single `provider-host` scope, `retainOnRelease` + idle TTL, thread routing via `inferredThreadId`; tests assert one host across sessions) |
 | 054  | Make WebSocket run streams resumable and liveness-aware   | P0       | L      | 024, 040   | DONE                                                                                  |
@@ -318,7 +318,8 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (one-line reason) | REJECTED 
   索引、synthetic-turn inbox、统一 completion owner、boot 恢复屏障、有界 history hydration）、
   072（blob store/GC/cradle-blob:// 解析/回填任务均已运行）、073 Provider identity（`a02e9ffb`
   一次落地）。075 Desktop fetch、075 CPA、076 Fabric 保持 IN PROGRESS 但备注已更新为真实剩余项
-  （packaged smoke / M0 OAuth gate / 手动 desktop smoke）。经核实仍未开始的：043、045、050、051。
+  （packaged smoke / M0 OAuth gate / 手动 desktop smoke）。050 已落地（Session projection
+  gateway + targeted snapshot recovery）。经核实仍未开始的：043、045、051。
 
 - 2026-07-15，Plan 055 完成：Codex `thread/tokenUsage/updated` 在 root filtering 前投影为
   deterministic per-call usage events，TurnExecutor 附加 Cradle session/run/message/provider identity，

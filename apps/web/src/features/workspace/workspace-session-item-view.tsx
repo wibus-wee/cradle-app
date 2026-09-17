@@ -24,12 +24,12 @@ import {
   STATUS_ICON_CLASS,
   statusKind,
 } from '~/features/pull-requests/status-meta'
+import type { WorkspaceSession } from '~/features/session/use-session'
 import type { WorkSummary } from '~/features/work/use-work'
 import type { Workspace } from '~/features/workspace/types'
 import { cn } from '~/lib/cn'
 
 import { SessionRenameInput } from './session-rename-input'
-import type { WorkspaceSession } from './use-session'
 
 export type WorkspaceSessionAttentionKind = 'userInput' | 'toolApproval'
 

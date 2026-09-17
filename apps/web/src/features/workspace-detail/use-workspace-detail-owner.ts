@@ -15,12 +15,12 @@ import type { DraftChatComposerSubmitOptions } from '~/features/chat/composer/co
 import type { ChatContextPart } from '~/features/chat/context/chat-context-parts'
 import { readRunRuntimeSettingsPatch } from '~/features/chat/runtime/runtime-settings-presenter'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
+import {
+  projectCreatedSession,
+  refreshSessionLists,
+} from '~/features/session/api/session-projection'
 import type { Workspace } from '~/features/workspace/types'
 import { isLocalWorkspace } from '~/features/workspace/types'
-import {
-  sessionsQueryKey,
-  updateSessionInSessionLists,
-} from '~/features/workspace/use-session'
 import { WORKSPACES_QUERY_KEY } from '~/features/workspace/use-workspace'
 import { openChatSession } from '~/navigation/navigation-commands'
 import { openTearoffChatSessionWindow } from '~/navigation/tearoff-surfaces'
@@ -80,10 +80,7 @@ export function useWorkspaceDetailOwner(
   const createSessionMutation = useMutation({
     ...postSessionsMutation(),
     onSuccess: () => {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: sessionsQueryKey(workspaceId) }),
-        queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-      ])
+      void refreshSessionLists(queryClient)
     },
   })
 
@@ -150,13 +147,13 @@ export function useWorkspaceDetailOwner(
         return false
       }
 
-      updateSessionInSessionLists(queryClient, {
+      projectCreatedSession(queryClient, {
         id: session.id,
         title: sessionTitle,
         workspaceId,
         agentId: isRemoteWorkspace ? null : options.agentId,
         runtimeKind: options.runtimeKind,
-      }, { promote: true })
+      })
       await openCreatedWorkspaceSession(session.id, target)
       return true
     }
@@ -193,14 +190,14 @@ export function useWorkspaceDetailOwner(
       return false
     }
 
-    updateSessionInSessionLists(queryClient, {
+    projectCreatedSession(queryClient, {
       id: session.id,
       title: sessionTitle,
       workspaceId,
       providerTargetId: options.providerTargetId ?? null,
       modelId: options.modelId ?? null,
       runtimeKind: options.runtimeKind,
-    }, { promote: true })
+    })
     await openCreatedWorkspaceSession(session.id, target)
 
     startOptimisticChatResponse({
@@ -216,10 +213,7 @@ export function useWorkspaceDetailOwner(
         runtimeSettings: readRunRuntimeSettingsPatch(options.runtimeSettings),
       },
       onAccepted: () => {
-        void Promise.all([
-          queryClient.invalidateQueries({ queryKey: sessionsQueryKey(workspaceId) }),
-          queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-        ])
+        void refreshSessionLists(queryClient)
       },
       onError: (error) => {
         toastManager.add({
@@ -230,16 +224,10 @@ export function useWorkspaceDetailOwner(
         })
       },
       onSettled: () => {
-        void Promise.all([
-          queryClient.invalidateQueries({ queryKey: sessionsQueryKey(workspaceId) }),
-          queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-        ])
+        void refreshSessionLists(queryClient)
       },
     })
-    void Promise.all([
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey(workspaceId) }),
-      queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-    ])
+    void refreshSessionLists(queryClient)
     return true
   }
 

@@ -15,7 +15,6 @@ import { m } from 'motion/react'
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { postSessions } from '~/api-gen/sdk.gen'
 import { useLayoutGeometry } from '~/components/layout/layout-geometry-context'
 import { CENTER_COLUMN_EXPANDED_SCALE, CENTER_COLUMN_EXPANDED_Y } from '~/components/layout/layout-motion'
@@ -29,6 +28,7 @@ import type { ChatContextPart } from '~/features/chat/context/chat-context-parts
 import { ChatSessionSyncBoundary } from '~/features/chat/session/chat-session-sync-boundary'
 import { startOptimisticChatResponse } from '~/features/chat/session/optimistic-chat-turn'
 import { readSessionThinkingEffort } from '~/features/chat/session/session-thinking-effort'
+import { sessionDetailOptions } from '~/features/session/api/session-projection'
 import { cn } from '~/lib/cn'
 import { useActiveSurface } from '~/navigation/active-surface'
 
@@ -299,7 +299,7 @@ function JarvisRuntimePanel({
   placeholder: string
 }) {
   const { data: session } = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId } }),
+    ...sessionDetailOptions(sessionId),
     enabled: !!sessionId,
   })
   const updateSessionTitle = useJarvisUiStore(s => s.updateSessionTitle)

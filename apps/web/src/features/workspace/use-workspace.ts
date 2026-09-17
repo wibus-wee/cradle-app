@@ -4,9 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import {
   deleteWorkspacesByWorkspaceIdMutation,
-  getSessionsByIdQueryKey,
   getSessionsByIdWorkQueryKey,
-  getSessionsQueryKey,
   getWorksByIdQueryKey,
   getWorkspacesOptions,
   getWorkspacesQueryKey,
@@ -23,6 +21,10 @@ import {
   trackProductTaskFinished,
   trackProductTaskStarted,
 } from '~/features/product-analytics/client'
+import {
+  dropSessionProjection,
+  refreshSessionLists,
+} from '~/features/session/api/session-projection'
 import { useAppPreferencesQuery, useUpdateAppPreferencesMutation } from '~/features/settings/use-app-preferences'
 
 export const WORKSPACES_QUERY_KEY = getWorkspacesQueryKey()
@@ -233,7 +235,7 @@ export function useDeleteWorkspace() {
     ...deleteWorkspacesByWorkspaceIdMutation(),
     onSuccess: async (result) => {
       for (const sessionId of result.removedSessionIds) {
-        queryClient.removeQueries({ queryKey: getSessionsByIdQueryKey({ path: { id: sessionId } }) })
+        dropSessionProjection(queryClient, sessionId)
         queryClient.removeQueries({ queryKey: getSessionsByIdWorkQueryKey({ path: { id: sessionId } }) })
       }
       for (const workId of result.removedWorkIds) {
@@ -241,7 +243,7 @@ export function useDeleteWorkspace() {
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: WORKSPACES_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() }),
+        refreshSessionLists(queryClient),
         queryClient.invalidateQueries({ queryKey: getWorksQueryKey() }),
       ])
     },

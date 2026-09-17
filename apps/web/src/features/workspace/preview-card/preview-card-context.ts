@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-import type { WorkspaceSession } from '../use-session'
+import type { WorkspaceSession } from '~/features/session/use-session'
 
 export type PreviewCardPlacement = 'bottom' | 'right'
 

@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
   getSessionsByIdIsolationOptions,
-  getSessionsByIdQueryKey,
   getWorkspacesByWorkspaceIdGitRepositoriesQueryKey,
   getWorkspacesByWorkspaceIdGitStatusQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
@@ -14,7 +13,8 @@ import {
   postSessionsByIdIsolationLeave,
   postSessionsByIdIsolationStart,
 } from '~/api-gen/sdk.gen'
-import { sessionsQueryKey } from '~/features/workspace/use-session'
+
+import { refreshSessionLists, refreshSessionProjections } from './api/session-projection'
 
 export interface IssueIsolationContextGroup {
   worktreeId: string
@@ -59,9 +59,8 @@ function invalidateSessionIsolationQueries(
   sessionId: string,
   workspaceId?: string | null,
 ) {
-  void queryClient.invalidateQueries({ queryKey: getSessionsByIdQueryKey({ path: { id: sessionId } }) })
+  void refreshSessionProjections(queryClient, sessionId)
   void queryClient.invalidateQueries({ queryKey: getSessionsByIdIsolationOptions({ path: { id: sessionId } }).queryKey })
-  void queryClient.invalidateQueries({ queryKey: sessionsQueryKey() })
   if (workspaceId) {
     void queryClient.invalidateQueries({
       queryKey: getWorkspacesByWorkspaceIdGitStatusQueryKey({ path: { workspaceId } }),
@@ -179,7 +178,7 @@ export function useCleanupWorktree() {
       })
     },
     onSuccess: (_data, vars) => {
-      void queryClient.invalidateQueries({ queryKey: sessionsQueryKey() })
+      void refreshSessionLists(queryClient)
       void queryClient.invalidateQueries({
         queryKey: getWorkspacesByWorkspaceIdGitStatusQueryKey({ path: { workspaceId: vars.workspaceId } }),
       })

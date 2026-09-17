@@ -10,7 +10,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { getSessionsByIdQueryKey } from '~/api-gen/@tanstack/react-query.gen'
 import { postSessionsByIdArchive } from '~/api-gen/sdk.gen'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -29,10 +28,11 @@ import { listSelectableComposerProfilesForRuntimes } from '~/features/composer-t
 import { filterThinkingOptionsForModel, selectSupportedThinkingValue } from '~/features/composer-toolbar/constants'
 import type { ThinkingOption } from '~/features/composer-toolbar/provider-model-menu'
 import { ProviderModelPicker } from '~/features/composer-toolbar/provider-model-picker'
+import { refreshSessionProjections } from '~/features/session/api/session-projection'
+import type { WorkspaceSession } from '~/features/session/use-session'
+import { useAllSessions } from '~/features/session/use-session'
 import { cn } from '~/lib/cn'
 
-import type { WorkspaceSession } from '../workspace/use-session'
-import { sessionsQueryKey, useAllSessions } from '../workspace/use-session'
 import { SettingsGroup, SettingsPage } from './settings-container'
 import { SettingsRow } from './settings-row'
 import { useFeatureFlag } from './use-app-preferences'
@@ -207,13 +207,7 @@ function ArchivedSessionList() {
     },
     onSuccess: async (session) => {
       toastManager.add({ type: 'success', title: t('chat.archive.restored' as SettingsKey) })
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: sessionsQueryKey() }),
-        queryClient.invalidateQueries({ queryKey: sessionsQueryKey(undefined, true) }),
-        queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? null) }),
-        queryClient.invalidateQueries({ queryKey: sessionsQueryKey(session.workspaceId ?? null, true) }),
-        queryClient.invalidateQueries({ queryKey: getSessionsByIdQueryKey({ path: { id: session.id } }) }),
-      ])
+      await refreshSessionProjections(queryClient, session.id)
     },
     onError: (error) => {
       toastManager.add({

@@ -15,10 +15,6 @@ vi.mock('~/api-gen/sdk.gen', () => ({
   postSessionsByIdPullRequestReady: mocks.markReady,
 }))
 
-vi.mock('~/api-gen/@tanstack/react-query.gen', () => ({
-  getSessionsByIdQueryKey: ({ path }: { path: { id: string } }) => [{ _id: path.id }],
-}))
-
 const pullRequest = {
   owner: 'cradle',
   repo: 'app',

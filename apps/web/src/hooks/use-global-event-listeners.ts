@@ -5,15 +5,17 @@ import { useCallback, useEffect } from 'react'
 
 import {
   getChatSessionsBySessionIdMessagesQueryKey,
-  getSessionsByIdQueryKey,
 } from '~/api-gen/@tanstack/react-query.gen'
 import { postSessionsByIdRead } from '~/api-gen/sdk.gen'
 import { runtimeUiSlotStatesQueryKey } from '~/features/chat/capabilities/chat-capabilities'
 import { runtimeSettingsQueryKey } from '~/features/chat/commands/runtime-settings-command'
-import { runtimeSessionStatusQueryKey } from '~/features/chat/runtime/use-runtime-session-status'
 import { onAnyChatRunEvent, onChatRunSettled } from '~/features/chat/transport/sse-chat-transport'
-import { useGlobalSessionEventSync } from '~/features/workspace/use-global-session-event-sync'
-import { isSessionsQueryKey, updateSessionReadState } from '~/features/workspace/use-session'
+import {
+  applySessionReadResult,
+  refreshSessionProjections,
+  refreshSessionRuntimeStatus,
+} from '~/features/session/api/session-projection'
+import { useGlobalSessionEventSync } from '~/features/session/use-global-session-event-sync'
 import { useShortcut } from '~/hooks/use-shortcut'
 import { isElectron, isTearoffWindow, nativeIpc, platform } from '~/lib/electron'
 import {
@@ -38,14 +40,9 @@ function invalidateChatSessionRuntimeQueries(queryClient: QueryClient, sessionId
   void queryClient.invalidateQueries({
     queryKey: getChatSessionsBySessionIdMessagesQueryKey({ path: { sessionId } }),
   })
-  void queryClient.invalidateQueries({
-    queryKey: getSessionsByIdQueryKey({ path: { id: sessionId } }),
-  })
-  void queryClient.invalidateQueries({ queryKey: runtimeSessionStatusQueryKey(sessionId) })
-  void queryClient.invalidateQueries({ queryKey: ['chat', 'session-queue', sessionId] })
+  void refreshSessionProjections(queryClient, sessionId)
   void queryClient.invalidateQueries({ queryKey: runtimeUiSlotStatesQueryKey(sessionId) })
   void queryClient.invalidateQueries({ queryKey: runtimeSettingsQueryKey(sessionId) })
-  void queryClient.invalidateQueries({ predicate: query => isSessionsQueryKey(query.queryKey) })
 }
 
 function isClaudeEnterPlanModeChunk(chunk: UIMessageChunk): boolean {
@@ -182,7 +179,7 @@ export function useGlobalEventListeners(
         void postSessionsByIdRead({ path: { id: chatSessionId } })
           .then(({ data }) => {
             if (data) {
-              updateSessionReadState(queryClient, data)
+              applySessionReadResult(queryClient, data)
             }
           })
           .catch(() => {})
@@ -198,9 +195,7 @@ export function useGlobalEventListeners(
       }
       if (isClaudeEnterPlanModeChunk(chunk)) {
         void queryClient.invalidateQueries({ queryKey: runtimeSettingsQueryKey(chatSessionId) })
-        void queryClient.invalidateQueries({
-          queryKey: runtimeSessionStatusQueryKey(chatSessionId),
-        })
+        void refreshSessionRuntimeStatus(queryClient, chatSessionId)
       }
     })
   }, [queryClient])

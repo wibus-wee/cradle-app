@@ -6,11 +6,11 @@ import { useQuery } from '@tanstack/react-query'
 import type { FileUIPart } from 'ai'
 import { useCallback, useState } from 'react'
 
-import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { getSkills } from '~/api-gen/sdk.gen'
 import { Alert, AlertDescription, AlertTitle } from '~/components/ui/alert'
 import { ChatRenderStoreProvider } from '~/features/chat/rendering/chat-render-store'
 import { MessageBubbleById } from '~/features/chat/transcript/containers/message-bubble-by-id'
+import { sessionDetailOptions } from '~/features/session/api/session-projection'
 import type { SkillInventoryEntry } from '~/features/skills/types'
 import { chatSelectors } from '~/store/chat'
 import { useRendererChatStore } from '~/store/renderer-chat'
@@ -48,7 +48,7 @@ export function SideConversationPanel({
   // selector and permission/plan controls — those follow the main session. We only
   // need the parent's workspace to power @file and $skill mentions.
   const { data: parentWorkspaceId } = useQuery({
-    ...getSessionsByIdOptions({ path: { id: parentSessionId } }),
+    ...sessionDetailOptions(parentSessionId),
     enabled: Boolean(parentSessionId),
     select: session => session?.workspaceId ?? null,
     staleTime: 60_000,

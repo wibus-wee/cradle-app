@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { m } from 'motion/react'
 import { useState } from 'react'
 
-import { getSessionsByIdOptions } from '~/api-gen/@tanstack/react-query.gen'
 import { Button } from '~/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '~/components/ui/collapsible'
+import { sessionDetailOptions } from '~/features/session/api/session-projection'
 import { cn } from '~/lib/cn'
 import { clampPercent, formatTokenCount } from '~/lib/number-format'
 
@@ -110,7 +110,7 @@ export function ContextUsageReport({
 }: ContextUsageReportProps) {
   const [expandedSectionKinds, setExpandedSectionKinds] = useState<Set<string>>(() => new Set())
   const { data: session } = useQuery({
-    ...getSessionsByIdOptions({ path: { id: sessionId } }),
+    ...sessionDetailOptions(sessionId),
     staleTime: 30_000,
   })
   const { data, isError, isLoading } = useQuery({

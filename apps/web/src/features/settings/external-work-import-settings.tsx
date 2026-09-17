@@ -23,6 +23,7 @@ import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Spinner } from '~/components/ui/spinner'
+import { refreshSessionLists } from '~/features/session/api/session-projection'
 import { cn } from '~/lib/cn'
 import { openChatSession } from '~/navigation/navigation-commands'
 
@@ -33,7 +34,6 @@ import type {
 import {
   getExternalSessionImportImportsOptions,
   getExternalSessionImportImportsQueryKey,
-  getSessionsQueryKey,
   getWorkspacesQueryKey,
   postExternalSessionImportImportsByImportIdSyncMutation,
   postExternalSessionImportImportsMutation,
@@ -315,7 +315,7 @@ export function ExternalWorkImportSettings() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getExternalSessionImportImportsQueryKey() }),
         queryClient.invalidateQueries({ queryKey: getWorkspacesQueryKey() }),
-        queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() }),
+        refreshSessionLists(queryClient),
       ])
       setStatusMessage(t('import.status.imported', {
         imported: result.imported,
@@ -343,7 +343,7 @@ export function ExternalWorkImportSettings() {
       })
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: getExternalSessionImportImportsQueryKey() }),
-        queryClient.invalidateQueries({ queryKey: getSessionsQueryKey() }),
+        refreshSessionLists(queryClient),
       ])
       setStatusMessage(result.status === 'diverged'
         ? result.reason
