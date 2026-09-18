@@ -126,6 +126,7 @@
     "@hey-api/openapi-ts": "^0.99.0",
     "@octokit/types": "^18.0.0",
     "@sinclair/typebox": "0.34.52",
+    "@sourcegraph/scip-typescript": "^0.4.0",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.20.1",
     "@types/yauzl": "^3.4.0",
