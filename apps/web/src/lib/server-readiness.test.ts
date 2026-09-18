@@ -79,7 +79,9 @@ describe('desktop server readiness bridge', () => {
     } as unknown as typeof window.cradle
 
     await expect(waitForDesktopServer()).resolves.toBe('http://127.0.0.1:21423')
-    expect(onStatusChanged).not.toHaveBeenCalled()
+    // The subscription is kept for the document lifetime so a post-ready
+    // respawn status can re-arm the owned-ipc generation.
+    expect(onStatusChanged).toHaveBeenCalledTimes(1)
   })
 
   it('applies owned-ipc generation and keeps the HTTP URL for request construction', async () => {
