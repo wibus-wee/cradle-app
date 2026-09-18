@@ -2,18 +2,18 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
 import type {
-  Agent,
+  AgentConnection,
   AuthenticateRequest,
   InitializeRequest,
   InitializeResponse,
   NewSessionRequest,
+  NewSessionResponse,
   PromptRequest,
   PromptResponse,
   StopReason,
 } from '@agentclientprotocol/sdk'
 import {
   agent,
-  AgentSideConnection,
   methods,
   ndJsonStream,
   PROTOCOL_VERSION,
@@ -31,10 +31,13 @@ import type { AcpConnectionRecord, AcpLocalConnectionRecord } from './config'
 import { AcpConnectionManager, listRegisteredAcpMcpServers } from './connection-manager'
 import type { AcpProcessHost, AcpProcessSpawnOptions, ProcessEntry } from './process-manager'
 
+type PeerNewSessionResponse = NewSessionResponse & { models?: unknown }
+
 interface PeerBehavior {
   initialize?: (request: InitializeRequest, spawn: AcpProcessSpawnOptions) => InitializeResponse | Promise<InitializeResponse>
   authenticate?: (request: AuthenticateRequest, spawn: AcpProcessSpawnOptions) => void | Promise<void>
-  newSession?: (request: NewSessionRequest) => { sessionId: string } | Promise<{ sessionId: string }>
+  newSession?: (request: NewSessionRequest) => PeerNewSessionResponse | Promise<PeerNewSessionResponse>
+  setModel?: (params: { sessionId: string, modelId: string }) => void | Promise<void>
   prompt?: (request: PromptRequest) => PromptResponse | Promise<PromptResponse>
   cancel?: (sessionId: string) => void | Promise<void>
 }
@@ -42,7 +45,7 @@ interface PeerBehavior {
 class MemoryAcpProcessHost implements AcpProcessHost {
   readonly spawns: AcpProcessSpawnOptions[] = []
   readonly stops: string[] = []
-  readonly peers: AgentSideConnection[] = []
+  readonly peers: AgentConnection[] = []
 
   constructor(private readonly behavior: PeerBehavior) {}
 
@@ -52,20 +55,29 @@ class MemoryAcpProcessHost implements AcpProcessHost {
     const agentToClient = new TransformStream<Uint8Array, Uint8Array>()
     const behavior = this.behavior
 
-    this.peers.push(new AgentSideConnection(() => ({
-      initialize: request => behavior.initialize?.(request, options) ?? {
+    const app = agent({ name: 'memory-agent' })
+      .onRequest(methods.agent.initialize, ({ params }) => behavior.initialize?.(params, options) ?? {
         protocolVersion: PROTOCOL_VERSION,
         agentCapabilities: { loadSession: true, sessionCapabilities: { resume: {} } },
         authMethods: [],
-      },
-      authenticate: request => behavior.authenticate?.(request, options),
-      newSession: request => behavior.newSession?.(request) ?? { sessionId: 'session-1' },
-      loadSession: async () => ({}),
-      resumeSession: async () => ({}),
-      setSessionConfigOption: async () => ({ configOptions: [] }),
-      prompt: request => behavior.prompt?.(request) ?? { stopReason: 'end_turn' },
-      cancel: async ({ sessionId }) => behavior.cancel?.(sessionId),
-    } as Agent), ndJsonStream(agentToClient.writable, clientToAgent.readable)))
+      })
+      .onRequest(methods.agent.authenticate, ({ params }) => behavior.authenticate?.(params, options))
+      .onRequest(methods.agent.session.new, ({ params }) => behavior.newSession?.(params) ?? { sessionId: 'session-1' })
+      .onRequest(methods.agent.session.load, async () => ({}))
+      .onRequest(methods.agent.session.resume, async () => ({}))
+      .onRequest(methods.agent.session.setConfigOption, async () => ({ configOptions: [] }))
+      .onRequest(methods.agent.session.prompt, ({ params }) => behavior.prompt?.(params) ?? { stopReason: 'end_turn' })
+      .onNotification(methods.agent.session.cancel, async ({ params }) => { await behavior.cancel?.(params.sessionId) })
+
+    if (behavior.setModel) {
+      app.onRequest(
+        'session/set_model',
+        params => params as { sessionId: string, modelId: string },
+        async ({ params }) => { await behavior.setModel?.(params) },
+      )
+    }
+
+    this.peers.push(app.connect(ndJsonStream(agentToClient.writable, clientToAgent.readable)))
 
     return {
       agentId: options.agentId,
@@ -220,6 +232,38 @@ describe('acpConnectionManager', () => {
     await expect(runtime.connect('agent', connectionRecord())).rejects.toThrow('protocol version mismatch')
     expect(runtime.isConnected('agent')).toBe(false)
     expect(host.stops).toContain('agent')
+  })
+
+  it('reads the legacy models field and routes model switches through session/set_model', async () => {
+    const setModelCalls: Array<{ sessionId: string, modelId: string }> = []
+    const host = new MemoryAcpProcessHost({
+      setModel: (params) => {
+        setModelCalls.push(params)
+      },
+      newSession: async () => ({
+        sessionId: 'session-1',
+        models: {
+          availableModels: [
+            { modelId: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+            { modelId: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+          ],
+          currentModelId: 'gemini-2.5-pro',
+        },
+      }),
+    })
+    const runtime = new AcpConnectionManager(host)
+    await runtime.connect('agent', connectionRecord())
+
+    const session = await runtime.newSession('agent', '/workspace')
+    expect(session.models?.currentModelId).toBe('gemini-2.5-pro')
+    expect(session.models?.availableModels.map(model => model.modelId)).toEqual([
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+    ])
+
+    await runtime.setSessionModel('agent', 'session-1', 'gemini-2.5-flash')
+    expect(setModelCalls).toEqual([{ sessionId: 'session-1', modelId: 'gemini-2.5-flash' }])
+    expect(runtime.getSessionState('agent', 'session-1')?.models?.currentModelId).toBe('gemini-2.5-flash')
   })
 
   it('maps exact auth-required responses without matching error text', async () => {

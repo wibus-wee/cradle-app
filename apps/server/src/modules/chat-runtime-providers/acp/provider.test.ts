@@ -6,6 +6,25 @@ import { ProviderErrors, ProviderRuntimeError } from '../../chat-runtime/runtime
 import type { AcpConnectionManager } from './connection-manager'
 import { AcpChatProvider } from './provider'
 
+vi.mock('../../acp/service', () => ({
+  getInstalled: () => ({
+    id: 'gemini',
+    status: 'installed',
+    connectionType: 'stdio',
+    endpointUrl: null,
+    remoteHeadersSecretRefsJson: '{}',
+    distributionType: 'command',
+    installPath: null,
+    cmd: '/fake/gemini',
+    args: '[]',
+    env: '{}',
+    overrideCmd: null,
+    overrideArgs: null,
+    overrideEnv: null,
+  }),
+  readAgentAuthConfig: () => ({ methodId: null }),
+}))
+
 const profile: RuntimeProviderTargetProfile = {
   id: 'acp-profile',
   name: 'ACP profile',
@@ -43,6 +62,42 @@ function createRuntime(resumeError: Error) {
     setSessionModel: vi.fn(),
   }
 }
+
+describe('acpChatProvider draft session models', () => {
+  it('projects the legacy models field for pre-configOptions agents', async () => {
+    const runtime = {
+      isConnected: () => false,
+      connect: vi.fn(async () => ({})),
+      disconnect: vi.fn(),
+      newSession: vi.fn(async () => ({
+        sessionId: 'native-1',
+        title: null,
+        modes: null,
+        models: {
+          availableModels: [
+            { modelId: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+            { modelId: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+          ],
+          currentModelId: 'gemini-2.5-pro',
+        },
+        configOptions: [],
+        availableCommands: [],
+        plans: [],
+        contextUsage: null,
+      })),
+      disposeNativeSession: vi.fn(),
+    }
+    const provider = new AcpChatProvider({ runtime: runtime as unknown as AcpConnectionManager })
+
+    const draft = await provider.openDraftSession({ agentId: 'gemini', workspacePath: '/workspace' })
+
+    expect(draft.models).toEqual([
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    ])
+    expect(draft.selectedModelId).toBe('gemini-2.5-pro')
+  })
+})
 
 describe('acpChatProvider resume fallback', () => {
   it('falls back from resume to load only for an exact method-not-found code', async () => {

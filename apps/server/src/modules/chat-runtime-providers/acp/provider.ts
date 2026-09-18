@@ -31,6 +31,7 @@ import {
 import type { TokenUsage } from '../../chat-runtime-engine/ai-sdk-engine'
 import { readDurableProviderRuntimeBinding } from '../../provider-runtime/service'
 import { readAcpDraftSessionId, resolveAcpConnectionRecord } from './config'
+import type { AcpSessionModelState } from './connection-manager'
 import { AcpConnectionManager } from './connection-manager'
 import { projectAcpPrompt } from './input-projector'
 import {
@@ -123,14 +124,21 @@ export class AcpChatProvider implements ChatRuntime {
     const response = await this.deps.runtime.newSession(connectionKey, input.workspacePath)
     this.scheduleDraftSessionExpiry(response.sessionId)
     const modelOption = response.configOptions.find(isAcpModelConfigOption)
-    if (!modelOption) {
-      return { sessionId: response.sessionId, models: [], selectedModelId: null }
+    if (modelOption) {
+      return {
+        sessionId: response.sessionId,
+        models: flattenModelOptions(modelOption.options),
+        selectedModelId: modelOption.currentValue,
+      }
     }
-    return {
-      sessionId: response.sessionId,
-      models: flattenModelOptions(modelOption.options),
-      selectedModelId: modelOption.currentValue,
+    if (response.models) {
+      return {
+        sessionId: response.sessionId,
+        models: response.models.availableModels.map(model => ({ id: model.modelId, label: model.name })),
+        selectedModelId: response.models.currentModelId,
+      }
     }
+    return { sessionId: response.sessionId, models: [], selectedModelId: null }
   }
 
   async startChatSession(input: StartChatSessionInput): Promise<RuntimeSession> {
@@ -152,6 +160,7 @@ export class AcpChatProvider implements ChatRuntime {
       providerSessionId: response.sessionId,
       providerStateSnapshot: JSON.stringify({
         modes: response.modes ?? null,
+        models: projectAcpSnapshotModels(response),
         configOptions: response.configOptions,
       }),
     }
@@ -184,6 +193,7 @@ export class AcpChatProvider implements ChatRuntime {
           ...input.runtimeSession,
           providerStateSnapshot: JSON.stringify({
             modes: response.modes ?? null,
+            models: projectAcpSnapshotModels(response),
             configOptions: response.configOptions,
           }),
         }
@@ -208,6 +218,7 @@ export class AcpChatProvider implements ChatRuntime {
           ...input.runtimeSession,
           providerStateSnapshot: JSON.stringify({
             modes: response.modes ?? null,
+            models: projectAcpSnapshotModels(response),
             configOptions: response.configOptions,
           }),
         }
@@ -260,7 +271,11 @@ export class AcpChatProvider implements ChatRuntime {
       providerTargetId: profile.providerTargetId,
       runtimeKind: this.runtimeKind,
       providerSessionId: response.sessionId,
-      providerStateSnapshot: JSON.stringify(response),
+      providerStateSnapshot: JSON.stringify({
+        modes: response.modes ?? null,
+        models: projectAcpSnapshotModels(response),
+        configOptions: response.configOptions,
+      }),
     }
   }
 
@@ -277,7 +292,7 @@ export class AcpChatProvider implements ChatRuntime {
     const resolved = await this.resolveConnectedSession(input)
     return {
       ...this.capabilities,
-      sessionModelSwitch: resolved.state.configOptions.some(isAcpModelConfigOption)
+      sessionModelSwitch: resolved.state.configOptions.some(isAcpModelConfigOption) || resolved.state.models
         ? 'in-session' as const
         : 'unsupported' as const,
     }
@@ -471,6 +486,7 @@ export class AcpChatProvider implements ChatRuntime {
   ): Promise<{
     sessionId: string
     modes: SessionModeState | null
+    models: AcpSessionModelState | null
     configOptions: SessionConfigOption[]
   }> {
     const state = this.deps.runtime.getSessionState(connectionKey, sessionId)
@@ -479,11 +495,11 @@ export class AcpChatProvider implements ChatRuntime {
     }
     if (this.deps.runtime.supportsResumeSession(connectionKey)) {
       const response = await this.deps.runtime.resumeSession(connectionKey, sessionId, workspacePath, chatSessionId)
-      return { sessionId, modes: response.modes, configOptions: response.configOptions }
+      return { sessionId, modes: response.modes, models: response.models, configOptions: response.configOptions }
     }
     if (this.deps.runtime.supportsLoadSession(connectionKey)) {
       const response = await this.deps.runtime.loadSession(connectionKey, sessionId, workspacePath, chatSessionId)
-      return { sessionId, modes: response.modes, configOptions: response.configOptions }
+      return { sessionId, modes: response.modes, models: response.models, configOptions: response.configOptions }
     }
     return await this.deps.runtime.newSession(connectionKey, workspacePath, chatSessionId)
   }
@@ -515,6 +531,14 @@ function flattenModelOptions(options: Array<{ value: string, name: string } | { 
   return options.flatMap(option => 'options' in option
     ? option.options.map(item => ({ id: item.value, label: item.name }))
     : [{ id: option.value, label: option.name }])
+}
+
+function projectAcpSnapshotModels(state: { models: AcpSessionModelState | null, configOptions: SessionConfigOption[] }): { currentModelId: string | null } {
+  return {
+    currentModelId: state.configOptions.find(isAcpModelConfigOption)?.currentValue
+      ?? state.models?.currentModelId
+      ?? null,
+  }
 }
 
 function isAcpModelConfigOption(option: SessionConfigOption): option is Extract<SessionConfigOption, { type: 'select' }> {

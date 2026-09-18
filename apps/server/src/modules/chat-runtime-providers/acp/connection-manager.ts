@@ -77,10 +77,23 @@ export interface AcpConnectionManagerOptions {
 export interface AcpSessionState {
   title: string | null
   modes: SessionModeState | null
+  models: AcpSessionModelState | null
   configOptions: SessionConfigOption[]
   availableCommands: AvailableCommand[]
   plans: AcpPlanState[]
   contextUsage: { used: number, size: number, cost?: { amount: number, currency: string } | null } | null
+}
+
+/**
+ * Legacy `models` session field (UNSTABLE in protocol v1, dropped from the
+ * current schema). Agents that predate `configOptions` — e.g. Gemini CLI —
+ * still return it from session lifecycle responses and honor
+ * `session/set_model`. The field is absent from SDK types but reaches the
+ * client verbatim on the wire, so we normalize it ourselves.
+ */
+export interface AcpSessionModelState {
+  availableModels: Array<{ modelId: string, name: string, description?: string | null }>
+  currentModelId: string
 }
 
 export interface AcpPlanState {
@@ -380,22 +393,39 @@ export class AcpConnectionManager {
       throw new Error(`ACP session ${sessionId} does not have cached session configuration`)
     }
     const modelOption = state.configOptions.find(isModelConfigOption)
-    if (!modelOption || !hasConfigValue(modelOption, modelId)) {
-      throw new Error(`ACP session ${sessionId} does not expose model ${modelId} as a session config option`)
+    if (modelOption) {
+      if (!hasConfigValue(modelOption, modelId)) {
+        throw new Error(`ACP session ${sessionId} does not expose model ${modelId} as a session config option`)
+      }
+      const response = await this.requestWithDeadline({
+        conn,
+        operation: methods.agent.session.setConfigOption,
+        sessionId,
+        timeoutMs: this.requestTimeouts.metadataMs,
+        request: signal => this.requestSessionConfigOption(conn.agent, {
+          sessionId,
+          configId: modelOption.id,
+          value: modelId,
+        }, signal),
+      })
+      state.configOptions = response.configOptions
+      return
     }
 
-    const response = await this.requestWithDeadline({
+    if (!state.models?.availableModels.some(model => model.modelId === modelId)) {
+      throw new Error(`ACP session ${sessionId} does not expose model ${modelId}`)
+    }
+    // Legacy agents expose models through the pre-configOptions `models` field
+    // and honor `session/set_model`; the method no longer exists in SDK 1.4
+    // typings, so it goes through the generic request path verbatim.
+    await this.requestWithDeadline({
       conn,
-      operation: methods.agent.session.setConfigOption,
+      operation: 'session/set_model',
       sessionId,
       timeoutMs: this.requestTimeouts.metadataMs,
-      request: signal => this.requestSessionConfigOption(conn.agent, {
-        sessionId,
-        configId: modelOption.id,
-        value: modelId,
-      }, signal),
+      request: signal => conn.agent.request('session/set_model', { sessionId, modelId }, { cancellationSignal: signal }),
     })
-    state.configOptions = response.configOptions
+    state.models.currentModelId = modelId
   }
 
   async setSessionConfigOption(agentId: string, sessionId: string, configId: string, value: string | boolean): Promise<void> {
@@ -1316,15 +1346,29 @@ function readUsage(response: PromptResponse | null): {
   return response?.usage ?? null
 }
 
-function readAcpSessionState(response: { modes?: SessionModeState | null, configOptions?: SessionConfigOption[] | null }): AcpSessionState {
+interface AcpSessionResponseFields {
+  modes?: SessionModeState | null
+  models?: AcpSessionModelState | null
+  configOptions?: SessionConfigOption[] | null
+}
+
+function readAcpSessionState(response: AcpSessionResponseFields): AcpSessionState {
   return {
     title: null,
     modes: response.modes ?? null,
+    models: readAcpSessionModelState(response.models),
     configOptions: response.configOptions ?? [],
     availableCommands: [],
     plans: [],
     contextUsage: null,
   }
+}
+
+function readAcpSessionModelState(models: AcpSessionModelState | null | undefined): AcpSessionModelState | null {
+  if (!models || !Array.isArray(models.availableModels) || typeof models.currentModelId !== 'string') {
+    return null
+  }
+  return models
 }
 
 type AcpSelectConfigOption = Extract<SessionConfigOption, { type: 'select' }>
