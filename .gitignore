@@ -27,6 +27,7 @@ apps/desktop/resources/relayd/**/relayd
 apps/desktop/resources/relayd/**/relayd.exe
 apps/desktop/resources/relayd/**/relayd-runtime.json
 .cradle/
+.cce/
 .expo/
 .claude/worktrees/
 apps/server/openapi.json
