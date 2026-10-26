@@ -219,4 +219,51 @@ describe('useChatSessionDriver', () => {
       mocks.store.setMessages.mock.invocationCallOrder[0] ?? Number.MAX_SAFE_INTEGER,
     )
   })
+
+  it('releases every settled passive lease when queued runs finish before snapshot refresh', () => {
+    const driver = renderHook(() => useChatSessionDriver('new-session'))
+
+    act(() => {
+      mocks.snapshotQuery = {
+        data: { pages: [{ revision: 1, rows: [], nextCursor: null }] },
+        dataUpdatedAt: 10,
+        isError: false,
+        isFetching: false,
+      }
+      driver.rerender()
+    })
+
+    const factory = mocks.engineInstances[0]?.passiveStreamFactory
+    expect(factory).not.toBeNull()
+    factory?.({
+      sessionId: 'new-session',
+      runId: 'run-1',
+      messageId: 'assistant-1',
+      onSettled: vi.fn(),
+    })
+    factory?.({
+      sessionId: 'new-session',
+      runId: 'run-2',
+      messageId: 'assistant-2',
+      onSettled: vi.fn(),
+    })
+    const passiveStreamInputs = vi.mocked(openPassiveSessionStream).mock.calls.map(([input]) => input)
+    expect(passiveStreamInputs).toHaveLength(2)
+
+    act(() => {
+      mocks.store.streamLeaseMap.set('assistant-1', { sessionId: 'new-session' })
+      mocks.store.streamLeaseMap.set('assistant-2', { sessionId: 'new-session' })
+      passiveStreamInputs[0]?.releaseStreamLeaseAfterSnapshot('assistant-1')
+      passiveStreamInputs[1]?.releaseStreamLeaseAfterSnapshot('assistant-2')
+      mocks.runtimeStatusQuery = {
+        data: { status: 'idle', activeRun: null },
+        dataUpdatedAt: 10,
+        isFetchedAfterMount: true,
+      }
+      driver.rerender()
+    })
+
+    expect(mocks.store.releaseStreamLease).toHaveBeenCalledWith('assistant-1')
+    expect(mocks.store.releaseStreamLease).toHaveBeenCalledWith('assistant-2')
+  })
 })
