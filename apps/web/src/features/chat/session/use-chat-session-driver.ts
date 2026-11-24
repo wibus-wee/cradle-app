@@ -96,10 +96,7 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
     && !runtimeStatus.activeRun,
   )
   const syncEngineRef = useRef<SessionSyncEngine | null>(null)
-  const pendingPassiveStreamLeaseReleaseRef = useRef<{
-    messageId: string
-    requestedDataUpdatedAt: number
-  } | null>(null)
+  const pendingPassiveStreamLeaseReleasesRef = useRef(new Map<string, number>())
   const runtimeStatusFreshForSubscription = runtimeStatusQuery.isFetchedAfterMount
     && runtimeStatusQuery.dataUpdatedAt >= mountedAtMs
 
@@ -140,10 +137,10 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
         scheduleSnapshotRefresh: delay => controlsRef.current.scheduleSnapshotRefresh(delay),
         refreshQueue: delay => controlsRef.current.refreshQueue(delay),
         releaseStreamLeaseAfterSnapshot: (messageId) => {
-          pendingPassiveStreamLeaseReleaseRef.current = {
+          pendingPassiveStreamLeaseReleasesRef.current.set(
             messageId,
-            requestedDataUpdatedAt: snapshotDataUpdatedAtRef.current,
-          }
+            snapshotDataUpdatedAtRef.current,
+          )
           controlsRef.current.scheduleSnapshotRefresh(0)
         },
       }),
@@ -274,21 +271,17 @@ export function useChatSessionDriver(chatSessionId: string | null, active = true
       return
     }
 
-    const pendingPassiveStreamLeaseRelease = pendingPassiveStreamLeaseReleaseRef.current
     let releasedPassiveStreamLease = false
-    if (
-      pendingPassiveStreamLeaseRelease
-      && !snapshotRowsQuery.isFetching
-      && (
-        snapshotRowsQuery.dataUpdatedAt > pendingPassiveStreamLeaseRelease.requestedDataUpdatedAt
-        || runtimeIdle
-      )
-    ) {
-      pendingPassiveStreamLeaseReleaseRef.current = null
+    if (!snapshotRowsQuery.isFetching) {
       const state = useChatStore.getState()
-      if (state.streamLeaseMap.get(pendingPassiveStreamLeaseRelease.messageId)?.sessionId === chatSessionId) {
-        state.releaseStreamLease(pendingPassiveStreamLeaseRelease.messageId)
-        releasedPassiveStreamLease = true
+      for (const [messageId, requestedDataUpdatedAt] of pendingPassiveStreamLeaseReleasesRef.current) {
+        if (snapshotRowsQuery.dataUpdatedAt > requestedDataUpdatedAt || runtimeIdle) {
+          pendingPassiveStreamLeaseReleasesRef.current.delete(messageId)
+          if (state.streamLeaseMap.get(messageId)?.sessionId === chatSessionId) {
+            state.releaseStreamLease(messageId)
+            releasedPassiveStreamLease = true
+          }
+        }
       }
     }
 
