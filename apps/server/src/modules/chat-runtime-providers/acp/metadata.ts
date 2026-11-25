@@ -6,7 +6,19 @@ import type { RuntimeKind } from '../../provider-contracts/types'
 
 export const ACP_RUNTIME_KIND = 'acp-chat' as const satisfies RuntimeKind
 
+export const ACP_RUNTIME_CAPABILITIES = {
+  steer: 'queue-fallback',
+  supportsShellExecution: false,
+  supportsLastTurnRollback: false,
+  supportsRuntimeSettings: false,
+  supportsUiSlotStates: true,
+  supportsDynamicCapabilities: true,
+  supportsTitleGeneration: true,
+  sessionModelSwitch: 'in-session',
+} satisfies ChatRuntimeCapabilities
+
 export const ACP_RUNTIME_METADATA = {
+  capabilities: ACP_RUNTIME_CAPABILITIES,
   label: 'ACP Chat',
   description: 'Agent Client Protocol runtime',
   providerKinds: [],
@@ -41,14 +53,3 @@ export const ACP_RUNTIME_METADATA = {
     },
   ],
 } satisfies ChatRuntimeMetadata
-
-export const ACP_RUNTIME_CAPABILITIES = {
-  steer: 'queue-fallback',
-  supportsShellExecution: false,
-  supportsLastTurnRollback: false,
-  supportsRuntimeSettings: false,
-  supportsUiSlotStates: true,
-  supportsDynamicCapabilities: true,
-  supportsTitleGeneration: true,
-  sessionModelSwitch: 'in-session',
-} satisfies ChatRuntimeCapabilities

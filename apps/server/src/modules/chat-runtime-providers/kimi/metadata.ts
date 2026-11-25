@@ -4,16 +4,6 @@ import type { RuntimeKind } from '../../provider-contracts/types'
 
 export const KIMI_RUNTIME_KIND: RuntimeKind = 'kimi'
 
-export const KIMI_RUNTIME_METADATA = {
-  label: 'Kimi',
-  description: 'Kimi Code Web runtime',
-  providerKinds: ['openai-compatible', 'anthropic', 'universal'],
-  iconKey: 'kimi',
-  surfaces: ['chat', 'jarvis'],
-  sortOrder: 30,
-  settingsSchema: readRuntimeSettingsSchema('kimi') ?? undefined,
-} satisfies ChatRuntimeMetadata
-
 export const KIMI_RUNTIME_CAPABILITIES = {
   // Synara-aligned: non-Codex steers interrupt + durable front-of-queue follow-up.
   steer: 'queue-fallback',
@@ -25,3 +15,14 @@ export const KIMI_RUNTIME_CAPABILITIES = {
   supportsTitleGeneration: false,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities
+
+export const KIMI_RUNTIME_METADATA = {
+  capabilities: KIMI_RUNTIME_CAPABILITIES,
+  label: 'Kimi',
+  description: 'Kimi Code Web runtime',
+  providerKinds: ['openai-compatible', 'anthropic', 'universal'],
+  iconKey: 'kimi',
+  surfaces: ['chat', 'jarvis'],
+  sortOrder: 30,
+  settingsSchema: readRuntimeSettingsSchema('kimi') ?? undefined,
+} satisfies ChatRuntimeMetadata

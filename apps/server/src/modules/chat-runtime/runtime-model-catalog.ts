@@ -9,7 +9,7 @@ export async function listRuntimeModels(input: {
   workspaceId?: string
   providerTargetId?: string
 }): Promise<RuntimeModelCatalog> {
-  const runtime = getRuntimeRegistry().get(input.runtimeKind)
+  const runtime = await getRuntimeRegistry().require(input.runtimeKind)
   if (!runtime) {
     throw new AppError({
       code: 'chat_runtime_not_available',

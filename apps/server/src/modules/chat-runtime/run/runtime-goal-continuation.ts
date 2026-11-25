@@ -39,7 +39,7 @@ export interface RuntimeGoalContinuationSchedulerDeps {
   pendingQueueItemCount: (sessionId: string) => number
   scheduleQueueDrain: (sessionId: string) => void
   readRuntimeBinding: (sessionId: string) => BackendSessionBinding | undefined
-  readRuntime: (runtimeKind: string) => ChatRuntime | undefined
+  readRuntime: (runtimeKind: string) => ChatRuntime | undefined | Promise<ChatRuntime | undefined>
   isProviderTargetAvailable: (providerTargetId: string | null | undefined) => boolean
   createContinuationRun: (input: {
     sessionId: string
@@ -161,7 +161,7 @@ async function startScheduledRuntimeGoalContinuation(
     return
   }
   const binding = deps.readRuntimeBinding(input.sessionId)
-  const runtime = binding ? deps.readRuntime(binding.runtimeKind) : undefined
+  const runtime = binding ? await deps.readRuntime(binding.runtimeKind) : undefined
   if (!hasContinuableRuntimeGoal({
     runtime,
     binding,
@@ -214,7 +214,7 @@ async function startScheduledRuntimeGoalContinuation(
       sessionId: input.sessionId,
     })
     const latestBinding = deps.readRuntimeBinding(input.sessionId)
-    const latestRuntime = latestBinding ? deps.readRuntime(latestBinding.runtimeKind) : undefined
+    const latestRuntime = latestBinding ? await deps.readRuntime(latestBinding.runtimeKind) : undefined
     if (
       !deps.hasActiveOrPendingRun(input.sessionId)
       && hasContinuableRuntimeGoal({

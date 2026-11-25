@@ -1272,9 +1272,16 @@ export interface ChatRuntimeMetadata {
   composer?: RuntimeComposerDescriptor
   slots?: RuntimeUiSlot[]
   settingsSchema?: RuntimeSettingsSchemaLike
+  /**
+   * Static capability advertisement for catalog listing before the runtime
+   * implementation has loaded. Runtime instances remain the source of truth
+   * once materialized; metadata capabilities must mirror the implementation's
+   * static `capabilities` exactly. Required for lazy-registered runtimes.
+   */
+  capabilities?: ChatRuntimeCapabilities
 }
 
-export interface ChatRuntimeCatalogItem extends ChatRuntimeMetadata {
+export interface ChatRuntimeCatalogItem extends Omit<ChatRuntimeMetadata, 'capabilities'> {
   runtimeKind: RuntimeKind
   source: 'builtin' | 'plugin'
   pluginOwner: string | null

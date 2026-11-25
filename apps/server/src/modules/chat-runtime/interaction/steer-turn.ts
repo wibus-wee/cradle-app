@@ -101,7 +101,7 @@ export async function submitSessionSteerTurn(
   assertRuntimeCompatibleTarget(context, input.providerTargetId)
 
   const runtimeKind = context.session.runtimeKind ?? 'standard'
-  const runtime = getRuntimeRegistry().get(runtimeKind)
+  const runtime = await getRuntimeRegistry().require(runtimeKind)
   if (!runtime || runtime.capabilities.steer === 'unsupported') {
     throw new AppError({
       code: 'chat_steer_not_supported',

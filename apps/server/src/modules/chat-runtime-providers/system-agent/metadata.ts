@@ -7,7 +7,19 @@ import type { RuntimeKind } from '../../provider-contracts/types'
 
 export const SYSTEM_AGENT_RUNTIME_KIND: RuntimeKind = 'jar-core'
 
+export const SYSTEM_AGENT_RUNTIME_CAPABILITIES = {
+  steer: 'queue-fallback',
+  supportsShellExecution: false,
+  supportsLastTurnRollback: false,
+  supportsRuntimeSettings: false,
+  supportsUiSlotStates: false,
+  supportsDynamicCapabilities: false,
+  supportsTitleGeneration: false,
+  sessionModelSwitch: 'in-session',
+} satisfies ChatRuntimeCapabilities
+
 export const SYSTEM_AGENT_RUNTIME_METADATA = {
+  capabilities: SYSTEM_AGENT_RUNTIME_CAPABILITIES,
   label: 'HiJarvis',
   description: 'Multi-surface AI agent with local memory',
   providerKinds: ['openai-compatible', 'anthropic', 'universal'],
@@ -21,14 +33,3 @@ export const SYSTEM_AGENT_RUNTIME_ACTOR = {
   id: 'jarvis',
   issueLabel: 'AI',
 } satisfies RuntimeDefaultActorDescriptor
-
-export const SYSTEM_AGENT_RUNTIME_CAPABILITIES = {
-  steer: 'queue-fallback',
-  supportsShellExecution: false,
-  supportsLastTurnRollback: false,
-  supportsRuntimeSettings: false,
-  supportsUiSlotStates: false,
-  supportsDynamicCapabilities: false,
-  supportsTitleGeneration: false,
-  sessionModelSwitch: 'in-session',
-} satisfies ChatRuntimeCapabilities

@@ -13,7 +13,21 @@ import type { RuntimeKind } from '../../provider-contracts/types'
 
 export const CLAUDE_AGENT_RUNTIME_KIND: RuntimeKind = 'claude-agent'
 
+export const CLAUDE_AGENT_RUNTIME_CAPABILITIES = {
+  // Synara-aligned: non-Codex steers interrupt the live turn and drain a durable front-of-queue
+  // follow-up (continuation.mode = steer). No mid-turn SDK input push for product steer.
+  steer: 'queue-fallback',
+  supportsShellExecution: false,
+  supportsLastTurnRollback: false,
+  supportsRuntimeSettings: true,
+  supportsUiSlotStates: true,
+  supportsDynamicCapabilities: false,
+  supportsTitleGeneration: true,
+  sessionModelSwitch: 'in-session',
+} satisfies ChatRuntimeCapabilities
+
 export const CLAUDE_AGENT_RUNTIME_METADATA = {
+  capabilities: CLAUDE_AGENT_RUNTIME_CAPABILITIES,
   label: 'Claude Agent',
   description: 'Claude Agent SDK runtime',
   providerKinds: ['anthropic', 'universal'],
@@ -29,19 +43,6 @@ export const CLAUDE_AGENT_RUNTIME_METADATA = {
     },
   },
 } satisfies ChatRuntimeMetadata
-
-export const CLAUDE_AGENT_RUNTIME_CAPABILITIES = {
-  // Synara-aligned: non-Codex steers interrupt the live turn and drain a durable front-of-queue
-  // follow-up (continuation.mode = steer). No mid-turn SDK input push for product steer.
-  steer: 'queue-fallback',
-  supportsShellExecution: false,
-  supportsLastTurnRollback: false,
-  supportsRuntimeSettings: true,
-  supportsUiSlotStates: true,
-  supportsDynamicCapabilities: false,
-  supportsTitleGeneration: true,
-  sessionModelSwitch: 'in-session',
-} satisfies ChatRuntimeCapabilities
 
 const CLAUDE_AGENT_COMPACT_SLOT: RuntimeUiSlot = {
   id: 'claude-agent:compact',

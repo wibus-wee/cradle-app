@@ -51,7 +51,7 @@ export interface ActiveParentRuntimeSession {
 export interface CreateSideChatDeps {
   getParentSession: (parentSessionId: string) => Session
   getParentContext: (parentSessionId: string, providerTargetId?: string) => SideChatRunContext
-  getRuntime: (runtimeKind: RuntimeKind) => ChatRuntime | undefined
+  getRuntime: (runtimeKind: RuntimeKind) => ChatRuntime | undefined | Promise<ChatRuntime | undefined>
   getActiveParentRuntimeSession: (parentSessionId: string) => ActiveParentRuntimeSession | undefined
   readReusableBinding: (input: {
     parentSessionId: string
@@ -81,7 +81,7 @@ export async function createSideChat(
   }
 
   const runtimeKind = context.session.runtimeKind ?? 'standard'
-  const runtime = deps.getRuntime(runtimeKind)
+  const runtime = await deps.getRuntime(runtimeKind)
   if (!runtime) {
     throw new AppError({
       code: 'chat_runtime_not_available',

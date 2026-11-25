@@ -7,16 +7,6 @@ import type { RuntimeKind } from '../../provider-contracts/types'
 
 export const CODEX_RUNTIME_KIND: RuntimeKind = 'codex'
 
-export const CODEX_RUNTIME_METADATA = {
-  label: 'Codex',
-  description: 'Codex app-server runtime',
-  providerKinds: ['openai-compatible', 'universal'],
-  iconKey: 'codex',
-  surfaces: ['chat', 'jarvis'],
-  sortOrder: 20,
-  settingsSchema: readRuntimeSettingsSchema('codex') ?? undefined,
-} satisfies ChatRuntimeMetadata
-
 export const CODEX_RUNTIME_CAPABILITIES = {
   steer: 'native',
   supportsShellExecution: true,
@@ -28,3 +18,14 @@ export const CODEX_RUNTIME_CAPABILITIES = {
   supportsNativeReview: true,
   sessionModelSwitch: 'in-session',
 } satisfies ChatRuntimeCapabilities
+
+export const CODEX_RUNTIME_METADATA = {
+  capabilities: CODEX_RUNTIME_CAPABILITIES,
+  label: 'Codex',
+  description: 'Codex app-server runtime',
+  providerKinds: ['openai-compatible', 'universal'],
+  iconKey: 'codex',
+  surfaces: ['chat', 'jarvis'],
+  sortOrder: 20,
+  settingsSchema: readRuntimeSettingsSchema('codex') ?? undefined,
+} satisfies ChatRuntimeMetadata
