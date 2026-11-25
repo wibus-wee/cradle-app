@@ -3,13 +3,13 @@ import path from 'node:path'
 
 import { createChildLogger } from '../../logging/logger'
 import { getPluginSkillProjectionSources, getPluginSkillRegistryVersion } from '../../plugins/skill-registry'
-import { ACP_RUNTIME_METADATA } from '../chat-runtime-providers/acp/metadata'
-import { CLAUDE_AGENT_RUNTIME_METADATA } from '../chat-runtime-providers/claude-agent/metadata'
-import { CODEX_RUNTIME_METADATA } from '../chat-runtime-providers/codex/metadata'
-import { KIMI_RUNTIME_METADATA } from '../chat-runtime-providers/kimi/metadata'
-import { STANDARD_RUNTIME_METADATA } from '../chat-runtime-providers/openai-compatible/metadata'
-import { OPENCODE_RUNTIME_METADATA } from '../chat-runtime-providers/opencode/metadata'
-import { SYSTEM_AGENT_RUNTIME_METADATA } from '../chat-runtime-providers/system-agent/metadata'
+import { ACP_RUNTIME_KIND, ACP_RUNTIME_METADATA } from '../chat-runtime-providers/acp/metadata'
+import { CLAUDE_AGENT_RUNTIME_KIND, CLAUDE_AGENT_RUNTIME_METADATA } from '../chat-runtime-providers/claude-agent/metadata'
+import { CODEX_RUNTIME_KIND, CODEX_RUNTIME_METADATA } from '../chat-runtime-providers/codex/metadata'
+import { KIMI_RUNTIME_KIND, KIMI_RUNTIME_METADATA } from '../chat-runtime-providers/kimi/metadata'
+import { STANDARD_RUNTIME_KIND, STANDARD_RUNTIME_METADATA } from '../chat-runtime-providers/openai-compatible/metadata'
+import { OPENCODE_RUNTIME_KIND, OPENCODE_RUNTIME_METADATA } from '../chat-runtime-providers/opencode/metadata'
+import { SYSTEM_AGENT_RUNTIME_KIND, SYSTEM_AGENT_RUNTIME_METADATA } from '../chat-runtime-providers/system-agent/metadata'
 import * as ModelRegistry from '../model-registry/service'
 import { record as recordObservability } from '../observability/service'
 import * as Preferences from '../preferences/service'
@@ -700,13 +700,13 @@ export function getRuntimeRegistry(): RuntimeRegistry {
     // the implementation module cost — it is the dominant share of server
     // boot memory. Metadata constants live in provider-owned `metadata.ts`
     // modules that stay free of implementation imports.
-    registry.registerLazy('acp', ACP_RUNTIME_METADATA, () => loadAcpProvider(ctx))
-    registry.registerLazy('standard', STANDARD_RUNTIME_METADATA, () => loadStandardProvider(ctx))
-    registry.registerLazy('opencode', OPENCODE_RUNTIME_METADATA, () => loadOpencodeProvider(ctx))
-    registry.registerLazy('claude-agent', CLAUDE_AGENT_RUNTIME_METADATA, () => loadClaudeAgentProvider(ctx))
-    registry.registerLazy('codex', CODEX_RUNTIME_METADATA, () => loadCodexProvider(ctx))
-    registry.registerLazy('kimi', KIMI_RUNTIME_METADATA, () => loadKimiProvider(ctx))
-    registry.registerLazy('system-agent', SYSTEM_AGENT_RUNTIME_METADATA, () => loadSystemAgentProvider(ctx))
+    registry.registerLazy(ACP_RUNTIME_KIND, ACP_RUNTIME_METADATA, () => loadAcpProvider(ctx))
+    registry.registerLazy(STANDARD_RUNTIME_KIND, STANDARD_RUNTIME_METADATA, () => loadStandardProvider(ctx))
+    registry.registerLazy(OPENCODE_RUNTIME_KIND, OPENCODE_RUNTIME_METADATA, () => loadOpencodeProvider(ctx))
+    registry.registerLazy(CLAUDE_AGENT_RUNTIME_KIND, CLAUDE_AGENT_RUNTIME_METADATA, () => loadClaudeAgentProvider(ctx))
+    registry.registerLazy(CODEX_RUNTIME_KIND, CODEX_RUNTIME_METADATA, () => loadCodexProvider(ctx))
+    registry.registerLazy(KIMI_RUNTIME_KIND, KIMI_RUNTIME_METADATA, () => loadKimiProvider(ctx))
+    registry.registerLazy(SYSTEM_AGENT_RUNTIME_KIND, SYSTEM_AGENT_RUNTIME_METADATA, () => loadSystemAgentProvider(ctx))
   }
   return registry
 }
