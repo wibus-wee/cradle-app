@@ -17,8 +17,9 @@
 
 | Metric | Baseline (2026-11-25, dev Mac Studio) | Target |
 |---|---|---|
-| Server process RSS after boot, empty data dir | **370 MB** | **< 150 MB** |
-| Server boot → listening | TBD (measure in M0) | < 2 s |
+| Server process RSS after boot, empty data dir | **370 MB** → **288 MB** (M1.3) | **< 150 MB** |
+| Server boot → listening, empty data dir | 608ms → 541ms (M1.1) | < 2 s ✅ |
+| Server boot → listening, real 3.2GB data dir | **∞ (never listened)** → **531ms** (M1.5) | < 2 s ✅ |
 | Desktop cold start → interactive UI | TBD | < 4 s |
 | Packaged .app size | 471 MB (post-079, unreleased) | ≤ 471 MB, no regression |
 
@@ -87,9 +88,12 @@ Prime suspects, in order:
 - [x] M1.3 models.dev warmup deferred 10s post-listening + refresh results
   only retained once a consumer shows interest (`fb6d15ce`): measured idle+10s
   RSS **390MB → 288MB (-102MB)**. Boot time unchanged (boot never waited).
-- [ ] M1.4 defer non-critical services until after listening (observability
-  flush loops, warmers) — listening must not wait for them. Partially done:
-  models.dev warmup already deferred in M1.3.
+- [x] M1.4 defer non-critical services until after listening — maintenance
+  runOnStart now defers 5s past listen (`e13f2269`); recall reconcile moved
+  from synchronous boot into runOnStart maintenance (`3ca5ddc8`).
+- [x] M1.5 real-data boot path repair (added 2026-11-25, same day fixed):
+  backfill scan-once + maintenance-after-listen + recall off boot. Real
+  3.2GB database: never-listened → 531ms. Commits `e13f2269`, `3ca5ddc8`.
 - Verify: server RSS empty-boot, plus a dogfood-realistic boot (owner's data
   dir copy) — both numbers in the diff.
 
