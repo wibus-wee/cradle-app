@@ -125,8 +125,9 @@ export async function backfillMessageBlobs(
   let rowsSkipped = 0
   let cursorPayloadId = detail.cursorPayloadId
 
+  let candidates: string[]
   if (detail.candidatePayloadIds === undefined) {
-    const candidates = scanBackfillCandidates({
+    candidates = scanBackfillCandidates({
       minRowChars,
       maxPayloadIdAtStart,
     })
@@ -137,8 +138,9 @@ export async function backfillMessageBlobs(
     }
     persistSweepDetail(detail)
   }
-
-  const candidates = detail.candidatePayloadIds
+ else {
+    candidates = detail.candidatePayloadIds
+  }
   let candidateCursor = detail.candidateCursor ?? 0
 
   while (Date.now() < context.deadline) {
