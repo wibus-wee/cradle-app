@@ -595,7 +595,7 @@ export async function activateServerPlugins(
   app.use(createPluginRoutesElysia(staticServer))
 }
 
-function createPluginRoutesElysia(staticServer: ReturnType<typeof createPluginStaticServer>): Elysia {
+function createPluginRoutesElysia(staticServer: ReturnType<typeof createPluginStaticServer>) {
   return new Elysia({ prefix: '/api/plugins' })
     .get('/', () => staticServer.getPluginList())
     .get('/-/deps/:fileName', ({ params, set }) => {

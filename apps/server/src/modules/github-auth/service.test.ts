@@ -12,6 +12,10 @@ import { hasGitHubToken, resetGitHubTokenCache, resolveGitHubToken } from '../..
 import { resetCredentialLifecycleForTests } from '../provider-auth/credential-lifecycle'
 import { resetCredentialKeyringForTests } from '../secrets/service'
 import {
+  resetLocalGitHubCredentialCache,
+  setLocalGitHubCredentialProbeForTests,
+} from './local-credential'
+import {
   cancelGitHubDeviceLogin,
   disconnectGitHubApp,
   getGitHubAppConnection,
@@ -30,12 +34,20 @@ beforeEach(() => {
   dataDir = mkdtempSync(join(tmpdir(), 'cradle-github-auth-'))
   process.env.CRADLE_DATA_DIR = dataDir
   process.env.CRADLE_CREDENTIAL_SECRET = 'github-auth-test-secret'
+  delete process.env.GH_TOKEN
+  delete process.env.GITHUB_TOKEN
   initializeDatabase()
   setGitHubAuthProvider(resolveGitHubAppIdentity)
+  // Tests run on machines where the maintainer is signed into gh. Default to
+  // an isolated probe so connection projections stay deterministic; individual
+  // tests install their own probe.
+  setLocalGitHubCredentialProbeForTests(async () => ({ available: false, login: null, source: null }))
 })
 
 afterEach(() => {
   setGitHubAuthFetchForTests(null)
+  setLocalGitHubCredentialProbeForTests(null)
+  resetLocalGitHubCredentialCache()
   resetCredentialLifecycleForTests()
   resetGitHubAuthProviderForTests()
   resetGitHubTokenCache()
@@ -219,6 +231,19 @@ describe('gitHub App Device Flow', () => {
     expect(getGitHubDeviceLogin(start.loginId)).toMatchObject({ state: 'completed', error: null })
     expect(tokenRequests).toHaveLength(3)
     expect(tokenRequests.every(body => body.includes('client_id=Iv23liafSutKq8Ldqkog'))).toBe(true)
+  })
+
+  it('projects the ambient local credential without exposing the token', async () => {
+    setLocalGitHubCredentialProbeForTests(async () => ({ available: true, login: 'octocat', source: 'gh-cli' }))
+
+    const connection = await getGitHubAppConnection()
+    expect(connection.localCredential).toEqual({ available: true, login: 'octocat', source: 'gh-cli' })
+    expect(JSON.stringify(connection)).not.toContain('token')
+  })
+
+  it('projects an unavailable local credential when neither gh nor env tokens exist', async () => {
+    const connection = await getGitHubAppConnection()
+    expect(connection.localCredential).toEqual({ available: false, login: null, source: null })
   })
 
   it('expires an incomplete device authorization', async () => {

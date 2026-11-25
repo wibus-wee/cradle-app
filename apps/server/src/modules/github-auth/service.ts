@@ -9,6 +9,8 @@ import { outboundFetch } from '../../lib/outbound-network'
 import type { CredentialAuthDriver, CredentialLifecycleStore } from '../provider-auth/credential-lifecycle'
 import { resolveFreshAccessToken } from '../provider-auth/credential-lifecycle'
 import * as Secrets from '../secrets/service'
+import type { LocalGitHubCredentialProjection } from './local-credential'
+import { resolveLocalGitHubCredential } from './local-credential'
 
 const GITHUB_APP_CREDENTIAL_ID = 'system:github-app-user'
 const GITHUB_APP_CREDENTIAL_KIND = 'system-github-app-user'
@@ -103,6 +105,12 @@ export interface GitHubAppConnectionView {
   expiresAt: number | null
   refreshTokenExpiresAt: number | null
   error: string | null
+  /**
+   * Safe projection of the ambient local GitHub credential (gh CLI or env
+   * token). Never carries the token itself. GitHub-backed features can fall
+   * back to this credential when no App user is connected.
+   */
+  localCredential: LocalGitHubCredentialProjection
 }
 
 let fetchForTests: FetchLike | null = null
@@ -126,6 +134,7 @@ const githubCredentialStore: CredentialLifecycleStore = {
 
 export async function getGitHubAppConnection(): Promise<GitHubAppConnectionView> {
   const config = loadGitHubAppConfig()
+  const localCredential = await resolveLocalGitHubCredential()
   if (!config.clientId || !config.slug) {
     return {
       state: 'unconfigured',
@@ -136,6 +145,7 @@ export async function getGitHubAppConnection(): Promise<GitHubAppConnectionView>
       expiresAt: null,
       refreshTokenExpiresAt: null,
       error: 'GitHub App is not configured in this build.',
+      localCredential,
     }
   }
 
@@ -150,12 +160,13 @@ export async function getGitHubAppConnection(): Promise<GitHubAppConnectionView>
       expiresAt: pending.expiresAt,
       refreshTokenExpiresAt: null,
       error: null,
+      localCredential,
     }
   }
 
   let credential = readCredential()
   if (!credential) {
-    return baseConnection(config, 'disconnected')
+    return baseConnection(config, 'disconnected', localCredential)
   }
 
   if (needsRefresh(credential)) {
@@ -184,6 +195,7 @@ export async function getGitHubAppConnection(): Promise<GitHubAppConnectionView>
     error: expired
       ? 'Your GitHub connection has expired. Connect again to continue.'
       : credential.lastError,
+    localCredential,
   }
 }
 
@@ -519,7 +531,11 @@ function clearPendingLogins(): void {
   finishedLogins.clear()
 }
 
-function baseConnection(config: ReturnType<typeof loadGitHubAppConfig>, state: 'disconnected'): GitHubAppConnectionView {
+function baseConnection(
+  config: ReturnType<typeof loadGitHubAppConfig>,
+  state: 'disconnected',
+  localCredential: LocalGitHubCredentialProjection,
+): GitHubAppConnectionView {
   return {
     state,
     appName: config.name,
@@ -529,6 +545,7 @@ function baseConnection(config: ReturnType<typeof loadGitHubAppConfig>, state: '
     expiresAt: null,
     refreshTokenExpiresAt: null,
     error: null,
+    localCredential,
   }
 }
 

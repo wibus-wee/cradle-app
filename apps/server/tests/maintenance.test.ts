@@ -23,7 +23,9 @@ describe('maintenance scheduler', () => {
     })
 
     Maintenance.start()
-    await vi.waitFor(() => expect(run).toHaveBeenCalledOnce())
+    // runOnStart fires through a real 5s setTimeout deferred past app.listen —
+    // vi.waitFor's default 1s timeout can never observe it.
+    await vi.waitFor(() => expect(run).toHaveBeenCalledOnce(), { timeout: 10_000 })
     await vi.waitFor(() =>
       expect(BackgroundActivity.list()).toEqual([
         expect.objectContaining({
@@ -32,7 +34,7 @@ describe('maintenance scheduler', () => {
           status: 'succeeded',
           progress: { changed: 3, completed: true },
         }),
-      ]))
+      ]), { timeout: 10_000 })
   })
 
   it('single-flights interval and manual requests and stops future timers', async () => {

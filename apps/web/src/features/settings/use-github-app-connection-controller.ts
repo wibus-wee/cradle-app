@@ -29,7 +29,7 @@ function openExternal(url: string): void {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-export function useGithubAppConnectionController() {
+export function useGithubAppConnectionController(options: { pollWhileOpen?: boolean } = {}) {
   const { t } = useTranslation('settings')
   const queryClient = useQueryClient()
   const [pendingLogin, setPendingLogin] = useState<PostGithubAuthDeviceLoginResponse | null>(null)
@@ -39,6 +39,10 @@ export function useGithubAppConnectionController() {
       const { data } = await getGithubAuthConnection({ throwOnError: true })
       return data
     },
+    // While the required-feature dialog is open, keep probing so a gh CLI
+    // sign-in completed in the terminal unlocks the feature without a manual
+    // retry. The server-side probe is cached for 30s, so polling is cheap.
+    refetchInterval: options.pollWhileOpen ? 5000 : false,
   })
   const loginQuery = useQuery({
     queryKey: ['github-auth', 'device-login', pendingLogin?.loginId],
@@ -100,7 +104,14 @@ export function useGithubAppConnectionController() {
     loading: connectionQuery.isLoading,
     connecting: startMutation.isPending,
     disconnecting: disconnectMutation.isPending,
-    isConnected: connection?.state === 'connected' && connection.viewer !== null,
+    // Unlock tracks any usable GitHub identity: the connected App user or an
+    // ambient local credential (gh CLI / env token). The local fallback only
+    // counts when no App credential exists — an expired App connection fails
+    // closed server-side and must not be masked. The required-feature dialog
+    // closes itself once either usable identity appears.
+    isConnected: (connection?.state === 'connected' && connection.viewer !== null)
+      || ((connection?.state === 'disconnected' || connection?.state === 'unconfigured')
+        && connection?.localCredential?.available === true),
     labels: {
       title: t('githubApp.title'),
       description: t('githubApp.description'),
@@ -123,6 +134,11 @@ export function useGithubAppConnectionController() {
       expired: t('githubApp.expired'),
       unavailable: t('githubApp.unavailable'),
       pendingCode: t('githubApp.pendingCode'),
+      localCredentialActive: t('githubApp.localCredential.active'),
+      localCredentialActiveAnonymous: t('githubApp.localCredential.activeAnonymous'),
+      localCredentialActiveBadge: t('githubApp.localCredential.activeBadge'),
+      localCredentialUpgradeHint: t('githubApp.localCredential.upgradeHint'),
+      installDescriptionUpgrade: t('githubApp.install.descriptionUpgrade'),
     },
     onInstall: () => {
       if (connection?.installationUrl) {

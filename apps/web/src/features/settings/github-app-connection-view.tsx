@@ -1,3 +1,4 @@
+import { GithubFill as GithubIcon } from '@mingcute/react'
 import { useState } from 'react'
 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '~/components/ui/alert-dialog'
@@ -8,6 +9,12 @@ import { cn } from '~/lib/cn'
 
 import { SettingsGroup } from './settings-container'
 
+export interface GithubAppLocalCredential {
+  available: boolean
+  login: string | null
+  source: 'env' | 'gh-cli' | null
+}
+
 export interface GithubAppConnection {
   state: 'unconfigured' | 'disconnected' | 'pending' | 'connected' | 'expired' | 'error'
   appName: string | null
@@ -16,6 +23,7 @@ export interface GithubAppConnection {
   viewer: { login: string, avatarUrl: string | null, profileUrl: string | null } | null
   expiresAt: number | null
   error: string | null
+  localCredential: GithubAppLocalCredential
 }
 
 export interface GithubAppPendingLogin {
@@ -55,6 +63,11 @@ interface GithubAppConnectionViewProps {
     expired: string
     unavailable: string
     pendingCode: string
+    localCredentialActive: string
+    localCredentialActiveAnonymous: string
+    localCredentialActiveBadge: string
+    localCredentialUpgradeHint: string
+    installDescriptionUpgrade: string
   }
   onInstall: () => void
   onConnect: () => void
@@ -83,6 +96,13 @@ export function GithubAppConnectionView({
   const isPending = pendingLogin !== null
   const isConnected = state === 'connected' && viewer !== null
   const isRecoverable = state === 'expired' || state === 'error'
+  const localCredential = connection?.localCredential ?? null
+  // The ambient credential only actually backs GitHub operations when no App
+  // credential exists. An expired or errored App connection fails closed and
+  // requires reconnection, so the strip would overstate reality there.
+  const localActive = (state === 'disconnected' || state === 'unconfigured')
+    && !isPending
+    && localCredential?.available === true
 
   const body = loading
     ? (
@@ -128,10 +148,33 @@ export function GithubAppConnectionView({
           )
         : (
             <div className="flex flex-col gap-4 px-4 py-4">
+              {localActive && (
+                <div className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <GithubIcon className="size-4 shrink-0 text-foreground" aria-hidden="true" />
+                    <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
+                      {(localCredential?.login
+                        ? labels.localCredentialActive.replace('{{login}}', localCredential.login)
+                        : labels.localCredentialActiveAnonymous)}
+                    </p>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                      <span className="size-1 rounded-full bg-emerald-500" aria-hidden="true" />
+                      {labels.localCredentialActiveBadge}
+                    </span>
+                  </div>
+                  <p className="text-[12px] leading-relaxed text-muted-foreground">
+                    {labels.localCredentialUpgradeHint}
+                  </p>
+                </div>
+              )}
               <div className="space-y-1">
                 <p className="text-sm font-medium text-foreground">{state === 'unconfigured' ? labels.unavailable : labels.installTitle}</p>
                 <p className={cn('text-sm leading-relaxed text-muted-foreground', isRecoverable && 'text-destructive')}>
-                  {isRecoverable ? (connection?.error ?? labels.expired) : labels.installDescription}
+                  {isRecoverable
+                    ? (connection?.error ?? labels.expired)
+                    : localActive
+                      ? labels.installDescriptionUpgrade
+                      : labels.installDescription}
                 </p>
               </div>
               {state !== 'unconfigured' && (

@@ -3961,6 +3961,11 @@ export type GetGithubAuthConnectionResponses = {
         expiresAt: number | null;
         refreshTokenExpiresAt: number | null;
         error: string | null;
+        localCredential: {
+            available: boolean;
+            login: string | null;
+            source: 'env' | 'gh-cli' | null;
+        };
     };
 };
 
