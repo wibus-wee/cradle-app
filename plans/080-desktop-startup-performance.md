@@ -81,10 +81,11 @@ Prime suspects, in order:
 - [x] M1.1 `NODE_COMPILE_CACHE` wired in desktop server spawn
   (`server-process.ts`): measured boot **717ms → 541ms (-25%)** warm-cache.
   Cache keyed by node version so app updates invalidate cleanly.
-- [ ] M1.2 lazy-load provider implementations behind first-use (provider
-  registry keeps metadata eager, implementation lazy) — the big structural
-  lever, est. -100-150MB RSS. Includes splitting the runtime-snapshot
-  mega-chunk.
+- [x] M1.2 provider lazy loading — structural inversion merged
+  (`fd2e9d92`). runtime-snapshot mega-chunk 6.42MB → 2.82MB. Static boot
+  closure ~19.7MB → ~9.17MB. Boot-time utility hooks extracted (`3e544e5e`).
+  See `PROVIDER_LAZY_LOADING_REPORT.md`. Remaining RSS driver is background
+  services starting unconditionally at boot, not provider compilation.
 - [x] M1.3 models.dev warmup deferred 10s post-listening + refresh results
   only retained once a consumer shows interest (`fb6d15ce`): measured idle+10s
   RSS **390MB → 288MB (-102MB)**. Boot time unchanged (boot never waited).
