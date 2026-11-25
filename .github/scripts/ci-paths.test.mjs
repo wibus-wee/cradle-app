@@ -78,10 +78,13 @@ test('forced E2E uses current labels, and scheduled/manual suites remain uncondi
   assert.ok(daily.on.schedule)
   assert.ok(daily.on.workflow_dispatch)
   assert.equal(daily.jobs.e2e.if, undefined)
-  for (const [file, job] of [['deploy-web', 'deploy-web'], ['release-desktop', 'resolve']]) {
+  // deploy-web gates on build-web (deploy-web needs it); release-desktop gates on resolve.
+  for (const [file, job] of [['deploy-web', 'build-web'], ['release-desktop', 'resolve']]) {
     const workflow = readYaml(`../workflows/${file}.yml`)
     assert.ok(workflow.jobs[job].if.includes('github.event_name == \'workflow_dispatch\''))
     assert.equal(workflow.jobs.changes.steps.find(step => step.id === 'filter').with.base, '${{ github.event.before }}')
     if (file === 'release-desktop') { assert.ok(workflow.jobs[job].if.includes('github.ref_type == \'tag\'')) }
   }
+  // The deploy job itself must stay behind the gated build.
+  assert.ok(readYaml('../workflows/deploy-web.yml').jobs['deploy-web'].needs.includes('build-web'))
 })
