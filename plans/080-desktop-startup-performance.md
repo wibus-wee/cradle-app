@@ -84,10 +84,12 @@ Prime suspects, in order:
   registry keeps metadata eager, implementation lazy) — the big structural
   lever, est. -100-150MB RSS. Includes splitting the runtime-snapshot
   mega-chunk.
-- [ ] M1.3 models.dev registry parsed per-provider on demand (~8MB heap,
-  ~40ms boot CPU).
+- [x] M1.3 models.dev warmup deferred 10s post-listening + refresh results
+  only retained once a consumer shows interest (`fb6d15ce`): measured idle+10s
+  RSS **390MB → 288MB (-102MB)**. Boot time unchanged (boot never waited).
 - [ ] M1.4 defer non-critical services until after listening (observability
-  flush loops, warmers) — listening must not wait for them.
+  flush loops, warmers) — listening must not wait for them. Partially done:
+  models.dev warmup already deferred in M1.3.
 - Verify: server RSS empty-boot, plus a dogfood-realistic boot (owner's data
   dir copy) — both numbers in the diff.
 
@@ -102,14 +104,21 @@ Prime suspects, in order:
 - Spawn relayd only when a pairing/remote-access configuration exists or a
   mobile client has connected before. Default cold boot: no relayd.
 
-### M3b — Database retention (added 2026-11-25)
+### M3b — Database retention (added 2026-11-25) — PARTIAL DONE
 
-- chat_message_payloads (1.7GB in dogfood), recall_tool_events (428MB),
-  observability_events (159MB), backend_run_snapshot_events (108MB) grow
-  unbounded. Design age-based + size-based caps per table; blob payloads are
-  content-addressed so dedupe is free. observability_events need
-  aggregate-then-drop. Unbounded growth degrades boot recovery, migrations,
-  FTS, and disk — this is startup cost deferred, not a separate concern.
+- [x] recall_tool_events: 30-day age-based retention, cascade to
+  recall_file_touches, hourly deadline-bounded batches of 500 rows via
+  Maintenance (`3c468a13`). 6/6 tests.
+- [x] observability_events: 14-day age-based retention, same mechanism
+  (`3c468a13`).
+- [x] chat_message_payloads: blob-externalization backfill already exists
+  and self-drives at boot + hourly passes (5min cap, batch 50, resumable
+  cursor in database_maintenance_tasks). Verified complete: covers inline
+  base64, legacy truncated markers, and oversized tool payloads. Requires
+  post-completion VACUUM to reclaim disk.
+- [ ] diff_review_revisions (170MB): deferred — needs product decision on
+  revision retention semantics.
+- [ ] backend_run_snapshot_events (108MB, 75k rows): not yet addressed.
 
 ### M4 — Desktop/renderer path
 
@@ -121,6 +130,13 @@ Prime suspects, in order:
 
 - Cut a dev release so the owner actually runs the fixed build (last release
   predates Plan 079 entirely).
+- Finding (2026-11-25): pipeline is NOT broken. Every push to main produces
+  a bleeding-edge build in rolling `feed-bleeding-edge` (last updated
+  2026-11-24, all platforms green). But `dev-YYYYMMDD.N` releases require a
+  manual `dev-*` tag push — nobody has pushed one since 2026-09-10. The
+  rolling `feed-dev` update feed is stale since 2026-06-07, so dev-channel
+  installs never see updates. Needs: push a `dev-$(date +%Y%m%d).1` tag, or
+  decide if dev cadence should be automated.
 
 ## STOP conditions
 
