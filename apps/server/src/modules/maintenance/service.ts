@@ -33,6 +33,7 @@ interface MaintenanceTaskRecord {
 
 const DEFAULT_MAX_RUN_MS = 30_000
 const MAX_JITTER_MS = 5 * 60 * 1000
+const RUN_ON_START_DELAY_MS = 5_000
 const tasks = new Map<string, MaintenanceTaskRecord>()
 let started = false
 
@@ -110,14 +111,21 @@ export function reset(): void {
 
 function startTask(record: MaintenanceTaskRecord): void {
   if (record.descriptor.runOnStart) {
-    queueMicrotask(() => {
+    // runOnStart means "shortly after the server is up", not "before the
+    // listener binds". better-sqlite3 is synchronous — a heavy first pass
+    // (e.g. the chat-blob backfill scanning overflow pages on a multi-GB
+    // database) blocks the event loop wholesale, so even a microtask queued
+    // here would stall app.listen() for seconds or minutes. Defer past the
+    // listen callback; a few seconds are immaterial for hourly maintenance.
+    const timer = setTimeout(() => {
       if (
         started
         && tasks.get(taskId(record.descriptor.ownerNamespace, record.descriptor.key)) === record
       ) {
         void BackgroundActivity.requestRun(record.descriptor.ownerNamespace, record.descriptor.key)
       }
-    })
+    }, RUN_ON_START_DELAY_MS)
+    timer.unref()
   }
   scheduleNext(record)
 }

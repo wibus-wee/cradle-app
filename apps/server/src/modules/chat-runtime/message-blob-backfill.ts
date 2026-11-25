@@ -13,6 +13,7 @@ import {
   asc,
   eq,
   gt,
+  inArray,
   like,
   lte,
   max,
@@ -53,6 +54,15 @@ interface BackfillSweepDetail {
    * no backfill.
    */
   maxPayloadIdAtStart: string | null
+  /**
+   * Matching payload ids collected by the one-time candidate scan. The scan
+   * reads every overflow page of every row (~10s per GB) so it must run once
+   * per sweep, not once per batch — batch selection afterwards is a primary
+   * key lookup over this list.
+   */
+  candidatePayloadIds?: string[]
+  /** Index into candidatePayloadIds of the next unprocessed candidate. */
+  candidateCursor?: number
 }
 
 /**
@@ -115,12 +125,27 @@ export async function backfillMessageBlobs(
   let rowsSkipped = 0
   let cursorPayloadId = detail.cursorPayloadId
 
+  if (detail.candidatePayloadIds === undefined) {
+    const candidates = scanBackfillCandidates({
+      minRowChars,
+      maxPayloadIdAtStart,
+    })
+    detail = {
+      ...detail,
+      candidatePayloadIds: candidates,
+      candidateCursor: 0,
+    }
+    persistSweepDetail(detail)
+  }
+
+  const candidates = detail.candidatePayloadIds
+  let candidateCursor = detail.candidateCursor ?? 0
+
   while (Date.now() < context.deadline) {
     const batch = selectBackfillBatch({
       batchSize,
-      minRowChars,
-      cursorPayloadId,
-      maxPayloadIdAtStart,
+      candidatePayloadIds: candidates,
+      candidateCursor,
     })
     if (batch.length === 0) {
       completeBackfillTask({
@@ -137,6 +162,7 @@ export async function backfillMessageBlobs(
 
       rowsScanned += 1
       cursorPayloadId = row.payloadId
+      candidateCursor += 1
 
       let parsed: UIMessage
       try {
@@ -192,6 +218,8 @@ export async function backfillMessageBlobs(
     persistSweepDetail({
       cursorPayloadId,
       maxPayloadIdAtStart,
+      candidatePayloadIds: candidates,
+      candidateCursor,
     })
 
     context.report({
@@ -275,18 +303,16 @@ function shrinkLegacyTruncationMarkers(
   return changed ? { ...message, parts } : message
 }
 
-function selectBackfillBatch(input: {
-  batchSize: number
+/**
+ * One-time full scan collecting every payload id that matches the rewrite
+ * predicate. Reads all overflow pages of all rows up to the sweep bound —
+ * the cost the per-batch version paid repeatedly. Ids are ordered so batch
+ * processing stays deterministic.
+ */
+function scanBackfillCandidates(input: {
   minRowChars: number
-  cursorPayloadId: string
   maxPayloadIdAtStart: string
-}): Array<{
-  payloadId: string
-  sessionId: string
-  messageId: string
-  messageJson: string
-  errorText: string | null
-}> {
+}): string[] {
   const messageJsonLength = sql`length(${chatMessagePayloads.messageJson})`
   const matchPredicate = and(
     or(
@@ -297,11 +323,43 @@ function selectBackfillBatch(input: {
       like(chatMessagePayloads.messageJson, '%"type":"tool-%'),
     ),
     gt(messageJsonLength, input.minRowChars),
-    gt(chatMessagePayloads.id, input.cursorPayloadId),
     lte(chatMessagePayloads.id, input.maxPayloadIdAtStart),
   )
 
   return db()
+    .select({ payloadId: chatMessagePayloads.id })
+    .from(chatMessagePayloads)
+    .where(matchPredicate)
+    .orderBy(asc(chatMessagePayloads.id))
+    .all()
+    .map(row => row.payloadId)
+}
+
+/**
+ * Batch fetch by primary key over the pre-collected candidate ids. No LIKE
+ * or length() evaluation — overflow pages are read only for rows that will
+ * actually be rewritten in this batch.
+ */
+function selectBackfillBatch(input: {
+  batchSize: number
+  candidatePayloadIds: string[]
+  candidateCursor: number
+}): Array<{
+  payloadId: string
+  sessionId: string
+  messageId: string
+  messageJson: string
+  errorText: string | null
+}> {
+  const ids = input.candidatePayloadIds.slice(
+    input.candidateCursor,
+    input.candidateCursor + input.batchSize,
+  )
+  if (ids.length === 0) {
+    return []
+  }
+
+  const rows = db()
     .select({
       payloadId: chatMessagePayloads.id,
       sessionId: chatMessagePayloads.sessionId,
@@ -311,10 +369,11 @@ function selectBackfillBatch(input: {
     })
     .from(chatMessagePayloads)
     .innerJoin(messages, eq(messages.payloadId, chatMessagePayloads.id))
-    .where(matchPredicate)
+    .where(inArray(chatMessagePayloads.id, ids))
     .orderBy(asc(chatMessagePayloads.id))
-    .limit(input.batchSize)
     .all()
+
+  return rows
 }
 
 function ensureBackfillTask(): typeof databaseMaintenanceTasks.$inferSelect {

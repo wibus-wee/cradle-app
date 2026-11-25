@@ -6,12 +6,13 @@
  * Usage: node scripts/desktop-startup-baseline/measure-server-boot.mjs [runs=3]
  *
  * Requires apps/server/dist built (pnpm --filter @cradle/server build).
- * Uses a fresh empty data dir per run. Numbers are boot-upper-bound: the
- * harness measures with unbuilt plugins (activation errors are fast noise);
- * packaged reality may differ slightly.
+ * Uses a fresh empty data dir per run, unless CRADLE_BASELINE_DATA_DIR is
+ * set — then copies that directory as the seed (for real-data measurement).
+ * Numbers are boot-upper-bound: the harness measures with unbuilt plugins
+ * (activation errors are fast noise); packaged reality may differ slightly.
  */
 import { execSync, spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -32,6 +33,13 @@ function probePort(port, timeoutMs = 300) {
   })
 }
 
+function readCredentialSecretFile(dataDir) {
+  try {
+    return readFileSync(join(dataDir, 'credential-secret'), 'utf8').trim() || null
+  }
+ catch { return null }
+}
+
 function rssKb(pid) {
   try {
     const out = String(execSyncSafe(`ps -o rss= -p ${pid}`)).trim()
@@ -46,6 +54,12 @@ function execSyncSafe(cmd) {
 
 async function oneRun(idx) {
   const dataDir = mkdtempSync(join(tmpdir(), 'cradle-baseline-'))
+  const seedDir = process.env.CRADLE_BASELINE_DATA_DIR
+  if (seedDir) { cpSync(seedDir, dataDir, { recursive: true }) }
+  // Real-data seeds carry credentials encrypted with the instance key; the
+  // desktop passes it as env. Auto-load from the seed when present.
+  const credentialSecret = process.env.CRADLE_CREDENTIAL_SECRET
+    ?? readCredentialSecretFile(dataDir)
   const t0 = performance.now()
   const child = spawn('node', ['dist/main.js'], {
     cwd: join(ROOT, 'apps/server'),
@@ -54,6 +68,7 @@ async function oneRun(idx) {
       CRADLE_DATA_DIR: dataDir,
       CRADLE_MIGRATIONS_DIR: join(ROOT, 'packages/db/drizzle'),
       CRADLE_OTEL_ENABLED: '0',
+      ...(credentialSecret ? { CRADLE_CREDENTIAL_SECRET: credentialSecret } : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
   })
